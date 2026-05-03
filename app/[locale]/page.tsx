@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { FeatureRow } from "@/components/feature-row";
+import { HeroSplit } from "@/components/hero-split";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
@@ -27,9 +28,11 @@ export default async function Home({ params }: HomeProps) {
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
       <TitleBar currentLocale={locale} title={dictionary.hero.eyebrow} />
-      <div className="flex-1" />
-      <FeatureRow />
-      <SiteFooter />
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
+        <HeroSplit />
+        <FeatureRow />
+        <SiteFooter />
+      </div>
     </main>
   );
 }
