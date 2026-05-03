@@ -1,0 +1,16 @@
+name: healthspan
+services:
+  - name: web
+    source_dir: /
+    github:
+      repo: REPLACE_WITH_YOUR_GITHUB_ORG/healthspan
+      branch: main
+      deploy_on_push: true
+    build_command: npm run build
+    run_command: npm run start
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    http_port: 3000
+    routes:
+      - path: /
