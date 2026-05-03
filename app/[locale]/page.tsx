@@ -29,7 +29,15 @@ export default async function Home({ params }: HomeProps) {
     <main className="flex min-h-screen flex-col bg-background text-foreground">
       <TitleBar currentLocale={locale} title={dictionary.hero.eyebrow} />
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
-        <HeroSplit />
+        <HeroSplit
+          cta={dictionary.hero.cta}
+          eyebrow={dictionary.hero.eyebrow}
+          headline={dictionary.hero.subtitle}
+          headlineAccent={dictionary.hero.subtitleAccent}
+          headlineMuted={dictionary.hero.subtitleMuted}
+          subheadline={dictionary.hero.followOn}
+          subheadlineAccent={dictionary.hero.followOnAccent}
+        />
         <FeatureRow />
         <SiteFooter />
       </div>

@@ -17,9 +17,12 @@ const en = {
   hero: {
     eyebrow: "Healthspan",
     title: "Hello",
-    subtitle:
-      "We create personalized, science-backed supplement protocols built specifically for your goals — with the right supplements at the exact dose your body needs.",
-    followOn: "No guesswork, bespoke nutrition",
+    subtitle: "Know exactly what your body needs",
+    subtitleAccent: "your body needs",
+    subtitleMuted: "no guesswork",
+    followOn:
+      "AI powered plans for supplements, sleep, nutrition and more - Tailored to YOU",
+    followOnAccent: "YOU",
     cta: "Design your future health",
     stack: "Next.js · TypeScript · Tailwind"
   }
@@ -37,8 +40,12 @@ const dictionaries: Record<Locale, Dictionary> = {
     hero: {
       eyebrow: "Healthspan",
       title: "Hola mundo.",
-      subtitle: "Un lienzo limpio de Next.js para la experiencia Healthspan.",
-      followOn: "",
+      subtitle: "Sepa exactamente lo que su cuerpo necesita",
+      subtitleAccent: "su cuerpo necesita",
+      subtitleMuted: "sin conjeturas",
+      followOn:
+        "Planes con IA para suplementos, sueño, nutrición y más - adaptados a TI",
+      followOnAccent: "TI",
       cta: "Listo para desplegar",
       stack: "Next.js · TypeScript · Tailwind"
     }
@@ -52,9 +59,12 @@ const dictionaries: Record<Locale, Dictionary> = {
     hero: {
       eyebrow: "Healthspan",
       title: "Hello",
-      subtitle:
-        "เราสร้างโปรโตคอลอาหารเสริมเฉพาะบุคคลที่อิงหลักวิทยาศาสตร์ เพื่อเป้าหมายของคุณโดยเฉพาะ พร้อมอาหารเสริมที่เหมาะสมในปริมาณที่ร่างกายต้องการ",
-      followOn: "ไม่ต้องเดา โภชนาการที่ออกแบบเฉพาะคุณ",
+      subtitle: "รู้ชัดว่าร่างกายของคุณต้องการอะไร",
+      subtitleAccent: "ร่างกายของคุณต้องการอะไร",
+      subtitleMuted: "ไม่ต้องเดา",
+      followOn:
+        "แผนด้วย AI สำหรับอาหารเสริม การนอนหลับ โภชนาการ และอื่นๆ - ออกแบบเพื่อคุณ",
+      followOnAccent: "คุณ",
       cta: "ออกแบบสุขภาพอนาคตของคุณ",
       stack: "Next.js · TypeScript · Tailwind"
     }
