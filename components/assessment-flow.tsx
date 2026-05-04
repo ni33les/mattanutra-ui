@@ -38,9 +38,16 @@ type Copy = Readonly<{
     ageOptions: Option[];
     build: string;
     buildOptions: Option[];
+    country: string;
+    countryOptions: Option[];
+    height: string;
+    name: string;
     sex: string;
     sexOptions: Option[];
+    skin: string;
+    skinOptions: Option[];
     title: string;
+    weight: string;
   };
   badges: string[];
   common: {
@@ -82,6 +89,10 @@ type Copy = Readonly<{
     toggle: string;
   };
   lifestyle: {
+    alcohol: string;
+    alcoholOptions: Option[];
+    coffee: string;
+    coffeeOptions: Option[];
     diet: string;
     dietOptions: Option[];
     fish: string;
@@ -93,23 +104,38 @@ type Copy = Readonly<{
     medType: string;
     medTypeOptions: Option[];
     medsOptions: Option[];
+    smoke: string;
+    smokeOptions: Option[];
+    supps: string;
+    suppsOptions: Option[];
     sun: string;
     sunOptions: Option[];
     title: string;
   };
   precision: {
+    family: string;
+    familyOptions: Option[];
     gut: string;
     gutOptions: Option[];
     helper: string;
     labs: string;
     labFields: LabField[];
-    region: string;
-    regionOptions: Option[];
+    protein: string;
+    proteinOptions: Option[];
     sleep: string;
     sleepOptions: ScaleOption[];
     stress: string;
     stressOptions: ScaleOption[];
+    stressSource: string;
+    stressSourceOptions: Option[];
     title: string;
+    vo2Known: string;
+    vo2KnownOptions: Option[];
+    vo2Max: string;
+    vo2Proxy: string;
+    vo2ProxyOptions: Option[];
+    wearable: string;
+    wearableOptions: Option[];
   };
   preferences: {
     budget: string;
@@ -125,7 +151,14 @@ type Copy = Readonly<{
     start: string;
     status: (done: number, total: number) => string;
   };
+  sleepBasics: {
+    average: string;
+    options: Option[];
+    title: string;
+  };
   symptoms: {
+    energy: string;
+    energyOptions: ScaleOption[];
     great: Option;
     hint: string;
     options: Option[];
@@ -141,39 +174,64 @@ type Copy = Readonly<{
 
 type Answers = {
   activity: string;
+  alcohol: string;
   age: string;
   budget: string;
   build: string;
+  coffee: string;
   conditions: string[];
+  country: string;
   diet: string;
+  energy: string;
+  family: string[];
   fish: string;
   feelGreat: boolean;
   form: string;
   goals: string[];
   gut: string;
+  heightCm: string;
   labs: Record<string, string>;
   lifestage: string;
   meds: string;
   medTypes: string[];
+  name: string;
   notes: string;
   pills: string;
-  region: string;
+  protein: string;
   sex: string;
+  skin: string;
   sleep: string;
+  sleepHours: string;
+  smoke: string;
   stress: string;
+  stressSource: string;
   sun: string;
+  supps: string;
   symptoms: string[];
+  vo2Known: string;
+  vo2Max: string;
+  vo2Proxy: string;
+  wearable: string;
+  weightKg: string;
 };
 
 const requiredGroups = [
+  "name",
   "sex",
   "age",
+  "heightCm",
+  "weightKg",
+  "skin",
+  "country",
+  "sun",
   "activity",
   "goals",
   "symptoms",
+  "sleepHours",
   "diet",
   "fish",
-  "sun",
+  "smoke",
+  "alcohol",
   "meds",
   "budget",
   "pills"
@@ -181,51 +239,103 @@ const requiredGroups = [
 
 const initialAnswers: Answers = {
   activity: "",
+  alcohol: "",
   age: "",
   budget: "",
   build: "",
+  coffee: "",
   conditions: [],
+  country: "TH",
   diet: "",
+  energy: "",
+  family: [],
   fish: "",
   feelGreat: false,
   form: "",
   goals: [],
   gut: "",
+  heightCm: "170",
   labs: {},
   lifestage: "",
   meds: "",
   medTypes: [],
+  name: "",
   notes: "",
   pills: "",
-  region: "",
+  protein: "",
   sex: "",
+  skin: "",
   sleep: "",
+  sleepHours: "",
+  smoke: "",
   stress: "",
+  stressSource: "",
   sun: "",
-  symptoms: []
+  supps: "",
+  symptoms: [],
+  vo2Known: "",
+  vo2Max: "",
+  vo2Proxy: "",
+  wearable: "",
+  weightKg: "70"
 };
 
 const en: Copy = {
   about: {
     title: "About you",
-    sex: "I am",
+    name: "First name",
+    sex: "Sex",
     sexOptions: [
       { label: "Male", value: "male" },
       { label: "Female", value: "female" }
     ],
-    age: "My age",
+    age: "Age",
     ageOptions: [
-      { label: "18-30", value: "18-30" },
-      { label: "31-45", value: "31-45" },
-      { label: "46-60", value: "46-60" },
-      { label: "61+", value: "61+" }
+      { label: "18-25", value: "18-25" },
+      { label: "26-35", value: "26-35" },
+      { label: "36-45", value: "36-45" },
+      { label: "46-55", value: "46-55" },
+      { label: "56-65", value: "56-65" },
+      { label: "66+", value: "66+" }
     ],
-    activity: "How active am I?",
+    height: "Height",
+    weight: "Weight",
+    skin: "Skin tone",
+    skinOptions: [
+      { label: "Skin tone 1", value: "I" },
+      { label: "Skin tone 2", value: "II" },
+      { label: "Skin tone 3", value: "III" },
+      { label: "Skin tone 4", value: "IV" },
+      { label: "Skin tone 5", value: "V" },
+      { label: "Skin tone 6", value: "VI" }
+    ],
+    country: "Country",
+    countryOptions: [
+      { label: "Thailand", value: "TH" },
+      { label: "Singapore", value: "SG" },
+      { label: "Malaysia", value: "MY" },
+      { label: "Indonesia", value: "ID" },
+      { label: "Philippines", value: "PH" },
+      { label: "Vietnam", value: "VN" },
+      { label: "Myanmar", value: "MM" },
+      { label: "United States", value: "US" },
+      { label: "Australia", value: "AU" },
+      { label: "United Kingdom", value: "GB" },
+      { label: "Canada", value: "CA" },
+      { label: "Germany", value: "DE" },
+      { label: "France", value: "FR" },
+      { label: "Japan", value: "JP" },
+      { label: "South Korea", value: "KR" },
+      { label: "India", value: "IN" },
+      { label: "China", value: "CN" },
+      { label: "Other", value: "OTHER" }
+    ],
+    activity: "Activity level",
     activityOptions: [
-      { label: "Barely active", value: "inactive" },
+      { label: "Mostly sitting", value: "sedentary" },
       { label: "Light", value: "light" },
       { label: "Moderate", value: "moderate" },
-      { label: "Very active", value: "active" },
+      { label: "Active", value: "active" },
       { label: "Athlete", value: "athlete" }
     ],
     build: "My current build",
@@ -267,27 +377,27 @@ const en: Copy = {
   },
   fixedAction: {
     complete: "All essentials answered - ready to generate.",
-    generate: "Generate my formulation brief",
+    generate: "Generate my formula brief",
     remaining: (count) =>
       `${count} required question${count === 1 ? "" : "s"} remaining`
   },
   goals: {
-    title: "My number one priority",
-    prompt: "What do I want most?",
+    title: "Goals",
+    prompt: "Primary health goals",
     hint: "Pick up to 3",
     options: [
-      { label: "Live longer", value: "longevity" },
       { label: "More energy", value: "energy" },
-      { label: "Think clearer", value: "brain" },
-      { label: "Sleep better", value: "sleep" },
-      { label: "Build muscle", value: "muscle" },
-      { label: "Less stress", value: "stress" },
-      { label: "Gut health", value: "gut" },
-      { label: "Manage weight", value: "weight" },
-      { label: "Immunity", value: "immunity" },
-      { label: "Hormones", value: "hormones" },
-      { label: "Joints", value: "joints" },
-      { label: "Skin and hair", value: "skin" }
+      { label: "Better sleep", value: "sleep" },
+      { label: "Brain / focus", value: "focus" },
+      { label: "Longevity", value: "longevity" },
+      { label: "Immunity", value: "immune" },
+      { label: "Fitness / VO2", value: "fitness" },
+      { label: "Weight loss", value: "weight" },
+      { label: "Mood / calm", value: "mood" },
+      { label: "Heart health", value: "heart" },
+      { label: "Joints / bones", value: "joints" },
+      { label: "Skin / hair", value: "skin" },
+      { label: "Hormones", value: "hormones" }
     ]
   },
   hero: {
@@ -303,48 +413,81 @@ const en: Copy = {
     toggle: "Send me monthly formulation updates"
   },
   lifestyle: {
-    title: "My lifestyle",
-    diet: "My diet",
+    title: "Food, drinks, and habits",
+    diet: "Diet pattern",
     dietOptions: [
-      { label: "Omnivore", value: "omnivore" },
-      { label: "Pescatarian", value: "pescatarian" },
-      { label: "Vegetarian", value: "vegetarian" },
+      { label: "None", value: "none" },
+      { label: "Processed", value: "western" },
+      { label: "Balanced", value: "balanced" },
+      { label: "Whole foods", value: "whole" },
+      { label: "Mediterranean", value: "mediterranean" },
+      { label: "Plant-based", value: "plant" },
       { label: "Vegan", value: "vegan" },
-      { label: "Keto / carnivore", value: "keto" }
+      { label: "Carnivore", value: "keto" }
     ],
-    fish: "Fatty fish such as salmon, sardines, or mackerel",
+    fish: "Fatty fish / week",
     fishOptions: [
-      { label: "Daily", value: "daily" },
-      { label: "2-3x / week", value: "2-3pw" },
-      { label: "Once / week", value: "weekly" },
+      { label: "Never", value: "never" },
       { label: "Rarely", value: "rarely" },
-      { label: "Never", value: "never" }
+      { label: "Once", value: "weekly" },
+      { label: "Often", value: "2-3pw" },
+      { label: "Daily", value: "daily" }
     ],
-    sun: "Daily sun exposure on skin",
+    sun: "Sun exposure (min)",
     sunOptions: [
-      { label: "60+ min", value: "high" },
-      { label: "30-60 min", value: "moderate" },
-      { label: "15-30 min", value: "low" },
-      { label: "Under 15 min", value: "minimal" }
+      { label: "Under 15", value: "minimal" },
+      { label: "15-30", value: "low" },
+      { label: "30-60", value: "moderate" },
+      { label: "60+", value: "high" }
     ],
-    meds: "Regular medications?",
+    smoke: "Smoking",
+    smokeOptions: [
+      { label: "Never", value: "never" },
+      { label: "Ex (>5 yrs)", value: "exlong" },
+      { label: "Ex (<5 yrs)", value: "exrecent" },
+      { label: "Occasional", value: "occasional" },
+      { label: "Daily", value: "daily" }
+    ],
+    alcohol: "Alcoholic drinks / week",
+    alcoholOptions: [
+      { label: "None", value: "none" },
+      { label: "1-3", value: "low" },
+      { label: "4-7", value: "moderate" },
+      { label: "8+", value: "high" }
+    ],
+    coffee: "Caffeine cups per day",
+    coffeeOptions: [
+      { label: "None", value: "none" },
+      { label: "1", value: "1" },
+      { label: "2-3", value: "2-3" },
+      { label: "4+", value: "4+" }
+    ],
+    meds: "Medications?",
     medsHint:
-      "This is important for safety. We use it to flag items for review, not to diagnose.",
+      "Used for safety checks only.",
     medsOptions: [
-      { label: "Yes", value: "yes" },
-      { label: "None", value: "no" }
+      { label: "None", value: "no" },
+      { label: "Yes", value: "yes" }
     ],
-    medType: "Which type or types?",
+    medType: "Medication type(s)",
     medTypeOptions: [
       { label: "Statin", value: "statin" },
       { label: "Metformin", value: "metformin" },
-      { label: "PPI / acid reflux", value: "ppi" },
+      { label: "PPI / Omeprazole", value: "ppi" },
       { label: "Contraceptive pill", value: "ocp" },
-      { label: "Mood or anxiety medication", value: "mood" },
+      { label: "Antidepressant", value: "antidepressant" },
       { label: "Blood thinner / aspirin", value: "blood-thinner" },
       { label: "Thyroid medication", value: "thyroid" },
       { label: "Blood pressure", value: "bp" },
+      { label: "Corticosteroid", value: "steroid" },
       { label: "Other", value: "other" }
+    ],
+    supps: "Supplements?",
+    suppsOptions: [
+      { label: "None", value: "none" },
+      { label: "Basic multi", value: "basic" },
+      { label: "D3 / Omega-3", value: "several" },
+      { label: "Several targeted", value: "many" }
     ],
     lifestage: "My hormonal stage",
     lifestageOptions: [
@@ -358,7 +501,23 @@ const en: Copy = {
     title: "Precision boost",
     helper:
       "Optional. Answer any or all. These details can sharpen your formulation brief.",
-    sleep: "How do I sleep?",
+    family: "Family history",
+    familyOptions: [
+      { label: "Heart disease", value: "heart" },
+      { label: "Alzheimer's", value: "alzheimer" },
+      { label: "Diabetes", value: "diabetes" },
+      { label: "Cancer", value: "cancer" },
+      { label: "Osteoporosis", value: "bones" },
+      { label: "None / unknown", value: "none" }
+    ],
+    protein: "Protein / day",
+    proteinOptions: [
+      { label: "Under 1g / kg", value: "low" },
+      { label: "1-1.5g / kg", value: "mid" },
+      { label: "1.5-2g / kg", value: "good" },
+      { label: "Over 2g / kg", value: "high" }
+    ],
+    sleep: "Wake refreshed?",
     sleepOptions: [
       { label: "Awful", value: "1", tone: "Low" },
       { label: "Poor", value: "2", tone: "Low" },
@@ -366,51 +525,82 @@ const en: Copy = {
       { label: "Good", value: "4", tone: "High" },
       { label: "Great", value: "5", tone: "High" }
     ],
-    stress: "My daily stress",
+    stress: "Stress level",
     stressOptions: [
       { label: "Very low", value: "1", tone: "Low" },
       { label: "Low", value: "2", tone: "Low" },
       { label: "Moderate", value: "3", tone: "Mid" },
       { label: "High", value: "4", tone: "High" },
-      { label: "Very high", value: "5", tone: "High" }
+      { label: "Extreme", value: "5", tone: "High" }
     ],
-    gut: "My digestion is",
+    stressSource: "Stress source",
+    stressSourceOptions: [
+      { label: "None", value: "none" },
+      { label: "Work", value: "work" },
+      { label: "Anxiety", value: "anxiety" },
+      { label: "Burnout", value: "burnout" },
+      { label: "Health", value: "health" },
+      { label: "Life events", value: "life" }
+    ],
+    gut: "Digestion",
     gutOptions: [
       { label: "No issues", value: "great" },
-      { label: "Often bloated", value: "bloat" },
+      { label: "Bloating", value: "bloat" },
       { label: "Constipation", value: "constipation" },
       { label: "Loose stools", value: "loose" },
-      { label: "Alternating", value: "mixed" }
+      { label: "IBS / mixed", value: "ibs" }
     ],
-    region: "My region / climate",
-    regionOptions: [
-      { label: "Tropical / SE Asia", value: "tropical" },
-      { label: "Subtropical", value: "subtropical" },
-      { label: "Temperate", value: "temperate" },
-      { label: "Northern Europe / Canada", value: "northern" }
+    wearable: "Fitness tracker?",
+    wearableOptions: [
+      { label: "No wearable", value: "none" },
+      { label: "Garmin", value: "garmin" },
+      { label: "Oura", value: "oura" },
+      { label: "WHOOP", value: "whoop" },
+      { label: "Apple Watch", value: "apple" },
+      { label: "Fitbit", value: "fitbit" },
+      { label: "Other", value: "other" }
+    ],
+    vo2Known: "Know your VO2 max?",
+    vo2KnownOptions: [
+      { label: "No, estimate it", value: "no" },
+      { label: "Yes", value: "yes" }
+    ],
+    vo2Max: "VO2 max",
+    vo2Proxy: "Cardio fitness",
+    vo2ProxyOptions: [
+      { label: "Winded on stairs", value: "winded" },
+      { label: "Brisk walk is hard", value: "moderate" },
+      { label: "20-30 min moderate", value: "sustained" },
+      { label: "30+ min hard effort", value: "athlete" }
     ],
     labs: "My lab values, if I know them",
     labFields: [
       {
         label: "Vitamin D",
         value: "vitaminD",
-        placeholder: "e.g. 35",
+        placeholder: "",
         hint: "ng/mL"
       },
-      { label: "Vitamin B12", value: "b12", placeholder: "e.g. 450", hint: "pg/mL" },
-      { label: "Ferritin", value: "ferritin", placeholder: "e.g. 80", hint: "ng/mL" },
-      { label: "HbA1c", value: "hba1c", placeholder: "e.g. 5.4", hint: "%" },
+      { label: "Vitamin B12", value: "b12", placeholder: "", hint: "pg/mL" },
+      { label: "Ferritin", value: "ferritin", placeholder: "", hint: "ng/mL" },
+      { label: "HbA1c", value: "hba1c", placeholder: "", hint: "%" },
       {
         label: "Omega-3 Index",
         value: "omega3",
-        placeholder: "e.g. 5.0",
+        placeholder: "",
         hint: "%"
       },
       {
         label: "Homocysteine",
         value: "homocysteine",
-        placeholder: "e.g. 9.0",
+        placeholder: "",
         hint: "umol/L"
+      },
+      {
+        label: "Average HRV",
+        value: "hrv",
+        placeholder: "",
+        hint: "ms"
       }
     ]
   },
@@ -418,10 +608,10 @@ const en: Copy = {
     title: "My preferences",
     budget: "Monthly supplement budget",
     budgetOptions: [
-      { label: "Under $30", value: "low" },
-      { label: "$30-70", value: "mid" },
-      { label: "$70-150", value: "good" },
-      { label: "$150+", value: "high" }
+      { label: "Under ฿1,000", value: "low" },
+      { label: "฿1,000-2,500", value: "mid" },
+      { label: "฿2,500-5,000", value: "good" },
+      { label: "฿5,000+", value: "high" }
     ],
     pills: "Max pills / capsules per day",
     pillsOptions: [
@@ -443,23 +633,43 @@ const en: Copy = {
     complete: "All essentials complete",
     status: (done, total) => `${done} of ${total} essentials answered`
   },
-  symptoms: {
-    title: "How am I feeling?",
-    prompt: "Select all that apply",
-    hint: "Tap any that match you",
-    great: { label: "I feel great", value: "great" },
+  sleepBasics: {
+    title: "Sleep, energy, and activity",
+    average: "Sleep (hours)",
     options: [
-      { label: "Always tired", value: "tired" },
-      { label: "Brain fog", value: "fog" },
-      { label: "Stressed out", value: "stress" },
-      { label: "Poor sleep", value: "bad-sleep" },
-      { label: "Joint discomfort", value: "joints" },
-      { label: "Gut issues", value: "gut" },
-      { label: "Low mood", value: "mood" },
-      { label: "Get sick often", value: "sick" },
-      { label: "Hair / skin", value: "hair-skin" },
+      { label: "Under 5", value: "under-5" },
+      { label: "5-6", value: "5-6" },
+      { label: "6-7", value: "6-7" },
+      { label: "7-8", value: "7-8" },
+      { label: "8-9", value: "8-9" },
+      { label: "9+", value: "9-plus" }
+    ]
+  },
+  symptoms: {
+    title: "Symptoms",
+    prompt: "Current symptoms",
+    hint: "Select all that apply",
+    great: { label: "Feeling great", value: "great" },
+    options: [
+      { label: "Fatigue", value: "fatigue" },
+      { label: "Brain fog", value: "brain" },
+      { label: "Mood", value: "mood" },
+      { label: "Joint pain", value: "joints" },
+      { label: "Digestion", value: "digestion" },
+      { label: "Poor sleep", value: "sleep" },
+      { label: "Stress / anxiety", value: "stress" },
+      { label: "Skin", value: "skin" },
+      { label: "Hair loss", value: "hair" },
       { label: "Low libido", value: "libido" },
-      { label: "Weight gain", value: "weight" }
+      { label: "Frequent colds", value: "cold" }
+    ],
+    energy: "Energy level",
+    energyOptions: [
+      { label: "Drained", value: "1", tone: "Low" },
+      { label: "Low", value: "2", tone: "Low" },
+      { label: "OK", value: "3", tone: "Mid" },
+      { label: "Good", value: "4", tone: "High" },
+      { label: "Excellent", value: "5", tone: "High" }
     ]
   },
   thankYou: {
@@ -486,20 +696,47 @@ const en: Copy = {
 const th: Copy = {
   ...en,
   about: {
+    ...en.about,
     title: "เกี่ยวกับคุณ",
-    sex: "ฉันคือ",
+    name: "ชื่อจริง",
+    sex: "เพศ",
     sexOptions: [
       { label: "ชาย", value: "male" },
       { label: "หญิง", value: "female" }
     ],
-    age: "อายุของฉัน",
+    age: "อายุ",
     ageOptions: en.about.ageOptions,
-    activity: "ฉันออกกำลังกายมากแค่ไหน?",
+    height: "ส่วนสูง",
+    weight: "น้ำหนัก",
+    skin: "สีผิว",
+    skinOptions: en.about.skinOptions,
+    country: "ประเทศ",
+    countryOptions: [
+      { label: "ไทย", value: "TH" },
+      { label: "สิงคโปร์", value: "SG" },
+      { label: "มาเลเซีย", value: "MY" },
+      { label: "อินโดนีเซีย", value: "ID" },
+      { label: "ฟิลิปปินส์", value: "PH" },
+      { label: "เวียดนาม", value: "VN" },
+      { label: "เมียนมา", value: "MM" },
+      { label: "สหรัฐอเมริกา", value: "US" },
+      { label: "ออสเตรเลีย", value: "AU" },
+      { label: "สหราชอาณาจักร", value: "GB" },
+      { label: "แคนาดา", value: "CA" },
+      { label: "เยอรมนี", value: "DE" },
+      { label: "ฝรั่งเศส", value: "FR" },
+      { label: "ญี่ปุ่น", value: "JP" },
+      { label: "เกาหลีใต้", value: "KR" },
+      { label: "อินเดีย", value: "IN" },
+      { label: "จีน", value: "CN" },
+      { label: "อื่นๆ", value: "OTHER" }
+    ],
+    activity: "ระดับกิจกรรม",
     activityOptions: [
-      { label: "แทบไม่ออกกำลัง", value: "inactive" },
-      { label: "เบาๆ", value: "light" },
+      { label: "นั่งเป็นส่วนใหญ่", value: "sedentary" },
+      { label: "เบา", value: "light" },
       { label: "ปานกลาง", value: "moderate" },
-      { label: "กระฉับกระเฉงมาก", value: "active" },
+      { label: "แอคทีฟ", value: "active" },
       { label: "นักกีฬา", value: "athlete" }
     ],
     build: "รูปร่างปัจจุบันของฉัน",
@@ -545,22 +782,22 @@ const th: Copy = {
     remaining: (count) => `เหลือคำถามจำเป็น ${count} ข้อ`
   },
   goals: {
-    title: "เป้าหมายอันดับหนึ่งของฉัน",
-    prompt: "ฉันต้องการอะไรมากที่สุด?",
+    title: "เป้าหมาย",
+    prompt: "เป้าหมายสุขภาพหลัก",
     hint: "เลือกได้สูงสุด 3 ข้อ",
     options: [
-      { label: "อายุยืนขึ้น", value: "longevity" },
       { label: "พลังงานมากขึ้น", value: "energy" },
-      { label: "คิดได้ชัดขึ้น", value: "brain" },
       { label: "นอนหลับดีขึ้น", value: "sleep" },
-      { label: "สร้างกล้ามเนื้อ", value: "muscle" },
-      { label: "เครียดน้อยลง", value: "stress" },
-      { label: "สุขภาพลำไส้", value: "gut" },
-      { label: "จัดการน้ำหนัก", value: "weight" },
-      { label: "ภูมิคุ้มกัน", value: "immunity" },
-      { label: "ฮอร์โมน", value: "hormones" },
-      { label: "ข้อต่อ", value: "joints" },
-      { label: "ผิวและผม", value: "skin" }
+      { label: "สมองและสมาธิ", value: "focus" },
+      { label: "อายุยืน", value: "longevity" },
+      { label: "สุขภาพภูมิคุ้มกัน", value: "immune" },
+      { label: "ฟิตเนสและ VO2", value: "fitness" },
+      { label: "ลดน้ำหนัก", value: "weight" },
+      { label: "อารมณ์และความสงบ", value: "mood" },
+      { label: "สุขภาพหัวใจ", value: "heart" },
+      { label: "ข้อต่อและกระดูก", value: "joints" },
+      { label: "ผิวและผม", value: "skin" },
+      { label: "สมดุลฮอร์โมน", value: "hormones" }
     ]
   },
   hero: {
@@ -577,48 +814,80 @@ const th: Copy = {
   },
   lifestyle: {
     ...en.lifestyle,
-    title: "ไลฟ์สไตล์ของฉัน",
-    diet: "รูปแบบอาหารของฉัน",
+    title: "อาหาร เครื่องดื่ม และพฤติกรรม",
+    diet: "รูปแบบอาหาร",
     dietOptions: [
-      { label: "กินได้หลากหลาย", value: "omnivore" },
-      { label: "กินปลา", value: "pescatarian" },
-      { label: "มังสวิรัติ", value: "vegetarian" },
+      { label: "ไม่มี", value: "none" },
+      { label: "แปรรูป", value: "western" },
+      { label: "สมดุล", value: "balanced" },
+      { label: "อาหารธรรมชาติ", value: "whole" },
+      { label: "เมดิเตอร์เรเนียน", value: "mediterranean" },
+      { label: "เน้นพืช", value: "plant" },
       { label: "วีแกน", value: "vegan" },
-      { label: "คีโต / คาร์นิวอร์", value: "keto" }
+      { label: "คาร์นิวอร์", value: "keto" }
     ],
-    fish: "ปลาที่มีไขมันดี เช่น แซลมอน ซาร์ดีน หรือแมคเคอเรล",
+    fish: "ปลามัน / สัปดาห์",
     fishOptions: [
-      { label: "ทุกวัน", value: "daily" },
-      { label: "2-3 ครั้ง / สัปดาห์", value: "2-3pw" },
-      { label: "สัปดาห์ละครั้ง", value: "weekly" },
+      { label: "ไม่เคย", value: "never" },
       { label: "นานๆ ครั้ง", value: "rarely" },
-      { label: "ไม่เคย", value: "never" }
+      { label: "1 ครั้ง", value: "weekly" },
+      { label: "บ่อย", value: "2-3pw" },
+      { label: "ทุกวัน", value: "daily" }
     ],
-    sun: "แสงแดดต่อผิวในแต่ละวัน",
+    sun: "แดด (นาที)",
     sunOptions: [
-      { label: "60+ นาที", value: "high" },
-      { label: "30-60 นาที", value: "moderate" },
-      { label: "15-30 นาที", value: "low" },
-      { label: "น้อยกว่า 15 นาที", value: "minimal" }
+      { label: "น้อยกว่า 15", value: "minimal" },
+      { label: "15-30", value: "low" },
+      { label: "30-60", value: "moderate" },
+      { label: "60+", value: "high" }
     ],
-    meds: "ใช้ยาเป็นประจำหรือไม่?",
-    medsHint:
-      "ข้อมูลนี้สำคัญด้านความปลอดภัย ใช้เพื่อระบุสิ่งที่ควรตรวจทาน ไม่ใช่เพื่อวินิจฉัย",
+    smoke: "การสูบบุหรี่",
+    smokeOptions: [
+      { label: "ไม่เคย", value: "never" },
+      { label: "เลิก >5 ปี", value: "exlong" },
+      { label: "เลิก <5 ปี", value: "exrecent" },
+      { label: "เป็นครั้งคราว", value: "occasional" },
+      { label: "ทุกวัน", value: "daily" }
+    ],
+    alcohol: "แอลกอฮอล์ / สัปดาห์",
+    alcoholOptions: [
+      { label: "ไม่ดื่ม", value: "none" },
+      { label: "1-3", value: "low" },
+      { label: "4-7", value: "moderate" },
+      { label: "8+", value: "high" }
+    ],
+    coffee: "คาเฟอีน แก้วต่อวัน",
+    coffeeOptions: [
+      { label: "ไม่มี", value: "none" },
+      { label: "1", value: "1" },
+      { label: "2-3", value: "2-3" },
+      { label: "4+", value: "4+" }
+    ],
+    meds: "ใช้ยา?",
+    medsHint: "ใช้เพื่อตรวจความปลอดภัยเท่านั้น",
     medsOptions: [
-      { label: "ใช่", value: "yes" },
-      { label: "ไม่มี", value: "no" }
+      { label: "ไม่มี", value: "no" },
+      { label: "ใช่", value: "yes" }
     ],
-    medType: "เป็นยาประเภทใด?",
+    medType: "ประเภทยา",
     medTypeOptions: [
       { label: "ยากลุ่มสแตติน", value: "statin" },
       { label: "เมตฟอร์มิน", value: "metformin" },
-      { label: "ยาลดกรด / กรดไหลย้อน", value: "ppi" },
+      { label: "PPI / โอเมพราโซล", value: "ppi" },
       { label: "ยาคุมกำเนิด", value: "ocp" },
-      { label: "ยาดูแลอารมณ์หรือความกังวล", value: "mood" },
+      { label: "ยาต้านซึมเศร้า", value: "antidepressant" },
       { label: "ยาละลายลิ่มเลือด / แอสไพริน", value: "blood-thinner" },
       { label: "ยาไทรอยด์", value: "thyroid" },
       { label: "ยาความดัน", value: "bp" },
+      { label: "คอร์ติโคสเตียรอยด์", value: "steroid" },
       { label: "อื่นๆ", value: "other" }
+    ],
+    supps: "อาหารเสริม?",
+    suppsOptions: [
+      { label: "ไม่มี", value: "none" },
+      { label: "มัลตวิตามินพื้นฐาน", value: "basic" },
+      { label: "D3 / โอเมก้า-3", value: "several" },
+      { label: "อาหารเสริมเฉพาะหลายตัว", value: "many" }
     ],
     lifestage: "ช่วงฮอร์โมนของฉัน",
     lifestageOptions: [
@@ -632,7 +901,23 @@ const th: Copy = {
     ...en.precision,
     title: "เพิ่มความแม่นยำ",
     helper: "ไม่บังคับ ตอบเท่าที่ทราบ รายละเอียดเหล่านี้ช่วยให้บรีฟแม่นขึ้น",
-    sleep: "ฉันนอนหลับเป็นอย่างไร?",
+    family: "ประวัติครอบครัว",
+    familyOptions: [
+      { label: "โรคหัวใจ", value: "heart" },
+      { label: "อัลไซเมอร์", value: "alzheimer" },
+      { label: "เบาหวาน", value: "diabetes" },
+      { label: "มะเร็ง", value: "cancer" },
+      { label: "กระดูกพรุน", value: "bones" },
+      { label: "ไม่มี / ไม่ทราบ", value: "none" }
+    ],
+    protein: "โปรตีน / วัน",
+    proteinOptions: [
+      { label: "ต่ำกว่า 1g / kg", value: "low" },
+      { label: "1-1.5g / kg", value: "mid" },
+      { label: "1.5-2g / kg", value: "good" },
+      { label: "มากกว่า 2g / kg", value: "high" }
+    ],
+    sleep: "ตื่นแล้วสดชื่น?",
     sleepOptions: [
       { label: "แย่มาก", value: "1", tone: "Low" },
       { label: "ไม่ดี", value: "2", tone: "Low" },
@@ -640,41 +925,72 @@ const th: Copy = {
       { label: "ดี", value: "4", tone: "High" },
       { label: "ดีมาก", value: "5", tone: "High" }
     ],
-    stress: "ความเครียดในแต่ละวัน",
+    stress: "ระดับความเครียด",
     stressOptions: [
       { label: "ต่ำมาก", value: "1", tone: "Low" },
       { label: "ต่ำ", value: "2", tone: "Low" },
       { label: "ปานกลาง", value: "3", tone: "Mid" },
       { label: "สูง", value: "4", tone: "High" },
-      { label: "สูงมาก", value: "5", tone: "High" }
+      { label: "รุนแรงมาก", value: "5", tone: "High" }
     ],
-    gut: "ระบบย่อยอาหารของฉัน",
+    stressSource: "แหล่งความเครียด",
+    stressSourceOptions: [
+      { label: "ไม่มี", value: "none" },
+      { label: "งาน", value: "work" },
+      { label: "กังวล", value: "anxiety" },
+      { label: "หมดไฟ", value: "burnout" },
+      { label: "สุขภาพ", value: "health" },
+      { label: "เหตุการณ์ชีวิต", value: "life" }
+    ],
+    gut: "การย่อยอาหาร",
     gutOptions: [
       { label: "ไม่มีปัญหา", value: "great" },
-      { label: "ท้องอืดบ่อย", value: "bloat" },
+      { label: "ท้องอืด", value: "bloat" },
       { label: "ท้องผูก", value: "constipation" },
       { label: "ถ่ายเหลว", value: "loose" },
-      { label: "สลับกัน", value: "mixed" }
+      { label: "IBS / สลับกัน", value: "ibs" }
     ],
-    region: "ภูมิภาค / สภาพอากาศ",
-    regionOptions: [
-      { label: "เขตร้อน / เอเชียตะวันออกเฉียงใต้", value: "tropical" },
-      { label: "กึ่งร้อน", value: "subtropical" },
-      { label: "อบอุ่น", value: "temperate" },
-      { label: "ยุโรปเหนือ / แคนาดา", value: "northern" }
+    wearable: "Fitness tracker?",
+    wearableOptions: [
+      { label: "ไม่ใช้", value: "none" },
+      { label: "Garmin", value: "garmin" },
+      { label: "Oura", value: "oura" },
+      { label: "WHOOP", value: "whoop" },
+      { label: "Apple Watch", value: "apple" },
+      { label: "Fitbit", value: "fitbit" },
+      { label: "อื่นๆ", value: "other" }
+    ],
+    vo2Known: "ทราบ VO2 max?",
+    vo2KnownOptions: [
+      { label: "ไม่ทราบ", value: "no" },
+      { label: "ทราบ", value: "yes" }
+    ],
+    vo2Max: "VO2 max",
+    vo2Proxy: "ความฟิตคาร์ดิโอ",
+    vo2ProxyOptions: [
+      { label: "ขึ้นบันไดแล้วเหนื่อย", value: "winded" },
+      { label: "เดินเร็วแล้วพูดยาก", value: "moderate" },
+      { label: "ปานกลาง 20-30 นาที", value: "sustained" },
+      { label: "หนัก 30+ นาที", value: "athlete" }
     ],
     labs: "ค่าตรวจเลือด หากทราบ",
     labFields: [
-      { label: "วิตามินดี", value: "vitaminD", placeholder: "เช่น 35", hint: "ng/mL" },
-      { label: "วิตามินบี12", value: "b12", placeholder: "เช่น 450", hint: "pg/mL" },
-      { label: "เฟอร์ริติน", value: "ferritin", placeholder: "เช่น 80", hint: "ng/mL" },
-      { label: "HbA1c", value: "hba1c", placeholder: "เช่น 5.4", hint: "%" },
-      { label: "ดัชนีโอเมก้า-3", value: "omega3", placeholder: "เช่น 5.0", hint: "%" },
+      { label: "วิตามินดี", value: "vitaminD", placeholder: "", hint: "ng/mL" },
+      { label: "วิตามินบี12", value: "b12", placeholder: "", hint: "pg/mL" },
+      { label: "เฟอร์ริติน", value: "ferritin", placeholder: "", hint: "ng/mL" },
+      { label: "HbA1c", value: "hba1c", placeholder: "", hint: "%" },
+      { label: "ดัชนีโอเมก้า-3", value: "omega3", placeholder: "", hint: "%" },
       {
         label: "โฮโมซิสเทอีน",
         value: "homocysteine",
-        placeholder: "เช่น 9.0",
+        placeholder: "",
         hint: "umol/L"
+      },
+      {
+        label: "ค่า HRV เฉลี่ย",
+        value: "hrv",
+        placeholder: "",
+        hint: "ms"
       }
     ]
   },
@@ -683,10 +999,10 @@ const th: Copy = {
     title: "ความต้องการของฉัน",
     budget: "งบอาหารเสริมต่อเดือน",
     budgetOptions: [
-      { label: "ต่ำกว่า $30", value: "low" },
-      { label: "$30-70", value: "mid" },
-      { label: "$70-150", value: "good" },
-      { label: "$150+", value: "high" }
+      { label: "ต่ำกว่า ฿1,000", value: "low" },
+      { label: "฿1,000-2,500", value: "mid" },
+      { label: "฿2,500-5,000", value: "good" },
+      { label: "฿5,000+", value: "high" }
     ],
     pills: "จำนวนเม็ด / แคปซูลสูงสุดต่อวัน",
     pillsOptions: [
@@ -708,24 +1024,44 @@ const th: Copy = {
     complete: "ตอบคำถามสำคัญครบแล้ว",
     status: (done, total) => `ตอบแล้ว ${done} จาก ${total} ข้อสำคัญ`
   },
+  sleepBasics: {
+    title: "การนอนหลับ พลังงาน และกิจกรรม",
+    average: "การนอน (ชั่วโมง)",
+    options: [
+      { label: "น้อยกว่า 5", value: "under-5" },
+      { label: "5-6", value: "5-6" },
+      { label: "6-7", value: "6-7" },
+      { label: "7-8", value: "7-8" },
+      { label: "8-9", value: "8-9" },
+      { label: "9+", value: "9-plus" }
+    ]
+  },
   symptoms: {
     ...en.symptoms,
-    title: "ตอนนี้ฉันรู้สึกอย่างไร?",
-    prompt: "เลือกทุกข้อที่ตรงกับคุณ",
-    hint: "แตะข้อที่ตรงกับคุณ",
-    great: { label: "ฉันรู้สึกดีมาก", value: "great" },
+    title: "อาการ",
+    prompt: "อาการปัจจุบัน",
+    hint: "เลือกได้ทุกข้อ",
+    great: { label: "รู้สึกดีมาก", value: "great" },
     options: [
-      { label: "เหนื่อยตลอดเวลา", value: "tired" },
-      { label: "สมองล้า", value: "fog" },
-      { label: "เครียดมาก", value: "stress" },
-      { label: "นอนหลับไม่ดี", value: "bad-sleep" },
-      { label: "ไม่สบายข้อต่อ", value: "joints" },
-      { label: "ปัญหาลำไส้", value: "gut" },
-      { label: "อารมณ์ต่ำ", value: "mood" },
-      { label: "ป่วยบ่อย", value: "sick" },
-      { label: "ผม / ผิว", value: "hair-skin" },
+      { label: "อ่อนเพลีย", value: "fatigue" },
+      { label: "สมองล้า", value: "brain" },
+      { label: "อารมณ์", value: "mood" },
+      { label: "ปวดข้อ", value: "joints" },
+      { label: "การย่อยอาหาร", value: "digestion" },
+      { label: "นอนไม่ดี", value: "sleep" },
+      { label: "เครียด / กังวล", value: "stress" },
+      { label: "ผิว", value: "skin" },
+      { label: "ผมร่วง", value: "hair" },
       { label: "ความต้องการทางเพศต่ำ", value: "libido" },
-      { label: "น้ำหนักขึ้น", value: "weight" }
+      { label: "ป่วยบ่อย", value: "cold" }
+    ],
+    energy: "ระดับพลังงาน",
+    energyOptions: [
+      { label: "หมดแรง", value: "1", tone: "Low" },
+      { label: "ต่ำ", value: "2", tone: "Low" },
+      { label: "พอใช้", value: "3", tone: "Mid" },
+      { label: "ดี", value: "4", tone: "High" },
+      { label: "ดีเยี่ยม", value: "5", tone: "High" }
     ]
   },
   thankYou: {
@@ -751,6 +1087,14 @@ const th: Copy = {
 
 const copies: Record<Locale, Copy> = { en, th };
 const heroBadgeIcons = [BeakerIcon, ShieldCheckIcon, SparklesIcon];
+const fitzpatrickSkinToneColors: Record<string, string> = {
+  I: "#f8dfc8",
+  II: "#eec29a",
+  III: "#d6a071",
+  IV: "#a66c45",
+  V: "#744222",
+  VI: "#3b2116"
+};
 
 function cx(...classes: Array<string | false | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -788,20 +1132,101 @@ function cardOptionClasses(selected: boolean) {
   );
 }
 
-function buildPreviewTags(copy: Copy, answers: Answers) {
-  const selectedGoalLabels = copy.goals.options
-    .filter((option) => answers.goals.includes(option.value))
-    .map((option) => option.label);
-  const tags = [
-    ...selectedGoalLabels,
-    answers.diet ? copy.lifestyle.dietOptions.find((option) => option.value === answers.diet)?.label : "",
-    answers.budget
-      ? copy.preferences.budgetOptions.find((option) => option.value === answers.budget)?.label
-      : "",
-    answers.meds === "yes" ? "Safety review" : ""
-  ].filter(Boolean);
+function getOptionLabel(options: readonly Option[], value: string) {
+  return options.find((option) => option.value === value)?.label ?? value;
+}
 
-  return tags.slice(0, 8);
+function buildPreviewTags(copy: Copy, answers: Answers) {
+  const tags: string[] = [];
+  const add = (label: string, value: string | undefined) => {
+    if (value) {
+      tags.push(`${label}: ${value}`);
+    }
+  };
+  const addOptions = (
+    label: string,
+    options: readonly Option[],
+    values: readonly string[]
+  ) => {
+    values.forEach((value) => add(label, getOptionLabel(options, value)));
+  };
+  const heightImperial = formatHeightImperial(answers.heightCm);
+  const weightImperial = formatWeightImperial(answers.weightKg);
+
+  add(copy.about.name, answers.name.trim());
+  add(copy.about.sex, answers.sex ? getOptionLabel(copy.about.sexOptions, answers.sex) : "");
+  add(copy.about.age, answers.age ? getOptionLabel(copy.about.ageOptions, answers.age) : "");
+  add(
+    copy.about.height,
+    answers.heightCm
+      ? `${answers.heightCm} cm${heightImperial ? ` / ${heightImperial}` : ""}`
+      : ""
+  );
+  add(
+    copy.about.weight,
+    answers.weightKg
+      ? `${answers.weightKg} kg${weightImperial ? ` / ${weightImperial}` : ""}`
+      : ""
+  );
+  add(copy.about.skin, answers.skin ? getOptionLabel(copy.about.skinOptions, answers.skin) : "");
+  add(copy.about.country, answers.country ? getOptionLabel(copy.about.countryOptions, answers.country) : "");
+  add(copy.lifestyle.sun, answers.sun ? getOptionLabel(copy.lifestyle.sunOptions, answers.sun) : "");
+  add(copy.about.activity, answers.activity ? getOptionLabel(copy.about.activityOptions, answers.activity) : "");
+  addOptions(copy.goals.title, copy.goals.options, answers.goals);
+
+  if (answers.feelGreat) {
+    add(copy.symptoms.title, copy.symptoms.great.label);
+  } else {
+    addOptions(copy.symptoms.title, copy.symptoms.options, answers.symptoms);
+  }
+
+  add(copy.sleepBasics.average, answers.sleepHours ? getOptionLabel(copy.sleepBasics.options, answers.sleepHours) : "");
+  add(copy.lifestyle.diet, answers.diet ? getOptionLabel(copy.lifestyle.dietOptions, answers.diet) : "");
+  add(copy.lifestyle.fish, answers.fish ? getOptionLabel(copy.lifestyle.fishOptions, answers.fish) : "");
+  add(copy.lifestyle.smoke, answers.smoke ? getOptionLabel(copy.lifestyle.smokeOptions, answers.smoke) : "");
+  add(copy.lifestyle.alcohol, answers.alcohol ? getOptionLabel(copy.lifestyle.alcoholOptions, answers.alcohol) : "");
+  add(copy.lifestyle.meds, answers.meds ? getOptionLabel(copy.lifestyle.medsOptions, answers.meds) : "");
+  addOptions(copy.lifestyle.medType, copy.lifestyle.medTypeOptions, answers.medTypes);
+  add(copy.preferences.budget, answers.budget ? getOptionLabel(copy.preferences.budgetOptions, answers.budget) : "");
+  add(copy.preferences.pills, answers.pills ? getOptionLabel(copy.preferences.pillsOptions, answers.pills) : "");
+  add(copy.symptoms.energy, answers.energy ? getOptionLabel(copy.symptoms.energyOptions, answers.energy) : "");
+  add(copy.lifestyle.coffee, answers.coffee ? getOptionLabel(copy.lifestyle.coffeeOptions, answers.coffee) : "");
+  add(copy.lifestyle.supps, answers.supps ? getOptionLabel(copy.lifestyle.suppsOptions, answers.supps) : "");
+  add(copy.preferences.form, answers.form ? getOptionLabel(copy.preferences.formOptions, answers.form) : "");
+  add(copy.lifestyle.lifestage, answers.lifestage ? getOptionLabel(copy.lifestyle.lifestageOptions, answers.lifestage) : "");
+  addOptions(copy.conditions.title, copy.conditions.options, answers.conditions);
+  addOptions(copy.precision.family, copy.precision.familyOptions, answers.family);
+
+  Object.entries(answers.labs).forEach(([key, value]) => {
+    const field = copy.precision.labFields.find((item) => item.value === key);
+    add(field?.label ?? key, value ? `${value}${field?.hint ? ` ${field.hint}` : ""}` : "");
+  });
+
+  return tags;
+}
+
+function formatHeightImperial(value: string) {
+  const cm = Number(value);
+
+  if (!Number.isFinite(cm) || cm <= 0) {
+    return "";
+  }
+
+  const totalInches = Math.round(cm / 2.54);
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+
+  return `${feet} ft ${inches} in`;
+}
+
+function formatWeightImperial(value: string) {
+  const kg = Number(value);
+
+  if (!Number.isFinite(kg) || kg <= 0) {
+    return "";
+  }
+
+  return `${Math.round(kg * 2.20462)} lb`;
 }
 
 type AssessmentFlowProps = Readonly<{
@@ -839,6 +1264,26 @@ type ProcessingStatus = Readonly<{
   >;
 }>;
 
+type PlanTier = Readonly<{
+  cta: string;
+  description: string;
+  featured?: boolean;
+  features: string[];
+  id: string;
+  name: string;
+  price: string;
+  priceSuffix: string;
+}>;
+
+type PlanContent = Readonly<{
+  back: string;
+  badge: string;
+  eyebrow: string;
+  subtitle: string;
+  tiers: PlanTier[];
+  title: string;
+}>;
+
 function useCompactAssessment() {
   const [isCompact, setIsCompact] = useState(false);
 
@@ -855,6 +1300,128 @@ function useCompactAssessment() {
   return isCompact;
 }
 
+function getPlanContent(locale: Locale): PlanContent {
+  if (locale === "th") {
+    return {
+      back: "กลับไปที่บรีฟ",
+      badge: "แนะนำ",
+      eyebrow: "เลือกแผนบรีฟ",
+      subtitle:
+        "ตอนนี้ทุกแผนจะพาไปยังคิวสร้างสูตรเดียวกัน เพื่อให้เราทดสอบขั้นตอนการชำระเงินได้ก่อน",
+      title: "เลือกความละเอียดของคำแนะนำ",
+      tiers: [
+        {
+          cta: "ไปต่อ",
+          description:
+            "บรีฟสูตรแบบกระชับจากคำถามพื้นฐาน เหมาะสำหรับเริ่มเห็นภาพรวมทันที",
+          features: [
+            "ลำดับความสำคัญหลักจากคำตอบของคุณ",
+            "หมวดอาหารเสริมพื้นฐาน",
+            "หมายเหตุความปลอดภัยทั่วไป",
+            "ตัวอย่างผลลัพธ์เบื้องต้น"
+          ],
+          id: "free-basic",
+          name: "แผนพื้นฐานฟรี",
+          price: "฿0",
+          priceSuffix: ""
+        },
+        {
+          cta: "ไปต่อ",
+          description:
+            "บรีฟสูตรเต็ม พร้อมปรับขนาดและตัวเลือกผลิตภัณฑ์ให้เหมาะกับข้อมูลของคุณมากขึ้น",
+          featured: true,
+          features: [
+            "ทุกอย่างในแผนพื้นฐานฟรี",
+            "ช่วงปริมาณที่ปรับตามร่างกาย",
+            "รวมข้อมูลยา แล็บ และข้อควรระวัง",
+            "ตัวเลือกผลิตภัณฑ์และทางเลือกทดแทน",
+            "พร้อมเช็คอินซ้ำใน 60 วัน"
+          ],
+          id: "optimal-precision",
+          name: "ความแม่นยำสูง",
+          price: "฿399",
+          priceSuffix: "ครั้งเดียว"
+        },
+        {
+          cta: "ไปต่อ",
+          description:
+            "การดูแลต่อเนื่องพร้อม AI agent ที่ช่วยปรับคำแนะนำให้เข้ากับความต้องการรายวัน",
+          features: [
+            "ทุกอย่างในแผนความแม่นยำสูง",
+            "AI agent สำหรับความต้องการรายวัน",
+            "ปรับเวลาทานและกิจวัตร",
+            "รองรับการเดินทาง การฝึก และการนอน",
+            "ทบทวนลำดับความสำคัญเมื่อข้อมูลเปลี่ยน"
+          ],
+          id: "pro",
+          name: "โปร",
+          price: "฿1,490",
+          priceSuffix: "/เดือน"
+        }
+      ]
+    };
+  }
+
+  return {
+    back: "Back to brief",
+    badge: "Recommended",
+    eyebrow: "Choose your brief",
+    subtitle:
+      "For now, every plan continues to the same mocked formulation queue while we test the purchase step.",
+    title: "Select the level of guidance",
+    tiers: [
+      {
+        cta: "Go",
+        description:
+          "A concise formulation brief from the basic questions, useful for a quick starting point.",
+        features: [
+          "Core priorities from your answers",
+          "Basic supplement categories",
+          "General safety notes",
+          "Preview of your results"
+        ],
+        id: "free-basic",
+        name: "Free Basic Plan",
+        price: "฿0",
+        priceSuffix: ""
+      },
+      {
+        cta: "Go",
+        description:
+          "The full formulation brief with more precise dosing logic and practical product matching.",
+        featured: true,
+        features: [
+          "Everything in Free Basic",
+          "Body-size adjusted dose ranges",
+          "Medication and lab flags included",
+          "Recommended products and alternatives",
+          "60-day reassessment prompt"
+        ],
+        id: "optimal-precision",
+        name: "Optimal Precision",
+        price: "฿399",
+        priceSuffix: "one time"
+      },
+      {
+        cta: "Go",
+        description:
+          "Ongoing support with an AI agent that adapts the plan to day-to-day requirements.",
+        features: [
+          "Everything in Optimal Precision",
+          "AI agent for daily needs",
+          "Routine and timing adjustments",
+          "Travel, training, and sleep adaptation",
+          "Priority review as your data changes"
+        ],
+        id: "pro",
+        name: "Pro",
+        price: "฿1,490",
+        priceSuffix: "/month"
+      }
+    ]
+  };
+}
+
 export function AssessmentFlow({ locale }: AssessmentFlowProps) {
   const copy = copies[locale];
   const router = useRouter();
@@ -864,6 +1431,8 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
   const [processingStatus, setProcessingStatus] =
     useState<ProcessingStatus | null>(null);
   const [processingError, setProcessingError] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState("");
+  const [showPlans, setShowPlans] = useState(false);
   const isCompact = useCompactAssessment();
 
   const completed = countRequired(answers);
@@ -883,7 +1452,8 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
           currentStep: "ขั้นตอนปัจจุบัน",
           notesHint: "เพิ่มได้ถ้ามีรายละเอียดสำคัญ เช่น ความไวต่อส่วนผสม ข้อจำกัด หรือสิ่งที่อยากหลีกเลี่ยง",
           notesLabel: "มีอะไรเพิ่มเติมที่เราควรรู้ไหม?",
-          optionalSection: "ขั้นตอนเสริม",
+          optionalSection: "เพิ่มความแม่นยำ",
+          requiredSection: "คำถามพื้นฐาน",
           processingError: "ไม่สามารถเริ่มการประมวลผลได้ โปรดลองอีกครั้ง",
           processingQueue: (count: number) =>
             count > 0
@@ -916,7 +1486,7 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
           summaryTitle: "สรุปบรีฟของคุณ",
           step: (current: number, total: number) =>
             `คำถามที่ ${current} จาก ${total}`,
-          validation: "ตอบข้อที่จำเป็นเพื่อไปต่อ"
+          validation: "ตอบคำถามจำเป็นเพื่อไปต่อ"
         }
       : {
           back: "Back",
@@ -927,6 +1497,7 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
             "Add anything useful, such as sensitivities, constraints, products you already use, or ingredients you want to avoid.",
           notesLabel: "Anything else we should know?",
           optionalSection: "Optional precision",
+          requiredSection: "Basic questions",
           processingError: "We could not start processing. Please try again.",
           processingQueue: (count: number) =>
             count > 0
@@ -956,10 +1527,10 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
             `Section ${current} of ${total}`,
           sectionHint: "Complete the required questions in this section to continue.",
           skipOptional: "Skip optional",
-          summaryTitle: "Your brief preview",
+          summaryTitle: "Your brief overview",
           step: (current: number, total: number) =>
             `Question ${current} of ${total}`,
-          validation: "Answer the required item to continue"
+          validation: "Answer the required questions to continue"
         };
 
   function setSingle(key: keyof Answers, value: string) {
@@ -967,17 +1538,39 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
       ...current,
       [key]: value,
       ...(key === "sex" && value !== "female" ? { lifestage: "" } : {}),
-      ...(key === "meds" && value !== "yes" ? { medTypes: [] } : {})
+      ...(key === "meds" && value !== "yes" ? { medTypes: [] } : {}),
+      ...(key === "vo2Known" && value === "yes" ? { vo2Proxy: "" } : {}),
+      ...(key === "vo2Known" && value !== "yes" ? { vo2Max: "" } : {})
     }));
   }
 
-  function toggleMulti(key: "goals" | "symptoms" | "medTypes" | "conditions", value: string, max = 99) {
+  function toggleMulti(
+    key: "conditions" | "family" | "goals" | "medTypes" | "symptoms",
+    value: string,
+    max = 99
+  ) {
     setAnswers((current) => {
       const values = current[key];
       const selected = values.includes(value);
 
       if (!selected && values.length >= max) {
         return current;
+      }
+
+      if (key === "family") {
+        if (value === "none") {
+          return {
+            ...current,
+            family: selected ? [] : ["none"]
+          };
+        }
+
+        return {
+          ...current,
+          family: selected
+            ? values.filter((item) => item !== value)
+            : [...values.filter((item) => item !== "none"), value]
+        };
       }
 
       return {
@@ -1008,6 +1601,21 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
       questions: [
         {
           content: (
+            <input
+              type="text"
+              autoComplete="given-name"
+              value={answers.name}
+              className="block w-full rounded-md border border-foreground/10 bg-white px-4 py-3 text-sm text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
+              onChange={(event) => setSingle("name", event.target.value)}
+            />
+          ),
+          id: "name",
+          isAnswered: Boolean(answers.name.trim()),
+          label: copy.about.name,
+          required: true
+        },
+        {
+          content: (
             <PillGroup
               options={copy.about.sexOptions}
               selected={answers.sex}
@@ -1034,28 +1642,108 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
         },
         {
           content: (
-            <PillGroup
-              options={copy.about.activityOptions}
-              selected={answers.activity}
-              onSelect={(value) => setSingle("activity", value)}
+            <div className="grid gap-5 sm:grid-cols-2">
+              <label className="block">
+                <span className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A]">
+                  <span>{copy.about.height}</span>
+                  <span className="rounded-md bg-[#3A7BD5]/10 px-2 py-1 text-[#3A7BD5]">
+                    {answers.heightCm || "170"} cm
+                  </span>
+                </span>
+                <input
+                  type="range"
+                  min={120}
+                  max={220}
+                  step={1}
+                  value={answers.heightCm || "170"}
+                  className="mt-3 block w-full accent-[#1FA77A]"
+                  onChange={(event) => setSingle("heightCm", event.target.value)}
+                />
+                <span className="mt-2 flex justify-end">
+                  <span className="rounded-md bg-[#3A7BD5]/10 px-2 py-1 text-xs font-semibold text-[#3A7BD5]">
+                    {formatHeightImperial(answers.heightCm || "170")}
+                  </span>
+                </span>
+              </label>
+              <label className="block">
+                <span className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A]">
+                  <span>{copy.about.weight}</span>
+                  <span className="rounded-md bg-[#3A7BD5]/10 px-2 py-1 text-[#3A7BD5]">
+                    {answers.weightKg || "70"} kg
+                  </span>
+                </span>
+                <input
+                  type="range"
+                  min={35}
+                  max={180}
+                  step={1}
+                  value={answers.weightKg || "70"}
+                  className="mt-3 block w-full accent-[#1FA77A]"
+                  onChange={(event) => setSingle("weightKg", event.target.value)}
+                />
+                <span className="mt-2 flex justify-end">
+                  <span className="rounded-md bg-[#3A7BD5]/10 px-2 py-1 text-xs font-semibold text-[#3A7BD5]">
+                    {formatWeightImperial(answers.weightKg || "70")}
+                  </span>
+                </span>
+              </label>
+            </div>
+          ),
+          id: "height-weight",
+          isAnswered: Boolean(answers.heightCm && answers.weightKg),
+          label:
+            locale === "th"
+              ? "ส่วนสูงและน้ำหนัก"
+              : "Height and weight",
+          required: true
+        },
+        {
+          content: (
+            <SkinToneGroup
+              options={copy.about.skinOptions}
+              selected={answers.skin}
+              onSelect={(value) => setSingle("skin", value)}
             />
           ),
-          id: "activity",
-          isAnswered: Boolean(answers.activity),
-          label: copy.about.activity,
+          id: "skin",
+          isAnswered: Boolean(answers.skin),
+          label: copy.about.skin,
+          required: true
+        },
+        {
+          content: (
+            <select
+              value={answers.country}
+              className="block w-full rounded-md border border-foreground/10 bg-white px-4 py-3 text-sm font-semibold text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
+              onChange={(event) => setSingle("country", event.target.value)}
+            >
+              <option value="">
+                {locale === "th" ? "เลือกประเทศ" : "Select country"}
+              </option>
+              {copy.about.countryOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ),
+          id: "country",
+          isAnswered: Boolean(answers.country),
+          label: copy.about.country,
           required: true
         },
         {
           content: (
             <PillGroup
-              options={copy.about.buildOptions}
-              selected={answers.build}
-              onSelect={(value) => setSingle("build", value)}
+              options={copy.lifestyle.sunOptions}
+              selected={answers.sun}
+              onSelect={(value) => setSingle("sun", value)}
             />
           ),
-          id: "build",
-          isAnswered: Boolean(answers.build),
-          label: copy.about.build
+          id: "sun",
+          isAnswered: Boolean(answers.sun),
+          label: copy.lifestyle.sun,
+          required: true
         }
       ],
       title: copy.about.title
@@ -1123,8 +1811,56 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
     {
       description:
         locale === "th"
-          ? "อาหาร แสงแดด และยาที่ใช้อยู่ช่วยให้เราสร้างบรีฟที่ระมัดระวังและเหมาะสม"
-          : "Diet, sunlight, and medication context keep the brief useful and careful.",
+          ? "เวลานอนเฉลี่ยเป็นพื้นฐานสำคัญก่อนเพิ่มรายละเอียดคุณภาพการนอนในขั้นตอนเสริม"
+          : "Average sleep duration gives us the baseline before optional sleep-quality detail.",
+      id: "sleep-basics",
+      questions: [
+        {
+          content: (
+            <PillGroup
+              options={copy.sleepBasics.options}
+              selected={answers.sleepHours}
+              onSelect={(value) => setSingle("sleepHours", value)}
+            />
+          ),
+          id: "sleep-hours",
+          isAnswered: Boolean(answers.sleepHours),
+          label: copy.sleepBasics.average,
+          required: true
+        },
+        {
+          content: (
+            <ScaleGroup
+              options={copy.symptoms.energyOptions}
+              selected={answers.energy}
+              onSelect={(value) => setSingle("energy", value)}
+            />
+          ),
+          id: "energy",
+          isAnswered: Boolean(answers.energy),
+          label: copy.symptoms.energy
+        },
+        {
+          content: (
+            <PillGroup
+              options={copy.about.activityOptions}
+              selected={answers.activity}
+              onSelect={(value) => setSingle("activity", value)}
+            />
+          ),
+          id: "activity",
+          isAnswered: Boolean(answers.activity),
+          label: copy.about.activity,
+          required: true
+        }
+      ],
+      title: copy.sleepBasics.title
+    },
+    {
+      description:
+        locale === "th"
+          ? "อาหาร เครื่องดื่ม และการสูบบุหรี่ช่วยให้เราปรับบรีฟให้เหมาะกับกิจวัตรจริง"
+          : "Food, beverages, and smoking context keep the brief grounded in real habits.",
       id: "lifestyle",
       questions: [
         {
@@ -1156,16 +1892,51 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
         {
           content: (
             <PillGroup
-              options={copy.lifestyle.sunOptions}
-              selected={answers.sun}
-              onSelect={(value) => setSingle("sun", value)}
+              options={copy.lifestyle.smokeOptions}
+              selected={answers.smoke}
+              onSelect={(value) => setSingle("smoke", value)}
             />
           ),
-          id: "sun",
-          isAnswered: Boolean(answers.sun),
-          label: copy.lifestyle.sun,
+          id: "smoke",
+          isAnswered: Boolean(answers.smoke),
+          label: copy.lifestyle.smoke,
           required: true
         },
+        {
+          content: (
+            <PillGroup
+              options={copy.lifestyle.alcoholOptions}
+              selected={answers.alcohol}
+              onSelect={(value) => setSingle("alcohol", value)}
+            />
+          ),
+          id: "alcohol",
+          isAnswered: Boolean(answers.alcohol),
+          label: copy.lifestyle.alcohol,
+          required: true
+        },
+        {
+          content: (
+            <PillGroup
+              options={copy.lifestyle.coffeeOptions}
+              selected={answers.coffee}
+              onSelect={(value) => setSingle("coffee", value)}
+            />
+          ),
+          id: "coffee",
+          isAnswered: Boolean(answers.coffee),
+          label: copy.lifestyle.coffee
+        }
+      ],
+      title: copy.lifestyle.title
+    },
+    {
+      description:
+        locale === "th"
+          ? "ยาและอาหารเสริมที่ใช้อยู่ช่วยให้เราตรวจทานความซ้ำซ้อนและข้อควรระวัง"
+          : "Medication and supplement context helps us check safety flags and avoid doubling up.",
+      id: "medications-supplements",
+      questions: [
         {
           content: (
             <>
@@ -1197,6 +1968,18 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
           label: copy.lifestyle.meds,
           required: true
         },
+        {
+          content: (
+            <PillGroup
+              options={copy.lifestyle.suppsOptions}
+              selected={answers.supps}
+              onSelect={(value) => setSingle("supps", value)}
+            />
+          ),
+          id: "supps",
+          isAnswered: Boolean(answers.supps),
+          label: copy.lifestyle.supps
+        },
         ...(answers.sex === "female"
           ? [
               {
@@ -1214,7 +1997,7 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
             ]
           : [])
       ],
-      title: copy.lifestyle.title
+      title: locale === "th" ? "ยาและอาหารเสริม" : "Medications and supplements"
     },
     {
       description:
@@ -1271,6 +2054,18 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
       questions: [
         {
           content: (
+            <PillGroup
+              options={copy.precision.proteinOptions}
+              selected={answers.protein}
+              onSelect={(value) => setSingle("protein", value)}
+            />
+          ),
+          id: "protein",
+          isAnswered: Boolean(answers.protein),
+          label: copy.precision.protein
+        },
+        {
+          content: (
             <ScaleGroup
               options={copy.precision.sleepOptions}
               selected={answers.sleep}
@@ -1296,6 +2091,18 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
         {
           content: (
             <PillGroup
+              options={copy.precision.stressSourceOptions}
+              selected={answers.stressSource}
+              onSelect={(value) => setSingle("stressSource", value)}
+            />
+          ),
+          id: "stress-source",
+          isAnswered: Boolean(answers.stressSource),
+          label: copy.precision.stressSource
+        },
+        {
+          content: (
+            <PillGroup
               options={copy.precision.gutOptions}
               selected={answers.gut}
               onSelect={(value) => setSingle("gut", value)}
@@ -1308,14 +2115,60 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
         {
           content: (
             <PillGroup
-              options={copy.precision.regionOptions}
-              selected={answers.region}
-              onSelect={(value) => setSingle("region", value)}
+              options={copy.precision.wearableOptions}
+              selected={answers.wearable}
+              onSelect={(value) => setSingle("wearable", value)}
             />
           ),
-          id: "region",
-          isAnswered: Boolean(answers.region),
-          label: copy.precision.region
+          id: "wearable",
+          isAnswered: Boolean(answers.wearable),
+          label: copy.precision.wearable
+        },
+        {
+          content: (
+            <>
+              <PillGroup
+                options={copy.precision.vo2KnownOptions}
+                selected={answers.vo2Known}
+                onSelect={(value) => setSingle("vo2Known", value)}
+              />
+              {answers.vo2Known === "yes" ? (
+                <label className="mt-4 block max-w-xs">
+                  <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A]">
+                    {copy.precision.vo2Max}
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={answers.vo2Max}
+                    className="mt-2 block w-full rounded-md border border-foreground/10 bg-white px-3 py-2 text-sm text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
+                    onChange={(event) => setSingle("vo2Max", event.target.value)}
+                  />
+                </label>
+              ) : null}
+              {answers.vo2Known === "no" ? (
+                <div className="mt-4">
+                  <p className="mb-3 text-sm font-semibold text-[#20343A]">
+                    {copy.precision.vo2Proxy}
+                  </p>
+                  <PillGroup
+                    options={copy.precision.vo2ProxyOptions}
+                    selected={answers.vo2Proxy}
+                    onSelect={(value) => setSingle("vo2Proxy", value)}
+                  />
+                </div>
+              ) : null}
+            </>
+          ),
+          id: "vo2",
+          isAnswered:
+            Boolean(answers.vo2Known) &&
+            (answers.vo2Known === "yes"
+              ? Boolean(answers.vo2Max)
+              : answers.vo2Known === "no"
+                ? Boolean(answers.vo2Proxy)
+                : true),
+          label: copy.precision.vo2Known
         }
       ],
       title: copy.precision.title
@@ -1340,6 +2193,18 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
           id: "conditions",
           isAnswered: answers.conditions.length > 0,
           label: copy.conditions.prompt
+        },
+        {
+          content: (
+            <OptionGrid
+              options={copy.precision.familyOptions}
+              selected={answers.family}
+              onToggle={(value) => toggleMulti("family", value, 8)}
+            />
+          ),
+          id: "family",
+          isAnswered: answers.family.length > 0,
+          label: copy.precision.family
         },
         {
           content: (
@@ -1388,9 +2253,9 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
                 </h3>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {previewTags.length > 0 ? (
-                    previewTags.map((tag) => (
+                    previewTags.map((tag, index) => (
                       <span
-                        key={tag}
+                        key={`${tag}-${index}`}
                         className="rounded-full bg-[#3A7BD5]/10 px-3 py-1 text-xs font-semibold text-[#20343A]"
                       >
                         {tag}
@@ -1503,7 +2368,8 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
     }
 
     if (isReview) {
-      void startProcessing();
+      setShowPlans(true);
+      window.scrollTo({ behavior: "smooth", top: 0 });
       return;
     }
 
@@ -1521,7 +2387,13 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
     setQuestionIndex(0);
   }
 
-  async function startProcessing() {
+  function choosePlan(planId: string) {
+    setSelectedPlan(planId);
+    setShowPlans(false);
+    void startProcessing(planId);
+  }
+
+  async function startProcessing(planId = selectedPlan || "free-basic") {
     setProcessingError("");
     setProcessingStatus({
       jobId: "",
@@ -1536,7 +2408,7 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
 
     try {
       const response = await fetch("/api/assessment", {
-        body: JSON.stringify({ answers, locale }),
+        body: JSON.stringify({ answers, locale, plan: planId }),
         headers: {
           "content-type": "application/json"
         },
@@ -1612,7 +2484,7 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
         {processingStatus ? (
           <ProcessingPanel
             error={processingError}
-            onRetry={startProcessing}
+            onRetry={() => void startProcessing()}
             queueLabel={ui.processingQueue(processingStatus.queuePosition)}
             retryLabel={ui.retry}
             status={processingStatus}
@@ -1621,10 +2493,16 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
             subtitle={ui.processingSubtitle}
             title={ui.processingTitle}
           />
+        ) : showPlans ? (
+          <PlanSelectionPanel
+            content={getPlanContent(locale)}
+            onBack={() => setShowPlans(false)}
+            onSelect={choosePlan}
+          />
         ) : (
           <div className="mx-auto max-w-4xl space-y-6">
             {sectionIndex === 0 ? (
-              <section className="rounded-lg bg-white p-6 ring-1 ring-foreground/10 sm:p-8 lg:p-10">
+              <section className="rounded-lg bg-[#3A7BD5]/5 p-6 ring-1 ring-[#3A7BD5]/10 sm:p-8 lg:p-10">
               <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#3A7BD5]">
@@ -1661,12 +2539,18 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
             ) : null}
 
             <div>
+              <SectionProgress
+                progress={progress}
+                progressLabel={progressLabel}
+              />
               <SectionCard
                 done={sectionIsComplete(currentSection)}
                 number={sectionIndex + 1}
-                optionalLabel={currentSection.optional ? ui.optionalSection : undefined}
-                progress={progress}
-                progressLabel={progressLabel}
+                sectionLabel={
+                  currentSection.optional || currentSection.id === "review"
+                    ? ui.optionalSection
+                    : ui.requiredSection
+                }
                 stepLabel={
                   isCompact
                     ? ui.step(flowStepCurrent, flowStepTotal)
@@ -1744,11 +2628,14 @@ type SectionCardProps = Readonly<{
   children: React.ReactNode;
   done: boolean;
   number: number;
-  optionalLabel?: string;
-  progress: number;
-  progressLabel: string;
+  sectionLabel: string;
   stepLabel: string;
   title: string;
+}>;
+
+type SectionProgressProps = Readonly<{
+  progress: number;
+  progressLabel: string;
 }>;
 
 type ProcessingPanelProps = Readonly<{
@@ -1762,6 +2649,114 @@ type ProcessingPanelProps = Readonly<{
   subtitle: string;
   title: string;
 }>;
+
+type PlanSelectionPanelProps = Readonly<{
+  content: PlanContent;
+  onBack: () => void;
+  onSelect: (planId: string) => void;
+}>;
+
+function PlanSelectionPanel({
+  content,
+  onBack,
+  onSelect
+}: PlanSelectionPanelProps) {
+  return (
+    <section className="mx-auto max-w-6xl rounded-lg bg-white px-5 py-8 ring-1 ring-foreground/10 sm:px-8 lg:px-10">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#3A7BD5]">
+          {content.eyebrow}
+        </p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-4xl">
+          {content.title}
+        </h1>
+        <p className="mt-4 text-base leading-7 text-muted-foreground">
+          {content.subtitle}
+        </p>
+      </div>
+
+      <div className="mt-8 grid gap-5 lg:grid-cols-3">
+        {content.tiers.map((tier) => (
+          <div
+            key={tier.id}
+            className={cx(
+              "flex rounded-lg p-6 ring-1 transition",
+              tier.featured
+                ? "bg-[#3A7BD5]/5 ring-2 ring-[#3A7BD5]"
+                : "bg-white ring-foreground/10"
+            )}
+          >
+            <div className="flex w-full flex-col">
+              <div className="flex items-start justify-between gap-4">
+                <h2
+                  id={tier.id}
+                  className={cx(
+                    "text-lg font-semibold text-[#20343A]",
+                    tier.featured && "text-[#3A7BD5]"
+                  )}
+                >
+                  {tier.name}
+                </h2>
+                {tier.featured ? (
+                  <p className="rounded-full bg-[#3A7BD5]/10 px-2.5 py-1 text-xs font-semibold text-[#3A7BD5]">
+                    {content.badge}
+                  </p>
+                ) : null}
+              </div>
+              <p className="mt-4 min-h-20 text-sm leading-6 text-muted-foreground">
+                {tier.description}
+              </p>
+              <p className="mt-6 flex items-baseline gap-2">
+                <span className="text-4xl font-semibold tracking-normal text-[#20343A]">
+                  {tier.price}
+                </span>
+                {tier.priceSuffix ? (
+                  <span className="text-sm font-semibold text-muted-foreground">
+                    {tier.priceSuffix}
+                  </span>
+                ) : null}
+              </p>
+              <button
+                type="button"
+                aria-describedby={tier.id}
+                className={cx(
+                  "mt-6 rounded-md px-3 py-3 text-center text-sm font-semibold uppercase tracking-[0.08em] transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3A7BD5]",
+                  tier.featured
+                    ? "bg-[#3A7BD5] text-white shadow-sm hover:bg-[#2f69bb]"
+                    : "border border-[#3A7BD5]/20 bg-white text-[#3A7BD5] hover:border-[#3A7BD5]/40 hover:bg-[#3A7BD5]/5"
+                )}
+                onClick={() => onSelect(tier.id)}
+              >
+                {tier.cta}
+              </button>
+              <ul className="mt-8 space-y-3 text-sm leading-6 text-muted-foreground">
+                {tier.features.map((feature) => (
+                  <li key={feature} className="flex gap-3">
+                    <CheckIcon
+                      aria-hidden={true}
+                      className="mt-0.5 size-5 flex-none text-[#1FA77A]"
+                    />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-8 flex justify-center">
+        <button
+          type="button"
+          className="rounded-md border border-foreground/10 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-[#20343A] transition hover:bg-background"
+          onClick={onBack}
+        >
+          {content.back}
+        </button>
+      </div>
+    </section>
+  );
+}
 
 function ProcessingPanel({
   error,
@@ -1870,19 +2865,38 @@ function ProcessingPanel({
   );
 }
 
+function SectionProgress({ progress, progressLabel }: SectionProgressProps) {
+  return (
+    <div className="mb-3 px-1 py-1">
+      <div className="flex items-center justify-between gap-3">
+        <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          {progressLabel}
+        </p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#20343A]">
+          {progress}%
+        </p>
+      </div>
+      <div className="mt-1.5 h-1 rounded-md bg-background">
+        <div
+          className="h-full rounded-md bg-[#1FA77A] transition-all"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function SectionCard({
   children,
   done,
   number,
-  optionalLabel,
-  progress,
-  progressLabel,
+  sectionLabel,
   stepLabel,
   title
 }: SectionCardProps) {
   return (
     <section className="rounded-lg bg-white p-5 ring-1 ring-foreground/10 sm:p-6">
-      <div className="mb-6 space-y-4">
+      <div className="mb-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
@@ -1899,28 +2913,9 @@ function SectionCard({
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#3A7BD5]">
               {stepLabel}
             </p>
-            {optionalLabel ? (
-              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                {optionalLabel}
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              {progressLabel}
+            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              {sectionLabel}
             </p>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#20343A]">
-              {progress}%
-            </p>
-          </div>
-          <div className="mt-1.5 h-1 rounded-md bg-background">
-            <div
-              className="h-full rounded-md bg-[#1FA77A] transition-all"
-              style={{ width: `${progress}%` }}
-            />
           </div>
         </div>
       </div>
@@ -1992,6 +2987,46 @@ function PillGroup({
             }
           >
             {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+type SkinToneGroupProps = Readonly<{
+  onSelect: (value: string) => void;
+  options: readonly Option[];
+  selected: string;
+}>;
+
+function SkinToneGroup({ onSelect, options, selected }: SkinToneGroupProps) {
+  return (
+    <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+      {options.map((option) => {
+        const isSelected = selected === option.value;
+
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-label={option.label}
+            className={cx(
+              "aspect-square rounded-md border bg-white p-1 transition",
+              isSelected
+                ? "border-[#1FA77A] ring-2 ring-[#1FA77A]/20"
+                : "border-foreground/10 hover:border-[#1FA77A]/40 hover:bg-[#1FA77A]/5"
+            )}
+            onClick={() => onSelect(option.value)}
+          >
+            <span
+              aria-hidden={true}
+              className="block size-full rounded-[4px] border border-black/10"
+              style={{
+                backgroundColor:
+                  fitzpatrickSkinToneColors[option.value] ?? "#f8dfc8"
+              }}
+            />
           </button>
         );
       })}
