@@ -1777,9 +1777,9 @@ function ProcessingPanel({
   return (
     <section className="mx-auto max-w-3xl rounded-lg bg-white p-6 ring-1 ring-foreground/10 sm:p-8">
       <div className="mx-auto flex size-12 items-center justify-center rounded-md bg-[#3A7BD5]/10">
-        <ArrowPathIcon
+        <BeakerIcon
           aria-hidden={true}
-          className="size-6 animate-spin text-[#3A7BD5]"
+          className="size-6 text-[#3A7BD5]"
         />
       </div>
       <h1 className="mt-6 text-center text-3xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-4xl">

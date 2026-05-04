@@ -2,9 +2,9 @@ export type FormulationStatus = "covered" | "add" | "review";
 
 export type FormulationIngredient = {
   category: string;
+  dailyDose: string;
   id: string;
   rationale: string;
-  servingGuidance: string;
   status: FormulationStatus;
   supplement: string;
 };
@@ -13,7 +13,7 @@ export type RecommendedProduct = {
   covers: string[];
   description: string;
   id: string;
-  marketplace: "Lazada Thailand";
+  marketplace: "Lazada Thailand" | "Shopee Thailand";
   name: string;
   priority: number;
   tag: string;
@@ -39,114 +39,114 @@ export type FormulationResult = {
 
 const formula: FormulationIngredient[] = [
   {
-    category: "Foundation",
+    category: "Foundation add-on",
+    dailyDose: "5,000 IU/day",
     id: "vitamin-d3",
     rationale: "Supports normal vitamin D status where sun exposure is limited.",
-    servingGuidance: "Provider determined",
     status: "add",
     supplement: "Vitamin D3"
   },
   {
-    category: "Foundation",
+    category: "Foundation add-on",
+    dailyDose: "200 mcg/day",
     id: "vitamin-k2",
     rationale: "Commonly paired with vitamin D in adult wellness stacks.",
-    servingGuidance: "Provider determined",
     status: "add",
     supplement: "Vitamin K2 MK-7"
   },
   {
-    category: "Foundation",
+    category: "Foundation add-on",
+    dailyDose: "2,000 mg EPA / 800 mg DHA",
     id: "omega-3",
     rationale: "Supports general cardiovascular, brain, and recovery wellness goals.",
-    servingGuidance: "Provider determined",
     status: "review",
     supplement: "Omega-3 EPA and DHA"
   },
   {
-    category: "Foundation",
+    category: "Foundation add-on",
+    dailyDose: "300-400 mg/day",
     id: "magnesium",
     rationale: "Supports sleep quality, calm, and muscle relaxation goals.",
-    servingGuidance: "Provider determined",
     status: "add",
     supplement: "Magnesium Glycinate"
   },
   {
-    category: "Foundation",
+    category: "Add separately",
+    dailyDose: "1,000 mcg/day",
     id: "b12",
     rationale: "Useful to consider when dietary intake may be low.",
-    servingGuidance: "Provider determined",
     status: "add",
     supplement: "Vitamin B12 Methylcobalamin"
   },
   {
-    category: "Foundation",
+    category: "Add separately",
+    dailyDose: "400-800 mcg/day",
     id: "methylfolate",
     rationale: "Supports methylation and general daily nutrient coverage.",
-    servingGuidance: "Provider determined",
     status: "add",
     supplement: "Methylfolate 5-MTHF"
   },
   {
     category: "Foundation",
+    dailyDose: "Included in base option",
     id: "b6",
     rationale: "Included as part of the base micronutrient layer.",
-    servingGuidance: "Included in base option",
     status: "covered",
     supplement: "Vitamin B6"
   },
   {
     category: "Foundation",
+    dailyDose: "Included in base option",
     id: "vitamin-c",
     rationale: "Included as part of the base antioxidant layer.",
-    servingGuidance: "Included in base option",
     status: "covered",
     supplement: "Vitamin C"
   },
   {
     category: "Foundation",
+    dailyDose: "Included in base option",
     id: "zinc",
     rationale: "Included as part of the base immune and recovery support layer.",
-    servingGuidance: "Included in base option",
     status: "covered",
     supplement: "Zinc"
   },
   {
-    category: "Targeted",
+    category: "Add separately",
+    dailyDose: "100-200 mg/day",
     id: "coq10",
     rationale: "Supports energy metabolism and healthy aging goals.",
-    servingGuidance: "Provider determined",
     status: "add",
     supplement: "CoQ10 Ubiquinol"
   },
   {
-    category: "Targeted",
+    category: "Add separately",
+    dailyDose: "250-500 mg/day",
     id: "nmn",
     rationale: "Optional healthy aging support for users who prefer advanced longevity products.",
-    servingGuidance: "Provider determined",
     status: "add",
     supplement: "NMN"
   },
   {
-    category: "Targeted",
+    category: "Add separately",
+    dailyDose: "10 g/day",
     id: "collagen",
     rationale: "Supports skin, joint, and active lifestyle goals.",
-    servingGuidance: "Provider determined",
     status: "add",
     supplement: "Collagen Peptides"
   },
   {
-    category: "Targeted",
+    category: "Add separately",
+    dailyDose: "3-5 g/day",
     id: "creatine",
     rationale: "Supports strength, recovery, and cognitive performance goals.",
-    servingGuidance: "Provider determined",
     status: "add",
     supplement: "Creatine Monohydrate"
   },
   {
-    category: "Targeted",
+    category: "Add separately",
+    dailyDose: "1-2 g/day",
     id: "l-carnitine",
     rationale: "Optional active lifestyle support for energy and training goals.",
-    servingGuidance: "Provider determined",
     status: "add",
     supplement: "L-Carnitine L-Tartrate"
   }
@@ -180,11 +180,11 @@ const products: RecommendedProduct[] = [
     description:
       "A focused search for magnesium glycinate products to support calm evenings and recovery.",
     id: "magnesium-product",
-    marketplace: "Lazada Thailand",
+    marketplace: "Shopee Thailand",
     name: "Magnesium glycinate",
     priority: 3,
     tag: "Sleep and calm",
-    url: "https://www.lazada.co.th/tag/magnesium-glycinate/"
+    url: "https://shopee.co.th/search?keyword=magnesium%20glycinate"
   },
   {
     covers: ["vitamin-d3", "vitamin-k2"],
@@ -213,11 +213,11 @@ const products: RecommendedProduct[] = [
     description:
       "An optional longevity-focused product search for users who want an advanced healthy aging layer.",
     id: "nmn-product",
-    marketplace: "Lazada Thailand",
+    marketplace: "Shopee Thailand",
     name: "NMN healthy aging support",
     priority: 6,
     tag: "Optional advanced",
-    url: "https://www.lazada.co.th/tag/nmn/"
+    url: "https://shopee.co.th/search?keyword=nmn"
   },
   {
     covers: ["collagen", "creatine", "l-carnitine"],
@@ -238,7 +238,7 @@ const products: RecommendedProduct[] = [
     marketplace: "Lazada Thailand",
     name: "Methylated B12 and folate",
     priority: 8,
-    tag: "Foundation add-on",
+    tag: "Add separately",
     url: "https://www.lazada.co.th/tag/methyl-b12-folate/"
   }
 ];
@@ -262,7 +262,7 @@ export function getMockFormulationResult(jobId: string): FormulationResult {
     products,
     safetyNotes: [
       "These are optional wellness product suggestions, not medical advice.",
-      "Review all labels for allergens, ingredients, and serving instructions before purchase.",
+      "Review all labels for allergens, ingredients, and daily use instructions before purchase.",
       "Ask a qualified clinician or pharmacist to review the plan if you are pregnant, breastfeeding, taking medication, or managing a medical condition."
     ],
     subtitle:

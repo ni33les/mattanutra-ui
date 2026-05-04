@@ -27,6 +27,12 @@ type FormulationResultsProps = Readonly<{
 
 type LoadState = "loading" | "ready" | "error";
 
+type ProductTone = {
+  highlight: string;
+  matchPill: string;
+  number: string;
+};
+
 const copy = {
   en: {
     add: "Add separately",
@@ -38,12 +44,15 @@ const copy = {
       "The formulation could not be loaded. Please refresh the page and try again.",
     formula: "Supplement breakdown",
     formulaHint:
-      "Hover a product to highlight the formulation entries it covers.",
+      "Rows are grouped by role. Hover a product to highlight the formulation entries it covers.",
     generated: "Generated",
     goals: "Goals",
+    groupAddSeparately: "Add separately",
+    groupFoundation: "Foundation",
+    groupFoundationAddOn: "Foundation add-on",
     job: "Job",
     loading: "Loading your formulation",
-    marketplace: "View product search",
+    dailyDose: "Daily dose",
     matches: "Matches",
     products: "Recommended product searches",
     productsHint:
@@ -52,9 +61,10 @@ const copy = {
     region: "Region",
     review: "Review carefully",
     safety: "Safety notes",
-    serving: "Serving guidance",
+    shopLazada: "Shop on Lazada",
+    shopShopee: "Shop on Shopee",
     statusLegend:
-      "Status shows whether an item is covered by the base option, should be added separately, or needs careful review before purchase."
+      "Formula rows are grouped by role. Status shows whether an item is covered by the base option, should be added separately, or needs careful review before purchase."
   },
   th: {
     add: "เพิ่มแยกต่างหาก",
@@ -65,12 +75,15 @@ const copy = {
     error: "ไม่สามารถโหลดสูตรได้ กรุณารีเฟรชหน้าและลองอีกครั้ง",
     formula: "รายการอาหารเสริม",
     formulaHint:
-      "วางเมาส์บนผลิตภัณฑ์เพื่อไฮไลต์รายการในสูตรที่เกี่ยวข้อง",
+      "รายการถูกจัดกลุ่มตามบทบาท วางเมาส์บนผลิตภัณฑ์เพื่อไฮไลต์รายการในสูตรที่เกี่ยวข้อง",
     generated: "สร้างเมื่อ",
     goals: "เป้าหมาย",
+    groupAddSeparately: "เพิ่มแยกต่างหาก",
+    groupFoundation: "พื้นฐาน",
+    groupFoundationAddOn: "ส่วนเสริมพื้นฐาน",
     job: "งาน",
     loading: "กำลังโหลดสูตรของคุณ",
-    marketplace: "ดูการค้นหาผลิตภัณฑ์",
+    dailyDose: "ขนาดต่อวัน",
     matches: "ตรงกับ",
     products: "การค้นหาผลิตภัณฑ์ที่แนะนำ",
     productsHint:
@@ -79,9 +92,10 @@ const copy = {
     region: "ภูมิภาค",
     review: "ตรวจสอบอย่างระมัดระวัง",
     safety: "หมายเหตุด้านความปลอดภัย",
-    serving: "คำแนะนำการใช้",
+    shopLazada: "ช้อปบน Lazada",
+    shopShopee: "ช้อปบน Shopee",
     statusLegend:
-      "สถานะแสดงว่ารายการนั้นอยู่ในตัวเลือกพื้นฐาน ควรเพิ่มแยกต่างหาก หรือต้องตรวจสอบก่อนซื้อ"
+      "รายการสูตรถูกจัดกลุ่มตามบทบาท สถานะแสดงว่ารายการนั้นอยู่ในตัวเลือกพื้นฐาน ควรเพิ่มแยกต่างหาก หรือต้องตรวจสอบก่อนซื้อ"
   }
 } satisfies Record<
   Locale,
@@ -96,9 +110,12 @@ const copy = {
     | "formulaHint"
     | "generated"
     | "goals"
+    | "groupAddSeparately"
+    | "groupFoundation"
+    | "groupFoundationAddOn"
     | "job"
     | "loading"
-    | "marketplace"
+    | "dailyDose"
     | "matches"
     | "products"
     | "productsHint"
@@ -106,7 +123,8 @@ const copy = {
     | "region"
     | "review"
     | "safety"
-    | "serving"
+    | "shopLazada"
+    | "shopShopee"
     | "statusLegend",
     string
   >
@@ -137,6 +155,55 @@ const statusStyles = {
   }
 >;
 
+const productTones: ProductTone[] = [
+  {
+    highlight: "border-[#3A7BD5]/50 bg-[#3A7BD5]/5 shadow-sm",
+    matchPill: "bg-[#3A7BD5]/10 text-[#245f9f] ring-[#3A7BD5]/20",
+    number: "bg-[#3A7BD5]"
+  },
+  {
+    highlight: "border-[#1FA77A]/50 bg-[#1FA77A]/5 shadow-sm",
+    matchPill: "bg-[#1FA77A]/10 text-[#126b4f] ring-[#1FA77A]/20",
+    number: "bg-[#1FA77A]"
+  },
+  {
+    highlight: "border-cyan-400/60 bg-cyan-50/70 shadow-sm",
+    matchPill: "bg-cyan-50 text-cyan-800 ring-cyan-200",
+    number: "bg-cyan-600"
+  },
+  {
+    highlight: "border-amber-400/60 bg-amber-50/70 shadow-sm",
+    matchPill: "bg-amber-50 text-amber-800 ring-amber-200",
+    number: "bg-amber-500"
+  },
+  {
+    highlight: "border-slate-400/60 bg-slate-50 shadow-sm",
+    matchPill: "bg-slate-100 text-slate-700 ring-slate-200",
+    number: "bg-slate-600"
+  },
+  {
+    highlight: "border-emerald-400/60 bg-emerald-50/70 shadow-sm",
+    matchPill: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+    number: "bg-emerald-600"
+  },
+  {
+    highlight: "border-sky-400/60 bg-sky-50/70 shadow-sm",
+    matchPill: "bg-sky-50 text-sky-800 ring-sky-200",
+    number: "bg-sky-600"
+  },
+  {
+    highlight: "border-lime-400/60 bg-lime-50/70 shadow-sm",
+    matchPill: "bg-lime-50 text-lime-800 ring-lime-200",
+    number: "bg-lime-600"
+  }
+];
+
+const formulationGroupOrder = [
+  "Foundation",
+  "Foundation add-on",
+  "Add separately"
+] as const;
+
 function getStatusLabel(status: FormulationStatus, labels: (typeof copy)["en"]) {
   if (status === "covered") {
     return labels.covered;
@@ -147,6 +214,24 @@ function getStatusLabel(status: FormulationStatus, labels: (typeof copy)["en"]) 
   }
 
   return labels.add;
+}
+
+function getShopLabel(product: RecommendedProduct, labels: (typeof copy)["en"]) {
+  return product.marketplace === "Shopee Thailand"
+    ? labels.shopShopee
+    : labels.shopLazada;
+}
+
+function getGroupLabel(group: string, labels: PanelLabels) {
+  if (group === "Foundation add-on") {
+    return labels.groupFoundationAddOn;
+  }
+
+  if (group === "Add separately") {
+    return labels.groupAddSeparately;
+  }
+
+  return labels.groupFoundation;
 }
 
 export function FormulationResults({ jobId, locale }: FormulationResultsProps) {
@@ -238,10 +323,21 @@ export function FormulationResults({ jobId, locale }: FormulationResultsProps) {
   const ingredientById = new Map(
     result.formula.map((ingredient) => [ingredient.id, ingredient])
   );
+  const productToneById = new Map(
+    result.products.map((product, index) => [
+      product.id,
+      productTones[index % productTones.length]
+    ])
+  );
   const hoveredProduct = result.products.find(
     (product) => product.id === hoveredProductId
   );
-  const highlightedIngredientIds = new Set(hoveredProduct?.covers ?? []);
+  const highlightedIngredientToneById = new Map(
+    (hoveredProduct?.covers ?? []).map((ingredientId) => [
+      ingredientId,
+      productToneById.get(hoveredProduct?.id ?? "") ?? productTones[0]
+    ])
+  );
   const highlightedProductIds = new Set(
     hoveredIngredientId
       ? result.products
@@ -310,7 +406,7 @@ export function FormulationResults({ jobId, locale }: FormulationResultsProps) {
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]">
         <FormulaPanel
-          highlightedIngredientIds={highlightedIngredientIds}
+          highlightedIngredientToneById={highlightedIngredientToneById}
           ingredients={result.formula}
           labels={labels}
           onHoverIngredient={(ingredientId) => {
@@ -322,6 +418,7 @@ export function FormulationResults({ jobId, locale }: FormulationResultsProps) {
 
         <ProductsPanel
           highlightedProductIds={highlightedProductIds}
+          hoveredProductId={hoveredProductId}
           ingredientById={ingredientById}
           labels={labels}
           onHoverProduct={(productId) => {
@@ -329,6 +426,7 @@ export function FormulationResults({ jobId, locale }: FormulationResultsProps) {
             setHoveredProductId(productId);
           }}
           onLeaveProduct={() => setHoveredProductId(null)}
+          productToneById={productToneById}
           products={result.products}
         />
       </div>
@@ -392,18 +490,25 @@ function ContextChips({
 }
 
 function FormulaPanel({
-  highlightedIngredientIds,
+  highlightedIngredientToneById,
   ingredients,
   labels,
   onHoverIngredient,
   onLeaveIngredient
 }: Readonly<{
-  highlightedIngredientIds: Set<string>;
+  highlightedIngredientToneById: Map<string, ProductTone>;
   ingredients: FormulationIngredient[];
   labels: PanelLabels;
   onHoverIngredient: (ingredientId: string) => void;
   onLeaveIngredient: () => void;
 }>) {
+  const groupedIngredients = formulationGroupOrder
+    .map((group) => ({
+      group,
+      ingredients: ingredients.filter((ingredient) => ingredient.category === group)
+    }))
+    .filter((group) => group.ingredients.length > 0);
+
   return (
     <section className="rounded-lg bg-white p-5 ring-1 ring-foreground/10 sm:p-6">
       <div className="flex items-start justify-between gap-4">
@@ -421,67 +526,84 @@ function FormulaPanel({
         />
       </div>
 
-      <div className="mt-6 space-y-3">
-        {ingredients.map((ingredient) => {
-          const highlighted = highlightedIngredientIds.has(ingredient.id);
-          const StatusIcon = statusStyles[ingredient.status].icon;
+      <div className="mt-6 space-y-7">
+        {groupedIngredients.map(({ group, ingredients: groupIngredients }) => (
+          <div key={group}>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#20343A]">
+              {getGroupLabel(group, labels)}
+            </h3>
+            <div className="mt-3 space-y-3">
+              {groupIngredients.map((ingredient) => {
+                const highlightTone = highlightedIngredientToneById.get(
+                  ingredient.id
+                );
+                const StatusIcon = statusStyles[ingredient.status].icon;
 
-          return (
-            <article
-              key={ingredient.id}
-              tabIndex={0}
-              className={cn(
-                "rounded-lg border border-foreground/10 bg-white p-4 transition",
-                highlighted && "border-[#3A7BD5]/40 bg-[#3A7BD5]/5 shadow-sm"
-              )}
-              onBlur={onLeaveIngredient}
-              onFocus={() => onHoverIngredient(ingredient.id)}
-              onMouseEnter={() => onHoverIngredient(ingredient.id)}
-              onMouseLeave={onLeaveIngredient}
-            >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "flex size-7 flex-none items-center justify-center rounded-md text-white",
-                        statusStyles[ingredient.status].dot
-                      )}
-                    >
-                      <StatusIcon aria-hidden={true} className="size-4" />
-                    </span>
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      {ingredient.category}
-                    </p>
-                  </div>
-                  <h3 className="mt-3 text-base font-semibold text-[#20343A]">
-                    {ingredient.supplement}
-                  </h3>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    {ingredient.rationale}
-                  </p>
-                </div>
-
-                <div className="shrink-0 sm:w-44">
-                  <span
+                return (
+                  <article
+                    key={ingredient.id}
+                    tabIndex={0}
                     className={cn(
-                      "inline-flex rounded-md px-2.5 py-1.5 text-xs font-semibold ring-1 ring-inset",
-                      statusStyles[ingredient.status].badge
+                      "rounded-lg border border-foreground/10 bg-white p-4 transition",
+                      highlightTone?.highlight
                     )}
+                    onBlur={onLeaveIngredient}
+                    onFocus={() => onHoverIngredient(ingredient.id)}
+                    onMouseEnter={() => onHoverIngredient(ingredient.id)}
+                    onMouseLeave={onLeaveIngredient}
                   >
-                    {getStatusLabel(ingredient.status, labels)}
-                  </span>
-                  <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    {labels.serving}
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[#20343A]">
-                    {ingredient.servingGuidance}
-                  </p>
-                </div>
-              </div>
-            </article>
-          );
-        })}
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              "flex size-7 flex-none items-center justify-center rounded-md text-white",
+                              statusStyles[ingredient.status].dot
+                            )}
+                          >
+                            <StatusIcon aria-hidden={true} className="size-4" />
+                          </span>
+                          {highlightTone ? (
+                            <span
+                              aria-hidden={true}
+                              className={cn(
+                                "h-7 w-1.5 rounded-full",
+                                highlightTone.number
+                              )}
+                            />
+                          ) : null}
+                        </div>
+                        <h4 className="mt-3 text-base font-semibold text-[#20343A]">
+                          {ingredient.supplement}
+                        </h4>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                          {ingredient.rationale}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 sm:w-44">
+                        <span
+                          className={cn(
+                            "inline-flex rounded-md px-2.5 py-1.5 text-xs font-semibold ring-1 ring-inset",
+                            statusStyles[ingredient.status].badge
+                          )}
+                        >
+                          {getStatusLabel(ingredient.status, labels)}
+                        </span>
+                        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                          {labels.dailyDose}
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-[#20343A]">
+                          {ingredient.dailyDose}
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -489,17 +611,21 @@ function FormulaPanel({
 
 function ProductsPanel({
   highlightedProductIds,
+  hoveredProductId,
   ingredientById,
   labels,
   onHoverProduct,
   onLeaveProduct,
+  productToneById,
   products
 }: Readonly<{
   highlightedProductIds: Set<string>;
+  hoveredProductId: string | null;
   ingredientById: Map<string, FormulationIngredient>;
   labels: PanelLabels;
   onHoverProduct: (productId: string) => void;
   onLeaveProduct: () => void;
+  productToneById: Map<string, ProductTone>;
   products: RecommendedProduct[];
 }>) {
   return (
@@ -515,7 +641,9 @@ function ProductsPanel({
 
       <div className="mt-6 space-y-4">
         {products.map((product) => {
-          const highlighted = highlightedProductIds.has(product.id);
+          const tone = productToneById.get(product.id) ?? productTones[0];
+          const highlighted =
+            product.id === hoveredProductId || highlightedProductIds.has(product.id);
 
           return (
             <article
@@ -523,7 +651,7 @@ function ProductsPanel({
               tabIndex={0}
               className={cn(
                 "rounded-lg border border-foreground/10 bg-white p-4 transition",
-                highlighted && "border-[#3A7BD5]/40 bg-[#3A7BD5]/5 shadow-sm"
+                highlighted && tone.highlight
               )}
               onBlur={onLeaveProduct}
               onFocus={() => onHoverProduct(product.id)}
@@ -531,7 +659,10 @@ function ProductsPanel({
               onMouseLeave={onLeaveProduct}
             >
               <div className="flex gap-4">
-                <div className="flex size-10 flex-none items-center justify-center rounded-md bg-[#20343A] text-sm font-semibold text-white">
+                <div className={cn(
+                  "flex size-10 flex-none items-center justify-center rounded-md text-sm font-semibold text-white",
+                  tone.number
+                )}>
                   {product.priority}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -563,7 +694,12 @@ function ProductsPanel({
                     return (
                       <li
                         key={ingredientId}
-                        className="rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-[#20343A] ring-1 ring-foreground/10"
+                        className={cn(
+                          "rounded-md px-2.5 py-1.5 text-xs font-medium ring-1 ring-inset",
+                          highlighted
+                            ? tone.matchPill
+                            : "bg-white text-[#20343A] ring-foreground/10"
+                        )}
                       >
                         {ingredient?.supplement ?? ingredientId}
                       </li>
@@ -578,7 +714,7 @@ function ProductsPanel({
                 rel="noreferrer"
                 target="_blank"
               >
-                {labels.marketplace}
+                {getShopLabel(product, labels)}
                 <ArrowTopRightOnSquareIcon
                   aria-hidden={true}
                   className="size-4"
