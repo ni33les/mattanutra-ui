@@ -1,10 +1,14 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useState } from "react";
 import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
   BeakerIcon,
+  CheckIcon,
+  ClipboardDocumentIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
   SparklesIcon
@@ -34,8 +38,45 @@ type ProductReference = {
   tone: ProductTone;
 };
 
+const chatChannels = [
+  {
+    buttonClasses: "bg-[#06C755] text-white hover:bg-[#05B34D]",
+    iconUrl: "https://cdn.simpleicons.org/line/06C755",
+    id: "line",
+    name: "LINE",
+    qrPanelClasses: "bg-[#06C755]/5 ring-[#06C755]/15",
+    url: "https://line.me/R/ti/p/@healthspan"
+  },
+  {
+    buttonClasses: "bg-[#25D366] text-white hover:bg-[#1FB85A]",
+    iconUrl: "https://cdn.simpleicons.org/whatsapp/25D366",
+    id: "whatsapp",
+    name: "WhatsApp",
+    qrPanelClasses: "bg-[#25D366]/5 ring-[#25D366]/15",
+    url: "https://wa.me/660000000000"
+  },
+  {
+    buttonClasses: "bg-[#229ED9] text-white hover:bg-[#1D8EC4]",
+    iconUrl: "https://cdn.simpleicons.org/telegram/229ED9",
+    id: "telegram",
+    name: "Telegram",
+    qrPanelClasses: "bg-[#229ED9]/5 ring-[#229ED9]/15",
+    url: "https://t.me/healthspan"
+  }
+] as const;
+
 const copy = {
   en: {
+    connectChatBody:
+      "Choose your preferred chat app for support tailored to your diet, routine, travel, training, and daily life. Send your plan ID and the advisor can continue from this recommendation.",
+    connectChatButton: "Open chat",
+    connectChatCopied: "Copied",
+    connectChatCopy: "Copy plan ID",
+    connectChatEyebrow: "Continue in chat",
+    connectChatPlanId: "Plan ID",
+    connectChatQrAlt: "QR code to connect with the Healthspan AI advisor",
+    connectChatTitle:
+      "Connect with our specialist AI supplement advisor for ongoing support and refinement.",
     constraints: "Constraints",
     context: "Assessment summary",
     coveragePrefix: "Covers",
@@ -62,6 +103,16 @@ const copy = {
     shopShopee: "Shop on Shopee"
   },
   th: {
+    connectChatBody:
+      "เลือกแอปแชตที่คุณสะดวก เพื่อรับการดูแลต่อเนื่องที่ปรับตามอาหาร กิจวัตร การเดินทาง การฝึก และชีวิตประจำวัน ส่ง Plan ID แล้ว advisor จะคุยต่อจากคำแนะนำนี้ได้",
+    connectChatButton: "เปิดแชต",
+    connectChatCopied: "คัดลอกแล้ว",
+    connectChatCopy: "คัดลอก Plan ID",
+    connectChatEyebrow: "คุยต่อในแชต",
+    connectChatPlanId: "Plan ID",
+    connectChatQrAlt: "QR code สำหรับเชื่อมต่อ Healthspan AI advisor",
+    connectChatTitle:
+      "เชื่อมต่อกับ AI advisor เฉพาะทางด้านอาหารเสริมเพื่อการดูแลและปรับแผนต่อเนื่อง",
     constraints: "ข้อจำกัด",
     context: "สรุปแบบประเมิน",
     coveragePrefix: "ครอบคลุม",
@@ -89,6 +140,14 @@ const copy = {
 } satisfies Record<
   Locale,
   Record<
+    | "connectChatBody"
+    | "connectChatButton"
+    | "connectChatCopied"
+    | "connectChatCopy"
+    | "connectChatEyebrow"
+    | "connectChatPlanId"
+    | "connectChatQrAlt"
+    | "connectChatTitle"
     | "constraints"
     | "context"
     | "coveragePrefix"
@@ -313,6 +372,7 @@ export function FormulationResults({ jobId, locale }: FormulationResultsProps) {
       timeStyle: "short"
     }
   ).format(new Date(result.generatedAt));
+  const planId = result.jobId || effectiveJobId;
 
   return (
     <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
@@ -382,6 +442,8 @@ export function FormulationResults({ jobId, locale }: FormulationResultsProps) {
         />
       </div>
 
+      <ChatConnectPanel labels={labels} planId={planId} />
+
       <div className="mt-8 rounded-lg bg-[#20343A] p-6 text-sm leading-6 text-white/75">
         <div className="flex gap-3">
           <InformationCircleIcon
@@ -437,6 +499,126 @@ function ContextChips({
         ))}
       </dd>
     </div>
+  );
+}
+
+function ChatConnectPanel({
+  labels,
+  planId
+}: Readonly<{ labels: PanelLabels; planId: string }>) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyPlanId() {
+    try {
+      await navigator.clipboard.writeText(planId);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <section className="mt-8 overflow-hidden rounded-lg bg-white ring-1 ring-foreground/10">
+      <div className="p-6 sm:p-8">
+        <div className="inline-flex w-fit items-center gap-3 rounded-md bg-[#06C755]/10 px-3 py-2">
+          <span className="flex size-9 items-center justify-center rounded-md bg-[#06C755] text-xs font-black tracking-tight text-white">
+            AI
+          </span>
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#058B3F]">
+            {labels.connectChatEyebrow}
+          </span>
+        </div>
+        <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
+          <div>
+            <h2 className="max-w-2xl text-2xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-3xl">
+              {labels.connectChatTitle}
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
+              {labels.connectChatBody}
+            </p>
+          </div>
+          <div className="flex max-w-full flex-wrap items-center gap-2 text-xs lg:justify-end">
+            <span className="font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              {labels.connectChatPlanId}
+            </span>
+            <code className="max-w-full truncate rounded-md bg-background px-2.5 py-1.5 font-mono text-[11px] font-medium text-muted-foreground ring-1 ring-foreground/10">
+              {planId}
+            </code>
+            <button
+              type="button"
+              aria-label={copied ? labels.connectChatCopied : labels.connectChatCopy}
+              className="inline-flex size-8 items-center justify-center rounded-md border border-[#06C755]/25 bg-white text-[#058B3F] transition hover:bg-[#06C755]/5 focus:outline-none focus:ring-2 focus:ring-[#06C755]/25"
+              title={copied ? labels.connectChatCopied : labels.connectChatCopy}
+              onClick={copyPlanId}
+            >
+              {copied ? (
+                <CheckIcon aria-hidden={true} className="size-4" />
+              ) : (
+                <ClipboardDocumentIcon aria-hidden={true} className="size-4" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-7 grid gap-4 lg:grid-cols-3">
+          {chatChannels.map((channel) => {
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=176x176&margin=10&data=${encodeURIComponent(channel.url)}`;
+
+            return (
+              <article
+                key={channel.id}
+                className="rounded-lg border border-foreground/10 bg-white p-4"
+              >
+                <div className="flex items-center gap-3">
+                  <img
+                    alt={`${channel.name} logo`}
+                    className="size-8"
+                    height={32}
+                    src={channel.iconUrl}
+                    width={32}
+                  />
+                  <h3 className="text-base font-semibold text-[#20343A]">
+                    {channel.name}
+                  </h3>
+                </div>
+                <div
+                  className={cn(
+                    "mt-4 flex justify-center rounded-md p-4 ring-1",
+                    channel.qrPanelClasses
+                  )}
+                >
+                  <div className="rounded-lg bg-white p-2 shadow-sm ring-1 ring-foreground/10">
+                    <img
+                      alt={`${labels.connectChatQrAlt}: ${channel.name}`}
+                      className="size-36"
+                      height={144}
+                      src={qrUrl}
+                      width={144}
+                    />
+                  </div>
+                </div>
+                <a
+                  className={cn(
+                    "mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-semibold uppercase tracking-[0.08em] transition focus:outline-none focus:ring-2 focus:ring-offset-2",
+                    channel.buttonClasses
+                  )}
+                  href={channel.url}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {labels.connectChatButton}
+                  <ArrowTopRightOnSquareIcon
+                    aria-hidden={true}
+                    className="size-4"
+                  />
+                </a>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -216,7 +216,6 @@ type Answers = {
 };
 
 const requiredGroups = [
-  "name",
   "sex",
   "age",
   "heightCm",
@@ -283,7 +282,7 @@ const initialAnswers: Answers = {
 const en: Copy = {
   about: {
     title: "About you",
-    name: "First name",
+    name: "Name",
     sex: "Sex",
     sexOptions: [
       { label: "Male", value: "male" },
@@ -377,7 +376,7 @@ const en: Copy = {
   },
   fixedAction: {
     complete: "All essentials answered - ready to generate.",
-    generate: "Generate my formula brief",
+    generate: "Continue",
     remaining: (count) =>
       `${count} required question${count === 1 ? "" : "s"} remaining`
   },
@@ -698,7 +697,7 @@ const th: Copy = {
   about: {
     ...en.about,
     title: "เกี่ยวกับคุณ",
-    name: "ชื่อจริง",
+    name: "ชื่อ",
     sex: "เพศ",
     sexOptions: [
       { label: "ชาย", value: "male" },
@@ -785,7 +784,7 @@ const th: Copy = {
   },
   fixedAction: {
     complete: "ตอบคำถามสำคัญครบแล้ว พร้อมสร้างบรีฟ",
-    generate: "สร้างบรีฟสูตรของฉัน",
+    generate: "ดำเนินการต่อ",
     remaining: (count) => `เหลือคำถามจำเป็น ${count} ข้อ`
   },
   goals: {
@@ -1281,6 +1280,7 @@ type PlanTier = Readonly<{
   name: string;
   price: string;
   priceSuffix: string;
+  tierBadge?: string;
 }>;
 
 type PlanContent = Readonly<{
@@ -1328,7 +1328,7 @@ const questionWhyEn: QuestionWhyMap = {
   meds:
     "Medications are essential for safety screening and avoiding interaction risks.",
   name:
-    "This makes the brief feel personal and easier to review later.",
+    "This is only used to personalise the brief. It is completely okay to stay anonymous.",
   pills: "Capsule limit helps keep the plan usable day to day.",
   protein:
     "Protein intake helps interpret activity, recovery, muscle, and satiety needs.",
@@ -1391,7 +1391,8 @@ const questionWhyTh: QuestionWhyMap = {
     "ช่วงฮอร์โมนอาจมีผลต่อธาตุเหล็ก กระดูก การนอน และอาการต่างๆ",
   meds:
     "ข้อมูลยาจำเป็นต่อการตรวจความปลอดภัยและลดความเสี่ยงจากปฏิกิริยาระหว่างกัน",
-  name: "ช่วยให้บรีฟอ่านเป็นส่วนตัวและตรวจทานง่ายขึ้น",
+  name:
+    "ใช้เพื่อให้บรีฟเป็นส่วนตัวขึ้นเท่านั้น คุณสามารถไม่ระบุตัวตนได้",
   pills: "จำนวนเม็ดสูงสุดช่วยให้แผนทำตามได้จริงในชีวิตประจำวัน",
   protein:
     "โปรตีนช่วยตีความกิจกรรม การฟื้นตัว กล้ามเนื้อ และความอิ่ม",
@@ -1461,9 +1462,10 @@ function getPlanContent(locale: Locale): PlanContent {
             "ตัวอย่างผลลัพธ์เบื้องต้น"
           ],
           id: "free-basic",
-          name: "แผนพื้นฐานฟรี",
+          name: "แผนพื้นฐาน",
           price: "฿0",
-          priceSuffix: ""
+          priceSuffix: "",
+          tierBadge: "ฟรี"
         },
         {
           cta: "ไปต่อ",
@@ -1496,7 +1498,8 @@ function getPlanContent(locale: Locale): PlanContent {
           id: "pro",
           name: "โปร",
           price: "฿1,490",
-          priceSuffix: "/เดือน"
+          priceSuffix: "/เดือน",
+          tierBadge: "มี AI เอเจนต์"
         }
       ]
     };
@@ -1521,9 +1524,10 @@ function getPlanContent(locale: Locale): PlanContent {
           "Preview of your results"
         ],
         id: "free-basic",
-        name: "Free Basic Plan",
+        name: "Basic Plan",
         price: "฿0",
-        priceSuffix: ""
+        priceSuffix: "",
+        tierBadge: "Free"
       },
       {
         cta: "Go",
@@ -1554,9 +1558,10 @@ function getPlanContent(locale: Locale): PlanContent {
           "Priority review as your data changes"
         ],
         id: "pro",
-        name: "Pro",
+        name: "Pro Plan",
         price: "฿1,490",
-        priceSuffix: "/month"
+        priceSuffix: "/month",
+        tierBadge: "AI agent included"
       }
     ]
   };
@@ -1741,21 +1746,6 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
           : "A few basics help us shape the plan around your body and lifestyle.",
       id: "about",
       questions: [
-        {
-          content: (
-            <input
-              type="text"
-              autoComplete="given-name"
-              value={answers.name}
-              className="block w-full rounded-md border border-foreground/10 bg-white px-4 py-3 text-sm text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
-              onChange={(event) => setSingle("name", event.target.value)}
-            />
-          ),
-          id: "name",
-          isAnswered: Boolean(answers.name.trim()),
-          label: copy.about.name,
-          required: true
-        },
         {
           content: (
             <PillGroup
@@ -2831,7 +2821,7 @@ function PlanSelectionPanel({
             )}
           >
             <div className="flex w-full flex-col">
-              <div className="flex items-start justify-between gap-4">
+              <div>
                 <h2
                   id={tier.id}
                   className={cx(
@@ -2841,11 +2831,18 @@ function PlanSelectionPanel({
                 >
                   {tier.name}
                 </h2>
-                {tier.featured ? (
-                  <p className="rounded-full bg-[#3A7BD5]/10 px-2.5 py-1 text-xs font-semibold text-[#3A7BD5]">
-                    {content.badge}
-                  </p>
-                ) : null}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {tier.featured ? (
+                    <p className="inline-flex rounded-full bg-[#3A7BD5]/10 px-2.5 py-1 text-xs font-semibold text-[#3A7BD5]">
+                      {content.badge}
+                    </p>
+                  ) : null}
+                  {tier.tierBadge ? (
+                    <p className="inline-flex rounded-full bg-[#1FA77A]/10 px-2.5 py-1 text-xs font-semibold text-[#126b4f]">
+                      {tier.tierBadge}
+                    </p>
+                  ) : null}
+                </div>
               </div>
               <p className="mt-4 min-h-20 text-sm leading-6 text-muted-foreground">
                 {tier.description}
@@ -2864,10 +2861,10 @@ function PlanSelectionPanel({
                 type="button"
                 aria-describedby={tier.id}
                 className={cx(
-                  "mt-6 rounded-md px-3 py-3 text-center text-sm font-semibold uppercase tracking-[0.08em] transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3A7BD5]",
+                  "mt-6 rounded-md px-3 py-3 text-center text-sm font-semibold uppercase tracking-[0.08em] transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A]",
                   tier.featured
-                    ? "bg-[#3A7BD5] text-white shadow-sm hover:bg-[#2f69bb]"
-                    : "border border-[#3A7BD5]/20 bg-white text-[#3A7BD5] hover:border-[#3A7BD5]/40 hover:bg-[#3A7BD5]/5"
+                    ? "bg-[#1FA77A] text-white shadow-sm hover:bg-[#188a65]"
+                    : "border border-[#1FA77A]/25 bg-white text-[#126b4f] hover:border-[#1FA77A]/50 hover:bg-[#1FA77A]/5"
                 )}
                 onClick={() => onSelect(tier.id)}
               >
