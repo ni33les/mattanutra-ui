@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BeakerIcon,
-  CheckCircleIcon,
-  ChevronDownIcon,
-  LockClosedIcon
+  CheckCircleIcon
 } from "@heroicons/react/20/solid";
 import type { Locale } from "@/lib/i18n";
 
@@ -142,7 +140,6 @@ type Answers = {
   build: string;
   conditions: string[];
   diet: string;
-  email: string;
   fish: string;
   feelGreat: boolean;
   form: string;
@@ -152,7 +149,7 @@ type Answers = {
   lifestage: string;
   meds: string;
   medTypes: string[];
-  monthly: boolean;
+  notes: string;
   pills: string;
   region: string;
   sex: string;
@@ -183,7 +180,6 @@ const initialAnswers: Answers = {
   build: "",
   conditions: [],
   diet: "",
-  email: "",
   fish: "",
   feelGreat: false,
   form: "",
@@ -193,7 +189,7 @@ const initialAnswers: Answers = {
   lifestage: "",
   meds: "",
   medTypes: [],
-  monthly: true,
+  notes: "",
   pills: "",
   region: "",
   sex: "",
@@ -209,8 +205,7 @@ const en: Copy = {
     sex: "I am",
     sexOptions: [
       { label: "Male", value: "male" },
-      { label: "Female", value: "female" },
-      { label: "Other", value: "other" }
+      { label: "Female", value: "female" }
     ],
     age: "My age",
     ageOptions: [
@@ -489,8 +484,7 @@ const th: Copy = {
     sex: "ฉันคือ",
     sexOptions: [
       { label: "ชาย", value: "male" },
-      { label: "หญิง", value: "female" },
-      { label: "อื่นๆ", value: "other" }
+      { label: "หญิง", value: "female" }
     ],
     age: "อายุของฉัน",
     ageOptions: en.about.ageOptions,
@@ -769,29 +763,9 @@ function countRequired(answers: Answers) {
   }, 0);
 }
 
-function isSectionDone(index: number, answers: Answers) {
-  if (index === 1) {
-    return Boolean(answers.sex && answers.age && answers.activity);
-  }
-
-  if (index === 2) {
-    return answers.goals.length > 0;
-  }
-
-  if (index === 3) {
-    return answers.symptoms.length > 0 || answers.feelGreat;
-  }
-
-  if (index === 4) {
-    return Boolean(answers.diet && answers.fish && answers.sun && answers.meds);
-  }
-
-  return Boolean(answers.budget && answers.pills);
-}
-
 function pillClasses(selected: boolean) {
   return cx(
-    "rounded-full border px-4 py-2 text-sm font-semibold transition",
+    "rounded-md border px-4 py-2 text-sm font-semibold transition",
     selected
       ? "border-[#1FA77A] bg-[#1FA77A] text-white"
       : "border-foreground/10 bg-white text-[#20343A] hover:border-[#1FA77A]/40 hover:bg-[#1FA77A]/5"
@@ -817,8 +791,7 @@ function buildPreviewTags(copy: Copy, answers: Answers) {
     answers.budget
       ? copy.preferences.budgetOptions.find((option) => option.value === answers.budget)?.label
       : "",
-    answers.meds === "yes" ? "Safety review" : "",
-    answers.monthly ? "Monthly updates" : ""
+    answers.meds === "yes" ? "Safety review" : ""
   ].filter(Boolean);
 
   return tags.slice(0, 8);
@@ -828,19 +801,101 @@ type AssessmentFlowProps = Readonly<{
   locale: Locale;
 }>;
 
+type AssessmentQuestion = Readonly<{
+  content: React.ReactNode;
+  hint?: string;
+  id: string;
+  isAnswered: boolean;
+  label: string;
+  required?: boolean;
+}>;
+
+type AssessmentSection = Readonly<{
+  description: string;
+  id: string;
+  optional?: boolean;
+  questions: AssessmentQuestion[];
+  title: string;
+}>;
+
+function useCompactAssessment() {
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsCompact(query.matches);
+
+    update();
+    query.addEventListener("change", update);
+
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return isCompact;
+}
+
 export function AssessmentFlow({ locale }: AssessmentFlowProps) {
   const copy = copies[locale];
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
-  const [precisionOpen, setPrecisionOpen] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [sectionIndex, setSectionIndex] = useState(0);
+  const [questionIndex, setQuestionIndex] = useState(0);
   const [submitted, setSubmitted] = useState(false);
-  const [emailError, setEmailError] = useState(false);
+  const isCompact = useCompactAssessment();
 
   const completed = countRequired(answers);
   const requiredTotal = requiredGroups.length;
   const progress = Math.round((completed / requiredTotal) * 100);
   const canGenerate = completed === requiredTotal;
   const previewTags = buildPreviewTags(copy, answers);
+  const ui =
+    locale === "th"
+      ? {
+          back: "ย้อนกลับ",
+          close: "ปิด",
+          continue: "ต่อไป",
+          currentStep: "ขั้นตอนปัจจุบัน",
+          notesHint: "เพิ่มได้ถ้ามีรายละเอียดสำคัญ เช่น ความไวต่อส่วนผสม ข้อจำกัด หรือสิ่งที่อยากหลีกเลี่ยง",
+          notesLabel: "มีอะไรเพิ่มเติมที่เราควรรู้ไหม?",
+          optionalSection: "ขั้นตอนเสริม",
+          reviewDescription:
+            "ตรวจสอบสรุปเบื้องต้น แล้วสร้างบรีฟสูตรอาหารเสริมของคุณ",
+          reviewQuestion: "ตรวจสอบบรีฟของคุณ",
+          reviewSafety:
+            "อาหารเสริมเป็นผลิตภัณฑ์เพื่อสุขภาพ ไม่ใช่การวินิจฉัย การรักษา หรือคำแนะนำให้หยุดยา",
+          reviewTitle: "ตรวจสอบและสร้างบรีฟ",
+          section: (current: number, total: number) =>
+            `ส่วนที่ ${current} จาก ${total}`,
+          sectionHint: "ตอบคำถามในส่วนนี้เพื่อไปต่อ",
+          skipOptional: "ข้ามขั้นตอนเสริม",
+          summaryTitle: "สรุปบรีฟของคุณ",
+          step: (current: number, total: number) =>
+            `คำถามที่ ${current} จาก ${total}`,
+          validation: "ตอบข้อที่จำเป็นเพื่อไปต่อ"
+        }
+      : {
+          back: "Back",
+          close: "Close",
+          continue: "Continue",
+          currentStep: "Current step",
+          notesHint:
+            "Add anything useful, such as sensitivities, constraints, products you already use, or ingredients you want to avoid.",
+          notesLabel: "Anything else we should know?",
+          optionalSection: "Optional precision",
+          reviewDescription:
+            "Review your draft profile, then generate the formulation brief.",
+          reviewQuestion: "Review your brief",
+          reviewSafety:
+            "Supplements are optional wellness products, not diagnosis, treatment, or advice to stop medication.",
+          reviewTitle: "Review and generate",
+          section: (current: number, total: number) =>
+            `Section ${current} of ${total}`,
+          sectionHint: "Complete the required questions in this section to continue.",
+          skipOptional: "Skip optional",
+          summaryTitle: "Your brief preview",
+          step: (current: number, total: number) =>
+            `Question ${current} of ${total}`,
+          validation: "Answer the required item to continue"
+        };
 
   function setSingle(key: keyof Answers, value: string) {
     setAnswers((current) => ({
@@ -878,43 +933,557 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
     }));
   }
 
-  function submitEmail() {
-    if (!answers.email.includes("@")) {
-      setEmailError(true);
+  const sections: AssessmentSection[] = [
+    {
+      description:
+        locale === "th"
+          ? "ข้อมูลพื้นฐานช่วยให้เราปรับแผนให้เหมาะกับร่างกายและไลฟ์สไตล์ของคุณ"
+          : "A few basics help us shape the plan around your body and lifestyle.",
+      id: "about",
+      questions: [
+        {
+          content: (
+            <PillGroup
+              options={copy.about.sexOptions}
+              selected={answers.sex}
+              onSelect={(value) => setSingle("sex", value)}
+            />
+          ),
+          id: "sex",
+          isAnswered: Boolean(answers.sex),
+          label: copy.about.sex,
+          required: true
+        },
+        {
+          content: (
+            <PillGroup
+              options={copy.about.ageOptions}
+              selected={answers.age}
+              onSelect={(value) => setSingle("age", value)}
+            />
+          ),
+          id: "age",
+          isAnswered: Boolean(answers.age),
+          label: copy.about.age,
+          required: true
+        },
+        {
+          content: (
+            <PillGroup
+              options={copy.about.activityOptions}
+              selected={answers.activity}
+              onSelect={(value) => setSingle("activity", value)}
+            />
+          ),
+          id: "activity",
+          isAnswered: Boolean(answers.activity),
+          label: copy.about.activity,
+          required: true
+        },
+        {
+          content: (
+            <PillGroup
+              options={copy.about.buildOptions}
+              selected={answers.build}
+              onSelect={(value) => setSingle("build", value)}
+            />
+          ),
+          id: "build",
+          isAnswered: Boolean(answers.build),
+          label: copy.about.build
+        }
+      ],
+      title: copy.about.title
+    },
+    {
+      description:
+        locale === "th"
+          ? "เลือกสิ่งที่สำคัญที่สุด เพื่อให้สูตรมีทิศทางชัดเจนตั้งแต่ต้น"
+          : "Choose what matters most so the formulation has a clear direction.",
+      id: "goals",
+      questions: [
+        {
+          content: (
+            <OptionGrid
+              max={3}
+              options={copy.goals.options}
+              selected={answers.goals}
+              onToggle={(value) => toggleMulti("goals", value, 3)}
+            />
+          ),
+          hint: copy.goals.hint,
+          id: "goals",
+          isAnswered: answers.goals.length > 0,
+          label: copy.goals.prompt,
+          required: true
+        }
+      ],
+      title: copy.goals.title
+    },
+    {
+      description:
+        locale === "th"
+          ? "บอกเราว่าตอนนี้คุณรู้สึกอย่างไร เพื่อแยกสิ่งที่ควรสนับสนุนเป็นอันดับแรก"
+          : "Tell us how you feel right now so we can separate priorities from nice-to-haves.",
+      id: "symptoms",
+      questions: [
+        {
+          content: (
+            <>
+              <OptionGrid
+                options={copy.symptoms.options}
+                selected={answers.symptoms}
+                onToggle={(value) => toggleMulti("symptoms", value)}
+              />
+              <div className="mt-3">
+                <button
+                  type="button"
+                  className={cardOptionClasses(answers.feelGreat)}
+                  onClick={markFeelingGreat}
+                >
+                  {copy.symptoms.great.label}
+                </button>
+              </div>
+            </>
+          ),
+          hint: copy.symptoms.hint,
+          id: "symptoms",
+          isAnswered: answers.symptoms.length > 0 || answers.feelGreat,
+          label: copy.symptoms.prompt,
+          required: true
+        }
+      ],
+      title: copy.symptoms.title
+    },
+    {
+      description:
+        locale === "th"
+          ? "อาหาร แสงแดด และยาที่ใช้อยู่ช่วยให้เราสร้างบรีฟที่ระมัดระวังและเหมาะสม"
+          : "Diet, sunlight, and medication context keep the brief useful and careful.",
+      id: "lifestyle",
+      questions: [
+        {
+          content: (
+            <PillGroup
+              options={copy.lifestyle.dietOptions}
+              selected={answers.diet}
+              onSelect={(value) => setSingle("diet", value)}
+            />
+          ),
+          id: "diet",
+          isAnswered: Boolean(answers.diet),
+          label: copy.lifestyle.diet,
+          required: true
+        },
+        {
+          content: (
+            <PillGroup
+              options={copy.lifestyle.fishOptions}
+              selected={answers.fish}
+              onSelect={(value) => setSingle("fish", value)}
+            />
+          ),
+          id: "fish",
+          isAnswered: Boolean(answers.fish),
+          label: copy.lifestyle.fish,
+          required: true
+        },
+        {
+          content: (
+            <PillGroup
+              options={copy.lifestyle.sunOptions}
+              selected={answers.sun}
+              onSelect={(value) => setSingle("sun", value)}
+            />
+          ),
+          id: "sun",
+          isAnswered: Boolean(answers.sun),
+          label: copy.lifestyle.sun,
+          required: true
+        },
+        {
+          content: (
+            <>
+              <PillGroup
+                options={copy.lifestyle.medsOptions}
+                selected={answers.meds}
+                onSelect={(value) => setSingle("meds", value)}
+              />
+              {answers.meds === "yes" ? (
+                <div className="mt-4 rounded-lg border border-[#1FA77A]/20 bg-[#1FA77A]/5 p-4">
+                  <p className="text-sm font-semibold text-[#20343A]">
+                    {copy.lifestyle.medType}
+                  </p>
+                  <div className="mt-3">
+                    <PillGroup
+                      multi={true}
+                      options={copy.lifestyle.medTypeOptions}
+                      selected={answers.medTypes}
+                      onToggle={(value) => toggleMulti("medTypes", value)}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </>
+          ),
+          hint: copy.lifestyle.medsHint,
+          id: "meds",
+          isAnswered: Boolean(answers.meds),
+          label: copy.lifestyle.meds,
+          required: true
+        },
+        ...(answers.sex === "female"
+          ? [
+              {
+                content: (
+                  <PillGroup
+                    options={copy.lifestyle.lifestageOptions}
+                    selected={answers.lifestage}
+                    onSelect={(value) => setSingle("lifestage", value)}
+                  />
+                ),
+                id: "lifestage",
+                isAnswered: Boolean(answers.lifestage),
+                label: copy.lifestyle.lifestage
+              }
+            ]
+          : [])
+      ],
+      title: copy.lifestyle.title
+    },
+    {
+      description:
+        locale === "th"
+          ? "กำหนดงบ รูปแบบ และความสะดวก เพื่อให้คำแนะนำเหมาะกับการใช้จริง"
+          : "Set budget, format, and convenience constraints so the plan can be practical.",
+      id: "preferences",
+      questions: [
+        {
+          content: (
+            <PillGroup
+              options={copy.preferences.budgetOptions}
+              selected={answers.budget}
+              onSelect={(value) => setSingle("budget", value)}
+            />
+          ),
+          id: "budget",
+          isAnswered: Boolean(answers.budget),
+          label: copy.preferences.budget,
+          required: true
+        },
+        {
+          content: (
+            <PillGroup
+              options={copy.preferences.pillsOptions}
+              selected={answers.pills}
+              onSelect={(value) => setSingle("pills", value)}
+            />
+          ),
+          id: "pills",
+          isAnswered: Boolean(answers.pills),
+          label: copy.preferences.pills,
+          required: true
+        },
+        {
+          content: (
+            <PillGroup
+              options={copy.preferences.formOptions}
+              selected={answers.form}
+              onSelect={(value) => setSingle("form", value)}
+            />
+          ),
+          id: "form",
+          isAnswered: Boolean(answers.form),
+          label: copy.preferences.form
+        }
+      ],
+      title: copy.preferences.title
+    },
+    {
+      description: copy.precision.helper,
+      id: "precision",
+      optional: true,
+      questions: [
+        {
+          content: (
+            <ScaleGroup
+              options={copy.precision.sleepOptions}
+              selected={answers.sleep}
+              onSelect={(value) => setSingle("sleep", value)}
+            />
+          ),
+          id: "sleep",
+          isAnswered: Boolean(answers.sleep),
+          label: copy.precision.sleep
+        },
+        {
+          content: (
+            <ScaleGroup
+              options={copy.precision.stressOptions}
+              selected={answers.stress}
+              onSelect={(value) => setSingle("stress", value)}
+            />
+          ),
+          id: "stress",
+          isAnswered: Boolean(answers.stress),
+          label: copy.precision.stress
+        },
+        {
+          content: (
+            <PillGroup
+              options={copy.precision.gutOptions}
+              selected={answers.gut}
+              onSelect={(value) => setSingle("gut", value)}
+            />
+          ),
+          id: "gut",
+          isAnswered: Boolean(answers.gut),
+          label: copy.precision.gut
+        },
+        {
+          content: (
+            <PillGroup
+              options={copy.precision.regionOptions}
+              selected={answers.region}
+              onSelect={(value) => setSingle("region", value)}
+            />
+          ),
+          id: "region",
+          isAnswered: Boolean(answers.region),
+          label: copy.precision.region
+        }
+      ],
+      title: copy.precision.title
+    },
+    {
+      description:
+        locale === "th"
+          ? "เพิ่มบริบทด้านความปลอดภัยและค่าตรวจที่คุณมี ข้ามได้ทุกข้อถ้ายังไม่ทราบ"
+          : "Add safety context and any lab values you know. Skip anything you do not have.",
+      id: "health-context",
+      optional: true,
+      questions: [
+        {
+          content: (
+            <PillGroup
+              multi={true}
+              options={copy.conditions.options}
+              selected={answers.conditions}
+              onToggle={(value) => toggleMulti("conditions", value)}
+            />
+          ),
+          id: "conditions",
+          isAnswered: answers.conditions.length > 0,
+          label: copy.conditions.prompt
+        },
+        {
+          content: (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {copy.precision.labFields.map((field) => (
+                <label key={field.value} className="block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A]">
+                    {field.label}
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={answers.labs[field.value] ?? ""}
+                    className="mt-2 block w-full rounded-md border border-foreground/10 bg-white px-3 py-2 text-sm text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
+                    onChange={(event) =>
+                      setAnswers((current) => ({
+                        ...current,
+                        labs: {
+                          ...current.labs,
+                          [field.value]: event.target.value
+                        }
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+          ),
+          id: "labs",
+          isAnswered: Object.values(answers.labs).some(Boolean),
+          label: copy.precision.labs
+        }
+      ],
+      title: copy.conditions.title
+    },
+    {
+      description: ui.reviewDescription,
+      id: "review",
+      questions: [
+        {
+          content: (
+            <>
+              <div className="rounded-lg bg-background p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#20343A]">
+                  {ui.summaryTitle}
+                </h3>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {previewTags.length > 0 ? (
+                    previewTags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-[#3A7BD5]/10 px-3 py-1 text-xs font-semibold text-[#20343A]"
+                      >
+                        {tag}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">
+                      {copy.progress.start}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <label className="mt-5 block">
+                <span className="text-sm font-semibold text-[#20343A]">
+                  {ui.notesLabel}
+                </span>
+                <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                  {ui.notesHint}
+                </span>
+                <textarea
+                  value={answers.notes}
+                  rows={5}
+                  className="mt-3 block w-full resize-y rounded-md border border-foreground/10 bg-white px-4 py-3 text-sm leading-6 text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
+                  onChange={(event) =>
+                    setAnswers((current) => ({
+                      ...current,
+                      notes: event.target.value
+                    }))
+                  }
+                />
+              </label>
+
+              <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                {ui.reviewSafety}
+              </p>
+            </>
+          ),
+          id: "review",
+          isAnswered: canGenerate,
+          label: ui.reviewQuestion,
+          required: true
+        }
+      ],
+      title: ui.reviewTitle
+    }
+  ];
+
+  const currentSection = sections[Math.min(sectionIndex, sections.length - 1)];
+  const currentQuestionIndex = Math.min(
+    questionIndex,
+    currentSection.questions.length - 1
+  );
+  const currentQuestion = currentSection.questions[currentQuestionIndex];
+  const renderedQuestions = isCompact
+    ? [currentQuestion]
+    : currentSection.questions;
+  const requiredQuestions = isCompact
+    ? [currentQuestion]
+    : currentSection.questions;
+  const currentStepComplete =
+    currentSection.optional ||
+    requiredQuestions.every((question) => !question.required || question.isAnswered);
+  const isReview = currentSection.id === "review";
+  const canMoveForward = isReview ? canGenerate : currentStepComplete;
+  const flowStepTotal = isCompact
+    ? sections.reduce((total, section) => total + section.questions.length, 0)
+    : sections.length;
+  const flowStepCurrent = isCompact
+    ? sections
+        .slice(0, sectionIndex)
+        .reduce((total, section) => total + section.questions.length, 0) +
+      currentQuestionIndex +
+      1
+    : sectionIndex + 1;
+
+  function sectionIsComplete(section: AssessmentSection) {
+    if (section.id === "review") {
+      return canGenerate;
+    }
+
+    if (section.optional) {
+      return section.questions.some((question) => question.isAnswered);
+    }
+
+    return section.questions.every(
+      (question) => !question.required || question.isAnswered
+    );
+  }
+
+  function goBack() {
+    if (isCompact && currentQuestionIndex > 0) {
+      setQuestionIndex(currentQuestionIndex - 1);
       return;
     }
 
-    setEmailError(false);
-    setModalOpen(false);
-    setSubmitted(true);
+    if (sectionIndex > 0) {
+      const previousSection = sections[sectionIndex - 1];
+      setSectionIndex(sectionIndex - 1);
+      setQuestionIndex(isCompact ? previousSection.questions.length - 1 : 0);
+      return;
+    }
+
+    return;
+  }
+
+  function goNext() {
+    if (!canMoveForward) {
+      return;
+    }
+
+    if (isReview) {
+      setSubmitted(true);
+      return;
+    }
+
+    if (isCompact && currentQuestionIndex < currentSection.questions.length - 1) {
+      setQuestionIndex(currentQuestionIndex + 1);
+      return;
+    }
+
+    setSectionIndex(Math.min(sectionIndex + 1, sections.length - 1));
+    setQuestionIndex(0);
+  }
+
+  function skipOptionalSection() {
+    setSectionIndex(Math.min(sectionIndex + 1, sections.length - 1));
+    setQuestionIndex(0);
   }
 
   return (
     <>
-      <div className="sticky top-18 z-40 border-b border-foreground/10 bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-6xl px-6 py-4 sm:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              {canGenerate
-                ? copy.progress.complete
-                : completed === 0
-                  ? copy.progress.start
-                  : copy.progress.status(completed, requiredTotal)}
-            </p>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#20343A]">
-              {progress}%
-            </p>
-          </div>
-          <div className="mt-3 h-2 rounded-full bg-white">
-            <div
-              className="h-full rounded-full bg-[#1FA77A] transition-all"
-              style={{ width: `${progress}%` }}
-            />
+      {!submitted ? (
+        <div className="sticky top-18 z-40 border-b border-foreground/10 bg-background/95 backdrop-blur">
+          <div className="mx-auto max-w-4xl px-6 py-2 sm:px-8">
+            <div className="flex items-center justify-between gap-3">
+              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                {canGenerate
+                  ? copy.progress.complete
+                  : completed === 0
+                    ? copy.progress.start
+                    : copy.progress.status(completed, requiredTotal)}
+              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#20343A]">
+                {progress}%
+              </p>
+            </div>
+            <div className="mt-1.5 h-1 rounded-full bg-white">
+              <div
+                className="h-full rounded-full bg-[#1FA77A] transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
 
-      <div className="mx-auto w-full max-w-6xl px-6 pb-36 pt-10 sm:px-8 lg:pt-14">
+      <div className="mx-auto w-full max-w-6xl px-6 pb-16 pt-10 sm:px-8 lg:pt-14">
         {submitted ? (
           <section className="rounded-lg bg-white px-6 py-12 text-center ring-1 ring-foreground/10 sm:px-10">
             <CheckCircleIcon
@@ -947,440 +1516,117 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
             </div>
           </section>
         ) : (
-          <>
-            <section className="grid gap-8 rounded-lg bg-white p-6 ring-1 ring-foreground/10 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] lg:p-10">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#3A7BD5]">
-                  {copy.hero.time}
-                </p>
-                <h1 className="mt-5 text-4xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-5xl">
-                  {copy.hero.title}
-                </h1>
-                <p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">
-                  {copy.hero.description}
-                </p>
-              </div>
-              <div className="grid content-center gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                {copy.badges.map((badge) => (
-                  <div
-                    key={badge}
-                    className="rounded-md border border-foreground/10 bg-background px-4 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-[#20343A]"
-                  >
-                    {badge}
-                  </div>
-                ))}
+          <div className="mx-auto max-w-4xl space-y-6">
+            {sectionIndex === 0 ? (
+              <section className="rounded-lg bg-white p-6 ring-1 ring-foreground/10 sm:p-8 lg:p-10">
+              <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#3A7BD5]">
+                    {copy.hero.time}
+                  </p>
+                  <h1 className="mt-5 text-4xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-5xl">
+                    {copy.hero.title}
+                  </h1>
+                  <p className="mt-5 text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+                    {copy.hero.description}
+                  </p>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-3 lg:min-w-80 lg:grid-cols-1">
+                  {copy.badges.map((badge) => (
+                    <div
+                      key={badge}
+                      className="rounded-md border border-foreground/10 bg-background px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A] sm:text-sm"
+                    >
+                      {badge}
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
+            ) : null}
 
-            <div className="mt-8 space-y-6">
-              <SectionCard
-                done={isSectionDone(1, answers)}
-                number={1}
-                title={copy.about.title}
-              >
-                <Question label={copy.about.sex} required={true} requiredLabel={copy.common.required}>
-                  <PillGroup
-                    options={copy.about.sexOptions}
-                    selected={answers.sex}
-                    onSelect={(value) => setSingle("sex", value)}
-                  />
-                </Question>
-                <Question label={copy.about.age} required={true} requiredLabel={copy.common.required}>
-                  <PillGroup
-                    options={copy.about.ageOptions}
-                    selected={answers.age}
-                    onSelect={(value) => setSingle("age", value)}
-                  />
-                </Question>
-                <Question label={copy.about.activity} required={true} requiredLabel={copy.common.required}>
-                  <PillGroup
-                    options={copy.about.activityOptions}
-                    selected={answers.activity}
-                    onSelect={(value) => setSingle("activity", value)}
-                  />
-                </Question>
-                <Question label={copy.about.build}>
-                  <PillGroup
-                    options={copy.about.buildOptions}
-                    selected={answers.build}
-                    onSelect={(value) => setSingle("build", value)}
-                  />
-                </Question>
-              </SectionCard>
-
-              <SectionCard
-                done={isSectionDone(2, answers)}
-                number={2}
-                title={copy.goals.title}
-              >
-                <Question
-                  hint={copy.goals.hint}
-                  label={copy.goals.prompt}
-                  required={true}
-                  requiredLabel={copy.common.required}
-                >
-                  <OptionGrid
-                    max={3}
-                    options={copy.goals.options}
-                    selected={answers.goals}
-                    onToggle={(value) => toggleMulti("goals", value, 3)}
-                  />
-                </Question>
-              </SectionCard>
-
-              <SectionCard
-                done={isSectionDone(3, answers)}
-                number={3}
-                title={copy.symptoms.title}
-              >
-                <Question
-                  hint={copy.symptoms.hint}
-                  label={copy.symptoms.prompt}
-                  required={true}
-                  requiredLabel={copy.common.required}
-                >
-                  <OptionGrid
-                    options={copy.symptoms.options}
-                    selected={answers.symptoms}
-                    onToggle={(value) => toggleMulti("symptoms", value)}
-                  />
-                  <div className="mt-3">
-                    <button
-                      type="button"
-                      className={cardOptionClasses(answers.feelGreat)}
-                      onClick={markFeelingGreat}
-                    >
-                      {copy.symptoms.great.label}
-                    </button>
-                  </div>
-                </Question>
-              </SectionCard>
-
-              <SectionCard
-                done={isSectionDone(4, answers)}
-                number={4}
-                title={copy.lifestyle.title}
-              >
-                <Question label={copy.lifestyle.diet} required={true} requiredLabel={copy.common.required}>
-                  <PillGroup
-                    options={copy.lifestyle.dietOptions}
-                    selected={answers.diet}
-                    onSelect={(value) => setSingle("diet", value)}
-                  />
-                </Question>
-                <Question label={copy.lifestyle.fish} required={true} requiredLabel={copy.common.required}>
-                  <PillGroup
-                    options={copy.lifestyle.fishOptions}
-                    selected={answers.fish}
-                    onSelect={(value) => setSingle("fish", value)}
-                  />
-                </Question>
-                <Question label={copy.lifestyle.sun} required={true} requiredLabel={copy.common.required}>
-                  <PillGroup
-                    options={copy.lifestyle.sunOptions}
-                    selected={answers.sun}
-                    onSelect={(value) => setSingle("sun", value)}
-                  />
-                </Question>
-                <Question
-                  hint={copy.lifestyle.medsHint}
-                  label={copy.lifestyle.meds}
-                  required={true}
-                  requiredLabel={copy.common.required}
-                >
-                  <PillGroup
-                    options={copy.lifestyle.medsOptions}
-                    selected={answers.meds}
-                    onSelect={(value) => setSingle("meds", value)}
-                  />
-                  {answers.meds === "yes" ? (
-                    <div className="mt-4 rounded-lg border border-[#1FA77A]/20 bg-[#1FA77A]/5 p-4">
-                      <p className="text-sm font-semibold text-[#20343A]">
-                        {copy.lifestyle.medType}
-                      </p>
-                      <div className="mt-3">
-                        <PillGroup
-                          multi={true}
-                          options={copy.lifestyle.medTypeOptions}
-                          selected={answers.medTypes}
-                          onToggle={(value) => toggleMulti("medTypes", value)}
-                        />
-                      </div>
-                    </div>
+            <div>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#3A7BD5]">
+                    {isCompact
+                      ? ui.step(flowStepCurrent, flowStepTotal)
+                      : ui.section(sectionIndex + 1, sections.length)}
+                  </p>
+                  {currentSection.optional ? (
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      {ui.optionalSection}
+                    </p>
                   ) : null}
-                </Question>
-                {answers.sex === "female" ? (
-                  <Question label={copy.lifestyle.lifestage}>
-                    <PillGroup
-                      options={copy.lifestyle.lifestageOptions}
-                      selected={answers.lifestage}
-                      onSelect={(value) => setSingle("lifestage", value)}
-                    />
-                  </Question>
-                ) : null}
-              </SectionCard>
+                </div>
+                <p className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-[#20343A] ring-1 ring-foreground/10">
+                  {progress}%
+                </p>
+              </div>
 
               <SectionCard
-                done={isSectionDone(5, answers)}
-                number={5}
-                title={copy.preferences.title}
+                done={sectionIsComplete(currentSection)}
+                number={sectionIndex + 1}
+                title={currentSection.title}
               >
-                <Question label={copy.preferences.budget} required={true} requiredLabel={copy.common.required}>
-                  <PillGroup
-                    options={copy.preferences.budgetOptions}
-                    selected={answers.budget}
-                    onSelect={(value) => setSingle("budget", value)}
-                  />
-                </Question>
-                <Question label={copy.preferences.pills} required={true} requiredLabel={copy.common.required}>
-                  <PillGroup
-                    options={copy.preferences.pillsOptions}
-                    selected={answers.pills}
-                    onSelect={(value) => setSingle("pills", value)}
-                  />
-                </Question>
-                <Question label={copy.preferences.form}>
-                  <PillGroup
-                    options={copy.preferences.formOptions}
-                    selected={answers.form}
-                    onSelect={(value) => setSingle("form", value)}
-                  />
-                </Question>
+                {renderedQuestions.map((question) => (
+                  <Question
+                    key={question.id}
+                    hint={question.hint}
+                    label={question.label}
+                    required={question.required}
+                    requiredLabel={copy.common.required}
+                  >
+                    {question.content}
+                  </Question>
+                ))}
               </SectionCard>
 
-              <section className="rounded-lg border border-dashed border-[#3A7BD5]/30 bg-white p-5 sm:p-6">
+              {!canMoveForward ? (
+                <p className="mt-3 text-sm font-medium text-muted-foreground">
+                  {ui.validation}
+                </p>
+              ) : null}
+
+              <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <button
                   type="button"
-                  className="flex w-full items-start justify-between gap-4 text-left"
-                  onClick={() => setPrecisionOpen((open) => !open)}
+                  disabled={sectionIndex === 0 && currentQuestionIndex === 0}
+                  className="rounded-md border border-foreground/10 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-[#20343A] transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={goBack}
                 >
-                  <div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="text-lg font-semibold text-[#20343A]">
-                        {copy.precision.title}
-                      </h2>
-                      <span className="rounded-full bg-[#3A7BD5]/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#3A7BD5]">
-                        {copy.common.optional}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {copy.precision.helper}
-                    </p>
-                  </div>
-                  <ChevronDownIcon
-                    aria-hidden={true}
-                    className={cx(
-                      "mt-1 size-5 flex-none text-[#3A7BD5] transition",
-                      precisionOpen && "rotate-180"
-                    )}
-                  />
+                  {ui.back}
                 </button>
 
-                {precisionOpen ? (
-                  <div className="mt-6 space-y-5">
-                    <Question label={copy.precision.sleep}>
-                      <ScaleGroup
-                        options={copy.precision.sleepOptions}
-                        selected={answers.sleep}
-                        onSelect={(value) => setSingle("sleep", value)}
-                      />
-                    </Question>
-                    <Question label={copy.precision.stress}>
-                      <ScaleGroup
-                        options={copy.precision.stressOptions}
-                        selected={answers.stress}
-                        onSelect={(value) => setSingle("stress", value)}
-                      />
-                    </Question>
-                    <Question label={copy.precision.gut}>
-                      <PillGroup
-                        options={copy.precision.gutOptions}
-                        selected={answers.gut}
-                        onSelect={(value) => setSingle("gut", value)}
-                      />
-                    </Question>
-                    <Question label={copy.precision.region}>
-                      <PillGroup
-                        options={copy.precision.regionOptions}
-                        selected={answers.region}
-                        onSelect={(value) => setSingle("region", value)}
-                      />
-                    </Question>
-                    <Question label={copy.conditions.prompt}>
-                      <PillGroup
-                        multi={true}
-                        options={copy.conditions.options}
-                        selected={answers.conditions}
-                        onToggle={(value) => toggleMulti("conditions", value)}
-                      />
-                    </Question>
-                    <Question label={copy.precision.labs}>
-                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {copy.precision.labFields.map((field) => (
-                          <label key={field.value} className="block">
-                            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A]">
-                              {field.label}
-                            </span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={answers.labs[field.value] ?? ""}
-                              placeholder={field.placeholder}
-                              className="mt-2 block w-full rounded-md border border-foreground/10 bg-white px-3 py-2 text-sm text-[#20343A] outline-none transition placeholder:text-muted-foreground/70 focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
-                              onChange={(event) =>
-                                setAnswers((current) => ({
-                                  ...current,
-                                  labs: {
-                                    ...current.labs,
-                                    [field.value]: event.target.value
-                                  }
-                                }))
-                              }
-                            />
-                            <span className="mt-1 block text-xs text-muted-foreground">
-                              {field.hint}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </Question>
-                  </div>
-                ) : null}
-              </section>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  {currentSection.optional ? (
+                    <button
+                      type="button"
+                      className="rounded-md px-4 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground transition hover:text-[#20343A]"
+                      onClick={skipOptionalSection}
+                    >
+                      {ui.skipOptional}
+                    </button>
+                  ) : null}
 
-              {canGenerate ? (
-                <section className="rounded-lg bg-[#20343A] p-5 text-white sm:p-6">
-                  <h2 className="text-lg font-semibold">{copy.hook.title}</h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-white/75">
-                    {copy.hook.detail}
-                  </p>
                   <button
                     type="button"
-                    className="mt-5 inline-flex items-center gap-3 rounded-md bg-white/10 px-4 py-3 text-left text-sm font-semibold transition hover:bg-white/15"
-                    onClick={() =>
-                      setAnswers((current) => ({
-                        ...current,
-                        monthly: !current.monthly
-                      }))
-                    }
+                    disabled={!canMoveForward}
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-6 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition enabled:hover:bg-[#188a65] disabled:cursor-not-allowed disabled:bg-foreground/15 disabled:text-muted-foreground"
+                    onClick={goNext}
                   >
-                    <span
-                      className={cx(
-                        "relative h-6 w-11 rounded-full transition",
-                        answers.monthly ? "bg-[#1FA77A]" : "bg-white/25"
-                      )}
-                    >
-                      <span
-                        className={cx(
-                          "absolute top-1 size-4 rounded-full bg-white transition",
-                          answers.monthly ? "left-6" : "left-1"
-                        )}
-                      />
-                    </span>
-                    {copy.hook.toggle}
+                    {isReview ? copy.fixedAction.generate : ui.continue}
+                    {isReview ? (
+                      <BeakerIcon aria-hidden={true} className="size-5" />
+                    ) : null}
                   </button>
-                </section>
-              ) : null}
-            </div>
-          </>
-        )}
-      </div>
-
-      {!submitted ? (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-foreground/10 bg-white/95 px-6 py-4 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur">
-          <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-medium text-muted-foreground">
-              {canGenerate
-                ? copy.fixedAction.complete
-                : copy.fixedAction.remaining(requiredTotal - completed)}
-            </p>
-            <button
-              type="button"
-              disabled={!canGenerate}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition enabled:hover:bg-[#188a65] disabled:cursor-not-allowed disabled:bg-foreground/15 disabled:text-muted-foreground"
-              onClick={() => setModalOpen(true)}
-            >
-              <BeakerIcon aria-hidden={true} className="size-5" />
-              {copy.fixedAction.generate}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {modalOpen ? (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 px-4 sm:items-center">
-          <div className="w-full max-w-xl rounded-t-2xl bg-white p-6 shadow-xl sm:rounded-2xl sm:p-8">
-            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[#1FA77A]/10">
-              <BeakerIcon aria-hidden={true} className="size-6 text-[#1FA77A]" />
-            </div>
-            <h2 className="mt-5 text-center text-3xl font-semibold tracking-normal text-[#20343A]">
-              {copy.emailModal.title}
-            </h2>
-            <p className="mx-auto mt-3 max-w-md text-center text-sm leading-6 text-muted-foreground">
-              {copy.emailModal.subtitle}
-            </p>
-
-            <div className="mt-6 rounded-lg bg-background p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#20343A]">
-                {copy.emailModal.previewTitle}
-              </h3>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {previewTags.length > 0 ? (
-                  previewTags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full bg-[#3A7BD5]/10 px-3 py-1 text-xs font-semibold text-[#20343A]"
-                    >
-                      {tag}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-sm text-muted-foreground">
-                    {copy.progress.start}
-                  </span>
-                )}
+                </div>
               </div>
             </div>
-
-            <label className="mt-5 block">
-              <span className="sr-only">{copy.emailModal.emailPlaceholder}</span>
-              <input
-                type="email"
-                value={answers.email}
-                placeholder={copy.emailModal.emailPlaceholder}
-                className={cx(
-                  "block w-full rounded-md border bg-white px-4 py-3 text-base text-[#20343A] outline-none transition placeholder:text-muted-foreground/70 focus:ring-2 focus:ring-[#1FA77A]/15",
-                  emailError ? "border-red-400" : "border-foreground/10 focus:border-[#1FA77A]"
-                )}
-                onChange={(event) =>
-                  setAnswers((current) => ({
-                    ...current,
-                    email: event.target.value
-                  }))
-                }
-              />
-            </label>
-            <button
-              type="button"
-              className="mt-4 w-full rounded-md bg-[#1FA77A] px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-[#188a65]"
-              onClick={submitEmail}
-            >
-              {copy.emailModal.button}
-            </button>
-            <p className="mt-4 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              <LockClosedIcon aria-hidden={true} className="size-4" />
-              {copy.emailModal.privacy}
-            </p>
-            <button
-              type="button"
-              className="mt-5 w-full text-sm font-semibold text-muted-foreground hover:text-[#20343A]"
-              onClick={() => setModalOpen(false)}
-            >
-              Close
-            </button>
           </div>
-        </div>
-      ) : null}
+        )}
+      </div>
     </>
   );
 }
@@ -1522,7 +1768,7 @@ type ScaleGroupProps = Readonly<{
 
 function ScaleGroup({ onSelect, options, selected }: ScaleGroupProps) {
   return (
-    <div className="grid grid-cols-5 gap-2">
+    <div className="flex flex-wrap gap-2">
       {options.map((option) => {
         const isSelected = selected === option.value;
 
@@ -1530,18 +1776,10 @@ function ScaleGroup({ onSelect, options, selected }: ScaleGroupProps) {
           <button
             key={option.value}
             type="button"
-            className={cx(
-              "rounded-md border px-2 py-3 text-center transition",
-              isSelected
-                ? "border-[#1FA77A] bg-[#1FA77A] text-white"
-                : "border-foreground/10 bg-white text-[#20343A] hover:border-[#1FA77A]/40 hover:bg-[#1FA77A]/5"
-            )}
+            className={pillClasses(isSelected)}
             onClick={() => onSelect(option.value)}
           >
-            <span className="block text-base font-semibold">{option.value}</span>
-            <span className="mt-1 block text-[11px] font-medium">
-              {option.label}
-            </span>
+            {option.label}
           </button>
         );
       })}
