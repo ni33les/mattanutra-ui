@@ -28,6 +28,16 @@ const en = {
     imageAlt: "Healthy and fit Asian couple outdoors",
     stack: "Next.js · TypeScript · Tailwind"
   },
+  assessment: {
+    eyebrow: "Smart Assessment",
+    title: "Let’s understand your goals",
+    description:
+      "This is the starting point for the Healthspan assessment. We’ll use this flow to capture your goals, lifestyle, preferences, and constraints before creating your supplement formulation.",
+    stepLabel: "Step 1 of 3",
+    prompt: "What would you like to improve first?",
+    options: ["Energy", "Sleep", "Focus", "Calm", "Recovery", "Healthy aging"],
+    helper: "Questionnaire controls and progress will be layered in next."
+  },
   featureSection: {
     eyebrow: "Personalized wellness",
     title: "From goals to supplement options",
@@ -114,6 +124,23 @@ const dictionaries: Record<Locale, Dictionary> = {
       secondaryCta: "วิธีการทำงาน",
       imageAlt: "คู่รักชาวเอเชียที่สุขภาพดีและแข็งแรงกลางแจ้ง",
       stack: "Next.js · TypeScript · Tailwind"
+    },
+    assessment: {
+      eyebrow: "การประเมินอัจฉริยะ",
+      title: "มาเริ่มทำความเข้าใจเป้าหมายของคุณ",
+      description:
+        "นี่คือจุดเริ่มต้นของแบบประเมิน Healthspan เราจะใช้ขั้นตอนนี้เพื่อเก็บเป้าหมาย ไลฟ์สไตล์ ความต้องการ และข้อจำกัดของคุณ ก่อนสร้างสูตรอาหารเสริมเฉพาะบุคคล",
+      stepLabel: "ขั้นตอนที่ 1 จาก 3",
+      prompt: "คุณอยากปรับปรุงเรื่องใดก่อน?",
+      options: [
+        "พลังงาน",
+        "การนอนหลับ",
+        "สมาธิ",
+        "ความสงบ",
+        "การฟื้นตัว",
+        "สูงวัยอย่างมีสุขภาพดี"
+      ],
+      helper: "ส่วนควบคุมแบบสอบถามและแถบความคืบหน้าจะเพิ่มในขั้นตอนถัดไป"
     },
     featureSection: {
       eyebrow: "สุขภาพเฉพาะบุคคล",

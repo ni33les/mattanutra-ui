@@ -6,6 +6,7 @@ const heroBottomLeftFade =
 
 type HeroSplitProps = Readonly<{
   cta: string;
+  ctaHref: string;
   eyebrow: string;
   headline: string;
   headlineAccent: string;
@@ -34,6 +35,7 @@ function renderAccentText(text: string, accent: string, className: string) {
 
 export function HeroSplit({
   cta,
+  ctaHref,
   eyebrow,
   headline,
   headlineAccent,
@@ -65,7 +67,7 @@ export function HeroSplit({
           ) : null}
           <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-4">
             <a
-              href="#"
+              href={ctaHref}
               className="rounded-md bg-[#1FA77A] px-4 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition hover:bg-[#188a65] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A]"
             >
               {cta}

@@ -4,10 +4,15 @@ import type { Locale } from "@/lib/i18n";
 
 type TitleBarProps = Readonly<{
   currentLocale: Locale;
+  currentPath?: string;
   title: string;
 }>;
 
-export function TitleBar({ currentLocale, title }: TitleBarProps) {
+export function TitleBar({
+  currentLocale,
+  currentPath = `/${currentLocale}`,
+  title
+}: TitleBarProps) {
   return (
     <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background/90 backdrop-blur">
       <div className="mx-auto flex h-18 w-full max-w-6xl items-center justify-between gap-4 px-6 sm:px-8">
@@ -18,7 +23,10 @@ export function TitleBar({ currentLocale, title }: TitleBarProps) {
         >
           <HealthspanLogo className="shrink-0" />
         </a>
-        <LanguageSwitcher currentLocale={currentLocale} />
+        <LanguageSwitcher
+          currentLocale={currentLocale}
+          currentPath={currentPath}
+        />
       </div>
     </header>
   );

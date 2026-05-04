@@ -8,9 +8,20 @@ import { cn } from "@/lib/utils";
 
 type LanguageSwitcherProps = Readonly<{
   currentLocale: Locale;
+  currentPath: string;
 }>;
 
-export function LanguageSwitcher({ currentLocale }: LanguageSwitcherProps) {
+function getLocalizedPath(currentPath: string, locale: Locale) {
+  const segments = currentPath.split("/");
+  segments[1] = locale;
+
+  return segments.join("/") || `/${locale}`;
+}
+
+export function LanguageSwitcher({
+  currentLocale,
+  currentPath
+}: LanguageSwitcherProps) {
   return (
     <nav
       aria-label="Language"
@@ -18,7 +29,7 @@ export function LanguageSwitcher({ currentLocale }: LanguageSwitcherProps) {
     >
       {locales.map((locale) => {
         const isActive = locale === currentLocale;
-        const next = `/${locale}`;
+        const next = getLocalizedPath(currentPath, locale);
 
         return (
           <Link

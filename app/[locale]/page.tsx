@@ -26,13 +26,19 @@ export default async function Home({ params }: HomeProps) {
 
   const locale: Locale = rawLocale;
   const dictionary = getDictionary(locale);
+  const assessmentPath = `/${locale}/assessment`;
 
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
-      <TitleBar currentLocale={locale} title={dictionary.hero.eyebrow} />
+      <TitleBar
+        currentLocale={locale}
+        currentPath={`/${locale}`}
+        title={dictionary.hero.eyebrow}
+      />
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
         <HeroSplit
           cta={dictionary.hero.cta}
+          ctaHref={assessmentPath}
           eyebrow={dictionary.hero.eyebrow}
           headline={dictionary.hero.subtitle}
           headlineAccent={dictionary.hero.subtitleAccent}
@@ -43,7 +49,7 @@ export default async function Home({ params }: HomeProps) {
           subheadlineAccent={dictionary.hero.followOnAccent}
         />
         <FeatureRow content={dictionary.featureSection} />
-        <CtaSection content={dictionary.cta} />
+        <CtaSection content={dictionary.cta} ctaHref={assessmentPath} />
         <SupportFeatureSection content={dictionary.supportSection} />
         <SiteFooter content={dictionary.footer} />
       </div>

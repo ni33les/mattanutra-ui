@@ -7,7 +7,12 @@ type CtaContent = Readonly<{
   titleLine2: string;
 }>;
 
-export function CtaSection({ content }: Readonly<{ content: CtaContent }>) {
+type CtaSectionProps = Readonly<{
+  content: CtaContent;
+  ctaHref: string;
+}>;
+
+export function CtaSection({ content, ctaHref }: CtaSectionProps) {
   return (
     <section className="bg-background">
       <div className="mx-auto max-w-7xl px-6 py-24 sm:py-32 lg:px-8">
@@ -18,7 +23,7 @@ export function CtaSection({ content }: Readonly<{ content: CtaContent }>) {
         </h2>
         <div className="mt-10 flex items-center">
           <a
-            href="#"
+            href={ctaHref}
             className="inline-flex items-center gap-2 rounded-md bg-[#1FA77A] px-5 py-3 text-[15px] font-semibold uppercase tracking-[0.08em] text-white shadow-sm hover:bg-[#188a65] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A]"
           >
             {content.button} <span aria-hidden="true">-&gt;</span>
