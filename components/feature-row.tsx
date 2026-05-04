@@ -12,7 +12,6 @@ type FeatureIconProps = Readonly<{
 
 type Feature = Readonly<{
   description: string;
-  href: string;
   name: string;
 }>;
 
@@ -20,7 +19,6 @@ type FeatureRowContent = Readonly<{
   description: string;
   eyebrow: string;
   features: readonly Feature[];
-  learnMore: string;
   title: string;
 }>;
 
@@ -59,15 +57,6 @@ export function FeatureRow({ content }: Readonly<{ content: FeatureRowContent }>
                   </dt>
                   <dd className="mt-4 flex flex-auto flex-col text-base/7 text-gray-600">
                     <p className="flex-auto">{feature.description}</p>
-                    <p className="mt-6">
-                      <a
-                        href={feature.href}
-                        className="text-sm/6 font-semibold text-[#3A7BD5] hover:text-[#326dbf]"
-                      >
-                        {content.learnMore}{" "}
-                        <span aria-hidden="true">-&gt;</span>
-                      </a>
-                    </p>
                   </dd>
                 </div>
               );

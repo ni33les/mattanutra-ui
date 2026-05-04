@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAssessmentJobSnapshot } from "@/lib/assessment-jobs";
+import { isLocale, type Locale } from "@/lib/i18n";
 import { getMockFormulationResult } from "@/lib/mock-formulation";
 
 type FormulationRouteProps = Readonly<{
@@ -8,7 +9,7 @@ type FormulationRouteProps = Readonly<{
   }>;
 }>;
 
-export async function GET(_request: Request, { params }: FormulationRouteProps) {
+export async function GET(request: Request, { params }: FormulationRouteProps) {
   const { jobId } = await params;
   const snapshot = getAssessmentJobSnapshot(jobId);
 
@@ -23,5 +24,13 @@ export async function GET(_request: Request, { params }: FormulationRouteProps) 
     );
   }
 
-  return NextResponse.json(getMockFormulationResult(jobId));
+  const requestedLocale = new URL(request.url).searchParams.get("locale");
+  const localeCandidate = requestedLocale ?? undefined;
+  const locale: Locale = isLocale(localeCandidate)
+    ? localeCandidate
+    : "en";
+
+  return NextResponse.json(
+    getMockFormulationResult(jobId, locale, snapshot?.plan ?? "free")
+  );
 }

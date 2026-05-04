@@ -1,16 +1,20 @@
 type JobStatus = "queued" | "preparing" | "ready";
 type StepState = "active" | "complete" | "pending";
 
+export type AssessmentPlan = "free" | "optimised" | "pro";
+
 type AssessmentJob = {
   createdAt: number;
   formulationMs: number;
   id: string;
   initialQueue: number;
+  plan: AssessmentPlan;
   queueMs: number;
 };
 
 export type AssessmentJobSnapshot = {
   jobId: string;
+  plan: AssessmentPlan;
   queuePosition: number;
   status: JobStatus;
   steps: Array<{
@@ -30,6 +34,22 @@ function randomInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+export function normalizeAssessmentPlan(plan: unknown): AssessmentPlan {
+  if (plan === "pro") {
+    return "pro";
+  }
+
+  if (
+    plan === "optimised" ||
+    plan === "optimized" ||
+    plan === "optimal-precision"
+  ) {
+    return "optimised";
+  }
+
+  return "free";
+}
+
 function pruneJobs() {
   const staleBefore = Date.now() - 1000 * 60 * 30;
 
@@ -40,7 +60,7 @@ function pruneJobs() {
   }
 }
 
-export function createAssessmentJob() {
+export function createAssessmentJob(plan: unknown = "free") {
   pruneJobs();
 
   const id = crypto.randomUUID();
@@ -49,6 +69,7 @@ export function createAssessmentJob() {
     formulationMs: randomInt(4500, 7500),
     id,
     initialQueue: randomInt(3, 8),
+    plan: normalizeAssessmentPlan(plan),
     queueMs: randomInt(3500, 6500)
   };
 
@@ -76,6 +97,7 @@ export function getAssessmentJobSnapshot(id: string): AssessmentJobSnapshot | nu
 
   return {
     jobId: id,
+    plan: job.plan ?? "free",
     queuePosition,
     status,
     steps: [

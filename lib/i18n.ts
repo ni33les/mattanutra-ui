@@ -43,31 +43,27 @@ const en = {
     title: "From goals to supplement options",
     description:
       "Healthspan turns a short conversation about your lifestyle, your body and preferences into a supplement formulation tailored specifically for you — then finds the closest matching products that meet your body’s needs.",
-    learnMore: "Learn more",
     features: [
       {
         name: "Smart Assessment",
         description:
-          "Share your goals for energy, sleep, focus, calm, recovery, or healthy aging in a 2 minute questionnaire.",
-        href: "#"
+          "Share your goals for energy, sleep, focus, calm, recovery, or healthy aging in a 2 minute questionnaire."
       },
       {
         name: "AI Powered Plan",
         description:
-          "We generate a comprehensive AI powered supplement plan tailored to you.",
-        href: "#"
+          "We generate a comprehensive AI powered supplement plan tailored to you."
       },
       {
         name: "Buy with confidence",
         description:
-          "We discover the very best products that match your individual formulation.",
-        href: "#"
+          "We discover the very best products that match your individual formulation."
       }
     ]
   },
   cta: {
-    titleLine1: "Personalised today.",
-    titleLine2: "Healthier tomorrow.",
+    titleLine1: "Personalised today, healthier tomorrow",
+    titleLine2: "",
     button: "START YOUR FREE ASSESSMENT NOW",
     reassurance: "Takes 2-3 minutes * No credit card required"
   },
@@ -113,7 +109,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     },
     hero: {
       eyebrow: "Healthspan",
-      title: "Hello",
+      title: "สวัสดี",
       subtitle: "รู้ชัดว่าร่างกายของคุณต้องการอะไร",
       subtitleAccent: "ร่างกายของคุณต้องการอะไร",
       subtitleMuted: "ไม่ต้องเดา",
@@ -147,31 +143,27 @@ const dictionaries: Record<Locale, Dictionary> = {
       title: "จากเป้าหมายสู่ตัวเลือกอาหารเสริม",
       description:
         "Healthspan เปลี่ยนบทสนทนาสั้นๆ เกี่ยวกับไลฟ์สไตล์ ร่างกาย และความต้องการของคุณให้เป็นสูตรอาหารเสริมที่ปรับมาเพื่อคุณโดยเฉพาะ แล้วค้นหาผลิตภัณฑ์ที่ใกล้เคียงที่สุดกับสิ่งที่ร่างกายคุณต้องการ",
-      learnMore: "เรียนรู้เพิ่มเติม",
       features: [
         {
           name: "การประเมินอัจฉริยะ",
           description:
-            "บอกเป้าหมายของคุณเรื่องพลังงาน การนอนหลับ สมาธิ ความสงบ การฟื้นตัว หรือการสูงวัยอย่างมีสุขภาพดี ผ่านแบบสอบถาม 2 นาที",
-          href: "#"
+            "บอกเป้าหมายของคุณเรื่องพลังงาน การนอนหลับ สมาธิ ความสงบ การฟื้นตัว หรือการสูงวัยอย่างมีสุขภาพดี ผ่านแบบสอบถาม 2 นาที"
         },
         {
           name: "แผนจาก AI",
           description:
-            "เราสร้างแผนอาหารเสริมด้วย AI ที่ครอบคลุมและปรับให้เหมาะกับคุณ",
-          href: "#"
+            "เราสร้างแผนอาหารเสริมด้วย AI ที่ครอบคลุมและปรับให้เหมาะกับคุณ"
         },
         {
           name: "ซื้อได้อย่างมั่นใจ",
           description:
-            "เราค้นหาผลิตภัณฑ์ที่ดีที่สุดซึ่งตรงกับสูตรเฉพาะบุคคลของคุณ",
-          href: "#"
+            "เราค้นหาผลิตภัณฑ์ที่ดีที่สุดซึ่งตรงกับสูตรเฉพาะบุคคลของคุณ"
         }
       ]
     },
     cta: {
-      titleLine1: "ดูแลวันนี้.",
-      titleLine2: "สุขภาพดีขึ้นในวันพรุ่งนี้.",
+      titleLine1: "ดูแลวันนี้ สุขภาพดีขึ้นในวันพรุ่งนี้",
+      titleLine2: "",
       button: "เริ่มประเมินฟรีตอนนี้",
       reassurance: "ใช้เวลา 2-3 นาที * ไม่ต้องใช้บัตรเครดิต"
     },

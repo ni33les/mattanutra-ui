@@ -30,6 +30,7 @@ export function LanguageSwitcher({
       {locales.map((locale) => {
         const isActive = locale === currentLocale;
         const next = getLocalizedPath(currentPath, locale);
+        const label = localeLabels[locale];
 
         return (
           <Link
@@ -43,7 +44,7 @@ export function LanguageSwitcher({
                 : "text-muted-foreground hover:bg-[#1FA77A]/10 hover:text-[#20343A]"
             )}
           >
-            {localeLabels[locale]}
+            {label}
           </Link>
         );
       })}

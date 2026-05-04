@@ -508,7 +508,7 @@ const en: Copy = {
       { label: "Diabetes", value: "diabetes" },
       { label: "Cancer", value: "cancer" },
       { label: "Osteoporosis", value: "bones" },
-      { label: "None / unknown", value: "none" }
+      { label: "None", value: "none" }
     ],
     protein: "Protein / day",
     proteinOptions: [
@@ -709,7 +709,14 @@ const th: Copy = {
     height: "ส่วนสูง",
     weight: "น้ำหนัก",
     skin: "สีผิว",
-    skinOptions: en.about.skinOptions,
+    skinOptions: [
+      { label: "สีผิวระดับ 1", value: "I" },
+      { label: "สีผิวระดับ 2", value: "II" },
+      { label: "สีผิวระดับ 3", value: "III" },
+      { label: "สีผิวระดับ 4", value: "IV" },
+      { label: "สีผิวระดับ 5", value: "V" },
+      { label: "สีผิวระดับ 6", value: "VI" }
+    ],
     country: "ประเทศ",
     countryOptions: [
       { label: "ไทย", value: "TH" },
@@ -908,7 +915,7 @@ const th: Copy = {
       { label: "เบาหวาน", value: "diabetes" },
       { label: "มะเร็ง", value: "cancer" },
       { label: "กระดูกพรุน", value: "bones" },
-      { label: "ไม่มี / ไม่ทราบ", value: "none" }
+      { label: "ไม่มี", value: "none" }
     ],
     protein: "โปรตีน / วัน",
     proteinOptions: [
@@ -950,7 +957,7 @@ const th: Copy = {
       { label: "ถ่ายเหลว", value: "loose" },
       { label: "IBS / สลับกัน", value: "ibs" }
     ],
-    wearable: "Fitness tracker?",
+    wearable: "ใช้อุปกรณ์ติดตามฟิตเนส?",
     wearableOptions: [
       { label: "ไม่ใช้", value: "none" },
       { label: "Garmin", value: "garmin" },
@@ -1240,6 +1247,7 @@ type AssessmentQuestion = Readonly<{
   isAnswered: boolean;
   label: string;
   required?: boolean;
+  why?: string;
 }>;
 
 type AssessmentSection = Readonly<{
@@ -1283,6 +1291,138 @@ type PlanContent = Readonly<{
   tiers: PlanTier[];
   title: string;
 }>;
+
+type QuestionWhyMap = Record<string, string>;
+
+const questionWhyEn: QuestionWhyMap = {
+  activity:
+    "Activity level changes recovery, protein, electrolyte, and performance support needs.",
+  age:
+    "Age changes baseline needs for bone, muscle, metabolic, and recovery support.",
+  alcohol:
+    "Alcohol intake can affect B-vitamin and magnesium needs, and shapes safety notes.",
+  budget:
+    "Budget keeps recommendations realistic and prevents an overbuilt stack.",
+  coffee: "Caffeine gives context for sleep, stress, and energy patterns.",
+  conditions:
+    "Known considerations help us avoid mismatched recommendations and flag extra caution.",
+  country:
+    "Country helps infer climate, latitude, marketplace, and product availability.",
+  diet:
+    "Diet pattern helps identify likely gaps and avoid recommending things you already get regularly.",
+  energy:
+    "Energy level helps cross-check goals against how you feel day to day.",
+  family:
+    "Family history adds useful risk context for long-term wellness priorities.",
+  fish: "Fatty fish intake is the simplest proxy for omega-3 intake.",
+  form: "Preferred format helps match products you are likely to stick with.",
+  goals:
+    "Goals set the priority order so the brief focuses on what matters most.",
+  gut: "Digestion affects comfort, nutrient absorption, and product tolerance.",
+  "height-weight":
+    "Body size helps estimate practical dose ranges and avoid generic recommendations.",
+  labs:
+    "Lab values make the brief more precise than symptom-based estimates alone.",
+  lifestage:
+    "Hormonal stage can change iron, bone, sleep, and symptom priorities.",
+  meds:
+    "Medications are essential for safety screening and avoiding interaction risks.",
+  name:
+    "This makes the brief feel personal and easier to review later.",
+  pills: "Capsule limit helps keep the plan usable day to day.",
+  protein:
+    "Protein intake helps interpret activity, recovery, muscle, and satiety needs.",
+  review:
+    "This is your chance to add context that structured questions might miss.",
+  sex:
+    "Some nutrient ranges, hormonal considerations, and safety checks differ by biological sex.",
+  skin:
+    "Skin tone affects how much vitamin D your body may produce from sunlight.",
+  sleep:
+    "Sleep quality adds detail beyond hours, showing whether rest is actually restorative.",
+  "sleep-hours":
+    "Sleep duration is a major recovery signal and helps prioritize the brief.",
+  smoke:
+    "Smoking status changes antioxidant and vitamin C considerations.",
+  stress: "Stress level helps prioritize recovery and calm support.",
+  "stress-source":
+    "The source of stress helps separate lifestyle context from supplement support.",
+  sun:
+    "Sun exposure influences how strongly vitamin D support should be considered.",
+  supps:
+    "Current supplements help avoid duplicate products and unnecessary spend.",
+  symptoms:
+    "Symptoms help distinguish current friction points from longer-term goals.",
+  vo2:
+    "VO2 max is a useful proxy for cardiorespiratory fitness and long-term health capacity.",
+  wearable:
+    "Wearable data can sharpen recovery and activity interpretation."
+};
+
+const questionWhyTh: QuestionWhyMap = {
+  activity:
+    "กิจกรรมมีผลต่อการฟื้นตัว โปรตีน อิเล็กโทรไลต์ และการสนับสนุนสมรรถภาพ",
+  age:
+    "อายุมีผลต่อความต้องการด้านกระดูก กล้ามเนื้อ เมตาบอลิซึม และการฟื้นตัว",
+  alcohol:
+    "แอลกอฮอล์อาจเกี่ยวกับวิตามิน B แมกนีเซียม และหมายเหตุด้านความปลอดภัย",
+  budget: "งบประมาณทำให้คำแนะนำใช้งานจริง ไม่ใหญ่เกินจำเป็น",
+  coffee: "คาเฟอีนช่วยอธิบายรูปแบบการนอน ความเครียด และพลังงาน",
+  conditions:
+    "ข้อมูลสุขภาพช่วยหลีกเลี่ยงคำแนะนำที่ไม่เหมาะและเพิ่มข้อควรระวัง",
+  country:
+    "ประเทศช่วยประเมินภูมิอากาศ ละติจูด ตลาด และสินค้าที่หาได้",
+  diet:
+    "รูปแบบอาหารช่วยเห็นช่องว่างที่เป็นไปได้และหลีกเลี่ยงสิ่งที่คุณได้รับเพียงพอแล้ว",
+  energy:
+    "ระดับพลังงานช่วยเทียบเป้าหมายกับความรู้สึกจริงในแต่ละวัน",
+  family:
+    "ประวัติครอบครัวเพิ่มบริบทความเสี่ยงสำหรับเป้าหมายสุขภาพระยะยาว",
+  fish: "ปลามันเป็นตัวแทนง่ายๆ ของปริมาณโอเมก้า-3 จากอาหาร",
+  form:
+    "รูปแบบที่ชอบช่วยเลือกผลิตภัณฑ์ที่คุณมีแนวโน้มจะใช้ต่อเนื่อง",
+  goals: "เป้าหมายช่วยจัดลำดับความสำคัญของบรีฟ",
+  gut: "การย่อยมีผลต่อความสบาย การดูดซึม และความทนต่อผลิตภัณฑ์",
+  "height-weight":
+    "ขนาดร่างกายช่วยประเมินช่วงปริมาณให้เหมาะขึ้น ไม่ใช่คำแนะนำแบบทั่วไป",
+  labs:
+    "ค่าตรวจช่วยให้บรีฟแม่นกว่าการประเมินจากอาการอย่างเดียว",
+  lifestage:
+    "ช่วงฮอร์โมนอาจมีผลต่อธาตุเหล็ก กระดูก การนอน และอาการต่างๆ",
+  meds:
+    "ข้อมูลยาจำเป็นต่อการตรวจความปลอดภัยและลดความเสี่ยงจากปฏิกิริยาระหว่างกัน",
+  name: "ช่วยให้บรีฟอ่านเป็นส่วนตัวและตรวจทานง่ายขึ้น",
+  pills: "จำนวนเม็ดสูงสุดช่วยให้แผนทำตามได้จริงในชีวิตประจำวัน",
+  protein:
+    "โปรตีนช่วยตีความกิจกรรม การฟื้นตัว กล้ามเนื้อ และความอิ่ม",
+  review:
+    "ส่วนนี้ให้คุณเพิ่มบริบทที่คำถามแบบเลือกตอบอาจเก็บไม่ครบ",
+  sex:
+    "สารอาหารบางช่วง ฮอร์โมน และข้อควรระวังแตกต่างกันตามเพศชีวภาพ",
+  skin: "สีผิวมีผลต่อการสร้างวิตามินดีจากแสงแดด",
+  sleep:
+    "คุณภาพการนอนบอกได้ว่าเวลานอนนั้นฟื้นตัวจริงแค่ไหน",
+  "sleep-hours":
+    "เวลานอนเป็นสัญญาณสำคัญของการฟื้นตัวและการจัดลำดับคำแนะนำ",
+  smoke:
+    "การสูบบุหรี่มีผลต่อการพิจารณาสารต้านอนุมูลอิสระและวิตามิน C",
+  stress: "ความเครียดช่วยจัดลำดับการฟื้นตัวและการสนับสนุนความสงบ",
+  "stress-source":
+    "แหล่งความเครียดช่วยแยกบริบทชีวิตจากสิ่งที่อาหารเสริมช่วยได้",
+  sun: "แดดที่ได้รับมีผลต่อการพิจารณาวิตามินดี",
+  supps:
+    "อาหารเสริมที่ใช้อยู่ช่วยหลีกเลี่ยงการซ้ำซ้อนและค่าใช้จ่ายไม่จำเป็น",
+  symptoms:
+    "อาการปัจจุบันช่วยแยกสิ่งที่ควรดูแลก่อนจากเป้าหมายระยะยาว",
+  vo2:
+    "VO2 max เป็นตัวชี้วัดสมรรถภาพหัวใจและปอดที่มีประโยชน์",
+  wearable:
+    "ข้อมูลจากอุปกรณ์ช่วยเพิ่มความแม่นยำเรื่องการฟื้นตัวและกิจกรรม"
+};
+
+function getQuestionWhy(locale: Locale, id: string) {
+  return (locale === "th" ? questionWhyTh : questionWhyEn)[id];
+}
 
 function useCompactAssessment() {
   const [isCompact, setIsCompact] = useState(false);
@@ -1345,10 +1485,10 @@ function getPlanContent(locale: Locale): PlanContent {
         {
           cta: "ไปต่อ",
           description:
-            "การดูแลต่อเนื่องพร้อม AI agent ที่ช่วยปรับคำแนะนำให้เข้ากับความต้องการรายวัน",
+            "การดูแลต่อเนื่องพร้อม AI เอเจนต์ที่ช่วยปรับคำแนะนำให้เข้ากับความต้องการรายวัน",
           features: [
             "ทุกอย่างในแผนความแม่นยำสูง",
-            "AI agent สำหรับความต้องการรายวัน",
+            "AI เอเจนต์สำหรับความต้องการรายวัน",
             "ปรับเวลาทานและกิจวัตร",
             "รองรับการเดินทาง การฝึก และการนอน",
             "ทบทวนลำดับความสำคัญเมื่อข้อมูลเปลี่ยน"
@@ -1450,6 +1590,7 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
           close: "ปิด",
           continue: "ต่อไป",
           currentStep: "ขั้นตอนปัจจุบัน",
+          infoLabel: "ทำไมคำถามนี้สำคัญ",
           notesHint: "เพิ่มได้ถ้ามีรายละเอียดสำคัญ เช่น ความไวต่อส่วนผสม ข้อจำกัด หรือสิ่งที่อยากหลีกเลี่ยง",
           notesLabel: "มีอะไรเพิ่มเติมที่เราควรรู้ไหม?",
           optionalSection: "เพิ่มความแม่นยำ",
@@ -1493,6 +1634,7 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
           close: "Close",
           continue: "Continue",
           currentStep: "Current step",
+          infoLabel: "Why this matters",
           notesHint:
             "Add anything useful, such as sensitivities, constraints, products you already use, or ingredients you want to avoid.",
           notesLabel: "Anything else we should know?",
@@ -1557,17 +1699,17 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
         return current;
       }
 
-      if (key === "family") {
+      if (key === "conditions" || key === "family") {
         if (value === "none") {
           return {
             ...current,
-            family: selected ? [] : ["none"]
+            [key]: selected ? [] : ["none"]
           };
         }
 
         return {
           ...current,
-          family: selected
+          [key]: selected
             ? values.filter((item) => item !== value)
             : [...values.filter((item) => item !== "none"), value]
         };
@@ -2562,9 +2704,11 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
                   <Question
                     key={question.id}
                     hint={question.hint}
+                    infoLabel={ui.infoLabel}
                     label={question.label}
                     required={question.required}
                     requiredLabel={copy.common.required}
+                    why={question.why ?? getQuestionWhy(locale, question.id)}
                   >
                     {question.content}
                   </Question>
@@ -2927,22 +3071,34 @@ function SectionCard({
 type QuestionProps = Readonly<{
   children: React.ReactNode;
   hint?: string;
+  infoLabel: string;
   label: string;
   required?: boolean;
   requiredLabel?: string;
+  why?: string;
 }>;
 
 function Question({
   children,
   hint,
+  infoLabel,
   label,
   required = false,
-  requiredLabel
+  requiredLabel,
+  why
 }: QuestionProps) {
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-sm font-semibold text-[#20343A]">{label}</p>
+        {why ? (
+          <QuestionLabelPopover
+            infoLabel={infoLabel}
+            label={label}
+            text={why}
+          />
+        ) : (
+          <p className="text-sm font-semibold text-[#20343A]">{label}</p>
+        )}
         {required ? (
           <span className="rounded-full bg-[#1FA77A]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#1FA77A]">
             {requiredLabel}
@@ -2952,6 +3108,43 @@ function Question({
       {hint ? <p className="mt-1 text-sm text-muted-foreground">{hint}</p> : null}
       <div className="mt-3">{children}</div>
     </div>
+  );
+}
+
+function QuestionLabelPopover({
+  infoLabel,
+  label,
+  text
+}: Readonly<{ infoLabel: string; label: string; text: string }>) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <span
+      className="relative inline-flex max-w-full"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-label={`${infoLabel}: ${label}`}
+        className="cursor-help rounded-sm text-left text-sm font-semibold text-[#20343A] underline decoration-foreground/20 decoration-dotted underline-offset-4 transition hover:text-[#245f9f] focus:outline-none focus:ring-2 focus:ring-[#3A7BD5]/25"
+        onBlur={() => setIsOpen(false)}
+        onClick={() => setIsOpen((current) => !current)}
+        onFocus={() => setIsOpen(true)}
+      >
+        {label}
+      </button>
+      <span
+        role="tooltip"
+        className={cx(
+          "absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-md bg-[#20343A] px-3 py-2 text-left text-xs font-medium normal-case leading-5 tracking-normal text-white shadow-lg sm:left-1/2 sm:-translate-x-1/2",
+          isOpen ? "block" : "hidden"
+        )}
+      >
+        {text}
+      </span>
+    </span>
   );
 }
 
@@ -3001,6 +3194,8 @@ type SkinToneGroupProps = Readonly<{
 }>;
 
 function SkinToneGroup({ onSelect, options, selected }: SkinToneGroupProps) {
+  const hasSelection = Boolean(selected);
+
   return (
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
       {options.map((option) => {
@@ -3012,10 +3207,13 @@ function SkinToneGroup({ onSelect, options, selected }: SkinToneGroupProps) {
             type="button"
             aria-label={option.label}
             className={cx(
-              "aspect-square rounded-md border bg-white p-1 transition",
+              "aspect-square rounded-md border-2 bg-white p-1 transition duration-150 focus:outline-none focus:ring-2 focus:ring-[#1FA77A]/25",
               isSelected
-                ? "border-[#1FA77A] ring-2 ring-[#1FA77A]/20"
-                : "border-foreground/10 hover:border-[#1FA77A]/40 hover:bg-[#1FA77A]/5"
+                ? "border-[#1FA77A] shadow-sm ring-2 ring-[#1FA77A]/25"
+                : cx(
+                    "border-foreground/10 hover:border-[#1FA77A]/40 hover:bg-[#1FA77A]/5 hover:opacity-100",
+                    hasSelection && "opacity-35 saturate-75"
+                  )
             )}
             onClick={() => onSelect(option.value)}
           >
