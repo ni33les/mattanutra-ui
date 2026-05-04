@@ -3,6 +3,7 @@ import { CtaSection } from "@/components/cta-section";
 import { FeatureRow } from "@/components/feature-row";
 import { HeroSplit } from "@/components/hero-split";
 import { SiteFooter } from "@/components/site-footer";
+import { SupportFeatureSection } from "@/components/support-feature-section";
 import { TitleBar } from "@/components/title-bar";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 
@@ -36,12 +37,15 @@ export default async function Home({ params }: HomeProps) {
           headline={dictionary.hero.subtitle}
           headlineAccent={dictionary.hero.subtitleAccent}
           headlineMuted={dictionary.hero.subtitleMuted}
+          imageAlt={dictionary.hero.imageAlt}
+          secondaryCta={dictionary.hero.secondaryCta}
           subheadline={dictionary.hero.followOn}
           subheadlineAccent={dictionary.hero.followOnAccent}
         />
-        <FeatureRow />
-        <CtaSection />
-        <SiteFooter />
+        <FeatureRow content={dictionary.featureSection} />
+        <CtaSection content={dictionary.cta} />
+        <SupportFeatureSection content={dictionary.supportSection} />
+        <SiteFooter content={dictionary.footer} />
       </div>
     </main>
   );

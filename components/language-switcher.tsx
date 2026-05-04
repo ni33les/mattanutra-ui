@@ -12,7 +12,10 @@ type LanguageSwitcherProps = Readonly<{
 
 export function LanguageSwitcher({ currentLocale }: LanguageSwitcherProps) {
   return (
-    <nav aria-label="Language" className="flex items-center gap-1 rounded-md border border-foreground/10 bg-white/60 p-1.5">
+    <nav
+      aria-label="Language"
+      className="flex items-center gap-1 rounded-md border border-[#1FA77A]/20 bg-background/60 p-1"
+    >
       {locales.map((locale) => {
         const isActive = locale === currentLocale;
         const next = `/${locale}`;
@@ -23,10 +26,10 @@ export function LanguageSwitcher({ currentLocale }: LanguageSwitcherProps) {
             href={`/api/locale?locale=${locale}&next=${encodeURIComponent(next)}`}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "rounded px-3.5 py-2 text-base font-medium transition",
+              "rounded px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition",
               isActive
-                ? "bg-foreground text-background"
-                : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                ? "bg-[#1FA77A] text-white"
+                : "text-muted-foreground hover:bg-[#1FA77A]/10 hover:text-[#20343A]"
             )}
           >
             {localeLabels[locale]}

@@ -8,10 +8,13 @@ export function GET(request: NextRequest) {
   const requestedLocale = url.searchParams.get("locale") || defaultLocale;
   const locale = isLocale(requestedLocale) ? requestedLocale : defaultLocale;
   const requestedNextPath = url.searchParams.get("next");
-  const nextPath =
+  const safeNextPath =
     requestedNextPath?.startsWith("/") && !requestedNextPath.startsWith("//")
       ? requestedNextPath
       : `/${locale}`;
+  const nextPath = safeNextPath.startsWith(`/${locale}`)
+    ? safeNextPath
+    : `/${locale}`;
   const response = NextResponse.redirect(new URL(nextPath, request.url));
 
   response.cookies.set("NEXT_LOCALE", locale, {

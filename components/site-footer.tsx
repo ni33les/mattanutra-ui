@@ -75,13 +75,20 @@ function ShopeeLogo() {
   );
 }
 
-export function SiteFooter() {
+type FooterContent = Readonly<{
+  recommended: string;
+  starsLabel: string;
+  trustedLine1: string;
+  trustedLine2: string;
+}>;
+
+export function SiteFooter({ content }: Readonly<{ content: FooterContent }>) {
   return (
     <footer className="border-t border-foreground/10 bg-background">
       <div className="mx-auto grid min-h-28 w-full max-w-6xl grid-cols-[minmax(0,1.35fr)_minmax(240px,0.65fr)] items-stretch gap-4 px-4 py-6 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-x-3 whitespace-nowrap text-[#20343A]">
           <p className="shrink-0 text-[10px] font-semibold uppercase leading-6 tracking-[0.06em] sm:text-[11px] lg:text-xs">
-            Recommended products on trusted sources
+            {content.recommended}
           </p>
           <div className="flex shrink-0 items-center gap-x-3">
             <LazadaLogo />
@@ -91,15 +98,18 @@ export function SiteFooter() {
 
         <div className="flex min-w-0 items-center justify-center">
           <div className="text-center">
-            <div className="flex justify-center gap-1" aria-label="Five stars">
+            <div
+              className="flex justify-center gap-1"
+              aria-label={content.starsLabel}
+            >
               {Array.from({ length: 5 }).map((_, index) => (
                 <StarIcon key={index} />
               ))}
             </div>
-            <p className="mt-3 text-sm font-semibold leading-5 text-[#20343A]">
-              Trusted by thousands
+            <p className="mt-3 text-sm font-semibold uppercase leading-5 tracking-[0.08em] text-[#20343A]">
+              {content.trustedLine1}
               <br />
-              on their health journey
+              {content.trustedLine2}
             </p>
           </div>
         </div>

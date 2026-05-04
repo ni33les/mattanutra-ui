@@ -8,7 +8,6 @@ The app uses lightweight locale-prefixed routes:
 
 ```txt
 /en
-/es
 /th
 ```
 

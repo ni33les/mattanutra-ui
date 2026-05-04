@@ -1,18 +1,18 @@
-export const locales = ["en", "es", "th"] as const;
+export const locales = ["en", "th"] as const;
 export type Locale = (typeof locales)[number];
 
 export const defaultLocale: Locale = "en";
 
 export const localeLabels: Record<Locale, string> = {
   en: "EN",
-  es: "ES",
   th: "TH"
 };
 
 const en = {
   meta: {
     title: "Healthspan",
-    description: "A blank Healthspan canvas built on Next.js and Tailwind CSS."
+    description:
+      "Personalized supplement recommendations tailored to your body, lifestyle, and goals."
   },
   hero: {
     eyebrow: "Healthspan",
@@ -24,7 +24,70 @@ const en = {
       "AI powered plans for supplements, sleep, nutrition and more - Tailored to YOU",
     followOnAccent: "YOU",
     cta: "Design your future health",
+    secondaryCta: "How it works",
+    imageAlt: "Healthy and fit Asian couple outdoors",
     stack: "Next.js · TypeScript · Tailwind"
+  },
+  featureSection: {
+    eyebrow: "Personalized wellness",
+    title: "From goals to supplement options",
+    description:
+      "Healthspan turns a short conversation about your lifestyle, your body and preferences into a supplement formulation tailored specifically for you — then finds the closest matching products that meet your body’s needs.",
+    learnMore: "Learn more",
+    features: [
+      {
+        name: "Smart Assessment",
+        description:
+          "Share your goals for energy, sleep, focus, calm, recovery, or healthy aging in a 2 minute questionnaire.",
+        href: "#"
+      },
+      {
+        name: "AI Powered Plan",
+        description:
+          "We generate a comprehensive AI powered supplement plan tailored to you.",
+        href: "#"
+      },
+      {
+        name: "Buy with confidence",
+        description:
+          "We discover the very best products that match your individual formulation.",
+        href: "#"
+      }
+    ]
+  },
+  cta: {
+    titleLine1: "Personalised today.",
+    titleLine2: "Healthier tomorrow.",
+    button: "START YOUR FREE ASSESSMENT NOW",
+    reassurance: "Takes 2-3 minutes * No credit card required"
+  },
+  supportSection: {
+    title: "Built around your health goals",
+    features: [
+      {
+        name: "Personalised",
+        description: "Plans built for your unique body and goals."
+      },
+      {
+        name: "Backed by science",
+        description: "Based on the latest research, not trends."
+      },
+      {
+        name: "Save time & money",
+        description:
+          "No more trial and error, wasting time and money on the wrong supplements."
+      },
+      {
+        name: "Live better longer",
+        description: "Optimise today. Proactive for tomorrow."
+      }
+    ]
+  },
+  footer: {
+    recommended: "Recommended products on trusted sources",
+    starsLabel: "Five stars",
+    trustedLine1: "Trusted by thousands",
+    trustedLine2: "on their health journey"
   }
 };
 
@@ -32,29 +95,11 @@ type Dictionary = typeof en;
 
 const dictionaries: Record<Locale, Dictionary> = {
   en,
-  es: {
-    meta: {
-      title: "Healthspan",
-      description: "Un lienzo limpio de Healthspan creado con Next.js y Tailwind CSS."
-    },
-    hero: {
-      eyebrow: "Healthspan",
-      title: "Hola mundo.",
-      subtitle: "Sepa exactamente lo que su cuerpo necesita",
-      subtitleAccent: "su cuerpo necesita",
-      subtitleMuted: "sin conjeturas",
-      followOn:
-        "Planes con IA para suplementos, sueño, nutrición y más - adaptados a TI",
-      followOnAccent: "TI",
-      cta: "Listo para desplegar",
-      stack: "Next.js · TypeScript · Tailwind"
-    }
-  },
   th: {
     meta: {
       title: "Healthspan",
       description:
-        "เราสร้างโปรโตคอลอาหารเสริมเฉพาะบุคคลที่อิงหลักวิทยาศาสตร์ เพื่อเป้าหมายสุขภาพของคุณ"
+        "คำแนะนำอาหารเสริมเฉพาะบุคคลที่ปรับให้เข้ากับร่างกาย ไลฟ์สไตล์ และเป้าหมายของคุณ"
     },
     hero: {
       eyebrow: "Healthspan",
@@ -66,7 +111,70 @@ const dictionaries: Record<Locale, Dictionary> = {
         "แผนด้วย AI สำหรับอาหารเสริม การนอนหลับ โภชนาการ และอื่นๆ - ออกแบบเพื่อคุณ",
       followOnAccent: "คุณ",
       cta: "ออกแบบสุขภาพอนาคตของคุณ",
+      secondaryCta: "วิธีการทำงาน",
+      imageAlt: "คู่รักชาวเอเชียที่สุขภาพดีและแข็งแรงกลางแจ้ง",
       stack: "Next.js · TypeScript · Tailwind"
+    },
+    featureSection: {
+      eyebrow: "สุขภาพเฉพาะบุคคล",
+      title: "จากเป้าหมายสู่ตัวเลือกอาหารเสริม",
+      description:
+        "Healthspan เปลี่ยนบทสนทนาสั้นๆ เกี่ยวกับไลฟ์สไตล์ ร่างกาย และความต้องการของคุณให้เป็นสูตรอาหารเสริมที่ปรับมาเพื่อคุณโดยเฉพาะ แล้วค้นหาผลิตภัณฑ์ที่ใกล้เคียงที่สุดกับสิ่งที่ร่างกายคุณต้องการ",
+      learnMore: "เรียนรู้เพิ่มเติม",
+      features: [
+        {
+          name: "การประเมินอัจฉริยะ",
+          description:
+            "บอกเป้าหมายของคุณเรื่องพลังงาน การนอนหลับ สมาธิ ความสงบ การฟื้นตัว หรือการสูงวัยอย่างมีสุขภาพดี ผ่านแบบสอบถาม 2 นาที",
+          href: "#"
+        },
+        {
+          name: "แผนจาก AI",
+          description:
+            "เราสร้างแผนอาหารเสริมด้วย AI ที่ครอบคลุมและปรับให้เหมาะกับคุณ",
+          href: "#"
+        },
+        {
+          name: "ซื้อได้อย่างมั่นใจ",
+          description:
+            "เราค้นหาผลิตภัณฑ์ที่ดีที่สุดซึ่งตรงกับสูตรเฉพาะบุคคลของคุณ",
+          href: "#"
+        }
+      ]
+    },
+    cta: {
+      titleLine1: "ดูแลวันนี้.",
+      titleLine2: "สุขภาพดีขึ้นในวันพรุ่งนี้.",
+      button: "เริ่มประเมินฟรีตอนนี้",
+      reassurance: "ใช้เวลา 2-3 นาที * ไม่ต้องใช้บัตรเครดิต"
+    },
+    supportSection: {
+      title: "สร้างขึ้นรอบเป้าหมายสุขภาพของคุณ",
+      features: [
+        {
+          name: "เฉพาะบุคคล",
+          description: "แผนที่สร้างขึ้นเพื่อร่างกายและเป้าหมายเฉพาะของคุณ"
+        },
+        {
+          name: "อิงหลักวิทยาศาสตร์",
+          description: "อ้างอิงงานวิจัยล่าสุด ไม่ใช่กระแสชั่วคราว"
+        },
+        {
+          name: "ประหยัดเวลาและเงิน",
+          description:
+            "ไม่ต้องลองผิดลองถูก เสียเวลาและเงินกับอาหารเสริมที่ไม่เหมาะกับคุณ"
+        },
+        {
+          name: "ใช้ชีวิตดีขึ้น ยาวนานขึ้น",
+          description: "ดูแลวันนี้ พร้อมวางแผนเชิงรุกเพื่อวันพรุ่งนี้"
+        }
+      ]
+    },
+    footer: {
+      recommended: "ผลิตภัณฑ์ที่แนะนำจากแหล่งที่เชื่อถือได้",
+      starsLabel: "ห้าดาว",
+      trustedLine1: "ได้รับความไว้วางใจจากผู้ใช้หลายพันคน",
+      trustedLine2: "บนเส้นทางสุขภาพของพวกเขา"
     }
   }
 };

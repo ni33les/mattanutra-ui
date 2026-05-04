@@ -10,6 +10,8 @@ type HeroSplitProps = Readonly<{
   headline: string;
   headlineAccent: string;
   headlineMuted: string;
+  imageAlt: string;
+  secondaryCta: string;
   subheadline: string;
   subheadlineAccent: string;
 }>;
@@ -36,6 +38,8 @@ export function HeroSplit({
   headline,
   headlineAccent,
   headlineMuted,
+  imageAlt,
+  secondaryCta,
   subheadline,
   subheadlineAccent
 }: HeroSplitProps) {
@@ -62,7 +66,7 @@ export function HeroSplit({
           <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-4">
             <a
               href="#"
-              className="rounded-md bg-[#3A7BD5] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#326dbf] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3A7BD5]"
+              className="rounded-md bg-[#1FA77A] px-4 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition hover:bg-[#188a65] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A]"
             >
               {cta}
             </a>
@@ -70,7 +74,7 @@ export function HeroSplit({
               href="#features"
               className="text-sm font-semibold leading-6 text-[#20343A]"
             >
-              How it works <span aria-hidden="true">-&gt;</span>
+              {secondaryCta} <span aria-hidden="true">-&gt;</span>
             </a>
           </div>
         </div>
@@ -78,7 +82,7 @@ export function HeroSplit({
         <div className="relative min-h-[24rem] overflow-hidden rounded-lg bg-background lg:min-h-[34rem]">
           <Image
             src={heroImageUrl}
-            alt="Healthy and fit Asian couple outdoors"
+            alt={imageAlt}
             fill
             priority
             sizes="(min-width: 1024px) 560px, 100vw"
