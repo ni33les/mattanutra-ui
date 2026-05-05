@@ -531,6 +531,32 @@ function valueLabel(value: unknown) {
   return text ? humanize(text) : "";
 }
 
+function formatHeight(value: unknown) {
+  const cm = Number(value);
+
+  if (!Number.isFinite(cm) || cm <= 0) {
+    return "";
+  }
+
+  return `${Math.round(cm)} cm`;
+}
+
+function formatWeight(value: unknown) {
+  const kg = Number(value);
+
+  if (!Number.isFinite(kg) || kg <= 0) {
+    return "";
+  }
+
+  return `${Math.round(kg)} kg`;
+}
+
+function fallbackProfile(locale: Locale) {
+  return locale === "th"
+    ? "ไม่ระบุเพศ / ไม่ระบุส่วนสูง / ไม่ระบุน้ำหนัก"
+    : "Sex not shown / height not shown / weight not shown";
+}
+
 export function buildAssessmentSummary({
   answers,
   locale,
@@ -543,8 +569,10 @@ export function buildAssessmentSummary({
   const record = toRecord(answers);
   const country = toText(record.country) || "TH";
   const region = countryLabels[country] ?? valueLabel(country) ?? "Thailand";
-  const ageRange = valueLabel(record.age) || (locale === "th" ? "ผู้ใหญ่" : "Adult");
-  const sex = valueLabel(record.sex) || (locale === "th" ? "ไม่แสดง" : "Not displayed");
+  const sex = valueLabel(record.sex);
+  const height = formatHeight(record.heightCm);
+  const weight = formatWeight(record.weightKg);
+  const profileParts = [sex, height, weight].filter(Boolean);
   const goals = toTextArray(record.goals).map(humanize);
   const symptoms = toTextArray(record.symptoms);
   const conditions = toTextArray(record.conditions);
@@ -573,7 +601,10 @@ export function buildAssessmentSummary({
         ? goals
         : [locale === "th" ? "สุขภาพโดยรวม" : "General wellness"],
     plan: planLabels[locale][plan],
-    profile: `${ageRange} / ${sex}`,
+    profile:
+      profileParts.length > 0
+        ? profileParts.join(" / ")
+        : fallbackProfile(locale),
     region
   };
 }
