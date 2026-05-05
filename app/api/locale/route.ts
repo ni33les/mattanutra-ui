@@ -6,10 +6,22 @@ const oneYear = 60 * 60 * 24 * 365;
 function redirectToRelativePath(path: string) {
   return new NextResponse(null, {
     headers: {
-      Location: path
+      "Cache-Control":
+        "private, no-store, no-cache, max-age=0, must-revalidate",
+      "CDN-Cache-Control": "no-store",
+      Location: path,
+      "Surrogate-Control": "no-store"
     },
     status: 307
   });
+}
+
+function stripInternalSearchParams(path: string) {
+  const url = new URL(path, "https://mattanutra.local");
+
+  url.searchParams.delete("_rsc");
+
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 export function GET(request: NextRequest) {
@@ -19,7 +31,7 @@ export function GET(request: NextRequest) {
   const requestedNextPath = url.searchParams.get("next");
   const safeNextPath =
     requestedNextPath?.startsWith("/") && !requestedNextPath.startsWith("//")
-      ? requestedNextPath
+      ? stripInternalSearchParams(requestedNextPath)
       : `/${locale}`;
   const nextPath = safeNextPath.startsWith(`/${locale}`)
     ? safeNextPath

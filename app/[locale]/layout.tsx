@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import "../globals.css";
 import { getDictionary, isLocale } from "@/lib/i18n";
 
+export const dynamic = "force-dynamic";
+
 type LocaleLayoutProps = Readonly<{
   children: ReactNode;
   params: Promise<{

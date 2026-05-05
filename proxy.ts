@@ -34,9 +34,35 @@ function getRequestOrigin(request: NextRequest) {
   return `${protocol}://${host.split(",")[0]?.trim()}`;
 }
 
+function stripInternalSearchParams(search: string) {
+  const params = new URLSearchParams(search);
+
+  params.delete("_rsc");
+
+  const nextSearch = params.toString();
+
+  return nextSearch ? `?${nextSearch}` : "";
+}
+
+function withNoStore(response: NextResponse) {
+  response.headers.set(
+    "Cache-Control",
+    "private, no-store, no-cache, max-age=0, must-revalidate"
+  );
+  response.headers.set("CDN-Cache-Control", "no-store");
+  response.headers.set("Surrogate-Control", "no-store");
+
+  return response;
+}
+
 function redirectToPath(request: NextRequest, pathname: string, search = "") {
-  return NextResponse.redirect(
-    new URL(`${pathname}${search}`, getRequestOrigin(request))
+  return withNoStore(
+    NextResponse.redirect(
+      new URL(
+        `${pathname}${stripInternalSearchParams(search)}`,
+        getRequestOrigin(request)
+      )
+    )
   );
 }
 
@@ -54,7 +80,7 @@ export function proxy(request: NextRequest) {
   const pathnameLocale = pathname.split("/")[1];
 
   if (isLocale(pathnameLocale)) {
-    return NextResponse.next();
+    return withNoStore(NextResponse.next());
   }
 
   if (removedLocales.has(pathnameLocale)) {
