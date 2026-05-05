@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { AssessmentFlow } from "@/components/assessment-flow";
+import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 
@@ -31,6 +32,7 @@ export default async function AssessmentPage({ params }: AssessmentPageProps) {
         title={dictionary.hero.eyebrow}
       />
       <AssessmentFlow locale={locale} />
+      <SiteFooter content={dictionary.footer} locale={locale} />
     </main>
   );
 }

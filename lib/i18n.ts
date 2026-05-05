@@ -90,8 +90,11 @@ const en = {
     ]
   },
   footer: {
+    copyright: "© 2026 MATTANUTRA. Wellness information only. Not medical advice.",
+    privacy: "Privacy Policy",
     recommended: "Recommended products on trusted sources",
     starsLabel: "Five stars",
+    terms: "Terms of Service",
     trustedLine1: "Trusted by thousands",
     trustedLine2: "on their health journey"
   }
@@ -190,8 +193,12 @@ const dictionaries: Record<Locale, Dictionary> = {
       ]
     },
     footer: {
+      copyright:
+        "© 2026 MATTANUTRA ข้อมูลเพื่อ wellness เท่านั้น ไม่ใช่คำแนะนำทางการแพทย์",
+      privacy: "นโยบายความเป็นส่วนตัว",
       recommended: "ผลิตภัณฑ์ที่แนะนำจากแหล่งที่เชื่อถือได้",
       starsLabel: "ห้าดาว",
+      terms: "เงื่อนไขการให้บริการ",
       trustedLine1: "ได้รับความไว้วางใจจากผู้ใช้หลายพันคน",
       trustedLine2: "บนเส้นทางสุขภาพของพวกเขา"
     }

@@ -1,3 +1,6 @@
+import Link from "next/link";
+import type { Locale } from "@/lib/i18n";
+
 function StarIcon() {
   return (
     <svg
@@ -76,13 +79,19 @@ function ShopeeLogo() {
 }
 
 type FooterContent = Readonly<{
+  copyright: string;
+  privacy: string;
   recommended: string;
   starsLabel: string;
+  terms: string;
   trustedLine1: string;
   trustedLine2: string;
 }>;
 
-export function SiteFooter({ content }: Readonly<{ content: FooterContent }>) {
+export function SiteFooter({
+  content,
+  locale
+}: Readonly<{ content: FooterContent; locale: Locale }>) {
   return (
     <footer className="border-t border-foreground/10 bg-background">
       <div className="mx-auto grid min-h-28 w-full max-w-6xl grid-cols-1 items-center gap-7 px-4 py-7 sm:px-6 md:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.65fr)] md:gap-4 lg:px-8">
@@ -113,6 +122,20 @@ export function SiteFooter({ content }: Readonly<{ content: FooterContent }>) {
             </p>
           </div>
         </div>
+      </div>
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-3 px-4 pb-6 pt-2 text-center text-xs text-muted-foreground sm:px-6 lg:px-8">
+        <nav
+          aria-label="Legal"
+          className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground sm:text-[11px]"
+        >
+          <Link href={`/${locale}/terms`} className="transition hover:text-[#3A7BD5]">
+            {content.terms}
+          </Link>
+          <Link href={`/${locale}/privacy`} className="transition hover:text-[#3A7BD5]">
+            {content.privacy}
+          </Link>
+        </nav>
+        <p className="max-w-2xl text-[11px] leading-5">{content.copyright}</p>
       </div>
     </footer>
   );

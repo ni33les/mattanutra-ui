@@ -51,7 +51,7 @@ export default async function Home({ params }: HomeProps) {
         <FeatureRow content={dictionary.featureSection} />
         <CtaSection content={dictionary.cta} ctaHref={assessmentPath} />
         <SupportFeatureSection content={dictionary.supportSection} />
-        <SiteFooter content={dictionary.footer} />
+        <SiteFooter content={dictionary.footer} locale={locale} />
       </div>
     </main>
   );
