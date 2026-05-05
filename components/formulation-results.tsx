@@ -85,6 +85,40 @@ const chatChannels = [
 
 const formulationHeroBackgroundImage = "/formulation-couple.jpg";
 
+type CopyLabels = Record<
+  | "connectChatBody"
+  | "connectChatButton"
+  | "connectChatEyebrow"
+  | "connectChatPlanId"
+  | "connectChatQrAlt"
+  | "connectChatTitle"
+  | "constraints"
+  | "context"
+  | "coveragePrefix"
+  | "coverageSuffix"
+  | "emptyPlan"
+  | "error"
+  | "formula"
+  | "formulaHint"
+  | "generated"
+  | "goals"
+  | "heroSubtitle"
+  | "heroTitle"
+  | "loading"
+  | "dailyDose"
+  | "plan"
+  | "products"
+  | "productsHint"
+  | "profile"
+  | "region"
+  | "safety"
+  | "shopLazada"
+  | "shopShopee",
+  string
+> & {
+  safetyNotes: string[];
+};
+
 const copy = {
   en: {
     connectChatBody:
@@ -107,6 +141,9 @@ const copy = {
       "Supplements follow the product order. Product numbers show which recommendations cover each supplement.",
     generated: "Generated",
     goals: "Goals",
+    heroSubtitle:
+      "A concise wellness formulation and marketplace search guide based on the completed assessment.",
+    heroTitle: "Your personalised nutritional formulation",
     loading: "Loading your formulation",
     dailyDose: "Dose",
     plan: "Plan",
@@ -116,6 +153,11 @@ const copy = {
     profile: "Profile",
     region: "Region",
     safety: "Safety notes",
+    safetyNotes: [
+      "These are optional wellness product suggestions, not medical advice.",
+      "Review all labels for allergens, ingredients, and daily use instructions before purchase.",
+      "Ask a qualified clinician or pharmacist to review the plan if you are pregnant, breastfeeding, taking medication, or managing a medical condition."
+    ],
     shopLazada: "Shop on Lazada",
     shopShopee: "Shop on Shopee"
   },
@@ -139,6 +181,9 @@ const copy = {
       "รายการอาหารเสริมเรียงตามลำดับผลิตภัณฑ์ หมายเลขผลิตภัณฑ์แสดงว่าคำแนะนำใดครอบคลุมอาหารเสริมแต่ละตัว",
     generated: "สร้างเมื่อ",
     goals: "เป้าหมาย",
+    heroSubtitle:
+      "บรีฟสูตรเพื่อสุขภาพและคู่มือค้นหาผลิตภัณฑ์จากคำตอบในแบบประเมินของคุณ",
+    heroTitle: "สูตรโภชนาการเฉพาะบุคคลของคุณ",
     loading: "กำลังโหลดสูตรของคุณ",
     dailyDose: "ขนาด",
     plan: "แผน",
@@ -148,41 +193,15 @@ const copy = {
     profile: "โปรไฟล์",
     region: "ภูมิภาค",
     safety: "หมายเหตุด้านความปลอดภัย",
+    safetyNotes: [
+      "คำแนะนำเหล่านี้เป็นตัวเลือกผลิตภัณฑ์เพื่อสุขภาพ ไม่ใช่คำแนะนำทางการแพทย์",
+      "ตรวจฉลากทั้งหมดเพื่อดูสารก่อแพ้ ส่วนผสม และวิธีใช้ต่อวันก่อนซื้อ",
+      "ปรึกษาแพทย์หรือเภสัชกรหากคุณตั้งครรภ์ ให้นมบุตร ใช้ยา หรือมีโรคประจำตัว"
+    ],
     shopLazada: "ช้อปบน Lazada",
     shopShopee: "ช้อปบน Shopee"
   }
-} satisfies Record<
-  Locale,
-  Record<
-    | "connectChatBody"
-    | "connectChatButton"
-    | "connectChatEyebrow"
-    | "connectChatPlanId"
-    | "connectChatQrAlt"
-    | "connectChatTitle"
-    | "constraints"
-    | "context"
-    | "coveragePrefix"
-    | "coverageSuffix"
-    | "emptyPlan"
-    | "error"
-    | "formula"
-    | "formulaHint"
-    | "generated"
-    | "goals"
-    | "loading"
-    | "dailyDose"
-    | "plan"
-    | "products"
-    | "productsHint"
-    | "profile"
-    | "region"
-    | "safety"
-    | "shopLazada"
-    | "shopShopee",
-    string
-  >
->;
+} satisfies Record<Locale, CopyLabels>;
 
 const productTones: ProductTone[] = [
   {
@@ -309,12 +328,12 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
   }
 
   const ingredientById = new Map(
-    result.formula.map((ingredient) => [ingredient.id, ingredient])
+    result.supplementBreakdown.map((ingredient) => [ingredient.id, ingredient])
   );
   const coverageCount = (product: RecommendedProduct) =>
     product.covers.filter((ingredientId) => ingredientById.has(ingredientId))
       .length;
-  const sortedProducts = [...result.products].sort((a, b) => {
+  const sortedProducts = [...result.recommendations].sort((a, b) => {
     const coverageDifference = coverageCount(b) - coverageCount(a);
 
     if (coverageDifference !== 0) {
@@ -323,7 +342,10 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
 
     return a.priority - b.priority;
   });
-  const totalRecommendedIngredients = Math.max(result.formula.length, 1);
+  const totalRecommendedIngredients = Math.max(
+    result.supplementBreakdown.length,
+    1
+  );
   const productCoveragePercentById = new Map(
     sortedProducts.map((product) => [
       product.id,
@@ -366,7 +388,7 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
       }
     });
   });
-  result.formula.forEach((ingredient) => {
+  result.supplementBreakdown.forEach((ingredient) => {
     if (!seenIngredientIds.has(ingredient.id)) {
       orderedIngredientIds.push(ingredient.id);
     }
@@ -411,10 +433,10 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
               className="size-12 text-[#3A7BD5]"
             />
             <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-5xl">
-              {result.title}
+              {labels.heroTitle}
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-              {result.subtitle}
+              {labels.heroSubtitle}
             </p>
           </div>
 
@@ -425,23 +447,23 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
             <dl className="mt-4 space-y-4 text-sm">
               <ContextItem
                 label={labels.plan}
-                value={result.customerContext.plan}
+                value={result.assessmentSummary.plan}
               />
               <ContextItem
                 label={labels.profile}
-                value={`${result.customerContext.ageRange} / ${result.customerContext.sex}`}
+                value={result.assessmentSummary.profile}
               />
               <ContextItem
                 label={labels.region}
-                value={result.customerContext.region}
+                value={result.assessmentSummary.region}
               />
               <ContextChips
                 label={labels.goals}
-                values={result.customerContext.goals}
+                values={result.assessmentSummary.goals}
               />
               <ContextChips
                 label={labels.constraints}
-                values={result.customerContext.constraints}
+                values={result.assessmentSummary.constraints}
               />
             </dl>
           </div>
@@ -485,7 +507,7 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
               {labels.safety}
             </p>
             <ul className="mt-3 space-y-2">
-              {result.safetyNotes.map((note) => (
+              {labels.safetyNotes.map((note) => (
                 <li key={note}>{note}</li>
               ))}
             </ul>

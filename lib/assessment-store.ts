@@ -4,7 +4,13 @@ import {
   type AssessmentPlan,
   type AssessmentSnapshot
 } from "@/lib/assessment-jobs";
-import type { FormulationResult } from "@/lib/mock-formulation";
+import {
+  buildAssessmentSummary,
+  getMockFormulationBlueprint,
+  type FormulationIngredient,
+  type FormulationResult,
+  type RecommendedProduct
+} from "@/lib/mock-formulation";
 import { getSql } from "@/lib/db";
 
 export type StoredAssessmentStatus =
@@ -40,6 +46,14 @@ function toJsonRecord(value: unknown) {
   }
 
   return {};
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return toJsonRecord(value);
+}
+
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
 }
 
 export function toJsonValue(value: unknown): postgres.JSONValue {
@@ -382,11 +396,51 @@ export async function getStoredFormulationResult(planId: string) {
   }
 
   const rows = await sql`
-    select formulation
-    from formulations
-    where plan_id = ${planId}::uuid
+    select
+      assessments.answers,
+      assessments.locale,
+      assessments.selected_plan::text,
+      formulations.formulation,
+      formulations.generated_at,
+      recommendations.recommendations
+    from assessments
+    join formulations on formulations.plan_id = assessments.plan_id
+    left join recommendations on recommendations.plan_id = assessments.plan_id
+    where assessments.plan_id = ${planId}::uuid
     limit 1
   `;
+  const row = rows[0];
 
-  return (rows[0]?.formulation ?? null) as FormulationResult | null;
+  if (!row) {
+    return null;
+  }
+
+  const locale = normalizeLocale(row.locale);
+  const plan = fromStoredPlan(row.selected_plan);
+  const storedFormulation = asRecord(row.formulation);
+  const defaultBlueprint = getMockFormulationBlueprint(locale);
+  const supplementBreakdown = asArray<FormulationIngredient>(
+    storedFormulation.supplementBreakdown ?? storedFormulation.formula
+  );
+  const recommendations = asArray<RecommendedProduct>(row.recommendations);
+  const generatedAt =
+    row.generated_at instanceof Date
+      ? row.generated_at.toISOString()
+      : new Date(row.generated_at).toISOString();
+
+  return {
+    assessmentSummary: buildAssessmentSummary({
+      answers: row.answers,
+      locale,
+      plan
+    }),
+    generatedAt,
+    planId,
+    recommendations,
+    schemaVersion: 1,
+    supplementBreakdown:
+      supplementBreakdown.length > 0
+        ? supplementBreakdown
+        : defaultBlueprint.supplementBreakdown
+  } satisfies FormulationResult;
 }

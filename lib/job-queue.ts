@@ -1,11 +1,11 @@
 import type postgres from "postgres";
 import { getSql } from "@/lib/db";
 import { isLocale, type Locale } from "@/lib/i18n";
+import { type AssessmentPlan } from "@/lib/assessment-jobs";
 import {
-  normalizeAssessmentPlan,
-  type AssessmentPlan
-} from "@/lib/assessment-jobs";
-import { getMockFormulationResult } from "@/lib/mock-formulation";
+  getMockFormulationBlueprint,
+  getMockRecommendations
+} from "@/lib/mock-formulation";
 import {
   ensureAssessmentSchema,
   isUuid,
@@ -257,9 +257,7 @@ async function completeFormulationJob(sql: postgres.Sql, job: ClaimedJob) {
 
   const submissions = await sql`
     select
-      answers,
-      locale,
-      selected_plan::text
+      locale
     from assessments
     where plan_id = ${job.plan_id}::uuid
     limit 1
@@ -273,8 +271,8 @@ async function completeFormulationJob(sql: postgres.Sql, job: ClaimedJob) {
   const locale: Locale = isLocale(submission.locale)
     ? submission.locale
     : "en";
-  const plan = normalizeAssessmentPlan(submission.selected_plan);
-  const result = getMockFormulationResult(job.plan_id, locale, plan);
+  const formulation = getMockFormulationBlueprint(locale);
+  const recommendations = getMockRecommendations(locale);
 
   await delay(randomInt(1200, 2400));
 
@@ -289,7 +287,7 @@ async function completeFormulationJob(sql: postgres.Sql, job: ClaimedJob) {
       )
       values (
         ${job.plan_id}::uuid,
-        ${transaction.json(toJsonValue(result))},
+        ${transaction.json(toJsonValue(formulation))},
         'mock-v1',
         now(),
         now()
@@ -309,7 +307,7 @@ async function completeFormulationJob(sql: postgres.Sql, job: ClaimedJob) {
       )
       values (
         ${job.plan_id}::uuid,
-        ${transaction.json(toJsonValue(result.products))},
+        ${transaction.json(toJsonValue(recommendations))},
         now(),
         now()
       )

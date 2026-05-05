@@ -23,22 +23,24 @@ export type RecommendedProduct = {
   url: string;
 };
 
-export type FormulationResult = {
-  customerContext: {
-    ageRange: string;
-    constraints: string[];
-    goals: string[];
-    plan: AssessmentPlan;
-    region: string;
-    sex: string;
-  };
-  formula: FormulationIngredient[];
+export type AssessmentSummary = {
+  constraints: string[];
+  goals: string[];
+  plan: string;
+  profile: string;
+  region: string;
+};
+
+export type FormulationBlueprint = {
+  supplementBreakdown: FormulationIngredient[];
+};
+
+export type FormulationResult = FormulationBlueprint & {
+  assessmentSummary: AssessmentSummary;
   generatedAt: string;
   planId: string;
-  products: RecommendedProduct[];
-  safetyNotes: string[];
-  subtitle: string;
-  title: string;
+  recommendations: RecommendedProduct[];
+  schemaVersion: 1;
 };
 
 const formulaEn: FormulationIngredient[] = [
@@ -465,74 +467,149 @@ const productsTh: RecommendedProduct[] = [
   }
 ];
 
-export function getMockFormulationResult(
-  planId: string,
-  locale: Locale = "en",
-  plan: AssessmentPlan = "free"
-): FormulationResult {
+const countryLabels: Record<string, string> = {
+  AU: "Australia",
+  CA: "Canada",
+  CN: "China",
+  DE: "Germany",
+  FR: "France",
+  GB: "United Kingdom",
+  ID: "Indonesia",
+  IN: "India",
+  JP: "Japan",
+  KR: "South Korea",
+  MM: "Myanmar",
+  MY: "Malaysia",
+  OTHER: "Other",
+  PH: "Philippines",
+  SG: "Singapore",
+  TH: "Thailand",
+  US: "United States",
+  VN: "Vietnam"
+};
+
+const planLabels = {
+  en: {
+    free: "Basic",
+    precision: "Precision",
+    pro: "Pro"
+  },
+  th: {
+    free: "พื้นฐาน",
+    precision: "ความแม่นยำ",
+    pro: "โปร"
+  }
+} satisfies Record<Locale, Record<AssessmentPlan, string>>;
+
+function toRecord(value: unknown) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+function toText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function toTextArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.map((item) => toText(item)).filter(Boolean)
+    : [];
+}
+
+function humanize(value: string) {
+  return value
+    .replaceAll("-", " ")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function valueLabel(value: unknown) {
+  const text = toText(value);
+  return text ? humanize(text) : "";
+}
+
+export function buildAssessmentSummary({
+  answers,
+  locale,
+  plan
+}: Readonly<{
+  answers?: unknown;
+  locale: Locale;
+  plan: AssessmentPlan;
+}>): AssessmentSummary {
+  const record = toRecord(answers);
+  const country = toText(record.country) || "TH";
+  const region = countryLabels[country] ?? valueLabel(country) ?? "Thailand";
+  const ageRange = valueLabel(record.age) || (locale === "th" ? "ผู้ใหญ่" : "Adult");
+  const sex = valueLabel(record.sex) || (locale === "th" ? "ไม่แสดง" : "Not displayed");
+  const goals = toTextArray(record.goals).map(humanize);
+  const symptoms = toTextArray(record.symptoms);
+  const conditions = toTextArray(record.conditions);
+  const medTypes = toTextArray(record.medTypes);
+  const constraints = [
+    ...conditions.map(humanize),
+    ...medTypes.map(humanize),
+    ...(toText(record.meds) === "yes"
+      ? [locale === "th" ? "ใช้ยาเป็นประจำ" : "Regular medication noted"]
+      : []),
+    ...(toText(record.notes) ? [toText(record.notes)] : []),
+    ...(symptoms.length > 0 ? symptoms.map(humanize).slice(0, 3) : [])
+  ];
+
+  return {
+    constraints:
+      constraints.length > 0
+        ? constraints
+        : [
+            locale === "th"
+              ? "ตรวจฉลากเพื่อดูสารก่อแพ้และความไวต่อส่วนผสม"
+              : "Review labels for allergies and sensitivities"
+          ],
+    goals:
+      goals.length > 0
+        ? goals
+        : [locale === "th" ? "สุขภาพโดยรวม" : "General wellness"],
+    plan: planLabels[locale][plan],
+    profile: `${ageRange} / ${sex}`,
+    region
+  };
+}
+
+export function getMockFormulationBlueprint(
+  locale: Locale = "en"
+): FormulationBlueprint {
   if (locale === "th") {
     return {
-      customerContext: {
-        ageRange: "ผู้ใหญ่",
-        constraints: [
-          "ต้องการผลิตภัณฑ์ที่ใช้ประจำวันได้ง่าย",
-          "หลีกเลี่ยงการทานซ้ำซ้อนโดยไม่จำเป็น",
-          "ตรวจฉลากเพื่อดูสารก่อแพ้และความไวต่อส่วนผสม"
-        ],
-        goals: [
-          "สูงวัยอย่างมีสุขภาพดี",
-          "พลังงาน",
-          "การฟื้นตัว",
-          "คุณภาพการนอน"
-        ],
-        plan,
-        region: "ประเทศไทย",
-        sex: "ไม่แสดง"
-      },
-      formula: formulaTh,
-      generatedAt: new Date().toISOString(),
-      planId,
-      products: productsTh,
-      safetyNotes: [
-        "คำแนะนำเหล่านี้เป็นตัวเลือกผลิตภัณฑ์เพื่อสุขภาพ ไม่ใช่คำแนะนำทางการแพทย์",
-        "ตรวจฉลากทั้งหมดเพื่อดูสารก่อแพ้ ส่วนผสม และวิธีใช้ต่อวันก่อนซื้อ",
-        "ปรึกษาแพทย์หรือเภสัชกรหากคุณตั้งครรภ์ ให้นมบุตร ใช้ยา หรือมีโรคประจำตัว"
-      ],
-      subtitle:
-        "บรีฟสูตรเพื่อสุขภาพและคู่มือค้นหาผลิตภัณฑ์จากคำตอบในแบบประเมินของคุณ",
-      title: "สูตรโภชนาการเฉพาะบุคคลของคุณ"
+      supplementBreakdown: formulaTh
     };
   }
 
   return {
-    customerContext: {
-      ageRange: "Adult",
-      constraints: [
-        "Prefers simple daily products",
-        "Avoids unnecessary duplication",
-        "Review labels for allergies and sensitivities"
-      ],
-      goals: [
-        "Healthy aging",
-        "Energy support",
-        "Recovery",
-        "Sleep quality"
-      ],
-      plan,
-      region: "Thailand",
-      sex: "Not displayed"
-    },
-    formula: formulaEn,
+    supplementBreakdown: formulaEn
+  };
+}
+
+export function getMockRecommendations(locale: Locale = "en") {
+  return locale === "th" ? productsTh : productsEn;
+}
+
+export function getMockFormulationResult(
+  planId: string,
+  locale: Locale = "en",
+  plan: AssessmentPlan = "free",
+  answers?: unknown
+): FormulationResult {
+  const blueprint = getMockFormulationBlueprint(locale);
+
+  return {
+    ...blueprint,
+    assessmentSummary: buildAssessmentSummary({ answers, locale, plan }),
     generatedAt: new Date().toISOString(),
     planId,
-    products: productsEn,
-    safetyNotes: [
-      "These are optional wellness product suggestions, not medical advice.",
-      "Review all labels for allergens, ingredients, and daily use instructions before purchase.",
-      "Ask a qualified clinician or pharmacist to review the plan if you are pregnant, breastfeeding, taking medication, or managing a medical condition."
-    ],
-    subtitle:
-      "A concise wellness formulation and marketplace search guide based on the completed assessment.",
-    title: "Your personalised nutritional formulation"
+    recommendations: getMockRecommendations(locale),
+    schemaVersion: 1
   };
 }
