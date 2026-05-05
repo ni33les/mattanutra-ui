@@ -14,9 +14,18 @@ export async function GET(_request: Request, { params }: AssessmentStatusRoutePr
   if (!snapshot) {
     return NextResponse.json(
       { message: "Assessment job not found" },
-      { status: 404 }
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        },
+        status: 404
+      }
     );
   }
 
-  return NextResponse.json(snapshot);
+  return NextResponse.json(snapshot, {
+    headers: {
+      "Cache-Control": "no-store"
+    }
+  });
 }

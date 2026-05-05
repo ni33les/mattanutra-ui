@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowPathIcon,
@@ -1582,6 +1582,7 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
   const [processingError, setProcessingError] = useState("");
   const [selectedPlan, setSelectedPlan] = useState("");
   const [showPlans, setShowPlans] = useState(false);
+  const pollFailureCount = useRef(0);
   const isCompact = useCompactAssessment();
 
   const completed = countRequired(answers);
@@ -2531,6 +2532,7 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
 
   async function startProcessing(planId = selectedPlan || "free-basic") {
     setProcessingError("");
+    pollFailureCount.current = 0;
     setProcessingStatus({
       jobId: "",
       queuePosition: 0,
@@ -2545,6 +2547,7 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
     try {
       const response = await fetch("/api/assessment", {
         body: JSON.stringify({ answers, locale, plan: planId }),
+        cache: "no-store",
         headers: {
           "content-type": "application/json"
         },
@@ -2582,7 +2585,9 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
 
     async function pollStatus() {
       try {
-        const response = await fetch(`/api/assessment/${jobId}`);
+        const response = await fetch(`/api/assessment/${jobId}`, {
+          cache: "no-store"
+        });
 
         if (!response.ok) {
           throw new Error("Unable to fetch assessment job");
@@ -2591,11 +2596,17 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
         const status = (await response.json()) as ProcessingStatus;
 
         if (!cancelled) {
+          pollFailureCount.current = 0;
+          setProcessingError("");
           setProcessingStatus(status);
         }
       } catch {
         if (!cancelled) {
-          setProcessingError(ui.processingError);
+          pollFailureCount.current += 1;
+
+          if (pollFailureCount.current >= 3) {
+            setProcessingError(ui.processingError);
+          }
         }
       }
     }
@@ -2616,7 +2627,7 @@ export function AssessmentFlow({ locale }: AssessmentFlowProps) {
 
   return (
     <>
-      <div className="mx-auto w-full max-w-6xl px-6 pb-16 pt-10 sm:px-8 lg:pt-14">
+      <div className="mx-auto w-full max-w-6xl px-6 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-10 sm:px-8 sm:pb-16 lg:pt-14">
         {processingStatus ? (
           <ProcessingPanel
             error={processingError}

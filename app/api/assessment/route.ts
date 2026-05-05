@@ -13,5 +13,9 @@ export async function POST(request: Request) {
 
   const snapshot = createAssessmentJob(plan);
 
-  return NextResponse.json(snapshot);
+  return NextResponse.json(snapshot, {
+    headers: {
+      "Cache-Control": "no-store"
+    }
+  });
 }

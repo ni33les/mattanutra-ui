@@ -85,18 +85,18 @@ type FooterContent = Readonly<{
 export function SiteFooter({ content }: Readonly<{ content: FooterContent }>) {
   return (
     <footer className="border-t border-foreground/10 bg-background">
-      <div className="mx-auto grid min-h-28 w-full max-w-6xl grid-cols-[minmax(0,1.35fr)_minmax(240px,0.65fr)] items-stretch gap-4 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-x-3 whitespace-nowrap text-[#20343A]">
-          <p className="shrink-0 text-[10px] font-semibold uppercase leading-6 tracking-[0.06em] sm:text-[11px] lg:text-xs">
+      <div className="mx-auto grid min-h-28 w-full max-w-6xl grid-cols-1 items-center gap-7 px-4 py-7 sm:px-6 md:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.65fr)] md:gap-4 lg:px-8">
+        <div className="flex min-w-0 flex-col items-center gap-3 text-center text-[#20343A] sm:flex-row sm:justify-center md:justify-start md:text-left">
+          <p className="max-w-full text-wrap text-[10px] font-semibold uppercase leading-5 tracking-[0.06em] sm:text-[11px] lg:text-xs">
             {content.recommended}
           </p>
-          <div className="flex shrink-0 items-center gap-x-3">
+          <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-2">
             <LazadaLogo />
             <ShopeeLogo />
           </div>
         </div>
 
-        <div className="flex min-w-0 items-center justify-center">
+        <div className="flex min-w-0 items-center justify-center md:justify-end">
           <div className="text-center">
             <div
               className="flex justify-center gap-1"
