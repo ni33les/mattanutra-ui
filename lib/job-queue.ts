@@ -2,10 +2,7 @@ import type postgres from "postgres";
 import { getSql } from "@/lib/db";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { type AssessmentPlan } from "@/lib/assessment-jobs";
-import {
-  getMockFormulationBlueprint,
-  getMockRecommendations
-} from "@/lib/mock-formulation";
+import { getMockFormulationBlueprint } from "@/lib/mock-formulation";
 import {
   ensureAssessmentSchema,
   isUuid,
@@ -343,7 +340,6 @@ async function completeFormulationJob(sql: postgres.Sql, job: ClaimedJob) {
     ? submission.locale
     : "en";
   const formulation = getMockFormulationBlueprint(locale);
-  const recommendations = getMockRecommendations(locale);
 
   await delay(randomInt(1200, 2400));
 
@@ -394,7 +390,7 @@ async function completeFormulationJob(sql: postgres.Sql, job: ClaimedJob) {
       values (
         ${job.plan_id}::uuid,
         ${version},
-        ${transaction.json(toJsonValue(recommendations))},
+        ${transaction.json(toJsonValue([]))},
         now(),
         now()
       )

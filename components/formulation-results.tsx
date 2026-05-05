@@ -108,6 +108,8 @@ type CopyLabels = Record<
   | "dailyDose"
   | "plan"
   | "products"
+  | "productsEmptyBody"
+  | "productsEmptyTitle"
   | "productsHint"
   | "profile"
   | "region"
@@ -138,7 +140,7 @@ const copy = {
       "The formulation could not be loaded. Please refresh the page and try again.",
     formula: "Supplement breakdown",
     formulaHint:
-      "Supplements follow the product order. Product numbers show which recommendations cover each supplement.",
+      "Your suggested supplement stack, grouped by role, with practical daily dose guidance.",
     generated: "Generated",
     goals: "Goals",
     heroSubtitle:
@@ -148,8 +150,11 @@ const copy = {
     dailyDose: "Dose",
     plan: "Plan",
     products: "Recommended products for you",
+    productsEmptyBody:
+      "Your formulation is ready. Product matching is still being prepared, so there are no marketplace recommendations attached to this plan yet.",
+    productsEmptyTitle: "No product matches yet",
     productsHint:
-      "Product numbers map directly to the supplement rows on the left.",
+      "When available, product numbers map directly to the supplement rows on the left.",
     profile: "Profile",
     region: "Region",
     safety: "Safety notes",
@@ -178,7 +183,7 @@ const copy = {
     error: "ไม่สามารถโหลดสูตรได้ กรุณารีเฟรชหน้าและลองอีกครั้ง",
     formula: "รายการอาหารเสริม",
     formulaHint:
-      "รายการอาหารเสริมเรียงตามลำดับผลิตภัณฑ์ หมายเลขผลิตภัณฑ์แสดงว่าคำแนะนำใดครอบคลุมอาหารเสริมแต่ละตัว",
+      "รายการอาหารเสริมที่แนะนำ จัดกลุ่มตามบทบาท พร้อมขนาดรับประทานต่อวันที่ใช้งานได้จริง",
     generated: "สร้างเมื่อ",
     goals: "เป้าหมาย",
     heroSubtitle:
@@ -188,8 +193,11 @@ const copy = {
     dailyDose: "ขนาด",
     plan: "แผน",
     products: "ผลิตภัณฑ์ที่แนะนำสำหรับคุณ",
+    productsEmptyBody:
+      "สูตรของคุณพร้อมแล้ว แต่ระบบจับคู่ผลิตภัณฑ์ยังอยู่ระหว่างเตรียม จึงยังไม่มีคำแนะนำจาก marketplace สำหรับแผนนี้",
+    productsEmptyTitle: "ยังไม่มีผลิตภัณฑ์ที่จับคู่ได้",
     productsHint:
-      "หมายเลขผลิตภัณฑ์เชื่อมกับรายการอาหารเสริมทางซ้ายโดยตรง",
+      "เมื่อมีคำแนะนำ หมายเลขผลิตภัณฑ์จะเชื่อมกับรายการอาหารเสริมทางซ้ายโดยตรง",
     profile: "โปรไฟล์",
     region: "ภูมิภาค",
     safety: "หมายเหตุด้านความปลอดภัย",
@@ -752,7 +760,20 @@ function ProductsPanel({
       </div>
 
       <div className="mt-6 space-y-4">
-        {products.map((product, index) => {
+        {products.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-foreground/15 bg-background/60 p-6 text-center">
+            <BeakerIcon
+              aria-hidden={true}
+              className="mx-auto size-7 text-[#3A7BD5]"
+            />
+            <h3 className="mt-4 text-base font-semibold text-[#20343A]">
+              {labels.productsEmptyTitle}
+            </h3>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+              {labels.productsEmptyBody}
+            </p>
+          </div>
+        ) : products.map((product, index) => {
           const coveragePercent = coveragePercentByProductId.get(product.id) ?? 0;
           const tone = productToneById.get(product.id) ?? productTones[0];
 
