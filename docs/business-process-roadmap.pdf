@@ -1,0 +1,3949 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+4 0 obj
+<< /Length 8249 >>
+stream
+q
+0.8 w
+0.953 0.973 1.000 rg
+0.769 0.851 0.961 RG
+58 742 m
+536 742 l
+546 742 546 742 546 752 c
+546 784 l
+546 794 546 794 536 794 c
+58 794 l
+48 794 48 794 48 784 c
+48 752 l
+48 742 48 742 58 742 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 21 Tf 66 763 Td
+(MattaNutra Business Process Roadmap) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 722 Td
+(This document distils the business process from the revised roadmap and maps it to the current product) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 709 Td
+(state. Technical choices, vendor details, credentials, hosting decisions, and implementation mechanics) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 696 Td
+(have been removed.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 14 Tf 48 657 Td
+(Status Legend) Tj ET
+Q
+q
+0.4 w
+0.953 0.973 1.000 rg
+0.580 0.639 0.722 RG
+48 616 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 55 626 Td
+(Status) Tj ET
+Q
+q
+0.4 w
+0.953 0.973 1.000 rg
+0.580 0.639 0.722 RG
+228 616 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 235 626 Td
+(Meaning) Tj ET
+Q
+q
+0.4 w
+0.863 0.988 0.906 rg
+0.580 0.639 0.722 RG
+48 591 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 55 601 Td
+(Done) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+228 591 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 235 601 Td
+(Already working in the current product) Tj ET
+Q
+q
+0.4 w
+0.996 0.953 0.780 rg
+0.580 0.639 0.722 RG
+48 566 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 55 576 Td
+(In Progress) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+228 566 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 235 576 Td
+(Partly built or present as a placeholder) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 541 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 55 551 Td
+(Pending) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+228 541 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 235 551 Td
+(Not yet built) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 516 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 526 Td
+(Decision Needed) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+228 516 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 235 526 Td
+(Business decision or external dependency required) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 14 Tf 48 488 Td
+(Current State Summary) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 472 Td
+(MattaNutra already has the core assessment-to-formulation journey working. A customer can land on the) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 459 Td
+(site, complete an anonymous assessment, select a plan level, and receive a personalised nutritional) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 446 Td
+(formulation generated from their answers.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 425 Td
+(The main missing business pieces are payment activation, product matching, affiliate purchase links,) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 412 Td
+(safety governance, and ongoing customer follow-up.) Tj ET
+Q
+q
+0.4 w
+0.953 0.973 1.000 rg
+0.580 0.639 0.722 RG
+48 366 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 55 376 Td
+(Business Area) Tj ET
+Q
+q
+0.4 w
+0.953 0.973 1.000 rg
+0.580 0.639 0.722 RG
+180 366 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 187 376 Td
+(Current State) Tj ET
+Q
+q
+0.4 w
+0.953 0.973 1.000 rg
+0.580 0.639 0.722 RG
+458 366 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 465 376 Td
+(Status) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 330 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 351 Td
+(Brand and website) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 330 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 351 Td
+(MattaNutra branding, English and Thai pages, legal pages, footer,) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 340 Td
+(and core site navigation exist.) Tj ET
+Q
+q
+0.4 w
+0.863 0.988 0.906 rg
+0.580 0.639 0.722 RG
+458 330 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 351 Td
+(Done) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 294 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 315 Td
+(Anonymous assessment) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 294 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 315 Td
+(Questionnaire captures profile, goals, lifestyle, preferences, and) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 304 Td
+(constraints.) Tj ET
+Q
+q
+0.4 w
+0.863 0.988 0.906 rg
+0.580 0.639 0.722 RG
+458 294 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 315 Td
+(Done) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 258 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 279 Td
+(Assessment sanity check) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 258 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 279 Td
+(Basic impossible values and stop conditions still need a formal) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 268 Td
+(business path.) Tj ET
+Q
+q
+0.4 w
+0.996 0.953 0.780 rg
+0.580 0.639 0.722 RG
+458 258 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 279 Td
+(In Progress) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 222 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 243 Td
+(Assessment storage) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 222 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 243 Td
+(Assessment answers are saved before payment so abandoned paywall) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 232 Td
+(users are still captured.) Tj ET
+Q
+q
+0.4 w
+0.863 0.988 0.906 rg
+0.580 0.639 0.722 RG
+458 222 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 243 Td
+(Done) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 186 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 207 Td
+(Plan selection) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 186 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 207 Td
+(Customer can choose Precision or Pro before formulation) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 196 Td
+(processing.) Tj ET
+Q
+q
+0.4 w
+0.863 0.988 0.906 rg
+0.580 0.639 0.722 RG
+458 186 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 207 Td
+(Done) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 150 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 171 Td
+(Formulation generation) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 150 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 171 Td
+(Assessment answers are processed and return a personalised) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 160 Td
+(formulation.) Tj ET
+Q
+q
+0.4 w
+0.863 0.988 0.906 rg
+0.580 0.639 0.722 RG
+458 150 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 171 Td
+(Done) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 125 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 135 Td
+(Formulation storage) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 125 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 135 Td
+(The final formulation is saved before the results page renders it.) Tj ET
+Q
+q
+0.4 w
+0.863 0.988 0.906 rg
+0.580 0.639 0.722 RG
+458 125 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 135 Td
+(Done) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 100 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 110 Td
+(Bilingual result display) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 100 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 110 Td
+(Formulation fields can be returned and shown in English or Thai.) Tj ET
+Q
+q
+0.4 w
+0.863 0.988 0.906 rg
+0.580 0.639 0.722 RG
+458 100 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 110 Td
+(Done) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 64 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 85 Td
+(Product recommendations) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 64 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 85 Td
+(Result page handles recommendations, but live product matching is) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 74 Td
+(not yet active.) Tj ET
+Q
+q
+0.4 w
+0.996 0.953 0.780 rg
+0.580 0.639 0.722 RG
+458 64 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 85 Td
+(In Progress) Tj ET
+Q
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 22 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 4783 >>
+stream
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 758 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 779 Td
+(Recommendation storage) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 758 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 779 Td
+(Recommendation versions can be saved, but live matched content is) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 768 Td
+(not yet active.) Tj ET
+Q
+q
+0.4 w
+0.996 0.953 0.780 rg
+0.580 0.639 0.722 RG
+458 758 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 779 Td
+(In Progress) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 733 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 743 Td
+(Chat support) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 733 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 743 Td
+(Chat CTA exists, but live advisor workflow is not fully connected.) Tj ET
+Q
+q
+0.4 w
+0.996 0.953 0.780 rg
+0.580 0.639 0.722 RG
+458 733 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 743 Td
+(In Progress) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 708 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 718 Td
+(Payment) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 708 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 718 Td
+(Plan selection exists, but payment collection is not yet active.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+458 708 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 718 Td
+(Pending) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 672 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 693 Td
+(Payment abandonment) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 672 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 693 Td
+(Assessment is saved first, but abandoned-payment follow-up is not) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 682 Td
+(yet active.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+458 672 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 693 Td
+(Pending) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 636 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 657 Td
+(Affiliate purchase journey) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 636 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 657 Td
+(Business model is affiliate-led, but affiliate product links are) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 646 Td
+(not yet live.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+458 636 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 657 Td
+(Pending) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 600 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 621 Td
+(Safety governance) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 600 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 621 Td
+(Disclaimers and legal pages exist; dosing rules, exclusions, and) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 610 Td
+(practitioner review are still needed.) Tj ET
+Q
+q
+0.4 w
+0.996 0.953 0.780 rg
+0.580 0.639 0.722 RG
+458 600 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 621 Td
+(In Progress) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 564 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 585 Td
+(Social operations) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 564 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 585 Td
+(Social presence and inbound handling remain a business operations) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 574 Td
+(task.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+458 564 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 585 Td
+(Pending) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 539 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 549 Td
+(Follow-up and retention) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 539 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 549 Td
+(Reassessment, reorder, and lifecycle messaging are not yet active.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+458 539 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 549 Td
+(Pending) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 514 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 524 Td
+(Admin and reporting) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 514 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 524 Td
+(Operational dashboard and funnel reporting are not yet active.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+458 514 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.4 Tf 465 524 Td
+(Pending) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 14 Tf 48 486 Td
+(Target Customer Journey) Tj ET
+Q
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 22 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 7992 >>
+stream
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 758 m
+337 758 l
+344 758 344 758 344 765 c
+344 779 l
+344 786 344 786 337 786 c
+101 786 l
+94 786 94 786 94 779 c
+94 765 l
+94 758 94 758 101 758 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 771 Td
+(Completes anonymous assessment) Tj ET
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 712 m
+337 712 l
+344 712 344 712 344 719 c
+344 733 l
+344 740 344 740 337 740 c
+101 740 l
+94 740 94 740 94 733 c
+94 719 l
+94 712 94 712 101 712 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 725 Td
+(Assessment is saved) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 756 m 219 744 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 744 m 216.320866025105 748.2216396275101 l 221.679133974895 748.2216396275101 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+101 666 m
+337 666 l
+344 666 344 666 344 673 c
+344 687 l
+344 694 344 694 337 694 c
+101 694 l
+94 694 94 694 94 687 c
+94 673 l
+94 666 94 666 101 666 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 679 Td
+(Questionnaire sanity check) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 710 m 219 698 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 698 m 216.320866025105 702.2216396275101 l 221.679133974895 702.2216396275101 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+405 659 m
+546 659 l
+553 659 553 659 553 666 c
+553 687 l
+553 694 553 694 546 694 c
+405 694 l
+398 694 398 694 398 687 c
+398 666 l
+398 659 398 659 405 659 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 679 Td
+(Correct answers or route to human) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 668.5 Td
+(review) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+344 680 m 390 676.5 l S
+Q
+q
+0.580 0.639 0.722 rg
+390 676.5 m 385.5872679381675 674.1488735145732 l 385.993787221063 679.4916983754854 l h f
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 7 Tf 371 681.25 Td
+(Fail) Tj ET
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 620 m
+337 620 l
+344 620 344 620 344 627 c
+344 641 l
+344 648 344 648 337 648 c
+101 648 l
+94 648 94 648 94 641 c
+94 627 l
+94 620 94 620 101 620 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 633 Td
+(Chooses plan level) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 664 m 219 652 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 652 m 216.320866025105 656.2216396275101 l 221.679133974895 656.2216396275101 l h f
+Q
+q
+1.1 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+101 574 m
+337 574 l
+344 574 344 574 344 581 c
+344 595 l
+344 602 344 602 337 602 c
+101 602 l
+94 602 94 602 94 595 c
+94 581 l
+94 574 94 574 101 574 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 587 Td
+(Payment) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 618 m 219 606 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 606 m 216.320866025105 610.2216396275101 l 221.679133974895 610.2216396275101 l h f
+Q
+q
+1.1 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+405 574 m
+546 574 l
+553 574 553 574 553 581 c
+553 595 l
+553 602 553 602 546 602 c
+405 602 l
+398 602 398 602 398 595 c
+398 581 l
+398 574 398 574 405 574 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 587 Td
+(Abandoned-payment follow-up) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+344 588 m 390 588 l S
+Q
+q
+0.580 0.639 0.722 rg
+390 588 m 385.77836037248994 585.320866025105 l 385.77836037248994 590.679133974895 l h f
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 7 Tf 371 591 Td
+(Abandoned) Tj ET
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 528 m
+337 528 l
+344 528 344 528 344 535 c
+344 549 l
+344 556 344 556 337 556 c
+101 556 l
+94 556 94 556 94 549 c
+94 535 l
+94 528 94 528 101 528 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 541 Td
+(Personalised formulation is prepared) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 572 m 219 560 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 560 m 216.320866025105 564.2216396275101 l 221.679133974895 564.2216396275101 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+101 482 m
+337 482 l
+344 482 344 482 344 489 c
+344 503 l
+344 510 344 510 337 510 c
+101 510 l
+94 510 94 510 94 503 c
+94 489 l
+94 482 94 482 101 482 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 495 Td
+(Safety checks) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 526 m 219 514 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 514 m 216.320866025105 518.2216396275101 l 221.679133974895 518.2216396275101 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+405 475 m
+546 475 l
+553 475 553 475 553 482 c
+553 503 l
+553 510 553 510 546 510 c
+405 510 l
+398 510 398 510 398 503 c
+398 482 l
+398 475 398 475 405 475 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 495 Td
+(Correct answers or route to human) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 484.5 Td
+(review) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+344 496 m 390 492.5 l S
+Q
+q
+0.580 0.639 0.722 rg
+390 492.5 m 385.5872679381675 490.1488735145732 l 385.993787221063 495.4916983754853 l h f
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 7 Tf 371 497.25 Td
+(Fail) Tj ET
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 436 m
+337 436 l
+344 436 344 436 344 443 c
+344 457 l
+344 464 344 464 337 464 c
+101 464 l
+94 464 94 464 94 457 c
+94 443 l
+94 436 94 436 101 436 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 449 Td
+(Formulation is saved) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 480 m 219 468 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 468 m 216.320866025105 472.22163962751006 l 221.679133974895 472.22163962751006 l h f
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 390 m
+337 390 l
+344 390 344 390 344 397 c
+344 411 l
+344 418 344 418 337 418 c
+101 418 l
+94 418 94 418 94 411 c
+94 397 l
+94 390 94 390 101 390 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 403 Td
+(Customer views results) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 434 m 219 422 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 422 m 216.320866025105 426.22163962751006 l 221.679133974895 426.22163962751006 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+405 390 m
+546 390 l
+553 390 553 390 553 397 c
+553 411 l
+553 418 553 418 546 418 c
+405 418 l
+398 418 398 418 398 411 c
+398 397 l
+398 390 398 390 405 390 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 403 Td
+(Customer connects to advisor chat) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+344 404 m 390 404 l S
+Q
+q
+0.580 0.639 0.722 rg
+390 404 m 385.77836037248994 401.32086602510503 l 385.77836037248994 406.67913397489497 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+101 344 m
+337 344 l
+344 344 344 344 344 351 c
+344 365 l
+344 372 344 372 337 372 c
+101 372 l
+94 372 94 372 94 365 c
+94 351 l
+94 344 94 344 101 344 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 357 Td
+(Matched products are prepared) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 388 m 219 376 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 376 m 216.320866025105 380.22163962751006 l 221.679133974895 380.22163962751006 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+101 298 m
+337 298 l
+344 298 344 298 344 305 c
+344 319 l
+344 326 344 326 337 326 c
+101 326 l
+94 326 94 326 94 319 c
+94 305 l
+94 298 94 298 101 298 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 311 Td
+(Recommendations are saved) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 342 m 219 330 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 330 m 216.320866025105 334.22163962751006 l 221.679133974895 334.22163962751006 l h f
+Q
+q
+1.1 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+101 252 m
+337 252 l
+344 252 344 252 344 259 c
+344 273 l
+344 280 344 280 337 280 c
+101 280 l
+94 280 94 280 94 273 c
+94 259 l
+94 252 94 252 101 252 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 265 Td
+(Customer buys through affiliate link) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 296 m 219 284 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 284 m 216.320866025105 288.22163962751006 l 221.679133974895 288.22163962751006 l h f
+Q
+q
+1.1 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+101 206 m
+337 206 l
+344 206 344 206 344 213 c
+344 227 l
+344 234 344 234 337 234 c
+101 234 l
+94 234 94 234 94 227 c
+94 213 l
+94 206 94 206 101 206 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 219 Td
+(Reassessment and reorder prompts) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 250 m 219 238 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 238 m 216.320866025105 242.22163962751006 l 221.679133974895 242.22163962751006 l h f
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 14 Tf 48 162 Td
+(Business Process Gates) Tj ET
+Q
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 22 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 7388 >>
+stream
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 758 m
+337 758 l
+344 758 344 758 344 765 c
+344 779 l
+344 786 344 786 337 786 c
+101 786 l
+94 786 94 786 94 779 c
+94 765 l
+94 758 94 758 101 758 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 771 Td
+(2. Capture assessment) Tj ET
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 712 m
+337 712 l
+344 712 344 712 344 719 c
+344 733 l
+344 740 344 740 337 740 c
+101 740 l
+94 740 94 740 94 733 c
+94 719 l
+94 712 94 712 101 712 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 725 Td
+(3. Save assessment) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 756 m 219 744 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 744 m 216.320866025105 748.2216396275101 l 221.679133974895 748.2216396275101 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+101 666 m
+337 666 l
+344 666 344 666 344 673 c
+344 687 l
+344 694 344 694 337 694 c
+101 694 l
+94 694 94 694 94 687 c
+94 673 l
+94 666 94 666 101 666 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 679 Td
+(4. Sanity check questionnaire) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 710 m 219 698 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 698 m 216.320866025105 702.2216396275101 l 221.679133974895 702.2216396275101 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+405 666 m
+546 666 l
+553 666 553 666 553 673 c
+553 687 l
+553 694 553 694 546 694 c
+405 694 l
+398 694 398 694 398 687 c
+398 673 l
+398 666 398 666 405 666 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 679 Td
+(Correct answers or human review) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+344 680 m 390 680 l S
+Q
+q
+0.580 0.639 0.722 rg
+390 680 m 385.77836037248994 677.320866025105 l 385.77836037248994 682.679133974895 l h f
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 7 Tf 371 683 Td
+(Fail) Tj ET
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 620 m
+337 620 l
+344 620 344 620 344 627 c
+344 641 l
+344 648 344 648 337 648 c
+101 648 l
+94 648 94 648 94 641 c
+94 627 l
+94 620 94 620 101 620 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 633 Td
+(5. Select plan and collect payment) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 664 m 219 652 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 652 m 216.320866025105 656.2216396275101 l 221.679133974895 656.2216396275101 l h f
+Q
+q
+1.1 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+405 620 m
+546 620 l
+553 620 553 620 553 627 c
+553 641 l
+553 648 553 648 546 648 c
+405 648 l
+398 648 398 648 398 641 c
+398 627 l
+398 620 398 620 405 620 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 633 Td
+(Abandoned-payment follow-up) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+344 634 m 390 634 l S
+Q
+q
+0.580 0.639 0.722 rg
+390 634 m 385.77836037248994 631.320866025105 l 385.77836037248994 636.679133974895 l h f
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 7 Tf 371 637 Td
+(Abandoned) Tj ET
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 574 m
+337 574 l
+344 574 344 574 344 581 c
+344 595 l
+344 602 344 602 337 602 c
+101 602 l
+94 602 94 602 94 595 c
+94 581 l
+94 574 94 574 101 574 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 587 Td
+(6. Generate formulation) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 618 m 219 606 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 606 m 216.320866025105 610.2216396275101 l 221.679133974895 610.2216396275101 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+101 528 m
+337 528 l
+344 528 344 528 344 535 c
+344 549 l
+344 556 344 556 337 556 c
+101 556 l
+94 556 94 556 94 549 c
+94 535 l
+94 528 94 528 101 528 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 541 Td
+(7. Run safety checks) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 572 m 219 560 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 560 m 216.320866025105 564.2216396275101 l 221.679133974895 564.2216396275101 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+405 528 m
+546 528 l
+553 528 553 528 553 535 c
+553 549 l
+553 556 553 556 546 556 c
+405 556 l
+398 556 398 556 398 549 c
+398 535 l
+398 528 398 528 405 528 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 541 Td
+(Correct answers or human review) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+344 542 m 390 542 l S
+Q
+q
+0.580 0.639 0.722 rg
+390 542 m 385.77836037248994 539.320866025105 l 385.77836037248994 544.679133974895 l h f
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 7 Tf 371 545 Td
+(Fail) Tj ET
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 482 m
+337 482 l
+344 482 344 482 344 489 c
+344 503 l
+344 510 344 510 337 510 c
+101 510 l
+94 510 94 510 94 503 c
+94 489 l
+94 482 94 482 101 482 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 495 Td
+(8. Save formulation) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 526 m 219 514 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 514 m 216.320866025105 518.2216396275101 l 221.679133974895 518.2216396275101 l h f
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 436 m
+337 436 l
+344 436 344 436 344 443 c
+344 457 l
+344 464 344 464 337 464 c
+101 464 l
+94 464 94 464 94 457 c
+94 443 l
+94 436 94 436 101 436 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 449 Td
+(9. Show results) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 480 m 219 468 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 468 m 216.320866025105 472.22163962751006 l 221.679133974895 472.22163962751006 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+405 436 m
+546 436 l
+553 436 553 436 553 443 c
+553 457 l
+553 464 553 464 546 464 c
+405 464 l
+398 464 398 464 398 457 c
+398 443 l
+398 436 398 436 405 436 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 449 Td
+(13. Offer ongoing advisor support) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+344 450 m 390 450 l S
+Q
+q
+0.580 0.639 0.722 rg
+390 450 m 385.77836037248994 447.32086602510503 l 385.77836037248994 452.67913397489497 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+101 390 m
+337 390 l
+344 390 344 390 344 397 c
+344 411 l
+344 418 344 418 337 418 c
+101 418 l
+94 418 94 418 94 411 c
+94 397 l
+94 390 94 390 101 390 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 403 Td
+(10. Match products) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 434 m 219 422 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 422 m 216.320866025105 426.22163962751006 l 221.679133974895 426.22163962751006 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+101 344 m
+337 344 l
+344 344 344 344 344 351 c
+344 365 l
+344 372 344 372 337 372 c
+101 372 l
+94 372 94 372 94 365 c
+94 351 l
+94 344 94 344 101 344 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 357 Td
+(11. Save recommendations) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 388 m 219 376 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 376 m 216.320866025105 380.22163962751006 l 221.679133974895 380.22163962751006 l h f
+Q
+q
+1.1 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+101 298 m
+337 298 l
+344 298 344 298 344 305 c
+344 319 l
+344 326 344 326 337 326 c
+101 326 l
+94 326 94 326 94 319 c
+94 305 l
+94 298 94 298 101 298 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 311 Td
+(12. Send customer to affiliate purchase) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 342 m 219 330 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 330 m 216.320866025105 334.22163962751006 l 221.679133974895 334.22163962751006 l h f
+Q
+q
+1.1 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+101 252 m
+337 252 l
+344 252 344 252 344 259 c
+344 273 l
+344 280 344 280 337 280 c
+101 280 l
+94 280 94 280 94 273 c
+94 259 l
+94 252 94 252 101 252 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 265 Td
+(14. Follow up, reassess, and retain) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 296 m 219 284 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 284 m 216.320866025105 288.22163962751006 l 221.679133974895 288.22163962751006 l h f
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 14 Tf 48 208 Td
+(Operating Model) Tj ET
+Q
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 22 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 4777 >>
+stream
+q
+1.1 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+101 758 m
+337 758 l
+344 758 344 758 344 765 c
+344 779 l
+344 786 344 786 337 786 c
+101 786 l
+94 786 94 786 94 779 c
+94 765 l
+94 758 94 758 101 758 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 771 Td
+(Social channels) Tj ET
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+101 712 m
+337 712 l
+344 712 344 712 344 719 c
+344 733 l
+344 740 344 740 337 740 c
+101 740 l
+94 740 94 740 94 733 c
+94 719 l
+94 712 94 712 101 712 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 725 Td
+(Chat entry points) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 756 m 219 744 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 744 m 216.320866025105 748.2216396275101 l 221.679133974895 748.2216396275101 l h f
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 666 m
+337 666 l
+344 666 344 666 344 673 c
+344 687 l
+344 694 344 694 337 694 c
+101 694 l
+94 694 94 694 94 687 c
+94 673 l
+94 666 94 666 101 666 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 679 Td
+(Anonymous questionnaire) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 710 m 219 698 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 698 m 216.320866025105 702.2216396275101 l 221.679133974895 702.2216396275101 l h f
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 14 Tf 48 622 Td
+(Simplified Process Detail) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 11.5 Tf 48 590 Td
+(1. Brand and Trust) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 579 Td
+(Purpose: make MattaNutra look credible enough for a customer to start the assessment.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 558 Td
+(Current state: website, brand, English and Thai pages, privacy policy, terms, and wellness disclaimers) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 545 Td
+(are in place.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 524 Td
+(Next business work:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 491 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 491 Td
+(Finalise social handles.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 473 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 473 Td
+(Ensure the public website includes enough information for payment and affiliate review.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 455 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 455 Td
+(Add a simple contact route for customer trust.) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 11.5 Tf 48 433 Td
+(2. Assessment) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 422 Td
+(Purpose: collect enough anonymous information to personalise the formulation.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 401 Td
+(Current state: built and working.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 380 Td
+(The assessment captures:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 347 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 347 Td
+(Profile basics.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 329 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 329 Td
+(Region.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 311 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 311 Td
+(Goals.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 293 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 293 Td
+(Lifestyle.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 275 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 275 Td
+(Diet.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 257 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 257 Td
+(Medication and supplement considerations.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 239 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 239 Td
+(Preferences such as budget and capsule limit.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 233 Td
+(Next business work:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 200 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 200 Td
+(Review all questions for regulatory sensitivity.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 182 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 182 Td
+(Confirm any values that should stop the process and route to human review.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 164 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 164 Td
+(Confirm the customer-facing message when the sanity check fails.) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 11.5 Tf 48 142 Td
+(2.1 Questionnaire Sanity Check) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 131 Td
+(Purpose: catch impossible, contradictory, or high-risk answers before taking payment or preparing a) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 118 Td
+(formulation.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 97 Td
+(Current state: partially defined. The assessment has required fields, but the formal failed-sanity path) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 84 Td
+(still needs to be completed.) Tj ET
+Q
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 22 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 6500 >>
+stream
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 794 Td
+(The sanity check should catch:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 761 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 761 Td
+(Impossible profile values.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 743 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 743 Td
+(Missing required answers.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 725 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 725 Td
+(Contradictory answers.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 707 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 707 Td
+(Joke or clearly unusable submissions.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 689 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 689 Td
+(High-risk answers that should not continue automatically.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 683 Td
+(If the sanity check fails:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 650 Td
+(1.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 650 Td
+(If the issue is fixable, ask the customer to correct the answers.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 632 Td
+(2.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 632 Td
+(If the issue is high-risk, stop the automated journey and route to human review.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 614 Td
+(3.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 614 Td
+(Do not take payment until the assessment passes or is approved for continuation.) Tj ET
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 572 m
+337 572 l
+344 572 344 572 344 579 c
+344 593 l
+344 600 344 600 337 600 c
+101 600 l
+94 600 94 600 94 593 c
+94 579 l
+94 572 94 572 101 572 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 585 Td
+(Assessment saved) Tj ET
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+101 526 m
+337 526 l
+344 526 344 526 344 533 c
+344 547 l
+344 554 344 554 337 554 c
+101 554 l
+94 554 94 554 94 547 c
+94 533 l
+94 526 94 526 101 526 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 539 Td
+(Questionnaire sanity check) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 570 m 219 558 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 558 m 216.320866025105 562.2216396275101 l 221.679133974895 562.2216396275101 l h f
+Q
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+405 526 m
+546 526 l
+553 526 553 526 553 533 c
+553 547 l
+553 554 553 554 546 554 c
+405 554 l
+398 554 398 554 398 547 c
+398 533 l
+398 526 398 526 405 526 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 539 Td
+(Ask customer to correct answers) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+344 540 m 390 540 l S
+Q
+q
+0.580 0.639 0.722 rg
+390 540 m 385.77836037248994 537.320866025105 l 385.77836037248994 542.679133974895 l h f
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 7 Tf 371 543 Td
+(Fixable issue) Tj ET
+Q
+q
+1.1 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+405 486 m
+546 486 l
+553 486 553 486 553 493 c
+553 507 l
+553 514 553 514 546 514 c
+405 514 l
+398 514 398 514 398 507 c
+398 493 l
+398 486 398 486 405 486 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 499 Td
+(Route to human review) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+344 540 m 390 500 l S
+Q
+q
+0.580 0.639 0.722 rg
+390 500 m 385.0563367357387 500.7484607735835 l 388.57231811325454 504.79183935772676 l h f
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 7 Tf 371 523 Td
+(High-risk or unusable) Tj ET
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+101 480 m
+337 480 l
+344 480 344 480 344 487 c
+344 501 l
+344 508 344 508 337 508 c
+101 508 l
+94 508 94 508 94 501 c
+94 487 l
+94 480 94 480 101 480 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 103 493 Td
+(Plan selection) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+219 524 m 219 512 l S
+Q
+q
+0.580 0.639 0.722 rg
+219 512 m 216.320866025105 516.2216396275101 l 221.679133974895 516.2216396275101 l h f
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 11.5 Tf 48 438 Td
+(3. Plan and Payment) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 427 Td
+(Purpose: convert the assessment into a paid or supported plan.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 406 Td
+(Current state: plan selection exists. Payment is not connected.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 385 Td
+(Planned plans:) Tj ET
+Q
+q
+0.4 w
+0.953 0.973 1.000 rg
+0.580 0.639 0.722 RG
+48 339 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 55 349 Td
+(Plan) Tj ET
+Q
+q
+0.4 w
+0.953 0.973 1.000 rg
+0.580 0.639 0.722 RG
+228 339 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 235 349 Td
+(Business Promise) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 314 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 324 Td
+(Precision Plan) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+228 314 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 235 324 Td
+(Full personalised formulation and product guidance.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 289 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 299 Td
+(Pro Plan) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+228 289 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 235 299 Td
+(Precision Plan plus ongoing AI advisor support and refinement.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 279 Td
+(Next business work:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 246 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 246 Td
+(Confirm pricing.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 228 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 228 Td
+(Confirm refund policy.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 210 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 210 Td
+(Activate payment acceptance.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 192 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 192 Td
+(Decide what happens if payment fails or is abandoned.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 174 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 174 Td
+(Use the saved assessment to support a respectful follow-up if the customer abandons payment.) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 11.5 Tf 48 152 Td
+(4. Formulation) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 141 Td
+(Purpose: turn assessment answers into a clear wellness formulation.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 120 Td
+(Current state: working. The formulation is prepared, saved, and then rendered on the results page.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 99 Td
+(The formulation result should remain:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 66 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 66 Td
+(Concise.) Tj ET
+Q
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 22 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 14 0 R >>
+endobj
+16 0 obj
+<< /Length 4941 >>
+stream
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 782 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 782 Td
+(Bilingual.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 764 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 764 Td
+(Tied to the customer assessment.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 746 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 746 Td
+(Safe in tone.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 728 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 728 Td
+(Free of disease-treatment claims.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 710 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 710 Td
+(Saved before it is displayed to the customer.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 704 Td
+(Next business work:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 671 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 671 Td
+(Add formal safety review rules.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 653 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 653 Td
+(Define when a customer should be shown a consult a qualified professional message instead of a) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 641 Td
+(formulation.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 625 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 625 Td
+(Identify the qualified reviewer for formula logic and compliance sign-off.) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 11.5 Tf 48 603 Td
+(5. Product Matching) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 592 Td
+(Purpose: translate the formulation into trustworthy products the customer can buy.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 571 Td
+(Current state: not active yet. The result page can gracefully show no products.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 550 Td
+(Target process:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 517 Td
+(1.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 517 Td
+(Maintain a curated list of trusted products.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 499 Td
+(2.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 499 Td
+(Match products to formulation ingredients.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 481 Td
+(3.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 481 Td
+(Prefer fewer products when one product covers multiple ingredients.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 463 Td
+(4.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 463 Td
+(Save the matched recommendation set.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 445 Td
+(5.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 445 Td
+(Show clear product rationale.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 427 Td
+(6.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 427 Td
+(Send the customer to marketplace purchase links.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 421 Td
+(Next business work:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 388 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 388 Td
+(Confirm first ingredient scope.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 370 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 370 Td
+(Build the initial trusted product list.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 352 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 352 Td
+(Confirm affiliate approval and link rules.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 334 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 334 Td
+(Define product quality standards.) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 11.5 Tf 48 312 Td
+(6. Safety and Compliance) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 301 Td
+(Purpose: keep the service in the wellness category and reduce avoidable risk.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 280 Td
+(Current state: legal pages and disclaimers exist. Hard safety rules are still needed.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 259 Td
+(Business rules to define:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 226 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 226 Td
+(Conditions that stop formulation generation.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 208 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 208 Td
+(Ingredients that should be excluded for pregnancy, medication conflicts, age, or serious health) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 196 Td
+(conditions.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 180 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 180 Td
+(Maximum daily supplement amounts.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 162 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 162 Td
+(Human review triggers.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 144 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 144 Td
+(How long records should be retained.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 138 Td
+(Safety should be treated as a hard gate, not a warning at the end.) Tj ET
+Q
+endstream
+endobj
+17 0 obj
+<< /Type /Page /Parent 22 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 16 0 R >>
+endobj
+18 0 obj
+<< /Length 7367 >>
+stream
+q
+1.1 w
+0.996 0.953 0.780 rg
+0.851 0.467 0.024 RG
+101 758 m
+337 758 l
+344 758 344 758 344 765 c
+344 779 l
+344 786 344 786 337 786 c
+101 786 l
+94 786 94 786 94 779 c
+94 765 l
+94 758 94 758 101 758 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 103 771 Td
+(Check for stop conditions) Tj ET
+Q
+q
+1.1 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+405 758 m
+546 758 l
+553 758 553 758 553 765 c
+553 779 l
+553 786 553 786 546 786 c
+405 786 l
+398 786 398 786 398 779 c
+398 765 l
+398 758 398 758 405 758 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.5 Tf 407 771 Td
+(Show consult-professional message) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+344 772 m 390 772 l S
+Q
+q
+0.580 0.639 0.722 rg
+390 772 m 385.77836037248994 769.320866025105 l 385.77836037248994 774.679133974895 l h f
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 7 Tf 371 775 Td
+(Stop condition found) Tj ET
+Q
+q
+1.6 w
+0.863 0.988 0.906 rg
+0.086 0.639 0.290 RG
+405 718 m
+546 718 l
+553 718 553 718 553 725 c
+553 739 l
+553 746 553 746 546 746 c
+405 746 l
+398 746 398 746 398 739 c
+398 725 l
+398 718 398 718 405 718 c
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 7.5 Tf 407 731 Td
+(Prepare formulation) Tj ET
+Q
+q
+0.580 0.639 0.722 RG
+1.2 w
+344 772 m 390 732 l S
+Q
+q
+0.580 0.639 0.722 rg
+390 732 m 385.0563367357387 732.7484607735835 l 388.57231811325454 736.7918393577268 l h f
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 7 Tf 371 755 Td
+(No stop condition) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 11.5 Tf 48 692 Td
+(7. Advisor Support) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 681 Td
+(Purpose: give customers a way to continue the conversation after receiving their plan.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 660 Td
+(Current state: advisor CTA exists. The live chat workflow is not complete.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 639 Td
+(Target process:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 606 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 606 Td
+(Customer opens preferred chat channel.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 588 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 588 Td
+(Customer shares their plan reference.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 570 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 570 Td
+(Advisor retrieves the customers plan.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 552 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 552 Td
+(Advisor helps refine timing, routine, travel, diet, and practical use.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 546 Td
+(Next business work:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 513 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 513 Td
+(Confirm which chat channels launch first.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 495 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 495 Td
+(Confirm advisor behaviour and escalation rules.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 477 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 477 Td
+(Define what support is included in each plan.) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 11.5 Tf 48 455 Td
+(8. Retention and Operations) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 444 Td
+(Purpose: turn a one-time formulation into an ongoing relationship.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 423 Td
+(Current state: not active.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 402 Td
+(Target process:) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 369 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 369 Td
+(Follow up after purchase.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 351 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 351 Td
+(Prompt reassessment.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 333 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 333 Td
+(Support reorder decisions.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 315 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 315 Td
+(Track customer outcomes.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 297 Td
+() Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 297 Td
+(Review conversion and retention metrics weekly.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 14 Tf 48 273 Td
+(Current MVP Gap Map) Tj ET
+Q
+q
+0.4 w
+0.953 0.973 1.000 rg
+0.580 0.639 0.722 RG
+48 221 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 55 242 Td
+(Gap) Tj ET
+Q
+q
+0.4 w
+0.953 0.973 1.000 rg
+0.580 0.639 0.722 RG
+180 221 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 187 242 Td
+(Why It Matters) Tj ET
+Q
+q
+0.4 w
+0.953 0.973 1.000 rg
+0.580 0.639 0.722 RG
+458 221 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 465 242 Td
+(Suggested) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 465 231 Td
+(Priority) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 196 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 206 Td
+(Payment activation) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 196 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 206 Td
+(Required for paid conversion.) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+458 196 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 465 206 Td
+(High) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 160 132 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 181 Td
+(Affiliate approval and link) Tj ET
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 170 Td
+(setup) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 160 278 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 181 Td
+(Required for revenue from product purchases.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+458 160 88 36 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 465 181 Td
+(High) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 135 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 145 Td
+(Product whitelist) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 135 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 145 Td
+(Required for trustworthy recommendations.) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+458 135 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 465 145 Td
+(High) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 110 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 120 Td
+(Safety stop rules) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 110 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 120 Td
+(Required before scaling traffic.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+458 110 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 465 120 Td
+(High) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 85 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 95 Td
+(Qualified reviewer) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 85 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 95 Td
+(Reduces compliance and trust risk.) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+458 85 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 465 95 Td
+(High) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 60 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 70 Td
+(Live chat workflow) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 60 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 70 Td
+(Needed for Pro Plan value.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+458 60 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 465 70 Td
+(Medium) Tj ET
+Q
+endstream
+endobj
+19 0 obj
+<< /Type /Page /Parent 22 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 18 0 R >>
+endobj
+20 0 obj
+<< /Length 5519 >>
+stream
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 769 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 779 Td
+(Social launch) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 769 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 779 Td
+(Needed for low-cost customer acquisition.) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+458 769 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 465 779 Td
+(Medium) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 744 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 754 Td
+(Follow-up and reassessment) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+180 744 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 754 Td
+(Needed for retention and repeat use.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+458 744 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 465 754 Td
+(Medium) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 719 132 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 729 Td
+(Admin reporting) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+180 719 278 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 187 729 Td
+(Needed once traffic begins.) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+458 719 88 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 465 729 Td
+(Medium) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 14 Tf 48 691 Td
+(Recommended Next Sequence) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 663 Td
+(1.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 663 Td
+(Finish payment readiness.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 645 Td
+(2.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 645 Td
+(Confirm affiliate onboarding and marketplace link rules.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 627 Td
+(3.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 627 Td
+(Build the first trusted product list.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 609 Td
+(4.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 609 Td
+(Add safety stop rules and ingredient exclusion rules.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 591 Td
+(5.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 591 Td
+(Connect product matching to the result page.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 573 Td
+(6.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 573 Td
+(Make advisor chat work for one channel first.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 555 Td
+(7.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 555 Td
+(Add follow-up and reassessment messages.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 8.6 Tf 56 537 Td
+(8.) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 8.6 Tf 74 537 Td
+(Add basic operational reporting.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 14 Tf 48 513 Td
+(Open Business Decisions) Tj ET
+Q
+q
+0.4 w
+0.953 0.973 1.000 rg
+0.580 0.639 0.722 RG
+48 472 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 55 482 Td
+(Decision) Tj ET
+Q
+q
+0.4 w
+0.953 0.973 1.000 rg
+0.580 0.639 0.722 RG
+228 472 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F2 8 Tf 235 482 Td
+(Needed Because) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 447 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 457 Td
+(Final pricing for Precision and Pro) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+228 447 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 235 457 Td
+(Required before payment launch.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 422 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 432 Td
+(First product category scope) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+228 422 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 235 432 Td
+(Keeps product matching manageable.) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 397 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 407 Td
+(Qualified reviewer) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+228 397 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 235 407 Td
+(Needed for formulation logic and claim review.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 372 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 382 Td
+(Support promise for Pro) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+228 372 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 235 382 Td
+(Defines what customers are buying.) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+48 347 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 357 Td
+(Product quality standard) Tj ET
+Q
+q
+0.4 w
+0.973 0.980 0.988 rg
+0.580 0.639 0.722 RG
+228 347 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 235 357 Td
+(Protects trust and reduces poor recommendations.) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+48 322 180 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 55 332 Td
+(Stop-condition policy) Tj ET
+Q
+q
+0.4 w
+1.000 1.000 1.000 rg
+0.580 0.639 0.722 RG
+228 322 318 25 re
+B
+Q
+q
+0.125 0.204 0.227 rg
+BT /F1 7.4 Tf 235 332 Td
+(Defines when MattaNutra should not generate a plan.) Tj ET
+Q
+q
+0.227 0.482 0.835 rg
+BT /F2 14 Tf 48 294 Td
+(One-Line Business Process) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 278 Td
+(MattaNutra captures an anonymous wellness assessment, turns it into a personalised nutritional) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 265 Td
+(formulation, connects that formulation to trusted purchasable products, and supports the customer over) Tj ET
+Q
+q
+0.278 0.333 0.412 rg
+BT /F1 9.2 Tf 48 252 Td
+(time through reassessment and advisor-led refinement.) Tj ET
+Q
+endstream
+endobj
+21 0 obj
+<< /Type /Page /Parent 22 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 20 0 R >>
+endobj
+22 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R 19 0 R 21 0 R] /Count 9 >>
+endobj
+23 0 obj
+<< /Type /Catalog /Pages 22 0 R >>
+endobj
+xref
+0 24
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000000154 00000 n 
+0000000222 00000 n 
+0000008523 00000 n 
+0000008670 00000 n 
+0000013505 00000 n 
+0000013652 00000 n 
+0000021696 00000 n 
+0000021843 00000 n 
+0000029284 00000 n 
+0000029433 00000 n 
+0000034263 00000 n 
+0000034412 00000 n 
+0000040965 00000 n 
+0000041114 00000 n 
+0000046108 00000 n 
+0000046257 00000 n 
+0000053677 00000 n 
+0000053826 00000 n 
+0000059398 00000 n 
+0000059547 00000 n 
+0000059659 00000 n 
+trailer
+<< /Size 24 /Root 23 0 R >>
+startxref
+59710
+%%EOF
