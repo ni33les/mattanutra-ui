@@ -45,6 +45,11 @@ begin
     and to_regclass('public.formulations') is null then
     alter table public.assessment_formulations rename to formulations;
   end if;
+
+  if to_regclass('public.blog_testimonials') is not null
+    and to_regclass('public.testimonials') is null then
+    alter table public.blog_testimonials rename to testimonials;
+  end if;
 end $$;
 
 create table if not exists public.assessments (
@@ -677,7 +682,7 @@ create unique index if not exists cron_unsubscribe_token_idx
   on public.cron (unsubscribe_token)
   where unsubscribe_token is not null;
 
-create table if not exists public.blog_testimonials (
+create table if not exists public.testimonials (
   id uuid primary key,
   locale text not null default 'en',
   status text not null default 'published',
@@ -694,7 +699,7 @@ create table if not exists public.blog_testimonials (
   updated_at timestamptz not null default now()
 );
 
-alter table public.blog_testimonials
+alter table public.testimonials
   add column if not exists locale text default 'en',
   add column if not exists status text default 'published',
   add column if not exists quote text,
@@ -709,7 +714,7 @@ alter table public.blog_testimonials
   add column if not exists created_at timestamptz default now(),
   add column if not exists updated_at timestamptz default now();
 
-update public.blog_testimonials
+update public.testimonials
 set
   locale = coalesce(locale, 'en'),
   status = case
@@ -732,7 +737,7 @@ where locale is null
   or created_at is null
   or updated_at is null;
 
-alter table public.blog_testimonials
+alter table public.testimonials
   alter column locale set default 'en',
   alter column locale set not null,
   alter column status set default 'published',
@@ -750,18 +755,24 @@ alter table public.blog_testimonials
 
 do $$
 begin
-  alter table public.blog_testimonials
+  alter table public.testimonials
     drop constraint if exists blog_testimonials_locale_check;
 
-  alter table public.blog_testimonials
-    add constraint blog_testimonials_locale_check
+  alter table public.testimonials
+    drop constraint if exists testimonials_locale_check;
+
+  alter table public.testimonials
+    add constraint testimonials_locale_check
     check (locale in ('en', 'th'));
 
-  alter table public.blog_testimonials
+  alter table public.testimonials
     drop constraint if exists blog_testimonials_status_check;
 
-  alter table public.blog_testimonials
-    add constraint blog_testimonials_status_check
+  alter table public.testimonials
+    drop constraint if exists testimonials_status_check;
+
+  alter table public.testimonials
+    add constraint testimonials_status_check
     check (status in ('draft', 'review', 'published', 'archived'));
 end $$;
 
@@ -776,7 +787,7 @@ create table if not exists public.blog_posts (
   body jsonb not null default '{}'::jsonb,
   image_url text null,
   image_alt text null,
-  testimonial_id uuid null references public.blog_testimonials(id) on delete set null,
+  testimonial_id uuid null references public.testimonials(id) on delete set null,
   tags text[] not null default '{}'::text[],
   seo_title text null,
   seo_description text null,
@@ -803,7 +814,7 @@ alter table public.blog_posts
   add column if not exists body jsonb default '{}'::jsonb,
   add column if not exists image_url text null,
   add column if not exists image_alt text null,
-  add column if not exists testimonial_id uuid null references public.blog_testimonials(id) on delete set null,
+  add column if not exists testimonial_id uuid null references public.testimonials(id) on delete set null,
   add column if not exists tags text[] default '{}'::text[],
   add column if not exists seo_title text null,
   add column if not exists seo_description text null,
@@ -900,10 +911,12 @@ create index if not exists blog_posts_status_idx
 create index if not exists blog_posts_tags_idx
   on public.blog_posts using gin (tags);
 
-create index if not exists blog_testimonials_status_idx
-  on public.blog_testimonials (locale, status, sort_order asc, created_at desc);
+drop index if exists public.blog_testimonials_status_idx;
 
-insert into public.blog_testimonials (
+create index if not exists testimonials_status_idx
+  on public.testimonials (locale, status, sort_order asc, created_at desc);
+
+insert into public.testimonials (
   id,
   locale,
   status,
@@ -954,8 +967,8 @@ values
     'Arun K.',
     'Consultant',
     '',
-    null,
-    null,
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
+    'Smiling consultant',
     3,
     'seed',
     '{"seed": true}'::jsonb
@@ -1194,9 +1207,9 @@ begin
   end;
 
   begin
-    execute 'alter table public.blog_testimonials owner to mn';
+    execute 'alter table public.testimonials owner to mn';
   exception when others then
-    raise notice 'Skipping blog_testimonials owner change: %', sqlerrm;
+    raise notice 'Skipping testimonials owner change: %', sqlerrm;
   end;
 
   begin

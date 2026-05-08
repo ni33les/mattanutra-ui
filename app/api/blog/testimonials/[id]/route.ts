@@ -16,7 +16,7 @@ type TestimonialRouteProps = Readonly<{
 
 function unauthorized() {
   return NextResponse.json(
-    { message: "Blog testimonial write access is not authorized" },
+    { message: "Testimonial write access is not authorized" },
     {
       headers: { "Cache-Control": "no-store" },
       status: 401

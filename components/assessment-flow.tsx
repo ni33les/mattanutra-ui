@@ -14,12 +14,14 @@ import {
   ShieldCheckIcon,
   SparklesIcon
 } from "@heroicons/react/20/solid";
+import { HighlightedBrandText } from "@/components/highlighted-brand-text";
 import {
   computeHealthScore,
   type HealthScoreResult
 } from "@/lib/health-score";
 import { buildChatChannels } from "@/lib/chat-links";
 import { normalizeLeadEmail, validateLeadEmail } from "@/lib/email-validation";
+import type { BlogTestimonial } from "@/lib/blog";
 import type { Locale } from "@/lib/i18n";
 
 type Option = Readonly<{
@@ -1205,6 +1207,7 @@ function formatWeightImperial(value: string) {
 }
 
 type AssessmentFlowProps = Readonly<{
+  exampleTestimonial?: BlogTestimonial | null;
   locale: Locale;
   prefillAnswers?: unknown;
   returningPlan?: "precision" | "pro" | null;
@@ -1602,6 +1605,7 @@ function getPlanContent(locale: Locale): PlanContent {
 }
 
 export function AssessmentFlow({
+  exampleTestimonial,
   locale,
   prefillAnswers,
   returningPlan,
@@ -1733,10 +1737,7 @@ export function AssessmentFlow({
               "คุยกับ AI advisor ระหว่างรอตัวอย่างของคุณ",
             emailPrefix: "เราจะส่งไปที่",
             testimonialTitle: "ลูกค้าใช้ MattaNutra เพื่อเปลี่ยนข้อมูลสุขภาพให้เป็นขั้นตอนที่ทำได้จริง",
-            title: "ตัวอย่างของคุณกำลังถูกจัดเตรียม",
-            upsellBody:
-              "แผนแบบชำระเงินจะปลดล็อกสูตรโภชนาการฉบับเต็ม แนวทางปริมาณ และคู่มือค้นหาผลิตภัณฑ์ แทนที่จะได้รับเพียงตัวอย่างสั้นทางอีเมล",
-            upsellTitle: "อยากดูสูตรฉบับเต็มทันทีไหม?"
+            title: "ตัวอย่างของคุณกำลังถูกจัดเตรียม"
           },
           exampleProcessingQueue: "กำลังเตรียมอีเมลตัวอย่างของคุณ",
           exampleProcessingSteps: {
@@ -1836,10 +1837,7 @@ export function AssessmentFlow({
             emailPrefix: "We will send it to",
             testimonialTitle:
               "People use MattaNutra to turn wellness data into practical next steps",
-            title: "Your example is being prepared",
-            upsellBody:
-              "A paid plan unlocks the full nutritional formulation, dose guidance, and product search guide instead of the short email example.",
-            upsellTitle: "Want the full formulation now?"
+            title: "Your example is being prepared"
           },
           exampleProcessingQueue: "Preparing your email example",
           exampleProcessingSteps: {
@@ -3161,6 +3159,7 @@ export function AssessmentFlow({
         ) : showExampleExit ? (
           <ExampleExitPanel
             content={ui.exampleExit}
+            dbTestimonial={exampleTestimonial}
             email={exampleRequest?.email ?? exampleEmail}
             locale={locale}
             planId={exampleRequest?.planId ?? capturedStatus?.planId ?? ""}
@@ -3628,31 +3627,6 @@ function PlanSelectionPanel({
   );
 }
 
-function HighlightedBrandText({ text }: Readonly<{ text: string }>) {
-  const parts = text.split(/(HealthScore|MattaNutra)/i);
-
-  return (
-    <>
-      {parts.map((part, index) =>
-        part.toLowerCase() === "healthscore" ? (
-          <span key={`${part}-${index}`} className="text-[#1FA77A]">
-            {part}
-          </span>
-        ) : part.toLowerCase() === "mattanutra" ? (
-          <span
-            key={`${part}-${index}`}
-            className="font-semibold text-[#3A7BD5]"
-          >
-            {part}
-          </span>
-        ) : (
-          <span key={`${part}-${index}`}>{part}</span>
-        )
-      )}
-    </>
-  );
-}
-
 function FreePreviewEmailSection({
   content,
   email,
@@ -3907,8 +3881,34 @@ function getExampleTestimonial(locale: Locale) {
       };
 }
 
+function mapExampleTestimonial(
+  dbTestimonial: BlogTestimonial | null | undefined,
+  locale: Locale
+) {
+  if (!dbTestimonial) {
+    const fallback = getExampleTestimonial(locale);
+
+    return {
+      imageAlt: "",
+      imageUrl: "",
+      meta: fallback.meta,
+      name: fallback.name,
+      quote: fallback.quote
+    };
+  }
+
+  return {
+    imageAlt: dbTestimonial.authorImageAlt,
+    imageUrl: dbTestimonial.authorImageUrl,
+    meta: dbTestimonial.authorTitle || dbTestimonial.authorHandle,
+    name: dbTestimonial.authorName,
+    quote: dbTestimonial.quote
+  };
+}
+
 function ExampleExitPanel({
   content,
+  dbTestimonial,
   email,
   locale,
   planId
@@ -3923,14 +3923,13 @@ function ExampleExitPanel({
     emailPrefix: string;
     testimonialTitle: string;
     title: string;
-    upsellBody: string;
-    upsellTitle: string;
   };
+  dbTestimonial?: BlogTestimonial | null;
   email: string;
   locale: Locale;
   planId: string;
 }>) {
-  const testimonial = getExampleTestimonial(locale);
+  const testimonial = mapExampleTestimonial(dbTestimonial, locale);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -3967,18 +3966,6 @@ function ExampleExitPanel({
         </div>
       </section>
 
-      <section className="rounded-lg bg-[#EAF5FF] p-6 ring-1 ring-[#3A7BD5]/10 sm:p-8">
-        <p className="text-sm font-semibold tracking-[0.04em] text-[#3A7BD5]">
-          <HighlightedBrandText text="MattaNutra" />
-        </p>
-        <h2 className="mt-3 text-2xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-3xl">
-          {content.upsellTitle}
-        </h2>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
-          {content.upsellBody}
-        </p>
-      </section>
-
       <section className="isolate overflow-hidden rounded-lg bg-white px-6 ring-1 ring-foreground/10 lg:px-8">
         <div className="relative mx-auto max-w-2xl py-16 sm:py-20 lg:max-w-4xl">
           <div className="absolute left-1/2 top-0 -z-10 h-[32rem] w-[64rem] -translate-x-1/2 bg-[radial-gradient(50%_100%_at_top,#DDF7EC,white)] opacity-40 lg:left-36" />
@@ -4007,12 +3994,29 @@ function ExampleExitPanel({
               </blockquote>
             </div>
             <div className="col-start-1 row-start-1 w-16 sm:w-20 lg:row-span-4 lg:w-72">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt=""
-                src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=576&h=576&q=80"
-                className="aspect-square rounded-xl bg-[#EAF5FF] object-cover lg:rounded-3xl"
-              />
+              {testimonial.imageUrl ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt={testimonial.imageAlt}
+                    src={testimonial.imageUrl}
+                    className="aspect-square rounded-xl bg-[#EAF5FF] object-cover lg:rounded-3xl"
+                  />
+                </>
+              ) : (
+                <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-[#EAF5FF] text-lg font-semibold text-[#3A7BD5] lg:rounded-3xl lg:text-5xl">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_24%,#DDF7EC,transparent_38%),radial-gradient(circle_at_78%_74%,#CFE8FF,transparent_44%)]" />
+                  <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_0_44%,rgba(31,167,122,0.18)_45%_47%,transparent_48%),linear-gradient(45deg,transparent_0_56%,rgba(58,123,213,0.12)_57%_59%,transparent_60%)]" />
+                  <span className="relative">
+                    {testimonial.name
+                      .split(/\s+/)
+                      .map((part) => part[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </span>
+                </div>
+              )}
             </div>
             <figcaption className="col-start-2 row-start-2 text-base lg:row-start-3">
               <div className="font-semibold text-[#20343A]">

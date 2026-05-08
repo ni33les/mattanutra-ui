@@ -28,6 +28,32 @@ async function getPagePost(params: BlogArticlePageProps["params"]) {
   return post ? { locale, post } : null;
 }
 
+function getArticleCta(locale: Locale) {
+  if (locale === "th") {
+    return {
+      body:
+        "ใช้เวลาเพียงไม่กี่นาทีเพื่อดู HealthScore ของคุณ และเริ่มบทสนทนาที่เป็นส่วนตัวมากขึ้นเกี่ยวกับพลังงาน การนอน อาหาร งบประมาณ และสิ่งที่เหมาะกับชีวิตประจำวันของคุณจริงๆ",
+      eyebrow: "ขั้นตอนถัดไป",
+      href: "/th/assessment",
+      primaryLabel: "เริ่มทำแบบประเมิน",
+      secondaryHref: "/th",
+      secondaryLabel: "กลับหน้าหลัก",
+      title: "เริ่มจาก HealthScore ของคุณ แล้วค่อยๆ สร้างแผนที่เหมาะกับคุณ"
+    };
+  }
+
+  return {
+    body:
+      "Take a few minutes to discover your HealthScore and begin a more personal conversation about your energy, sleep, diet, budget, and what support actually fits your day.",
+    eyebrow: "Your next step",
+    href: "/en/assessment",
+    primaryLabel: "Start the assessment",
+    secondaryHref: "/en",
+    secondaryLabel: "Back to home",
+    title: "Start with your HealthScore, then build from there"
+  };
+}
+
 export async function generateMetadata({
   params
 }: BlogArticlePageProps): Promise<Metadata> {
@@ -63,7 +89,7 @@ export default async function BlogArticlePage({
         title={dictionary.hero.eyebrow}
       />
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
-        <BlogArticle post={page.post} />
+        <BlogArticle cta={getArticleCta(page.locale)} post={page.post} />
         <SiteFooter content={dictionary.footer} locale={page.locale} />
       </div>
     </main>

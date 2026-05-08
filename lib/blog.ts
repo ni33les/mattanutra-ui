@@ -103,7 +103,6 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
   month: "short",
   year: "numeric"
 });
-
 function toLocale(value: unknown): Locale {
   return isLocale(value) ? value : defaultLocale;
 }
@@ -213,6 +212,18 @@ function mapTestimonial(row: TestimonialRow | BlogPostRow): BlogTestimonial | nu
     "testimonial_id" in row ? row.testimonial_id : "id" in row ? row.id : "";
   const quote =
     "testimonial_quote" in row ? row.testimonial_quote : "quote" in row ? row.quote : "";
+  const authorName =
+    ("testimonial_author_name" in row
+      ? row.testimonial_author_name
+      : row.author_name) ?? "MattaNutra reader";
+  const authorImageUrl =
+    ("testimonial_author_image_url" in row
+      ? row.testimonial_author_image_url
+      : row.author_image_url) ?? "";
+  const authorImageAlt =
+    ("testimonial_author_image_alt" in row
+      ? row.testimonial_author_image_alt
+      : row.author_image_alt) ?? "";
 
   if (!id || !quote) {
     return null;
@@ -224,17 +235,9 @@ function mapTestimonial(row: TestimonialRow | BlogPostRow): BlogTestimonial | nu
         ? row.testimonial_author_handle
         : row.author_handle) ?? "",
     authorImageAlt:
-      ("testimonial_author_image_alt" in row
-        ? row.testimonial_author_image_alt
-        : row.author_image_alt) ?? "",
-    authorImageUrl:
-      ("testimonial_author_image_url" in row
-        ? row.testimonial_author_image_url
-        : row.author_image_url) ?? "",
-    authorName:
-      ("testimonial_author_name" in row
-        ? row.testimonial_author_name
-        : row.author_name) ?? "MattaNutra reader",
+      authorImageAlt || (authorImageUrl ? `${authorName} testimonial photo` : ""),
+    authorImageUrl,
+    authorName,
     authorTitle:
       ("testimonial_author_title" in row
         ? row.testimonial_author_title
@@ -311,7 +314,7 @@ function blogSelectSql() {
       t.author_image_url as testimonial_author_image_url,
       t.author_image_alt as testimonial_author_image_alt
     from public.blog_posts p
-    left join public.blog_testimonials t on t.id = p.testimonial_id
+    left join public.testimonials t on t.id = p.testimonial_id
   `;
 }
 
@@ -491,7 +494,7 @@ async function findEditablePost(idOrSlug: string, locale?: Locale) {
           t.author_image_url as testimonial_author_image_url,
           t.author_image_alt as testimonial_author_image_alt
         from public.blog_posts p
-        left join public.blog_testimonials t on t.id = p.testimonial_id
+        left join public.testimonials t on t.id = p.testimonial_id
         where p.id = ${idOrSlug}
         limit 1
       `
@@ -506,7 +509,7 @@ async function findEditablePost(idOrSlug: string, locale?: Locale) {
           t.author_image_url as testimonial_author_image_url,
           t.author_image_alt as testimonial_author_image_alt
         from public.blog_posts p
-        left join public.blog_testimonials t on t.id = p.testimonial_id
+        left join public.testimonials t on t.id = p.testimonial_id
         where p.slug = ${idOrSlug}
           and p.locale = ${locale ?? defaultLocale}
         limit 1
@@ -718,7 +721,7 @@ export async function listTestimonialsForApi(locale?: unknown, status?: unknown)
   const rows = selectedLocale
     ? await sql<TestimonialRow[]>`
         select *
-        from public.blog_testimonials
+        from public.testimonials
         where locale = ${selectedLocale}
           and status = ${selectedStatus}
         order by sort_order asc, created_at desc
@@ -726,7 +729,7 @@ export async function listTestimonialsForApi(locale?: unknown, status?: unknown)
       `
     : await sql<TestimonialRow[]>`
         select *
-        from public.blog_testimonials
+        from public.testimonials
         where status = ${selectedStatus}
         order by sort_order asc, created_at desc
         limit 100
@@ -739,6 +742,32 @@ export async function listTestimonialsForApi(locale?: unknown, status?: unknown)
     );
 }
 
+export async function getRandomPublishedTestimonial(locale: Locale) {
+  const sql = getSql();
+
+  if (!sql) {
+    return null;
+  }
+
+  try {
+    const rows = await sql<TestimonialRow[]>`
+      select *
+      from public.testimonials
+      where status = 'published'
+        and locale in (${locale}, ${defaultLocale})
+      order by
+        case when locale = ${locale} then 0 else 1 end,
+        random()
+      limit 1
+    `;
+
+    return rows[0] ? mapTestimonial(rows[0]) : null;
+  } catch (error) {
+    console.error("Unable to load testimonial", error);
+    return null;
+  }
+}
+
 async function findEditableTestimonial(id: string) {
   const sql = getSql();
 
@@ -748,7 +777,7 @@ async function findEditableTestimonial(id: string) {
 
   const rows = await sql<TestimonialRow[]>`
     select *
-    from public.blog_testimonials
+    from public.testimonials
     where id = ${id}
     limit 1
   `;
@@ -776,7 +805,7 @@ export async function createTestimonial(input: BlogTestimonialInput) {
   }
 
   const rows = await sql<TestimonialRow[]>`
-    insert into public.blog_testimonials (
+    insert into public.testimonials (
       id,
       locale,
       status,
@@ -835,7 +864,7 @@ export async function updateTestimonial(
 
   const testimonial = normalizeTestimonialInput(input, existing);
   const rows = await sql<TestimonialRow[]>`
-    update public.blog_testimonials
+    update public.testimonials
     set
       locale = ${testimonial.locale},
       status = ${testimonial.status},

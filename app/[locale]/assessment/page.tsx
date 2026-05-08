@@ -3,6 +3,7 @@ import { AssessmentFlow } from "@/components/assessment-flow";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { getStoredAssessmentPrefill, isUuid } from "@/lib/assessment-store";
+import { getRandomPublishedTestimonial } from "@/lib/blog";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 
 type AssessmentPageProps = Readonly<{
@@ -17,6 +18,8 @@ type AssessmentPageProps = Readonly<{
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
+
+export const dynamic = "force-dynamic";
 
 export default async function AssessmentPage({
   params,
@@ -36,6 +39,7 @@ export default async function AssessmentPage({
   const prefill = returningPlanId
     ? await getStoredAssessmentPrefill(returningPlanId)
     : null;
+  const exampleTestimonial = await getRandomPublishedTestimonial(locale);
   const currentPath = returningPlanId
     ? `/${locale}/assessment?plan=${encodeURIComponent(returningPlanId)}`
     : `/${locale}/assessment`;
@@ -48,6 +52,7 @@ export default async function AssessmentPage({
         title={dictionary.hero.eyebrow}
       />
       <AssessmentFlow
+        exampleTestimonial={exampleTestimonial}
         locale={locale}
         prefillAnswers={prefill?.answers ?? null}
         returningPlan={prefill?.plan ?? null}
