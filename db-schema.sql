@@ -1,6 +1,18 @@
 -- MattaNutra database schema
 -- Re-runnable PostgreSQL schema for UAT/production.
 -- Intended for copy/paste into the DigitalOcean database console.
+-- Creates or upgrades every app table, index, constraint, and seed content.
+-- Seed rows are upserted by stable IDs/slugs; operational customer data is not
+-- deleted when this script is reapplied.
+
+do $$
+begin
+  begin
+    execute 'create schema if not exists public';
+  exception when others then
+    raise notice 'Skipping public schema create: %', sqlerrm;
+  end;
+end $$;
 
 do $$
 begin
@@ -972,6 +984,48 @@ values
     3,
     'seed',
     '{"seed": true}'::jsonb
+  ),
+  (
+    '44444444-4444-4444-8444-444444444444',
+    'th',
+    'published',
+    'สิ่งที่ชอบคือคำแนะนำไม่ได้แยกอาหารเสริมออกจากการนอน อาหาร และการออกกำลังกาย ทำให้รู้ว่าควรเริ่มตรงไหนก่อน',
+    'ธนพล พ.',
+    'ผู้ก่อตั้ง, กรุงเทพฯ',
+    '@thanapol-wellness',
+    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
+    'ผู้ชายยิ้ม',
+    1,
+    'seed',
+    '{"seed": true}'::jsonb
+  ),
+  (
+    '55555555-5555-4555-8555-555555555555',
+    'th',
+    'published',
+    'ประโยชน์คือช่วยจัดลำดับความสำคัญ ไม่ได้ให้ซื้อของเพิ่มไปเรื่อยๆ แต่ช่วยให้ตัดสินใจง่ายขึ้น',
+    'เมย์ ส.',
+    'นักวิ่งและหัวหน้าทีมผลิตภัณฑ์',
+    '@mai-runs',
+    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
+    'ผู้หญิงยิ้ม',
+    2,
+    'seed',
+    '{"seed": true}'::jsonb
+  ),
+  (
+    '66666666-6666-4666-8666-666666666666',
+    'th',
+    'published',
+    'แนวคิดการประเมินซ้ำเหมาะกับผม เพราะกิจวัตรเปลี่ยนอยู่ตลอด แผนสุขภาพจึงควรเปลี่ยนตามชีวิตจริง',
+    'อรุณ ก.',
+    'ที่ปรึกษา',
+    '',
+    null,
+    null,
+    3,
+    'seed',
+    '{"seed": true, "fallbackImageDemo": true}'::jsonb
   )
 on conflict (id) do update
 set
@@ -1112,6 +1166,108 @@ values
     'seed-after-50',
     '{"seed": true}'::jsonb,
     now() - interval '1 day'
+  ),
+  (
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+    'th',
+    'why-a-healthscore-beats-a-generic-supplement-list',
+    'published',
+    'ทำไม HealthScore ถึงดีกว่ารายการอาหารเสริมทั่วไป',
+    'แผนที่ดีควรเริ่มจากการเข้าใจว่าสิ่งใดกำลังดึงสุขภาพของคุณไว้',
+    'HealthScore ช่วยเปลี่ยนคำตอบเรื่องไลฟ์สไตล์ให้เป็นจุดเริ่มต้นที่ชัดขึ้นสำหรับโภชนาการ การฟื้นตัว และการเลือกอาหารเสริม',
+    jsonb_build_object(
+      'intro', 'หลายคนไม่ได้ต้องการรายการอาหารเสริมที่ยาวขึ้น แต่ต้องการวิธีตัดสินใจว่าสิ่งใดสำคัญก่อน HealthScore ทำหน้าที่เป็นจุดเริ่มต้นของบทสนทนา ก่อนจะแนะนำผลิตภัณฑ์ใดๆ',
+      'points', jsonb_build_array(
+        jsonb_build_object('title', 'สร้างบริบทให้คำแนะนำ', 'body', 'การนอน กิจกรรม อาหาร ความเครียด และพฤติกรรมสุขภาพส่งผลต่อกัน การดูร่วมกันช่วยลดการตัดสินใจจากข้อมูลเพียงด้านเดียว'),
+        jsonb_build_object('title', 'ลดการเดา', 'body', 'แทนที่จะเริ่มจากส่วนผสมที่กำลังนิยม แผนเริ่มจากโปรไฟล์ของผู้ใช้และโอกาสที่น่าจะสร้างผลลัพธ์มากที่สุด'),
+        jsonb_build_object('title', 'รองรับการติดตามผล', 'body', 'เมื่อผู้ใช้กลับมาประเมินอีกครั้ง คะแนนช่วยให้เห็นได้ง่ายว่าสิ่งใดเปลี่ยนไป')
+      ),
+      'sectionTitle', 'คะแนนไม่ใช่ผลิตภัณฑ์',
+      'sectionBody', 'คะแนนคือช่วงเวลาที่ทำให้เห็นภาพชัด ส่วนสูตร คำแนะนำผลิตภัณฑ์ และการดูแลต่อเนื่องคือขั้นตอนที่เปลี่ยนความชัดเจนนั้นให้เป็นการลงมือทำ',
+      'closing', 'ประสบการณ์ HealthScore ที่ดีควรทำให้ผู้ใช้รู้สึกว่า แบรนด์เข้าใจฉัน และฉันเห็นขั้นตอนถัดไปแล้ว'
+    ),
+    'https://images.unsplash.com/photo-1496128858413-b36217c2ce36?auto=format&fit=crop&w=2400&q=80',
+    'สมุดบันทึกและโต๊ะวางแผนสุขภาพ',
+    '44444444-4444-4444-8444-444444444444',
+    array['healthscore','personalisation','wellness'],
+    'ทำไม HealthScore ถึงดีกว่ารายการอาหารเสริมทั่วไป',
+    'HealthScore ช่วยสร้างบริบทก่อนคำแนะนำอาหารเสริมอย่างไร',
+    'ทำไม HealthScore ถึงดีกว่ารายการอาหารเสริมทั่วไป',
+    'วิธีเริ่มต้นโภชนาการและอาหารเสริมเฉพาะบุคคลอย่างชัดเจนขึ้น',
+    'https://images.unsplash.com/photo-1496128858413-b36217c2ce36?auto=format&fit=crop&w=1200&q=80',
+    'seed',
+    'seed',
+    'seed-healthscore-th',
+    '{"seed": true}'::jsonb,
+    now() - interval '3 days'
+  ),
+  (
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',
+    'th',
+    'how-to-choose-supplements-without-wasting-money',
+    'published',
+    'เลือกอาหารเสริมอย่างไรไม่ให้เสียเงินเปล่า',
+    'คำถามที่สำคัญไม่ใช่อะไรกำลังนิยม แต่คืออะไรเหมาะกับร่างกาย อาหาร และกิจวัตรของคุณ',
+    'การใช้งบกับอาหารเสริมจะฉลาดขึ้นเมื่อแผนดูงบประมาณ ปริมาณ รูปแบบผลิตภัณฑ์ และสิ่งที่คุณได้รับจากอาหารอยู่แล้ว',
+    jsonb_build_object(
+      'intro', 'โลกของอาหารเสริมมีเสียงรบกวนมาก ความผิดพลาดที่พบบ่อยคือซื้อทีละชิ้นโดยไม่รู้ว่ามันเข้ากับแผนรวมอย่างไร',
+      'points', jsonb_build_array(
+        jsonb_build_object('title', 'เริ่มจากช่องว่าง', 'body', 'รูปแบบอาหาร การกินปลา แสงแดด การนอน และความเครียดมักอธิบายความต้องการได้ดีกว่ารายการขายดีทั่วไป'),
+        jsonb_build_object('title', 'เคารพงบประมาณ', 'body', 'งบปานกลางควรใช้กับสิ่งที่มั่นใจสูงที่สุด และหลีกเลี่ยงผลิตภัณฑ์ที่ซ้ำซ้อนกัน'),
+        jsonb_build_object('title', 'ดูรูปแบบการใช้', 'body', 'แคปซูล ผง หรือของเหลวล้วนมีประโยชน์ได้ แต่รูปแบบที่ดีที่สุดคือรูปแบบที่ผู้ใช้ทำได้จริง')
+      ),
+      'sectionTitle', 'คุณค่ามาจากความเหมาะสม',
+      'sectionBody', 'คำแนะนำที่ดีควรอธิบายว่าผลิตภัณฑ์ช่วยอะไร เหตุใดจึงเกี่ยวข้อง และครอบคลุมแผนได้มากแค่ไหน',
+      'closing', 'คำแนะนำอาหารเสริมที่ฉลาดควรลดเวลาค้นหา ลดการลองผิดลองถูก และช่วยให้ลูกค้าซื้อของผิดน้อยลง'
+    ),
+    'https://images.unsplash.com/photo-1547586696-ea22b4d4235d?auto=format&fit=crop&w=2400&q=80',
+    'เส้นทางภูเขาที่มองเห็นชัด',
+    '55555555-5555-4555-8555-555555555555',
+    array['supplements','budget','product guidance'],
+    'เลือกอาหารเสริมอย่างไรไม่ให้เสียเงินเปล่า',
+    'คำแนะนำเฉพาะบุคคลช่วยลดค่าใช้จ่ายอาหารเสริมที่ไม่จำเป็นได้อย่างไร',
+    'เลือกอาหารเสริมอย่างไรไม่ให้เสียเงินเปล่า',
+    'เลือกจากความเหมาะสม งบประมาณ และการใช้งานจริง ไม่ใช่กระแส',
+    'https://images.unsplash.com/photo-1547586696-ea22b4d4235d?auto=format&fit=crop&w=1200&q=80',
+    'seed',
+    'seed',
+    'seed-budget-th',
+    '{"seed": true}'::jsonb,
+    now() - interval '2 days'
+  ),
+  (
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3',
+    'th',
+    'what-changes-after-50-energy-sleep-and-recovery',
+    'published',
+    'หลังอายุ 50 อะไรเปลี่ยนไป: พลังงาน การนอน และการฟื้นตัว',
+    'เป้าหมายสุขภาพหลัง 50 มักไม่ใช่ความสุดโต่ง แต่คือความสม่ำเสมอ',
+    'หลังอายุ 50 แผนสุขภาพที่ดีมักสนับสนุนคุณภาพการนอน กล้ามเนื้อ การฟื้นตัว และพลังงานที่ใช้ได้จริงในแต่ละวัน',
+    jsonb_build_object(
+      'intro', 'หลายคนหลังอายุ 50 ไม่ได้ต้องการเป็นนักกีฬา แต่อยากมีพลังงานที่นิ่งขึ้น ฟื้นตัวดีขึ้น และมั่นใจว่ากิจวัตรของตนกำลังสนับสนุนสิบปีข้างหน้า',
+      'points', jsonb_build_array(
+        jsonb_build_object('title', 'การฟื้นตัวสำคัญขึ้น', 'body', 'คุณภาพการนอน ความเครียด และภาระการออกกำลังกายเปลี่ยนวิธีที่ร่างกายตอบสนองต่อกิจวัตรเดิมได้'),
+        jsonb_build_object('title', 'กล้ามเนื้อคือสัญญาณสุขภาพ', 'body', 'โปรตีนและกิจกรรมแรงต้านสำคัญขึ้นต่อความแข็งแรงและความยืดหยุ่นในชีวิตประจำวัน'),
+        jsonb_build_object('title', 'การเปลี่ยนแปลงเล็กๆ สะสมผล', 'body', 'ผลลัพธ์ที่ใหญ่ที่สุดมักมาจากพื้นฐานที่ทำสม่ำเสมอ ไม่ใช่สูตรอาหารเสริมที่ซับซ้อนเกินไป')
+      ),
+      'sectionTitle', 'แผนที่ดีต้องทำซ้ำได้ง่าย',
+      'sectionBody', 'สูตรเฉพาะบุคคลควรเคารพความพร้อมของลูกค้าในการจัดการความซับซ้อน ยามากเกินไปอาจทำให้ทำตามยาก แม้เหตุผลทางวิทยาศาสตร์จะดี',
+      'closing', 'สำหรับลูกค้าอายุ 52 ปี ประสบการณ์ที่ชนะคือชัดเจน ทำได้จริง และทำซ้ำได้'
+    ),
+    null,
+    null,
+    '66666666-6666-4666-8666-666666666666',
+    array['healthy aging','energy','recovery'],
+    'หลังอายุ 50 อะไรเปลี่ยนไป: พลังงาน การนอน และการฟื้นตัว',
+    'มุมมองที่ใช้งานได้จริงต่อสุขภาพหลังอายุ 50',
+    'หลังอายุ 50 อะไรเปลี่ยนไป: พลังงาน การนอน และการฟื้นตัว',
+    'การนอน การฟื้นตัว และความสม่ำเสมอช่วยวางสุขภาพหลัง 50 อย่างไร',
+    null,
+    'seed',
+    'seed',
+    'seed-after-50-th',
+    '{"seed": true}'::jsonb,
+    now() - interval '1 day'
   )
 on conflict (locale, slug) do update
 set
@@ -1150,6 +1306,40 @@ begin
     execute 'grant usage, create on schema public to mn';
   exception when others then
     raise notice 'Skipping schema grant: %', sqlerrm;
+  end;
+
+  begin
+    if current_user = 'mn' then
+      raise notice 'Skipping database grant: already running as mn';
+    else
+      execute format('grant connect, create on database %I to mn', current_database());
+    end if;
+  exception when others then
+    raise notice 'Skipping database grant: %', sqlerrm;
+  end;
+
+  begin
+    execute 'grant all privileges on all tables in schema public to mn';
+  exception when others then
+    raise notice 'Skipping table grants: %', sqlerrm;
+  end;
+
+  begin
+    execute 'grant all privileges on all sequences in schema public to mn';
+  exception when others then
+    raise notice 'Skipping sequence grants: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter default privileges in schema public grant all privileges on tables to mn';
+  exception when others then
+    raise notice 'Skipping default table grants: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter default privileges in schema public grant all privileges on sequences to mn';
+  exception when others then
+    raise notice 'Skipping default sequence grants: %', sqlerrm;
   end;
 
   begin

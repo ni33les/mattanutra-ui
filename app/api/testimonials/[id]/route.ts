@@ -1,6 +1,7 @@
+export const runtime = "nodejs";
+
 export {
   DELETE,
   GET,
-  PATCH,
-  runtime
+  PATCH
 } from "@/app/api/blog/testimonials/[id]/route";
