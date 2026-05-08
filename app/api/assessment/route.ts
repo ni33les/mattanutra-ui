@@ -10,6 +10,7 @@ import {
   persistAssessmentSubmission
 } from "@/lib/assessment-store";
 import { computeHealthScore } from "@/lib/health-score";
+import { analyzeHealthScoreAdvice } from "@/lib/health-score-analysis";
 import {
   enqueueFormulationJob,
   kickCronWorker,
@@ -28,6 +29,25 @@ function reassessmentEmailFromAnswers(answers: unknown) {
   const value = (answers as Record<string, unknown>).reassessmentEmail;
 
   return typeof value === "string" ? value : "";
+}
+
+async function buildHealthScore(answers: unknown, locale: unknown) {
+  const normalizedLocale = isLocale(locale) ? locale : "en";
+  const healthScore = computeHealthScore(answers, normalizedLocale);
+
+  try {
+    return {
+      ...healthScore,
+      advice: await analyzeHealthScoreAdvice({
+        answers,
+        healthScore,
+        locale: normalizedLocale
+      })
+    };
+  } catch (error) {
+    console.warn("Unable to analyze HealthScore advice", error);
+    return healthScore;
+  }
 }
 
 export async function POST(request: Request) {
@@ -68,10 +88,7 @@ export async function POST(request: Request) {
     selectedPlan = body.plan;
   }
   const snapshot = createAssessmentSnapshot({
-    healthScore: computeHealthScore(
-      body.answers,
-      isLocale(body.locale) ? body.locale : "en"
-    ),
+    healthScore: await buildHealthScore(body.answers, body.locale),
     plan: selectedPlan ?? DEFAULT_ASSESSMENT_PLAN
   });
   let responseSnapshot = snapshot;

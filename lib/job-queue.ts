@@ -919,6 +919,7 @@ function buildExampleRequestSteps(status: unknown) {
   return [
     { id: "assessment", state: "complete" },
     { id: "score", state: "complete" },
+    { id: "scoreAnalysis", state: "complete" },
     { id: "payment", state: "complete" },
     { id: "formulation", state: formulationState },
     {

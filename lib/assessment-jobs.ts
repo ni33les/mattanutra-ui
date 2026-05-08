@@ -5,6 +5,7 @@ type StepState = "active" | "complete" | "failed" | "pending";
 type AssessmentStepId =
   | "assessment"
   | "score"
+  | "scoreAnalysis"
   | "payment"
   | "formulation"
   | "safety"
@@ -57,6 +58,7 @@ export function buildAssessmentSteps(status: AssessmentStatus) {
   return [
     { id: "assessment", state: "complete" },
     { id: "score", state: "complete" },
+    { id: "scoreAnalysis", state: "complete" },
     { id: "payment", state: "complete" },
     {
       id: "formulation",

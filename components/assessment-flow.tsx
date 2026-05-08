@@ -18,7 +18,11 @@ import { HighlightedBrandText } from "@/components/highlighted-brand-text";
 import { buildChatChannels } from "@/lib/chat-links";
 import { normalizeLeadEmail, validateLeadEmail } from "@/lib/email-validation";
 import type { BlogTestimonial } from "@/lib/blog";
-import type { HealthScoreDomain, HealthScoreResult } from "@/lib/health-score";
+import type {
+  HealthScoreDomain,
+  HealthScoreResult,
+  LocalizedHealthScoreText
+} from "@/lib/health-score";
 import type { Locale } from "@/lib/i18n";
 
 type Option = Readonly<{
@@ -1131,6 +1135,7 @@ const th: Copy = {
 
 const copies: Record<Locale, Copy> = { en, th };
 const heroBadgeIcons = [BeakerIcon, ShieldCheckIcon, SparklesIcon];
+const paywallFeatureIcons = [SparklesIcon, ShieldCheckIcon, ArrowPathIcon];
 const assessmentHeroImageUrl = "/final.png";
 const assessmentHeroFade =
   "radial-gradient(ellipse at bottom left, rgba(243, 248, 255, 0.98) 0%, rgba(243, 248, 255, 0.76) 18%, rgba(243, 248, 255, 0.28) 34%, rgba(243, 248, 255, 0) 52%)";
@@ -1313,6 +1318,7 @@ function buildExampleProcessingStatus(planId: string): ProcessingStatus {
     steps: [
       { id: "assessment", state: "complete" },
       { id: "score", state: "complete" },
+      { id: "scoreAnalysis", state: "complete" },
       { id: "payment", state: "complete" },
       { id: "formulation", state: "active" },
       { id: "safety", state: "pending" },
@@ -1329,6 +1335,7 @@ function buildExampleQueuedStatus(planId: string): ProcessingStatus {
     steps: [
       { id: "assessment", state: "complete" },
       { id: "score", state: "complete" },
+      { id: "scoreAnalysis", state: "complete" },
       { id: "payment", state: "complete" },
       { id: "formulation", state: "complete" },
       { id: "safety", state: "pending" },
@@ -1681,6 +1688,7 @@ export function AssessmentFlow({
           processingSteps: {
             assessment: "ทำแบบประเมินเสร็จแล้ว",
             score: "กำลังเตรียม HealthScore",
+            scoreAnalysis: "กำลังวิเคราะห์ HealthScore",
             payment: "กำลังประมวลผลการชำระเงิน",
             formulation: "กำลังเตรียมสูตร",
             safety: "กำลังปรับสูตรให้เหมาะสม",
@@ -1693,6 +1701,7 @@ export function AssessmentFlow({
           scoreProcessingSteps: {
             assessment: "ทำแบบประเมินเสร็จแล้ว",
             score: "กำลังเตรียม HealthScore",
+            scoreAnalysis: "กำลังวิเคราะห์ HealthScore",
             payment: "กำลังประมวลผลการชำระเงิน",
             formulation: "กำลังเตรียมสูตร",
             safety: "กำลังปรับสูตรให้เหมาะสม",
@@ -1710,7 +1719,7 @@ export function AssessmentFlow({
             emailPlaceholder: "your@email.com",
             emailTitle: "ยังไม่พร้อมปลดล็อก?",
             planDescription:
-              "รู้ชัดว่าร่างกายของคุณต้องการอะไร เพื่อดูแลสุขภาพให้ดีที่สุดในปริมาณที่เหมาะสม",
+              "เลือกระดับคำแนะนำที่ต้องการ ก่อนที่เราจะเตรียมสูตรของคุณ",
             planTitle: "ปลดล็อกแผนโภชนาการเฉพาะตัวของคุณ",
             preparing: "กำลังเตรียม...",
             proContinueCta: "ไปต่อ",
@@ -1740,6 +1749,7 @@ export function AssessmentFlow({
           exampleProcessingSteps: {
             assessment: "ทำแบบประเมินเสร็จแล้ว",
             score: "กำลังเตรียม HealthScore",
+            scoreAnalysis: "กำลังวิเคราะห์ HealthScore",
             payment: "กำลังประมวลผลการชำระเงิน",
             formulation: "กำลังส่งคำขอสูตร",
             safety: "กำลังปรับสูตรให้เหมาะสม",
@@ -1781,6 +1791,7 @@ export function AssessmentFlow({
           processingSteps: {
             assessment: "Assessment complete",
             score: "Preparing your HealthScore",
+            scoreAnalysis: "Analyzing HealthScore",
             payment: "Processing Payment",
             formulation: "Preparing Formulation",
             safety: "Refining Formulation",
@@ -1793,6 +1804,7 @@ export function AssessmentFlow({
           scoreProcessingSteps: {
             assessment: "Assessment complete",
             score: "Preparing your HealthScore",
+            scoreAnalysis: "Analyzing HealthScore",
             payment: "Processing Payment",
             formulation: "Preparing Formulation",
             safety: "Refining Formulation",
@@ -1810,7 +1822,7 @@ export function AssessmentFlow({
             emailPlaceholder: "your@email.com",
             emailTitle: "Not ready to unlock?",
             planDescription:
-              "Know exactly what your body needs to maximise your health, in the right amount.",
+              "Choose the level of guidance you want before we prepare your formulation.",
             planTitle: "Unlock your bespoke nutrition plan",
             preparing: "Preparing...",
             proContinueCta: "Continue",
@@ -1840,6 +1852,7 @@ export function AssessmentFlow({
           exampleProcessingSteps: {
             assessment: "Assessment complete",
             score: "Preparing your HealthScore",
+            scoreAnalysis: "Analyzing HealthScore",
             payment: "Processing Payment",
             formulation: "Requesting Formulation",
             safety: "Refining Formulation",
@@ -2697,23 +2710,42 @@ export function AssessmentFlow({
     setShowExampleExit(false);
     setExampleRequest(null);
     setProcessingMode("score");
-    showProcessingStatus({
+    const scoreStatus: ProcessingStatus = {
       planId: "",
       queuePosition: 0,
       status: "preparing",
       steps: [
         { id: "assessment", state: "complete" },
         { id: "score", state: "active" },
+        { id: "scoreAnalysis", state: "pending" },
         { id: "payment", state: "pending" },
         { id: "formulation", state: "pending" },
         { id: "safety", state: "pending" },
         { id: "results", state: "pending" }
       ]
-    });
+    };
+    const analysisStatus: ProcessingStatus = {
+      ...scoreStatus,
+      steps: [
+        { id: "assessment", state: "complete" },
+        { id: "score", state: "complete" },
+        { id: "scoreAnalysis", state: "active" },
+        { id: "payment", state: "pending" },
+        { id: "formulation", state: "pending" },
+        { id: "safety", state: "pending" },
+        { id: "results", state: "pending" }
+      ]
+    };
+    const analysisStepTimeout = window.setTimeout(() => {
+      setProcessingStatus(analysisStatus);
+    }, PROCESSING_STEP_MIN_MS);
+
+    showProcessingStatus(scoreStatus);
     window.scrollTo({ behavior: "smooth", top: 0 });
 
     try {
       const captured = await captureAssessment(true, answerPayload);
+      window.clearTimeout(analysisStepTimeout);
 
       if (!captured?.planId) {
         throw new Error("Unable to capture assessment before plan selection");
@@ -2733,6 +2765,7 @@ export function AssessmentFlow({
         steps: [
           { id: "assessment", state: "complete" },
           { id: "score", state: "complete" },
+          { id: "scoreAnalysis", state: "complete" },
           { id: "payment", state: "pending" },
           { id: "formulation", state: "pending" },
           { id: "safety", state: "pending" },
@@ -2741,6 +2774,7 @@ export function AssessmentFlow({
       });
 
     } catch {
+      window.clearTimeout(analysisStepTimeout);
       clearProcessingStatus();
       setProcessingError(ui.processingError);
     }
@@ -2814,6 +2848,7 @@ export function AssessmentFlow({
       steps: [
         { id: "assessment", state: "complete" },
         { id: "score", state: "complete" },
+        { id: "scoreAnalysis", state: "complete" },
         { id: "payment", state: "active" },
         { id: "formulation", state: "pending" },
         { id: "safety", state: "pending" },
@@ -3419,6 +3454,79 @@ function PlanSelectionPanel({
   reassessmentAlreadyOptedIn,
   scoreContent
 }: PlanSelectionPanelProps) {
+  const personalizedEyebrow = localizeHealthScoreText(
+    healthScore?.advice?.paywallEyebrow,
+    locale
+  );
+  const personalizedTitle = localizeHealthScoreText(
+    healthScore?.advice?.paywallTitle,
+    locale
+  );
+  const personalizedDescription = localizeHealthScoreText(
+    healthScore?.advice?.paywallSubtitle,
+    locale
+  );
+  const fallbackFeatures =
+    locale === "th"
+      ? [
+          {
+            description:
+              "จัดลำดับคำแนะนำตามจุดที่คะแนนของคุณบอกว่าควรเริ่มก่อน",
+            name: "โฟกัสตามคะแนนของคุณ"
+          },
+          {
+            description:
+              "ช่วยให้เห็นภาพว่าควรสนับสนุนร่างกายในปริมาณที่เหมาะสม ไม่ใช่เดาสุ่ม",
+            name: "แนวทางปริมาณที่เหมาะสม"
+          },
+          {
+            description:
+              "ออกแบบให้เข้ากับเป้าหมาย พฤติกรรม และข้อมูลที่คุณให้ไว้",
+            name: "เหมาะกับชีวิตประจำวัน"
+          }
+        ]
+      : [
+          {
+            description:
+              "Prioritises the areas your HealthScore suggests deserve attention first.",
+            name: "Score-led priorities"
+          },
+          {
+            description:
+              "Shows what your body may need in sensible amounts, without guesswork.",
+            name: "Right-amount guidance"
+          },
+          {
+            description:
+              "Frames your plan around your goals, habits, constraints, and daily routine.",
+            name: "Built around your day"
+          }
+        ];
+  const personalizedFeatures =
+    healthScore?.advice?.paywallFeatures
+      ?.map((feature) => ({
+        description: localizeHealthScoreText(feature.description, locale),
+        name: localizeHealthScoreText(feature.name, locale)
+      }))
+      .filter((feature) => feature.description && feature.name)
+      .slice(0, 3) ?? [];
+  const paywallFeatures =
+    !proAccess && personalizedFeatures.length === 3
+      ? personalizedFeatures
+      : fallbackFeatures;
+  const planTitle = proAccess
+    ? scoreContent.proContinueTitle
+    : personalizedTitle || scoreContent.planTitle;
+  const planDescription = proAccess
+    ? scoreContent.proContinueDescription
+    : personalizedDescription || scoreContent.planDescription;
+  const heroEyebrow =
+    !proAccess && personalizedEyebrow ? personalizedEyebrow : content.eyebrow;
+  const heroSubtitle =
+    !proAccess && personalizedDescription
+      ? personalizedDescription
+      : content.subtitle;
+
   return (
     <section className="relative isolate overflow-hidden rounded-lg bg-white px-6 py-16 ring-1 ring-foreground/10 sm:py-20 lg:px-8">
       <div
@@ -3436,14 +3544,14 @@ function PlanSelectionPanel({
 
       <div className="mx-auto max-w-4xl text-center">
         <p className="text-base/7 font-semibold text-[#3A7BD5]">
-          {content.eyebrow}
+          {heroEyebrow}
         </p>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight text-balance text-gray-900 sm:text-6xl">
           <HighlightedBrandText text={scoreContent.title} />
         </h1>
       </div>
       <p className="mx-auto mt-6 max-w-2xl text-center text-lg font-medium text-pretty text-gray-600 sm:text-xl/8">
-        {content.subtitle}
+        {heroSubtitle}
       </p>
 
       {healthScore ? (
@@ -3452,14 +3560,37 @@ function PlanSelectionPanel({
 
       <div className="mx-auto mt-10 max-w-2xl text-center">
         <h2 className="text-xl font-semibold text-[#20343A]">
-          {proAccess ? scoreContent.proContinueTitle : scoreContent.planTitle}
+          <HighlightedBrandText text={planTitle} />
         </h2>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          {proAccess
-            ? scoreContent.proContinueDescription
-            : scoreContent.planDescription}
+          {planDescription}
         </p>
       </div>
+
+      {!proAccess ? (
+        <div className="mx-auto mt-12 max-w-5xl rounded-3xl bg-white/80 px-6 py-8 ring-1 ring-[#3A7BD5]/10 sm:px-8">
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-3">
+            {paywallFeatures.map((feature, index) => {
+              const Icon = paywallFeatureIcons[index] ?? ArrowPathIcon;
+
+              return (
+                <div key={feature.name} className="flex flex-col">
+                  <dt className="flex items-center gap-x-3 text-base/7 font-semibold text-[#20343A]">
+                    <Icon
+                      aria-hidden={true}
+                      className="size-5 flex-none text-[#1FA77A]"
+                    />
+                    {feature.name}
+                  </dt>
+                  <dd className="mt-4 text-sm/6 text-gray-600">
+                    {feature.description}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+        </div>
+      ) : null}
 
       {proAccess ? (
         <div className="mx-auto mt-14 max-w-xl rounded-3xl bg-[#20343A] p-8 text-center shadow-2xl ring-1 ring-gray-900/10 sm:p-10">
@@ -3962,6 +4093,21 @@ function lowestDomainAdvice(domain: HealthScoreDomain, locale: Locale) {
   return `Your ${domain.label} score (${domain.score}/100) has room to improve. ${domain.description} This is the clearest place to focus first.`;
 }
 
+function localizeHealthScoreText(
+  value: LocalizedHealthScoreText | undefined,
+  locale: Locale
+) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (!value) {
+    return "";
+  }
+
+  return value[locale] || value.en || value.th || "";
+}
+
 function HealthScoreAdvice({
   locale,
   result
@@ -3970,46 +4116,37 @@ function HealthScoreAdvice({
   result: HealthScoreResult;
 }>) {
   const lowest = [...result.domains].sort((a, b) => a.score - b.score)[0];
-  const labels =
-    locale === "th"
-      ? {
-          actions: "พื้นที่ที่ควรโฟกัส",
-          lowest: "พื้นที่ที่ควรให้ความสำคัญที่สุด",
-          meaning: "คะแนนนี้บอกอะไรเรา"
-        }
-      : {
-          actions: "Your focus area",
-          lowest: "Your lowest area",
-          meaning: "How to improve"
-        };
-  const body =
-    locale === "th"
+  const fallbackImprovement =
+    (locale === "th"
       ? `${result.headline} ใช้คะแนนนี้เป็นจุดเริ่มต้น โดยรักษาด้านที่ทำได้ดีไว้ และให้ความสำคัญกับพื้นที่คะแนนต่ำสุดก่อน`
-      : `${result.headline} Use this as a practical starting point: protect the areas already working well, then focus first on this lowest-scoring domain.`;
+      : `${result.headline} Use this as a practical starting point: protect the areas already working well, then focus first on this lowest-scoring domain.`);
+  const legacyFocus = localizeHealthScoreText(
+    result.advice?.focusArea,
+    locale
+  );
+  const legacyImprovement = localizeHealthScoreText(
+    result.advice?.howToImprove,
+    locale
+  );
+  const fallbackFocus = legacyFocus || lowestDomainAdvice(lowest, locale);
+  const fallbackHowToImprove = legacyImprovement || fallbackImprovement;
+  const overview =
+    localizeHealthScoreText(result.advice?.overview, locale) ||
+    `${fallbackFocus} ${fallbackHowToImprove}`;
 
   return (
-    <div className="mx-auto mt-4 max-w-4xl rounded-2xl bg-[#F7FAFD] p-4 ring-1 ring-[#3A7BD5]/10 sm:mt-5 sm:p-7">
-      <div className="rounded-2xl bg-white p-4 ring-1 ring-[#3A7BD5]/10 sm:p-6">
-        <p className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-[#20343A]">
-          {labels.actions}
-        </p>
-        <div className="mt-4 grid gap-3">
-          <div className="rounded-2xl bg-red-50 p-5 ring-1 ring-red-200 sm:p-6">
-            <p className="text-sm font-semibold text-[#20343A]">
-              {labels.lowest}: {lowest.label} ({lowest.score}/100)
-            </p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              {lowestDomainAdvice(lowest, locale)}
-            </p>
-          </div>
-          <div className="rounded-2xl bg-[#EFFBF5] p-5 ring-1 ring-[#1FA77A]/20 sm:p-6">
-            <p className="text-sm font-semibold text-[#20343A]">
-              {labels.meaning}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              {body}
-            </p>
-          </div>
+    <div className="mt-5 rounded-2xl bg-white p-5 ring-1 ring-[#3A7BD5]/10 sm:mt-6 sm:p-6">
+      <div className="flex gap-4">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#FFF8E8]">
+          <ExclamationTriangleIcon
+            aria-hidden={true}
+            className="size-5 text-[#D97706]"
+          />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm leading-6 text-muted-foreground">
+            {overview}
+          </p>
         </div>
       </div>
     </div>
@@ -4035,34 +4172,32 @@ function HealthScorePanel({
         };
 
   return (
-    <>
-      <div className="mx-auto mt-10 max-w-4xl rounded-2xl bg-[#F7FAFD] p-4 ring-1 ring-[#3A7BD5]/10 sm:p-7">
-        <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 lg:items-stretch">
-          <div className="flex min-w-0 flex-col">
-            <div className="flex h-full min-h-[14rem] flex-col justify-between rounded-2xl bg-white p-5 text-center ring-1 ring-[#3A7BD5]/10 sm:min-h-0 sm:p-8">
-              <p className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-[#20343A]">
-                {labels.score}
-              </p>
-              <div className="flex items-end justify-center gap-3">
-                <span className="text-6xl font-semibold tracking-normal text-[#20343A] sm:text-8xl">
-                  {result.score}
-                </span>
-                <span className="pb-2 text-lg font-semibold text-muted-foreground sm:pb-3 sm:text-xl">
-                  /100
-                </span>
-              </div>
-              <p className="inline-flex self-center rounded-full bg-[#1FA77A]/10 px-4 py-1.5 text-sm font-semibold text-[#126b4f]">
-                {result.band}
-              </p>
+    <div className="mx-auto mt-10 max-w-4xl rounded-2xl bg-[#F7FAFD] p-4 ring-1 ring-[#3A7BD5]/10 sm:p-7">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 lg:items-stretch">
+        <div className="flex min-w-0 flex-col">
+          <div className="flex h-full min-h-[14rem] flex-col justify-between rounded-2xl bg-white p-5 text-center ring-1 ring-[#3A7BD5]/10 sm:min-h-0 sm:p-8">
+            <p className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-[#20343A]">
+              {labels.score}
+            </p>
+            <div className="flex items-end justify-center gap-3">
+              <span className="text-6xl font-semibold tracking-normal text-[#20343A] sm:text-8xl">
+                {result.score}
+              </span>
+              <span className="pb-2 text-lg font-semibold text-muted-foreground sm:pb-3 sm:text-xl">
+                /100
+              </span>
             </div>
+            <p className="inline-flex self-center rounded-full bg-[#1FA77A]/10 px-4 py-1.5 text-sm font-semibold text-[#126b4f]">
+              {result.band}
+            </p>
           </div>
-
-          <HealthScoreRadar result={result} />
         </div>
-        <HealthScoreVisuals locale={locale} result={result} />
+
+        <HealthScoreRadar result={result} />
       </div>
+      <HealthScoreVisuals locale={locale} result={result} />
       <HealthScoreAdvice locale={locale} result={result} />
-    </>
+    </div>
   );
 }
 

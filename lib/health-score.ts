@@ -12,7 +12,30 @@ export type HealthScoreMover = Readonly<{
   label: string;
 }>;
 
+export type LocalizedHealthScoreText =
+  | string
+  | Readonly<{
+      en: string;
+      th: string;
+    }>;
+
+export type HealthScorePaywallFeature = Readonly<{
+  description: LocalizedHealthScoreText;
+  name: LocalizedHealthScoreText;
+}>;
+
+export type HealthScoreAdvice = Readonly<{
+  paywallEyebrow?: LocalizedHealthScoreText;
+  paywallFeatures?: HealthScorePaywallFeature[];
+  paywallSubtitle?: LocalizedHealthScoreText;
+  paywallTitle?: LocalizedHealthScoreText;
+  overview: LocalizedHealthScoreText;
+  focusArea?: LocalizedHealthScoreText;
+  howToImprove?: LocalizedHealthScoreText;
+}>;
+
 export type HealthScoreResult = Readonly<{
+  advice?: HealthScoreAdvice;
   band: string;
   domains: HealthScoreDomain[];
   headline: string;
