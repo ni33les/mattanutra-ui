@@ -9,21 +9,24 @@ export const runtime = "nodejs";
 
 function unauthorized() {
   return NextResponse.json(
-    { message: "Testimonial write access is not authorized" },
+    { message: "Testimonial API access is not authorized" },
     {
-      headers: { "Cache-Control": "no-store" },
+      headers: {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": 'Bearer realm="mattanutra-admin-api"'
+      },
       status: 401
     }
   );
 }
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const status = url.searchParams.get("status");
-
-  if (status && status !== "published" && !blogWriteAuthorized(request)) {
+  if (!blogWriteAuthorized(request)) {
     return unauthorized();
   }
+
+  const url = new URL(request.url);
+  const status = url.searchParams.get("status");
 
   const testimonials = await listTestimonialsForApi(
     url.searchParams.get("locale"),

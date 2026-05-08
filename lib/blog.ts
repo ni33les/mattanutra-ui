@@ -273,10 +273,10 @@ function mapPost(row: BlogPostRow, localeOverride?: Locale): BlogPost {
 }
 
 export function blogWriteAuthorized(request: Request) {
-  const configuredToken = process.env.OPENCLAW_API_TOKEN?.trim();
+  const configuredToken = process.env.ADMIN_TOKEN?.trim();
 
   if (!configuredToken) {
-    return process.env.NODE_ENV !== "production";
+    return false;
   }
 
   const authHeader = request.headers.get("authorization") ?? "";
@@ -286,7 +286,7 @@ export function blogWriteAuthorized(request: Request) {
 
   return (
     bearer === configuredToken ||
-    request.headers.get("x-openclaw-token") === configuredToken
+    request.headers.get("x-admin-token") === configuredToken
   );
 }
 

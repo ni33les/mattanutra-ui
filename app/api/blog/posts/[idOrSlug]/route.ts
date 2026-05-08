@@ -19,7 +19,10 @@ function unauthorized() {
   return NextResponse.json(
     { message: "Blog write access is not authorized" },
     {
-      headers: { "Cache-Control": "no-store" },
+      headers: {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": 'Bearer realm="mattanutra-admin-api"'
+      },
       status: 401
     }
   );
