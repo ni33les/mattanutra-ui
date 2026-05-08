@@ -2,30 +2,30 @@
 flowchart TB
   A["Brand website"] --> B["Visitor arrives"]
   B --> C["Anonymous assessment"]
-  C --> C1["Optional reassessment email captured"]
-  C1 --> D["Assessment saved"]
-  D --> D1["Optional reassessment email captured"]
-  D1 --> D2["Recurring 60-day action scheduled"]
-  D2 --> E["Questionnaire sanity check"]
-  E -->|Pass| F["HealthScore calculation"]
-  E -->|Fixable| G["Correct answers"]
-  G --> E
-  E -->|High-risk| H["Human review"]
+  C --> D["Assessment saved"]
+  D --> E["Required answer check"]
+  E --> F["HealthScore calculation"]
+  E --> E1["Formal sanity checks"]
+  E1 -->|Fixable| G["Correct answers"]
+  G --> E1
+  E1 -->|High-risk| H["Human review"]
   F --> I["HealthScore gate"]
   I -->|Free example| J["Email captured"]
-  J --> K["Request formulation"]
-  K --> L["Low-priority example job"]
+  J --> J1["Optional 60-day consent"]
+  J1 --> J2["Recurring reminder scheduled"]
+  J2 --> K["Shared processing page"]
+  K --> L["Low-priority example request"]
   L --> M["Upsell page with chat options"]
-  L --> N["Full formulation prepared"]
+  L --> N["Background formulation worker"]
   N --> N0["Limited email example rendered and audited"]
   N0 --> N1["Example email sent and audited"]
   N1 --> N3["Unsubscribe link cancels reminder"]
   I -->|Paid plan| O["Plan selected"]
-  O --> P["Payment"]
-  P -->|Paid| Q["Formulation job"]
+  O --> P["Payment activation"]
+  O --> Q["Paid formulation job"]
   P -->|Abandoned| R["Payment follow-up"]
   Q --> S["Full formulation prepared"]
-  S --> T["Hard safety checks"]
+  S --> T["Refine and validate formulation"]
   T -->|Pass| U["Formulation saved"]
   T -->|Fail 1-2| V["Revised prompt"]
   V --> S
@@ -56,7 +56,7 @@ flowchart TB
   classDef partial fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
   classDef todo fill:#ffffff,stroke:#94a3b8,color:#334155,stroke-width:1px;
 
-  class A,B,C,C1,D,D1,D2,F,I,J,K,L,M,N,N1,N2,N3,O,Q,S,U,W,AF,AG,AH,AI,AJ,AK,AL,AO done;
-  class E,G,T,V,X,Y,AB,AD,AE partial;
+  class A,B,C,D,E,F,I,J,J1,J2,K,L,M,N,N0,N1,N3,O,Q,S,U,W,AF,AG,AH,AI,AJ,AK,AL,AO done;
+  class E1,G,T,V,X,Y,AB,AD,AE partial;
   class H,P,R,Z,AA,AC,AM,AN todo;
 ```

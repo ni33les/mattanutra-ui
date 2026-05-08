@@ -1,375 +1,314 @@
 # MattaNutra Business Process Roadmap
 
-This document distils the business process and maps it to the current product state. It intentionally avoids technical vendor choices and implementation detail.
+This document describes the MattaNutra customer and business process in business terms. It focuses on the decisions we need customers to make, the value we need to prove at each point, and the weaknesses that may reduce conversion.
+
+It intentionally avoids internal process detail.
 
 ## Status Legend
 
 | Status | Meaning |
 | --- | --- |
-| Done | Working in the current product |
-| In Progress | Partly built or present as a placeholder |
-| Pending | Not yet built |
-| Decision Needed | Business decision or external dependency required |
+| Done | Present in the current product |
+| Partial | Present but incomplete, unproven, or dependent on another decision |
+| Pending | Not live yet |
 
-## Current State Summary
+## Executive Summary
 
-MattaNutra can capture an anonymous wellness assessment, calculate a HealthScore, show a plan gate, and generate a personalised nutritional formulation from the saved assessment.
+MattaNutra currently has the core shape of a commercial wellness journey:
 
-The new commercial flow is now:
+1. A visitor can start an anonymous assessment.
+2. The assessment produces a HealthScore.
+3. The HealthScore creates a moment to choose between a free email preview, Precision Plan, or Pro Plan.
+4. A paid user can receive a full personalised nutritional formulation.
+5. A free user can receive a smaller email preview and be invited back.
+6. Users can be invited into chat and future reassessment.
 
-1. Complete the assessment.
-2. Optionally capture an email for a free 60-day reassessment reminder inside the health considerations section.
-3. Save the assessment before payment.
-4. Calculate and show the HealthScore.
-5. Let the user either request a free email example or choose a paid plan.
-6. For the free path, request the formulation as a low-priority background job, then continue to the upsell page while the email example is prepared.
-7. The upsell page shows email expectation copy, testimonials, and chat connection options tied to the plan where supported.
-8. For the paid path, continue processing and show the full formulation page.
-9. For reassessment reminders, schedule a recurring 60-day action that emails the user, supports unsubscribe, and invites the user back with the previous plan prefilled.
+The strongest parts of the current journey are the anonymous assessment, HealthScore, plan gate, formulation page, free email path, and 60-day reassessment concept.
 
-| Business Area | Current State | Status |
-| --- | --- | --- |
-| Brand and website | MattaNutra branding, English and Thai pages, legal pages, footer, and navigation exist. | Done |
-| Anonymous assessment | Questionnaire captures profile, goals, lifestyle, preferences, and constraints. | Done |
-| Reassessment email capture | Optional reassessment email capture appears inside the health considerations section before HealthScore generation. | Done |
-| Assessment storage | Assessment answers are saved before payment or plan selection. | Done |
-| Questionnaire sanity check | Required fields exist, but formal impossible-value and high-risk handling is not complete. | In Progress |
-| HealthScore | HealthScore is calculated from assessment answers before the paywall. | Done |
-| HealthScore gate | User sees score context before choosing email example or paid plan. | Done |
-| Free example capture | Email can be captured for a free example lead path. | Done |
-| Example formulation | The full formulation is queued and prepared for the example path. | Done |
-| Example email | A limited HTML email preview is rendered, sent when email delivery is configured, and audited with delivery status and delivery reference. | Done |
-| Example upsell page | After example processing, the user sees email expectation copy, testimonial proof, and LINE, Telegram, and WhatsApp connection options. | Done |
-| Plan selection | Customer can choose Precision or Pro before full formulation processing. | Done |
-| Returning reassessment | A returning plan link can prefill previous answers and create a new formulation version for the same plan. | Done |
-| Payment | Plan gate exists, but payment collection is not active. | Pending |
-| Full formulation generation | Assessment answers are processed and return a personalised formulation. | Done |
-| Formulation storage | Formulation versions are saved before display. | Done |
-| Bilingual result display | Formulation fields can be returned and shown in English or Thai. | Done |
-| Product recommendations | Result page handles recommendations, but live product matching is not active. | In Progress |
-| Recommendation storage | Recommendation versions can be saved. Live matched content is not active. | In Progress |
-| Chat support | Chat CTA exists, but live advisor workflow is not fully connected. | In Progress |
-| Affiliate purchase journey | Affiliate-led purchase flow is not live. | Pending |
-| Safety governance | Disclaimers and legal pages exist; hard dosing, exclusion, and review rules are still needed. | In Progress |
-| Follow-up and retention | Recurring reassessment scheduling, email sending, audit logging, unsubscribe handling, and return-link prefill exist. Wider lifecycle messaging is not active. | In Progress |
-| Admin and reporting | Operational dashboard and funnel reporting are not active. | Pending |
+The weakest commercial points are payment activation, proof of product trust, live advisor value, product matching, and clear safety governance. These are the areas most likely to block conversion or create risk as traffic grows.
 
-## Product UX TODOs
+## Sales Funnel View
 
-- Add an overall progress bar to the processing page so users can see total journey progress, not just the active step list.
-- Include nutrition guidance in the formulation output and carry that nutrition context into subsequent advisor conversations.
+MattaNutra should be read as a trust-building funnel, not only as an assessment tool. Each step must earn the right to ask for the next step.
 
-## Target Customer Journey
+| Funnel Stage | Customer Mindset | Business Goal | Current Strength | Main Weakness | Suggested Tune |
+| --- | --- | --- | --- | --- | --- |
+| Awareness | "Is this relevant to me?" | Get the right visitors to start | Clear wellness and personalisation promise | Need stronger proof and education content | Use specific, relatable use cases: energy, longevity, sleep, budget-conscious guidance |
+| Assessment start | "Will this waste my time?" | Reduce friction and fear | Anonymous, structured, low-pressure | Risk of feeling like a long form | Show time expectation, privacy reassurance, and progress clearly |
+| Assessment completion | "Was this worth doing?" | Create anticipation | Good data capture | Some optional detail may feel cognitively heavy | Make optional precision feel like a benefit, not homework |
+| HealthScore | "Did it understand me?" | Deliver pre-payment value | Strong conversion moment already exists | Needs sharper insight hierarchy | Lead with the one insight most likely to make the user care |
+| Free preview | "Can I try before buying?" | Capture lead and nurture | Good fallback path | The free value boundary is not yet defined | Make the preview useful but clearly incomplete |
+| Precision Plan | "Is this worth a one-time payment?" | Convert intent into revenue | Clear one-time product | Payment not active; product value needs proof | Show exact unlocks: formulation, dose logic, product guidance, reassessment |
+| Pro Plan | "Why pay monthly?" | Create recurring revenue | Strong idea: ongoing advisor | Promise is still abstract | Show daily-life examples: travel, meals, sleep changes, training days |
+| Results page | "Can I act on this?" | Deliver satisfaction and confidence | Full formulation exists | Product trust is partial | Make benefits, dose, timing, and product form very easy to scan |
+| Product purchase | "Can I trust this product?" | Capture affiliate value | Commercial path identified | Trusted product guidance not live | Build quality proof into recommendations before scaling |
+| Follow-up | "Is this helping over time?" | Increase retention and reactivation | 60-day reassessment concept exists | Broader nurture not defined | Use score movement as the reason to return |
 
-```mermaid
-flowchart LR
-  A["Visitor lands on MattaNutra"] --> B["Completes anonymous assessment"]
-  B --> B1["Optional reassessment email captured"]
-  B1 --> C["Assessment is saved"]
-  C --> C1["Schedule reassessment if email supplied"]
-  C1 --> D["Questionnaire sanity check"]
-  D -->|Pass| E["HealthScore is calculated"]
-  D -->|Fixable issue| F["Ask customer to correct answers"]
-  D -->|High-risk| G["Route to human review"]
-  F --> D
-  E --> H["HealthScore gate"]
-  H -->|Free example| I["Capture email"]
-  I --> J["Show example processing"]
-  J --> K["Queue full formulation"]
-  K --> L["Render and send limited example email"]
-  L --> L1["Show upsell and chat options"]
-  H -->|Paid plan| M["Select Precision or Pro"]
-  M --> N["Payment"]
-  N -->|Paid| O["Prepare full formulation"]
-  N -->|Abandoned| P["Abandoned-payment follow-up"]
-  O --> Q["Safety checks"]
-  Q -->|Pass| R["Save formulation"]
-  Q -->|Fail 1-2| S["Revise formulation request"]
-  S --> O
-  Q -->|Fail 3| G
-  R --> T["Show results"]
-  T --> U["Match products"]
-  U --> V["Save recommendations"]
-  V --> W["Customer buys through affiliate link"]
-  T --> X["Customer connects to advisor chat"]
-  X --> Y["Ongoing support and refinement"]
-  W --> Z["Reassessment and reorder prompts"]
-  Z --> ZA["Recurring 60-day reminder"]
-  ZA --> Z0["Send reminder email with unsubscribe"]
-  Z0 --> ZAA["Return with previous answers prefilled"]
-  ZAA --> ZB["Create new formulation version"]
-
-  classDef done fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:2px;
-  classDef progress fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
-  classDef pending fill:#f8fafc,stroke:#64748b,color:#334155,stroke-width:1px;
-
-  class A,B,B1,C,C1,E,H,I,J,K,L,L1,M,O,R,T,Z0,ZA,ZAA,ZB done;
-  class D,F,Q,S,U,V,X,Z progress;
-  class G,N,P,W,Y pending;
-```
-
-## Business Process Gates
+## Business Journey
 
 ```mermaid
 flowchart TB
-  G1["1. Establish trust"] --> G2["2. Capture assessment"]
-  G2 --> G2A["3. Optional reassessment email"]
-  G2A --> G3["4. Save assessment"]
-  G3 --> G3A["Schedule reassessment if requested"]
-  G3A --> G4["5. Sanity check"]
-  G4 -->|Pass| G5["6. Calculate HealthScore"]
-  G4 -->|Fixable| G6["Ask for correction"]
-  G4 -->|High-risk| G7["Human review"]
-  G6 --> G4
-  G5 --> G8["7. Show HealthScore gate"]
-  G8 -->|Example| G9["Capture email"]
-  G9 --> G10["Show example processing"]
-  G10 --> G11["Queue full formulation"]
-  G11 --> G12["Render and send limited example email"]
-  G12 --> G12A["Upsell page with testimonials and chat"]
-  G8 -->|Paid| G13["Select plan"]
-  G13 --> G14["Payment"]
-  G14 -->|Paid| G15["Generate formulation"]
-  G14 -->|Abandoned| G16["Follow up"]
-  G15 --> G17["Safety checks"]
-  G17 -->|Pass| G18["Save formulation"]
-  G17 -->|Fail 1-2| G19["Revise and retry"]
-  G19 --> G15
-  G17 -->|Fail 3| G7
-  G18 --> G20["Show results"]
-  G20 --> G21["Match products"]
-  G21 --> G22["Save recommendations"]
-  G22 --> G23["Affiliate purchase"]
-  G20 --> G24["Advisor support"]
-  G23 --> G25["Reassess and retain"]
-  G24 --> G25
-  G25 --> G25A["Send reminder email with unsubscribe"]
-  G25A --> G26["Prefill previous answers"]
-  G26 --> G27["Save new formulation version"]
+  A["Visitor arrives"] --> B["Trust and relevance check"]
+  B --> C["Anonymous assessment"]
+  C --> D["HealthScore moment"]
+  D --> E{"Customer decision"}
+  E -->|Not ready to pay| F["Free preview"]
+  E -->|Wants full answer| G["Precision Plan"]
+  E -->|Wants ongoing help| H["Pro Plan"]
+  F --> I["Email relationship"]
+  G --> J["Full formulation"]
+  H --> K["Advisor relationship"]
+  J --> L["Product confidence"]
+  K --> M["Ongoing support"]
+  I --> N["60-day reassessment"]
+  L --> N
+  M --> N
+  N --> O["Return and refine"]
 
   classDef done fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:2px;
-  classDef progress fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
-  classDef pending fill:#f8fafc,stroke:#64748b,color:#334155,stroke-width:1px;
+  classDef partial fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
+  classDef pending fill:#ffffff,stroke:#94a3b8,color:#334155,stroke-width:1px;
 
-  class G1,G2,G2A,G3,G3A,G5,G8,G9,G10,G11,G12,G12A,G13,G15,G18,G20,G25A,G26,G27 done;
-  class G4,G6,G17,G19,G21,G22,G24,G25 progress;
-  class G7,G14,G16,G23 pending;
+  class A,B,C,D,E,F,G,H,I,J,N,O done;
+  class K,L,M partial;
 ```
 
-## Process Detail
+## Main Customer Decision Points
 
-### 1. Assessment
+| Decision Point | Customer Question | Current State | Business Critique |
+| --- | --- | --- | --- |
+| Landing page | "Is this for someone like me?" | Done | The brand and CTA exist, but the page must quickly prove personalisation and trust. |
+| Assessment start | "Is this safe and worth my time?" | Done | The anonymous positioning helps. The business should keep the assessment short enough to avoid fatigue. |
+| Assessment completion | "Have I given enough useful information?" | Done | The flow captures good data, but formal sanity and high-risk checks are still incomplete. |
+| HealthScore | "Did MattaNutra understand me?" | Done | This is the key pre-payment value moment. It should be sharpened into the strongest conversion asset. |
+| Free preview | "Can I get value without paying yet?" | Done | Good lead capture path. The business must decide exactly how generous the free preview should be. |
+| Paid plan choice | "Is the full plan worth paying for?" | Partial | The plans exist, but payment is not live and the value difference between Precision and Pro needs sharper proof. |
+| Full formulation | "Is this specific, practical, and safe?" | Done | The result exists. The business should continue simplifying the explanation of benefits, dose, timing, and practical use. |
+| Product recommendations | "Can I trust what to buy?" | Partial | This is commercially important but not yet strong as trusted buying guidance. Without trust, affiliate conversion will suffer. |
+| Advisor chat | "Can I get help adapting this to real life?" | Partial | Chat CTA exists, but the advisor experience is not yet proven as a paid Pro benefit. |
+| Reassessment | "Will this improve over time?" | Done for first reminder | Strong retention concept. Wider lifecycle follow-up is still undefined. |
 
-Purpose: collect enough anonymous information to personalise the formulation and calculate a useful HealthScore.
+## Conversion and Service Levers
 
-Current state: built and working. The separate review step has been removed; once the final questionnaire section is complete, the user generates their HealthScore directly.
+| Lever | Why It Helps Conversion | Why It Helps Satisfaction | Suggested Change |
+| --- | --- | --- | --- |
+| Make the HealthScore more explanatory | Users need a reason to continue | Users feel understood, not scored generically | Add one plain-language "what is holding you back most" insight near the score |
+| Show paid value before price | Reduces price resistance | Makes the purchase feel informed | Use a concise "what unlocks" comparison between free, Precision, and Pro |
+| Give the free path a clear next step | Prevents free users from disappearing | Makes the free experience feel complete | After the email preview, invite the user to improve one score area and return in 60 days |
+| Make Pro use cases concrete | Helps justify recurring payment | Sets expectations for service | Show examples: "What should I take on a poor sleep day?", "How do I adjust while travelling?" |
+| Make product recommendations trustworthy | Supports affiliate conversion | Reduces buyer anxiety | Show quality criteria, coverage, form, and price confidence |
+| Connect chat with the plan | Increases engagement after result | Avoids making the user repeat themselves | Make the plan reference visible and explain what the advisor can do with it |
+| Make safety visible but calm | Builds trust without scaring users | Protects the user and brand | Use plain wellness disclaimers and stop-condition messaging where needed |
 
-The assessment captures:
-
-- Profile basics.
-- Region.
-- Goals.
-- Lifestyle and diet.
-- Medication and supplement considerations.
-- Preferences such as budget and capsule limit.
-- Optional precision inputs such as labs, family history, stress, wearable data, and VO2 context.
-
-Next business work:
-
-- Define formal impossible-value checks.
-- Define high-risk answers that must stop automation.
-- Confirm the customer-facing message when sanity checks fail.
-
-### 2. HealthScore
-
-Purpose: give the user immediate value before the paywall and identify the areas that shape the formulation.
-
-Current state: built. HealthScore is calculated after the assessment is saved and before plan selection.
-
-The HealthScore should show:
-
-- Overall score.
-- Score band.
-- Six domain scores.
-- Short summary of the largest opportunity.
-- A few high-impact areas that would most improve the score.
-
-### 3. Free Example Lead Path
-
-Purpose: capture value from users who do not choose a paid plan immediately.
-
-Current state: built. Email capture, example formulation queueing, limited HTML email rendering, email sending, and delivery audit logging are present.
-
-Target process:
-
-1. User enters email on the HealthScore gate.
-2. User sees the shared processing page while the free formulation request is queued.
-3. The request is stored as a low-priority background job.
-4. The user lands on an upsell page explaining that the example is being prepared and should arrive by email.
-5. The background worker prepares the full formulation, then renders and sends only the limited example.
-6. The upsell page shows testimonial proof and invites the user to connect through LINE, Telegram, or WhatsApp with the plan attached where the channel supports it.
-7. The send result is audited with delivery status, recipient, email type, and delivery reference when available.
-8. If the user opted into reassessment reminders, the example email includes an unsubscribe link.
-
-The user receives only a limited example, even though the full formulation is processed.
-
-Queue priority: Pro paid jobs run first, then Precision paid jobs, then reassessment jobs, then free example formulation and email jobs.
-
-### 4. Plan and Payment
-
-Purpose: convert the assessment into a paid plan.
-
-Current state: plan selection exists. Payment is not connected.
-
-Planned plans:
-
-| Plan | Business Promise |
-| --- | --- |
-| Precision Plan | Full personalised formulation and product guidance. |
-| Pro Plan | Precision Plan plus ongoing specialist AI advisor support and refinement. |
-
-Next business work:
-
-- Confirm pricing.
-- Confirm refund policy.
-- Activate payment acceptance.
-- Decide what happens if payment fails or is abandoned.
-- Use the saved assessment and HealthScore to support respectful follow-up.
-
-### 5. Formulation
-
-Purpose: turn assessment answers into a clear wellness formulation.
-
-Current state: working. The formulation is prepared, saved, versioned, and then rendered on the results page.
-
-The formulation result should remain:
-
-- Concise.
-- Bilingual.
-- Tied to the saved assessment.
-- Safe in tone.
-- Free of disease-treatment claims.
-- Saved before it is displayed or used in an email example.
-
-### 6. Safety and Compliance
-
-Purpose: keep the service in the wellness category and reduce avoidable risk.
-
-Current state: legal pages and disclaimers exist. Hard safety rules are still needed.
+## Current Commercial Flow
 
 ```mermaid
 flowchart TB
-  A["Assessment completed"] --> B["Questionnaire sanity check"]
-  B -->|Stop condition| C["Human review or consult-professional message"]
-  B -->|Pass| D["Prepare formulation"]
-  D --> E["Check ingredient limits and exclusions"]
-  E -->|Pass| F["Save formulation"]
-  F --> G["Use formulation for result or email example"]
-  E -->|Fail, attempts 1-2| H["Create revised prompt"]
-  H --> D
-  E -->|Fail on attempt 3| C
+  A["Start assessment"] --> B["Complete health profile"]
+  B --> C["Receive HealthScore"]
+  C --> D{"Choose next step"}
+  D -->|Free| E["Send email preview"]
+  E --> F["Upsell page"]
+  F --> G["Chat invitation"]
+  E --> H["60-day reminder option"]
+  H --> I["Return for reassessment"]
+  D -->|Precision| J["Choose one-time plan"]
+  J --> K["Payment"]
+  K --> L["Full formulation"]
+  L --> M["Product guidance"]
+  D -->|Pro| N["Choose ongoing plan"]
+  N --> O["Payment"]
+  O --> P["Full formulation"]
+  P --> Q["Specialist advisor"]
+  Q --> R["Ongoing refinement"]
+  M --> I
+  R --> I
 
   classDef done fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:2px;
-  classDef progress fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
-  classDef pending fill:#f8fafc,stroke:#64748b,color:#334155,stroke-width:1px;
+  classDef partial fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
+  classDef pending fill:#ffffff,stroke:#94a3b8,color:#334155,stroke-width:1px;
 
-  class A,D,F,G done;
-  class B,E,H progress;
-  class C pending;
+  class A,B,C,D,E,F,G,H,I,J,L,N,P done;
+  class M,Q,R partial;
+  class K,O pending;
 ```
 
-### 7. Product Matching
+## Path Critique
 
-Purpose: translate the formulation into trustworthy products the customer can buy.
+### Free Preview Path
 
-Current state: the result page can gracefully show no recommendations. Live matching is not active.
+Business purpose: capture skeptical users who are not ready to pay.
 
-Target process:
+What works:
 
-1. Maintain a curated list of trusted products.
-2. Match products to formulation ingredients.
-3. Prefer fewer products when one product covers multiple ingredients.
-4. Save the matched recommendation set.
-5. Show clear product rationale.
-6. Send the customer to marketplace purchase links.
+- Low-friction email capture.
+- Gives the customer a useful next step without forcing payment.
+- Keeps a relationship open through the 60-day reassessment idea.
+- Creates another chance to convert after the user sees value.
 
-### 8. Advisor Support
+Weaknesses:
 
-Purpose: give customers a way to continue the conversation after receiving their plan.
+- The free preview must not feel too small or it will be ignored.
+- It must not give away so much that Precision feels unnecessary.
+- The follow-up strategy after the first email is not yet strong enough.
+- Chat from the free path is promising, but plan handoff must feel effortless.
 
-Current state: advisor CTA exists. The live chat workflow is not complete.
+Business decision needed:
 
-Target process:
+- Define the exact free preview promise: "3-point nutrition plan", "3 most important next steps", or another offer.
+- Decide how soon and how often free users should be followed up.
 
-- Customer opens preferred chat channel.
-- Customer shares their plan reference.
-- Advisor retrieves the customer’s plan.
-- Advisor helps refine timing, routine, travel, diet, and practical use.
+### Precision Plan Path
 
-### 9. Retention and Operations
+Business purpose: convert users who want a complete, one-time personalised formulation.
 
-Purpose: turn a one-time formulation into an ongoing relationship.
+What works:
 
-Current state: partly active. The assessment can capture a reassessment email, schedule a recurring 60-day reminder action, render and send a branded reminder email, audit the rendered output and delivery result, provide an unsubscribe link that cancels the cron action, and prefill the questionnaire when the user returns with the plan link. Broader lifecycle messaging and reporting are not active.
+- Clear one-time paid option.
+- Good fit for customers with medium budget and moderate skepticism.
+- Full formulation is already a meaningful paid deliverable.
 
-Target process:
+Weaknesses:
 
-- Capture optional reassessment consent before plan selection.
-- Schedule a recurring 60-day reminder against the plan.
-- Keep one active reassessment reminder per email address and gracefully cancel duplicates.
-- Convert due reminder actions into jobs.
-- Render, audit, and send a branded email with a reassessment link.
-- Include an unsubscribe link that cancels future reassessment reminders.
-- Prefill prior answers when the user returns.
-- Save the reassessment as a new version of the same plan.
-- Bypass the paywall for active Pro members and show a direct continue action.
-- Follow up after example request, plan purchase, and product purchase.
-- Support reorder decisions.
-- Track conversion and retention metrics.
+- Payment is not active, so conversion cannot yet be measured.
+- Product recommendations are not yet strong enough to carry affiliate revenue.
+- Paid users need a reliable reassessment contact method.
+- The page must make the paid value clearly better than the free preview.
 
-## Current MVP Gap Map
+Business decision needed:
 
-| Gap | Why It Matters | Suggested Priority |
+- Confirm price, refund promise, and what exactly is included.
+- Decide whether paid users must provide email before or during payment.
+- Decide how product trust will be communicated.
+
+### Pro Plan Path
+
+Business purpose: create recurring revenue through ongoing advisor support.
+
+What works:
+
+- Pro has a clear strategic role: ongoing support and refinement.
+- Chat is a natural channel for Thai and mobile-first customers.
+- The plan can become more valuable over time through reassessment.
+
+Weaknesses:
+
+- "AI advisor" is not yet a concrete enough paid promise.
+- The business needs examples of what the advisor actually helps with.
+- Chat connection exists, but the full advisor workflow is not proven.
+- Subscription payment is not active.
+
+Business decision needed:
+
+- Define the Pro service promise in plain customer language.
+- Choose the first chat channel to make excellent.
+- Decide whether Pro includes AI only, human escalation, or both.
+
+## Key Process Weaknesses
+
+| Weakness | Why It Matters | Business Risk |
 | --- | --- | --- |
-| Questionnaire sanity checks | Prevents unusable or risky automated results. | High |
-| Payment activation | Required for paid conversion. | High |
-| Safety stop rules | Required before scaling traffic. | High |
-| Product whitelist | Required for trustworthy recommendations. | High |
-| Affiliate approval and link setup | Required for marketplace revenue. | High |
-| Qualified reviewer | Reduces compliance and trust risk. | High |
-| Live chat workflow | Needed for Pro Plan value. | Medium |
-| Email deliverability monitoring | Needed to watch bounces, spam placement, and email delivery failures after launch. | Medium |
-| Wider follow-up and reassessment | Needed for retention and repeat use beyond the first 60-day reminder. | Medium |
-| Business funnel events | Needed for marketing and conversion optimisation. | Medium |
-| Admin reporting | Needed once traffic begins. | Medium |
-| Blog section | Needed for acquisition, trust, and explainability content. | Medium |
+| Payment is not live | Paid conversion cannot be tested | Revenue path is unproven |
+| HealthScore value is not yet optimised | This is the main conversion trigger | Users may choose free or leave |
+| Safety rules are incomplete | Wellness trust depends on responsible boundaries | Regulatory, reputation, and customer risk |
+| Product matching is not live | Affiliate revenue depends on trusted buying guidance | Users may buy elsewhere or not buy at all |
+| Pro promise is vague | Recurring revenue needs clear ongoing value | Users may choose Precision instead |
+| Advisor handoff is not seamless | Chat should feel personal and connected to the plan | Users may drop before engagement |
+| Follow-up cadence is undefined | Leads need nurturing after the free preview | Email capture may not convert |
+| Blog/content acquisition is not live | The site needs education and search traffic | Paid traffic may carry too much burden |
 
-## Recommended Next Sequence
+## Funnel Metrics to Watch
 
-1. Finish plan model and flow cleanup.
-2. Add questionnaire sanity checks and failure handling.
-3. Connect payment.
-4. Add safety stop rules and ingredient exclusion rules.
-5. Build the first trusted product list.
-6. Connect product matching to the result page.
-7. Make advisor chat work for one channel first.
-8. Add email deliverability monitoring.
-9. Add blog section and early educational content.
-10. Add business funnel events and basic operational reporting.
-11. Add broader follow-up and lifecycle messaging.
+These are the simplest business numbers to add once measurement is ready.
 
-## Open Business Decisions
+| Metric | What It Reveals | Healthy Direction |
+| --- | --- | --- |
+| Landing to assessment start | Whether the promise and CTA are compelling | Up |
+| Assessment start to completion | Whether the questionnaire feels worth finishing | Up |
+| Completion to HealthScore view | Whether the transition works reliably | Up |
+| HealthScore to free preview | Whether skeptical users are being captured | Up, but not at the expense of paid conversion |
+| HealthScore to paid plan | Whether the score creates enough purchase intent | Up |
+| Free preview to later paid plan | Whether email nurture works | Up |
+| Precision to Pro mix | Whether Pro has a clear enough value proposition | Depends on strategy, but should be intentional |
+| Results page to chat | Whether users want ongoing support | Up for Pro, moderate for Precision |
+| Results page to product click | Whether product guidance feels trustworthy | Up |
+| 60-day return rate | Whether reassessment is meaningful | Up |
+| Refunds or complaints | Whether expectations are mismatched | Down |
 
-| Decision | Needed Because |
-| --- | --- |
-| Final pricing for Precision and Pro | Required before payment launch. |
-| Free example content depth | Defines how much value is given away before payment. |
-| Email follow-up cadence | Determines how leads are nurtured. |
-| First product category scope | Keeps product matching manageable. |
-| Qualified reviewer | Needed for formulation logic and claim review. |
-| Support promise for Pro | Defines what customers are buying. |
-| Stop-condition policy | Defines when MattaNutra should not generate a plan. |
+## Customer Satisfaction Principles
+
+- Give the customer a useful result even if they do not pay.
+- Never make the customer feel trapped in a health claim or fear-based sale.
+- Explain why each recommendation exists in practical language.
+- Keep the plan realistic for budget, pill burden, diet, and lifestyle.
+- Make it easy to ask "what should I do today?" after the formulation.
+- Make returning feel natural: "your score changes as your life changes."
+
+## Business Priorities
+
+### 1. Make the HealthScore a Conversion Asset
+
+The HealthScore should not just be a score. It should create a persuasive reason to continue.
+
+Business questions:
+
+- What is the most compelling insight shown with the score?
+- Should the page lead with lowest domain, biggest improvement opportunity, or comparison to peers?
+- What should the customer believe after seeing the score?
+
+### 2. Define the Free Preview Boundary
+
+The free preview is a lead magnet, not the product.
+
+Business questions:
+
+- What exactly is included?
+- What is held back for paid plans?
+- What follow-up sequence should start after the free preview?
+
+### 3. Activate the Paid Plan Moment
+
+Precision and Pro must have a clean purchase decision.
+
+Business questions:
+
+- What payment methods are essential for Thai customers?
+- What refund or satisfaction promise reduces hesitation?
+- Should payment happen before or after showing a deeper teaser?
+
+### 4. Make Product Trust Visible
+
+The formulation creates intent. Product guidance captures commercial value.
+
+Business questions:
+
+- What makes a product "trusted"?
+- How should quality, coverage, form, and price be explained?
+- How should the business handle cases where no good product match exists?
+
+### 5. Make Pro Tangible
+
+Pro should feel like an ongoing wellness companion, not just a more expensive version of Precision.
+
+Business questions:
+
+- What are the top five real-life advisor use cases?
+- Which channel should be prioritised first?
+- Should Pro include human review or escalation?
+
+## Recommended Next Business Sequence
+
+1. Finalise the HealthScore conversion message.
+2. Define the free preview content boundary.
+3. Activate payment for Precision and Pro.
+4. Define safety stop rules and customer-facing safety messages.
+5. Create the first trusted product recommendation standard.
+6. Make one chat channel work end-to-end.
+7. Define the Pro service promise.
+8. Build the first follow-up sequence after free preview.
+9. Add blog and educational content for acquisition.
+10. Add funnel reporting so the team can see where customers drop.
 
 ## One-Line Business Process
 
-MattaNutra captures an anonymous wellness assessment, calculates a useful HealthScore, converts the user through either a paid plan or limited email example, and turns the saved assessment into a personalised nutritional formulation with future product matching and advisor support.
+MattaNutra earns trust with an anonymous assessment and HealthScore, converts customers through either a free preview or paid plan, then uses formulation, product guidance, advisor support, and reassessment to build an ongoing wellness relationship.

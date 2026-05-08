@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowPathIcon,
@@ -60,21 +60,12 @@ type Copy = Readonly<{
   };
   badges: string[];
   common: {
-    optional: string;
     required: string;
   };
   conditions: {
     options: Option[];
     prompt: string;
     title: string;
-  };
-  emailModal: {
-    button: string;
-    emailPlaceholder: string;
-    privacy: string;
-    previewTitle: string;
-    title: string;
-    subtitle: string;
   };
   fixedAction: {
     complete: string;
@@ -91,11 +82,6 @@ type Copy = Readonly<{
     description: string;
     time: string;
     title: string;
-  };
-  hook: {
-    detail: string;
-    title: string;
-    toggle: string;
   };
   lifestyle: {
     alcohol: string;
@@ -173,11 +159,6 @@ type Copy = Readonly<{
     options: Option[];
     prompt: string;
     title: string;
-  };
-  thankYou: {
-    steps: Array<Readonly<{ body: string; title: string }>>;
-    title: string;
-    body: string;
   };
 }>;
 
@@ -473,7 +454,6 @@ const en: Copy = {
   },
   badges: ["120+ ingredients", "Private and secure", "AI powered"],
   common: {
-    optional: "Optional",
     required: "Required"
   },
   conditions: {
@@ -491,14 +471,6 @@ const en: Copy = {
       { label: "Bone density support", value: "bone" },
       { label: "Mood support", value: "mood" }
     ]
-  },
-  emailModal: {
-    title: "Almost there",
-    subtitle: "Your assessment is ready. Where should we send the summary?",
-    previewTitle: "Assessment preview",
-    emailPlaceholder: "your@email.com",
-    button: "Send my assessment",
-    privacy: "We never share your data. Unsubscribe anytime."
   },
   fixedAction: {
     complete: "All essentials answered - ready to generate.",
@@ -530,12 +502,6 @@ const en: Copy = {
     description:
       "Answer honestly. The more accurate you are, the more precise your formulation brief becomes.",
     time: "About 4 minutes"
-  },
-  hook: {
-    title: "Stay on track with free monthly updates",
-    detail:
-      "Your body and routine change over time. Opt in for a quick monthly check-in to keep your formulation tuned as you progress.",
-    toggle: "Send me monthly formulation updates"
   },
   lifestyle: {
     title: "Food, drinks, and habits",
@@ -796,25 +762,6 @@ const en: Copy = {
       { label: "Good", value: "4", tone: "High" },
       { label: "Excellent", value: "5", tone: "High" }
     ]
-  },
-  thankYou: {
-    title: "Your assessment is ready",
-    body:
-      "Next, we’ll turn your answers into a wellness-focused formulation brief and prepare matched supplement options.",
-    steps: [
-      {
-        title: "Formulation brief",
-        body: "A clear summary of your goals, constraints, and supplement preferences."
-      },
-      {
-        title: "Matched products",
-        body: "We’ll use the brief to find the closest matching products."
-      },
-      {
-        title: "Monthly tuning",
-        body: "Optional check-ins can help keep your formulation aligned over time."
-      }
-    ]
   }
 };
 
@@ -881,7 +828,6 @@ const th: Copy = {
   },
   badges: ["ส่วนผสม 120+", "เป็นส่วนตัวและปลอดภัย", "ขับเคลื่อนด้วย AI"],
   common: {
-    optional: "ไม่บังคับ",
     required: "จำเป็น"
   },
   conditions: {
@@ -899,14 +845,6 @@ const th: Copy = {
       { label: "ดูแลความหนาแน่นกระดูก", value: "bone" },
       { label: "ดูแลอารมณ์", value: "mood" }
     ]
-  },
-  emailModal: {
-    title: "อีกนิดเดียว",
-    subtitle: "แบบประเมินของคุณพร้อมแล้ว ต้องการให้ส่งสรุปไปที่ไหน?",
-    previewTitle: "ตัวอย่างสรุปแบบประเมิน",
-    emailPlaceholder: "your@email.com",
-    button: "ส่งแบบประเมินของฉัน",
-    privacy: "เราไม่แบ่งปันข้อมูลของคุณ และยกเลิกได้ทุกเมื่อ"
   },
   fixedAction: {
     complete: "ตอบคำถามสำคัญครบแล้ว พร้อมสร้างบรีฟ",
@@ -937,12 +875,6 @@ const th: Copy = {
     description:
       "ตอบตามจริง ยิ่งข้อมูลแม่นยำ บรีฟสูตรอาหารเสริมของคุณก็ยิ่งเฉพาะเจาะจง",
     time: "ประมาณ 4 นาที"
-  },
-  hook: {
-    title: "ติดตามความคืบหน้าด้วยอัปเดตรายเดือนฟรี",
-    detail:
-      "ร่างกายและกิจวัตรของคุณเปลี่ยนได้เสมอ เลือกรับเช็คอินรายเดือนสั้นๆ เพื่อให้สูตรยังสอดคล้องกับคุณ",
-    toggle: "ส่งอัปเดตสูตรรายเดือนให้ฉัน"
   },
   lifestyle: {
     ...en.lifestyle,
@@ -1195,25 +1127,6 @@ const th: Copy = {
       { label: "ดี", value: "4", tone: "High" },
       { label: "ดีเยี่ยม", value: "5", tone: "High" }
     ]
-  },
-  thankYou: {
-    title: "แบบประเมินของคุณพร้อมแล้ว",
-    body:
-      "ต่อไปเราจะเปลี่ยนคำตอบของคุณเป็นบรีฟสูตรอาหารเสริมเพื่อสุขภาพ และเตรียมตัวเลือกผลิตภัณฑ์ที่เหมาะสม",
-    steps: [
-      {
-        title: "บรีฟสูตรอาหารเสริม",
-        body: "สรุปเป้าหมาย ข้อจำกัด และความต้องการของคุณอย่างชัดเจน"
-      },
-      {
-        title: "ผลิตภัณฑ์ที่ตรงกัน",
-        body: "เราจะใช้บรีฟเพื่อค้นหาผลิตภัณฑ์ที่ใกล้เคียงที่สุด"
-      },
-      {
-        title: "ปรับแต่งรายเดือน",
-        body: "เช็คอินเสริมช่วยให้สูตรสอดคล้องกับคุณเมื่อเวลาผ่านไป"
-      }
-    ]
   }
 };
 
@@ -1265,10 +1178,6 @@ function cardOptionClasses(selected: boolean) {
       ? "border-[#1FA77A] bg-[#1FA77A] text-white"
       : "border-foreground/10 bg-white text-[#20343A] hover:border-[#1FA77A]/40 hover:bg-[#1FA77A]/5"
   );
-}
-
-function getOptionLabel(options: readonly Option[], value: string) {
-  return options.find((option) => option.value === value)?.label ?? value;
 }
 
 function formatHeightImperial(value: string) {
@@ -1731,6 +1640,12 @@ export function AssessmentFlow({
   const displayedStepStartedAt = useRef(0);
   const pollFailureCount = useRef(0);
   const isCompact = useCompactAssessment();
+
+  const clearProcessingStatus = useCallback(() => {
+    displayedStepStartedAt.current = 0;
+    setDisplayedProcessingStatus(null);
+    setProcessingStatus(null);
+  }, []);
 
   const completed = countRequired(answers);
   const requiredTotal = requiredGroups.length;
@@ -2652,7 +2567,7 @@ export function AssessmentFlow({
     setExampleError("");
     setShowPlans(false);
     setShowExampleExit(false);
-    setProcessingStatus(null);
+    clearProcessingStatus();
     setCapturedStatus(null);
     setExampleRequest(null);
     captureInFlight.current = null;
@@ -2726,7 +2641,7 @@ export function AssessmentFlow({
     setExampleError("");
     setShowPlans(false);
     setShowExampleExit(false);
-    setProcessingStatus(null);
+    clearProcessingStatus();
     setExampleRequest(null);
   }
 
@@ -2822,7 +2737,7 @@ export function AssessmentFlow({
       });
 
     } catch {
-      setProcessingStatus(null);
+      clearProcessingStatus();
       setProcessingError(ui.processingError);
     }
   }
@@ -2938,7 +2853,7 @@ export function AssessmentFlow({
       setProcessingStatus(status);
     } catch {
       setProcessingError(ui.processingError);
-      setProcessingStatus(null);
+      clearProcessingStatus();
     }
   }
 
@@ -3013,20 +2928,27 @@ export function AssessmentFlow({
   useEffect(() => {
     if (!processingStatus) {
       displayedStepStartedAt.current = 0;
-      setDisplayedProcessingStatus(null);
       return;
     }
 
     if (processingStatus.status === "failed") {
-      displayedStepStartedAt.current = Date.now();
-      setDisplayedProcessingStatus(processingStatus);
-      return;
+      const timeout = window.setTimeout(() => {
+        displayedStepStartedAt.current = Date.now();
+        setDisplayedProcessingStatus(processingStatus);
+      }, 0);
+
+      return () => window.clearTimeout(timeout);
     }
 
     if (!displayedProcessingStatus) {
-      displayedStepStartedAt.current = Date.now();
-      setDisplayedProcessingStatus(getPacedProcessingStatus(processingStatus, 0));
-      return;
+      const timeout = window.setTimeout(() => {
+        displayedStepStartedAt.current = Date.now();
+        setDisplayedProcessingStatus(
+          getPacedProcessingStatus(processingStatus, 0)
+        );
+      }, 0);
+
+      return () => window.clearTimeout(timeout);
     }
 
     const displayedStepIndex = getProcessingStepIndex(displayedProcessingStatus);
@@ -3076,13 +2998,13 @@ export function AssessmentFlow({
 
     const timeout = window.setTimeout(() => {
       if (processingMode === "score") {
-        setProcessingStatus(null);
+        clearProcessingStatus();
         setShowPlans(true);
         return;
       }
 
       if (processingMode === "example") {
-        setProcessingStatus(null);
+        clearProcessingStatus();
         setShowExampleExit(true);
         return;
       }
@@ -3095,7 +3017,13 @@ export function AssessmentFlow({
     }, PROCESSING_COMPLETE_HOLD_MS);
 
     return () => window.clearTimeout(timeout);
-  }, [displayedProcessingStatus, locale, processingMode, router]);
+  }, [
+    clearProcessingStatus,
+    displayedProcessingStatus,
+    locale,
+    processingMode,
+    router
+  ]);
 
   useEffect(() => {
     if (!processingStatus?.planId) {
@@ -4070,6 +3998,7 @@ function ExampleExitPanel({
               </blockquote>
             </div>
             <div className="col-start-1 row-start-1 w-16 sm:w-20 lg:row-span-4 lg:w-72">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 alt=""
                 src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=576&h=576&q=80"
@@ -4139,6 +4068,7 @@ function ExampleExitPanel({
                 >
                   <div className="rounded-lg bg-white p-2 shadow-sm ring-1 ring-foreground/10">
                     {/* Dynamic API URLs with query strings are intentionally not sent through next/image. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       alt={`${content.chatQrAlt}: ${channel.name}`}
                       className="size-36"
