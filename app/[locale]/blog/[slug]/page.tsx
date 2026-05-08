@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BlogArticle } from "@/components/blog-article";
 import { SiteFooter } from "@/components/site-footer";
+import { ServiceIssue } from "@/components/service-issue";
 import { TitleBar } from "@/components/title-bar";
 import { getPublishedBlogPost } from "@/lib/blog";
+import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 
 type BlogArticlePageProps = Readonly<{
@@ -57,6 +59,12 @@ function getArticleCta(locale: Locale) {
 export async function generateMetadata({
   params
 }: BlogArticlePageProps): Promise<Metadata> {
+  const databaseReady = await checkDatabaseConnection();
+
+  if (!databaseReady) {
+    return {};
+  }
+
   const page = await getPagePost(params);
 
   if (!page) {
@@ -72,25 +80,47 @@ export async function generateMetadata({
 export default async function BlogArticlePage({
   params
 }: BlogArticlePageProps) {
-  const page = await getPagePost(params);
+  const { locale: rawLocale, slug } = await params;
 
-  if (!page) {
+  if (!isLocale(rawLocale)) {
     notFound();
   }
 
-  const dictionary = getDictionary(page.locale);
-  const currentPath = `/${page.locale}/blog/${page.post.slug}`;
+  const locale: Locale = rawLocale;
+  const dictionary = getDictionary(locale);
+  const currentPath = `/${locale}/blog/${slug}`;
+  const databaseReady = await checkDatabaseConnection();
+
+  if (!databaseReady) {
+    return (
+      <main className="flex min-h-screen flex-col bg-background text-foreground">
+        <TitleBar
+          currentLocale={locale}
+          currentPath={currentPath}
+          title={dictionary.hero.eyebrow}
+        />
+        <ServiceIssue href={currentPath} locale={locale} />
+        <SiteFooter content={dictionary.footer} locale={locale} />
+      </main>
+    );
+  }
+
+  const post = await getPublishedBlogPost(locale, slug);
+
+  if (!post) {
+    notFound();
+  }
 
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
       <TitleBar
-        currentLocale={page.locale}
+        currentLocale={locale}
         currentPath={currentPath}
         title={dictionary.hero.eyebrow}
       />
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
-        <BlogArticle cta={getArticleCta(page.locale)} post={page.post} />
-        <SiteFooter content={dictionary.footer} locale={page.locale} />
+        <BlogArticle cta={getArticleCta(locale)} post={post} />
+        <SiteFooter content={dictionary.footer} locale={locale} />
       </div>
     </main>
   );
