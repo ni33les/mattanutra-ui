@@ -103,6 +103,8 @@ function userPrompt({
               en: "short English daily dose string",
               th: "short Thai daily dose string"
             },
+            effectivenessRank:
+              "integer starting at 1; 1 is the most effective/highest-impact suggestion for this person",
             id: "stable kebab-case identifier",
             rationale: {
               en: "one English sentence explaining the wellness benefit in plain language",
@@ -120,7 +122,9 @@ function userPrompt({
         "Return a JSON object with exactly one top-level key: supplementBreakdown.",
         "supplementBreakdown must contain 6 to 18 items.",
         "Every supplementBreakdown array entry must be an object. Do not put plain strings in the array.",
-        "Every item must include id, category, supplement, dailyDose, status, and rationale.",
+        "Every item must include id, category, supplement, dailyDose, effectivenessRank, status, and rationale.",
+        "Set effectivenessRank as a unique integer from 1 to the number of items, where 1 is the most effective/highest-impact supplement suggestion for this person's assessment.",
+        "Order supplementBreakdown by effectivenessRank ascending.",
         "supplement, dailyDose, and rationale must each be localized objects with exactly en and th string values.",
         "Write the English fields for a consumer wellness audience, and the Thai fields as natural Thai, not transliterated English unless the ingredient name is normally used that way.",
         "Keep category and status as canonical English values for internal processing.",
@@ -143,6 +147,7 @@ function retryPrompt(errors: string[]) {
     "Return corrected JSON only, matching the required contract.",
     "Do not include markdown or prose.",
     "Every supplementBreakdown item must be a JSON object, not a string.",
+    "Every item must include a unique integer effectivenessRank where 1 is highest impact.",
     "If a field is uncertain, set status to review and still return valid JSON.",
     "Validation errors:",
     ...errors.map((error) => `- ${error}`)
@@ -340,6 +345,7 @@ function validateFormulation(value: unknown) {
   }
 
   const seenIds = new Set<string>();
+  const seenRanks = new Set<number>();
 
   rawItems.forEach((item, index) => {
     if (typeof item === "string") {
@@ -359,6 +365,8 @@ function validateFormulation(value: unknown) {
     const category = readText(item, "category") || "Targeted";
     const supplement = readLocalizedText(item, "supplement", index, errors);
     const dailyDose = readLocalizedText(item, "dailyDose", index, errors);
+    const rawRank = Number(item.effectivenessRank);
+    const effectivenessRank = Number.isInteger(rawRank) ? rawRank : 0;
     const rawStatus = readText(item, "status");
     const status = VALID_STATUSES.has(rawStatus as FormulationStatus)
       ? rawStatus
@@ -375,9 +383,22 @@ function validateFormulation(value: unknown) {
       seenIds.add(id);
     }
 
+    if (effectivenessRank < 1 || effectivenessRank > rawItems.length) {
+      errors.push(
+        `supplementBreakdown[${index}].effectivenessRank must be an integer from 1 to ${rawItems.length}`
+      );
+    } else if (seenRanks.has(effectivenessRank)) {
+      errors.push(
+        `supplementBreakdown[${index}].effectivenessRank is duplicated`
+      );
+    } else {
+      seenRanks.add(effectivenessRank);
+    }
+
     supplementBreakdown.push({
       category,
       dailyDose,
+      effectivenessRank,
       id,
       rationale,
       status: status as FormulationStatus,
@@ -391,7 +412,11 @@ function validateFormulation(value: unknown) {
 
   return {
     errors,
-    formulation: { supplementBreakdown } satisfies FormulationBlueprint
+    formulation: {
+      supplementBreakdown: [...supplementBreakdown].sort(
+        (a, b) => a.effectivenessRank - b.effectivenessRank
+      )
+    } satisfies FormulationBlueprint
   };
 }
 

@@ -10,6 +10,7 @@ export type LocalizedText =
 export type FormulationIngredient = {
   category: string;
   dailyDose: LocalizedText;
+  effectivenessRank: number;
   id: string;
   rationale: LocalizedText;
   status: FormulationStatus;

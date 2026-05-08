@@ -20,6 +20,15 @@ function localize(value: LocalizedText, locale: Locale) {
   return value[locale] || value.en || value.th || "";
 }
 
+function effectivenessRank(
+  item: FormulationBlueprint["supplementBreakdown"][number],
+  index: number
+) {
+  return Number.isFinite(item.effectivenessRank) && item.effectivenessRank > 0
+    ? item.effectivenessRank
+    : index + 1;
+}
+
 export function buildExampleEmailHtml({
   formulation,
   healthScore,
@@ -33,7 +42,14 @@ export function buildExampleEmailHtml({
   planId: string;
   unsubscribeToken?: string | null;
 }>) {
-  const previewItems = formulation.supplementBreakdown.slice(0, 3);
+  const previewItems = formulation.supplementBreakdown
+    .map((item, index) => ({
+      item,
+      rank: effectivenessRank(item, index)
+    }))
+    .sort((a, b) => a.rank - b.rank)
+    .map(({ item }) => item)
+    .slice(0, 3);
   const labels =
     locale === "th"
       ? {
