@@ -17,13 +17,13 @@ It intentionally avoids internal process detail.
 MattaNutra currently has the core shape of a commercial wellness journey:
 
 1. A visitor can start an anonymous assessment.
-2. The assessment produces a HealthScore.
+2. The assessment produces a spreadsheet-aligned HealthScore; the scoring formula is now implemented and verified against workbook samples.
 3. The HealthScore creates a moment to choose between a free email preview, Precision Plan, or Pro Plan.
 4. A paid user can receive a full personalised nutritional formulation.
 5. A free user can receive a smaller email preview and be invited back.
 6. Users can be invited into chat and future reassessment.
 
-The strongest parts of the current journey are the anonymous assessment, HealthScore, plan gate, formulation page, free email path, and 60-day reassessment concept.
+The strongest parts of the current journey are the anonymous assessment, completed spreadsheet-backed HealthScore formula, plan gate, formulation page, free email path, and 60-day reassessment concept.
 
 The weakest commercial points are payment activation, proof of product trust, live advisor value, product matching, and clear safety governance. These are the areas most likely to block conversion or create risk as traffic grows.
 
@@ -36,7 +36,7 @@ MattaNutra should be read as a trust-building funnel, not only as an assessment 
 | Awareness | "Is this relevant to me?" | Get the right visitors to start | Clear wellness and personalisation promise, plus live blog infrastructure | Need stronger proof, content cadence, and distribution | Use specific, relatable use cases: energy, longevity, sleep, budget-conscious guidance |
 | Assessment start | "Will this waste my time?" | Reduce friction and fear | Anonymous, structured, low-pressure | Risk of feeling like a long form | Show time expectation, privacy reassurance, and progress clearly |
 | Assessment completion | "Was this worth doing?" | Create anticipation | Good data capture | Some optional detail may feel cognitively heavy | Make optional precision feel like a benefit, not homework |
-| HealthScore | "Did it understand me?" | Deliver pre-payment value | Strong conversion moment already exists | Needs sharper insight hierarchy | Lead with the one insight most likely to make the user care |
+| HealthScore | "Did it understand me?" | Deliver pre-payment value | HealthScore formula is done, spreadsheet-backed, and verified against sample workbook outcomes | Needs sharper insight hierarchy | Lead with the one insight most likely to make the user care |
 | Free preview | "Can I try before buying?" | Capture lead and nurture | Good fallback path | The free value boundary is not yet defined | Make the preview useful but clearly incomplete |
 | Precision Plan | "Is this worth a one-time payment?" | Convert intent into revenue | Clear one-time product | Payment not active; product value needs proof | Show exact unlocks: formulation, dose logic, product guidance, reassessment |
 | Pro Plan | "Why pay monthly?" | Create recurring revenue | Strong idea: ongoing advisor | Promise is still abstract | Show daily-life examples: travel, meals, sleep changes, training days |
@@ -80,7 +80,7 @@ flowchart TB
 | Landing page | "Is this for someone like me?" | Done | The brand and CTA exist, but the page must quickly prove personalisation and trust. |
 | Assessment start | "Is this safe and worth my time?" | Done | The anonymous positioning helps. The business should keep the assessment short enough to avoid fatigue. |
 | Assessment completion | "Have I given enough useful information?" | Done | The flow captures good data, but formal sanity and high-risk checks are still incomplete. |
-| HealthScore | "Did MattaNutra understand me?" | Done | This is the key pre-payment value moment. It should be sharpened into the strongest conversion asset. |
+| HealthScore | "Did MattaNutra understand me?" | Done | The HealthScore formula is complete. It follows the business workbook: six domain point totals, raw maximum 95, and final score clamped from 8 to 96. It should still be sharpened into the strongest conversion asset. |
 | Free preview | "Can I get value without paying yet?" | Done | Good lead capture path. The business must decide exactly how generous the free preview should be. |
 | Paid plan choice | "Is the full plan worth paying for?" | Partial | The plans exist, but payment is not live and the value difference between Precision and Pro needs sharper proof. |
 | Full formulation | "Is this specific, practical, and safe?" | Done | The result exists. The business should continue simplifying the explanation of benefits, dose, timing, and practical use. |
@@ -99,6 +99,22 @@ flowchart TB
 | Make product recommendations trustworthy | Supports affiliate conversion | Reduces buyer anxiety | Show quality criteria, coverage, form, and price confidence |
 | Connect chat with the plan | Increases engagement after result | Avoids making the user repeat themselves | Make the plan reference visible and explain what the advisor can do with it |
 | Make safety visible but calm | Builds trust without scaring users | Protects the user and brand | Use plain wellness disclaimers and stop-condition messaging where needed |
+
+## HealthScore Model
+
+Implementation status: Done.
+
+The live HealthScore calculation is aligned with the MattaNutra HealthScore workbook.
+
+Business interpretation:
+
+- The score is based on six domains: Sleep & Recovery, Activity & Fitness, Nutrition & Diet, Stress & Recovery, Biomarkers & Labs, and Health Habits.
+- Each domain contributes explicit points rather than a loose weighted percentage.
+- The raw maximum is 95 points.
+- The final score is `ROUND(raw points / 95 x 100)`.
+- The displayed score is clamped between 8 and 96.
+- Score bands are: Excellent at 80+, Good at 65-79, Fair at 50-64, and Needs Attention below 50.
+- The current implementation has been checked against sampled workbook outcomes and is considered complete for the current product flow.
 
 ## Current Commercial Flow
 

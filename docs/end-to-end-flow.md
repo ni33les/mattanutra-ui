@@ -4,7 +4,7 @@ flowchart TB
   B --> C["Anonymous assessment"]
   C --> D["Assessment saved"]
   D --> E["Required answer check"]
-  E --> F["HealthScore calculation"]
+  E --> F["Workbook-aligned HealthScore formula complete"]
   E --> E1["Formal sanity checks"]
   E1 -->|Fixable| G["Correct answers"]
   G --> E1

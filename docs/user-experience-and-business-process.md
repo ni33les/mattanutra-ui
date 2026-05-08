@@ -36,7 +36,7 @@ David is not a quick impulse buyer. He is likely to convert if the product reduc
 | --- | --- | --- | --- |
 | Landing page | "This might be useful, but is it credible?" | Show personalisation, anonymity, and practical outcomes quickly | He leaves before starting |
 | Assessment | "This is a lot of questions. Is it worth it?" | Keep progress visible and questions easy to answer | He abandons before the HealthScore |
-| HealthScore | "Okay, it did understand something about me." | Show one or two specific insights that feel personal | The score feels decorative rather than valuable |
+| HealthScore | "Okay, it did understand something about me." | Show one or two specific insights from the spreadsheet-backed score model | The score feels accurate but not yet emotionally persuasive |
 | Free preview | "I am not paying yet, but I will give an email." | Make the free plan feel useful and low-risk | He gives email but never returns |
 | Precision | "I might pay once if this saves me research time." | Show clear one-time value and trusted product guidance | He delays because product trust is unclear |
 | Pro | "I would subscribe only if this helps me day to day." | Make advisor use cases concrete | Pro feels like a vague upsell |
@@ -52,6 +52,14 @@ David is not a quick impulse buyer. He is likely to convert if the product reduc
 - Give him an easy fallback if he is not ready to pay.
 - Use follow-up and chat to keep the relationship alive after the first decision.
 
+## HealthScore Basis
+
+Implementation status: Done.
+
+The HealthScore is now generated from the MattaNutra scoring workbook rather than a generic weighted estimate. It uses six domain point totals, scales the raw score against a 95-point maximum, and clamps the final display score between 8 and 96. The scoring formula has been checked against sampled workbook outcomes, making it consistent enough for business review and future reassessment comparisons.
+
+For David, this matters because the number should feel like a structured summary of his assessment, not a decorative quiz result. The remaining experience challenge is to translate the score into one or two insights that make him want to continue.
+
 ## Happy Flow Overview
 
 ```mermaid
@@ -62,7 +70,7 @@ flowchart TB
   D --> E["Adds optional precision details if motivated"]
   E --> F["Assessment saved"]
   F --> G["Required answer check"]
-  G --> H["HealthScore generated"]
+  G --> H["Workbook-aligned HealthScore generated"]
   G --> G1["Formal sanity checks"]
   H --> I["HealthScore gate"]
   I --> J{"David chooses next step"}
