@@ -50,13 +50,14 @@ flowchart TB
   AK --> AL["New formulation version"]
   AL --> AD
   AL --> AM["Reporting"]
-  B --> AN["Blog content"]
+  B --> AN["Blog content and testimonials"]
+  AN --> AP["OpenClaw content distribution"]
 
   classDef done fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:2px;
   classDef partial fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
   classDef todo fill:#ffffff,stroke:#94a3b8,color:#334155,stroke-width:1px;
 
-  class A,B,C,D,E,F,I,J,J1,J2,K,L,M,N,N0,N1,N3,O,Q,S,U,W,AF,AG,AH,AI,AJ,AK,AL,AO done;
-  class E1,G,T,V,X,Y,AB,AD,AE partial;
-  class H,P,R,Z,AA,AC,AM,AN todo;
+  class A,B,C,D,E,F,I,J,J1,J2,K,L,M,N,N0,N1,N3,O,Q,S,U,W,AF,AG,AH,AI,AJ,AK,AL,AN,AO done;
+  class E1,G,T,V,X,Y,AB,AD,AE,AP partial;
+  class H,P,R,Z,AA,AC,AM todo;
 ```

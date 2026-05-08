@@ -33,7 +33,7 @@ MattaNutra should be read as a trust-building funnel, not only as an assessment 
 
 | Funnel Stage | Customer Mindset | Business Goal | Current Strength | Main Weakness | Suggested Tune |
 | --- | --- | --- | --- | --- | --- |
-| Awareness | "Is this relevant to me?" | Get the right visitors to start | Clear wellness and personalisation promise | Need stronger proof and education content | Use specific, relatable use cases: energy, longevity, sleep, budget-conscious guidance |
+| Awareness | "Is this relevant to me?" | Get the right visitors to start | Clear wellness and personalisation promise, plus live blog infrastructure | Need stronger proof, content cadence, and distribution | Use specific, relatable use cases: energy, longevity, sleep, budget-conscious guidance |
 | Assessment start | "Will this waste my time?" | Reduce friction and fear | Anonymous, structured, low-pressure | Risk of feeling like a long form | Show time expectation, privacy reassurance, and progress clearly |
 | Assessment completion | "Was this worth doing?" | Create anticipation | Good data capture | Some optional detail may feel cognitively heavy | Make optional precision feel like a benefit, not homework |
 | HealthScore | "Did it understand me?" | Deliver pre-payment value | Strong conversion moment already exists | Needs sharper insight hierarchy | Lead with the one insight most likely to make the user care |
@@ -215,7 +215,7 @@ Business decision needed:
 | Pro promise is vague | Recurring revenue needs clear ongoing value | Users may choose Precision instead |
 | Advisor handoff is not seamless | Chat should feel personal and connected to the plan | Users may drop before engagement |
 | Follow-up cadence is undefined | Leads need nurturing after the free preview | Email capture may not convert |
-| Blog/content acquisition is not live | The site needs education and search traffic | Paid traffic may carry too much burden |
+| Content operations are immature | The blog platform exists, but publishing cadence and distribution are not yet proven | Paid traffic may carry too much burden |
 
 ## Funnel Metrics to Watch
 
@@ -308,7 +308,7 @@ Business questions:
 6. Make one chat channel work end-to-end.
 7. Define the Pro service promise.
 8. Build the first follow-up sequence after free preview.
-9. Add blog and educational content for acquisition.
+9. Build a repeatable blog, testimonial, and social distribution cadence.
 10. Add funnel reporting so the team can see where customers drop.
 
 ## One-Line Business Process
