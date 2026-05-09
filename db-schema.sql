@@ -151,6 +151,58 @@ create index if not exists assessments_plan_idx
 create index if not exists assessments_answers_gin_idx
   on public.assessments using gin (answers jsonb_path_ops);
 
+create table if not exists public.ai_response_cache (
+  cache_key text primary key,
+  cache_type text not null,
+  model text not null,
+  prompt_version text not null,
+  response jsonb not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.ai_response_cache
+  add column if not exists cache_type text,
+  add column if not exists model text,
+  add column if not exists prompt_version text,
+  add column if not exists response jsonb default '{}'::jsonb,
+  add column if not exists expires_at timestamptz default now(),
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+update public.ai_response_cache
+set
+  cache_type = coalesce(cache_type, 'unknown'),
+  model = coalesce(model, 'unknown'),
+  prompt_version = coalesce(prompt_version, 'v1'),
+  response = coalesce(response, '{}'::jsonb),
+  expires_at = coalesce(expires_at, now()),
+  created_at = coalesce(created_at, now()),
+  updated_at = coalesce(updated_at, now())
+where cache_type is null
+  or model is null
+  or prompt_version is null
+  or response is null
+  or expires_at is null
+  or created_at is null
+  or updated_at is null;
+
+alter table public.ai_response_cache
+  alter column cache_type set not null,
+  alter column model set not null,
+  alter column prompt_version set not null,
+  alter column response set default '{}'::jsonb,
+  alter column response set not null,
+  alter column expires_at set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null;
+
+create index if not exists ai_response_cache_type_expiry_idx
+  on public.ai_response_cache (cache_type, expires_at desc);
+
 create table if not exists public.jobs (
   id uuid primary key,
   job_type text not null,
@@ -2006,6 +2058,12 @@ begin
     execute 'alter table public.assessments owner to mn';
   exception when others then
     raise notice 'Skipping assessments owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter table public.ai_response_cache owner to mn';
+  exception when others then
+    raise notice 'Skipping ai_response_cache owner change: %', sqlerrm;
   end;
 
   begin

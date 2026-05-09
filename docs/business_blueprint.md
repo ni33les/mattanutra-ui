@@ -1,204 +1,283 @@
 # MattaNutra Business Blueprint
 
-This document explains the current MattaNutra business flows in plain business language. It focuses on how visitors become leads, customers, repeat users, and potential long-term advisor clients.
+This is the single business-facing blueprint for MattaNutra. It explains what the product does today, how the sales funnels work, what is measured, and what remains to be built.
 
-## Status Legend
+## Business Model
 
-| Status | Meaning |
-| --- | --- |
-| Done | Working in the current product |
-| Partial | Built, but incomplete, manually dependent, or not yet proven commercially |
-| Not Done | Not yet live |
+MattaNutra earns trust through an anonymous wellness assessment and HealthScore, then converts users into one of three paths:
 
-## Business Model in One Line
-
-MattaNutra uses an anonymous wellness assessment and HealthScore to earn trust, then converts users into either a free email lead, a one-time Precision Plan buyer, or an ongoing Pro advisor customer.
-
-## Offer Ladder
-
-| Offer | Customer Type | Business Purpose | Current Status |
+| Path | User Intent | Business Purpose | Status |
 | --- | --- | --- | --- |
-| Free HealthScore | Curious visitor | Create trust and show personal relevance | Done |
-| Free 3-point email plan | Skeptical lead | Capture email and nurture toward purchase | Done |
-| Precision Plan | One-time buyer | Sell a complete personalised nutritional formulation | Partial: plan exists, payment not live |
-| Pro Plan | Ongoing customer | Sell continuing AI advisor support and reassessment | Partial: offer exists, advisor workflow not fully live |
-| Product guidance | Buyer ready to act | Support marketplace or affiliate revenue | Partial: results section exists, live matching not active |
-| Blog and testimonials | Marketing audience | Generate awareness, trust, and organic/social traffic | Partial: platform and APIs exist, content cadence not proven |
+| Free HealthScore | "Show me something personal before I trust this." | Build trust and demonstrate relevance | Done |
+| Free 3-point email plan | "I am interested, but not ready to pay." | Capture leads and nurture later conversion | Done |
+| Precision Plan | "I want a complete answer now." | One-time paid personalised nutrition plan | Partial: offer exists, payment pending |
+| Pro Plan | "I want ongoing support." | Recurring advisor relationship | Partial: offer exists, advisor handoff pending |
+| Product guidance | "What should I actually buy?" | Future affiliate revenue and customer convenience | Partial: results area exists, matching not live |
+| Blog and testimonials | "Can I learn and trust the brand?" | Marketing engine for paid, social, and organic traffic | Partial: platform live, cadence pending |
 
 ## Current Funnel
 
 ```mermaid
 flowchart TB
-  A["Visitor reaches MattaNutra"] --> B["Reads wellness promise"]
-  B --> C["Starts anonymous assessment"]
-  C --> D["Completes foundation and optional precision answers"]
-  D --> E["Backend saves assessment"]
-  E --> F["HealthScore calculated from workbook-aligned model"]
-  F --> G["AI adds score overview and personalised plan-gate copy"]
-  G --> H["HealthScore page"]
-  H --> I{"User chooses path"}
-  I -->|Not ready to pay| J["Free 3-point email plan"]
-  I -->|Wants full one-time answer| K["Precision Plan"]
-  I -->|Wants ongoing help| L["Pro Plan"]
-  J --> M["Email relationship and reassessment reminder"]
-  K --> N["Full formulation page"]
-  L --> O["Full formulation plus advisor promise"]
-  N --> P["Product guidance and chat options"]
-  O --> Q["Ongoing advisor relationship"]
-  M --> R["60-day reassessment"]
-  P --> R
-  Q --> R
+  A["Ad, social, blog, direct, or referral visit"] --> B["Landing page or article"]
+  B --> C["Anonymous assessment"]
+  C --> D["Assessment saved"]
+  D --> E["HealthScore generated"]
+  E --> F["AI-personalised score overview and sales copy"]
+  F --> G["Plan gate"]
+  G -->|Free| H["Free 3-point plan by email"]
+  G -->|Precision| I["Precision Plan"]
+  G -->|Pro| J["Pro Plan"]
+  H --> K["Email preview sent"]
+  H --> L["60-day reassessment reminder"]
+  I --> M["Full formulation prepared"]
+  J --> M
+  M --> N["Formulation page"]
+  N --> O["Chat continuation"]
+  N --> P["Product guidance"]
+  L --> Q["Return reassessment"]
+  O --> Q
+  P --> Q
 
   classDef done fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:2px;
   classDef partial fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
   classDef todo fill:#ffffff,stroke:#94a3b8,color:#334155,stroke-width:1px;
 
-  class A,B,C,D,E,F,G,H,I,J,M,R,N done;
-  class K,L,O,P,Q partial;
+  class A,B,C,D,E,F,G,H,K,L,M,N,Q done;
+  class I,J,O,P partial;
 ```
 
 ## What Works Now
 
-- The assessment can be completed anonymously without requiring name, phone, or address.
-- The HealthScore is generated on the backend and aligned to the business scoring workbook.
-- The HealthScore page now gives a score, domain snapshot, radar chart, and AI-written overview.
-- The plan gate can adapt its sales copy and three feature cards to the user profile.
-- The free email route captures a lead and can schedule recurring 60-day reassessment reminders.
-- SMTP email sending is wired in, including audit logging and unsubscribe handling.
-- The formulation page can display stored formulation data from the backend.
-- Blog posts and testimonials are database-driven.
-- Blog/testimonial/attestation management APIs are protected by `ADMIN_TOKEN` for OpenClaw or another admin system.
-- English and Thai flows exist.
+- Anonymous assessment in English and Thai.
+- Backend-owned HealthScore using the business workbook formula.
+- HealthScore page with score, six-domain snapshot, radar visualisation, and AI-generated overview.
+- AI-personalised plan-gate copy and three feature cards.
+- Separate AI paths: one shared Grok model with lighter reasoning for HealthScore/marketing copy and deeper reasoning for formulation generation.
+- HealthScore/marketing AI responses are cached for up to one week to reduce latency and cost.
+- Free email lead capture.
+- Free email sends the top three supplement suggestions from the actual generated formulation.
+- Recurring 60-day reassessment scheduling with unsubscribe.
+- Formulation jobs and worker queue.
+- Grok formulation generation with validation/retry pattern.
+- Formulation page renders stored backend data.
+- Blog and testimonial tables, pages, and protected admin APIs.
+- BPM tracking for funnel, campaign, affiliate, safety, error, email, chat, and formulation events.
 
-## What Still Needs Work
+## Main Gaps
 
-| Area | Why It Matters | Status |
+| Gap | Why It Matters | Suggested Next Step |
 | --- | --- | --- |
-| Payment | Revenue cannot be measured until users can pay | Not Done |
-| Product matching | Affiliate revenue depends on trusted product guidance | Partial |
-| Advisor chat handoff | Pro only works if the advisor can retrieve and use the plan context | Partial |
-| LINE deep link | Thai users are likely to prefer LINE, but plan handoff is not seamless | Partial |
-| Safety checks | Wellness trust depends on clear stop conditions and exclusions | Partial |
-| Funnel analytics | The business needs event data to optimize conversion | Not Done |
-| Content distribution | Blog infrastructure exists, but repeatable publishing and social distribution are not proven | Partial |
-| Paid reassessment contact | Paid users need a reliable email path if they do not use the free email option | Partial |
+| Payment activation | Cannot test revenue conversion yet | Wire Precision/Pro checkout once account is ready |
+| Admin dashboard | BPM data exists but business users need charts and review queues | Build sales dashboard first, then safety/admin panels |
+| Supplement governance | AI output needs hard business rules around approved doses and exclusions | Build whitelist, blacklist, dose/frequency, and interaction tables |
+| Product matching | Affiliate revenue depends on trusted products | Start with curated whitelist before marketplace automation |
+| Chat handoff | Pro needs a convincing ongoing service experience | Make one channel excellent first, likely LINE |
+| Human safety review | Flagged suggestions need an operational decision process | Add `human_review` jobs and admin review screens |
+| Follow-up nurture | Free users need more than one email | Define post-preview sequence |
 
-## Sales Funnel by Path
+## Sales Funnel Paths
 
 ### Free Path
 
-Business goal: capture skeptical users without forcing payment.
+Goal: convert skeptical visitors into known leads without forcing a payment decision.
 
-Current customer promise:
+Current flow:
 
-- Complete the assessment.
-- Receive a HealthScore.
-- Enter email to receive a free 3-point nutrition plan.
-- Optionally receive a free 60-day reassessment reminder.
+1. User completes assessment.
+2. User sees HealthScore.
+3. User chooses free 3-point email plan.
+4. System generates the full formulation but emails only the top three supplement suggestions.
+5. User can opt into recurring 60-day reassessment.
 
 What is good:
 
-- Low-risk and generous enough to keep hesitant users in the funnel.
-- Email capture creates a relationship even when the user does not buy.
-- The 60-day reassessment creates a reason to return.
+- Low friction.
+- Gives real value.
+- Creates a reason to return.
 
-Remaining concerns:
+Risk:
 
-- The business must keep the free plan useful, but not so complete that Precision loses value.
-- The post-free-email page still needs a clearer business purpose: upgrade, chat, education, testimonial proof, or all of these.
-- Follow-up after the first email is still light.
+- The free plan must be useful enough to build trust, but not so complete that Precision loses value.
 
 ### Precision Plan
 
-Business goal: convert users who want a complete one-time plan.
+Goal: one-time conversion for users who want a complete personalised nutritional plan.
 
-Current customer promise:
+Current promise:
 
-- Unlock the full personalised nutritional formulation.
-- Get more complete dose logic, timing, benefits, and product guidance.
-- Use the plan without subscribing.
+- Full nutritional formulation.
+- Doses, forms, timing, and rationale.
+- Product guidance area.
+- Reassessment prompt.
 
-What is good:
+Risk:
 
-- Strong fit for medium-budget, skeptical customers.
-- Easy to understand as a one-time product.
-- Full formulation is already a meaningful deliverable.
-
-Remaining concerns:
-
-- Payment is not live.
-- Product guidance needs stronger trust signals before it can drive affiliate behavior.
-- The difference between the free email and Precision must be very clear.
+- Payment is not live yet, so true conversion cannot be measured.
+- Product trust needs to be clear before recommendations become commercially important.
 
 ### Pro Plan
 
-Business goal: create recurring revenue through an ongoing specialist AI supplement advisor.
+Goal: recurring relationship through an AI supplement advisor.
 
-Current customer promise:
+Current promise:
 
 - Everything in Precision.
-- Ongoing support and refinement through chat.
-- Help adapting the plan to day-to-day needs.
+- Ongoing refinement and daily-life support.
+- Chat-based continuation.
 
-What is good:
+Risk:
 
-- The strategic idea is strong: the user does not just get a static list.
-- Chat fits the Thai/mobile-first customer behavior.
-- Reassessment creates natural recurring value.
+- The advisor needs concrete use cases: travel, changed sleep, meals out, training changes, new lab data, medication changes, and budget changes.
+- The chat platform must reliably associate the user with their plan.
 
-Remaining concerns:
+## BPM and Admin Dashboard
 
-- The Pro promise needs more concrete use cases: travel, poor sleep, changed training, meals out, new lab results.
-- The advisor must clearly know the user's plan and HealthScore.
-- LINE, WhatsApp, and Telegram handoffs should be made reliable, starting with one best channel.
+BPM is the measurement and alerting layer. It is not the operational workflow itself.
 
-## Marketing Capture Flow
+It captures:
+
+- `ray`: anonymous journey/session UUID.
+- UTM fields.
+- campaign IDs and campaign names.
+- promo codes.
+- affiliate IDs, refs, sub IDs, and click IDs.
+- referrer, source channel, source URL, landing page, device, browser, and OS.
+- page views and CTA clicks.
+- assessment, HealthScore, plan-gate, free-email, formulation, email, chat, product, reassessment, safety, and error events.
+- hashed email and hashed IP only; raw email/IP are not stored in BPM.
+
+Current wired examples:
+
+| Area | Events |
+| --- | --- |
+| Website | `home_viewed`, `home_hero_assessment_clicked`, `home_bottom_assessment_clicked` |
+| Blog | `blog_article_viewed`, `blog_card_clicked`, `blog_assessment_cta_clicked` |
+| Assessment | `assessment_viewed`, `assessment_started`, `assessment_submitted`, `assessment_captured` |
+| HealthScore | `healthscore_viewed`, `plan_gate_viewed` |
+| Plans | `plan_selected_clicked`, `plan_selected` |
+| Free email | `free_email_requested_clicked`, `free_email_requested`, `free_email_sent` |
+| Formulation | `formulation_requested`, `formulation_ready`, `free_example_formulation_ready` |
+| Reassessment | `reassessment_opted_in`, `reassessment_email_sent` |
+| Chat and affiliate | `chat_channel_clicked`, `marketplace_product_clicked` |
+| Errors | `assessment_api_error`, `free_email_request_error`, `worker_job_failed` |
+
+Admin dashboard should show:
+
+1. Traffic over selectable windows: 1h, 3h, 6h, 12h, 1d, 7d, 1m, 1y, all time.
+2. Funnel: visit, assessment start, HealthScore, free email, Precision, Pro.
+3. Campaign and affiliate source performance.
+4. Free email conversion and later upgrade.
+5. Chat channel clicks.
+6. Product/affiliate clicks.
+7. Safety and error alerts.
+8. Ray drill-down for one anonymous journey.
+9. Pending human-review jobs.
+
+## Supplement Governance
+
+This should be managed from the admin dashboard.
+
+### Whitelist
+
+The whitelist is the approved supplement catalogue. It should define:
+
+- supplement/ingredient name
+- form, such as capsule, powder, liquid
+- approved minimum dose
+- approved maximum dose
+- dose unit
+- frequency range
+- timing guidance
+- age/sex/pregnancy notes
+- evidence/source notes
+- whether it can be shown to users
+- whether it can be matched to products
+
+### Blacklist
+
+The blacklist blocks previously rejected supplements or unsafe dose patterns. It should define:
+
+- supplement/ingredient name
+- banned dose or dose range
+- banned frequency, where relevant
+- reason
+- severity
+- whether the ban is absolute or context-specific
+- reviewer/admin who made the decision
+
+### Interaction Rules
+
+Interaction rules should flag risks based on:
+
+- existing medications
+- existing conditions
+- pregnancy or breastfeeding
+- age ranges
+- high-risk lab values
+- duplicate supplementation
+- dose or frequency above approved limits
+
+### Human Review
+
+When a suggestion fails a hard safety check:
 
 ```mermaid
 flowchart TB
-  A["Blog article or social post"] --> B["Visitor reads useful wellness content"]
-  B --> C["CTA invites HealthScore assessment"]
-  C --> D["Assessment start"]
-  D --> E["HealthScore"]
-  E --> F{"Conversion decision"}
-  F -->|Email only| G["Free 3-point plan"]
-  F -->|Ready now| H["Precision or Pro"]
-  G --> I["Email nurture and 60-day reassessment"]
-  H --> J["Formulation and chat"]
-  I --> K["Return visit"]
-  J --> K
+  A["AI suggests supplement and dose"] --> B["Validator checks whitelist, blacklist, dose, frequency, and interactions"]
+  B -->|Pass| C["Continue formulation"]
+  B -->|Fail or uncertain| D["BPM safety alert"]
+  D --> E["Human-review job"]
+  E --> F["Admin decision"]
+  F -->|Accept| G["Continue with item"]
+  F -->|Reject| H["Remove item"]
+  F -->|Revise| I["Change dose or substitute"]
+  G --> J["Client informed if needed"]
+  H --> J
+  I --> J
 
   classDef done fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:2px;
   classDef partial fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
   classDef todo fill:#ffffff,stroke:#94a3b8,color:#334155,stroke-width:1px;
 
-  class A,B,C,D,E,F,G,I,K done;
-  class H,J partial;
+  class A,B,D partial;
+  class C done;
+  class E,F,G,H,I,J todo;
 ```
 
-The blog is not only educational. It is the top of the marketing engine. Articles should answer common wellness questions, build credibility, and direct readers into the assessment.
+The job queue should carry the actionable work item: `job_type = 'human_review'`.
 
-## Most Important Business Decisions
+The safety review record should carry the operational details: supplement, dose, rule, context, reviewer decision, and client notification state.
 
-1. Activate the payment path and decide which local payment methods matter most.
-2. Define the exact free plan boundary: what the user gets and what stays paid.
-3. Decide the strongest first Pro use cases.
-4. Choose one chat channel to make excellent before polishing all three.
-5. Define product trust criteria before leaning hard into affiliate revenue.
-6. Add funnel analytics so decisions are based on behavior rather than opinion.
-7. Decide what the post-free-email page should do next.
+## Content and Marketing Engine
 
-## Suggested Next Commercial Priorities
+Blog articles and testimonials are database-driven and can be managed by OpenClaw or another admin system using protected APIs.
 
-| Priority | Work | Reason |
-| --- | --- | --- |
-| 1 | Payment activation | Revenue testing is blocked until this works |
-| 2 | Funnel event tracking | The business needs to see where users drop |
-| 3 | Free email follow-up sequence | Captured leads need nurturing |
-| 4 | Product trust and matching | Needed for affiliate upside |
-| 5 | Pro advisor handoff | Needed to justify subscription |
-| 6 | Blog/social cadence | Needed to feed the funnel without relying only on paid traffic |
+Purpose:
 
-## Core Business Narrative
+- create trust before asking for assessment completion
+- support paid and social campaigns
+- give affiliate/social partners useful pages to share
+- educate without making medical claims
+- move readers into the HealthScore assessment
 
-MattaNutra should feel like the start of a relationship, not a supplement checkout. The product earns trust with an anonymous HealthScore, shows a practical next step, then lets the customer choose how much guidance they want: free preview, full one-time plan, or ongoing advisor support.
+Best use:
+
+- broad traffic to home page
+- problem-aware traffic to blog articles
+- high-intent traffic directly to assessment
+
+## Near-Term Build Sequence
+
+1. Admin dashboard: sales funnel, BPM charts, campaign/affiliate reporting.
+2. Supplement whitelist, blacklist, and interaction rules.
+3. Human-review jobs and admin review screens.
+4. Payment integration for Precision and Pro.
+5. Product matching against approved supplement/product whitelist.
+6. One excellent chat handoff, likely LINE first.
+7. Free email nurture sequence.
+8. Pro advisor use-case design.
+
+## One-Line Narrative
+
+MattaNutra turns anonymous wellness answers into a HealthScore, uses that score to start a personalised relationship, and then helps the user choose the right level of guidance: free preview, complete plan, or ongoing specialist advisor support.

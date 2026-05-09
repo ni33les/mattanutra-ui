@@ -6,6 +6,7 @@ type BpmAttribution = Readonly<{
   affiliateId?: string;
   affiliateRef?: string;
   affiliateSubId?: string;
+  browser?: string;
   campaignId?: string;
   campaignName?: string;
   clickId?: string;
@@ -223,6 +224,18 @@ function osName() {
   return "";
 }
 
+function browserName() {
+  const agent = navigator.userAgent.toLowerCase();
+
+  if (agent.includes("edg/")) return "edge";
+  if (agent.includes("opr/") || agent.includes("opera")) return "opera";
+  if (agent.includes("chrome/") || agent.includes("crios/")) return "chrome";
+  if (agent.includes("safari/") && !agent.includes("chrome/")) return "safari";
+  if (agent.includes("firefox/") || agent.includes("fxios/")) return "firefox";
+
+  return "";
+}
+
 function currentAttribution(): BpmAttribution {
   const params = new URLSearchParams(window.location.search);
   const referrer = document.referrer || "";
@@ -244,6 +257,7 @@ function currentAttribution(): BpmAttribution {
     affiliateId,
     affiliateRef,
     affiliateSubId: searchParam(params, ["affiliate_sub_id", "sub_id"]),
+    browser: browserName(),
     campaignId: searchParam(params, ["campaign_id"]),
     campaignName: searchParam(params, ["campaign_name", "campaign"]),
     clickId,
@@ -287,6 +301,7 @@ export function getBpmAttribution() {
       return {
         ...JSON.parse(stored),
         deviceType: deviceType(),
+        browser: browserName(),
         os: osName(),
         path: window.location.pathname,
         route: window.location.pathname,

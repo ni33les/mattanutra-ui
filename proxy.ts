@@ -71,6 +71,7 @@ export function proxy(request: NextRequest) {
 
   if (
     pathname.startsWith("/_next") ||
+    pathname.startsWith("/admin") ||
     pathname.startsWith("/api") ||
     publicFile.test(pathname)
   ) {
@@ -97,5 +98,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next|api|.*\\..*).*)"]
+  matcher: ["/((?!_next|admin|api|.*\\..*).*)"]
 };

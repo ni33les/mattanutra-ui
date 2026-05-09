@@ -1252,6 +1252,27 @@ type ProcessingStatus = Readonly<{
 
 const PROCESSING_STEP_MIN_MS = 1000;
 const PROCESSING_COMPLETE_HOLD_MS = 1000;
+const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {}
+) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(
+    () => controller.abort(),
+    ASSESSMENT_REQUEST_TIMEOUT_MS
+  );
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal
+    });
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
 
 function getProcessingStepIndex(status: ProcessingStatus) {
   const failedIndex = status.steps.findIndex((step) => step.state === "failed");
@@ -2888,7 +2909,7 @@ export function AssessmentFlow({
     captureInFlight.current = (async () => {
       try {
         const response = returningPlanId
-          ? await fetch(
+          ? await fetchWithTimeout(
               `/api/assessment/${encodeURIComponent(returningPlanId)}`,
               {
                 body: JSON.stringify({
@@ -2904,7 +2925,7 @@ export function AssessmentFlow({
                 method: "PATCH"
               }
             )
-          : await fetch("/api/assessment", {
+          : await fetchWithTimeout("/api/assessment", {
               body: JSON.stringify({
                 answers: answerPayload,
                 bpm: getBpmPayload(),
@@ -2959,20 +2980,23 @@ export function AssessmentFlow({
         ? await captureInFlight.current
         : capturedStatus ?? (await captureAssessment());
       const response = captured?.planId
-        ? await fetch(`/api/assessment/${encodeURIComponent(captured.planId)}`, {
-            body: JSON.stringify({
-              answers,
-              bpm: getBpmPayload(),
-              locale,
-              plan: planId
-            }),
-            cache: "no-store",
-            headers: {
-              "content-type": "application/json"
-            },
-            method: "PATCH"
-          })
-        : await fetch("/api/assessment", {
+        ? await fetchWithTimeout(
+            `/api/assessment/${encodeURIComponent(captured.planId)}`,
+            {
+              body: JSON.stringify({
+                answers,
+                bpm: getBpmPayload(),
+                locale,
+                plan: planId
+              }),
+              cache: "no-store",
+              headers: {
+                "content-type": "application/json"
+              },
+              method: "PATCH"
+            }
+          )
+        : await fetchWithTimeout("/api/assessment", {
             body: JSON.stringify({
               answers,
               bpm: getBpmPayload(),
@@ -3033,16 +3057,16 @@ export function AssessmentFlow({
         throw new Error("Unable to capture assessment before example request");
       }
 
-      const response = await fetch(
-          `/api/assessment/${encodeURIComponent(captured.planId)}/example`,
-          {
-            body: JSON.stringify({
-              bpm: getBpmPayload(),
-              email,
-              includeReassessment:
-                includeExampleReassessment && !reassessmentAlreadyOptedIn,
-              locale
-            }),
+      const response = await fetchWithTimeout(
+        `/api/assessment/${encodeURIComponent(captured.planId)}/example`,
+        {
+          body: JSON.stringify({
+            bpm: getBpmPayload(),
+            email,
+            includeReassessment:
+              includeExampleReassessment && !reassessmentAlreadyOptedIn,
+            locale
+          }),
           cache: "no-store",
           headers: {
             "content-type": "application/json"
@@ -3209,7 +3233,7 @@ export function AssessmentFlow({
           processingMode === "example"
             ? `/api/assessment/${encodeURIComponent(planId)}/example?requestId=${encodeURIComponent(exampleRequest?.requestId ?? "")}`
             : `/api/assessment/${encodeURIComponent(planId)}`;
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           url,
           {
             cache: "no-store"

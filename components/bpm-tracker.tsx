@@ -32,8 +32,13 @@ function pageEventForPath(pathname: string) {
 export function BpmTracker({ locale }: Readonly<{ locale: Locale }>) {
   const pathname = usePathname();
   const lastPageKey = useRef("");
+  const isAdminPath = /^\/(en|th)\/admin(\/|$)/.test(pathname);
 
   useEffect(() => {
+    if (isAdminPath) {
+      return;
+    }
+
     const pageKey = `${pathname}${window.location.search}`;
 
     if (lastPageKey.current === pageKey) {
@@ -51,9 +56,13 @@ export function BpmTracker({ locale }: Readonly<{ locale: Locale }>) {
         title: document.title
       }
     });
-  }, [locale, pathname]);
+  }, [isAdminPath, locale, pathname]);
 
   useEffect(() => {
+    if (isAdminPath) {
+      return;
+    }
+
     function onTrackedClick(event: MouseEvent) {
       const target = event.target instanceof Element ? event.target : null;
       const element = target?.closest<HTMLElement>("[data-bpm-event]");
@@ -83,8 +92,7 @@ export function BpmTracker({ locale }: Readonly<{ locale: Locale }>) {
     return () => {
       document.removeEventListener("click", onTrackedClick, { capture: true });
     };
-  }, [locale]);
+  }, [isAdminPath, locale]);
 
   return null;
 }
-

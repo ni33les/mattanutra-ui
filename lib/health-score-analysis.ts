@@ -1,9 +1,11 @@
+import { createHash } from "crypto";
 import type {
   HealthScoreAdvice,
   HealthScorePaywallFeature,
   HealthScoreResult,
   LocalizedHealthScoreText
 } from "@/lib/health-score";
+import { getSql } from "@/lib/db";
 import type { Locale } from "@/lib/i18n";
 
 type XaiChatCompletion = {
@@ -18,9 +20,17 @@ type XaiChatCompletion = {
 };
 
 const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
-const DEFAULT_GROK_MODEL = "grok-4-1-fast-reasoning";
-const MAX_ATTEMPTS = 3;
-const REQUEST_TIMEOUT_MS = 120_000;
+const DEFAULT_GROK_MODEL = "grok-4.3";
+const DEFAULT_HEALTHSCORE_REASONING_EFFORT = "low";
+const DEFAULT_PROMPT_VERSION = "v2";
+const CACHE_TYPE = "healthscore_advice";
+const CACHE_TTL_DAYS = 7;
+const MAX_ATTEMPTS = 1;
+const REQUEST_TIMEOUT_MS = 15_000;
+
+const globalHealthScoreCache = globalThis as typeof globalThis & {
+  mattanutraHealthScoreCacheSchemaReady?: Promise<void>;
+};
 
 function configured(value: string | undefined) {
   return value?.trim() ?? "";
@@ -35,15 +45,21 @@ function grokConfig() {
 
   return {
     apiKey,
-    model: configured(process.env.GROK_MODEL) || DEFAULT_GROK_MODEL
+    model: configured(process.env.GROK_MODEL) || DEFAULT_GROK_MODEL,
+    promptVersion: DEFAULT_PROMPT_VERSION,
+    reasoningEffort:
+      configured(process.env.HEALTHSCORE_REASONING_EFFORT) ||
+      DEFAULT_HEALTHSCORE_REASONING_EFFORT
   };
 }
 
-function systemPrompt() {
+function systemPrompt(promptVersion: string) {
   return [
-    "You are MattaNutra's HealthScore interpretation engine.",
+    `You are MattaNutra's HealthScore interpretation and marketing engine ${promptVersion}.`,
     "This is wellness education, not medical advice, diagnosis, treatment, or a prescription.",
     "Use the completed assessment and HealthScore domains to write concise consumer-facing guidance.",
+    "Your commercial goal is to help the user feel understood and see why a paid personalised nutrition plan is worth unlocking.",
+    "Use honest conversion copywriting: specific value, low friction, calm confidence, and no hype.",
     "Do not recommend supplements, doses, products, brands, marketplace searches, or medical treatments.",
     "Do not make disease claims.",
     "Return JSON only. The first character must be { and the last character must be }."
@@ -61,7 +77,7 @@ function userPrompt({
 }>) {
   return JSON.stringify(
     {
-      assessment: answers,
+      assessment: compactAssessmentForAdvice(answers),
       contract: {
         advice: {
           overview: {
@@ -94,7 +110,7 @@ function userPrompt({
           }
         }
       },
-      healthScore,
+      healthScore: compactHealthScoreForAdvice(healthScore),
       instructions: [
         "Return exactly one top-level key: advice.",
         "advice must include overview, paywallEyebrow, paywallTitle, paywallSubtitle, and paywallFeatures.",
@@ -110,10 +126,17 @@ function userPrompt({
         "Keep paywallSubtitle under 160 characters in English.",
         "Keep each paywallFeatures name under 42 characters in English.",
         "Keep each paywallFeatures description under 150 characters in English.",
-        "The paywall copy should adapt the core offer: unlock a bespoke nutrition plan that shows what the user's body may need in the right amount.",
-        "The three feature cards should explain relevant product benefits, such as focus-domain prioritisation, right-amount guidance, routine support, lab awareness, or reassessment.",
+        "The paywall copy should be conversion-focused while staying calm, premium, and trustworthy.",
+        "Adapt the core offer: unlock a bespoke nutrition plan that shows what the user's body may need in the right amount.",
+        "Use the user's goals, budget, score band, and lowest domain to make the paid plan feel personally relevant.",
+        "If the profile suggests skepticism or budget sensitivity, make the copy practical, transparent, and value-led rather than luxurious.",
+        "The paywallTitle should be benefit-led, not generic. It should connect the user's HealthScore pattern to the value of a bespoke nutrition plan.",
+        "The paywallSubtitle should explain what paying unlocks: prioritised nutrition guidance, right amounts, timing/routine, and a clearer next step.",
+        "The three feature cards should each sell one concrete outcome: knowing what matters first, using the right amount, fitting the plan into daily life, tracking progress, or improving precision with labs/reassessment.",
         "Give practical lifestyle, behaviour, tracking, or lab-awareness guidance only.",
-        "Do not include supplement recommendations, product names, ingredient names, doses, links, prices, plan names, discounts, false urgency, fear-based copy, or medical instructions.",
+        "Do not include supplement recommendations, product names, ingredient names, doses, links, prices, discounts, false urgency, fear-based copy, or medical instructions.",
+        "Do not sound like a generic SaaS landing page.",
+        "Do not overpromise outcomes or imply that supplements will cure, treat, or prevent disease.",
         "Return both English and Thai regardless of the requested locale."
       ],
       locale
@@ -121,6 +144,62 @@ function userPrompt({
     null,
     2
   );
+}
+
+function compactHealthScoreForAdvice(healthScore: HealthScoreResult) {
+  return {
+    band: healthScore.band,
+    domains: healthScore.domains.map((domain) => ({
+      id: domain.id,
+      label: domain.label,
+      score: domain.score
+    })),
+    movers: healthScore.movers,
+    score: healthScore.score
+  };
+}
+
+function compactAssessmentForAdvice(answers: unknown) {
+  if (!isRecord(answers)) {
+    return {};
+  }
+
+  return {
+    activity: answers.activity,
+    age: answers.age,
+    alcohol: answers.alcohol,
+    budget: answers.budget,
+    coffee: answers.coffee,
+    conditions: answers.conditions,
+    country: answers.country,
+    diet: answers.diet,
+    energy: answers.energy,
+    family: answers.family,
+    fish: answers.fish,
+    goals: answers.goals,
+    gut: answers.gut,
+    heightCm: answers.heightCm,
+    labs: answers.labs,
+    lifestage: answers.lifestage,
+    meds: answers.meds,
+    medTypes: answers.medTypes,
+    pills: answers.pills,
+    protein: answers.protein,
+    sex: answers.sex,
+    skin: answers.skin,
+    sleepHours: answers.sleepHours,
+    smoke: answers.smoke,
+    stress: answers.stress,
+    stressSource: answers.stressSource,
+    sun: answers.sun,
+    supps: answers.supps,
+    symptoms: answers.symptoms,
+    vo2Known: answers.vo2Known,
+    vo2Max: answers.vo2Max,
+    vo2Proxy: answers.vo2Proxy,
+    wearable: answers.wearable,
+    weightKg: answers.weightKg
+  };
 }
 
 function retryPrompt(errors: string[]) {
@@ -136,11 +215,13 @@ function retryPrompt(errors: string[]) {
 async function callGrok({
   apiKey,
   messages,
-  model
+  model,
+  reasoningEffort
 }: Readonly<{
   apiKey: string;
   messages: Array<{ content: string; role: "assistant" | "system" | "user" }>;
   model: string;
+  reasoningEffort?: string;
 }>) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -150,6 +231,7 @@ async function callGrok({
       body: JSON.stringify({
         messages,
         model,
+        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
         response_format: { type: "json_object" },
         stream: false,
         temperature: 0.2
@@ -357,6 +439,171 @@ function validateAdvice(value: unknown) {
   return errors.length > 0 ? { errors } : { advice, errors };
 }
 
+function stableJson(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(stableJson);
+  }
+
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, stableJson(value[key])])
+    );
+  }
+
+  return value;
+}
+
+function jsonValue(value: unknown) {
+  const serialized = JSON.stringify(value);
+
+  return JSON.parse(serialized ?? "{}");
+}
+
+function cacheKey({
+  answers,
+  healthScore,
+  model,
+  promptVersion,
+  reasoningEffort
+}: Readonly<{
+  answers: unknown;
+  healthScore: HealthScoreResult;
+  model: string;
+  promptVersion: string;
+  reasoningEffort: string;
+}>) {
+  const payload = JSON.stringify(
+    stableJson({
+      assessment: compactAssessmentForAdvice(answers),
+      cacheType: CACHE_TYPE,
+      healthScore: compactHealthScoreForAdvice(healthScore),
+      model,
+      promptVersion,
+      reasoningEffort
+    })
+  );
+  const digest = createHash("sha256").update(payload).digest("hex");
+
+  return `${CACHE_TYPE}:${digest}`;
+}
+
+async function ensureCacheSchema() {
+  const sql = getSql();
+
+  if (!sql) {
+    return null;
+  }
+
+  globalHealthScoreCache.mattanutraHealthScoreCacheSchemaReady ??= (async () => {
+    await sql`
+      create table if not exists public.ai_response_cache (
+        cache_key text primary key,
+        cache_type text not null,
+        model text not null,
+        prompt_version text not null,
+        response jsonb not null,
+        expires_at timestamptz not null,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      )
+    `;
+    await sql`
+      create index if not exists ai_response_cache_type_expiry_idx
+        on public.ai_response_cache (cache_type, expires_at desc)
+    `;
+  })().catch((error) => {
+    globalHealthScoreCache.mattanutraHealthScoreCacheSchemaReady = undefined;
+    throw error;
+  });
+
+  await globalHealthScoreCache.mattanutraHealthScoreCacheSchemaReady;
+
+  return sql;
+}
+
+async function readCachedAdvice(key: string) {
+  try {
+    const sql = await ensureCacheSchema();
+
+    if (!sql) {
+      return null;
+    }
+
+    const rows = await sql<{ response: unknown }[]>`
+      select response
+      from public.ai_response_cache
+      where cache_key = ${key}
+        and cache_type = ${CACHE_TYPE}
+        and expires_at > now()
+      limit 1
+    `;
+    const cached = rows[0]?.response;
+
+    if (!cached) {
+      return null;
+    }
+
+    const validation = validateAdvice(cached);
+
+    return validation.advice ?? null;
+  } catch (error) {
+    console.warn("Unable to read HealthScore advice cache", error);
+    return null;
+  }
+}
+
+async function writeCachedAdvice({
+  advice,
+  key,
+  model,
+  promptVersion
+}: Readonly<{
+  advice: HealthScoreAdvice;
+  key: string;
+  model: string;
+  promptVersion: string;
+}>) {
+  try {
+    const sql = await ensureCacheSchema();
+
+    if (!sql) {
+      return;
+    }
+
+    await sql`
+      insert into public.ai_response_cache (
+        cache_key,
+        cache_type,
+        model,
+        prompt_version,
+        response,
+        expires_at
+      )
+      values (
+        ${key},
+        ${CACHE_TYPE},
+        ${model},
+        ${promptVersion},
+        ${sql.json(jsonValue({ advice }))},
+        now() + make_interval(days => ${CACHE_TTL_DAYS})
+      )
+      on conflict (cache_key) do update set
+        response = excluded.response,
+        updated_at = now(),
+        expires_at = excluded.expires_at
+    `;
+    await sql`
+      delete from public.ai_response_cache
+      where cache_type = ${CACHE_TYPE}
+        and expires_at < now()
+    `;
+  } catch (error) {
+    console.warn("Unable to write HealthScore advice cache", error);
+  }
+}
+
 export async function analyzeHealthScoreAdvice({
   answers,
   healthScore,
@@ -367,11 +614,24 @@ export async function analyzeHealthScoreAdvice({
   locale: Locale;
 }>) {
   const config = grokConfig();
+  const key = cacheKey({
+    answers,
+    healthScore,
+    model: config.model,
+    promptVersion: config.promptVersion,
+    reasoningEffort: config.reasoningEffort
+  });
+  const cachedAdvice = await readCachedAdvice(key);
+
+  if (cachedAdvice) {
+    return cachedAdvice;
+  }
+
   const messages: Array<{
     content: string;
     role: "assistant" | "system" | "user";
   }> = [
-    { content: systemPrompt(), role: "system" },
+    { content: systemPrompt(config.promptVersion), role: "system" },
     { content: userPrompt({ answers, healthScore, locale }), role: "user" }
   ];
   let lastErrors: string[] = [];
@@ -381,12 +641,19 @@ export async function analyzeHealthScoreAdvice({
       const completion = await callGrok({
         apiKey: config.apiKey,
         messages,
-        model: config.model
+        model: config.model,
+        reasoningEffort: config.reasoningEffort
       });
       const content = completion.choices?.[0]?.message?.content;
       const validation = validateAdvice(parseJsonObject(content));
 
       if (validation.advice) {
+        await writeCachedAdvice({
+          advice: validation.advice,
+          key,
+          model: config.model,
+          promptVersion: config.promptVersion
+        });
         return validation.advice;
       }
 

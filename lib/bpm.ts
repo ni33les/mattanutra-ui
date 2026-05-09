@@ -29,6 +29,7 @@ type BpmAttributionInput = Readonly<{
   affiliateId?: unknown;
   affiliateRef?: unknown;
   affiliateSubId?: unknown;
+  browser?: unknown;
   campaignId?: unknown;
   campaignName?: unknown;
   clickId?: unknown;
@@ -324,7 +325,7 @@ async function insertBpmEvent(sql: postgres.Sql, input: BpmEventInput) {
       ${ipHash},
       ${text(attribution.userAgent) ?? requestUserAgent(input.request)},
       ${text(attribution.deviceType)},
-      null,
+      ${text(attribution.browser)},
       ${text(attribution.os)},
       ${text(attribution.countryCode)},
       ${text(attribution.path)},

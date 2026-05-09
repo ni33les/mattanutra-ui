@@ -26,6 +26,7 @@ type AnalysisResult = Readonly<{
   formulation: FormulationBlueprint;
   model: string;
   promptVersion: string;
+  reasoningEffort: string;
   responseId?: string;
 }>;
 
@@ -41,7 +42,8 @@ type XaiChatCompletion = {
 };
 
 const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
-const DEFAULT_GROK_MODEL = "grok-4-1-fast-reasoning";
+const DEFAULT_GROK_MODEL = "grok-4.3";
+const DEFAULT_FORMULATION_REASONING_EFFORT = "medium";
 const DEFAULT_PROMPT_VERSION = "v1";
 const MAX_ATTEMPTS = 3;
 const REQUEST_TIMEOUT_MS = 360_000;
@@ -67,7 +69,10 @@ function getGrokConfig() {
     model: getConfiguredValue(process.env.GROK_MODEL) || DEFAULT_GROK_MODEL,
     promptVersion:
       getConfiguredValue(process.env.FORMULATION_PROMPT_VERSION) ||
-      DEFAULT_PROMPT_VERSION
+      DEFAULT_PROMPT_VERSION,
+    reasoningEffort:
+      getConfiguredValue(process.env.FORMULATION_REASONING_EFFORT) ||
+      DEFAULT_FORMULATION_REASONING_EFFORT
   };
 }
 
@@ -161,11 +166,13 @@ async function audit(input: AnalysisInput, event: AnalysisAuditEvent) {
 async function callGrok({
   apiKey,
   messages,
-  model
+  model,
+  reasoningEffort
 }: Readonly<{
   apiKey: string;
   messages: Array<{ content: string; role: "assistant" | "system" | "user" }>;
   model: string;
+  reasoningEffort?: string;
 }>) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -175,6 +182,7 @@ async function callGrok({
       body: JSON.stringify({
         messages,
         model,
+        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
         response_format: { type: "json_object" },
         stream: false,
         temperature: 0.2
@@ -443,7 +451,8 @@ export async function analyzeFormulationWithGrok(
       payload: {
         attempt,
         model: config.model,
-        promptVersion: config.promptVersion
+        promptVersion: config.promptVersion,
+        reasoningEffort: config.reasoningEffort
       }
     });
 
@@ -451,7 +460,8 @@ export async function analyzeFormulationWithGrok(
       const completion = await callGrok({
         apiKey: config.apiKey,
         messages,
-        model: config.model
+        model: config.model,
+        reasoningEffort: config.reasoningEffort
       });
       const content = completion.choices?.[0]?.message?.content;
       const parsed = parseJsonObject(content);
@@ -466,6 +476,7 @@ export async function analyzeFormulationWithGrok(
             itemCount: validation.formulation.supplementBreakdown.length,
             model: completion.model ?? config.model,
             promptVersion: config.promptVersion,
+            reasoningEffort: config.reasoningEffort,
             responseId: completion.id,
             usage: completion.usage
           }
@@ -476,6 +487,7 @@ export async function analyzeFormulationWithGrok(
           formulation: validation.formulation,
           model: completion.model ?? config.model,
           promptVersion: config.promptVersion,
+          reasoningEffort: config.reasoningEffort,
           responseId: completion.id
         };
       }

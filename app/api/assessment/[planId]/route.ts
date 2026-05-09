@@ -164,8 +164,12 @@ export async function PATCH(
       intent === "process" && isAssessmentPlan(body.plan)
         ? body.plan
         : (existingSnapshot?.plan ?? null);
+    const healthScore =
+      intent === "process" && existingSnapshot?.healthScore
+        ? existingSnapshot.healthScore
+        : await buildHealthScore(body.answers, body.locale);
     const snapshot = createAssessmentSnapshot({
-      healthScore: await buildHealthScore(body.answers, body.locale),
+      healthScore,
       plan: selectedPlan ?? existingSnapshot?.plan,
       planId,
       queuePosition: existingSnapshot?.queuePosition,

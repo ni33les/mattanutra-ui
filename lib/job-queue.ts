@@ -1603,7 +1603,7 @@ async function completeFormulationJob(sql: postgres.Sql, job: ClaimedJob) {
         ${job.plan_id}::uuid,
         ${version},
         ${transaction.json(toJsonValue(analysis.formulation))},
-        ${`xai:${analysis.model}:${analysis.promptVersion}`},
+        ${`xai:${analysis.model}:${analysis.reasoningEffort}:${analysis.promptVersion}`},
         now(),
         now()
       )
@@ -1668,6 +1668,7 @@ async function completeFormulationJob(sql: postgres.Sql, job: ClaimedJob) {
             model: analysis.model,
             promptVersion: analysis.promptVersion,
             recommendationVersion: version,
+            reasoningEffort: analysis.reasoningEffort,
             responseId: analysis.responseId
           })
         )},
@@ -1680,7 +1681,8 @@ async function completeFormulationJob(sql: postgres.Sql, job: ClaimedJob) {
     eventPayload: {
       attempts: analysis.attempts,
       model: analysis.model,
-      promptVersion: analysis.promptVersion
+      promptVersion: analysis.promptVersion,
+      reasoningEffort: analysis.reasoningEffort
     },
     eventType: "job_completed",
     jobId: job.id,
@@ -1700,6 +1702,7 @@ async function completeFormulationJob(sql: postgres.Sql, job: ClaimedJob) {
     properties: {
       model: analysis.model,
       promptVersion: analysis.promptVersion,
+      reasoningEffort: analysis.reasoningEffort,
       responseId: analysis.responseId
     },
     selectedPlan: plan
@@ -1788,7 +1791,7 @@ async function completeExampleFormulationJob(
         ${job.plan_id}::uuid,
         ${version},
         ${transaction.json(toJsonValue(analysis.formulation))},
-        ${`xai:${analysis.model}:${analysis.promptVersion}:example`},
+        ${`xai:${analysis.model}:${analysis.reasoningEffort}:${analysis.promptVersion}:example`},
         now(),
         now()
       )
@@ -1832,6 +1835,7 @@ async function completeExampleFormulationJob(
             formulationVersion: version,
             model: analysis.model,
             promptVersion: analysis.promptVersion,
+            reasoningEffort: analysis.reasoningEffort,
             requestId,
             responseId: analysis.responseId
           })
@@ -1859,6 +1863,7 @@ async function completeExampleFormulationJob(
     properties: {
       model: analysis.model,
       promptVersion: analysis.promptVersion,
+      reasoningEffort: analysis.reasoningEffort,
       responseId: analysis.responseId
     },
     selectedPlan: plan
