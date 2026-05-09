@@ -1,3 +1,5 @@
+import type postgres from "postgres";
+
 export type AdminDashboardFilters = Readonly<{
   affiliate: string;
   campaign: string;
@@ -137,4 +139,54 @@ export function adminDashboardFilterEntries(filters: AdminDashboardFilters) {
 
 export function hasAdminDashboardFilters(filters: AdminDashboardFilters) {
   return adminDashboardFilterEntries(filters).length > 0;
+}
+
+export function adminDashboardFilterSql(
+  sql: postgres.Sql,
+  filters: AdminDashboardFilters
+) {
+  const affiliate = filters.affiliate || null;
+  const campaign = filters.campaign || null;
+  const campaignId = filters.campaignId || null;
+  const device = filters.device || null;
+  const emailHash = filters.emailHash || null;
+  const locale = filters.locale || null;
+  const medium = filters.medium || null;
+  const planId = filters.planId || null;
+  const promoCode = filters.promoCode || null;
+  const ray = filters.ray || null;
+  const selectedPlan = filters.selectedPlan || null;
+  const source = filters.source || null;
+
+  return sql`
+    (${locale}::text is null or locale = ${locale})
+    and (
+      ${device}::text is null
+      or lower(coalesce(device_type, '')) = any(string_to_array(${device}, ','))
+    )
+    and (${selectedPlan}::text is null or selected_plan::text = ${selectedPlan})
+    and (${planId}::text is null or plan_id::text = ${planId})
+    and (${ray}::text is null or ray::text = ${ray})
+    and (${emailHash}::text is null or email_hash = ${emailHash})
+    and (
+      ${source}::text is null
+      or lower(coalesce(utm_source, '')) = lower(${source})
+      or lower(coalesce(traffic_source, '')) = lower(${source})
+      or lower(coalesce(source_channel, '')) = lower(${source})
+    )
+    and (${medium}::text is null or lower(utm_medium) = lower(${medium}))
+    and (
+      ${campaign}::text is null
+      or lower(coalesce(utm_campaign, '')) = lower(${campaign})
+      or lower(coalesce(campaign_name, '')) = lower(${campaign})
+    )
+    and (${campaignId}::text is null or lower(campaign_id) = lower(${campaignId}))
+    and (
+      ${affiliate}::text is null
+      or lower(coalesce(affiliate_id, '')) = lower(${affiliate})
+      or lower(coalesce(affiliate_ref, '')) = lower(${affiliate})
+      or lower(coalesce(affiliate_sub_id, '')) = lower(${affiliate})
+    )
+    and (${promoCode}::text is null or lower(promo_code) = lower(${promoCode}))
+  `;
 }

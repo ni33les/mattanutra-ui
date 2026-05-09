@@ -1,5 +1,8 @@
 import { getSql } from "@/lib/db";
-import type { AdminDashboardFilters } from "@/lib/admin-dashboard-filters";
+import {
+  adminDashboardFilterSql,
+  type AdminDashboardFilters
+} from "@/lib/admin-dashboard-filters";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 
 export type AdminFlowNodeId =
@@ -363,35 +366,7 @@ export async function getAdminFlowData(
             occurred_at
           from public.bpm
           where occurred_at >= ${start}
-            and (${filters.locale || null}::text is null or locale = ${filters.locale || null})
-            and (
-              ${filters.device || null}::text is null
-              or lower(coalesce(device_type, '')) = any(string_to_array(${filters.device}, ','))
-            )
-            and (${filters.selectedPlan || null}::text is null or selected_plan::text = ${filters.selectedPlan || null})
-            and (${filters.planId || null}::text is null or plan_id::text = ${filters.planId || null})
-            and (${filters.ray || null}::text is null or ray::text = ${filters.ray || null})
-            and (${filters.emailHash || null}::text is null or email_hash = ${filters.emailHash || null})
-            and (
-              ${filters.source || null}::text is null
-              or lower(coalesce(utm_source, '')) = lower(${filters.source || null})
-              or lower(coalesce(traffic_source, '')) = lower(${filters.source || null})
-              or lower(coalesce(source_channel, '')) = lower(${filters.source || null})
-            )
-            and (${filters.medium || null}::text is null or lower(utm_medium) = lower(${filters.medium || null}))
-            and (
-              ${filters.campaign || null}::text is null
-              or lower(coalesce(utm_campaign, '')) = lower(${filters.campaign || null})
-              or lower(coalesce(campaign_name, '')) = lower(${filters.campaign || null})
-            )
-            and (${filters.campaignId || null}::text is null or lower(campaign_id) = lower(${filters.campaignId || null}))
-            and (
-              ${filters.affiliate || null}::text is null
-              or lower(coalesce(affiliate_id, '')) = lower(${filters.affiliate || null})
-              or lower(coalesce(affiliate_ref, '')) = lower(${filters.affiliate || null})
-              or lower(coalesce(affiliate_sub_id, '')) = lower(${filters.affiliate || null})
-            )
-            and (${filters.promoCode || null}::text is null or lower(promo_code) = lower(${filters.promoCode || null}))
+            and ${adminDashboardFilterSql(sql, filters)}
             and (
               event_name in (
                 'assessment_captured',
@@ -434,35 +409,7 @@ export async function getAdminFlowData(
             selected_plan::text,
             occurred_at
           from public.bpm
-          where (${filters.locale || null}::text is null or locale = ${filters.locale || null})
-            and (
-              ${filters.device || null}::text is null
-              or lower(coalesce(device_type, '')) = any(string_to_array(${filters.device}, ','))
-            )
-            and (${filters.selectedPlan || null}::text is null or selected_plan::text = ${filters.selectedPlan || null})
-            and (${filters.planId || null}::text is null or plan_id::text = ${filters.planId || null})
-            and (${filters.ray || null}::text is null or ray::text = ${filters.ray || null})
-            and (${filters.emailHash || null}::text is null or email_hash = ${filters.emailHash || null})
-            and (
-              ${filters.source || null}::text is null
-              or lower(coalesce(utm_source, '')) = lower(${filters.source || null})
-              or lower(coalesce(traffic_source, '')) = lower(${filters.source || null})
-              or lower(coalesce(source_channel, '')) = lower(${filters.source || null})
-            )
-            and (${filters.medium || null}::text is null or lower(utm_medium) = lower(${filters.medium || null}))
-            and (
-              ${filters.campaign || null}::text is null
-              or lower(coalesce(utm_campaign, '')) = lower(${filters.campaign || null})
-              or lower(coalesce(campaign_name, '')) = lower(${filters.campaign || null})
-            )
-            and (${filters.campaignId || null}::text is null or lower(campaign_id) = lower(${filters.campaignId || null}))
-            and (
-              ${filters.affiliate || null}::text is null
-              or lower(coalesce(affiliate_id, '')) = lower(${filters.affiliate || null})
-              or lower(coalesce(affiliate_ref, '')) = lower(${filters.affiliate || null})
-              or lower(coalesce(affiliate_sub_id, '')) = lower(${filters.affiliate || null})
-            )
-            and (${filters.promoCode || null}::text is null or lower(promo_code) = lower(${filters.promoCode || null}))
+          where ${adminDashboardFilterSql(sql, filters)}
             and (
               event_name in (
               'assessment_captured',

@@ -14,6 +14,7 @@ MattaNutra earns trust through an anonymous wellness assessment and HealthScore,
 | Pro Plan | "I want ongoing support." | Recurring advisor relationship | Partial: offer exists, advisor handoff pending |
 | Product guidance | "What should I actually buy?" | Future affiliate revenue and customer convenience | Partial: results area exists, matching not live |
 | Blog and testimonials | "Can I learn and trust the brand?" | Marketing engine for paid, social, and organic traffic | Partial: platform live, cadence pending |
+| Admin analytics | "Where are users converting or dropping out?" | Tune marketing spend and the product funnel | Partial: KPI and Flow views live, operations views pending |
 
 ## Current Funnel
 
@@ -63,13 +64,15 @@ flowchart TB
 - Formulation page renders stored backend data.
 - Blog and testimonial tables, pages, and protected admin APIs.
 - BPM tracking for funnel, campaign, affiliate, safety, error, email, chat, and formulation events.
+- Admin dashboard with KPI and Flow views over hour, day, week, month, year, and all-time windows.
+- Dashboard filters for locale, device, source, medium, campaign, campaign ID, affiliate, promo code, selected plan, plan ID, ray, and email hash.
 
 ## Main Gaps
 
 | Gap | Why It Matters | Suggested Next Step |
 | --- | --- | --- |
 | Payment activation | Cannot test revenue conversion yet | Wire Precision/Pro checkout once account is ready |
-| Admin dashboard | BPM data exists but business users need charts and review queues | Build sales dashboard first, then safety/admin panels |
+| Admin operations views | Sales analytics exist, but safety, jobs, content, and supplement operations still need interfaces | Add safety/job queues after the sales funnel view stabilises |
 | Supplement governance | AI output needs hard business rules around approved doses and exclusions | Build whitelist, blacklist, dose/frequency, and interaction tables |
 | Product matching | Affiliate revenue depends on trusted products | Start with curated whitelist before marketplace automation |
 | Chat handoff | Pro needs a convincing ongoing service experience | Make one channel excellent first, likely LINE |
@@ -162,17 +165,25 @@ Current wired examples:
 | Chat and affiliate | `chat_channel_clicked`, `marketplace_product_clicked` |
 | Errors | `assessment_api_error`, `free_email_request_error`, `worker_job_failed` |
 
-Admin dashboard should show:
+Current admin dashboard:
 
-1. Traffic over selectable windows: 1h, 3h, 6h, 12h, 1d, 7d, 1m, 1y, all time.
-2. Funnel: visit, assessment start, HealthScore, free email, Precision, Pro.
-3. Campaign and affiliate source performance.
-4. Free email conversion and later upgrade.
-5. Chat channel clicks.
-6. Product/affiliate clicks.
-7. Safety and error alerts.
-8. Ray drill-down for one anonymous journey.
-9. Pending human-review jobs.
+1. KPI view for free conversions, paid Precision conversions, and paid Pro conversions.
+2. Conversion-rate cards with formulas and short trend forecasts.
+3. Flow view showing the observed user journey from landing through assessment, HealthScore, free email, paid plan, nutrition plan, results, chat, and marketplace clicks.
+4. Flow boxes show visits and drops, with border colours highlighting healthier or weaker stages.
+5. Timeframe controls: hour, day, week, month, year, and all time.
+6. Locale controls as EN and TH toggle pills. Both are selected by default.
+7. Collapsible filters for source, medium, campaign, campaign ID, affiliate, promo code, plan, device, plan ID, ray, and email hash.
+8. Filters are URL-driven and server-side, so KPI and Flow views use the same BPM slice.
+
+Remaining admin dashboard work:
+
+1. Campaign and affiliate comparison tables.
+2. Safety and error alert panels.
+3. Pending jobs and human-review queues.
+4. Ray drill-down for a single anonymous journey.
+5. Content, testimonial, supplement whitelist, blacklist, and interaction-rule management.
+6. Revenue and payment reporting after checkout is live.
 
 ## Supplement Governance
 
@@ -269,14 +280,15 @@ Best use:
 
 ## Near-Term Build Sequence
 
-1. Admin dashboard: sales funnel, BPM charts, campaign/affiliate reporting.
-2. Supplement whitelist, blacklist, and interaction rules.
-3. Human-review jobs and admin review screens.
-4. Payment integration for Precision and Pro.
-5. Product matching against approved supplement/product whitelist.
-6. One excellent chat handoff, likely LINE first.
-7. Free email nurture sequence.
-8. Pro advisor use-case design.
+1. Campaign/affiliate reporting tables on top of the live BPM dashboard filters.
+2. Safety, error, and stuck-job panels in the admin dashboard.
+3. Supplement whitelist, blacklist, and interaction rules.
+4. Human-review jobs and admin review screens.
+5. Payment integration for Precision and Pro.
+6. Product matching against approved supplement/product whitelist.
+7. One excellent chat handoff, likely LINE first.
+8. Free email nurture sequence.
+9. Pro advisor use-case design.
 
 ## One-Line Narrative
 

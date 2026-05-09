@@ -119,6 +119,45 @@ For each campaign, the admin dashboard should be able to show:
 
 The `ray` field ties each anonymous journey together, while campaign and affiliate fields explain where the journey came from.
 
+## Using the Admin Dashboard
+
+The admin dashboard is designed to answer: "Which traffic and messages create qualified users?"
+
+Current views:
+
+- KPI: free conversions, paid Precision conversions, paid Pro conversions, and conversion rates.
+- Flow: the funnel journey from landing/assessment through HealthScore, free email, paid plan, nutrition plan, results, chat, and marketplace clicks.
+
+Current timeframe windows:
+
+- hour
+- day
+- week
+- month
+- year
+- all time
+
+Current filter controls:
+
+- Locale: EN and TH toggle pills, both selected by default.
+- Device: dropdown for all, mobile, tablet, or desktop.
+- Source and medium: use `utm_source`, `utm_medium`, traffic source, or source channel.
+- Campaign: use `utm_campaign` or campaign name.
+- Campaign ID: use `campaign_id`.
+- Affiliate: use `affiliate_id`, `affiliate_ref`, or `affiliate_sub_id`.
+- Promo code: use `promo_code`.
+- Plan, plan ID, ray, and email hash for narrower debugging.
+
+Recommended campaign review:
+
+1. Start with the full week view.
+2. Filter by `utm_source`.
+3. Add `utm_campaign` or `campaign_id`.
+4. Compare EN vs TH.
+5. Check mobile separately if completion looks weak.
+6. Use the Flow view to find the step where users stop.
+7. Use KPI view to compare free, Precision, and Pro conversion.
+
 ## Campaign QA Checklist
 
 Before launching any ad:
