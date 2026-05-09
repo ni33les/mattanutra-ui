@@ -259,7 +259,10 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
       update public.supplements
       set
         is_active = ${input.listStatus !== "inactive"},
-        list_status = ${input.listStatus},
+        list_status = case
+          when ${input.listStatus} = 'inactive' then list_status
+          else ${input.listStatus}
+        end,
         updated_at = now()
       where id = ${input.id}::uuid
     `;
