@@ -1,0 +1,221 @@
+import type { AgentType } from "./task-service.ts";
+import { normalizeCapabilities } from "./task-service-utils.ts";
+
+export const AGENT_CAPABILITIES = {
+  chatSend: "chat_send",
+  clientSafetyFollowup: "client_safety_followup",
+  communicationDispatch: "communication_dispatch",
+  communicationRoute: "communication_route",
+  doseNormalization: "dose_normalization",
+  emailSend: "email_send",
+  formulationGeneration: "formulation_generation",
+  formulationReview: "formulation_review",
+  freeEmailSend: "free_email_send",
+  freeExampleFormulation: "free_example_formulation",
+  healthScoreAnalysis: "healthscore_analysis",
+  humanReview: "human_review",
+  internalWorker: "mattanutra_internal_worker",
+  lineSend: "line_send",
+  reassessmentEmailSend: "reassessment_email_send",
+  safetyReview: "safety_review",
+  salesCopy: "sales_copy",
+  scheduler: "scheduler",
+  supplementGovernance: "supplement_governance",
+  supplementReview: "supplement_review",
+  supplementReviewTriage: "supplement_review_triage",
+  supplementSafetyScan: "supplement_safety_scan",
+  telegramSend: "telegram_send",
+  whatsappSend: "whatsapp_send"
+} as const;
+
+export type SystemAgentKey =
+  | "chatDispatcher"
+  | "communicationsCoordinator"
+  | "emailDispatcher"
+  | "formulationWorker"
+  | "healthScoreEngine"
+  | "humanReviewer"
+  | "safetyScanner"
+  | "scheduler";
+
+export type SystemAgentDefinition = Readonly<{
+  capabilities: readonly string[];
+  id: string;
+  metadata: Readonly<Record<string, unknown>>;
+  model: string | null;
+  name: string;
+  type: AgentType;
+}>;
+
+export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinition>> = {
+  chatDispatcher: {
+    capabilities: [
+      AGENT_CAPABILITIES.chatSend,
+      AGENT_CAPABILITIES.lineSend,
+      AGENT_CAPABILITIES.telegramSend,
+      AGENT_CAPABILITIES.whatsappSend,
+      AGENT_CAPABILITIES.communicationDispatch
+    ],
+    id: "8386c905-f607-4d5f-bb5f-3a98a598294d",
+    metadata: {
+      channelFamily: "chat",
+      seeded: true
+    },
+    model: null,
+    name: "Chat Dispatcher",
+    type: "external"
+  },
+  communicationsCoordinator: {
+    capabilities: [
+      AGENT_CAPABILITIES.clientSafetyFollowup,
+      AGENT_CAPABILITIES.communicationRoute,
+      AGENT_CAPABILITIES.communicationDispatch
+    ],
+    id: "161f03a5-70ec-4e56-b54e-b23daee2e520",
+    metadata: {
+      channelFallbackOrder: ["chat", "email"],
+      seeded: true
+    },
+    model: null,
+    name: "Communications Coordinator",
+    type: "deterministic"
+  },
+  emailDispatcher: {
+    capabilities: [
+      AGENT_CAPABILITIES.emailSend,
+      AGENT_CAPABILITIES.freeEmailSend,
+      AGENT_CAPABILITIES.reassessmentEmailSend,
+      AGENT_CAPABILITIES.internalWorker
+    ],
+    id: "5a72e41c-4535-4d28-8043-51448af40343",
+    metadata: {
+      channelFamily: "email",
+      seeded: true
+    },
+    model: null,
+    name: "Email Dispatcher",
+    type: "deterministic"
+  },
+  formulationWorker: {
+    capabilities: [
+      AGENT_CAPABILITIES.formulationGeneration,
+      AGENT_CAPABILITIES.freeExampleFormulation,
+      AGENT_CAPABILITIES.internalWorker
+    ],
+    id: "ef8472a6-2049-44e0-a001-3f5d6963499f",
+    metadata: {
+      seeded: true,
+      usesModel: true
+    },
+    model: "grok:formulation",
+    name: "Nutrition Plan Formulator",
+    type: "ai"
+  },
+  healthScoreEngine: {
+    capabilities: [
+      AGENT_CAPABILITIES.healthScoreAnalysis,
+      AGENT_CAPABILITIES.salesCopy,
+      AGENT_CAPABILITIES.internalWorker
+    ],
+    id: "668ee3d3-00ec-48a0-86cc-8091af904eda",
+    metadata: {
+      seeded: true,
+      usesModel: true
+    },
+    model: "grok:healthscore",
+    name: "HealthScore Engine",
+    type: "ai"
+  },
+  humanReviewer: {
+    capabilities: [
+      AGENT_CAPABILITIES.formulationReview,
+      AGENT_CAPABILITIES.humanReview,
+      AGENT_CAPABILITIES.safetyReview,
+      AGENT_CAPABILITIES.supplementGovernance,
+      AGENT_CAPABILITIES.supplementReview
+    ],
+    id: "5ccf4955-5b2b-4240-aa75-d5d7dfc9b380",
+    metadata: {
+      seeded: true
+    },
+    model: null,
+    name: "Human Reviewer",
+    type: "human"
+  },
+  safetyScanner: {
+    capabilities: [
+      AGENT_CAPABILITIES.doseNormalization,
+      AGENT_CAPABILITIES.supplementReviewTriage,
+      AGENT_CAPABILITIES.supplementSafetyScan
+    ],
+    id: "1fa305ca-e68c-40f1-bd6e-a7cbc632d210",
+    metadata: {
+      seeded: true
+    },
+    model: null,
+    name: "Safety Scanner",
+    type: "deterministic"
+  },
+  scheduler: {
+    capabilities: [
+      AGENT_CAPABILITIES.communicationDispatch,
+      AGENT_CAPABILITIES.internalWorker,
+      AGENT_CAPABILITIES.scheduler
+    ],
+    id: "436cc481-6639-402e-b639-bf5737e3acd4",
+    metadata: {
+      seeded: true
+    },
+    model: null,
+    name: "Scheduler",
+    type: "deterministic"
+  }
+} as const;
+
+export const SYSTEM_AGENT_LIST = Object.values(SYSTEM_AGENTS);
+
+export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
+  analyze_healthscore: "healthScoreEngine",
+  generate_example_formulation: "formulationWorker",
+  generate_formulation: "formulationWorker",
+  send_example_email: "emailDispatcher",
+  send_reassessment_email: "emailDispatcher"
+} as const;
+
+export function systemAgentForKey(key: SystemAgentKey) {
+  return SYSTEM_AGENTS[key];
+}
+
+export function systemAgentForWorkTaskType(taskType: string) {
+  return SYSTEM_AGENTS[WORK_TASK_AGENT_KEYS[taskType] ?? "scheduler"];
+}
+
+export function requiredCapabilitiesForWorkTaskType(taskType: string) {
+  const capabilitiesByTaskType: Record<string, readonly string[]> = {
+    analyze_healthscore: [AGENT_CAPABILITIES.healthScoreAnalysis],
+    generate_example_formulation: [
+      AGENT_CAPABILITIES.freeExampleFormulation
+    ],
+    generate_formulation: [AGENT_CAPABILITIES.formulationGeneration],
+    send_example_email: [AGENT_CAPABILITIES.freeEmailSend],
+    send_reassessment_email: [AGENT_CAPABILITIES.reassessmentEmailSend]
+  };
+
+  return normalizeCapabilities(
+    capabilitiesByTaskType[taskType] ?? [AGENT_CAPABILITIES.internalWorker]
+  );
+}
+
+export function taskReservationAgent(agent: SystemAgentDefinition) {
+  return {
+    capabilities: normalizeCapabilities([...agent.capabilities]),
+    id: agent.id,
+    metadata: {
+      ...agent.metadata,
+      systemAgent: true
+    },
+    model: agent.model,
+    name: agent.name,
+    type: agent.type
+  };
+}
