@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
   type ComponentType,
+  type ReactNode,
   type SVGProps
 } from "react";
 import {
@@ -17,6 +18,7 @@ import {
   HomeIcon,
   MegaphoneIcon,
   QueueListIcon,
+  SparklesIcon,
   XMarkIcon
 } from "@heroicons/react/24/outline";
 import { HealthspanLogo } from "@/components/healthspan-logo";
@@ -48,6 +50,7 @@ import {
   supplementSafetyFlags,
   type SupplementSafetyFlag
 } from "@/lib/supplement-safety-flags";
+import { supplementDoseUnits } from "@/lib/supplement-dose-units";
 import {
   adminDashboardFilterEntries,
   emptyAdminDashboardFilters,
@@ -140,6 +143,7 @@ type AdminContent = Readonly<{
   rates: Record<AdminDashboardRateId, RateText>;
   ratesTitle: string;
   jobs: {
+    action: string;
     attempts: string;
     audit: string;
     complete: string;
@@ -154,21 +158,27 @@ type AdminContent = Readonly<{
     running: string;
     started: string;
     status: string;
+    title: string;
     total: string;
     updated: string;
   };
   reviewQueue: {
-    dismiss: string;
-    dismissError: string;
+    approve: string;
+    clientDose: string;
+    disapprove: string;
     doseReduced: string;
     empty: string;
-    maxDose: string;
+    flagReason: string;
+    highPriority: string;
+    lowPriority: string;
+    mediumPriority: string;
     newDose: string;
     originalDose: string;
     plan: string;
-    priority: string;
+    planLink: string;
     queued: string;
-    requiredFields: string;
+    doseUnverified: string;
+    reviewerNote: string;
     reviewRequired: string;
     total: string;
     unknown: string;
@@ -211,8 +221,12 @@ type AdminContent = Readonly<{
     search: string;
     sourceStatus: string;
     status: string;
+    suggestDose: string;
+    suggestDoseBusy: string;
+    suggestDoseError: string;
     total: string;
     updateError: string;
+    doseValidationError: string;
     whitelisted: string;
   };
   title: string;
@@ -227,6 +241,7 @@ const rangeOrder: AdminDashboardRange[] = [
   "year",
   "all"
 ];
+const supplementDoseSuggestionTimeoutMs = 45_000;
 
 const content = {
   en: {
@@ -358,6 +373,7 @@ const content = {
     },
     ratesTitle: "Conversion rates",
     jobs: {
+      action: "Action",
       attempts: "Attempts",
       audit: "Latest audit",
       complete: "Complete",
@@ -372,21 +388,27 @@ const content = {
       running: "Running",
       started: "Started",
       status: "Status",
+      title: "Title",
       total: "Total",
       updated: "Updated"
     },
     reviewQueue: {
-      dismiss: "Dismiss",
-      dismissError: "Could not dismiss this review job.",
+      approve: "Approve",
+      clientDose: "Client dose",
+      disapprove: "Disapprove",
       doseReduced: "Dose reduced",
       empty: "No supplement review jobs are waiting.",
-      maxDose: "Max dose",
+      flagReason: "Review reason",
+      highPriority: "High Priority",
+      lowPriority: "Low Priority",
+      mediumPriority: "Medium Priority",
       newDose: "New dose",
       originalDose: "Original dose",
       plan: "Plan",
-      priority: "Priority",
+      planLink: "Open plan",
       queued: "Queued",
-      requiredFields: "Required fields",
+      doseUnverified: "Dose unverified",
+      reviewerNote: "Reviewer note",
       reviewRequired: "Review required",
       total: "Total",
       unknown: "Unknown supplement"
@@ -447,8 +469,13 @@ const content = {
       search: "Search supplements",
       sourceStatus: "Source",
       status: "Status",
+      suggestDose: "Suggest with AI",
+      suggestDoseBusy: "AI is drafting safety details...",
+      suggestDoseError: "Could not suggest a dose.",
       total: "Total",
       updateError: "Could not save this supplement.",
+      doseValidationError:
+        "Enter a positive amount and unit for whitelisted or review-required supplements.",
       whitelisted: "Whitelisted"
     },
     title: "KPI",
@@ -587,6 +614,7 @@ const content = {
     },
     ratesTitle: "อัตราคอนเวอร์ชัน",
     jobs: {
+      action: "การทำงาน",
       attempts: "จำนวนครั้ง",
       audit: "Audit ล่าสุด",
       complete: "เสร็จแล้ว",
@@ -601,21 +629,27 @@ const content = {
       running: "กำลังทำงาน",
       started: "เริ่มเมื่อ",
       status: "สถานะ",
+      title: "หัวข้อ",
       total: "ทั้งหมด",
       updated: "อัปเดต"
     },
     reviewQueue: {
-      dismiss: "ปิดรายการ",
-      dismissError: "ไม่สามารถปิดงานรีวิวนี้ได้",
+      approve: "อนุมัติ",
+      clientDose: "ขนาดสำหรับลูกค้า",
+      disapprove: "ไม่อนุมัติ",
       doseReduced: "ลดขนาดแล้ว",
       empty: "ไม่มีงานรีวิวอาหารเสริมที่รอดำเนินการ",
-      maxDose: "ขนาดสูงสุด",
+      flagReason: "เหตุผลที่ต้องรีวิว",
+      highPriority: "ความสำคัญสูง",
+      lowPriority: "ความสำคัญต่ำ",
+      mediumPriority: "ความสำคัญปานกลาง",
       newDose: "ขนาดใหม่",
       originalDose: "ขนาดเดิม",
       plan: "แผน",
-      priority: "ความสำคัญ",
+      planLink: "เปิดแผน",
       queued: "เข้าคิว",
-      requiredFields: "ข้อมูลที่ต้องมี",
+      doseUnverified: "ยังตรวจขนาดไม่ได้",
+      reviewerNote: "หมายเหตุผู้รีวิว",
       reviewRequired: "ต้องรีวิว",
       total: "ทั้งหมด",
       unknown: "อาหารเสริมใหม่"
@@ -676,8 +710,13 @@ const content = {
       search: "ค้นหาอาหารเสริม",
       sourceStatus: "แหล่งข้อมูล",
       status: "สถานะ",
+      suggestDose: "แนะนำด้วย AI",
+      suggestDoseBusy: "AI กำลังร่างรายละเอียดความปลอดภัย...",
+      suggestDoseError: "ไม่สามารถแนะนำขนาดได้",
       total: "ทั้งหมด",
       updateError: "ไม่สามารถบันทึกอาหารเสริมนี้ได้",
+      doseValidationError:
+        "กรอกปริมาณที่มากกว่า 0 และหน่วยสำหรับรายการที่อนุญาตหรือต้องรีวิว",
       whitelisted: "อนุญาต"
     },
     title: "KPI",
@@ -1372,6 +1411,7 @@ function AdminSupplementsView({
 
       {draft ? (
         <SupplementDetailsModal
+          accessToken={accessToken}
           draft={draft}
           error={errorId === draft.id}
           labels={labels}
@@ -1421,23 +1461,27 @@ function SupplementListMeta({
   value
 }: Readonly<{
   label: string;
-  value: string;
+  value: ReactNode;
 }>) {
+  const hasValue = value !== null && value !== undefined && value !== "";
+
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
         {label}
       </p>
       <p className="mt-1 truncate text-sm font-semibold text-gray-900">
-        {value || "—"}
+        {hasValue ? value : "—"}
       </p>
     </div>
   );
 }
 
 function SupplementDetailsModal({
+  accessToken,
   draft,
   error,
+  headerNote,
   labels,
   locale,
   onChange,
@@ -1445,8 +1489,10 @@ function SupplementDetailsModal({
   onSave,
   saving
 }: Readonly<{
+  accessToken: string;
   draft: AdminSupplementRow;
   error: boolean;
+  headerNote?: string | null;
   labels: AdminContent;
   locale: Locale;
   onChange: (patch: Partial<AdminSupplementRow>) => void;
@@ -1454,8 +1500,124 @@ function SupplementDetailsModal({
   onSave: () => void;
   saving: boolean;
 }>) {
+  const [suggestingDose, setSuggestingDose] = useState(false);
+  const [suggestDoseError, setSuggestDoseError] = useState(false);
   const inputClass =
     "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]";
+  const doseRequired =
+    draft.listStatus === "review_required" || draft.listStatus === "whitelisted";
+  const doseValid =
+    !doseRequired ||
+    (draft.maxAmount !== null &&
+      Number.isFinite(draft.maxAmount) &&
+      draft.maxAmount > 0 &&
+      draft.maxUnit.trim() !== "");
+  const unitOptions =
+    draft.maxUnit &&
+    !(supplementDoseUnits as readonly string[]).includes(draft.maxUnit)
+      ? [draft.maxUnit, ...supplementDoseUnits]
+      : supplementDoseUnits;
+
+  async function suggestDose() {
+    setSuggestingDose(true);
+    setSuggestDoseError(false);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(
+      () => controller.abort(),
+      supplementDoseSuggestionTimeoutMs
+    );
+
+    try {
+      const response = await fetch("/api/admin/supplements/suggest-dose", {
+        body: JSON.stringify({
+          accessToken,
+          category: draft.category,
+          confidence: draft.confidence,
+          currentMaxAmount: draft.maxAmount,
+          currentMaxUnit: draft.maxUnit,
+          listStatus: draft.listStatus,
+          primaryUseCase: draft.primaryUseCase,
+          safetyFlags: draft.safetyFlags,
+          safetyNotes: draft.safetyNotes,
+          supplementName: draft.name
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST",
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to suggest supplement dose");
+      }
+
+      const payload = (await response.json()) as {
+        suggestion?: {
+          confidence?: SupplementConfidence;
+          listStatus?: SupplementListStatus;
+          maxAmount?: number | null;
+          maxUnit?: string;
+          safetyFlags?: SupplementSafetyFlag[];
+          safetyNotes?: string;
+        };
+      };
+      const suggestion = payload.suggestion;
+      const suggestedStatus = suggestion?.listStatus ?? draft.listStatus;
+      const suggestedMaxAmount = suggestion?.maxAmount;
+      const suggestedMaxUnit = suggestion?.maxUnit;
+      const suggestedDoseRequired =
+        suggestedStatus === "review_required" ||
+        suggestedStatus === "whitelisted";
+
+      if (
+        !suggestion ||
+        (suggestedDoseRequired &&
+          (typeof suggestedMaxAmount !== "number" ||
+            !Number.isFinite(suggestedMaxAmount) ||
+            suggestedMaxAmount <= 0 ||
+            typeof suggestedMaxUnit !== "string" ||
+            !suggestedMaxUnit.trim())) ||
+        (!suggestedDoseRequired &&
+          suggestedMaxAmount !== null &&
+          suggestedMaxAmount !== undefined &&
+          (typeof suggestedMaxAmount !== "number" ||
+            !Number.isFinite(suggestedMaxAmount))) ||
+        (suggestedMaxUnit !== undefined && typeof suggestedMaxUnit !== "string")
+      ) {
+        throw new Error("Invalid supplement dose suggestion");
+      }
+
+      onChange({
+        confidence: suggestion.confidence ?? draft.confidence,
+        listStatus: suggestedStatus,
+        maxAmount:
+          suggestedMaxAmount === null
+            ? null
+            : typeof suggestedMaxAmount === "number"
+              ? suggestedMaxAmount
+              : draft.maxAmount,
+        maxUnit:
+          typeof suggestedMaxUnit === "string"
+            ? suggestedMaxUnit
+            : draft.maxUnit,
+        safetyFlags: Array.isArray(suggestion.safetyFlags)
+          ? suggestion.safetyFlags
+          : draft.safetyFlags,
+        safetyNotes:
+          typeof suggestion.safetyNotes === "string" &&
+          suggestion.safetyNotes.trim()
+            ? suggestion.safetyNotes.trim()
+            : draft.safetyNotes
+      });
+    } catch (suggestionError) {
+      console.error("Unable to suggest supplement details", suggestionError);
+      setSuggestDoseError(true);
+    } finally {
+      window.clearTimeout(timeout);
+      setSuggestingDose(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -1490,6 +1652,9 @@ function SupplementDetailsModal({
                 {sourceStatusLabel(draft.sourceStatus)}
                 {draft.ingredientType ? ` · ${draft.ingredientType}` : ""}
               </p>
+              {headerNote ? (
+                <p className="mt-1 text-sm text-gray-500">{headerNote}</p>
+              ) : null}
             </div>
             <button
               aria-label={labels.supplements.close}
@@ -1502,7 +1667,7 @@ function SupplementDetailsModal({
           </div>
 
           <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <SupplementListMeta
                 label={labels.supplements.category}
                 value={draft.category}
@@ -1572,7 +1737,13 @@ function SupplementDetailsModal({
               <label className="grid gap-2 text-sm font-medium text-gray-700">
                 {labels.supplements.maxAmount}
                 <input
-                  className={inputClass}
+                  aria-invalid={doseRequired && !doseValid}
+                  className={classNames(
+                    inputClass,
+                    doseRequired && !doseValid
+                      ? "ring-red-300 focus:ring-red-500"
+                      : ""
+                  )}
                   min="0"
                   onChange={(event) =>
                     onChange({
@@ -1590,13 +1761,26 @@ function SupplementDetailsModal({
 
               <label className="grid gap-2 text-sm font-medium text-gray-700">
                 {labels.supplements.maxUnit}
-                <input
-                  className={inputClass}
+                <select
+                  aria-invalid={doseRequired && !doseValid}
+                  className={classNames(
+                    inputClass,
+                    doseRequired && !doseValid
+                      ? "ring-red-300 focus:ring-red-500"
+                      : ""
+                  )}
                   onChange={(event) =>
                     onChange({ maxUnit: event.target.value })
                   }
                   value={draft.maxUnit}
-                />
+                >
+                  <option value="">{labels.supplements.none}</option>
+                  {unitOptions.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {unit}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
 
@@ -1657,16 +1841,48 @@ function SupplementDetailsModal({
                 value={draft.safetyNotes ?? ""}
               />
             </label>
+
+            {!doseValid ? (
+              <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700 ring-1 ring-red-100">
+                {labels.supplements.doseValidationError}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col-reverse gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-            {error ? (
-              <p className="text-sm font-medium text-red-600">
-                {labels.supplements.updateError}
-              </p>
-            ) : (
-              <span />
-            )}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button
+                aria-label={labels.supplements.suggestDose}
+                className="inline-flex size-9 items-center justify-center rounded-md bg-[#3A7BD5] text-white shadow-sm transition hover:bg-[#2F67B8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3A7BD5] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={suggestingDose}
+                onClick={() => void suggestDose()}
+                title={labels.supplements.suggestDose}
+                type="button"
+              >
+                <SparklesIcon
+                  aria-hidden={true}
+                  className={classNames(
+                    "size-5",
+                    suggestingDose ? "animate-pulse" : ""
+                  )}
+                />
+              </button>
+              {suggestingDose ? (
+                <p className="text-sm font-medium text-[#3A7BD5]">
+                  {labels.supplements.suggestDoseBusy}
+                </p>
+              ) : null}
+              {suggestDoseError ? (
+                <p className="text-sm font-medium text-red-600">
+                  {labels.supplements.suggestDoseError}
+                </p>
+              ) : null}
+              {error ? (
+                <p className="text-sm font-medium text-red-600">
+                  {labels.supplements.updateError}
+                </p>
+              ) : null}
+            </div>
             <div className="flex gap-3">
               <button
                 className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
@@ -1677,7 +1893,7 @@ function SupplementDetailsModal({
               </button>
               <button
                 className="rounded-md bg-[#1FA77A] px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#188865] disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={saving}
+                disabled={saving || suggestingDose || !doseValid}
                 onClick={onSave}
                 type="button"
               >
@@ -1700,11 +1916,312 @@ function reviewKindLabel(labels: AdminContent, row: AdminReviewJobRow) {
     return labels.reviewQueue.unknown;
   }
 
+  if (row.reviewKind === "dose_unverified") {
+    return labels.reviewQueue.doseUnverified;
+  }
+
   return labels.reviewQueue.reviewRequired;
 }
 
-function canDismissReviewJob(row: AdminReviewJobRow) {
-  return row.reviewKind === "dose_reduced" || row.actionOptions.includes("dismiss");
+function reviewPriorityPill(labels: AdminContent, priority: number) {
+  if (priority >= 10) {
+    return {
+      className: "bg-red-50 text-red-700 ring-red-200",
+      label: labels.reviewQueue.highPriority
+    };
+  }
+
+  if (priority >= 5) {
+    return {
+      className: "bg-amber-50 text-amber-800 ring-amber-200",
+      label: labels.reviewQueue.mediumPriority
+    };
+  }
+
+  return {
+    className: "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]",
+    label: labels.reviewQueue.lowPriority
+  };
+}
+
+function reviewContextText(
+  labels: AdminContent,
+  row: AdminReviewJobRow
+) {
+  const details = [
+    row.planId ? `${labels.reviewQueue.plan}: ${row.planId}` : "",
+    row.originalDose
+      ? `${labels.reviewQueue.originalDose}: ${row.originalDose}`
+      : "",
+    row.newDose ? `${labels.reviewQueue.newDose}: ${row.newDose}` : ""
+  ].filter(Boolean);
+
+  return details.length > 0 ? details.join(" · ") : null;
+}
+
+function reviewRowToSupplementDraft(
+  labels: AdminContent,
+  row: AdminReviewJobRow
+): AdminSupplementRow {
+  const priority = reviewPriorityPill(labels, row.priority);
+
+  return {
+    category: reviewKindLabel(labels, row),
+    confidence: row.reviewKind === "unknown_supplement" ? "low" : "moderate",
+    id: row.id,
+    ingredientType: `${reviewKindLabel(labels, row)} · ${priority.label}`,
+    listStatus: "review_required",
+    maxAmount: row.maxAmount,
+    maxUnit: row.maxUnit ?? "",
+    name: row.supplementName,
+    primaryUseCase: null,
+    safetyFlags: [],
+    safetyNotes: reviewContextText(labels, row),
+    sourceStatus: "recommended_add",
+    updatedAt: row.queuedAt
+  };
+}
+
+function formatReviewQueueDose(
+  amount: number | null,
+  unit: string | null,
+  locale: Locale
+) {
+  if (amount === null && !unit) {
+    return "—";
+  }
+
+  const formattedAmount =
+    amount === null
+      ? "—"
+      : new Intl.NumberFormat(formatLocale(locale), {
+          maximumFractionDigits: 2
+        }).format(amount);
+
+  return unit ? `${formattedAmount} ${unit}` : formattedAmount;
+}
+
+function PlanSafetyReviewModal({
+  error,
+  labels,
+  locale,
+  onClose,
+  onDecision,
+  row,
+  saving
+}: Readonly<{
+  error: boolean;
+  labels: AdminContent;
+  locale: Locale;
+  onClose: () => void;
+  onDecision: (
+    decision: "approve" | "disapprove",
+    clientDoseAmount: number | null,
+    clientDoseUnit: string,
+    reviewerNote: string | null
+  ) => void;
+  row: AdminReviewJobRow;
+  saving: boolean;
+}>) {
+  const [clientDoseAmount, setClientDoseAmount] = useState<number | null>(
+    row.clientDoseAmount
+  );
+  const [clientDoseUnit, setClientDoseUnit] = useState(row.clientDoseUnit ?? "");
+  const [reviewerNote, setReviewerNote] = useState("");
+  const inputClass =
+    "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]";
+  const unitOptions =
+    clientDoseUnit &&
+    !(supplementDoseUnits as readonly string[]).includes(clientDoseUnit)
+      ? [clientDoseUnit, ...supplementDoseUnits]
+      : supplementDoseUnits;
+  const doseValid =
+    clientDoseAmount !== null &&
+    Number.isFinite(clientDoseAmount) &&
+    clientDoseAmount > 0 &&
+    clientDoseUnit.trim() !== "";
+  const planHref = row.planId
+    ? `/${locale}/assessment/results?plan=${encodeURIComponent(row.planId)}`
+    : "";
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <button
+        aria-label={labels.supplements.close}
+        className="fixed inset-0 cursor-default bg-gray-900/40"
+        onClick={onClose}
+        type="button"
+      />
+      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
+        <section
+          aria-modal={true}
+          className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-900/10"
+          role="dialog"
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+            <div>
+              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+                {reviewKindLabel(labels, row)}
+              </span>
+              <h2 className="mt-3 text-xl font-semibold text-gray-900">
+                {row.supplementName}
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                {formatGeneratedAt(row.queuedAt, locale)}
+              </p>
+            </div>
+            <button
+              aria-label={labels.supplements.close}
+              className="rounded-md p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
+              onClick={onClose}
+              type="button"
+            >
+              <XMarkIcon aria-hidden={true} className="size-5" />
+            </button>
+          </div>
+
+          <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+              <SupplementListMeta
+                label={labels.reviewQueue.clientDose}
+                value={
+                  row.clientDoseText ??
+                  formatReviewQueueDose(
+                    row.clientDoseAmount,
+                    row.clientDoseUnit,
+                    locale
+                  )
+                }
+              />
+              <SupplementListMeta
+                label={labels.supplements.maxAmount}
+                value={formatReviewQueueDose(
+                  row.limitAmount ?? row.maxAmount,
+                  row.limitUnit ?? row.maxUnit,
+                  locale
+                )}
+              />
+              <SupplementListMeta
+                label={labels.reviewQueue.plan}
+                value={
+                  planHref ? (
+                    <a
+                      className="text-[#3A7BD5] hover:text-[#2F67B8]"
+                      href={planHref}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {row.planId}
+                    </a>
+                  ) : (
+                    "—"
+                  )
+                }
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="grid gap-2 text-sm font-medium text-gray-700">
+                {labels.supplements.maxAmount}
+                <input
+                  aria-invalid={!doseValid}
+                  className={classNames(
+                    inputClass,
+                    !doseValid ? "ring-red-300 focus:ring-red-500" : ""
+                  )}
+                  min="0"
+                  onChange={(event) =>
+                    setClientDoseAmount(
+                      event.target.value === ""
+                        ? null
+                        : Number(event.target.value)
+                    )
+                  }
+                  step="any"
+                  type="number"
+                  value={clientDoseAmount ?? ""}
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-gray-700">
+                {labels.supplements.maxUnit}
+                <select
+                  aria-invalid={!doseValid}
+                  className={classNames(
+                    inputClass,
+                    !doseValid ? "ring-red-300 focus:ring-red-500" : ""
+                  )}
+                  onChange={(event) => setClientDoseUnit(event.target.value)}
+                  value={clientDoseUnit}
+                >
+                  <option value="">{labels.supplements.none}</option>
+                  {unitOptions.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {unit}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label className="grid gap-2 text-sm font-medium text-gray-700">
+              {labels.reviewQueue.reviewerNote}
+              <textarea
+                className={classNames(inputClass, "min-h-28 resize-y")}
+                onChange={(event) => setReviewerNote(event.target.value)}
+                value={reviewerNote}
+              />
+            </label>
+
+            {error ? (
+              <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700 ring-1 ring-red-100">
+                {labels.supplements.updateError}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
+            <button
+              className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+              onClick={onClose}
+              type="button"
+            >
+              {labels.supplements.close}
+            </button>
+            <button
+              className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={saving}
+              onClick={() =>
+                onDecision(
+                  "disapprove",
+                  clientDoseAmount,
+                  clientDoseUnit,
+                  reviewerNote.trim() || null
+                )
+              }
+              type="button"
+            >
+              {labels.reviewQueue.disapprove}
+            </button>
+            <button
+              className="rounded-md bg-[#1FA77A] px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#188865] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={saving || !doseValid}
+              onClick={() =>
+                onDecision(
+                  "approve",
+                  clientDoseAmount,
+                  clientDoseUnit,
+                  reviewerNote.trim() || null
+                )
+              }
+              type="button"
+            >
+              {saving ? "..." : labels.reviewQueue.approve}
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
 }
 
 function AdminReviewQueueView({
@@ -1718,19 +2235,72 @@ function AdminReviewQueueView({
   labels: AdminContent;
   locale: Locale;
 }>) {
-  const [queueData, setQueueData] = useState(data);
-  const [errorId, setErrorId] = useState<string | null>(null);
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [queueState, setQueueState] = useState<{
+    data: AdminReviewQueueData;
+    generatedAt: string;
+  }>({
+    data,
+    generatedAt: data.generatedAt
+  });
+  const [errorReviewId, setErrorReviewId] = useState<string | null>(null);
+  const [savingReviewId, setSavingReviewId] = useState<string | null>(null);
+  const [selectedReview, setSelectedReview] = useState<{
+    draft: AdminSupplementRow;
+    queuedLabel: string;
+    row: AdminReviewJobRow;
+  } | null>(null);
+  const queueData =
+    queueState.generatedAt === data.generatedAt ? queueState.data : data;
+  const sortedRows = [...queueData.rows].sort((left, right) => {
+    const priorityDifference = right.priority - left.priority;
 
-  async function dismissRow(row: AdminReviewJobRow) {
-    setSavingId(row.id);
-    setErrorId(null);
+    if (priorityDifference !== 0) {
+      return priorityDifference;
+    }
+
+    return (
+      new Date(left.queuedAt).getTime() - new Date(right.queuedAt).getTime()
+    );
+  });
+
+  function setLocalQueueData(
+    next:
+      | AdminReviewQueueData
+      | ((currentData: AdminReviewQueueData) => AdminReviewQueueData)
+  ) {
+    setQueueState((currentState) => {
+      const currentData =
+        currentState.generatedAt === data.generatedAt
+          ? currentState.data
+          : data;
+
+      return {
+        data:
+          typeof next === "function"
+            ? next(currentData)
+            : next,
+        generatedAt: data.generatedAt
+      };
+    });
+  }
+
+  async function saveReview(row: AdminSupplementRow) {
+    setSavingReviewId(row.id);
+    setErrorReviewId(null);
 
     try {
       const response = await fetch(`/api/admin/review-jobs/${row.id}`, {
         body: JSON.stringify({
           accessToken,
-          action: "dismiss"
+          action: "resolve",
+          category: row.category,
+          confidence: row.confidence,
+          listStatus: row.listStatus,
+          maxAmount: row.maxAmount,
+          maxUnit: row.maxUnit,
+          safetyFlags: row.safetyFlags,
+          safetyNotes: row.safetyNotes,
+          supplementName: row.name
         }),
         headers: {
           "Content-Type": "application/json"
@@ -1739,130 +2309,231 @@ function AdminReviewQueueView({
       });
 
       if (!response.ok) {
-        throw new Error("Unable to dismiss review job");
+        const errorPayload = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+
+        throw new Error(
+          errorPayload?.message ?? "Unable to resolve review job"
+        );
       }
 
       const payload = (await response.json()) as {
         data?: AdminReviewQueueData;
       };
 
-      setQueueData(
-        payload.data ?? {
-          ...queueData,
-          rows: queueData.rows.filter((item) => item.id !== row.id)
-        }
-      );
-    } catch {
-      setErrorId(row.id);
+      if (payload.data) {
+        setLocalQueueData(payload.data);
+      } else {
+        setLocalQueueData((currentData) => {
+          const rows = currentData.rows.filter((item) => item.id !== row.id);
+
+          return {
+            ...currentData,
+            rows,
+            summary: {
+              doseReduced: rows.filter(
+                (item) => item.reviewKind === "dose_reduced"
+              ).length,
+              reviewRequired: rows.filter(
+                (item) =>
+                  item.reviewKind !== "dose_reduced" &&
+                  item.reviewKind !== "unknown_supplement"
+              ).length,
+              total: rows.length,
+              unknown: rows.filter(
+                (item) => item.reviewKind === "unknown_supplement"
+              ).length
+            }
+          };
+        });
+      }
+
+      setSelectedReview(null);
+    } catch (saveError) {
+      console.error("Unable to resolve review job", saveError);
+      setErrorReviewId(row.id);
     } finally {
-      setSavingId(null);
+      setSavingReviewId(null);
+    }
+  }
+
+  async function decidePlanReview(
+    row: AdminReviewJobRow,
+    decision: "approve" | "disapprove",
+    clientDoseAmount: number | null,
+    clientDoseUnit: string,
+    reviewerNote: string | null
+  ) {
+    setSavingReviewId(row.id);
+    setErrorReviewId(null);
+
+    try {
+      const response = await fetch(`/api/admin/review-jobs/${row.id}`, {
+        body: JSON.stringify({
+          accessToken,
+          action: decision,
+          clientDoseAmount,
+          clientDoseUnit,
+          reviewerNote
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "PATCH"
+      });
+
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+
+        throw new Error(
+          errorPayload?.message ?? "Unable to update plan review"
+        );
+      }
+
+      const payload = (await response.json()) as {
+        data?: AdminReviewQueueData;
+      };
+
+      if (payload.data) {
+        setLocalQueueData(payload.data);
+      }
+
+      setSelectedReview(null);
+    } catch (decisionError) {
+      console.error("Unable to update plan review", decisionError);
+      setErrorReviewId(row.id);
+    } finally {
+      setSavingReviewId(null);
     }
   }
 
   return (
     <section className="mt-8 space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FlowSummaryCard
+          compact={true}
           label={labels.reviewQueue.total}
           value={formatNumber(queueData.summary.total, locale)}
         />
         <FlowSummaryCard
-          label={labels.reviewQueue.doseReduced}
-          value={formatNumber(queueData.summary.doseReduced, locale)}
-        />
-        <FlowSummaryCard
+          compact={true}
           label={labels.reviewQueue.unknown}
           value={formatNumber(queueData.summary.unknown, locale)}
         />
         <FlowSummaryCard
+          compact={true}
           label={labels.reviewQueue.reviewRequired}
           value={formatNumber(queueData.summary.reviewRequired, locale)}
         />
       </div>
 
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
-        <div className="divide-y divide-gray-100">
-          {queueData.rows.map((row) => {
-            const canDismiss = canDismissReviewJob(row);
+      {sortedRows.length > 0 ? (
+        <div className="space-y-3">
+          {sortedRows.map((row) => {
+            const priority = reviewPriorityPill(labels, row.priority);
+            const planHref = row.planId
+              ? `/${locale}/assessment/results?plan=${encodeURIComponent(row.planId)}`
+              : "";
 
             return (
-              <article key={row.id} className="px-5 py-4">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
-                        {reviewKindLabel(labels, row)}
-                      </span>
-                      <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
-                        {labels.reviewQueue.priority}: {row.priority}
-                      </span>
-                    </div>
-                    <h3 className="mt-3 text-base font-semibold text-gray-900">
+              <article
+                key={row.id}
+                className="flex w-full items-center justify-between gap-4 rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50"
+              >
+                <div className="min-w-0 flex-1">
+                  <button
+                    className="block w-full text-left"
+                    onClick={() =>
+                      setSelectedReview({
+                        draft: reviewRowToSupplementDraft(labels, row),
+                        queuedLabel: formatGeneratedAt(row.queuedAt, locale),
+                        row
+                      })
+                    }
+                    type="button"
+                  >
+                    <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+                      {reviewKindLabel(labels, row)}
+                    </span>
+                    <h3 className="mt-3 truncate text-base font-semibold text-gray-900">
                       {row.supplementName}
                     </h3>
-                    <div className="mt-3 grid gap-3 text-sm text-gray-600 sm:grid-cols-2 xl:grid-cols-4">
-                      <SupplementListMeta
-                        label={labels.reviewQueue.plan}
-                        value={row.planId ?? "—"}
-                      />
-                      <SupplementListMeta
-                        label={labels.reviewQueue.originalDose}
-                        value={row.originalDose ?? "—"}
-                      />
-                      <SupplementListMeta
-                        label={labels.reviewQueue.newDose}
-                        value={row.newDose ?? "—"}
-                      />
-                      <SupplementListMeta
-                        label={labels.reviewQueue.maxDose}
-                        value={
-                          row.maxAmount === null && !row.maxUnit
-                            ? "—"
-                            : `${row.maxAmount ?? "—"} ${row.maxUnit ?? ""}`.trim()
-                        }
-                      />
-                    </div>
-                    {row.requiredFields.length > 0 ? (
-                      <p className="mt-3 text-xs font-medium text-gray-500">
-                        {labels.reviewQueue.requiredFields}:{" "}
-                        {row.requiredFields.join(", ")}
-                      </p>
-                    ) : null}
-                    <p className="mt-3 text-xs text-gray-400">
-                      {labels.reviewQueue.queued}:{" "}
-                      {formatGeneratedAt(row.queuedAt, locale)}
-                    </p>
-                    {errorId === row.id ? (
-                      <p className="mt-3 text-sm font-medium text-red-600">
-                        {labels.reviewQueue.dismissError}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  {canDismiss ? (
-                    <button
-                      className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={savingId === row.id}
-                      onClick={() => {
-                        void dismissRow(row);
-                      }}
-                      type="button"
+                  </button>
+                  {planHref ? (
+                    <a
+                      className="mt-2 block truncate text-sm font-semibold text-[#3A7BD5] hover:text-[#2F67B8]"
+                      href={planHref}
+                      rel="noreferrer"
+                      target="_blank"
                     >
-                      {savingId === row.id ? "..." : labels.reviewQueue.dismiss}
-                    </button>
+                      {row.planId}
+                    </a>
                   ) : null}
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <span
+                    className={classNames(
+                      priority.className,
+                      "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+                    )}
+                  >
+                    {priority.label}
+                  </span>
                 </div>
               </article>
             );
           })}
         </div>
+      ) : (
+        <div className="rounded-2xl bg-white px-5 py-12 text-center text-sm font-medium text-gray-500 shadow-sm ring-1 ring-gray-200">
+          {labels.reviewQueue.empty}
+        </div>
+      )}
 
-        {queueData.rows.length === 0 ? (
-          <div className="border-t border-gray-100 px-5 py-12 text-center text-sm font-medium text-gray-500">
-            {labels.reviewQueue.empty}
-          </div>
-        ) : null}
-      </div>
+      {selectedReview?.row.reviewKind === "unknown_supplement" ? (
+        <SupplementDetailsModal
+          accessToken={accessToken}
+          draft={selectedReview.draft}
+          error={errorReviewId === selectedReview.draft.id}
+          headerNote={selectedReview.queuedLabel}
+          labels={labels}
+          locale={locale}
+          onChange={(patch) =>
+            setSelectedReview((currentReview) =>
+              currentReview
+                ? {
+                    ...currentReview,
+                    draft: { ...currentReview.draft, ...patch }
+                  }
+                : currentReview
+            )
+          }
+          onClose={() => setSelectedReview(null)}
+          onSave={() => void saveReview(selectedReview.draft)}
+          saving={savingReviewId === selectedReview.draft.id}
+        />
+      ) : selectedReview ? (
+        <PlanSafetyReviewModal
+          error={errorReviewId === selectedReview.row.id}
+          labels={labels}
+          locale={locale}
+          onClose={() => setSelectedReview(null)}
+          onDecision={(decision, clientDoseAmount, clientDoseUnit, reviewerNote) =>
+            void decidePlanReview(
+              selectedReview.row,
+              decision,
+              clientDoseAmount,
+              clientDoseUnit,
+              reviewerNote
+            )
+          }
+          row={selectedReview.row}
+          saving={savingReviewId === selectedReview.row.id}
+        />
+      ) : null}
     </section>
   );
 }
@@ -1893,24 +2564,45 @@ function severityClass(value: AdminTechnicalSeverity) {
   return "bg-gray-50 text-gray-700 ring-gray-200";
 }
 
-function jobStatusLabel(labels: AdminContent, status: AdminJobRow["status"]) {
-  return labels.jobs[status];
-}
-
-function jobStatusClass(status: AdminJobRow["status"]) {
+function jobCardClass(status: AdminJobRow["status"]) {
   if (status === "failed") {
-    return "bg-red-50 text-red-700 ring-red-100";
+    return "border-red-200";
   }
 
   if (status === "running") {
-    return "bg-blue-50 text-blue-700 ring-blue-100";
+    return "border-blue-200";
   }
 
   if (status === "complete") {
-    return "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]";
+    return "border-[#A7F3D0]";
   }
 
-  return "bg-amber-50 text-amber-800 ring-amber-200";
+  return "border-amber-200";
+}
+
+function payloadText(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function jobCardTitle(row: AdminJobRow) {
+  const payloadTitle =
+    payloadText(row.payload, "title") ||
+    payloadText(row.payload, "supplementName") ||
+    payloadText(row.payload, "emailType") ||
+    payloadText(row.payload, "actionType") ||
+    payloadText(row.payload, "requestId");
+
+  if (payloadTitle) {
+    return readableToken(payloadTitle);
+  }
+
+  if (row.latestAuditEvent) {
+    return readableToken(row.latestAuditEvent);
+  }
+
+  return row.planId ? row.planId : readableToken(row.jobType);
 }
 
 function jsonPreview(value: Record<string, unknown>) {
@@ -2060,130 +2752,80 @@ function AdminJobsView({
         />
       </div>
 
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
-        <div className="divide-y divide-gray-100">
-          {data.rows.map((row) => {
-            const payload = jsonPreview(row.payload);
-            const auditPayload = jsonPreview(row.latestAuditPayload);
-
-            return (
-              <article key={row.id} className="px-5 py-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={classNames(
-                          jobStatusClass(row.status),
-                          "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
-                        )}
-                      >
-                        {jobStatusLabel(labels, row.status)}
-                      </span>
-                      <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
-                        {labels.jobs.attempts}: {row.attempts}
-                      </span>
-                      <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
-                        {labels.jobs.priority}: {row.priority}
-                      </span>
-                    </div>
-
-                    <h3 className="mt-3 text-base font-semibold text-gray-900">
-                      {readableToken(row.jobType)}
-                    </h3>
-
-                    {row.errorMessage ? (
-                      <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 ring-1 ring-red-100">
-                        {row.errorMessage}
-                      </p>
-                    ) : null}
-
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      <SupplementListMeta
-                        label={labels.jobs.plan}
-                        value={row.planId ?? "—"}
-                      />
-                      <SupplementListMeta
-                        label={labels.jobs.queued}
-                        value={formatGeneratedAt(row.queuedAt, locale)}
-                      />
-                      <SupplementListMeta
-                        label={labels.jobs.started}
-                        value={
-                          row.startedAt
-                            ? formatGeneratedAt(row.startedAt, locale)
-                            : "—"
-                        }
-                      />
-                      <SupplementListMeta
-                        label={labels.jobs.completed}
-                        value={
-                          row.completedAt || row.failedAt
-                            ? formatGeneratedAt(
-                                row.completedAt ?? row.failedAt ?? row.updatedAt,
-                                locale
-                              )
-                            : "—"
-                        }
-                      />
-                    </div>
-
-                    {row.latestAuditEvent ? (
-                      <p className="mt-4 text-sm text-gray-600">
-                        <span className="font-semibold text-gray-900">
-                          {labels.jobs.audit}:
-                        </span>{" "}
-                        {readableToken(row.latestAuditEvent)}
-                        {row.latestAuditAt
-                          ? ` · ${formatGeneratedAt(row.latestAuditAt, locale)}`
-                          : ""}
-                      </p>
-                    ) : null}
-
-                    {payload || auditPayload ? (
-                      <details className="mt-4 rounded-xl bg-gray-50 p-3 text-xs text-gray-600 ring-1 ring-gray-100">
-                        <summary className="cursor-pointer font-semibold text-gray-700">
-                          {labels.jobs.audit}
-                        </summary>
-                        {payload ? (
-                          <pre className="mt-3 overflow-x-auto whitespace-pre-wrap">
-                            {payload}
-                          </pre>
-                        ) : null}
-                        {auditPayload ? (
-                          <pre className="mt-3 overflow-x-auto whitespace-pre-wrap">
-                            {auditPayload}
-                          </pre>
-                        ) : null}
-                      </details>
-                    ) : null}
-                  </div>
+      {data.rows.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {data.rows.map((row) => (
+            <article
+              className={classNames(
+                jobCardClass(row.status),
+                "rounded-2xl border bg-white p-5 shadow-sm"
+              )}
+              key={row.id}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    {labels.jobs.action}
+                  </p>
+                  <p className="mt-1 truncate text-sm font-semibold text-gray-900">
+                    {readableToken(row.jobType)}
+                  </p>
                 </div>
-              </article>
-            );
-          })}
-        </div>
+                <div className="shrink-0 rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-900 ring-1 ring-gray-200">
+                  {labels.jobs.priority}: {row.priority}
+                </div>
+              </div>
 
-        {data.rows.length === 0 ? (
-          <div className="border-t border-gray-100 px-5 py-12 text-center text-sm font-medium text-gray-500">
-            {labels.jobs.empty}
-          </div>
-        ) : null}
-      </div>
+              <div className="mt-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  {labels.jobs.title}
+                </p>
+                <h3 className="mt-1 line-clamp-2 text-base font-semibold text-gray-900">
+                  {jobCardTitle(row)}
+                </h3>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl bg-white px-5 py-12 text-center text-sm font-medium text-gray-500 shadow-sm ring-1 ring-gray-200">
+          {labels.jobs.empty}
+        </div>
+      )}
     </section>
   );
 }
 
 function FlowSummaryCard({
+  compact = false,
   label,
   value
 }: Readonly<{
+  compact?: boolean;
   label: string;
   value: string;
 }>) {
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-      <p className="text-sm font-semibold text-gray-500">{label}</p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-[#20343A]">
+    <div
+      className={classNames(
+        "rounded-2xl bg-white shadow-sm ring-1 ring-gray-200",
+        compact ? "p-3" : "p-5"
+      )}
+    >
+      <p
+        className={classNames(
+          "font-semibold text-gray-500",
+          compact ? "text-xs" : "text-sm"
+        )}
+      >
+        {label}
+      </p>
+      <p
+        className={classNames(
+          "font-semibold tracking-tight text-[#20343A]",
+          compact ? "mt-1 text-xl" : "mt-3 text-3xl"
+        )}
+      >
         {value}
       </p>
     </div>

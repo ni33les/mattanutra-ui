@@ -3,6 +3,12 @@ import { randomUUID } from "node:crypto";
 import type { AssessmentPlan } from "@/lib/assessment-jobs";
 import { toJsonValue } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
+import {
+  doseExceedsLimit,
+  parseDose,
+  parseDoseLimit,
+  type ParsedDose
+} from "@/lib/dose-conversion";
 import type { FormulationBlueprint, FormulationIngredient, LocalizedText } from "@/lib/formulation-types";
 import type { Locale } from "@/lib/i18n";
 
@@ -36,14 +42,6 @@ type SupplementRow = Readonly<{
   safety_notes: string | null;
 }>;
 
-type DoseUnit = "g" | "iu" | "mcg" | "mg";
-
-type ParsedDose = Readonly<{
-  amount: number;
-  originalText: string;
-  unit: DoseUnit;
-}>;
-
 type MatchedSupplement = SupplementRow & {
   requestedName: string;
 };
@@ -53,12 +51,6 @@ type ReviewKind =
   | "dose_unverified"
   | "review_required"
   | "unknown_supplement";
-
-const MASS_TO_MCG: Record<Exclude<DoseUnit, "iu">, number> = {
-  g: 1_000_000,
-  mcg: 1,
-  mg: 1_000
-};
 
 function textFromLocalized(value: LocalizedText) {
   return typeof value === "string" ? value : value.en || value.th || "";
@@ -85,71 +77,6 @@ function numberOrNull(value: number | string | null) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function normalizedUnit(value: string): DoseUnit | null {
-  const unit = value.toLowerCase().replace("µg", "mcg").replace("ug", "mcg");
-
-  if (unit === "g" || unit === "iu" || unit === "mcg" || unit === "mg") {
-    return unit;
-  }
-
-  return null;
-}
-
-function parseDose(text: string): ParsedDose | null {
-  const matches = [
-    ...text
-      .toLowerCase()
-      .replaceAll(",", "")
-      .replaceAll("µg", "mcg")
-      .replaceAll("ug", "mcg")
-      .matchAll(/(\d+(?:\.\d+)?)\s*(mcg|mg|g|iu)\b/g)
-  ];
-
-  const parsed = matches
-    .map((match) => {
-      const amount = Number(match[1]);
-      const unit = normalizedUnit(match[2] ?? "");
-
-      return Number.isFinite(amount) && unit
-        ? ({ amount, originalText: text, unit } satisfies ParsedDose)
-        : null;
-    })
-    .filter((candidate): candidate is ParsedDose => Boolean(candidate));
-
-  if (parsed.length < 1) {
-    return null;
-  }
-
-  return parsed.sort((a, b) => normalizedDoseAmount(b) - normalizedDoseAmount(a))[0];
-}
-
-function normalizedDoseAmount(dose: ParsedDose) {
-  return dose.unit === "iu" ? dose.amount : dose.amount * MASS_TO_MCG[dose.unit];
-}
-
-function maxDose(maxAmount: number | null, maxUnit: string | null): ParsedDose | null {
-  if (maxAmount === null || maxAmount < 0 || !maxUnit) {
-    return null;
-  }
-
-  const unit = normalizedUnit(
-    maxUnit
-      .toLowerCase()
-      .replace("mcg rae", "mcg")
-      .match(/\b(mcg|µg|ug|mg|g|iu)\b/)?.[1] ?? ""
-  );
-
-  return unit ? { amount: maxAmount, originalText: maxUnit, unit } : null;
-}
-
-function doseExceedsLimit(dose: ParsedDose, limit: ParsedDose) {
-  if (dose.unit === "iu" || limit.unit === "iu") {
-    return dose.unit === limit.unit ? dose.amount > limit.amount : null;
-  }
-
-  return normalizedDoseAmount(dose) > normalizedDoseAmount(limit);
 }
 
 function formatDose(amount: number, unit: string | null) {
@@ -642,9 +569,12 @@ export async function applyFormulationSafety(
 
   for (const ingredient of input.formulation.supplementBreakdown) {
     const match = matchSupplement(lookup, ingredient);
-    const dose = parseDose(textFromLocalized(ingredient.dailyDose));
+    const dose = parseDose(
+      textFromLocalized(ingredient.dailyDose),
+      match?.normalized_name
+    );
     const limit = match
-      ? maxDose(numberOrNull(match.max_amount), match.max_unit)
+      ? parseDoseLimit(numberOrNull(match.max_amount), match.max_unit)
       : null;
 
     if (!match) {
@@ -735,7 +665,7 @@ export async function applyFormulationSafety(
     }
 
     if (dose && limit) {
-      const exceedsLimit = doseExceedsLimit(dose, limit);
+      const exceedsLimit = doseExceedsLimit(dose, limit, match.normalized_name);
 
       if (exceedsLimit === null) {
         summary.hiddenCount += 1;

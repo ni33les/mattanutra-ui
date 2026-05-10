@@ -1681,7 +1681,7 @@ select
   seed.safety_notes,
   seed.source_url
 from seed
-join public.supplements supplements on supplements.normalized_name = seed.normalized_name
+join upserted_supplements supplements on supplements.normalized_name = seed.normalized_name
 on conflict (supplement_id, version) do update
 set
   max_amount = excluded.max_amount,

@@ -57,6 +57,8 @@ type CopyLabels = Record<
   | "formulaEmptyBody"
   | "formulaEmptyTitle"
   | "formulaHint"
+  | "formulaNoVisibleBody"
+  | "formulaNoVisibleTitle"
   | "generated"
   | "goals"
   | "heroSubtitle"
@@ -104,6 +106,9 @@ const copy = {
     formulaEmptyTitle: "Safety review in progress",
     formulaHint:
       "Your suggested supplement stack, grouped by role, with practical daily dose guidance.",
+    formulaNoVisibleBody:
+      "The reviewed items are no longer pending. Only supplements that pass MattaNutra review are shown here.",
+    formulaNoVisibleTitle: "No visible supplement suggestions",
     generated: "Generated",
     goals: "Goals",
     heroSubtitle:
@@ -154,6 +159,9 @@ const copy = {
     formulaEmptyTitle: "กำลังตรวจสอบความปลอดภัย",
     formulaHint:
       "รายการอาหารเสริมที่แนะนำ จัดกลุ่มตามบทบาท พร้อมขนาดรับประทานต่อวันที่ใช้งานได้จริง",
+    formulaNoVisibleBody:
+      "รายการที่รีวิวแล้วไม่ได้ค้างอยู่ในคิวอีกต่อไป หน้านี้จะแสดงเฉพาะรายการที่ผ่านการตรวจสอบของ MattaNutra",
+    formulaNoVisibleTitle: "ยังไม่มีรายการอาหารเสริมที่แสดงได้",
     generated: "สร้างเมื่อ",
     goals: "เป้าหมาย",
     heroSubtitle:
@@ -232,6 +240,16 @@ function getLocalizedText(value: LocalizedText, locale: Locale) {
   }
 
   return value[locale] || value.en || value.th;
+}
+
+function pendingReviewCount(result: FormulationResult) {
+  const summary = result.safetySummary;
+
+  if (!summary) {
+    return 0;
+  }
+
+  return Math.max(0, Number(summary.reviewCount ?? summary.hiddenCount ?? 0));
 }
 
 export function FormulationResults({ locale, planId }: FormulationResultsProps) {
@@ -398,6 +416,7 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
     }
   ).format(new Date(result.generatedAt));
   const effectiveResultPlanId = result.planId || effectivePlanId;
+  const hasPendingSafetyReview = pendingReviewCount(result) > 0;
 
   return (
     <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
@@ -475,6 +494,7 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]">
         <FormulaPanel
+          hasPendingSafetyReview={hasPendingSafetyReview}
           ingredients={orderedIngredients}
           labels={labels}
           locale={locale}
@@ -523,20 +543,17 @@ function SafetyReviewPanel({
   result: FormulationResult;
 }>) {
   const summary = result.safetySummary;
+  const pendingReviews = pendingReviewCount(result);
+  const adjustedCount = Math.max(0, Number(summary?.adjustedCount ?? 0));
 
-  if (
-    !summary ||
-    (summary.adjustedCount < 1 &&
-      summary.hiddenCount < 1 &&
-      summary.removedCount < 1)
-  ) {
+  if (!summary || (adjustedCount < 1 && pendingReviews < 1)) {
     return null;
   }
 
-  const showReviewNotice = summary.hiddenCount > 0 || summary.removedCount > 0;
+  const showReviewNotice = pendingReviews > 0;
   const messages = [
     showReviewNotice ? labels.safetyReviewBody : null,
-    summary.adjustedCount > 0 ? labels.doseAdjustedBody : null
+    adjustedCount > 0 ? labels.doseAdjustedBody : null
   ].filter((message): message is string => Boolean(message));
 
   return (
@@ -695,11 +712,13 @@ function ChatConnectPanel({
 }
 
 function FormulaPanel({
+  hasPendingSafetyReview,
   ingredients,
   labels,
   locale,
   productReferencesByIngredientId
 }: Readonly<{
+  hasPendingSafetyReview: boolean;
   ingredients: FormulationIngredient[];
   labels: PanelLabels;
   locale: Locale;
@@ -730,10 +749,14 @@ function FormulaPanel({
               className="mx-auto size-7 text-[#3A7BD5]"
             />
             <h3 className="mt-4 text-base font-semibold text-[#20343A]">
-              {labels.formulaEmptyTitle}
+              {hasPendingSafetyReview
+                ? labels.formulaEmptyTitle
+                : labels.formulaNoVisibleTitle}
             </h3>
             <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-              {labels.formulaEmptyBody}
+              {hasPendingSafetyReview
+                ? labels.formulaEmptyBody
+                : labels.formulaNoVisibleBody}
             </p>
           </div>
         ) : ingredients.map((ingredient) => {
