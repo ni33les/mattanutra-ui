@@ -69,7 +69,7 @@ flowchart TB
 - BPM tracking for funnel, campaign, affiliate, safety, error, email, chat, and formulation events.
 - Admin dashboard with KPI and Conversions views over hour, day, week, month, year, and all-time windows.
 - Admin Technical section with Alerts and Legacy Jobs views for failed email sends, stuck compatibility records, cron failures, AI/worker errors, and recent job history.
-- Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported slow work now creates task-backed work items, and the worker only falls back to direct legacy jobs if task tables are unavailable.
+- Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported slow work now creates task-backed work items, human review decisions write reviewed formulation versions, and client review follow-up is queued as a task.
 - Admin Goals view showing goal status, priority, source, BPM/session ray, tasks, events, comments, dependencies, reservations, and approvals.
 - Dashboard filters for locale, device, source, medium, campaign, campaign ID, affiliate, promo code, selected plan, plan ID, ray, and email hash.
 
@@ -82,7 +82,7 @@ flowchart TB
 | Supplement governance | Whitelist, blacklist, max dose, and safety review basics exist; frequency and interaction rules are not wired yet | Add frequency, condition, medication, pregnancy, and lab interaction checks |
 | Product matching | Affiliate revenue depends on trusted products | Start with curated whitelist before marketplace automation |
 | Chat handoff | Pro needs a convincing ongoing service experience | Make one channel excellent first, likely LINE |
-| Human safety review | Flagged suggestions now enter Human Review and create Goal/Task records; client follow-up after review still needs completion | Add client notification states, post-review worker, and audit reporting |
+| Human safety review | Flagged suggestions now enter Human Review and create Goal/Task records; decisions update the plan append-only and queue a client follow-up task | Connect the follow-up task to real communication channels and audit reporting |
 | Follow-up nurture | Free users need more than one email | Define post-preview sequence |
 
 ## Sales Funnel Paths
@@ -272,19 +272,20 @@ flowchart TB
   B -->|Unknown supplement| I
   I --> J["Create Human Review job + Goal/Task"]
   I --> K["Log BPM safety alert"]
-  J --> L["Admin later chooses whitelist, review, blacklist, or ignore"]
+  J --> L["Admin reviews and decides"]
+  L --> M["Write reviewed formulation version"]
+  M --> N["Queue client follow-up task when needed"]
 
   classDef done fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:2px;
   classDef partial fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
   classDef todo fill:#ffffff,stroke:#94a3b8,color:#334155,stroke-width:1px;
 
-  class A,B,C,D,E,F,G,H,I,J,K done;
-  class L partial;
+  class A,B,C,D,E,F,G,H,I,J,K,L,M,N done;
 ```
 
 The legacy job queue still carries supplement review work as `job_type = 'supplement_review'` while this flow migrates. New review work also creates a Goal and Task, so admin decisions are visible in the goal timeline with task comments and events. The worker does not process these automatically; they appear in the admin Human Review queue for a human decision.
 
-The safety review record carries the operational details: supplement, dose, rule, context, linked goal/task where available, reviewer decision, and client notification state.
+The safety review record carries the operational details: supplement, dose, rule, context, linked goal/task where available, reviewer decision, reviewed formulation version, client message, and client notification state.
 
 ## Content and Marketing Engine
 

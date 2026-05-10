@@ -6,7 +6,8 @@ Last updated: 2026-05-10
 
 - [x] Ensure the safety review box is removed or marked complete once the review is finished.
 - [ ] Add email and LINE capture to the safety review box so the client can be contacted when review completes.
-- [ ] Create a post-review job and worker to contact the client after a human decision is made.
+- [x] Create a post-review task after a human safety decision is made.
+- [ ] Add the worker that contacts the client from the post-review task.
 - [ ] Reword the safety review box so it feels reassuring, clear, and action-oriented.
 - [ ] Move plans toward explicit communication channels: LINE, WhatsApp, and email.
 - [ ] For plan communications, choose the first available working chat channel first, then fall back to email.
@@ -20,7 +21,7 @@ Last updated: 2026-05-10
 
 ## Data And Versioning
 
-- [ ] Ensure all meaningful plan, formulation, supplement, and review changes are append-only new versions, with no in-place updates for business-critical records.
+- [ ] Ensure all meaningful plan, supplement, and review changes are append-only new versions, with no in-place updates for business-critical records. Human-reviewed formulations are now append-only.
 
 ## Sales And Marketing
 

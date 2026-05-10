@@ -25,7 +25,7 @@ Tasks and agents must remain completely separate. A task should require capabili
 | Comment | Working context for humans and agents. |
 | Event | Append-only audit record of what happened. |
 | Reservation | A lease showing that an agent is currently working on a task. |
-| Approval | Four-eyes or specialist review before work is allowed to proceed. |
+| Approval | A normal task/dependency pattern for human or specialist sign-off when a workflow needs it. |
 
 ## Goal And Ray Policy
 
@@ -81,7 +81,7 @@ New tasks should normally inherit the parent goal priority unless a workflow has
 
 ## Current Status
 
-Phases 1, 2, 3, 4, 5, 6, and 7 are implemented.
+Phases 1 through 11 are implemented.
 
 The following tables now exist in the schema:
 
@@ -273,7 +273,7 @@ Acceptance criteria:
 
 - Unknown supplements create one useful human task instead of noisy duplicates. Done.
 - Completing a review updates the downstream state. Done for the Human Review queue bridge.
-- Review completion removes the user-facing review box where appropriate. Done for plan-specific approve/disapprove; remaining client follow-up is tracked separately.
+- Review completion removes the user-facing review box where appropriate. Done for plan-specific approve/disapprove by writing a reviewed formulation version.
 - Every admin action writes task events and comments. Done for dismiss, resolve, approve, and disapprove.
 
 ## Phase 6: Goal-First Scheduling
@@ -410,9 +410,33 @@ Acceptance criteria:
 - Admin task queue replaces the old jobs page for operational visibility. Done through Goals; the old page is now labelled Legacy Jobs.
 - Historical jobs remain understandable. Done.
 
+## Phase 11: Human Review Completion Lifecycle
+
+Status: complete for plan-specific human review decisions.
+
+Human supplement review now closes the loop from reviewer decision to customer-visible formulation state and operational follow-up.
+
+Current behaviour:
+
+- Approving or disapproving a plan-specific supplement review writes a new formulation version instead of editing the existing formulation in place.
+- The reviewed formulation version removes the pending hidden-review item from the customer-visible result: approved items become visible with the reviewed dose; disapproved items are removed.
+- The `safety_reviews` row records the decision, reviewed formulation version, reviewer note, client message, and client notification state.
+- The legacy supplement review job is marked complete for compatibility.
+- The linked review task is completed with a task comment and event.
+- If the client needs to be told about the decision, a `client_safety_followup` task is queued under the same goal with the review decision, plan id, supplement, and reviewed dose.
+- The goal remains active while client follow-up is still queued, so the timeline does not pretend the work is finished before the client has been contacted.
+
+Acceptance criteria:
+
+- Human review completion is append-only for formulations. Done.
+- The safety review box disappears once all pending review items have been accepted or rejected. Done for plan-specific review decisions.
+- The admin decision is visible in `safety_reviews`, `job_audit_events`, `task_comments`, and `task_events`. Done.
+- Client follow-up is represented as a task rather than hidden state. Done.
+- The future communications worker has a clear task to reserve. Done through `client_safety_followup`.
+
 ## Remaining Plan From Here
 
-Next phase: remove compatibility writes only after status pages, cron links, email audit, and historical admin diagnostics have task-native replacements.
+Next phase: connect `client_safety_followup` to the communications-channel architecture so LINE, WhatsApp, Telegram, or email can notify the client after a review decision.
 
 ## Definition Of Done
 

@@ -71,6 +71,20 @@ type CompletedTaskRow = Readonly<{
   id: string;
 }>;
 
+type FormulationRow = Readonly<{
+  formulation: Record<string, unknown>;
+  model_version: string | null;
+  version: number;
+}>;
+
+type SafetyReviewDecisionRow = Readonly<{
+  client_notification_status: string;
+  goal_id: string | null;
+  id: string;
+  supplement_name: string;
+  task_id: string | null;
+}>;
+
 const REVIEW_TASK_TYPES = [
   "classify_supplement",
   "review_supplement_for_plan",
@@ -546,6 +560,251 @@ async function completeSupplementReviewTasks(
   }
 
   return tasks;
+}
+
+async function appendReviewedFormulationVersion(
+  transaction: Db,
+  input: Readonly<{
+    formulation: Record<string, unknown>;
+    previousModelVersion: string | null;
+    planId: string;
+    reviewEvent: string;
+    reviewJobId: string;
+  }>
+) {
+  const versionRows = await transaction<{ version: number }[]>`
+    select coalesce(max(version), 0) + 1 as version
+    from public.formulations
+    where plan_id = ${input.planId}::uuid
+  `;
+  const version = Number(versionRows[0]?.version ?? 1);
+  const modelVersion = [
+    input.previousModelVersion ?? "manual",
+    input.reviewEvent
+  ].join(":");
+
+  await transaction`
+    insert into public.formulations (
+      plan_id,
+      version,
+      formulation,
+      model_version,
+      generated_at,
+      updated_at
+    )
+    values (
+      ${input.planId}::uuid,
+      ${version},
+      ${transaction.json(toJsonValue(input.formulation))},
+      ${modelVersion},
+      now(),
+      now()
+    )
+  `;
+
+  await transaction`
+    insert into public.job_audit_events (
+      id,
+      job_id,
+      plan_id,
+      event_type,
+      level,
+      event_payload,
+      created_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${input.reviewJobId}::uuid,
+      ${input.planId}::uuid,
+      'formulation_review_version_written',
+      'medium',
+      ${transaction.json(
+        toJsonValue({
+          formulationVersion: version,
+          previousModelVersion: input.previousModelVersion,
+          reviewEvent: input.reviewEvent
+        })
+      )},
+      now()
+    )
+  `;
+
+  return version;
+}
+
+async function queueClientSafetyFollowupTask(
+  transaction: Db,
+  input: Readonly<{
+    actor?: string | null;
+    clientDose: string | null;
+    decision: "approve" | "disapprove";
+    goalId: string | null;
+    parentTaskId: string | null;
+    planId: string;
+    reviewJobId: string;
+    safetyReviewId: string;
+    supplementName: string;
+  }>
+) {
+  if (!input.goalId || !(await taskTablesAvailable(transaction))) {
+    return null;
+  }
+
+  const idempotencyKey = `client-safety-followup:${input.safetyReviewId}`;
+  const existing = await transaction<{ id: string }[]>`
+    select id::text
+    from public.tasks
+    where goal_id = ${input.goalId}::uuid
+      and idempotency_key = ${idempotencyKey}
+      and status not in ('completed', 'failed', 'cancelled', 'skipped')
+    order by created_at desc
+    limit 1
+  `;
+
+  if (existing[0]?.id) {
+    return existing[0].id;
+  }
+
+  const goalRows = await transaction<{ priority: number | string }[]>`
+    select priority
+    from public.goals
+    where id = ${input.goalId}::uuid
+    limit 1
+  `;
+  const goalPriority = Number(goalRows[0]?.priority ?? 3);
+  const priority = Math.min(
+    6,
+    Math.max(5, Number.isFinite(goalPriority) ? goalPriority : 3)
+  );
+  const taskId = randomUUID();
+  const title = `Notify client about ${input.supplementName}`;
+  const payloadObject = {
+    clientDose: input.clientDose,
+    decision: input.decision,
+    planId: input.planId,
+    reviewJobId: input.reviewJobId,
+    safetyReviewId: input.safetyReviewId,
+    source: "human_review_completion",
+    supplementName: input.supplementName
+  };
+  const payload = toJsonValue(payloadObject);
+
+  await transaction`
+    insert into public.tasks (
+      id,
+      goal_id,
+      parent_task_id,
+      plan_id,
+      task_type,
+      title,
+      description,
+      actor_type,
+      status,
+      priority,
+      required_capabilities,
+      reasoning_effort,
+      payload,
+      idempotency_key,
+      max_attempts,
+      scheduled_for,
+      created_at,
+      updated_at
+    )
+    values (
+      ${taskId}::uuid,
+      ${input.goalId}::uuid,
+      ${input.parentTaskId ?? null}::uuid,
+      ${input.planId}::uuid,
+      'client_safety_followup',
+      ${title},
+      'Tell the client that a human safety review has been completed.',
+      'human',
+      'queued',
+      ${priority},
+      ${["client_safety_followup"]}::text[],
+      'none',
+      ${transaction.json(payload)},
+      ${idempotencyKey},
+      1,
+      now(),
+      now(),
+      now()
+    )
+  `;
+
+  await transaction`
+    update public.goals
+    set
+      status = case
+        when status in ('completed', 'open') then 'active'
+        else status
+      end,
+      completed_at = case
+        when status = 'completed' then null
+        else completed_at
+      end,
+      updated_at = now()
+    where id = ${input.goalId}::uuid
+  `;
+
+  await transaction`
+    insert into public.task_comments (
+      id,
+      task_id,
+      goal_id,
+      author_type,
+      author_name,
+      visibility,
+      comment_type,
+      body,
+      metadata,
+      created_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${taskId}::uuid,
+      ${input.goalId}::uuid,
+      'system',
+      'MattaNutra safety',
+      'admin',
+      'instruction',
+      'A human safety review is complete. Contact the client through the best available channel.',
+      ${transaction.json(payload)},
+      now()
+    )
+  `;
+
+  await transaction`
+    insert into public.task_events (
+      id,
+      task_id,
+      goal_id,
+      event_type,
+      event_status,
+      severity,
+      event_payload,
+      occurred_at,
+      created_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${taskId}::uuid,
+      ${input.goalId}::uuid,
+      'client_safety_followup_queued',
+      'requested',
+      'medium',
+      ${transaction.json(
+        toJsonValue({
+          actor: input.actor ?? "admin_dashboard",
+          ...payloadObject
+        })
+      )},
+      now(),
+      now()
+    )
+  `;
+
+  return taskId;
 }
 
 export async function dismissAdminReviewJob({
@@ -1031,13 +1290,13 @@ export async function decideAdminPlanReviewJob(
       throw new Error("Plan-specific review job not found");
     }
 
-    const safetyReviews = await transaction<
-      Array<{
-        id: string;
-        supplement_name: string;
-      }>
-    >`
-      select id::text, supplement_name
+    const safetyReviews = await transaction<SafetyReviewDecisionRow[]>`
+      select
+        client_notification_status,
+        goal_id::text,
+        id::text,
+        supplement_name,
+        task_id::text
       from public.safety_reviews
       where job_id = ${input.id}::uuid
         and plan_id = ${job.plan_id}::uuid
@@ -1052,13 +1311,8 @@ export async function decideAdminPlanReviewJob(
       throw new Error("Safety review not found");
     }
 
-    const formulations = await transaction<
-      Array<{
-        formulation: Record<string, unknown>;
-        version: number;
-      }>
-    >`
-      select formulation, version
+    const formulations = await transaction<FormulationRow[]>`
+      select formulation, model_version, version
       from public.formulations
       where plan_id = ${job.plan_id}::uuid
       order by version desc, generated_at desc
@@ -1087,19 +1341,36 @@ export async function decideAdminPlanReviewJob(
         ? clientDoseText(input.clientDoseAmount, input.clientDoseUnit)
         : null;
 
-    await transaction`
-      update public.formulations
-      set
-        formulation = ${transaction.json(toJsonValue(nextFormulation))},
-        generated_at = generated_at
-      where plan_id = ${job.plan_id}::uuid
-        and version = ${formulation.version}
-    `;
+    const nextVersion = await appendReviewedFormulationVersion(transaction, {
+      formulation: nextFormulation,
+      planId: job.plan_id,
+      previousModelVersion: formulation.model_version,
+      reviewEvent:
+        input.decision === "approve"
+          ? "human_review_approved"
+          : "human_review_disapproved",
+      reviewJobId: input.id
+    });
+    const followupTaskId =
+      review.client_notification_status === "not_required"
+        ? null
+        : await queueClientSafetyFollowupTask(transaction, {
+            actor: input.actor,
+            clientDose,
+            decision: input.decision,
+            goalId: review.goal_id,
+            parentTaskId: review.task_id,
+            planId: job.plan_id,
+            reviewJobId: input.id,
+            safetyReviewId: review.id,
+            supplementName: review.supplement_name
+          });
 
     await transaction`
       update public.safety_reviews
       set
         status = ${input.decision === "approve" ? "accepted" : "rejected"},
+        formulation_version = ${nextVersion},
         reviewed_at = now(),
         closed_at = now(),
         reviewer_id = ${input.actor ?? "admin_dashboard"},
@@ -1114,6 +1385,12 @@ export async function decideAdminPlanReviewJob(
           when client_notification_status = 'not_required' then 'not_required'
           else 'queued'
         end,
+        safety_context = safety_context || ${transaction.json(
+          toJsonValue({
+            followupTaskId,
+            reviewedFormulationVersion: nextVersion
+          })
+        )}::jsonb,
         updated_at = now()
       where id = ${review.id}::uuid
     `;
@@ -1127,6 +1404,8 @@ export async function decideAdminPlanReviewJob(
         payload = payload || ${transaction.json(
           toJsonValue({
             decision: input.decision,
+            formulationVersion: nextVersion,
+            followupTaskId,
             reviewedDose: clientDose,
             safetyReviewId: review.id
           })
@@ -1143,6 +1422,8 @@ export async function decideAdminPlanReviewJob(
       eventPayload: {
         clientDose,
         decision: input.decision,
+        formulationVersion: nextVersion,
+        followupTaskId,
         safetyReviewId: review.id,
         supplementName: review.supplement_name
       },
@@ -1173,6 +1454,8 @@ export async function decideAdminPlanReviewJob(
           toJsonValue({
             actor: input.actor ?? "admin_dashboard",
             clientDose,
+            formulationVersion: nextVersion,
+            followupTaskId,
             safetyReviewId: review.id,
             supplementName: review.supplement_name
           })
