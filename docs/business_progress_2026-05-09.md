@@ -37,7 +37,7 @@ Current sections:
 - Supplements
 - Human Review
 - Technical Alerts
-- Jobs
+- Goals
 
 The dashboard is protected by an admin dashboard token and supports English/Thai routing.
 
@@ -185,7 +185,7 @@ Business impact:
 
 The business has a place to handle edge cases that should not be decided automatically.
 
-### 10. Technical Alerts and Jobs
+### 10. Technical Alerts and Goals
 
 A new Technical section was added to the admin dashboard.
 
@@ -199,17 +199,14 @@ Technical Alerts show:
 - high/critical task events
 - BPM error events
 
-Jobs show:
+Goals show:
 
-- queued work
-- running work
-- completed work
-- failed work
-- attempts
-- priority
+- customer and operational outcomes
+- grouped task progress
+- status across active, completed, failed, blocked, or cancelled work
+- priority at goal and task level
 - timing
-- latest audit event
-- error details
+- task comments and events
 
 Business impact:
 
@@ -228,7 +225,7 @@ MattaNutra now has:
 - supplement whitelist/blacklist management
 - formulation safety checks
 - Human Review queue
-- Technical Alerts and Jobs monitoring
+- Technical Alerts and Goals monitoring
 - updated business blueprint and marketing guide
 
 ## What Is Still Pending
@@ -241,7 +238,7 @@ The major remaining areas are:
 4. Product matching and affiliate marketplace flow.
 5. Campaign comparison tables.
 6. Content management screens for blog/testimonials.
-7. Safe retry/acknowledge actions for technical alerts.
+7. Safe retry/acknowledge actions for technical alerts and task failures.
 8. Pro chat handoff, likely LINE first.
 9. Free email nurture sequence.
 
@@ -250,7 +247,7 @@ The major remaining areas are:
 The strongest next step is to finish the admin operational loop:
 
 1. Make Human Review actions complete.
-2. Add safe acknowledge/retry actions for Technical Alerts and Jobs.
+2. Add safe acknowledge/retry actions for Technical Alerts and task failures.
 3. Add campaign comparison reporting.
 
 That would give the business a platform it can operate daily, not just a product users can try.

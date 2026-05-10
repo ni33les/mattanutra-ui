@@ -18,9 +18,9 @@ Last updated: 2026-05-10
 ## Admin And Operations
 
 - [ ] Add protected OpenClaw APIs for admin operations.
-- [ ] Add notification counts to important admin menu items, especially Human Review, Technical Alerts, Jobs, Leads, and Campaigns.
+- [ ] Add notification counts to important admin menu items, especially Human Review, Technical Alerts, Goals, Leads, and Campaigns.
 - [ ] Improve the Technical Alerts page.
-- [ ] Improve the Jobs page.
+- [ ] Improve the Goals and task detail pages.
 
 ## Data And Versioning
 

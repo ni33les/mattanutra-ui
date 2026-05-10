@@ -130,7 +130,7 @@ Current views:
 - Supplements: the current supplement catalogue, list status, dose ceiling, confidence, and safety flags.
 - Human Review: supplement decisions and dose-reduction notices that need or needed a person.
 - Technical Alerts: operational failures or stuck work that may affect customer experience.
-- Jobs: queued, running, completed, and failed background work.
+- Goals: customer or operational outcomes grouped by ray, with their task progress and current status.
 
 Current timeframe windows:
 

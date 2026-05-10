@@ -29,14 +29,7 @@ Tasks and agents remain separate. A task requires capabilities; it is not hard-w
 
 ## Current Status
 
-The legacy compatibility queue has been removed. The database has been reset to a clean task-native state.
-
-The schema no longer creates or depends on:
-
-- `jobs`
-- compatibility audit rows for that queue
-- task compatibility links
-- BPM or safety-review references to compatibility queue IDs
+The database has been reset to a clean task-native state.
 
 Operational work is now represented by:
 
@@ -162,7 +155,6 @@ Tokens must not be passed in query strings, client bundles, BPM payloads, or log
 ## Acceptance Criteria
 
 - Schema can be rebuilt from `db-schema.sql`.
-- No compatibility queue tables or columns are created.
 - Every task belongs to a goal.
 - Agents and tasks remain separate.
 - Tasks can require capabilities without naming a specific agent.
