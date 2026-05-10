@@ -11,7 +11,7 @@ import {
   type SupplementSafetyFlag
 } from "@/lib/supplement-safety-flags";
 
-export type AdminReviewJobRow = Readonly<{
+export type AdminReviewTaskRow = Readonly<{
   actionOptions: string[];
   clientDoseAmount: number | null;
   clientDoseText: string | null;
@@ -37,7 +37,7 @@ export type AdminReviewJobRow = Readonly<{
 export type AdminReviewQueueData = Readonly<{
   databaseAvailable: boolean;
   generatedAt: string;
-  rows: AdminReviewJobRow[];
+  rows: AdminReviewTaskRow[];
   summary: {
     doseReduced: number;
     reviewRequired: number;
@@ -46,7 +46,7 @@ export type AdminReviewQueueData = Readonly<{
   };
 }>;
 
-type ReviewJobDbRow = Readonly<{
+type ReviewTaskDbRow = Readonly<{
   ai_suggestion: Record<string, unknown> | null;
   flag_reason: string | null;
   goal_id?: string | null;
@@ -92,7 +92,7 @@ const REVIEW_TASK_TYPES = [
   "client_safety_followup"
 ] as const;
 
-export type ResolveAdminReviewJobInput = Readonly<{
+export type ResolveAdminReviewTaskInput = Readonly<{
   actor?: string | null;
   category?: string | null;
   confidence: SupplementConfidence;
@@ -105,7 +105,7 @@ export type ResolveAdminReviewJobInput = Readonly<{
   supplementName: string;
 }>;
 
-export type DecideAdminPlanReviewJobInput = Readonly<{
+export type DecideAdminPlanReviewTaskInput = Readonly<{
   actor?: string | null;
   clientDoseAmount: number | null;
   clientDoseUnit: string | null;
@@ -221,7 +221,7 @@ function emptyAdminReviewQueueData(): AdminReviewQueueData {
   };
 }
 
-function rowFromDb(row: ReviewJobDbRow): AdminReviewJobRow {
+function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
   const payload = row.payload ?? {};
   const aiSuggestion = row.ai_suggestion ?? {};
   const clientDoseAmount =
@@ -265,7 +265,7 @@ function rowFromDb(row: ReviewJobDbRow): AdminReviewJobRow {
   };
 }
 
-function buildSummary(rows: AdminReviewJobRow[]) {
+function buildSummary(rows: AdminReviewTaskRow[]) {
   return rows.reduce(
     (summary, row) => {
       summary.total += 1;
@@ -289,115 +289,37 @@ function buildSummary(rows: AdminReviewJobRow[]) {
   );
 }
 
-async function loadLegacyReviewRows(sql: postgres.Sql) {
-  return sql<ReviewJobDbRow[]>`
-      select
-        jobs.id::text,
-        null::text as goal_id,
-        null::text as task_id,
-        jobs.plan_id::text,
-        jobs.status,
-        jobs.priority,
-        jobs.payload,
-        jobs.queued_at,
-        safety_reviews.id::text as review_id,
-        safety_reviews.flag_reason,
-        safety_reviews.suggested_dose_value,
-        safety_reviews.suggested_dose_unit,
-        safety_reviews.limit_value,
-        safety_reviews.limit_unit,
-        safety_reviews.ai_suggestion
-      from public.jobs jobs
-      left join lateral (
-        select *
-        from public.safety_reviews safety_reviews
-        where safety_reviews.job_id = jobs.id
-        order by safety_reviews.opened_at asc
-        limit 1
-      ) safety_reviews on true
-      where jobs.job_type = 'supplement_review'
-        and jobs.status = 'queued'
-      order by jobs.priority desc, jobs.queued_at asc
-      limit 200
-    `;
-}
-
-async function loadTaskBackedReviewRows(sql: postgres.Sql) {
-  return sql<ReviewJobDbRow[]>`
-      with task_reviews as (
-        select
-          jobs.id::text,
-          tasks.goal_id::text,
-          tasks.id::text as task_id,
-          jobs.plan_id::text,
-          jobs.status,
-          tasks.priority,
-          coalesce(jobs.payload, '{}'::jsonb) || coalesce(tasks.payload, '{}'::jsonb) as payload,
-          jobs.queued_at,
-          safety_reviews.id::text as review_id,
-          safety_reviews.flag_reason,
-          safety_reviews.suggested_dose_value,
-          safety_reviews.suggested_dose_unit,
-          safety_reviews.limit_value,
-          safety_reviews.limit_unit,
-          safety_reviews.ai_suggestion
-        from public.tasks tasks
-        join public.jobs jobs on jobs.id = tasks.legacy_job_id
-        left join lateral (
-          select *
-          from public.safety_reviews safety_reviews
-          where safety_reviews.job_id = jobs.id
-          order by safety_reviews.opened_at asc
-          limit 1
-        ) safety_reviews on true
-        where tasks.task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
-          and tasks.status not in ('completed', 'failed', 'cancelled', 'skipped')
-          and jobs.job_type = 'supplement_review'
-          and jobs.status = 'queued'
-      ),
-      legacy_reviews as (
-        select
-          jobs.id::text,
-          null::text as goal_id,
-          null::text as task_id,
-          jobs.plan_id::text,
-          jobs.status,
-          jobs.priority,
-          jobs.payload,
-          jobs.queued_at,
-          safety_reviews.id::text as review_id,
-          safety_reviews.flag_reason,
-          safety_reviews.suggested_dose_value,
-          safety_reviews.suggested_dose_unit,
-          safety_reviews.limit_value,
-          safety_reviews.limit_unit,
-          safety_reviews.ai_suggestion
-        from public.jobs jobs
-        left join lateral (
-          select *
-          from public.safety_reviews safety_reviews
-          where safety_reviews.job_id = jobs.id
-          order by safety_reviews.opened_at asc
-          limit 1
-        ) safety_reviews on true
-        where jobs.job_type = 'supplement_review'
-          and jobs.status = 'queued'
-          and not exists (
-            select 1
-            from public.tasks tasks
-            where tasks.legacy_job_id = jobs.id
-              and tasks.task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
-              and tasks.status not in ('completed', 'failed', 'cancelled', 'skipped')
-          )
-      )
+async function loadReviewTaskRows(sql: postgres.Sql) {
+  return sql<ReviewTaskDbRow[]>`
+    select
+      tasks.id::text,
+      tasks.goal_id::text,
+      tasks.id::text as task_id,
+      tasks.plan_id::text,
+      tasks.status,
+      tasks.priority,
+      tasks.payload,
+      tasks.created_at as queued_at,
+      safety_reviews.id::text as review_id,
+      safety_reviews.flag_reason,
+      safety_reviews.suggested_dose_value,
+      safety_reviews.suggested_dose_unit,
+      safety_reviews.limit_value,
+      safety_reviews.limit_unit,
+      safety_reviews.ai_suggestion
+    from public.tasks tasks
+    left join lateral (
       select *
-      from task_reviews
-      union all
-      select *
-      from legacy_reviews
-      order by priority desc, queued_at asc
-      limit 200
-    `;
+      from public.safety_reviews safety_reviews
+      where safety_reviews.task_id = tasks.id
+      order by safety_reviews.opened_at asc
+      limit 1
+    ) safety_reviews on true
+    where tasks.task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
+      and tasks.status not in ('completed', 'failed', 'cancelled', 'skipped')
+    order by tasks.priority desc, tasks.created_at asc
+    limit 200
+  `;
 }
 
 export async function getAdminReviewQueueData(): Promise<AdminReviewQueueData> {
@@ -408,15 +330,7 @@ export async function getAdminReviewQueueData(): Promise<AdminReviewQueueData> {
   }
 
   try {
-    let rows: ReviewJobDbRow[];
-
-    try {
-      rows = await loadTaskBackedReviewRows(sql);
-    } catch (error) {
-      console.warn("Unable to load task-backed review queue; falling back to legacy jobs", error);
-      rows = await loadLegacyReviewRows(sql);
-    }
-
+    const rows = await loadReviewTaskRows(sql);
     const mappedRows = rows.map(rowFromDb);
 
     return {
@@ -449,7 +363,6 @@ async function completeSupplementReviewTasks(
     commentBody: string;
     eventPayload?: Record<string, unknown>;
     eventType: string;
-    jobIds?: readonly string[];
     taskIds?: readonly string[];
   }>
 ) {
@@ -457,10 +370,9 @@ async function completeSupplementReviewTasks(
     return [];
   }
 
-  const jobIds = [...(input.jobIds ?? [])];
   const taskIds = [...(input.taskIds ?? [])];
 
-  if (jobIds.length < 1 && taskIds.length < 1) {
+  if (taskIds.length < 1) {
     return [];
   }
 
@@ -479,10 +391,7 @@ async function completeSupplementReviewTasks(
       updated_at = now()
     where task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
       and status not in ('completed', 'failed', 'cancelled', 'skipped')
-      and (
-        (${jobIds.length > 0} and legacy_job_id = any(${jobIds}::uuid[]))
-        or (${taskIds.length > 0} and id = any(${taskIds}::uuid[]))
-      )
+      and id = any(${taskIds}::uuid[])
     returning id::text, goal_id::text
   `;
 
@@ -569,7 +478,6 @@ async function appendReviewedFormulationVersion(
     previousModelVersion: string | null;
     planId: string;
     reviewEvent: string;
-    reviewJobId: string;
   }>
 ) {
   const versionRows = await transaction<{ version: number }[]>`
@@ -602,33 +510,6 @@ async function appendReviewedFormulationVersion(
     )
   `;
 
-  await transaction`
-    insert into public.job_audit_events (
-      id,
-      job_id,
-      plan_id,
-      event_type,
-      level,
-      event_payload,
-      created_at
-    )
-    values (
-      ${randomUUID()}::uuid,
-      ${input.reviewJobId}::uuid,
-      ${input.planId}::uuid,
-      'formulation_review_version_written',
-      'medium',
-      ${transaction.json(
-        toJsonValue({
-          formulationVersion: version,
-          previousModelVersion: input.previousModelVersion,
-          reviewEvent: input.reviewEvent
-        })
-      )},
-      now()
-    )
-  `;
-
   return version;
 }
 
@@ -641,7 +522,7 @@ async function queueClientSafetyFollowupTask(
     goalId: string | null;
     parentTaskId: string | null;
     planId: string;
-    reviewJobId: string;
+    reviewTaskId: string;
     safetyReviewId: string;
     supplementName: string;
   }>
@@ -682,7 +563,7 @@ async function queueClientSafetyFollowupTask(
     clientDose: input.clientDose,
     decision: input.decision,
     planId: input.planId,
-    reviewJobId: input.reviewJobId,
+    reviewTaskId: input.reviewTaskId,
     safetyReviewId: input.safetyReviewId,
     source: "human_review_completion",
     supplementName: input.supplementName
@@ -807,7 +688,7 @@ async function queueClientSafetyFollowupTask(
   return taskId;
 }
 
-export async function dismissAdminReviewJob({
+export async function dismissAdminReviewTask({
   actor,
   id
 }: Readonly<{
@@ -821,20 +702,17 @@ export async function dismissAdminReviewJob({
   }
 
   await sql.begin(async (transaction) => {
-    const updated = await transaction<{ id: string }[]>`
-      update public.jobs
-      set
-        status = 'complete',
-        completed_at = now(),
-        updated_at = now()
+    const tasks = await transaction<{ id: string }[]>`
+      select id::text
+      from public.tasks
       where id = ${id}::uuid
-        and job_type = 'supplement_review'
-        and status = 'queued'
-      returning id::text
+        and task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
+        and status not in ('completed', 'failed', 'cancelled', 'skipped')
+      for update
     `;
 
-    if (!updated[0]) {
-      throw new Error("Review job not found");
+    if (!tasks[0]) {
+      throw new Error("Review task not found");
     }
 
     await transaction`
@@ -847,7 +725,7 @@ export async function dismissAdminReviewJob({
         reviewer_note = coalesce(reviewer_note, 'Dismissed from admin review queue.'),
         client_notification_status = 'not_required',
         updated_at = now()
-      where job_id = ${id}::uuid
+      where task_id = ${id}::uuid
         and status in ('open', 'in_review', 'escalated')
     `;
 
@@ -855,36 +733,17 @@ export async function dismissAdminReviewJob({
       actor,
       commentBody: "Dismissed from admin review queue.",
       eventPayload: {
-        legacyJobId: id
+        taskId: id
       },
       eventType: "supplement_review_dismissed",
-      jobIds: [id]
+      taskIds: [id]
     });
-
-    await transaction`
-      insert into public.job_audit_events (
-        id,
-        job_id,
-        event_type,
-        level,
-        event_payload,
-        created_at
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${id}::uuid,
-        'supplement_review_dismissed',
-        'low',
-        ${transaction.json({ actor: actor ?? "admin_dashboard" })},
-        now()
-      )
-    `;
   });
 
   return getAdminReviewQueueData();
 }
 
-export async function resolveAdminReviewJob(input: ResolveAdminReviewJobInput) {
+export async function resolveAdminReviewTask(input: ResolveAdminReviewTaskInput) {
   const sql = getSql();
 
   if (!sql) {
@@ -899,7 +758,7 @@ export async function resolveAdminReviewJob(input: ResolveAdminReviewJobInput) {
   }
 
   await sql.begin(async (transaction) => {
-    const jobs = await transaction<
+    const tasks = await transaction<
       Array<{
         id: string;
         payload: Record<string, unknown>;
@@ -907,16 +766,16 @@ export async function resolveAdminReviewJob(input: ResolveAdminReviewJobInput) {
       }>
     >`
       select id::text, plan_id::text, payload
-      from public.jobs
+      from public.tasks
       where id = ${input.id}::uuid
-        and job_type = 'supplement_review'
-        and status = 'queued'
+        and task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
+        and status not in ('completed', 'failed', 'cancelled', 'skipped')
       for update
     `;
-    const job = jobs[0];
+    const task = tasks[0];
 
-    if (!job) {
-      throw new Error("Review job not found");
+    if (!task) {
+      throw new Error("Review task not found");
     }
 
     const supplementRows = await transaction<{ id: string }[]>`
@@ -945,7 +804,6 @@ export async function resolveAdminReviewJob(input: ResolveAdminReviewJobInput) {
         ${input.listStatus !== "inactive"},
         'admin_review_queue',
         ${transaction.json({
-          jobId: input.id,
           normalizedSupplementName,
           resolvedBy: input.actor ?? "admin_dashboard"
         })},
@@ -1027,24 +885,16 @@ export async function resolveAdminReviewJob(input: ResolveAdminReviewJobInput) {
       `;
     }
 
-    const completedJobs = await transaction<
+    const completedTasks = await transaction<
       Array<{
         id: string;
         plan_id: string | null;
       }>
     >`
-      update public.jobs
-      set
-        status = 'complete',
-        completed_at = now(),
-        updated_at = now(),
-        payload = payload || ${transaction.json({
-          resolvedSupplementId: supplementId,
-          resolvedSupplementName: supplementName,
-          resolution: input.listStatus
-        })}::jsonb
-      where job_type = 'supplement_review'
-        and status = 'queued'
+      select id::text, plan_id::text
+      from public.tasks
+      where task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
+        and status not in ('completed', 'failed', 'cancelled', 'skipped')
         and (
           id = ${input.id}::uuid
           or payload ->> 'normalizedSupplementName' = ${normalizedSupplementName}
@@ -1052,9 +902,9 @@ export async function resolveAdminReviewJob(input: ResolveAdminReviewJobInput) {
           or trim(both '_' from regexp_replace(lower(coalesce(payload ->> 'normalizedSupplementName', '')), '[^a-z0-9]+', '_', 'g')) = ${normalizedSupplementName}
           or trim(both '_' from regexp_replace(lower(coalesce(payload ->> 'supplementName', '')), '[^a-z0-9]+', '_', 'g')) = ${normalizedSupplementName}
       )
-      returning id::text, plan_id::text
+      for update
     `;
-    const completedJobIds = completedJobs.map((row) => row.id);
+    const completedTaskIds = completedTasks.map((row) => row.id);
 
     await transaction`
       update public.safety_reviews
@@ -1080,13 +930,13 @@ export async function resolveAdminReviewJob(input: ResolveAdminReviewJobInput) {
       actor: input.actor,
       commentBody: `Resolved as ${input.listStatus}.`,
       eventPayload: {
-        completedJobIds,
+        completedTaskIds,
         resolvedSupplementId: supplementId,
         resolution: input.listStatus,
         supplementName
       },
       eventType: "supplement_review_resolved",
-      jobIds: completedJobIds
+      taskIds: completedTaskIds
     });
 
     await transaction`
@@ -1103,9 +953,9 @@ export async function resolveAdminReviewJob(input: ResolveAdminReviewJobInput) {
         ${supplementId}::uuid,
         'review_resolved',
         ${input.actor ?? "admin_dashboard"},
-        ${transaction.json(toJsonValue(job.payload ?? {}))},
+        ${transaction.json(toJsonValue(task.payload ?? {}))},
         ${transaction.json({
-          completedJobIds,
+          completedTaskIds,
           confidence: input.confidence,
           listStatus: input.listStatus,
           maxAmount: input.maxAmount,
@@ -1116,34 +966,6 @@ export async function resolveAdminReviewJob(input: ResolveAdminReviewJobInput) {
         })}
       )
     `;
-
-    for (const completedJob of completedJobs) {
-      await transaction`
-        insert into public.job_audit_events (
-          id,
-          job_id,
-          plan_id,
-          event_type,
-          level,
-          event_payload,
-          created_at
-        )
-        values (
-          ${randomUUID()}::uuid,
-          ${completedJob.id}::uuid,
-          ${completedJob.plan_id}::uuid,
-          'supplement_review_resolved',
-          'low',
-          ${transaction.json({
-            actor: input.actor ?? "admin_dashboard",
-            resolvedSupplementId: supplementId,
-            resolution: input.listStatus,
-            supplementName
-          })},
-          now()
-        )
-      `;
-    }
   });
 
   return getAdminReviewQueueData();
@@ -1167,7 +989,7 @@ function ingredientMatchesReview(
   ingredient: Record<string, unknown>,
   input: {
     reviewId: string | null;
-    reviewJobId: string;
+    reviewTaskId: string;
     supplementName: string;
   }
 ) {
@@ -1175,7 +997,7 @@ function ingredientMatchesReview(
   const supplementName = localizedText(ingredient.supplement);
 
   return (
-    safety?.reviewJobId === input.reviewJobId ||
+    safety?.reviewTaskId === input.reviewTaskId ||
     safety?.reviewId === input.reviewId ||
     (supplementName !== null &&
       normalizeName(supplementName) === normalizeName(input.supplementName))
@@ -1189,7 +1011,7 @@ function applyReviewDecisionToFormulation(
     clientDoseUnit: string | null;
     decision: "approve" | "disapprove";
     reviewId: string | null;
-    reviewJobId: string;
+    reviewTaskId: string;
     supplementName: string;
   }
 ) {
@@ -1219,7 +1041,7 @@ function applyReviewDecisionToFormulation(
           action: "human_review",
           message: localized("Approved by MattaNutra human review."),
           reviewId: input.reviewId ?? undefined,
-          reviewJobId: input.reviewJobId,
+          reviewTaskId: input.reviewTaskId,
           visibility: "visible"
         },
         status: ingredient.status === "review" ? "add" : ingredient.status
@@ -1251,8 +1073,8 @@ function applyReviewDecisionToFormulation(
   };
 }
 
-export async function decideAdminPlanReviewJob(
-  input: DecideAdminPlanReviewJobInput
+export async function decideAdminPlanReviewTask(
+  input: DecideAdminPlanReviewTaskInput
 ) {
   const sql = getSql();
 
@@ -1270,7 +1092,7 @@ export async function decideAdminPlanReviewJob(
   }
 
   await sql.begin(async (transaction) => {
-    const jobs = await transaction<
+    const tasks = await transaction<
       Array<{
         id: string;
         payload: Record<string, unknown>;
@@ -1278,16 +1100,16 @@ export async function decideAdminPlanReviewJob(
       }>
     >`
       select id::text, plan_id::text, payload
-      from public.jobs
+      from public.tasks
       where id = ${input.id}::uuid
-        and job_type = 'supplement_review'
-        and status = 'queued'
+        and task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
+        and status not in ('completed', 'failed', 'cancelled', 'skipped')
       for update
     `;
-    const job = jobs[0];
+    const task = tasks[0];
 
-    if (!job?.plan_id) {
-      throw new Error("Plan-specific review job not found");
+    if (!task?.plan_id) {
+      throw new Error("Plan-specific review task not found");
     }
 
     const safetyReviews = await transaction<SafetyReviewDecisionRow[]>`
@@ -1298,8 +1120,8 @@ export async function decideAdminPlanReviewJob(
         supplement_name,
         task_id::text
       from public.safety_reviews
-      where job_id = ${input.id}::uuid
-        and plan_id = ${job.plan_id}::uuid
+      where task_id = ${input.id}::uuid
+        and plan_id = ${task.plan_id}::uuid
         and status in ('open', 'in_review', 'escalated')
       order by opened_at asc
       limit 1
@@ -1314,7 +1136,7 @@ export async function decideAdminPlanReviewJob(
     const formulations = await transaction<FormulationRow[]>`
       select formulation, model_version, version
       from public.formulations
-      where plan_id = ${job.plan_id}::uuid
+      where plan_id = ${task.plan_id}::uuid
       order by version desc, generated_at desc
       limit 1
       for update
@@ -1332,7 +1154,7 @@ export async function decideAdminPlanReviewJob(
         clientDoseUnit: input.clientDoseUnit,
         decision: input.decision,
         reviewId: review.id,
-        reviewJobId: input.id,
+        reviewTaskId: input.id,
         supplementName: review.supplement_name
       }
     );
@@ -1343,13 +1165,12 @@ export async function decideAdminPlanReviewJob(
 
     const nextVersion = await appendReviewedFormulationVersion(transaction, {
       formulation: nextFormulation,
-      planId: job.plan_id,
+      planId: task.plan_id,
       previousModelVersion: formulation.model_version,
       reviewEvent:
         input.decision === "approve"
           ? "human_review_approved"
-          : "human_review_disapproved",
-      reviewJobId: input.id
+          : "human_review_disapproved"
     });
     const followupTaskId =
       review.client_notification_status === "not_required"
@@ -1360,8 +1181,8 @@ export async function decideAdminPlanReviewJob(
             decision: input.decision,
             goalId: review.goal_id,
             parentTaskId: review.task_id,
-            planId: job.plan_id,
-            reviewJobId: input.id,
+            planId: task.plan_id,
+            reviewTaskId: input.id,
             safetyReviewId: review.id,
             supplementName: review.supplement_name
           });
@@ -1395,24 +1216,6 @@ export async function decideAdminPlanReviewJob(
       where id = ${review.id}::uuid
     `;
 
-    await transaction`
-      update public.jobs
-      set
-        status = 'complete',
-        completed_at = now(),
-        updated_at = now(),
-        payload = payload || ${transaction.json(
-          toJsonValue({
-            decision: input.decision,
-            formulationVersion: nextVersion,
-            followupTaskId,
-            reviewedDose: clientDose,
-            safetyReviewId: review.id
-          })
-        )}::jsonb
-      where id = ${input.id}::uuid
-    `;
-
     await completeSupplementReviewTasks(transaction, {
       actor: input.actor,
       commentBody:
@@ -1429,40 +1232,10 @@ export async function decideAdminPlanReviewJob(
       },
       eventType:
         input.decision === "approve"
-          ? "supplement_review_approved"
-          : "supplement_review_disapproved",
-      jobIds: [input.id]
+        ? "supplement_review_approved"
+        : "supplement_review_disapproved",
+      taskIds: [input.id]
     });
-
-    await transaction`
-      insert into public.job_audit_events (
-        id,
-        job_id,
-        plan_id,
-        event_type,
-        level,
-        event_payload,
-        created_at
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${input.id}::uuid,
-        ${job.plan_id}::uuid,
-        ${input.decision === "approve" ? "supplement_review_approved" : "supplement_review_disapproved"},
-        'medium',
-        ${transaction.json(
-          toJsonValue({
-            actor: input.actor ?? "admin_dashboard",
-            clientDose,
-            formulationVersion: nextVersion,
-            followupTaskId,
-            safetyReviewId: review.id,
-            supplementName: review.supplement_name
-          })
-        )},
-        now()
-      )
-    `;
   });
 
   return getAdminReviewQueueData();

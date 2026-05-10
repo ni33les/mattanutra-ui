@@ -4,7 +4,7 @@ import {
   DEFAULT_ASSESSMENT_PLAN,
   isAssessmentPlan,
   type AssessmentPlan
-} from "@/lib/assessment-jobs";
+} from "@/lib/assessment-snapshot";
 import {
   getStoredAssessmentSnapshot,
   getStoredHealthScoreAnalysisSnapshot,
@@ -13,12 +13,12 @@ import {
 import { computeHealthScore } from "@/lib/health-score";
 import { writeSkippedPaymentSuccessEvent } from "@/lib/payment-bpm";
 import {
-  enqueueHealthScoreAnalysisJob,
-  enqueueFormulationJob,
+  enqueueHealthScoreAnalysisTask,
+  enqueueFormulationTask,
   kickCronWorker,
-  kickJobsWorker,
+  kickTaskWorker,
   scheduleReassessmentAction
-} from "@/lib/job-queue";
+} from "@/lib/task-worker";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
 import { isLocale } from "@/lib/i18n";
 
@@ -126,12 +126,12 @@ export async function POST(request: Request) {
       ...healthScoreBpmFields(snapshot)
     });
 
-    const analysisJobId = await enqueueHealthScoreAnalysisJob({
+    const analysisTaskId = await enqueueHealthScoreAnalysisTask({
       planId: snapshot.planId
     });
 
-    if (analysisJobId) {
-      void kickJobsWorker();
+    if (analysisTaskId) {
+      void kickTaskWorker();
     }
 
     if (intent === "capture") {
@@ -183,26 +183,26 @@ export async function POST(request: Request) {
         ...healthScoreBpmFields(snapshot)
       });
 
-      const jobId = await enqueueFormulationJob({
+      const taskId = await enqueueFormulationTask({
         answers: body.answers,
         locale: body.locale,
         plan: selectedPlan,
         planId: snapshot.planId
       });
 
-      if (!jobId) {
+      if (!taskId) {
         throw new Error("Unable to queue assessment processing");
       }
 
-      void kickJobsWorker();
+      void kickTaskWorker();
       await writeBpmEvent({
         actorType: "system",
         attribution: bpm.attribution,
         eventName: "formulation_requested",
         eventType: "formulation",
-        jobId,
         locale: body.locale,
         planId: snapshot.planId,
+        properties: { taskId },
         ray: typeof bpm.ray === "string" ? bpm.ray : null,
         selectedPlan,
         ...healthScoreBpmFields(snapshot)

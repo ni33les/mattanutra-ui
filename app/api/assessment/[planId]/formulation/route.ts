@@ -3,7 +3,7 @@ import {
   getStoredAssessmentSnapshot,
   getStoredFormulationResult
 } from "@/lib/assessment-store";
-import { kickJobsWorker } from "@/lib/job-queue";
+import { kickTaskWorker } from "@/lib/task-worker";
 
 type FormulationRouteProps = Readonly<{
   params: Promise<{
@@ -31,7 +31,7 @@ export async function GET(_request: Request, { params }: FormulationRouteProps) 
   }
 
   if (snapshot.status !== "ready") {
-    void kickJobsWorker();
+    void kickTaskWorker();
 
     return NextResponse.json(
       {

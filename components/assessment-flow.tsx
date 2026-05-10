@@ -4279,16 +4279,16 @@ function HealthScoreAdvice({
     (locale === "th"
       ? `${result.headline} ใช้คะแนนนี้เป็นจุดเริ่มต้น โดยรักษาด้านที่ทำได้ดีไว้ และให้ความสำคัญกับพื้นที่คะแนนต่ำสุดก่อน`
       : `${result.headline} Use this as a practical starting point: protect the areas already working well, then focus first on this lowest-scoring domain.`);
-  const legacyFocus = localizeHealthScoreText(
+  const storedFocus = localizeHealthScoreText(
     result.advice?.focusArea,
     locale
   );
-  const legacyImprovement = localizeHealthScoreText(
+  const storedImprovement = localizeHealthScoreText(
     result.advice?.howToImprove,
     locale
   );
-  const fallbackFocus = legacyFocus || lowestDomainAdvice(lowest, locale);
-  const fallbackHowToImprove = legacyImprovement || fallbackImprovement;
+  const fallbackFocus = storedFocus || lowestDomainAdvice(lowest, locale);
+  const fallbackHowToImprove = storedImprovement || fallbackImprovement;
   const overview =
     localizeHealthScoreText(result.advice?.overview, locale) ||
     `${fallbackFocus} ${fallbackHowToImprove}`;

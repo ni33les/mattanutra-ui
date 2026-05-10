@@ -23,7 +23,7 @@ export type FormulationIngredient = {
     message: LocalizedText;
     originalDailyDose?: LocalizedText;
     reviewId?: string;
-    reviewJobId?: string;
+    reviewTaskId?: string;
     visibility: FormulationSafetyVisibility;
   };
   status: FormulationStatus;

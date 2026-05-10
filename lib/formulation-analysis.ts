@@ -1,4 +1,4 @@
-import type { AssessmentPlan } from "@/lib/assessment-jobs";
+import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { Locale } from "@/lib/i18n";
 import type {
   FormulationBlueprint,

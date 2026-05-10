@@ -10,7 +10,7 @@ import {
   updateCommunicationChannel,
   type CommunicationChannelStatus
 } from "@/lib/communications";
-import { kickJobsWorker } from "@/lib/job-queue";
+import { kickTaskWorker } from "@/lib/task-worker";
 
 export const runtime = "nodejs";
 
@@ -60,7 +60,7 @@ export async function PATCH(request: Request, { params }: ChannelRouteProps) {
       status: statusValue(body.status)
     });
 
-    void kickJobsWorker();
+    void kickTaskWorker();
 
     return openClawJson({ channel });
   } catch (error) {

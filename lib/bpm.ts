@@ -68,7 +68,6 @@ export type BpmEventInput = Readonly<{
   exampleRequestId?: string | null;
   healthScore?: number | null;
   httpStatus?: number | null;
-  jobId?: string | null;
   locale?: unknown;
   lowestDomain?: string | null;
   metrics?: Record<string, unknown>;
@@ -251,7 +250,6 @@ async function insertBpmEvent(sql: postgres.Sql, input: BpmEventInput) {
       id,
       ray,
       plan_id,
-      job_id,
       cron_id,
       example_request_id,
       event_name,
@@ -310,7 +308,6 @@ async function insertBpmEvent(sql: postgres.Sql, input: BpmEventInput) {
       ${id}::uuid,
       ${normalizedRay(input.ray)}::uuid,
       ${normalizedUuid(input.planId)}::uuid,
-      ${normalizedUuid(input.jobId)}::uuid,
       ${normalizedUuid(input.cronId)}::uuid,
       ${normalizedUuid(input.exampleRequestId)}::uuid,
       ${text(input.eventName) ?? "unknown"},

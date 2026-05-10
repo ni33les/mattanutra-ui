@@ -83,7 +83,6 @@ export async function POST(request: Request, { params }: SpawnTaskRouteProps) {
       id: textValue(body.id),
       idempotencyKey: textValue(body.idempotencyKey),
       initialComment: undefined,
-      legacyJobId: textValue(body.legacyJobId),
       maxAttempts: Number(body.maxAttempts),
       parentTaskId: id,
       payload: objectValue(body.payload),

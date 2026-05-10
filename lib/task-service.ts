@@ -127,7 +127,6 @@ export type TaskRecord = Readonly<{
   id: string;
   idempotencyKey: string | null;
   leaseUntil: string | null;
-  legacyJobId: string | null;
   maxAttempts: number;
   parentTaskId: string | null;
   payload: unknown;
@@ -226,7 +225,6 @@ type TaskRow = {
   id: string;
   idempotency_key: string | null;
   lease_until: Date | string | null;
-  legacy_job_id: string | null;
   max_attempts: number;
   parent_task_id: string | null;
   payload: unknown;
@@ -301,7 +299,6 @@ export type CreateTaskInput = Readonly<{
   id?: string | null;
   idempotencyKey?: string | null;
   initialComment?: Omit<AddTaskCommentInput, "taskId">;
-  legacyJobId?: string | null;
   maxAttempts?: number;
   parentTaskId?: string | null;
   payload?: Record<string, unknown>;
@@ -516,7 +513,6 @@ function mapTask(row: TaskRow): TaskRecord {
     id: row.id,
     idempotencyKey: row.idempotency_key,
     leaseUntil: isoDate(row.lease_until),
-    legacyJobId: row.legacy_job_id,
     maxAttempts: row.max_attempts,
     parentTaskId: row.parent_task_id,
     payload: row.payload,
@@ -1004,7 +1000,6 @@ async function createTaskInTransaction(sql: Db, input: CreateTaskInput) {
       goal_id,
       parent_task_id,
       plan_id,
-      legacy_job_id,
       task_type,
       title,
       description,
@@ -1029,7 +1024,6 @@ async function createTaskInTransaction(sql: Db, input: CreateTaskInput) {
       ${goalId}::uuid,
       ${uuidOrNull(input.parentTaskId)}::uuid,
       ${uuidOrNull(input.planId)}::uuid,
-      ${uuidOrNull(input.legacyJobId)}::uuid,
       ${cleanText(input.taskType, "unknown")},
       ${cleanText(input.title, "Untitled task")},
       ${optionalText(input.description)},

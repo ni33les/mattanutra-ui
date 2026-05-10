@@ -14,7 +14,7 @@ MattaNutra earns trust through an anonymous wellness assessment and HealthScore,
 | Pro Plan | "I want ongoing support." | Recurring advisor relationship | Partial: offer exists, advisor handoff pending |
 | Product guidance | "What should I actually buy?" | Future affiliate revenue and customer convenience | Partial: results area exists, matching not live |
 | Blog and testimonials | "Can I learn and trust the brand?" | Marketing engine for paid, social, and organic traffic | Partial: platform live, cadence pending |
-| Admin analytics | "Where are users converting, dropping out, or needing attention?" | Tune marketing spend, product funnel, and operations | Partial: KPI, Conversions, Supplements, Human Review, Technical Alerts, and Jobs views live |
+| Admin analytics | "Where are users converting, dropping out, or needing attention?" | Tune marketing spend, product funnel, and operations | Partial: KPI, Conversions, Goals, Supplements, Human Review, Technical Alerts, and Communications views live |
 
 ## Current Funnel
 
@@ -59,16 +59,16 @@ flowchart TB
 - Free email lead capture.
 - Free email sends the top three supplement suggestions from the actual generated formulation.
 - Recurring 60-day reassessment scheduling with unsubscribe.
-- Formulation task-backed worker queue, with legacy job rows retained as compatibility/audit records.
+- Formulation and follow-up processing now runs through the central Goals/Tasks engine.
 - Grok formulation generation with validation/retry pattern.
 - Supplement whitelist, blacklist, dose ceilings, safety flags, and admin editing.
 - Automated formulation safety check: blacklisted items are removed, over-limit doses are reduced, and uncertain/new items are hidden for review.
-- Human Review queue for supplement safety work items and dose-reduction notifications, now bridged into Goals/Tasks for traceability.
+- Human Review queue for supplement safety work items and dose-reduction notifications, all backed by Goals/Tasks for traceability.
 - Formulation page renders stored backend data.
 - Blog and testimonial tables, pages, and protected admin APIs.
 - BPM tracking for funnel, campaign, affiliate, safety, error, email, chat, and formulation events.
 - Admin dashboard with KPI and Conversions views over hour, day, week, month, year, and all-time windows.
-- Admin Technical section with Alerts and Legacy Jobs views for failed email sends, stuck compatibility records, cron failures, AI/worker errors, and recent job history.
+- Admin Technical section with task-based Alerts for failed email sends, stuck tasks, cron failures, AI/worker errors, and high-severity BPM/task events.
 - Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported slow work now creates task-backed work items, worker reservations are enforced, human review decisions write reviewed formulation versions, and client review follow-up is handled through the communication-channel worker.
 - Communication-channel foundation: each plan can be linked to an identity with LINE, WhatsApp, Telegram, WeChat, email, SMS, or manual channels; the system chooses the best available channel, preferring chat before email unless an explicit preference exists. Customers can now leave LINE, WhatsApp, Telegram, or email details from the safety review box, admin can monitor queued/sent/failed communications, and the worker can dispatch mapped LINE messages directly.
 - Admin Goals view showing goal status, priority, source, BPM/session ray, tasks, events, comments, dependencies, reservations, and approvals.
@@ -79,7 +79,7 @@ flowchart TB
 | Gap | Why It Matters | Suggested Next Step |
 | --- | --- | --- |
 | Payment activation | Cannot test revenue conversion yet | Wire Precision/Pro checkout once account is ready |
-| Admin operations views | Sales analytics, goals, task visibility, technical alerts, legacy jobs, supplement review, and supplement editing basics exist; content and campaign comparison views still need interfaces | Add campaign and content panels |
+| Admin operations views | Sales analytics, goals, task visibility, technical alerts, supplement review, and supplement editing basics exist; content and campaign comparison views still need interfaces | Add campaign and content panels |
 | Supplement governance | Whitelist, blacklist, max dose, and safety review basics exist; frequency and interaction rules are not wired yet | Add frequency, condition, medication, pregnancy, and lab interaction checks |
 | Product matching | Affiliate revenue depends on trusted products | Start with curated whitelist before marketplace automation |
 | Chat handoff | Pro needs a convincing ongoing service experience | LINE server dispatch and mapping API exist; production webhook/OpenClaw mapping and operating process still need tightening |
@@ -183,10 +183,9 @@ Current admin dashboard:
 6. Locale controls as EN and TH toggle pills. Both are selected by default.
 7. Collapsible filters for source, medium, campaign, campaign ID, affiliate, promo code, plan, device, plan ID, ray, and email hash.
 8. Filters are URL-driven and server-side, so KPI and Conversions views use the same BPM slice.
-9. Human Review queue for supplement review jobs and dose-reduction notices.
-10. Technical Alerts queue for failed jobs, stuck jobs, failed cron tasks, high/critical job audit events, and error/high BPM events.
-11. Jobs view for queued, running, failed, and completed operational jobs, including attempts, timing, payload, errors, and latest audit event.
-12. Goals view for milestone-level operational visibility over the newer task system.
+9. Human Review queue for supplement review tasks and dose-reduction notices.
+10. Technical Alerts queue for failed tasks, stuck tasks, failed cron tasks, high/critical task events, and error/high BPM events.
+11. Goals view for milestone-level operational visibility over the task system.
 
 How the admin sections should be read:
 
@@ -198,14 +197,13 @@ How the admin sections should be read:
 | Human Review | What needs a human decision before being shown or acted on? | Live for supplement review and dose-reduction notices |
 | Goals | What outcome is being pursued, and which tasks/events explain its current state? | Live for supplement review, formulation, Free email, reassessment, and staged task-backed work |
 | Communications | Which channel should be used to contact a client, and what messages were queued or sent? | Data model, worker, and OpenClaw APIs are live; dashboard view is still future work |
-| Technical Alerts | What failed or looks stuck? | Live for tasks, legacy jobs, cron, job audit, and BPM error events |
-| Legacy Jobs | What compatibility work has been queued, run, completed, or failed? | Live history and execution diagnostics while compatibility rows remain |
+| Technical Alerts | What failed or looks stuck? | Live for tasks, cron, task events, and BPM error events |
 
 Remaining admin dashboard work:
 
 1. Campaign and affiliate comparison tables.
 2. Communications dashboard for queued, sent, failed, and no-channel messages.
-3. Retry actions for failed technical jobs where safe.
+3. Retry actions for failed technical tasks where safe.
 4. Ray drill-down for a single anonymous BPM/session journey.
 5. Content, testimonial, interaction-rule, and advanced supplement decision management.
 6. Revenue and payment reporting after checkout is live.
@@ -285,7 +283,7 @@ flowchart TB
   class A,B,C,D,E,F,G,H,I,J,K,L,M,N done;
 ```
 
-The legacy job queue still carries supplement review work as `job_type = 'supplement_review'` while this flow migrates. New review work also creates a Goal and Task, so admin decisions are visible in the goal timeline with task comments and events. The worker does not process these automatically; they appear in the admin Human Review queue for a human decision.
+Supplement review work is task-native. New review work creates a Goal and Task, so admin decisions are visible in the goal timeline with task comments and events. The worker does not process these automatically; they appear in the admin Human Review queue for a human decision.
 
 The safety review record carries the operational details: supplement, dose, rule, context, linked goal/task where available, reviewer decision, reviewed formulation version, client message, and client notification state.
 
@@ -310,7 +308,7 @@ Best use:
 ## Near-Term Build Sequence
 
 1. Campaign/affiliate reporting tables on top of the live BPM dashboard filters.
-2. Safe acknowledge/retry/dismiss actions for technical alerts and failed jobs.
+2. Safe acknowledge/retry/dismiss actions for technical alerts and failed tasks.
 3. Supplement interaction rules for medications, conditions, pregnancy, age, and labs.
 4. Real chat provider delivery bridge, starting with LINE.
 5. Payment integration for Precision and Pro.

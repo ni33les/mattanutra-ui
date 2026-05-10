@@ -1,31 +1,67 @@
-# Prioritised Task Architecture
+# Prioritised Goal And Task Architecture
 
 ## Purpose
 
-MattaNutra is moving from a small set of specific job workers to a central, auditable task system.
+MattaNutra now uses a central, auditable Goals/Tasks engine for slow or operational work.
 
-The goal is to make the operational core work like a prioritised team queue. Humans, AI agents, deterministic workers, and external systems such as OpenClaw should all be able to reserve suitable work, process it, comment on it, and leave a clear audit trail.
+The goal is to make the operational core work like a prioritised team queue. Humans, AI agents, deterministic workers, and external systems such as OpenClaw can all reserve suitable work, process it, comment on it, and leave a clear audit trail.
 
 The guiding rule is:
 
 > Tasks describe what needs doing. Agents describe who or what can do it.
 
-Tasks and agents must remain completely separate. A task should require capabilities; it should not be hard-wired to a named worker.
+Tasks and agents remain separate. A task requires capabilities; it is not hard-wired to a named worker.
 
 ## Core Concepts
 
 | Concept | Meaning |
 | --- | --- |
 | Goal | Business-facing outcome the system is trying to achieve. A goal may need one task or many tasks discovered over time. |
-| Ray | BPM/session correlation trace used for marketing source, campaign, funnel, and anonymous journey analysis. |
-| Task | An atomic unit of work that can be prioritised, reserved, completed, failed, or blocked. |
-| Agent | A human, AI agent, deterministic worker, system worker, or external worker. |
-| Capability | A skill an agent has and a task may require. |
-| Dependency | A rule that one task must complete, succeed, or be approved before another can run. |
+| Ray | BPM/session correlation trace for campaign, affiliate, funnel, and anonymous journey analysis. |
+| Task | Atomic unit of work that can be prioritised, reserved, completed, failed, blocked, or skipped. |
+| Agent | Human, AI agent, deterministic worker, system worker, or external worker. |
+| Capability | Skill an agent has and a task may require. |
+| Dependency | Rule that one task must complete, succeed, or be approved before another can run. |
 | Comment | Working context for humans and agents. |
 | Event | Append-only audit record of what happened. |
-| Reservation | A lease showing that an agent is currently working on a task. |
-| Approval | A normal task/dependency pattern for human or specialist sign-off when a workflow needs it. |
+| Reservation | Lease showing that an agent is currently working on a task. |
+| Approval | Normal task/dependency pattern for human or specialist sign-off when a workflow needs it. |
+
+## Current Status
+
+The legacy compatibility queue has been removed. The database has been reset to a clean task-native state.
+
+The schema no longer creates or depends on:
+
+- `jobs`
+- compatibility audit rows for that queue
+- task compatibility links
+- BPM or safety-review references to compatibility queue IDs
+
+Operational work is now represented by:
+
+- `goals`
+- `tasks`
+- `task_dependencies`
+- `task_comments`
+- `task_events`
+- `task_reservations`
+- `task_approvals`
+- `agents`
+
+Communication work is represented by:
+
+- `communication_identities`
+- `plan_communication_identities`
+- `communication_channels`
+- `communication_messages`
+
+The internal service layer lives in:
+
+- `lib/task-service.ts`
+- `lib/task-service-utils.ts`
+- `lib/task-worker.ts`
+- `lib/openclaw-api.ts`
 
 ## Goal And Ray Policy
 
@@ -35,40 +71,26 @@ Use `goals.id` as the operational identifier for a business outcome or milestone
 
 Keep BPM `ray` as a separate trace attribute. A goal may store that trace in `goals.ray` when the work came from a web journey, campaign, funnel event, plan, or OpenClaw handoff.
 
-Tasks point to `goal_id`. They do not use `ray_id` as their parent. This keeps cause-and-effect clear: Goals group work; rays explain where the journey came from.
+Tasks point to `goal_id`. They do not use a ray as their parent. This keeps cause-and-effect clear: goals group work; rays explain where the journey came from.
 
-When no BPM ray exists, a goal can still be created and traced by `goals.id`. The optional `goals.ray` can later be populated if source context becomes available.
+When no BPM ray exists, a goal can still be created and traced by `goals.id`.
 
-Goals do not need to know every task upfront. They start with the next known task, and humans or agents may spawn more tasks into the same goal as the work becomes clearer.
-
-Goal status should be derived from its tasks unless explicitly cancelled:
-
-| Goal status | Meaning |
-| --- | --- |
-| `processing` | Work is queued, reserved, or running. |
-| `needs_review` | A human-facing task is waiting. |
-| `blocked` | A required dependency or approval is preventing progress. |
-| `stuck` | Work has failed, exhausted retries, or missed its service window. |
-| `succeeded` | The goal's success condition is met and no blocking task remains. |
-| `failed` | Required work failed and no retry or alternative is available. |
-| `cancelled` | The goal was deliberately stopped. |
+Goals do not need to know every task upfront. They start with the next known task, and humans or agents may spawn more tasks into the same goal as work becomes clearer.
 
 ## Priority Scale
 
-Tasks and goals use a simple `1` to `6` priority scale.
+Goals and tasks use a simple `1` to `6` priority scale.
 
 Goal priority is the primary business scheduling signal. It answers: which outcome matters most right now?
 
 Task priority is secondary. It answers: within that goal, which piece of work should happen next?
 
-Workers should reserve eligible tasks by:
+Workers reserve eligible tasks by:
 
 1. goal priority, highest first
 2. task priority, highest first
 3. scheduled time, oldest due work first
 4. creation time, oldest first
-
-New tasks should normally inherit the parent goal priority unless a workflow has a specific reason to lower or raise that task inside the goal.
 
 | Priority | Meaning | Use |
 | --- | --- | --- |
@@ -79,525 +101,73 @@ New tasks should normally inherit the parent goal priority unless a workflow has
 | `2` | Low | Background enrichment or non-urgent admin. |
 | `1` | When you can | Housekeeping, informational, or nice-to-have work. |
 
-## Current Status
+## Implemented Flows
 
-Phases 1 through 14 are implemented.
+Current task-backed flows:
 
-The following tables now exist in the schema:
+1. HealthScore analysis.
+2. Paid nutrition-plan formulation.
+3. Free example formulation.
+4. Free email send.
+5. Reassessment email scheduling and send.
+6. Supplement safety classification.
+7. Plan-specific supplement safety review.
+8. Dose-reduction notices.
+9. Client safety follow-up through communication channels.
 
-- `agents`
-- `goals`
-- `tasks`
-- `task_dependencies`
-- `task_comments`
-- `task_events`
-- `task_reservations`
-- `task_approvals`
-- `communication_identities`
-- `plan_communication_identities`
-- `communication_channels`
-- `communication_messages`
+Human Review decisions are append-only where they affect the formulation: a reviewed formulation version is written rather than updating the old one in place.
 
-The existing `jobs` table remains in place as the compatibility execution record. New formulation, free example, email, and reassessment jobs now also create Goals and Tasks, and the internal worker reserves task-backed jobs first.
+## Admin Views
 
-The internal service layer lives in:
+The dashboard now separates business and operational views:
 
-- `lib/task-service.ts`
-- `lib/task-service-utils.ts`
-- `lib/openclaw-api.ts`
+| View | Purpose |
+| --- | --- |
+| KPI | Free, Precision, and Pro conversion performance. |
+| Conversions | Funnel movement and stage loss. |
+| Goals | Outcome-level operational tracking, with tasks, comments, events, dependencies, reservations, and approvals. |
+| Human Review | Admin-facing safety and supplement decisions. |
+| Alerts | Failed/stuck tasks, failed cron work, high-severity task events, and BPM errors. |
+| Communications | Channel-aware outbound messages and contact state. |
+| Supplements | Whitelist, blacklist, inactive/review status, max dose, units, confidence, safety flags, and notes. |
 
-## Phase 1: Core Data Model
+## Worker Rules
 
-Status: complete.
+Workers should:
 
-What was added:
+- reserve tasks only through the task service
+- use capability matching
+- obey goal priority before task priority
+- write comments when useful context is needed by the next actor
+- write task events for status changes, failures, and important observations
+- fail tasks with clear error messages rather than hiding errors in logs
+- spawn child tasks under the same goal when follow-up work is needed
 
-- A task agent registry for humans, AI agents, deterministic workers, external workers, and system workers.
-- A goals table to group tasks under one business outcome or customer journey.
-- A central task table with priority, status, capabilities, actor type, reasoning effort, payload, result payload, idempotency key, lease fields, and legacy job link.
-- A priority scale of `1` to `6`, defaulting to `3`.
-- Dependency support for ordered workflows.
-- Comments for collaborative working notes.
-- Append-only task events for audit.
-- Lease-based reservations.
-- Approval records for normal human approval tasks where a workflow needs them.
+Only small atomic work should be synchronous. Slow AI calls, messages, safety reviews, and follow-ups should be task-backed.
 
-Acceptance criteria:
+## API Rules
 
-- Schema can be reapplied cleanly.
+Machine APIs are protected by `ADMIN_CLAW_TOKEN`.
+
+Dashboard URLs use `ADMIN_DASHBOARD_TOKEN` and must not be accepted for machine APIs.
+
+OpenClaw and external workers should use:
+
+```http
+Authorization: Bearer <ADMIN_CLAW_TOKEN>
+```
+
+Tokens must not be passed in query strings, client bundles, BPM payloads, or logs.
+
+## Acceptance Criteria
+
+- Schema can be rebuilt from `db-schema.sql`.
+- No compatibility queue tables or columns are created.
 - Every task belongs to a goal.
-- Existing BPM rays are stored on goals where available.
-- Agents and tasks are separate.
+- Agents and tasks remain separate.
 - Tasks can require capabilities without naming a specific agent.
-- Task and goal priority is constrained to `1..6`.
-- Events are append-only.
-- Existing `jobs` flow is unchanged.
-
-## Phase 2: Task Service Layer
-
-Status: complete.
-
-Internal helpers added:
-
-- `createGoal`
-- `createTask`
-- `addTaskComment`
-- `addTaskEvent`
-- `reserveNextTask`
-- `completeTask`
-- `failTask`
-- `releaseExpiredReservations`
-- `spawnChildTask`
-
-What was added:
-
-- Priority normalization for the `1..6` operating bands.
-- Capability normalization and matching.
-- Agent upsert/heartbeat support that keeps agents separate from tasks.
-- Idempotent task creation by `(goal_id, idempotency_key)`.
-- Task reservation by goal priority first, then task priority, oldest eligible scheduled work.
-- Dependency checks before reservation.
-- Lease expiry handling, including requeue or fail-after-max-attempts.
-- Completion and failure helpers.
-- Child task spawning under the same goal.
-- Automatic task events for creation, reservation, completion, failure, comments, expired leases, and spawned child tasks.
-- Unit tests for priority, capabilities, and lease boundaries.
-
-Acceptance criteria:
-
-- Creating a task writes a `task_created` event.
-- Reserving a task writes a reservation and a `task_reserved` event.
-- Completing or failing a task writes a result event.
-- Duplicate idempotency keys do not create duplicate active tasks.
-- Expired leases become claimable again.
-- Agents reserve work by capability rather than by hard-coded worker name.
-
-## Phase 3: Protected Worker API
-
-Status: complete.
-
-Machine APIs are protected by `ADMIN_CLAW_TOKEN`. Dashboard tokens are not accepted.
-
-Implemented endpoints:
-
-- `POST /api/tasks/reserve`
-- `POST /api/tasks/:id/comment`
-- `POST /api/tasks/:id/complete`
-- `POST /api/tasks/:id/fail`
-- `POST /api/tasks/:id/spawn`
-- `POST /api/tasks/:id/renew`
-- `GET /api/tasks/:id`
-- `GET /api/goals/:goalId/tasks`
-
-Authentication:
-
-- preferred: `Authorization: Bearer <ADMIN_CLAW_TOKEN>`
-- supported fallback: `x-admin-claw-token: <ADMIN_CLAW_TOKEN>`
-
-What was added:
-
-- Shared OpenClaw API helper with no-store responses and a consistent bearer challenge.
-- Task reservation endpoint returning task, goal, comments, dependencies, agent, and reservation id.
-- Task inspection endpoint.
-- Task comment endpoint.
-- Task complete/fail endpoints.
-- Task lease renewal endpoint.
-- Child task spawn endpoint.
-- Goal task listing endpoint.
-- Tests covering missing, wrong, bearer, and header token auth.
-
-Acceptance criteria:
-
-- Untokened requests return `401`.
-- Wrong token returns `401`.
-- Bearer token with `ADMIN_CLAW_TOKEN` succeeds.
-- `x-admin-claw-token` with `ADMIN_CLAW_TOKEN` succeeds.
-- Agents can reserve only tasks matching their capabilities.
-- Reservation response includes payload, comments, dependencies, and goal context.
-- Completing, failing, or renewing a task requires the active `reservationId`; this prevents a worker from accidentally closing work it has not reserved.
-
-## Phase 4: Goal Layer And Admin GUI
-
-Status: complete.
-
-Built the goal-first admin view over the operational task system.
-
-Views added or updated:
-
-- Goals
-- Goal Detail / Timeline
-- All Tasks
-- Human Review
-- Agents
-- Technical Alerts
-
-What was added:
-
-- Admin Goals menu item.
-- Server-side goal data loader over `goals`, `tasks`, `task_events`, comments, dependencies, reservations, and approvals.
-- Derived goal status: processing, needs review, blocked, stuck, succeeded, failed, or cancelled.
-- Goal summary cards.
-- Goal list with status, priority, source, task progress, and last activity.
-- Goal detail panel with task list, timeline, dependencies, reservations, and approvals.
-- Stable `goal=<goal_id>` dashboard query parameter for selected goal detail.
-
-Acceptance criteria:
-
-- Admin can see goals in a list with name, status, priority, source, plan/email context, age, and last activity.
-- Goal status is derived from task state: processing, needs review, blocked, stuck, succeeded, failed, or cancelled.
-- Goal detail shows tasks, comments, events, dependencies, reservations, and approvals in one explainable timeline.
-- Admin can see queued, reserved, running, blocked, failed, completed, and cancelled tasks.
-- Human tasks are separated from system and AI tasks.
-- A goal timeline explains cause and effect without reading logs.
-- Stuck or failed work is visible.
-
-## Phase 5: First Migration Slice
-
-Status: complete.
-
-Supplement review is the first migrated slice. New safety review work still creates the legacy `supplement_review` job so the existing admin queue remains stable, but it now also creates a Goal and a Task:
-
-Candidate task types:
-
-- `classify_supplement`
-- `review_supplement_for_plan`
-- `dose_reduction_notice`
-- `client_safety_followup`
-
-Current behaviour:
-
-- Unknown supplements create a stable global goal keyed by the normalised supplement name.
-- Plan-specific safety flags create a plan safety goal.
-- Review tasks point back to the legacy job through `legacy_job_id`.
-- `safety_reviews` may carry `goal_id` and `task_id` so the operational decision can be traced from plan to job to task.
-- The Human Review queue reads task-backed rows first and falls back to legacy jobs when needed.
-- Completing, dismissing, approving, or resolving a review completes the related task and writes task comments/events.
-- Goals are marked completed when their review tasks are complete and no active task remains.
-
-Acceptance criteria:
-
-- Unknown supplements create one useful human task instead of noisy duplicates. Done.
-- Completing a review updates the downstream state. Done for the Human Review queue bridge.
-- Review completion removes the user-facing review box where appropriate. Done for plan-specific approve/disapprove by writing a reviewed formulation version.
-- Every admin action writes task events and comments. Done for dismiss, resolve, approve, and disapprove.
-
-## Phase 6: Goal-First Scheduling
-
-Status: complete.
-
-The queue now reserves tasks by business goal priority first.
-
-Reservation order:
-
-- eligible tasks only
-- goal priority, highest first
-- task priority, highest first
-- scheduled time, oldest due work first
-- creation time, oldest first
-
-Acceptance criteria:
-
-- A task in a priority `6` goal outranks a priority `6` task in a priority `3` goal. Done.
-- Task priority still controls ordering inside the same goal. Done.
-- New tasks inherit goal priority unless explicitly overridden. Done.
-- The admin UI makes goal priority more prominent than task priority. Done through the Goals view.
-- Task events explain any explicit priority override. Done through `task_created` and `task_priority_overridden` events.
-
-## Phase 7: Worker Migration
-
-Status: complete as a migration bridge.
-
-The legacy job worker now reserves task-backed work before falling back to direct legacy job claims. The legacy `jobs` rows remain because existing formulation, email, cron, and status code still uses them as the execution payload.
-
-Migrated task-backed job types:
-
-- `generate_formulation`
-- `generate_example_formulation`
-- `analyze_healthscore`
-- `send_example_email`
-- `send_reassessment_email`
-
-Current behaviour:
-
-- Enqueuing a supported legacy job creates a Goal and Task with `legacy_job_id`.
-- Free example formulation and email jobs share the same Free example goal.
-- HealthScore sales copy and overview analysis creates a task-backed HealthScore goal.
-- Paid formulation jobs create task-backed nutrition-plan goals.
-- Reassessment email jobs create task-backed reassessment goals.
-- The internal worker reserves eligible tasks by capability, claims the linked legacy job, processes the existing worker function, then completes or fails the task.
-- The internal worker only reserves tasks that explicitly require the `legacy_job_worker` capability and match migrated legacy job task types.
-- If the linked legacy job is already running, the task is released and retried later without consuming a task attempt. Stale running jobs can be reclaimed after the worker lease window.
-- If task creation is unavailable, the legacy job path still works.
-
-Acceptance criteria:
-
-- Slow formulation and email work is task-backed. Done.
-- Only atomic validation remains synchronous for the customer journey. Done for HealthScore analysis, paid formulation, Free formulation, Free email, and reassessment email.
-- Workers can restart without losing task state. Done through task leases and legacy job compatibility.
-- Duplicate processing is prevented by leases, idempotency, task-type scoping, and stale-running guards. Done for task-backed job creation and reservation.
-
-## Phase 8: Task Sequence Helpers
-
-Status: complete.
-
-Task sequences can now be created with one service-layer helper. A sequence is made of stages: tasks inside a stage can run in parallel, and the next stage waits for the previous stage unless explicitly disabled.
-
-Implemented helpers:
-
-- `createTaskSequence`
-- `buildTaskSequenceDependencyPlan`
-
-Current behaviour:
-
-- Each sequence belongs to one goal.
-- A `sequenceKey` can make generated task idempotency keys stable.
-- Tasks in the next stage automatically depend on all tasks in the previous stage.
-- A stage can require previous tasks to be `complete`, `successful`, or `approved`.
-- Individual tasks can also depend on earlier tasks by sequence key or on existing task IDs.
-- Creating a sequence writes a `task_sequence_created` event to the goal timeline.
-- Human approval remains a normal human task plus an `approved` dependency, not a separate subsystem.
-
-Acceptance criteria:
-
-- Common workflows can create task sequences with one helper call. Done.
-- Human approval tasks are regular tasks with clear titles, comments, payloads, and dependencies. Done.
-- Downstream tasks stay ineligible until prerequisite tasks are complete or approved. Done through `task_dependencies`.
-- Rejected work can spawn correction tasks inside the same goal. Done through `spawnChildTask`.
-- Approval history is visible on the goal timeline through comments and events. Done through normal task comments, task events, and approval dependency records.
-
-## Phase 9: Move Customer-Facing Slow AI Onto Tasks
-
-Status: complete for the HealthScore gate.
-
-The HealthScore formula remains synchronous because it is deterministic and fast. The AI-generated overview and sales copy now runs through the task-backed worker path as `healthscore_analysis`.
-
-Current behaviour:
-
-- Assessment capture stores the deterministic HealthScore immediately.
-- A `healthscore_analysis` job is queued and bridged into a Goal and Task.
-- The progress page honestly displays `Preparing your HealthScore` followed by `Analyzing HealthScore`.
-- The frontend polls `mode=score` until the AI analysis is written back to the assessment.
-- If the analysis job fails or is unavailable, the user can still proceed with the deterministic HealthScore instead of being stuck.
-- Completed analysis is written to `assessments.health_score.advice`, audited in `job_audit_events`, and logged as BPM.
-
-Acceptance criteria:
-
-- HealthScore calculation does not wait for Grok. Done.
-- Personalised score overview and plan-gate sales copy are produced by worker task. Done.
-- The spinner starts from the correct step and completes only after the relevant job is done or safely bypassed. Done.
-- Existing formulation, Free email, and reassessment workers still run through task-backed compatibility. Done.
-
-## Phase 10: Deprecate Old Jobs
-
-Status: complete as a safe deprecation step.
-
-The `jobs` table is no longer the normal worker-discovery mechanism when the task tables are available. It remains as a compatibility execution record because existing status pages, cron links, email audit records, and historical diagnostics still read it.
-
-Current behaviour:
-
-- New supported slow work still writes a legacy `jobs` row for compatibility, but also writes a Goal and Task.
-- The internal worker reserves task-backed work first.
-- Before idling, the worker backfills any queued supported legacy jobs that do not yet have an active task.
-- The worker no longer directly claims legacy jobs when task tables are available.
-- Direct legacy job fallback only activates if the task tables are unavailable, and writes a high-level audit event so the problem is visible.
-- The admin Technical menu now labels the old jobs view as `Legacy Jobs`; the Goals view is the operational task view.
-
-Only after task flows are proven:
-
-- stop creating new legacy jobs for migrated paths.
-- map or migrate old jobs where useful. Done for queued supported jobs through worker backfill.
-- keep old history inspectable. Done through the Legacy Jobs page and job audit events.
-- remove old branches once no production path depends on them. Still future work because compatibility records remain in active use.
-
-Acceptance criteria:
-
-- No normal worker path directly claims legacy `jobs` while task tables are available. Done.
-- Admin task queue replaces the old jobs page for operational visibility. Done through Goals; the old page is now labelled Legacy Jobs.
-- Historical jobs remain understandable. Done.
-
-## Phase 11: Human Review Completion Lifecycle
-
-Status: complete for plan-specific human review decisions.
-
-Human supplement review now closes the loop from reviewer decision to customer-visible formulation state and operational follow-up.
-
-Current behaviour:
-
-- Approving or disapproving a plan-specific supplement review writes a new formulation version instead of editing the existing formulation in place.
-- The reviewed formulation version removes the pending hidden-review item from the customer-visible result: approved items become visible with the reviewed dose; disapproved items are removed.
-- The `safety_reviews` row records the decision, reviewed formulation version, reviewer note, client message, and client notification state.
-- The legacy supplement review job is marked complete for compatibility.
-- The linked review task is completed with a task comment and event.
-- If the client needs to be told about the decision, a `client_safety_followup` task is queued under the same goal with the review decision, plan id, supplement, and reviewed dose.
-- The goal remains active while client follow-up is still queued, so the timeline does not pretend the work is finished before the client has been contacted.
-
-Acceptance criteria:
-
-- Human review completion is append-only for formulations. Done.
-- The safety review box disappears once all pending review items have been accepted or rejected. Done for plan-specific review decisions.
-- The admin decision is visible in `safety_reviews`, `job_audit_events`, `task_comments`, and `task_events`. Done.
-- Client follow-up is represented as a task rather than hidden state. Done.
-- The future communications worker has a clear task to reserve. Done through `client_safety_followup`.
-
-## Phase 12: Worker Runtime Hardening
-
-Status: complete for the current task worker runtime.
-
-The worker runtime now protects reservations more carefully and keeps goal state fresher as tasks move.
-
-Current behaviour:
-
-- OpenClaw task completion and failure endpoints require the active `reservationId`.
-- Task completion, failure, and lease renewal verify the active reservation and optional agent id before changing task state.
-- The internal legacy-job worker passes its reservation id and agent id when completing or failing bridged tasks.
-- Reserving a task sets `started_at` the first time the task is picked up.
-- Renewing a lease updates the worker agent heartbeat.
-- Expired leases refresh the parent goal state after requeueing or failing a task.
-- Completing or failing a task refreshes the parent goal state so completed, failed, and still-active goals stay aligned with the task list.
-
-Acceptance criteria:
-
-- A worker cannot complete or fail a task through the machine API without the reservation it received at claim time. Done.
-- Legacy compatibility work remains able to complete and fail task-backed jobs. Done.
-- Goals do not remain active after all tasks complete. Done.
-- Failed terminal task sets the goal failed when no active task remains. Done.
-- Agent heartbeat reflects lease renewal activity. Done.
-
-## Phase 13: Communication Channels And Follow-Up Worker
-
-Status: complete for the first client safety follow-up slice.
-
-The system now has an explicit communication-channel layer. Plans can be associated with a communication identity, and that identity can hold multiple channels such as LINE, WhatsApp, Telegram, WeChat, email, SMS, or manual contact.
-
-Current behaviour:
-
-- Each plan can be linked to a primary communication identity.
-- A communication identity can hold multiple ranked channels.
-- Channel selection honours explicit preference rank first.
-- If no preference has been set, chat channels are preferred before email: LINE, WhatsApp, Telegram, WeChat, then email.
-- Known plan emails from Free email requests or reassessment records are seeded as email channels.
-- Outbound messages are recorded in `communication_messages` with plan, goal, task, channel, provider, status, and metadata.
-- Email messages use the existing SMTP sender.
-- Chat-channel messages are queued as communication messages for a future provider/OpenClaw delivery bridge.
-- The internal worker now reserves `client_safety_followup` tasks and sends or queues the follow-up through the best available channel.
-- If no channel exists, the task fails visibly and the related safety review is marked `failed` for client notification.
-- OpenClaw-protected APIs can create/list channels, send a message to a plan or identity, list queued messages, and update delivery status.
-
-Implemented endpoints:
-
-- `GET /api/communications/channels`
-- `POST /api/communications/channels`
-- `POST /api/communications/send`
-- `GET /api/communications/messages`
-- `GET /api/communications/messages/:id`
-- `PATCH /api/communications/messages/:id`
-- `POST /api/communications/messages/:id/dispatch`
-
-Acceptance criteria:
-
-- A plan can have multiple communication channels. Done.
-- Channel choice is deterministic and test-covered. Done.
-- Chat channels are preferred before email unless an explicit rank overrides that. Done.
-- Post-review client follow-up tasks are no longer stranded. Done.
-- Email follow-ups can be sent through SMTP when email is available. Done.
-- Chat follow-ups are queued for external delivery rather than silently discarded. Done.
-- OpenClaw machine APIs are protected by `ADMIN_CLAW_TOKEN`. Done.
-
-## Phase 14: Customer Channel Capture
-
-Status: complete for safety-review follow-up capture.
-
-The customer-facing safety review box now lets a user leave a communication channel while hidden supplement suggestions are under human review.
-
-Current behaviour:
-
-- The safety review panel has been reworded to make the review feel reassuring and action-oriented.
-- If a formulation has pending hidden review items, the panel shows a contact capture form.
-- Supported customer-entered channels are LINE, WhatsApp, Telegram, and email.
-- The public endpoint is plan-scoped: `POST /api/assessment/:planId/communication-channel`.
-- The endpoint validates the plan, validates email when the selected channel is email, stores the channel against the plan communication identity, and writes BPM success/failure events.
-- Captured chat channels get higher default priority than email, so post-review follow-up prefers chat when available.
-- The OpenClaw/admin machine communication endpoints remain protected by `ADMIN_CLAW_TOKEN`; the customer capture endpoint is separate and only writes a channel for the supplied plan.
-
-Acceptance criteria:
-
-- A customer can leave a channel from the safety review box. Done.
-- Email capture validates the address. Done.
-- LINE, WhatsApp, and Telegram capture can store handles or numbers. Done.
-- Saved contact details are available to the `client_safety_followup` worker. Done.
-- Capture activity is visible in BPM. Done.
-- The safety review copy is clearer and less alarming. Done.
-
-## Remaining Plan From Here
-
-## Phase 15: Communications Operations And LINE Dispatch
-
-Status: complete for the first provider bridge.
-
-The admin dashboard now has a Communications view. It reads real `communication_messages` rows and shows totals for queued, sent, delivered, failed, skipped, and no-channel messages across the standard time windows.
-
-Current behaviour:
-
-- Communications is a first-class dashboard menu item.
-- Message rows show status, channel/provider, body preview, plan, task, address, and any delivery error.
-- `POST /api/communications/messages/:id/dispatch` lets OpenClaw or a worker dispatch a queued message.
-- LINE is the first direct provider bridge. When `LINE_CHANNEL_ACCESS_TOKEN` is configured, queued LINE messages are sent through LINE Messaging API.
-- LINE dispatch records sent/failed status back to `communication_messages` and writes BPM dispatch events.
-- Unsupported chat providers remain queued for OpenClaw/provider-specific delivery rather than being dropped.
-- The dispatch API is protected by `ADMIN_CLAW_TOKEN`.
-
-Acceptance criteria:
-
-- Admin can see communication throughput and failures. Done.
-- Queued LINE messages can be dispatched server-side when credentials exist. Done.
-- Failed LINE sends are recorded against the message and become visible in admin. Done.
-- OpenClaw can still list and update queued messages for providers not bridged directly. Done.
-
-## Remaining Plan From Here
-
-## Phase 16: Internal Communication Dispatch Scheduling
-
-Status: complete for queued LINE delivery scheduling and identity mapping.
-
-The internal worker now owns dispatch scheduling for first-party providers that MattaNutra can deliver directly. OpenClaw remains useful for supplying provider identity mappings and for providers that are not bridged directly yet.
-
-Current behaviour:
-
-- The internal jobs worker checks queued communication messages after task-backed communication work.
-- Eligible queued LINE messages are dispatched in small batches when `LINE_CHANNEL_ACCESS_TOKEN` is configured.
-- LINE dispatch only sends when the channel has a real LINE user id. Handles such as `@mattanutra` are stored as identifiers, but are not treated as push-deliverable user ids.
-- If a LINE message cannot be pushed because the channel needs a LINE user id mapping, the message is marked `no_channel` with a clear error instead of being retried forever.
-- OpenClaw can update a captured channel through `PATCH /api/communications/channels/:id`, including adding `metadata.lineUserId`.
-- When a valid LINE user id is added to a channel, blocked LINE messages for that channel are reopened to `queued` and the worker is nudged to try again.
-- Creating or updating a channel through the protected machine API nudges the worker so newly deliverable messages do not sit idle.
-
-Implemented endpoint:
-
-- `PATCH /api/communications/channels/:id`
-
-Acceptance criteria:
-
-- Direct provider dispatch has an owner. Done: the internal worker owns direct LINE dispatch.
-- OpenClaw has a safe way to attach LINE identity mappings. Done.
-- LINE handles and LINE user ids are not confused. Done.
-- Unmappable LINE messages do not loop indefinitely. Done.
-- Once a user id is mapped, previously blocked messages can be retried. Done.
-
-## Remaining Plan From Here
-
-Next phase: add production LINE webhook/OpenClaw mapping flow, then decide whether WhatsApp or Telegram should be bridged directly or remain OpenClaw-delivered.
-
-## Definition Of Done
-
-The system is ready when the admin UI can answer:
-
-- What goal is this work part of?
-- What tasks were created?
-- Who or what worked on each task?
-- What comments or decisions were made?
-- What spawned what?
-- What is blocked and why?
-- What failed and why?
-- What still needs a human?
-- Which agent touched it?
-- Can the same task safely retry?
+- Goal priority is the first reservation ordering signal.
+- Events and comments preserve cause-and-effect.
+- Human review completion closes the review task and queues any needed client follow-up.
+- Technical alerts are task-based.
+- OpenClaw can integrate through protected task and communications APIs.

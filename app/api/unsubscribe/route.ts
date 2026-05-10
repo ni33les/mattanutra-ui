@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cancelReassessmentActionByToken } from "@/lib/job-queue";
+import { cancelReassessmentActionByToken } from "@/lib/task-worker";
 
 export const runtime = "nodejs";
 

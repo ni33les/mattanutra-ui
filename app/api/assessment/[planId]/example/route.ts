@@ -8,10 +8,10 @@ import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
 import {
   getExampleBriefStatus,
   kickCronWorker,
-  kickJobsWorker,
+  kickTaskWorker,
   requestExampleBrief,
   scheduleReassessmentAction
-} from "@/lib/job-queue";
+} from "@/lib/task-worker";
 
 export const runtime = "nodejs";
 
@@ -94,7 +94,7 @@ export async function GET(request: Request, { params }: ExampleRouteProps) {
   }
 
   if (status.status !== "ready" && status.status !== "failed") {
-    void kickJobsWorker();
+    void kickTaskWorker();
   }
 
   return NextResponse.json(status, {
@@ -234,7 +234,7 @@ export async function POST(request: Request, { params }: ExampleRouteProps) {
       });
     }
 
-    void kickJobsWorker();
+    void kickTaskWorker();
     await writeBpmEvent({
       actorType: "visitor",
       attribution: bpm.attribution,

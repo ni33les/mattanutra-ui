@@ -19,7 +19,6 @@ import {
   FunnelIcon,
   HomeIcon,
   MegaphoneIcon,
-  QueueListIcon,
   SparklesIcon,
   XMarkIcon
 } from "@heroicons/react/24/outline";
@@ -38,12 +37,10 @@ import type {
   AdminCommunicationStatus
 } from "@/lib/admin-communications";
 import type {
-  AdminReviewJobRow,
+  AdminReviewTaskRow,
   AdminReviewQueueData
 } from "@/lib/admin-review-queue";
 import type {
-  AdminJobRow,
-  AdminJobsData,
   AdminTechnicalAlertsData,
   AdminTechnicalSeverity
 } from "@/lib/admin-technical";
@@ -80,7 +77,6 @@ type AdminDashboardView =
   | "communications"
   | "flow"
   | "goals"
-  | "jobs"
   | "kpi"
   | "reviews"
   | "supplements";
@@ -198,26 +194,6 @@ type AdminContent = Readonly<{
   ranges: Record<AdminDashboardRange, string>;
   rates: Record<AdminDashboardRateId, RateText>;
   ratesTitle: string;
-  jobs: {
-    action: string;
-    attempts: string;
-    audit: string;
-    complete: string;
-    completed: string;
-    empty: string;
-    error: string;
-    failed: string;
-    jobType: string;
-    plan: string;
-    priority: string;
-    queued: string;
-    running: string;
-    started: string;
-    status: string;
-    title: string;
-    total: string;
-    updated: string;
-  };
   reviewQueue: {
     approve: string;
     clientDose: string;
@@ -245,12 +221,12 @@ type AdminContent = Readonly<{
     empty: string;
     event: string;
     high: string;
-    job: string;
     low: string;
     medium: string;
     plan: string;
     source: string;
     status: string;
+    task: string;
     time: string;
     total: string;
   };
@@ -446,7 +422,6 @@ const content = {
       communications: "Communications",
       flow: "Sales Conversions",
       goals: "Goals",
-      jobs: "Jobs",
       kpi: "Key Performance Indicators",
       reviews: "Human Review",
       supplements: "Supplements"
@@ -478,32 +453,12 @@ const content = {
       }
     },
     ratesTitle: "Conversion rates",
-    jobs: {
-      action: "Action",
-      attempts: "Attempts",
-      audit: "Latest audit",
-      complete: "Complete",
-      completed: "Completed",
-      empty: "No legacy jobs in this timeframe.",
-      error: "Error",
-      failed: "Failed",
-      jobType: "Job type",
-      plan: "Plan",
-      priority: "Priority",
-      queued: "Queued",
-      running: "Running",
-      started: "Started",
-      status: "Status",
-      title: "Title",
-      total: "Total",
-      updated: "Updated"
-    },
     reviewQueue: {
       approve: "Approve",
       clientDose: "Client dose",
       disapprove: "Disapprove",
       doseReduced: "Dose reduced",
-      empty: "No supplement review jobs are waiting.",
+      empty: "No supplement review tasks are waiting.",
       flagReason: "Review reason",
       highPriority: "High Priority",
       lowPriority: "Low Priority",
@@ -519,21 +474,18 @@ const content = {
       total: "Total",
       unknown: "Unknown supplement"
     },
-    technical: [
-      { icon: ExclamationTriangleIcon, name: "Alerts", view: "alerts" },
-      { icon: QueueListIcon, name: "Legacy Jobs", view: "jobs" }
-    ],
+    technical: [{ icon: ExclamationTriangleIcon, name: "Alerts", view: "alerts" }],
     technicalAlerts: {
       critical: "Critical",
       empty: "No technical alerts in this timeframe.",
       event: "Event",
       high: "High",
-      job: "Job",
       low: "Low",
       medium: "Medium",
       plan: "Plan",
       source: "Source",
       status: "Status",
+      task: "Task",
       time: "Time",
       total: "Total"
     },
@@ -737,7 +689,6 @@ const content = {
       communications: "การสื่อสาร",
       flow: "Sales Conversions",
       goals: "Goals",
-      jobs: "งานระบบ",
       kpi: "Key Performance Indicators",
       reviews: "รีวิวโดยคน",
       supplements: "อาหารเสริม"
@@ -769,26 +720,6 @@ const content = {
       }
     },
     ratesTitle: "อัตราคอนเวอร์ชัน",
-    jobs: {
-      action: "การทำงาน",
-      attempts: "จำนวนครั้ง",
-      audit: "Audit ล่าสุด",
-      complete: "เสร็จแล้ว",
-      completed: "เสร็จเมื่อ",
-      empty: "ไม่มีงาน legacy ในช่วงเวลานี้",
-      error: "ข้อผิดพลาด",
-      failed: "ล้มเหลว",
-      jobType: "ชนิดงาน",
-      plan: "แผน",
-      priority: "ความสำคัญ",
-      queued: "เข้าคิว",
-      running: "กำลังทำงาน",
-      started: "เริ่มเมื่อ",
-      status: "สถานะ",
-      title: "หัวข้อ",
-      total: "ทั้งหมด",
-      updated: "อัปเดต"
-    },
     reviewQueue: {
       approve: "อนุมัติ",
       clientDose: "ขนาดสำหรับลูกค้า",
@@ -810,21 +741,18 @@ const content = {
       total: "ทั้งหมด",
       unknown: "อาหารเสริมใหม่"
     },
-    technical: [
-      { icon: ExclamationTriangleIcon, name: "แจ้งเตือน", view: "alerts" },
-      { icon: QueueListIcon, name: "งาน Legacy", view: "jobs" }
-    ],
+    technical: [{ icon: ExclamationTriangleIcon, name: "แจ้งเตือน", view: "alerts" }],
     technicalAlerts: {
       critical: "วิกฤต",
       empty: "ไม่มี Technical Alert ในช่วงเวลานี้",
       event: "อีเวนต์",
       high: "สูง",
-      job: "งาน",
       low: "ต่ำ",
       medium: "กลาง",
       plan: "แผน",
       source: "แหล่งข้อมูล",
       status: "สถานะ",
+      task: "งาน",
       time: "เวลา",
       total: "ทั้งหมด"
     },
@@ -2090,7 +2018,7 @@ function SupplementDetailsModal({
   );
 }
 
-function reviewKindLabel(labels: AdminContent, row: AdminReviewJobRow) {
+function reviewKindLabel(labels: AdminContent, row: AdminReviewTaskRow) {
   if (row.reviewKind === "dose_reduced") {
     return labels.reviewQueue.doseReduced;
   }
@@ -2129,7 +2057,7 @@ function reviewPriorityPill(labels: AdminContent, priority: number) {
 
 function reviewContextText(
   labels: AdminContent,
-  row: AdminReviewJobRow
+  row: AdminReviewTaskRow
 ) {
   const details = [
     row.planId ? `${labels.reviewQueue.plan}: ${row.planId}` : "",
@@ -2144,7 +2072,7 @@ function reviewContextText(
 
 function reviewRowToSupplementDraft(
   labels: AdminContent,
-  row: AdminReviewJobRow
+  row: AdminReviewTaskRow
 ): AdminSupplementRow {
   const priority = reviewPriorityPill(labels, row.priority);
 
@@ -2203,7 +2131,7 @@ function PlanSafetyReviewModal({
     clientDoseUnit: string,
     reviewerNote: string | null
   ) => void;
-  row: AdminReviewJobRow;
+  row: AdminReviewTaskRow;
   saving: boolean;
 }>) {
   const [clientDoseAmount, setClientDoseAmount] = useState<number | null>(
@@ -2430,7 +2358,7 @@ function AdminReviewQueueView({
   const [selectedReview, setSelectedReview] = useState<{
     draft: AdminSupplementRow;
     queuedLabel: string;
-    row: AdminReviewJobRow;
+    row: AdminReviewTaskRow;
   } | null>(null);
   const queueData =
     queueState.generatedAt === data.generatedAt ? queueState.data : data;
@@ -2472,7 +2400,7 @@ function AdminReviewQueueView({
     setErrorReviewId(null);
 
     try {
-      const response = await fetch(`/api/admin/review-jobs/${row.id}`, {
+      const response = await fetch(`/api/admin/review-tasks/${row.id}`, {
         body: JSON.stringify({
           accessToken,
           action: "resolve",
@@ -2497,7 +2425,7 @@ function AdminReviewQueueView({
           | null;
 
         throw new Error(
-          errorPayload?.message ?? "Unable to resolve review job"
+          errorPayload?.message ?? "Unable to resolve review task"
         );
       }
 
@@ -2534,7 +2462,7 @@ function AdminReviewQueueView({
 
       setSelectedReview(null);
     } catch (saveError) {
-      console.error("Unable to resolve review job", saveError);
+      console.error("Unable to resolve review task", saveError);
       setErrorReviewId(row.id);
     } finally {
       setSavingReviewId(null);
@@ -2542,7 +2470,7 @@ function AdminReviewQueueView({
   }
 
   async function decidePlanReview(
-    row: AdminReviewJobRow,
+    row: AdminReviewTaskRow,
     decision: "approve" | "disapprove",
     clientDoseAmount: number | null,
     clientDoseUnit: string,
@@ -2552,7 +2480,7 @@ function AdminReviewQueueView({
     setErrorReviewId(null);
 
     try {
-      const response = await fetch(`/api/admin/review-jobs/${row.id}`, {
+      const response = await fetch(`/api/admin/review-tasks/${row.id}`, {
         body: JSON.stringify({
           accessToken,
           action: decision,
@@ -2745,47 +2673,6 @@ function severityClass(value: AdminTechnicalSeverity) {
   }
 
   return "bg-gray-50 text-gray-700 ring-gray-200";
-}
-
-function jobCardClass(status: AdminJobRow["status"]) {
-  if (status === "failed") {
-    return "border-red-200";
-  }
-
-  if (status === "running") {
-    return "border-blue-200";
-  }
-
-  if (status === "complete") {
-    return "border-[#A7F3D0]";
-  }
-
-  return "border-amber-200";
-}
-
-function payloadText(payload: Record<string, unknown>, key: string) {
-  const value = payload[key];
-
-  return typeof value === "string" && value.trim() ? value.trim() : "";
-}
-
-function jobCardTitle(row: AdminJobRow) {
-  const payloadTitle =
-    payloadText(row.payload, "title") ||
-    payloadText(row.payload, "supplementName") ||
-    payloadText(row.payload, "emailType") ||
-    payloadText(row.payload, "actionType") ||
-    payloadText(row.payload, "requestId");
-
-  if (payloadTitle) {
-    return readableToken(payloadTitle);
-  }
-
-  if (row.latestAuditEvent) {
-    return readableToken(row.latestAuditEvent);
-  }
-
-  return row.planId ? row.planId : readableToken(row.jobType);
 }
 
 function jsonPreview(value: Record<string, unknown>) {
@@ -3024,8 +2911,8 @@ function AdminTechnicalAlertsView({
                         value={row.planId ?? "—"}
                       />
                       <SupplementListMeta
-                        label={labels.technicalAlerts.job}
-                        value={row.jobId ?? row.jobType ?? "—"}
+                        label={labels.technicalAlerts.task}
+                        value={row.taskId ?? row.taskType ?? "—"}
                       />
                       <SupplementListMeta
                         label={labels.technicalAlerts.status}
@@ -3055,84 +2942,6 @@ function AdminTechnicalAlertsView({
           </div>
         ) : null}
       </div>
-    </section>
-  );
-}
-
-function AdminJobsView({
-  data,
-  labels,
-  locale
-}: Readonly<{
-  data: AdminJobsData;
-  labels: AdminContent;
-  locale: Locale;
-}>) {
-  return (
-    <section className="mt-8 space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <FlowSummaryCard
-          label={labels.jobs.total}
-          value={formatNumber(data.summary.total, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.jobs.failed}
-          value={formatNumber(data.summary.failed, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.jobs.running}
-          value={formatNumber(data.summary.running, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.jobs.queued}
-          value={formatNumber(data.summary.queued, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.jobs.complete}
-          value={formatNumber(data.summary.complete, locale)}
-        />
-      </div>
-
-      {data.rows.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-          {data.rows.map((row) => (
-            <article
-              className={classNames(
-                jobCardClass(row.status),
-                "rounded-2xl border bg-white p-5 shadow-sm"
-              )}
-              key={row.id}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    {labels.jobs.action}
-                  </p>
-                  <p className="mt-1 truncate text-sm font-semibold text-gray-900">
-                    {readableToken(row.jobType)}
-                  </p>
-                </div>
-                <div className="shrink-0 rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-900 ring-1 ring-gray-200">
-                  {labels.jobs.priority}: {row.priority}
-                </div>
-              </div>
-
-              <div className="mt-5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  {labels.jobs.title}
-                </p>
-                <h3 className="mt-1 line-clamp-2 text-base font-semibold text-gray-900">
-                  {jobCardTitle(row)}
-                </h3>
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-2xl bg-white px-5 py-12 text-center text-sm font-medium text-gray-500 shadow-sm ring-1 ring-gray-200">
-          {labels.jobs.empty}
-        </div>
-      )}
     </section>
   );
 }
@@ -4256,7 +4065,6 @@ function adminViewDatabaseAvailable({
   data,
   flowData,
   goalsData,
-  jobsData,
   reviewQueueData,
   supplementsData,
   view
@@ -4266,7 +4074,6 @@ function adminViewDatabaseAvailable({
   data: AdminDashboardData;
   flowData: AdminFlowData;
   goalsData: AdminGoalsData;
-  jobsData: AdminJobsData;
   reviewQueueData: AdminReviewQueueData;
   supplementsData: AdminSupplementsData;
   view: AdminDashboardView;
@@ -4285,10 +4092,6 @@ function adminViewDatabaseAvailable({
 
   if (view === "goals") {
     return goalsData.databaseAvailable;
-  }
-
-  if (view === "jobs") {
-    return jobsData.databaseAvailable;
   }
 
   if (view === "reviews") {
@@ -4310,7 +4113,6 @@ export function AdminDashboard({
   filters,
   flowData,
   goalsData,
-  jobsData,
   locale,
   reviewQueueData,
   supplementsData,
@@ -4323,7 +4125,6 @@ export function AdminDashboard({
   filters: AdminDashboardFilters;
   flowData: AdminFlowData;
   goalsData: AdminGoalsData;
-  jobsData: AdminJobsData;
   locale: Locale;
   reviewQueueData: AdminReviewQueueData;
   supplementsData: AdminSupplementsData;
@@ -4337,7 +4138,6 @@ export function AdminDashboard({
     data,
     flowData,
     goalsData,
-    jobsData,
     reviewQueueData,
     supplementsData,
     view
@@ -4428,7 +4228,6 @@ export function AdminDashboard({
           view === "communications" ||
           view === "flow" ||
           view === "goals" ||
-          view === "jobs" ||
           view === "kpi" ? (
             <>
               <div className="mt-6">
@@ -4487,8 +4286,6 @@ export function AdminDashboard({
               labels={labels}
               locale={locale}
             />
-          ) : view === "jobs" ? (
-            <AdminJobsView data={jobsData} labels={labels} locale={locale} />
           ) : view === "reviews" ? (
             <AdminReviewQueueView
               accessToken={accessToken}

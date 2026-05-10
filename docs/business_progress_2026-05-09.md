@@ -189,17 +189,14 @@ The business has a place to handle edge cases that should not be decided automat
 
 A new Technical section was added to the admin dashboard.
 
-It contains:
-
-- Technical Alerts
-- Jobs
+It contains Technical Alerts.
 
 Technical Alerts show:
 
-- failed jobs
-- stuck running jobs
+- failed tasks
+- stuck running tasks
 - failed scheduled tasks
-- high/critical job audit events
+- high/critical task events
 - BPM error events
 
 Jobs show:

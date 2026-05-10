@@ -11,7 +11,7 @@ import {
   normalizeCommunicationChannelType,
   upsertCommunicationChannel
 } from "@/lib/communications";
-import { kickJobsWorker } from "@/lib/job-queue";
+import { kickTaskWorker } from "@/lib/task-worker";
 
 export const runtime = "nodejs";
 
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
           : "active"
     });
 
-    void kickJobsWorker();
+    void kickTaskWorker();
 
     return openClawJson({ channel });
   } catch (error) {

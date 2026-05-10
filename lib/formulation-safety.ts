@@ -1,6 +1,6 @@
 import type postgres from "postgres";
 import { createHash, randomUUID } from "node:crypto";
-import type { AssessmentPlan } from "@/lib/assessment-jobs";
+import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import { toJsonValue } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
 import {
@@ -22,11 +22,11 @@ type SafetyAudit = (event: {
 type SafetyInput = Readonly<{
   audit?: SafetyAudit;
   formulation: FormulationBlueprint;
-  jobId: string;
   locale: Locale;
   plan: AssessmentPlan;
   planId: string;
   requestId?: string | null;
+  taskId: string;
 }>;
 
 type SupplementRow = Readonly<{
@@ -55,7 +55,6 @@ type ReviewKind =
 
 type SupplementReviewWork = Readonly<{
   goalId: string | null;
-  jobId: string;
   taskId: string | null;
 }>;
 
@@ -214,7 +213,7 @@ function withHiddenSafety(
     action: "human_review" | "unknown_supplement";
     message: LocalizedText;
     reviewId?: string;
-    reviewJobId?: string;
+    reviewTaskId?: string;
   }
 ): FormulationIngredient {
   return {
@@ -223,7 +222,7 @@ function withHiddenSafety(
       action: input.action,
       message: input.message,
       reviewId: input.reviewId,
-      reviewJobId: input.reviewJobId,
+      reviewTaskId: input.reviewTaskId,
       visibility: "hidden"
     },
     status: "review"
@@ -234,7 +233,7 @@ function withReducedDose(
   ingredient: FormulationIngredient,
   dose: string,
   message: LocalizedText,
-  reviewJobId?: string
+  reviewTaskId?: string
 ): FormulationIngredient {
   return {
     ...ingredient,
@@ -243,82 +242,10 @@ function withReducedDose(
       action: "dose_reduced",
       message,
       originalDailyDose: ingredient.dailyDose,
-      reviewJobId,
+      reviewTaskId,
       visibility: "visible"
     }
   };
-}
-
-async function enqueueSupplementReviewJob(
-  sql: postgres.Sql,
-  input: {
-    kind: ReviewKind;
-    normalizedSupplementName: string;
-    payload: Record<string, unknown>;
-    planId: string | null;
-  }
-) {
-  const globalUnknown = input.kind === "unknown_supplement";
-  const planId = input.planId ?? null;
-  const existing = globalUnknown
-    ? await sql<{ id: string }[]>`
-        select id::text
-        from public.jobs
-        where job_type = 'supplement_review'
-          and status = 'queued'
-          and payload ->> 'reviewKind' = ${input.kind}
-          and payload ->> 'normalizedSupplementName' = ${input.normalizedSupplementName}
-        order by queued_at asc
-        limit 1
-      `
-    : await sql<{ id: string }[]>`
-        select id::text
-        from public.jobs
-        where job_type = 'supplement_review'
-          and status = 'queued'
-          and plan_id = ${planId}::uuid
-          and payload ->> 'reviewKind' = ${input.kind}
-          and payload ->> 'normalizedSupplementName' = ${input.normalizedSupplementName}
-        order by queued_at asc
-        limit 1
-      `;
-
-  if (existing[0]?.id) {
-    return existing[0].id;
-  }
-
-  const jobId = randomUUID();
-
-  await sql`
-    insert into public.jobs (
-      id,
-      job_type,
-      plan_id,
-      status,
-      priority,
-      payload,
-      queued_at,
-      updated_at
-    )
-    values (
-      ${jobId}::uuid,
-      'supplement_review',
-      ${globalUnknown ? null : planId}::uuid,
-      'queued',
-      ${input.kind === "unknown_supplement" ? 12 : 8},
-      ${sql.json(
-        toJsonValue({
-          normalizedSupplementName: input.normalizedSupplementName,
-          reviewKind: input.kind,
-          ...input.payload
-        })
-      )},
-      now(),
-      now()
-    )
-  `;
-
-  return jobId;
 }
 
 async function enqueueSupplementReviewWork(
@@ -331,7 +258,6 @@ async function enqueueSupplementReviewWork(
     supplementName: string;
   }
 ): Promise<SupplementReviewWork> {
-  const jobId = await enqueueSupplementReviewJob(sql, input);
   const globalUnknown = input.kind === "unknown_supplement";
   const priority = reviewTaskPriority(input.kind);
   const goalId = deterministicUuid(
@@ -352,7 +278,6 @@ async function enqueueSupplementReviewWork(
   try {
     const goal = await createGoal({
       context: {
-        legacyJobId: jobId,
         normalizedSupplementName: input.normalizedSupplementName,
         reviewKind: input.kind,
         source: "formulation_safety"
@@ -374,16 +299,13 @@ async function enqueueSupplementReviewWork(
         body: `Safety review opened for ${input.supplementName}.`,
         commentType: "instruction",
         metadata: {
-          legacyJobId: jobId,
           reviewKind: input.kind
         },
         visibility: "admin"
       },
-      legacyJobId: jobId,
       maxAttempts: 1,
       payload: {
         normalizedSupplementName: input.normalizedSupplementName,
-        reviewJobId: jobId,
         reviewKind: input.kind,
         source: "formulation_safety",
         supplementName: input.supplementName,
@@ -396,35 +318,19 @@ async function enqueueSupplementReviewWork(
       title: taskTitle
     });
 
-    await sql`
-      update public.jobs
-      set
-        payload = payload || ${sql.json(
-          toJsonValue({
-            goalId: goal.id,
-            taskId: task.id
-          })
-        )}::jsonb,
-        updated_at = now()
-      where id = ${jobId}::uuid
-    `;
-
     return {
       goalId: goal.id,
-      jobId,
       taskId: task.id
     };
   } catch (error) {
     console.warn("Unable to create task-backed supplement review work", {
       error,
-      jobId,
       reviewKind: input.kind,
       supplementName: input.supplementName
     });
 
     return {
       goalId: null,
-      jobId,
       taskId: null
     };
   }
@@ -435,7 +341,6 @@ async function attachSafetyReviewWork(
   input: {
     context?: Record<string, unknown>;
     goalId?: string | null;
-    jobId?: string | null;
     reviewId: string;
     taskId?: string | null;
   }
@@ -444,7 +349,6 @@ async function attachSafetyReviewWork(
     await sql`
       update public.safety_reviews
       set
-        job_id = coalesce(job_id, ${input.jobId ?? null}::uuid),
         goal_id = coalesce(goal_id, ${input.goalId ?? null}::uuid),
         task_id = coalesce(task_id, ${input.taskId ?? null}::uuid),
         safety_context = safety_context || ${sql.json(
@@ -469,7 +373,6 @@ async function createSafetyReview(
     dose?: ParsedDose | null;
     flagReason: string;
     goalId?: string | null;
-    jobId?: string | null;
     limit?: ParsedDose | null;
     planId: string;
     reviewType: string;
@@ -494,7 +397,6 @@ async function createSafetyReview(
     await attachSafetyReviewWork(sql, {
       context: input.context,
       goalId: input.goalId,
-      jobId: input.jobId,
       reviewId: existing[0].id,
       taskId: input.taskId
     });
@@ -503,13 +405,10 @@ async function createSafetyReview(
   }
 
   const reviewId = randomUUID();
-  const jobId = input.jobId ?? null;
-
   await sql`
     insert into public.safety_reviews (
       id,
       plan_id,
-      job_id,
       review_type,
       status,
       severity,
@@ -528,7 +427,6 @@ async function createSafetyReview(
     values (
       ${reviewId}::uuid,
       ${input.planId}::uuid,
-      ${jobId}::uuid,
       ${input.reviewType},
       'open',
       ${input.severity},
@@ -549,7 +447,6 @@ async function createSafetyReview(
   await attachSafetyReviewWork(sql, {
     context: input.context,
     goalId: input.goalId,
-    jobId,
     reviewId,
     taskId: input.taskId
   });
@@ -572,10 +469,12 @@ async function logSafetyBpm(
     eventName,
     eventType: "safety",
     exampleRequestId: input.requestId,
-    jobId: input.jobId,
     locale: input.locale,
     planId: input.planId,
-    properties,
+    properties: {
+      taskId: input.taskId,
+      ...properties
+    },
     selectedPlan: input.plan,
     severity
   });
@@ -619,7 +518,7 @@ async function hideForReview(
       goalId: reviewWork.goalId,
       matchedSupplementId: match?.id,
       normalizedSupplementName,
-      reviewJobId: reviewWork.jobId,
+      reviewTaskId: reviewWork.taskId,
       safetyFlags: match?.safety_flags ?? [],
       safetyNotes: match?.safety_notes,
       taskId: reviewWork.taskId
@@ -627,7 +526,6 @@ async function hideForReview(
     dose,
     flagReason: reason,
     goalId: reviewWork.goalId,
-    jobId: reviewWork.jobId,
     limit,
     planId: input.planId,
     reviewType:
@@ -648,7 +546,6 @@ async function hideForReview(
     payload: {
       reason,
       reviewId,
-      reviewJobId: reviewWork.jobId,
       reviewKind: kind,
       reviewTaskId: reviewWork.taskId,
       supplementName
@@ -658,7 +555,6 @@ async function hideForReview(
     goalId: reviewWork.goalId,
     reason,
     reviewId,
-    reviewJobId: reviewWork.jobId,
     reviewKind: kind,
     reviewTaskId: reviewWork.taskId,
     supplementName
@@ -668,7 +564,7 @@ async function hideForReview(
     action: kind === "unknown_supplement" ? "unknown_supplement" : "human_review",
     message: localized(reason),
     reviewId,
-    reviewJobId: reviewWork.jobId
+    reviewTaskId: reviewWork.taskId ?? undefined
   });
 }
 
@@ -729,7 +625,7 @@ async function reduceDose(
     context: {
       goalId: reviewWork.goalId,
       normalizedSupplementName,
-      reviewJobId: reviewWork.jobId,
+      reviewTaskId: reviewWork.taskId,
       safetyFlags: match.safety_flags ?? [],
       safetyNotes: match.safety_notes,
       taskId: reviewWork.taskId
@@ -737,7 +633,6 @@ async function reduceDose(
     dose,
     flagReason: reason,
     goalId: reviewWork.goalId,
-    jobId: reviewWork.jobId,
     limit,
     planId: input.planId,
     reviewType: "dose_limit",
@@ -753,7 +648,6 @@ async function reduceDose(
       maxAmount: numberOrNull(match.max_amount),
       maxUnit: match.max_unit,
       originalDose: dose.originalText,
-      reviewJobId: reviewWork.jobId,
       reviewTaskId: reviewWork.taskId,
       supplementName: match.name
     }
@@ -763,7 +657,6 @@ async function reduceDose(
     maxAmount: numberOrNull(match.max_amount),
     maxUnit: match.max_unit,
     originalDose: dose.originalText,
-    reviewJobId: reviewWork.jobId,
     reviewTaskId: reviewWork.taskId,
     supplementName: match.name
   });
@@ -772,7 +665,7 @@ async function reduceDose(
     ingredient,
     formatDose(limit.amount, match.max_unit),
     localized(reason),
-    reviewWork.jobId
+    reviewWork.taskId ?? undefined
   );
 }
 

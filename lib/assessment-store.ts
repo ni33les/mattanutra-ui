@@ -5,7 +5,7 @@ import {
   normalizeAssessmentPlan,
   type AssessmentPlan,
   type AssessmentSnapshot
-} from "@/lib/assessment-jobs";
+} from "@/lib/assessment-snapshot";
 import { buildAssessmentSummary } from "@/lib/formulation-summary";
 import {
   type FormulationIngredient,
@@ -427,35 +427,31 @@ export async function getStoredAssessmentSnapshot(planId: string) {
   let queuePosition = Number(row.queue_position ?? 0);
 
   if (status === "queued") {
-    const tableCheck = await sql`
-      select to_regclass('jobs') as jobs_table
+    const positions = await sql`
+      with current_task as (
+        select priority, created_at
+        from public.tasks
+        where plan_id = ${planId}::uuid
+          and task_type in ('generate_formulation', 'generate_example_formulation')
+          and status = 'queued'
+        order by created_at desc
+        limit 1
+      )
+      select count(*)::int as queue_position
+      from public.tasks
+      cross join current_task
+      where tasks.status = 'queued'
+        and tasks.task_type in ('generate_formulation', 'generate_example_formulation')
+        and (
+          tasks.priority > current_task.priority
+          or (
+            tasks.priority = current_task.priority
+            and tasks.created_at <= current_task.created_at
+          )
+        )
     `;
 
-    if (tableCheck[0]?.jobs_table) {
-      const positions = await sql`
-        with current_job as (
-          select priority, queued_at
-          from jobs
-          where plan_id = ${planId}::uuid
-            and status = 'queued'
-          order by queued_at desc
-          limit 1
-        )
-        select count(*)::int as queue_position
-        from jobs
-        cross join current_job
-        where jobs.status = 'queued'
-          and (
-            jobs.priority > current_job.priority
-            or (
-              jobs.priority = current_job.priority
-              and jobs.queued_at <= current_job.queued_at
-            )
-          )
-      `;
-
-      queuePosition = Number(positions[0]?.queue_position ?? queuePosition);
-    }
+    queuePosition = Number(positions[0]?.queue_position ?? queuePosition);
   }
 
   const healthScore = asRecord(row.health_score);
@@ -506,26 +502,22 @@ export async function getStoredHealthScoreAnalysisSnapshot(planId: string) {
   let analysisStatus: AssessmentSnapshot["status"] = "ready";
 
   if (!hasAdvice) {
-    const tableCheck = await sql`
-      select to_regclass('jobs') as jobs_table
+    const tasks = await sql`
+      select status::text
+      from public.tasks
+      where plan_id = ${planId}::uuid
+        and task_type = 'analyze_healthscore'
+      order by created_at desc
+      limit 1
     `;
+    const taskStatus = tasks[0]?.status;
 
-    if (tableCheck[0]?.jobs_table) {
-      const jobs = await sql`
-        select status::text
-        from jobs
-        where plan_id = ${planId}::uuid
-          and job_type = 'healthscore_analysis'
-        order by queued_at desc
-        limit 1
-      `;
-      const jobStatus = jobs[0]?.status;
-
-      analysisStatus =
-        jobStatus === "queued" || jobStatus === "running"
-          ? "preparing"
-          : "ready";
-    }
+    analysisStatus =
+      taskStatus === "queued" ||
+      taskStatus === "reserved" ||
+      taskStatus === "running"
+        ? "preparing"
+        : "ready";
   }
 
   return createHealthScoreAnalysisSnapshot({

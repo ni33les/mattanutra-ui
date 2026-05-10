@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { kickCronWorker } from "@/lib/job-queue";
+import { kickCronWorker } from "@/lib/task-worker";
 
 export const runtime = "nodejs";
 

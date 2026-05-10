@@ -48,11 +48,6 @@ begin
     alter table public.assessment_submissions rename to assessments;
   end if;
 
-  if to_regclass('public.formulation_jobs') is not null
-    and to_regclass('public.jobs') is null then
-    alter table public.formulation_jobs rename to jobs;
-  end if;
-
   if to_regclass('public.assessment_formulations') is not null
     and to_regclass('public.formulations') is null then
     alter table public.assessment_formulations rename to formulations;
@@ -203,94 +198,6 @@ alter table public.ai_response_cache
 create index if not exists ai_response_cache_type_expiry_idx
   on public.ai_response_cache (cache_type, expires_at desc);
 
-create table if not exists public.jobs (
-  id uuid primary key,
-  job_type text not null,
-  plan_id uuid null references public.assessments(plan_id) on delete cascade,
-  status text not null default 'queued' check (
-    status in ('queued', 'running', 'complete', 'failed')
-  ),
-  priority integer not null default 0,
-  attempts integer not null default 0,
-  payload jsonb not null default '{}'::jsonb,
-  error_message text null,
-  queued_at timestamptz not null default now(),
-  started_at timestamptz null,
-  completed_at timestamptz null,
-  failed_at timestamptz null,
-  updated_at timestamptz not null default now()
-);
-
-alter table public.jobs
-  add column if not exists job_type text,
-  add column if not exists plan_id uuid null references public.assessments(plan_id) on delete cascade,
-  add column if not exists status text default 'queued',
-  add column if not exists priority integer default 0,
-  add column if not exists attempts integer default 0,
-  add column if not exists payload jsonb default '{}'::jsonb,
-  add column if not exists error_message text null,
-  add column if not exists queued_at timestamptz default now(),
-  add column if not exists started_at timestamptz null,
-  add column if not exists completed_at timestamptz null,
-  add column if not exists failed_at timestamptz null,
-  add column if not exists updated_at timestamptz default now();
-
-update public.jobs
-set
-  job_type = coalesce(job_type, 'formulation'),
-  status = case
-    when status in ('queued', 'running', 'complete', 'failed') then status
-    else 'queued'
-  end,
-  priority = coalesce(priority, 0),
-  attempts = coalesce(attempts, 0),
-  payload = coalesce(payload, '{}'::jsonb),
-  queued_at = coalesce(queued_at, now()),
-  updated_at = coalesce(updated_at, now())
-where job_type is null
-  or status is null
-  or status not in ('queued', 'running', 'complete', 'failed')
-  or priority is null
-  or attempts is null
-  or payload is null
-  or queued_at is null
-  or updated_at is null;
-
-alter table public.jobs
-  alter column job_type set not null,
-  alter column status set default 'queued',
-  alter column status set not null,
-  alter column priority set default 0,
-  alter column priority set not null,
-  alter column attempts set default 0,
-  alter column attempts set not null,
-  alter column payload set default '{}'::jsonb,
-  alter column payload set not null,
-  alter column queued_at set default now(),
-  alter column queued_at set not null,
-  alter column updated_at set default now(),
-  alter column updated_at set not null;
-
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_constraint
-    where conrelid = 'public.jobs'::regclass
-      and conname = 'jobs_status_check'
-  ) then
-    alter table public.jobs
-      add constraint jobs_status_check
-      check (status in ('queued', 'running', 'complete', 'failed'));
-  end if;
-end $$;
-
-create index if not exists jobs_queue_idx
-  on public.jobs (status, priority desc, queued_at asc);
-
-create index if not exists jobs_plan_type_idx
-  on public.jobs (plan_id, job_type, status);
-
 create table if not exists public.formulations (
   plan_id uuid not null references public.assessments(plan_id) on delete cascade,
   version integer not null default 1,
@@ -363,64 +270,6 @@ alter table public.recommendations
   alter column updated_at set default now(),
   alter column updated_at set not null;
 
-create table if not exists public.job_audit_events (
-  id uuid primary key,
-  job_id uuid null references public.jobs(id) on delete set null,
-  plan_id uuid null references public.assessments(plan_id) on delete cascade,
-  event_type text not null,
-  level text not null default 'low' check (
-    level in ('low', 'medium', 'high', 'critical')
-  ),
-  event_payload jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
-);
-
-alter table public.job_audit_events
-  add column if not exists job_id uuid null references public.jobs(id) on delete set null,
-  add column if not exists plan_id uuid null references public.assessments(plan_id) on delete cascade,
-  add column if not exists event_type text default 'unknown',
-  add column if not exists level text default 'low',
-  add column if not exists event_payload jsonb default '{}'::jsonb,
-  add column if not exists created_at timestamptz default now();
-
-update public.job_audit_events
-set
-  event_type = coalesce(event_type, 'unknown'),
-  level = case
-    when level in ('low', 'medium', 'high', 'critical') then level
-    else 'low'
-  end,
-  event_payload = coalesce(event_payload, '{}'::jsonb),
-  created_at = coalesce(created_at, now())
-where event_type is null
-  or level is null
-  or level not in ('low', 'medium', 'high', 'critical')
-  or event_payload is null
-  or created_at is null;
-
-alter table public.job_audit_events
-  alter column event_type set not null,
-  alter column level set default 'low',
-  alter column level set not null,
-  alter column event_payload set default '{}'::jsonb,
-  alter column event_payload set not null,
-  alter column created_at set default now(),
-  alter column created_at set not null;
-
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_constraint
-    where conrelid = 'public.job_audit_events'::regclass
-      and conname = 'job_audit_events_level_check'
-  ) then
-    alter table public.job_audit_events
-      add constraint job_audit_events_level_check
-      check (level in ('low', 'medium', 'high', 'critical'));
-  end if;
-end $$;
-
 -- Earlier versions used plan_id as the sole primary key, which allowed only one
 -- formulation/recommendation per assessment. The current model keeps the
 -- assessment as the master record and stores versioned child rows.
@@ -482,15 +331,6 @@ create index if not exists formulations_latest_idx
 
 create index if not exists recommendations_latest_idx
   on public.recommendations (plan_id, version desc, generated_at desc);
-
-create index if not exists job_audit_events_plan_idx
-  on public.job_audit_events (plan_id, created_at desc);
-
-create index if not exists job_audit_events_job_idx
-  on public.job_audit_events (job_id, created_at desc);
-
-create index if not exists job_audit_events_level_idx
-  on public.job_audit_events (level, created_at desc);
 
 create table if not exists public.agents (
   id uuid primary key,
@@ -909,7 +749,6 @@ create table if not exists public.tasks (
   goal_id uuid not null references public.goals(id) on delete cascade,
   parent_task_id uuid null references public.tasks(id) on delete set null,
   plan_id uuid null references public.assessments(plan_id) on delete set null,
-  legacy_job_id uuid null references public.jobs(id) on delete set null,
   task_type text not null,
   title text not null,
   description text null,
@@ -958,7 +797,6 @@ alter table public.tasks
   add column if not exists goal_id uuid references public.goals(id) on delete cascade,
   add column if not exists parent_task_id uuid null references public.tasks(id) on delete set null,
   add column if not exists plan_id uuid null references public.assessments(plan_id) on delete set null,
-  add column if not exists legacy_job_id uuid null references public.jobs(id) on delete set null,
   add column if not exists task_type text,
   add column if not exists title text,
   add column if not exists description text null,
@@ -1178,10 +1016,6 @@ create index if not exists tasks_plan_idx
 create index if not exists tasks_parent_idx
   on public.tasks (parent_task_id, created_at asc)
   where parent_task_id is not null;
-
-create index if not exists tasks_legacy_job_idx
-  on public.tasks (legacy_job_id, created_at desc)
-  where legacy_job_id is not null;
 
 create index if not exists tasks_reserved_agent_idx
   on public.tasks (reserved_by_agent_id, lease_until)
@@ -1823,7 +1657,6 @@ create table if not exists public.cron (
   status text not null default 'scheduled' check (
     status in ('scheduled', 'queued', 'complete', 'cancelled', 'failed')
   ),
-  job_id uuid null references public.jobs(id) on delete set null,
   attempts integer not null default 0,
   recurrence_days integer null,
   unsubscribe_token text null,
@@ -1843,7 +1676,6 @@ alter table public.cron
   add column if not exists payload jsonb default '{}'::jsonb,
   add column if not exists scheduled_for timestamptz,
   add column if not exists status text default 'scheduled',
-  add column if not exists job_id uuid null references public.jobs(id) on delete set null,
   add column if not exists attempts integer default 0,
   add column if not exists recurrence_days integer null,
   add column if not exists unsubscribe_token text null,
@@ -1861,10 +1693,6 @@ alter table public.cron
 update public.cron
 set action_type = 'reassessment'
 where action_type = 'reassessment_email';
-
-update public.jobs
-set job_type = 'reassessment'
-where job_type = 'reassessment_email';
 
 update public.cron
 set recurrence_days = 60
@@ -1953,7 +1781,6 @@ create table if not exists public.bpm (
   id uuid primary key,
   ray uuid not null,
   plan_id uuid null references public.assessments(plan_id) on delete set null,
-  job_id uuid null references public.jobs(id) on delete set null,
   cron_id uuid null references public.cron(id) on delete set null,
   example_request_id uuid null references public.assessment_example_requests(id) on delete set null,
   event_name text not null,
@@ -2012,7 +1839,6 @@ create table if not exists public.bpm (
 alter table public.bpm
   add column if not exists ray uuid,
   add column if not exists plan_id uuid null references public.assessments(plan_id) on delete set null,
-  add column if not exists job_id uuid null references public.jobs(id) on delete set null,
   add column if not exists cron_id uuid null references public.cron(id) on delete set null,
   add column if not exists example_request_id uuid null references public.assessment_example_requests(id) on delete set null,
   add column if not exists event_name text,
@@ -2930,11 +2756,9 @@ create table if not exists public.safety_reviews (
   id uuid primary key,
   ray uuid null,
   plan_id uuid null references public.assessments(plan_id) on delete cascade,
-  job_id uuid null references public.jobs(id) on delete set null,
   goal_id uuid null references public.goals(id) on delete set null,
   task_id uuid null references public.tasks(id) on delete set null,
   bpm_event_id uuid null references public.bpm(id) on delete set null,
-  notification_job_id uuid null references public.jobs(id) on delete set null,
   formulation_version integer null,
   review_type text not null default 'ingredient_safety',
   status text not null default 'open',
@@ -2965,11 +2789,9 @@ create table if not exists public.safety_reviews (
 alter table public.safety_reviews
   add column if not exists ray uuid null,
   add column if not exists plan_id uuid null references public.assessments(plan_id) on delete cascade,
-  add column if not exists job_id uuid null references public.jobs(id) on delete set null,
   add column if not exists goal_id uuid null references public.goals(id) on delete set null,
   add column if not exists task_id uuid null references public.tasks(id) on delete set null,
   add column if not exists bpm_event_id uuid null references public.bpm(id) on delete set null,
-  add column if not exists notification_job_id uuid null references public.jobs(id) on delete set null,
   add column if not exists formulation_version integer null,
   add column if not exists review_type text default 'ingredient_safety',
   add column if not exists status text default 'open',
@@ -3208,10 +3030,6 @@ create index if not exists safety_reviews_status_idx
 create index if not exists safety_reviews_plan_idx
   on public.safety_reviews (plan_id, opened_at desc)
   where plan_id is not null;
-
-create index if not exists safety_reviews_job_idx
-  on public.safety_reviews (job_id, opened_at desc)
-  where job_id is not null;
 
 drop index if exists public.safety_reviews_goal_idx;
 
@@ -4224,12 +4042,6 @@ begin
   end;
 
   begin
-    execute 'alter table public.jobs owner to mn';
-  exception when others then
-    raise notice 'Skipping jobs owner change: %', sqlerrm;
-  end;
-
-  begin
     execute 'alter table public.formulations owner to mn';
   exception when others then
     raise notice 'Skipping formulations owner change: %', sqlerrm;
@@ -4239,12 +4051,6 @@ begin
     execute 'alter table public.recommendations owner to mn';
   exception when others then
     raise notice 'Skipping recommendations owner change: %', sqlerrm;
-  end;
-
-  begin
-    execute 'alter table public.job_audit_events owner to mn';
-  exception when others then
-    raise notice 'Skipping job_audit_events owner change: %', sqlerrm;
   end;
 
   begin

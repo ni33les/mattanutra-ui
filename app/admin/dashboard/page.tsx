@@ -11,10 +11,7 @@ import { getAdminFlowData } from "@/lib/admin-flow-data";
 import { getAdminGoalsData } from "@/lib/admin-goals";
 import { getAdminReviewQueueData } from "@/lib/admin-review-queue";
 import { getAdminSupplementsData } from "@/lib/admin-supplements";
-import {
-  getAdminJobsData,
-  getAdminTechnicalAlertsData
-} from "@/lib/admin-technical";
+import { getAdminTechnicalAlertsData } from "@/lib/admin-technical";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +35,6 @@ export default async function AdminDashboardPage({
     rawView === "communications" ||
     rawView === "flow" ||
     rawView === "goals" ||
-    rawView === "jobs" ||
     rawView === "reviews" ||
     rawView === "supplements"
       ? rawView
@@ -56,7 +52,6 @@ export default async function AdminDashboardPage({
     data,
     flowData,
     goalsData,
-    jobsData,
     reviewQueueData,
     supplementsData
   ] = await Promise.all([
@@ -65,7 +60,6 @@ export default async function AdminDashboardPage({
     getAdminDashboardData(range, filters),
     getAdminFlowData(range, filters),
     getAdminGoalsData(range, selectedGoalId),
-    getAdminJobsData(range),
     getAdminReviewQueueData(),
     getAdminSupplementsData()
   ]);
@@ -79,7 +73,6 @@ export default async function AdminDashboardPage({
       filters={filters}
       flowData={flowData}
       goalsData={goalsData}
-      jobsData={jobsData}
       locale="en"
       reviewQueueData={reviewQueueData}
       supplementsData={supplementsData}
