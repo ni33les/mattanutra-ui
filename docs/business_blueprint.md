@@ -55,7 +55,7 @@ flowchart TB
 - HealthScore page with score, six-domain snapshot, radar visualisation, and AI-generated overview.
 - AI-personalised, sales-optimised plan-gate copy and three feature cards anchored to the user's actual assessment signals.
 - Separate AI paths: one shared Grok model with medium reasoning for HealthScore sales copy and formulation generation.
-- HealthScore/marketing AI responses are cached for up to one week to reduce latency and cost.
+- HealthScore/marketing AI responses are cached for up to one week and now run through the task-backed worker path, so the user sees an honest analysis step instead of the assessment request waiting on AI.
 - Free email lead capture.
 - Free email sends the top three supplement suggestions from the actual generated formulation.
 - Recurring 60-day reassessment scheduling with unsubscribe.
@@ -69,7 +69,7 @@ flowchart TB
 - BPM tracking for funnel, campaign, affiliate, safety, error, email, chat, and formulation events.
 - Admin dashboard with KPI and Conversions views over hour, day, week, month, year, and all-time windows.
 - Admin Technical section with Alerts and Jobs views for failed email sends, stuck jobs, cron failures, AI/worker errors, and recent job history.
-- Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported legacy jobs now create task-backed work items before the old worker fallback.
+- Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported slow work now creates task-backed work items before the old worker fallback.
 - Admin Goals view showing goal status, priority, source, BPM/session ray, tasks, events, comments, dependencies, reservations, and approvals.
 - Dashboard filters for locale, device, source, medium, campaign, campaign ID, affiliate, promo code, selected plan, plan ID, ray, and email hash.
 

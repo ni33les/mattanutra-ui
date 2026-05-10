@@ -14,6 +14,7 @@ import { validateLeadEmail } from "@/lib/email-validation";
 import { analyzeFormulationWithGrok } from "@/lib/formulation-analysis";
 import { applyFormulationSafety } from "@/lib/formulation-safety";
 import type { FormulationBlueprint } from "@/lib/formulation-types";
+import { analyzeHealthScoreAdvice } from "@/lib/health-score-analysis";
 import type { HealthScoreResult } from "@/lib/health-score";
 import { writeBpmEvent } from "@/lib/bpm";
 import {
@@ -39,6 +40,7 @@ type JobType =
   | "example_email"
   | "example_formulation"
   | "formulation"
+  | "healthscore_analysis"
   | "reassessment"
   | "supplement_review";
 type AuditLevel = "critical" | "high" | "low" | "medium";
@@ -66,6 +68,7 @@ const globalJobsWorker = globalThis as typeof globalThis & {
 const JOB_PRIORITIES = {
   exampleEmail: 3,
   exampleFormulation: 5,
+  healthScoreAnalysis: 25,
   precision: 20,
   pro: 30,
   reassessment: 10
@@ -74,6 +77,7 @@ const JOB_WORKER_CAPABILITY = "legacy_job_worker";
 const JOB_WORKER_TASK_TYPES = [
   "generate_formulation",
   "generate_example_formulation",
+  "analyze_healthscore",
   "send_example_email",
   "send_reassessment_email"
 ] as const;
@@ -124,6 +128,10 @@ function goalPriorityForJob(
     return normalizeAssessmentPlan(payload.plan) === "pro" ? 6 : 5;
   }
 
+  if (jobType === "healthscore_analysis") {
+    return 5;
+  }
+
   if (jobType === "example_formulation" || jobType === "example_email") {
     return 3;
   }
@@ -165,6 +173,18 @@ function jobTaskConfig(input: Readonly<{
       reasoningEffort: "medium" as const,
       taskTitle: "Generate nutrition plan",
       taskType: "generate_formulation"
+    };
+  }
+
+  if (input.jobType === "healthscore_analysis" && input.planId) {
+    return {
+      actorType: "ai" as const,
+      goalId: deterministicUuid(`mattanutra:goal:healthscore:${input.planId}`),
+      goalTitle: "Analyze HealthScore",
+      priority: goalPriorityForJob(input.jobType, input.payload),
+      reasoningEffort: "medium" as const,
+      taskTitle: "Analyze HealthScore",
+      taskType: "analyze_healthscore"
     };
   }
 
@@ -773,6 +793,20 @@ export async function enqueueFormulationJob({
 
   await ensureJobsSchema(sql);
 
+  const assessmentRows = await sql`
+    select health_score
+    from assessments
+    where plan_id = ${planId}::uuid
+    limit 1
+  `;
+
+  if (
+    !assessmentRows[0] ||
+    hasHealthScoreAdvice(assessmentRows[0].health_score)
+  ) {
+    return null;
+  }
+
   const existing = await sql`
     select id::text
     from jobs
@@ -848,6 +882,88 @@ export async function enqueueFormulationJob({
     jobId,
     jobType: "formulation",
     payload: { answers, locale, plan },
+    planId
+  });
+
+  return jobId;
+}
+
+export async function enqueueHealthScoreAnalysisJob({
+  planId
+}: Readonly<{
+  planId: string;
+}>) {
+  const sql = getSql();
+
+  if (!sql || !isUuid(planId)) {
+    return null;
+  }
+
+  await ensureJobsSchema(sql);
+
+  const existing = await sql`
+    select id::text
+    from jobs
+    where plan_id = ${planId}::uuid
+      and job_type = 'healthscore_analysis'
+      and status in ('queued', 'running')
+    order by queued_at desc
+    limit 1
+  `;
+
+  if (existing[0]) {
+    const existingJobId = existing[0].id as string;
+
+    await ensureTaskForJob(sql, {
+      jobId: existingJobId,
+      jobType: "healthscore_analysis",
+      payload: {},
+      planId
+    });
+
+    return existingJobId;
+  }
+
+  const jobId = crypto.randomUUID();
+
+  await sql`
+    insert into jobs (
+      id,
+      job_type,
+      plan_id,
+      status,
+      priority,
+      payload,
+      queued_at,
+      updated_at
+    )
+    values (
+      ${jobId}::uuid,
+      'healthscore_analysis',
+      ${planId}::uuid,
+      'queued',
+      ${JOB_PRIORITIES.healthScoreAnalysis},
+      ${sql.json(toJsonValue({}))},
+      now(),
+      now()
+    )
+  `;
+
+  await auditJobEvent(sql, {
+    eventPayload: {
+      businessEvent: true,
+      priority: JOB_PRIORITIES.healthScoreAnalysis
+    },
+    eventType: "healthscore_analysis_job_enqueued",
+    jobId,
+    level: "low",
+    planId
+  });
+
+  await ensureTaskForJob(sql, {
+    jobId,
+    jobType: "healthscore_analysis",
+    payload: {},
     planId
   });
 
@@ -2002,6 +2118,111 @@ async function failJob(
   });
 }
 
+function hasHealthScoreAdvice(value: unknown) {
+  const advice = payloadRecord(payloadRecord(value).advice);
+  const overview = advice.overview;
+
+  return (
+    Boolean(overview && typeof overview === "object") ||
+    Array.isArray(advice.paywallFeatures)
+  );
+}
+
+async function completeHealthScoreAnalysisJob(
+  sql: postgres.Sql,
+  job: ClaimedJob
+) {
+  if (!job.plan_id) {
+    throw new Error("HealthScore analysis job is missing plan_id");
+  }
+
+  const rows = await sql`
+    select
+      answers,
+      health_score,
+      locale
+    from assessments
+    where plan_id = ${job.plan_id}::uuid
+    limit 1
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error("Assessment submission not found");
+  }
+
+  const healthScore = payloadRecord(row.health_score);
+
+  if (typeof healthScore.score !== "number") {
+    throw new Error("Assessment is missing a backend HealthScore");
+  }
+
+  const locale: Locale = isLocale(row.locale) ? row.locale : "en";
+  const baseHealthScore = healthScore as HealthScoreResult;
+  const updatedHealthScore: HealthScoreResult = hasHealthScoreAdvice(healthScore)
+    ? baseHealthScore
+    : ({
+        ...baseHealthScore,
+        advice: await analyzeHealthScoreAdvice({
+          answers: row.answers,
+          healthScore: baseHealthScore,
+          locale
+        })
+      } as HealthScoreResult);
+
+  await sql.begin(async (transaction) => {
+    await transaction`
+      update assessments set
+        health_score = ${transaction.json(toJsonValue(updatedHealthScore))},
+        updated_at = now()
+      where plan_id = ${job.plan_id}::uuid
+    `;
+
+    await transaction`
+      update jobs set
+        status = 'complete',
+        completed_at = now(),
+        updated_at = now()
+      where id = ${job.id}::uuid
+    `;
+
+    await transaction`
+      insert into job_audit_events (
+        id,
+        job_id,
+        plan_id,
+        event_type,
+        level,
+        event_payload,
+        created_at
+      )
+      values (
+        ${crypto.randomUUID()}::uuid,
+        ${job.id}::uuid,
+        ${job.plan_id}::uuid,
+        'healthscore_analysis_completed',
+        'medium',
+        ${transaction.json(
+          toJsonValue({
+            businessEvent: true,
+            cachedOrExisting: hasHealthScoreAdvice(healthScore)
+          })
+        )},
+        now()
+      )
+    `;
+  });
+
+  await writeBpmEvent({
+    actorType: "worker",
+    eventName: "healthscore_analysis_completed",
+    eventType: "funnel",
+    jobId: job.id,
+    locale,
+    planId: job.plan_id
+  });
+}
+
 async function completeFormulationJob(sql: postgres.Sql, job: ClaimedJob) {
   if (!job.plan_id) {
     throw new Error("Formulation job is missing plan_id");
@@ -2710,6 +2931,11 @@ async function processJob(sql: postgres.Sql, job: ClaimedJob) {
 
   if (job.job_type === "formulation") {
     await completeFormulationJob(sql, job);
+    return;
+  }
+
+  if (job.job_type === "healthscore_analysis") {
+    await completeHealthScoreAnalysisJob(sql, job);
     return;
   }
 

@@ -7,12 +7,13 @@ import {
 } from "@/lib/assessment-jobs";
 import {
   getStoredAssessmentSnapshot,
+  getStoredHealthScoreAnalysisSnapshot,
   persistAssessmentSubmission
 } from "@/lib/assessment-store";
 import { computeHealthScore } from "@/lib/health-score";
-import { analyzeHealthScoreAdvice } from "@/lib/health-score-analysis";
 import { writeSkippedPaymentSuccessEvent } from "@/lib/payment-bpm";
 import {
+  enqueueHealthScoreAnalysisJob,
   enqueueFormulationJob,
   kickCronWorker,
   kickJobsWorker,
@@ -33,23 +34,10 @@ function reassessmentEmailFromAnswers(answers: unknown) {
   return typeof value === "string" ? value : "";
 }
 
-async function buildHealthScore(answers: unknown, locale: unknown) {
+function buildHealthScore(answers: unknown, locale: unknown) {
   const normalizedLocale = isLocale(locale) ? locale : "en";
-  const healthScore = computeHealthScore(answers, normalizedLocale);
 
-  try {
-    return {
-      ...healthScore,
-      advice: await analyzeHealthScoreAdvice({
-        answers,
-        healthScore,
-        locale: normalizedLocale
-      })
-    };
-  } catch (error) {
-    console.warn("Unable to analyze HealthScore advice", error);
-    return healthScore;
-  }
+  return computeHealthScore(answers, normalizedLocale);
 }
 
 function healthScoreBpmFields(snapshot: { healthScore?: ReturnType<typeof computeHealthScore> }) {
@@ -112,7 +100,7 @@ export async function POST(request: Request) {
     selectedPlan = body.plan;
   }
   const snapshot = createAssessmentSnapshot({
-    healthScore: await buildHealthScore(body.answers, body.locale),
+    healthScore: buildHealthScore(body.answers, body.locale),
     plan: selectedPlan ?? DEFAULT_ASSESSMENT_PLAN
   });
   let responseSnapshot = snapshot;
@@ -137,6 +125,20 @@ export async function POST(request: Request) {
       selectedPlan,
       ...healthScoreBpmFields(snapshot)
     });
+
+    const analysisJobId = await enqueueHealthScoreAnalysisJob({
+      planId: snapshot.planId
+    });
+
+    if (analysisJobId) {
+      void kickJobsWorker();
+    }
+
+    if (intent === "capture") {
+      responseSnapshot =
+        (await getStoredHealthScoreAnalysisSnapshot(snapshot.planId)) ??
+        responseSnapshot;
+    }
 
     const reassessmentEmail = reassessmentEmailFromAnswers(body.answers);
 

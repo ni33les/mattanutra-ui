@@ -51,7 +51,9 @@ export function normalizeAssessmentPlan(plan: unknown): AssessmentPlan {
   return isAssessmentPlan(plan) ? plan : DEFAULT_ASSESSMENT_PLAN;
 }
 
-export function buildAssessmentSteps(status: AssessmentStatus) {
+export function buildAssessmentSteps(
+  status: AssessmentStatus
+): AssessmentSnapshot["steps"] {
   const isReady = status === "ready";
   const hasFailed = status === "failed";
 
@@ -75,13 +77,33 @@ export function buildAssessmentSteps(status: AssessmentStatus) {
   ] satisfies AssessmentSnapshot["steps"];
 }
 
+export function buildHealthScoreAnalysisSteps(
+  status: AssessmentStatus
+): AssessmentSnapshot["steps"] {
+  const isReady = status === "ready";
+  const hasFailed = status === "failed";
+
+  return [
+    { id: "assessment", state: "complete" },
+    { id: "score", state: "complete" },
+    {
+      id: "scoreAnalysis",
+      state: isReady ? "complete" : hasFailed ? "failed" : "active"
+    },
+    { id: "payment", state: "pending" },
+    { id: "formulation", state: "pending" },
+    { id: "safety", state: "pending" },
+    { id: "results", state: "pending" }
+  ] satisfies AssessmentSnapshot["steps"];
+}
+
 export function createAssessmentSnapshot({
   healthScore,
   plan,
   planId = crypto.randomUUID(),
   queuePosition,
   status = "queued"
-}: AssessmentSnapshotInput = {}) {
+}: AssessmentSnapshotInput = {}): AssessmentSnapshot {
   const normalizedQueuePosition =
     status === "queued" ? Math.max(1, queuePosition ?? 1) : 0;
 
@@ -92,5 +114,26 @@ export function createAssessmentSnapshot({
     queuePosition: normalizedQueuePosition,
     status,
     steps: buildAssessmentSteps(status)
+  } satisfies AssessmentSnapshot;
+}
+
+export function createHealthScoreAnalysisSnapshot({
+  healthScore,
+  plan,
+  planId,
+  status
+}: Readonly<{
+  healthScore: HealthScoreResult;
+  plan?: unknown;
+  planId: string;
+  status: AssessmentStatus;
+}>): AssessmentSnapshot {
+  return {
+    healthScore,
+    plan: normalizeAssessmentPlan(plan),
+    planId,
+    queuePosition: 0,
+    status,
+    steps: buildHealthScoreAnalysisSteps(status)
   } satisfies AssessmentSnapshot;
 }

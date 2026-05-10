@@ -308,6 +308,7 @@ Migrated task-backed job types:
 
 - `generate_formulation`
 - `generate_example_formulation`
+- `analyze_healthscore`
 - `send_example_email`
 - `send_reassessment_email`
 
@@ -315,6 +316,7 @@ Current behaviour:
 
 - Enqueuing a supported legacy job creates a Goal and Task with `legacy_job_id`.
 - Free example formulation and email jobs share the same Free example goal.
+- HealthScore sales copy and overview analysis creates a task-backed HealthScore goal.
 - Paid formulation jobs create task-backed nutrition-plan goals.
 - Reassessment email jobs create task-backed reassessment goals.
 - The internal worker reserves eligible tasks by capability, claims the linked legacy job, processes the existing worker function, then completes or fails the task.
@@ -325,7 +327,7 @@ Current behaviour:
 Acceptance criteria:
 
 - Slow formulation and email work is task-backed. Done.
-- Only atomic validation remains synchronous. Mostly done; HealthScore copy and marketing copy still run in request/assessment flow and are candidates for later task extraction.
+- Only atomic validation remains synchronous for the customer journey. Done for HealthScore analysis, paid formulation, Free formulation, Free email, and reassessment email.
 - Workers can restart without losing task state. Done through task leases and legacy job compatibility.
 - Duplicate processing is prevented by leases, idempotency, task-type scoping, and stale-running guards. Done for task-backed job creation and reservation.
 
@@ -358,7 +360,29 @@ Acceptance criteria:
 - Rejected work can spawn correction tasks inside the same goal. Done through `spawnChildTask`.
 - Approval history is visible on the goal timeline through comments and events. Done through normal task comments, task events, and approval dependency records.
 
-## Phase 9: Deprecate Old Jobs
+## Phase 9: Move Customer-Facing Slow AI Onto Tasks
+
+Status: complete for the HealthScore gate.
+
+The HealthScore formula remains synchronous because it is deterministic and fast. The AI-generated overview and sales copy now runs through the task-backed worker path as `healthscore_analysis`.
+
+Current behaviour:
+
+- Assessment capture stores the deterministic HealthScore immediately.
+- A `healthscore_analysis` job is queued and bridged into a Goal and Task.
+- The progress page honestly displays `Preparing your HealthScore` followed by `Analyzing HealthScore`.
+- The frontend polls `mode=score` until the AI analysis is written back to the assessment.
+- If the analysis job fails or is unavailable, the user can still proceed with the deterministic HealthScore instead of being stuck.
+- Completed analysis is written to `assessments.health_score.advice`, audited in `job_audit_events`, and logged as BPM.
+
+Acceptance criteria:
+
+- HealthScore calculation does not wait for Grok. Done.
+- Personalised score overview and plan-gate sales copy are produced by worker task. Done.
+- The spinner starts from the correct step and completes only after the relevant job is done or safely bypassed. Done.
+- Existing formulation, Free email, and reassessment workers still run through task-backed compatibility. Done.
+
+## Phase 10: Deprecate Old Jobs
 
 Only after task flows are proven:
 
@@ -375,7 +399,7 @@ Acceptance criteria:
 
 ## Remaining Plan From Here
 
-Phase 9: Deprecate old jobs. Stop creating legacy jobs once migrated paths are proven and remove old branches safely.
+Phase 10: Deprecate old jobs. Stop creating legacy jobs once migrated paths are proven and remove old branches safely.
 
 ## Definition Of Done
 

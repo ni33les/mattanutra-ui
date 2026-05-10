@@ -1,6 +1,7 @@
 import type postgres from "postgres";
 import {
   buildAssessmentSteps,
+  createHealthScoreAnalysisSnapshot,
   normalizeAssessmentPlan,
   type AssessmentPlan,
   type AssessmentSnapshot
@@ -50,6 +51,16 @@ function toJsonRecord(value: unknown) {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return toJsonRecord(value);
+}
+
+function hasHealthScoreAdvice(value: unknown) {
+  const advice = asRecord(asRecord(value).advice);
+  const overview = advice.overview;
+
+  return (
+    Boolean(overview && typeof overview === "object") ||
+    Array.isArray(advice.paywallFeatures)
+  );
 }
 
 function asArray<T>(value: unknown): T[] {
@@ -459,6 +470,70 @@ export async function getStoredAssessmentSnapshot(planId: string) {
     status,
     steps: buildAssessmentSteps(status)
   } satisfies AssessmentSnapshot;
+}
+
+export async function getStoredHealthScoreAnalysisSnapshot(planId: string) {
+  const sql = getSql();
+
+  if (!sql || !isUuid(planId)) {
+    return null;
+  }
+
+  await ensureAssessmentSchema();
+
+  const rows = await sql`
+    select
+      plan_id::text,
+      selected_plan::text,
+      health_score
+    from assessments
+    where plan_id = ${planId}::uuid
+    limit 1
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    return null;
+  }
+
+  const healthScore = asRecord(row.health_score);
+
+  if (typeof healthScore.score !== "number") {
+    return null;
+  }
+
+  const hasAdvice = hasHealthScoreAdvice(healthScore);
+  let analysisStatus: AssessmentSnapshot["status"] = "ready";
+
+  if (!hasAdvice) {
+    const tableCheck = await sql`
+      select to_regclass('jobs') as jobs_table
+    `;
+
+    if (tableCheck[0]?.jobs_table) {
+      const jobs = await sql`
+        select status::text
+        from jobs
+        where plan_id = ${planId}::uuid
+          and job_type = 'healthscore_analysis'
+        order by queued_at desc
+        limit 1
+      `;
+      const jobStatus = jobs[0]?.status;
+
+      analysisStatus =
+        jobStatus === "queued" || jobStatus === "running"
+          ? "preparing"
+          : "ready";
+    }
+  }
+
+  return createHealthScoreAnalysisSnapshot({
+    healthScore: healthScore as NonNullable<AssessmentSnapshot["healthScore"]>,
+    plan: row.selected_plan,
+    planId: row.plan_id,
+    status: analysisStatus
+  });
 }
 
 export async function getStoredAssessmentPrefill(planId: string) {

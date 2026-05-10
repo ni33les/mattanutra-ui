@@ -1694,6 +1694,7 @@ export function AssessmentFlow({
   const displayedStepStartedAt = useRef(0);
   const pollFailureCount = useRef(0);
   const assessmentStartedTracked = useRef(false);
+  const healthScoreViewedTracked = useRef(false);
   const planGateTracked = useRef(false);
   const exampleExitTracked = useRef(false);
   const isCompact = useCompactAssessment();
@@ -2805,6 +2806,26 @@ export function AssessmentFlow({
     setProcessingStatus(status);
   }
 
+  const applyHealthScoreStatus = useCallback((status: ProcessingStatus) => {
+    if (!status.healthScore) {
+      return;
+    }
+
+    setHealthScore(status.healthScore);
+
+    if (status.status !== "ready" || healthScoreViewedTracked.current) {
+      return;
+    }
+
+    healthScoreViewedTracked.current = true;
+    trackBpmEvent("healthscore_viewed", {
+      eventType: "funnel",
+      locale,
+      planId: status.planId,
+      ...healthScoreBpmFields(status.healthScore)
+    });
+  }, [locale]);
+
   async function prepareHealthScoreGate(answerPayload = answers) {
     setProcessingError("");
     setExampleError("");
@@ -2812,6 +2833,7 @@ export function AssessmentFlow({
     setShowExampleExit(false);
     setExampleRequest(null);
     setProcessingMode("score");
+    healthScoreViewedTracked.current = false;
     const scoreStatus: ProcessingStatus = {
       planId: "",
       queuePosition: 0,
@@ -2865,29 +2887,9 @@ export function AssessmentFlow({
         throw new Error("Assessment capture did not return a HealthScore");
       }
 
-      setHealthScore(captured.healthScore);
-      trackBpmEvent("healthscore_viewed", {
-        eventType: "funnel",
-        locale,
-        planId: captured.planId,
-        ...healthScoreBpmFields(captured.healthScore)
-      });
-      setProcessingStatus({
-        ...captured,
-        healthScore: captured.healthScore,
-        planId: "",
-        queuePosition: 0,
-        status: "ready",
-        steps: [
-          { id: "assessment", state: "complete" },
-          { id: "score", state: "complete" },
-          { id: "scoreAnalysis", state: "complete" },
-          { id: "payment", state: "pending" },
-          { id: "formulation", state: "pending" },
-          { id: "safety", state: "pending" },
-          { id: "results", state: "pending" }
-        ]
-      });
+      applyHealthScoreStatus(captured);
+      setCapturedStatus(captured);
+      setProcessingStatus(captured);
 
     } catch {
       window.clearTimeout(analysisStepTimeout);
@@ -3231,6 +3233,8 @@ export function AssessmentFlow({
         const url =
           processingMode === "example"
             ? `/api/assessment/${encodeURIComponent(planId)}/example?requestId=${encodeURIComponent(exampleRequest?.requestId ?? "")}`
+            : processingMode === "score"
+              ? `/api/assessment/${encodeURIComponent(planId)}?mode=score`
             : `/api/assessment/${encodeURIComponent(planId)}`;
         const response = await fetchWithTimeout(
           url,
@@ -3250,6 +3254,10 @@ export function AssessmentFlow({
           setProcessingError(
             status.status === "failed" ? ui.processingError : ""
           );
+          if (processingMode === "score") {
+            applyHealthScoreStatus(status);
+            setCapturedStatus(status);
+          }
           setProcessingStatus(status);
         }
       } catch {
@@ -3270,6 +3278,7 @@ export function AssessmentFlow({
       window.clearInterval(interval);
     };
   }, [
+    applyHealthScoreStatus,
     exampleRequest?.requestId,
     locale,
     processingMode,

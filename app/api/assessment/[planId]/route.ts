@@ -5,13 +5,14 @@ import {
 } from "@/lib/assessment-jobs";
 import {
   getStoredAssessmentSnapshot,
+  getStoredHealthScoreAnalysisSnapshot,
   isUuid,
   persistAssessmentSubmission
 } from "@/lib/assessment-store";
 import { computeHealthScore } from "@/lib/health-score";
-import { analyzeHealthScoreAdvice } from "@/lib/health-score-analysis";
 import { writeSkippedPaymentSuccessEvent } from "@/lib/payment-bpm";
 import {
+  enqueueHealthScoreAnalysisJob,
   enqueueFormulationJob,
   kickCronWorker,
   kickJobsWorker,
@@ -32,23 +33,10 @@ function reassessmentEmailFromAnswers(answers: unknown) {
   return typeof value === "string" ? value : "";
 }
 
-async function buildHealthScore(answers: unknown, locale: unknown) {
+function buildHealthScore(answers: unknown, locale: unknown) {
   const normalizedLocale = isLocale(locale) ? locale : "en";
-  const healthScore = computeHealthScore(answers, normalizedLocale);
 
-  try {
-    return {
-      ...healthScore,
-      advice: await analyzeHealthScoreAdvice({
-        answers,
-        healthScore,
-        locale: normalizedLocale
-      })
-    };
-  } catch (error) {
-    console.warn("Unable to analyze HealthScore advice", error);
-    return healthScore;
-  }
+  return computeHealthScore(answers, normalizedLocale);
 }
 
 function healthScoreBpmFields(snapshot: { healthScore?: ReturnType<typeof computeHealthScore> }) {
@@ -79,11 +67,15 @@ type AssessmentStatusRouteProps = Readonly<{
 }>;
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: AssessmentStatusRouteProps
 ) {
   const { planId } = await params;
-  const snapshot = await getStoredAssessmentSnapshot(planId);
+  const url = new URL(request.url);
+  const scoreMode = url.searchParams.get("mode") === "score";
+  const snapshot = scoreMode
+    ? await getStoredHealthScoreAnalysisSnapshot(planId)
+    : await getStoredAssessmentSnapshot(planId);
 
   if (!snapshot) {
     return NextResponse.json(
@@ -95,6 +87,10 @@ export async function GET(
         status: 404
       }
     );
+  }
+
+  if (scoreMode && snapshot.status !== "ready") {
+    await enqueueHealthScoreAnalysisJob({ planId: snapshot.planId });
   }
 
   if (snapshot.status !== "ready") {
@@ -168,7 +164,7 @@ export async function PATCH(
     const healthScore =
       intent === "process" && existingSnapshot?.healthScore
         ? existingSnapshot.healthScore
-        : await buildHealthScore(body.answers, body.locale);
+        : buildHealthScore(body.answers, body.locale);
     const snapshot = createAssessmentSnapshot({
       healthScore,
       plan: selectedPlan ?? existingSnapshot?.plan,
@@ -200,6 +196,14 @@ export async function PATCH(
       ...healthScoreBpmFields(snapshot)
     });
 
+    const analysisJobId = await enqueueHealthScoreAnalysisJob({
+      planId: snapshot.planId
+    });
+
+    if (analysisJobId) {
+      void kickJobsWorker();
+    }
+
     const reassessmentEmail = reassessmentEmailFromAnswers(body.answers);
 
     if (reassessmentEmail) {
@@ -222,7 +226,9 @@ export async function PATCH(
     }
 
     if (intent === "capture") {
-      const storedSnapshot = await getStoredAssessmentSnapshot(snapshot.planId);
+      const storedSnapshot = await getStoredHealthScoreAnalysisSnapshot(
+        snapshot.planId
+      );
 
       return NextResponse.json(storedSnapshot ?? snapshot, {
         headers: {
