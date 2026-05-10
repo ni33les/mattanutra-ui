@@ -3,10 +3,13 @@ import type postgres from "postgres";
 import { isUuid, toJsonValue } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
 import {
+  buildTaskSequenceDependencyPlan,
   normalizeCapabilities,
   normalizeLeaseSeconds,
+  normalizeTaskDependencyType,
   normalizeTaskPriority,
   TASK_PRIORITY,
+  type TaskDependencyType,
   type TaskPriority
 } from "@/lib/task-service-utils";
 
@@ -80,8 +83,6 @@ export type TaskCommentVisibility =
   | "customer"
   | "internal"
   | "worker";
-
-export type TaskDependencyType = "approved" | "complete" | "successful";
 
 export type TaskAgent = Readonly<{
   capabilities: string[];
@@ -373,6 +374,36 @@ export type SpawnChildTaskInput = Omit<CreateTaskInput, "createdByTaskId" | "par
   Readonly<{
     parentTaskId: string;
   }>;
+
+export type TaskSequenceDependencyInput = Readonly<{
+  key?: string | null;
+  taskId?: string | null;
+  type?: TaskDependencyType;
+}>;
+
+export type TaskSequenceTaskInput = Omit<CreateTaskInput, "dependencies" | "goalId"> &
+  Readonly<{
+    dependsOn?: ReadonlyArray<TaskSequenceDependencyInput>;
+    key?: string | null;
+  }>;
+
+export type TaskSequenceStageInput = Readonly<{
+  dependencyType?: TaskDependencyType;
+  dependsOnPreviousStage?: boolean;
+  tasks: ReadonlyArray<TaskSequenceTaskInput>;
+}>;
+
+export type CreateTaskSequenceInput = Readonly<{
+  createdByAgentId?: string | null;
+  goalId: string;
+  sequenceKey?: string | null;
+  stages: ReadonlyArray<TaskSequenceStageInput>;
+}>;
+
+export type CreatedTaskSequence = Readonly<{
+  dependencies: TaskDependency[];
+  tasks: TaskRecord[];
+}>;
 
 function getRequiredSql(sql?: postgres.Sql) {
   const configured = sql ?? getSql();
@@ -758,6 +789,73 @@ async function addTaskCommentInTransaction(
   return mapComment(rows[0]);
 }
 
+async function ensureTaskDependenciesInTransaction(
+  sql: Db,
+  taskId: string,
+  dependencies: ReadonlyArray<{
+    taskId: string;
+    type?: TaskDependencyType;
+  }>
+) {
+  const taskUuid = uuidOrNull(taskId);
+
+  if (!taskUuid || dependencies.length < 1) {
+    return [];
+  }
+
+  const saved: TaskDependency[] = [];
+  const seen = new Set<string>();
+
+  for (const dependency of dependencies) {
+    const dependsOnTaskId = uuidOrNull(dependency.taskId);
+    const dependencyType = normalizeTaskDependencyType(dependency.type);
+
+    if (!dependsOnTaskId) {
+      continue;
+    }
+
+    if (dependsOnTaskId === taskUuid) {
+      throw new Error("Task cannot depend on itself");
+    }
+
+    const key = `${dependsOnTaskId}:${dependencyType}`;
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+
+    const rows = await sql<DependencyRow[]>`
+      insert into public.task_dependencies (
+        task_id,
+        depends_on_task_id,
+        dependency_type,
+        created_at
+      )
+      values (
+        ${taskUuid}::uuid,
+        ${dependsOnTaskId}::uuid,
+        ${dependencyType},
+        now()
+      )
+      on conflict (task_id, depends_on_task_id) do update set
+        dependency_type = excluded.dependency_type
+      returning
+        task_id::text,
+        depends_on_task_id::text,
+        dependency_type,
+        created_at
+    `;
+
+    if (rows[0]) {
+      saved.push(mapDependency(rows[0]));
+    }
+  }
+
+  return saved;
+}
+
 async function createTaskInTransaction(sql: Db, input: CreateTaskInput) {
   const goalId = uuidOrNull(input.goalId);
 
@@ -878,33 +976,12 @@ async function createTaskInTransaction(sql: Db, input: CreateTaskInput) {
   const task = mapTask(taskRow);
 
   if (!inserted[0]) {
+    await ensureTaskDependenciesInTransaction(sql, task.id, input.dependencies ?? []);
+
     return { created: false, task };
   }
 
-  for (const dependency of input.dependencies ?? []) {
-    const dependsOnTaskId = uuidOrNull(dependency.taskId);
-
-    if (!dependsOnTaskId) {
-      continue;
-    }
-
-    await sql`
-      insert into public.task_dependencies (
-        task_id,
-        depends_on_task_id,
-        dependency_type,
-        created_at
-      )
-      values (
-        ${task.id}::uuid,
-        ${dependsOnTaskId}::uuid,
-        ${dependency.type ?? "complete"},
-        now()
-      )
-      on conflict (task_id, depends_on_task_id) do update set
-        dependency_type = excluded.dependency_type
-    `;
-  }
+  await ensureTaskDependenciesInTransaction(sql, task.id, input.dependencies ?? []);
 
   await addTaskEventInTransaction(sql, {
     agentId: input.createdByAgentId,
@@ -962,6 +1039,106 @@ export async function createTask(input: CreateTaskInput) {
   const sql = getRequiredSql();
 
   return sql.begin((tx) => createTaskInTransaction(tx, input));
+}
+
+async function createTaskSequenceInTransaction(
+  sql: Db,
+  input: CreateTaskSequenceInput
+): Promise<CreatedTaskSequence> {
+  const goalId = uuidOrNull(input.goalId);
+
+  if (!goalId) {
+    throw new Error("Task sequence requires a valid goalId");
+  }
+
+  const plan = buildTaskSequenceDependencyPlan(input.stages);
+
+  if (plan.length < 1) {
+    throw new Error("Task sequence requires at least one task");
+  }
+
+  const sequenceKey = optionalText(input.sequenceKey);
+  const dependencies: TaskDependency[] = [];
+  const tasks: TaskRecord[] = [];
+  const tasksByKey = new Map<string, TaskRecord>();
+
+  for (const planItem of plan) {
+    const sourceTask =
+      input.stages[planItem.stageIndex]?.tasks[planItem.taskIndex];
+
+    if (!sourceTask) {
+      throw new Error(`Task sequence item ${planItem.key} no longer exists`);
+    }
+
+    const taskInput = { ...sourceTask };
+    delete taskInput.dependsOn;
+    delete taskInput.key;
+
+    const resolvedDependencies = planItem.dependencies.map((dependency) => {
+      if (dependency.taskId) {
+        return {
+          taskId: dependency.taskId,
+          type: dependency.type
+        };
+      }
+
+      const dependencyTask = tasksByKey.get(dependency.key ?? "");
+
+      if (!dependencyTask) {
+        throw new Error(
+          `Task sequence dependency ${dependency.key ?? "unknown"} has not been created`
+        );
+      }
+
+      return {
+        taskId: dependencyTask.id,
+        type: dependency.type
+      };
+    });
+    const created = await createTaskInTransaction(sql, {
+      ...taskInput,
+      createdByAgentId: taskInput.createdByAgentId ?? input.createdByAgentId,
+      dependencies: [],
+      goalId,
+      idempotencyKey:
+        optionalText(taskInput.idempotencyKey) ??
+        (sequenceKey ? `${sequenceKey}:${planItem.key}` : null)
+    });
+    const savedDependencies = await ensureTaskDependenciesInTransaction(
+      sql,
+      created.task.id,
+      resolvedDependencies
+    );
+
+    tasksByKey.set(planItem.key, created.task);
+    tasks.push(created.task);
+    dependencies.push(...savedDependencies);
+  }
+
+  await addTaskEventInTransaction(sql, {
+    agentId: input.createdByAgentId,
+    eventPayload: {
+      dependencyCount: dependencies.length,
+      sequenceKey,
+      stageCount: input.stages.length,
+      taskCount: tasks.length,
+      taskKeys: plan.map((item) => item.key)
+    },
+    eventStatus: "requested",
+    eventType: "task_sequence_created",
+    goalId
+  });
+
+  return {
+    dependencies,
+    tasks
+  };
+}
+
+export async function createTaskSequence(input: CreateTaskSequenceInput) {
+  const sql = getRequiredSql();
+
+  return sql.begin((tx) => createTaskSequenceInTransaction(tx, input));
 }
 
 export async function addTaskComment(input: AddTaskCommentInput) {
@@ -1494,4 +1671,9 @@ export async function spawnChildTask(input: SpawnChildTaskInput) {
   });
 }
 
-export { TASK_PRIORITY, normalizeTaskPriority };
+export {
+  buildTaskSequenceDependencyPlan,
+  TASK_PRIORITY,
+  normalizeTaskPriority
+};
+export type { TaskDependencyType };

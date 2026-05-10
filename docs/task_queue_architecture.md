@@ -331,15 +331,32 @@ Acceptance criteria:
 
 ## Phase 8: Task Sequence Helpers
 
-Make it easy to create ordered task chains, including optional human approval tasks. Approval is not a special subsystem; it is just a normal human task inside a goal with downstream task dependencies.
+Status: complete.
+
+Task sequences can now be created with one service-layer helper. A sequence is made of stages: tasks inside a stage can run in parallel, and the next stage waits for the previous stage unless explicitly disabled.
+
+Implemented helpers:
+
+- `createTaskSequence`
+- `buildTaskSequenceDependencyPlan`
+
+Current behaviour:
+
+- Each sequence belongs to one goal.
+- A `sequenceKey` can make generated task idempotency keys stable.
+- Tasks in the next stage automatically depend on all tasks in the previous stage.
+- A stage can require previous tasks to be `complete`, `successful`, or `approved`.
+- Individual tasks can also depend on earlier tasks by sequence key or on existing task IDs.
+- Creating a sequence writes a `task_sequence_created` event to the goal timeline.
+- Human approval remains a normal human task plus an `approved` dependency, not a separate subsystem.
 
 Acceptance criteria:
 
-- Common workflows can create task sequences with one helper call.
-- Human approval tasks are regular tasks with clear titles, comments, payloads, and dependencies.
-- Downstream tasks stay ineligible until prerequisite tasks are complete or approved.
-- Rejected work can spawn correction tasks inside the same goal.
-- Approval history is visible on the goal timeline through comments and events.
+- Common workflows can create task sequences with one helper call. Done.
+- Human approval tasks are regular tasks with clear titles, comments, payloads, and dependencies. Done.
+- Downstream tasks stay ineligible until prerequisite tasks are complete or approved. Done through `task_dependencies`.
+- Rejected work can spawn correction tasks inside the same goal. Done through `spawnChildTask`.
+- Approval history is visible on the goal timeline through comments and events. Done through normal task comments, task events, and approval dependency records.
 
 ## Phase 9: Deprecate Old Jobs
 
@@ -357,8 +374,6 @@ Acceptance criteria:
 - Historical jobs remain understandable.
 
 ## Remaining Plan From Here
-
-Phase 8: Task sequence helpers. Make ordered task chains easy, including normal human approval tasks where needed.
 
 Phase 9: Deprecate old jobs. Stop creating legacy jobs once migrated paths are proven and remove old branches safely.
 

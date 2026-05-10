@@ -69,7 +69,7 @@ flowchart TB
 - BPM tracking for funnel, campaign, affiliate, safety, error, email, chat, and formulation events.
 - Admin dashboard with KPI and Conversions views over hour, day, week, month, year, and all-time windows.
 - Admin Technical section with Alerts and Jobs views for failed email sends, stuck jobs, cron failures, AI/worker errors, and recent job history.
-- Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, and task events/comments preserve cause-and-effect. Supported legacy jobs now create task-backed work items before the old worker fallback.
+- Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported legacy jobs now create task-backed work items before the old worker fallback.
 - Admin Goals view showing goal status, priority, source, BPM/session ray, tasks, events, comments, dependencies, reservations, and approvals.
 - Dashboard filters for locale, device, source, medium, campaign, campaign ID, affiliate, promo code, selected plan, plan ID, ray, and email hash.
 
@@ -195,7 +195,7 @@ How the admin sections should be read:
 | Conversions | Where do people continue, and where do they stop? | Live from BPM events |
 | Supplements | Which supplements are allowed, blocked, or awaiting review? | Live with editable dose ceilings and safety flags |
 | Human Review | What needs a human decision before being shown or acted on? | Live for supplement review and dose-reduction notices |
-| Goals | What outcome is being pursued, and which tasks/events explain its current state? | Live for supplement review, formulation, Free email, and reassessment task-backed work |
+| Goals | What outcome is being pursued, and which tasks/events explain its current state? | Live for supplement review, formulation, Free email, reassessment, and staged task-backed work |
 | Technical Alerts | What failed or looks stuck? | Live for jobs, cron, job audit, and BPM error events |
 | Jobs | What legacy work has been queued, run, completed, or failed? | Live compatibility history and current execution state |
 
