@@ -28,10 +28,19 @@ export async function POST(
 
   const { id } = await params;
   const body = await readJsonObject(request);
+  const reservationId = textValue(body.reservationId);
+
+  if (!reservationId) {
+    return openClawJson(
+      { message: "reservationId is required to complete a task" },
+      { status: 400 }
+    );
+  }
 
   try {
     const task = await completeTask({
       agentId: textValue(body.agentId),
+      reservationId,
       resultPayload: objectValue(body.resultPayload),
       taskId: id
     });

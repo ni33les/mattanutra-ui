@@ -352,6 +352,7 @@ export type ReserveNextTaskInput = Readonly<{
 
 export type CompleteTaskInput = Readonly<{
   agentId?: string | null;
+  reservationId?: string | null;
   resultPayload?: Record<string, unknown>;
   taskId: string;
 }>;
@@ -359,6 +360,7 @@ export type CompleteTaskInput = Readonly<{
 export type FailTaskInput = Readonly<{
   agentId?: string | null;
   errorMessage: string;
+  reservationId?: string | null;
   resultPayload?: Record<string, unknown>;
   taskId: string;
 }>;
@@ -612,6 +614,102 @@ async function addTaskEventInTransaction(sql: Db, input: AddTaskEventInput) {
   `;
 
   return id;
+}
+
+async function refreshGoalStateInTransaction(sql: Db, goalId: string) {
+  const rows = await sql<
+    Array<{
+      active_count: number | string;
+      failed_count: number | string;
+      task_count: number | string;
+    }>
+  >`
+    select
+      count(*)::int as task_count,
+      count(*) filter (
+        where status in (
+          'queued',
+          'reserved',
+          'running',
+          'blocked',
+          'needs_review',
+          'waiting_approval'
+        )
+      )::int as active_count,
+      count(*) filter (where status = 'failed')::int as failed_count
+    from public.tasks
+    where goal_id = ${goalId}::uuid
+  `;
+  const counts = rows[0];
+
+  if (!counts || Number(counts.task_count) < 1) {
+    return;
+  }
+
+  const activeCount = Number(counts.active_count);
+  const failedCount = Number(counts.failed_count);
+  const status =
+    activeCount > 0 ? "active" : failedCount > 0 ? "failed" : "completed";
+
+  await sql`
+    update public.goals
+    set
+      status = ${status},
+      completed_at = case
+        when ${status} = 'completed' then coalesce(completed_at, now())
+        else null
+      end,
+      updated_at = now()
+    where id = ${goalId}::uuid
+      and status <> 'cancelled'
+  `;
+}
+
+async function activeReservationInTransaction(
+  sql: Db,
+  input: Readonly<{
+    agentId?: string | null;
+    reservationId?: string | null;
+    taskId: string;
+  }>
+) {
+  const agentId = uuidOrNull(input.agentId);
+  const reservationId = uuidOrNull(input.reservationId);
+
+  if (input.agentId && !agentId) {
+    throw new Error("Task reservation check requires a valid agentId");
+  }
+
+  if (input.reservationId && !reservationId) {
+    throw new Error("Task reservation check requires a valid reservationId");
+  }
+
+  if (!agentId && !reservationId) {
+    return null;
+  }
+
+  const rows = await sql<
+    Array<{
+      agent_id: string;
+      id: string;
+    }>
+  >`
+    select id::text, agent_id::text
+    from public.task_reservations
+    where task_id = ${input.taskId}::uuid
+      and status = 'active'
+      and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
+      and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+    order by reserved_at desc
+    limit 1
+    for update
+  `;
+
+  if (!rows[0]) {
+    throw new Error(`Active reservation for task ${input.taskId} not found`);
+  }
+
+  return rows[0];
 }
 
 async function upsertAgentInTransaction(
@@ -1313,6 +1411,7 @@ async function releaseExpiredReservationsInTransaction(sql: Db) {
       severity: exhausted ? "high" : "medium",
       taskId: row.task_id
     });
+    await refreshGoalStateInTransaction(sql, row.goal_id);
   }
 
   return expired.length;
@@ -1393,6 +1492,7 @@ export async function reserveNextTask(
         status = 'reserved',
         reserved_by_agent_id = ${agent.id}::uuid,
         lease_until = now() + make_interval(secs => ${leaseSeconds}),
+        started_at = coalesce(started_at, now()),
         attempts = public.tasks.attempts + 1,
         updated_at = now()
       from candidate
@@ -1469,6 +1569,11 @@ export async function completeTask(input: CompleteTaskInput) {
   const sql = getRequiredSql();
 
   return sql.begin(async (tx) => {
+    const activeReservation = await activeReservationInTransaction(tx, {
+      agentId: input.agentId,
+      reservationId: input.reservationId,
+      taskId: input.taskId
+    });
     const rows = await tx<TaskRow[]>`
       update public.tasks set
         status = 'completed',
@@ -1479,6 +1584,10 @@ export async function completeTask(input: CompleteTaskInput) {
         updated_at = now()
       where id = ${input.taskId}::uuid
         and status in ('queued', 'reserved', 'running', 'needs_review', 'waiting_approval')
+        and (
+          ${activeReservation?.agent_id ?? null}::uuid is null
+          or reserved_by_agent_id = ${activeReservation?.agent_id ?? null}::uuid
+        )
       returning *
     `;
 
@@ -1494,16 +1603,24 @@ export async function completeTask(input: CompleteTaskInput) {
         completed_at = now()
       where task_id = ${task.id}::uuid
         and status = 'active'
+        and (
+          ${activeReservation?.id ?? null}::uuid is null
+          or id = ${activeReservation?.id ?? null}::uuid
+        )
     `;
 
     await addTaskEventInTransaction(tx, {
-      agentId: input.agentId,
-      eventPayload: input.resultPayload ?? {},
+      agentId: input.agentId ?? activeReservation?.agent_id,
+      eventPayload: {
+        ...(input.resultPayload ?? {}),
+        reservationId: activeReservation?.id
+      },
       eventStatus: "succeeded",
       eventType: "task_completed",
       goalId: task.goalId,
       taskId: task.id
     });
+    await refreshGoalStateInTransaction(tx, task.goalId);
 
     return task;
   });
@@ -1563,6 +1680,13 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
         heartbeat_at = now()
       where id = ${reservation.id}::uuid
     `;
+    await tx`
+      update public.agents
+      set
+        last_seen_at = now(),
+        updated_at = now()
+      where id = ${reservation.agent_id}::uuid
+    `;
 
     const task = mapTask(taskRows[0]);
 
@@ -1589,6 +1713,11 @@ export async function failTask(input: FailTaskInput) {
   const sql = getRequiredSql();
 
   return sql.begin(async (tx) => {
+    const activeReservation = await activeReservationInTransaction(tx, {
+      agentId: input.agentId,
+      reservationId: input.reservationId,
+      taskId: input.taskId
+    });
     const rows = await tx<TaskRow[]>`
       update public.tasks set
         status = 'failed',
@@ -1599,6 +1728,10 @@ export async function failTask(input: FailTaskInput) {
         updated_at = now()
       where id = ${input.taskId}::uuid
         and status not in ('completed', 'cancelled', 'skipped')
+        and (
+          ${activeReservation?.agent_id ?? null}::uuid is null
+          or reserved_by_agent_id = ${activeReservation?.agent_id ?? null}::uuid
+        )
       returning *
     `;
 
@@ -1614,12 +1747,17 @@ export async function failTask(input: FailTaskInput) {
         released_at = now()
       where task_id = ${task.id}::uuid
         and status = 'active'
+        and (
+          ${activeReservation?.id ?? null}::uuid is null
+          or id = ${activeReservation?.id ?? null}::uuid
+        )
     `;
 
     await addTaskEventInTransaction(tx, {
-      agentId: input.agentId,
+      agentId: input.agentId ?? activeReservation?.agent_id,
       eventPayload: {
         errorMessage: input.errorMessage,
+        reservationId: activeReservation?.id,
         resultPayload: input.resultPayload ?? {}
       },
       eventStatus: "failed",
@@ -1628,6 +1766,7 @@ export async function failTask(input: FailTaskInput) {
       severity: "high",
       taskId: task.id
     });
+    await refreshGoalStateInTransaction(tx, task.goalId);
 
     return task;
   });

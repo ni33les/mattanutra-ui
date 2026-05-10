@@ -1981,7 +1981,9 @@ async function claimJobForReservedTask(
 
   if (!legacyJobId) {
     await failTask({
+      agentId: reserved.agent.id,
       errorMessage: "Reserved worker task is missing legacy_job_id.",
+      reservationId: reserved.reservationId,
       resultPayload: {
         taskType: reserved.task.taskType
       },
@@ -2044,6 +2046,8 @@ async function claimJobForReservedTask(
 
   if (status === "complete") {
     await completeTask({
+      agentId: reserved.agent.id,
+      reservationId: reserved.reservationId,
       resultPayload: {
         legacyJobId,
         status
@@ -2058,9 +2062,11 @@ async function claimJobForReservedTask(
     );
   } else {
     await failTask({
+      agentId: reserved.agent.id,
       errorMessage:
         statusRows[0]?.error_message ??
         `Legacy job is not available for processing: ${status}.`,
+      reservationId: reserved.reservationId,
       resultPayload: {
         legacyJobId,
         status
@@ -3106,6 +3112,8 @@ async function runJobsWorker() {
       if (claimedTaskJob) {
         try {
           await completeTask({
+            agentId: claimedTaskJob.reserved.agent.id,
+            reservationId: claimedTaskJob.reserved.reservationId,
             resultPayload: {
               jobId: job.id,
               jobType: job.job_type,
@@ -3131,7 +3139,9 @@ async function runJobsWorker() {
 
         try {
           await failTask({
+            agentId: claimedTaskJob.reserved.agent.id,
             errorMessage: message,
+            reservationId: claimedTaskJob.reserved.reservationId,
             resultPayload: {
               jobId: job.id,
               jobType: job.job_type,

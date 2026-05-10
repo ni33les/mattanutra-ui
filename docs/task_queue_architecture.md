@@ -81,7 +81,7 @@ New tasks should normally inherit the parent goal priority unless a workflow has
 
 ## Current Status
 
-Phases 1 through 11 are implemented.
+Phases 1 through 12 are implemented.
 
 The following tables now exist in the schema:
 
@@ -210,6 +210,7 @@ Acceptance criteria:
 - `x-admin-claw-token` with `ADMIN_CLAW_TOKEN` succeeds.
 - Agents can reserve only tasks matching their capabilities.
 - Reservation response includes payload, comments, dependencies, and goal context.
+- Completing, failing, or renewing a task requires the active `reservationId`; this prevents a worker from accidentally closing work it has not reserved.
 
 ## Phase 4: Goal Layer And Admin GUI
 
@@ -433,6 +434,30 @@ Acceptance criteria:
 - The admin decision is visible in `safety_reviews`, `job_audit_events`, `task_comments`, and `task_events`. Done.
 - Client follow-up is represented as a task rather than hidden state. Done.
 - The future communications worker has a clear task to reserve. Done through `client_safety_followup`.
+
+## Phase 12: Worker Runtime Hardening
+
+Status: complete for the current task worker runtime.
+
+The worker runtime now protects reservations more carefully and keeps goal state fresher as tasks move.
+
+Current behaviour:
+
+- OpenClaw task completion and failure endpoints require the active `reservationId`.
+- Task completion, failure, and lease renewal verify the active reservation and optional agent id before changing task state.
+- The internal legacy-job worker passes its reservation id and agent id when completing or failing bridged tasks.
+- Reserving a task sets `started_at` the first time the task is picked up.
+- Renewing a lease updates the worker agent heartbeat.
+- Expired leases refresh the parent goal state after requeueing or failing a task.
+- Completing or failing a task refreshes the parent goal state so completed, failed, and still-active goals stay aligned with the task list.
+
+Acceptance criteria:
+
+- A worker cannot complete or fail a task through the machine API without the reservation it received at claim time. Done.
+- Legacy compatibility work remains able to complete and fail task-backed jobs. Done.
+- Goals do not remain active after all tasks complete. Done.
+- Failed terminal task sets the goal failed when no active task remains. Done.
+- Agent heartbeat reflects lease renewal activity. Done.
 
 ## Remaining Plan From Here
 

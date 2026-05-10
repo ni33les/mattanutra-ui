@@ -25,11 +25,20 @@ export async function POST(request: Request, { params }: FailTaskRouteProps) {
 
   const { id } = await params;
   const body = await readJsonObject(request);
+  const reservationId = textValue(body.reservationId);
+
+  if (!reservationId) {
+    return openClawJson(
+      { message: "reservationId is required to fail a task" },
+      { status: 400 }
+    );
+  }
 
   try {
     const task = await failTask({
       agentId: textValue(body.agentId),
       errorMessage: textValue(body.errorMessage) ?? "Task failed.",
+      reservationId,
       resultPayload: objectValue(body.resultPayload),
       taskId: id
     });
