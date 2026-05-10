@@ -81,7 +81,7 @@ New tasks should normally inherit the parent goal priority unless a workflow has
 
 ## Current Status
 
-Phases 1 through 13 are implemented.
+Phases 1 through 14 are implemented.
 
 The following tables now exist in the schema:
 
@@ -502,9 +502,34 @@ Acceptance criteria:
 - Chat follow-ups are queued for external delivery rather than silently discarded. Done.
 - OpenClaw machine APIs are protected by `ADMIN_CLAW_TOKEN`. Done.
 
+## Phase 14: Customer Channel Capture
+
+Status: complete for safety-review follow-up capture.
+
+The customer-facing safety review box now lets a user leave a communication channel while hidden supplement suggestions are under human review.
+
+Current behaviour:
+
+- The safety review panel has been reworded to make the review feel reassuring and action-oriented.
+- If a formulation has pending hidden review items, the panel shows a contact capture form.
+- Supported customer-entered channels are LINE, WhatsApp, Telegram, and email.
+- The public endpoint is plan-scoped: `POST /api/assessment/:planId/communication-channel`.
+- The endpoint validates the plan, validates email when the selected channel is email, stores the channel against the plan communication identity, and writes BPM success/failure events.
+- Captured chat channels get higher default priority than email, so post-review follow-up prefers chat when available.
+- The OpenClaw/admin machine communication endpoints remain protected by `ADMIN_CLAW_TOKEN`; the customer capture endpoint is separate and only writes a channel for the supplied plan.
+
+Acceptance criteria:
+
+- A customer can leave a channel from the safety review box. Done.
+- Email capture validates the address. Done.
+- LINE, WhatsApp, and Telegram capture can store handles or numbers. Done.
+- Saved contact details are available to the `client_safety_followup` worker. Done.
+- Capture activity is visible in BPM. Done.
+- The safety review copy is clearer and less alarming. Done.
+
 ## Remaining Plan From Here
 
-Next phase: add customer-facing channel capture to the safety review box and connect real chat providers, starting with LINE.
+Next phase: connect a real chat provider delivery bridge, starting with LINE, and add a communications view to the admin dashboard.
 
 ## Definition Of Done
 

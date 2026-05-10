@@ -70,7 +70,7 @@ flowchart TB
 - Admin dashboard with KPI and Conversions views over hour, day, week, month, year, and all-time windows.
 - Admin Technical section with Alerts and Legacy Jobs views for failed email sends, stuck compatibility records, cron failures, AI/worker errors, and recent job history.
 - Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported slow work now creates task-backed work items, worker reservations are enforced, human review decisions write reviewed formulation versions, and client review follow-up is handled through the communication-channel worker.
-- Communication-channel foundation: each plan can be linked to an identity with LINE, WhatsApp, Telegram, WeChat, email, SMS, or manual channels; the system chooses the best available channel, preferring chat before email unless an explicit preference exists.
+- Communication-channel foundation: each plan can be linked to an identity with LINE, WhatsApp, Telegram, WeChat, email, SMS, or manual channels; the system chooses the best available channel, preferring chat before email unless an explicit preference exists. Customers can now leave LINE, WhatsApp, Telegram, or email details from the safety review box.
 - Admin Goals view showing goal status, priority, source, BPM/session ray, tasks, events, comments, dependencies, reservations, and approvals.
 - Dashboard filters for locale, device, source, medium, campaign, campaign ID, affiliate, promo code, selected plan, plan ID, ray, and email hash.
 
@@ -83,7 +83,7 @@ flowchart TB
 | Supplement governance | Whitelist, blacklist, max dose, and safety review basics exist; frequency and interaction rules are not wired yet | Add frequency, condition, medication, pregnancy, and lab interaction checks |
 | Product matching | Affiliate revenue depends on trusted products | Start with curated whitelist before marketplace automation |
 | Chat handoff | Pro needs a convincing ongoing service experience | Make one channel excellent first, likely LINE |
-| Human safety review | Flagged suggestions now enter Human Review and create Goal/Task records; decisions update the plan append-only and trigger channel-aware client follow-up | Add customer-facing channel capture and real chat provider delivery |
+| Human safety review | Flagged suggestions now enter Human Review and create Goal/Task records; decisions update the plan append-only and trigger channel-aware client follow-up; customer channel capture is live | Add real chat provider delivery |
 | Follow-up nurture | Free users need more than one email | Define post-preview sequence |
 
 ## Sales Funnel Paths
@@ -312,7 +312,7 @@ Best use:
 1. Campaign/affiliate reporting tables on top of the live BPM dashboard filters.
 2. Safe acknowledge/retry/dismiss actions for technical alerts and failed jobs.
 3. Supplement interaction rules for medications, conditions, pregnancy, age, and labs.
-4. Customer-facing email and chat capture for safety-review follow-up.
+4. Real chat provider delivery bridge, starting with LINE.
 5. Payment integration for Precision and Pro.
 6. Product matching against approved supplement/product whitelist.
 7. One excellent chat handoff, likely LINE first.

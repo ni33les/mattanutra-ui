@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
@@ -71,6 +71,19 @@ type CopyLabels = Record<
   | "profile"
   | "region"
   | "safety"
+  | "safetyCaptureAddress"
+  | "safetyCaptureBody"
+  | "safetyCaptureChannel"
+  | "safetyCaptureChatPlaceholder"
+  | "safetyCaptureEmailPlaceholder"
+  | "safetyCaptureError"
+  | "safetyCaptureSubmit"
+  | "safetyCaptureSuccess"
+  | "safetyCaptureTitle"
+  | "safetyChannelEmail"
+  | "safetyChannelLine"
+  | "safetyChannelTelegram"
+  | "safetyChannelWhatsapp"
   | "safetyReviewBody"
   | "safetyReviewTitle"
   | "shopLazada"
@@ -124,8 +137,23 @@ const copy = {
     profile: "Profile",
     region: "Region",
     safety: "Safety notes",
+    safetyCaptureAddress: "Contact detail",
+    safetyCaptureBody:
+      "Leave one contact channel and we will tell you when the human review is complete.",
+    safetyCaptureChannel: "Preferred channel",
+    safetyCaptureChatPlaceholder: "Your handle or number",
+    safetyCaptureEmailPlaceholder: "you@example.com",
+    safetyCaptureError: "We could not save that contact detail. Please try again.",
+    safetyCaptureSubmit: "Save contact",
+    safetyCaptureSuccess:
+      "Contact saved. We will use this channel for the review update.",
+    safetyCaptureTitle: "Want us to come back to you?",
+    safetyChannelEmail: "Email",
+    safetyChannelLine: "LINE",
+    safetyChannelTelegram: "Telegram",
+    safetyChannelWhatsapp: "WhatsApp",
     safetyReviewBody:
-      "Some supplement suggestions need human review before they are shown. They have been hidden from this page and added to the review queue.",
+      "A few supplement suggestions need a human safety check before we show them. They are hidden for now and the review team has been notified.",
     safetyReviewTitle: "Safety review active",
     safetyNotes: [
       "These are optional wellness product suggestions, not medical advice.",
@@ -177,8 +205,23 @@ const copy = {
     profile: "โปรไฟล์",
     region: "ภูมิภาค",
     safety: "หมายเหตุด้านความปลอดภัย",
+    safetyCaptureAddress: "รายละเอียดติดต่อ",
+    safetyCaptureBody:
+      "ฝากช่องทางติดต่อไว้หนึ่งช่องทาง แล้วเราจะแจ้งเมื่อทีมตรวจสอบเสร็จ",
+    safetyCaptureChannel: "ช่องทางที่สะดวก",
+    safetyCaptureChatPlaceholder: "แฮนเดิลหรือหมายเลขของคุณ",
+    safetyCaptureEmailPlaceholder: "you@example.com",
+    safetyCaptureError: "ไม่สามารถบันทึกช่องทางติดต่อได้ กรุณาลองอีกครั้ง",
+    safetyCaptureSubmit: "บันทึกช่องทางติดต่อ",
+    safetyCaptureSuccess:
+      "บันทึกแล้ว เราจะใช้ช่องทางนี้เพื่อแจ้งผลการตรวจสอบ",
+    safetyCaptureTitle: "ต้องการให้เราติดต่อกลับไหม",
+    safetyChannelEmail: "Email",
+    safetyChannelLine: "LINE",
+    safetyChannelTelegram: "Telegram",
+    safetyChannelWhatsapp: "WhatsApp",
     safetyReviewBody:
-      "คำแนะนำอาหารเสริมบางรายการต้องผ่านการตรวจสอบโดยทีมงานก่อนแสดง รายการเหล่านั้นถูกซ่อนไว้จากหน้านี้และส่งเข้าคิวรีวิวแล้ว",
+      "คำแนะนำอาหารเสริมบางรายการต้องผ่านการตรวจสอบความปลอดภัยโดยทีมงานก่อนแสดง ตอนนี้รายการเหล่านั้นถูกซ่อนไว้และส่งให้ทีมรีวิวแล้ว",
     safetyReviewTitle: "มีการตรวจสอบความปลอดภัย",
     safetyNotes: [
       "คำแนะนำเหล่านี้เป็นตัวเลือกผลิตภัณฑ์เพื่อสุขภาพ ไม่ใช่คำแนะนำทางการแพทย์",
@@ -488,7 +531,11 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
         </div>
       </div>
 
-      <SafetyReviewPanel labels={labels} result={result} />
+      <SafetyReviewPanel
+        labels={labels}
+        planId={effectiveResultPlanId}
+        result={result}
+      />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]">
         <FormulaPanel
@@ -535,11 +582,18 @@ type PanelLabels = (typeof copy)["en"];
 
 function SafetyReviewPanel({
   labels,
+  planId,
   result
 }: Readonly<{
   labels: PanelLabels;
+  planId: string;
   result: FormulationResult;
 }>) {
+  const [address, setAddress] = useState("");
+  const [channelType, setChannelType] = useState("line");
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const summary = result.safetySummary;
   const pendingReviews = pendingReviewCount(result);
   const adjustedCount = Math.max(0, Number(summary?.adjustedCount ?? 0));
@@ -553,24 +607,132 @@ function SafetyReviewPanel({
     showReviewNotice ? labels.safetyReviewBody : null,
     adjustedCount > 0 ? labels.doseAdjustedBody : null
   ].filter((message): message is string => Boolean(message));
+  const addressPlaceholder =
+    channelType === "email"
+      ? labels.safetyCaptureEmailPlaceholder
+      : labels.safetyCaptureChatPlaceholder;
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaveState("saving");
+
+    try {
+      const response = await fetch(
+        `/api/assessment/${encodeURIComponent(planId)}/communication-channel`,
+        {
+          body: JSON.stringify({
+            address,
+            channelType
+          }),
+          cache: "no-store",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          method: "POST"
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to save contact");
+      }
+
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
+    }
+  }
 
   return (
     <div className="mt-8 rounded-lg bg-white p-5 ring-1 ring-foreground/10 sm:p-6">
-      <div className="flex gap-3">
-        <ExclamationTriangleIcon
-          aria-hidden={true}
-          className="mt-0.5 size-5 flex-none text-amber-500"
-        />
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#20343A]">
-            {labels.safetyReviewTitle}
-          </p>
-          <div className="mt-2 space-y-2 text-sm leading-6 text-muted-foreground">
-            {messages.map((message) => (
-              <p key={message}>{message}</p>
-            ))}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.78fr)]">
+        <div className="flex gap-3">
+          <ExclamationTriangleIcon
+            aria-hidden={true}
+            className="mt-0.5 size-5 flex-none text-amber-500"
+          />
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#20343A]">
+              {labels.safetyReviewTitle}
+            </p>
+            <div className="mt-2 space-y-2 text-sm leading-6 text-muted-foreground">
+              {messages.map((message) => (
+                <p key={message}>{message}</p>
+              ))}
+            </div>
           </div>
         </div>
+
+        {showReviewNotice ? (
+          <form
+            className="rounded-lg bg-[#F3F8FF] p-4 ring-1 ring-[#3A7BD5]/10"
+            onSubmit={handleSubmit}
+          >
+            <p className="text-sm font-semibold text-[#20343A]">
+              {labels.safetyCaptureTitle}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              {labels.safetyCaptureBody}
+            </p>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-[9rem_1fr] lg:grid-cols-1">
+              <label className="block">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {labels.safetyCaptureChannel}
+                </span>
+                <select
+                  className="mt-2 block w-full rounded-md border border-foreground/10 bg-white px-3 py-2 text-sm font-medium text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
+                  disabled={saveState === "saving"}
+                  onChange={(event) => {
+                    setChannelType(event.target.value);
+                    setSaveState("idle");
+                  }}
+                  value={channelType}
+                >
+                  <option value="line">{labels.safetyChannelLine}</option>
+                  <option value="whatsapp">{labels.safetyChannelWhatsapp}</option>
+                  <option value="telegram">{labels.safetyChannelTelegram}</option>
+                  <option value="email">{labels.safetyChannelEmail}</option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {labels.safetyCaptureAddress}
+                </span>
+                <input
+                  className="mt-2 block w-full rounded-md border border-foreground/10 bg-white px-3 py-2 text-sm text-[#20343A] outline-none transition placeholder:text-muted-foreground/60 focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
+                  disabled={saveState === "saving"}
+                  onChange={(event) => {
+                    setAddress(event.target.value);
+                    setSaveState("idle");
+                  }}
+                  placeholder={addressPlaceholder}
+                  type={channelType === "email" ? "email" : "text"}
+                  value={address}
+                />
+              </label>
+            </div>
+
+            <button
+              className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-[#3A7BD5] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#2f67b4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3A7BD5] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!address.trim() || saveState === "saving"}
+              type="submit"
+            >
+              {labels.safetyCaptureSubmit}
+            </button>
+
+            {saveState === "saved" ? (
+              <p className="mt-3 text-sm font-medium text-[#126B4F]">
+                {labels.safetyCaptureSuccess}
+              </p>
+            ) : null}
+            {saveState === "error" ? (
+              <p className="mt-3 text-sm font-medium text-red-700">
+                {labels.safetyCaptureError}
+              </p>
+            ) : null}
+          </form>
+        ) : null}
       </div>
     </div>
   );
