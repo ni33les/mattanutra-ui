@@ -492,6 +492,1030 @@ create index if not exists job_audit_events_job_idx
 create index if not exists job_audit_events_level_idx
   on public.job_audit_events (level, created_at desc);
 
+create table if not exists public.agents (
+  id uuid primary key,
+  name text not null,
+  agent_type text not null default 'system' check (
+    agent_type in ('human', 'ai', 'deterministic', 'external', 'system')
+  ),
+  status text not null default 'active' check (
+    status in ('active', 'paused', 'offline', 'retired')
+  ),
+  capabilities text[] not null default '{}'::text[],
+  model text null,
+  endpoint_url text null,
+  metadata jsonb not null default '{}'::jsonb,
+  last_seen_at timestamptz null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.agents
+  add column if not exists name text,
+  add column if not exists agent_type text default 'system',
+  add column if not exists status text default 'active',
+  add column if not exists capabilities text[] default '{}'::text[],
+  add column if not exists model text null,
+  add column if not exists endpoint_url text null,
+  add column if not exists metadata jsonb default '{}'::jsonb,
+  add column if not exists last_seen_at timestamptz null,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+update public.agents
+set
+  name = coalesce(nullif(name, ''), id::text),
+  agent_type = case
+    when agent_type in ('human', 'ai', 'deterministic', 'external', 'system')
+      then agent_type
+    else 'system'
+  end,
+  status = case
+    when status in ('active', 'paused', 'offline', 'retired') then status
+    else 'active'
+  end,
+  capabilities = coalesce(capabilities, '{}'::text[]),
+  metadata = coalesce(metadata, '{}'::jsonb),
+  created_at = coalesce(created_at, now()),
+  updated_at = coalesce(updated_at, now())
+where name is null
+  or name = ''
+  or agent_type is null
+  or agent_type not in ('human', 'ai', 'deterministic', 'external', 'system')
+  or status is null
+  or status not in ('active', 'paused', 'offline', 'retired')
+  or capabilities is null
+  or metadata is null
+  or created_at is null
+  or updated_at is null;
+
+alter table public.agents
+  alter column name set not null,
+  alter column agent_type set default 'system',
+  alter column agent_type set not null,
+  alter column status set default 'active',
+  alter column status set not null,
+  alter column capabilities set default '{}'::text[],
+  alter column capabilities set not null,
+  alter column metadata set default '{}'::jsonb,
+  alter column metadata set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.agents'::regclass
+      and conname = 'agents_agent_type_check'
+  ) then
+    alter table public.agents
+      add constraint agents_agent_type_check
+      check (agent_type in ('human', 'ai', 'deterministic', 'external', 'system'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.agents'::regclass
+      and conname = 'agents_status_check'
+  ) then
+    alter table public.agents
+      add constraint agents_status_check
+      check (status in ('active', 'paused', 'offline', 'retired'));
+  end if;
+end $$;
+
+create unique index if not exists agents_name_idx
+  on public.agents (lower(name));
+
+create index if not exists agents_status_idx
+  on public.agents (status, agent_type, updated_at desc);
+
+create index if not exists agents_capabilities_gin_idx
+  on public.agents using gin (capabilities);
+
+create table if not exists public.rays (
+  id uuid primary key,
+  ray_type text not null default 'goal' check (
+    ray_type in ('journey', 'goal', 'task_run', 'system')
+  ),
+  title text not null,
+  status text not null default 'open' check (
+    status in ('open', 'active', 'blocked', 'completed', 'cancelled', 'failed')
+  ),
+  priority integer not null default 3 check (
+    priority >= 1 and priority <= 6
+  ),
+  plan_id uuid null references public.assessments(plan_id) on delete set null,
+  email_hash text null,
+  source text null,
+  context jsonb not null default '{}'::jsonb,
+  created_by_agent_id uuid null references public.agents(id) on delete set null,
+  completed_at timestamptz null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.rays
+  add column if not exists ray_type text default 'goal',
+  add column if not exists title text,
+  add column if not exists status text default 'open',
+  add column if not exists priority integer default 3,
+  add column if not exists plan_id uuid null references public.assessments(plan_id) on delete set null,
+  add column if not exists email_hash text null,
+  add column if not exists source text null,
+  add column if not exists context jsonb default '{}'::jsonb,
+  add column if not exists created_by_agent_id uuid null references public.agents(id) on delete set null,
+  add column if not exists completed_at timestamptz null,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+update public.rays
+set
+  ray_type = case
+    when ray_type in ('journey', 'goal', 'task_run', 'system') then ray_type
+    else 'goal'
+  end,
+  title = coalesce(nullif(title, ''), 'Untitled ray'),
+  status = case
+    when status in ('open', 'active', 'blocked', 'completed', 'cancelled', 'failed')
+      then status
+    else 'open'
+  end,
+  priority = greatest(1, least(coalesce(priority, 3), 6)),
+  context = coalesce(context, '{}'::jsonb),
+  created_at = coalesce(created_at, now()),
+  updated_at = coalesce(updated_at, now())
+where ray_type is null
+  or ray_type not in ('journey', 'goal', 'task_run', 'system')
+  or title is null
+  or title = ''
+  or status is null
+  or status not in ('open', 'active', 'blocked', 'completed', 'cancelled', 'failed')
+  or priority is null
+  or priority < 1
+  or priority > 6
+  or context is null
+  or created_at is null
+  or updated_at is null;
+
+alter table public.rays
+  alter column ray_type set default 'goal',
+  alter column ray_type set not null,
+  alter column title set not null,
+  alter column status set default 'open',
+  alter column status set not null,
+  alter column priority set default 3,
+  alter column priority set not null,
+  alter column context set default '{}'::jsonb,
+  alter column context set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.rays'::regclass
+      and conname = 'rays_type_check'
+  ) then
+    alter table public.rays
+      add constraint rays_type_check
+      check (ray_type in ('journey', 'goal', 'task_run', 'system'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.rays'::regclass
+      and conname = 'rays_status_check'
+  ) then
+    alter table public.rays
+      add constraint rays_status_check
+      check (status in ('open', 'active', 'blocked', 'completed', 'cancelled', 'failed'));
+  end if;
+
+  alter table public.rays
+    drop constraint if exists rays_priority_check;
+
+  alter table public.rays
+    add constraint rays_priority_check
+    check (priority >= 1 and priority <= 6);
+end $$;
+
+create index if not exists rays_status_idx
+  on public.rays (status, priority desc, created_at asc);
+
+create index if not exists rays_plan_idx
+  on public.rays (plan_id, created_at desc)
+  where plan_id is not null;
+
+create index if not exists rays_email_hash_idx
+  on public.rays (email_hash, created_at desc)
+  where email_hash is not null;
+
+create table if not exists public.tasks (
+  id uuid primary key,
+  ray_id uuid not null references public.rays(id) on delete cascade,
+  parent_task_id uuid null references public.tasks(id) on delete set null,
+  plan_id uuid null references public.assessments(plan_id) on delete set null,
+  legacy_job_id uuid null references public.jobs(id) on delete set null,
+  task_type text not null,
+  title text not null,
+  description text null,
+  actor_type text not null default 'system' check (
+    actor_type in ('human', 'ai', 'deterministic', 'external', 'system', 'worker')
+  ),
+  status text not null default 'queued' check (
+    status in (
+      'queued',
+      'reserved',
+      'running',
+      'blocked',
+      'needs_review',
+      'waiting_approval',
+      'completed',
+      'failed',
+      'cancelled',
+      'skipped'
+    )
+  ),
+  priority integer not null default 3 check (
+    priority >= 1 and priority <= 6
+  ),
+  required_capabilities text[] not null default '{}'::text[],
+  reasoning_effort text not null default 'none' check (
+    reasoning_effort in ('none', 'low', 'medium', 'high', 'xhigh')
+  ),
+  payload jsonb not null default '{}'::jsonb,
+  result_payload jsonb not null default '{}'::jsonb,
+  error_message text null,
+  idempotency_key text null,
+  scheduled_for timestamptz not null default now(),
+  reserved_by_agent_id uuid null references public.agents(id) on delete set null,
+  lease_until timestamptz null,
+  attempts integer not null default 0 check (attempts >= 0),
+  max_attempts integer not null default 3 check (max_attempts > 0),
+  created_by_agent_id uuid null references public.agents(id) on delete set null,
+  created_by_task_id uuid null references public.tasks(id) on delete set null,
+  started_at timestamptz null,
+  completed_at timestamptz null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.tasks
+  add column if not exists ray_id uuid references public.rays(id) on delete cascade,
+  add column if not exists parent_task_id uuid null references public.tasks(id) on delete set null,
+  add column if not exists plan_id uuid null references public.assessments(plan_id) on delete set null,
+  add column if not exists legacy_job_id uuid null references public.jobs(id) on delete set null,
+  add column if not exists task_type text,
+  add column if not exists title text,
+  add column if not exists description text null,
+  add column if not exists actor_type text default 'system',
+  add column if not exists status text default 'queued',
+  add column if not exists priority integer default 3,
+  add column if not exists required_capabilities text[] default '{}'::text[],
+  add column if not exists reasoning_effort text default 'none',
+  add column if not exists payload jsonb default '{}'::jsonb,
+  add column if not exists result_payload jsonb default '{}'::jsonb,
+  add column if not exists error_message text null,
+  add column if not exists idempotency_key text null,
+  add column if not exists scheduled_for timestamptz default now(),
+  add column if not exists reserved_by_agent_id uuid null references public.agents(id) on delete set null,
+  add column if not exists lease_until timestamptz null,
+  add column if not exists attempts integer default 0,
+  add column if not exists max_attempts integer default 3,
+  add column if not exists created_by_agent_id uuid null references public.agents(id) on delete set null,
+  add column if not exists created_by_task_id uuid null references public.tasks(id) on delete set null,
+  add column if not exists started_at timestamptz null,
+  add column if not exists completed_at timestamptz null,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+update public.tasks
+set
+  task_type = coalesce(nullif(task_type, ''), 'unknown'),
+  title = coalesce(nullif(title, ''), nullif(task_type, ''), 'Untitled task'),
+  actor_type = case
+    when actor_type in ('human', 'ai', 'deterministic', 'external', 'system', 'worker')
+      then actor_type
+    else 'system'
+  end,
+  status = case
+    when status in (
+      'queued',
+      'reserved',
+      'running',
+      'blocked',
+      'needs_review',
+      'waiting_approval',
+      'completed',
+      'failed',
+      'cancelled',
+      'skipped'
+    ) then status
+    else 'queued'
+  end,
+  priority = greatest(1, least(coalesce(priority, 3), 6)),
+  required_capabilities = coalesce(required_capabilities, '{}'::text[]),
+  reasoning_effort = case
+    when reasoning_effort in ('none', 'low', 'medium', 'high', 'xhigh')
+      then reasoning_effort
+    else 'none'
+  end,
+  payload = coalesce(payload, '{}'::jsonb),
+  result_payload = coalesce(result_payload, '{}'::jsonb),
+  scheduled_for = coalesce(scheduled_for, now()),
+  attempts = greatest(coalesce(attempts, 0), 0),
+  max_attempts = greatest(coalesce(max_attempts, 3), 1),
+  created_at = coalesce(created_at, now()),
+  updated_at = coalesce(updated_at, now())
+where task_type is null
+  or task_type = ''
+  or title is null
+  or title = ''
+  or actor_type is null
+  or actor_type not in ('human', 'ai', 'deterministic', 'external', 'system', 'worker')
+  or status is null
+  or status not in (
+    'queued',
+    'reserved',
+    'running',
+    'blocked',
+    'needs_review',
+    'waiting_approval',
+    'completed',
+    'failed',
+    'cancelled',
+    'skipped'
+  )
+  or priority is null
+  or priority < 1
+  or priority > 6
+  or required_capabilities is null
+  or reasoning_effort is null
+  or reasoning_effort not in ('none', 'low', 'medium', 'high', 'xhigh')
+  or payload is null
+  or result_payload is null
+  or scheduled_for is null
+  or attempts is null
+  or attempts < 0
+  or max_attempts is null
+  or max_attempts < 1
+  or created_at is null
+  or updated_at is null;
+
+alter table public.tasks
+  alter column ray_id set not null,
+  alter column task_type set not null,
+  alter column title set not null,
+  alter column actor_type set default 'system',
+  alter column actor_type set not null,
+  alter column status set default 'queued',
+  alter column status set not null,
+  alter column priority set default 3,
+  alter column priority set not null,
+  alter column required_capabilities set default '{}'::text[],
+  alter column required_capabilities set not null,
+  alter column reasoning_effort set default 'none',
+  alter column reasoning_effort set not null,
+  alter column payload set default '{}'::jsonb,
+  alter column payload set not null,
+  alter column result_payload set default '{}'::jsonb,
+  alter column result_payload set not null,
+  alter column scheduled_for set default now(),
+  alter column scheduled_for set not null,
+  alter column attempts set default 0,
+  alter column attempts set not null,
+  alter column max_attempts set default 3,
+  alter column max_attempts set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.tasks'::regclass
+      and conname = 'tasks_actor_type_check'
+  ) then
+    alter table public.tasks
+      add constraint tasks_actor_type_check
+      check (actor_type in ('human', 'ai', 'deterministic', 'external', 'system', 'worker'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.tasks'::regclass
+      and conname = 'tasks_status_check'
+  ) then
+    alter table public.tasks
+      add constraint tasks_status_check
+      check (
+        status in (
+          'queued',
+          'reserved',
+          'running',
+          'blocked',
+          'needs_review',
+          'waiting_approval',
+          'completed',
+          'failed',
+          'cancelled',
+          'skipped'
+        )
+      );
+  end if;
+
+  alter table public.tasks
+    drop constraint if exists tasks_priority_check;
+
+  alter table public.tasks
+    add constraint tasks_priority_check
+    check (priority >= 1 and priority <= 6);
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.tasks'::regclass
+      and conname = 'tasks_reasoning_effort_check'
+  ) then
+    alter table public.tasks
+      add constraint tasks_reasoning_effort_check
+      check (reasoning_effort in ('none', 'low', 'medium', 'high', 'xhigh'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.tasks'::regclass
+      and conname = 'tasks_attempts_check'
+  ) then
+    alter table public.tasks
+      add constraint tasks_attempts_check
+      check (attempts >= 0 and max_attempts > 0);
+  end if;
+end $$;
+
+comment on table public.agents is
+  'Humans, AI agents, deterministic workers, and external workers that may reserve and process tasks by capability.';
+comment on table public.rays is
+  'A ray is one goal or journey of work, tying related tasks, comments, events, plans, and customer context together.';
+comment on table public.tasks is
+  'Prioritised atomic work items. Tasks describe what must be done; agents describe who or what can do it.';
+comment on column public.tasks.priority is
+  'Higher numbers run first. Scale is 1-6: 6 means do now, 3 is normal, and 1 is when you can.';
+comment on column public.tasks.required_capabilities is
+  'Capabilities required to reserve the task. This keeps task identity separate from any specific worker.';
+comment on column public.tasks.reasoning_effort is
+  'Declared reasoning level for AI or human work planning: none, low, medium, high, or xhigh.';
+
+create index if not exists tasks_queue_idx
+  on public.tasks (status, priority desc, scheduled_for asc, created_at asc);
+
+create index if not exists tasks_ray_idx
+  on public.tasks (ray_id, created_at asc);
+
+create index if not exists tasks_plan_idx
+  on public.tasks (plan_id, created_at desc)
+  where plan_id is not null;
+
+create index if not exists tasks_parent_idx
+  on public.tasks (parent_task_id, created_at asc)
+  where parent_task_id is not null;
+
+create index if not exists tasks_legacy_job_idx
+  on public.tasks (legacy_job_id, created_at desc)
+  where legacy_job_id is not null;
+
+create index if not exists tasks_reserved_agent_idx
+  on public.tasks (reserved_by_agent_id, lease_until)
+  where reserved_by_agent_id is not null;
+
+create index if not exists tasks_required_capabilities_gin_idx
+  on public.tasks using gin (required_capabilities);
+
+create unique index if not exists tasks_active_idempotency_idx
+  on public.tasks (ray_id, idempotency_key)
+  where idempotency_key is not null
+    and status not in ('completed', 'failed', 'cancelled', 'skipped');
+
+create table if not exists public.task_dependencies (
+  task_id uuid not null references public.tasks(id) on delete cascade,
+  depends_on_task_id uuid not null references public.tasks(id) on delete cascade,
+  dependency_type text not null default 'complete' check (
+    dependency_type in ('complete', 'approved', 'successful')
+  ),
+  created_at timestamptz not null default now(),
+  primary key (task_id, depends_on_task_id),
+  check (task_id <> depends_on_task_id)
+);
+
+alter table public.task_dependencies
+  add column if not exists dependency_type text default 'complete',
+  add column if not exists created_at timestamptz default now();
+
+update public.task_dependencies
+set
+  dependency_type = case
+    when dependency_type in ('complete', 'approved', 'successful') then dependency_type
+    else 'complete'
+  end,
+  created_at = coalesce(created_at, now())
+where dependency_type is null
+  or dependency_type not in ('complete', 'approved', 'successful')
+  or created_at is null;
+
+alter table public.task_dependencies
+  alter column dependency_type set default 'complete',
+  alter column dependency_type set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.task_dependencies'::regclass
+      and conname = 'task_dependencies_type_check'
+  ) then
+    alter table public.task_dependencies
+      add constraint task_dependencies_type_check
+      check (dependency_type in ('complete', 'approved', 'successful'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.task_dependencies'::regclass
+      and conname = 'task_dependencies_no_self_check'
+  ) then
+    alter table public.task_dependencies
+      add constraint task_dependencies_no_self_check
+      check (task_id <> depends_on_task_id);
+  end if;
+end $$;
+
+create index if not exists task_dependencies_waiting_idx
+  on public.task_dependencies (depends_on_task_id, task_id);
+
+create table if not exists public.task_comments (
+  id uuid primary key,
+  task_id uuid not null references public.tasks(id) on delete cascade,
+  ray_id uuid not null references public.rays(id) on delete cascade,
+  agent_id uuid null references public.agents(id) on delete set null,
+  author_type text not null default 'system' check (
+    author_type in ('human', 'ai', 'deterministic', 'external', 'system', 'worker')
+  ),
+  author_name text null,
+  visibility text not null default 'internal' check (
+    visibility in ('internal', 'admin', 'worker', 'customer')
+  ),
+  comment_type text not null default 'note' check (
+    comment_type in ('instruction', 'note', 'decision', 'question', 'answer', 'status', 'system')
+  ),
+  body text not null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.task_comments
+  add column if not exists task_id uuid references public.tasks(id) on delete cascade,
+  add column if not exists ray_id uuid references public.rays(id) on delete cascade,
+  add column if not exists agent_id uuid null references public.agents(id) on delete set null,
+  add column if not exists author_type text default 'system',
+  add column if not exists author_name text null,
+  add column if not exists visibility text default 'internal',
+  add column if not exists comment_type text default 'note',
+  add column if not exists body text,
+  add column if not exists metadata jsonb default '{}'::jsonb,
+  add column if not exists created_at timestamptz default now();
+
+update public.task_comments
+set
+  author_type = case
+    when author_type in ('human', 'ai', 'deterministic', 'external', 'system', 'worker')
+      then author_type
+    else 'system'
+  end,
+  visibility = case
+    when visibility in ('internal', 'admin', 'worker', 'customer') then visibility
+    else 'internal'
+  end,
+  comment_type = case
+    when comment_type in ('instruction', 'note', 'decision', 'question', 'answer', 'status', 'system')
+      then comment_type
+    else 'note'
+  end,
+  body = coalesce(body, ''),
+  metadata = coalesce(metadata, '{}'::jsonb),
+  created_at = coalesce(created_at, now())
+where author_type is null
+  or author_type not in ('human', 'ai', 'deterministic', 'external', 'system', 'worker')
+  or visibility is null
+  or visibility not in ('internal', 'admin', 'worker', 'customer')
+  or comment_type is null
+  or comment_type not in ('instruction', 'note', 'decision', 'question', 'answer', 'status', 'system')
+  or body is null
+  or metadata is null
+  or created_at is null;
+
+alter table public.task_comments
+  alter column task_id set not null,
+  alter column ray_id set not null,
+  alter column author_type set default 'system',
+  alter column author_type set not null,
+  alter column visibility set default 'internal',
+  alter column visibility set not null,
+  alter column comment_type set default 'note',
+  alter column comment_type set not null,
+  alter column body set not null,
+  alter column metadata set default '{}'::jsonb,
+  alter column metadata set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.task_comments'::regclass
+      and conname = 'task_comments_author_type_check'
+  ) then
+    alter table public.task_comments
+      add constraint task_comments_author_type_check
+      check (author_type in ('human', 'ai', 'deterministic', 'external', 'system', 'worker'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.task_comments'::regclass
+      and conname = 'task_comments_visibility_check'
+  ) then
+    alter table public.task_comments
+      add constraint task_comments_visibility_check
+      check (visibility in ('internal', 'admin', 'worker', 'customer'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.task_comments'::regclass
+      and conname = 'task_comments_type_check'
+  ) then
+    alter table public.task_comments
+      add constraint task_comments_type_check
+      check (comment_type in ('instruction', 'note', 'decision', 'question', 'answer', 'status', 'system'));
+  end if;
+end $$;
+
+comment on table public.task_comments is
+  'Collaborative working notes for humans and agents. Comments explain what is needed or decided; task_events remains the immutable audit trail.';
+
+create index if not exists task_comments_task_idx
+  on public.task_comments (task_id, created_at asc);
+
+create index if not exists task_comments_ray_idx
+  on public.task_comments (ray_id, created_at asc);
+
+create index if not exists task_comments_agent_idx
+  on public.task_comments (agent_id, created_at desc)
+  where agent_id is not null;
+
+do $$
+begin
+  if to_regclass('public.task_events') is not null then
+    drop trigger if exists task_events_no_update_delete on public.task_events;
+  end if;
+end $$;
+
+create table if not exists public.task_events (
+  id uuid primary key,
+  task_id uuid null references public.tasks(id) on delete set null,
+  ray_id uuid not null references public.rays(id) on delete cascade,
+  agent_id uuid null references public.agents(id) on delete set null,
+  event_type text not null,
+  event_status text not null default 'observed' check (
+    event_status in ('observed', 'requested', 'accepted', 'rejected', 'succeeded', 'failed')
+  ),
+  severity text not null default 'low' check (
+    severity in ('low', 'medium', 'high', 'critical')
+  ),
+  event_payload jsonb not null default '{}'::jsonb,
+  occurred_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+alter table public.task_events
+  add column if not exists task_id uuid null references public.tasks(id) on delete set null,
+  add column if not exists ray_id uuid references public.rays(id) on delete cascade,
+  add column if not exists agent_id uuid null references public.agents(id) on delete set null,
+  add column if not exists event_type text,
+  add column if not exists event_status text default 'observed',
+  add column if not exists severity text default 'low',
+  add column if not exists event_payload jsonb default '{}'::jsonb,
+  add column if not exists occurred_at timestamptz default now(),
+  add column if not exists created_at timestamptz default now();
+
+update public.task_events
+set
+  event_type = coalesce(nullif(event_type, ''), 'unknown'),
+  event_status = case
+    when event_status in ('observed', 'requested', 'accepted', 'rejected', 'succeeded', 'failed')
+      then event_status
+    else 'observed'
+  end,
+  severity = case
+    when severity in ('low', 'medium', 'high', 'critical') then severity
+    else 'low'
+  end,
+  event_payload = coalesce(event_payload, '{}'::jsonb),
+  occurred_at = coalesce(occurred_at, now()),
+  created_at = coalesce(created_at, now())
+where event_type is null
+  or event_type = ''
+  or event_status is null
+  or event_status not in ('observed', 'requested', 'accepted', 'rejected', 'succeeded', 'failed')
+  or severity is null
+  or severity not in ('low', 'medium', 'high', 'critical')
+  or event_payload is null
+  or occurred_at is null
+  or created_at is null;
+
+alter table public.task_events
+  alter column ray_id set not null,
+  alter column event_type set not null,
+  alter column event_status set default 'observed',
+  alter column event_status set not null,
+  alter column severity set default 'low',
+  alter column severity set not null,
+  alter column event_payload set default '{}'::jsonb,
+  alter column event_payload set not null,
+  alter column occurred_at set default now(),
+  alter column occurred_at set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.task_events'::regclass
+      and conname = 'task_events_status_check'
+  ) then
+    alter table public.task_events
+      add constraint task_events_status_check
+      check (event_status in ('observed', 'requested', 'accepted', 'rejected', 'succeeded', 'failed'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.task_events'::regclass
+      and conname = 'task_events_severity_check'
+  ) then
+    alter table public.task_events
+      add constraint task_events_severity_check
+      check (severity in ('low', 'medium', 'high', 'critical'));
+  end if;
+end $$;
+
+create or replace function public.prevent_task_events_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  raise exception 'task_events is append-only';
+end;
+$$;
+
+create trigger task_events_no_update_delete
+  before update or delete on public.task_events
+  for each row execute function public.prevent_task_events_mutation();
+
+comment on table public.task_events is
+  'Append-only audit trail for task lifecycle and causal events. Comments are working notes; events are the record.';
+
+create index if not exists task_events_task_idx
+  on public.task_events (task_id, occurred_at asc)
+  where task_id is not null;
+
+create index if not exists task_events_ray_idx
+  on public.task_events (ray_id, occurred_at asc);
+
+create index if not exists task_events_agent_idx
+  on public.task_events (agent_id, occurred_at desc)
+  where agent_id is not null;
+
+create index if not exists task_events_type_idx
+  on public.task_events (event_type, occurred_at desc);
+
+create table if not exists public.task_reservations (
+  id uuid primary key,
+  task_id uuid not null references public.tasks(id) on delete cascade,
+  agent_id uuid not null references public.agents(id) on delete cascade,
+  status text not null default 'active' check (
+    status in ('active', 'released', 'completed', 'expired', 'cancelled')
+  ),
+  reserved_at timestamptz not null default now(),
+  lease_until timestamptz not null,
+  heartbeat_at timestamptz null,
+  released_at timestamptz null,
+  completed_at timestamptz null,
+  metadata jsonb not null default '{}'::jsonb
+);
+
+alter table public.task_reservations
+  add column if not exists task_id uuid references public.tasks(id) on delete cascade,
+  add column if not exists agent_id uuid references public.agents(id) on delete cascade,
+  add column if not exists status text default 'active',
+  add column if not exists reserved_at timestamptz default now(),
+  add column if not exists lease_until timestamptz,
+  add column if not exists heartbeat_at timestamptz null,
+  add column if not exists released_at timestamptz null,
+  add column if not exists completed_at timestamptz null,
+  add column if not exists metadata jsonb default '{}'::jsonb;
+
+update public.task_reservations
+set
+  status = case
+    when status in ('active', 'released', 'completed', 'expired', 'cancelled') then status
+    else 'active'
+  end,
+  reserved_at = coalesce(reserved_at, now()),
+  lease_until = coalesce(lease_until, now()),
+  metadata = coalesce(metadata, '{}'::jsonb)
+where status is null
+  or status not in ('active', 'released', 'completed', 'expired', 'cancelled')
+  or reserved_at is null
+  or lease_until is null
+  or metadata is null;
+
+alter table public.task_reservations
+  alter column task_id set not null,
+  alter column agent_id set not null,
+  alter column status set default 'active',
+  alter column status set not null,
+  alter column reserved_at set default now(),
+  alter column reserved_at set not null,
+  alter column lease_until set not null,
+  alter column metadata set default '{}'::jsonb,
+  alter column metadata set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.task_reservations'::regclass
+      and conname = 'task_reservations_status_check'
+  ) then
+    alter table public.task_reservations
+      add constraint task_reservations_status_check
+      check (status in ('active', 'released', 'completed', 'expired', 'cancelled'));
+  end if;
+end $$;
+
+create unique index if not exists task_reservations_active_task_idx
+  on public.task_reservations (task_id)
+  where status = 'active';
+
+create index if not exists task_reservations_agent_idx
+  on public.task_reservations (agent_id, status, reserved_at desc);
+
+create index if not exists task_reservations_lease_idx
+  on public.task_reservations (status, lease_until asc)
+  where status = 'active';
+
+create table if not exists public.task_approvals (
+  id uuid primary key,
+  task_id uuid not null references public.tasks(id) on delete cascade,
+  ray_id uuid not null references public.rays(id) on delete cascade,
+  requested_by_agent_id uuid null references public.agents(id) on delete set null,
+  decided_by_agent_id uuid null references public.agents(id) on delete set null,
+  approval_type text not null default 'four_eyes' check (
+    approval_type in ('four_eyes', 'human_review', 'agent_review', 'safety', 'business')
+  ),
+  status text not null default 'requested' check (
+    status in ('requested', 'approved', 'rejected', 'cancelled', 'expired')
+  ),
+  required_capabilities text[] not null default '{}'::text[],
+  request_comment text null,
+  decision_comment text null,
+  decision_payload jsonb not null default '{}'::jsonb,
+  requested_at timestamptz not null default now(),
+  decided_at timestamptz null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.task_approvals
+  add column if not exists task_id uuid references public.tasks(id) on delete cascade,
+  add column if not exists ray_id uuid references public.rays(id) on delete cascade,
+  add column if not exists requested_by_agent_id uuid null references public.agents(id) on delete set null,
+  add column if not exists decided_by_agent_id uuid null references public.agents(id) on delete set null,
+  add column if not exists approval_type text default 'four_eyes',
+  add column if not exists status text default 'requested',
+  add column if not exists required_capabilities text[] default '{}'::text[],
+  add column if not exists request_comment text null,
+  add column if not exists decision_comment text null,
+  add column if not exists decision_payload jsonb default '{}'::jsonb,
+  add column if not exists requested_at timestamptz default now(),
+  add column if not exists decided_at timestamptz null,
+  add column if not exists created_at timestamptz default now();
+
+update public.task_approvals
+set
+  approval_type = case
+    when approval_type in ('four_eyes', 'human_review', 'agent_review', 'safety', 'business')
+      then approval_type
+    else 'four_eyes'
+  end,
+  status = case
+    when status in ('requested', 'approved', 'rejected', 'cancelled', 'expired') then status
+    else 'requested'
+  end,
+  required_capabilities = coalesce(required_capabilities, '{}'::text[]),
+  decision_payload = coalesce(decision_payload, '{}'::jsonb),
+  requested_at = coalesce(requested_at, now()),
+  created_at = coalesce(created_at, now())
+where approval_type is null
+  or approval_type not in ('four_eyes', 'human_review', 'agent_review', 'safety', 'business')
+  or status is null
+  or status not in ('requested', 'approved', 'rejected', 'cancelled', 'expired')
+  or required_capabilities is null
+  or decision_payload is null
+  or requested_at is null
+  or created_at is null;
+
+alter table public.task_approvals
+  alter column task_id set not null,
+  alter column ray_id set not null,
+  alter column approval_type set default 'four_eyes',
+  alter column approval_type set not null,
+  alter column status set default 'requested',
+  alter column status set not null,
+  alter column required_capabilities set default '{}'::text[],
+  alter column required_capabilities set not null,
+  alter column decision_payload set default '{}'::jsonb,
+  alter column decision_payload set not null,
+  alter column requested_at set default now(),
+  alter column requested_at set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.task_approvals'::regclass
+      and conname = 'task_approvals_type_check'
+  ) then
+    alter table public.task_approvals
+      add constraint task_approvals_type_check
+      check (approval_type in ('four_eyes', 'human_review', 'agent_review', 'safety', 'business'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.task_approvals'::regclass
+      and conname = 'task_approvals_status_check'
+  ) then
+    alter table public.task_approvals
+      add constraint task_approvals_status_check
+      check (status in ('requested', 'approved', 'rejected', 'cancelled', 'expired'));
+  end if;
+end $$;
+
+create index if not exists task_approvals_task_idx
+  on public.task_approvals (task_id, requested_at desc);
+
+create index if not exists task_approvals_ray_idx
+  on public.task_approvals (ray_id, requested_at desc);
+
+create index if not exists task_approvals_status_idx
+  on public.task_approvals (status, requested_at asc);
+
+create index if not exists task_approvals_capabilities_gin_idx
+  on public.task_approvals using gin (required_capabilities);
+
 create table if not exists public.assessment_example_requests (
   id uuid primary key,
   plan_id uuid not null references public.assessments(plan_id) on delete cascade,
@@ -2713,6 +3737,60 @@ begin
   end;
 
   begin
+    execute 'alter table public.agents owner to mn';
+  exception when others then
+    raise notice 'Skipping agents owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter table public.rays owner to mn';
+  exception when others then
+    raise notice 'Skipping rays owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter table public.tasks owner to mn';
+  exception when others then
+    raise notice 'Skipping tasks owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter table public.task_dependencies owner to mn';
+  exception when others then
+    raise notice 'Skipping task_dependencies owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter table public.task_comments owner to mn';
+  exception when others then
+    raise notice 'Skipping task_comments owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter table public.task_events owner to mn';
+  exception when others then
+    raise notice 'Skipping task_events owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter function public.prevent_task_events_mutation() owner to mn';
+  exception when others then
+    raise notice 'Skipping prevent_task_events_mutation owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter table public.task_reservations owner to mn';
+  exception when others then
+    raise notice 'Skipping task_reservations owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter table public.task_approvals owner to mn';
+  exception when others then
+    raise notice 'Skipping task_approvals owner change: %', sqlerrm;
+  end;
+
+  begin
     execute 'alter table public.assessment_example_requests owner to mn';
   exception when others then
     raise notice 'Skipping assessment_example_requests owner change: %', sqlerrm;
@@ -2787,11 +3865,20 @@ begin
          public.supplement_safety_limits,
          public.supplement_aliases,
          public.supplement_admin_audit,
-         public.safety_reviews
+         public.safety_reviews,
+         public.agents,
+         public.rays,
+         public.tasks,
+         public.task_dependencies,
+         public.task_comments,
+         public.task_events,
+         public.task_reservations,
+         public.task_approvals
       to mn;
 
     grant execute
-      on function public.mattanutra_supplement_safety_flags(text)
+      on function public.mattanutra_supplement_safety_flags(text),
+                  public.prevent_task_events_mutation()
       to mn;
   end if;
 exception when others then
