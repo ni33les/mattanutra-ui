@@ -289,6 +289,8 @@ Supplement review work is task-native. New review work creates a Goal and Task, 
 
 The safety review record carries the operational details: supplement, dose, rule, context, linked goal/task where available, reviewer decision, reviewed formulation version, client message, and client notification state.
 
+Worker execution is currently internal, but it runs through the protected task API rather than directly mutating task state. A worker reserves a task, receives the work item, completes the work, and posts the result back. The platform then applies the state changes. This keeps the business flow visible today and leaves the door open to move workers onto separate servers later.
+
 ## Content and Marketing Engine
 
 Blog articles and testimonials are database-driven and can be managed by OpenClaw or another admin system using protected machine APIs. These APIs use `ADMIN_CLAW_TOKEN` with `Authorization: Bearer <ADMIN_CLAW_TOKEN>` or `x-admin-claw-token`; dashboard tokens are not accepted for machine API access.

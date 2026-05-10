@@ -902,10 +902,12 @@ async function writeCachedAdvice({
 
 export async function analyzeHealthScoreAdvice({
   answers,
+  cache = true,
   healthScore,
   locale
 }: Readonly<{
   answers: unknown;
+  cache?: boolean;
   healthScore: HealthScoreResult;
   locale: Locale;
 }>) {
@@ -917,7 +919,7 @@ export async function analyzeHealthScoreAdvice({
     promptVersion: config.promptVersion,
     reasoningEffort: config.reasoningEffort
   });
-  const cachedAdvice = await readCachedAdvice(key);
+  const cachedAdvice = cache ? await readCachedAdvice(key) : null;
 
   if (cachedAdvice) {
     return cachedAdvice;
@@ -944,12 +946,14 @@ export async function analyzeHealthScoreAdvice({
       const validation = validateAdvice(parseJsonObject(content));
 
       if (validation.advice) {
-        await writeCachedAdvice({
-          advice: validation.advice,
-          key,
-          model: config.model,
-          promptVersion: config.promptVersion
-        });
+        if (cache) {
+          await writeCachedAdvice({
+            advice: validation.advice,
+            key,
+            model: config.model,
+            promptVersion: config.promptVersion
+          });
+        }
         return validation.advice;
       }
 

@@ -6,7 +6,8 @@ import {
   taskApiError,
   textValue
 } from "@/lib/openclaw-api";
-import { getTaskBundle, reserveNextTask } from "@/lib/task-service";
+import { buildTaskWorkItem } from "@/lib/task-work-items";
+import { failTask, getTaskBundle, reserveNextTask } from "@/lib/task-service";
 import type { AgentType } from "@/lib/task-service";
 
 export const runtime = "nodejs";
@@ -20,6 +21,12 @@ function agentType(value: unknown): AgentType {
     text === "system"
     ? text
     : "external";
+}
+
+function textArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 export async function POST(request: Request) {
@@ -42,7 +49,9 @@ export async function POST(request: Request) {
         name: textValue(agent.name) ?? "Unnamed OpenClaw agent",
         type: agentType(agent.type)
       },
-      leaseSeconds: body.leaseSeconds
+      leaseSeconds: body.leaseSeconds,
+      mustRequireCapability: textValue(body.mustRequireCapability),
+      taskTypes: textArray(body.taskTypes)
     });
 
     if (!reserved) {
@@ -50,6 +59,26 @@ export async function POST(request: Request) {
     }
 
     const bundle = await getTaskBundle({ taskId: reserved.task.id });
+    let workItem;
+
+    try {
+      workItem = await buildTaskWorkItem(bundle.task);
+    } catch (error) {
+      await failTask({
+        agentId: reserved.agent.id,
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "Unable to build task work item",
+        reservationId: reserved.reservationId,
+        resultPayload: {
+          stage: "work_item_build",
+          taskType: bundle.task.taskType
+        },
+        taskId: bundle.task.id
+      });
+      throw error;
+    }
 
     return openClawJson({
       agent: reserved.agent,
@@ -57,7 +86,8 @@ export async function POST(request: Request) {
       dependencies: bundle.dependencies,
       goal: bundle.goal,
       reservationId: reserved.reservationId,
-      task: bundle.task
+      task: bundle.task,
+      workItem
     });
   } catch (error) {
     return taskApiError(error, "Unable to reserve task");

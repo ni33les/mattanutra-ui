@@ -6,7 +6,8 @@ import {
   taskApiError,
   textValue
 } from "@/lib/openclaw-api";
-import { completeTask } from "@/lib/task-service";
+import { applyTaskCompletionResult } from "@/lib/task-result-applier";
+import { assertActiveTaskReservation, completeTask } from "@/lib/task-service";
 
 export const runtime = "nodejs";
 
@@ -38,10 +39,24 @@ export async function POST(
   }
 
   try {
-    const task = await completeTask({
-      agentId: textValue(body.agentId),
+    const agentId = textValue(body.agentId);
+
+    await assertActiveTaskReservation({
+      agentId,
       reservationId,
-      resultPayload: objectValue(body.resultPayload),
+      taskId: id
+    });
+    const resultPayload = objectValue(
+      await applyTaskCompletionResult({
+        reservationId,
+        resultPayload: objectValue(body.resultPayload),
+        taskId: id
+      })
+    );
+    const task = await completeTask({
+      agentId,
+      reservationId,
+      resultPayload,
       taskId: id
     });
 

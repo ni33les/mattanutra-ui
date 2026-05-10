@@ -1302,6 +1302,18 @@ export async function getTaskBundle(input: Readonly<{ taskId: string }>) {
   } satisfies TaskBundle;
 }
 
+export async function assertActiveTaskReservation(
+  input: Readonly<{
+    agentId?: string | null;
+    reservationId?: string | null;
+    taskId: string;
+  }>
+) {
+  const sql = getRequiredSql();
+
+  return sql.begin((tx) => activeReservationInTransaction(tx, input));
+}
+
 export async function listGoalTasks(input: Readonly<{ goalId: string }>) {
   const sql = getRequiredSql();
   const goalId = uuidOrNull(input.goalId);

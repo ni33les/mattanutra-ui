@@ -148,7 +148,7 @@ The dashboard now separates business and operational views:
 
 Workers should:
 
-- reserve tasks only through the task service
+- reserve tasks through the protected task API
 - use capability matching
 - obey goal priority before task priority
 - write comments when useful context is needed by the next actor
@@ -157,6 +157,16 @@ Workers should:
 - spawn child tasks under the same goal when follow-up work is needed
 
 Only small atomic work should be synchronous. Slow AI calls, messages, safety reviews, and follow-ups should be task-backed.
+
+The current deployment runs the worker loop internally for convenience, but it already uses the same HTTP task API that future remote workers will use:
+
+1. `POST /api/tasks/reserve` reserves a task and returns comments, dependencies, goal context, reservation ID, and the task-specific work item.
+2. The worker executes the work item without owning platform state.
+3. `POST /api/tasks/[id]/complete` sends the result payload back to the platform.
+4. The platform applies durable side effects, then marks the task complete.
+5. `POST /api/tasks/[id]/fail` records the error, updates the owning flow where needed, and marks the task failed.
+
+This means we can later move workers to another server without changing the goal/task data model or the admin dashboard visibility.
 
 ## API Rules
 
@@ -171,6 +181,13 @@ Authorization: Bearer <ADMIN_CLAW_TOKEN>
 ```
 
 Tokens must not be passed in query strings, client bundles, BPM payloads, or logs.
+
+Internal workers need:
+
+- `ADMIN_CLAW_TOKEN`
+- `MATTANUTRA_API_BASE_URL` in production, unless `APP_BASE_URL` or `NEXT_PUBLIC_SITE_URL` already points to the running app
+- optional `WORKER_CONCURRENCY`
+- optional `WORKER_MAX_TASKS_PER_TICK`
 
 ## Acceptance Criteria
 
