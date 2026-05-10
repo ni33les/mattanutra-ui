@@ -9,6 +9,10 @@ import { normalizeAdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import { getAdminFlowData } from "@/lib/admin-flow-data";
 import { getAdminReviewQueueData } from "@/lib/admin-review-queue";
 import { getAdminSupplementsData } from "@/lib/admin-supplements";
+import {
+  getAdminJobsData,
+  getAdminTechnicalAlertsData
+} from "@/lib/admin-technical";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +32,11 @@ export default async function AdminDashboardPage({
   const range = normalizeAdminDashboardRange(params.range);
   const rawView = firstParam(params.view);
   const view =
-    rawView === "flow" || rawView === "reviews" || rawView === "supplements"
+    rawView === "alerts" ||
+    rawView === "flow" ||
+    rawView === "jobs" ||
+    rawView === "reviews" ||
+    rawView === "supplements"
       ? rawView
       : "kpi";
   const filters = normalizeAdminDashboardFilters(params);
@@ -37,9 +45,18 @@ export default async function AdminDashboardPage({
     notFound();
   }
 
-  const [data, flowData, reviewQueueData, supplementsData] = await Promise.all([
+  const [
+    alertsData,
+    data,
+    flowData,
+    jobsData,
+    reviewQueueData,
+    supplementsData
+  ] = await Promise.all([
+    getAdminTechnicalAlertsData(range),
     getAdminDashboardData(range, filters),
     getAdminFlowData(range, filters),
+    getAdminJobsData(range),
     getAdminReviewQueueData(),
     getAdminSupplementsData()
   ]);
@@ -47,9 +64,11 @@ export default async function AdminDashboardPage({
   return (
     <AdminDashboard
       accessToken={accessToken ?? ""}
+      alertsData={alertsData}
       data={data}
       filters={filters}
       flowData={flowData}
+      jobsData={jobsData}
       locale="en"
       reviewQueueData={reviewQueueData}
       supplementsData={supplementsData}

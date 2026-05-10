@@ -1987,7 +1987,10 @@ async function completeExampleEmailJob(sql: postgres.Sql, job: ClaimedJob) {
   });
   const delivery = await sendTransactionalEmail({
     html: emailHtml,
-    subject: buildExampleEmailSubject(locale),
+    subject: buildExampleEmailSubject(
+      locale,
+      row.health_score as HealthScoreResult
+    ),
     to: emailValidation.email
   });
   const eventType = delivery.sent

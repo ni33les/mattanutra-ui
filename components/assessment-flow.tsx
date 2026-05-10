@@ -3606,39 +3606,50 @@ function PlanSelectionPanel({
     healthScore?.advice?.paywallSubtitle,
     locale
   );
+  const lowestDomain = healthScore?.domains
+    .slice()
+    .sort((a, b) => a.score - b.score)[0];
   const fallbackFeatures =
     locale === "th"
       ? [
           {
             description:
-              "จัดลำดับคำแนะนำตามจุดที่คะแนนของคุณบอกว่าควรเริ่มก่อน",
-            name: "โฟกัสตามคะแนนของคุณ"
+              lowestDomain
+                ? `เริ่มจาก ${lowestDomain.label} (${lowestDomain.score}/100) เพื่อให้แผนเน้นจุดที่มีผลต่อ HealthScore มากที่สุด`
+                : "จัดลำดับคำแนะนำตามจุดที่คะแนนของคุณบอกว่าควรเริ่มก่อน",
+            name: lowestDomain ? `โฟกัส ${lowestDomain.label}` : "โฟกัสตามคะแนนของคุณ"
           },
           {
             description:
-              "ช่วยให้เห็นภาพว่าควรสนับสนุนร่างกายในปริมาณที่เหมาะสม ไม่ใช่เดาสุ่ม",
+              healthScore
+                ? `ใช้คะแนน ${healthScore.score}/100 เพื่อจัดลำดับสิ่งที่คุ้มค่าก่อน ลดการซื้อแบบเดาสุ่ม`
+                : "ช่วยให้เห็นภาพว่าควรสนับสนุนร่างกายในปริมาณที่เหมาะสม ไม่ใช่เดาสุ่ม",
             name: "แนวทางปริมาณที่เหมาะสม"
           },
           {
             description:
-              "ออกแบบให้เข้ากับเป้าหมาย พฤติกรรม และข้อมูลที่คุณให้ไว้",
+              "เปลี่ยนผลลัพธ์จากแบบประเมินให้เป็นขั้นตอนที่ทำตามได้จริง พร้อมจังหวะทบทวนเมื่อข้อมูลเปลี่ยน",
             name: "เหมาะกับชีวิตประจำวัน"
           }
         ]
       : [
           {
             description:
-              "Prioritises the areas your HealthScore suggests deserve attention first.",
-            name: "Score-led priorities"
+              lowestDomain
+                ? `Starts with ${lowestDomain.label} (${lowestDomain.score}/100), so the plan focuses on the area most likely to move your HealthScore.`
+                : "Prioritises the areas your HealthScore suggests deserve attention first.",
+            name: lowestDomain ? `${lowestDomain.label} focus` : "Score-led priorities"
           },
           {
             description:
-              "Shows what your body may need in sensible amounts, without guesswork.",
+              healthScore
+                ? `Uses your ${healthScore.score}/100 score to prioritise fewer, better-targeted moves and reduce wasted supplement spend.`
+                : "Shows what your body may need in sensible amounts, without guesswork.",
             name: "Right-amount guidance"
           },
           {
             description:
-              "Frames your plan around your goals, habits, constraints, and daily routine.",
+              "Turns the assessment into practical next steps you can fit into your routine, then refine as your data changes.",
             name: "Built around your day"
           }
         ];

@@ -276,7 +276,7 @@ function buildBuckets(range: AdminDashboardRange, rows: BpmConversionRow[]) {
   return buckets;
 }
 
-function bucketQueryStart(range: AdminDashboardRange) {
+export function adminDashboardRangeStart(range: AdminDashboardRange) {
   const now = new Date();
 
   if (range === "all") {
@@ -464,7 +464,7 @@ export async function getAdminDashboardData(
   }
 
   try {
-    const start = bucketQueryStart(range);
+    const start = adminDashboardRangeStart(range);
     const rows = start
       ? await sql<BpmConversionRow[]>`
           select

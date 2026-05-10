@@ -14,7 +14,7 @@ MattaNutra earns trust through an anonymous wellness assessment and HealthScore,
 | Pro Plan | "I want ongoing support." | Recurring advisor relationship | Partial: offer exists, advisor handoff pending |
 | Product guidance | "What should I actually buy?" | Future affiliate revenue and customer convenience | Partial: results area exists, matching not live |
 | Blog and testimonials | "Can I learn and trust the brand?" | Marketing engine for paid, social, and organic traffic | Partial: platform live, cadence pending |
-| Admin analytics | "Where are users converting or dropping out?" | Tune marketing spend and the product funnel | Partial: KPI, Flow, Supplements, and Human Review views live |
+| Admin analytics | "Where are users converting, dropping out, or needing attention?" | Tune marketing spend, product funnel, and operations | Partial: KPI, Conversions, Supplements, Human Review, Technical Alerts, and Jobs views live |
 
 ## Current Funnel
 
@@ -53,8 +53,8 @@ flowchart TB
 - Anonymous assessment in English and Thai.
 - Backend-owned HealthScore using the business workbook formula.
 - HealthScore page with score, six-domain snapshot, radar visualisation, and AI-generated overview.
-- AI-personalised plan-gate copy and three feature cards.
-- Separate AI paths: one shared Grok model with lighter reasoning for HealthScore/marketing copy and deeper reasoning for formulation generation.
+- AI-personalised, sales-optimised plan-gate copy and three feature cards anchored to the user's actual assessment signals.
+- Separate AI paths: one shared Grok model with medium reasoning for HealthScore sales copy and formulation generation.
 - HealthScore/marketing AI responses are cached for up to one week to reduce latency and cost.
 - Free email lead capture.
 - Free email sends the top three supplement suggestions from the actual generated formulation.
@@ -67,7 +67,8 @@ flowchart TB
 - Formulation page renders stored backend data.
 - Blog and testimonial tables, pages, and protected admin APIs.
 - BPM tracking for funnel, campaign, affiliate, safety, error, email, chat, and formulation events.
-- Admin dashboard with KPI and Flow views over hour, day, week, month, year, and all-time windows.
+- Admin dashboard with KPI and Conversions views over hour, day, week, month, year, and all-time windows.
+- Admin Technical section with Alerts and Jobs views for failed email sends, stuck jobs, cron failures, AI/worker errors, and recent job history.
 - Dashboard filters for locale, device, source, medium, campaign, campaign ID, affiliate, promo code, selected plan, plan ID, ray, and email hash.
 
 ## Main Gaps
@@ -75,7 +76,7 @@ flowchart TB
 | Gap | Why It Matters | Suggested Next Step |
 | --- | --- | --- |
 | Payment activation | Cannot test revenue conversion yet | Wire Precision/Pro checkout once account is ready |
-| Admin operations views | Sales analytics and supplement review basics exist, but stuck-job, error, and content operations still need interfaces | Add stuck-job, error, campaign, and content panels |
+| Admin operations views | Sales analytics, technical alerts, jobs, supplement review, and supplement editing basics exist; content and campaign comparison views still need interfaces | Add campaign and content panels |
 | Supplement governance | Whitelist, blacklist, max dose, and safety review basics exist; frequency and interaction rules are not wired yet | Add frequency, condition, medication, pregnancy, and lab interaction checks |
 | Product matching | Affiliate revenue depends on trusted products | Start with curated whitelist before marketplace automation |
 | Chat handoff | Pro needs a convincing ongoing service experience | Make one channel excellent first, likely LINE |
@@ -92,7 +93,7 @@ Current flow:
 
 1. User completes assessment.
 2. User sees HealthScore.
-3. User chooses free 3-point email plan.
+3. User chooses Free 3-point email plan.
 4. System generates the full formulation but emails only the top three supplement suggestions.
 5. User can opt into recurring 60-day reassessment.
 
@@ -104,7 +105,7 @@ What is good:
 
 Risk:
 
-- The free plan must be useful enough to build trust, but not so complete that Precision loses value.
+- The Free plan must be useful enough to build trust, but not so complete that Precision loses value.
 
 ### Precision Plan
 
@@ -150,7 +151,7 @@ It captures:
 - affiliate IDs, refs, sub IDs, and click IDs.
 - referrer, source channel, source URL, landing page, device, browser, and OS.
 - page views and CTA clicks.
-- assessment, HealthScore, plan-gate, free-email, formulation, email, chat, product, reassessment, safety, and error events.
+- assessment, HealthScore, plan-gate, Free email, formulation, email, chat, product, reassessment, safety, and error events.
 - hashed email and hashed IP only; raw email/IP are not stored in BPM.
 
 Current wired examples:
@@ -171,20 +172,34 @@ Current wired examples:
 
 Current admin dashboard:
 
-1. KPI view for free conversions, paid Precision conversions, and paid Pro conversions.
+1. KPI view for Free conversions, paid Precision conversions, and paid Pro conversions.
 2. Conversion-rate cards with formulas and short trend forecasts.
-3. Flow view showing the observed user journey from landing through assessment, HealthScore, free email, paid plan, nutrition plan, results, chat, and marketplace clicks.
-4. Flow boxes show visits and drops, with border colours highlighting healthier or weaker stages.
+3. Conversions view showing the observed user journey from landing through assessment, HealthScore, Free email, paid plan, nutrition plan, results, chat, and marketplace clicks.
+4. Conversion boxes show visits and drops, with border colours highlighting healthier or weaker stages.
 5. Timeframe controls: hour, day, week, month, year, and all time.
 6. Locale controls as EN and TH toggle pills. Both are selected by default.
 7. Collapsible filters for source, medium, campaign, campaign ID, affiliate, promo code, plan, device, plan ID, ray, and email hash.
-8. Filters are URL-driven and server-side, so KPI and Flow views use the same BPM slice.
+8. Filters are URL-driven and server-side, so KPI and Conversions views use the same BPM slice.
+9. Human Review queue for supplement review jobs and dose-reduction notices.
+10. Technical Alerts queue for failed jobs, stuck jobs, failed cron tasks, high/critical job audit events, and error/high BPM events.
+11. Jobs view for queued, running, failed, and completed operational jobs, including attempts, timing, payload, errors, and latest audit event.
+
+How the admin sections should be read:
+
+| Section | Business Question | Current Status |
+| --- | --- | --- |
+| KPI | Are Free, Precision, and Pro conversions increasing? | Live from BPM events |
+| Conversions | Where do people continue, and where do they stop? | Live from BPM events |
+| Supplements | Which supplements are allowed, blocked, or awaiting review? | Live with editable dose ceilings and safety flags |
+| Human Review | What needs a human decision before being shown or acted on? | Live for supplement review and dose-reduction notices |
+| Technical Alerts | What failed or looks stuck? | Live for jobs, cron, job audit, and BPM error events |
+| Jobs | What work has been queued, run, completed, or failed? | Live job history and current state |
 
 Remaining admin dashboard work:
 
 1. Campaign and affiliate comparison tables.
-2. Safety and error alert panels.
-3. Human Review queue for supplement review jobs and dose-reduction notices.
+2. Email-specific communications reporting if email volume makes it worth separating from Jobs/Alerts.
+3. Retry actions for failed technical jobs where safe.
 4. Ray drill-down for a single anonymous journey.
 5. Content, testimonial, interaction-rule, and advanced supplement decision management.
 6. Revenue and payment reporting after checkout is live.
@@ -288,7 +303,7 @@ Best use:
 ## Near-Term Build Sequence
 
 1. Campaign/affiliate reporting tables on top of the live BPM dashboard filters.
-2. Safety, error, and stuck-job panels in the admin dashboard.
+2. Safe acknowledge/retry/dismiss actions for technical alerts and failed jobs.
 3. Supplement interaction rules for medications, conditions, pregnancy, age, and labs.
 4. Full Human Review actions: whitelist, review-required, blacklist, ignore, revise dose, and client notification.
 5. Payment integration for Precision and Pro.
@@ -299,4 +314,4 @@ Best use:
 
 ## One-Line Narrative
 
-MattaNutra turns anonymous wellness answers into a HealthScore, uses that score to start a personalised relationship, and then helps the user choose the right level of guidance: free preview, complete plan, or ongoing specialist advisor support.
+MattaNutra turns anonymous wellness answers into a HealthScore, uses that score to start a personalised relationship, and then helps the user choose the right level of guidance: Free preview, complete plan, or ongoing specialist advisor support.

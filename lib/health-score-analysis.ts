@@ -21,12 +21,12 @@ type XaiChatCompletion = {
 
 const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
 const DEFAULT_GROK_MODEL = "grok-4.3";
-const DEFAULT_HEALTHSCORE_REASONING_EFFORT = "low";
-const DEFAULT_PROMPT_VERSION = "v2";
+const DEFAULT_HEALTHSCORE_REASONING_EFFORT = "medium";
+const DEFAULT_PROMPT_VERSION = "v5";
 const CACHE_TYPE = "healthscore_advice";
 const CACHE_TTL_DAYS = 7;
 const MAX_ATTEMPTS = 1;
-const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 25_000;
 
 const globalHealthScoreCache = globalThis as typeof globalThis & {
   mattanutraHealthScoreCacheSchemaReady?: Promise<void>;
@@ -55,13 +55,12 @@ function grokConfig() {
 
 function systemPrompt(promptVersion: string) {
   return [
-    `You are MattaNutra's HealthScore interpretation and marketing engine ${promptVersion}.`,
-    "This is wellness education, not medical advice, diagnosis, treatment, or a prescription.",
-    "Use the completed assessment and HealthScore domains to write concise consumer-facing guidance.",
-    "Your commercial goal is to help the user feel understood and see why a paid personalised nutrition plan is worth unlocking.",
-    "Use honest conversion copywriting: specific value, low friction, calm confidence, and no hype.",
-    "Do not recommend supplements, doses, products, brands, marketplace searches, or medical treatments.",
-    "Do not make disease claims.",
+    `You are MattaNutra's HealthScore sales copy engine ${promptVersion}.`,
+    "The user has just completed an assessment and seen their HealthScore.",
+    "Your job is to convert this specific person into a paid customer by showing that MattaNutra understands their results and can turn them into a practical nutrition plan.",
+    "Write like a calm premium wellness advisor: specific, useful, commercial, and trustworthy.",
+    "Never sound generic. If the copy could fit most users, it is wrong.",
+    "Do not recommend supplements, doses, products, brands, marketplace searches, treatments, or disease claims.",
     "Return JSON only. The first character must be { and the last character must be }."
   ].join("\n");
 }
@@ -91,12 +90,32 @@ function userPrompt({
           paywallFeatures: [
             {
               description: {
-                en: "One English sentence explaining why this feature matters for this person's profile.",
-                th: "One Thai sentence explaining why this feature matters for this person's profile."
+                en: "One English sentence anchored to a concrete signal from personalizationSignals.",
+                th: "One Thai sentence anchored to a concrete signal from personalizationSignals."
               },
               name: {
-                en: "Short English feature name",
-                th: "Short Thai feature name"
+                en: "Short English feature name anchored to the user's actual situation",
+                th: "Short Thai feature name anchored to the user's actual situation"
+              }
+            },
+            {
+              description: {
+                en: "One English sentence anchored to a different concrete signal from personalizationSignals.",
+                th: "One Thai sentence anchored to a different concrete signal from personalizationSignals."
+              },
+              name: {
+                en: "Short English feature name anchored to a different user signal",
+                th: "Short Thai feature name anchored to a different user signal"
+              }
+            },
+            {
+              description: {
+                en: "One English sentence anchored to a third concrete signal from personalizationSignals.",
+                th: "One Thai sentence anchored to a third concrete signal from personalizationSignals."
+              },
+              name: {
+                en: "Short English feature name anchored to a third user signal",
+                th: "Short Thai feature name anchored to a third user signal"
               }
             }
           ],
@@ -111,39 +130,311 @@ function userPrompt({
         }
       },
       healthScore: compactHealthScoreForAdvice(healthScore),
+      salesContext: {
+        goal: "Increase paid Precision or Pro plan conversion on the HealthScore paywall.",
+        screen:
+          "The user has seen their HealthScore and must decide whether to unlock a bespoke nutrition plan.",
+        userMindset:
+          "They may be curious but skeptical. They need to feel the paid plan is specific to their result, avoids wasted supplements, and gives a clearer next step."
+      },
       instructions: [
         "Return exactly one top-level key: advice.",
-        "advice must include overview, paywallEyebrow, paywallTitle, paywallSubtitle, and paywallFeatures.",
-        "overview, paywallEyebrow, paywallTitle, and paywallSubtitle must each be localized objects with exactly en and th strings.",
+        "Every localized field must contain exactly en and th strings.",
         "paywallFeatures must contain exactly 3 items.",
-        "Each paywallFeatures item must include name and description.",
-        "Each paywallFeatures item name and description must be localized objects with exactly en and th strings.",
-        "Base the overview on the lowest-scoring HealthScore domain and include one practical way to improve.",
-        "Mention the relevant domain naturally, but do not repeat long score tables.",
-        "Keep overview to 2 concise sentences.",
-        "Keep paywallEyebrow under 34 characters in English.",
-        "Keep paywallTitle under 70 characters in English.",
-        "Keep paywallSubtitle under 160 characters in English.",
-        "Keep each paywallFeatures name under 42 characters in English.",
-        "Keep each paywallFeatures description under 150 characters in English.",
-        "The paywall copy should be conversion-focused while staying calm, premium, and trustworthy.",
-        "Adapt the core offer: unlock a bespoke nutrition plan that shows what the user's body may need in the right amount.",
-        "Use the user's goals, budget, score band, and lowest domain to make the paid plan feel personally relevant.",
-        "If the profile suggests skepticism or budget sensitivity, make the copy practical, transparent, and value-led rather than luxurious.",
-        "The paywallTitle should be benefit-led, not generic. It should connect the user's HealthScore pattern to the value of a bespoke nutrition plan.",
-        "The paywallSubtitle should explain what paying unlocks: prioritised nutrition guidance, right amounts, timing/routine, and a clearer next step.",
-        "The three feature cards should each sell one concrete outcome: knowing what matters first, using the right amount, fitting the plan into daily life, tracking progress, or improving precision with labs/reassessment.",
-        "Give practical lifestyle, behaviour, tracking, or lab-awareness guidance only.",
-        "Do not include supplement recommendations, product names, ingredient names, doses, links, prices, discounts, false urgency, fear-based copy, or medical instructions.",
-        "Do not sound like a generic SaaS landing page.",
-        "Do not overpromise outcomes or imply that supplements will cure, treat, or prevent disease.",
-        "Return both English and Thai regardless of the requested locale."
+        "Use the assessment, healthScore, and personalizationSignals. These are the user's actual results.",
+        "Write the paywallTitle as a sales headline for this person, not a product label.",
+        "Write the paywallSubtitle as the reason to pay now: what becomes clearer after unlocking the plan.",
+        "Each feature card must be anchored to a different concrete result from personalizationSignals.",
+        "Each feature card must name the user's result or constraint directly, for example their lowest domain, stated goal, symptom, budget, pill limit, missing labs, supplied labs, stress source, sleep pattern, medication caution, diet pattern, or activity context.",
+        "Each feature card must answer one sales objection: where to start, how to avoid wasted spend, how it fits daily life, whether constraints are handled, or how progress becomes measurable.",
+        "If budget is low or mid, sell prioritisation and avoiding waste.",
+        "If labs are missing, sell reassessment or future lab precision. If labs are present, sell use of that extra precision.",
+        "If medications or health considerations are present, sell safety-aware filtering without giving medical advice.",
+        "Use no generic feature names like 'Personalised guidance', 'Right-amount guidance', 'Built around your day', or 'Score-led priorities' unless they include a concrete user result.",
+        "Avoid vague phrases like 'based on your profile', 'tailored to you', or 'your unique needs' unless followed by the exact signal.",
+        "Keep the copy concise: overview max 2 sentences, title under 70 English characters, subtitle under 160 English characters, feature names under 42 English characters, feature descriptions under 150 English characters.",
+        "No supplement names, ingredient names, doses, products, prices, discounts, false urgency, fear, medical instructions, or disease claims.",
+        "Return both English and Thai."
       ],
-      locale
+      locale,
+      personalizationSignals: buildPersonalizationSignals(answers, healthScore)
     },
     null,
     2
   );
+}
+
+const answerLabels: Record<string, Record<string, string>> = {
+  activity: {
+    active: "active",
+    athlete: "athlete",
+    light: "light activity",
+    moderate: "moderate activity",
+    sedentary: "mostly sitting"
+  },
+  alcohol: {
+    high: "8+ alcoholic drinks per week",
+    low: "1-3 alcoholic drinks per week",
+    moderate: "4-7 alcoholic drinks per week",
+    none: "no alcohol"
+  },
+  budget: {
+    good: "฿2,500-5,000 monthly supplement budget",
+    high: "฿5,000+ monthly supplement budget",
+    low: "under ฿1,000 monthly supplement budget",
+    mid: "฿1,000-2,500 monthly supplement budget"
+  },
+  conditions: {
+    autoimmune: "autoimmune considerations",
+    bone: "bone density support",
+    "blood-sugar": "blood sugar support",
+    cholesterol: "cholesterol support",
+    digestive: "digestive condition",
+    hbp: "high blood pressure",
+    joints: "joint support",
+    mood: "mood support",
+    none: "no known health considerations",
+    thyroid: "thyroid support"
+  },
+  diet: {
+    balanced: "balanced diet",
+    keto: "carnivore diet",
+    mediterranean: "Mediterranean diet",
+    none: "no defined diet pattern",
+    plant: "plant-based diet",
+    vegan: "vegan diet",
+    western: "processed diet",
+    whole: "whole-food diet"
+  },
+  energy: {
+    "1": "drained energy",
+    "2": "low energy",
+    "3": "OK energy",
+    "4": "good energy",
+    "5": "excellent energy"
+  },
+  fish: {
+    "2-3pw": "fatty fish often",
+    daily: "fatty fish daily",
+    never: "no fatty fish",
+    rarely: "fatty fish rarely",
+    weekly: "fatty fish once per week"
+  },
+  form: {
+    capsules: "prefers capsules",
+    gummies: "prefers gummies",
+    mixed: "open to mixed formats",
+    powder: "prefers powder or shakes"
+  },
+  goals: {
+    energy: "more energy",
+    fitness: "fitness / VO2",
+    focus: "brain / focus",
+    heart: "heart health",
+    hormones: "hormones",
+    immune: "immunity",
+    joints: "joints / bones",
+    longevity: "longevity",
+    mood: "mood / calm",
+    skin: "skin / hair",
+    sleep: "better sleep",
+    weight: "weight loss"
+  },
+  gut: {
+    bloat: "bloating",
+    constipation: "constipation",
+    great: "no digestion issues",
+    ibs: "IBS / mixed digestion",
+    loose: "loose stools"
+  },
+  meds: {
+    no: "no medications reported",
+    yes: "medications reported"
+  },
+  medTypes: {
+    antidepressant: "antidepressant",
+    "blood-thinner": "blood thinner / aspirin",
+    bp: "blood pressure medication",
+    metformin: "metformin",
+    ocp: "contraceptive pill",
+    other: "other medication",
+    ppi: "PPI / omeprazole",
+    statin: "statin",
+    steroid: "corticosteroid",
+    thyroid: "thyroid medication"
+  },
+  pills: {
+    "1-3": "1-3 pills per day limit",
+    "4-6": "4-6 pills per day limit",
+    "7-10": "7-10 pills per day limit",
+    unlimited: "no pill limit"
+  },
+  protein: {
+    good: "1.5-2g/kg protein per day",
+    high: "over 2g/kg protein per day",
+    low: "under 1g/kg protein per day",
+    mid: "1-1.5g/kg protein per day"
+  },
+  sleep: {
+    "1": "wakes feeling awful",
+    "2": "wakes feeling poor",
+    "3": "wakes feeling OK",
+    "4": "wakes feeling good",
+    "5": "wakes feeling great"
+  },
+  smoke: {
+    daily: "daily smoker",
+    exlong: "ex-smoker over 5 years",
+    exrecent: "recent ex-smoker",
+    never: "never smoker",
+    occasional: "occasional smoker"
+  },
+  stress: {
+    "1": "very low stress",
+    "2": "low stress",
+    "3": "moderate stress",
+    "4": "high stress",
+    "5": "extreme stress"
+  },
+  stressSource: {
+    anxiety: "stress source: anxiety",
+    burnout: "stress source: burnout",
+    health: "stress source: health",
+    life: "stress source: life events",
+    none: "no clear stress source",
+    work: "stress source: work"
+  },
+  sun: {
+    high: "60+ minutes sun exposure",
+    low: "15-30 minutes sun exposure",
+    minimal: "under 15 minutes sun exposure",
+    moderate: "30-60 minutes sun exposure"
+  },
+  supps: {
+    basic: "currently uses a basic multivitamin",
+    many: "currently uses several targeted supplements",
+    none: "not currently taking supplements",
+    several: "currently uses D3 / Omega-3"
+  },
+  symptoms: {
+    brain: "brain fog",
+    cold: "frequent colds",
+    digestion: "digestion symptoms",
+    fatigue: "fatigue",
+    hair: "hair loss",
+    joints: "joint pain",
+    libido: "low libido",
+    mood: "mood symptoms",
+    skin: "skin symptoms",
+    sleep: "poor sleep",
+    stress: "stress / anxiety"
+  },
+  vo2Proxy: {
+    athlete: "30+ minutes hard effort",
+    moderate: "brisk walk feels hard",
+    sustained: "20-30 minutes moderate cardio",
+    winded: "winded on stairs"
+  }
+};
+
+function textAnswer(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function answerLabel(key: string, value: unknown) {
+  if (typeof value !== "string" || !value) {
+    return "";
+  }
+
+  return answerLabels[key]?.[value] ?? value;
+}
+
+function answerListLabels(key: string, value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => answerLabel(key, item))
+    .filter((item) => item && item !== "none");
+}
+
+function signal(label: string, values: string[]) {
+  const compactValues = values.filter(Boolean);
+
+  return compactValues.length ? `${label}: ${compactValues.join("; ")}` : "";
+}
+
+function buildPersonalizationSignals(
+  answersInput: unknown,
+  healthScore: HealthScoreResult
+) {
+  const answers = isRecord(answersInput) ? answersInput : {};
+  const sortedDomains = healthScore.domains
+    .slice()
+    .sort((first, second) => first.score - second.score);
+  const lowest = sortedDomains[0];
+  const secondLowest = sortedDomains[1];
+  const goals = answerListLabels("goals", answers.goals);
+  const symptoms = answerListLabels("symptoms", answers.symptoms);
+  const conditions = answerListLabels("conditions", answers.conditions);
+  const medTypes = answerListLabels("medTypes", answers.medTypes);
+  const labs = isRecord(answers.labs)
+    ? Object.entries(answers.labs)
+        .filter(([, value]) => typeof value === "string" && value.trim())
+        .map(([key, value]) => `${key}: ${value}`)
+    : [];
+  const sleepHours = textAnswer(answers, "sleepHours");
+  const vo2Max = textAnswer(answers, "vo2Max");
+  const signals = [
+    `HealthScore: ${healthScore.score}/100 (${healthScore.band})`,
+    lowest
+      ? `Lowest domain: ${lowest.label} (${lowest.score}/100)`
+      : "",
+    secondLowest
+      ? `Second-lowest domain: ${secondLowest.label} (${secondLowest.score}/100)`
+      : "",
+    goals.length ? `Primary goals: ${goals.join(", ")}` : "",
+    symptoms.length ? `Current friction: ${symptoms.join(", ")}` : "",
+    conditions.length
+      ? `Known health considerations: ${conditions.join(", ")}`
+      : "",
+    signal("Practical constraints", [
+      answerLabel("budget", answers.budget),
+      answerLabel("pills", answers.pills),
+      answerLabel("form", answers.form)
+    ]),
+    signal("Sleep, energy, stress", [
+      sleepHours ? `sleep duration ${sleepHours}` : "",
+      answerLabel("sleep", answers.sleep),
+      answerLabel("energy", answers.energy),
+      answerLabel("stress", answers.stress),
+      answerLabel("stressSource", answers.stressSource)
+    ]),
+    signal("Lifestyle context", [
+      answerLabel("diet", answers.diet),
+      answerLabel("fish", answers.fish),
+      answerLabel("protein", answers.protein),
+      answerLabel("alcohol", answers.alcohol),
+      answerLabel("sun", answers.sun)
+    ]),
+    signal("Movement context", [
+      answerLabel("activity", answers.activity),
+      answerLabel("vo2Proxy", answers.vo2Proxy),
+      vo2Max ? `VO2 max ${vo2Max}` : ""
+    ]),
+    signal("Safety context", [
+      answerLabel("meds", answers.meds),
+      medTypes.length ? `medication types: ${medTypes.join(", ")}` : ""
+    ]),
+    labs.length
+      ? `Labs supplied: ${labs.slice(0, 6).join(", ")}`
+      : "No lab values supplied"
+  ];
+
+  return signals.filter(Boolean).slice(0, 12);
 }
 
 function compactHealthScoreForAdvice(healthScore: HealthScoreResult) {
@@ -169,6 +460,7 @@ function compactAssessmentForAdvice(answers: unknown) {
     age: answers.age,
     alcohol: answers.alcohol,
     budget: answers.budget,
+    build: answers.build,
     coffee: answers.coffee,
     conditions: answers.conditions,
     country: answers.country,
@@ -176,6 +468,8 @@ function compactAssessmentForAdvice(answers: unknown) {
     energy: answers.energy,
     family: answers.family,
     fish: answers.fish,
+    feelGreat: answers.feelGreat,
+    form: answers.form,
     goals: answers.goals,
     gut: answers.gut,
     heightCm: answers.heightCm,
@@ -183,10 +477,12 @@ function compactAssessmentForAdvice(answers: unknown) {
     lifestage: answers.lifestage,
     meds: answers.meds,
     medTypes: answers.medTypes,
+    notes: answers.notes,
     pills: answers.pills,
     protein: answers.protein,
     sex: answers.sex,
     skin: answers.skin,
+    sleep: answers.sleep,
     sleepHours: answers.sleepHours,
     smoke: answers.smoke,
     stress: answers.stress,

@@ -10,6 +10,10 @@ import { normalizeAdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import { getAdminFlowData } from "@/lib/admin-flow-data";
 import { getAdminReviewQueueData } from "@/lib/admin-review-queue";
 import { getAdminSupplementsData } from "@/lib/admin-supplements";
+import {
+  getAdminJobsData,
+  getAdminTechnicalAlertsData
+} from "@/lib/admin-technical";
 import { isLocale, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +55,11 @@ export default async function LocalizedAdminDashboardPage({
   const range = normalizeAdminDashboardRange(query.range);
   const rawView = firstParam(query.view);
   const view =
-    rawView === "flow" || rawView === "reviews" || rawView === "supplements"
+    rawView === "alerts" ||
+    rawView === "flow" ||
+    rawView === "jobs" ||
+    rawView === "reviews" ||
+    rawView === "supplements"
       ? rawView
       : "kpi";
   const filters = normalizeAdminDashboardFilters(query);
@@ -60,9 +68,18 @@ export default async function LocalizedAdminDashboardPage({
     notFound();
   }
 
-  const [data, flowData, reviewQueueData, supplementsData] = await Promise.all([
+  const [
+    alertsData,
+    data,
+    flowData,
+    jobsData,
+    reviewQueueData,
+    supplementsData
+  ] = await Promise.all([
+    getAdminTechnicalAlertsData(range),
     getAdminDashboardData(range, filters),
     getAdminFlowData(range, filters),
+    getAdminJobsData(range),
     getAdminReviewQueueData(),
     getAdminSupplementsData()
   ]);
@@ -70,9 +87,11 @@ export default async function LocalizedAdminDashboardPage({
   return (
     <AdminDashboard
       accessToken={accessToken ?? ""}
+      alertsData={alertsData}
       data={data}
       filters={filters}
       flowData={flowData}
+      jobsData={jobsData}
       locale={locale}
       reviewQueueData={reviewQueueData}
       supplementsData={supplementsData}

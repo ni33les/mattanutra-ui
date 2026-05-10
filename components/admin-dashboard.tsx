@@ -9,7 +9,6 @@ import {
 import {
   Bars3Icon,
   BeakerIcon,
-  ChartPieIcon,
   ChevronDownIcon,
   DocumentTextIcon,
   EnvelopeIcon,
@@ -34,6 +33,12 @@ import type {
   AdminReviewQueueData
 } from "@/lib/admin-review-queue";
 import type {
+  AdminJobRow,
+  AdminJobsData,
+  AdminTechnicalAlertsData,
+  AdminTechnicalSeverity
+} from "@/lib/admin-technical";
+import type {
   AdminSupplementRow,
   AdminSupplementsData,
   SupplementConfidence,
@@ -55,7 +60,13 @@ import type {
 } from "@/lib/admin-flow-data";
 import type { Locale } from "@/lib/i18n";
 
-type AdminDashboardView = "flow" | "kpi" | "reviews" | "supplements";
+type AdminDashboardView =
+  | "alerts"
+  | "flow"
+  | "jobs"
+  | "kpi"
+  | "reviews"
+  | "supplements";
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 type AdminNavItem = Readonly<{
@@ -128,6 +139,24 @@ type AdminContent = Readonly<{
   ranges: Record<AdminDashboardRange, string>;
   rates: Record<AdminDashboardRateId, RateText>;
   ratesTitle: string;
+  jobs: {
+    attempts: string;
+    audit: string;
+    complete: string;
+    completed: string;
+    empty: string;
+    error: string;
+    failed: string;
+    jobType: string;
+    plan: string;
+    priority: string;
+    queued: string;
+    running: string;
+    started: string;
+    status: string;
+    total: string;
+    updated: string;
+  };
   reviewQueue: {
     dismiss: string;
     dismissError: string;
@@ -144,6 +173,22 @@ type AdminContent = Readonly<{
     total: string;
     unknown: string;
   };
+  technical: AdminNavItem[];
+  technicalAlerts: {
+    critical: string;
+    empty: string;
+    event: string;
+    high: string;
+    job: string;
+    low: string;
+    medium: string;
+    plan: string;
+    source: string;
+    status: string;
+    time: string;
+    total: string;
+  };
+  technicalTitle: string;
   supplements: {
     allCategories: string;
     allStatuses: string;
@@ -188,7 +233,7 @@ const content = {
     bucketPrefix: "per",
     closeSidebar: "Close sidebar",
     dataUnavailable:
-      "Dashboard data is unavailable. Check the database connection and BPM table.",
+      "Dashboard data is unavailable. Check the database connection.",
     emptyFlow: "No flow events in this timeframe.",
     filters: {
       active: "Active filters",
@@ -217,7 +262,7 @@ const content = {
       dropoffAfterAssessment: "Dropped after assessment",
       dropoffAfterAssessmentStart: "Dropped after start",
       dropoffAfterFormulation: "Dropped after nutrition plan",
-      dropoffAfterFreeEmailRequest: "Dropped after free request",
+      dropoffAfterFreeEmailRequest: "Dropped after Free request",
       dropoffAfterHealthScore: "Dropped after HealthScore",
       dropoffAfterLanding: "Dropped after landing",
       dropoffAfterPlanSelection: "Dropped after plan",
@@ -275,14 +320,12 @@ const content = {
     ],
     nextBuckets: "Next 3 buckets",
     openSidebar: "Open sidebar",
-    queues: [
-      { icon: ExclamationTriangleIcon, name: "Human review", view: "reviews" },
-      { href: "#", icon: QueueListIcon, name: "Jobs" },
-      { href: "#", icon: ChartPieIcon, name: "Reports" }
-    ],
+    queues: [{ icon: ExclamationTriangleIcon, name: "Human review", view: "reviews" }],
     queuesTitle: "Queues",
     pageTitles: {
+      alerts: "Technical Alerts",
       flow: "Sales Conversions",
+      jobs: "Jobs",
       kpi: "Key Performance Indicators",
       reviews: "Human Review",
       supplements: "Supplements"
@@ -314,6 +357,24 @@ const content = {
       }
     },
     ratesTitle: "Conversion rates",
+    jobs: {
+      attempts: "Attempts",
+      audit: "Latest audit",
+      complete: "Complete",
+      completed: "Completed",
+      empty: "No jobs in this timeframe.",
+      error: "Error",
+      failed: "Failed",
+      jobType: "Job type",
+      plan: "Plan",
+      priority: "Priority",
+      queued: "Queued",
+      running: "Running",
+      started: "Started",
+      status: "Status",
+      total: "Total",
+      updated: "Updated"
+    },
     reviewQueue: {
       dismiss: "Dismiss",
       dismissError: "Could not dismiss this review job.",
@@ -330,6 +391,25 @@ const content = {
       total: "Total",
       unknown: "Unknown supplement"
     },
+    technical: [
+      { icon: ExclamationTriangleIcon, name: "Alerts", view: "alerts" },
+      { icon: QueueListIcon, name: "Jobs", view: "jobs" }
+    ],
+    technicalAlerts: {
+      critical: "Critical",
+      empty: "No technical alerts in this timeframe.",
+      event: "Event",
+      high: "High",
+      job: "Job",
+      low: "Low",
+      medium: "Medium",
+      plan: "Plan",
+      source: "Source",
+      status: "Status",
+      time: "Time",
+      total: "Total"
+    },
+    technicalTitle: "Technical",
     supplements: {
       allCategories: "All categories",
       allStatuses: "All statuses",
@@ -382,7 +462,7 @@ const content = {
     bucketPrefix: "ต่อ",
     closeSidebar: "ปิดแถบเมนู",
     dataUnavailable:
-      "ไม่สามารถโหลดข้อมูลแดชบอร์ดได้ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูลและตาราง BPM",
+      "ไม่สามารถโหลดข้อมูลแดชบอร์ดได้ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล",
     emptyFlow: "ยังไม่มีข้อมูล Flow ในช่วงเวลานี้",
     filters: {
       active: "ตัวกรองที่ใช้",
@@ -469,14 +549,12 @@ const content = {
     ],
     nextBuckets: "คาดการณ์ 3 ช่วงถัดไป",
     openSidebar: "เปิดแถบเมนู",
-    queues: [
-      { icon: ExclamationTriangleIcon, name: "รีวิวโดยคน", view: "reviews" },
-      { href: "#", icon: QueueListIcon, name: "งานในคิว" },
-      { href: "#", icon: ChartPieIcon, name: "รายงาน" }
-    ],
+    queues: [{ icon: ExclamationTriangleIcon, name: "รีวิวโดยคน", view: "reviews" }],
     queuesTitle: "คิวงาน",
     pageTitles: {
+      alerts: "การแจ้งเตือนทางเทคนิค",
       flow: "Sales Conversions",
+      jobs: "งานระบบ",
       kpi: "Key Performance Indicators",
       reviews: "รีวิวโดยคน",
       supplements: "อาหารเสริม"
@@ -508,6 +586,24 @@ const content = {
       }
     },
     ratesTitle: "อัตราคอนเวอร์ชัน",
+    jobs: {
+      attempts: "จำนวนครั้ง",
+      audit: "Audit ล่าสุด",
+      complete: "เสร็จแล้ว",
+      completed: "เสร็จเมื่อ",
+      empty: "ไม่มีงานในช่วงเวลานี้",
+      error: "ข้อผิดพลาด",
+      failed: "ล้มเหลว",
+      jobType: "ชนิดงาน",
+      plan: "แผน",
+      priority: "ความสำคัญ",
+      queued: "เข้าคิว",
+      running: "กำลังทำงาน",
+      started: "เริ่มเมื่อ",
+      status: "สถานะ",
+      total: "ทั้งหมด",
+      updated: "อัปเดต"
+    },
     reviewQueue: {
       dismiss: "ปิดรายการ",
       dismissError: "ไม่สามารถปิดงานรีวิวนี้ได้",
@@ -524,6 +620,25 @@ const content = {
       total: "ทั้งหมด",
       unknown: "อาหารเสริมใหม่"
     },
+    technical: [
+      { icon: ExclamationTriangleIcon, name: "แจ้งเตือน", view: "alerts" },
+      { icon: QueueListIcon, name: "งานระบบ", view: "jobs" }
+    ],
+    technicalAlerts: {
+      critical: "วิกฤต",
+      empty: "ไม่มี Technical Alert ในช่วงเวลานี้",
+      event: "อีเวนต์",
+      high: "สูง",
+      job: "งาน",
+      low: "ต่ำ",
+      medium: "กลาง",
+      plan: "แผน",
+      source: "แหล่งข้อมูล",
+      status: "สถานะ",
+      time: "เวลา",
+      total: "ทั้งหมด"
+    },
+    technicalTitle: "เทคนิค",
     supplements: {
       allCategories: "ทุกหมวดหมู่",
       allStatuses: "ทุกสถานะ",
@@ -636,6 +751,71 @@ function formatPercent(value: number, locale: Locale) {
   }).format(value)}%`;
 }
 
+function SidebarNavList({
+  accessToken,
+  filters,
+  items,
+  locale,
+  onNavigate,
+  range,
+  title,
+  view
+}: Readonly<{
+  accessToken: string;
+  filters: AdminDashboardFilters;
+  items: AdminNavItem[];
+  locale: Locale;
+  onNavigate?: () => void;
+  range: AdminDashboardRange;
+  title?: string;
+  view: AdminDashboardView;
+}>) {
+  return (
+    <li>
+      {title ? (
+        <div className="text-xs/6 font-semibold uppercase tracking-[0.16em] text-gray-400">
+          {title}
+        </div>
+      ) : null}
+      <ul role="list" className={classNames("-mx-2 space-y-1", title && "mt-2")}>
+        {items.map((item) => {
+          const current = item.view === view;
+          const href = item.view
+            ? adminHref(locale, accessToken, range, item.view, filters)
+            : item.href ?? "#";
+
+          return (
+            <li key={item.name}>
+              <a
+                href={href}
+                onClick={onNavigate}
+                aria-current={current ? "page" : undefined}
+                className={classNames(
+                  current
+                    ? "bg-[#1FA77A]/10 text-[#126B4F]"
+                    : "text-gray-700 hover:bg-gray-50 hover:text-[#126B4F]",
+                  "group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold"
+                )}
+              >
+                <item.icon
+                  aria-hidden={true}
+                  className={classNames(
+                    current
+                      ? "text-[#1FA77A]"
+                      : "text-gray-400 group-hover:text-[#1FA77A]",
+                    "size-6 shrink-0"
+                  )}
+                />
+                {item.name}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </li>
+  );
+}
+
 function SidebarContent({
   accessToken,
   filters,
@@ -668,84 +848,35 @@ function SidebarContent({
 
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-8">
-          <li>
-            <ul role="list" className="-mx-2 space-y-1">
-              {labels.navigation.map((item) => {
-                const current = item.view === view;
-                const href = item.view
-                  ? adminHref(locale, accessToken, range, item.view, filters)
-                  : item.href ?? "#";
-
-                return (
-                  <li key={item.name}>
-                    <a
-                      href={href}
-                      onClick={onNavigate}
-                      aria-current={current ? "page" : undefined}
-                      className={classNames(
-                        current
-                          ? "bg-[#1FA77A]/10 text-[#126B4F]"
-                          : "text-gray-700 hover:bg-gray-50 hover:text-[#126B4F]",
-                        "group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold"
-                      )}
-                    >
-                      <item.icon
-                        aria-hidden={true}
-                        className={classNames(
-                          current
-                            ? "text-[#1FA77A]"
-                            : "text-gray-400 group-hover:text-[#1FA77A]",
-                          "size-6 shrink-0"
-                        )}
-                      />
-                      {item.name}
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-          </li>
-
-          <li>
-            <div className="text-xs/6 font-semibold uppercase tracking-[0.16em] text-gray-400">
-              {labels.queuesTitle}
-            </div>
-            <ul role="list" className="-mx-2 mt-2 space-y-1">
-              {labels.queues.map((item) => {
-                const current = item.view === view;
-                const href = item.view
-                  ? adminHref(locale, accessToken, range, item.view, filters)
-                  : item.href ?? "#";
-
-                return (
-                  <li key={item.name}>
-                    <a
-                      href={href}
-                      onClick={onNavigate}
-                      aria-current={current ? "page" : undefined}
-                      className={classNames(
-                        current
-                          ? "bg-[#1FA77A]/10 text-[#126B4F]"
-                          : "text-gray-700 hover:bg-gray-50 hover:text-[#126B4F]",
-                        "group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold"
-                      )}
-                    >
-                      <item.icon
-                        aria-hidden={true}
-                        className={classNames(
-                          current
-                            ? "text-[#1FA77A]"
-                            : "text-gray-400 group-hover:text-[#1FA77A]",
-                          "size-6 shrink-0"
-                        )}
-                      />
-                      {item.name}
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-          </li>
+          <SidebarNavList
+            accessToken={accessToken}
+            filters={filters}
+            items={labels.navigation}
+            locale={locale}
+            onNavigate={onNavigate}
+            range={range}
+            view={view}
+          />
+          <SidebarNavList
+            accessToken={accessToken}
+            filters={filters}
+            items={labels.queues}
+            locale={locale}
+            onNavigate={onNavigate}
+            range={range}
+            title={labels.queuesTitle}
+            view={view}
+          />
+          <SidebarNavList
+            accessToken={accessToken}
+            filters={filters}
+            items={labels.technical}
+            locale={locale}
+            onNavigate={onNavigate}
+            range={range}
+            title={labels.technicalTitle}
+            view={view}
+          />
         </ul>
       </nav>
     </div>
@@ -1736,6 +1867,312 @@ function AdminReviewQueueView({
   );
 }
 
+function readableToken(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function severityLabel(labels: AdminContent, value: AdminTechnicalSeverity) {
+  return labels.technicalAlerts[value];
+}
+
+function severityClass(value: AdminTechnicalSeverity) {
+  if (value === "critical") {
+    return "bg-red-100 text-red-800 ring-red-200";
+  }
+
+  if (value === "high") {
+    return "bg-red-50 text-red-700 ring-red-100";
+  }
+
+  if (value === "medium") {
+    return "bg-amber-50 text-amber-800 ring-amber-200";
+  }
+
+  return "bg-gray-50 text-gray-700 ring-gray-200";
+}
+
+function jobStatusLabel(labels: AdminContent, status: AdminJobRow["status"]) {
+  return labels.jobs[status];
+}
+
+function jobStatusClass(status: AdminJobRow["status"]) {
+  if (status === "failed") {
+    return "bg-red-50 text-red-700 ring-red-100";
+  }
+
+  if (status === "running") {
+    return "bg-blue-50 text-blue-700 ring-blue-100";
+  }
+
+  if (status === "complete") {
+    return "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]";
+  }
+
+  return "bg-amber-50 text-amber-800 ring-amber-200";
+}
+
+function jsonPreview(value: Record<string, unknown>) {
+  const text = JSON.stringify(value, null, 2);
+
+  return text === "{}" ? "" : text;
+}
+
+function AdminTechnicalAlertsView({
+  data,
+  labels,
+  locale
+}: Readonly<{
+  data: AdminTechnicalAlertsData;
+  labels: AdminContent;
+  locale: Locale;
+}>) {
+  return (
+    <section className="mt-8 space-y-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <FlowSummaryCard
+          label={labels.technicalAlerts.total}
+          value={formatNumber(data.summary.total, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.technicalAlerts.critical}
+          value={formatNumber(data.summary.critical, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.technicalAlerts.high}
+          value={formatNumber(data.summary.high, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.technicalAlerts.medium}
+          value={formatNumber(data.summary.medium, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.technicalAlerts.low}
+          value={formatNumber(data.summary.low, locale)}
+        />
+      </div>
+
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+        <div className="divide-y divide-gray-100">
+          {data.rows.map((row) => {
+            const details = jsonPreview(row.details);
+
+            return (
+              <article key={`${row.source}:${row.id}`} className="px-5 py-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={classNames(
+                          severityClass(row.severity),
+                          "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+                        )}
+                      >
+                        {severityLabel(labels, row.severity)}
+                      </span>
+                      <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
+                        {readableToken(row.source)}
+                      </span>
+                    </div>
+                    <h3 className="mt-3 text-base font-semibold text-gray-900">
+                      {readableToken(row.title)}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">
+                      {row.message}
+                    </p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <SupplementListMeta
+                        label={labels.technicalAlerts.time}
+                        value={formatGeneratedAt(row.occurredAt, locale)}
+                      />
+                      <SupplementListMeta
+                        label={labels.technicalAlerts.plan}
+                        value={row.planId ?? "—"}
+                      />
+                      <SupplementListMeta
+                        label={labels.technicalAlerts.job}
+                        value={row.jobId ?? row.jobType ?? "—"}
+                      />
+                      <SupplementListMeta
+                        label={labels.technicalAlerts.status}
+                        value={row.status ?? "—"}
+                      />
+                    </div>
+                    {details ? (
+                      <details className="mt-4 rounded-xl bg-gray-50 p-3 text-xs text-gray-600 ring-1 ring-gray-100">
+                        <summary className="cursor-pointer font-semibold text-gray-700">
+                          {labels.technicalAlerts.event}
+                        </summary>
+                        <pre className="mt-3 overflow-x-auto whitespace-pre-wrap">
+                          {details}
+                        </pre>
+                      </details>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        {data.rows.length === 0 ? (
+          <div className="border-t border-gray-100 px-5 py-12 text-center text-sm font-medium text-gray-500">
+            {labels.technicalAlerts.empty}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function AdminJobsView({
+  data,
+  labels,
+  locale
+}: Readonly<{
+  data: AdminJobsData;
+  labels: AdminContent;
+  locale: Locale;
+}>) {
+  return (
+    <section className="mt-8 space-y-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <FlowSummaryCard
+          label={labels.jobs.total}
+          value={formatNumber(data.summary.total, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.jobs.failed}
+          value={formatNumber(data.summary.failed, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.jobs.running}
+          value={formatNumber(data.summary.running, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.jobs.queued}
+          value={formatNumber(data.summary.queued, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.jobs.complete}
+          value={formatNumber(data.summary.complete, locale)}
+        />
+      </div>
+
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+        <div className="divide-y divide-gray-100">
+          {data.rows.map((row) => {
+            const payload = jsonPreview(row.payload);
+            const auditPayload = jsonPreview(row.latestAuditPayload);
+
+            return (
+              <article key={row.id} className="px-5 py-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={classNames(
+                          jobStatusClass(row.status),
+                          "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+                        )}
+                      >
+                        {jobStatusLabel(labels, row.status)}
+                      </span>
+                      <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
+                        {labels.jobs.attempts}: {row.attempts}
+                      </span>
+                      <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
+                        {labels.jobs.priority}: {row.priority}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-3 text-base font-semibold text-gray-900">
+                      {readableToken(row.jobType)}
+                    </h3>
+
+                    {row.errorMessage ? (
+                      <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 ring-1 ring-red-100">
+                        {row.errorMessage}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <SupplementListMeta
+                        label={labels.jobs.plan}
+                        value={row.planId ?? "—"}
+                      />
+                      <SupplementListMeta
+                        label={labels.jobs.queued}
+                        value={formatGeneratedAt(row.queuedAt, locale)}
+                      />
+                      <SupplementListMeta
+                        label={labels.jobs.started}
+                        value={
+                          row.startedAt
+                            ? formatGeneratedAt(row.startedAt, locale)
+                            : "—"
+                        }
+                      />
+                      <SupplementListMeta
+                        label={labels.jobs.completed}
+                        value={
+                          row.completedAt || row.failedAt
+                            ? formatGeneratedAt(
+                                row.completedAt ?? row.failedAt ?? row.updatedAt,
+                                locale
+                              )
+                            : "—"
+                        }
+                      />
+                    </div>
+
+                    {row.latestAuditEvent ? (
+                      <p className="mt-4 text-sm text-gray-600">
+                        <span className="font-semibold text-gray-900">
+                          {labels.jobs.audit}:
+                        </span>{" "}
+                        {readableToken(row.latestAuditEvent)}
+                        {row.latestAuditAt
+                          ? ` · ${formatGeneratedAt(row.latestAuditAt, locale)}`
+                          : ""}
+                      </p>
+                    ) : null}
+
+                    {payload || auditPayload ? (
+                      <details className="mt-4 rounded-xl bg-gray-50 p-3 text-xs text-gray-600 ring-1 ring-gray-100">
+                        <summary className="cursor-pointer font-semibold text-gray-700">
+                          {labels.jobs.audit}
+                        </summary>
+                        {payload ? (
+                          <pre className="mt-3 overflow-x-auto whitespace-pre-wrap">
+                            {payload}
+                          </pre>
+                        ) : null}
+                        {auditPayload ? (
+                          <pre className="mt-3 overflow-x-auto whitespace-pre-wrap">
+                            {auditPayload}
+                          </pre>
+                        ) : null}
+                      </details>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        {data.rows.length === 0 ? (
+          <div className="border-t border-gray-100 px-5 py-12 text-center text-sm font-medium text-gray-500">
+            {labels.jobs.empty}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 function FlowSummaryCard({
   label,
   value
@@ -2440,20 +2877,64 @@ function AdminFilterPanel({
   );
 }
 
+function adminViewDatabaseAvailable({
+  alertsData,
+  data,
+  flowData,
+  jobsData,
+  reviewQueueData,
+  supplementsData,
+  view
+}: Readonly<{
+  alertsData: AdminTechnicalAlertsData;
+  data: AdminDashboardData;
+  flowData: AdminFlowData;
+  jobsData: AdminJobsData;
+  reviewQueueData: AdminReviewQueueData;
+  supplementsData: AdminSupplementsData;
+  view: AdminDashboardView;
+}>) {
+  if (view === "alerts") {
+    return alertsData.databaseAvailable;
+  }
+
+  if (view === "flow") {
+    return flowData.databaseAvailable;
+  }
+
+  if (view === "jobs") {
+    return jobsData.databaseAvailable;
+  }
+
+  if (view === "reviews") {
+    return reviewQueueData.databaseAvailable;
+  }
+
+  if (view === "supplements") {
+    return supplementsData.databaseAvailable;
+  }
+
+  return data.databaseAvailable;
+}
+
 export function AdminDashboard({
   accessToken,
+  alertsData,
   data,
   filters,
   flowData,
+  jobsData,
   locale,
   reviewQueueData,
   supplementsData,
   view
 }: Readonly<{
   accessToken: string;
+  alertsData: AdminTechnicalAlertsData;
   data: AdminDashboardData;
   filters: AdminDashboardFilters;
   flowData: AdminFlowData;
+  jobsData: AdminJobsData;
   locale: Locale;
   reviewQueueData: AdminReviewQueueData;
   supplementsData: AdminSupplementsData;
@@ -2461,14 +2942,15 @@ export function AdminDashboard({
 }>) {
   const labels = content[locale];
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const databaseAvailable =
-    view === "flow"
-      ? flowData.databaseAvailable
-      : view === "reviews"
-        ? reviewQueueData.databaseAvailable
-      : view === "supplements"
-        ? supplementsData.databaseAvailable
-        : data.databaseAvailable;
+  const databaseAvailable = adminViewDatabaseAvailable({
+    alertsData,
+    data,
+    flowData,
+    jobsData,
+    reviewQueueData,
+    supplementsData,
+    view
+  });
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#20343A]">
@@ -2551,7 +3033,10 @@ export function AdminDashboard({
             </div>
           ) : null}
 
-          {view === "flow" || view === "kpi" ? (
+          {view === "alerts" ||
+          view === "flow" ||
+          view === "jobs" ||
+          view === "kpi" ? (
             <>
               <div className="mt-6">
                 <TimeframeSelector
@@ -2562,28 +3047,40 @@ export function AdminDashboard({
                   locale={locale}
                   view={view}
                 />
-                <LocaleFilterSelector
+                {view === "flow" || view === "kpi" ? (
+                  <LocaleFilterSelector
+                    accessToken={accessToken}
+                    filters={filters}
+                    locale={locale}
+                    range={data.range}
+                    view={view}
+                  />
+                ) : null}
+              </div>
+
+              {view === "flow" || view === "kpi" ? (
+                <AdminFilterPanel
                   accessToken={accessToken}
                   filters={filters}
+                  labels={labels}
                   locale={locale}
                   range={data.range}
                   view={view}
                 />
-              </div>
-
-              <AdminFilterPanel
-                accessToken={accessToken}
-                filters={filters}
-                labels={labels}
-                locale={locale}
-                range={data.range}
-                view={view}
-              />
+              ) : null}
             </>
           ) : null}
 
           {view === "flow" ? (
             <AdminFlowView flowData={flowData} labels={labels} locale={locale} />
+          ) : view === "alerts" ? (
+            <AdminTechnicalAlertsView
+              data={alertsData}
+              labels={labels}
+              locale={locale}
+            />
+          ) : view === "jobs" ? (
+            <AdminJobsView data={jobsData} labels={labels} locale={locale} />
           ) : view === "reviews" ? (
             <AdminReviewQueueView
               accessToken={accessToken}

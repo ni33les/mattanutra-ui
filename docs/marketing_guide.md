@@ -109,7 +109,7 @@ For each campaign, the admin dashboard should be able to show:
 - assessment starts
 - assessment completions
 - HealthScore views
-- free email requests
+- Free email requests
 - Precision intent
 - Pro intent
 - chat clicks
@@ -125,8 +125,12 @@ The admin dashboard is designed to answer: "Which traffic and messages create qu
 
 Current views:
 
-- KPI: free conversions, paid Precision conversions, paid Pro conversions, and conversion rates.
-- Flow: the funnel journey from landing/assessment through HealthScore, free email, paid plan, nutrition plan, results, chat, and marketplace clicks.
+- KPI: Free conversions, paid Precision conversions, paid Pro conversions, and conversion rates.
+- Conversions: the funnel journey from landing/assessment through HealthScore, Free email, paid plan, nutrition plan, results, chat, and marketplace clicks.
+- Supplements: the current supplement catalogue, list status, dose ceiling, confidence, and safety flags.
+- Human Review: supplement decisions and dose-reduction notices that need or needed a person.
+- Technical Alerts: operational failures or stuck work that may affect customer experience.
+- Jobs: queued, running, completed, and failed background work.
 
 Current timeframe windows:
 
@@ -155,8 +159,9 @@ Recommended campaign review:
 3. Add `utm_campaign` or `campaign_id`.
 4. Compare EN vs TH.
 5. Check mobile separately if completion looks weak.
-6. Use the Flow view to find the step where users stop.
-7. Use KPI view to compare free, Precision, and Pro conversion.
+6. Use the Conversions view to find the step where users stop.
+7. Use KPI view to compare Free, Precision, and Pro conversion.
+8. Check Technical Alerts if a campaign suddenly drops, because broken email, AI, or job processing can make a good campaign look bad.
 
 ## Campaign QA Checklist
 
