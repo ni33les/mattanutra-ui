@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowPathIcon,
-  ArrowTopRightOnSquareIcon,
   BeakerIcon,
   CheckIcon,
   CheckCircleIcon,
@@ -14,8 +13,8 @@ import {
   ShieldCheckIcon,
   SparklesIcon
 } from "@heroicons/react/20/solid";
+import { ChatChannelCards } from "@/components/chat-channel-cards";
 import { HighlightedBrandText } from "@/components/highlighted-brand-text";
-import { buildChatChannels } from "@/lib/chat-links";
 import { getBpmPayload, trackBpmEvent } from "@/lib/bpm-client";
 import { normalizeLeadEmail, validateLeadEmail } from "@/lib/email-validation";
 import type { BlogTestimonial } from "@/lib/blog";
@@ -4539,64 +4538,12 @@ function ExampleExitPanel({
           ) : null}
         </div>
 
-        <div className="mt-7 grid gap-4 lg:grid-cols-3">
-          {buildChatChannels(planId).map((channel) => {
-            const qrUrl = `/api/qr?data=${encodeURIComponent(channel.url)}`;
-
-            return (
-              <article
-                key={channel.id}
-                className="rounded-lg border border-foreground/10 bg-white p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <Image
-                    alt={`${channel.name} logo`}
-                    height={32}
-                    src={channel.iconUrl}
-                    width={32}
-                    className="size-8"
-                  />
-                  <h3 className="text-base font-semibold text-[#20343A]">
-                    {channel.name}
-                  </h3>
-                </div>
-                <div
-                  className={cx(
-                    "mt-4 flex justify-center rounded-md p-4 ring-1",
-                    channel.qrPanelClasses
-                  )}
-                >
-                  <div className="rounded-lg bg-white p-2 shadow-sm ring-1 ring-foreground/10">
-                    {/* Dynamic API URLs with query strings are intentionally not sent through next/image. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      alt={`${content.chatQrAlt}: ${channel.name}`}
-                      className="size-36"
-                      height={144}
-                      src={qrUrl}
-                      width={144}
-                    />
-                  </div>
-                </div>
-                <a
-                  className={cx(
-                    "mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-semibold uppercase tracking-[0.08em] transition focus:outline-none focus:ring-2 focus:ring-offset-2",
-                    channel.buttonClasses
-                  )}
-                  href={channel.url}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  {content.chatButton}
-                  <ArrowTopRightOnSquareIcon
-                    aria-hidden={true}
-                    className="size-4"
-                  />
-                </a>
-              </article>
-            );
-          })}
-        </div>
+        <ChatChannelCards
+          buttonLabel={content.chatButton}
+          className="mt-7"
+          planId={planId}
+          qrAlt={content.chatQrAlt}
+        />
       </section>
     </div>
   );

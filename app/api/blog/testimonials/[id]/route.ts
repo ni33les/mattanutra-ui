@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { adminClawRequestAllowed } from "@/lib/admin-auth";
 import {
   archiveTestimonial,
-  blogWriteAuthorized,
   getTestimonialForApi,
   updateTestimonial
 } from "@/lib/blog";
@@ -20,7 +20,7 @@ function unauthorized() {
     {
       headers: {
         "Cache-Control": "no-store",
-        "WWW-Authenticate": 'Bearer realm="mattanutra-admin-api"'
+        "WWW-Authenticate": 'Bearer realm="mattanutra-openclaw-api"'
       },
       status: 401
     }
@@ -31,7 +31,7 @@ export async function GET(
   request: Request,
   { params }: TestimonialRouteProps
 ) {
-  if (!blogWriteAuthorized(request)) {
+  if (!adminClawRequestAllowed(request)) {
     return unauthorized();
   }
 
@@ -60,7 +60,7 @@ export async function PATCH(
   request: Request,
   { params }: TestimonialRouteProps
 ) {
-  if (!blogWriteAuthorized(request)) {
+  if (!adminClawRequestAllowed(request)) {
     return unauthorized();
   }
 
@@ -108,7 +108,7 @@ export async function DELETE(
   request: Request,
   { params }: TestimonialRouteProps
 ) {
-  if (!blogWriteAuthorized(request)) {
+  if (!adminClawRequestAllowed(request)) {
     return unauthorized();
   }
 

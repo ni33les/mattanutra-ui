@@ -284,7 +284,7 @@ The safety review record should carry the operational details: supplement, dose,
 
 ## Content and Marketing Engine
 
-Blog articles and testimonials are database-driven and can be managed by OpenClaw or another admin system using protected APIs.
+Blog articles and testimonials are database-driven and can be managed by OpenClaw or another admin system using protected machine APIs. These APIs use `ADMIN_CLAW_TOKEN` with `Authorization: Bearer <ADMIN_CLAW_TOKEN>` or `x-admin-claw-token`; dashboard tokens are not accepted for machine API access.
 
 Purpose:
 

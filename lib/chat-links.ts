@@ -1,3 +1,12 @@
+export type ChatChannel = Readonly<{
+  buttonClasses: string;
+  iconUrl: string;
+  id: "line" | "telegram" | "whatsapp";
+  name: string;
+  qrPanelClasses: string;
+  url: string;
+}>;
+
 function getConfiguredUrl(value: string | undefined) {
   return value?.trim() || "";
 }
@@ -51,7 +60,7 @@ function getWhatsAppUrl(planId: string) {
   return appendQuery(baseUrl, { text });
 }
 
-export function buildChatChannels(planId = "") {
+export function buildChatChannels(planId = ""): ChatChannel[] {
   return [
     {
       buttonClasses: "bg-[#06C755] text-white hover:bg-[#05B34D]",
@@ -77,5 +86,5 @@ export function buildChatChannels(planId = "") {
       qrPanelClasses: "bg-[#25D366]/5 ring-[#25D366]/15",
       url: getWhatsAppUrl(planId)
     }
-  ] as const;
+  ];
 }

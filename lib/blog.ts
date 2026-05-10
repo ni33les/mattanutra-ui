@@ -272,24 +272,6 @@ function mapPost(row: BlogPostRow, localeOverride?: Locale): BlogPost {
   };
 }
 
-export function blogWriteAuthorized(request: Request) {
-  const configuredToken = process.env.ADMIN_TOKEN?.trim();
-
-  if (!configuredToken) {
-    return false;
-  }
-
-  const authHeader = request.headers.get("authorization") ?? "";
-  const bearer = authHeader.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length).trim()
-    : "";
-
-  return (
-    bearer === configuredToken ||
-    request.headers.get("x-admin-token") === configuredToken
-  );
-}
-
 function blogSelectSql() {
   return `
     select

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { adminClawRequestAllowed } from "@/lib/admin-auth";
 import {
   archiveBlogPost,
-  blogWriteAuthorized,
   getBlogPostForApi,
   updateBlogPost
 } from "@/lib/blog";
@@ -21,7 +21,7 @@ function unauthorized() {
     {
       headers: {
         "Cache-Control": "no-store",
-        "WWW-Authenticate": 'Bearer realm="mattanutra-admin-api"'
+        "WWW-Authenticate": 'Bearer realm="mattanutra-openclaw-api"'
       },
       status: 401
     }
@@ -35,7 +35,7 @@ function localeFromUrl(request: Request) {
 }
 
 export async function GET(request: Request, { params }: BlogPostRouteProps) {
-  if (!blogWriteAuthorized(request)) {
+  if (!adminClawRequestAllowed(request)) {
     return unauthorized();
   }
 
@@ -61,7 +61,7 @@ export async function GET(request: Request, { params }: BlogPostRouteProps) {
 }
 
 export async function PATCH(request: Request, { params }: BlogPostRouteProps) {
-  if (!blogWriteAuthorized(request)) {
+  if (!adminClawRequestAllowed(request)) {
     return unauthorized();
   }
 
@@ -105,7 +105,7 @@ export async function PATCH(request: Request, { params }: BlogPostRouteProps) {
 }
 
 export async function DELETE(request: Request, { params }: BlogPostRouteProps) {
-  if (!blogWriteAuthorized(request)) {
+  if (!adminClawRequestAllowed(request)) {
     return unauthorized();
   }
 
