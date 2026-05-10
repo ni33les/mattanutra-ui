@@ -74,6 +74,13 @@ const JOB_PRIORITIES = {
   reassessment: 10
 } as const;
 const JOB_WORKER_CAPABILITY = "legacy_job_worker";
+const JOB_BRIDGE_JOB_TYPES = [
+  "example_email",
+  "example_formulation",
+  "formulation",
+  "healthscore_analysis",
+  "reassessment"
+] as const;
 const JOB_WORKER_TASK_TYPES = [
   "generate_formulation",
   "generate_example_formulation",
@@ -245,7 +252,7 @@ async function ensureTaskForJob(
   });
 
   if (!config) {
-    return;
+    return false;
   }
 
   try {
@@ -293,6 +300,8 @@ async function ensureTaskForJob(
       taskType: config.taskType,
       title: config.taskTitle
     });
+
+    return true;
   } catch (error) {
     console.warn("Unable to create task-backed job work", {
       error,
@@ -311,6 +320,8 @@ async function ensureTaskForJob(
       level: "medium",
       planId: input.planId
     });
+
+    return false;
   }
 }
 
@@ -1844,6 +1855,64 @@ async function claimNextJob(sql: postgres.Sql) {
   });
 }
 
+async function taskTablesAvailable(sql: postgres.Sql) {
+  const rows = await sql<{ available: boolean }[]>`
+    select
+      to_regclass('public.goals') is not null
+      and to_regclass('public.tasks') is not null
+      and to_regclass('public.task_events') is not null
+      and to_regclass('public.task_comments') is not null
+      as available
+  `;
+
+  return rows[0]?.available === true;
+}
+
+async function backfillQueuedLegacyJobsIntoTasks(sql: postgres.Sql) {
+  const jobs = await sql<ClaimedJob[]>`
+    select id::text, job_type, plan_id::text, attempts, payload
+    from jobs
+    where status = 'queued'
+      and job_type = any(${[...JOB_BRIDGE_JOB_TYPES]}::text[])
+      and not exists (
+        select 1
+        from public.tasks
+        where tasks.legacy_job_id = jobs.id
+          and tasks.status not in ('completed', 'failed', 'cancelled', 'skipped')
+      )
+    order by priority desc, queued_at asc
+    limit 100
+  `;
+  let backfilled = 0;
+
+  for (const job of jobs) {
+    const taskCreated = await ensureTaskForJob(sql, {
+      jobId: job.id,
+      jobType: job.job_type,
+      payload: payloadRecord(job.payload),
+      planId: job.plan_id
+    });
+
+    if (taskCreated) {
+      backfilled += 1;
+    }
+  }
+
+  if (jobs.length > 0) {
+    await auditJobEvent(sql, {
+      eventPayload: {
+        backfilled,
+        checked: jobs.length,
+        jobTypes: [...JOB_BRIDGE_JOB_TYPES]
+      },
+      eventType: "legacy_jobs_task_backfill_completed",
+      level: backfilled === jobs.length ? "low" : "medium"
+    });
+  }
+
+  return backfilled;
+}
+
 async function deferReservedTask(
   sql: postgres.Sql,
   reserved: ReservedTask,
@@ -2959,12 +3028,36 @@ async function runJobsWorker() {
     eventType: "worker_started",
     level: "low"
   });
+  const taskBackedWorkerEnabled = await taskTablesAvailable(sql);
+
+  if (taskBackedWorkerEnabled) {
+    await backfillQueuedLegacyJobsIntoTasks(sql);
+  } else {
+    await auditJobEvent(sql, {
+      eventPayload: {
+        reason: "task_tables_unavailable"
+      },
+      eventType: "legacy_job_fallback_enabled",
+      level: "high"
+    });
+  }
 
   while (true) {
-    const claimedTaskJob = await claimNextTaskJob(sql);
-    const job = claimedTaskJob?.job ?? (await claimNextJob(sql));
+    const claimedTaskJob = taskBackedWorkerEnabled
+      ? await claimNextTaskJob(sql)
+      : null;
+    const job = claimedTaskJob?.job ??
+      (!taskBackedWorkerEnabled ? await claimNextJob(sql) : null);
 
     if (!job) {
+      if (taskBackedWorkerEnabled) {
+        const backfilled = await backfillQueuedLegacyJobsIntoTasks(sql);
+
+        if (backfilled > 0) {
+          continue;
+        }
+      }
+
       await auditJobEvent(sql, {
         eventType: "worker_idle",
         level: "low"

@@ -435,7 +435,7 @@ const content = {
       audit: "Latest audit",
       complete: "Complete",
       completed: "Completed",
-      empty: "No jobs in this timeframe.",
+      empty: "No legacy jobs in this timeframe.",
       error: "Error",
       failed: "Failed",
       jobType: "Job type",
@@ -472,7 +472,7 @@ const content = {
     },
     technical: [
       { icon: ExclamationTriangleIcon, name: "Alerts", view: "alerts" },
-      { icon: QueueListIcon, name: "Jobs", view: "jobs" }
+      { icon: QueueListIcon, name: "Legacy Jobs", view: "jobs" }
     ],
     technicalAlerts: {
       critical: "Critical",
@@ -702,7 +702,7 @@ const content = {
       audit: "Audit ล่าสุด",
       complete: "เสร็จแล้ว",
       completed: "เสร็จเมื่อ",
-      empty: "ไม่มีงานในช่วงเวลานี้",
+      empty: "ไม่มีงาน legacy ในช่วงเวลานี้",
       error: "ข้อผิดพลาด",
       failed: "ล้มเหลว",
       jobType: "ชนิดงาน",
@@ -739,7 +739,7 @@ const content = {
     },
     technical: [
       { icon: ExclamationTriangleIcon, name: "แจ้งเตือน", view: "alerts" },
-      { icon: QueueListIcon, name: "งานระบบ", view: "jobs" }
+      { icon: QueueListIcon, name: "งาน Legacy", view: "jobs" }
     ],
     technicalAlerts: {
       critical: "วิกฤต",

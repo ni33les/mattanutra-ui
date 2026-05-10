@@ -59,7 +59,7 @@ flowchart TB
 - Free email lead capture.
 - Free email sends the top three supplement suggestions from the actual generated formulation.
 - Recurring 60-day reassessment scheduling with unsubscribe.
-- Formulation jobs and worker queue, now bridged into Goals/Tasks for task-backed processing.
+- Formulation task-backed worker queue, with legacy job rows retained as compatibility/audit records.
 - Grok formulation generation with validation/retry pattern.
 - Supplement whitelist, blacklist, dose ceilings, safety flags, and admin editing.
 - Automated formulation safety check: blacklisted items are removed, over-limit doses are reduced, and uncertain/new items are hidden for review.
@@ -68,8 +68,8 @@ flowchart TB
 - Blog and testimonial tables, pages, and protected admin APIs.
 - BPM tracking for funnel, campaign, affiliate, safety, error, email, chat, and formulation events.
 - Admin dashboard with KPI and Conversions views over hour, day, week, month, year, and all-time windows.
-- Admin Technical section with Alerts and Jobs views for failed email sends, stuck jobs, cron failures, AI/worker errors, and recent job history.
-- Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported slow work now creates task-backed work items before the old worker fallback.
+- Admin Technical section with Alerts and Legacy Jobs views for failed email sends, stuck compatibility records, cron failures, AI/worker errors, and recent job history.
+- Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported slow work now creates task-backed work items, and the worker only falls back to direct legacy jobs if task tables are unavailable.
 - Admin Goals view showing goal status, priority, source, BPM/session ray, tasks, events, comments, dependencies, reservations, and approvals.
 - Dashboard filters for locale, device, source, medium, campaign, campaign ID, affiliate, promo code, selected plan, plan ID, ray, and email hash.
 
@@ -196,8 +196,8 @@ How the admin sections should be read:
 | Supplements | Which supplements are allowed, blocked, or awaiting review? | Live with editable dose ceilings and safety flags |
 | Human Review | What needs a human decision before being shown or acted on? | Live for supplement review and dose-reduction notices |
 | Goals | What outcome is being pursued, and which tasks/events explain its current state? | Live for supplement review, formulation, Free email, reassessment, and staged task-backed work |
-| Technical Alerts | What failed or looks stuck? | Live for jobs, cron, job audit, and BPM error events |
-| Jobs | What legacy work has been queued, run, completed, or failed? | Live compatibility history and current execution state |
+| Technical Alerts | What failed or looks stuck? | Live for tasks, legacy jobs, cron, job audit, and BPM error events |
+| Legacy Jobs | What compatibility work has been queued, run, completed, or failed? | Live history and execution diagnostics while compatibility rows remain |
 
 Remaining admin dashboard work:
 

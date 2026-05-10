@@ -384,22 +384,35 @@ Acceptance criteria:
 
 ## Phase 10: Deprecate Old Jobs
 
+Status: complete as a safe deprecation step.
+
+The `jobs` table is no longer the normal worker-discovery mechanism when the task tables are available. It remains as a compatibility execution record because existing status pages, cron links, email audit records, and historical diagnostics still read it.
+
+Current behaviour:
+
+- New supported slow work still writes a legacy `jobs` row for compatibility, but also writes a Goal and Task.
+- The internal worker reserves task-backed work first.
+- Before idling, the worker backfills any queued supported legacy jobs that do not yet have an active task.
+- The worker no longer directly claims legacy jobs when task tables are available.
+- Direct legacy job fallback only activates if the task tables are unavailable, and writes a high-level audit event so the problem is visible.
+- The admin Technical menu now labels the old jobs view as `Legacy Jobs`; the Goals view is the operational task view.
+
 Only after task flows are proven:
 
 - stop creating new legacy jobs for migrated paths.
-- map or migrate old jobs where useful.
-- keep old history inspectable.
-- remove old branches once no production path depends on them.
+- map or migrate old jobs where useful. Done for queued supported jobs through worker backfill.
+- keep old history inspectable. Done through the Legacy Jobs page and job audit events.
+- remove old branches once no production path depends on them. Still future work because compatibility records remain in active use.
 
 Acceptance criteria:
 
-- No production path depends on legacy `jobs`.
-- Admin task queue replaces the old jobs page.
-- Historical jobs remain understandable.
+- No normal worker path directly claims legacy `jobs` while task tables are available. Done.
+- Admin task queue replaces the old jobs page for operational visibility. Done through Goals; the old page is now labelled Legacy Jobs.
+- Historical jobs remain understandable. Done.
 
 ## Remaining Plan From Here
 
-Phase 10: Deprecate old jobs. Stop creating legacy jobs once migrated paths are proven and remove old branches safely.
+Next phase: remove compatibility writes only after status pages, cron links, email audit, and historical admin diagnostics have task-native replacements.
 
 ## Definition Of Done
 
