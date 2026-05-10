@@ -2105,6 +2105,28 @@ async function claimNextTaskJob(sql: postgres.Sql): Promise<ClaimedTaskJob | nul
   return null;
 }
 
+async function claimNextWorkerJob(
+  sql: postgres.Sql,
+  taskBackedWorkerEnabled: boolean
+): Promise<Readonly<{
+  claimedTaskJob: ClaimedTaskJob | null;
+  job: ClaimedJob | null;
+}>> {
+  if (taskBackedWorkerEnabled) {
+    const claimedTaskJob = await claimNextTaskJob(sql);
+
+    return {
+      claimedTaskJob,
+      job: claimedTaskJob?.job ?? null
+    };
+  }
+
+  return {
+    claimedTaskJob: null,
+    job: await claimNextJob(sql)
+  };
+}
+
 async function failJob(
   sql: postgres.Sql,
   job: ClaimedJob,
@@ -3043,11 +3065,10 @@ async function runJobsWorker() {
   }
 
   while (true) {
-    const claimedTaskJob = taskBackedWorkerEnabled
-      ? await claimNextTaskJob(sql)
-      : null;
-    const job = claimedTaskJob?.job ??
-      (!taskBackedWorkerEnabled ? await claimNextJob(sql) : null);
+    const { claimedTaskJob, job } = await claimNextWorkerJob(
+      sql,
+      taskBackedWorkerEnabled
+    );
 
     if (!job) {
       if (taskBackedWorkerEnabled) {
