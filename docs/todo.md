@@ -12,7 +12,8 @@ Last updated: 2026-05-10
 - [x] Move plans toward explicit communication channels: LINE, WhatsApp, and email.
 - [x] For plan communications, choose the first available working chat channel first, then fall back to email.
 - [x] Connect a real chat provider delivery bridge, likely LINE first.
-- [ ] Tighten production LINE identity mapping so captured handles can reliably become LINE user IDs.
+- [x] Add the protected channel mapping API and worker retry path for LINE user IDs.
+- [ ] Configure the production LINE webhook/OpenClaw mapping flow so captured LINE handles can reliably become LINE user IDs.
 
 ## Admin And Operations
 

@@ -54,6 +54,16 @@ export function normalizeCommunicationChannelType(
     : null;
 }
 
+export function normalizeLineUserId(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return /^[UCR][0-9a-f]{32}$/i.test(trimmed) ? trimmed : null;
+}
+
 export function selectBestCommunicationChannel<
   T extends CommunicationChannelCandidate
 >(

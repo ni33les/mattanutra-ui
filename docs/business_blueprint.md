@@ -70,7 +70,7 @@ flowchart TB
 - Admin dashboard with KPI and Conversions views over hour, day, week, month, year, and all-time windows.
 - Admin Technical section with Alerts and Legacy Jobs views for failed email sends, stuck compatibility records, cron failures, AI/worker errors, and recent job history.
 - Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported slow work now creates task-backed work items, worker reservations are enforced, human review decisions write reviewed formulation versions, and client review follow-up is handled through the communication-channel worker.
-- Communication-channel foundation: each plan can be linked to an identity with LINE, WhatsApp, Telegram, WeChat, email, SMS, or manual channels; the system chooses the best available channel, preferring chat before email unless an explicit preference exists. Customers can now leave LINE, WhatsApp, Telegram, or email details from the safety review box, and admin can monitor queued/sent/failed communications.
+- Communication-channel foundation: each plan can be linked to an identity with LINE, WhatsApp, Telegram, WeChat, email, SMS, or manual channels; the system chooses the best available channel, preferring chat before email unless an explicit preference exists. Customers can now leave LINE, WhatsApp, Telegram, or email details from the safety review box, admin can monitor queued/sent/failed communications, and the worker can dispatch mapped LINE messages directly.
 - Admin Goals view showing goal status, priority, source, BPM/session ray, tasks, events, comments, dependencies, reservations, and approvals.
 - Dashboard filters for locale, device, source, medium, campaign, campaign ID, affiliate, promo code, selected plan, plan ID, ray, and email hash.
 
@@ -82,7 +82,7 @@ flowchart TB
 | Admin operations views | Sales analytics, goals, task visibility, technical alerts, legacy jobs, supplement review, and supplement editing basics exist; content and campaign comparison views still need interfaces | Add campaign and content panels |
 | Supplement governance | Whitelist, blacklist, max dose, and safety review basics exist; frequency and interaction rules are not wired yet | Add frequency, condition, medication, pregnancy, and lab interaction checks |
 | Product matching | Affiliate revenue depends on trusted products | Start with curated whitelist before marketplace automation |
-| Chat handoff | Pro needs a convincing ongoing service experience | LINE server dispatch exists; production identity mapping and operating process still need tightening |
+| Chat handoff | Pro needs a convincing ongoing service experience | LINE server dispatch and mapping API exist; production webhook/OpenClaw mapping and operating process still need tightening |
 | Human safety review | Flagged suggestions now enter Human Review and create Goal/Task records; decisions update the plan append-only and trigger channel-aware client follow-up; customer channel capture and communication monitoring are live | Make the first production review-to-client notification path excellent |
 | Follow-up nurture | Free users need more than one email | Define post-preview sequence |
 

@@ -4,6 +4,7 @@ import { isUuid, toJsonValue } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
 import {
   normalizeCommunicationChannelType,
+  normalizeLineUserId,
   selectBestCommunicationChannel,
   type CommunicationChannelStatus,
   type CommunicationChannelType
@@ -13,7 +14,11 @@ import { validateLeadEmail } from "@/lib/email-validation";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 import type { ReservedTask } from "@/lib/task-service";
 
-export { normalizeCommunicationChannelType, selectBestCommunicationChannel };
+export {
+  normalizeCommunicationChannelType,
+  normalizeLineUserId,
+  selectBestCommunicationChannel
+};
 export type { CommunicationChannelStatus, CommunicationChannelType };
 
 export type CommunicationMessageStatus =
@@ -102,6 +107,7 @@ type MessageRow = {
 
 type DeliveryTargetRow = MessageRow & {
   delivery_address: string | null;
+  delivery_channel_metadata: unknown;
   delivery_channel_type: CommunicationChannelType | null;
 };
 
@@ -158,6 +164,25 @@ function objectValue(value: unknown) {
 
 function configuredLineAccessToken() {
   return process.env.LINE_CHANNEL_ACCESS_TOKEN?.trim() || "";
+}
+
+function lineMetadata(address: string, metadata: Record<string, unknown>) {
+  const userId =
+    normalizeLineUserId(metadata.lineUserId) ?? normalizeLineUserId(address);
+  const trimmedAddress = address.trim();
+  const mappingRequired =
+    Boolean(trimmedAddress) && !userId && trimmedAddress !== "manual";
+
+  return {
+    ...metadata,
+    ...(userId ? { lineUserId: userId, requiresIdentityMapping: false } : {}),
+    ...(!userId && trimmedAddress
+      ? { lineHandle: trimmedAddress, requiresIdentityMapping: true }
+      : {}),
+    ...(mappingRequired
+      ? { identityMappingRequired: true }
+      : { identityMappingRequired: false })
+  };
 }
 
 function normalizeAddress(type: CommunicationChannelType, address: string) {
@@ -456,6 +481,10 @@ async function upsertChannelInTransaction(
 ) {
   const address = normalizeAddress(input.channelType, input.address);
   const status = input.status ?? "active";
+  const metadata =
+    input.channelType === "line"
+      ? lineMetadata(address, input.metadata ?? {})
+      : (input.metadata ?? {});
 
   if (input.channelType === "email") {
     const validation = validateLeadEmail(address);
@@ -480,7 +509,7 @@ async function upsertChannelInTransaction(
         set
           actor_type = ${input.actorType ?? existing[0].actor_type},
           display_name = ${input.displayName ?? existing[0].display_name},
-          metadata = metadata || ${sql.json(toJsonValue(input.metadata ?? {}))}::jsonb,
+          metadata = metadata || ${sql.json(toJsonValue(metadata))}::jsonb,
           preference_rank = ${input.preferenceRank ?? existing[0].preference_rank},
           status = ${status},
           updated_at = now()
@@ -510,7 +539,7 @@ async function upsertChannelInTransaction(
           ${status},
           ${input.preferenceRank ?? 100},
           ${input.actorType ?? "human"},
-          ${sql.json(toJsonValue(input.metadata ?? {}))},
+          ${sql.json(toJsonValue(metadata))},
           now(),
           now()
         )
@@ -617,6 +646,85 @@ export async function upsertCommunicationChannel(input: Readonly<{
       preferenceRank: input.preferenceRank,
       status: input.status
     });
+  });
+}
+
+export async function updateCommunicationChannel(input: Readonly<{
+  address?: string | null;
+  channelId: string;
+  displayName?: string | null;
+  metadata?: Record<string, unknown>;
+  preferenceRank?: number | null;
+  status?: CommunicationChannelStatus | null;
+}>) {
+  if (!isUuid(input.channelId)) {
+    throw new Error("Communication channel not found");
+  }
+
+  const sql = sqlOrThrow();
+
+  await ensureCommunicationSchema(sql);
+
+  return sql.begin(async (tx) => {
+    const existingRows = await tx<ChannelRow[]>`
+      select *
+      from public.communication_channels
+      where id = ${input.channelId}::uuid
+      limit 1
+    `;
+    const existing = existingRows[0];
+
+    if (!existing) {
+      throw new Error("Communication channel not found");
+    }
+
+    const nextAddress = input.address
+      ? normalizeAddress(existing.channel_type, input.address)
+      : existing.address;
+
+    if (existing.channel_type === "email") {
+      const validation = validateLeadEmail(nextAddress);
+
+      if (!validation.ok) {
+        throw new Error("Communication email channel is not valid");
+      }
+    }
+
+    const metadataPatch =
+      existing.channel_type === "line"
+        ? lineMetadata(nextAddress, input.metadata ?? {})
+        : (input.metadata ?? {});
+    const rows = await tx<ChannelRow[]>`
+      update public.communication_channels
+      set
+        address = ${nextAddress},
+        display_name = coalesce(${input.displayName ?? null}, display_name),
+        metadata = metadata || ${tx.json(toJsonValue(metadataPatch))}::jsonb,
+        preference_rank = coalesce(${input.preferenceRank ?? null}, preference_rank),
+        status = coalesce(${input.status ?? null}, status),
+        updated_at = now()
+      where id = ${input.channelId}::uuid
+      returning *
+    `;
+
+    if (
+      existing.channel_type === "line" &&
+      normalizeLineUserId(metadataPatch.lineUserId)
+    ) {
+      await tx`
+        update public.communication_messages
+        set
+          status = 'queued',
+          error_message = null,
+          updated_at = now()
+        where channel_id = ${input.channelId}::uuid
+          and status = 'no_channel'
+          and provider = 'line'
+          and error_message = 'LINE channel needs a LINE user id mapping'
+      `;
+    }
+
+    return mapChannel(rows[0]);
   });
 }
 
@@ -959,12 +1067,15 @@ export async function updateCommunicationMessageStatus(input: Readonly<{
 }
 
 function lineRecipient(row: DeliveryTargetRow) {
-  const metadata = objectValue(row.metadata);
+  const messageMetadata = objectValue(row.metadata);
+  const channelMetadata = objectValue(row.delivery_channel_metadata);
 
   return (
-    cleanText(metadata.lineUserId) ||
-    cleanText(metadata.userId) ||
-    cleanText(row.delivery_address)
+    normalizeLineUserId(messageMetadata.lineUserId) ||
+    normalizeLineUserId(messageMetadata.userId) ||
+    normalizeLineUserId(channelMetadata.lineUserId) ||
+    normalizeLineUserId(channelMetadata.userId) ||
+    normalizeLineUserId(row.delivery_address)
   );
 }
 
@@ -985,9 +1096,9 @@ async function deliverLineMessage(row: DeliveryTargetRow) {
 
   if (!recipient) {
     const message = await updateCommunicationMessageStatus({
-      errorMessage: "LINE channel is missing a recipient user id",
+      errorMessage: "LINE channel needs a LINE user id mapping",
       messageId: row.id,
-      status: "failed"
+      status: "no_channel"
     });
 
     return {
@@ -995,7 +1106,7 @@ async function deliverLineMessage(row: DeliveryTargetRow) {
       configured: true,
       message,
       provider: "line",
-      reason: "LINE channel is missing a recipient user id"
+      reason: "LINE channel needs a LINE user id mapping"
     } satisfies CommunicationDispatchResult;
   }
 
@@ -1060,7 +1171,8 @@ export async function dispatchCommunicationMessage(messageId: string) {
     select
       communication_messages.*,
       communication_channels.channel_type as delivery_channel_type,
-      communication_channels.address as delivery_address
+      communication_channels.address as delivery_address,
+      communication_channels.metadata as delivery_channel_metadata
     from public.communication_messages
     left join public.communication_channels
       on communication_channels.id = communication_messages.channel_id
@@ -1157,6 +1269,42 @@ export async function dispatchCommunicationMessage(messageId: string) {
   }
 
   return result;
+}
+
+export async function dispatchQueuedCommunicationMessages(input: Readonly<{
+  limit?: number | null;
+}> = {}) {
+  if (!configuredLineAccessToken()) {
+    return [];
+  }
+
+  const sql = sqlOrThrow();
+  const limit = Math.min(25, Math.max(1, Math.round(input.limit ?? 10)));
+
+  await ensureCommunicationSchema(sql);
+
+  const rows = await sql<Array<{ id: string }>>`
+    select communication_messages.id::text
+    from public.communication_messages
+    join public.communication_channels
+      on communication_channels.id = communication_messages.channel_id
+    where communication_messages.status = 'queued'
+      and communication_channels.status = 'active'
+      and communication_channels.channel_type = 'line'
+      and (
+        communication_messages.scheduled_for is null
+        or communication_messages.scheduled_for <= now()
+      )
+    order by communication_messages.created_at asc
+    limit ${limit}
+  `;
+  const results: CommunicationDispatchResult[] = [];
+
+  for (const row of rows) {
+    results.push(await dispatchCommunicationMessage(row.id));
+  }
+
+  return results;
 }
 
 function safetyFollowupMessage(input: Readonly<{

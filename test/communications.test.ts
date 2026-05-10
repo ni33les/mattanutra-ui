@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   normalizeCommunicationChannelType,
+  normalizeLineUserId,
   selectBestCommunicationChannel,
   type CommunicationChannelCandidate
 } from "../lib/communication-channel-utils.ts";
@@ -60,5 +61,14 @@ describe("communications channel selection", () => {
     ]);
 
     assert.equal(selected?.channelType, "email");
+  });
+
+  it("accepts LINE user ids and rejects handles for push delivery", () => {
+    assert.equal(
+      normalizeLineUserId("U0123456789abcdef0123456789abcdef"),
+      "U0123456789abcdef0123456789abcdef"
+    );
+    assert.equal(normalizeLineUserId("@mattanutra"), null);
+    assert.equal(normalizeLineUserId("richard"), null);
   });
 });

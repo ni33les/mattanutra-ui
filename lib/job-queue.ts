@@ -17,7 +17,10 @@ import type { FormulationBlueprint } from "@/lib/formulation-types";
 import { analyzeHealthScoreAdvice } from "@/lib/health-score-analysis";
 import type { HealthScoreResult } from "@/lib/health-score";
 import { writeBpmEvent } from "@/lib/bpm";
-import { sendClientSafetyFollowupTask } from "@/lib/communications";
+import {
+  dispatchQueuedCommunicationMessages,
+  sendClientSafetyFollowupTask
+} from "@/lib/communications";
 import {
   buildReassessmentEmailHtml,
   buildReassessmentEmailSubject
@@ -75,6 +78,7 @@ const JOB_PRIORITIES = {
   reassessment: 10
 } as const;
 const COMMUNICATION_WORKER_CAPABILITY = "client_safety_followup";
+const COMMUNICATION_DISPATCH_BATCH_SIZE = 10;
 const JOB_WORKER_CAPABILITY = "legacy_job_worker";
 const JOB_BRIDGE_JOB_TYPES = [
   "example_email",
@@ -2194,6 +2198,40 @@ async function processCommunicationTask(
   }
 }
 
+async function processQueuedCommunicationDispatch(sql: postgres.Sql) {
+  const results = await dispatchQueuedCommunicationMessages({
+    limit: COMMUNICATION_DISPATCH_BATCH_SIZE
+  });
+
+  if (results.length === 0) {
+    return 0;
+  }
+
+  await auditJobEvent(sql, {
+    eventPayload: {
+      attempted: results.filter((result) => result.attempted).length,
+      configured: results.filter((result) => result.configured).length,
+      failed: results.filter((result) => result.message.status === "failed")
+        .length,
+      noChannel: results.filter(
+        (result) => result.message.status === "no_channel"
+      ).length,
+      sent: results.filter(
+        (result) =>
+          result.message.status === "sent" ||
+          result.message.status === "delivered"
+      ).length,
+      total: results.length
+    },
+    eventType: "communication_dispatch_batch_processed",
+    level: results.some((result) => result.message.status === "failed")
+      ? "medium"
+      : "low"
+  });
+
+  return results.length;
+}
+
 async function claimNextWorkerJob(
   sql: postgres.Sql,
   taskBackedWorkerEnabled: boolean
@@ -3159,6 +3197,12 @@ async function runJobsWorker() {
 
       if (communicationTask) {
         await processCommunicationTask(sql, communicationTask);
+        continue;
+      }
+
+      const dispatchedMessages = await processQueuedCommunicationDispatch(sql);
+
+      if (dispatchedMessages > 0) {
         continue;
       }
     }

@@ -555,7 +555,37 @@ Acceptance criteria:
 
 ## Remaining Plan From Here
 
-Next phase: decide whether OpenClaw or an internal worker owns provider polling/dispatch scheduling, then make the first production LINE identity mapping robust.
+## Phase 16: Internal Communication Dispatch Scheduling
+
+Status: complete for queued LINE delivery scheduling and identity mapping.
+
+The internal worker now owns dispatch scheduling for first-party providers that MattaNutra can deliver directly. OpenClaw remains useful for supplying provider identity mappings and for providers that are not bridged directly yet.
+
+Current behaviour:
+
+- The internal jobs worker checks queued communication messages after task-backed communication work.
+- Eligible queued LINE messages are dispatched in small batches when `LINE_CHANNEL_ACCESS_TOKEN` is configured.
+- LINE dispatch only sends when the channel has a real LINE user id. Handles such as `@mattanutra` are stored as identifiers, but are not treated as push-deliverable user ids.
+- If a LINE message cannot be pushed because the channel needs a LINE user id mapping, the message is marked `no_channel` with a clear error instead of being retried forever.
+- OpenClaw can update a captured channel through `PATCH /api/communications/channels/:id`, including adding `metadata.lineUserId`.
+- When a valid LINE user id is added to a channel, blocked LINE messages for that channel are reopened to `queued` and the worker is nudged to try again.
+- Creating or updating a channel through the protected machine API nudges the worker so newly deliverable messages do not sit idle.
+
+Implemented endpoint:
+
+- `PATCH /api/communications/channels/:id`
+
+Acceptance criteria:
+
+- Direct provider dispatch has an owner. Done: the internal worker owns direct LINE dispatch.
+- OpenClaw has a safe way to attach LINE identity mappings. Done.
+- LINE handles and LINE user ids are not confused. Done.
+- Unmappable LINE messages do not loop indefinitely. Done.
+- Once a user id is mapped, previously blocked messages can be retried. Done.
+
+## Remaining Plan From Here
+
+Next phase: add production LINE webhook/OpenClaw mapping flow, then decide whether WhatsApp or Telegram should be bridged directly or remain OpenClaw-delivered.
 
 ## Definition Of Done
 
