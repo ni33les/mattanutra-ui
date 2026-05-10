@@ -158,6 +158,20 @@ export type TaskComment = Readonly<{
   visibility: TaskCommentVisibility;
 }>;
 
+export type TaskDependency = Readonly<{
+  createdAt: string;
+  dependencyType: TaskDependencyType;
+  dependsOnTaskId: string;
+  taskId: string;
+}>;
+
+export type TaskBundle = Readonly<{
+  comments: TaskComment[];
+  dependencies: TaskDependency[];
+  ray: TaskRay;
+  task: TaskRecord;
+}>;
+
 export type ReservedTask = Readonly<{
   agent: TaskAgent;
   comments: TaskComment[];
@@ -240,6 +254,13 @@ type CommentRow = {
   ray_id: string;
   task_id: string;
   visibility: TaskCommentVisibility;
+};
+
+type DependencyRow = {
+  created_at: Date | string;
+  dependency_type: TaskDependencyType;
+  depends_on_task_id: string;
+  task_id: string;
 };
 
 type ExpiredReservationRow = {
@@ -333,6 +354,13 @@ export type FailTaskInput = Readonly<{
   agentId?: string | null;
   errorMessage: string;
   resultPayload?: Record<string, unknown>;
+  taskId: string;
+}>;
+
+export type RenewTaskLeaseInput = Readonly<{
+  agentId?: string | null;
+  leaseSeconds?: unknown;
+  reservationId?: string | null;
   taskId: string;
 }>;
 
@@ -482,6 +510,15 @@ function mapComment(row: CommentRow): TaskComment {
     rayId: row.ray_id,
     taskId: row.task_id,
     visibility: row.visibility
+  };
+}
+
+function mapDependency(row: DependencyRow): TaskDependency {
+  return {
+    createdAt: isoDate(row.created_at) ?? new Date().toISOString(),
+    dependencyType: row.dependency_type,
+    dependsOnTaskId: row.depends_on_task_id,
+    taskId: row.task_id
   };
 }
 
@@ -891,6 +928,110 @@ export async function addTaskEvent(input: AddTaskEventInput) {
   return sql.begin((tx) => addTaskEventInTransaction(tx, input));
 }
 
+export async function getTaskBundle(input: Readonly<{ taskId: string }>) {
+  const sql = getRequiredSql();
+  const taskId = uuidOrNull(input.taskId);
+
+  if (!taskId) {
+    throw new Error("Task not found");
+  }
+
+  const taskRows = await sql<TaskRow[]>`
+    select *
+    from public.tasks
+    where id = ${taskId}::uuid
+    limit 1
+  `;
+
+  if (!taskRows[0]) {
+    throw new Error(`Task ${taskId} not found`);
+  }
+
+  const task = mapTask(taskRows[0]);
+  const [rayRows, commentRows, dependencyRows] = await Promise.all([
+    sql<RayRow[]>`
+      select *
+      from public.rays
+      where id = ${task.rayId}::uuid
+      limit 1
+    `,
+    sql<CommentRow[]>`
+      select *
+      from public.task_comments
+      where task_id = ${task.id}::uuid
+      order by created_at asc
+    `,
+    sql<DependencyRow[]>`
+      select
+        task_id::text,
+        depends_on_task_id::text,
+        dependency_type,
+        created_at
+      from public.task_dependencies
+      where task_id = ${task.id}::uuid
+      order by created_at asc
+    `
+  ]);
+
+  if (!rayRows[0]) {
+    throw new Error(`Ray ${task.rayId} not found`);
+  }
+
+  return {
+    comments: commentRows.map(mapComment),
+    dependencies: dependencyRows.map(mapDependency),
+    ray: mapRay(rayRows[0]),
+    task
+  } satisfies TaskBundle;
+}
+
+export async function listRayTasks(input: Readonly<{ rayId: string }>) {
+  const sql = getRequiredSql();
+  const rayId = uuidOrNull(input.rayId);
+
+  if (!rayId) {
+    throw new Error("Ray not found");
+  }
+
+  const rayRows = await sql<RayRow[]>`
+    select *
+    from public.rays
+    where id = ${rayId}::uuid
+    limit 1
+  `;
+
+  if (!rayRows[0]) {
+    throw new Error(`Ray ${rayId} not found`);
+  }
+
+  const taskRows = await sql<TaskRow[]>`
+    select *
+    from public.tasks
+    where ray_id = ${rayId}::uuid
+    order by created_at asc
+  `;
+  const taskIds = taskRows.map((row) => row.id);
+  const dependencyRows =
+    taskIds.length > 0
+      ? await sql<DependencyRow[]>`
+          select
+            task_id::text,
+            depends_on_task_id::text,
+            dependency_type,
+            created_at
+          from public.task_dependencies
+          where task_id = any(${taskIds}::uuid[])
+          order by created_at asc
+        `
+      : [];
+
+  return {
+    dependencies: dependencyRows.map(mapDependency),
+    ray: mapRay(rayRows[0]),
+    tasks: taskRows.map(mapTask)
+  };
+}
+
 export async function releaseExpiredReservations() {
   const sql = getRequiredSql();
 
@@ -1118,6 +1259,82 @@ export async function completeTask(input: CompleteTaskInput) {
     });
 
     return task;
+  });
+}
+
+export async function renewTaskLease(input: RenewTaskLeaseInput) {
+  const sql = getRequiredSql();
+  const taskId = uuidOrNull(input.taskId);
+  const reservationId = uuidOrNull(input.reservationId);
+  const agentId = uuidOrNull(input.agentId);
+
+  if (!taskId || (!reservationId && !agentId)) {
+    throw new Error("Task lease renewal requires a valid taskId and reservationId or agentId");
+  }
+
+  return sql.begin(async (tx) => {
+    const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
+    const reservations = await tx<
+      Array<{
+        agent_id: string;
+        id: string;
+      }>
+    >`
+      select id::text, agent_id::text
+      from public.task_reservations
+      where task_id = ${taskId}::uuid
+        and status = 'active'
+        and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
+        and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+      order by reserved_at desc
+      limit 1
+      for update
+    `;
+
+    if (!reservations[0]) {
+      throw new Error(`Active reservation for task ${taskId} not found`);
+    }
+
+    const reservation = reservations[0];
+    const taskRows = await tx<TaskRow[]>`
+      update public.tasks set
+        lease_until = now() + make_interval(secs => ${leaseSeconds}),
+        updated_at = now()
+      where id = ${taskId}::uuid
+        and reserved_by_agent_id = ${reservation.agent_id}::uuid
+        and status in ('reserved', 'running')
+      returning *
+    `;
+
+    if (!taskRows[0]) {
+      throw new Error(`Task ${taskId} is not currently renewable`);
+    }
+
+    await tx`
+      update public.task_reservations set
+        lease_until = ${taskRows[0].lease_until},
+        heartbeat_at = now()
+      where id = ${reservation.id}::uuid
+    `;
+
+    const task = mapTask(taskRows[0]);
+
+    await addTaskEventInTransaction(tx, {
+      agentId: reservation.agent_id,
+      eventPayload: {
+        leaseSeconds,
+        reservationId: reservation.id
+      },
+      eventStatus: "accepted",
+      eventType: "task_lease_renewed",
+      rayId: task.rayId,
+      taskId: task.id
+    });
+
+    return {
+      reservationId: reservation.id,
+      task
+    };
   });
 }
 

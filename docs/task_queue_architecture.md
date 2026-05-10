@@ -16,7 +16,8 @@ Tasks and agents must remain completely separate. A task should require capabili
 
 | Concept | Meaning |
 | --- | --- |
-| Ray | One goal or journey of work, tying related tasks together. |
+| Goal | Business-facing outcome the system is trying to achieve. A goal may need one task or many tasks discovered over time. |
+| Ray | Technical correlation ID behind a goal, tying related tasks, comments, events, plans, and BPM activity together. |
 | Task | An atomic unit of work that can be prioritised, reserved, completed, failed, or blocked. |
 | Agent | A human, AI agent, deterministic worker, system worker, or external worker. |
 | Capability | A skill an agent has and a task may require. |
@@ -26,11 +27,29 @@ Tasks and agents must remain completely separate. A task should require capabili
 | Reservation | A lease showing that an agent is currently working on a task. |
 | Approval | Four-eyes or specialist review before work is allowed to proceed. |
 
-## Ray Policy
+## Goal And Ray Policy
+
+Use **Goal** in the admin UI, docs, and business language.
+
+Keep `ray_id` as the technical identifier. A ray is the thread of evidence behind a goal.
 
 Use the existing BPM `ray` whenever one is available. This gives traceability from traffic source, campaign, funnel events, and plan activity into the operational task history.
 
 When no BPM ray exists, create a new ray for the operational goal. The ray can later be linked to a plan, email hash, source, or parent context if that information becomes available.
+
+Goals do not need to know every task upfront. They start with the next known task, and humans or agents may spawn more tasks into the same ray as the work becomes clearer.
+
+Goal status should be derived from its tasks unless explicitly cancelled:
+
+| Goal status | Meaning |
+| --- | --- |
+| `processing` | Work is queued, reserved, or running. |
+| `needs_review` | A human-facing task is waiting. |
+| `blocked` | A required dependency or approval is preventing progress. |
+| `stuck` | Work has failed, exhausted retries, or missed its service window. |
+| `succeeded` | The goal's success condition is met and no blocking task remains. |
+| `failed` | Required work failed and no retry or alternative is available. |
+| `cancelled` | The goal was deliberately stopped. |
 
 ## Priority Scale
 
@@ -47,7 +66,7 @@ Tasks and rays use a simple `1` to `6` priority scale.
 
 ## Current Status
 
-Phases 1 and 2 are implemented.
+Phases 1, 2, and 3 are implemented.
 
 The following tables now exist in the schema:
 
@@ -66,6 +85,7 @@ The internal service layer lives in:
 
 - `lib/task-service.ts`
 - `lib/task-service-utils.ts`
+- `lib/openclaw-api.ts`
 
 ## Phase 1: Core Data Model
 
@@ -135,9 +155,11 @@ Acceptance criteria:
 
 ## Phase 3: Protected Worker API
 
-Create machine APIs protected by `ADMIN_CLAW_TOKEN`.
+Status: complete.
 
-Likely endpoints:
+Machine APIs are protected by `ADMIN_CLAW_TOKEN`. Dashboard tokens are not accepted.
+
+Implemented endpoints:
 
 - `POST /api/tasks/reserve`
 - `POST /api/tasks/:id/comment`
@@ -148,29 +170,53 @@ Likely endpoints:
 - `GET /api/tasks/:id`
 - `GET /api/rays/:rayId/tasks`
 
+Authentication:
+
+- preferred: `Authorization: Bearer <ADMIN_CLAW_TOKEN>`
+- supported fallback: `x-admin-claw-token: <ADMIN_CLAW_TOKEN>`
+
+What was added:
+
+- Shared OpenClaw API helper with no-store responses and a consistent bearer challenge.
+- Task reservation endpoint returning task, ray, comments, dependencies, agent, and reservation id.
+- Task inspection endpoint.
+- Task comment endpoint.
+- Task complete/fail endpoints.
+- Task lease renewal endpoint.
+- Child task spawn endpoint.
+- Ray task listing endpoint.
+- Tests covering missing, wrong, bearer, and header token auth.
+
 Acceptance criteria:
 
 - Untokened requests return `401`.
 - Wrong token returns `401`.
 - Bearer token with `ADMIN_CLAW_TOKEN` succeeds.
+- `x-admin-claw-token` with `ADMIN_CLAW_TOKEN` succeeds.
 - Agents can reserve only tasks matching their capabilities.
 - Reservation response includes payload, comments, dependencies, and ray context.
 
-## Phase 4: Admin GUI
+## Phase 4: Goal Layer And Admin GUI
+
+Build the goal-first admin view over rays.
 
 Views needed:
 
+- Goals
+- Goal Detail / Ray Timeline
 - All Tasks
 - Human Review
-- Ray Timeline
 - Agents
 - Technical Alerts
 
 Acceptance criteria:
 
+- Admin can see goals in a list with name, status, priority, source, plan/email context, age, and last activity.
+- Goal status is derived from task state: processing, needs review, blocked, stuck, succeeded, failed, or cancelled.
+- Goal detail shows tasks, comments, events, dependencies, reservations, and approvals in one explainable timeline.
 - Admin can see queued, reserved, running, blocked, failed, completed, and cancelled tasks.
 - Human tasks are separated from system and AI tasks.
-- A ray timeline explains cause and effect without reading logs.
+- A goal timeline explains cause and effect without reading logs.
 - Stuck or failed work is visible.
 
 ## Phase 5: First Migration Slice
@@ -239,6 +285,18 @@ Acceptance criteria:
 - No production path depends on legacy `jobs`.
 - Admin task queue replaces the old jobs page.
 - Historical jobs remain understandable.
+
+## Remaining Plan From Here
+
+Phase 4: Goal layer and admin GUI. Make rays visible as named Goals, derive useful statuses, and give the admin team a goal timeline.
+
+Phase 5: First migration slice. Move supplement review onto Goals/Tasks while leaving legacy jobs untouched elsewhere.
+
+Phase 6: Worker migration. Move deterministic workers first, then AI workers, onto task reservation and completion.
+
+Phase 7: Four-eyes approval. Add approval rules and unblock dependent tasks only after approval.
+
+Phase 8: Deprecate old jobs. Stop creating legacy jobs once migrated paths are proven and remove old branches safely.
 
 ## Definition Of Done
 
