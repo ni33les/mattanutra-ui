@@ -718,7 +718,7 @@ async function queueClientSafetyFollowupTask(
       'client_safety_followup',
       ${title},
       'Tell the client that a human safety review has been completed.',
-      'human',
+      'deterministic',
       'queued',
       ${priority},
       ${["client_safety_followup"]}::text[],

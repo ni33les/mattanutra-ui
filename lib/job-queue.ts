@@ -17,6 +17,7 @@ import type { FormulationBlueprint } from "@/lib/formulation-types";
 import { analyzeHealthScoreAdvice } from "@/lib/health-score-analysis";
 import type { HealthScoreResult } from "@/lib/health-score";
 import { writeBpmEvent } from "@/lib/bpm";
+import { sendClientSafetyFollowupTask } from "@/lib/communications";
 import {
   buildReassessmentEmailHtml,
   buildReassessmentEmailSubject
@@ -73,6 +74,7 @@ const JOB_PRIORITIES = {
   pro: 30,
   reassessment: 10
 } as const;
+const COMMUNICATION_WORKER_CAPABILITY = "client_safety_followup";
 const JOB_WORKER_CAPABILITY = "legacy_job_worker";
 const JOB_BRIDGE_JOB_TYPES = [
   "example_email",
@@ -88,6 +90,7 @@ const JOB_WORKER_TASK_TYPES = [
   "send_example_email",
   "send_reassessment_email"
 ] as const;
+const COMMUNICATION_WORKER_TASK_TYPES = ["client_safety_followup"] as const;
 const STALE_RUNNING_JOB_MINUTES = 70;
 
 function priorityForPlan(plan: AssessmentPlan) {
@@ -2111,6 +2114,86 @@ async function claimNextTaskJob(sql: postgres.Sql): Promise<ClaimedTaskJob | nul
   return null;
 }
 
+async function claimNextCommunicationTask(): Promise<ReservedTask | null> {
+  return reserveNextTask({
+    agent: {
+      capabilities: [COMMUNICATION_WORKER_CAPABILITY],
+      metadata: {
+        worker: "communications"
+      },
+      name: "MattaNutra Communications Worker",
+      type: "deterministic"
+    },
+    leaseSeconds: 600,
+    mustRequireCapability: COMMUNICATION_WORKER_CAPABILITY,
+    taskTypes: [...COMMUNICATION_WORKER_TASK_TYPES]
+  });
+}
+
+async function processCommunicationTask(
+  sql: postgres.Sql,
+  reserved: ReservedTask
+) {
+  await auditJobEvent(sql, {
+    eventPayload: {
+      taskId: reserved.task.id,
+      taskType: reserved.task.taskType
+    },
+    eventType: "communication_task_picked_up",
+    level: "low",
+    planId: reserved.task.planId
+  });
+
+  try {
+    const result = await sendClientSafetyFollowupTask(reserved);
+
+    await completeTask({
+      agentId: reserved.agent.id,
+      reservationId: reserved.reservationId,
+      resultPayload: {
+        channelId: result.channel?.id,
+        channelType: result.channel?.channelType,
+        messageId: result.message.id,
+        status: result.message.status
+      },
+      taskId: reserved.task.id
+    });
+    await auditJobEvent(sql, {
+      eventPayload: {
+        channelType: result.channel?.channelType,
+        messageId: result.message.id,
+        taskId: reserved.task.id
+      },
+      eventType: "communication_task_completed",
+      level: "low",
+      planId: reserved.task.planId
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown communication error";
+
+    await failTask({
+      agentId: reserved.agent.id,
+      errorMessage: message,
+      reservationId: reserved.reservationId,
+      resultPayload: {
+        taskType: reserved.task.taskType
+      },
+      taskId: reserved.task.id
+    });
+    await auditJobEvent(sql, {
+      eventPayload: {
+        errorMessage: message,
+        taskId: reserved.task.id,
+        taskType: reserved.task.taskType
+      },
+      eventType: "communication_task_failed",
+      level: "high",
+      planId: reserved.task.planId
+    });
+  }
+}
+
 async function claimNextWorkerJob(
   sql: postgres.Sql,
   taskBackedWorkerEnabled: boolean
@@ -3071,6 +3154,15 @@ async function runJobsWorker() {
   }
 
   while (true) {
+    if (taskBackedWorkerEnabled) {
+      const communicationTask = await claimNextCommunicationTask();
+
+      if (communicationTask) {
+        await processCommunicationTask(sql, communicationTask);
+        continue;
+      }
+    }
+
     const { claimedTaskJob, job } = await claimNextWorkerJob(
       sql,
       taskBackedWorkerEnabled

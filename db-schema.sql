@@ -3239,6 +3239,318 @@ create index if not exists safety_reviews_ai_suggestion_gin_idx
 create index if not exists safety_reviews_context_gin_idx
   on public.safety_reviews using gin (safety_context jsonb_path_ops);
 
+create table if not exists public.communication_identities (
+  id uuid primary key,
+  display_name text null,
+  source text null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.communication_identities
+  add column if not exists display_name text null,
+  add column if not exists source text null,
+  add column if not exists metadata jsonb default '{}'::jsonb,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+update public.communication_identities
+set
+  metadata = coalesce(metadata, '{}'::jsonb),
+  created_at = coalesce(created_at, now()),
+  updated_at = coalesce(updated_at, now())
+where metadata is null
+  or created_at is null
+  or updated_at is null;
+
+alter table public.communication_identities
+  alter column metadata set default '{}'::jsonb,
+  alter column metadata set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null;
+
+create table if not exists public.plan_communication_identities (
+  plan_id uuid not null references public.assessments(plan_id) on delete cascade,
+  identity_id uuid not null references public.communication_identities(id) on delete cascade,
+  relationship text not null default 'client',
+  is_primary boolean not null default true,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  primary key (plan_id, identity_id)
+);
+
+alter table public.plan_communication_identities
+  add column if not exists relationship text default 'client',
+  add column if not exists is_primary boolean default true,
+  add column if not exists metadata jsonb default '{}'::jsonb,
+  add column if not exists created_at timestamptz default now();
+
+update public.plan_communication_identities
+set
+  relationship = coalesce(nullif(relationship, ''), 'client'),
+  is_primary = coalesce(is_primary, true),
+  metadata = coalesce(metadata, '{}'::jsonb),
+  created_at = coalesce(created_at, now())
+where relationship is null
+  or relationship = ''
+  or is_primary is null
+  or metadata is null
+  or created_at is null;
+
+alter table public.plan_communication_identities
+  alter column relationship set default 'client',
+  alter column relationship set not null,
+  alter column is_primary set default true,
+  alter column is_primary set not null,
+  alter column metadata set default '{}'::jsonb,
+  alter column metadata set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null;
+
+create unique index if not exists plan_communication_primary_identity_idx
+  on public.plan_communication_identities (plan_id)
+  where is_primary;
+
+create table if not exists public.communication_channels (
+  id uuid primary key,
+  identity_id uuid not null references public.communication_identities(id) on delete cascade,
+  channel_type text not null,
+  address text not null,
+  display_name text null,
+  status text not null default 'active',
+  preference_rank integer not null default 100,
+  actor_type text not null default 'human',
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.communication_channels
+  add column if not exists identity_id uuid references public.communication_identities(id) on delete cascade,
+  add column if not exists channel_type text,
+  add column if not exists address text,
+  add column if not exists display_name text null,
+  add column if not exists status text default 'active',
+  add column if not exists preference_rank integer default 100,
+  add column if not exists actor_type text default 'human',
+  add column if not exists metadata jsonb default '{}'::jsonb,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+update public.communication_channels
+set
+  channel_type = case
+    when channel_type in ('email', 'line', 'manual', 'sms', 'telegram', 'wechat', 'whatsapp') then channel_type
+    else 'manual'
+  end,
+  address = coalesce(nullif(address, ''), 'unknown'),
+  status = case
+    when status in ('active', 'unverified', 'disabled', 'failed') then status
+    else 'active'
+  end,
+  preference_rank = coalesce(preference_rank, 100),
+  actor_type = case
+    when actor_type in ('ai', 'human', 'system', 'unknown') then actor_type
+    else 'human'
+  end,
+  metadata = coalesce(metadata, '{}'::jsonb),
+  created_at = coalesce(created_at, now()),
+  updated_at = coalesce(updated_at, now())
+where channel_type is null
+  or channel_type not in ('email', 'line', 'manual', 'sms', 'telegram', 'wechat', 'whatsapp')
+  or address is null
+  or address = ''
+  or status is null
+  or status not in ('active', 'unverified', 'disabled', 'failed')
+  or preference_rank is null
+  or actor_type is null
+  or actor_type not in ('ai', 'human', 'system', 'unknown')
+  or metadata is null
+  or created_at is null
+  or updated_at is null;
+
+alter table public.communication_channels
+  alter column identity_id set not null,
+  alter column channel_type set not null,
+  alter column address set not null,
+  alter column status set default 'active',
+  alter column status set not null,
+  alter column preference_rank set default 100,
+  alter column preference_rank set not null,
+  alter column actor_type set default 'human',
+  alter column actor_type set not null,
+  alter column metadata set default '{}'::jsonb,
+  alter column metadata set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.communication_channels'::regclass
+      and conname = 'communication_channels_type_check'
+  ) then
+    alter table public.communication_channels
+      add constraint communication_channels_type_check
+      check (channel_type in ('email', 'line', 'manual', 'sms', 'telegram', 'wechat', 'whatsapp'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.communication_channels'::regclass
+      and conname = 'communication_channels_status_check'
+  ) then
+    alter table public.communication_channels
+      add constraint communication_channels_status_check
+      check (status in ('active', 'unverified', 'disabled', 'failed'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.communication_channels'::regclass
+      and conname = 'communication_channels_actor_check'
+  ) then
+    alter table public.communication_channels
+      add constraint communication_channels_actor_check
+      check (actor_type in ('ai', 'human', 'system', 'unknown'));
+  end if;
+end $$;
+
+create unique index if not exists communication_channels_identity_address_idx
+  on public.communication_channels (identity_id, channel_type, lower(address));
+
+create table if not exists public.communication_messages (
+  id uuid primary key,
+  identity_id uuid null references public.communication_identities(id) on delete set null,
+  channel_id uuid null references public.communication_channels(id) on delete set null,
+  plan_id uuid null references public.assessments(plan_id) on delete set null,
+  goal_id uuid null references public.goals(id) on delete set null,
+  task_id uuid null references public.tasks(id) on delete set null,
+  direction text not null default 'outbound',
+  message_type text not null default 'general',
+  status text not null default 'queued',
+  subject text null,
+  body text not null,
+  html text null,
+  provider text null,
+  provider_message_id text null,
+  error_message text null,
+  metadata jsonb not null default '{}'::jsonb,
+  scheduled_for timestamptz null,
+  sent_at timestamptz null,
+  delivered_at timestamptz null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.communication_messages
+  add column if not exists identity_id uuid null references public.communication_identities(id) on delete set null,
+  add column if not exists channel_id uuid null references public.communication_channels(id) on delete set null,
+  add column if not exists plan_id uuid null references public.assessments(plan_id) on delete set null,
+  add column if not exists goal_id uuid null references public.goals(id) on delete set null,
+  add column if not exists task_id uuid null references public.tasks(id) on delete set null,
+  add column if not exists direction text default 'outbound',
+  add column if not exists message_type text default 'general',
+  add column if not exists status text default 'queued',
+  add column if not exists subject text null,
+  add column if not exists body text,
+  add column if not exists html text null,
+  add column if not exists provider text null,
+  add column if not exists provider_message_id text null,
+  add column if not exists error_message text null,
+  add column if not exists metadata jsonb default '{}'::jsonb,
+  add column if not exists scheduled_for timestamptz null,
+  add column if not exists sent_at timestamptz null,
+  add column if not exists delivered_at timestamptz null,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+update public.communication_messages
+set
+  direction = case when direction in ('inbound', 'outbound') then direction else 'outbound' end,
+  message_type = coalesce(nullif(message_type, ''), 'general'),
+  status = case
+    when status in ('queued', 'sent', 'delivered', 'failed', 'skipped', 'no_channel') then status
+    else 'queued'
+  end,
+  body = coalesce(body, ''),
+  metadata = coalesce(metadata, '{}'::jsonb),
+  created_at = coalesce(created_at, now()),
+  updated_at = coalesce(updated_at, now())
+where direction is null
+  or direction not in ('inbound', 'outbound')
+  or message_type is null
+  or message_type = ''
+  or status is null
+  or status not in ('queued', 'sent', 'delivered', 'failed', 'skipped', 'no_channel')
+  or body is null
+  or metadata is null
+  or created_at is null
+  or updated_at is null;
+
+alter table public.communication_messages
+  alter column direction set default 'outbound',
+  alter column direction set not null,
+  alter column message_type set default 'general',
+  alter column message_type set not null,
+  alter column status set default 'queued',
+  alter column status set not null,
+  alter column body set not null,
+  alter column metadata set default '{}'::jsonb,
+  alter column metadata set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.communication_messages'::regclass
+      and conname = 'communication_messages_status_check'
+  ) then
+    alter table public.communication_messages
+      add constraint communication_messages_status_check
+      check (status in ('queued', 'sent', 'delivered', 'failed', 'skipped', 'no_channel'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.communication_messages'::regclass
+      and conname = 'communication_messages_direction_check'
+  ) then
+    alter table public.communication_messages
+      add constraint communication_messages_direction_check
+      check (direction in ('inbound', 'outbound'));
+  end if;
+end $$;
+
+comment on table public.communication_identities is
+  'Customer communication identities. One identity can have several channels.';
+comment on table public.communication_channels is
+  'Plan or customer contact channels such as LINE, WhatsApp, Telegram, WeChat, and email.';
+comment on table public.communication_messages is
+  'Append-only-ish outbound and inbound communication records tied to plans, goals, and tasks.';
+
+create index if not exists communication_messages_plan_idx
+  on public.communication_messages (plan_id, created_at desc)
+  where plan_id is not null;
+
+create index if not exists communication_messages_status_idx
+  on public.communication_messages (status, created_at asc);
+
 create table if not exists public.testimonials (
   id uuid primary key,
   locale text not null default 'en',
@@ -4044,6 +4356,30 @@ begin
   end;
 
   begin
+    execute 'alter table public.communication_identities owner to mn';
+  exception when others then
+    raise notice 'Skipping communication_identities owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter table public.plan_communication_identities owner to mn';
+  exception when others then
+    raise notice 'Skipping plan_communication_identities owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter table public.communication_channels owner to mn';
+  exception when others then
+    raise notice 'Skipping communication_channels owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter table public.communication_messages owner to mn';
+  exception when others then
+    raise notice 'Skipping communication_messages owner change: %', sqlerrm;
+  end;
+
+  begin
     execute 'alter table public.testimonials owner to mn';
   exception when others then
     raise notice 'Skipping testimonials owner change: %', sqlerrm;
@@ -4065,6 +4401,10 @@ begin
          public.supplement_aliases,
          public.supplement_admin_audit,
          public.safety_reviews,
+         public.communication_identities,
+         public.plan_communication_identities,
+         public.communication_channels,
+         public.communication_messages,
          public.agents,
          public.goals,
          public.tasks,

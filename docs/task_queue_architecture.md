@@ -81,7 +81,7 @@ New tasks should normally inherit the parent goal priority unless a workflow has
 
 ## Current Status
 
-Phases 1 through 12 are implemented.
+Phases 1 through 13 are implemented.
 
 The following tables now exist in the schema:
 
@@ -93,6 +93,10 @@ The following tables now exist in the schema:
 - `task_events`
 - `task_reservations`
 - `task_approvals`
+- `communication_identities`
+- `plan_communication_identities`
+- `communication_channels`
+- `communication_messages`
 
 The existing `jobs` table remains in place as the compatibility execution record. New formulation, free example, email, and reassessment jobs now also create Goals and Tasks, and the internal worker reserves task-backed jobs first.
 
@@ -459,9 +463,48 @@ Acceptance criteria:
 - Failed terminal task sets the goal failed when no active task remains. Done.
 - Agent heartbeat reflects lease renewal activity. Done.
 
+## Phase 13: Communication Channels And Follow-Up Worker
+
+Status: complete for the first client safety follow-up slice.
+
+The system now has an explicit communication-channel layer. Plans can be associated with a communication identity, and that identity can hold multiple channels such as LINE, WhatsApp, Telegram, WeChat, email, SMS, or manual contact.
+
+Current behaviour:
+
+- Each plan can be linked to a primary communication identity.
+- A communication identity can hold multiple ranked channels.
+- Channel selection honours explicit preference rank first.
+- If no preference has been set, chat channels are preferred before email: LINE, WhatsApp, Telegram, WeChat, then email.
+- Known plan emails from Free email requests or reassessment records are seeded as email channels.
+- Outbound messages are recorded in `communication_messages` with plan, goal, task, channel, provider, status, and metadata.
+- Email messages use the existing SMTP sender.
+- Chat-channel messages are queued as communication messages for a future provider/OpenClaw delivery bridge.
+- The internal worker now reserves `client_safety_followup` tasks and sends or queues the follow-up through the best available channel.
+- If no channel exists, the task fails visibly and the related safety review is marked `failed` for client notification.
+- OpenClaw-protected APIs can create/list channels, send a message to a plan or identity, list queued messages, and update delivery status.
+
+Implemented endpoints:
+
+- `GET /api/communications/channels`
+- `POST /api/communications/channels`
+- `POST /api/communications/send`
+- `GET /api/communications/messages`
+- `GET /api/communications/messages/:id`
+- `PATCH /api/communications/messages/:id`
+
+Acceptance criteria:
+
+- A plan can have multiple communication channels. Done.
+- Channel choice is deterministic and test-covered. Done.
+- Chat channels are preferred before email unless an explicit rank overrides that. Done.
+- Post-review client follow-up tasks are no longer stranded. Done.
+- Email follow-ups can be sent through SMTP when email is available. Done.
+- Chat follow-ups are queued for external delivery rather than silently discarded. Done.
+- OpenClaw machine APIs are protected by `ADMIN_CLAW_TOKEN`. Done.
+
 ## Remaining Plan From Here
 
-Next phase: connect `client_safety_followup` to the communications-channel architecture so LINE, WhatsApp, Telegram, or email can notify the client after a review decision.
+Next phase: add customer-facing channel capture to the safety review box and connect real chat providers, starting with LINE.
 
 ## Definition Of Done
 

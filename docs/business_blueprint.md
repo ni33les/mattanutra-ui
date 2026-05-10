@@ -69,7 +69,8 @@ flowchart TB
 - BPM tracking for funnel, campaign, affiliate, safety, error, email, chat, and formulation events.
 - Admin dashboard with KPI and Conversions views over hour, day, week, month, year, and all-time windows.
 - Admin Technical section with Alerts and Legacy Jobs views for failed email sends, stuck compatibility records, cron failures, AI/worker errors, and recent job history.
-- Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported slow work now creates task-backed work items, worker reservations are enforced, human review decisions write reviewed formulation versions, and client review follow-up is queued as a task.
+- Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported slow work now creates task-backed work items, worker reservations are enforced, human review decisions write reviewed formulation versions, and client review follow-up is handled through the communication-channel worker.
+- Communication-channel foundation: each plan can be linked to an identity with LINE, WhatsApp, Telegram, WeChat, email, SMS, or manual channels; the system chooses the best available channel, preferring chat before email unless an explicit preference exists.
 - Admin Goals view showing goal status, priority, source, BPM/session ray, tasks, events, comments, dependencies, reservations, and approvals.
 - Dashboard filters for locale, device, source, medium, campaign, campaign ID, affiliate, promo code, selected plan, plan ID, ray, and email hash.
 
@@ -82,7 +83,7 @@ flowchart TB
 | Supplement governance | Whitelist, blacklist, max dose, and safety review basics exist; frequency and interaction rules are not wired yet | Add frequency, condition, medication, pregnancy, and lab interaction checks |
 | Product matching | Affiliate revenue depends on trusted products | Start with curated whitelist before marketplace automation |
 | Chat handoff | Pro needs a convincing ongoing service experience | Make one channel excellent first, likely LINE |
-| Human safety review | Flagged suggestions now enter Human Review and create Goal/Task records; decisions update the plan append-only and queue a client follow-up task | Connect the follow-up task to real communication channels and audit reporting |
+| Human safety review | Flagged suggestions now enter Human Review and create Goal/Task records; decisions update the plan append-only and trigger channel-aware client follow-up | Add customer-facing channel capture and real chat provider delivery |
 | Follow-up nurture | Free users need more than one email | Define post-preview sequence |
 
 ## Sales Funnel Paths
@@ -196,13 +197,14 @@ How the admin sections should be read:
 | Supplements | Which supplements are allowed, blocked, or awaiting review? | Live with editable dose ceilings and safety flags |
 | Human Review | What needs a human decision before being shown or acted on? | Live for supplement review and dose-reduction notices |
 | Goals | What outcome is being pursued, and which tasks/events explain its current state? | Live for supplement review, formulation, Free email, reassessment, and staged task-backed work |
+| Communications | Which channel should be used to contact a client, and what messages were queued or sent? | Data model, worker, and OpenClaw APIs are live; dashboard view is still future work |
 | Technical Alerts | What failed or looks stuck? | Live for tasks, legacy jobs, cron, job audit, and BPM error events |
 | Legacy Jobs | What compatibility work has been queued, run, completed, or failed? | Live history and execution diagnostics while compatibility rows remain |
 
 Remaining admin dashboard work:
 
 1. Campaign and affiliate comparison tables.
-2. Email-specific communications reporting if email volume makes it worth separating from Jobs/Alerts.
+2. Communications dashboard for queued, sent, failed, and no-channel messages.
 3. Retry actions for failed technical jobs where safe.
 4. Ray drill-down for a single anonymous BPM/session journey.
 5. Content, testimonial, interaction-rule, and advanced supplement decision management.
@@ -310,7 +312,7 @@ Best use:
 1. Campaign/affiliate reporting tables on top of the live BPM dashboard filters.
 2. Safe acknowledge/retry/dismiss actions for technical alerts and failed jobs.
 3. Supplement interaction rules for medications, conditions, pregnancy, age, and labs.
-4. Post-review client notification and communication-channel fallback.
+4. Customer-facing email and chat capture for safety-review follow-up.
 5. Payment integration for Precision and Pro.
 6. Product matching against approved supplement/product whitelist.
 7. One excellent chat handoff, likely LINE first.
