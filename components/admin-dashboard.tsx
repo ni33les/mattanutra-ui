@@ -10,6 +10,7 @@ import {
 import {
   Bars3Icon,
   BeakerIcon,
+  ChatBubbleLeftRightIcon,
   ChevronDownIcon,
   DocumentTextIcon,
   EnvelopeIcon,
@@ -31,6 +32,11 @@ import type {
   AdminDashboardRateId,
   AdminDashboardRange
 } from "@/lib/admin-dashboard-data";
+import type {
+  AdminCommunicationRow,
+  AdminCommunicationsData,
+  AdminCommunicationStatus
+} from "@/lib/admin-communications";
 import type {
   AdminReviewJobRow,
   AdminReviewQueueData
@@ -71,6 +77,7 @@ import type { Locale } from "@/lib/i18n";
 
 type AdminDashboardView =
   | "alerts"
+  | "communications"
   | "flow"
   | "goals"
   | "jobs"
@@ -118,6 +125,24 @@ type AdminContent = Readonly<{
     selectedPlan: string;
     source: string;
     title: string;
+  };
+  communications: {
+    address: string;
+    body: string;
+    delivered: string;
+    empty: string;
+    failed: string;
+    messageType: string;
+    noChannel: string;
+    plan: string;
+    provider: string;
+    queued: string;
+    sent: string;
+    skipped: string;
+    status: string;
+    task: string;
+    time: string;
+    total: string;
   };
   generated: string;
   goals: {
@@ -299,6 +324,24 @@ const content = {
       source: "Source",
       title: "Filters"
     },
+    communications: {
+      address: "Address",
+      body: "Message",
+      delivered: "Delivered",
+      empty: "No communication messages in this timeframe.",
+      failed: "Failed",
+      messageType: "Type",
+      noChannel: "No channel",
+      plan: "Plan",
+      provider: "Provider",
+      queued: "Queued",
+      sent: "Sent",
+      skipped: "Skipped",
+      status: "Status",
+      task: "Task",
+      time: "Time",
+      total: "Total"
+    },
     generated: "Generated",
     goals: {
       active: "Active",
@@ -386,6 +429,11 @@ const content = {
       { icon: FunnelIcon, name: "Conversions", view: "flow" },
       { href: "#", icon: MegaphoneIcon, name: "Campaigns" },
       { href: "#", icon: EnvelopeIcon, name: "Leads" },
+      {
+        icon: ChatBubbleLeftRightIcon,
+        name: "Communications",
+        view: "communications"
+      },
       { icon: BeakerIcon, name: "Supplements", view: "supplements" },
       { href: "#", icon: DocumentTextIcon, name: "Content" }
     ],
@@ -395,6 +443,7 @@ const content = {
     queuesTitle: "Queues",
     pageTitles: {
       alerts: "Technical Alerts",
+      communications: "Communications",
       flow: "Sales Conversions",
       goals: "Goals",
       jobs: "Jobs",
@@ -566,6 +615,24 @@ const content = {
       source: "Source",
       title: "ตัวกรอง"
     },
+    communications: {
+      address: "ปลายทาง",
+      body: "ข้อความ",
+      delivered: "ส่งถึงแล้ว",
+      empty: "ไม่มีข้อความสื่อสารในช่วงเวลานี้",
+      failed: "ล้มเหลว",
+      messageType: "ชนิด",
+      noChannel: "ไม่มีช่องทาง",
+      plan: "แผน",
+      provider: "Provider",
+      queued: "รอส่ง",
+      sent: "ส่งแล้ว",
+      skipped: "ข้าม",
+      status: "สถานะ",
+      task: "งาน",
+      time: "เวลา",
+      total: "ทั้งหมด"
+    },
     generated: "สร้างเมื่อ",
     goals: {
       active: "กำลังทำ",
@@ -653,6 +720,11 @@ const content = {
       { icon: FunnelIcon, name: "Conversions", view: "flow" },
       { href: "#", icon: MegaphoneIcon, name: "แคมเปญ" },
       { href: "#", icon: EnvelopeIcon, name: "ลีด" },
+      {
+        icon: ChatBubbleLeftRightIcon,
+        name: "การสื่อสาร",
+        view: "communications"
+      },
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplements" },
       { href: "#", icon: DocumentTextIcon, name: "คอนเทนต์" }
     ],
@@ -662,6 +734,7 @@ const content = {
     queuesTitle: "คิวงาน",
     pageTitles: {
       alerts: "การแจ้งเตือนทางเทคนิค",
+      communications: "การสื่อสาร",
       flow: "Sales Conversions",
       goals: "Goals",
       jobs: "งานระบบ",
@@ -2721,6 +2794,164 @@ function jsonPreview(value: Record<string, unknown>) {
   return text === "{}" ? "" : text;
 }
 
+function communicationStatusLabel(
+  labels: AdminContent,
+  status: AdminCommunicationStatus
+) {
+  if (status === "no_channel") {
+    return labels.communications.noChannel;
+  }
+
+  return labels.communications[status];
+}
+
+function communicationStatusClass(status: AdminCommunicationStatus) {
+  if (status === "failed" || status === "no_channel") {
+    return "bg-red-50 text-red-700 ring-red-100";
+  }
+
+  if (status === "queued") {
+    return "bg-amber-50 text-amber-800 ring-amber-200";
+  }
+
+  if (status === "sent" || status === "delivered") {
+    return "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]";
+  }
+
+  return "bg-gray-50 text-gray-700 ring-gray-200";
+}
+
+function communicationTitle(row: AdminCommunicationRow) {
+  return (
+    row.subject ||
+    row.taskTitle ||
+    row.goalTitle ||
+    readableToken(row.messageType)
+  );
+}
+
+function AdminCommunicationsView({
+  data,
+  labels,
+  locale
+}: Readonly<{
+  data: AdminCommunicationsData;
+  labels: AdminContent;
+  locale: Locale;
+}>) {
+  return (
+    <section className="mt-8 space-y-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <FlowSummaryCard
+          label={labels.communications.total}
+          value={formatNumber(data.summary.total, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.communications.queued}
+          value={formatNumber(data.summary.queued, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.communications.sent}
+          value={formatNumber(data.summary.sent, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.communications.delivered}
+          value={formatNumber(data.summary.delivered, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.communications.failed}
+          value={formatNumber(data.summary.failed, locale)}
+        />
+        <FlowSummaryCard
+          label={labels.communications.noChannel}
+          value={formatNumber(data.summary.noChannel, locale)}
+        />
+      </div>
+
+      {data.rows.length > 0 ? (
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+          <div className="divide-y divide-gray-100">
+            {data.rows.map((row) => (
+              <article key={row.id} className="px-5 py-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={classNames(
+                          communicationStatusClass(row.status),
+                          "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+                        )}
+                      >
+                        {communicationStatusLabel(labels, row.status)}
+                      </span>
+                      <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                        {readableToken(row.channelType ?? row.provider ?? "manual")}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-3 text-base font-semibold text-gray-900">
+                      {communicationTitle(row)}
+                    </h3>
+                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-600">
+                      {row.body}
+                    </p>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                      <SupplementListMeta
+                        label={labels.communications.time}
+                        value={formatGeneratedAt(row.createdAt, locale)}
+                      />
+                      <SupplementListMeta
+                        label={labels.communications.messageType}
+                        value={readableToken(row.messageType)}
+                      />
+                      <SupplementListMeta
+                        label={labels.communications.address}
+                        value={row.address ?? "—"}
+                      />
+                      <SupplementListMeta
+                        label={labels.communications.plan}
+                        value={
+                          row.planId ? (
+                            <a
+                              className="font-semibold text-[#0EA5E9] hover:text-[#0284C7]"
+                              href={`/${locale}/assessment/results?plan=${row.planId}`}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              {row.planId}
+                            </a>
+                          ) : (
+                            "—"
+                          )
+                        }
+                      />
+                      <SupplementListMeta
+                        label={labels.communications.task}
+                        value={row.taskTitle ?? row.taskId ?? "—"}
+                      />
+                    </div>
+
+                    {row.errorMessage ? (
+                      <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
+                        {row.errorMessage}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-2xl bg-white px-5 py-12 text-center text-sm font-medium text-gray-500 shadow-sm ring-1 ring-gray-200">
+          {labels.communications.empty}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function AdminTechnicalAlertsView({
   data,
   labels,
@@ -4021,6 +4252,7 @@ function AdminFilterPanel({
 
 function adminViewDatabaseAvailable({
   alertsData,
+  communicationsData,
   data,
   flowData,
   goalsData,
@@ -4030,6 +4262,7 @@ function adminViewDatabaseAvailable({
   view
 }: Readonly<{
   alertsData: AdminTechnicalAlertsData;
+  communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
   flowData: AdminFlowData;
   goalsData: AdminGoalsData;
@@ -4040,6 +4273,10 @@ function adminViewDatabaseAvailable({
 }>) {
   if (view === "alerts") {
     return alertsData.databaseAvailable;
+  }
+
+  if (view === "communications") {
+    return communicationsData.databaseAvailable;
   }
 
   if (view === "flow") {
@@ -4068,6 +4305,7 @@ function adminViewDatabaseAvailable({
 export function AdminDashboard({
   accessToken,
   alertsData,
+  communicationsData,
   data,
   filters,
   flowData,
@@ -4080,6 +4318,7 @@ export function AdminDashboard({
 }: Readonly<{
   accessToken: string;
   alertsData: AdminTechnicalAlertsData;
+  communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
   filters: AdminDashboardFilters;
   flowData: AdminFlowData;
@@ -4094,6 +4333,7 @@ export function AdminDashboard({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const databaseAvailable = adminViewDatabaseAvailable({
     alertsData,
+    communicationsData,
     data,
     flowData,
     goalsData,
@@ -4185,6 +4425,7 @@ export function AdminDashboard({
           ) : null}
 
           {view === "alerts" ||
+          view === "communications" ||
           view === "flow" ||
           view === "goals" ||
           view === "jobs" ||
@@ -4225,6 +4466,12 @@ export function AdminDashboard({
 
           {view === "flow" ? (
             <AdminFlowView flowData={flowData} labels={labels} locale={locale} />
+          ) : view === "communications" ? (
+            <AdminCommunicationsView
+              data={communicationsData}
+              labels={labels}
+              locale={locale}
+            />
           ) : view === "goals" ? (
             <AdminGoalsView
               accessToken={accessToken}

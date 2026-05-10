@@ -11,7 +11,8 @@ Last updated: 2026-05-10
 - [x] Reword the safety review box so it feels reassuring, clear, and action-oriented.
 - [x] Move plans toward explicit communication channels: LINE, WhatsApp, and email.
 - [x] For plan communications, choose the first available working chat channel first, then fall back to email.
-- [ ] Connect a real chat provider delivery bridge, likely LINE first.
+- [x] Connect a real chat provider delivery bridge, likely LINE first.
+- [ ] Tighten production LINE identity mapping so captured handles can reliably become LINE user IDs.
 
 ## Admin And Operations
 

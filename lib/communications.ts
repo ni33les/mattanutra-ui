@@ -100,6 +100,19 @@ type MessageRow = {
   updated_at: Date | string;
 };
 
+type DeliveryTargetRow = MessageRow & {
+  delivery_address: string | null;
+  delivery_channel_type: CommunicationChannelType | null;
+};
+
+export type CommunicationDispatchResult = Readonly<{
+  attempted: boolean;
+  configured: boolean;
+  message: CommunicationMessage;
+  provider: string | null;
+  reason: string | null;
+}>;
+
 const MESSAGE_STATUSES = new Set<string>([
   "delivered",
   "failed",
@@ -141,6 +154,10 @@ function objectValue(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function configuredLineAccessToken() {
+  return process.env.LINE_CHANNEL_ACCESS_TOKEN?.trim() || "";
 }
 
 function normalizeAddress(type: CommunicationChannelType, address: string) {
@@ -939,6 +956,207 @@ export async function updateCommunicationMessageStatus(input: Readonly<{
 
     return message;
   });
+}
+
+function lineRecipient(row: DeliveryTargetRow) {
+  const metadata = objectValue(row.metadata);
+
+  return (
+    cleanText(metadata.lineUserId) ||
+    cleanText(metadata.userId) ||
+    cleanText(row.delivery_address)
+  );
+}
+
+async function deliverLineMessage(row: DeliveryTargetRow) {
+  const accessToken = configuredLineAccessToken();
+
+  if (!accessToken) {
+    return {
+      attempted: false,
+      configured: false,
+      message: mapMessage(row),
+      provider: "line",
+      reason: "LINE_CHANNEL_ACCESS_TOKEN is not configured"
+    } satisfies CommunicationDispatchResult;
+  }
+
+  const recipient = lineRecipient(row);
+
+  if (!recipient) {
+    const message = await updateCommunicationMessageStatus({
+      errorMessage: "LINE channel is missing a recipient user id",
+      messageId: row.id,
+      status: "failed"
+    });
+
+    return {
+      attempted: false,
+      configured: true,
+      message,
+      provider: "line",
+      reason: "LINE channel is missing a recipient user id"
+    } satisfies CommunicationDispatchResult;
+  }
+
+  const response = await fetch("https://api.line.me/v2/bot/message/push", {
+    body: JSON.stringify({
+      messages: [
+        {
+          text: row.body.slice(0, 4900),
+          type: "text"
+        }
+      ],
+      to: recipient
+    }),
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    method: "POST"
+  });
+  const providerMessageId = response.headers.get("x-line-request-id");
+
+  if (response.ok) {
+    const message = await updateCommunicationMessageStatus({
+      messageId: row.id,
+      providerMessageId,
+      status: "sent"
+    });
+
+    return {
+      attempted: true,
+      configured: true,
+      message,
+      provider: "line",
+      reason: null
+    } satisfies CommunicationDispatchResult;
+  }
+
+  const errorText = await response.text().catch(() => "");
+  const message = await updateCommunicationMessageStatus({
+    errorMessage:
+      errorText || `LINE delivery failed with status ${response.status}`,
+    messageId: row.id,
+    providerMessageId,
+    status: "failed"
+  });
+
+  return {
+    attempted: true,
+    configured: true,
+    message,
+    provider: "line",
+    reason: message.errorMessage
+  } satisfies CommunicationDispatchResult;
+}
+
+export async function dispatchCommunicationMessage(messageId: string) {
+  const sql = sqlOrThrow();
+
+  await ensureCommunicationSchema(sql);
+
+  const rows = await sql<DeliveryTargetRow[]>`
+    select
+      communication_messages.*,
+      communication_channels.channel_type as delivery_channel_type,
+      communication_channels.address as delivery_address
+    from public.communication_messages
+    left join public.communication_channels
+      on communication_channels.id = communication_messages.channel_id
+    where communication_messages.id = ${messageId}::uuid
+    limit 1
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error("Communication message not found");
+  }
+
+  if (row.status !== "queued") {
+    return {
+      attempted: false,
+      configured: true,
+      message: mapMessage(row),
+      provider: row.provider,
+      reason: "Message is not queued"
+    } satisfies CommunicationDispatchResult;
+  }
+
+  if (!row.delivery_channel_type) {
+    const message = await updateCommunicationMessageStatus({
+      errorMessage: "Communication message has no channel",
+      messageId,
+      status: "no_channel"
+    });
+
+    if (row.plan_id) {
+      await writeBpmEvent({
+        actorType: "worker",
+        eventName: "communication_dispatch_no_channel",
+        eventStatus: "failed",
+        eventType: "chat",
+        planId: row.plan_id,
+        properties: {
+          messageId: row.id,
+          messageType: row.message_type
+        },
+        severity: "medium"
+      });
+    }
+
+    return {
+      attempted: false,
+      configured: true,
+      message,
+      provider: null,
+      reason: "Communication message has no channel"
+    } satisfies CommunicationDispatchResult;
+  }
+
+  const result =
+    row.delivery_channel_type === "line"
+      ? await deliverLineMessage(row)
+      : ({
+          attempted: false,
+          configured: false,
+          message: mapMessage(row),
+          provider: row.delivery_channel_type,
+          reason: `${row.delivery_channel_type} delivery is not configured`
+        } satisfies CommunicationDispatchResult);
+
+  if (row.plan_id) {
+    await writeBpmEvent({
+      actorType: "worker",
+      eventName:
+        result.message.status === "sent" ||
+        result.message.status === "delivered"
+          ? "communication_dispatch_sent"
+          : result.message.status === "failed"
+            ? "communication_dispatch_failed"
+            : "communication_dispatch_queued",
+      eventStatus:
+        result.message.status === "sent" ||
+        result.message.status === "delivered"
+          ? "succeeded"
+          : result.message.status === "failed"
+            ? "failed"
+            : "observed",
+      eventType: row.delivery_channel_type === "email" ? "email" : "chat",
+      planId: row.plan_id,
+      properties: {
+        attempted: result.attempted,
+        configured: result.configured,
+        messageId: row.id,
+        messageType: row.message_type,
+        provider: result.provider,
+        reason: result.reason
+      },
+      severity: result.message.status === "failed" ? "medium" : "low"
+    });
+  }
+
+  return result;
 }
 
 function safetyFollowupMessage(input: Readonly<{

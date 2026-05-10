@@ -491,6 +491,7 @@ Implemented endpoints:
 - `GET /api/communications/messages`
 - `GET /api/communications/messages/:id`
 - `PATCH /api/communications/messages/:id`
+- `POST /api/communications/messages/:id/dispatch`
 
 Acceptance criteria:
 
@@ -529,7 +530,32 @@ Acceptance criteria:
 
 ## Remaining Plan From Here
 
-Next phase: connect a real chat provider delivery bridge, starting with LINE, and add a communications view to the admin dashboard.
+## Phase 15: Communications Operations And LINE Dispatch
+
+Status: complete for the first provider bridge.
+
+The admin dashboard now has a Communications view. It reads real `communication_messages` rows and shows totals for queued, sent, delivered, failed, skipped, and no-channel messages across the standard time windows.
+
+Current behaviour:
+
+- Communications is a first-class dashboard menu item.
+- Message rows show status, channel/provider, body preview, plan, task, address, and any delivery error.
+- `POST /api/communications/messages/:id/dispatch` lets OpenClaw or a worker dispatch a queued message.
+- LINE is the first direct provider bridge. When `LINE_CHANNEL_ACCESS_TOKEN` is configured, queued LINE messages are sent through LINE Messaging API.
+- LINE dispatch records sent/failed status back to `communication_messages` and writes BPM dispatch events.
+- Unsupported chat providers remain queued for OpenClaw/provider-specific delivery rather than being dropped.
+- The dispatch API is protected by `ADMIN_CLAW_TOKEN`.
+
+Acceptance criteria:
+
+- Admin can see communication throughput and failures. Done.
+- Queued LINE messages can be dispatched server-side when credentials exist. Done.
+- Failed LINE sends are recorded against the message and become visible in admin. Done.
+- OpenClaw can still list and update queued messages for providers not bridged directly. Done.
+
+## Remaining Plan From Here
+
+Next phase: decide whether OpenClaw or an internal worker owns provider polling/dispatch scheduling, then make the first production LINE identity mapping robust.
 
 ## Definition Of Done
 

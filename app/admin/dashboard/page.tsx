@@ -5,6 +5,7 @@ import {
   getAdminDashboardData,
   normalizeAdminDashboardRange
 } from "@/lib/admin-dashboard-data";
+import { getAdminCommunicationsData } from "@/lib/admin-communications";
 import { normalizeAdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import { getAdminFlowData } from "@/lib/admin-flow-data";
 import { getAdminGoalsData } from "@/lib/admin-goals";
@@ -34,6 +35,7 @@ export default async function AdminDashboardPage({
   const rawView = firstParam(params.view);
   const view =
     rawView === "alerts" ||
+    rawView === "communications" ||
     rawView === "flow" ||
     rawView === "goals" ||
     rawView === "jobs" ||
@@ -50,6 +52,7 @@ export default async function AdminDashboardPage({
 
   const [
     alertsData,
+    communicationsData,
     data,
     flowData,
     goalsData,
@@ -58,6 +61,7 @@ export default async function AdminDashboardPage({
     supplementsData
   ] = await Promise.all([
     getAdminTechnicalAlertsData(range),
+    getAdminCommunicationsData(range),
     getAdminDashboardData(range, filters),
     getAdminFlowData(range, filters),
     getAdminGoalsData(range, selectedGoalId),
@@ -70,6 +74,7 @@ export default async function AdminDashboardPage({
     <AdminDashboard
       accessToken={accessToken ?? ""}
       alertsData={alertsData}
+      communicationsData={communicationsData}
       data={data}
       filters={filters}
       flowData={flowData}
