@@ -8,6 +8,13 @@ import {
   type SVGProps
 } from "react";
 import {
+  Combobox,
+  ComboboxButton,
+  ComboboxInput,
+  ComboboxOption,
+  ComboboxOptions
+} from "@headlessui/react";
+import {
   Bars3Icon,
   BeakerIcon,
   ChatBubbleLeftRightIcon,
@@ -24,6 +31,7 @@ import {
   SparklesIcon,
   XMarkIcon
 } from "@heroicons/react/24/outline";
+import { ChevronDownIcon as ChevronDownSolidIcon } from "@heroicons/react/20/solid";
 import { HealthspanLogo } from "@/components/healthspan-logo";
 import type {
   AdminDashboardData,
@@ -180,6 +188,7 @@ type AdminContent = Readonly<{
     empty: string;
     events: string;
     failed: string;
+    age: string;
     lastActivity: string;
     live: string;
     needsReview: string;
@@ -216,12 +225,17 @@ type AdminContent = Readonly<{
   };
   flowTitle: string;
   kpis: Record<AdminDashboardKpiId, KpiText>;
-  navigation: AdminNavItem[];
+  execution: AdminNavItem[];
+  executionTitle: string;
+  governance: AdminNavItem[];
+  governanceTitle: string;
+  marketing: AdminNavItem[];
+  marketingTitle: string;
   nextBuckets: string;
   openSidebar: string;
-  queues: AdminNavItem[];
-  queuesTitle: string;
   pageTitles: Record<AdminDashboardView, string>;
+  performance: AdminNavItem[];
+  performanceTitle: string;
   ranges: Record<AdminDashboardRange, string>;
   rates: Record<AdminDashboardRateId, RateText>;
   ratesTitle: string;
@@ -239,14 +253,15 @@ type AdminContent = Readonly<{
     originalDose: string;
     plan: string;
     planLink: string;
+    planReview: string;
     queued: string;
     doseUnverified: string;
+    supplementReview: string;
     reviewerNote: string;
     reviewRequired: string;
     total: string;
     unknown: string;
   };
-  technical: AdminNavItem[];
   technicalAlerts: {
     critical: string;
     empty: string;
@@ -255,13 +270,13 @@ type AdminContent = Readonly<{
     low: string;
     medium: string;
     plan: string;
+    rootCause: string;
     source: string;
     status: string;
     task: string;
     time: string;
     total: string;
   };
-  technicalTitle: string;
   visibility: {
     active: string;
     actor: string;
@@ -297,8 +312,16 @@ type AdminContent = Readonly<{
     safetyFlag: string;
     safetyFlagOptions: Record<SupplementSafetyFlag, string>;
     safetyNotes: string;
+    associateExisting: string;
+    associations: string;
+    associationHint: string;
+    associatedWith: string;
+    clearAssociation: string;
+    noAssociationMatches: string;
+    removeAssociation: string;
     save: string;
     search: string;
+    searchExisting: string;
     sourceStatus: string;
     status: string;
     suggestDose: string;
@@ -396,6 +419,7 @@ const content = {
       empty: "No goals in this timeframe.",
       events: "Events",
       failed: "Failed",
+      age: "Age",
       lastActivity: "Last activity",
       live: "Live",
       needsReview: "Needs review",
@@ -468,9 +492,12 @@ const content = {
         title: "Pro conversions"
       }
     },
-    navigation: [
-      { icon: HomeIcon, name: "KPI", view: "kpi" },
-      { icon: FunnelIcon, name: "Conversions", view: "flow" },
+    performance: [
+      { icon: HomeIcon, name: "KPIs", view: "kpi" },
+      { icon: FunnelIcon, name: "Conversions", view: "flow" }
+    ],
+    performanceTitle: "Performance",
+    marketing: [
       { href: "#", icon: MegaphoneIcon, name: "Campaigns" },
       { href: "#", icon: EnvelopeIcon, name: "Leads" },
       {
@@ -478,18 +505,23 @@ const content = {
         name: "Communications",
         view: "communications"
       },
-      { icon: BeakerIcon, name: "Supplements", view: "supplements" },
       { href: "#", icon: DocumentTextIcon, name: "Content" }
     ],
+    marketingTitle: "Marketing",
+    governance: [
+      { icon: ExclamationTriangleIcon, name: "Reviews", view: "reviews" },
+      { icon: BeakerIcon, name: "Supplements", view: "supplements" }
+    ],
+    governanceTitle: "Safety",
     nextBuckets: "Next 3 buckets",
     openSidebar: "Open sidebar",
-    queues: [
+    execution: [
       { icon: FlagIcon, name: "Goals", view: "goals" },
-      { icon: QueueListIcon, name: "Visibility", view: "visibility" },
+      { icon: QueueListIcon, name: "Tasks", view: "visibility" },
       { icon: CpuChipIcon, name: "Agents", view: "agents" },
-      { icon: ExclamationTriangleIcon, name: "Human review", view: "reviews" }
+      { icon: ExclamationTriangleIcon, name: "Alerts", view: "alerts" }
     ],
-    queuesTitle: "Execution",
+    executionTitle: "Execution",
     pageTitles: {
       agents: "Agents",
       alerts: "Technical Alerts",
@@ -497,7 +529,7 @@ const content = {
       flow: "Sales Conversions",
       goals: "Goals",
       kpi: "Key Performance Indicators",
-      reviews: "Human Review",
+      reviews: "Review",
       supplements: "Supplements",
       visibility: "Visibility"
     },
@@ -542,14 +574,15 @@ const content = {
       originalDose: "Original dose",
       plan: "Plan",
       planLink: "Open plan",
+      planReview: "Plan review",
       queued: "Queued",
       doseUnverified: "Dose unverified",
+      supplementReview: "Supplement review",
       reviewerNote: "Reviewer note",
       reviewRequired: "Review required",
       total: "Total",
       unknown: "Unknown supplement"
     },
-    technical: [{ icon: ExclamationTriangleIcon, name: "Alerts", view: "alerts" }],
     technicalAlerts: {
       critical: "Critical",
       empty: "No technical alerts in this timeframe.",
@@ -558,13 +591,13 @@ const content = {
       low: "Low",
       medium: "Medium",
       plan: "Plan",
+      rootCause: "Root cause",
       source: "Source",
       status: "Status",
       task: "Task",
       time: "Time",
       total: "Total"
     },
-    technicalTitle: "Technical",
     visibility: {
       active: "Active",
       actor: "Actor",
@@ -615,8 +648,17 @@ const content = {
         upper_dose_risk: "Upper dose risk"
       },
       safetyNotes: "Safety notes",
+      associateExisting: "Associate with existing supplement",
+      associations: "Associations",
+      associationHint:
+        "Use this when the unknown item is just another name for a supplement already in the database.",
+      associatedWith: "Associated with",
+      clearAssociation: "Clear",
+      noAssociationMatches: "No matching supplements.",
+      removeAssociation: "Remove association",
       save: "Save",
       search: "Search supplements",
+      searchExisting: "Search existing supplements",
       sourceStatus: "Source",
       status: "Status",
       suggestDose: "Suggest with AI",
@@ -707,6 +749,7 @@ const content = {
       empty: "ไม่มี Goals ในช่วงเวลานี้",
       events: "อีเวนต์",
       failed: "ล้มเหลว",
+      age: "อายุ",
       lastActivity: "กิจกรรมล่าสุด",
       live: "สด",
       needsReview: "ต้องรีวิว",
@@ -779,9 +822,12 @@ const content = {
         title: "คอนเวอร์ชัน Pro"
       }
     },
-    navigation: [
-      { icon: HomeIcon, name: "KPI", view: "kpi" },
-      { icon: FunnelIcon, name: "Conversions", view: "flow" },
+    performance: [
+      { icon: HomeIcon, name: "KPIs", view: "kpi" },
+      { icon: FunnelIcon, name: "Conversions", view: "flow" }
+    ],
+    performanceTitle: "ประสิทธิภาพ",
+    marketing: [
       { href: "#", icon: MegaphoneIcon, name: "แคมเปญ" },
       { href: "#", icon: EnvelopeIcon, name: "ลีด" },
       {
@@ -789,18 +835,23 @@ const content = {
         name: "การสื่อสาร",
         view: "communications"
       },
-      { icon: BeakerIcon, name: "อาหารเสริม", view: "supplements" },
       { href: "#", icon: DocumentTextIcon, name: "คอนเทนต์" }
     ],
+    marketingTitle: "การตลาด",
+    governance: [
+      { icon: ExclamationTriangleIcon, name: "รีวิว", view: "reviews" },
+      { icon: BeakerIcon, name: "อาหารเสริม", view: "supplements" }
+    ],
+    governanceTitle: "ความปลอดภัย",
     nextBuckets: "คาดการณ์ 3 ช่วงถัดไป",
     openSidebar: "เปิดแถบเมนู",
-    queues: [
+    execution: [
       { icon: FlagIcon, name: "Goals", view: "goals" },
-      { icon: QueueListIcon, name: "Visibility", view: "visibility" },
+      { icon: QueueListIcon, name: "Tasks", view: "visibility" },
       { icon: CpuChipIcon, name: "Agents", view: "agents" },
-      { icon: ExclamationTriangleIcon, name: "รีวิวโดยคน", view: "reviews" }
+      { icon: ExclamationTriangleIcon, name: "แจ้งเตือน", view: "alerts" }
     ],
-    queuesTitle: "Execution",
+    executionTitle: "การปฏิบัติงาน",
     pageTitles: {
       agents: "Agents",
       alerts: "การแจ้งเตือนทางเทคนิค",
@@ -808,7 +859,7 @@ const content = {
       flow: "Sales Conversions",
       goals: "Goals",
       kpi: "Key Performance Indicators",
-      reviews: "รีวิวโดยคน",
+      reviews: "รีวิว",
       supplements: "อาหารเสริม",
       visibility: "Visibility"
     },
@@ -853,14 +904,15 @@ const content = {
       originalDose: "ขนาดเดิม",
       plan: "แผน",
       planLink: "เปิดแผน",
+      planReview: "รีวิวแผน",
       queued: "เข้าคิว",
       doseUnverified: "ยังตรวจขนาดไม่ได้",
+      supplementReview: "รีวิวอาหารเสริม",
       reviewerNote: "หมายเหตุผู้รีวิว",
       reviewRequired: "ต้องรีวิว",
       total: "ทั้งหมด",
       unknown: "อาหารเสริมใหม่"
     },
-    technical: [{ icon: ExclamationTriangleIcon, name: "แจ้งเตือน", view: "alerts" }],
     technicalAlerts: {
       critical: "วิกฤต",
       empty: "ไม่มี Technical Alert ในช่วงเวลานี้",
@@ -869,13 +921,13 @@ const content = {
       low: "ต่ำ",
       medium: "กลาง",
       plan: "แผน",
+      rootCause: "สาเหตุหลัก",
       source: "แหล่งข้อมูล",
       status: "สถานะ",
       task: "งาน",
       time: "เวลา",
       total: "ทั้งหมด"
     },
-    technicalTitle: "เทคนิค",
     visibility: {
       active: "กำลังทำ",
       actor: "ผู้ทำ",
@@ -926,8 +978,17 @@ const content = {
         upper_dose_risk: "ความเสี่ยงขนาดสูง"
       },
       safetyNotes: "หมายเหตุความปลอดภัย",
+      associateExisting: "เชื่อมกับอาหารเสริมที่มีอยู่",
+      associations: "ชื่อเชื่อมโยง",
+      associationHint:
+        "ใช้เมื่อรายการใหม่นี้เป็นอีกชื่อหนึ่งของอาหารเสริมที่มีอยู่ในฐานข้อมูลแล้ว",
+      associatedWith: "เชื่อมกับ",
+      clearAssociation: "ล้าง",
+      noAssociationMatches: "ไม่พบอาหารเสริมที่ตรงกัน",
+      removeAssociation: "ลบชื่อเชื่อมโยง",
       save: "บันทึก",
       search: "ค้นหาอาหารเสริม",
+      searchExisting: "ค้นหาอาหารเสริมที่มีอยู่",
       sourceStatus: "แหล่งข้อมูล",
       status: "สถานะ",
       suggestDose: "แนะนำด้วย AI",
@@ -1005,6 +1066,33 @@ function adminGoalHref({
     goal: goalId,
     range,
     view: "goals"
+  });
+
+  adminDashboardFilterEntries(filters).forEach(([key, value]) => {
+    params.set(key, value);
+  });
+
+  return `/${locale}/admin/dashboard?${params.toString()}`;
+}
+
+function adminReviewTaskHref({
+  accessToken,
+  filters,
+  locale,
+  range,
+  reviewTaskId
+}: Readonly<{
+  accessToken: string;
+  filters: AdminDashboardFilters;
+  locale: Locale;
+  range: AdminDashboardRange;
+  reviewTaskId: string;
+}>) {
+  const params = new URLSearchParams({
+    access_token: accessToken,
+    range,
+    review: reviewTaskId,
+    view: "reviews"
   });
 
   adminDashboardFilterEntries(filters).forEach(([key, value]) => {
@@ -1115,6 +1203,29 @@ function formatNumber(value: number, locale: Locale) {
   return new Intl.NumberFormat(formatLocale(locale)).format(value);
 }
 
+function formatTaskDuration(ms: number, locale: Locale) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const number = (value: number) => formatNumber(value, locale);
+
+  if (days > 0) {
+    return `${number(days)}d ${number(hours)}h`;
+  }
+
+  if (hours > 0) {
+    return `${number(hours)}h ${number(minutes)}m`;
+  }
+
+  if (minutes > 0) {
+    return `${number(minutes)}m ${number(seconds)}s`;
+  }
+
+  return `${number(seconds)}s`;
+}
+
 function formatPercent(value: number, locale: Locale) {
   return `${new Intl.NumberFormat(formatLocale(locale), {
     maximumFractionDigits: 1,
@@ -1222,30 +1333,41 @@ function SidebarContent({
           <SidebarNavList
             accessToken={accessToken}
             filters={filters}
-            items={labels.navigation}
+            items={labels.performance}
             locale={locale}
             onNavigate={onNavigate}
             range={range}
+            title={labels.performanceTitle}
             view={view}
           />
           <SidebarNavList
             accessToken={accessToken}
             filters={filters}
-            items={labels.queues}
+            items={labels.marketing}
             locale={locale}
             onNavigate={onNavigate}
             range={range}
-            title={labels.queuesTitle}
+            title={labels.marketingTitle}
             view={view}
           />
           <SidebarNavList
             accessToken={accessToken}
             filters={filters}
-            items={labels.technical}
+            items={labels.governance}
             locale={locale}
             onNavigate={onNavigate}
             range={range}
-            title={labels.technicalTitle}
+            title={labels.governanceTitle}
+            view={view}
+          />
+          <SidebarNavList
+            accessToken={accessToken}
+            filters={filters}
+            items={labels.execution}
+            locale={locale}
+            onNavigate={onNavigate}
+            range={range}
+            title={labels.executionTitle}
             view={view}
           />
         </ul>
@@ -1480,10 +1602,6 @@ function supplementStatusClass(status: SupplementListStatus) {
   return "bg-amber-50 text-amber-800 ring-amber-200";
 }
 
-function sourceStatusLabel(status: AdminSupplementRow["sourceStatus"]) {
-  return status === "recommended_add" ? "Recommended add" : "Core";
-}
-
 function supplementSafetyFlagLabel(
   labels: AdminContent,
   flag: SupplementSafetyFlag
@@ -1498,6 +1616,20 @@ function formatSupplementSafetyFlags(
   return flags.length
     ? flags.map((flag) => supplementSafetyFlagLabel(labels, flag)).join(", ")
     : labels.supplements.none;
+}
+
+function supplementSearchText(labels: AdminContent, row: AdminSupplementRow) {
+  return [
+    row.name,
+    row.category,
+    row.ingredientType,
+    row.primaryUseCase,
+    row.aliases.map((alias) => alias.name).join(" "),
+    ...row.safetyFlags.map((flag) => supplementSafetyFlagLabel(labels, flag))
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 }
 
 function toggleSupplementSafetyFlag(
@@ -1522,6 +1654,7 @@ function AdminSupplementsView({
 }>) {
   const [rows, setRows] = useState(data.rows);
   const [category, setCategory] = useState("");
+  const [deletingAliasId, setDeletingAliasId] = useState<string | null>(null);
   const [draft, setDraft] = useState<AdminSupplementRow | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -1555,13 +1688,7 @@ function AdminSupplementsView({
   const filteredRows = rows.filter((row) => {
     const matchesSearch =
       !normalizedSearch ||
-      row.name.toLowerCase().includes(normalizedSearch) ||
-      row.category.toLowerCase().includes(normalizedSearch) ||
-      row.safetyFlags.some((flag) =>
-        supplementSafetyFlagLabel(labels, flag)
-          .toLowerCase()
-          .includes(normalizedSearch)
-      );
+      supplementSearchText(labels, row).includes(normalizedSearch);
     const matchesCategory = !category || row.category === category;
     const matchesStatus = !status || row.listStatus === status;
 
@@ -1611,6 +1738,38 @@ function AdminSupplementsView({
       return false;
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function deleteAssociation(row: AdminSupplementRow, aliasId: string) {
+    setDeletingAliasId(aliasId);
+    setErrorId(null);
+
+    try {
+      const response = await fetch(
+        `/api/admin/supplements/${row.id}/aliases/${aliasId}`,
+        {
+          body: JSON.stringify({ accessToken }),
+          headers: {
+            "Content-Type": "application/json"
+          },
+          method: "DELETE"
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to delete supplement association");
+      }
+
+      const payload = (await response.json()) as { row?: AdminSupplementRow };
+
+      if (payload.row) {
+        syncRow(payload.row);
+      }
+    } catch {
+      setErrorId(row.id);
+    } finally {
+      setDeletingAliasId(null);
     }
   }
 
@@ -1691,7 +1850,7 @@ function AdminSupplementsView({
               }}
               type="button"
             >
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_12rem_10rem_8rem] lg:items-center">
+              <div className="grid gap-x-8 gap-y-5 lg:grid-cols-[minmax(0,1fr)_12rem_10rem_8rem] lg:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span
@@ -1707,13 +1866,24 @@ function AdminSupplementsView({
                     {row.name}
                   </h3>
                   <p className="mt-1 text-sm text-gray-500">
-                    {sourceStatusLabel(row.sourceStatus)}
-                    {row.ingredientType ? ` · ${row.ingredientType}` : ""}
+                    {row.ingredientType ?? row.category}
                   </p>
                   {row.primaryUseCase ? (
                     <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-600">
                       {row.primaryUseCase}
                     </p>
+                  ) : null}
+                  {row.aliases.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {row.aliases.map((alias) => (
+                        <span
+                          className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100"
+                          key={alias.id}
+                        >
+                          {alias.name}
+                        </span>
+                      ))}
+                    </div>
                   ) : null}
                 </div>
 
@@ -1759,6 +1929,7 @@ function AdminSupplementsView({
               setErrorId(null);
             }
           }}
+          onDeleteAssociation={(aliasId) => void deleteAssociation(draft, aliasId)}
           onSave={() => {
             void saveRow(draft).then((saved) => {
               if (saved) {
@@ -1767,6 +1938,7 @@ function AdminSupplementsView({
             });
           }}
           saving={savingId === draft.id}
+          deletingAssociationId={deletingAliasId}
         />
       ) : null}
     </section>
@@ -1811,24 +1983,34 @@ function SupplementListMeta({
 
 function SupplementDetailsModal({
   accessToken,
+  associatedSupplementId,
+  associationOptions,
+  deletingAssociationId,
   draft,
   error,
   headerNote,
   labels,
   locale,
+  onAssociateSupplement,
   onChange,
   onClose,
+  onDeleteAssociation,
   onSave,
   saving
 }: Readonly<{
   accessToken: string;
+  associatedSupplementId?: string;
+  associationOptions?: AdminSupplementRow[];
+  deletingAssociationId?: string | null;
   draft: AdminSupplementRow;
   error: boolean;
   headerNote?: string | null;
   labels: AdminContent;
   locale: Locale;
+  onAssociateSupplement?: (supplementId: string) => void;
   onChange: (patch: Partial<AdminSupplementRow>) => void;
   onClose: () => void;
+  onDeleteAssociation?: (aliasId: string) => void;
   onSave: () => void;
   saving: boolean;
 }>) {
@@ -1836,6 +2018,9 @@ function SupplementDetailsModal({
   const [suggestDoseError, setSuggestDoseError] = useState(false);
   const inputClass =
     "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]";
+  const associationLocked = Boolean(associatedSupplementId);
+  const associationEnabled =
+    Boolean(onAssociateSupplement) && Boolean(associationOptions?.length);
   const doseRequired =
     draft.listStatus === "review_required" || draft.listStatus === "whitelisted";
   const doseValid =
@@ -1967,22 +2152,11 @@ function SupplementDetailsModal({
         >
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={classNames(
-                    supplementStatusClass(draft.listStatus),
-                    "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
-                  )}
-                >
-                  {supplementStatusLabel(labels, draft.listStatus)}
-                </span>
-              </div>
-              <h2 className="mt-3 text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-gray-900">
                 {draft.name}
               </h2>
               <p className="mt-1 text-sm text-gray-500">
-                {sourceStatusLabel(draft.sourceStatus)}
-                {draft.ingredientType ? ` · ${draft.ingredientType}` : ""}
+                {draft.ingredientType ?? draft.category}
               </p>
               {headerNote ? (
                 <p className="mt-1 text-sm text-gray-500">{headerNote}</p>
@@ -2024,157 +2198,206 @@ function SupplementDetailsModal({
               </div>
             ) : null}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="grid gap-2 text-sm font-medium text-gray-700">
-                {labels.supplements.status}
-                <select
-                  className={classNames(
-                    supplementStatusClass(draft.listStatus),
-                    "rounded-md px-3 py-2 text-sm font-semibold ring-1 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-                  )}
-                  onChange={(event) =>
-                    onChange({
-                      listStatus: event.target.value as SupplementListStatus
-                    })
-                  }
-                  value={draft.listStatus}
-                >
-                  {supplementListStatuses.map((item) => (
-                    <option key={item} value={item}>
-                      {supplementStatusLabel(labels, item)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="grid gap-2 text-sm font-medium text-gray-700">
-                {labels.supplements.confidence}
-                <select
-                  className={inputClass}
-                  onChange={(event) =>
-                    onChange({
-                      confidence: event.target.value as SupplementConfidence
-                    })
-                  }
-                  value={draft.confidence}
-                >
-                  {supplementConfidences.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="grid gap-2 text-sm font-medium text-gray-700">
-                {labels.supplements.maxAmount}
-                <input
-                  aria-invalid={doseRequired && !doseValid}
-                  className={classNames(
-                    inputClass,
-                    doseRequired && !doseValid
-                      ? "ring-red-300 focus:ring-red-500"
-                      : ""
-                  )}
-                  min="0"
-                  onChange={(event) =>
-                    onChange({
-                      maxAmount:
-                        event.target.value === ""
-                          ? null
-                          : Number(event.target.value)
-                    })
-                  }
-                  step="any"
-                  type="number"
-                  value={draft.maxAmount ?? ""}
-                />
-              </label>
-
-              <label className="grid gap-2 text-sm font-medium text-gray-700">
-                {labels.supplements.maxUnit}
-                <select
-                  aria-invalid={doseRequired && !doseValid}
-                  className={classNames(
-                    inputClass,
-                    doseRequired && !doseValid
-                      ? "ring-red-300 focus:ring-red-500"
-                      : ""
-                  )}
-                  onChange={(event) =>
-                    onChange({ maxUnit: event.target.value })
-                  }
-                  value={draft.maxUnit}
-                >
-                  <option value="">{labels.supplements.none}</option>
-                  {unitOptions.map((unit) => (
-                    <option key={unit} value={unit}>
-                      {unit}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="grid gap-2 text-sm font-medium text-gray-700">
-              {labels.supplements.safetyFlag}
-              <details className="rounded-xl bg-white ring-1 ring-gray-200">
-                <summary className="cursor-pointer list-none px-3 py-2 text-sm text-gray-900 outline-none marker:hidden">
-                  <span className="font-normal">
-                    {formatSupplementSafetyFlags(labels, draft.safetyFlags)}
-                  </span>
-                </summary>
-                <div className="grid gap-2 border-t border-gray-100 p-3 sm:grid-cols-2">
-                  <label className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    <input
-                      checked={draft.safetyFlags.length === 0}
-                      className="size-4 rounded border-gray-300 text-[#1FA77A] focus:ring-[#1FA77A]"
-                      onChange={(event) => {
-                        if (event.target.checked) {
-                          onChange({ safetyFlags: [] });
-                        }
-                      }}
-                      type="checkbox"
-                    />
-                    {labels.supplements.none}
-                  </label>
-                  {supplementSafetyFlags.map((flag) => (
-                    <label
-                      key={flag}
-                      className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            {draft.aliases.length > 0 ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                  {labels.supplements.associations}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {draft.aliases.map((alias) => (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100"
+                      key={alias.id}
                     >
-                      <input
-                        checked={draft.safetyFlags.includes(flag)}
-                        className="size-4 rounded border-gray-300 text-[#1FA77A] focus:ring-[#1FA77A]"
-                        onChange={() =>
-                          onChange({
-                            safetyFlags: toggleSupplementSafetyFlag(
-                              draft.safetyFlags,
-                              flag
-                            )
-                          })
-                        }
-                        type="checkbox"
-                      />
-                      {supplementSafetyFlagLabel(labels, flag)}
-                    </label>
+                      {alias.name}
+                      {onDeleteAssociation ? (
+                        <button
+                          aria-label={`${labels.supplements.removeAssociation}: ${alias.name}`}
+                          className="rounded-full p-0.5 text-emerald-500 hover:bg-white hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                          disabled={deletingAssociationId === alias.id}
+                          onClick={() => onDeleteAssociation(alias.id)}
+                          type="button"
+                        >
+                          <XMarkIcon aria-hidden={true} className="size-3.5" />
+                        </button>
+                      ) : null}
+                    </span>
                   ))}
                 </div>
-              </details>
-            </div>
+              </div>
+            ) : null}
 
-            <label className="grid gap-2 text-sm font-medium text-gray-700">
-              {labels.supplements.safetyNotes}
-              <textarea
-                className={classNames(inputClass, "min-h-32 resize-y")}
-                onChange={(event) =>
-                  onChange({ safetyNotes: event.target.value })
+            {associationEnabled ? (
+              <SupplementAssociationPicker
+                labels={labels}
+                locale={locale}
+                onSelect={(supplementId) =>
+                  onAssociateSupplement?.(supplementId)
                 }
-                value={draft.safetyNotes ?? ""}
+                options={associationOptions ?? []}
+                selectedId={associatedSupplementId ?? ""}
               />
-            </label>
+            ) : null}
 
-            {!doseValid ? (
+            <fieldset
+              className={classNames(
+                "space-y-6 transition-opacity",
+                associationLocked ? "opacity-40" : ""
+              )}
+              disabled={associationLocked}
+            >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="grid gap-2 text-sm font-medium text-gray-700">
+                  {labels.supplements.status}
+                  <select
+                    className={classNames(
+                      supplementStatusClass(draft.listStatus),
+                      "rounded-md px-3 py-2 text-sm font-semibold ring-1 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                    )}
+                    onChange={(event) =>
+                      onChange({
+                        listStatus: event.target.value as SupplementListStatus
+                      })
+                    }
+                    value={draft.listStatus}
+                  >
+                    {supplementListStatuses.map((item) => (
+                      <option key={item} value={item}>
+                        {supplementStatusLabel(labels, item)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="grid gap-2 text-sm font-medium text-gray-700">
+                  {labels.supplements.confidence}
+                  <select
+                    className={inputClass}
+                    onChange={(event) =>
+                      onChange({
+                        confidence: event.target.value as SupplementConfidence
+                      })
+                    }
+                    value={draft.confidence}
+                  >
+                    {supplementConfidences.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="grid gap-2 text-sm font-medium text-gray-700">
+                  {labels.supplements.maxAmount}
+                  <input
+                    aria-invalid={doseRequired && !doseValid}
+                    className={classNames(
+                      inputClass,
+                      doseRequired && !doseValid
+                        ? "ring-red-300 focus:ring-red-500"
+                        : ""
+                    )}
+                    min="0"
+                    onChange={(event) =>
+                      onChange({
+                        maxAmount:
+                          event.target.value === ""
+                            ? null
+                            : Number(event.target.value)
+                      })
+                    }
+                    step="any"
+                    type="number"
+                    value={draft.maxAmount ?? ""}
+                  />
+                </label>
+
+                <label className="grid gap-2 text-sm font-medium text-gray-700">
+                  {labels.supplements.maxUnit}
+                  <select
+                    aria-invalid={doseRequired && !doseValid}
+                    className={classNames(
+                      inputClass,
+                      doseRequired && !doseValid
+                        ? "ring-red-300 focus:ring-red-500"
+                        : ""
+                    )}
+                    onChange={(event) =>
+                      onChange({ maxUnit: event.target.value })
+                    }
+                    value={draft.maxUnit}
+                  >
+                    <option value="">{labels.supplements.none}</option>
+                    {unitOptions.map((unit) => (
+                      <option key={unit} value={unit}>
+                        {unit}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-2 text-sm font-medium text-gray-700">
+                {labels.supplements.safetyFlag}
+                <details className="rounded-xl bg-white ring-1 ring-gray-200">
+                  <summary className="cursor-pointer list-none px-3 py-2 text-sm text-gray-900 outline-none marker:hidden">
+                    <span className="font-normal">
+                      {formatSupplementSafetyFlags(labels, draft.safetyFlags)}
+                    </span>
+                  </summary>
+                  <div className="grid gap-2 border-t border-gray-100 p-3 sm:grid-cols-2">
+                    <label className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                      <input
+                        checked={draft.safetyFlags.length === 0}
+                        className="size-4 rounded border-gray-300 text-[#1FA77A] focus:ring-[#1FA77A]"
+                        onChange={(event) => {
+                          if (event.target.checked) {
+                            onChange({ safetyFlags: [] });
+                          }
+                        }}
+                        type="checkbox"
+                      />
+                      {labels.supplements.none}
+                    </label>
+                    {supplementSafetyFlags.map((flag) => (
+                      <label
+                        key={flag}
+                        className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        <input
+                          checked={draft.safetyFlags.includes(flag)}
+                          className="size-4 rounded border-gray-300 text-[#1FA77A] focus:ring-[#1FA77A]"
+                          onChange={() =>
+                            onChange({
+                              safetyFlags: toggleSupplementSafetyFlag(
+                                draft.safetyFlags,
+                                flag
+                              )
+                            })
+                          }
+                          type="checkbox"
+                        />
+                        {supplementSafetyFlagLabel(labels, flag)}
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              </div>
+
+              <label className="grid gap-2 text-sm font-medium text-gray-700">
+                {labels.supplements.safetyNotes}
+                <textarea
+                  className={classNames(inputClass, "min-h-32 resize-y")}
+                  onChange={(event) =>
+                    onChange({ safetyNotes: event.target.value })
+                  }
+                  value={draft.safetyNotes ?? ""}
+                />
+              </label>
+            </fieldset>
+
+            {!associationLocked && !doseValid ? (
               <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700 ring-1 ring-red-100">
                 {labels.supplements.doseValidationError}
               </p>
@@ -2186,7 +2409,7 @@ function SupplementDetailsModal({
               <button
                 aria-label={labels.supplements.suggestDose}
                 className="inline-flex size-9 items-center justify-center rounded-md bg-[#3A7BD5] text-white shadow-sm transition hover:bg-[#2F67B8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3A7BD5] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={suggestingDose}
+                disabled={suggestingDose || associationLocked}
                 onClick={() => void suggestDose()}
                 title={labels.supplements.suggestDose}
                 type="button"
@@ -2225,7 +2448,11 @@ function SupplementDetailsModal({
               </button>
               <button
                 className="rounded-md bg-[#1FA77A] px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#188865] disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={saving || suggestingDose || !doseValid}
+                disabled={
+                  saving ||
+                  suggestingDose ||
+                  (!associationLocked && !doseValid)
+                }
                 onClick={onSave}
                 type="button"
               >
@@ -2235,6 +2462,148 @@ function SupplementDetailsModal({
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+function SupplementAssociationPicker({
+  labels,
+  locale,
+  onSelect,
+  options,
+  selectedId
+}: Readonly<{
+  labels: AdminContent;
+  locale: Locale;
+  onSelect: (supplementId: string) => void;
+  options: AdminSupplementRow[];
+  selectedId: string;
+}>) {
+  const [query, setQuery] = useState("");
+  const selectedSupplement =
+    options.find((option) => option.id === selectedId) ?? null;
+  const normalizedQuery = query.trim().toLowerCase();
+  const matches = options
+    .filter((option) => {
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      return [
+        option.name,
+        option.category,
+        option.ingredientType,
+        option.primaryUseCase,
+        option.aliases.map((alias) => alias.name).join(" ")
+      ]
+        .filter(Boolean)
+        .some((value) =>
+          value?.toLowerCase().includes(normalizedQuery)
+        );
+    });
+
+  return (
+    <div className="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <span className="text-sm font-semibold text-gray-900">
+            {labels.supplements.associateExisting}
+          </span>
+          <p className="mt-1 text-sm leading-6 text-gray-600">
+            {labels.supplements.associationHint}
+          </p>
+        </div>
+        {selectedSupplement ? (
+          <button
+            className="rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+            onClick={() => onSelect("")}
+            type="button"
+          >
+            {labels.supplements.clearAssociation}
+          </button>
+        ) : null}
+      </div>
+
+      <Combobox
+        as="div"
+        className="mt-4"
+        onChange={(option: AdminSupplementRow | null) => {
+          setQuery("");
+          onSelect(option?.id ?? "");
+        }}
+        value={selectedSupplement}
+      >
+        <div className="relative mt-2">
+          <ComboboxInput
+            aria-label={labels.supplements.associateExisting}
+            className="block w-full rounded-md bg-white py-2 pr-12 pl-3 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
+            displayValue={(option: AdminSupplementRow | null) =>
+              option?.name ?? ""
+            }
+            id="supplement-association-search"
+            onBlur={() => setQuery("")}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={labels.supplements.searchExisting}
+          />
+          <ComboboxButton className="absolute inset-y-0 right-0 flex items-center rounded-r-md px-2 focus:outline-none">
+            <ChevronDownSolidIcon
+              aria-hidden={true}
+              className="size-5 text-gray-400"
+            />
+          </ComboboxButton>
+
+          <ComboboxOptions
+            transition={true}
+            className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg outline outline-black/5 data-closed:data-leave:opacity-0 data-leave:transition data-leave:duration-100 data-leave:ease-in"
+          >
+            {matches.length > 0 ? (
+              matches.map((option) => (
+                <ComboboxOption
+                  className="cursor-default px-3 py-2 text-gray-900 select-none data-focus:bg-[#1FA77A] data-focus:text-white data-focus:outline-none"
+                  key={option.id}
+                  value={option}
+                >
+                  <span className="block truncate font-semibold">
+                    {option.name}
+                  </span>
+                  <span className="block truncate text-xs text-gray-500 data-focus:text-white/80">
+                    {option.category} · {supplementStatusLabel(labels, option.listStatus)}
+                  </span>
+                </ComboboxOption>
+              ))
+            ) : (
+              <p className="px-3 py-2 text-sm font-medium text-gray-500">
+                {labels.supplements.noAssociationMatches}
+              </p>
+            )}
+          </ComboboxOptions>
+        </div>
+      </Combobox>
+
+      {selectedSupplement ? (
+        <div className="mt-3 rounded-xl bg-white p-3 ring-1 ring-gray-200">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+            {labels.supplements.associatedWith}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span
+              className={classNames(
+                supplementStatusClass(selectedSupplement.listStatus),
+                "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+              )}
+            >
+              {supplementStatusLabel(labels, selectedSupplement.listStatus)}
+            </span>
+            <h3 className="text-sm font-semibold text-gray-900">
+              {selectedSupplement.name}
+            </h3>
+          </div>
+          <p className="mt-1 text-sm text-gray-500">
+            {selectedSupplement.category} ·{" "}
+            {formatSupplementDose(selectedSupplement, locale)}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2253,6 +2622,77 @@ function reviewKindLabel(labels: AdminContent, row: AdminReviewTaskRow) {
   }
 
   return labels.reviewQueue.reviewRequired;
+}
+
+function reviewScopeLabel(labels: AdminContent, row: AdminReviewTaskRow) {
+  return row.planId
+    ? labels.reviewQueue.planReview
+    : labels.reviewQueue.supplementReview;
+}
+
+type ReviewGoalGroup = Readonly<{
+  createdAt: string;
+  key: string;
+  planId: string | null;
+  priority: number;
+  rows: AdminReviewTaskRow[];
+  title: string;
+}>;
+
+function sortReviewRows(
+  left: AdminReviewTaskRow,
+  right: AdminReviewTaskRow
+) {
+  const priorityDifference = right.priority - left.priority;
+
+  if (priorityDifference !== 0) {
+    return priorityDifference;
+  }
+
+  return new Date(left.queuedAt).getTime() - new Date(right.queuedAt).getTime();
+}
+
+function groupReviewRows(
+  labels: AdminContent,
+  rows: AdminReviewTaskRow[]
+): ReviewGoalGroup[] {
+  const groups = new Map<string, ReviewGoalGroup>();
+
+  rows.forEach((row) => {
+    const key = row.goalId ?? row.id;
+    const existing = groups.get(key);
+    const createdAt = existing
+      ? existing.createdAt
+      : row.goalQueuedAt || row.queuedAt;
+    const priority = Math.max(existing?.priority ?? 0, row.goalPriority, row.priority);
+
+    groups.set(key, {
+      createdAt,
+      key,
+      planId: existing?.planId ?? row.planId,
+      priority,
+      rows: [...(existing?.rows ?? []), row],
+      title: existing?.title ?? row.goalTitle ?? reviewScopeLabel(labels, row)
+    });
+  });
+
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      rows: [...group.rows].sort(sortReviewRows)
+    }))
+    .sort((left, right) => {
+      const priorityDifference = right.priority - left.priority;
+
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+
+      return (
+        new Date(left.createdAt).getTime() -
+        new Date(right.createdAt).getTime()
+      );
+    });
 }
 
 function reviewPriorityPill(labels: AdminContent, priority: number) {
@@ -2298,6 +2738,7 @@ function reviewRowToSupplementDraft(
   const priority = reviewPriorityPill(labels, row.priority);
 
   return {
+    aliases: [],
     category: reviewKindLabel(labels, row),
     confidence: row.reviewKind === "unknown_supplement" ? "low" : "moderate",
     id: row.id,
@@ -2331,6 +2772,13 @@ function formatReviewQueueDose(
         }).format(amount);
 
   return unit ? `${formattedAmount} ${unit}` : formattedAmount;
+}
+
+function reviewProposedDose(row: AdminReviewTaskRow, locale: Locale) {
+  return (
+    row.clientDoseText ??
+    formatReviewQueueDose(row.clientDoseAmount, row.clientDoseUnit, locale)
+  );
 }
 
 function PlanSafetyReviewModal({
@@ -2372,9 +2820,6 @@ function PlanSafetyReviewModal({
     Number.isFinite(clientDoseAmount) &&
     clientDoseAmount > 0 &&
     clientDoseUnit.trim() !== "";
-  const planHref = row.planId
-    ? `/${locale}/assessment/results?plan=${encodeURIComponent(row.planId)}`
-    : "";
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -2392,10 +2837,7 @@ function PlanSafetyReviewModal({
         >
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
             <div>
-              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
-                {reviewKindLabel(labels, row)}
-              </span>
-              <h2 className="mt-3 text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-gray-900">
                 {row.supplementName}
               </h2>
               <p className="mt-1 text-sm text-gray-500">
@@ -2413,7 +2855,14 @@ function PlanSafetyReviewModal({
           </div>
 
           <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+            {row.planId ? (
+              <SupplementListMeta
+                label={labels.reviewQueue.plan}
+                value={<PlanIdLink locale={locale} planId={row.planId} />}
+              />
+            ) : null}
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <SupplementListMeta
                 label={labels.reviewQueue.clientDose}
                 value={
@@ -2432,23 +2881,6 @@ function PlanSafetyReviewModal({
                   row.limitUnit ?? row.maxUnit,
                   locale
                 )}
-              />
-              <SupplementListMeta
-                label={labels.reviewQueue.plan}
-                value={
-                  planHref ? (
-                    <a
-                      className="text-[#3A7BD5] hover:text-[#2F67B8]"
-                      href={planHref}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      {row.planId}
-                    </a>
-                  ) : (
-                    "—"
-                  )
-                }
               />
             </div>
 
@@ -2560,12 +2992,16 @@ function AdminReviewQueueView({
   accessToken,
   data,
   labels,
-  locale
+  locale,
+  selectedReviewTaskId,
+  supplementsData
 }: Readonly<{
   accessToken: string;
   data: AdminReviewQueueData;
   labels: AdminContent;
   locale: Locale;
+  selectedReviewTaskId?: string | null;
+  supplementsData: AdminSupplementsData;
 }>) {
   const [queueState, setQueueState] = useState<{
     data: AdminReviewQueueData;
@@ -2577,23 +3013,17 @@ function AdminReviewQueueView({
   const [errorReviewId, setErrorReviewId] = useState<string | null>(null);
   const [savingReviewId, setSavingReviewId] = useState<string | null>(null);
   const [selectedReview, setSelectedReview] = useState<{
+    associatedSupplementId: string;
     draft: AdminSupplementRow;
     queuedLabel: string;
     row: AdminReviewTaskRow;
   } | null>(null);
+  const [dismissedReviewTaskId, setDismissedReviewTaskId] = useState<
+    string | null
+  >(null);
   const queueData =
     queueState.generatedAt === data.generatedAt ? queueState.data : data;
-  const sortedRows = [...queueData.rows].sort((left, right) => {
-    const priorityDifference = right.priority - left.priority;
-
-    if (priorityDifference !== 0) {
-      return priorityDifference;
-    }
-
-    return (
-      new Date(left.queuedAt).getTime() - new Date(right.queuedAt).getTime()
-    );
-  });
+  const reviewGroups = groupReviewRows(labels, queueData.rows);
 
   function setLocalQueueData(
     next:
@@ -2616,7 +3046,10 @@ function AdminReviewQueueView({
     });
   }
 
-  async function saveReview(row: AdminSupplementRow) {
+  async function saveReview(
+    row: AdminSupplementRow,
+    associatedSupplementId: string
+  ) {
     setSavingReviewId(row.id);
     setErrorReviewId(null);
 
@@ -2625,6 +3058,7 @@ function AdminReviewQueueView({
         body: JSON.stringify({
           accessToken,
           action: "resolve",
+          associatedSupplementId: associatedSupplementId || null,
           category: row.category,
           confidence: row.confidence,
           listStatus: row.listStatus,
@@ -2681,6 +3115,7 @@ function AdminReviewQueueView({
         });
       }
 
+      setDismissedReviewTaskId(row.id);
       setSelectedReview(null);
     } catch (saveError) {
       console.error("Unable to resolve review task", saveError);
@@ -2733,6 +3168,7 @@ function AdminReviewQueueView({
         setLocalQueueData(payload.data);
       }
 
+      setDismissedReviewTaskId(row.id);
       setSelectedReview(null);
     } catch (decisionError) {
       console.error("Unable to update plan review", decisionError);
@@ -2740,6 +3176,36 @@ function AdminReviewQueueView({
     } finally {
       setSavingReviewId(null);
     }
+  }
+
+  function selectReview(row: AdminReviewTaskRow) {
+    setDismissedReviewTaskId(null);
+    setSelectedReview({
+      associatedSupplementId: "",
+      draft: reviewRowToSupplementDraft(labels, row),
+      queuedLabel: formatGeneratedAt(row.queuedAt, locale),
+      row
+    });
+  }
+
+  const linkedReviewRow =
+    selectedReviewTaskId && dismissedReviewTaskId !== selectedReviewTaskId
+      ? queueData.rows.find((item) => item.id === selectedReviewTaskId) ?? null
+      : null;
+  const visibleReview =
+    selectedReview ??
+    (linkedReviewRow
+      ? {
+          associatedSupplementId: "",
+          draft: reviewRowToSupplementDraft(labels, linkedReviewRow),
+          queuedLabel: formatGeneratedAt(linkedReviewRow.queuedAt, locale),
+          row: linkedReviewRow
+        }
+      : null);
+
+  function closeReviewModal() {
+    setDismissedReviewTaskId(selectedReviewTaskId ?? visibleReview?.row.id ?? null);
+    setSelectedReview(null);
   }
 
   return (
@@ -2762,62 +3228,111 @@ function AdminReviewQueueView({
         />
       </div>
 
-      {sortedRows.length > 0 ? (
-        <div className="space-y-3">
-          {sortedRows.map((row) => {
-            const priority = reviewPriorityPill(labels, row.priority);
-            const planHref = row.planId
-              ? `/${locale}/assessment/results?plan=${encodeURIComponent(row.planId)}`
-              : "";
-
-            return (
-              <article
-                key={row.id}
-                className="flex w-full items-center justify-between gap-4 rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50"
-              >
-                <div className="min-w-0 flex-1">
-                  <button
-                    className="block w-full text-left"
-                    onClick={() =>
-                      setSelectedReview({
-                        draft: reviewRowToSupplementDraft(labels, row),
-                        queuedLabel: formatGeneratedAt(row.queuedAt, locale),
-                        row
-                      })
-                    }
-                    type="button"
-                  >
-                    <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
-                      {reviewKindLabel(labels, row)}
-                    </span>
-                    <h3 className="mt-3 truncate text-base font-semibold text-gray-900">
-                      {row.supplementName}
-                    </h3>
-                  </button>
-                  {planHref ? (
-                    <a
-                      className="mt-2 block truncate text-sm font-semibold text-[#3A7BD5] hover:text-[#2F67B8]"
-                      href={planHref}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      {row.planId}
-                    </a>
-                  ) : null}
+      {reviewGroups.length > 0 ? (
+        <div className="space-y-7">
+          {reviewGroups.map((group) => (
+            <section key={group.key} className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+                <div className="min-w-0">
+                  <h3 className="flex flex-wrap items-baseline gap-x-1 text-sm font-semibold text-gray-900">
+                    {group.planId ? (
+                      <>
+                        <span>Review supplement safety for plan</span>
+                        <PlanIdLink
+                          className="break-all"
+                          locale={locale}
+                          planId={group.planId}
+                        />
+                      </>
+                    ) : (
+                      group.title
+                    )}
+                  </h3>
+                  <p className="mt-0.5 text-xs font-medium text-gray-500">
+                    <ReviewGoalAgeTimer
+                      createdAt={group.createdAt}
+                      locale={locale}
+                    />
+                  </p>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={classNames(
-                      priority.className,
-                      "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+                      taskPriorityClass(group.priority),
+                      "w-max rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
                     )}
                   >
-                    {priority.label}
+                    {taskPriorityLabel(group.priority, locale)}
                   </span>
                 </div>
-              </article>
-            );
-          })}
+              </div>
+              <div className="space-y-3">
+                {group.rows.map((row) => (
+                  <article
+                    key={row.id}
+                    className="grid w-full cursor-pointer gap-3 rounded-2xl bg-white px-5 py-3 text-left shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] sm:grid-cols-[8rem_8rem_9rem_minmax(0,1fr)_8rem_7rem] sm:items-center"
+                    onClick={() => selectReview(row)}
+                    onKeyDown={(event) => {
+                      if (
+                        event.target instanceof HTMLElement &&
+                        event.target.closest("a")
+                      ) {
+                        return;
+                      }
+
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        selectReview(row);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <span
+                      className={classNames(
+                        taskStatusClass(row.status),
+                        "w-max rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+                      )}
+                    >
+                      {readableToken(row.status)}
+                    </span>
+                    <span
+                      className={classNames(
+                        taskPriorityClass(row.priority),
+                        "w-max rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+                      )}
+                    >
+                      {taskPriorityLabel(row.priority, locale)}
+                    </span>
+                    <span className="w-max rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+                      {reviewScopeLabel(labels, row)}
+                    </span>
+                    <h3 className="min-w-0 truncate text-sm font-semibold text-gray-900 sm:text-base">
+                      {row.supplementName}
+                    </h3>
+                    {row.planId ? (
+                      <span className="truncate text-sm font-semibold text-gray-700">
+                        {reviewProposedDose(row, locale)}
+                      </span>
+                    ) : (
+                      <span className="hidden sm:block" />
+                    )}
+                    {row.planId ? (
+                      <PlanIdLink
+                        className="truncate text-sm sm:justify-self-end"
+                        compact={true}
+                        locale={locale}
+                        planId={row.planId}
+                        stopPropagation={true}
+                      />
+                    ) : (
+                      <span className="hidden sm:block" />
+                    )}
+                  </article>
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       ) : (
         <div className="rounded-2xl bg-white px-5 py-12 text-center text-sm font-medium text-gray-500 shadow-sm ring-1 ring-gray-200">
@@ -2825,14 +3340,26 @@ function AdminReviewQueueView({
         </div>
       )}
 
-      {selectedReview?.row.reviewKind === "unknown_supplement" ? (
+      {visibleReview?.row.reviewKind === "unknown_supplement" ? (
         <SupplementDetailsModal
           accessToken={accessToken}
-          draft={selectedReview.draft}
-          error={errorReviewId === selectedReview.draft.id}
-          headerNote={selectedReview.queuedLabel}
+          associatedSupplementId={visibleReview.associatedSupplementId}
+          associationOptions={supplementsData.rows}
+          draft={visibleReview.draft}
+          error={errorReviewId === visibleReview.draft.id}
+          headerNote={visibleReview.queuedLabel}
           labels={labels}
           locale={locale}
+          onAssociateSupplement={(supplementId) =>
+            setSelectedReview((currentReview) =>
+              currentReview
+                ? {
+                    ...currentReview,
+                    associatedSupplementId: supplementId
+                  }
+                : currentReview
+            )
+          }
           onChange={(patch) =>
             setSelectedReview((currentReview) =>
               currentReview
@@ -2843,27 +3370,32 @@ function AdminReviewQueueView({
                 : currentReview
             )
           }
-          onClose={() => setSelectedReview(null)}
-          onSave={() => void saveReview(selectedReview.draft)}
-          saving={savingReviewId === selectedReview.draft.id}
+          onClose={closeReviewModal}
+          onSave={() =>
+            void saveReview(
+              visibleReview.draft,
+              visibleReview.associatedSupplementId
+            )
+          }
+          saving={savingReviewId === visibleReview.draft.id}
         />
-      ) : selectedReview ? (
+      ) : visibleReview ? (
         <PlanSafetyReviewModal
-          error={errorReviewId === selectedReview.row.id}
+          error={errorReviewId === visibleReview.row.id}
           labels={labels}
           locale={locale}
-          onClose={() => setSelectedReview(null)}
+          onClose={closeReviewModal}
           onDecision={(decision, clientDoseAmount, clientDoseUnit, reviewerNote) =>
             void decidePlanReview(
-              selectedReview.row,
+              visibleReview.row,
               decision,
               clientDoseAmount,
               clientDoseUnit,
               reviewerNote
             )
           }
-          row={selectedReview.row}
-          saving={savingReviewId === selectedReview.row.id}
+          row={visibleReview.row}
+          saving={savingReviewId === visibleReview.row.id}
         />
       ) : null}
     </section>
@@ -2874,6 +3406,136 @@ function readableToken(value: string) {
   return value
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function taskPriorityLabel(priority: number, locale: Locale) {
+  const labels =
+    locale === "th"
+      ? ["ต่ำ", "ปกติ", "เร่งด่วน", "สูง", "วิกฤต"]
+      : ["Low", "Normal", "Expedited", "High", "Critical"];
+  const index = Math.min(Math.max(Math.round(priority), 1), 5) - 1;
+
+  return labels[index];
+}
+
+function taskPriorityClass(priority: number) {
+  const normalized = Math.min(Math.max(Math.round(priority), 1), 5);
+
+  if (normalized >= 5) {
+    return "bg-red-50 text-red-700 ring-red-100";
+  }
+
+  if (normalized === 4) {
+    return "bg-amber-50 text-amber-800 ring-amber-200";
+  }
+
+  if (normalized === 3) {
+    return "bg-sky-50 text-sky-700 ring-sky-100";
+  }
+
+  if (normalized === 2) {
+    return "bg-gray-50 text-gray-700 ring-gray-200";
+  }
+
+  return "bg-emerald-50 text-emerald-700 ring-emerald-100";
+}
+
+function taskActorClass(actorType: string) {
+  if (actorType === "human") {
+    return "bg-violet-50 text-violet-700 ring-violet-100";
+  }
+
+  return "bg-cyan-50 text-cyan-700 ring-cyan-100";
+}
+
+function taskActorLabel(actorType: string) {
+  return actorType === "human" ? "Human" : "Agent";
+}
+
+function isReviewTaskType(taskType: string) {
+  return [
+    "classify_supplement",
+    "dose_reduction_notice",
+    "review_supplement_for_plan"
+  ].includes(taskType);
+}
+
+function taskIsTerminal(status: string) {
+  return ["cancelled", "completed", "failed", "skipped"].includes(status);
+}
+
+function useNowTimer(enabled: boolean) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+
+    return () => window.clearInterval(interval);
+  }, [enabled]);
+
+  return now;
+}
+
+function TaskAgeTimer({
+  locale,
+  row
+}: Readonly<{
+  locale: Locale;
+  row: Pick<AdminTaskVisibilityRow, "createdAt" | "status" | "updatedAt">;
+}>) {
+  const terminal = taskIsTerminal(row.status);
+  const now = useNowTimer(!terminal);
+
+  const createdAt = new Date(row.createdAt).getTime();
+  const endAt = terminal ? new Date(row.updatedAt).getTime() : now;
+
+  if (!Number.isFinite(createdAt) || endAt === null || !Number.isFinite(endAt)) {
+    return "—";
+  }
+
+  return formatTaskDuration(endAt - createdAt, locale);
+}
+
+function GoalAgeTimer({
+  goal,
+  locale
+}: Readonly<{
+  goal: AdminGoalRow;
+  locale: Locale;
+}>) {
+  const terminal = ["cancelled", "failed", "stuck", "succeeded"].includes(
+    goal.status
+  );
+  const now = useNowTimer(!terminal);
+  const createdAt = new Date(goal.createdAt).getTime();
+  const endAt = terminal ? new Date(goal.lastActivityAt).getTime() : now;
+
+  if (!Number.isFinite(createdAt) || endAt === null || !Number.isFinite(endAt)) {
+    return "—";
+  }
+
+  return formatTaskDuration(endAt - createdAt, locale);
+}
+
+function ReviewGoalAgeTimer({
+  createdAt,
+  locale
+}: Readonly<{
+  createdAt: string;
+  locale: Locale;
+}>) {
+  const now = useNowTimer(true);
+  const startedAt = new Date(createdAt).getTime();
+
+  if (!Number.isFinite(startedAt)) {
+    return "—";
+  }
+
+  return formatTaskDuration(now - startedAt, locale);
 }
 
 function severityLabel(labels: AdminContent, value: AdminTechnicalSeverity) {
@@ -3027,20 +3689,7 @@ function AdminCommunicationsView({
                       />
                       <SupplementListMeta
                         label={labels.communications.plan}
-                        value={
-                          row.planId ? (
-                            <a
-                              className="font-semibold text-[#0EA5E9] hover:text-[#0284C7]"
-                              href={`/${locale}/assessment/results?plan=${row.planId}`}
-                              rel="noreferrer"
-                              target="_blank"
-                            >
-                              {row.planId}
-                            </a>
-                          ) : (
-                            "—"
-                          )
-                        }
+                        value={<PlanIdLink locale={locale} planId={row.planId} />}
                       />
                       <SupplementListMeta
                         label={labels.communications.task}
@@ -3127,9 +3776,19 @@ function AdminTechnicalAlertsView({
                     <h3 className="mt-3 text-base font-semibold text-gray-900">
                       {readableToken(row.title)}
                     </h3>
-                    <p className="mt-2 text-sm leading-6 text-gray-600">
-                      {row.message}
-                    </p>
+                    <div className="mt-3 rounded-xl bg-red-50 px-4 py-3 ring-1 ring-red-100">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                        {labels.technicalAlerts.rootCause}
+                      </div>
+                      <p className="mt-1 text-sm leading-6 text-red-900">
+                        {row.rootCause}
+                      </p>
+                    </div>
+                    {row.message && row.message !== row.rootCause ? (
+                      <p className="mt-2 text-sm leading-6 text-gray-600">
+                        {row.message}
+                      </p>
+                    ) : null}
                     <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <SupplementListMeta
                         label={labels.technicalAlerts.time}
@@ -3137,7 +3796,7 @@ function AdminTechnicalAlertsView({
                       />
                       <SupplementListMeta
                         label={labels.technicalAlerts.plan}
-                        value={row.planId ?? "—"}
+                        value={<PlanIdLink locale={locale} planId={row.planId} />}
                       />
                       <SupplementListMeta
                         label={labels.technicalAlerts.task}
@@ -3205,6 +3864,46 @@ function goalStatusClass(status: AdminGoalStatus) {
 
 function compactId(value: string) {
   return value.length > 12 ? `${value.slice(0, 8)}…${value.slice(-4)}` : value;
+}
+
+function planResultsHref(locale: Locale, planId: string) {
+  return `/${locale}/assessment/results?plan=${encodeURIComponent(planId)}`;
+}
+
+function PlanIdLink({
+  className,
+  compact = false,
+  locale,
+  planId,
+  stopPropagation = false
+}: Readonly<{
+  className?: string;
+  compact?: boolean;
+  locale: Locale;
+  planId: string | null | undefined;
+  stopPropagation?: boolean;
+}>) {
+  if (!planId) {
+    return "—";
+  }
+
+  return (
+    <a
+      className={classNames(
+        "font-semibold text-[#3A7BD5] hover:text-[#2F67B8]",
+        className
+      )}
+      href={planResultsHref(locale, planId)}
+      onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
+      onKeyDown={
+        stopPropagation ? (event) => event.stopPropagation() : undefined
+      }
+      rel="noreferrer"
+      target="_blank"
+    >
+      {compact ? compactId(planId) : planId}
+    </a>
+  );
 }
 
 function LiveUpdatedBadge({
@@ -3304,6 +4003,9 @@ function AdminVisibilityView({
   labels: AdminContent;
   locale: Locale;
 }>) {
+  const [selectedTask, setSelectedTask] =
+    useState<AdminTaskVisibilityRow | null>(null);
+
   return (
     <section className="mt-8 space-y-6">
       <LiveUpdatedBadge
@@ -3354,10 +4056,11 @@ function AdminVisibilityView({
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
           <div className="divide-y divide-gray-100">
             {data.rows.map((row) => (
-              <VisibilityTaskCard
+              <VisibilityTaskRow
                 key={row.id}
                 labels={labels}
                 locale={locale}
+                onClick={() => setSelectedTask(row)}
                 row={row}
               />
             ))}
@@ -3368,86 +4071,215 @@ function AdminVisibilityView({
           {labels.visibility.empty}
         </div>
       )}
+
+      {selectedTask ? (
+        <VisibilityTaskDetailsModal
+          labels={labels}
+          locale={locale}
+          onClose={() => setSelectedTask(null)}
+          row={selectedTask}
+        />
+      ) : null}
     </section>
   );
 }
 
-function VisibilityTaskCard({
+function VisibilityTaskRow({
   labels,
   locale,
+  onClick,
   row
 }: Readonly<{
   labels: AdminContent;
   locale: Locale;
+  onClick: () => void;
   row: AdminTaskVisibilityRow;
 }>) {
   return (
-    <article className="px-5 py-4">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={classNames(
-                taskStatusClass(row.status),
-                "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
-              )}
+    <button
+      aria-label={`${labels.supplements.details}: ${row.title}`}
+      className="block w-full px-5 py-3 text-left transition hover:bg-gray-50 focus:outline-none focus-visible:bg-gray-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#1FA77A]"
+      onClick={onClick}
+      type="button"
+    >
+      <div className="grid gap-3 sm:grid-cols-[9rem_8rem_8rem_minmax(0,1fr)_7rem] sm:items-center">
+        <span
+          className={classNames(
+            taskStatusClass(row.status),
+            "w-max rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+          )}
+        >
+          {readableToken(row.status)}
+        </span>
+        <span
+          className={classNames(
+            taskPriorityClass(row.goalPriority),
+            "w-max rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+          )}
+        >
+          {taskPriorityLabel(row.goalPriority, locale)}
+        </span>
+        <span
+          className={classNames(
+            taskActorClass(row.actorType),
+            "w-max rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+          )}
+        >
+          {taskActorLabel(row.actorType)}
+        </span>
+        <h2 className="min-w-0 truncate text-sm font-semibold text-gray-900 sm:text-base">
+          {row.title}
+        </h2>
+        <span className="text-sm font-semibold tabular-nums text-gray-500 sm:justify-self-end">
+          <TaskAgeTimer locale={locale} row={row} />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function VisibilityTaskDetailsModal({
+  labels,
+  locale,
+  onClose,
+  row
+}: Readonly<{
+  labels: AdminContent;
+  locale: Locale;
+  onClose: () => void;
+  row: AdminTaskVisibilityRow;
+}>) {
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <button
+        aria-label={labels.supplements.close}
+        className="fixed inset-0 cursor-default bg-gray-900/40"
+        onClick={onClose}
+        type="button"
+      />
+      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
+        <section
+          aria-modal={true}
+          className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-900/10"
+          role="dialog"
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={classNames(
+                    taskStatusClass(row.status),
+                    "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+                  )}
+                >
+                  {readableToken(row.status)}
+                </span>
+                <span
+                  className={classNames(
+                    taskPriorityClass(row.goalPriority),
+                    "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+                  )}
+                >
+                  {taskPriorityLabel(row.goalPriority, locale)}
+                </span>
+              </div>
+              <h2 className="mt-3 text-xl font-semibold text-gray-900">
+                {row.title}
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                {readableToken(row.taskType)} · {compactId(row.id)}
+              </p>
+            </div>
+            <button
+              aria-label={labels.supplements.close}
+              className="rounded-md p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
+              onClick={onClose}
+              type="button"
             >
-              {readableToken(row.status)}
-            </span>
-            <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-              {labels.visibility.priority}: {row.goalPriority}.{row.priority}
-            </span>
-            {row.blockedDependencyCount > 0 ? (
-              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
-                {labels.visibility.blocked}: {row.blockedDependencyCount}
-              </span>
+              <XMarkIcon aria-hidden={true} className="size-5" />
+            </button>
+          </div>
+
+          <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <SupplementListMeta
+                label={labels.visibility.goal}
+                value={row.goalTitle}
+              />
+              <SupplementListMeta
+                label={labels.visibility.actor}
+                value={readableToken(row.actorType)}
+              />
+              <SupplementListMeta
+                label={labels.visibility.worker}
+                value={row.agentName ?? "—"}
+              />
+              <SupplementListMeta
+                label={labels.visibility.task}
+                value={taskPriorityLabel(row.priority, locale)}
+              />
+              <SupplementListMeta
+                label={labels.visibility.status}
+                value={`${row.attempts}/${row.maxAttempts}`}
+              />
+              <SupplementListMeta
+                label={labels.visibility.blocked}
+                value={formatNumber(row.blockedDependencyCount, locale)}
+              />
+              <SupplementListMeta
+                label={labels.goals.lastActivity}
+                value={formatGeneratedAt(row.updatedAt, locale)}
+              />
+              <SupplementListMeta
+                label={labels.generated}
+                value={formatGeneratedAt(row.createdAt, locale)}
+              />
+              <SupplementListMeta
+                label="Scheduled"
+                value={formatGeneratedAt(row.scheduledFor, locale)}
+              />
+              <SupplementListMeta
+                label="Lease"
+                value={
+                  row.leaseUntil ? formatGeneratedAt(row.leaseUntil, locale) : "—"
+                }
+              />
+              <SupplementListMeta
+                label="Plan"
+                value={
+                  <PlanIdLink
+                    compact={true}
+                    locale={locale}
+                    planId={row.planId}
+                  />
+                }
+              />
+              <SupplementListMeta
+                label="Ray"
+                value={row.ray ? compactId(row.ray) : "—"}
+              />
+              <SupplementListMeta
+                label="Reasoning"
+                value={readableToken(row.reasoningEffort)}
+              />
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+                {labels.visibility.capabilities}
+              </p>
+              <CapabilityList values={row.requiredCapabilities} />
+            </div>
+
+            {row.errorMessage ? (
+              <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
+                {row.errorMessage}
+              </p>
             ) : null}
           </div>
-          <h2 className="mt-3 text-base font-semibold text-gray-900">
-            {row.title}
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            {readableToken(row.taskType)} · {compactId(row.id)}
-          </p>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <SupplementListMeta
-              label={labels.visibility.goal}
-              value={row.goalTitle}
-            />
-            <SupplementListMeta
-              label={labels.visibility.actor}
-              value={readableToken(row.actorType)}
-            />
-            <SupplementListMeta
-              label={labels.visibility.worker}
-              value={row.agentName ?? "—"}
-            />
-            <SupplementListMeta
-              label={labels.visibility.status}
-              value={`${row.attempts}/${row.maxAttempts}`}
-            />
-            <SupplementListMeta
-              label={labels.goals.lastActivity}
-              value={formatGeneratedAt(row.updatedAt, locale)}
-            />
-          </div>
-
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
-              {labels.visibility.capabilities}
-            </p>
-            <CapabilityList values={row.requiredCapabilities} />
-          </div>
-
-          {row.errorMessage ? (
-            <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
-              {row.errorMessage}
-            </p>
-          ) : null}
-        </div>
+        </section>
       </div>
-    </article>
+    </div>
   );
 }
 
@@ -3658,7 +4490,7 @@ function AdminGoalsView({
       </div>
 
       {data.rows.length > 0 ? (
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(18rem,0.72fr)_minmax(0,1.55fr)]">
           <div className="space-y-3">
             {data.rows.map((goal) => (
               <a
@@ -3689,11 +4521,11 @@ function AdminGoalsView({
                   </div>
                   <span
                     className={classNames(
-                      goalStatusClass(goal.status),
+                      taskPriorityClass(goal.priority),
                       "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
                     )}
                   >
-                    {goalStatusLabel(labels, goal.status)}
+                    {taskPriorityLabel(goal.priority, locale)}
                   </span>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -3702,16 +4534,8 @@ function AdminGoalsView({
                     value={`${formatNumber(goal.completedTaskCount, locale)} / ${formatNumber(goal.taskCount, locale)}`}
                   />
                   <SupplementListMeta
-                    label={labels.goals.priority}
-                    value={goal.priority}
-                  />
-                  <SupplementListMeta
-                    label={labels.goals.source}
-                    value={goal.source ?? "—"}
-                  />
-                  <SupplementListMeta
-                    label={labels.goals.lastActivity}
-                    value={formatGeneratedAt(goal.lastActivityAt, locale)}
+                    label={labels.goals.age}
+                    value={<GoalAgeTimer goal={goal} locale={locale} />}
                   />
                 </div>
               </a>
@@ -3719,10 +4543,13 @@ function AdminGoalsView({
           </div>
 
           <GoalDetailPanel
+            accessToken={accessToken}
             data={data}
+            filters={filters}
             goal={selectedGoal}
             labels={labels}
             locale={locale}
+            range={range}
           />
         </div>
       ) : (
@@ -3735,15 +4562,21 @@ function AdminGoalsView({
 }
 
 function GoalDetailPanel({
+  accessToken,
   data,
+  filters,
   goal,
   labels,
-  locale
+  locale,
+  range
 }: Readonly<{
+  accessToken: string;
   data: AdminGoalsData;
+  filters: AdminDashboardFilters;
   goal: AdminGoalRow | null;
   labels: AdminContent;
   locale: Locale;
+  range: AdminDashboardRange;
 }>) {
   if (!goal) {
     return (
@@ -3769,18 +4602,21 @@ function GoalDetailPanel({
             <h2 className="mt-3 text-xl font-semibold text-gray-900">
               {goal.title}
             </h2>
-            <p className="mt-1 text-sm text-gray-500">{goal.id}</p>
+            <p className="mt-1 text-sm">
+              <PlanIdLink locale={locale} planId={goal.planId} />
+            </p>
           </div>
-          <div className="shrink-0 rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-            {labels.goals.priority}: {goal.priority}
+          <div
+            className={classNames(
+              taskPriorityClass(goal.priority),
+              "shrink-0 rounded-full px-3 py-1 text-xs font-semibold ring-1"
+            )}
+          >
+            {taskPriorityLabel(goal.priority, locale)}
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <SupplementListMeta
-            label={labels.goals.plan}
-            value={goal.planId ?? "—"}
-          />
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <SupplementListMeta
             label={labels.goals.trace}
             value={goal.ray ?? "—"}
@@ -3796,69 +4632,77 @@ function GoalDetailPanel({
         </div>
       </section>
 
-      <GoalDetailSection title={labels.goals.tasks}>
+      <GoalDetailSection
+        count={data.tasks.length}
+        defaultOpen={true}
+        locale={locale}
+        title={labels.goals.tasks}
+      >
         <div className="space-y-3">
-          {data.tasks.map((task) => (
-            <article
-              key={task.id}
-              className="rounded-xl bg-white p-4 ring-1 ring-gray-200"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <h3 className="truncate text-sm font-semibold text-gray-900">
-                    {task.title}
-                  </h3>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {readableToken(task.taskType)} · {readableToken(task.actorType)}
-                  </p>
+          {data.tasks.map((task) => {
+            const reviewTaskIsOpen =
+              isReviewTaskType(task.taskType) && !taskIsTerminal(task.status);
+            const reviewHref = reviewTaskIsOpen
+              ? adminReviewTaskHref({
+                  accessToken,
+                  filters,
+                  locale,
+                  range,
+                  reviewTaskId: task.id
+                })
+              : null;
+
+            return (
+              <article
+                key={task.id}
+                className="rounded-xl bg-white p-4 ring-1 ring-gray-200"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-semibold text-gray-900">
+                      {reviewHref ? (
+                        <a
+                          className="text-[#1FA77A] underline-offset-2 hover:underline"
+                          href={reviewHref}
+                        >
+                          {task.title}
+                        </a>
+                      ) : (
+                        task.title
+                      )}
+                    </h3>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+                    <span
+                      className={classNames(
+                        taskActorClass(task.actorType),
+                        "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+                      )}
+                    >
+                      {taskActorLabel(task.actorType)}
+                    </span>
+                    <span
+                      className={classNames(
+                        taskStatusClass(task.status),
+                        "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+                      )}
+                    >
+                      {readableToken(task.status)}
+                    </span>
+                  </div>
                 </div>
-                <span className="shrink-0 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                  {readableToken(task.status)}
-                </span>
-              </div>
-              {task.errorMessage ? (
-                <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700 ring-1 ring-red-100">
-                  {task.errorMessage}
-                </p>
-              ) : null}
-            </article>
-          ))}
+                {task.errorMessage ? (
+                  <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700 ring-1 ring-red-100">
+                    {task.errorMessage}
+                  </p>
+                ) : null}
+              </article>
+            );
+          })}
         </div>
       </GoalDetailSection>
 
-      <GoalDetailSection title={labels.goals.events}>
-        <div className="space-y-3">
-          {[...data.events, ...data.comments]
-            .sort((left, right) => {
-              const leftDate =
-                "occurredAt" in left ? left.occurredAt : left.createdAt;
-              const rightDate =
-                "occurredAt" in right ? right.occurredAt : right.createdAt;
-
-              return (
-                new Date(rightDate).getTime() - new Date(leftDate).getTime()
-              );
-            })
-            .slice(0, 30)
-            .map((item) =>
-              "occurredAt" in item ? (
-                <TimelineItem
-                  key={`event:${item.id}`}
-                  eyebrow={`${readableToken(item.eventStatus)} · ${item.agentName ?? "System"}`}
-                  title={readableToken(item.eventType)}
-                  time={formatGeneratedAt(item.occurredAt, locale)}
-                />
-              ) : (
-                <TimelineItem
-                  key={`comment:${item.id}`}
-                  eyebrow={`${readableToken(item.commentType)} · ${item.authorName ?? readableToken(item.authorType)}`}
-                  title={item.body}
-                  time={formatGeneratedAt(item.createdAt, locale)}
-                />
-              )
-            )}
-        </div>
-      </GoalDetailSection>
+      <GoalEventsSection data={data} labels={labels} locale={locale} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <GoalDetailCompactList
@@ -3890,19 +4734,112 @@ function GoalDetailPanel({
   );
 }
 
+function GoalEventsSection({
+  data,
+  labels,
+  locale
+}: Readonly<{
+  data: AdminGoalsData;
+  labels: AdminContent;
+  locale: Locale;
+}>) {
+  const [open, setOpen] = useState(false);
+  const timelineItems = [...data.events, ...data.comments]
+    .sort((left, right) => {
+      const leftDate = "occurredAt" in left ? left.occurredAt : left.createdAt;
+      const rightDate =
+        "occurredAt" in right ? right.occurredAt : right.createdAt;
+
+      return new Date(rightDate).getTime() - new Date(leftDate).getTime();
+    })
+    .slice(0, 30);
+
+  return (
+    <section>
+      <button
+        className="flex w-full items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 text-left shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+          {labels.goals.events}
+        </span>
+        <span className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+          {formatNumber(timelineItems.length, locale)}
+          <ChevronDownIcon
+            aria-hidden={true}
+            className={classNames(
+              "size-4 transition-transform",
+              open ? "rotate-180" : ""
+            )}
+          />
+        </span>
+      </button>
+
+      {open ? (
+        <div className="mt-3 space-y-3">
+          {timelineItems.map((item) =>
+            "occurredAt" in item ? (
+              <TimelineItem
+                key={`event:${item.id}`}
+                eyebrow={`${readableToken(item.eventStatus)} · ${item.agentName ?? "System"}`}
+                title={readableToken(item.eventType)}
+                time={formatGeneratedAt(item.occurredAt, locale)}
+              />
+            ) : (
+              <TimelineItem
+                key={`comment:${item.id}`}
+                eyebrow={`${readableToken(item.commentType)} · ${item.authorName ?? readableToken(item.authorType)}`}
+                title={item.body}
+                time={formatGeneratedAt(item.createdAt, locale)}
+              />
+            )
+          )}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function GoalDetailSection({
   children,
+  count,
+  defaultOpen = false,
+  locale,
   title
 }: Readonly<{
   children: ReactNode;
+  count?: number;
+  defaultOpen?: boolean;
+  locale?: Locale;
   title: string;
 }>) {
+  const [open, setOpen] = useState(defaultOpen);
+
   return (
     <section>
-      <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-        {title}
-      </h2>
-      <div className="mt-3">{children}</div>
+      <button
+        className="flex w-full items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 text-left shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+          {title}
+        </span>
+        <span className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+          {typeof count === "number" && locale
+            ? formatNumber(count, locale)
+            : null}
+          <ChevronDownIcon
+            aria-hidden={true}
+            className={classNames(
+              "size-4 transition-transform",
+              open ? "rotate-180" : ""
+            )}
+          />
+        </span>
+      </button>
+      {open ? <div className="mt-3">{children}</div> : null}
     </section>
   );
 }
@@ -4755,6 +5692,7 @@ export function AdminDashboard({
   goalsData,
   locale,
   reviewQueueData,
+  selectedReviewTaskId,
   supplementsData,
   visibilityData,
   view
@@ -4769,6 +5707,7 @@ export function AdminDashboard({
   goalsData: AdminGoalsData;
   locale: Locale;
   reviewQueueData: AdminReviewQueueData;
+  selectedReviewTaskId?: string | null;
   supplementsData: AdminSupplementsData;
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
@@ -4991,6 +5930,8 @@ export function AdminDashboard({
               data={reviewQueueData}
               labels={labels}
               locale={locale}
+              selectedReviewTaskId={selectedReviewTaskId}
+              supplementsData={supplementsData}
             />
           ) : view === "supplements" ? (
             <AdminSupplementsView

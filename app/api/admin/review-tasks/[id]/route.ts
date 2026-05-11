@@ -139,6 +139,20 @@ export async function PATCH(
     );
   }
 
+  const associatedSupplementId = textOrNull(body.associatedSupplementId);
+
+  if (associatedSupplementId && !isUuid(associatedSupplementId)) {
+    return NextResponse.json(
+      { message: "Invalid associated supplement" },
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        },
+        status: 400
+      }
+    );
+  }
+
   try {
     const data =
       action === "dismiss"
@@ -157,6 +171,7 @@ export async function PATCH(
             })
           : await resolveAdminReviewTask({
             actor: "admin_dashboard",
+            associatedSupplementId,
             category: textOrNull(body.category),
             confidence: parseConfidence(body.confidence) ?? "low",
             id,

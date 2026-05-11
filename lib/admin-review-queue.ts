@@ -17,6 +17,10 @@ export type AdminReviewTaskRow = Readonly<{
   clientDoseText: string | null;
   clientDoseUnit: string | null;
   flagReason: string | null;
+  goalId: string | null;
+  goalPriority: number;
+  goalQueuedAt: string;
+  goalTitle: string | null;
   id: string;
   limitAmount: number | null;
   limitUnit: string | null;
@@ -49,7 +53,10 @@ export type AdminReviewQueueData = Readonly<{
 type ReviewTaskDbRow = Readonly<{
   ai_suggestion: Record<string, unknown> | null;
   flag_reason: string | null;
-  goal_id?: string | null;
+  goal_created_at: Date | string | null;
+  goal_id: string | null;
+  goal_priority: number | string | null;
+  goal_title: string | null;
   id: string;
   limit_unit: string | null;
   limit_value: number | string | null;
@@ -78,6 +85,7 @@ type FormulationRow = Readonly<{
 }>;
 
 type SafetyReviewDecisionRow = Readonly<{
+  ai_suggestion: Record<string, unknown> | null;
   client_notification_status: string;
   goal_id: string | null;
   id: string;
@@ -85,15 +93,21 @@ type SafetyReviewDecisionRow = Readonly<{
   task_id: string | null;
 }>;
 
+type SafetyFollowupReviewRow = Readonly<{
+  client_message: Record<string, unknown> | null;
+  id: string;
+  supplement_name: string;
+}>;
+
 const REVIEW_TASK_TYPES = [
   "classify_supplement",
   "review_supplement_for_plan",
-  "dose_reduction_notice",
-  "client_safety_followup"
+  "dose_reduction_notice"
 ] as const;
 
 export type ResolveAdminReviewTaskInput = Readonly<{
   actor?: string | null;
+  associatedSupplementId?: string | null;
   category?: string | null;
   confidence: SupplementConfidence;
   id: string;
@@ -244,6 +258,10 @@ function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
       formatReviewDose(clientDoseAmount, clientDoseUnit),
     clientDoseUnit,
     flagReason: row.flag_reason,
+    goalId: row.goal_id,
+    goalPriority: Number(row.goal_priority ?? row.priority) || 0,
+    goalQueuedAt: new Date(row.goal_created_at ?? row.queued_at).toISOString(),
+    goalTitle: row.goal_title,
     id: row.id,
     limitAmount: numberOrNull(row.limit_value),
     limitUnit: row.limit_unit,
@@ -306,8 +324,13 @@ async function loadReviewTaskRows(sql: postgres.Sql) {
       safety_reviews.suggested_dose_unit,
       safety_reviews.limit_value,
       safety_reviews.limit_unit,
-      safety_reviews.ai_suggestion
+      safety_reviews.ai_suggestion,
+      goals.title as goal_title,
+      goals.priority as goal_priority,
+      goals.created_at as goal_created_at
     from public.tasks tasks
+    left join public.goals goals
+      on goals.id = tasks.goal_id
     left join lateral (
       select *
       from public.safety_reviews safety_reviews
@@ -317,7 +340,11 @@ async function loadReviewTaskRows(sql: postgres.Sql) {
     ) safety_reviews on true
     where tasks.task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
       and tasks.status not in ('completed', 'failed', 'cancelled', 'skipped')
-    order by tasks.priority desc, tasks.created_at asc
+    order by
+      coalesce(goals.priority, tasks.priority) desc,
+      coalesce(goals.created_at, tasks.created_at) asc,
+      tasks.priority desc,
+      tasks.created_at asc
     limit 200
   `;
 }
@@ -517,21 +544,58 @@ async function queueClientSafetyFollowupTask(
   transaction: Db,
   input: Readonly<{
     actor?: string | null;
-    clientDose: string | null;
-    decision: "approve" | "disapprove";
     goalId: string | null;
     parentTaskId: string | null;
     planId: string;
-    reviewTaskId: string;
-    safetyReviewId: string;
-    supplementName: string;
   }>
 ) {
   if (!input.goalId || !(await taskTablesAvailable(transaction))) {
     return null;
   }
 
-  const idempotencyKey = `client-safety-followup:${input.safetyReviewId}`;
+  const remainingReviewTasks = await transaction<{ count: number | string }[]>`
+    select count(*)::int as count
+    from public.tasks
+    where goal_id = ${input.goalId}::uuid
+      and task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
+      and status not in ('completed', 'failed', 'cancelled', 'skipped')
+  `;
+
+  if (Number(remainingReviewTasks[0]?.count ?? 0) > 0) {
+    return null;
+  }
+
+  const reviewedRows = await transaction<SafetyFollowupReviewRow[]>`
+    select
+      id::text,
+      supplement_name,
+      client_message
+    from public.safety_reviews
+    where goal_id = ${input.goalId}::uuid
+      and plan_id = ${input.planId}::uuid
+      and status in ('accepted', 'rejected')
+      and client_notification_status <> 'not_required'
+    order by reviewed_at asc, opened_at asc
+  `;
+
+  if (reviewedRows.length < 1) {
+    return null;
+  }
+
+  const reviewedItems = reviewedRows.map((row) => {
+    const clientMessage = row.client_message ?? {};
+    const decision = textOrNull(clientMessage.decision) ?? "reviewed";
+    const clientDose = textOrNull(clientMessage.dose);
+
+    return {
+      clientDose,
+      decision,
+      safetyReviewId: row.id,
+      supplementName: row.supplement_name
+    };
+  });
+  const safetyReviewIds = reviewedRows.map((row) => row.id);
+  const idempotencyKey = `client-safety-followup:${input.goalId}`;
   const existing = await transaction<{ id: string }[]>`
     select id::text
     from public.tasks
@@ -546,6 +610,24 @@ async function queueClientSafetyFollowupTask(
     return existing[0].id;
   }
 
+  await transaction`
+    update public.tasks
+    set
+      status = 'cancelled',
+      result_payload = coalesce(result_payload, '{}'::jsonb) || ${transaction.json(
+        toJsonValue({
+          cancelledBy: input.actor ?? "admin_dashboard",
+          reason: "Superseded by grouped client safety follow-up"
+        })
+      )}::jsonb,
+      completed_at = coalesce(completed_at, now()),
+      updated_at = now()
+    where goal_id = ${input.goalId}::uuid
+      and task_type = 'client_safety_followup'
+      and coalesce(idempotency_key, '') <> ${idempotencyKey}
+      and status in ('queued', 'blocked', 'needs_review', 'waiting_approval')
+  `;
+
   const goalRows = await transaction<{ priority: number | string }[]>`
     select priority
     from public.goals
@@ -554,19 +636,17 @@ async function queueClientSafetyFollowupTask(
   `;
   const goalPriority = Number(goalRows[0]?.priority ?? 3);
   const priority = Math.min(
-    6,
-    Math.max(5, Number.isFinite(goalPriority) ? goalPriority : 3)
+    5,
+    Math.max(4, Number.isFinite(goalPriority) ? goalPriority : 3)
   );
   const taskId = randomUUID();
-  const title = `Notify client about ${input.supplementName}`;
+  const title = "Notify client about completed safety review";
   const payloadObject = {
-    clientDose: input.clientDose,
-    decision: input.decision,
     planId: input.planId,
-    reviewTaskId: input.reviewTaskId,
-    safetyReviewId: input.safetyReviewId,
+    reviewedItems,
+    safetyReviewIds,
     source: "human_review_completion",
-    supplementName: input.supplementName
+    supplementCount: reviewedItems.length
   };
   const payload = toJsonValue(payloadObject);
 
@@ -614,6 +694,16 @@ async function queueClientSafetyFollowupTask(
   `;
 
   await transaction`
+    update public.safety_reviews
+    set
+      safety_context = safety_context || ${transaction.json(
+        toJsonValue({ followupTaskId: taskId })
+      )}::jsonb,
+      updated_at = now()
+    where id = any(${safetyReviewIds}::uuid[])
+  `;
+
+  await transaction`
     update public.goals
     set
       status = case
@@ -649,7 +739,7 @@ async function queueClientSafetyFollowupTask(
       'MattaNutra safety',
       'admin',
       'instruction',
-      'A human safety review is complete. Contact the client through the best available channel.',
+      'All human safety reviews in this goal are complete. Contact the client once through the best available channel.',
       ${transaction.json(payload)},
       now()
     )
@@ -778,111 +868,161 @@ export async function resolveAdminReviewTask(input: ResolveAdminReviewTaskInput)
       throw new Error("Review task not found");
     }
 
-    const supplementRows = await transaction<{ id: string }[]>`
-      insert into public.supplements (
-        id,
-        name,
-        normalized_name,
-        category,
-        source_status,
-        ingredient_type,
-        list_status,
-        is_active,
-        source,
-        source_payload,
-        created_at,
-        updated_at
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${supplementName},
-        ${normalizedSupplementName},
-        ${supplementCategory(input.category)},
-        'recommended_add',
-        null,
-        ${input.listStatus},
-        ${input.listStatus !== "inactive"},
-        'admin_review_queue',
-        ${transaction.json({
-          normalizedSupplementName,
-          resolvedBy: input.actor ?? "admin_dashboard"
-        })},
-        now(),
-        now()
-      )
-      on conflict (normalized_name) do update
-      set
-        name = excluded.name,
-        category = case
-          when public.supplements.category in ('', 'Uncategorised', 'Admin review')
-            then excluded.category
-          else public.supplements.category
-        end,
-        list_status = excluded.list_status,
-        is_active = excluded.is_active,
-        source_status = case
-          when public.supplements.source_status = 'core' then 'core'
-          else 'recommended_add'
-        end,
-        source_payload = coalesce(public.supplements.source_payload, '{}'::jsonb)
-          || excluded.source_payload,
-        updated_at = now()
-      returning id::text
-    `;
-    const supplementId = supplementRows[0]?.id;
+    let supplementId: string | null = null;
+    let associatedSupplementName: string | null = null;
+    const associatedSupplementId = input.associatedSupplementId ?? null;
 
-    if (!supplementId) {
-      throw new Error("Supplement could not be resolved");
-    }
-
-    const latestLimit = await transaction<{ version: number | null }[]>`
-      select max(version)::integer as version
-      from public.supplement_safety_limits
-      where supplement_id = ${supplementId}::uuid
-    `;
-    const version = latestLimit[0]?.version ?? null;
-    const safetyFlags = normalizeSupplementSafetyFlags(input.safetyFlags);
-
-    if (version) {
-      await transaction`
-        update public.supplement_safety_limits
-        set
-          max_amount = ${input.maxAmount},
-          max_unit = ${input.maxUnit},
-          confidence = ${input.confidence},
-          safety_flags = ${safetyFlags},
-          safety_notes = ${input.safetyNotes},
-          updated_at = now()
-        where supplement_id = ${supplementId}::uuid
-          and version = ${version}
+    if (associatedSupplementId) {
+      const associatedRows = await transaction<
+        Array<{
+          id: string;
+          name: string;
+        }>
+      >`
+        select id::text, name
+        from public.supplements
+        where id = ${associatedSupplementId}::uuid
+        for update
       `;
-    } else {
+      const associatedSupplement = associatedRows[0];
+
+      if (!associatedSupplement) {
+        throw new Error("Associated supplement not found");
+      }
+
+      supplementId = associatedSupplement.id;
+      associatedSupplementName = associatedSupplement.name;
+
       await transaction`
-        insert into public.supplement_safety_limits (
+        insert into public.supplement_aliases (
           id,
           supplement_id,
-          version,
-          max_amount,
-          max_unit,
-          confidence,
-          safety_flags,
-          safety_notes,
+          alias,
+          normalized_alias,
+          created_at
+        )
+        values (
+          ${randomUUID()}::uuid,
+          ${supplementId}::uuid,
+          ${supplementName},
+          ${normalizedSupplementName},
+          now()
+        )
+        on conflict (normalized_alias) do update
+        set
+          alias = excluded.alias,
+          supplement_id = excluded.supplement_id
+      `;
+    } else {
+      const supplementRows = await transaction<{ id: string }[]>`
+        insert into public.supplements (
+          id,
+          name,
+          normalized_name,
+          category,
+          source_status,
+          ingredient_type,
+          list_status,
+          is_active,
+          source,
+          source_payload,
           created_at,
           updated_at
         )
         values (
           ${randomUUID()}::uuid,
-          ${supplementId}::uuid,
-          1,
-          ${input.maxAmount},
-          ${input.maxUnit},
-          ${input.confidence},
-          ${safetyFlags},
-          ${input.safetyNotes},
+          ${supplementName},
+          ${normalizedSupplementName},
+          ${supplementCategory(input.category)},
+          'recommended_add',
+          null,
+          ${input.listStatus},
+          ${input.listStatus !== "inactive"},
+          'admin_review_queue',
+          ${transaction.json({
+            normalizedSupplementName,
+            resolvedBy: input.actor ?? "admin_dashboard"
+          })},
           now(),
           now()
         )
+        on conflict (normalized_name) do update
+        set
+          name = excluded.name,
+          category = case
+            when public.supplements.category in ('', 'Uncategorised', 'Admin review')
+              then excluded.category
+            else public.supplements.category
+          end,
+          list_status = excluded.list_status,
+          is_active = excluded.is_active,
+          source_status = case
+            when public.supplements.source_status = 'core' then 'core'
+            else 'recommended_add'
+          end,
+          source_payload = coalesce(public.supplements.source_payload, '{}'::jsonb)
+            || excluded.source_payload,
+          updated_at = now()
+        returning id::text
       `;
+      supplementId = supplementRows[0]?.id ?? null;
+    }
+
+    if (!supplementId) {
+      throw new Error("Supplement could not be resolved");
+    }
+
+    const safetyFlags = normalizeSupplementSafetyFlags(input.safetyFlags);
+
+    if (!associatedSupplementId) {
+      const latestLimit = await transaction<{ version: number | null }[]>`
+        select max(version)::integer as version
+        from public.supplement_safety_limits
+        where supplement_id = ${supplementId}::uuid
+      `;
+      const version = latestLimit[0]?.version ?? null;
+
+      if (version) {
+        await transaction`
+          update public.supplement_safety_limits
+          set
+            max_amount = ${input.maxAmount},
+            max_unit = ${input.maxUnit},
+            confidence = ${input.confidence},
+            safety_flags = ${safetyFlags},
+            safety_notes = ${input.safetyNotes},
+            updated_at = now()
+          where supplement_id = ${supplementId}::uuid
+            and version = ${version}
+        `;
+      } else {
+        await transaction`
+          insert into public.supplement_safety_limits (
+            id,
+            supplement_id,
+            version,
+            max_amount,
+            max_unit,
+            confidence,
+            safety_flags,
+            safety_notes,
+            created_at,
+            updated_at
+          )
+          values (
+            ${randomUUID()}::uuid,
+            ${supplementId}::uuid,
+            1,
+            ${input.maxAmount},
+            ${input.maxUnit},
+            ${input.confidence},
+            ${safetyFlags},
+            ${input.safetyNotes},
+            now(),
+            now()
+          )
+        `;
+      }
     }
 
     const completedTasks = await transaction<
@@ -905,6 +1045,15 @@ export async function resolveAdminReviewTask(input: ResolveAdminReviewTaskInput)
       for update
     `;
     const completedTaskIds = completedTasks.map((row) => row.id);
+    const resolutionLabel = associatedSupplementName
+      ? `Associated with ${associatedSupplementName}.`
+      : `Resolved as ${input.listStatus}.`;
+    const auditAction = associatedSupplementName
+      ? "review_associated"
+      : "review_resolved";
+    const eventType = associatedSupplementName
+      ? "supplement_review_associated"
+      : "supplement_review_resolved";
 
     await transaction`
       update public.safety_reviews
@@ -913,7 +1062,7 @@ export async function resolveAdminReviewTask(input: ResolveAdminReviewTaskInput)
         reviewed_at = coalesce(reviewed_at, now()),
         closed_at = now(),
         reviewer_id = ${input.actor ?? "admin_dashboard"},
-        reviewer_note = ${`Resolved as ${input.listStatus} from admin review queue.`},
+        reviewer_note = ${`${resolutionLabel} Closed from admin review queue.`},
         client_notification_status = case
           when client_notification_status = 'not_required' then 'not_required'
           else 'queued'
@@ -928,14 +1077,15 @@ export async function resolveAdminReviewTask(input: ResolveAdminReviewTaskInput)
 
     await completeSupplementReviewTasks(transaction, {
       actor: input.actor,
-      commentBody: `Resolved as ${input.listStatus}.`,
+      commentBody: resolutionLabel,
       eventPayload: {
+        associatedSupplementName,
         completedTaskIds,
         resolvedSupplementId: supplementId,
         resolution: input.listStatus,
         supplementName
       },
-      eventType: "supplement_review_resolved",
+      eventType,
       taskIds: completedTaskIds
     });
 
@@ -951,10 +1101,11 @@ export async function resolveAdminReviewTask(input: ResolveAdminReviewTaskInput)
       values (
         ${randomUUID()}::uuid,
         ${supplementId}::uuid,
-        'review_resolved',
+        ${auditAction},
         ${input.actor ?? "admin_dashboard"},
         ${transaction.json(toJsonValue(task.payload ?? {}))},
         ${transaction.json({
+          associatedSupplementName,
           completedTaskIds,
           confidence: input.confidence,
           listStatus: input.listStatus,
@@ -1004,9 +1155,48 @@ function ingredientMatchesReview(
   );
 }
 
+function approvedIngredientFromSuggestion(input: {
+  aiSuggestion: Record<string, unknown> | null;
+  clientDoseAmount: number | null;
+  clientDoseUnit: string | null;
+  reviewId: string | null;
+  reviewTaskId: string;
+  supplementName: string;
+}) {
+  const suggestion = input.aiSuggestion;
+
+  if (!suggestion) {
+    return null;
+  }
+
+  const suggestedStatus = textOrNull(suggestion.status);
+  const suggestionSupplementText = localizedText(suggestion.supplement);
+  const suggestedSupplement =
+    recordOrNull(suggestion.supplement) ??
+    localized(suggestionSupplementText ?? input.supplementName);
+
+  return {
+    ...suggestion,
+    dailyDose: localized(
+      clientDoseText(input.clientDoseAmount, input.clientDoseUnit)
+    ),
+    safety: {
+      ...(recordOrNull(suggestion.safety) ?? {}),
+      action: "human_review",
+      message: localized("Approved by MattaNutra human review."),
+      reviewId: input.reviewId ?? undefined,
+      reviewTaskId: input.reviewTaskId,
+      visibility: "visible"
+    },
+    status: suggestedStatus === "review" ? "add" : suggestedStatus ?? "add",
+    supplement: suggestedSupplement
+  };
+}
+
 function applyReviewDecisionToFormulation(
   formulation: Record<string, unknown>,
   input: {
+    aiSuggestion: Record<string, unknown> | null;
     clientDoseAmount: number | null;
     clientDoseUnit: string | null;
     decision: "approve" | "disapprove";
@@ -1019,7 +1209,7 @@ function applyReviewDecisionToFormulation(
     ? formulation.supplementBreakdown
     : [];
   let changedCount = 0;
-  const nextBreakdown = supplementBreakdown.flatMap((item) => {
+  let nextBreakdown = supplementBreakdown.flatMap((item) => {
     const ingredient = recordOrNull(item);
 
     if (!ingredient || !ingredientMatchesReview(ingredient, input)) {
@@ -1050,7 +1240,17 @@ function applyReviewDecisionToFormulation(
   });
 
   if (changedCount < 1) {
-    throw new Error("Reviewed supplement was not found in formulation");
+    if (input.decision === "approve") {
+      const approvedIngredient = approvedIngredientFromSuggestion(input);
+
+      if (!approvedIngredient) {
+        throw new Error("Reviewed supplement was not found in formulation");
+      }
+
+      nextBreakdown = [...nextBreakdown, approvedIngredient];
+    }
+
+    changedCount = 1;
   }
 
   const summary = recordOrNull(formulation.safetySummary);
@@ -1117,6 +1317,7 @@ export async function decideAdminPlanReviewTask(
         client_notification_status,
         goal_id::text,
         id::text,
+        ai_suggestion,
         supplement_name,
         task_id::text
       from public.safety_reviews
@@ -1153,6 +1354,7 @@ export async function decideAdminPlanReviewTask(
         clientDoseAmount: input.clientDoseAmount,
         clientDoseUnit: input.clientDoseUnit,
         decision: input.decision,
+        aiSuggestion: review.ai_suggestion,
         reviewId: review.id,
         reviewTaskId: input.id,
         supplementName: review.supplement_name
@@ -1172,20 +1374,6 @@ export async function decideAdminPlanReviewTask(
           ? "human_review_approved"
           : "human_review_disapproved"
     });
-    const followupTaskId =
-      review.client_notification_status === "not_required"
-        ? null
-        : await queueClientSafetyFollowupTask(transaction, {
-            actor: input.actor,
-            clientDose,
-            decision: input.decision,
-            goalId: review.goal_id,
-            parentTaskId: review.task_id,
-            planId: task.plan_id,
-            reviewTaskId: input.id,
-            safetyReviewId: review.id,
-            supplementName: review.supplement_name
-          });
 
     await transaction`
       update public.safety_reviews
@@ -1208,7 +1396,6 @@ export async function decideAdminPlanReviewTask(
         end,
         safety_context = safety_context || ${transaction.json(
           toJsonValue({
-            followupTaskId,
             reviewedFormulationVersion: nextVersion
           })
         )}::jsonb,
@@ -1226,7 +1413,6 @@ export async function decideAdminPlanReviewTask(
         clientDose,
         decision: input.decision,
         formulationVersion: nextVersion,
-        followupTaskId,
         safetyReviewId: review.id,
         supplementName: review.supplement_name
       },
@@ -1236,6 +1422,48 @@ export async function decideAdminPlanReviewTask(
         : "supplement_review_disapproved",
       taskIds: [input.id]
     });
+
+    const followupTaskId =
+      review.client_notification_status === "not_required"
+        ? null
+        : await queueClientSafetyFollowupTask(transaction, {
+            actor: input.actor,
+            goalId: review.goal_id,
+            parentTaskId: review.task_id,
+            planId: task.plan_id
+          });
+
+    if (followupTaskId) {
+      await transaction`
+        insert into public.task_events (
+          id,
+          task_id,
+          goal_id,
+          event_type,
+          event_status,
+          severity,
+          event_payload,
+          occurred_at,
+          created_at
+        )
+        values (
+          ${randomUUID()}::uuid,
+          ${input.id}::uuid,
+          ${review.goal_id ?? null}::uuid,
+          'client_safety_followup_grouped',
+          'requested',
+          'medium',
+          ${transaction.json(
+            toJsonValue({
+              followupTaskId,
+              planId: task.plan_id
+            })
+          )},
+          now(),
+          now()
+        )
+      `;
+    }
   });
 
   return getAdminReviewQueueData();

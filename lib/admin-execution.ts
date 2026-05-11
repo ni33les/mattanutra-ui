@@ -94,6 +94,7 @@ type VisibilityDbRow = Readonly<{
   id: string;
   lease_until: Date | string | null;
   max_attempts: number | string;
+  payload: Record<string, unknown> | null;
   plan_id: string | null;
   priority: number | string;
   ray: string | null;
@@ -119,6 +120,7 @@ type VisibilitySummaryDbRow = Readonly<{
 type AgentDbRow = Readonly<{
   active_task_count: number | string | null;
   active_task_id: string | null;
+  active_task_payload: Record<string, unknown> | null;
   active_task_title: string | null;
   capabilities: string[] | null;
   completed_count: number | string | null;
@@ -142,6 +144,57 @@ function isoOrNull(value: Date | string | null) {
 
 function numberValue(value: number | string | null | undefined) {
   return Number(value ?? 0);
+}
+
+function textFromPayload(
+  payload: Record<string, unknown> | null | undefined,
+  key: string
+) {
+  const value = payload?.[key];
+
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function displayGoalTitle(value: string) {
+  if (value.startsWith("Review supplement safety for plan ")) {
+    return "Review plan";
+  }
+
+  if (
+    value.startsWith("Classify supplement: ") ||
+    value.startsWith("Classify new supplement: ")
+  ) {
+    return "Review supplement";
+  }
+
+  return value;
+}
+
+function displayTaskTitle(value: string, payload: Record<string, unknown> | null) {
+  const supplementName = textFromPayload(payload, "supplementName");
+
+  if (
+    value === "Review plan" ||
+    value === "Review supplement" ||
+    value.startsWith("Review supplement: ") ||
+    value.startsWith("Review dose reduction: ") ||
+    value.startsWith("Classify supplement: ") ||
+    value.startsWith("Classify new supplement: ")
+  ) {
+    const name =
+      supplementName ??
+      value
+        .replace(/^Review supplement:\s*/i, "")
+        .replace(/^Review dose reduction:\s*/i, "")
+        .replace(/^Classify(?: new)? supplement:\s*/i, "")
+        .trim();
+
+    return name && name !== "Review plan" && name !== "Review supplement"
+      ? `Review supplement ${name}`
+      : "Review supplement";
+  }
+
+  return value;
 }
 
 function emptyVisibilityData(): AdminTaskVisibilityData {
@@ -189,7 +242,7 @@ function visibilityRowFromDb(row: VisibilityDbRow): AdminTaskVisibilityRow {
     goalId: row.goal_id,
     goalPriority: numberValue(row.goal_priority),
     goalStatus: row.goal_status,
-    goalTitle: row.goal_title,
+    goalTitle: displayGoalTitle(row.goal_title),
     id: row.id,
     leaseUntil: isoOrNull(row.lease_until),
     maxAttempts: numberValue(row.max_attempts),
@@ -201,7 +254,7 @@ function visibilityRowFromDb(row: VisibilityDbRow): AdminTaskVisibilityRow {
     scheduledFor: iso(row.scheduled_for),
     status: row.status,
     taskType: row.task_type,
-    title: row.title,
+    title: displayTaskTitle(row.title, row.payload),
     updatedAt: iso(row.updated_at)
   };
 }
@@ -214,7 +267,9 @@ function agentRowFromDb(row: AgentDbRow): AdminAgentRow {
   return {
     activeTaskCount: numberValue(row.active_task_count),
     activeTaskId: row.active_task_id,
-    activeTaskTitle: row.active_task_title,
+    activeTaskTitle: row.active_task_title
+      ? displayTaskTitle(row.active_task_title, row.active_task_payload)
+      : null,
     capabilities: row.capabilities ?? [],
     completedCount,
     failureRate: totalFinished > 0 ? failedCount / totalFinished : null,
@@ -291,6 +346,7 @@ export async function getAdminTaskVisibilityData(
           tasks.reasoning_effort,
           tasks.attempts,
           tasks.max_attempts,
+          tasks.payload,
           tasks.scheduled_for,
           tasks.lease_until,
           tasks.error_message,
@@ -385,6 +441,21 @@ export async function getAdminAgentsData(
           or released_at >= ${start}
         group by agent_id
       ),
+      human_task_stats as (
+        select
+          count(*) filter (where status = 'completed')::int as completed_count,
+          count(*) filter (
+            where status in ('cancelled', 'failed', 'skipped')
+          )::int as failed_count
+        from public.tasks
+        where actor_type = 'human'
+          and (
+            ${start}::timestamptz is null
+            or created_at >= ${start}
+            or completed_at >= ${start}
+            or updated_at >= ${start}
+          )
+      ),
       active_tasks as (
         select
           reserved_by_agent_id as agent_id,
@@ -394,15 +465,47 @@ export async function getAdminAgentsData(
           and status in ('reserved', 'running')
         group by reserved_by_agent_id
       ),
+      human_active_tasks as (
+        select count(*)::int as active_task_count
+        from public.tasks
+        where actor_type = 'human'
+          and status in (
+            'blocked',
+            'needs_review',
+            'queued',
+            'reserved',
+            'running',
+            'waiting_approval'
+          )
+      ),
       latest_active_task as (
         select distinct on (reserved_by_agent_id)
           reserved_by_agent_id as agent_id,
           id::text as active_task_id,
+          payload as active_task_payload,
           title as active_task_title
         from public.tasks
         where reserved_by_agent_id is not null
           and status in ('reserved', 'running')
         order by reserved_by_agent_id, updated_at desc
+      ),
+      human_latest_active_task as (
+        select
+          id::text as active_task_id,
+          payload as active_task_payload,
+          title as active_task_title
+        from public.tasks
+        where actor_type = 'human'
+          and status in (
+            'blocked',
+            'needs_review',
+            'queued',
+            'reserved',
+            'running',
+            'waiting_approval'
+          )
+        order by priority desc, scheduled_for asc, created_at asc
+        limit 1
       )
       select
         agents.id::text,
@@ -413,17 +516,57 @@ export async function getAdminAgentsData(
         agents.model,
         agents.last_seen_at,
         agents.updated_at,
-        coalesce(active_tasks.active_task_count, 0) as active_task_count,
-        latest_active_task.active_task_id,
-        latest_active_task.active_task_title,
-        coalesce(reservation_stats.completed_count, 0) as completed_count,
-        coalesce(reservation_stats.failed_count, 0) as failed_count
+        coalesce(active_tasks.active_task_count, 0)
+          + case
+            when agents.agent_type = 'human'
+              then coalesce(human_active_tasks.active_task_count, 0)
+            else 0
+          end as active_task_count,
+        case
+          when agents.agent_type = 'human'
+            then coalesce(
+              latest_active_task.active_task_id,
+              human_latest_active_task.active_task_id
+            )
+          else latest_active_task.active_task_id
+        end as active_task_id,
+        case
+          when agents.agent_type = 'human'
+            then coalesce(
+              latest_active_task.active_task_payload,
+              human_latest_active_task.active_task_payload
+            )
+          else latest_active_task.active_task_payload
+        end as active_task_payload,
+        case
+          when agents.agent_type = 'human'
+            then coalesce(
+              latest_active_task.active_task_title,
+              human_latest_active_task.active_task_title
+            )
+          else latest_active_task.active_task_title
+        end as active_task_title,
+        coalesce(reservation_stats.completed_count, 0)
+          + case
+            when agents.agent_type = 'human'
+              then coalesce(human_task_stats.completed_count, 0)
+            else 0
+          end as completed_count,
+        coalesce(reservation_stats.failed_count, 0)
+          + case
+            when agents.agent_type = 'human'
+              then coalesce(human_task_stats.failed_count, 0)
+            else 0
+          end as failed_count
       from public.agents
       left join reservation_stats on reservation_stats.agent_id = agents.id
       left join active_tasks on active_tasks.agent_id = agents.id
       left join latest_active_task on latest_active_task.agent_id = agents.id
+      left join human_task_stats on agents.agent_type = 'human'
+      left join human_active_tasks on agents.agent_type = 'human'
+      left join human_latest_active_task on agents.agent_type = 'human'
       order by
-        coalesce(active_tasks.active_task_count, 0) desc,
+        active_task_count desc,
         agents.status asc,
         agents.updated_at desc
       limit 120

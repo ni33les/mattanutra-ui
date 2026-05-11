@@ -266,14 +266,9 @@ async function enqueueSupplementReviewWork(
       : `mattanutra:goal:supplement-safety:${input.planId}`
   );
   const goalTitle = globalUnknown
-    ? `Classify supplement: ${input.supplementName}`
-    : `Review supplement safety for plan ${input.planId?.slice(0, 8) ?? "unknown"}`;
-  const taskTitle =
-    input.kind === "dose_reduced"
-      ? `Review dose reduction: ${input.supplementName}`
-      : input.kind === "unknown_supplement"
-        ? `Classify new supplement: ${input.supplementName}`
-        : `Review supplement: ${input.supplementName}`;
+    ? "Review supplement"
+    : "Review plan";
+  const taskTitle = `Review supplement ${input.supplementName}`;
 
   try {
     const goal = await createGoal({

@@ -293,6 +293,10 @@ function pendingReviewCount(result: FormulationResult) {
   return Math.max(0, Number(summary.reviewCount ?? summary.hiddenCount ?? 0));
 }
 
+function planResultsHref(locale: Locale, planId: string) {
+  return `/${locale}/assessment/results?plan=${encodeURIComponent(planId)}`;
+}
+
 export function FormulationResults({ locale, planId }: FormulationResultsProps) {
   const labels = copy[locale];
   const effectivePlanId = planId;
@@ -526,7 +530,13 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
             {labels.generated}: {formattedDate}
           </p>
           <p className="mt-1">
-            {labels.plan}: {effectiveResultPlanId}
+            {labels.plan}:{" "}
+            <a
+              className="font-semibold text-[#3A7BD5] hover:text-[#2F67B8]"
+              href={planResultsHref(locale, effectiveResultPlanId)}
+            >
+              {effectiveResultPlanId}
+            </a>
           </p>
         </div>
       </div>
@@ -554,7 +564,11 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
         />
       </div>
 
-      <ChatConnectPanel labels={labels} planId={effectiveResultPlanId} />
+      <ChatConnectPanel
+        labels={labels}
+        locale={locale}
+        planId={effectiveResultPlanId}
+      />
 
       <div className="mt-8 rounded-lg bg-[#20343A] p-6 text-sm leading-6 text-white/75">
         <div className="flex gap-3">
@@ -774,8 +788,9 @@ function ContextChips({
 
 function ChatConnectPanel({
   labels,
+  locale,
   planId
-}: Readonly<{ labels: PanelLabels; planId: string }>) {
+}: Readonly<{ labels: PanelLabels; locale: Locale; planId: string }>) {
   return (
     <section className="mt-8 overflow-hidden rounded-lg bg-white ring-1 ring-foreground/10">
       <div className="p-6 sm:p-8">
@@ -800,9 +815,12 @@ function ChatConnectPanel({
             <span className="font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {labels.connectChatPlanId}
             </span>
-            <code className="max-w-full truncate rounded-md bg-background px-2.5 py-1.5 font-mono text-[11px] font-medium text-muted-foreground ring-1 ring-foreground/10">
+            <a
+              className="max-w-full truncate rounded-md bg-background px-2.5 py-1.5 font-mono text-[11px] font-medium text-[#3A7BD5] ring-1 ring-foreground/10 hover:text-[#2F67B8]"
+              href={planResultsHref(locale, planId)}
+            >
               {planId}
-            </code>
+            </a>
           </div>
         </div>
 

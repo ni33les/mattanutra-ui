@@ -47,6 +47,7 @@ export default async function AdminDashboardPage({
       : "kpi";
   const filters = normalizeAdminDashboardFilters(params);
   const selectedGoalId = firstParam(params.goal);
+  const selectedReviewTaskId = firstParam(params.review);
 
   if (!adminDashboardTokenAllowed(accessToken)) {
     notFound();
@@ -86,6 +87,7 @@ export default async function AdminDashboardPage({
       goalsData={goalsData}
       locale="en"
       reviewQueueData={reviewQueueData}
+      selectedReviewTaskId={selectedReviewTaskId}
       supplementsData={supplementsData}
       visibilityData={visibilityData}
       view={view}

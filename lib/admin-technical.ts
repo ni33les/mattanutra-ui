@@ -14,6 +14,7 @@ export type AdminTechnicalAlertRow = Readonly<{
   message: string;
   occurredAt: string;
   planId: string | null;
+  rootCause: string;
   severity: AdminTechnicalSeverity;
   source: "bpm" | "cron" | "task" | "task_event";
   status: string | null;
@@ -77,6 +78,90 @@ function normalizeSeverity(value: string): AdminTechnicalSeverity {
     : "medium";
 }
 
+function textValue(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function usefulCause(value: unknown) {
+  const text = textValue(value);
+
+  if (
+    !text ||
+    text === "Task failed." ||
+    text === "High-priority task event." ||
+    text === "Task failed without a recorded error." ||
+    text === "Scheduled action failed without a recorded error."
+  ) {
+    return "";
+  }
+
+  return text;
+}
+
+function findRootCause(value: unknown, depth = 0): string {
+  if (depth > 4) {
+    return "";
+  }
+
+  const record = jsonRecord(value);
+
+  for (const key of [
+    "rootCause",
+    "errorMessage",
+    "error",
+    "message",
+    "reason",
+    "cause"
+  ]) {
+    const cause = usefulCause(record[key]);
+
+    if (cause) {
+      return cause;
+    }
+  }
+
+  for (const nested of Object.values(record)) {
+    if (nested && typeof nested === "object") {
+      const cause = findRootCause(nested, depth + 1);
+
+      if (cause) {
+        return cause;
+      }
+    }
+  }
+
+  return "";
+}
+
+function explainRootCause({
+  details,
+  fallback,
+  taskType
+}: Readonly<{
+  details: Record<string, unknown>;
+  fallback: string;
+  taskType: string | null;
+}>) {
+  const rawCause = findRootCause(details) || usefulCause(fallback) || fallback;
+  const lower = rawCause.toLowerCase();
+
+  if (lower.includes("this operation was aborted")) {
+    return taskType === "analyze_healthscore"
+      ? "xAI HealthScore analysis timed out before a response was returned."
+      : "The external request was aborted before a response was returned.";
+  }
+
+  if (lower.includes("healthscore") && lower.includes("timed out")) {
+    return rawCause;
+  }
+
+  if (lower.includes("connect_timeout")) {
+    return "A network or database connection timed out before a response was returned.";
+  }
+
+  return rawCause;
+}
+
 function emptyAlertsData(): AdminTechnicalAlertsData {
   return {
     databaseAvailable: false,
@@ -111,14 +196,22 @@ function buildAlertsSummary(rows: AdminTechnicalAlertRow[]) {
 }
 
 function alertRowFromDb(row: AlertDbRow): AdminTechnicalAlertRow {
+  const details = jsonRecord(row.details);
+  const message = row.message ?? row.title;
+
   return {
     cronId: row.cron_id,
-    details: jsonRecord(row.details),
+    details,
     eventType: row.event_type,
     id: row.id,
-    message: row.message ?? row.title,
+    message,
     occurredAt: iso(row.occurred_at),
     planId: row.plan_id,
+    rootCause: explainRootCause({
+      details,
+      fallback: message,
+      taskType: row.task_type
+    }),
     severity: normalizeSeverity(row.severity),
     source: row.source,
     status: row.status,

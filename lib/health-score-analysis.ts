@@ -25,8 +25,8 @@ const DEFAULT_HEALTHSCORE_REASONING_EFFORT = "medium";
 const DEFAULT_PROMPT_VERSION = "v5";
 const CACHE_TYPE = "healthscore_advice";
 const CACHE_TTL_DAYS = 7;
-const MAX_ATTEMPTS = 1;
-const REQUEST_TIMEOUT_MS = 25_000;
+const MAX_ATTEMPTS = 2;
+const REQUEST_TIMEOUT_MS = 60_000;
 
 const globalHealthScoreCache = globalThis as typeof globalThis & {
   mattanutraHealthScoreCacheSchemaReady?: Promise<void>;
@@ -548,6 +548,14 @@ async function callGrok({
     }
 
     return (await response.json()) as XaiChatCompletion;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(
+        `xAI HealthScore request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)} seconds`
+      );
+    }
+
+    throw error;
   } finally {
     clearTimeout(timeout);
   }

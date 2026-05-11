@@ -1498,7 +1498,7 @@ export async function reserveNextTask(
         status = 'reserved',
         reserved_by_agent_id = ${agent.id}::uuid,
         lease_until = now() + make_interval(secs => ${leaseSeconds}),
-        started_at = coalesce(started_at, now()),
+        started_at = coalesce(public.tasks.started_at, now()),
         attempts = public.tasks.attempts + 1,
         updated_at = now()
       from candidate

@@ -70,6 +70,7 @@ export default async function LocalizedAdminDashboardPage({
       : "kpi";
   const filters = normalizeAdminDashboardFilters(query);
   const selectedGoalId = firstParam(query.goal);
+  const selectedReviewTaskId = firstParam(query.review);
 
   if (!adminDashboardTokenAllowed(accessToken)) {
     notFound();
@@ -109,6 +110,7 @@ export default async function LocalizedAdminDashboardPage({
       goalsData={goalsData}
       locale={locale}
       reviewQueueData={reviewQueueData}
+      selectedReviewTaskId={selectedReviewTaskId}
       supplementsData={supplementsData}
       visibilityData={visibilityData}
       view={view}

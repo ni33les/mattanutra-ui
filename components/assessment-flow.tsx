@@ -4401,6 +4401,10 @@ function mapExampleTestimonial(
   };
 }
 
+function assessmentResultsHref(locale: Locale, planId: string) {
+  return `/${locale}/assessment/results?plan=${encodeURIComponent(planId)}`;
+}
+
 function ExampleExitPanel({
   content,
   dbTestimonial,
@@ -4540,9 +4544,12 @@ function ExampleExitPanel({
               <span className="font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 {content.chatPlanLabel}
               </span>
-              <code className="max-w-full truncate rounded-md bg-background px-2.5 py-1.5 font-mono text-[11px] font-medium text-muted-foreground ring-1 ring-foreground/10">
+              <a
+                className="max-w-full truncate rounded-md bg-background px-2.5 py-1.5 font-mono text-[11px] font-medium text-[#3A7BD5] ring-1 ring-foreground/10 hover:text-[#2F67B8]"
+                href={assessmentResultsHref(locale, planId)}
+              >
                 {planId}
-              </code>
+              </a>
             </div>
           ) : null}
         </div>

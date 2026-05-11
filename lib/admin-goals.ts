@@ -160,6 +160,7 @@ type TaskDbRow = Readonly<{
   id: string;
   lease_until: Date | string | null;
   max_attempts: number | string;
+  payload: Record<string, unknown> | null;
   priority: number | string;
   required_capabilities: string[] | null;
   scheduled_for: Date | string;
@@ -220,13 +221,87 @@ type ApprovalDbRow = Readonly<{
 }>;
 
 function dateOrNull(value: Date | string | null) {
-  return value ? new Date(value).toISOString() : null;
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
 function numberValue(value: number | string | null | undefined) {
   const parsed = Number(value ?? 0);
 
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function uuidOrNull(value: string | null | undefined) {
+  return value &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value
+    )
+    ? value
+    : null;
+}
+
+function textFromPayload(
+  payload: Record<string, unknown> | null | undefined,
+  key: string
+) {
+  const value = payload?.[key];
+
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function displayGoalTitle(value: string) {
+  if (value.startsWith("Review supplement safety for plan ")) {
+    return "Review plan";
+  }
+
+  if (value.startsWith("Review dose reduction: ")) {
+    return "Review plan";
+  }
+
+  if (value.startsWith("Review supplement: ")) {
+    return "Review plan";
+  }
+
+  if (
+    value.startsWith("Classify supplement: ") ||
+    value.startsWith("Classify new supplement: ")
+  ) {
+    return "Review supplement";
+  }
+
+  return value;
+}
+
+function displayTaskTitle(value: string, payload: Record<string, unknown> | null) {
+  const supplementName = textFromPayload(payload, "supplementName");
+
+  if (
+    value === "Review plan" ||
+    value === "Review supplement" ||
+    value.startsWith("Review supplement: ") ||
+    value.startsWith("Review dose reduction: ") ||
+    value.startsWith("Classify supplement: ") ||
+    value.startsWith("Classify new supplement: ")
+  ) {
+    const name =
+      supplementName ??
+      value
+        .replace(/^Review supplement:\s*/i, "")
+        .replace(/^Review dose reduction:\s*/i, "")
+        .replace(/^Classify(?: new)? supplement:\s*/i, "")
+        .trim();
+
+    return name && name !== "Review plan" && name !== "Review supplement"
+      ? `Review supplement ${name}`
+      : "Review supplement";
+  }
+
+  return value;
 }
 
 function goalStatus(row: GoalDbRow): AdminGoalStatus {
@@ -284,10 +359,52 @@ function goalFromDb(row: GoalDbRow): AdminGoalRow {
     status: goalStatus(row),
     stuckTaskCount: numberValue(row.stuck_task_count),
     taskCount: numberValue(row.task_count),
-    title: row.title,
+    title: displayGoalTitle(row.title),
     type: row.goal_type,
     updatedAt: new Date(row.updated_at).toISOString()
   };
+}
+
+function goalStatusOrder(status: AdminGoalStatus) {
+  if (status === "failed") {
+    return 1;
+  }
+
+  if (status === "succeeded") {
+    return 2;
+  }
+
+  if (status === "cancelled") {
+    return 3;
+  }
+
+  return 0;
+}
+
+function sortGoals(left: AdminGoalRow, right: AdminGoalRow) {
+  const statusDifference = goalStatusOrder(left.status) - goalStatusOrder(right.status);
+
+  if (statusDifference !== 0) {
+    return statusDifference;
+  }
+
+  const priorityDifference = right.priority - left.priority;
+
+  if (priorityDifference !== 0) {
+    return priorityDifference;
+  }
+
+  const ageDifference =
+    new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+
+  if (ageDifference !== 0) {
+    return ageDifference;
+  }
+
+  return (
+    new Date(right.lastActivityAt).getTime() -
+    new Date(left.lastActivityAt).getTime()
+  );
 }
 
 function taskFromDb(row: TaskDbRow): AdminGoalTaskRow {
@@ -308,7 +425,7 @@ function taskFromDb(row: TaskDbRow): AdminGoalTaskRow {
     startedAt: dateOrNull(row.started_at),
     status: row.status,
     taskType: row.task_type,
-    title: row.title,
+    title: displayTaskTitle(row.title, row.payload),
     updatedAt: new Date(row.updated_at).toISOString()
   };
 }
@@ -444,11 +561,12 @@ export async function getAdminGoalsData(
           coalesce(task_summary.task_updated_at, goals.updated_at),
           coalesce(event_summary.event_at, goals.updated_at)
         ) >= ${start}
-      order by last_activity_at desc, goals.priority desc, goals.created_at desc
-      limit 60
+      order by goals.created_at desc
+      limit 500
     `;
-    const rows = goalRows.map(goalFromDb);
-    const selectedId = selectedGoalId || rows[0]?.id || null;
+    const rows = goalRows.map(goalFromDb).sort(sortGoals).slice(0, 60);
+    const requestedSelectedId = uuidOrNull(selectedGoalId);
+    const selectedId = requestedSelectedId || rows[0]?.id || null;
     const selectedGoal = rows.find((row) => row.id === selectedId) ?? null;
 
     if (!selectedId) {
@@ -485,6 +603,7 @@ export async function getAdminGoalsData(
           completed_at,
           lease_until,
           error_message,
+          payload,
           created_at,
           updated_at
         from public.tasks

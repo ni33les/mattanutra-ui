@@ -162,6 +162,39 @@ function objectValue(value: unknown) {
     : {};
 }
 
+type SafetyFollowupItem = Readonly<{
+  clientDose: string | null;
+  decision: string;
+  safetyReviewId: string | null;
+  supplementName: string;
+}>;
+
+function safetyFollowupItems(value: unknown): SafetyFollowupItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      const record = objectValue(item);
+      const supplementName = cleanText(record.supplementName);
+
+      if (!supplementName) {
+        return null;
+      }
+
+      return {
+        clientDose: optionalText(record.clientDose),
+        decision: cleanText(record.decision, "reviewed"),
+        safetyReviewId: isUuid(cleanText(record.safetyReviewId))
+          ? cleanText(record.safetyReviewId)
+          : null,
+        supplementName
+      } satisfies SafetyFollowupItem;
+    })
+    .filter((item): item is SafetyFollowupItem => Boolean(item));
+}
+
 function configuredLineAccessToken() {
   return process.env.LINE_CHANNEL_ACCESS_TOKEN?.trim() || "";
 }
@@ -1310,8 +1343,41 @@ export async function dispatchQueuedCommunicationMessages(input: Readonly<{
 function safetyFollowupMessage(input: Readonly<{
   clientDose?: string | null;
   decision: string;
+  reviewedItems?: SafetyFollowupItem[];
   supplementName: string;
 }>) {
+  const reviewedItems = input.reviewedItems ?? [];
+
+  if (reviewedItems.length > 1) {
+    const summary = reviewedItems
+      .map((item) => {
+        if (item.decision === "approve") {
+          return item.clientDose
+            ? `${item.supplementName} approved at ${item.clientDose}`
+            : `${item.supplementName} approved`;
+        }
+
+        if (item.decision === "disapprove") {
+          return `${item.supplementName} removed`;
+        }
+
+        return `${item.supplementName} reviewed`;
+      })
+      .join("; ");
+
+    return `Your human safety review is complete. We have updated your nutrition plan after reviewing ${reviewedItems.length} supplements: ${summary}.`;
+  }
+
+  const singleItem = reviewedItems[0];
+
+  if (singleItem) {
+    return safetyFollowupMessage({
+      clientDose: singleItem.clientDose,
+      decision: singleItem.decision,
+      supplementName: singleItem.supplementName
+    });
+  }
+
   if (input.decision === "approve") {
     return input.clientDose
       ? `Your human safety review for ${input.supplementName} is complete. The reviewed dose is ${input.clientDose}. Your nutrition plan has been updated.`
@@ -1323,7 +1389,14 @@ function safetyFollowupMessage(input: Readonly<{
 
 export async function sendClientSafetyFollowupTask(reserved: ReservedTask) {
   const payload = objectValue(reserved.task.payload);
-  const safetyReviewId = cleanText(payload.safetyReviewId);
+  const legacySafetyReviewId = cleanText(payload.safetyReviewId);
+  const reviewedItems = safetyFollowupItems(payload.reviewedItems);
+  const safetyReviewIds = [
+    ...reviewedItems
+      .map((item) => item.safetyReviewId)
+      .filter((id): id is string => Boolean(id)),
+    ...(isUuid(legacySafetyReviewId) ? [legacySafetyReviewId] : [])
+  ];
   const supplementName = cleanText(payload.supplementName, "your supplement");
   const decision = cleanText(payload.decision, "reviewed");
   const planId = isUuid(cleanText(payload.planId))
@@ -1338,6 +1411,7 @@ export async function sendClientSafetyFollowupTask(reserved: ReservedTask) {
   const body = safetyFollowupMessage({
     clientDose,
     decision,
+    reviewedItems,
     supplementName
   });
   const result = await sendCommunication({
@@ -1346,7 +1420,8 @@ export async function sendClientSafetyFollowupTask(reserved: ReservedTask) {
     messageType: "safety_review_decision",
     metadata: {
       decision,
-      safetyReviewId,
+      reviewedItems,
+      safetyReviewIds,
       source: "client_safety_followup_task",
       supplementName
     },
@@ -1362,7 +1437,7 @@ export async function sendClientSafetyFollowupTask(reserved: ReservedTask) {
         : "failed";
   const sql = sqlOrThrow();
 
-  if (isUuid(safetyReviewId)) {
+  if (safetyReviewIds.length > 0) {
     await sql`
       update public.safety_reviews
       set
@@ -1378,7 +1453,7 @@ export async function sendClientSafetyFollowupTask(reserved: ReservedTask) {
           })
         )}::jsonb,
         updated_at = now()
-      where id = ${safetyReviewId}::uuid
+      where id = any(${safetyReviewIds}::uuid[])
     `;
   }
 
