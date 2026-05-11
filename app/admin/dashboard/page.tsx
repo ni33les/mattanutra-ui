@@ -39,12 +39,14 @@ export default async function AdminDashboardPage({
     rawView === "agents" ||
     rawView === "communications" ||
     rawView === "flow" ||
+    rawView === "glance" ||
     rawView === "goals" ||
+    rawView === "kpi" ||
     rawView === "reviews" ||
     rawView === "supplements" ||
     rawView === "visibility"
       ? rawView
-      : "kpi";
+      : "glance";
   const filters = normalizeAdminDashboardFilters(params);
   const selectedGoalId = firstParam(params.goal);
   const selectedReviewTaskId = firstParam(params.review);

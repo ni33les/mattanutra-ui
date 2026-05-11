@@ -93,6 +93,7 @@ type AdminDashboardView =
   | "alerts"
   | "communications"
   | "flow"
+  | "glance"
   | "goals"
   | "kpi"
   | "reviews"
@@ -178,6 +179,25 @@ type AdminContent = Readonly<{
     working: string;
   };
   generated: string;
+  atAGlance: {
+    assessmentCompletions: string;
+    assessmentStarts: string;
+    attentionClear: string;
+    attentionTitle: string;
+    conversion: string;
+    conversionSnapshot: string;
+    count: string;
+    criticalAlerts: string;
+    customerContactIssues: string;
+    dropoff: string;
+    freeRequests: string;
+    healthScoreViews: string;
+    landingVisitors: string;
+    pendingReviews: string;
+    precisionConversions: string;
+    proConversions: string;
+    stage: string;
+  };
   goals: {
     active: string;
     approvals: string;
@@ -409,6 +429,25 @@ const content = {
       working: "Working"
     },
     generated: "Generated",
+    atAGlance: {
+      assessmentCompletions: "Assessment completions",
+      assessmentStarts: "Assessment starts",
+      attentionClear: "Nothing urgent right now.",
+      attentionTitle: "Attention required",
+      conversion: "Conversion",
+      conversionSnapshot: "Conversion snapshot",
+      count: "Count",
+      criticalAlerts: "Site issues needing attention",
+      customerContactIssues: "Customer contact issues",
+      dropoff: "Drop-off",
+      freeRequests: "Free requests",
+      healthScoreViews: "HealthScore views",
+      landingVisitors: "Landed visitors",
+      pendingReviews: "Pending reviews",
+      precisionConversions: "Precision conversions",
+      proConversions: "Pro conversions",
+      stage: "Stage"
+    },
     goals: {
       active: "Active",
       approvals: "Approvals",
@@ -470,8 +509,8 @@ const content = {
       reached: "Reached"
     },
     flowSummary: {
-      conversionRate: "Conversion",
-      converted: "Converted",
+      conversionRate: "From HealthScore",
+      converted: "Free or paid",
       entered: "Landed",
       reachedHealthScore: "HealthScore"
     },
@@ -493,7 +532,8 @@ const content = {
       }
     },
     performance: [
-      { icon: HomeIcon, name: "KPIs", view: "kpi" },
+      { icon: HomeIcon, name: "At a Glance", view: "glance" },
+      { icon: SparklesIcon, name: "KPIs", view: "kpi" },
       { icon: FunnelIcon, name: "Conversions", view: "flow" }
     ],
     performanceTitle: "Performance",
@@ -527,6 +567,7 @@ const content = {
       alerts: "Technical Alerts",
       communications: "Communications",
       flow: "Sales Conversions",
+      glance: "At a Glance",
       goals: "Goals",
       kpi: "Key Performance Indicators",
       reviews: "Review",
@@ -739,6 +780,25 @@ const content = {
       working: "กำลังทำ"
     },
     generated: "สร้างเมื่อ",
+    atAGlance: {
+      assessmentCompletions: "ทำแบบประเมินเสร็จ",
+      assessmentStarts: "เริ่มแบบประเมิน",
+      attentionClear: "ยังไม่มีเรื่องเร่งด่วน",
+      attentionTitle: "เรื่องที่ต้องดู",
+      conversion: "คอนเวอร์ชัน",
+      conversionSnapshot: "ภาพรวมคอนเวอร์ชัน",
+      count: "จำนวน",
+      criticalAlerts: "ปัญหาเว็บไซต์ที่ควรดู",
+      customerContactIssues: "ปัญหาการติดต่อลูกค้า",
+      dropoff: "หลุดออก",
+      freeRequests: "คำขอฟรี",
+      healthScoreViews: "ดู HealthScore",
+      landingVisitors: "ผู้เข้าเว็บ",
+      pendingReviews: "รีวิวที่รออยู่",
+      precisionConversions: "คอนเวอร์ชัน Precision",
+      proConversions: "คอนเวอร์ชัน Pro",
+      stage: "ขั้นตอน"
+    },
     goals: {
       active: "กำลังทำ",
       approvals: "การอนุมัติ",
@@ -800,8 +860,8 @@ const content = {
       reached: "มาถึง"
     },
     flowSummary: {
-      conversionRate: "คอนเวอร์ชัน",
-      converted: "แปลงเป็นลูกค้า/ลีด",
+      conversionRate: "จาก HealthScore",
+      converted: "ฟรีหรือชำระเงิน",
       entered: "เข้า Landing",
       reachedHealthScore: "HealthScore"
     },
@@ -823,7 +883,8 @@ const content = {
       }
     },
     performance: [
-      { icon: HomeIcon, name: "KPIs", view: "kpi" },
+      { icon: HomeIcon, name: "ภาพรวม", view: "glance" },
+      { icon: SparklesIcon, name: "KPIs", view: "kpi" },
       { icon: FunnelIcon, name: "Conversions", view: "flow" }
     ],
     performanceTitle: "ประสิทธิภาพ",
@@ -857,6 +918,7 @@ const content = {
       alerts: "การแจ้งเตือนทางเทคนิค",
       communications: "การสื่อสาร",
       flow: "Sales Conversions",
+      glance: "ภาพรวม",
       goals: "Goals",
       kpi: "Key Performance Indicators",
       reviews: "รีวิว",
@@ -1521,9 +1583,6 @@ function RateCard({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">{text.title}</h3>
-          <p className="mt-2 rounded-lg bg-gray-50 px-3 py-2 font-mono text-xs text-gray-600 ring-1 ring-gray-200">
-            {text.formula}
-          </p>
         </div>
         <TrendPill labels={labels} trend={rate.trend} />
       </div>
@@ -1551,6 +1610,298 @@ function RateCard({
         {rate.forecast.map((value) => formatPercent(value, locale)).join(" / ")}
       </p>
     </section>
+  );
+}
+
+function dashboardKpiValue(data: AdminDashboardData, id: AdminDashboardKpiId) {
+  return data.kpis.find((kpi) => kpi.id === id)?.value ?? 0;
+}
+
+type BusinessMetric = Readonly<{
+  label: string;
+  value: string;
+}>;
+
+function BusinessStatsGrid({
+  metrics
+}: Readonly<{
+  metrics: BusinessMetric[];
+}>) {
+  return (
+    <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+      <div className="grid grid-cols-1 gap-px bg-gray-900/5 sm:grid-cols-2 xl:grid-cols-4">
+        {metrics.map((metric) => (
+          <div className="bg-white px-5 py-6" key={metric.label}>
+            <p className="text-sm/6 font-medium text-gray-500">{metric.label}</p>
+            <p className="mt-2 flex items-baseline gap-x-2">
+              <span className="text-4xl font-semibold tracking-tight text-gray-900">
+                {metric.value}
+              </span>
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type BusinessFunnelStage = Readonly<{
+  count: number;
+  denominator: number | null;
+  label: string;
+}>;
+
+function businessFunnelStages(
+  flowData: AdminFlowData,
+  labels: AdminContent
+): BusinessFunnelStage[] {
+  const landed = flowNodeCount(flowData, "landingViewed");
+  const started = flowNodeCount(flowData, "assessmentStarted");
+  const completed = flowNodeCount(flowData, "assessmentSubmitted");
+  const healthScore = flowNodeCount(flowData, "healthscoreViewed");
+
+  return [
+    {
+      count: landed,
+      denominator: null,
+      label: labels.atAGlance.landingVisitors
+    },
+    {
+      count: started,
+      denominator: landed,
+      label: labels.atAGlance.assessmentStarts
+    },
+    {
+      count: completed,
+      denominator: started,
+      label: labels.atAGlance.assessmentCompletions
+    },
+    {
+      count: healthScore,
+      denominator: completed,
+      label: labels.atAGlance.healthScoreViews
+    },
+    {
+      count: flowNodeCount(flowData, "freeEmailRequested"),
+      denominator: healthScore,
+      label: labels.atAGlance.freeRequests
+    },
+    {
+      count: flowNodeCount(flowData, "precisionPaid"),
+      denominator: healthScore,
+      label: labels.atAGlance.precisionConversions
+    },
+    {
+      count: flowNodeCount(flowData, "proPaid"),
+      denominator: healthScore,
+      label: labels.atAGlance.proConversions
+    }
+  ];
+}
+
+function BusinessFunnelTable({
+  flowData,
+  labels,
+  locale
+}: Readonly<{
+  flowData: AdminFlowData;
+  labels: AdminContent;
+  locale: Locale;
+}>) {
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+      <h2 className="text-base font-semibold text-gray-900">
+        {labels.atAGlance.conversionSnapshot}
+      </h2>
+      <div className="mt-6 flow-root">
+        <div className="-mx-5 -my-2 overflow-x-auto">
+          <div className="inline-block min-w-full py-2 align-middle px-5">
+            <div className="overflow-hidden shadow-sm outline-1 outline-black/5 sm:rounded-lg">
+              <table className="relative min-w-full divide-y divide-gray-300">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th
+                      className="py-3.5 pr-3 pl-4 text-left text-sm font-semibold text-gray-900 sm:pl-6"
+                      scope="col"
+                    >
+                      {labels.atAGlance.stage}
+                    </th>
+                    <th
+                      className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
+                      scope="col"
+                    >
+                      {labels.atAGlance.count}
+                    </th>
+                    <th
+                      className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
+                      scope="col"
+                    >
+                      {labels.atAGlance.dropoff}
+                    </th>
+                    <th
+                      className="py-3.5 pr-4 pl-3 text-right text-sm font-semibold text-gray-900 sm:pr-6"
+                      scope="col"
+                    >
+                      {labels.atAGlance.conversion}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {businessFunnelStages(flowData, labels).map((stage) => {
+                    const dropoff =
+                      stage.denominator === null
+                        ? null
+                        : Math.max(0, stage.denominator - stage.count);
+                    const conversion =
+                      stage.denominator && stage.denominator > 0
+                        ? (stage.count / stage.denominator) * 100
+                        : null;
+
+                    return (
+                      <tr key={stage.label}>
+                        <td className="py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap text-gray-900 sm:pl-6">
+                          {stage.label}
+                        </td>
+                        <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-500">
+                          {formatNumber(stage.count, locale)}
+                        </td>
+                        <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-500">
+                          {dropoff === null ? "-" : formatNumber(dropoff, locale)}
+                        </td>
+                        <td className="py-4 pr-4 pl-3 text-right text-sm whitespace-nowrap text-gray-500 sm:pr-6">
+                          {conversion === null
+                            ? "-"
+                            : formatPercent(conversion, locale)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AdminAtAGlanceView({
+  accessToken,
+  alertsData,
+  communicationsData,
+  data,
+  filters,
+  flowData,
+  labels,
+  locale,
+  reviewQueueData
+}: Readonly<{
+  accessToken: string;
+  alertsData: AdminTechnicalAlertsData;
+  communicationsData: AdminCommunicationsData;
+  data: AdminDashboardData;
+  filters: AdminDashboardFilters;
+  flowData: AdminFlowData;
+  labels: AdminContent;
+  locale: Locale;
+  reviewQueueData: AdminReviewQueueData;
+}>) {
+  const communicationIssues =
+    communicationsData.summary.failed + communicationsData.summary.noChannel;
+  const siteIssues =
+    alertsData.summary.critical + alertsData.summary.high;
+  const attentionItems = [
+    {
+      count: reviewQueueData.summary.total,
+      href: adminHref(locale, accessToken, data.range, "reviews", filters),
+      label: labels.atAGlance.pendingReviews
+    },
+    {
+      count: reviewQueueData.summary.unknown,
+      href: adminHref(locale, accessToken, data.range, "reviews", filters),
+      label: labels.reviewQueue.unknown
+    },
+    {
+      count: communicationIssues,
+      href: adminHref(locale, accessToken, data.range, "communications", filters),
+      label: labels.atAGlance.customerContactIssues
+    },
+    {
+      count: siteIssues,
+      href: adminHref(locale, accessToken, data.range, "alerts", filters),
+      label: labels.atAGlance.criticalAlerts
+    }
+  ].filter((item) => item.count > 0);
+  const metrics: BusinessMetric[] = [
+    {
+      label: labels.atAGlance.landingVisitors,
+      value: formatNumber(flowNodeCount(flowData, "landingViewed"), locale)
+    },
+    {
+      label: labels.atAGlance.assessmentStarts,
+      value: formatNumber(flowNodeCount(flowData, "assessmentStarted"), locale)
+    },
+    {
+      label: labels.atAGlance.assessmentCompletions,
+      value: formatNumber(flowNodeCount(flowData, "assessmentSubmitted"), locale)
+    },
+    {
+      label: labels.atAGlance.healthScoreViews,
+      value: formatNumber(flowNodeCount(flowData, "healthscoreViewed"), locale)
+    },
+    {
+      label: labels.atAGlance.freeRequests,
+      value: formatNumber(dashboardKpiValue(data, "free"), locale)
+    },
+    {
+      label: labels.atAGlance.precisionConversions,
+      value: formatNumber(dashboardKpiValue(data, "precision"), locale)
+    },
+    {
+      label: labels.atAGlance.proConversions,
+      value: formatNumber(dashboardKpiValue(data, "pro"), locale)
+    },
+    {
+      label: labels.atAGlance.pendingReviews,
+      value: formatNumber(reviewQueueData.summary.total, locale)
+    }
+  ];
+
+  return (
+    <>
+      <BusinessStatsGrid metrics={metrics} />
+
+      <div className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+        <BusinessFunnelTable flowData={flowData} labels={labels} locale={locale} />
+
+        <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {labels.atAGlance.attentionTitle}
+          </h2>
+          <div className="mt-4 space-y-3">
+            {attentionItems.length > 0 ? (
+              attentionItems.map((item) => (
+                <a
+                  className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800 ring-1 ring-gray-100 transition hover:bg-gray-100"
+                  href={item.href}
+                  key={item.label}
+                >
+                  <span>{item.label}</span>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-gray-900 ring-1 ring-gray-200">
+                    {formatNumber(item.count, locale)}
+                  </span>
+                </a>
+              ))
+            ) : (
+              <p className="rounded-xl bg-[#ECFDF5] px-4 py-3 text-sm font-medium text-[#126B4F] ring-1 ring-[#A7F3D0]">
+                {labels.atAGlance.attentionClear}
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
+    </>
   );
 }
 
@@ -5304,6 +5655,9 @@ function AdminFlowView({
           value={formatPercent(flowData.summary.conversionRate, locale)}
         />
       </div>
+      <div className="mt-8">
+        <BusinessFunnelTable flowData={flowData} labels={labels} locale={locale} />
+      </div>
       <FlowChart flowData={flowData} labels={labels} locale={locale} />
     </>
   );
@@ -5646,6 +6000,16 @@ function adminViewDatabaseAvailable({
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
 }>) {
+  if (view === "glance") {
+    return (
+      alertsData.databaseAvailable &&
+      communicationsData.databaseAvailable &&
+      data.databaseAvailable &&
+      flowData.databaseAvailable &&
+      reviewQueueData.databaseAvailable
+    );
+  }
+
   if (view === "agents") {
     return agentsData.databaseAvailable;
   }
@@ -5840,7 +6204,7 @@ export function AdminDashboard({
               <h1 className="text-3xl font-bold tracking-tight text-gray-900">
                 {labels.pageTitles[view]}
               </h1>
-              {view === "kpi" ? (
+              {view === "glance" || view === "kpi" ? (
                 <p className="mt-1 text-xs text-gray-400">
                   {labels.generated}: {formatGeneratedAt(data.generatedAt, locale)}
                 </p>
@@ -5858,6 +6222,7 @@ export function AdminDashboard({
           view === "alerts" ||
           view === "communications" ||
           view === "flow" ||
+          view === "glance" ||
           view === "goals" ||
           view === "kpi" ||
           view === "visibility" ? (
@@ -5871,7 +6236,7 @@ export function AdminDashboard({
                   locale={locale}
                   view={view}
                 />
-                {view === "flow" || view === "kpi" ? (
+                {view === "flow" || view === "glance" || view === "kpi" ? (
                   <LocaleFilterSelector
                     accessToken={accessToken}
                     filters={filters}
@@ -5882,7 +6247,7 @@ export function AdminDashboard({
                 ) : null}
               </div>
 
-              {view === "flow" || view === "kpi" ? (
+              {view === "flow" || view === "glance" || view === "kpi" ? (
                 <AdminFilterPanel
                   accessToken={accessToken}
                   filters={filters}
@@ -5897,6 +6262,18 @@ export function AdminDashboard({
 
           {view === "flow" ? (
             <AdminFlowView flowData={flowData} labels={labels} locale={locale} />
+          ) : view === "glance" ? (
+            <AdminAtAGlanceView
+              accessToken={accessToken}
+              alertsData={alertsData}
+              communicationsData={communicationsData}
+              data={data}
+              filters={filters}
+              flowData={flowData}
+              labels={labels}
+              locale={locale}
+              reviewQueueData={reviewQueueData}
+            />
           ) : view === "agents" ? (
             <AdminAgentsView
               data={liveAgentsData}

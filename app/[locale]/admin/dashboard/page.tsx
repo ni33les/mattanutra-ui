@@ -62,12 +62,14 @@ export default async function LocalizedAdminDashboardPage({
     rawView === "agents" ||
     rawView === "communications" ||
     rawView === "flow" ||
+    rawView === "glance" ||
     rawView === "goals" ||
+    rawView === "kpi" ||
     rawView === "reviews" ||
     rawView === "supplements" ||
     rawView === "visibility"
       ? rawView
-      : "kpi";
+      : "glance";
   const filters = normalizeAdminDashboardFilters(query);
   const selectedGoalId = firstParam(query.goal);
   const selectedReviewTaskId = firstParam(query.review);
