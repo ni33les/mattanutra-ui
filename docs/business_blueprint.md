@@ -14,7 +14,7 @@ MattaNutra earns trust through an anonymous wellness assessment and HealthScore,
 | Pro Plan | "I want ongoing support." | Recurring advisor relationship | Partial: offer exists, advisor handoff pending |
 | Product guidance | "What should I actually buy?" | Future affiliate revenue and customer convenience | Partial: results area exists, matching not live |
 | Blog and testimonials | "Can I learn and trust the brand?" | Marketing engine for paid, social, and organic traffic | Partial: platform live, cadence pending |
-| Admin analytics | "Where are users converting, dropping out, or needing attention?" | Tune marketing spend, product funnel, and operations | Partial: KPI, Conversions, Execution, Supplements, Human Review, Technical Alerts, and Communications views live |
+| Admin analytics | "Where are users converting, dropping out, or needing attention?" | Tune marketing spend, product funnel, and operations | Partial: Dashboard, Conversions, Execution, Supplements, Human Review, Technical Alerts, and Communications views live |
 
 ## Current Funnel
 
@@ -67,7 +67,7 @@ flowchart TB
 - Formulation page renders stored backend data.
 - Blog and testimonial tables, pages, and protected admin APIs.
 - BPM tracking for funnel, campaign, affiliate, safety, error, email, chat, and formulation events.
-- Admin dashboard with KPI and Conversions views over hour, day, week, month, year, and all-time windows.
+- Admin dashboard with Dashboard and Conversions views over hour, day, week, month, year, and all-time windows.
 - Admin Technical section with task-based Alerts for failed email sends, stuck tasks, cron failures, AI/worker errors, and high-severity BPM/task events.
 - Goal-based task architecture foundation: goals group tasks, agents reserve work by goal priority first, staged task sequences support ordered work, and task events/comments preserve cause-and-effect. Supported slow work now creates task-backed work items, worker reservations are enforced, human review decisions write reviewed formulation versions, and client review follow-up is handled through the communication-channel worker.
 - Built-in operational agents are seeded for HealthScore analysis, nutrition-plan formulation, safety scanning, communications coordination, email dispatch, chat dispatch, human review, and scheduling. OpenClaw is not part of this built-in roster yet.
@@ -176,23 +176,23 @@ Current wired examples:
 
 Current admin dashboard:
 
-1. KPI view for Free conversions, paid Precision conversions, and paid Pro conversions.
-2. Conversion-rate cards with formulas and short trend forecasts.
-3. Conversions view showing the observed user journey from landing through assessment, HealthScore, Free email, paid plan, nutrition plan, results, chat, and marketplace clicks.
-4. Conversion boxes show visits and drops, with border colours highlighting healthier or weaker stages.
-5. Timeframe controls: hour, day, week, month, year, and all time.
-6. Locale controls as EN and TH toggle pills. Both are selected by default.
-7. Collapsible filters for source, medium, campaign, campaign ID, affiliate, promo code, plan, device, plan ID, ray, and email hash.
-8. Filters are URL-driven and server-side, so KPI and Conversions views use the same BPM slice.
-9. Human Review queue for supplement review tasks and dose-reduction notices.
-10. Technical Alerts queue for failed tasks, stuck tasks, failed cron tasks, high/critical task events, and error/high BPM events.
-11. Execution views for milestone-level goals, live task visibility, and agent performance over the task system.
+1. Dashboard view for landed visitors, assessment starts/completions, HealthScore views, Free requests, Precision/Pro conversions, pending reviews, customer-contact issues, and clickable trend graphing.
+2. Conversions view showing the observed user journey from landing through assessment, HealthScore, Free email, paid plan, nutrition plan, results, chat, and marketplace clicks.
+3. Conversion boxes show visits and drops, with border colours highlighting healthier or weaker stages.
+4. Timeframe controls: hour, day, week, month, year, and all time.
+5. Locale controls as EN and TH toggle pills. Both are selected by default.
+6. Collapsible filters for source, medium, campaign, campaign ID, affiliate, promo code, plan, device, plan ID, ray, and email hash.
+7. Filters are URL-driven and server-side, so Dashboard and Conversions views use the same BPM slice.
+8. Human Review queue for supplement review tasks and dose-reduction notices.
+9. Technical Alerts queue for failed tasks, stuck tasks, failed cron tasks, high/critical task events, and error/high BPM events.
+10. Execution views for milestone-level goals, live task visibility, and agent performance over the task system.
+11. External admin query APIs expose business and execution data to OpenClaw and remote agents with `ADMIN_CLAW_TOKEN`.
 
 How the admin sections should be read:
 
 | Section | Business Question | Current Status |
 | --- | --- | --- |
-| KPI | Are Free, Precision, and Pro conversions increasing? | Live from BPM events |
+| Dashboard | Are traffic, assessment progress, conversions, reviews, and contact issues moving in the right direction? | Live from BPM events and review/communication queues |
 | Conversions | Where do people continue, and where do they stop? | Live from BPM events |
 | Supplements | Which supplements are allowed, blocked, or awaiting review? | Live with editable dose ceilings and safety flags |
 | Human Review | What needs a human decision before being shown or acted on? | Live for supplement review and dose-reduction notices |
@@ -202,12 +202,29 @@ How the admin sections should be read:
 | Communications | Which channel should be used to contact a client, and what messages were queued or sent? | Live for queued, sent, failed, delivered, and no-channel communication messages |
 | Technical Alerts | What failed or looks stuck? | Live for tasks, cron, task events, and BPM error events |
 
+External agent query surface:
+
+- `/api/admin/query/glance`
+- `/api/admin/query/conversions`
+- `/api/admin/query/campaigns`
+- `/api/admin/query/leads`
+- `/api/admin/query/content`
+- `/api/admin/query/reviews`
+- `/api/admin/query/supplements`
+- `/api/admin/query/communications`
+- `/api/admin/query/alerts`
+- `/api/admin/query/goals`
+- `/api/admin/query/tasks`
+- `/api/admin/query/agents`
+
+These endpoints are machine-to-machine only. They accept `Authorization: Bearer <ADMIN_CLAW_TOKEN>` or `x-admin-claw-token`; dashboard URL tokens are not accepted.
+
 Remaining admin dashboard work:
 
-1. Campaign and affiliate comparison tables.
+1. Browser-facing Campaigns and Leads pages that use the same external-query data.
 2. Retry actions for failed technical tasks where safe.
 3. Ray drill-down for a single anonymous BPM/session journey.
-4. Content, testimonial, interaction-rule, and advanced supplement decision management.
+4. Interaction-rule and advanced supplement decision management.
 5. Revenue and payment reporting after checkout is live.
 
 ## Supplement Governance
@@ -294,6 +311,8 @@ Worker execution is currently internal, but it runs through the protected task A
 ## Content and Marketing Engine
 
 Blog articles and testimonials are database-driven and can be managed by OpenClaw or another admin system using protected machine APIs. These APIs use `ADMIN_CLAW_TOKEN` with `Authorization: Bearer <ADMIN_CLAW_TOKEN>` or `x-admin-claw-token`; dashboard tokens are not accepted for machine API access.
+
+The dashboard can also request Draft, Review, Publish Now, Publish On, and Archive workflows through `/api/admin/content/workflow`. That API creates a content goal and a `content_status_change` task. The deterministic Content Publisher agent applies the status change through the normal task completion flow, so content changes are visible in Goals, Tasks, and task events.
 
 Purpose:
 

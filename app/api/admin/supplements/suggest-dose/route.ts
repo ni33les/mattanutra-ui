@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDashboardTokenAllowed } from "@/lib/admin-auth";
+import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import type { SupplementConfidence } from "@/lib/admin-supplements";
 import { suggestSupplementDose } from "@/lib/supplement-dose-suggestion";
 import { normalizeSupplementSafetyFlags } from "@/lib/supplement-safety-flags";
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   const accessToken =
     request.headers.get("x-admin-dashboard-token") ?? textOrNull(body.accessToken);
 
-  if (!adminDashboardTokenAllowed(accessToken)) {
+  if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {
     return NextResponse.json(
       { message: "Not found" },
       {

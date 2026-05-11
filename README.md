@@ -42,18 +42,20 @@ npm run start
 
 The optional app spec example lives at `.do/app.yaml.example`; copy it to `.do/app.yaml` and replace the placeholder GitHub repo before using it directly.
 
-## Admin Content API
+## Admin Machine APIs
 
-Blog and testimonial management endpoints are server-to-server APIs for admin systems and require `ADMIN_TOKEN`.
+OpenClaw, external agents, and remote workers use protected server-to-server APIs. They require `ADMIN_CLAW_TOKEN`.
 
 Send either header:
 
 ```txt
-Authorization: Bearer <ADMIN_TOKEN>
-x-admin-token: <ADMIN_TOKEN>
+Authorization: Bearer <ADMIN_CLAW_TOKEN>
+x-admin-claw-token: <ADMIN_CLAW_TOKEN>
 ```
 
-Endpoints:
+Dashboard URL tokens are only for browser dashboard access and are not accepted by machine APIs.
+
+Content endpoints:
 
 ```txt
 GET    /api/blog/posts
@@ -82,3 +84,22 @@ DELETE /api/attestations/:id
 ```
 
 The public website renders published blog and testimonial content server-side; these API routes are not public read endpoints.
+
+Admin query endpoints for external agents:
+
+```txt
+GET /api/admin/query/glance
+GET /api/admin/query/conversions
+GET /api/admin/query/campaigns
+GET /api/admin/query/leads
+GET /api/admin/query/content
+GET /api/admin/query/reviews
+GET /api/admin/query/supplements
+GET /api/admin/query/communications
+GET /api/admin/query/alerts
+GET /api/admin/query/goals
+GET /api/admin/query/tasks
+GET /api/admin/query/agents
+```
+
+Shared query parameters include `range`, `locale`, `device`, `source`, `campaign`, `affiliate`, `planId`, `ray`, `emailHash`, `status`, `limit`, and `cursor`.

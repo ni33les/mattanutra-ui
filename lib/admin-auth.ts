@@ -66,3 +66,15 @@ export function adminClawRequestAllowed(request: Request) {
     adminClawTokenAllowed(request.headers.get("x-admin-claw-token"))
   );
 }
+
+export function adminDashboardOrClawRequestAllowed(
+  request: Request,
+  dashboardToken?: unknown
+) {
+  return (
+    adminClawRequestAllowed(request) ||
+    adminDashboardTokenAllowed(
+      dashboardToken ?? request.headers.get("x-admin-dashboard-token")
+    )
+  );
+}

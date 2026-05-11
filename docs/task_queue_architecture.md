@@ -68,6 +68,7 @@ The clean schema seeds the MattaNutra-operated agents that keep the system movin
 | Safety Scanner | Deterministic | Supplement matching, dose normalization, safety triage, and review flags. |
 | Communications Coordinator | Deterministic | Channel choice, client follow-up orchestration, and chat-then-email fallback. |
 | Email Dispatcher | Deterministic | Free example emails and reassessment emails. |
+| Content Publisher | Deterministic | Applies approved blog/testimonial status changes requested through the admin content workflow API. |
 | Chat Dispatcher | External | LINE, WhatsApp, Telegram, and other chat delivery handoff. |
 | Human Reviewer | Human | Safety approvals, supplement governance, and formulation review. |
 | Scheduler | Deterministic | Cron, housekeeping, and fallback task processing. |
@@ -133,7 +134,7 @@ The dashboard now separates business and operational views:
 
 | View | Purpose |
 | --- | --- |
-| KPI | Free, Precision, and Pro conversion performance. |
+| Dashboard | Business summary for traffic, assessment progress, conversions, reviews, contact issues, and trend graphing. |
 | Conversions | Funnel movement and stage loss. |
 | Execution / Goals | Outcome-level operational tracking, with tasks, comments, events, dependencies, reservations, and approvals. |
 | Execution / Visibility | Live task queue visibility across queued, active, human, blocked, failed, and completed work. |
@@ -188,6 +189,8 @@ Internal workers need:
 - optional `WORKER_CONCURRENCY`
 - optional `WORKER_MAX_TASKS_PER_TICK`
 
+External agents can query admin/business state without DB access through `/api/admin/query/*` endpoints. Available views are `glance`, `conversions`, `campaigns`, `leads`, `content`, `reviews`, `supplements`, `communications`, `alerts`, `goals`, `tasks`, and `agents`.
+
 ## Acceptance Criteria
 
 - Schema can be rebuilt from `db-schema.sql`.
@@ -198,4 +201,4 @@ Internal workers need:
 - Events and comments preserve cause-and-effect.
 - Human review completion closes the review task and queues any needed client follow-up.
 - Technical alerts are task-based.
-- OpenClaw can integrate through protected task and communications APIs.
+- OpenClaw can integrate through protected task, communications, content workflow, and admin query APIs.

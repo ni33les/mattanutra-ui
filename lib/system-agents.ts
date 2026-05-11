@@ -5,6 +5,7 @@ export const AGENT_CAPABILITIES = {
   chatSend: "chat_send",
   clientSafetyFollowup: "client_safety_followup",
   communicationDispatch: "communication_dispatch",
+  contentPublish: "content_publish",
   communicationRoute: "communication_route",
   doseNormalization: "dose_normalization",
   emailSend: "email_send",
@@ -31,6 +32,7 @@ export const AGENT_CAPABILITIES = {
 export type SystemAgentKey =
   | "chatDispatcher"
   | "communicationsCoordinator"
+  | "contentPublisher"
   | "emailDispatcher"
   | "formulationWorker"
   | "healthScoreEngine"
@@ -78,6 +80,19 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
     },
     model: null,
     name: "Communications Coordinator",
+    type: "deterministic"
+  },
+  contentPublisher: {
+    capabilities: [
+      AGENT_CAPABILITIES.contentPublish,
+      AGENT_CAPABILITIES.internalWorker
+    ],
+    id: "bd2db46f-149a-4d7c-8805-25efcb621b3d",
+    metadata: {
+      seeded: true
+    },
+    model: null,
+    name: "Content Publisher",
     type: "deterministic"
   },
   emailDispatcher: {
@@ -178,6 +193,7 @@ export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
   analyze_healthscore: "healthScoreEngine",
   generate_example_formulation: "formulationWorker",
   generate_formulation: "formulationWorker",
+  content_status_change: "contentPublisher",
   send_example_email: "emailDispatcher",
   send_reassessment_email: "emailDispatcher"
 } as const;
@@ -197,6 +213,7 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
       AGENT_CAPABILITIES.freeExampleFormulation
     ],
     generate_formulation: [AGENT_CAPABILITIES.formulationGeneration],
+    content_status_change: [AGENT_CAPABILITIES.contentPublish],
     send_example_email: [AGENT_CAPABILITIES.freeEmailSend],
     send_reassessment_email: [AGENT_CAPABILITIES.reassessmentEmailSend]
   };

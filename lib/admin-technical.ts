@@ -7,6 +7,8 @@ import {
 export type AdminTechnicalSeverity = "critical" | "high" | "low" | "medium";
 
 export type AdminTechnicalAlertRow = Readonly<{
+  acknowledgedAt: string | null;
+  adminStatus: "acknowledged" | "open" | "resolved";
   cronId: string | null;
   details: Record<string, unknown>;
   eventType: string | null;
@@ -21,6 +23,7 @@ export type AdminTechnicalAlertRow = Readonly<{
   taskId: string | null;
   taskType: string | null;
   title: string;
+  resolvedAt: string | null;
 }>;
 
 export type AdminTechnicalAlertsData = Readonly<{
@@ -200,6 +203,8 @@ function alertRowFromDb(row: AlertDbRow): AdminTechnicalAlertRow {
   const message = row.message ?? row.title;
 
   return {
+    acknowledgedAt: null,
+    adminStatus: "open",
     cronId: row.cron_id,
     details,
     eventType: row.event_type,
@@ -217,8 +222,52 @@ function alertRowFromDb(row: AlertDbRow): AdminTechnicalAlertRow {
     status: row.status,
     taskId: row.task_id,
     taskType: row.task_type,
-    title: row.title
+    title: row.title,
+    resolvedAt: null
   };
+}
+
+async function alertAcknowledgements(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  rows: readonly AdminTechnicalAlertRow[]
+) {
+  const tableRows = await sql<{ exists: boolean }[]>`
+    select to_regclass('public.admin_alert_acknowledgements') is not null as exists
+  `;
+
+  if (!tableRows[0]?.exists || rows.length < 1) {
+    return new Map<string, {
+      acknowledged_at: Date | string | null;
+      resolved_at: Date | string | null;
+      status: "acknowledged" | "open" | "resolved";
+    }>();
+  }
+
+  const ids = rows.map((row) => row.id);
+  const sources = [...new Set(rows.map((row) => row.source))];
+  const acknowledgementRows = await sql<
+    Array<{
+      acknowledged_at: Date | string | null;
+      resolved_at: Date | string | null;
+      source: AdminTechnicalAlertRow["source"];
+      source_id: string;
+      status: "acknowledged" | "open" | "resolved";
+    }>
+  >`
+    select
+      source,
+      source_id,
+      status,
+      acknowledged_at,
+      resolved_at
+    from public.admin_alert_acknowledgements
+    where source = any(${sources}::text[])
+      and source_id = any(${ids}::text[])
+  `;
+
+  return new Map(
+    acknowledgementRows.map((row) => [`${row.source}:${row.source_id}`, row])
+  );
 }
 
 export async function getAdminTechnicalAlertsData(
@@ -372,7 +421,7 @@ export async function getAdminTechnicalAlertsData(
         limit 100
       `
     ]);
-    const rows = [
+    const rawRows = [
       ...failedTasks,
       ...stuckTasks,
       ...failedCron,
@@ -393,6 +442,25 @@ export async function getAdminTechnicalAlertsData(
         );
       })
       .slice(0, 300);
+    const acknowledgements = await alertAcknowledgements(sql, rawRows);
+    const rows = rawRows
+      .map((row) => {
+        const acknowledgement = acknowledgements.get(`${row.source}:${row.id}`);
+        const acknowledgedAt = acknowledgement?.acknowledged_at
+          ? new Date(acknowledgement.acknowledged_at).toISOString()
+          : null;
+        const resolvedAt = acknowledgement?.resolved_at
+          ? new Date(acknowledgement.resolved_at).toISOString()
+          : null;
+
+        return {
+          ...row,
+          acknowledgedAt,
+          adminStatus: acknowledgement?.status ?? "open",
+          resolvedAt
+        };
+      })
+      .filter((row) => row.adminStatus !== "resolved");
 
     return {
       databaseAvailable: true,

@@ -120,5 +120,14 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
     return { accepted: true };
   }
 
+  if (workItem.taskType === "content_status_change") {
+    return {
+      accepted: true,
+      contentId: workItem.contentId,
+      contentType: workItem.contentType,
+      targetStatus: workItem.targetStatus
+    };
+  }
+
   throw new Error(`Unsupported task type: ${workItem.taskType}`);
 }

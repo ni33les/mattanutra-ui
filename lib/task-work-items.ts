@@ -50,8 +50,17 @@ export type CommunicationFollowupWorkItem = Readonly<{
   taskType: "client_safety_followup";
 }>;
 
+export type ContentStatusChangeWorkItem = Readonly<{
+  contentId: string;
+  contentType: "blog_post" | "testimonial";
+  payload: Record<string, unknown>;
+  targetStatus: "archived" | "draft" | "published" | "review";
+  taskType: "content_status_change";
+}>;
+
 export type TaskWorkItem =
   | CommunicationFollowupWorkItem
+  | ContentStatusChangeWorkItem
   | ExampleEmailWorkItem
   | FormulationWorkItem
   | HealthScoreWorkItem
@@ -301,6 +310,32 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
       planId: task.planId,
       taskType: "client_safety_followup"
     } satisfies CommunicationFollowupWorkItem;
+  }
+
+  if (task.taskType === "content_status_change") {
+    const payload = payloadRecord(task.payload);
+    const contentType = payloadText(payload, "contentType");
+    const targetStatus = payloadText(payload, "targetStatus");
+    const contentId = payloadText(payload, "contentId");
+
+    if (
+      (contentType !== "blog_post" && contentType !== "testimonial") ||
+      (targetStatus !== "archived" &&
+        targetStatus !== "draft" &&
+        targetStatus !== "published" &&
+        targetStatus !== "review") ||
+      !isUuid(contentId)
+    ) {
+      throw new Error("Content status change work item is incomplete");
+    }
+
+    return {
+      contentId,
+      contentType,
+      payload,
+      targetStatus,
+      taskType: "content_status_change"
+    } satisfies ContentStatusChangeWorkItem;
   }
 
   return {

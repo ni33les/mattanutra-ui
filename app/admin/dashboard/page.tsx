@@ -41,7 +41,6 @@ export default async function AdminDashboardPage({
     rawView === "flow" ||
     rawView === "glance" ||
     rawView === "goals" ||
-    rawView === "kpi" ||
     rawView === "reviews" ||
     rawView === "supplements" ||
     rawView === "visibility"

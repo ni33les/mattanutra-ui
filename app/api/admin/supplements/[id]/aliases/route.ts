@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
-import { deleteAdminSupplementAlias } from "@/lib/admin-supplements";
+import { addAdminSupplementAlias } from "@/lib/admin-supplements";
 import { isUuid } from "@/lib/assessment-store";
 
 export const runtime = "nodejs";
 
-type AdminSupplementAliasRouteProps = Readonly<{
+type AdminSupplementAliasesRouteProps = Readonly<{
   params: Promise<{
-    aliasId: string;
     id: string;
   }>;
 }>;
@@ -40,11 +39,11 @@ function errorDetails(error: unknown) {
   };
 }
 
-export async function DELETE(
+export async function POST(
   request: Request,
-  { params }: AdminSupplementAliasRouteProps
+  { params }: AdminSupplementAliasesRouteProps
 ) {
-  const [{ aliasId, id }, body] = await Promise.all([
+  const [{ id }, body] = await Promise.all([
     params,
     request.json().catch(() => ({})) as Promise<Record<string, unknown>>
   ]);
@@ -63,9 +62,9 @@ export async function DELETE(
     );
   }
 
-  if (!isUuid(id) || !isUuid(aliasId)) {
+  if (!isUuid(id)) {
     return NextResponse.json(
-      { message: "Supplement association not found" },
+      { message: "Supplement not found" },
       {
         headers: {
           "Cache-Control": "no-store"
@@ -75,10 +74,24 @@ export async function DELETE(
     );
   }
 
+  const alias = textOrNull(body.alias);
+
+  if (!alias) {
+    return NextResponse.json(
+      { message: "Supplement association name is required" },
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        },
+        status: 400
+      }
+    );
+  }
+
   try {
-    const row = await deleteAdminSupplementAlias({
-      actor: "admin_dashboard",
-      aliasId,
+    const row = await addAdminSupplementAlias({
+      actor: "admin_api",
+      alias,
       supplementId: id
     });
 
@@ -91,14 +104,13 @@ export async function DELETE(
       }
     );
   } catch (error) {
-    console.error("Unable to delete supplement association", {
+    console.error("Unable to add supplement association", {
       error: errorDetails(error),
-      supplementAliasId: aliasId,
       supplementId: id
     });
 
     return NextResponse.json(
-      { message: "Unable to delete supplement association" },
+      { message: "Unable to add supplement association" },
       {
         headers: {
           "Cache-Control": "no-store"

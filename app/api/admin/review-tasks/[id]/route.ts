@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDashboardTokenAllowed } from "@/lib/admin-auth";
+import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import {
   decideAdminPlanReviewTask,
   dismissAdminReviewTask,
@@ -96,7 +96,7 @@ export async function PATCH(
   const accessToken =
     request.headers.get("x-admin-dashboard-token") ?? textOrNull(body.accessToken);
 
-  if (!adminDashboardTokenAllowed(accessToken)) {
+  if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {
     return NextResponse.json(
       { message: "Not found" },
       {

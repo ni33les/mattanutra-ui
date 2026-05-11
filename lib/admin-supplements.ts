@@ -85,6 +85,12 @@ export type DeleteAdminSupplementAliasInput = Readonly<{
   supplementId: string;
 }>;
 
+export type AddAdminSupplementAliasInput = Readonly<{
+  actor?: string | null;
+  alias: string;
+  supplementId: string;
+}>;
+
 const listStatuses = new Set<SupplementListStatus>([
   "blacklisted",
   "inactive",
@@ -138,6 +144,15 @@ function aliasesFromDb(value: unknown): AdminSupplementAlias[] {
       return id && name ? { id, name } : null;
     })
     .filter((item): item is AdminSupplementAlias => Boolean(item));
+}
+
+function normalizeAlias(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 function rowFromDb(row: SupplementDbRow): AdminSupplementRow {
@@ -445,6 +460,97 @@ export async function deleteAdminSupplementAlias(
   if (deletedRows.length === 0) {
     throw new Error("Supplement association not found");
   }
+
+  const data = await getAdminSupplementsData();
+  const row = data.rows.find((item) => item.id === input.supplementId);
+
+  if (!row) {
+    throw new Error("Supplement update could not be reloaded");
+  }
+
+  return row;
+}
+
+export async function addAdminSupplementAlias(input: AddAdminSupplementAliasInput) {
+  const sql = getSql();
+  const alias = input.alias.trim().slice(0, 200);
+  const normalizedAlias = normalizeAlias(alias);
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  if (!alias || !normalizedAlias) {
+    throw new Error("Supplement association requires a name");
+  }
+
+  await sql.begin(async (transaction) => {
+    const supplementRows = await transaction<{ id: string; name: string }[]>`
+      select id::text, name
+      from public.supplements
+      where id = ${input.supplementId}::uuid
+      limit 1
+    `;
+    const supplement = supplementRows[0];
+
+    if (!supplement) {
+      throw new Error("Supplement not found");
+    }
+
+    const beforeRows = await transaction<
+      {
+        alias: string;
+        id: string;
+        normalized_alias: string;
+        supplement_id: string;
+      }[]
+    >`
+      select id::text, supplement_id::text, alias, normalized_alias
+      from public.supplement_aliases
+      where normalized_alias = ${normalizedAlias}
+      limit 1
+    `;
+    const before = beforeRows[0] ?? null;
+
+    await transaction`
+      insert into public.supplement_aliases (
+        id,
+        supplement_id,
+        alias,
+        normalized_alias,
+        created_at
+      )
+      values (
+        ${randomUUID()}::uuid,
+        ${input.supplementId}::uuid,
+        ${alias},
+        ${normalizedAlias},
+        now()
+      )
+      on conflict (normalized_alias) do update set
+        supplement_id = excluded.supplement_id,
+        alias = excluded.alias
+    `;
+
+    await transaction`
+      insert into public.supplement_admin_audit (
+        id,
+        supplement_id,
+        action,
+        actor,
+        before_payload,
+        after_payload
+      )
+      values (
+        ${randomUUID()}::uuid,
+        ${input.supplementId}::uuid,
+        ${before ? "alias_reassigned" : "alias_added"},
+        ${input.actor ?? "admin_dashboard"},
+        ${transaction.json(before ?? {})},
+        ${transaction.json({ alias, normalizedAlias, supplementId: input.supplementId })}
+      )
+    `;
+  });
 
   const data = await getAdminSupplementsData();
   const row = data.rows.find((item) => item.id === input.supplementId);

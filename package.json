@@ -17,7 +17,6 @@
     "@types/nodemailer": "^8.0.0",
     "clsx": "latest",
     "lucide-react": "latest",
-    "mermaid": "^11.14.0",
     "next": "latest",
     "nodemailer": "^8.0.7",
     "postgres": "^3.4.9",

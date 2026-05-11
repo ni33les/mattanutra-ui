@@ -533,6 +533,21 @@ values
     now()
   ),
   (
+    'bd2db46f-149a-4d7c-8805-25efcb621b3d'::uuid,
+    'Content Publisher',
+    'deterministic',
+    'active',
+    array[
+      'content_publish',
+      'mattanutra_internal_worker'
+    ]::text[],
+    null,
+    '{"seeded": true}'::jsonb,
+    null,
+    now(),
+    now()
+  ),
+  (
     '8386c905-f607-4d5f-bb5f-3a98a598294d'::uuid,
     'Chat Dispatcher',
     'external',
@@ -2329,6 +2344,108 @@ create index if not exists bpm_promo_code_filter_idx
   on public.bpm (lower(promo_code), occurred_at desc)
   where promo_code is not null;
 
+create table if not exists public.admin_alert_acknowledgements (
+  id uuid primary key,
+  source text not null check (source in ('bpm', 'cron', 'task', 'task_event')),
+  source_id text not null,
+  status text not null default 'acknowledged' check (
+    status in ('acknowledged', 'resolved')
+  ),
+  actor text not null default 'admin_api',
+  note text null,
+  acknowledged_at timestamptz null,
+  resolved_at timestamptz null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (source, source_id)
+);
+
+alter table public.admin_alert_acknowledgements
+  add column if not exists source text,
+  add column if not exists source_id text,
+  add column if not exists status text default 'acknowledged',
+  add column if not exists actor text default 'admin_api',
+  add column if not exists note text null,
+  add column if not exists acknowledged_at timestamptz null,
+  add column if not exists resolved_at timestamptz null,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+update public.admin_alert_acknowledgements
+set
+  source = coalesce(nullif(source, ''), 'task'),
+  source_id = coalesce(nullif(source_id, ''), id::text),
+  status = case
+    when status in ('acknowledged', 'resolved') then status
+    else 'acknowledged'
+  end,
+  actor = coalesce(nullif(actor, ''), 'admin_api'),
+  acknowledged_at = coalesce(acknowledged_at, created_at, now()),
+  created_at = coalesce(created_at, now()),
+  updated_at = coalesce(updated_at, now())
+where source is null
+  or source = ''
+  or source_id is null
+  or source_id = ''
+  or status is null
+  or status not in ('acknowledged', 'resolved')
+  or actor is null
+  or actor = ''
+  or acknowledged_at is null
+  or created_at is null
+  or updated_at is null;
+
+alter table public.admin_alert_acknowledgements
+  alter column source set not null,
+  alter column source_id set not null,
+  alter column status set default 'acknowledged',
+  alter column status set not null,
+  alter column actor set default 'admin_api',
+  alter column actor set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.admin_alert_acknowledgements'::regclass
+      and conname = 'admin_alert_acknowledgements_source_check'
+  ) then
+    alter table public.admin_alert_acknowledgements
+      add constraint admin_alert_acknowledgements_source_check
+      check (source in ('bpm', 'cron', 'task', 'task_event'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.admin_alert_acknowledgements'::regclass
+      and conname = 'admin_alert_acknowledgements_status_check'
+  ) then
+    alter table public.admin_alert_acknowledgements
+      add constraint admin_alert_acknowledgements_status_check
+      check (status in ('acknowledged', 'resolved'));
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.admin_alert_acknowledgements'::regclass
+      and conname = 'admin_alert_acknowledgements_source_id_key'
+  ) then
+    alter table public.admin_alert_acknowledgements
+      add constraint admin_alert_acknowledgements_source_id_key
+      unique (source, source_id);
+  end if;
+end $$;
+
+create index if not exists admin_alert_acknowledgements_status_idx
+  on public.admin_alert_acknowledgements (status, updated_at desc);
+
 create index if not exists bpm_alerts_idx
   on public.bpm (severity, event_type, occurred_at desc)
   where severity in ('medium', 'high', 'critical')
@@ -2339,6 +2456,74 @@ create index if not exists bpm_properties_gin_idx
 
 create index if not exists bpm_metrics_gin_idx
   on public.bpm using gin (metrics jsonb_path_ops);
+
+create table if not exists public.admin_conversion_targets (
+  target_id text primary key,
+  target_rate numeric(5, 2) not null,
+  description text null,
+  updated_by text null,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  constraint admin_conversion_targets_rate_check
+    check (target_rate >= 0 and target_rate <= 100)
+);
+
+alter table public.admin_conversion_targets
+  add column if not exists target_rate numeric(5, 2),
+  add column if not exists description text null,
+  add column if not exists updated_by text null,
+  add column if not exists updated_at timestamptz default now(),
+  add column if not exists created_at timestamptz default now();
+
+insert into public.admin_conversion_targets (
+  target_id,
+  target_rate,
+  description,
+  updated_by,
+  created_at,
+  updated_at
+)
+values
+  ('landingVisitors', 100, 'Entry benchmark', 'schema_default', now(), now()),
+  ('assessmentStarts', 30, 'Landed visitors who start the assessment', 'schema_default', now(), now()),
+  ('assessmentCompletions', 65, 'Assessment starts that complete submission', 'schema_default', now(), now()),
+  ('healthScoreViews', 95, 'Completed assessments that view HealthScore', 'schema_default', now(), now()),
+  ('freeRequests', 20, 'HealthScore views that request the Free email', 'schema_default', now(), now()),
+  ('precisionConversions', 5, 'HealthScore views that buy Precision', 'schema_default', now(), now()),
+  ('proConversions', 1, 'HealthScore views that buy Pro', 'schema_default', now(), now())
+on conflict (target_id) do nothing;
+
+update public.admin_conversion_targets
+set
+  target_rate = greatest(0, least(100, coalesce(target_rate, 0))),
+  updated_at = coalesce(updated_at, now()),
+  created_at = coalesce(created_at, now())
+where target_rate is null
+  or target_rate < 0
+  or target_rate > 100
+  or updated_at is null
+  or created_at is null;
+
+alter table public.admin_conversion_targets
+  alter column target_rate set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.admin_conversion_targets'::regclass
+      and conname = 'admin_conversion_targets_rate_check'
+  ) then
+    alter table public.admin_conversion_targets
+      add constraint admin_conversion_targets_rate_check
+      check (target_rate >= 0 and target_rate <= 100);
+  end if;
+end $$;
 
 
 -- Supplement whitelist/blacklist governance.
@@ -4284,6 +4469,12 @@ begin
   end;
 
   begin
+    execute 'alter table public.admin_alert_acknowledgements owner to mn';
+  exception when others then
+    raise notice 'Skipping admin_alert_acknowledgements owner change: %', sqlerrm;
+  end;
+
+  begin
     execute 'alter table public.supplements owner to mn';
   exception when others then
     raise notice 'Skipping supplements owner change: %', sqlerrm;
@@ -4364,6 +4555,7 @@ begin
          public.supplement_safety_limits,
          public.supplement_aliases,
          public.supplement_admin_audit,
+         public.admin_alert_acknowledgements,
          public.safety_reviews,
          public.communication_identities,
          public.plan_communication_identities,

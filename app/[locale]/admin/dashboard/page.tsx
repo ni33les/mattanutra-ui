@@ -64,7 +64,6 @@ export default async function LocalizedAdminDashboardPage({
     rawView === "flow" ||
     rawView === "glance" ||
     rawView === "goals" ||
-    rawView === "kpi" ||
     rawView === "reviews" ||
     rawView === "supplements" ||
     rawView === "visibility"

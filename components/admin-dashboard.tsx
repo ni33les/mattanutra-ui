@@ -35,10 +35,6 @@ import { ChevronDownIcon as ChevronDownSolidIcon } from "@heroicons/react/20/sol
 import { HealthspanLogo } from "@/components/healthspan-logo";
 import type {
   AdminDashboardData,
-  AdminDashboardKpi,
-  AdminDashboardKpiId,
-  AdminDashboardRate,
-  AdminDashboardRateId,
   AdminDashboardRange
 } from "@/lib/admin-dashboard-data";
 import type {
@@ -78,6 +74,8 @@ import {
   type AdminDashboardFilters
 } from "@/lib/admin-dashboard-filters";
 import type {
+  AdminConversionTargetId,
+  AdminConversionTargets,
   AdminFlowData,
   AdminFlowNodeId
 } from "@/lib/admin-flow-data";
@@ -95,7 +93,6 @@ type AdminDashboardView =
   | "flow"
   | "glance"
   | "goals"
-  | "kpi"
   | "reviews"
   | "supplements"
   | "visibility";
@@ -109,17 +106,7 @@ type AdminNavItem = Readonly<{
   view?: AdminDashboardView;
 }>;
 
-type KpiText = Readonly<{
-  title: string;
-}>;
-
-type RateText = Readonly<{
-  formula: string;
-  title: string;
-}>;
-
 type AdminContent = Readonly<{
-  bucketPrefix: string;
   closeSidebar: string;
   dataUnavailable: string;
   emptyFlow: string;
@@ -152,6 +139,8 @@ type AdminContent = Readonly<{
     plan: string;
     provider: string;
     queued: string;
+    retry: string;
+    retrying: string;
     sent: string;
     skipped: string;
     status: string;
@@ -187,16 +176,22 @@ type AdminContent = Readonly<{
     conversion: string;
     conversionSnapshot: string;
     count: string;
+    cancel: string;
     criticalAlerts: string;
     customerContactIssues: string;
+    deviation: string;
     dropoff: string;
+    editTargets: string;
     freeRequests: string;
     healthScoreViews: string;
     landingVisitors: string;
     pendingReviews: string;
     precisionConversions: string;
     proConversions: string;
+    saveTargets: string;
+    targetSaveError: string;
     stage: string;
+    target: string;
   };
   goals: {
     active: string;
@@ -244,21 +239,17 @@ type AdminContent = Readonly<{
     okay: string;
   };
   flowTitle: string;
-  kpis: Record<AdminDashboardKpiId, KpiText>;
   execution: AdminNavItem[];
   executionTitle: string;
   governance: AdminNavItem[];
   governanceTitle: string;
   marketing: AdminNavItem[];
   marketingTitle: string;
-  nextBuckets: string;
   openSidebar: string;
   pageTitles: Record<AdminDashboardView, string>;
   performance: AdminNavItem[];
   performanceTitle: string;
   ranges: Record<AdminDashboardRange, string>;
-  rates: Record<AdminDashboardRateId, RateText>;
-  ratesTitle: string;
   reviewQueue: {
     approve: string;
     clientDose: string;
@@ -353,7 +344,6 @@ type AdminContent = Readonly<{
     whitelisted: string;
   };
   title: string;
-  trend: Record<AdminDashboardKpi["trend"], string>;
 }>;
 
 const rangeOrder: AdminDashboardRange[] = [
@@ -368,7 +358,6 @@ const supplementDoseSuggestionTimeoutMs = 45_000;
 
 const content = {
   en: {
-    bucketPrefix: "per",
     closeSidebar: "Close sidebar",
     dataUnavailable:
       "Dashboard data is unavailable. Check the database connection.",
@@ -398,10 +387,12 @@ const content = {
       empty: "No communication messages in this timeframe.",
       failed: "Failed",
       messageType: "Type",
-      noChannel: "No channel",
+      noChannel: "Awaiting channel",
       plan: "Plan",
       provider: "Provider",
       queued: "Queued",
+      retry: "Retry",
+      retrying: "Retrying...",
       sent: "Sent",
       skipped: "Skipped",
       status: "Status",
@@ -434,19 +425,25 @@ const content = {
       assessmentStarts: "Assessment starts",
       attentionClear: "Nothing urgent right now.",
       attentionTitle: "Attention required",
+      cancel: "Cancel",
       conversion: "Conversion",
       conversionSnapshot: "Conversion snapshot",
       count: "Count",
       criticalAlerts: "Site issues needing attention",
       customerContactIssues: "Customer contact issues",
+      deviation: "Actual vs target",
       dropoff: "Drop-off",
+      editTargets: "Edit targets",
       freeRequests: "Free requests",
       healthScoreViews: "HealthScore views",
       landingVisitors: "Landed visitors",
       pendingReviews: "Pending reviews",
       precisionConversions: "Precision conversions",
       proConversions: "Pro conversions",
-      stage: "Stage"
+      saveTargets: "Save targets",
+      stage: "Stage",
+      target: "Target",
+      targetSaveError: "Could not save targets."
     },
     goals: {
       active: "Active",
@@ -519,21 +516,9 @@ const content = {
       needsWork: "Needs work",
       okay: "Okay"
     },
-    flowTitle: "Sales Conversions",
-    kpis: {
-      free: {
-        title: "Free conversions"
-      },
-      precision: {
-        title: "Precision conversions"
-      },
-      pro: {
-        title: "Pro conversions"
-      }
-    },
+    flowTitle: "Conversions",
     performance: [
-      { icon: HomeIcon, name: "At a Glance", view: "glance" },
-      { icon: SparklesIcon, name: "KPIs", view: "kpi" },
+      { icon: HomeIcon, name: "Dashboard", view: "glance" },
       { icon: FunnelIcon, name: "Conversions", view: "flow" }
     ],
     performanceTitle: "Performance",
@@ -553,7 +538,6 @@ const content = {
       { icon: BeakerIcon, name: "Supplements", view: "supplements" }
     ],
     governanceTitle: "Safety",
-    nextBuckets: "Next 3 buckets",
     openSidebar: "Open sidebar",
     execution: [
       { icon: FlagIcon, name: "Goals", view: "goals" },
@@ -566,10 +550,9 @@ const content = {
       agents: "Agents",
       alerts: "Technical Alerts",
       communications: "Communications",
-      flow: "Sales Conversions",
-      glance: "At a Glance",
+      flow: "Conversions",
+      glance: "Dashboard",
       goals: "Goals",
-      kpi: "Key Performance Indicators",
       reviews: "Review",
       supplements: "Supplements",
       visibility: "Visibility"
@@ -582,25 +565,6 @@ const content = {
       week: "Week",
       year: "Year"
     },
-    rates: {
-      freeRate: {
-        formula: "Free email requests / HealthScore views",
-        title: "Free conversion rate"
-      },
-      paidRate: {
-        formula: "(Paid Precision + Paid Pro) / HealthScore views",
-        title: "Paid conversion rate"
-      },
-      precisionRate: {
-        formula: "Paid Precision purchases / HealthScore views",
-        title: "Precision conversion rate"
-      },
-      proRate: {
-        formula: "Paid Pro purchases / HealthScore views",
-        title: "Pro conversion rate"
-      }
-    },
-    ratesTitle: "Conversion rates",
     reviewQueue: {
       approve: "Approve",
       clientDose: "Client dose",
@@ -711,15 +675,9 @@ const content = {
         "Enter a positive amount and unit for whitelisted or review-required supplements.",
       whitelisted: "Whitelisted"
     },
-    title: "KPI",
-    trend: {
-      down: "Down",
-      flat: "Flat",
-      up: "Up"
-    }
+    title: "Performance"
   },
   th: {
-    bucketPrefix: "ต่อ",
     closeSidebar: "ปิดแถบเมนู",
     dataUnavailable:
       "ไม่สามารถโหลดข้อมูลแดชบอร์ดได้ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล",
@@ -749,10 +707,12 @@ const content = {
       empty: "ไม่มีข้อความสื่อสารในช่วงเวลานี้",
       failed: "ล้มเหลว",
       messageType: "ชนิด",
-      noChannel: "ไม่มีช่องทาง",
+      noChannel: "รอช่องทางติดต่อ",
       plan: "แผน",
       provider: "Provider",
       queued: "รอส่ง",
+      retry: "ลองอีกครั้ง",
+      retrying: "กำลังลองอีกครั้ง...",
       sent: "ส่งแล้ว",
       skipped: "ข้าม",
       status: "สถานะ",
@@ -785,19 +745,25 @@ const content = {
       assessmentStarts: "เริ่มแบบประเมิน",
       attentionClear: "ยังไม่มีเรื่องเร่งด่วน",
       attentionTitle: "เรื่องที่ต้องดู",
+      cancel: "ยกเลิก",
       conversion: "คอนเวอร์ชัน",
       conversionSnapshot: "ภาพรวมคอนเวอร์ชัน",
       count: "จำนวน",
       criticalAlerts: "ปัญหาเว็บไซต์ที่ควรดู",
       customerContactIssues: "ปัญหาการติดต่อลูกค้า",
+      deviation: "จริงเทียบเป้า",
       dropoff: "หลุดออก",
+      editTargets: "แก้เป้า",
       freeRequests: "คำขอฟรี",
       healthScoreViews: "ดู HealthScore",
       landingVisitors: "ผู้เข้าเว็บ",
       pendingReviews: "รีวิวที่รออยู่",
       precisionConversions: "คอนเวอร์ชัน Precision",
       proConversions: "คอนเวอร์ชัน Pro",
-      stage: "ขั้นตอน"
+      saveTargets: "บันทึกเป้า",
+      stage: "ขั้นตอน",
+      target: "เป้า",
+      targetSaveError: "ไม่สามารถบันทึกเป้าได้"
     },
     goals: {
       active: "กำลังทำ",
@@ -870,21 +836,9 @@ const content = {
       needsWork: "ควรปรับปรุง",
       okay: "ดี"
     },
-    flowTitle: "Sales Conversions",
-    kpis: {
-      free: {
-        title: "คอนเวอร์ชันฟรี"
-      },
-      precision: {
-        title: "คอนเวอร์ชัน Precision"
-      },
-      pro: {
-        title: "คอนเวอร์ชัน Pro"
-      }
-    },
+    flowTitle: "Conversions",
     performance: [
-      { icon: HomeIcon, name: "ภาพรวม", view: "glance" },
-      { icon: SparklesIcon, name: "KPIs", view: "kpi" },
+      { icon: HomeIcon, name: "Dashboard", view: "glance" },
       { icon: FunnelIcon, name: "Conversions", view: "flow" }
     ],
     performanceTitle: "ประสิทธิภาพ",
@@ -904,7 +858,6 @@ const content = {
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplements" }
     ],
     governanceTitle: "ความปลอดภัย",
-    nextBuckets: "คาดการณ์ 3 ช่วงถัดไป",
     openSidebar: "เปิดแถบเมนู",
     execution: [
       { icon: FlagIcon, name: "Goals", view: "goals" },
@@ -917,10 +870,9 @@ const content = {
       agents: "Agents",
       alerts: "การแจ้งเตือนทางเทคนิค",
       communications: "การสื่อสาร",
-      flow: "Sales Conversions",
-      glance: "ภาพรวม",
+      flow: "Conversions",
+      glance: "Dashboard",
       goals: "Goals",
-      kpi: "Key Performance Indicators",
       reviews: "รีวิว",
       supplements: "อาหารเสริม",
       visibility: "Visibility"
@@ -933,25 +885,6 @@ const content = {
       week: "สัปดาห์",
       year: "ปี"
     },
-    rates: {
-      freeRate: {
-        formula: "คำขอแผนฟรี / การดู HealthScore",
-        title: "อัตราคอนเวอร์ชันฟรี"
-      },
-      paidRate: {
-        formula: "(Precision ที่ชำระแล้ว + Pro ที่ชำระแล้ว) / การดู HealthScore",
-        title: "อัตราคอนเวอร์ชันชำระเงิน"
-      },
-      precisionRate: {
-        formula: "Precision ที่ชำระแล้ว / การดู HealthScore",
-        title: "อัตราคอนเวอร์ชัน Precision"
-      },
-      proRate: {
-        formula: "Pro ที่ชำระแล้ว / การดู HealthScore",
-        title: "อัตราคอนเวอร์ชัน Pro"
-      }
-    },
-    ratesTitle: "อัตราคอนเวอร์ชัน",
     reviewQueue: {
       approve: "อนุมัติ",
       clientDose: "ขนาดสำหรับลูกค้า",
@@ -1062,27 +995,9 @@ const content = {
         "กรอกปริมาณที่มากกว่า 0 และหน่วยสำหรับรายการที่อนุญาตหรือต้องรีวิว",
       whitelisted: "อนุญาต"
     },
-    title: "KPI",
-    trend: {
-      down: "ลดลง",
-      flat: "คงที่",
-      up: "เพิ่มขึ้น"
-    }
+    title: "Performance"
   }
 } satisfies Record<Locale, AdminContent>;
-
-const kpiColors = {
-  free: "#0EA5E9",
-  precision: "#1FA77A",
-  pro: "#20343A"
-} satisfies Record<AdminDashboardKpiId, string>;
-
-const rateColors = {
-  freeRate: "#0EA5E9",
-  paidRate: "#20343A",
-  precisionRate: "#1FA77A",
-  proRate: "#8B5CF6"
-} satisfies Record<AdminDashboardRateId, string>;
 
 function classNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -1438,222 +1353,230 @@ function SidebarContent({
   );
 }
 
-function Sparkline({
-  color,
-  forecast,
-  series
-}: Readonly<{
-  color: string;
-  forecast: number[];
-  series: number[];
-}>) {
-  const width = 260;
-  const height = 72;
-  const actual = series.length > 0 ? series : [0];
-  const forecastLine = [actual.at(-1) ?? 0, ...forecast];
-  const totalPoints = Math.max(2, actual.length + forecast.length);
-  const maxValue = Math.max(1, ...actual, ...forecast);
-
-  const points = (values: number[], startIndex: number) =>
-    values
-      .map((value, index) => {
-        const x = ((startIndex + index) / (totalPoints - 1)) * width;
-        const y = height - (value / maxValue) * (height - 8) - 4;
-
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .join(" ");
-
-  return (
-    <svg
-      aria-hidden={true}
-      className="h-20 w-full overflow-visible"
-      preserveAspectRatio="none"
-      viewBox={`0 0 ${width} ${height}`}
-    >
-      <line
-        x1="0"
-        x2={width}
-        y1={height - 4}
-        y2={height - 4}
-        className="stroke-gray-200"
-        strokeWidth="1"
-      />
-      <polyline
-        fill="none"
-        points={points(actual, 0)}
-        stroke={color}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="3"
-      />
-      <polyline
-        fill="none"
-        opacity="0.55"
-        points={points(forecastLine, Math.max(0, actual.length - 1))}
-        stroke={color}
-        strokeDasharray="5 5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="3"
-      />
-    </svg>
-  );
-}
-
-function TrendPill({
-  labels,
-  trend
-}: Readonly<{
-  labels: AdminContent;
-  trend: AdminDashboardKpi["trend"];
-}>) {
-  return (
-    <span
-      className={classNames(
-        trend === "up" && "bg-[#1FA77A]/10 text-[#126B4F]",
-        trend === "down" && "bg-red-50 text-red-700",
-        trend === "flat" && "bg-gray-100 text-gray-600",
-        "rounded-full px-2 py-1 text-xs font-medium"
-      )}
-    >
-      {labels.trend[trend]}
-    </span>
-  );
-}
-
-function KpiCard({
-  bucketLabel,
-  kpi,
-  labels,
-  locale
-}: Readonly<{
-  bucketLabel: string;
-  kpi: AdminDashboardKpi;
-  labels: AdminContent;
-  locale: Locale;
-}>) {
-  const text = labels.kpis[kpi.id];
-  const color = kpiColors[kpi.id];
-
-  return (
-    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-sm font-semibold text-gray-900">{text.title}</h2>
-        </div>
-        <TrendPill labels={labels} trend={kpi.trend} />
-      </div>
-
-      <div className="mt-5 flex items-end justify-between gap-4">
-        <p className="text-4xl font-semibold tracking-tight text-[#20343A]">
-          {formatNumber(kpi.value, locale)}
-        </p>
-        <p className="pb-1 text-xs font-medium uppercase tracking-[0.14em] text-gray-400">
-          {labels.bucketPrefix} {bucketLabel}
-        </p>
-      </div>
-
-      <div className="mt-5">
-        <Sparkline color={color} forecast={kpi.forecast} series={kpi.series} />
-      </div>
-
-      <p className="mt-3 text-sm text-gray-600">
-        <span className="font-medium text-gray-900">{labels.nextBuckets}:</span>{" "}
-        {kpi.forecast.map((value) => formatNumber(value, locale)).join(" / ")}
-      </p>
-    </section>
-  );
-}
-
-function RateCard({
-  labels,
-  locale,
-  rate
-}: Readonly<{
-  labels: AdminContent;
-  locale: Locale;
-  rate: AdminDashboardRate;
-}>) {
-  const text = labels.rates[rate.id];
-  const color = rateColors[rate.id];
-
-  return (
-    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900">{text.title}</h3>
-        </div>
-        <TrendPill labels={labels} trend={rate.trend} />
-      </div>
-
-      <div className="mt-5 flex items-end justify-between gap-4">
-        <p className="text-4xl font-semibold tracking-tight text-[#20343A]">
-          {formatPercent(rate.value, locale)}
-        </p>
-        <p className="pb-1 text-xs font-medium uppercase tracking-[0.14em] text-gray-400">
-          {formatNumber(rate.numerator, locale)} /{" "}
-          {formatNumber(rate.denominator, locale)}
-        </p>
-      </div>
-
-      <div className="mt-5">
-        <Sparkline
-          color={color}
-          forecast={rate.forecast}
-          series={rate.series}
-        />
-      </div>
-
-      <p className="mt-3 text-sm text-gray-600">
-        <span className="font-medium text-gray-900">{labels.nextBuckets}:</span>{" "}
-        {rate.forecast.map((value) => formatPercent(value, locale)).join(" / ")}
-      </p>
-    </section>
-  );
-}
-
-function dashboardKpiValue(data: AdminDashboardData, id: AdminDashboardKpiId) {
-  return data.kpis.find((kpi) => kpi.id === id)?.value ?? 0;
-}
-
 type BusinessMetric = Readonly<{
+  color: string;
+  format?: "number" | "percent";
+  id:
+    | AdminConversionTargetId
+    | "conversionRate"
+    | "converted"
+    | "pendingReviews";
   label: string;
+  series: number[];
   value: string;
 }>;
 
+const businessMetricColors = {
+  assessmentCompletions: "#2563EB",
+  assessmentStarts: "#0EA5E9",
+  freeRequests: "#8B5CF6",
+  healthScoreViews: "#1FA77A",
+  landingVisitors: "#20343A",
+  pendingReviews: "#F59E0B",
+  precisionConversions: "#126B4F",
+  proConversions: "#111827",
+  converted: "#8B5CF6",
+  conversionRate: "#0F766E"
+} satisfies Record<BusinessMetric["id"], string>;
+
+function flowNodeSeries(flowData: AdminFlowData, id: AdminFlowNodeId) {
+  return (
+    flowData.series.nodes[id] ??
+    flowData.series.bucketLabels.map(() => 0)
+  );
+}
+
+function combinedSeries(...seriesList: number[][]) {
+  const maxLength = Math.max(0, ...seriesList.map((series) => series.length));
+
+  return Array.from({ length: maxLength }, (_, index) =>
+    seriesList.reduce((total, series) => total + (series[index] ?? 0), 0)
+  );
+}
+
+function percentageMetricSeries(numerator: number[], denominator: number[]) {
+  const maxLength = Math.max(numerator.length, denominator.length);
+
+  return Array.from({ length: maxLength }, (_, index) => {
+    const bottom = denominator[index] ?? 0;
+
+    return bottom > 0 ? Number((((numerator[index] ?? 0) / bottom) * 100).toFixed(1)) : 0;
+  });
+}
+
+function formatBusinessMetricAxisValue(
+  metric: BusinessMetric,
+  value: number,
+  locale: Locale
+) {
+  return metric.format === "percent"
+    ? formatPercent(value, locale)
+    : formatNumber(Math.round(value), locale);
+}
+
 function BusinessStatsGrid({
-  metrics
+  metrics,
+  onMetricSelect,
+  selectedMetricId
 }: Readonly<{
   metrics: BusinessMetric[];
+  onMetricSelect: (id: BusinessMetric["id"]) => void;
+  selectedMetricId: BusinessMetric["id"];
 }>) {
   return (
     <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
       <div className="grid grid-cols-1 gap-px bg-gray-900/5 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => (
-          <div className="bg-white px-5 py-6" key={metric.label}>
+          <button
+            className={classNames(
+              metric.id === selectedMetricId
+                ? "bg-[#ECFDF5]"
+                : "bg-white hover:bg-gray-50",
+              "px-5 py-6 text-left transition focus:outline-2 focus:-outline-offset-2 focus:outline-[#1FA77A]"
+            )}
+            key={metric.id}
+            onClick={() => onMetricSelect(metric.id)}
+            type="button"
+          >
             <p className="text-sm/6 font-medium text-gray-500">{metric.label}</p>
             <p className="mt-2 flex items-baseline gap-x-2">
               <span className="text-4xl font-semibold tracking-tight text-gray-900">
                 {metric.value}
               </span>
             </p>
-          </div>
+          </button>
         ))}
       </div>
     </div>
   );
 }
 
+function BusinessTrendChart({
+  bucketLabels,
+  locale,
+  metric
+}: Readonly<{
+  bucketLabels: string[];
+  locale: Locale;
+  metric: BusinessMetric;
+}>) {
+  const width = 900;
+  const height = 260;
+  const paddingX = 28;
+  const paddingTop = 18;
+  const paddingBottom = 36;
+  const series = metric.series.length > 0 ? metric.series : [0];
+  const maxValue = Math.max(1, ...series);
+  const chartWidth = width - paddingX * 2;
+  const chartHeight = height - paddingTop - paddingBottom;
+  const xFor = (index: number) =>
+    paddingX + (series.length <= 1 ? 0 : (index / (series.length - 1)) * chartWidth);
+  const yFor = (value: number) =>
+    paddingTop + chartHeight - (value / maxValue) * chartHeight;
+  const points = series
+    .map((value, index) => `${xFor(index).toFixed(1)},${yFor(value).toFixed(1)}`)
+    .join(" ");
+  const firstLabel = bucketLabels[0] ?? "";
+  const lastLabel = bucketLabels.at(-1) ?? "";
+
+  return (
+    <section className="mt-8 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">
+            {metric.label}
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">{firstLabel} - {lastLabel}</p>
+        </div>
+        <p className="text-3xl font-semibold tracking-tight text-gray-900">
+          {metric.value}
+        </p>
+      </div>
+
+      <svg
+        aria-label={metric.label}
+        className="mt-5 h-72 w-full overflow-visible"
+        preserveAspectRatio="none"
+        role="img"
+        viewBox={`0 0 ${width} ${height}`}
+      >
+        {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
+          const y = paddingTop + chartHeight - tick * chartHeight;
+
+          return (
+            <g key={tick}>
+              <line
+                className="stroke-gray-200"
+                strokeWidth="1"
+                x1={paddingX}
+                x2={width - paddingX}
+                y1={y}
+                y2={y}
+              />
+              <text
+                className="fill-gray-400 text-[10px]"
+                textAnchor="start"
+                x={paddingX}
+                y={Math.max(10, y - 4)}
+              >
+                {formatBusinessMetricAxisValue(metric, maxValue * tick, locale)}
+              </text>
+            </g>
+          );
+        })}
+        <polyline
+          fill="none"
+          points={points}
+          stroke={metric.color}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="4"
+        />
+        {series.map((value, index) => (
+          <circle
+            cx={xFor(index)}
+            cy={yFor(value)}
+            fill="white"
+            key={`${index}-${value}`}
+            r="4"
+            stroke={metric.color}
+            strokeWidth="3"
+          />
+        ))}
+        <text
+          className="fill-gray-400 text-[10px]"
+          textAnchor="start"
+          x={paddingX}
+          y={height - 8}
+        >
+          {firstLabel}
+        </text>
+        <text
+          className="fill-gray-400 text-[10px]"
+          textAnchor="end"
+          x={width - paddingX}
+          y={height - 8}
+        >
+          {lastLabel}
+        </text>
+      </svg>
+    </section>
+  );
+}
+
 type BusinessFunnelStage = Readonly<{
   count: number;
   denominator: number | null;
+  id: AdminConversionTargetId;
+  isEntry?: boolean;
   label: string;
+  targetConversion: number;
 }>;
 
 function businessFunnelStages(
   flowData: AdminFlowData,
-  labels: AdminContent
+  labels: AdminContent,
+  targets: AdminConversionTargets = flowData.targets
 ): BusinessFunnelStage[] {
   const landed = flowNodeCount(flowData, "landingViewed");
   const started = flowNodeCount(flowData, "assessmentStarted");
@@ -1664,55 +1587,231 @@ function businessFunnelStages(
     {
       count: landed,
       denominator: null,
-      label: labels.atAGlance.landingVisitors
+      id: "landingVisitors",
+      isEntry: true,
+      label: labels.atAGlance.landingVisitors,
+      targetConversion: targets.landingVisitors
     },
     {
       count: started,
       denominator: landed,
-      label: labels.atAGlance.assessmentStarts
+      id: "assessmentStarts",
+      label: labels.atAGlance.assessmentStarts,
+      targetConversion: targets.assessmentStarts
     },
     {
       count: completed,
       denominator: started,
-      label: labels.atAGlance.assessmentCompletions
+      id: "assessmentCompletions",
+      label: labels.atAGlance.assessmentCompletions,
+      targetConversion: targets.assessmentCompletions
     },
     {
       count: healthScore,
       denominator: completed,
-      label: labels.atAGlance.healthScoreViews
+      id: "healthScoreViews",
+      label: labels.atAGlance.healthScoreViews,
+      targetConversion: targets.healthScoreViews
     },
     {
       count: flowNodeCount(flowData, "freeEmailRequested"),
       denominator: healthScore,
-      label: labels.atAGlance.freeRequests
+      id: "freeRequests",
+      label: labels.atAGlance.freeRequests,
+      targetConversion: targets.freeRequests
     },
     {
       count: flowNodeCount(flowData, "precisionPaid"),
       denominator: healthScore,
-      label: labels.atAGlance.precisionConversions
+      id: "precisionConversions",
+      label: labels.atAGlance.precisionConversions,
+      targetConversion: targets.precisionConversions
     },
     {
       count: flowNodeCount(flowData, "proPaid"),
       denominator: healthScore,
-      label: labels.atAGlance.proConversions
+      id: "proConversions",
+      label: labels.atAGlance.proConversions,
+      targetConversion: targets.proConversions
     }
   ];
 }
 
+function stageActualConversion(stage: BusinessFunnelStage) {
+  if (stage.isEntry) {
+    return stage.count > 0 ? 100 : null;
+  }
+
+  return stage.denominator && stage.denominator > 0
+    ? (stage.count / stage.denominator) * 100
+    : null;
+}
+
+function conversionTargetClass(
+  actualConversion: number | null,
+  targetConversion: number
+) {
+  if (actualConversion === null) {
+    return "bg-white";
+  }
+
+  const targetAchievement =
+    targetConversion > 0 ? actualConversion / targetConversion : 1;
+
+  if (targetAchievement >= 1) {
+    return "bg-[#ECFDF5]";
+  }
+
+  if (targetAchievement >= 0.75) {
+    return "bg-amber-50";
+  }
+
+  return "bg-red-50";
+}
+
+function conversionDeltaClass(delta: number | null) {
+  if (delta === null) {
+    return "text-gray-500";
+  }
+
+  if (delta >= 0) {
+    return "text-[#126B4F]";
+  }
+
+  if (delta >= -10) {
+    return "text-amber-800";
+  }
+
+  return "text-red-700";
+}
+
+function formatConversionDelta(delta: number, locale: Locale) {
+  const formatted = new Intl.NumberFormat(formatLocale(locale), {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: Number.isInteger(delta) ? 0 : 1,
+    signDisplay: "always"
+  }).format(delta);
+
+  return `${formatted} pp`;
+}
+
 function BusinessFunnelTable({
+  accessToken,
   flowData,
   labels,
-  locale
+  locale,
+  showTargets = false
 }: Readonly<{
+  accessToken?: string;
   flowData: AdminFlowData;
   labels: AdminContent;
   locale: Locale;
+  showTargets?: boolean;
 }>) {
+  const [editingTargets, setEditingTargets] = useState(false);
+  const [isSavingTargets, setIsSavingTargets] = useState(false);
+  const [targetSaveError, setTargetSaveError] = useState<string | null>(null);
+  const [targets, setTargets] = useState<AdminConversionTargets>(
+    flowData.targets
+  );
+  const [draftTargets, setDraftTargets] = useState<AdminConversionTargets>(
+    flowData.targets
+  );
+
+  const activeTargets = editingTargets ? draftTargets : targets;
+
+  async function saveTargets() {
+    if (!accessToken) {
+      setTargetSaveError(labels.atAGlance.targetSaveError);
+      return;
+    }
+
+    setIsSavingTargets(true);
+    setTargetSaveError(null);
+
+    try {
+      const response = await fetch("/api/admin/conversion-targets", {
+        body: JSON.stringify({
+          accessToken,
+          targets: draftTargets
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "PATCH"
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to save targets");
+      }
+
+      const payload = (await response.json()) as {
+        targets?: AdminConversionTargets;
+      };
+      const savedTargets = payload.targets ?? draftTargets;
+
+      setTargets(savedTargets);
+      setDraftTargets(savedTargets);
+      setEditingTargets(false);
+    } catch {
+      setTargetSaveError(labels.atAGlance.targetSaveError);
+    } finally {
+      setIsSavingTargets(false);
+    }
+  }
+
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-      <h2 className="text-base font-semibold text-gray-900">
-        {labels.atAGlance.conversionSnapshot}
-      </h2>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-base font-semibold text-gray-900">
+          {labels.atAGlance.conversionSnapshot}
+        </h2>
+        {showTargets ? (
+          <div className="flex items-center gap-2">
+            {editingTargets ? (
+              <>
+                <button
+                  type="button"
+                  className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 disabled:opacity-60"
+                  disabled={isSavingTargets}
+                  onClick={() => {
+                    setDraftTargets(targets);
+                    setEditingTargets(false);
+                    setTargetSaveError(null);
+                  }}
+                >
+                  {labels.atAGlance.cancel}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white hover:bg-[#168B65] disabled:opacity-60"
+                  disabled={isSavingTargets}
+                  onClick={saveTargets}
+                >
+                  {labels.atAGlance.saveTargets}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50"
+                onClick={() => {
+                  setDraftTargets(targets);
+                  setEditingTargets(true);
+                  setTargetSaveError(null);
+                }}
+              >
+                {labels.atAGlance.editTargets}
+              </button>
+            )}
+          </div>
+        ) : null}
+      </div>
+      {targetSaveError ? (
+        <p className="mt-3 text-sm font-medium text-red-700">
+          {targetSaveError}
+        </p>
+      ) : null}
       <div className="mt-6 flow-root">
         <div className="-mx-5 -my-2 overflow-x-auto">
           <div className="inline-block min-w-full py-2 align-middle px-5">
@@ -1739,26 +1838,57 @@ function BusinessFunnelTable({
                       {labels.atAGlance.dropoff}
                     </th>
                     <th
-                      className="py-3.5 pr-4 pl-3 text-right text-sm font-semibold text-gray-900 sm:pr-6"
+                      className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
                       scope="col"
                     >
                       {labels.atAGlance.conversion}
                     </th>
+                    {showTargets ? (
+                      <>
+                        <th
+                          className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
+                          scope="col"
+                        >
+                          {labels.atAGlance.target}
+                        </th>
+                        <th
+                          className="py-3.5 pr-4 pl-3 text-right text-sm font-semibold text-gray-900 sm:pr-6"
+                          scope="col"
+                        >
+                          {labels.atAGlance.deviation}
+                        </th>
+                      </>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
-                  {businessFunnelStages(flowData, labels).map((stage) => {
+                  {businessFunnelStages(
+                    flowData,
+                    labels,
+                    activeTargets
+                  ).map((stage) => {
                     const dropoff =
-                      stage.denominator === null
+                      stage.denominator === null || stage.isEntry
                         ? null
                         : Math.max(0, stage.denominator - stage.count);
-                    const conversion =
-                      stage.denominator && stage.denominator > 0
-                        ? (stage.count / stage.denominator) * 100
-                        : null;
+                    const conversion = stageActualConversion(stage);
+                    const delta =
+                      conversion === null
+                        ? null
+                        : conversion - stage.targetConversion;
 
                     return (
-                      <tr key={stage.label}>
+                      <tr
+                        className={
+                          showTargets
+                            ? conversionTargetClass(
+                                conversion,
+                                stage.targetConversion
+                              )
+                            : undefined
+                        }
+                        key={stage.id}
+                      >
                         <td className="py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap text-gray-900 sm:pl-6">
                           {stage.label}
                         </td>
@@ -1768,11 +1898,51 @@ function BusinessFunnelTable({
                         <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-500">
                           {dropoff === null ? "-" : formatNumber(dropoff, locale)}
                         </td>
-                        <td className="py-4 pr-4 pl-3 text-right text-sm whitespace-nowrap text-gray-500 sm:pr-6">
+                        <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-500">
                           {conversion === null
                             ? "-"
                             : formatPercent(conversion, locale)}
                         </td>
+                        {showTargets ? (
+                          <>
+                            <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-500">
+                              {editingTargets ? (
+                                <input
+                                  aria-label={`${labels.atAGlance.target}: ${stage.label}`}
+                                  className="ml-auto block w-24 rounded-md bg-white px-2 py-1 text-right text-sm text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-[#1FA77A]"
+                                  max={100}
+                                  min={0}
+                                  onChange={(event) => {
+                                    const parsed = Number(event.target.value);
+                                    const nextValue = Number.isFinite(parsed)
+                                      ? Math.max(0, Math.min(100, parsed))
+                                      : 0;
+
+                                    setDraftTargets((current) => ({
+                                      ...current,
+                                      [stage.id]: nextValue
+                                    }));
+                                  }}
+                                  step={0.1}
+                                  type="number"
+                                  value={draftTargets[stage.id]}
+                                />
+                              ) : (
+                                formatPercent(stage.targetConversion, locale)
+                              )}
+                            </td>
+                            <td
+                              className={classNames(
+                                conversionDeltaClass(delta),
+                                "py-4 pr-4 pl-3 text-right text-sm font-semibold whitespace-nowrap sm:pr-6"
+                              )}
+                            >
+                              {delta === null
+                                ? "-"
+                                : formatConversionDelta(delta, locale)}
+                            </td>
+                          </>
+                        ) : null}
                       </tr>
                     );
                   })}
@@ -1835,42 +2005,80 @@ function AdminAtAGlanceView({
   ].filter((item) => item.count > 0);
   const metrics: BusinessMetric[] = [
     {
+      color: businessMetricColors.landingVisitors,
+      id: "landingVisitors",
       label: labels.atAGlance.landingVisitors,
+      series: flowNodeSeries(flowData, "landingViewed"),
       value: formatNumber(flowNodeCount(flowData, "landingViewed"), locale)
     },
     {
+      color: businessMetricColors.assessmentStarts,
+      id: "assessmentStarts",
       label: labels.atAGlance.assessmentStarts,
+      series: flowNodeSeries(flowData, "assessmentStarted"),
       value: formatNumber(flowNodeCount(flowData, "assessmentStarted"), locale)
     },
     {
+      color: businessMetricColors.assessmentCompletions,
+      id: "assessmentCompletions",
       label: labels.atAGlance.assessmentCompletions,
+      series: flowNodeSeries(flowData, "assessmentSubmitted"),
       value: formatNumber(flowNodeCount(flowData, "assessmentSubmitted"), locale)
     },
     {
+      color: businessMetricColors.healthScoreViews,
+      id: "healthScoreViews",
       label: labels.atAGlance.healthScoreViews,
+      series: flowNodeSeries(flowData, "healthscoreViewed"),
       value: formatNumber(flowNodeCount(flowData, "healthscoreViewed"), locale)
     },
     {
+      color: businessMetricColors.freeRequests,
+      id: "freeRequests",
       label: labels.atAGlance.freeRequests,
-      value: formatNumber(dashboardKpiValue(data, "free"), locale)
+      series: flowNodeSeries(flowData, "freeEmailRequested"),
+      value: formatNumber(flowNodeCount(flowData, "freeEmailRequested"), locale)
     },
     {
+      color: businessMetricColors.precisionConversions,
+      id: "precisionConversions",
       label: labels.atAGlance.precisionConversions,
-      value: formatNumber(dashboardKpiValue(data, "precision"), locale)
+      series: flowNodeSeries(flowData, "precisionPaid"),
+      value: formatNumber(flowNodeCount(flowData, "precisionPaid"), locale)
     },
     {
+      color: businessMetricColors.proConversions,
+      id: "proConversions",
       label: labels.atAGlance.proConversions,
-      value: formatNumber(dashboardKpiValue(data, "pro"), locale)
+      series: flowNodeSeries(flowData, "proPaid"),
+      value: formatNumber(flowNodeCount(flowData, "proPaid"), locale)
     },
     {
+      color: businessMetricColors.pendingReviews,
+      id: "pendingReviews",
       label: labels.atAGlance.pendingReviews,
+      series: flowData.series.bucketLabels.map(() => reviewQueueData.summary.total),
       value: formatNumber(reviewQueueData.summary.total, locale)
     }
   ];
+  const [selectedMetricId, setSelectedMetricId] =
+    useState<BusinessMetric["id"]>("landingVisitors");
+  const selectedMetric =
+    metrics.find((metric) => metric.id === selectedMetricId) ?? metrics[0];
 
   return (
     <>
-      <BusinessStatsGrid metrics={metrics} />
+      <BusinessStatsGrid
+        metrics={metrics}
+        onMetricSelect={setSelectedMetricId}
+        selectedMetricId={selectedMetric.id}
+      />
+
+      <BusinessTrendChart
+        bucketLabels={flowData.series.bucketLabels}
+        locale={locale}
+        metric={selectedMetric}
+      />
 
       <div className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
         <BusinessFunnelTable flowData={flowData} labels={labels} locale={locale} />
@@ -3927,8 +4135,12 @@ function communicationStatusLabel(
 }
 
 function communicationStatusClass(status: AdminCommunicationStatus) {
-  if (status === "failed" || status === "no_channel") {
+  if (status === "failed") {
     return "bg-red-50 text-red-700 ring-red-100";
+  }
+
+  if (status === "no_channel") {
+    return "bg-amber-50 text-amber-800 ring-amber-200";
   }
 
   if (status === "queued") {
@@ -3952,14 +4164,47 @@ function communicationTitle(row: AdminCommunicationRow) {
 }
 
 function AdminCommunicationsView({
+  accessToken,
   data,
   labels,
   locale
 }: Readonly<{
+  accessToken: string;
   data: AdminCommunicationsData;
   labels: AdminContent;
   locale: Locale;
 }>) {
+  const [retryErrorId, setRetryErrorId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+
+  async function retryMessage(row: AdminCommunicationRow) {
+    setRetryErrorId(null);
+    setRetryingId(row.id);
+
+    try {
+      const response = await fetch(
+        `/api/admin/communications/messages/${row.id}/retry`,
+        {
+          body: JSON.stringify({ accessToken }),
+          headers: {
+            "Content-Type": "application/json"
+          },
+          method: "POST"
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to retry communication");
+      }
+
+      window.location.reload();
+    } catch {
+      setRetryErrorId(row.id);
+    } finally {
+      setRetryingId(null);
+    }
+  }
+
   return (
     <section className="mt-8 space-y-6">
       <div className="flex justify-end">
@@ -4049,11 +4294,29 @@ function AdminCommunicationsView({
                     </div>
 
                     {row.errorMessage ? (
-                      <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
+                      <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800 ring-1 ring-amber-100">
                         {row.errorMessage}
                       </p>
                     ) : null}
+                    {retryErrorId === row.id ? (
+                      <p className="mt-3 text-sm font-medium text-red-700">
+                        Unable to retry this message.
+                      </p>
+                    ) : null}
                   </div>
+
+                  {row.status === "failed" || row.status === "no_channel" ? (
+                    <button
+                      className="inline-flex w-max items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={retryingId === row.id}
+                      onClick={() => retryMessage(row)}
+                      type="button"
+                    >
+                      {retryingId === row.id
+                        ? labels.communications.retrying
+                        : labels.communications.retry}
+                    </button>
+                  ) : null}
                 </div>
               </article>
             ))}
@@ -5291,374 +5554,85 @@ function flowNodeCount(flowData: AdminFlowData, id: AdminFlowNodeId) {
   return flowData.nodes.find((node) => node.id === id)?.count ?? 0;
 }
 
-function flowEdgesFrom(
-  flowData: AdminFlowData,
-  id: AdminFlowNodeId,
-  kind: "continue" | "dropoff"
-) {
-  return flowData.edges.filter((edge) => edge.from === id && edge.kind === kind);
-}
-
-function FlowLegend({ labels }: Readonly<{ labels: AdminContent }>) {
-  return (
-    <div className="mt-4 flex flex-wrap gap-3 text-xs font-semibold">
-      <span className="rounded-full bg-[#ECFDF5] px-3 py-1.5 text-[#126B4F] ring-1 ring-[#A7F3D0]">
-        {labels.flowStatus.okay}
-      </span>
-      <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-800 ring-1 ring-amber-200">
-        {labels.flowStatus.needsWork}
-      </span>
-      <span className="rounded-full bg-red-50 px-3 py-1.5 text-red-700 ring-1 ring-red-100">
-        {labels.flowStatus.lossy}
-      </span>
-    </div>
-  );
-}
-
-type MermaidFlowEdge = Readonly<{
-  from: AdminFlowNodeId;
-  to: AdminFlowNodeId;
-}>;
-
-const mermaidNodeIds: Partial<Record<AdminFlowNodeId, string>> = {
-  assessmentStarted: "started",
-  assessmentSubmitted: "submitted",
-  assessmentViewed: "assessment",
-  chatClicked: "chat",
-  formulationReady: "formulation",
-  freeEmailRequested: "free_email",
-  freeEmailSent: "email_sent",
-  healthscoreViewed: "healthscore",
-  landingViewed: "landing",
-  marketplaceClicked: "marketplace",
-  planSelected: "plan",
-  precisionPaid: "precision",
-  proPaid: "pro",
-  resultsViewed: "results"
-};
-
-const mermaidFlowNodes: AdminFlowNodeId[] = [
-  "landingViewed",
-  "assessmentViewed",
-  "assessmentStarted",
-  "assessmentSubmitted",
-  "healthscoreViewed",
-  "freeEmailRequested",
-  "freeEmailSent",
-  "planSelected",
-  "precisionPaid",
-  "proPaid",
-  "formulationReady",
-  "resultsViewed",
-  "chatClicked",
-  "marketplaceClicked"
-];
-
-const mermaidFlowEdges: MermaidFlowEdge[] = [
-  { from: "landingViewed", to: "assessmentViewed" },
-  { from: "assessmentViewed", to: "assessmentStarted" },
-  { from: "assessmentStarted", to: "assessmentSubmitted" },
-  { from: "assessmentSubmitted", to: "healthscoreViewed" },
-  { from: "healthscoreViewed", to: "freeEmailRequested" },
-  { from: "freeEmailRequested", to: "freeEmailSent" },
-  { from: "healthscoreViewed", to: "planSelected" },
-  { from: "planSelected", to: "precisionPaid" },
-  { from: "planSelected", to: "proPaid" },
-  { from: "precisionPaid", to: "formulationReady" },
-  { from: "proPaid", to: "formulationReady" },
-  { from: "formulationReady", to: "resultsViewed" },
-  { from: "resultsViewed", to: "chatClicked" },
-  { from: "resultsViewed", to: "marketplaceClicked" }
-];
-
-const mermaidTerminalNodes = new Set<AdminFlowNodeId>([
-  "chatClicked",
-  "freeEmailSent",
-  "marketplaceClicked"
-]);
-
-function hashString(value: string) {
-  let hash = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-
-  return hash.toString(36);
-}
-
-function mermaidEscape(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function mermaidCount(value: number, locale: Locale) {
-  return mermaidEscape(formatNumber(value, locale));
-}
-
-function mermaidNodeLabel({
-  flowData,
-  labels,
-  locale,
-  nodeId
-}: Readonly<{
-  flowData: AdminFlowData;
-  labels: AdminContent;
-  locale: Locale;
-  nodeId: AdminFlowNodeId;
-}>) {
-  const reached = flowNodeCount(flowData, nodeId);
-  const happy = flowEdgesFrom(flowData, nodeId, "continue").reduce(
-    (total, edge) => total + edge.count,
-    0
-  );
-  const dropped = flowEdgesFrom(flowData, nodeId, "dropoff").reduce(
-    (total, edge) => total + edge.count,
-    0
-  );
-  const ratio =
-    reached > 0 && !mermaidTerminalNodes.has(nodeId)
-      ? Math.min(100, (happy / reached) * 100)
-      : null;
-
-  const lines = [
-    mermaidEscape(labels.flowNodes[nodeId]),
-    `<b>▲ ${mermaidCount(reached, locale)} <span style='display:inline-block;width:0.75rem'></span> ▼ ${mermaidCount(dropped, locale)}</b>`
-  ];
-
-  if (ratio !== null) {
-    lines.push(formatPercent(ratio, locale));
-  }
-
-  return lines.join("<br/>");
-}
-
-type MermaidNodeHealth = "lossy" | "needs_work" | "neutral" | "okay";
-
-function mermaidNodeHealth(
-  flowData: AdminFlowData,
-  nodeId: AdminFlowNodeId
-): MermaidNodeHealth {
-  const reached = flowNodeCount(flowData, nodeId);
-  const happy = flowEdgesFrom(flowData, nodeId, "continue").reduce(
-    (total, edge) => total + edge.count,
-    0
-  );
-
-  if (reached === 0 || mermaidTerminalNodes.has(nodeId)) {
-    return "neutral";
-  }
-
-  const dropRate = Math.max(0, (reached - Math.min(happy, reached)) / reached);
-
-  if (dropRate >= 0.4) {
-    return "lossy";
-  }
-
-  if (dropRate >= 0.15) {
-    return "needs_work";
-  }
-
-  return "okay";
-}
-
-function flowEdgeCount(
-  flowData: AdminFlowData,
-  from: AdminFlowNodeId,
-  to: AdminFlowNodeId
-) {
-  return flowData.edges.find((edge) => edge.from === from && edge.to === to)
-    ?.count ?? 0;
-}
-
-function buildMermaidFlowDefinition(
-  flowData: AdminFlowData,
-  labels: AdminContent,
-  locale: Locale
-) {
-  const lines = [
-    "flowchart TD",
-    "  classDef okay fill:#FFFFFF,stroke:#1FA77A,color:#111827,stroke-width:2px;",
-    "  classDef needs_work fill:#FFFFFF,stroke:#F59E0B,color:#111827,stroke-width:2px;",
-    "  classDef lossy fill:#FFFFFF,stroke:#EF4444,color:#111827,stroke-width:2px;",
-    "  classDef neutral fill:#FFFFFF,stroke:#CBD5E1,color:#111827,stroke-width:1px;"
-  ];
-
-  mermaidFlowNodes.forEach((nodeId) => {
-    const id = mermaidNodeIds[nodeId];
-
-    if (!id) {
-      return;
-    }
-
-    const label = mermaidNodeLabel({ flowData, labels, locale, nodeId });
-    const nodeDefinition = mermaidTerminalNodes.has(nodeId)
-      ? `${id}(["${label}"])`
-      : `${id}["${label}"]`;
-
-    lines.push(`  ${nodeDefinition}`);
-    lines.push(`  class ${id} ${mermaidNodeHealth(flowData, nodeId)};`);
-  });
-
-  mermaidFlowEdges.forEach((edge) => {
-    const from = mermaidNodeIds[edge.from];
-    const to = mermaidNodeIds[edge.to];
-
-    if (!from || !to) {
-      return;
-    }
-
-    const count = flowEdgeCount(flowData, edge.from, edge.to);
-
-    lines.push(`  ${from} -->|"${mermaidCount(count, locale)}"| ${to}`);
-  });
-
-  return lines.join("\n");
-}
-
-function MermaidFlow({
-  definition,
-  labels
-}: Readonly<{
-  definition: string;
-  labels: AdminContent;
-}>) {
-  const [svg, setSvg] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    const diagramId = `admin-flow-${hashString(definition)}`;
-
-    import("mermaid")
-      .then(async (module) => {
-        const mermaid = module.default;
-        mermaid.initialize({
-          flowchart: {
-            curve: "basis",
-            htmlLabels: true,
-            nodeSpacing: 54,
-            rankSpacing: 72
-          },
-          securityLevel: "loose",
-          startOnLoad: false,
-          theme: "base",
-          themeVariables: {
-            fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
-            lineColor: "#1FA77A",
-            mainBkg: "#FFFFFF",
-            primaryBorderColor: "#CBD5E1",
-            primaryColor: "#FFFFFF",
-            primaryTextColor: "#111827"
-          }
-        });
-
-        return mermaid.render(diagramId, definition);
-      })
-      .then((result) => {
-        if (!cancelled) {
-          setSvg(result.svg);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          console.error("Unable to render admin flow diagram", error);
-          setSvg("");
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [definition]);
-
-  return (
-    <div className="mt-6 overflow-x-auto">
-      {svg ? (
-        <div
-          aria-label={labels.flowTitle}
-          className="[&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
-          dangerouslySetInnerHTML={{ __html: svg }}
-          role="img"
-        />
-      ) : (
-        <div className="flex min-h-96 items-center justify-center text-sm font-medium text-gray-500">
-          {labels.flowTitle}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FlowChart({
-  flowData,
-  labels,
-  locale
-}: Readonly<{
-  flowData: AdminFlowData;
-  labels: AdminContent;
-  locale: Locale;
-}>) {
-  const hasEvents =
-    flowData.nodes.some((node) => node.count > 0) ||
-    flowData.edges.some((edge) => edge.count > 0);
-  const mermaidDefinition = buildMermaidFlowDefinition(
-    flowData,
-    labels,
-    locale
-  );
-
-  return (
-    <section className="mt-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-      {hasEvents ? (
-        <>
-          <FlowLegend labels={labels} />
-          <MermaidFlow definition={mermaidDefinition} labels={labels} />
-        </>
-      ) : (
-        <div className="mt-6 flex min-h-64 items-center justify-center rounded-xl bg-gray-50 text-sm font-medium text-gray-500 ring-1 ring-gray-100">
-          {labels.emptyFlow}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function AdminFlowView({
+  accessToken,
   flowData,
   labels,
   locale
 }: Readonly<{
+  accessToken: string;
   flowData: AdminFlowData;
   labels: AdminContent;
   locale: Locale;
 }>) {
+  const freeSeries = flowNodeSeries(flowData, "freeEmailRequested");
+  const precisionSeries = flowNodeSeries(flowData, "precisionPaid");
+  const proSeries = flowNodeSeries(flowData, "proPaid");
+  const convertedSeries = combinedSeries(freeSeries, precisionSeries, proSeries);
+  const healthScoreSeries = flowNodeSeries(flowData, "healthscoreViewed");
+  const conversionRateSeries = percentageMetricSeries(
+    convertedSeries,
+    healthScoreSeries
+  );
+  const metrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.landingVisitors,
+      id: "landingVisitors",
+      label: labels.flowSummary.entered,
+      series: flowNodeSeries(flowData, "landingViewed"),
+      value: formatNumber(flowData.summary.entered, locale)
+    },
+    {
+      color: businessMetricColors.healthScoreViews,
+      id: "healthScoreViews",
+      label: labels.flowSummary.reachedHealthScore,
+      series: healthScoreSeries,
+      value: formatNumber(flowData.summary.reachedHealthScore, locale)
+    },
+    {
+      color: businessMetricColors.converted,
+      id: "converted",
+      label: labels.flowSummary.converted,
+      series: convertedSeries,
+      value: formatNumber(flowData.summary.converted, locale)
+    },
+    {
+      color: businessMetricColors.conversionRate,
+      format: "percent",
+      id: "conversionRate",
+      label: labels.flowSummary.conversionRate,
+      series: conversionRateSeries,
+      value: formatPercent(flowData.summary.conversionRate, locale)
+    }
+  ];
+  const [selectedMetricId, setSelectedMetricId] =
+    useState<BusinessMetric["id"]>("landingVisitors");
+  const selectedMetric =
+    metrics.find((metric) => metric.id === selectedMetricId) ?? metrics[0];
+
   return (
     <>
-      <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-4">
-        <FlowSummaryCard
-          label={labels.flowSummary.entered}
-          value={formatNumber(flowData.summary.entered, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.flowSummary.reachedHealthScore}
-          value={formatNumber(flowData.summary.reachedHealthScore, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.flowSummary.converted}
-          value={formatNumber(flowData.summary.converted, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.flowSummary.conversionRate}
-          value={formatPercent(flowData.summary.conversionRate, locale)}
-        />
-      </div>
+      <BusinessStatsGrid
+        metrics={metrics}
+        onMetricSelect={setSelectedMetricId}
+        selectedMetricId={selectedMetric.id}
+      />
+
+      <BusinessTrendChart
+        bucketLabels={flowData.series.bucketLabels}
+        locale={locale}
+        metric={selectedMetric}
+      />
+
       <div className="mt-8">
-        <BusinessFunnelTable flowData={flowData} labels={labels} locale={locale} />
+        <BusinessFunnelTable
+          accessToken={accessToken}
+          flowData={flowData}
+          labels={labels}
+          locale={locale}
+          showTargets={true}
+        />
       </div>
-      <FlowChart flowData={flowData} labels={labels} locale={locale} />
     </>
   );
 }
@@ -6204,7 +6178,7 @@ export function AdminDashboard({
               <h1 className="text-3xl font-bold tracking-tight text-gray-900">
                 {labels.pageTitles[view]}
               </h1>
-              {view === "glance" || view === "kpi" ? (
+              {view === "glance" ? (
                 <p className="mt-1 text-xs text-gray-400">
                   {labels.generated}: {formatGeneratedAt(data.generatedAt, locale)}
                 </p>
@@ -6224,7 +6198,6 @@ export function AdminDashboard({
           view === "flow" ||
           view === "glance" ||
           view === "goals" ||
-          view === "kpi" ||
           view === "visibility" ? (
             <>
               <div className="mt-6">
@@ -6236,7 +6209,7 @@ export function AdminDashboard({
                   locale={locale}
                   view={view}
                 />
-                {view === "flow" || view === "glance" || view === "kpi" ? (
+                {view === "flow" || view === "glance" ? (
                   <LocaleFilterSelector
                     accessToken={accessToken}
                     filters={filters}
@@ -6247,7 +6220,7 @@ export function AdminDashboard({
                 ) : null}
               </div>
 
-              {view === "flow" || view === "glance" || view === "kpi" ? (
+              {view === "flow" || view === "glance" ? (
                 <AdminFilterPanel
                   accessToken={accessToken}
                   filters={filters}
@@ -6261,7 +6234,12 @@ export function AdminDashboard({
           ) : null}
 
           {view === "flow" ? (
-            <AdminFlowView flowData={flowData} labels={labels} locale={locale} />
+            <AdminFlowView
+              accessToken={accessToken}
+              flowData={flowData}
+              labels={labels}
+              locale={locale}
+            />
           ) : view === "glance" ? (
             <AdminAtAGlanceView
               accessToken={accessToken}
@@ -6282,6 +6260,7 @@ export function AdminDashboard({
             />
           ) : view === "communications" ? (
             <AdminCommunicationsView
+              accessToken={accessToken}
               data={communicationsData}
               labels={labels}
               locale={locale}
@@ -6323,37 +6302,7 @@ export function AdminDashboard({
               labels={labels}
               locale={locale}
             />
-          ) : (
-            <>
-              <div className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-3">
-                {data.kpis.map((kpi) => (
-                  <KpiCard
-                    key={kpi.id}
-                    bucketLabel={data.bucketLabel}
-                    kpi={kpi}
-                    labels={labels}
-                    locale={locale}
-                  />
-                ))}
-              </div>
-
-              <section className="mt-8">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  {labels.ratesTitle}
-                </h2>
-                <div className="mt-4 grid grid-cols-1 gap-5 xl:grid-cols-4">
-                  {data.rates.map((rate) => (
-                    <RateCard
-                      key={rate.id}
-                      labels={labels}
-                      locale={locale}
-                      rate={rate}
-                    />
-                  ))}
-                </div>
-              </section>
-            </>
-          )}
+          ) : null}
         </div>
       </main>
     </div>

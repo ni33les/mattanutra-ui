@@ -18,6 +18,7 @@ describe("system agents", () => {
       [
         "Chat Dispatcher",
         "Communications Coordinator",
+        "Content Publisher",
         "Email Dispatcher",
         "HealthScore Engine",
         "Human Reviewer",
@@ -31,6 +32,7 @@ describe("system agents", () => {
   it("routes each current work task to an agent with the required capability", () => {
     for (const taskType of [
       "analyze_healthscore",
+      "content_status_change",
       "generate_example_formulation",
       "generate_formulation",
       "send_example_email",

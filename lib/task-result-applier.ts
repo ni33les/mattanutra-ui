@@ -1,4 +1,5 @@
 import { isUuid, toJsonValue } from "@/lib/assessment-store";
+import { updateBlogPost, updateTestimonial } from "@/lib/blog";
 import { writeBpmEvent } from "@/lib/bpm";
 import { sendClientSafetyFollowupTask } from "@/lib/communications";
 import { getSql } from "@/lib/db";
@@ -485,16 +486,88 @@ async function applyCommunicationFollowupResult(
     task
   } satisfies ReservedTask);
 
-  await addWorkEvent(task, "communication_task_completed", "low", {
-    channelType: result.channel?.channelType,
-    messageId: result.message.id
-  });
+  await addWorkEvent(
+    task,
+    result.message.status === "no_channel"
+      ? "communication_channel_unavailable"
+      : "communication_task_completed",
+    result.message.status === "no_channel" ? "medium" : "low",
+    {
+      channelType: result.channel?.channelType,
+      messageId: result.message.id,
+      status: result.message.status
+    }
+  );
 
   return {
     channelId: result.channel?.id,
     channelType: result.channel?.channelType,
     messageId: result.message.id,
     status: result.message.status
+  };
+}
+
+function contentStatus(value: unknown) {
+  return value === "archived" ||
+    value === "draft" ||
+    value === "published" ||
+    value === "review"
+    ? value
+    : null;
+}
+
+async function applyContentStatusChangeResult(task: TaskRecord) {
+  const payload = objectValue(task.payload);
+  const contentType = payloadText(payload, "contentType");
+  const contentId = payloadText(payload, "contentId");
+  const targetStatus = contentStatus(payload.targetStatus);
+  const publishAt = payloadText(payload, "publishAt");
+
+  if (
+    (contentType !== "blog_post" && contentType !== "testimonial") ||
+    !isUuid(contentId) ||
+    !targetStatus
+  ) {
+    throw new Error("Content status change task is incomplete");
+  }
+
+  const updated =
+    contentType === "blog_post"
+      ? await updateBlogPost(contentId, {
+          publishedAt:
+            targetStatus === "published"
+              ? publishAt || new Date().toISOString()
+              : null,
+          status: targetStatus
+        })
+      : await updateTestimonial(contentId, { status: targetStatus });
+
+  if (!updated) {
+    throw new Error("Content item not found");
+  }
+
+  await addWorkEvent(task, "content_status_changed", "medium", {
+    contentId,
+    contentType,
+    targetStatus
+  });
+  await writeBpmEvent({
+    actorType: "worker",
+    eventName: "content_status_changed",
+    eventType: "content",
+    properties: {
+      contentId,
+      contentType,
+      targetStatus,
+      taskId: task.id
+    }
+  });
+
+  return {
+    contentId,
+    contentType,
+    status: targetStatus,
+    updated
   };
 }
 
@@ -537,6 +610,10 @@ export async function applyTaskCompletionResult({
 
   if (task.taskType === "client_safety_followup") {
     return applyCommunicationFollowupResult(task, reservationId);
+  }
+
+  if (task.taskType === "content_status_change") {
+    return applyContentStatusChangeResult(task);
   }
 
   return resultPayload;

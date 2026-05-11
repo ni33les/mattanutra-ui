@@ -38,6 +38,12 @@ const DEFAULT_WORKER_GROUPS: readonly WorkerGroup[] = [
     taskTypes: ["analyze_healthscore"]
   },
   {
+    agent: taskReservationAgent(SYSTEM_AGENTS.contentPublisher),
+    leaseSeconds: 600,
+    mustRequireCapability: AGENT_CAPABILITIES.contentPublish,
+    taskTypes: ["content_status_change"]
+  },
+  {
     agent: taskReservationAgent(SYSTEM_AGENTS.formulationWorker),
     leaseSeconds: 3600,
     taskTypes: ["generate_formulation", "generate_example_formulation"]

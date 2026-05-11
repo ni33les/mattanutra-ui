@@ -119,6 +119,11 @@ export type CommunicationDispatchResult = Readonly<{
   reason: string | null;
 }>;
 
+type PreparedRetryMessage = Readonly<{
+  channel: CommunicationChannel | null;
+  message: CommunicationMessage;
+}>;
+
 const MESSAGE_STATUSES = new Set<string>([
   "delivered",
   "failed",
@@ -1099,6 +1104,178 @@ export async function updateCommunicationMessageStatus(input: Readonly<{
   });
 }
 
+async function sendPreparedEmailMessage(
+  message: CommunicationMessage,
+  channel: CommunicationChannel
+): Promise<CommunicationDispatchResult> {
+  const delivery = await sendTransactionalEmail({
+    html:
+      message.html ??
+      plainTextEmailHtml(message.subject ?? "MattaNutra update", message.body),
+    subject: message.subject ?? "MattaNutra update",
+    to: channel.address
+  });
+  const updated = await updateCommunicationMessageStatus({
+    errorMessage: delivery.reason ?? null,
+    messageId: message.id,
+    providerMessageId: delivery.messageId ?? null,
+    status: delivery.sent ? "sent" : "failed"
+  });
+
+  if (message.planId) {
+    await writeBpmEvent({
+      actorType: "worker",
+      eventName: delivery.sent
+        ? "communication_retry_sent"
+        : "communication_retry_failed",
+      eventStatus: delivery.sent ? "succeeded" : "failed",
+      eventType: "email",
+      planId: message.planId,
+      properties: {
+        channelType: "email",
+        messageId: message.id,
+        messageType: message.messageType,
+        providerMessageId: delivery.messageId,
+        reason: delivery.reason
+      },
+      severity: delivery.sent ? "low" : "medium"
+    });
+  }
+
+  return {
+    attempted: true,
+    configured: true,
+    message: updated,
+    provider: "email",
+    reason: delivery.reason ?? null
+  };
+}
+
+async function prepareCommunicationRetry(
+  tx: Db,
+  messageId: string
+): Promise<PreparedRetryMessage> {
+  const rows = await tx<MessageRow[]>`
+    select *
+    from public.communication_messages
+    where id = ${messageId}::uuid
+    limit 1
+    for update
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error("Communication message not found");
+  }
+
+  if (row.status === "sent" || row.status === "delivered") {
+    return {
+      channel: null,
+      message: mapMessage(row)
+    };
+  }
+
+  const planId = isUuid(row.plan_id ?? "") ? row.plan_id : null;
+  const identityId = isUuid(row.identity_id ?? "")
+    ? row.identity_id
+    : planId
+      ? await ensurePlanIdentityInTransaction(tx, planId)
+      : null;
+
+  if (planId && identityId) {
+    await seedKnownPlanChannelsInTransaction(tx, planId, identityId);
+  }
+
+  const channels = identityId
+    ? (
+        await tx<ChannelRow[]>`
+          select *
+          from public.communication_channels
+          where identity_id = ${identityId}::uuid
+          order by preference_rank asc, created_at asc
+        `
+      ).map(mapChannel)
+    : [];
+  const selected = selectBestCommunicationChannel(channels);
+
+  if (!selected) {
+    const updated = await tx<MessageRow[]>`
+      update public.communication_messages
+      set
+        identity_id = coalesce(${identityId ?? null}::uuid, identity_id),
+        channel_id = null,
+        provider = null,
+        status = 'no_channel',
+        error_message = 'Awaiting a contact channel for this plan',
+        updated_at = now()
+      where id = ${messageId}::uuid
+      returning *
+    `;
+
+    return {
+      channel: null,
+      message: mapMessage(updated[0])
+    };
+  }
+
+  const updated = await tx<MessageRow[]>`
+    update public.communication_messages
+    set
+      identity_id = coalesce(${identityId ?? null}::uuid, identity_id),
+      channel_id = ${selected.id}::uuid,
+      provider = ${selected.channelType},
+      status = 'queued',
+      error_message = null,
+      metadata = metadata || ${tx.json(
+        toJsonValue({
+          retrySelectedChannelType: selected.channelType,
+          retryStartedAt: new Date().toISOString()
+        })
+      )}::jsonb,
+      updated_at = now()
+    where id = ${messageId}::uuid
+    returning *
+  `;
+
+  return {
+    channel: selected,
+    message: mapMessage(updated[0])
+  };
+}
+
+export async function retryCommunicationMessage(messageId: string) {
+  if (!isUuid(messageId)) {
+    throw new Error("Communication message not found");
+  }
+
+  const sql = sqlOrThrow();
+
+  await ensureCommunicationSchema(sql);
+
+  const prepared = await sql.begin((tx) =>
+    prepareCommunicationRetry(tx, messageId)
+  );
+
+  if (!prepared.channel) {
+    return {
+      attempted: false,
+      configured: true,
+      message: prepared.message,
+      provider: prepared.message.provider,
+      reason:
+        prepared.message.status === "no_channel"
+          ? "Awaiting a contact channel for this plan"
+          : "Message is already complete"
+    } satisfies CommunicationDispatchResult;
+  }
+
+  if (prepared.channel.channelType === "email") {
+    return sendPreparedEmailMessage(prepared.message, prepared.channel);
+  }
+
+  return dispatchCommunicationMessage(messageId);
+}
+
 function lineRecipient(row: DeliveryTargetRow) {
   const messageMetadata = objectValue(row.metadata);
   const channelMetadata = objectValue(row.delivery_channel_metadata);
@@ -1458,7 +1635,7 @@ export async function sendClientSafetyFollowupTask(reserved: ReservedTask) {
   }
 
   if (result.message.status === "no_channel") {
-    throw new Error("No communication channel is available for this plan");
+    return result;
   }
 
   if (result.message.status === "failed") {
