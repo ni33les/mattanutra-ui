@@ -15,6 +15,7 @@ import {
   ComboboxOptions
 } from "@headlessui/react";
 import {
+  BanknotesIcon,
   Bars3Icon,
   BeakerIcon,
   ChatBubbleLeftRightIcon,
@@ -102,6 +103,7 @@ type AdminDashboardView =
   | "campaigns"
   | "content"
   | "communications"
+  | "financials"
   | "flow"
   | "glance"
   | "goals"
@@ -678,7 +680,8 @@ const content = {
     },
     performance: [
       { icon: HomeIcon, name: "Dashboard", view: "glance" },
-      { icon: FunnelIcon, name: "Conversions", view: "flow" }
+      { icon: FunnelIcon, name: "Conversions", view: "flow" },
+      { icon: BanknotesIcon, name: "Financials", view: "financials" }
     ],
     performanceTitle: "Performance",
     marketing: [
@@ -711,6 +714,7 @@ const content = {
       campaigns: "Campaigns",
       content: "Content",
       communications: "Communications",
+      financials: "Financials",
       flow: "Conversions",
       glance: "Dashboard",
       goals: "Goals",
@@ -1062,7 +1066,8 @@ const content = {
     },
     performance: [
       { icon: HomeIcon, name: "Dashboard", view: "glance" },
-      { icon: FunnelIcon, name: "Conversions", view: "flow" }
+      { icon: FunnelIcon, name: "Conversions", view: "flow" },
+      { icon: BanknotesIcon, name: "Financials", view: "financials" }
     ],
     performanceTitle: "ประสิทธิภาพ",
     marketing: [
@@ -1095,6 +1100,7 @@ const content = {
       campaigns: "แคมเปญ",
       content: "คอนเทนต์",
       communications: "การสื่อสาร",
+      financials: "Financials",
       flow: "Conversions",
       glance: "Dashboard",
       goals: "Goals",
@@ -7619,6 +7625,10 @@ function adminViewDatabaseAvailable({
 
   if (view === "flow") {
     return flowData.databaseAvailable;
+  }
+
+  if (view === "financials") {
+    return true;
   }
 
   if (view === "goals") {

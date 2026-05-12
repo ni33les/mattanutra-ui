@@ -68,6 +68,7 @@ export default async function LocalizedAdminDashboardPage({
     rawView === "campaigns" ||
     rawView === "content" ||
     rawView === "communications" ||
+    rawView === "financials" ||
     rawView === "flow" ||
     rawView === "glance" ||
     rawView === "goals" ||

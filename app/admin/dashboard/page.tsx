@@ -45,6 +45,7 @@ export default async function AdminDashboardPage({
     rawView === "campaigns" ||
     rawView === "content" ||
     rawView === "communications" ||
+    rawView === "financials" ||
     rawView === "flow" ||
     rawView === "glance" ||
     rawView === "goals" ||
