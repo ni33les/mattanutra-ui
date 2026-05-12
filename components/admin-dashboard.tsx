@@ -3521,39 +3521,6 @@ function ContentCard({
         </p>
       ) : null}
 
-      <div className="mt-5 grid gap-3 text-xs text-gray-500 sm:grid-cols-2">
-        <SupplementListMeta
-          label={labels.contentPages.updated}
-          value={formatGeneratedAt(row.updatedAt, locale)}
-        />
-        <SupplementListMeta
-          label={labels.contentPages.lastViewed}
-          value={
-            row.lastViewedAt
-              ? formatGeneratedAt(row.lastViewedAt, locale)
-              : ""
-          }
-        />
-        <SupplementListMeta
-          label={labels.contentPages.scheduledFor}
-          value={
-            row.scheduledFor
-              ? formatGeneratedAt(row.scheduledFor, locale)
-              : ""
-          }
-        />
-        <SupplementListMeta
-          label={labels.contentPages.source}
-          value={
-            row.sourceAgent || row.sourceChannel || row.sourceRef
-              ? [row.sourceAgent, row.sourceChannel, row.sourceRef]
-                  .filter(Boolean)
-                  .join(" · ")
-              : ""
-          }
-        />
-      </div>
-
       <div className="mt-auto pt-5">
         <div className="flex flex-wrap items-center gap-3">
           <span className="isolate inline-flex rounded-md shadow-xs">
