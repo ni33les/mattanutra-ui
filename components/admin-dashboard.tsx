@@ -110,6 +110,30 @@ type AdminDashboardView =
   | "supplements"
   | "visibility";
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
+type GoalMetricId =
+  | "goalsBlocked"
+  | "goalsFailed"
+  | "goalsProcessing"
+  | "goalsScheduled"
+  | "goalsSucceeded"
+  | "goalsTotal";
+type ContentMetricId =
+  | "contentBlogPosts"
+  | "contentDeleted"
+  | "contentDraft"
+  | "contentPageViews"
+  | "contentPublished"
+  | "contentScheduled"
+  | "contentTestimonials"
+  | "contentTotal";
+type TaskMetricId =
+  | "tasksActive"
+  | "tasksBlocked"
+  | "tasksCompleted"
+  | "tasksFailed"
+  | "tasksHuman"
+  | "tasksQueued"
+  | "tasksTotal";
 
 type AdminNavItem = Readonly<{
   current?: boolean;
@@ -247,15 +271,13 @@ type AdminContent = Readonly<{
     age: string;
     lastActivity: string;
     live: string;
-    needsReview: string;
     noSelection: string;
     plan: string;
     priority: string;
     processing: string;
     reservations: string;
-    showCompleted: string;
+    scheduled: string;
     source: string;
-    stuck: string;
     succeeded: string;
     tasks: string;
     trace: string;
@@ -562,15 +584,13 @@ const content = {
       age: "Age",
       lastActivity: "Last activity",
       live: "Live",
-      needsReview: "Needs review",
       noSelection: "Select a goal to see its timeline.",
       plan: "Plan",
       priority: "Priority",
       processing: "Processing",
       reservations: "Reservations",
-      showCompleted: "Show completed",
+      scheduled: "Scheduled",
       source: "Source",
-      stuck: "Stuck",
       succeeded: "Succeeded",
       tasks: "Tasks",
       trace: "Trace",
@@ -697,7 +717,7 @@ const content = {
       leads: "Leads",
       reviews: "Reviews",
       supplements: "Supplements",
-      visibility: "Visibility"
+      visibility: "Tasks"
     },
     ranges: {
       all: "All",
@@ -746,7 +766,7 @@ const content = {
       total: "Total"
     },
     visibility: {
-      active: "Active",
+      active: "Processing",
       actor: "Actor",
       blocked: "Blocked",
       capabilities: "Capabilities",
@@ -948,15 +968,13 @@ const content = {
       age: "อายุ",
       lastActivity: "กิจกรรมล่าสุด",
       live: "สด",
-      needsReview: "ต้องรีวิว",
       noSelection: "เลือก Goal เพื่อดูไทม์ไลน์",
       plan: "แผน",
       priority: "ความสำคัญ",
       processing: "กำลังดำเนินการ",
       reservations: "การจองงาน",
-      showCompleted: "แสดงงานที่เสร็จแล้ว",
+      scheduled: "ตั้งเวลาแล้ว",
       source: "แหล่งที่มา",
-      stuck: "ค้าง",
       succeeded: "สำเร็จ",
       tasks: "งาน",
       trace: "Trace",
@@ -1083,7 +1101,7 @@ const content = {
       leads: "ลีด",
       reviews: "รีวิว",
       supplements: "อาหารเสริม",
-      visibility: "Visibility"
+      visibility: "Tasks"
     },
     ranges: {
       all: "ทั้งหมด",
@@ -1132,7 +1150,7 @@ const content = {
       total: "ทั้งหมด"
     },
     visibility: {
-      active: "กำลังทำ",
+      active: "กำลังประมวลผล",
       actor: "ผู้ทำ",
       blocked: "ติดขัด",
       capabilities: "ความสามารถ",
@@ -1233,31 +1251,51 @@ function adminHref(
   return `/${locale}/admin/dashboard?${params.toString()}`;
 }
 
-function adminGoalHref({
+function adminGoalsHref({
   accessToken,
   filters,
+  goalFilter,
   goalId,
   locale,
   range
 }: Readonly<{
   accessToken: string;
   filters: AdminDashboardFilters;
-  goalId: string;
+  goalFilter?: GoalMetricId;
+  goalId?: string | null;
   locale: Locale;
   range: AdminDashboardRange;
 }>) {
   const params = new URLSearchParams({
     access_token: accessToken,
-    goal: goalId,
     range,
     view: "goals"
   });
+
+  if (goalId) {
+    params.set("goal", goalId);
+  }
 
   adminDashboardFilterEntries(filters).forEach(([key, value]) => {
     params.set(key, value);
   });
 
+  if (goalFilter && goalFilter !== "goalsTotal") {
+    params.set("goalFilter", goalFilter);
+  }
+
   return `/${locale}/admin/dashboard?${params.toString()}`;
+}
+
+function adminGoalHref(input: Readonly<{
+  accessToken: string;
+  filters: AdminDashboardFilters;
+  goalFilter?: GoalMetricId;
+  goalId: string;
+  locale: Locale;
+  range: AdminDashboardRange;
+}>) {
+  return adminGoalsHref(input);
 }
 
 function adminReviewTaskHref({
@@ -1593,6 +1631,7 @@ type BusinessMetricColorId =
   | "processing"
   | "queued"
   | "retired"
+  | "scheduled"
   | "stuck"
   | "succeeded"
   | "noChannel"
@@ -1630,6 +1669,7 @@ const businessMetricColors = {
   proConversions: "#111827",
   queued: "#0EA5E9",
   retired: "#64748B",
+  scheduled: "#0EA5E9",
   stuck: "#DC2626",
   succeeded: "#126B4F",
   total: "#20343A",
@@ -1650,6 +1690,90 @@ function combinedSeries(...seriesList: number[][]) {
   return Array.from({ length: maxLength }, (_, index) =>
     seriesList.reduce((total, series) => total + (series[index] ?? 0), 0)
   );
+}
+
+function normalizeGoalMetricId(value?: string | null): GoalMetricId {
+  return value === "goalsBlocked" ||
+    value === "goalsFailed" ||
+    value === "goalsProcessing" ||
+    value === "goalsScheduled" ||
+    value === "goalsSucceeded" ||
+    value === "goalsTotal"
+    ? value
+    : "goalsTotal";
+}
+
+function goalMatchesMetric(goal: AdminGoalRow, metricId: GoalMetricId) {
+  if (metricId === "goalsProcessing") {
+    return goal.status === "processing";
+  }
+
+  if (metricId === "goalsBlocked") {
+    return goal.status === "blocked";
+  }
+
+  if (metricId === "goalsScheduled") {
+    return goal.status === "scheduled";
+  }
+
+  if (metricId === "goalsFailed") {
+    return goal.status === "failed";
+  }
+
+  if (metricId === "goalsSucceeded") {
+    return goal.status === "succeeded";
+  }
+
+  return true;
+}
+
+function filterGoalsByMetric(rows: AdminGoalRow[], metricId: GoalMetricId) {
+  return rows.filter((goal) => goalMatchesMetric(goal, metricId));
+}
+
+function taskMatchesMetric(
+  row: AdminTaskVisibilityRow,
+  metricId: TaskMetricId,
+  generatedAt: string
+) {
+  const generatedAtTime = new Date(generatedAt).getTime();
+  const leaseUntilTime = row.leaseUntil
+    ? new Date(row.leaseUntil).getTime()
+    : Number.POSITIVE_INFINITY;
+  const staleLease =
+    (row.status === "reserved" || row.status === "running") &&
+    Number.isFinite(generatedAtTime) &&
+    leaseUntilTime < generatedAtTime;
+
+  if (metricId === "tasksQueued") {
+    return row.status === "queued";
+  }
+
+  if (metricId === "tasksActive") {
+    return row.status === "reserved" || row.status === "running";
+  }
+
+  if (metricId === "tasksHuman") {
+    return (
+      row.actorType === "human" ||
+      row.status === "needs_review" ||
+      row.status === "waiting_approval"
+    );
+  }
+
+  if (metricId === "tasksBlocked") {
+    return row.status === "blocked";
+  }
+
+  if (metricId === "tasksFailed") {
+    return row.status === "failed" || staleLease;
+  }
+
+  if (metricId === "tasksCompleted") {
+    return row.status === "completed";
+  }
+
+  return true;
 }
 
 function percentageMetricSeries(numerator: number[], denominator: number[]) {
@@ -1685,6 +1809,7 @@ function BusinessStatsGrid({
     <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
       <div className="grid grid-cols-1 gap-px bg-gray-900/5 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => {
+          const selected = metric.id === selectedMetricId;
           const content = (
             <>
               <p className="text-sm/6 font-medium text-gray-500">{metric.label}</p>
@@ -1696,12 +1821,9 @@ function BusinessStatsGrid({
             </>
           );
           const classes = classNames(
-            metric.id === selectedMetricId
-              ? "bg-[#ECFDF5]"
-              : onMetricSelect
-                ? "bg-white hover:bg-gray-50"
-                : "bg-white",
+            selected ? "bg-gray-50 ring-1 ring-inset ring-gray-200" : "bg-white",
             "px-5 py-6 text-left transition",
+            onMetricSelect && !selected && "hover:bg-gray-50",
             onMetricSelect &&
               "focus:outline-2 focus:-outline-offset-2 focus:outline-[#1FA77A]"
           );
@@ -2948,13 +3070,6 @@ function LeadDetailsModal({
   );
 }
 
-const contentStatusOrder: AdminContentWorkflowStatus[] = [
-  "draft",
-  "scheduled",
-  "published",
-  "deleted"
-];
-
 function contentWorkflowStatusLabel(
   labels: AdminContent,
   status: AdminContentWorkflowStatus
@@ -2976,6 +3091,86 @@ function contentWorkflowStatusClass(status: AdminContentWorkflowStatus) {
   }
 
   return "bg-amber-50 text-amber-800 ring-amber-200";
+}
+
+function contentWorkflowActionButtonClass(
+  status: AdminContentWorkflowStatus,
+  position: "left" | "middle" | "right" | "single"
+) {
+  const positionClass =
+    position === "left"
+      ? "rounded-l-md"
+      : position === "right"
+        ? "rounded-r-md"
+        : position === "single"
+          ? "rounded-md"
+          : "";
+  const baseClass = classNames(
+    "relative inline-flex items-center px-3 py-2 text-xs font-semibold ring-1 ring-inset transition focus:z-10 disabled:cursor-not-allowed disabled:opacity-50",
+    position !== "left" && "-ml-px",
+    positionClass
+  );
+
+  if (status === "published") {
+    return classNames(
+      baseClass,
+      "bg-emerald-50 text-emerald-800 ring-emerald-200 hover:bg-emerald-100"
+    );
+  }
+
+  if (status === "scheduled") {
+    return classNames(
+      baseClass,
+      "bg-blue-50 text-blue-800 ring-blue-200 hover:bg-blue-100"
+    );
+  }
+
+  if (status === "deleted") {
+    return classNames(
+      baseClass,
+      "bg-gray-50 text-gray-700 ring-gray-200 hover:bg-gray-100"
+    );
+  }
+
+  return classNames(
+    baseClass,
+    "bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100"
+  );
+}
+
+function contentMatchesMetric(
+  row: AdminContentInventoryRow,
+  metricId: ContentMetricId
+) {
+  if (metricId === "contentPublished") {
+    return row.workflowStatus === "published";
+  }
+
+  if (metricId === "contentScheduled") {
+    return row.workflowStatus === "scheduled";
+  }
+
+  if (metricId === "contentDraft") {
+    return row.workflowStatus === "draft";
+  }
+
+  if (metricId === "contentDeleted") {
+    return row.workflowStatus === "deleted";
+  }
+
+  if (metricId === "contentBlogPosts") {
+    return row.contentType === "blog_post";
+  }
+
+  if (metricId === "contentTestimonials") {
+    return row.contentType === "testimonial";
+  }
+
+  if (metricId === "contentPageViews") {
+    return row.pageViews > 0;
+  }
+
+  return true;
 }
 
 function contentTypeLabel(type: AdminContentInventoryRow["contentType"]) {
@@ -3034,9 +3229,8 @@ function AdminContentView({
     Record<string, Partial<AdminContentInventoryRow>>
   >({});
   const [scheduleValues, setScheduleValues] = useState<Record<string, string>>({});
-  const [statusFilter, setStatusFilter] = useState<
-    AdminContentWorkflowStatus | "all"
-  >("all");
+  const [selectedMetricId, setSelectedMetricId] =
+    useState<ContentMetricId>("contentTotal");
   const rows = data.rows.map((row) => ({
     ...row,
     ...(rowOverrides[row.id] ?? {})
@@ -3068,10 +3262,9 @@ function AdminContentView({
       total: 0
     }
   );
-  const filteredRows =
-    statusFilter === "all"
-      ? rows
-      : rows.filter((row) => row.workflowStatus === statusFilter);
+  const filteredRows = rows.filter((row) =>
+    contentMatchesMetric(row, selectedMetricId)
+  );
   const contentMetrics: BusinessMetric[] = [
     {
       color: businessMetricColors.total,
@@ -3207,100 +3400,49 @@ function AdminContentView({
 
   return (
     <section className="mt-8">
-      <BusinessStatsGrid metrics={contentMetrics} />
+      <BusinessStatsGrid
+        metrics={contentMetrics}
+        onMetricSelect={(metricId) => setSelectedMetricId(metricId as ContentMetricId)}
+        selectedMetricId={selectedMetricId}
+      />
 
-      <div className="mt-6 flex flex-wrap items-center gap-2">
-        {[
-          { label: labels.contentPages.all, value: "all" as const },
-          ...contentStatusOrder.map((status) => ({
-            label: contentWorkflowStatusLabel(labels, status),
-            value: status
-          }))
-        ].map((option) => (
-          <button
-            className={classNames(
-              statusFilter === option.value
-                ? "bg-[#1FA77A] text-white"
-                : "bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50",
-              "rounded-full px-3 py-1.5 text-sm font-semibold transition"
-            )}
-            key={option.value}
-            onClick={() => setStatusFilter(option.value)}
-            type="button"
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                {[
-                  labels.contentPages.title,
-                  labels.contentPages.type,
-                  labels.contentPages.status,
-                  labels.contentPages.views,
-                  labels.contentPages.updated,
-                  labels.contentPages.actions
-                ].map((heading) => (
-                  <th
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-500"
-                    key={heading}
-                    scope="col"
-                  >
-                    {heading}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
-              {filteredRows.length > 0 ? (
-                filteredRows.map((row) => (
-                  <ContentRow
-                    accessToken={accessToken}
-                    busy={busyId === row.id}
-                    error={errorId === row.id}
-                    key={row.id}
-                    labels={labels}
-                    locale={locale}
-                    onScheduleChange={(value) =>
-                      setScheduleValues((current) => ({
-                        ...current,
-                        [row.id]: value
-                      }))
-                    }
-                    onWorkflow={runWorkflow}
-                    row={row}
-                    scheduleValue={
-                      scheduleValues[row.id] ??
-                      (row.scheduledFor
-                        ? localDateTimeInputValue(new Date(row.scheduledFor))
-                        : defaultContentScheduleValue())
-                    }
-                  />
-                ))
-              ) : (
-                <tr>
-                  <td
-                    className="px-4 py-10 text-center text-sm font-medium text-gray-500"
-                    colSpan={6}
-                  >
-                    {labels.contentPages.empty}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      {filteredRows.length > 0 ? (
+        <div className="mt-8 grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {filteredRows.map((row) => (
+            <ContentCard
+              accessToken={accessToken}
+              busy={busyId === row.id}
+              error={errorId === row.id}
+              key={row.id}
+              labels={labels}
+              locale={locale}
+              onScheduleChange={(value) =>
+                setScheduleValues((current) => ({
+                  ...current,
+                  [row.id]: value
+                }))
+              }
+              onWorkflow={runWorkflow}
+              row={row}
+              scheduleValue={
+                scheduleValues[row.id] ??
+                (row.scheduledFor
+                  ? localDateTimeInputValue(new Date(row.scheduledFor))
+                  : defaultContentScheduleValue())
+              }
+            />
+          ))}
         </div>
-      </div>
+      ) : (
+        <div className="mt-8 rounded-lg bg-white px-5 py-12 text-center text-sm font-medium text-gray-500 shadow-sm ring-1 ring-gray-200">
+          {labels.contentPages.empty}
+        </div>
+      )}
     </section>
   );
 }
 
-function ContentRow({
+function ContentCard({
   accessToken,
   busy,
   error,
@@ -3327,70 +3469,90 @@ function ContentRow({
   const href = contentHref(row, accessToken);
 
   return (
-    <tr className="align-top hover:bg-gray-50">
-      <td className="max-w-md px-4 py-4 text-sm">
-        <a
-          className="block text-[#20343A] hover:text-[#126B4F]"
-          href={href}
-          rel="noreferrer"
-          target="_blank"
-        >
-          <span className="font-semibold">
-            {row.title}
-          </span>
-          {row.summary ? (
-            <span className="mt-1 block line-clamp-2 text-xs text-gray-500">
-              {row.summary}
+    <article className="flex h-full flex-col rounded-lg bg-white p-5 shadow-sm ring-1 ring-gray-200 transition hover:shadow-md">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <a
+            className="block text-[#20343A] hover:text-[#126B4F]"
+            href={href}
+            rel="noreferrer"
+            target="_blank"
+          >
+            <span className="line-clamp-2 text-base font-semibold">
+              {row.title}
             </span>
-          ) : null}
-        </a>
-        <p className="mt-2 text-xs text-gray-400">
-          {row.sourceAgent || row.sourceChannel || row.sourceRef
-            ? [row.sourceAgent, row.sourceChannel, row.sourceRef]
-                .filter(Boolean)
-                .join(" · ")
-            : ""}
-        </p>
-      </td>
-      <td className="px-4 py-4 text-sm text-gray-600">
-        <div>{contentTypeLabel(row.contentType)}</div>
-        <div className="mt-1 text-xs text-gray-400">{row.locale.toUpperCase()}</div>
-      </td>
-      <td className="px-4 py-4 text-sm">
-        <span
-          className={classNames(
-            contentWorkflowStatusClass(row.workflowStatus),
-            "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
-          )}
-        >
-          {contentWorkflowStatusLabel(labels, row.workflowStatus)}
-        </span>
-        {row.scheduledFor ? (
-          <div className="mt-2 text-xs text-gray-500">
-            {labels.contentPages.scheduledFor}:{" "}
-            {formatGeneratedAt(row.scheduledFor, locale)}
+          </a>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span
+              className={classNames(
+                contentWorkflowStatusClass(row.workflowStatus),
+                "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+              )}
+            >
+              {contentWorkflowStatusLabel(labels, row.workflowStatus)}
+            </span>
+            <span className="inline-flex rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+              {contentTypeLabel(row.contentType)}
+            </span>
+            <span className="inline-flex rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+              {row.locale.toUpperCase()}
+            </span>
           </div>
-        ) : null}
-      </td>
-      <td className="px-4 py-4 text-sm text-gray-600">
-        <div className="font-medium text-gray-900">
-          {formatNumber(row.pageViews, locale)}
         </div>
-        {row.lastViewedAt ? (
-          <div className="mt-1 text-xs text-gray-400">
-            {labels.contentPages.lastViewed}:{" "}
-            {formatGeneratedAt(row.lastViewedAt, locale)}
+        <div className="shrink-0 text-left sm:text-right">
+          <div className="text-xl font-semibold tabular-nums text-gray-900">
+            {formatNumber(row.pageViews, locale)}
           </div>
-        ) : null}
-      </td>
-      <td className="px-4 py-4 text-sm text-gray-500">
-        {formatGeneratedAt(row.updatedAt, locale)}
-      </td>
-      <td className="min-w-[360px] px-4 py-4 text-sm">
+          <div className="text-xs font-medium text-gray-500">
+            {labels.contentPages.views}
+          </div>
+        </div>
+      </div>
+
+      {row.summary ? (
+        <p className="mt-4 line-clamp-3 text-sm text-gray-600">
+          {row.summary}
+        </p>
+      ) : null}
+
+      <div className="mt-5 grid gap-3 text-xs text-gray-500 sm:grid-cols-2">
+        <SupplementListMeta
+          label={labels.contentPages.updated}
+          value={formatGeneratedAt(row.updatedAt, locale)}
+        />
+        <SupplementListMeta
+          label={labels.contentPages.lastViewed}
+          value={
+            row.lastViewedAt
+              ? formatGeneratedAt(row.lastViewedAt, locale)
+              : ""
+          }
+        />
+        <SupplementListMeta
+          label={labels.contentPages.scheduledFor}
+          value={
+            row.scheduledFor
+              ? formatGeneratedAt(row.scheduledFor, locale)
+              : ""
+          }
+        />
+        <SupplementListMeta
+          label={labels.contentPages.source}
+          value={
+            row.sourceAgent || row.sourceChannel || row.sourceRef
+              ? [row.sourceAgent, row.sourceChannel, row.sourceRef]
+                  .filter(Boolean)
+                  .join(" · ")
+              : ""
+          }
+        />
+      </div>
+
+      <div className="mt-auto pt-5">
         <div className="flex flex-wrap items-center gap-3">
           <span className="isolate inline-flex rounded-md shadow-xs">
             <button
-              className="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-xs font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-50"
+              className={contentWorkflowActionButtonClass("draft", "left")}
               disabled={busy || row.workflowStatus === "draft"}
               onClick={() => onWorkflow(row, "draft")}
               type="button"
@@ -3398,7 +3560,7 @@ function ContentRow({
               {labels.contentPages.draftAction}
             </button>
             <button
-              className="relative -ml-px inline-flex items-center bg-white px-3 py-2 text-xs font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-50"
+              className={contentWorkflowActionButtonClass("published", "middle")}
               disabled={busy || row.workflowStatus === "published"}
               onClick={() => onWorkflow(row, "published")}
               type="button"
@@ -3406,7 +3568,7 @@ function ContentRow({
               {labels.contentPages.publishAction}
             </button>
             <button
-              className="relative -ml-px inline-flex items-center rounded-r-md bg-white px-3 py-2 text-xs font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-50"
+              className={contentWorkflowActionButtonClass("deleted", "right")}
               disabled={busy || row.workflowStatus === "deleted"}
               onClick={() => onWorkflow(row, "deleted")}
               type="button"
@@ -3414,16 +3576,16 @@ function ContentRow({
               {labels.contentPages.deleteAction}
             </button>
           </span>
-          <span className="isolate inline-flex rounded-md shadow-xs">
+          <span className="isolate inline-flex max-w-full rounded-md shadow-xs">
             <input
               aria-label={labels.contentPages.scheduledFor}
-              className="relative inline-flex rounded-l-md bg-white px-3 py-2 text-xs text-gray-900 ring-1 ring-inset ring-gray-300 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-[#1FA77A]"
+              className="relative inline-flex min-w-0 rounded-l-md bg-white px-3 py-2 text-xs text-gray-900 ring-1 ring-inset ring-blue-200 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-[#1FA77A]"
               onChange={(event) => onScheduleChange(event.target.value)}
               type="datetime-local"
               value={scheduleValue}
             />
             <button
-              className="relative -ml-px inline-flex items-center rounded-r-md bg-white px-3 py-2 text-xs font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-50"
+              className={contentWorkflowActionButtonClass("scheduled", "right")}
               disabled={busy}
               onClick={() => onWorkflow(row, "scheduled")}
               type="button"
@@ -3439,11 +3601,10 @@ function ContentRow({
               : labels.contentPages.updateError}
           </p>
         ) : null}
-      </td>
-    </tr>
+      </div>
+    </article>
   );
 }
-
 const supplementListStatuses: SupplementListStatus[] = [
   "whitelisted",
   "review_required",
@@ -5845,10 +6006,6 @@ function AdminTechnicalAlertsView({
 }
 
 function goalStatusLabel(labels: AdminContent, status: AdminGoalStatus) {
-  if (status === "needs_review") {
-    return labels.goals.needsReview;
-  }
-
   return labels.goals[status];
 }
 
@@ -5857,11 +6014,15 @@ function goalStatusClass(status: AdminGoalStatus) {
     return "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]";
   }
 
-  if (status === "needs_review" || status === "blocked") {
+  if (status === "blocked") {
     return "bg-amber-50 text-amber-800 ring-amber-200";
   }
 
-  if (status === "stuck" || status === "failed") {
+  if (status === "scheduled") {
+    return "bg-sky-50 text-sky-700 ring-sky-100";
+  }
+
+  if (status === "failed") {
     return "bg-red-50 text-red-700 ring-red-100";
   }
 
@@ -6015,6 +6176,15 @@ function AdminVisibilityView({
 }>) {
   const [selectedTask, setSelectedTask] =
     useState<AdminTaskVisibilityRow | null>(null);
+  const [selectedMetricId, setSelectedMetricId] =
+    useState<TaskMetricId>("tasksTotal");
+  const visibleRows = data.rows.filter((row) =>
+    taskMatchesMetric(row, selectedMetricId, data.generatedAt)
+  );
+  const selectMetric = (metricId: BusinessMetric["id"]) => {
+    setSelectedMetricId(metricId as TaskMetricId);
+    setSelectedTask(null);
+  };
   const visibilityMetrics: BusinessMetric[] = [
     {
       color: businessMetricColors.total,
@@ -6075,12 +6245,16 @@ function AdminVisibilityView({
         locale={locale}
       />
 
-      <BusinessStatsGrid metrics={visibilityMetrics} />
+      <BusinessStatsGrid
+        metrics={visibilityMetrics}
+        onMetricSelect={selectMetric}
+        selectedMetricId={selectedMetricId}
+      />
 
-      {data.rows.length > 0 ? (
+      {visibleRows.length > 0 ? (
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
           <div className="divide-y divide-gray-100">
-            {data.rows.map((row) => (
+            {visibleRows.map((row) => (
               <VisibilityTaskRow
                 key={row.id}
                 labels={labels}
@@ -6476,7 +6650,8 @@ function AdminGoalsView({
   filters,
   labels,
   locale,
-  range
+  range,
+  selectedGoalFilter
 }: Readonly<{
   accessToken: string;
   data: AdminGoalsData;
@@ -6484,13 +6659,12 @@ function AdminGoalsView({
   labels: AdminContent;
   locale: Locale;
   range: AdminDashboardRange;
+  selectedGoalFilter?: string | null;
 }>) {
-  const [showCompleted, setShowCompleted] = useState(false);
-  const visibleGoals = showCompleted
-    ? data.rows
-    : data.rows.filter((goal) => goal.status !== "succeeded");
+  const selectedMetricId = normalizeGoalMetricId(selectedGoalFilter);
+  const visibleGoals = filterGoalsByMetric(data.rows, selectedMetricId);
   const selectedGoal =
-    showCompleted || data.selectedGoal?.status !== "succeeded"
+    data.selectedGoal && visibleGoals.some((goal) => goal.id === data.selectedGoal?.id)
       ? data.selectedGoal
       : null;
   const goalMetrics: BusinessMetric[] = [
@@ -6502,18 +6676,18 @@ function AdminGoalsView({
       value: formatNumber(data.summary.total, locale)
     },
     {
+      color: businessMetricColors.scheduled,
+      id: "goalsScheduled",
+      label: labels.goals.scheduled,
+      series: [],
+      value: formatNumber(data.summary.scheduled, locale)
+    },
+    {
       color: businessMetricColors.processing,
       id: "goalsProcessing",
       label: labels.goals.processing,
       series: [],
       value: formatNumber(data.summary.processing, locale)
-    },
-    {
-      color: businessMetricColors.pendingReviews,
-      id: "goalsNeedsReview",
-      label: labels.goals.needsReview,
-      series: [],
-      value: formatNumber(data.summary.needsReview, locale)
     },
     {
       color: businessMetricColors.blocked,
@@ -6523,11 +6697,11 @@ function AdminGoalsView({
       value: formatNumber(data.summary.blocked, locale)
     },
     {
-      color: businessMetricColors.stuck,
-      id: "goalsStuck",
-      label: labels.goals.stuck,
+      color: businessMetricColors.failed,
+      id: "goalsFailed",
+      label: labels.goals.failed,
       series: [],
-      value: formatNumber(data.summary.stuck, locale)
+      value: formatNumber(data.summary.failed, locale)
     },
     {
       color: businessMetricColors.succeeded,
@@ -6537,6 +6711,28 @@ function AdminGoalsView({
       value: formatNumber(data.summary.succeeded, locale)
     }
   ];
+  const selectMetric = (metricId: BusinessMetric["id"]) => {
+    const goalFilter = normalizeGoalMetricId(metricId);
+    const goal = filterGoalsByMetric(data.rows, goalFilter)[0];
+    const href = goal
+      ? adminGoalHref({
+          accessToken,
+          filters,
+          goalFilter,
+          goalId: goal.id,
+          locale,
+          range
+        })
+      : adminGoalsHref({
+          accessToken,
+          filters,
+          goalFilter,
+          locale,
+          range
+        });
+
+    window.location.assign(href);
+  };
 
   return (
     <section className="mt-8 space-y-6">
@@ -6546,19 +6742,11 @@ function AdminGoalsView({
         locale={locale}
       />
 
-      <BusinessStatsGrid metrics={goalMetrics} />
-
-      <div className="flex justify-end">
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200">
-          <input
-            checked={showCompleted}
-            className="size-4 rounded border-gray-300 text-[#1FA77A] focus:ring-[#1FA77A]"
-            onChange={(event) => setShowCompleted(event.target.checked)}
-            type="checkbox"
-          />
-          {labels.goals.showCompleted}
-        </label>
-      </div>
+      <BusinessStatsGrid
+        metrics={goalMetrics}
+        onMetricSelect={selectMetric}
+        selectedMetricId={selectedMetricId}
+      />
 
       {visibleGoals.length > 0 ? (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(18rem,0.72fr)_minmax(0,1.55fr)]">
@@ -6576,6 +6764,7 @@ function AdminGoalsView({
                 href={adminGoalHref({
                   accessToken,
                   filters,
+                  goalFilter: selectedMetricId,
                   goalId: goal.id,
                   locale,
                   range
@@ -7470,6 +7659,7 @@ export function AdminDashboard({
   locale,
   reviewQueueData,
   selectedReviewTaskId,
+  selectedGoalFilter,
   supplementsData,
   visibilityData,
   view
@@ -7487,6 +7677,7 @@ export function AdminDashboard({
   leadsData: AdminLeadsData;
   locale: Locale;
   reviewQueueData: AdminReviewQueueData;
+  selectedGoalFilter?: string | null;
   selectedReviewTaskId?: string | null;
   supplementsData: AdminSupplementsData;
   visibilityData: AdminTaskVisibilityData;
@@ -7747,6 +7938,7 @@ export function AdminDashboard({
               labels={labels}
               locale={locale}
               range={data.range}
+              selectedGoalFilter={selectedGoalFilter}
             />
           ) : view === "alerts" ? (
             <AdminTechnicalAlertsView

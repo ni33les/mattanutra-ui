@@ -55,6 +55,7 @@ export default async function AdminDashboardPage({
       ? rawView
       : "glance";
   const filters = normalizeAdminDashboardFilters(params);
+  const selectedGoalFilter = firstParam(params.goalFilter);
   const selectedGoalId = firstParam(params.goal);
   const selectedReviewTaskId = firstParam(params.review);
 
@@ -104,6 +105,7 @@ export default async function AdminDashboardPage({
       goalsData={goalsData}
       leadsData={leadsData}
       locale="en"
+      selectedGoalFilter={selectedGoalFilter}
       reviewQueueData={reviewQueueData}
       selectedReviewTaskId={selectedReviewTaskId}
       supplementsData={supplementsData}

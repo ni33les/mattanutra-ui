@@ -78,6 +78,7 @@ export default async function LocalizedAdminDashboardPage({
       ? rawView
       : "glance";
   const filters = normalizeAdminDashboardFilters(query);
+  const selectedGoalFilter = firstParam(query.goalFilter);
   const selectedGoalId = firstParam(query.goal);
   const selectedReviewTaskId = firstParam(query.review);
 
@@ -127,6 +128,7 @@ export default async function LocalizedAdminDashboardPage({
       goalsData={goalsData}
       leadsData={leadsData}
       locale={locale}
+      selectedGoalFilter={selectedGoalFilter}
       reviewQueueData={reviewQueueData}
       selectedReviewTaskId={selectedReviewTaskId}
       supplementsData={supplementsData}

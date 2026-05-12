@@ -766,6 +766,100 @@ export async function updateCommunicationChannel(input: Readonly<{
   });
 }
 
+export async function recordEmailCommunicationDelivery(input: Readonly<{
+  body: string;
+  emailHtml?: string | null;
+  goalId?: string | null;
+  messageId?: string | null;
+  messageType: string;
+  metadata?: Record<string, unknown>;
+  planId: string;
+  reason?: string | null;
+  sent: boolean;
+  subject?: string | null;
+  taskId?: string | null;
+  to: string;
+}>) {
+  const sql = sqlOrThrow();
+  const emailValidation = validateLeadEmail(input.to);
+
+  if (!emailValidation.ok || !isUuid(input.planId)) {
+    throw new Error("Communication email delivery is missing identifiers");
+  }
+
+  await ensureCommunicationSchema(sql);
+
+  return sql.begin(async (tx) => {
+    const planId = input.planId;
+    const goalId = isUuid(input.goalId ?? "") ? input.goalId! : null;
+    const taskId = isUuid(input.taskId ?? "") ? input.taskId! : null;
+    const status: CommunicationMessageStatus = input.sent ? "sent" : "failed";
+    const errorMessage = input.sent ? null : optionalText(input.reason);
+    const identityId = await ensurePlanIdentityInTransaction(tx, planId);
+    await seedKnownPlanChannelsInTransaction(tx, planId, identityId);
+    const channel = await upsertChannelInTransaction(tx, {
+      actorType: "human",
+      address: emailValidation.email,
+      channelType: "email",
+      displayName: "Email",
+      identityId,
+      metadata: {
+        source: "email_delivery"
+      },
+      preferenceRank: 80,
+      status: "active"
+    });
+    const sentAt = input.sent ? new Date() : null;
+    const rows = await tx<MessageRow[]>`
+      insert into public.communication_messages (
+        id,
+        identity_id,
+        channel_id,
+        plan_id,
+        goal_id,
+        task_id,
+        direction,
+        message_type,
+        status,
+        subject,
+        body,
+        html,
+        provider,
+        provider_message_id,
+        error_message,
+        metadata,
+        sent_at,
+        created_at,
+        updated_at
+      )
+      values (
+        ${randomUUID()}::uuid,
+        ${identityId}::uuid,
+        ${channel.id}::uuid,
+        ${planId}::uuid,
+        ${goalId}::uuid,
+        ${taskId}::uuid,
+        'outbound',
+        ${cleanText(input.messageType, "email")},
+        ${status},
+        ${optionalText(input.subject)},
+        ${cleanText(input.body, "Email sent from MattaNutra")},
+        ${optionalText(input.emailHtml)},
+        'email',
+        ${optionalText(input.messageId)},
+        ${errorMessage},
+        ${tx.json(toJsonValue(input.metadata ?? {}))},
+        ${sentAt},
+        now(),
+        now()
+      )
+      returning *
+    `;
+
+    return mapMessage(rows[0]);
+  });
+}
+
 export async function listCommunicationChannels(input: Readonly<{
   identityId?: string | null;
   planId?: string | null;

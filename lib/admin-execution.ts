@@ -373,6 +373,20 @@ export async function getAdminTaskVisibilityData(
         left join public.agents on agents.id = tasks.reserved_by_agent_id
         where ${whereClause}
         order by
+          case
+            when tasks.status in (
+              'queued',
+              'reserved',
+              'running',
+              'needs_review',
+              'waiting_approval',
+              'blocked'
+            ) then 0
+            else 1
+          end,
+          goals.priority desc,
+          tasks.priority desc,
+          tasks.scheduled_for asc,
           case tasks.status
             when 'queued' then 0
             when 'reserved' then 1
@@ -386,9 +400,6 @@ export async function getAdminTaskVisibilityData(
             when 'cancelled' then 8
             else 9
           end,
-          goals.priority desc,
-          tasks.priority desc,
-          tasks.scheduled_for asc,
           tasks.created_at asc
         limit 120
       `

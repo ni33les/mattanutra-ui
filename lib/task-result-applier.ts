@@ -1,7 +1,10 @@
 import { isUuid, toJsonValue } from "@/lib/assessment-store";
 import { updateBlogPost, updateTestimonial } from "@/lib/blog";
 import { writeBpmEvent } from "@/lib/bpm";
-import { sendClientSafetyFollowupTask } from "@/lib/communications";
+import {
+  recordEmailCommunicationDelivery,
+  sendClientSafetyFollowupTask
+} from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import { applyFormulationSafety } from "@/lib/formulation-safety";
 import type { FormulationBlueprint } from "@/lib/formulation-types";
@@ -67,6 +70,45 @@ async function addWorkEvent(
     severity: level,
     taskId: task.id
   });
+}
+
+async function recordTaskEmailCommunication(input: Readonly<{
+  body: string;
+  emailHtml: string;
+  metadata?: Record<string, unknown>;
+  messageType: string;
+  payload: Record<string, unknown>;
+  task: TaskRecord;
+}>) {
+  if (!input.task.planId) {
+    return;
+  }
+
+  try {
+    await recordEmailCommunicationDelivery({
+      body: input.body,
+      emailHtml: input.emailHtml,
+      goalId: input.task.goalId,
+      messageId: textValue(input.payload.messageId),
+      messageType: input.messageType,
+      metadata: {
+        emailType: textValue(input.payload.emailType),
+        ...(input.metadata ?? {}),
+        source: "task_email_delivery"
+      },
+      planId: input.task.planId,
+      reason: textValue(input.payload.reason),
+      sent: input.payload.sent === true,
+      subject: textValue(input.payload.subject),
+      taskId: input.task.id,
+      to: textValue(input.payload.to)
+    });
+  } catch (error) {
+    await addWorkEvent(input.task, "communication_record_failed", "medium", {
+      error: error instanceof Error ? error.message : "Unable to record email",
+      messageType: input.messageType
+    });
+  }
 }
 
 async function applyHealthScoreResult(
@@ -370,6 +412,14 @@ async function applyExampleEmailResult(task: TaskRecord, resultPayload: unknown)
       updated_at = now()
     where id = ${requestId}::uuid
   `;
+  await recordTaskEmailCommunication({
+    body: "Free nutrition plan email",
+    emailHtml: textValue(payload.emailHtml),
+    metadata: { requestId },
+    messageType: "example_preview",
+    payload,
+    task
+  });
   await addWorkEvent(
     task,
     payload.sent === true ? "example_email_sent" : "example_email_rendered_not_sent",
@@ -440,6 +490,14 @@ async function applyReassessmentEmailResult(
       updated_at = now()
     where id = ${cronId}::uuid
   `;
+  await recordTaskEmailCommunication({
+    body: "60-day reassessment invite",
+    emailHtml: textValue(payload.emailHtml),
+    metadata: { cronId },
+    messageType: "reassessment",
+    payload,
+    task
+  });
   await addWorkEvent(
     task,
     payload.sent === true ? "reassessment_email_sent" : "reassessment_rendered_not_sent",

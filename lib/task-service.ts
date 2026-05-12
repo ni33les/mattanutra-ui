@@ -1337,7 +1337,21 @@ export async function listGoalTasks(input: Readonly<{ goalId: string }>) {
     select *
     from public.tasks
     where goal_id = ${goalId}::uuid
-    order by created_at asc
+    order by
+      case
+        when status in (
+          'queued',
+          'reserved',
+          'running',
+          'needs_review',
+          'waiting_approval',
+          'blocked'
+        ) then 0
+        else 1
+      end,
+      priority desc,
+      scheduled_for asc,
+      created_at asc
   `;
   const taskIds = taskRows.map((row) => row.id);
   const dependencyRows =

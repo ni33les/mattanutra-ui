@@ -90,9 +90,10 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
       planId: workItem.planId,
       unsubscribeToken: workItem.unsubscribeToken
     });
+    const subject = buildExampleEmailSubject(workItem.locale, workItem.healthScore);
     const delivery = await sendTransactionalEmail({
       html: emailHtml,
-      subject: buildExampleEmailSubject(workItem.locale, workItem.healthScore),
+      subject,
       to: emailValidation.email
     });
 
@@ -102,6 +103,7 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
       messageId: delivery.messageId,
       reason: delivery.reason,
       sent: delivery.sent,
+      subject,
       to: emailValidation.email
     };
   }
@@ -118,9 +120,10 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
       planId: workItem.planId,
       unsubscribeToken: workItem.unsubscribeToken
     });
+    const subject = buildReassessmentEmailSubject(workItem.locale);
     const delivery = await sendTransactionalEmail({
       html: emailHtml,
-      subject: buildReassessmentEmailSubject(workItem.locale),
+      subject,
       to: emailValidation.email
     });
 
@@ -131,6 +134,7 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
       reason: delivery.reason,
       recurrenceDays: workItem.recurrenceDays,
       sent: delivery.sent,
+      subject,
       to: emailValidation.email,
       unsubscribeToken: workItem.unsubscribeToken
     };

@@ -8,9 +8,8 @@ export type AdminGoalStatus =
   | "blocked"
   | "cancelled"
   | "failed"
-  | "needs_review"
   | "processing"
-  | "stuck"
+  | "scheduled"
   | "succeeded";
 
 export type AdminGoalRow = Readonly<{
@@ -23,14 +22,13 @@ export type AdminGoalRow = Readonly<{
   failedTaskCount: number;
   id: string;
   lastActivityAt: string;
-  needsReviewTaskCount: number;
   planId: string | null;
   priority: number;
   rawStatus: string;
   ray: string | null;
+  scheduledTaskCount: number;
   source: string | null;
   status: AdminGoalStatus;
-  stuckTaskCount: number;
   taskCount: number;
   title: string;
   type: string;
@@ -119,9 +117,8 @@ export type AdminGoalsData = Readonly<{
   summary: {
     blocked: number;
     failed: number;
-    needsReview: number;
     processing: number;
-    stuck: number;
+    scheduled: number;
     succeeded: number;
     total: number;
   };
@@ -138,14 +135,13 @@ type GoalDbRow = Readonly<{
   failed_task_count: number | string | null;
   id: string;
   last_activity_at: Date | string | null;
-  needs_review_task_count: number | string | null;
   plan_id: string | null;
   priority: number | string;
   raw_status: string;
   ray: string | null;
   goal_type: string;
+  scheduled_task_count: number | string | null;
   source: string | null;
-  stuck_task_count: number | string | null;
   task_count: number | string | null;
   title: string;
   updated_at: Date | string;
@@ -313,20 +309,16 @@ function goalStatus(row: GoalDbRow): AdminGoalStatus {
     return "failed";
   }
 
-  if (numberValue(row.needs_review_task_count) > 0) {
-    return "needs_review";
-  }
-
   if (numberValue(row.blocked_task_count) > 0 || row.raw_status === "blocked") {
     return "blocked";
   }
 
-  if (numberValue(row.stuck_task_count) > 0) {
-    return "stuck";
-  }
-
   if (numberValue(row.active_task_count) > 0) {
     return "processing";
+  }
+
+  if (numberValue(row.scheduled_task_count) > 0) {
+    return "scheduled";
   }
 
   if (
@@ -350,14 +342,13 @@ function goalFromDb(row: GoalDbRow): AdminGoalRow {
     failedTaskCount: numberValue(row.failed_task_count),
     id: row.id,
     lastActivityAt: new Date(row.last_activity_at ?? row.updated_at).toISOString(),
-    needsReviewTaskCount: numberValue(row.needs_review_task_count),
     planId: row.plan_id,
     priority: numberValue(row.priority),
     rawStatus: row.raw_status,
     ray: row.ray,
+    scheduledTaskCount: numberValue(row.scheduled_task_count),
     source: row.source,
     status: goalStatus(row),
-    stuckTaskCount: numberValue(row.stuck_task_count),
     taskCount: numberValue(row.task_count),
     title: displayGoalTitle(row.title),
     type: row.goal_type,
@@ -424,9 +415,8 @@ function emptyGoalsData(): AdminGoalsData {
     summary: {
       blocked: 0,
       failed: 0,
-      needsReview: 0,
       processing: 0,
-      stuck: 0,
+      scheduled: 0,
       succeeded: 0,
       total: 0
     },
@@ -439,9 +429,7 @@ function summary(rows: AdminGoalRow[]): AdminGoalsData["summary"] {
     (current, row) => {
       current.total += 1;
 
-      if (row.status === "needs_review") {
-        current.needsReview += 1;
-      } else if (row.status !== "cancelled") {
+      if (row.status !== "cancelled") {
         current[row.status] += 1;
       }
 
@@ -450,9 +438,8 @@ function summary(rows: AdminGoalRow[]): AdminGoalsData["summary"] {
     {
       blocked: 0,
       failed: 0,
-      needsReview: 0,
       processing: 0,
-      stuck: 0,
+      scheduled: 0,
       succeeded: 0,
       total: 0
     }
@@ -477,26 +464,31 @@ export async function getAdminGoalsData(
           goal_id,
           count(*)::int as task_count,
           count(*) filter (
-            where status in ('queued', 'reserved', 'running')
+            where status in ('reserved', 'running')
+              or (
+                status = 'queued'
+                and scheduled_for <= now()
+              )
           )::int as active_task_count,
           count(*) filter (
-            where status in ('needs_review', 'waiting_approval')
+            where status = 'queued'
+              and scheduled_for > now()
+          )::int as scheduled_task_count,
+          count(*) filter (
+            where status in ('blocked', 'needs_review', 'waiting_approval', 'failed')
               or (
                 actor_type = 'human'
                 and status in ('queued', 'reserved', 'running')
+                and scheduled_for <= now()
               )
-          )::int as needs_review_task_count,
-          count(*) filter (where status = 'blocked')::int as blocked_task_count,
-          count(*) filter (where status = 'failed')::int as failed_task_count,
-          count(*) filter (where status = 'completed')::int as completed_task_count,
-          count(*) filter (
-            where status = 'failed'
               or (
                 status in ('reserved', 'running')
                 and lease_until is not null
                 and lease_until < now()
               )
-          )::int as stuck_task_count,
+          )::int as blocked_task_count,
+          count(*) filter (where status = 'failed')::int as failed_task_count,
+          count(*) filter (where status = 'completed')::int as completed_task_count,
           max(updated_at) as task_updated_at
         from public.tasks
         group by goal_id
@@ -521,11 +513,10 @@ export async function getAdminGoalsData(
         goals.completed_at,
         coalesce(task_summary.task_count, 0) as task_count,
         coalesce(task_summary.active_task_count, 0) as active_task_count,
-        coalesce(task_summary.needs_review_task_count, 0) as needs_review_task_count,
+        coalesce(task_summary.scheduled_task_count, 0) as scheduled_task_count,
         coalesce(task_summary.blocked_task_count, 0) as blocked_task_count,
         coalesce(task_summary.failed_task_count, 0) as failed_task_count,
         coalesce(task_summary.completed_task_count, 0) as completed_task_count,
-        coalesce(task_summary.stuck_task_count, 0) as stuck_task_count,
         greatest(
           goals.updated_at,
           coalesce(task_summary.task_updated_at, goals.updated_at),
@@ -587,7 +578,21 @@ export async function getAdminGoalsData(
           updated_at
         from public.tasks
         where goal_id = ${selectedId}::uuid
-        order by created_at asc
+        order by
+          case
+            when status in (
+              'queued',
+              'reserved',
+              'running',
+              'needs_review',
+              'waiting_approval',
+              'blocked'
+            ) then 0
+            else 1
+          end,
+          priority desc,
+          scheduled_for asc,
+          created_at asc
       `,
       sql<EventDbRow[]>`
         select
