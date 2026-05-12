@@ -84,15 +84,28 @@ import type {
   AdminGoalRow,
   AdminGoalStatus
 } from "@/lib/admin-goals";
+import type {
+  AdminCampaignRow,
+  AdminCampaignsData,
+  AdminContentInventoryData,
+  AdminContentInventoryRow,
+  AdminContentWorkflowStatus,
+  AdminLeadsData,
+  AdminLeadEventRow,
+  AdminLeadRow
+} from "@/lib/admin-query-data";
 import type { Locale } from "@/lib/i18n";
 
 type AdminDashboardView =
   | "agents"
   | "alerts"
+  | "campaigns"
+  | "content"
   | "communications"
   | "flow"
   | "glance"
   | "goals"
+  | "leads"
   | "reviews"
   | "supplements"
   | "visibility";
@@ -147,6 +160,34 @@ type AdminContent = Readonly<{
     task: string;
     time: string;
     total: string;
+  };
+  contentPages: {
+    actions: string;
+    all: string;
+    blogPosts: string;
+    created: string;
+    deleted: string;
+    deleteAction: string;
+    draft: string;
+    draftAction: string;
+    empty: string;
+    lastViewed: string;
+    pageViews: string;
+    publishAction: string;
+    published: string;
+    scheduleAction: string;
+    scheduled: string;
+    scheduledFor: string;
+    scheduleError: string;
+    source: string;
+    status: string;
+    testimonials: string;
+    title: string;
+    total: string;
+    type: string;
+    updateError: string;
+    updated: string;
+    views: string;
   };
   agents: {
     active: string;
@@ -212,6 +253,7 @@ type AdminContent = Readonly<{
     priority: string;
     processing: string;
     reservations: string;
+    showCompleted: string;
     source: string;
     stuck: string;
     succeeded: string;
@@ -239,6 +281,40 @@ type AdminContent = Readonly<{
     okay: string;
   };
   flowTitle: string;
+  marketingPages: {
+    affiliate: string;
+    assessmentCompletions: string;
+    assessmentStarts: string;
+    campaign: string;
+    campaignId: string;
+    communicationIssues: string;
+    currentStage: string;
+    emptyCampaigns: string;
+    emptyLeads: string;
+    events: string;
+    firstSeen: string;
+    freeRequests: string;
+    groupedBy: string;
+    healthScoreViews: string;
+    identifiers: string;
+    interactionThread: string;
+    landed: string;
+    lastEvent: string;
+    lastSeen: string;
+    lead: string;
+    emailHash: string;
+    locale: string;
+    medium: string;
+    noLeadEvents: string;
+    pendingReviews: string;
+    plan: string;
+    ray: string;
+    precisionConversions: string;
+    proConversions: string;
+    promoCode: string;
+    source: string;
+    totalLeads: string;
+  };
   execution: AdminNavItem[];
   executionTitle: string;
   governance: AdminNavItem[];
@@ -400,6 +476,34 @@ const content = {
       time: "Time",
       total: "Total"
     },
+    contentPages: {
+      actions: "Actions",
+      all: "All",
+      blogPosts: "Blog posts",
+      created: "Created",
+      deleted: "Deleted",
+      deleteAction: "Delete",
+      draft: "Draft",
+      draftAction: "Draft",
+      empty: "No content matches this view.",
+      lastViewed: "Last viewed",
+      pageViews: "Page views",
+      publishAction: "Publish",
+      published: "Published",
+      scheduleAction: "Schedule",
+      scheduled: "Scheduled",
+      scheduledFor: "Scheduled for",
+      scheduleError: "Choose a future publish date.",
+      source: "Source",
+      status: "Status",
+      testimonials: "Testimonials",
+      title: "Title",
+      total: "Total",
+      type: "Type",
+      updateError: "Could not update this content item.",
+      updated: "Updated",
+      views: "Views"
+    },
     agents: {
       active: "Active",
       capabilities: "Capabilities",
@@ -464,6 +568,7 @@ const content = {
       priority: "Priority",
       processing: "Processing",
       reservations: "Reservations",
+      showCompleted: "Show completed",
       source: "Source",
       stuck: "Stuck",
       succeeded: "Succeeded",
@@ -517,20 +622,54 @@ const content = {
       okay: "Okay"
     },
     flowTitle: "Conversions",
+    marketingPages: {
+      affiliate: "Affiliate",
+      assessmentCompletions: "Completed",
+      assessmentStarts: "Started",
+      campaign: "Campaign",
+      campaignId: "Campaign ID",
+      communicationIssues: "Contact issues",
+      currentStage: "Stage",
+      emptyCampaigns: "No campaign traffic in this timeframe.",
+      emptyLeads: "No leads in this timeframe.",
+      events: "Events",
+      firstSeen: "First seen",
+      freeRequests: "Free",
+      groupedBy: "Grouped by",
+      healthScoreViews: "HealthScore",
+      identifiers: "Identifiers",
+      interactionThread: "Interaction thread",
+      landed: "Landed",
+      lastEvent: "Last action",
+      lastSeen: "Last seen",
+      lead: "Lead",
+      emailHash: "Email hash",
+      locale: "Locale",
+      medium: "Medium",
+      noLeadEvents: "No interaction events are available for this lead.",
+      pendingReviews: "Reviews",
+      plan: "Plan",
+      precisionConversions: "Precision",
+      proConversions: "Pro",
+      promoCode: "Promo",
+      ray: "Ray",
+      source: "Source",
+      totalLeads: "Leads"
+    },
     performance: [
       { icon: HomeIcon, name: "Dashboard", view: "glance" },
       { icon: FunnelIcon, name: "Conversions", view: "flow" }
     ],
     performanceTitle: "Performance",
     marketing: [
-      { href: "#", icon: MegaphoneIcon, name: "Campaigns" },
-      { href: "#", icon: EnvelopeIcon, name: "Leads" },
+      { icon: MegaphoneIcon, name: "Campaigns", view: "campaigns" },
+      { icon: EnvelopeIcon, name: "Leads", view: "leads" },
       {
         icon: ChatBubbleLeftRightIcon,
         name: "Communications",
         view: "communications"
       },
-      { href: "#", icon: DocumentTextIcon, name: "Content" }
+      { icon: DocumentTextIcon, name: "Content", view: "content" }
     ],
     marketingTitle: "Marketing",
     governance: [
@@ -549,11 +688,14 @@ const content = {
     pageTitles: {
       agents: "Agents",
       alerts: "Technical Alerts",
+      campaigns: "Campaigns",
+      content: "Content",
       communications: "Communications",
       flow: "Conversions",
       glance: "Dashboard",
       goals: "Goals",
-      reviews: "Review",
+      leads: "Leads",
+      reviews: "Reviews",
       supplements: "Supplements",
       visibility: "Visibility"
     },
@@ -720,6 +862,34 @@ const content = {
       time: "เวลา",
       total: "ทั้งหมด"
     },
+    contentPages: {
+      actions: "การดำเนินการ",
+      all: "ทั้งหมด",
+      blogPosts: "บทความ",
+      created: "สร้างเมื่อ",
+      deleted: "ลบแล้ว",
+      deleteAction: "ลบ",
+      draft: "ฉบับร่าง",
+      draftAction: "ฉบับร่าง",
+      empty: "ไม่มีคอนเทนต์ที่ตรงกับมุมมองนี้",
+      lastViewed: "ดูล่าสุด",
+      pageViews: "ยอดดูหน้า",
+      publishAction: "เผยแพร่",
+      published: "เผยแพร่แล้ว",
+      scheduleAction: "ตั้งเวลา",
+      scheduled: "ตั้งเวลาแล้ว",
+      scheduledFor: "ตั้งเวลา",
+      scheduleError: "เลือกเวลาเผยแพร่ในอนาคต",
+      source: "แหล่งที่มา",
+      status: "สถานะ",
+      testimonials: "คำรับรอง",
+      title: "ชื่อ",
+      total: "ทั้งหมด",
+      type: "ประเภท",
+      updateError: "ไม่สามารถอัปเดตคอนเทนต์นี้ได้",
+      updated: "อัปเดต",
+      views: "ยอดดู"
+    },
     agents: {
       active: "ใช้งาน",
       capabilities: "ความสามารถ",
@@ -784,6 +954,7 @@ const content = {
       priority: "ความสำคัญ",
       processing: "กำลังดำเนินการ",
       reservations: "การจองงาน",
+      showCompleted: "แสดงงานที่เสร็จแล้ว",
       source: "แหล่งที่มา",
       stuck: "ค้าง",
       succeeded: "สำเร็จ",
@@ -837,20 +1008,54 @@ const content = {
       okay: "ดี"
     },
     flowTitle: "Conversions",
+    marketingPages: {
+      affiliate: "Affiliate",
+      assessmentCompletions: "เสร็จ",
+      assessmentStarts: "เริ่ม",
+      campaign: "แคมเปญ",
+      campaignId: "Campaign ID",
+      communicationIssues: "ปัญหาติดต่อ",
+      currentStage: "ขั้นตอน",
+      emptyCampaigns: "ยังไม่มีทราฟฟิกจากแคมเปญในช่วงเวลานี้",
+      emptyLeads: "ยังไม่มีลีดในช่วงเวลานี้",
+      events: "เหตุการณ์",
+      firstSeen: "พบครั้งแรก",
+      freeRequests: "ฟรี",
+      groupedBy: "จัดกลุ่มตาม",
+      healthScoreViews: "HealthScore",
+      identifiers: "ตัวระบุ",
+      interactionThread: "ลำดับการโต้ตอบ",
+      landed: "เข้าเว็บ",
+      lastEvent: "กิจกรรมล่าสุด",
+      lastSeen: "พบล่าสุด",
+      lead: "ลีด",
+      emailHash: "Email hash",
+      locale: "ภาษา",
+      medium: "Medium",
+      noLeadEvents: "ยังไม่มีเหตุการณ์สำหรับลีดนี้",
+      pendingReviews: "รีวิว",
+      plan: "แผน",
+      precisionConversions: "Precision",
+      proConversions: "Pro",
+      promoCode: "Promo",
+      ray: "Ray",
+      source: "Source",
+      totalLeads: "ลีด"
+    },
     performance: [
       { icon: HomeIcon, name: "Dashboard", view: "glance" },
       { icon: FunnelIcon, name: "Conversions", view: "flow" }
     ],
     performanceTitle: "ประสิทธิภาพ",
     marketing: [
-      { href: "#", icon: MegaphoneIcon, name: "แคมเปญ" },
-      { href: "#", icon: EnvelopeIcon, name: "ลีด" },
+      { icon: MegaphoneIcon, name: "แคมเปญ", view: "campaigns" },
+      { icon: EnvelopeIcon, name: "ลีด", view: "leads" },
       {
         icon: ChatBubbleLeftRightIcon,
         name: "การสื่อสาร",
         view: "communications"
       },
-      { href: "#", icon: DocumentTextIcon, name: "คอนเทนต์" }
+      { icon: DocumentTextIcon, name: "คอนเทนต์", view: "content" }
     ],
     marketingTitle: "การตลาด",
     governance: [
@@ -869,10 +1074,13 @@ const content = {
     pageTitles: {
       agents: "Agents",
       alerts: "การแจ้งเตือนทางเทคนิค",
+      campaigns: "แคมเปญ",
+      content: "คอนเทนต์",
       communications: "การสื่อสาร",
       flow: "Conversions",
       glance: "Dashboard",
       goals: "Goals",
+      leads: "ลีด",
       reviews: "รีวิว",
       supplements: "อาหารเสริม",
       visibility: "Visibility"
@@ -1356,28 +1564,78 @@ function SidebarContent({
 type BusinessMetric = Readonly<{
   color: string;
   format?: "number" | "percent";
-  id:
-    | AdminConversionTargetId
-    | "conversionRate"
-    | "converted"
-    | "pendingReviews";
+  id: string;
   label: string;
   series: number[];
   value: string;
 }>;
 
+type BusinessMetricColorId =
+  | AdminConversionTargetId
+  | "communicationIssues"
+  | "contentDeleted"
+  | "contentDraft"
+  | "contentPublished"
+  | "contentScheduled"
+  | "conversionRate"
+  | "converted"
+  | "active"
+  | "blocked"
+  | "completed"
+  | "critical"
+  | "failed"
+  | "high"
+  | "human"
+  | "low"
+  | "medium"
+  | "offline"
+  | "paused"
+  | "processing"
+  | "queued"
+  | "retired"
+  | "stuck"
+  | "succeeded"
+  | "noChannel"
+  | "pageViews"
+  | "pendingReviews"
+  | "total";
+
 const businessMetricColors = {
+  active: "#3A7BD5",
   assessmentCompletions: "#2563EB",
   assessmentStarts: "#0EA5E9",
+  blocked: "#F59E0B",
+  communicationIssues: "#DC2626",
+  completed: "#126B4F",
+  contentDeleted: "#6B7280",
+  contentDraft: "#64748B",
+  contentPublished: "#126B4F",
+  contentScheduled: "#3A7BD5",
+  critical: "#991B1B",
+  failed: "#DC2626",
   freeRequests: "#8B5CF6",
   healthScoreViews: "#1FA77A",
+  high: "#DC2626",
+  human: "#8B5CF6",
   landingVisitors: "#20343A",
+  low: "#0F766E",
+  medium: "#F59E0B",
+  noChannel: "#DC2626",
+  offline: "#6B7280",
+  pageViews: "#0F766E",
+  paused: "#F59E0B",
   pendingReviews: "#F59E0B",
   precisionConversions: "#126B4F",
+  processing: "#3A7BD5",
   proConversions: "#111827",
+  queued: "#0EA5E9",
+  retired: "#64748B",
+  stuck: "#DC2626",
+  succeeded: "#126B4F",
+  total: "#20343A",
   converted: "#8B5CF6",
   conversionRate: "#0F766E"
-} satisfies Record<BusinessMetric["id"], string>;
+} satisfies Record<BusinessMetricColorId, string>;
 
 function flowNodeSeries(flowData: AdminFlowData, id: AdminFlowNodeId) {
   return (
@@ -1420,32 +1678,49 @@ function BusinessStatsGrid({
   selectedMetricId
 }: Readonly<{
   metrics: BusinessMetric[];
-  onMetricSelect: (id: BusinessMetric["id"]) => void;
-  selectedMetricId: BusinessMetric["id"];
+  onMetricSelect?: (id: BusinessMetric["id"]) => void;
+  selectedMetricId?: BusinessMetric["id"];
 }>) {
   return (
     <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
       <div className="grid grid-cols-1 gap-px bg-gray-900/5 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
-          <button
-            className={classNames(
-              metric.id === selectedMetricId
-                ? "bg-[#ECFDF5]"
-                : "bg-white hover:bg-gray-50",
-              "px-5 py-6 text-left transition focus:outline-2 focus:-outline-offset-2 focus:outline-[#1FA77A]"
-            )}
-            key={metric.id}
-            onClick={() => onMetricSelect(metric.id)}
-            type="button"
-          >
-            <p className="text-sm/6 font-medium text-gray-500">{metric.label}</p>
-            <p className="mt-2 flex items-baseline gap-x-2">
-              <span className="text-4xl font-semibold tracking-tight text-gray-900">
-                {metric.value}
-              </span>
-            </p>
-          </button>
-        ))}
+        {metrics.map((metric) => {
+          const content = (
+            <>
+              <p className="text-sm/6 font-medium text-gray-500">{metric.label}</p>
+              <p className="mt-2 flex items-baseline gap-x-2">
+                <span className="text-4xl font-semibold tracking-tight text-gray-900">
+                  {metric.value}
+                </span>
+              </p>
+            </>
+          );
+          const classes = classNames(
+            metric.id === selectedMetricId
+              ? "bg-[#ECFDF5]"
+              : onMetricSelect
+                ? "bg-white hover:bg-gray-50"
+                : "bg-white",
+            "px-5 py-6 text-left transition",
+            onMetricSelect &&
+              "focus:outline-2 focus:-outline-offset-2 focus:outline-[#1FA77A]"
+          );
+
+          return onMetricSelect ? (
+            <button
+              className={classes}
+              key={metric.id}
+              onClick={() => onMetricSelect(metric.id)}
+              type="button"
+            >
+              {content}
+            </button>
+          ) : (
+            <div className={classes} key={metric.id}>
+              {content}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1896,11 +2171,11 @@ function BusinessFunnelTable({
                           {formatNumber(stage.count, locale)}
                         </td>
                         <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-500">
-                          {dropoff === null ? "-" : formatNumber(dropoff, locale)}
+                          {dropoff === null ? "" : formatNumber(dropoff, locale)}
                         </td>
                         <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-500">
                           {conversion === null
-                            ? "-"
+                            ? ""
                             : formatPercent(conversion, locale)}
                         </td>
                         {showTargets ? (
@@ -1938,7 +2213,7 @@ function BusinessFunnelTable({
                               )}
                             >
                               {delta === null
-                                ? "-"
+                                ? ""
                                 : formatConversionDelta(delta, locale)}
                             </td>
                           </>
@@ -2110,6 +2385,1062 @@ function AdminAtAGlanceView({
         </section>
       </div>
     </>
+  );
+}
+
+function optionalLabel(value: string | null | undefined) {
+  const trimmed = value?.trim();
+
+  return trimmed ?? "";
+}
+
+function marketingConversion(numerator: number, denominator: number, locale: Locale) {
+  return denominator > 0 ? formatPercent((numerator / denominator) * 100, locale) : "";
+}
+
+function AdminCampaignsView({
+  data,
+  labels,
+  locale
+}: Readonly<{
+  data: AdminCampaignsData;
+  labels: AdminContent;
+  locale: Locale;
+}>) {
+  const summary = data.summary;
+  const campaignMetrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.landingVisitors,
+      id: "landingVisitors",
+      label: labels.marketingPages.landed,
+      series: [],
+      value: formatNumber(summary.landed, locale)
+    },
+    {
+      color: businessMetricColors.healthScoreViews,
+      id: "healthScoreViews",
+      label: labels.marketingPages.healthScoreViews,
+      series: [],
+      value: formatNumber(summary.healthScoreViews, locale)
+    },
+    {
+      color: businessMetricColors.freeRequests,
+      id: "freeRequests",
+      label: labels.marketingPages.freeRequests,
+      series: [],
+      value: formatNumber(summary.freeRequests, locale)
+    },
+    {
+      color: businessMetricColors.converted,
+      id: "converted",
+      label: `${labels.marketingPages.precisionConversions} / ${labels.marketingPages.proConversions}`,
+      series: [],
+      value: `${formatNumber(summary.precisionConversions, locale)} / ${formatNumber(summary.proConversions, locale)}`
+    }
+  ];
+
+  return (
+    <section className="mt-8">
+      <BusinessStatsGrid metrics={campaignMetrics} />
+
+      <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                {[
+                  labels.marketingPages.campaign,
+                  labels.marketingPages.source,
+                  labels.marketingPages.medium,
+                  labels.marketingPages.affiliate,
+                  labels.marketingPages.landed,
+                  labels.marketingPages.assessmentStarts,
+                  labels.marketingPages.assessmentCompletions,
+                  labels.marketingPages.healthScoreViews,
+                  labels.marketingPages.freeRequests,
+                  labels.marketingPages.precisionConversions,
+                  labels.marketingPages.proConversions,
+                  labels.marketingPages.lastSeen
+                ].map((heading) => (
+                  <th
+                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-500"
+                    key={heading}
+                    scope="col"
+                  >
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 bg-white">
+              {data.rows.length > 0 ? (
+                data.rows.map((row) => (
+                  <CampaignRow
+                    key={[
+                      row.source,
+                      row.medium,
+                      row.campaign,
+                      row.campaignId,
+                      row.affiliate,
+                      row.promoCode
+                    ].join(":")}
+                    locale={locale}
+                    row={row}
+                  />
+                ))
+              ) : (
+                <tr>
+                  <td
+                    className="px-4 py-10 text-center text-sm font-medium text-gray-500"
+                    colSpan={12}
+                  >
+                    {labels.marketingPages.emptyCampaigns}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CampaignRow({
+  locale,
+  row
+}: Readonly<{
+  locale: Locale;
+  row: AdminCampaignRow;
+}>) {
+  const paidConversions = row.precisionConversions + row.proConversions;
+
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-4 py-4 text-sm font-semibold text-gray-900">
+        <div>{optionalLabel(row.campaign)}</div>
+        <div className="mt-1 text-xs font-medium text-gray-400">
+          {optionalLabel(row.campaignId)}
+          {row.promoCode ? ` · ${row.promoCode}` : ""}
+        </div>
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-600">{optionalLabel(row.source)}</td>
+      <td className="px-4 py-4 text-sm text-gray-600">{optionalLabel(row.medium)}</td>
+      <td className="px-4 py-4 text-sm text-gray-600">{optionalLabel(row.affiliate)}</td>
+      <td className="px-4 py-4 text-sm font-medium text-gray-900">
+        {formatNumber(row.landed, locale)}
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-600">
+        {formatNumber(row.assessmentStarts, locale)}
+        <span className="ml-2 text-xs text-gray-400">
+          {marketingConversion(row.assessmentStarts, row.landed, locale)}
+        </span>
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-600">
+        {formatNumber(row.assessmentCompletions, locale)}
+        <span className="ml-2 text-xs text-gray-400">
+          {marketingConversion(row.assessmentCompletions, row.assessmentStarts, locale)}
+        </span>
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-600">
+        {formatNumber(row.healthScoreViews, locale)}
+        <span className="ml-2 text-xs text-gray-400">
+          {marketingConversion(row.healthScoreViews, row.assessmentCompletions, locale)}
+        </span>
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-600">{formatNumber(row.freeRequests, locale)}</td>
+      <td className="px-4 py-4 text-sm text-gray-600">{formatNumber(row.precisionConversions, locale)}</td>
+      <td className="px-4 py-4 text-sm text-gray-600">
+        {formatNumber(row.proConversions, locale)}
+        <span className="ml-2 text-xs text-gray-400">
+          {marketingConversion(paidConversions, row.healthScoreViews, locale)}
+        </span>
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-500">
+        {formatGeneratedAt(row.lastSeenAt, locale)}
+      </td>
+    </tr>
+  );
+}
+
+function leadStageClass(stage: string) {
+  if (stage === "precision" || stage === "pro") {
+    return "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]";
+  }
+
+  if (stage === "free_sent" || stage === "free_requested") {
+    return "bg-blue-50 text-blue-700 ring-blue-100";
+  }
+
+  if (stage === "healthscore" || stage === "assessment_completed") {
+    return "bg-amber-50 text-amber-800 ring-amber-200";
+  }
+
+  return "bg-gray-50 text-gray-700 ring-gray-200";
+}
+
+function leadDisplayName(row: AdminLeadRow) {
+  if (row.emailHash) {
+    return `Email ${compactId(row.emailHash)}`;
+  }
+
+  if (row.planId) {
+    return `Plan ${compactId(row.planId)}`;
+  }
+
+  if (row.ray) {
+    return `Ray ${compactId(row.ray)}`;
+  }
+
+  return compactId(row.subject);
+}
+
+function leadGroupLabel(labels: AdminContent, row: AdminLeadRow) {
+  if (row.subject === row.ray) {
+    return labels.marketingPages.ray;
+  }
+
+  if (row.subject === row.planId) {
+    return labels.marketingPages.plan;
+  }
+
+  if (row.subject === row.emailHash) {
+    return labels.marketingPages.emailHash;
+  }
+
+  return labels.marketingPages.lead;
+}
+
+function leadEventContext(labels: AdminContent, event: AdminLeadEventRow) {
+  return [
+    event.path ?? event.route,
+    [event.source, event.campaign].filter(Boolean).join(" / "),
+    event.planId
+      ? `${labels.marketingPages.plan} ${compactId(event.planId)}`
+      : null
+  ].filter(Boolean);
+}
+
+function AdminLeadsView({
+  data,
+  labels,
+  locale
+}: Readonly<{
+  data: AdminLeadsData;
+  labels: AdminContent;
+  locale: Locale;
+}>) {
+  const [selectedLead, setSelectedLead] = useState<AdminLeadRow | null>(null);
+  const pendingReviews = data.rows.reduce(
+    (total, row) => total + row.pendingReviews,
+    0
+  );
+  const communicationIssues = data.rows.reduce(
+    (total, row) => total + row.communicationIssues,
+    0
+  );
+  const freeLeads = data.rows.filter((row) =>
+    row.currentStage.startsWith("free")
+  ).length;
+  const precisionLeads = data.rows.filter(
+    (row) => row.currentStage === "precision"
+  ).length;
+  const proLeads = data.rows.filter((row) => row.currentStage === "pro").length;
+  const leadMetrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "leadsTotal",
+      label: labels.marketingPages.totalLeads,
+      series: [],
+      value: formatNumber(data.summary.total, locale)
+    },
+    {
+      color: businessMetricColors.pendingReviews,
+      id: "leadsPendingReviews",
+      label: labels.marketingPages.pendingReviews,
+      series: [],
+      value: formatNumber(pendingReviews, locale)
+    },
+    {
+      color: businessMetricColors.communicationIssues,
+      id: "leadsCommunicationIssues",
+      label: labels.marketingPages.communicationIssues,
+      series: [],
+      value: formatNumber(communicationIssues, locale)
+    },
+    {
+      color: businessMetricColors.converted,
+      id: "leadsPlanStages",
+      label: `${labels.marketingPages.freeRequests} / ${labels.marketingPages.precisionConversions} / ${labels.marketingPages.proConversions}`,
+      series: [],
+      value: `${formatNumber(freeLeads, locale)} / ${formatNumber(precisionLeads, locale)} / ${formatNumber(proLeads, locale)}`
+    }
+  ];
+
+  return (
+    <section className="mt-8">
+      <BusinessStatsGrid metrics={leadMetrics} />
+
+      <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                {[
+                  labels.marketingPages.lead,
+                  labels.marketingPages.currentStage,
+                  labels.marketingPages.source,
+                  labels.marketingPages.plan,
+                  labels.marketingPages.pendingReviews,
+                  labels.marketingPages.communicationIssues,
+                  labels.marketingPages.lastEvent,
+                  labels.marketingPages.lastSeen
+                ].map((heading) => (
+                  <th
+                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-500"
+                    key={heading}
+                    scope="col"
+                  >
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 bg-white">
+              {data.rows.length > 0 ? (
+                data.rows.map((row) => (
+                  <LeadRow
+                    key={row.subject}
+                    locale={locale}
+                    onSelect={() => setSelectedLead(row)}
+                    row={row}
+                  />
+                ))
+              ) : (
+                <tr>
+                  <td
+                    className="px-4 py-10 text-center text-sm font-medium text-gray-500"
+                    colSpan={8}
+                  >
+                    {labels.marketingPages.emptyLeads}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {selectedLead ? (
+        <LeadDetailsModal
+          labels={labels}
+          locale={locale}
+          onClose={() => setSelectedLead(null)}
+          row={selectedLead}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function LeadRow({
+  locale,
+  onSelect,
+  row
+}: Readonly<{
+  locale: Locale;
+  onSelect: () => void;
+  row: AdminLeadRow;
+}>) {
+  const leadName = leadDisplayName(row);
+
+  return (
+    <tr
+      className="cursor-pointer hover:bg-gray-50 focus-within:bg-gray-50"
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
+      <td className="px-4 py-4 text-sm">
+        <div className="font-semibold text-gray-900">{leadName}</div>
+        <div className="mt-1 text-xs font-medium text-gray-400">
+          {formatGeneratedAt(row.firstSeenAt, locale)}
+        </div>
+      </td>
+      <td className="px-4 py-4 text-sm">
+        <span
+          className={classNames(
+            leadStageClass(row.currentStage),
+            "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+          )}
+        >
+          {readableToken(row.currentStage)}
+        </span>
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-600">
+        <div>{optionalLabel(row.source)}</div>
+        <div className="mt-1 text-xs text-gray-400">{optionalLabel(row.campaign)}</div>
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-600">
+        <PlanIdLink
+          compact={true}
+          locale={locale}
+          planId={row.planId}
+          stopPropagation={true}
+        />
+        <div className="mt-1 text-xs text-gray-400">
+          {row.selectedPlan ? readableToken(row.selectedPlan) : optionalLabel(row.locale)}
+        </div>
+      </td>
+      <td className="px-4 py-4 text-sm font-medium text-gray-900">
+        {formatNumber(row.pendingReviews, locale)}
+      </td>
+      <td className="px-4 py-4 text-sm font-medium text-gray-900">
+        {formatNumber(row.communicationIssues, locale)}
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-600">{readableToken(row.lastEvent)}</td>
+      <td className="px-4 py-4 text-sm text-gray-500">
+        {formatGeneratedAt(row.lastSeenAt, locale)}
+      </td>
+    </tr>
+  );
+}
+
+function LeadDetailsModal({
+  labels,
+  locale,
+  onClose,
+  row
+}: Readonly<{
+  labels: AdminContent;
+  locale: Locale;
+  onClose: () => void;
+  row: AdminLeadRow;
+}>) {
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <button
+        aria-label={labels.supplements.close}
+        className="fixed inset-0 cursor-default bg-gray-900/40"
+        onClick={onClose}
+        type="button"
+      />
+      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
+        <section
+          aria-modal={true}
+          className="relative w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-900/10"
+          role="dialog"
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+                {labels.marketingPages.interactionThread}
+              </p>
+              <h2 className="mt-2 text-xl font-semibold text-gray-900">
+                {leadDisplayName(row)}
+              </h2>
+            </div>
+            <button
+              aria-label={labels.supplements.close}
+              className="rounded-md p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
+              onClick={onClose}
+              type="button"
+            >
+              <XMarkIcon aria-hidden={true} className="size-5" />
+            </button>
+          </div>
+
+          <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <SupplementListMeta
+                label={labels.marketingPages.groupedBy}
+                value={leadGroupLabel(labels, row)}
+              />
+              <SupplementListMeta
+                label={labels.marketingPages.currentStage}
+                value={readableToken(row.currentStage)}
+              />
+              <SupplementListMeta
+                label={labels.marketingPages.firstSeen}
+                value={formatGeneratedAt(row.firstSeenAt, locale)}
+              />
+              <SupplementListMeta
+                label={labels.marketingPages.lastSeen}
+                value={formatGeneratedAt(row.lastSeenAt, locale)}
+              />
+              <SupplementListMeta
+                label={labels.marketingPages.ray}
+                value={row.ray}
+              />
+              <SupplementListMeta
+                label={labels.marketingPages.emailHash}
+                value={row.emailHash}
+              />
+              <SupplementListMeta
+                label={labels.marketingPages.plan}
+                value={<PlanIdLink locale={locale} planId={row.planId} />}
+              />
+              <SupplementListMeta
+                label={labels.marketingPages.source}
+                value={[row.source, row.campaign].filter(Boolean).join(" / ")}
+              />
+            </div>
+
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+                {labels.marketingPages.events}
+              </p>
+              {row.events.length > 0 ? (
+                <div className="space-y-3">
+                  {row.events.map((event) => {
+                    const context = leadEventContext(labels, event);
+
+                    return (
+                      <article
+                        className="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100"
+                        key={event.id}
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                              {readableToken(event.eventType)} ·{" "}
+                              {readableToken(event.eventStatus)} ·{" "}
+                              {readableToken(event.actorType)}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">
+                              {readableToken(event.eventName)}
+                            </p>
+                            {context.length > 0 ? (
+                              <p className="mt-1 text-xs text-gray-500">
+                                {context.join(" · ")}
+                              </p>
+                            ) : null}
+                            {event.errorMessage ? (
+                              <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700 ring-1 ring-red-100">
+                                {event.errorMessage}
+                              </p>
+                            ) : null}
+                          </div>
+                          <p className="shrink-0 text-xs font-medium text-gray-500">
+                            {formatGeneratedAt(event.occurredAt, locale)}
+                          </p>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-xl bg-gray-50 px-4 py-6 text-sm font-medium text-gray-500 ring-1 ring-gray-100">
+                  {labels.marketingPages.noLeadEvents}
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+const contentStatusOrder: AdminContentWorkflowStatus[] = [
+  "draft",
+  "scheduled",
+  "published",
+  "deleted"
+];
+
+function contentWorkflowStatusLabel(
+  labels: AdminContent,
+  status: AdminContentWorkflowStatus
+) {
+  return labels.contentPages[status];
+}
+
+function contentWorkflowStatusClass(status: AdminContentWorkflowStatus) {
+  if (status === "published") {
+    return "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]";
+  }
+
+  if (status === "scheduled") {
+    return "bg-blue-50 text-blue-700 ring-blue-100";
+  }
+
+  if (status === "deleted") {
+    return "bg-gray-50 text-gray-700 ring-gray-200";
+  }
+
+  return "bg-amber-50 text-amber-800 ring-amber-200";
+}
+
+function contentTypeLabel(type: AdminContentInventoryRow["contentType"]) {
+  return type === "blog_post" ? "Blog post" : "Testimonial";
+}
+
+function localDateTimeInputValue(date: Date) {
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function defaultContentScheduleValue() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  date.setHours(9, 0, 0, 0);
+
+  return localDateTimeInputValue(date);
+}
+
+function contentHref(row: AdminContentInventoryRow, accessToken: string) {
+  const locale = row.locale === "th" ? "th" : "en";
+
+  if (
+    row.contentType === "blog_post" &&
+    row.slug &&
+    row.status === "published" &&
+    row.workflowStatus === "published"
+  ) {
+    return `/${locale}/blog/${encodeURIComponent(row.slug)}`;
+  }
+
+  const params = new URLSearchParams({
+    access_token: accessToken,
+    status: row.workflowStatus,
+    type: row.contentType
+  });
+
+  return `/${locale}/admin/content/preview/${encodeURIComponent(row.id)}?${params.toString()}`;
+}
+
+function AdminContentView({
+  accessToken,
+  data,
+  labels,
+  locale
+}: Readonly<{
+  accessToken: string;
+  data: AdminContentInventoryData;
+  labels: AdminContent;
+  locale: Locale;
+}>) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [errorId, setErrorId] = useState<string | null>(null);
+  const [rowOverrides, setRowOverrides] = useState<
+    Record<string, Partial<AdminContentInventoryRow>>
+  >({});
+  const [scheduleValues, setScheduleValues] = useState<Record<string, string>>({});
+  const [statusFilter, setStatusFilter] = useState<
+    AdminContentWorkflowStatus | "all"
+  >("all");
+  const rows = data.rows.map((row) => ({
+    ...row,
+    ...(rowOverrides[row.id] ?? {})
+  }));
+
+  const summary = rows.reduce(
+    (counts, row) => {
+      counts.total += 1;
+      counts.pageViews += row.pageViews;
+
+      if (row.contentType === "blog_post") {
+        counts.blogPosts += 1;
+      } else {
+        counts.testimonials += 1;
+      }
+
+      counts[row.workflowStatus] += 1;
+
+      return counts;
+    },
+    {
+      blogPosts: 0,
+      deleted: 0,
+      draft: 0,
+      pageViews: 0,
+      published: 0,
+      scheduled: 0,
+      testimonials: 0,
+      total: 0
+    }
+  );
+  const filteredRows =
+    statusFilter === "all"
+      ? rows
+      : rows.filter((row) => row.workflowStatus === statusFilter);
+  const contentMetrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "contentTotal",
+      label: labels.contentPages.total,
+      series: [],
+      value: formatNumber(summary.total, locale)
+    },
+    {
+      color: businessMetricColors.contentPublished,
+      id: "contentPublished",
+      label: labels.contentPages.published,
+      series: [],
+      value: formatNumber(summary.published, locale)
+    },
+    {
+      color: businessMetricColors.contentScheduled,
+      id: "contentScheduled",
+      label: labels.contentPages.scheduled,
+      series: [],
+      value: formatNumber(summary.scheduled, locale)
+    },
+    {
+      color: businessMetricColors.pageViews,
+      id: "contentPageViews",
+      label: labels.contentPages.pageViews,
+      series: [],
+      value: formatNumber(summary.pageViews, locale)
+    },
+    {
+      color: businessMetricColors.landingVisitors,
+      id: "contentBlogPosts",
+      label: labels.contentPages.blogPosts,
+      series: [],
+      value: formatNumber(summary.blogPosts, locale)
+    },
+    {
+      color: businessMetricColors.healthScoreViews,
+      id: "contentTestimonials",
+      label: labels.contentPages.testimonials,
+      series: [],
+      value: formatNumber(summary.testimonials, locale)
+    },
+    {
+      color: businessMetricColors.contentDraft,
+      id: "contentDraft",
+      label: labels.contentPages.draft,
+      series: [],
+      value: formatNumber(summary.draft, locale)
+    },
+    {
+      color: businessMetricColors.contentDeleted,
+      id: "contentDeleted",
+      label: labels.contentPages.deleted,
+      series: [],
+      value: formatNumber(summary.deleted, locale)
+    }
+  ];
+
+  async function runWorkflow(
+    row: AdminContentInventoryRow,
+    targetStatus: AdminContentWorkflowStatus
+  ) {
+    const scheduleValue =
+      scheduleValues[row.id] ??
+      (row.scheduledFor
+        ? localDateTimeInputValue(new Date(row.scheduledFor))
+        : defaultContentScheduleValue());
+    const publishAt =
+      targetStatus === "scheduled" ? new Date(scheduleValue) : null;
+
+    if (
+      targetStatus === "scheduled" &&
+      (!publishAt || Number.isNaN(publishAt.getTime()) || publishAt <= new Date())
+    ) {
+      setErrorId(row.id);
+      return;
+    }
+
+    setBusyId(row.id);
+    setErrorId(null);
+
+    try {
+      const response = await fetch("/api/admin/content/workflow", {
+        body: JSON.stringify({
+          accessToken,
+          contentId: row.id,
+          contentType: row.contentType,
+          publishAt: publishAt?.toISOString() ?? null,
+          targetStatus
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        task?: { id?: string };
+      };
+
+      if (!response.ok) {
+        throw new Error("Unable to update content workflow");
+      }
+
+      setRowOverrides((current) => ({
+        ...current,
+        [row.id]: {
+          pendingTaskId: result.task?.id ?? row.pendingTaskId,
+          publishedAt:
+            targetStatus === "published"
+              ? new Date().toISOString()
+              : targetStatus === "draft" || targetStatus === "deleted"
+                ? null
+                : row.publishedAt,
+          scheduledFor:
+            targetStatus === "scheduled" ? publishAt?.toISOString() ?? null : null,
+          status:
+            targetStatus === "deleted"
+              ? "archived"
+              : targetStatus === "published"
+                ? "published"
+                : "draft",
+          updatedAt: new Date().toISOString(),
+          workflowStatus: targetStatus
+        }
+      }));
+    } catch {
+      setErrorId(row.id);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <section className="mt-8">
+      <BusinessStatsGrid metrics={contentMetrics} />
+
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        {[
+          { label: labels.contentPages.all, value: "all" as const },
+          ...contentStatusOrder.map((status) => ({
+            label: contentWorkflowStatusLabel(labels, status),
+            value: status
+          }))
+        ].map((option) => (
+          <button
+            className={classNames(
+              statusFilter === option.value
+                ? "bg-[#1FA77A] text-white"
+                : "bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50",
+              "rounded-full px-3 py-1.5 text-sm font-semibold transition"
+            )}
+            key={option.value}
+            onClick={() => setStatusFilter(option.value)}
+            type="button"
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                {[
+                  labels.contentPages.title,
+                  labels.contentPages.type,
+                  labels.contentPages.status,
+                  labels.contentPages.views,
+                  labels.contentPages.updated,
+                  labels.contentPages.actions
+                ].map((heading) => (
+                  <th
+                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-500"
+                    key={heading}
+                    scope="col"
+                  >
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 bg-white">
+              {filteredRows.length > 0 ? (
+                filteredRows.map((row) => (
+                  <ContentRow
+                    accessToken={accessToken}
+                    busy={busyId === row.id}
+                    error={errorId === row.id}
+                    key={row.id}
+                    labels={labels}
+                    locale={locale}
+                    onScheduleChange={(value) =>
+                      setScheduleValues((current) => ({
+                        ...current,
+                        [row.id]: value
+                      }))
+                    }
+                    onWorkflow={runWorkflow}
+                    row={row}
+                    scheduleValue={
+                      scheduleValues[row.id] ??
+                      (row.scheduledFor
+                        ? localDateTimeInputValue(new Date(row.scheduledFor))
+                        : defaultContentScheduleValue())
+                    }
+                  />
+                ))
+              ) : (
+                <tr>
+                  <td
+                    className="px-4 py-10 text-center text-sm font-medium text-gray-500"
+                    colSpan={6}
+                  >
+                    {labels.contentPages.empty}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ContentRow({
+  accessToken,
+  busy,
+  error,
+  labels,
+  locale,
+  onScheduleChange,
+  onWorkflow,
+  row,
+  scheduleValue
+}: Readonly<{
+  accessToken: string;
+  busy: boolean;
+  error: boolean;
+  labels: AdminContent;
+  locale: Locale;
+  onScheduleChange: (value: string) => void;
+  onWorkflow: (
+    row: AdminContentInventoryRow,
+    targetStatus: AdminContentWorkflowStatus
+  ) => void;
+  row: AdminContentInventoryRow;
+  scheduleValue: string;
+}>) {
+  const href = contentHref(row, accessToken);
+
+  return (
+    <tr className="align-top hover:bg-gray-50">
+      <td className="max-w-md px-4 py-4 text-sm">
+        <a
+          className="block text-[#20343A] hover:text-[#126B4F]"
+          href={href}
+          rel="noreferrer"
+          target="_blank"
+        >
+          <span className="font-semibold">
+            {row.title}
+          </span>
+          {row.summary ? (
+            <span className="mt-1 block line-clamp-2 text-xs text-gray-500">
+              {row.summary}
+            </span>
+          ) : null}
+        </a>
+        <p className="mt-2 text-xs text-gray-400">
+          {row.sourceAgent || row.sourceChannel || row.sourceRef
+            ? [row.sourceAgent, row.sourceChannel, row.sourceRef]
+                .filter(Boolean)
+                .join(" · ")
+            : ""}
+        </p>
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-600">
+        <div>{contentTypeLabel(row.contentType)}</div>
+        <div className="mt-1 text-xs text-gray-400">{row.locale.toUpperCase()}</div>
+      </td>
+      <td className="px-4 py-4 text-sm">
+        <span
+          className={classNames(
+            contentWorkflowStatusClass(row.workflowStatus),
+            "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+          )}
+        >
+          {contentWorkflowStatusLabel(labels, row.workflowStatus)}
+        </span>
+        {row.scheduledFor ? (
+          <div className="mt-2 text-xs text-gray-500">
+            {labels.contentPages.scheduledFor}:{" "}
+            {formatGeneratedAt(row.scheduledFor, locale)}
+          </div>
+        ) : null}
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-600">
+        <div className="font-medium text-gray-900">
+          {formatNumber(row.pageViews, locale)}
+        </div>
+        {row.lastViewedAt ? (
+          <div className="mt-1 text-xs text-gray-400">
+            {labels.contentPages.lastViewed}:{" "}
+            {formatGeneratedAt(row.lastViewedAt, locale)}
+          </div>
+        ) : null}
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-500">
+        {formatGeneratedAt(row.updatedAt, locale)}
+      </td>
+      <td className="min-w-[360px] px-4 py-4 text-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="isolate inline-flex rounded-md shadow-xs">
+            <button
+              className="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-xs font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={busy || row.workflowStatus === "draft"}
+              onClick={() => onWorkflow(row, "draft")}
+              type="button"
+            >
+              {labels.contentPages.draftAction}
+            </button>
+            <button
+              className="relative -ml-px inline-flex items-center bg-white px-3 py-2 text-xs font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={busy || row.workflowStatus === "published"}
+              onClick={() => onWorkflow(row, "published")}
+              type="button"
+            >
+              {labels.contentPages.publishAction}
+            </button>
+            <button
+              className="relative -ml-px inline-flex items-center rounded-r-md bg-white px-3 py-2 text-xs font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={busy || row.workflowStatus === "deleted"}
+              onClick={() => onWorkflow(row, "deleted")}
+              type="button"
+            >
+              {labels.contentPages.deleteAction}
+            </button>
+          </span>
+          <span className="isolate inline-flex rounded-md shadow-xs">
+            <input
+              aria-label={labels.contentPages.scheduledFor}
+              className="relative inline-flex rounded-l-md bg-white px-3 py-2 text-xs text-gray-900 ring-1 ring-inset ring-gray-300 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-[#1FA77A]"
+              onChange={(event) => onScheduleChange(event.target.value)}
+              type="datetime-local"
+              value={scheduleValue}
+            />
+            <button
+              className="relative -ml-px inline-flex items-center rounded-r-md bg-white px-3 py-2 text-xs font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={busy}
+              onClick={() => onWorkflow(row, "scheduled")}
+              type="button"
+            >
+              {labels.contentPages.scheduleAction}
+            </button>
+          </span>
+        </div>
+        {error ? (
+          <p className="mt-2 text-xs font-medium text-red-600">
+            {row.workflowStatus === "scheduled"
+              ? labels.contentPages.scheduleError
+              : labels.contentPages.updateError}
+          </p>
+        ) : null}
+      </td>
+    </tr>
   );
 }
 
@@ -2332,30 +3663,47 @@ function AdminSupplementsView({
     }
   }
 
+  const supplementMetrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "supplementsTotal",
+      label: labels.supplements.total,
+      series: [],
+      value: formatNumber(summary.total, locale)
+    },
+    {
+      color: businessMetricColors.succeeded,
+      id: "supplementsWhitelisted",
+      label: labels.supplements.whitelisted,
+      series: [],
+      value: formatNumber(summary.whitelisted, locale)
+    },
+    {
+      color: businessMetricColors.pendingReviews,
+      id: "supplementsReviewRequired",
+      label: labels.supplements.reviewRequired,
+      series: [],
+      value: formatNumber(summary.reviewRequired, locale)
+    },
+    {
+      color: businessMetricColors.failed,
+      id: "supplementsBlacklisted",
+      label: labels.supplements.blacklisted,
+      series: [],
+      value: formatNumber(summary.blacklisted, locale)
+    },
+    {
+      color: businessMetricColors.offline,
+      id: "supplementsInactive",
+      label: labels.supplements.inactive,
+      series: [],
+      value: formatNumber(summary.inactive, locale)
+    }
+  ];
+
   return (
     <section className="mt-8 space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <FlowSummaryCard
-          label={labels.supplements.total}
-          value={formatNumber(summary.total, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.supplements.whitelisted}
-          value={formatNumber(summary.whitelisted, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.supplements.reviewRequired}
-          value={formatNumber(summary.reviewRequired, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.supplements.blacklisted}
-          value={formatNumber(summary.blacklisted, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.supplements.inactive}
-          value={formatNumber(summary.inactive, locale)}
-        />
-      </div>
+      <BusinessStatsGrid metrics={supplementMetrics} />
 
       <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_14rem_14rem]">
@@ -2396,56 +3744,62 @@ function AdminSupplementsView({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
-        <div className="divide-y divide-gray-100">
+      {filteredRows.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {filteredRows.map((row) => (
             <button
               key={row.id}
               aria-label={`${labels.supplements.details}: ${row.name}`}
-              className="block w-full px-5 py-4 text-left transition hover:bg-gray-50 focus:outline-none focus-visible:bg-gray-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#1FA77A]"
+              className="rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
               onClick={() => {
                 setDraft(row);
                 setErrorId(null);
               }}
               type="button"
             >
-              <div className="grid gap-x-8 gap-y-5 lg:grid-cols-[minmax(0,1fr)_12rem_10rem_8rem] lg:items-center">
+              <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={classNames(
-                        supplementStatusClass(row.listStatus),
-                        "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
-                      )}
-                    >
-                      {supplementStatusLabel(labels, row.listStatus)}
-                    </span>
-                  </div>
-                  <h3 className="mt-3 truncate text-base font-semibold text-gray-900">
+                  <h3 className="truncate text-base font-semibold text-gray-900">
                     {row.name}
                   </h3>
                   <p className="mt-1 text-sm text-gray-500">
                     {row.ingredientType ?? row.category}
                   </p>
-                  {row.primaryUseCase ? (
-                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-600">
-                      {row.primaryUseCase}
-                    </p>
-                  ) : null}
-                  {row.aliases.length > 0 ? (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {row.aliases.map((alias) => (
-                        <span
-                          className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100"
-                          key={alias.id}
-                        >
-                          {alias.name}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
+                <span
+                  className={classNames(
+                    supplementStatusClass(row.listStatus),
+                    "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+                  )}
+                >
+                  {supplementStatusLabel(labels, row.listStatus)}
+                </span>
+              </div>
 
+              {row.primaryUseCase ? (
+                <p className="mt-4 line-clamp-2 min-h-12 text-sm leading-6 text-gray-600">
+                  {row.primaryUseCase}
+                </p>
+              ) : (
+                <div className="mt-4 min-h-12" />
+              )}
+
+              {row.aliases.length > 0 ? (
+                <div className="mt-4 flex min-h-6 flex-wrap gap-1.5">
+                  {row.aliases.map((alias) => (
+                    <span
+                      className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100"
+                      key={alias.id}
+                    >
+                      {alias.name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 min-h-6" />
+              )}
+
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <SupplementListMeta
                   label={labels.supplements.category}
                   value={row.category}
@@ -2462,13 +3816,11 @@ function AdminSupplementsView({
             </button>
           ))}
         </div>
-
-        {filteredRows.length === 0 ? (
-          <div className="border-t border-gray-100 px-5 py-12 text-center text-sm font-medium text-gray-500">
+      ) : (
+        <div className="rounded-2xl bg-white px-5 py-12 text-center text-sm font-medium text-gray-500 shadow-sm ring-1 ring-gray-200">
             {labels.supplements.empty}
-          </div>
-        ) : null}
-      </div>
+        </div>
+      )}
 
       {draft ? (
         <SupplementDetailsModal
@@ -2506,17 +3858,17 @@ function AdminSupplementsView({
 
 function formatSupplementDose(row: AdminSupplementRow, locale: Locale) {
   if (row.maxAmount === null && !row.maxUnit) {
-    return "—";
+    return "";
   }
 
   const amount =
     row.maxAmount === null
-      ? "—"
+      ? ""
       : new Intl.NumberFormat(formatLocale(locale), {
           maximumFractionDigits: 2
         }).format(row.maxAmount);
 
-  return row.maxUnit ? `${amount} ${row.maxUnit}` : amount;
+  return row.maxUnit ? [amount, row.maxUnit].filter(Boolean).join(" ") : amount;
 }
 
 function SupplementListMeta({
@@ -2534,7 +3886,7 @@ function SupplementListMeta({
         {label}
       </p>
       <p className="mt-1 truncate text-sm font-semibold text-gray-900">
-        {hasValue ? value : "—"}
+        {hasValue ? value : ""}
       </p>
     </div>
   );
@@ -3320,17 +4672,17 @@ function formatReviewQueueDose(
   locale: Locale
 ) {
   if (amount === null && !unit) {
-    return "—";
+    return "";
   }
 
   const formattedAmount =
     amount === null
-      ? "—"
+      ? ""
       : new Intl.NumberFormat(formatLocale(locale), {
           maximumFractionDigits: 2
         }).format(amount);
 
-  return unit ? `${formattedAmount} ${unit}` : formattedAmount;
+  return unit ? [formattedAmount, unit].filter(Boolean).join(" ") : formattedAmount;
 }
 
 function reviewProposedDose(row: AdminReviewTaskRow, locale: Locale) {
@@ -3767,25 +5119,33 @@ function AdminReviewQueueView({
     setSelectedReview(null);
   }
 
+  const reviewMetrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "reviewsTotal",
+      label: labels.reviewQueue.total,
+      series: [],
+      value: formatNumber(queueData.summary.total, locale)
+    },
+    {
+      color: businessMetricColors.stuck,
+      id: "reviewsUnknown",
+      label: labels.reviewQueue.unknown,
+      series: [],
+      value: formatNumber(queueData.summary.unknown, locale)
+    },
+    {
+      color: businessMetricColors.pendingReviews,
+      id: "reviewsRequired",
+      label: labels.reviewQueue.reviewRequired,
+      series: [],
+      value: formatNumber(queueData.summary.reviewRequired, locale)
+    }
+  ];
+
   return (
     <section className="mt-8 space-y-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <FlowSummaryCard
-          compact={true}
-          label={labels.reviewQueue.total}
-          value={formatNumber(queueData.summary.total, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.reviewQueue.unknown}
-          value={formatNumber(queueData.summary.unknown, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.reviewQueue.reviewRequired}
-          value={formatNumber(queueData.summary.reviewRequired, locale)}
-        />
-      </div>
+      <BusinessStatsGrid metrics={reviewMetrics} />
 
       {reviewGroups.length > 0 ? (
         <div className="space-y-7">
@@ -4053,7 +5413,7 @@ function TaskAgeTimer({
   const endAt = terminal ? new Date(row.updatedAt).getTime() : now;
 
   if (!Number.isFinite(createdAt) || endAt === null || !Number.isFinite(endAt)) {
-    return "—";
+    return "";
   }
 
   return formatTaskDuration(endAt - createdAt, locale);
@@ -4074,7 +5434,7 @@ function GoalAgeTimer({
   const endAt = terminal ? new Date(goal.lastActivityAt).getTime() : now;
 
   if (!Number.isFinite(createdAt) || endAt === null || !Number.isFinite(endAt)) {
-    return "—";
+    return "";
   }
 
   return formatTaskDuration(endAt - createdAt, locale);
@@ -4091,7 +5451,7 @@ function ReviewGoalAgeTimer({
   const startedAt = new Date(createdAt).getTime();
 
   if (!Number.isFinite(startedAt)) {
-    return "—";
+    return "";
   }
 
   return formatTaskDuration(now - startedAt, locale);
@@ -4176,6 +5536,50 @@ function AdminCommunicationsView({
 }>) {
   const [retryErrorId, setRetryErrorId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const communicationMetrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "communicationsTotal",
+      label: labels.communications.total,
+      series: [],
+      value: formatNumber(data.summary.total, locale)
+    },
+    {
+      color: businessMetricColors.contentScheduled,
+      id: "communicationsQueued",
+      label: labels.communications.queued,
+      series: [],
+      value: formatNumber(data.summary.queued, locale)
+    },
+    {
+      color: businessMetricColors.freeRequests,
+      id: "communicationsSent",
+      label: labels.communications.sent,
+      series: [],
+      value: formatNumber(data.summary.sent, locale)
+    },
+    {
+      color: businessMetricColors.contentPublished,
+      id: "communicationsDelivered",
+      label: labels.communications.delivered,
+      series: [],
+      value: formatNumber(data.summary.delivered, locale)
+    },
+    {
+      color: businessMetricColors.communicationIssues,
+      id: "communicationsFailed",
+      label: labels.communications.failed,
+      series: [],
+      value: formatNumber(data.summary.failed, locale)
+    },
+    {
+      color: businessMetricColors.noChannel,
+      id: "communicationsNoChannel",
+      label: labels.communications.noChannel,
+      series: [],
+      value: formatNumber(data.summary.noChannel, locale)
+    }
+  ];
 
   async function retryMessage(row: AdminCommunicationRow) {
     setRetryErrorId(null);
@@ -4215,32 +5619,7 @@ function AdminCommunicationsView({
         </span>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <FlowSummaryCard
-          label={labels.communications.total}
-          value={formatNumber(data.summary.total, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.communications.queued}
-          value={formatNumber(data.summary.queued, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.communications.sent}
-          value={formatNumber(data.summary.sent, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.communications.delivered}
-          value={formatNumber(data.summary.delivered, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.communications.failed}
-          value={formatNumber(data.summary.failed, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.communications.noChannel}
-          value={formatNumber(data.summary.noChannel, locale)}
-        />
-      </div>
+      <BusinessStatsGrid metrics={communicationMetrics} />
 
       {data.rows.length > 0 ? (
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
@@ -4281,7 +5660,7 @@ function AdminCommunicationsView({
                       />
                       <SupplementListMeta
                         label={labels.communications.address}
-                        value={row.address ?? "—"}
+                        value={row.address ?? ""}
                       />
                       <SupplementListMeta
                         label={labels.communications.plan}
@@ -4289,7 +5668,7 @@ function AdminCommunicationsView({
                       />
                       <SupplementListMeta
                         label={labels.communications.task}
-                        value={row.taskTitle ?? row.taskId ?? "—"}
+                        value={row.taskTitle ?? row.taskId ?? ""}
                       />
                     </div>
 
@@ -4340,30 +5719,47 @@ function AdminTechnicalAlertsView({
   labels: AdminContent;
   locale: Locale;
 }>) {
+  const alertMetrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "alertsTotal",
+      label: labels.technicalAlerts.total,
+      series: [],
+      value: formatNumber(data.summary.total, locale)
+    },
+    {
+      color: businessMetricColors.critical,
+      id: "alertsCritical",
+      label: labels.technicalAlerts.critical,
+      series: [],
+      value: formatNumber(data.summary.critical, locale)
+    },
+    {
+      color: businessMetricColors.high,
+      id: "alertsHigh",
+      label: labels.technicalAlerts.high,
+      series: [],
+      value: formatNumber(data.summary.high, locale)
+    },
+    {
+      color: businessMetricColors.medium,
+      id: "alertsMedium",
+      label: labels.technicalAlerts.medium,
+      series: [],
+      value: formatNumber(data.summary.medium, locale)
+    },
+    {
+      color: businessMetricColors.low,
+      id: "alertsLow",
+      label: labels.technicalAlerts.low,
+      series: [],
+      value: formatNumber(data.summary.low, locale)
+    }
+  ];
+
   return (
     <section className="mt-8 space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <FlowSummaryCard
-          label={labels.technicalAlerts.total}
-          value={formatNumber(data.summary.total, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.technicalAlerts.critical}
-          value={formatNumber(data.summary.critical, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.technicalAlerts.high}
-          value={formatNumber(data.summary.high, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.technicalAlerts.medium}
-          value={formatNumber(data.summary.medium, locale)}
-        />
-        <FlowSummaryCard
-          label={labels.technicalAlerts.low}
-          value={formatNumber(data.summary.low, locale)}
-        />
-      </div>
+      <BusinessStatsGrid metrics={alertMetrics} />
 
       <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
         <div className="divide-y divide-gray-100">
@@ -4414,11 +5810,11 @@ function AdminTechnicalAlertsView({
                       />
                       <SupplementListMeta
                         label={labels.technicalAlerts.task}
-                        value={row.taskId ?? row.taskType ?? "—"}
+                        value={row.taskId ?? row.taskType ?? ""}
                       />
                       <SupplementListMeta
                         label={labels.technicalAlerts.status}
-                        value={row.status ?? "—"}
+                        value={row.status ?? ""}
                       />
                     </div>
                     {details ? (
@@ -4498,7 +5894,7 @@ function PlanIdLink({
   stopPropagation?: boolean;
 }>) {
   if (!planId) {
-    return "—";
+    return "";
   }
 
   return (
@@ -4586,7 +5982,7 @@ function agentStatusClass(status: string) {
 
 function CapabilityList({ values }: Readonly<{ values: string[] }>) {
   if (values.length === 0) {
-    return <span className="text-gray-400">—</span>;
+    return null;
   }
 
   return (
@@ -4619,6 +6015,57 @@ function AdminVisibilityView({
 }>) {
   const [selectedTask, setSelectedTask] =
     useState<AdminTaskVisibilityRow | null>(null);
+  const visibilityMetrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "tasksTotal",
+      label: labels.visibility.total,
+      series: [],
+      value: formatNumber(data.summary.total, locale)
+    },
+    {
+      color: businessMetricColors.queued,
+      id: "tasksQueued",
+      label: labels.visibility.queued,
+      series: [],
+      value: formatNumber(data.summary.queued, locale)
+    },
+    {
+      color: businessMetricColors.active,
+      id: "tasksActive",
+      label: labels.visibility.active,
+      series: [],
+      value: formatNumber(data.summary.active, locale)
+    },
+    {
+      color: businessMetricColors.human,
+      id: "tasksHuman",
+      label: labels.visibility.human,
+      series: [],
+      value: formatNumber(data.summary.human, locale)
+    },
+    {
+      color: businessMetricColors.blocked,
+      id: "tasksBlocked",
+      label: labels.visibility.blocked,
+      series: [],
+      value: formatNumber(data.summary.blocked, locale)
+    },
+    {
+      color: businessMetricColors.failed,
+      id: "tasksFailed",
+      label: labels.visibility.failed,
+      series: [],
+      value: formatNumber(data.summary.failed, locale)
+    },
+    {
+      color: businessMetricColors.completed,
+      id: "tasksCompleted",
+      label: labels.visibility.completed,
+      series: [],
+      value: formatNumber(data.summary.completed, locale)
+    }
+  ];
 
   return (
     <section className="mt-8 space-y-6">
@@ -4628,43 +6075,7 @@ function AdminVisibilityView({
         locale={locale}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-7">
-        <FlowSummaryCard
-          compact={true}
-          label={labels.visibility.total}
-          value={formatNumber(data.summary.total, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.visibility.queued}
-          value={formatNumber(data.summary.queued, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.visibility.active}
-          value={formatNumber(data.summary.active, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.visibility.human}
-          value={formatNumber(data.summary.human, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.visibility.blocked}
-          value={formatNumber(data.summary.blocked, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.visibility.failed}
-          value={formatNumber(data.summary.failed, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.visibility.completed}
-          value={formatNumber(data.summary.completed, locale)}
-        />
-      </div>
+      <BusinessStatsGrid metrics={visibilityMetrics} />
 
       {data.rows.length > 0 ? (
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
@@ -4826,7 +6237,7 @@ function VisibilityTaskDetailsModal({
               />
               <SupplementListMeta
                 label={labels.visibility.worker}
-                value={row.agentName ?? "—"}
+                value={row.agentName ?? ""}
               />
               <SupplementListMeta
                 label={labels.visibility.task}
@@ -4855,7 +6266,7 @@ function VisibilityTaskDetailsModal({
               <SupplementListMeta
                 label="Lease"
                 value={
-                  row.leaseUntil ? formatGeneratedAt(row.leaseUntil, locale) : "—"
+                  row.leaseUntil ? formatGeneratedAt(row.leaseUntil, locale) : ""
                 }
               />
               <SupplementListMeta
@@ -4870,7 +6281,7 @@ function VisibilityTaskDetailsModal({
               />
               <SupplementListMeta
                 label="Ray"
-                value={row.ray ? compactId(row.ray) : "—"}
+                value={row.ray ? compactId(row.ray) : ""}
               />
               <SupplementListMeta
                 label="Reasoning"
@@ -4906,6 +6317,51 @@ function AdminAgentsView({
   labels: AdminContent;
   locale: Locale;
 }>) {
+  const agentMetrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "agentsTotal",
+      label: labels.agents.total,
+      series: [],
+      value: formatNumber(data.summary.total, locale)
+    },
+    {
+      color: businessMetricColors.active,
+      id: "agentsWorking",
+      label: labels.agents.working,
+      series: [],
+      value: formatNumber(data.summary.working, locale)
+    },
+    {
+      color: businessMetricColors.succeeded,
+      id: "agentsActive",
+      label: labels.agents.active,
+      series: [],
+      value: formatNumber(data.summary.active, locale)
+    },
+    {
+      color: businessMetricColors.offline,
+      id: "agentsOffline",
+      label: labels.agents.offline,
+      series: [],
+      value: formatNumber(data.summary.offline, locale)
+    },
+    {
+      color: businessMetricColors.paused,
+      id: "agentsPaused",
+      label: labels.agents.paused,
+      series: [],
+      value: formatNumber(data.summary.paused, locale)
+    },
+    {
+      color: businessMetricColors.retired,
+      id: "agentsRetired",
+      label: labels.agents.retired,
+      series: [],
+      value: formatNumber(data.summary.retired, locale)
+    }
+  ];
+
   return (
     <section className="mt-8 space-y-6">
       <LiveUpdatedBadge
@@ -4914,38 +6370,7 @@ function AdminAgentsView({
         locale={locale}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <FlowSummaryCard
-          compact={true}
-          label={labels.agents.total}
-          value={formatNumber(data.summary.total, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.agents.working}
-          value={formatNumber(data.summary.working, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.agents.active}
-          value={formatNumber(data.summary.active, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.agents.offline}
-          value={formatNumber(data.summary.offline, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.agents.paused}
-          value={formatNumber(data.summary.paused, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.agents.retired}
-          value={formatNumber(data.summary.retired, locale)}
-        />
-      </div>
+      <BusinessStatsGrid metrics={agentMetrics} />
 
       {data.rows.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -4995,17 +6420,17 @@ function AgentCard({
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <SupplementListMeta
           label={labels.agents.currentTask}
-          value={row.activeTaskTitle ?? row.activeTaskId ?? "—"}
+          value={row.activeTaskTitle ?? row.activeTaskId ?? ""}
         />
         <SupplementListMeta
           label={labels.agents.model}
-          value={row.model ?? "—"}
+          value={row.model ?? ""}
         />
         <SupplementListMeta
           label={labels.agents.successRate}
           value={
             row.successRate === null
-              ? "—"
+              ? ""
               : formatPercent(row.successRate * 100, locale)
           }
         />
@@ -5013,7 +6438,7 @@ function AgentCard({
           label={labels.agents.failureRate}
           value={
             row.failureRate === null
-              ? "—"
+              ? ""
               : formatPercent(row.failureRate * 100, locale)
           }
         />
@@ -5027,7 +6452,7 @@ function AgentCard({
         />
         <SupplementListMeta
           label={labels.agents.lastSeen}
-          value={row.lastSeenAt ? formatGeneratedAt(row.lastSeenAt, locale) : "—"}
+          value={row.lastSeenAt ? formatGeneratedAt(row.lastSeenAt, locale) : ""}
         />
         <SupplementListMeta
           label={labels.agents.working}
@@ -5060,7 +6485,58 @@ function AdminGoalsView({
   locale: Locale;
   range: AdminDashboardRange;
 }>) {
-  const selectedGoal = data.selectedGoal;
+  const [showCompleted, setShowCompleted] = useState(false);
+  const visibleGoals = showCompleted
+    ? data.rows
+    : data.rows.filter((goal) => goal.status !== "succeeded");
+  const selectedGoal =
+    showCompleted || data.selectedGoal?.status !== "succeeded"
+      ? data.selectedGoal
+      : null;
+  const goalMetrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "goalsTotal",
+      label: labels.goals.total,
+      series: [],
+      value: formatNumber(data.summary.total, locale)
+    },
+    {
+      color: businessMetricColors.processing,
+      id: "goalsProcessing",
+      label: labels.goals.processing,
+      series: [],
+      value: formatNumber(data.summary.processing, locale)
+    },
+    {
+      color: businessMetricColors.pendingReviews,
+      id: "goalsNeedsReview",
+      label: labels.goals.needsReview,
+      series: [],
+      value: formatNumber(data.summary.needsReview, locale)
+    },
+    {
+      color: businessMetricColors.blocked,
+      id: "goalsBlocked",
+      label: labels.goals.blocked,
+      series: [],
+      value: formatNumber(data.summary.blocked, locale)
+    },
+    {
+      color: businessMetricColors.stuck,
+      id: "goalsStuck",
+      label: labels.goals.stuck,
+      series: [],
+      value: formatNumber(data.summary.stuck, locale)
+    },
+    {
+      color: businessMetricColors.succeeded,
+      id: "goalsSucceeded",
+      label: labels.goals.succeeded,
+      series: [],
+      value: formatNumber(data.summary.succeeded, locale)
+    }
+  ];
 
   return (
     <section className="mt-8 space-y-6">
@@ -5070,48 +6546,29 @@ function AdminGoalsView({
         locale={locale}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <FlowSummaryCard
-          compact={true}
-          label={labels.goals.total}
-          value={formatNumber(data.summary.total, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.goals.processing}
-          value={formatNumber(data.summary.processing, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.goals.needsReview}
-          value={formatNumber(data.summary.needsReview, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.goals.blocked}
-          value={formatNumber(data.summary.blocked, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.goals.stuck}
-          value={formatNumber(data.summary.stuck, locale)}
-        />
-        <FlowSummaryCard
-          compact={true}
-          label={labels.goals.succeeded}
-          value={formatNumber(data.summary.succeeded, locale)}
-        />
+      <BusinessStatsGrid metrics={goalMetrics} />
+
+      <div className="flex justify-end">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200">
+          <input
+            checked={showCompleted}
+            className="size-4 rounded border-gray-300 text-[#1FA77A] focus:ring-[#1FA77A]"
+            onChange={(event) => setShowCompleted(event.target.checked)}
+            type="checkbox"
+          />
+          {labels.goals.showCompleted}
+        </label>
       </div>
 
-      {data.rows.length > 0 ? (
+      {visibleGoals.length > 0 ? (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(18rem,0.72fr)_minmax(0,1.55fr)]">
           <div className="space-y-3">
-            {data.rows.map((goal) => (
+            {visibleGoals.map((goal) => (
               <a
                 key={goal.id}
-                aria-current={goal.id === data.selectedGoalId ? "page" : undefined}
+                aria-current={goal.id === selectedGoal?.id ? "page" : undefined}
                 className={classNames(
-                  goal.id === data.selectedGoalId
+                  goal.id === selectedGoal?.id
                     ? "ring-[#1FA77A]"
                     : "ring-gray-200 hover:bg-gray-50",
                   "block rounded-2xl bg-white p-4 shadow-sm ring-1 transition"
@@ -5233,11 +6690,11 @@ function GoalDetailPanel({
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <SupplementListMeta
             label={labels.goals.trace}
-            value={goal.ray ?? "—"}
+            value={goal.ray ?? ""}
           />
           <SupplementListMeta
             label={labels.goals.source}
-            value={goal.source ?? "—"}
+            value={goal.source ?? ""}
           />
           <SupplementListMeta
             label={labels.goals.lastActivity}
@@ -5320,7 +6777,7 @@ function GoalDetailPanel({
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <GoalDetailCompactList
-          empty="—"
+          empty=""
           items={data.dependencies.map(
             (item) =>
               `${compactId(item.taskId)} → ${compactId(item.dependsOnTaskId)} · ${readableToken(item.dependencyType)}`
@@ -5328,7 +6785,7 @@ function GoalDetailPanel({
           title={labels.goals.dependencies}
         />
         <GoalDetailCompactList
-          empty="—"
+          empty=""
           items={data.reservations.map(
             (item) =>
               `${item.agentName ?? "Agent"} · ${readableToken(item.status)} · ${formatGeneratedAt(item.reservedAt, locale)}`
@@ -5336,7 +6793,7 @@ function GoalDetailPanel({
           title={labels.goals.reservations}
         />
         <GoalDetailCompactList
-          empty="—"
+          empty=""
           items={data.approvals.map(
             (item) =>
               `${readableToken(item.approvalType)} · ${readableToken(item.status)} · ${formatGeneratedAt(item.requestedAt, locale)}`
@@ -5511,42 +6968,6 @@ function GoalDetailCompactList({
         )}
       </div>
     </section>
-  );
-}
-
-function FlowSummaryCard({
-  compact = false,
-  label,
-  value
-}: Readonly<{
-  compact?: boolean;
-  label: string;
-  value: string;
-}>) {
-  return (
-    <div
-      className={classNames(
-        "rounded-2xl bg-white shadow-sm ring-1 ring-gray-200",
-        compact ? "p-3" : "p-5"
-      )}
-    >
-      <p
-        className={classNames(
-          "font-semibold text-gray-500",
-          compact ? "text-xs" : "text-sm"
-        )}
-      >
-        {label}
-      </p>
-      <p
-        className={classNames(
-          "font-semibold tracking-tight text-[#20343A]",
-          compact ? "mt-1 text-xl" : "mt-3 text-3xl"
-        )}
-      >
-        {value}
-      </p>
-    </div>
   );
 }
 
@@ -5831,15 +7252,12 @@ function AdminFilterPanel({
       open={hasPanelFilters}
     >
       <summary className="group flex cursor-pointer list-none items-center gap-3 p-5 marker:hidden">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
           <span className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">
             {labels.filters.title}
           </span>
           {hasPanelFilters ? (
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="font-semibold uppercase tracking-[0.14em] text-gray-400">
-                {labels.filters.active}
-              </span>
               {activeFilters.map(([key, value]) => (
                 <span
                   key={key}
@@ -5954,10 +7372,13 @@ function AdminFilterPanel({
 function adminViewDatabaseAvailable({
   alertsData,
   agentsData,
+  campaignsData,
+  contentData,
   communicationsData,
   data,
   flowData,
   goalsData,
+  leadsData,
   reviewQueueData,
   supplementsData,
   visibilityData,
@@ -5965,10 +7386,13 @@ function adminViewDatabaseAvailable({
 }: Readonly<{
   alertsData: AdminTechnicalAlertsData;
   agentsData: AdminAgentsData;
+  campaignsData: AdminCampaignsData;
+  contentData: AdminContentInventoryData;
   communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
   flowData: AdminFlowData;
   goalsData: AdminGoalsData;
+  leadsData: AdminLeadsData;
   reviewQueueData: AdminReviewQueueData;
   supplementsData: AdminSupplementsData;
   visibilityData: AdminTaskVisibilityData;
@@ -5992,6 +7416,14 @@ function adminViewDatabaseAvailable({
     return alertsData.databaseAvailable;
   }
 
+  if (view === "campaigns") {
+    return campaignsData.databaseAvailable;
+  }
+
+  if (view === "content") {
+    return contentData.databaseAvailable;
+  }
+
   if (view === "communications") {
     return communicationsData.databaseAvailable;
   }
@@ -6002,6 +7434,10 @@ function adminViewDatabaseAvailable({
 
   if (view === "goals") {
     return goalsData.databaseAvailable;
+  }
+
+  if (view === "leads") {
+    return leadsData.databaseAvailable;
   }
 
   if (view === "reviews") {
@@ -6023,11 +7459,14 @@ export function AdminDashboard({
   accessToken,
   alertsData,
   agentsData,
+  campaignsData,
+  contentData,
   communicationsData,
   data,
   filters,
   flowData,
   goalsData,
+  leadsData,
   locale,
   reviewQueueData,
   selectedReviewTaskId,
@@ -6038,11 +7477,14 @@ export function AdminDashboard({
   accessToken: string;
   alertsData: AdminTechnicalAlertsData;
   agentsData: AdminAgentsData;
+  campaignsData: AdminCampaignsData;
+  contentData: AdminContentInventoryData;
   communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
   filters: AdminDashboardFilters;
   flowData: AdminFlowData;
   goalsData: AdminGoalsData;
+  leadsData: AdminLeadsData;
   locale: Locale;
   reviewQueueData: AdminReviewQueueData;
   selectedReviewTaskId?: string | null;
@@ -6101,10 +7543,13 @@ export function AdminDashboard({
   const databaseAvailable = adminViewDatabaseAvailable({
     alertsData,
     agentsData: liveAgentsData,
+    campaignsData,
+    contentData,
     communicationsData,
     data,
     flowData,
     goalsData: liveGoalsData,
+    leadsData,
     reviewQueueData,
     supplementsData,
     visibilityData: liveVisibilityData,
@@ -6194,10 +7639,13 @@ export function AdminDashboard({
 
           {view === "agents" ||
           view === "alerts" ||
+          view === "campaigns" ||
+          view === "content" ||
           view === "communications" ||
           view === "flow" ||
           view === "glance" ||
           view === "goals" ||
+          view === "leads" ||
           view === "visibility" ? (
             <>
               <div className="mt-6">
@@ -6209,7 +7657,11 @@ export function AdminDashboard({
                   locale={locale}
                   view={view}
                 />
-                {view === "flow" || view === "glance" ? (
+                {view === "campaigns" ||
+                view === "content" ||
+                view === "flow" ||
+                view === "glance" ||
+                view === "leads" ? (
                   <LocaleFilterSelector
                     accessToken={accessToken}
                     filters={filters}
@@ -6220,7 +7672,10 @@ export function AdminDashboard({
                 ) : null}
               </div>
 
-              {view === "flow" || view === "glance" ? (
+              {view === "campaigns" ||
+              view === "flow" ||
+              view === "glance" ||
+              view === "leads" ? (
                 <AdminFilterPanel
                   accessToken={accessToken}
                   filters={filters}
@@ -6233,7 +7688,20 @@ export function AdminDashboard({
             </>
           ) : null}
 
-          {view === "flow" ? (
+          {view === "campaigns" ? (
+            <AdminCampaignsView
+              data={campaignsData}
+              labels={labels}
+              locale={locale}
+            />
+          ) : view === "content" ? (
+            <AdminContentView
+              accessToken={accessToken}
+              data={contentData}
+              labels={labels}
+              locale={locale}
+            />
+          ) : view === "flow" ? (
             <AdminFlowView
               accessToken={accessToken}
               flowData={flowData}
@@ -6251,6 +7719,12 @@ export function AdminDashboard({
               labels={labels}
               locale={locale}
               reviewQueueData={reviewQueueData}
+            />
+          ) : view === "leads" ? (
+            <AdminLeadsView
+              data={leadsData}
+              labels={labels}
+              locale={locale}
             />
           ) : view === "agents" ? (
             <AdminAgentsView

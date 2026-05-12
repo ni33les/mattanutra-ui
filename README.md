@@ -84,6 +84,7 @@ DELETE /api/attestations/:id
 ```
 
 The public website renders published blog and testimonial content server-side; these API routes are not public read endpoints.
+Blog posts are stored as one locale-specific row per translation, linked by `translationGroupId`. To add a translation, create or update a post with the existing article's `translationGroupId` or pass `translatedFromPostId`; the public language switcher uses the linked sibling post when it exists.
 
 Admin query endpoints for external agents:
 

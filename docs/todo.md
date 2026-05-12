@@ -26,5 +26,5 @@ Last updated: 2026-05-10
 
 ## Sales And Marketing
 
-- [ ] Complete Marketing Campaigns.
-- [ ] Complete Leads.
+- [x] Complete Marketing Campaigns.
+- [x] Complete Leads.

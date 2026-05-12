@@ -5,12 +5,14 @@ import type { Locale } from "@/lib/i18n";
 type TitleBarProps = Readonly<{
   currentLocale: Locale;
   currentPath?: string;
+  localizedPaths?: Partial<Record<Locale, string>>;
   title: string;
 }>;
 
 export function TitleBar({
   currentLocale,
   currentPath = `/${currentLocale}`,
+  localizedPaths,
   title
 }: TitleBarProps) {
   return (
@@ -32,6 +34,7 @@ export function TitleBar({
         <LanguageSwitcher
           currentLocale={currentLocale}
           currentPath={currentPath}
+          localizedPaths={localizedPaths}
         />
       </div>
     </header>

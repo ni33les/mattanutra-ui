@@ -365,29 +365,7 @@ function goalFromDb(row: GoalDbRow): AdminGoalRow {
   };
 }
 
-function goalStatusOrder(status: AdminGoalStatus) {
-  if (status === "failed") {
-    return 1;
-  }
-
-  if (status === "succeeded") {
-    return 2;
-  }
-
-  if (status === "cancelled") {
-    return 3;
-  }
-
-  return 0;
-}
-
 function sortGoals(left: AdminGoalRow, right: AdminGoalRow) {
-  const statusDifference = goalStatusOrder(left.status) - goalStatusOrder(right.status);
-
-  if (statusDifference !== 0) {
-    return statusDifference;
-  }
-
   const priorityDifference = right.priority - left.priority;
 
   if (priorityDifference !== 0) {
@@ -401,10 +379,11 @@ function sortGoals(left: AdminGoalRow, right: AdminGoalRow) {
     return ageDifference;
   }
 
-  return (
-    new Date(right.lastActivityAt).getTime() -
-    new Date(left.lastActivityAt).getTime()
-  );
+  const activityDifference =
+    new Date(left.lastActivityAt).getTime() -
+    new Date(right.lastActivityAt).getTime();
+
+  return activityDifference || left.title.localeCompare(right.title);
 }
 
 function taskFromDb(row: TaskDbRow): AdminGoalTaskRow {
@@ -561,7 +540,7 @@ export async function getAdminGoalsData(
           coalesce(task_summary.task_updated_at, goals.updated_at),
           coalesce(event_summary.event_at, goals.updated_at)
         ) >= ${start}
-      order by goals.created_at desc
+      order by goals.priority desc, goals.created_at asc
       limit 500
     `;
     const rows = goalRows.map(goalFromDb).sort(sortGoals).slice(0, 60);

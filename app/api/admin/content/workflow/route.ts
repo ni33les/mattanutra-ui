@@ -13,7 +13,8 @@ import { TASK_PRIORITY } from "@/lib/task-service-utils";
 export const runtime = "nodejs";
 
 type ContentType = "blog_post" | "testimonial";
-type ContentStatus = "archived" | "draft" | "published" | "review";
+type ContentWorkflowStatus = "deleted" | "draft" | "published" | "scheduled";
+type ContentStorageStatus = "archived" | "draft" | "published";
 
 function textOrNull(value: unknown) {
   if (typeof value !== "string") {
@@ -29,11 +30,10 @@ function contentType(value: unknown): ContentType | null {
   return value === "blog_post" || value === "testimonial" ? value : null;
 }
 
-function contentStatus(value: unknown): ContentStatus | null {
-  return value === "archived" ||
-    value === "draft" ||
-    value === "published" ||
-    value === "review"
+function contentStatus(value: unknown): ContentWorkflowStatus | null {
+  return value === "archived" || value === "deleted"
+    ? "deleted"
+    : value === "draft" || value === "published" || value === "scheduled"
     ? value
     : null;
 }
@@ -50,17 +50,25 @@ function scheduledDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function statusVerb(status: ContentStatus) {
+function storageStatus(status: ContentWorkflowStatus): ContentStorageStatus {
+  return status === "deleted"
+    ? "archived"
+    : status === "scheduled"
+      ? "published"
+      : status;
+}
+
+function statusVerb(status: ContentWorkflowStatus) {
+  if (status === "scheduled") {
+    return "Schedule";
+  }
+
   if (status === "published") {
     return "Publish";
   }
 
-  if (status === "review") {
-    return "Send to review";
-  }
-
-  if (status === "archived") {
-    return "Archive";
+  if (status === "deleted") {
+    return "Delete";
   }
 
   return "Move to draft";
@@ -98,11 +106,11 @@ export async function POST(request: Request) {
   }
 
   const selectedContentType = contentType(body.contentType);
-  const targetStatus = contentStatus(body.targetStatus ?? body.status);
+  const requestedStatus = contentStatus(body.targetStatus ?? body.status);
   const contentId = textOrNull(body.contentId);
   const publishAt = scheduledDate(body.publishAt ?? body.scheduledFor);
 
-  if (!selectedContentType || !contentId || !isUuid(contentId) || !targetStatus) {
+  if (!selectedContentType || !contentId || !isUuid(contentId) || !requestedStatus) {
     return NextResponse.json(
       { message: "Content workflow request is incomplete" },
       {
@@ -114,31 +122,45 @@ export async function POST(request: Request) {
     );
   }
 
+  if (requestedStatus === "scheduled" && (!publishAt || publishAt <= new Date())) {
+    return NextResponse.json(
+      { message: "Scheduled content needs a future publish date" },
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        },
+        status: 400
+      }
+    );
+  }
+
   try {
     const machineRequest = adminClawRequestAllowed(request);
+    const targetStatus = storageStatus(requestedStatus);
     const scheduledFor =
-      targetStatus === "published" && publishAt ? publishAt : new Date();
+      requestedStatus === "scheduled" && publishAt ? publishAt : new Date();
     const goal = await createGoal({
       context: {
         contentId,
         contentType: selectedContentType,
         publishAt: publishAt?.toISOString() ?? null,
+        requestedStatus,
         targetStatus
       },
       priority: TASK_PRIORITY.normal,
       source: "admin_content_workflow",
-      title: `${statusVerb(targetStatus)} content`,
+      title: `${statusVerb(requestedStatus)} content`,
       type: "system"
     });
     const { task } = await createTask({
       actorType: "deterministic",
       description: "Apply an approved content status change through the platform API.",
       goalId: goal.id,
-      idempotencyKey: `content-status:${selectedContentType}:${contentId}:${targetStatus}:${scheduledFor.toISOString()}`,
+      idempotencyKey: `content-status:${selectedContentType}:${contentId}:${requestedStatus}:${scheduledFor.toISOString()}`,
       initialComment: {
         authorName: "Admin API",
         authorType: "system",
-        body: `${statusVerb(targetStatus)} requested for ${selectedContentType} ${contentId}.`,
+        body: `${statusVerb(requestedStatus)} requested for ${selectedContentType} ${contentId}.`,
         commentType: "instruction",
         visibility: "worker"
       },
@@ -146,6 +168,7 @@ export async function POST(request: Request) {
         contentId,
         contentType: selectedContentType,
         publishAt: publishAt?.toISOString() ?? null,
+        requestedStatus,
         requestedBy: machineRequest ? "machine_api" : "admin_dashboard",
         targetStatus
       },
@@ -153,7 +176,7 @@ export async function POST(request: Request) {
       requiredCapabilities: [AGENT_CAPABILITIES.contentPublish],
       scheduledFor,
       taskType: "content_status_change",
-      title: `${statusVerb(targetStatus)} content`
+      title: `${statusVerb(requestedStatus)} content`
     });
 
     await writeBpmEvent({
@@ -165,6 +188,7 @@ export async function POST(request: Request) {
         contentType: selectedContentType,
         goalId: goal.id,
         publishAt: publishAt?.toISOString() ?? null,
+        requestedStatus,
         targetStatus,
         taskId: task.id
       }

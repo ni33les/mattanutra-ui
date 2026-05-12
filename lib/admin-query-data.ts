@@ -46,13 +46,13 @@ type QueryParams = Readonly<{
   status: string;
 }>;
 
-type Pagination = Readonly<{
+export type AdminQueryPagination = Readonly<{
   cursor: string | null;
   limit: number;
   nextCursor: string | null;
 }>;
 
-type CampaignRow = Readonly<{
+export type AdminCampaignRow = Readonly<{
   affiliate: string | null;
   assessmentCompletions: number;
   assessmentStarts: number;
@@ -70,11 +70,29 @@ type CampaignRow = Readonly<{
   source: string | null;
 }>;
 
-type LeadRow = Readonly<{
+export type AdminCampaignSummary = Readonly<{
+  assessmentCompletions: number;
+  assessmentStarts: number;
+  freeRequests: number;
+  healthScoreViews: number;
+  landed: number;
+  precisionConversions: number;
+  proConversions: number;
+}>;
+
+export type AdminCampaignsData = Readonly<{
+  databaseAvailable: boolean;
+  pagination?: AdminQueryPagination;
+  rows: AdminCampaignRow[];
+  summary: AdminCampaignSummary;
+}>;
+
+export type AdminLeadRow = Readonly<{
   campaign: string | null;
   communicationIssues: number;
   currentStage: string;
   emailHash: string | null;
+  events: AdminLeadEventRow[];
   firstSeenAt: string;
   lastEvent: string;
   lastSeenAt: string;
@@ -87,12 +105,49 @@ type LeadRow = Readonly<{
   subject: string;
 }>;
 
-type ContentInventoryRow = Readonly<{
+export type AdminLeadEventRow = Readonly<{
+  actorType: string;
+  campaign: string | null;
+  emailHash: string | null;
+  errorMessage: string | null;
+  eventName: string;
+  eventStatus: string;
+  eventType: string;
+  id: string;
+  occurredAt: string;
+  path: string | null;
+  planId: string | null;
+  ray: string | null;
+  route: string | null;
+  severity: string;
+  source: string | null;
+}>;
+
+export type AdminLeadsData = Readonly<{
+  databaseAvailable: boolean;
+  pagination?: AdminQueryPagination;
+  rows: AdminLeadRow[];
+  summary: Readonly<{
+    total: number;
+  }>;
+}>;
+
+export type AdminContentWorkflowStatus =
+  | "deleted"
+  | "draft"
+  | "published"
+  | "scheduled";
+
+export type AdminContentInventoryRow = Readonly<{
   contentType: "blog_post" | "testimonial";
   createdAt: string;
   id: string;
+  lastViewedAt: string | null;
   locale: string;
+  pageViews: number;
+  pendingTaskId: string | null;
   publishedAt: string | null;
+  scheduledFor: string | null;
   slug: string | null;
   sourceAgent: string | null;
   sourceChannel: string | null;
@@ -100,7 +155,25 @@ type ContentInventoryRow = Readonly<{
   status: string;
   summary: string | null;
   title: string;
+  translationGroupId: string | null;
   updatedAt: string;
+  workflowStatus: AdminContentWorkflowStatus;
+}>;
+
+export type AdminContentInventoryData = Readonly<{
+  databaseAvailable: boolean;
+  pagination?: AdminQueryPagination;
+  rows: AdminContentInventoryRow[];
+  summary: Readonly<{
+    blogPosts: number;
+    deleted: number;
+    draft: number;
+    pageViews: number;
+    published: number;
+    scheduled: number;
+    testimonials: number;
+    total: number;
+  }>;
 }>;
 
 const views = new Set<AdminExternalQueryView>([
@@ -133,6 +206,18 @@ const paidEventStatuses = new Set([
   "paid",
   "success",
   "succeeded"
+]);
+
+const leadEventNames = new Set([
+  "assessment_started",
+  "assessment_submitted",
+  "assessment_captured",
+  "assessment_recaptured",
+  "healthscore_viewed",
+  "free_email_requested",
+  "free_email_sent",
+  "formulation_page_viewed",
+  "plan_selected"
 ]);
 
 export function normalizeAdminExternalQueryView(
@@ -193,14 +278,14 @@ function paginate<T>(rows: readonly T[], params: QueryParams) {
       cursor: start > 0 ? String(start) : null,
       limit: params.limit,
       nextCursor
-    } satisfies Pagination
+    } satisfies AdminQueryPagination
   };
 }
 
 function queryEnvelope(
   data: unknown,
   params: QueryParams,
-  pagination?: Pagination
+  pagination?: AdminQueryPagination
 ) {
   return {
     data,
@@ -216,6 +301,26 @@ function queryEnvelope(
         limit: params.limit,
         nextCursor: null
       }
+  };
+}
+
+function dashboardQueryParams({
+  filters,
+  limit,
+  range,
+  status = ""
+}: Readonly<{
+  filters: AdminDashboardFilters;
+  limit: number;
+  range: AdminDashboardRange;
+  status?: string;
+}>): QueryParams {
+  return {
+    cursor: 0,
+    filters,
+    limit: Math.max(1, Math.min(100, Math.round(limit))),
+    range,
+    status: status.trim().slice(0, 80)
   };
 }
 
@@ -264,7 +369,7 @@ function currentLeadStage(row: {
   return row.landed ? "landed" : "observed";
 }
 
-function campaignSummary(rows: readonly CampaignRow[]) {
+function campaignSummary(rows: readonly AdminCampaignRow[]): AdminCampaignSummary {
   return rows.reduce(
     (summary, row) => ({
       assessmentCompletions:
@@ -289,7 +394,7 @@ function campaignSummary(rows: readonly CampaignRow[]) {
   );
 }
 
-async function getCampaigns(params: QueryParams) {
+async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
   const sql = getSql();
 
   if (!sql) {
@@ -371,7 +476,7 @@ async function getCampaigns(params: QueryParams) {
     order by landed desc, healthscore_views desc, last_seen_at desc
     limit 1000
   `;
-  const mappedRows: CampaignRow[] = rows.map((row) => ({
+  const mappedRows: AdminCampaignRow[] = rows.map((row) => ({
     affiliate: row.affiliate,
     assessmentCompletions: Number(row.assessment_completions) || 0,
     assessmentStarts: Number(row.assessment_starts) || 0,
@@ -398,7 +503,7 @@ async function getCampaigns(params: QueryParams) {
   };
 }
 
-async function getLeads(params: QueryParams) {
+async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
   const sql = getSql();
 
   if (!sql) {
@@ -437,10 +542,14 @@ async function getLeads(params: QueryParams) {
   >`
     with lead_events as (
       select
-        coalesce(plan_id::text, ray::text, id::text) as subject,
+        coalesce(
+          case when ray <> id then ray::text else null end,
+          plan_id::text,
+          nullif(email_hash, '')
+        ) as subject,
         ray::text,
         plan_id::text,
-        email_hash,
+        nullif(email_hash, '') as email_hash,
         locale,
         selected_plan::text,
         coalesce(nullif(utm_source, ''), nullif(traffic_source, ''), nullif(source_channel, '')) as source,
@@ -487,7 +596,15 @@ async function getLeads(params: QueryParams) {
           )
         ) as pro_paid
       from lead_events
+      where subject is not null
       group by subject
+      having bool_or(
+        event_name = any(${[...leadEventNames]}::text[])
+        or event_name = any(${[...paidEventNames]}::text[])
+        or selected_plan is not null
+        or email_hash is not null
+        or plan_id is not null
+      )
     )
     select
       lead_rows.*,
@@ -511,11 +628,12 @@ async function getLeads(params: QueryParams) {
     limit 1000
   `;
   const mappedRows = rows
-    .map((row): LeadRow => ({
+    .map((row): AdminLeadRow => ({
       campaign: row.campaign,
       communicationIssues: Number(row.communication_issues) || 0,
       currentStage: currentLeadStage(row),
       emailHash: row.email_hash,
+      events: [],
       firstSeenAt: new Date(row.first_seen_at).toISOString(),
       lastEvent: row.last_event,
       lastSeenAt: new Date(row.last_seen_at).toISOString(),
@@ -529,15 +647,140 @@ async function getLeads(params: QueryParams) {
     }))
     .filter((row) => !params.status || row.currentStage === params.status);
   const { pageRows, pagination } = paginate(mappedRows, params);
+  const subjects = pageRows.map((row) => row.subject);
+  const eventRows = subjects.length
+    ? await sql<
+        Array<{
+          actor_type: string;
+          campaign: string | null;
+          email_hash: string | null;
+          error_message: string | null;
+          event_name: string;
+          event_status: string;
+          event_type: string;
+          id: string;
+          occurred_at: Date | string;
+          path: string | null;
+          plan_id: string | null;
+          ray: string | null;
+          route: string | null;
+          severity: string;
+          source: string | null;
+          subject: string;
+        }>
+      >`
+        with event_rows as (
+          select
+            coalesce(
+              case when ray <> id then ray::text else null end,
+              plan_id::text,
+              nullif(email_hash, '')
+            ) as subject,
+            id::text,
+            ray::text,
+            plan_id::text,
+            nullif(email_hash, '') as email_hash,
+            event_name,
+            event_type,
+            event_status,
+            severity,
+            actor_type,
+            path,
+            route,
+            coalesce(nullif(utm_source, ''), nullif(traffic_source, ''), nullif(source_channel, '')) as source,
+            coalesce(nullif(utm_campaign, ''), nullif(campaign_name, '')) as campaign,
+            error_message,
+            occurred_at
+          from public.bpm
+          where ${start ? sql`occurred_at >= ${start} and` : sql``}
+            ${adminDashboardFilterSql(sql, params.filters)}
+        ),
+        ranked_events as (
+          select
+            *,
+            row_number() over (
+              partition by subject
+              order by occurred_at asc, id asc
+            ) as event_index
+          from event_rows
+          where subject = any(${subjects}::text[])
+        )
+        select
+          subject,
+          id,
+          ray,
+          plan_id,
+          email_hash,
+          event_name,
+          event_type,
+          event_status,
+          severity,
+          actor_type,
+          path,
+          route,
+          source,
+          campaign,
+          error_message,
+          occurred_at
+        from ranked_events
+        where event_index <= 80
+        order by subject asc, occurred_at asc, id asc
+      `
+    : [];
+  const eventsBySubject = new Map<string, AdminLeadEventRow[]>();
+
+  eventRows.forEach((row) => {
+    const current = eventsBySubject.get(row.subject) ?? [];
+
+    current.push({
+      actorType: row.actor_type,
+      campaign: row.campaign,
+      emailHash: row.email_hash,
+      errorMessage: row.error_message,
+      eventName: row.event_name,
+      eventStatus: row.event_status,
+      eventType: row.event_type,
+      id: row.id,
+      occurredAt: new Date(row.occurred_at).toISOString(),
+      path: row.path,
+      planId: row.plan_id,
+      ray: row.ray,
+      route: row.route,
+      severity: row.severity,
+      source: row.source
+    });
+    eventsBySubject.set(row.subject, current);
+  });
+  const rowsWithEvents = pageRows.map((row) => ({
+    ...row,
+    events: eventsBySubject.get(row.subject) ?? []
+  }));
 
   return {
     databaseAvailable: true,
-    rows: pageRows,
+    rows: rowsWithEvents,
     summary: {
       total: mappedRows.length
     },
     pagination
   };
+}
+
+export async function getAdminCampaignsData(
+  range: AdminDashboardRange,
+  filters: AdminDashboardFilters,
+  limit = 100
+) {
+  return getCampaigns(dashboardQueryParams({ filters, limit, range }));
+}
+
+export async function getAdminLeadsData(
+  range: AdminDashboardRange,
+  filters: AdminDashboardFilters,
+  status = "",
+  limit = 100
+) {
+  return getLeads(dashboardQueryParams({ filters, limit, range, status }));
 }
 
 async function getContentInventory(params: QueryParams) {
@@ -547,19 +790,30 @@ async function getContentInventory(params: QueryParams) {
     return {
       databaseAvailable: false,
       rows: [],
-      summary: { archived: 0, draft: 0, published: 0, review: 0, total: 0 }
+      summary: {
+        blogPosts: 0,
+        deleted: 0,
+        draft: 0,
+        pageViews: 0,
+        published: 0,
+        scheduled: 0,
+        testimonials: 0,
+        total: 0
+      }
     };
   }
 
-  const status = params.status || null;
   const locale = params.filters.locale || null;
-  const [postRows, testimonialRows] = await Promise.all([
+  const start = adminDashboardRangeStart(params.range);
+  const [postRows, testimonialRows, scheduledTaskRows] = await Promise.all([
     sql<
       Array<{
         created_at: Date | string;
         excerpt: string | null;
         id: string;
+        last_viewed_at: Date | string | null;
         locale: string;
+        page_views: number | string;
         published_at: Date | string | null;
         slug: string;
         source_agent: string | null;
@@ -567,11 +821,13 @@ async function getContentInventory(params: QueryParams) {
         source_ref: string | null;
         status: string;
         title: string;
+        translation_group_id: string;
         updated_at: Date | string;
       }>
     >`
       select
         id::text,
+        translation_group_id::text,
         locale,
         status,
         slug,
@@ -581,11 +837,24 @@ async function getContentInventory(params: QueryParams) {
         source_channel,
         source_ref,
         published_at,
+        coalesce(view_stats.page_views, 0)::int as page_views,
+        view_stats.last_viewed_at,
         created_at,
         updated_at
       from public.blog_posts
-      where (${status}::text is null or status = ${status})
-        and (${locale}::text is null or locale = ${locale})
+      left join lateral (
+        select
+          count(*)::int as page_views,
+          max(occurred_at) as last_viewed_at
+        from public.bpm
+        where event_name = 'blog_article_viewed'
+          ${start ? sql`and occurred_at >= ${start}` : sql``}
+          and (
+            path = '/' || blog_posts.locale || '/blog/' || blog_posts.slug
+            or source_url like '%' || '/blog/' || blog_posts.slug || '%'
+          )
+      ) view_stats on true
+      where (${locale}::text is null or locale = ${locale})
       order by updated_at desc
       limit 500
     `,
@@ -611,21 +880,77 @@ async function getContentInventory(params: QueryParams) {
         created_at,
         updated_at
       from public.testimonials
-      where (${status}::text is null or status = ${status})
-        and (${locale}::text is null or locale = ${locale})
+      where (${locale}::text is null or locale = ${locale})
       order by updated_at desc
       limit 500
+    `,
+    sql<
+      Array<{
+        content_id: string | null;
+        content_type: string | null;
+        id: string;
+        scheduled_for: Date | string;
+      }>
+    >`
+      select
+        id::text,
+        payload ->> 'contentId' as content_id,
+        payload ->> 'contentType' as content_type,
+        scheduled_for
+      from public.tasks
+      where task_type = 'content_status_change'
+        and payload ->> 'targetStatus' = 'published'
+        and scheduled_for > now()
+        and status not in ('completed', 'failed', 'cancelled', 'skipped')
+      order by scheduled_for asc
+      limit 1000
     `
   ]);
-  const rows: ContentInventoryRow[] = [
+  const scheduledTasks = new Map(
+    scheduledTaskRows
+      .filter((row) => row.content_id && row.content_type)
+      .map((row) => [
+        `${row.content_type}:${row.content_id}`,
+        {
+          id: row.id,
+          scheduledFor: new Date(row.scheduled_for).toISOString()
+        }
+      ])
+  );
+  const workflowStatus = (
+    contentType: "blog_post" | "testimonial",
+    id: string,
+    status: string
+  ): AdminContentWorkflowStatus => {
+    if (scheduledTasks.has(`${contentType}:${id}`)) {
+      return "scheduled";
+    }
+
+    if (status === "archived") {
+      return "deleted";
+    }
+
+    if (status === "published") {
+      return "published";
+    }
+
+    return "draft";
+  };
+  const rows: AdminContentInventoryRow[] = [
     ...postRows.map((row) => ({
       contentType: "blog_post" as const,
       createdAt: new Date(row.created_at).toISOString(),
       id: row.id,
+      lastViewedAt: row.last_viewed_at
+        ? new Date(row.last_viewed_at).toISOString()
+        : null,
       locale: row.locale,
+      pageViews: Number(row.page_views) || 0,
+      pendingTaskId: scheduledTasks.get(`blog_post:${row.id}`)?.id ?? null,
       publishedAt: row.published_at
         ? new Date(row.published_at).toISOString()
         : null,
+      scheduledFor: scheduledTasks.get(`blog_post:${row.id}`)?.scheduledFor ?? null,
       slug: row.slug,
       sourceAgent: row.source_agent,
       sourceChannel: row.source_channel,
@@ -633,14 +958,21 @@ async function getContentInventory(params: QueryParams) {
       status: row.status,
       summary: row.excerpt,
       title: row.title,
-      updatedAt: new Date(row.updated_at).toISOString()
+      translationGroupId: row.translation_group_id,
+      updatedAt: new Date(row.updated_at).toISOString(),
+      workflowStatus: workflowStatus("blog_post", row.id, row.status)
     })),
     ...testimonialRows.map((row) => ({
       contentType: "testimonial" as const,
       createdAt: new Date(row.created_at).toISOString(),
       id: row.id,
+      lastViewedAt: null,
       locale: row.locale,
+      pageViews: 0,
+      pendingTaskId: scheduledTasks.get(`testimonial:${row.id}`)?.id ?? null,
       publishedAt: null,
+      scheduledFor:
+        scheduledTasks.get(`testimonial:${row.id}`)?.scheduledFor ?? null,
       slug: null,
       sourceAgent: row.source_agent,
       sourceChannel: null,
@@ -648,28 +980,41 @@ async function getContentInventory(params: QueryParams) {
       status: row.status,
       summary: row.quote,
       title: row.author_name || "Testimonial",
-      updatedAt: new Date(row.updated_at).toISOString()
+      translationGroupId: null,
+      updatedAt: new Date(row.updated_at).toISOString(),
+      workflowStatus: workflowStatus("testimonial", row.id, row.status)
     }))
-  ].sort(
-    (left, right) =>
-      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
-  );
+  ]
+    .filter((row) => !params.status || row.workflowStatus === params.status)
+    .sort(
+      (left, right) =>
+        new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+    );
   const summary = rows.reduce(
     (counts, row) => {
       counts.total += 1;
+      counts.pageViews += row.pageViews;
 
-      if (
-        row.status === "archived" ||
-        row.status === "draft" ||
-        row.status === "published" ||
-        row.status === "review"
-      ) {
-        counts[row.status] += 1;
+      if (row.contentType === "blog_post") {
+        counts.blogPosts += 1;
+      } else {
+        counts.testimonials += 1;
       }
+
+      counts[row.workflowStatus] += 1;
 
       return counts;
     },
-    { archived: 0, draft: 0, published: 0, review: 0, total: 0 }
+    {
+      blogPosts: 0,
+      deleted: 0,
+      draft: 0,
+      pageViews: 0,
+      published: 0,
+      scheduled: 0,
+      testimonials: 0,
+      total: 0
+    }
   );
   const { pageRows, pagination } = paginate(rows, params);
 
@@ -679,6 +1024,15 @@ async function getContentInventory(params: QueryParams) {
     summary,
     pagination
   };
+}
+
+export async function getAdminContentData(
+  range: AdminDashboardRange,
+  filters: AdminDashboardFilters,
+  status = "",
+  limit = 100
+) {
+  return getContentInventory(dashboardQueryParams({ filters, limit, range, status }));
 }
 
 export async function getAdminExternalQueryData(

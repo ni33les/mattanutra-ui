@@ -80,7 +80,7 @@ flowchart TB
 | Gap | Why It Matters | Suggested Next Step |
 | --- | --- | --- |
 | Payment activation | Cannot test revenue conversion yet | Wire Precision/Pro checkout once account is ready |
-| Admin operations views | Sales analytics, goals, task visibility, technical alerts, supplement review, and supplement editing basics exist; content and campaign comparison views still need interfaces | Add campaign and content panels |
+| Admin operations views | Business dashboard, conversions, campaigns, leads, content workflow, goals, task visibility, technical alerts, supplement review, and supplement editing basics exist | Add deeper ray drill-down and revenue once payments are live |
 | Supplement governance | Whitelist, blacklist, max dose, and safety review basics exist; frequency and interaction rules are not wired yet | Add frequency, condition, medication, pregnancy, and lab interaction checks |
 | Product matching | Affiliate revenue depends on trusted products | Start with curated whitelist before marketplace automation |
 | Chat handoff | Pro needs a convincing ongoing service experience | LINE server dispatch and mapping API exist; production webhook/OpenClaw mapping and operating process still need tightening |
@@ -194,6 +194,9 @@ How the admin sections should be read:
 | --- | --- | --- |
 | Dashboard | Are traffic, assessment progress, conversions, reviews, and contact issues moving in the right direction? | Live from BPM events and review/communication queues |
 | Conversions | Where do people continue, and where do they stop? | Live from BPM events |
+| Campaigns | Which campaigns, affiliates, and promo sources create qualified traffic and conversions? | Live from BPM campaign/source/affiliate fields |
+| Leads | Which visitors are becoming usable leads, and where are they in the journey? | Live from BPM, review, communication, and plan records |
+| Content | Which articles/testimonials are draft, scheduled, published, or deleted, and how are pages performing? | Live from content tables, BPM page views, and content workflow tasks |
 | Supplements | Which supplements are allowed, blocked, or awaiting review? | Live with editable dose ceilings and safety flags |
 | Human Review | What needs a human decision before being shown or acted on? | Live for supplement review and dose-reduction notices |
 | Execution / Goals | What outcome is being pursued, and which tasks/events explain its current state? | Live for supplement review, formulation, Free email, reassessment, and staged task-backed work |
@@ -221,11 +224,10 @@ These endpoints are machine-to-machine only. They accept `Authorization: Bearer 
 
 Remaining admin dashboard work:
 
-1. Browser-facing Campaigns and Leads pages that use the same external-query data.
-2. Retry actions for failed technical tasks where safe.
-3. Ray drill-down for a single anonymous BPM/session journey.
-4. Interaction-rule and advanced supplement decision management.
-5. Revenue and payment reporting after checkout is live.
+1. Retry actions for failed technical tasks where safe.
+2. Ray drill-down for a single anonymous BPM/session journey.
+3. Interaction-rule and advanced supplement decision management.
+4. Revenue and payment reporting after checkout is live.
 
 ## Supplement Governance
 
@@ -312,7 +314,9 @@ Worker execution is currently internal, but it runs through the protected task A
 
 Blog articles and testimonials are database-driven and can be managed by OpenClaw or another admin system using protected machine APIs. These APIs use `ADMIN_CLAW_TOKEN` with `Authorization: Bearer <ADMIN_CLAW_TOKEN>` or `x-admin-claw-token`; dashboard tokens are not accepted for machine API access.
 
-The dashboard can also request Draft, Review, Publish Now, Publish On, and Archive workflows through `/api/admin/content/workflow`. That API creates a content goal and a `content_status_change` task. The deterministic Content Publisher agent applies the status change through the normal task completion flow, so content changes are visible in Goals, Tasks, and task events.
+Blog articles use linked locale-specific records: English and Thai copies are separate rows, but related rows share a `translationGroupId`. This lets the language switcher route to the actual translated slug when it exists and avoid dead translated article URLs when it does not.
+
+The dashboard can request Draft, Schedule, Publish, and Delete workflows through `/api/admin/content/workflow`. That API creates a content goal and a `content_status_change` task. The deterministic Content Publisher agent applies the status change through the normal task completion flow, so content changes are visible in Goals, Tasks, and task events.
 
 Purpose:
 

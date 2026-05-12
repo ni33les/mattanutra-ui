@@ -3808,6 +3808,7 @@ end $$;
 
 create table if not exists public.blog_posts (
   id uuid primary key,
+  translation_group_id uuid not null,
   locale text not null default 'en',
   slug text not null,
   status text not null default 'draft',
@@ -3835,6 +3836,7 @@ create table if not exists public.blog_posts (
 );
 
 alter table public.blog_posts
+  add column if not exists translation_group_id uuid null,
   add column if not exists locale text default 'en',
   add column if not exists slug text,
   add column if not exists status text default 'draft',
@@ -3886,7 +3888,25 @@ where locale is null
   or created_at is null
   or updated_at is null;
 
+with grouped_blog_posts as (
+  select
+    slug,
+    (array_agg(id order by locale, id))[1] as translation_group_id
+  from public.blog_posts
+  group by slug
+)
+update public.blog_posts p
+set translation_group_id = grouped_blog_posts.translation_group_id
+from grouped_blog_posts
+where p.slug = grouped_blog_posts.slug
+  and p.translation_group_id is null;
+
+update public.blog_posts
+set translation_group_id = id
+where translation_group_id is null;
+
 alter table public.blog_posts
+  alter column translation_group_id set not null,
   alter column locale set default 'en',
   alter column locale set not null,
   alter column slug set not null,
@@ -3930,6 +3950,17 @@ begin
     alter table public.blog_posts
       add constraint blog_posts_locale_slug_key unique (locale, slug);
   end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.blog_posts'::regclass
+      and conname = 'blog_posts_translation_group_locale_key'
+  ) then
+    alter table public.blog_posts
+      add constraint blog_posts_translation_group_locale_key
+      unique (translation_group_id, locale);
+  end if;
 end $$;
 
 create index if not exists blog_posts_published_idx
@@ -3937,6 +3968,9 @@ create index if not exists blog_posts_published_idx
 
 create index if not exists blog_posts_status_idx
   on public.blog_posts (status, updated_at desc);
+
+create index if not exists blog_posts_translation_group_idx
+  on public.blog_posts (translation_group_id);
 
 create index if not exists blog_posts_tags_idx
   on public.blog_posts using gin (tags);
@@ -4060,6 +4094,7 @@ set
 
 insert into public.blog_posts (
   id,
+  translation_group_id,
   locale,
   slug,
   status,
@@ -4085,6 +4120,7 @@ insert into public.blog_posts (
 values
   (
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+    '10000000-0000-4000-8000-000000000001',
     'en',
     'why-a-healthscore-beats-a-generic-supplement-list',
     'published',
@@ -4119,6 +4155,7 @@ values
   ),
   (
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2',
+    '10000000-0000-4000-8000-000000000002',
     'en',
     'how-to-choose-supplements-without-wasting-money',
     'published',
@@ -4153,6 +4190,7 @@ values
   ),
   (
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3',
+    '10000000-0000-4000-8000-000000000003',
     'en',
     'what-changes-after-50-energy-sleep-and-recovery',
     'published',
@@ -4187,6 +4225,7 @@ values
   ),
   (
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+    '10000000-0000-4000-8000-000000000001',
     'th',
     'why-a-healthscore-beats-a-generic-supplement-list',
     'published',
@@ -4221,6 +4260,7 @@ values
   ),
   (
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',
+    '10000000-0000-4000-8000-000000000002',
     'th',
     'how-to-choose-supplements-without-wasting-money',
     'published',
@@ -4255,6 +4295,7 @@ values
   ),
   (
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3',
+    '10000000-0000-4000-8000-000000000003',
     'th',
     'what-changes-after-50-energy-sleep-and-recovery',
     'published',
@@ -4289,6 +4330,7 @@ values
   )
 on conflict (locale, slug) do update
 set
+  translation_group_id = excluded.translation_group_id,
   status = excluded.status,
   title = excluded.title,
   subtitle = excluded.subtitle,

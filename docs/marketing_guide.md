@@ -126,13 +126,24 @@ The admin dashboard is designed to answer: "Which traffic and messages create qu
 Current views:
 
 - Dashboard: business summary of traffic, assessment progress, conversions, reviews, and customer-contact issues.
-- Dashboard: traffic, assessment progress, Free requests, paid conversions, reviews, contact issues, and clickable trend graphing.
 - Conversions: the funnel journey from landing/assessment through HealthScore, Free email, paid plan, nutrition plan, results, chat, and marketplace clicks.
-- Campaigns and Leads: available to external agents through protected admin query APIs, with browser pages still to be completed.
+- Campaigns: campaign/source/medium/affiliate/promo performance, from landed visitors through HealthScore, Free requests, and paid-plan conversions.
+- Leads: current lead stage, source/campaign, plan, pending reviews, contact issues, and last action.
+- Content: draft, scheduled, published, and soft-deleted articles/testimonials, with per-page view counts and workflow actions.
 - Supplements: the current supplement catalogue, list status, dose ceiling, confidence, and safety flags.
-- Human Review: supplement decisions and dose-reduction notices that need or needed a person.
+- Reviews: supplement decisions and dose-reduction notices that need or needed a person.
 - Technical Alerts: operational failures or stuck work that may affect customer experience.
 - Goals: customer or operational outcomes grouped by ray, with their task progress and current status.
+
+## Demo Campaign Data
+
+For local demos, seed fake BPM traffic with:
+
+```bash
+npm run seed:campaigns
+```
+
+This recreates only rows marked as `dev_campaign_seed` / `campaign-demo`, then inserts demo journeys across HealthScore Launch, Precision Longevity Search, and Bangkok Clinic Referrals. Use `npm run seed:campaigns -- --dry-run` to preview, `--append` to add another batch without deleting the previous demo rows, and `--reset-only` to remove the demo rows.
 
 Current timeframe windows:
 

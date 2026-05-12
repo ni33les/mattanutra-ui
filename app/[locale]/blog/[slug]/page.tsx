@@ -4,7 +4,10 @@ import { BlogArticle } from "@/components/blog-article";
 import { SiteFooter } from "@/components/site-footer";
 import { ServiceIssue } from "@/components/service-issue";
 import { TitleBar } from "@/components/title-bar";
-import { getPublishedBlogPost } from "@/lib/blog";
+import {
+  getPublishedBlogPost,
+  getPublishedBlogPostLocalePaths
+} from "@/lib/blog";
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 
@@ -15,7 +18,8 @@ type BlogArticlePageProps = Readonly<{
   }>;
 }>;
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
+export const revalidate = 300;
 
 async function getPagePost(params: BlogArticlePageProps["params"]) {
   const { locale: rawLocale, slug } = await params;
@@ -111,11 +115,20 @@ export default async function BlogArticlePage({
     notFound();
   }
 
+  const translationPaths = await getPublishedBlogPostLocalePaths(
+    post.translationGroupId
+  );
+  const localizedPaths = {
+    en: translationPaths.en ?? "/en",
+    th: translationPaths.th ?? "/th"
+  };
+
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
       <TitleBar
         currentLocale={locale}
         currentPath={currentPath}
+        localizedPaths={localizedPaths}
         title={dictionary.hero.eyebrow}
       />
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">

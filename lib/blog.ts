@@ -38,6 +38,7 @@ export type BlogPostSummary = Readonly<{
   imageUrl: string;
   slug: string;
   title: string;
+  translationGroupId: string;
 }>;
 
 export type BlogPost = BlogPostSummary &
@@ -81,6 +82,7 @@ type BlogPostRow = {
   testimonial_id: string | null;
   testimonial_quote: string | null;
   title: string;
+  translation_group_id: string;
 };
 
 type TestimonialRow = {
@@ -124,6 +126,12 @@ function toOptionalString(value: unknown) {
   const text = toStringValue(value);
 
   return text || null;
+}
+
+function toOptionalUuid(value: unknown) {
+  const text = toOptionalString(value);
+
+  return text && isUuid(text) ? text : null;
 }
 
 function toTags(value: unknown) {
@@ -268,7 +276,8 @@ function mapPost(row: BlogPostRow, localeOverride?: Locale): BlogPost {
     subtitle: row.subtitle ?? row.excerpt ?? "",
     tags: row.tags ?? [],
     testimonial: mapTestimonial(row),
-    title: row.title
+    title: row.title,
+    translationGroupId: row.translation_group_id
   };
 }
 
@@ -276,6 +285,7 @@ function blogSelectSql() {
   return `
     select
       p.id,
+      p.translation_group_id,
       p.locale,
       p.slug,
       p.title,
@@ -345,6 +355,42 @@ export async function getPublishedBlogPost(locale: Locale, slug: string) {
   } catch (error) {
     console.error("Unable to load blog post", error);
     return null;
+  }
+}
+
+export async function getPublishedBlogPostLocalePaths(
+  translationGroupId: string
+) {
+  const sql = getSql();
+
+  if (!sql) {
+    return {} as Partial<Record<Locale, string>>;
+  }
+
+  try {
+    const rows = await sql<
+      Array<{
+        locale: string | null;
+        slug: string;
+      }>
+    >`
+      select locale, slug
+      from public.blog_posts
+      where translation_group_id = ${translationGroupId}
+        and status = 'published'
+        and locale in ('en', 'th')
+    `;
+
+    return rows.reduce<Partial<Record<Locale, string>>>((paths, row) => {
+      const locale = toLocale(row.locale);
+
+      paths[locale] = hrefForPost(locale, row.slug);
+
+      return paths;
+    }, {});
+  } catch (error) {
+    console.error("Unable to load blog translation links", error);
+    return {} as Partial<Record<Locale, string>>;
   }
 }
 
@@ -453,8 +499,59 @@ function normalizePostInput(input: BlogPostInput, existing?: BlogPostRow) {
       toOptionalString(input.testimonialId ?? input.testimonial_id) ??
       existing?.testimonial_id ??
       null,
-    title
+    title,
+    translationGroupId:
+      toOptionalUuid(input.translationGroupId ?? input.translation_group_id) ??
+      existing?.translation_group_id ??
+      null
   };
+}
+
+async function findTranslationGroupForInput(
+  input: BlogPostInput,
+  post: ReturnType<typeof normalizePostInput>
+) {
+  const sql = getSql();
+
+  if (!sql) {
+    return post.translationGroupId ?? randomUUID();
+  }
+
+  const sourceIdOrSlug = toOptionalString(
+    input.translatedFromPostId ??
+      input.translated_from_post_id ??
+      input.translationSourceId ??
+      input.translation_source_id
+  );
+  const sourceLocale = toLocale(
+    input.translatedFromLocale ??
+      input.translated_from_locale ??
+      input.translationSourceLocale ??
+      input.translation_source_locale
+  );
+
+  if (sourceIdOrSlug) {
+    const source = await findEditablePost(sourceIdOrSlug, sourceLocale);
+
+    if (source?.translation_group_id) {
+      return source.translation_group_id;
+    }
+  }
+
+  if (post.translationGroupId) {
+    return post.translationGroupId;
+  }
+
+  const slugMatches = await sql<Array<{ translation_group_id: string }>>`
+    select translation_group_id::text
+    from public.blog_posts
+    where slug = ${post.slug}
+      and locale <> ${post.locale}
+    order by created_at asc
+    limit 1
+  `;
+
+  return slugMatches[0]?.translation_group_id ?? randomUUID();
 }
 
 async function findEditablePost(idOrSlug: string, locale?: Locale) {
@@ -508,6 +605,7 @@ export async function createBlogPost(input: BlogPostInput) {
   }
 
   const post = normalizePostInput(input);
+  const translationGroupId = await findTranslationGroupForInput(input, post);
 
   if (!post.title || !post.slug || !post.excerpt) {
     throw new Error("Blog post requires title, slug, and excerpt");
@@ -516,6 +614,7 @@ export async function createBlogPost(input: BlogPostInput) {
   const rows = await sql<BlogPostRow[]>`
     insert into public.blog_posts (
       id,
+      translation_group_id,
       locale,
       slug,
       status,
@@ -540,6 +639,7 @@ export async function createBlogPost(input: BlogPostInput) {
     )
     values (
       ${post.id},
+      ${translationGroupId},
       ${post.locale},
       ${post.slug},
       ${post.status},
@@ -613,6 +713,7 @@ export async function updateBlogPost(
   const rows = await sql<BlogPostRow[]>`
     update public.blog_posts
     set
+      translation_group_id = ${post.translationGroupId ?? existing.translation_group_id},
       locale = ${post.locale},
       slug = ${post.slug},
       status = ${post.status},

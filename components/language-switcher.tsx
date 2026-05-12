@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 type LanguageSwitcherProps = Readonly<{
   currentLocale: Locale;
   currentPath: string;
+  localizedPaths?: Partial<Record<Locale, string>>;
 }>;
 
 function getLocalizedPath(currentPath: string, locale: Locale) {
@@ -23,7 +24,8 @@ function getLocalizedPath(currentPath: string, locale: Locale) {
 
 export function LanguageSwitcher({
   currentLocale,
-  currentPath
+  currentPath,
+  localizedPaths
 }: LanguageSwitcherProps) {
   return (
     <nav
@@ -32,7 +34,7 @@ export function LanguageSwitcher({
     >
       {locales.map((locale) => {
         const isActive = locale === currentLocale;
-        const next = getLocalizedPath(currentPath, locale);
+        const next = localizedPaths?.[locale] ?? getLocalizedPath(currentPath, locale);
         const label = localeLabels[locale];
 
         return (

@@ -14,6 +14,11 @@ import {
 } from "@/lib/admin-execution";
 import { getAdminFlowData } from "@/lib/admin-flow-data";
 import { getAdminGoalsData } from "@/lib/admin-goals";
+import {
+  getAdminCampaignsData,
+  getAdminContentData,
+  getAdminLeadsData
+} from "@/lib/admin-query-data";
 import { getAdminReviewQueueData } from "@/lib/admin-review-queue";
 import { getAdminSupplementsData } from "@/lib/admin-supplements";
 import { getAdminTechnicalAlertsData } from "@/lib/admin-technical";
@@ -60,10 +65,13 @@ export default async function LocalizedAdminDashboardPage({
   const view =
     rawView === "alerts" ||
     rawView === "agents" ||
+    rawView === "campaigns" ||
+    rawView === "content" ||
     rawView === "communications" ||
     rawView === "flow" ||
     rawView === "glance" ||
     rawView === "goals" ||
+    rawView === "leads" ||
     rawView === "reviews" ||
     rawView === "supplements" ||
     rawView === "visibility"
@@ -80,20 +88,26 @@ export default async function LocalizedAdminDashboardPage({
   const [
     alertsData,
     agentsData,
+    campaignsData,
+    contentData,
     communicationsData,
     data,
     flowData,
     goalsData,
+    leadsData,
     reviewQueueData,
     supplementsData,
     visibilityData
   ] = await Promise.all([
     getAdminTechnicalAlertsData(range),
     getAdminAgentsData(range),
+    getAdminCampaignsData(range, filters),
+    getAdminContentData(range, filters),
     getAdminCommunicationsData(range),
     getAdminDashboardData(range, filters),
     getAdminFlowData(range, filters),
     getAdminGoalsData(range, selectedGoalId),
+    getAdminLeadsData(range, filters),
     getAdminReviewQueueData(),
     getAdminSupplementsData(),
     getAdminTaskVisibilityData(range)
@@ -104,11 +118,14 @@ export default async function LocalizedAdminDashboardPage({
       accessToken={accessToken ?? ""}
       alertsData={alertsData}
       agentsData={agentsData}
+      campaignsData={campaignsData}
+      contentData={contentData}
       communicationsData={communicationsData}
       data={data}
       filters={filters}
       flowData={flowData}
       goalsData={goalsData}
+      leadsData={leadsData}
       locale={locale}
       reviewQueueData={reviewQueueData}
       selectedReviewTaskId={selectedReviewTaskId}
