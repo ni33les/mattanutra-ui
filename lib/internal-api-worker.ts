@@ -75,15 +75,38 @@ function positiveInteger(value: string | undefined, fallback: number) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function apiBaseUrl(baseUrl?: string | null) {
-  const configured =
-    baseUrl?.trim() ||
-    process.env.MATTANUTRA_API_BASE_URL ||
-    process.env.APP_BASE_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL;
+function configured(value: string | undefined) {
+  return value?.trim().replace(/\/+$/, "") || "";
+}
 
-  if (configured) {
-    return configured.replace(/\/$/, "");
+function localApiBaseUrl() {
+  const explicit = configured(process.env.MATTANUTRA_INTERNAL_API_BASE_URL);
+
+  if (explicit) {
+    return explicit;
+  }
+
+  const port = process.env.PORT?.trim();
+
+  return port ? `http://127.0.0.1:${port}` : "";
+}
+
+function apiBaseUrl(baseUrl?: string | null) {
+  const localBaseUrl = localApiBaseUrl();
+
+  if (process.env.NODE_ENV === "production" && localBaseUrl) {
+    return localBaseUrl;
+  }
+
+  const resolved =
+    configured(baseUrl ?? undefined) ||
+    configured(process.env.MATTANUTRA_API_BASE_URL) ||
+    configured(process.env.APP_BASE_URL) ||
+    configured(process.env.NEXT_PUBLIC_SITE_URL) ||
+    localBaseUrl;
+
+  if (resolved) {
+    return resolved;
   }
 
   if (process.env.NODE_ENV !== "production") {
@@ -95,6 +118,14 @@ function apiBaseUrl(baseUrl?: string | null) {
 
 function apiToken() {
   return process.env.ADMIN_CLAW_TOKEN || "";
+}
+
+function baseUrlForLog(value: string) {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value;
+  }
 }
 
 async function requestJson<T>(
@@ -115,15 +146,29 @@ async function requestJson<T>(
     throw new Error("ADMIN_CLAW_TOKEN is required for API workers");
   }
 
-  const response = await fetch(`${baseUrl}${path}`, {
-    body: JSON.stringify(body),
-    cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json"
-    },
-    method: "POST"
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${baseUrl}${path}`, {
+      body: JSON.stringify(body),
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      method: "POST"
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "fetch failed";
+    const cause =
+      error instanceof Error && error.cause instanceof Error
+        ? `: ${error.cause.message}`
+        : "";
+
+    throw new Error(
+      `${path} fetch failed via ${baseUrlForLog(baseUrl)}: ${message}${cause}`
+    );
+  }
 
   if (!response.ok) {
     let detail = "";
