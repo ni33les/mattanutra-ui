@@ -421,7 +421,7 @@ export async function enqueueExampleEmailTask(planId: string, requestId: string)
     goalId: deterministicUuid(`mattanutra:goal:free-example:${requestId}`),
     goalTitle: "Prepare Free nutrition plan email",
     idempotencyKey: `example-email:${requestId}`,
-    idempotencyScope: "successful",
+    idempotencyScope: "active",
     maxAttempts: 2,
     payload: { priorityClass: "free_example", requestId },
     planId,
@@ -502,10 +502,45 @@ export async function requestExampleBrief({
   `;
   const existingRequest = existingRequests[0];
 
-  if (existingRequest && existingRequest.status !== "failed") {
+  if (existingRequest && existingRequest.status === "email_sent") {
     return {
       requestId: existingRequest.id,
       taskId: existingRequest.task_id ?? ""
+    };
+  }
+
+  if (existingRequest?.task_id) {
+    return {
+      requestId: existingRequest.id,
+      taskId: existingRequest.task_id
+    };
+  }
+
+  if (
+    existingRequest &&
+    (
+      existingRequest.status === "formulation_ready" ||
+      existingRequest.status === "email_queued" ||
+      existingRequest.status === "email_rendered"
+    )
+  ) {
+    return {
+      requestId: existingRequest.id,
+      taskId: (await enqueueExampleEmailTask(planId, existingRequest.id)) ?? ""
+    };
+  }
+
+  if (
+    existingRequest &&
+    (
+      existingRequest.status === "requested" ||
+      existingRequest.status === "formulation_queued"
+    )
+  ) {
+    return {
+      requestId: existingRequest.id,
+      taskId:
+        (await enqueueExampleFormulationTask(planId, existingRequest.id)) ?? ""
     };
   }
 
@@ -545,14 +580,12 @@ function mapExampleRequestStatus(status: unknown) {
     return "failed";
   }
 
-  if (
-    status === "formulation_queued" ||
-    status === "formulation_ready" ||
-    status === "email_queued" ||
-    status === "email_rendered" ||
-    status === "email_sent"
-  ) {
+  if (status === "email_sent") {
     return "ready";
+  }
+
+  if (status === "email_rendered") {
+    return "failed";
   }
 
   return "preparing";

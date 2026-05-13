@@ -13,6 +13,7 @@ import {
 } from "@/lib/reassessment-email";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 import type { TaskWorkItem } from "@/lib/task-work-items";
+import type { SendTransactionalEmailResult } from "@/lib/smtp-email";
 
 function analysisErrorMessage(error: unknown) {
   return error instanceof Error
@@ -26,6 +27,19 @@ function hasHealthScoreAdvice(value: unknown): value is HealthScoreResult {
     typeof value === "object" &&
     "advice" in value &&
     Boolean((value as HealthScoreResult).advice)
+  );
+}
+
+function requireSentEmail(
+  delivery: SendTransactionalEmailResult,
+  emailType: string
+) {
+  if (delivery.sent) {
+    return;
+  }
+
+  throw new Error(
+    `${emailType} email was not sent${delivery.reason ? `: ${delivery.reason}` : ""}`
   );
 }
 
@@ -99,6 +113,7 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
       subject,
       to: emailValidation.email
     });
+    requireSentEmail(delivery, "Example preview");
 
     return {
       emailHtml,
@@ -129,6 +144,7 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
       subject,
       to: emailValidation.email
     });
+    requireSentEmail(delivery, "Reassessment");
 
     return {
       emailHtml,

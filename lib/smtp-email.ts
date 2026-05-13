@@ -6,7 +6,7 @@ type SendTransactionalEmailInput = Readonly<{
   to: string;
 }>;
 
-type SendTransactionalEmailResult = Readonly<{
+export type SendTransactionalEmailResult = Readonly<{
   messageId?: string;
   reason?: string;
   sent: boolean;
