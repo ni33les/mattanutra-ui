@@ -38,14 +38,19 @@ export type AdminGoalRow = Readonly<{
 export type AdminGoalTaskRow = Readonly<{
   actorType: string;
   attempts: number;
+  canRetry: boolean;
   completedAt: string | null;
   createdAt: string;
   errorMessage: string | null;
   id: string;
   leaseUntil: string | null;
   maxAttempts: number;
+  maxRetries: number;
   priority: number;
   requiredCapabilities: string[];
+  retryAttempt: number;
+  retryOfTaskId: string | null;
+  retryRootTaskId: string | null;
   scheduledFor: string;
   startedAt: string | null;
   status: string;
@@ -150,15 +155,20 @@ type GoalDbRow = Readonly<{
 type TaskDbRow = Readonly<{
   actor_type: string;
   attempts: number | string;
+  can_retry: boolean | null;
   completed_at: Date | string | null;
   created_at: Date | string;
   error_message: string | null;
   id: string;
   lease_until: Date | string | null;
   max_attempts: number | string;
+  max_retries: number | string;
   payload: Record<string, unknown> | null;
   priority: number | string;
   required_capabilities: string[] | null;
+  retry_attempt: number | string;
+  retry_of_task_id: string | null;
+  retry_root_task_id: string | null;
   scheduled_for: Date | string;
   started_at: Date | string | null;
   status: string;
@@ -385,16 +395,21 @@ function taskFromDb(row: TaskDbRow): AdminGoalTaskRow {
   return {
     actorType: row.actor_type,
     attempts: numberValue(row.attempts),
+    canRetry: Boolean(row.can_retry),
     completedAt: dateOrNull(row.completed_at),
     createdAt: new Date(row.created_at).toISOString(),
     errorMessage: row.error_message,
     id: row.id,
     leaseUntil: dateOrNull(row.lease_until),
     maxAttempts: numberValue(row.max_attempts),
+    maxRetries: numberValue(row.max_retries),
     priority: numberValue(row.priority),
     requiredCapabilities: Array.isArray(row.required_capabilities)
       ? row.required_capabilities
       : [],
+    retryAttempt: numberValue(row.retry_attempt),
+    retryOfTaskId: row.retry_of_task_id,
+    retryRootTaskId: row.retry_root_task_id,
     scheduledFor: new Date(row.scheduled_for).toISOString(),
     startedAt: dateOrNull(row.started_at),
     status: row.status,
@@ -631,6 +646,10 @@ export async function getAdminGoalsData(
           required_capabilities,
           attempts,
           max_attempts,
+          max_retries,
+          retry_attempt,
+          retry_of_task_id::text as retry_of_task_id,
+          retry_root_task_id::text as retry_root_task_id,
           scheduled_for,
           started_at,
           completed_at,
@@ -638,7 +657,29 @@ export async function getAdminGoalsData(
           error_message,
           payload,
           created_at,
-          updated_at
+          updated_at,
+          (
+            status = 'failed'
+            and not exists (
+              select 1
+              from public.tasks as successor
+              where successor.goal_id = tasks.goal_id
+                and successor.id <> tasks.id
+                and successor.status <> 'cancelled'
+                and (
+                  (
+                    coalesce(successor.retry_root_task_id, successor.id)
+                      = coalesce(tasks.retry_root_task_id, tasks.id)
+                    and successor.retry_attempt > tasks.retry_attempt
+                  )
+                  or (
+                    tasks.idempotency_key is not null
+                    and successor.idempotency_key = tasks.idempotency_key
+                    and successor.created_at > tasks.created_at
+                  )
+                )
+            )
+          ) as can_retry
         from public.tasks
         where goal_id = ${selectedId}::uuid
         order by

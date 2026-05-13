@@ -371,6 +371,11 @@ export type ReleaseExpiredReservationsInput = Readonly<{
   applyFailure?: (context: TaskFailureContext) => Promise<unknown>;
 }>;
 
+export type RetryFailedTaskInput = Readonly<{
+  agentId?: string | null;
+  taskId: string;
+}>;
+
 export type CompleteTaskInput = Readonly<{
   agentId?: string | null;
   applyResult?: (context: TaskCompletionContext) => Promise<unknown>;
@@ -1317,6 +1322,119 @@ export async function createTask(input: CreateTaskInput) {
   return sql.begin((tx) => createTaskInTransaction(tx, input));
 }
 
+export async function retryFailedTask(input: RetryFailedTaskInput) {
+  const sql = getRequiredSql();
+  const taskId = uuidOrNull(input.taskId);
+
+  if (!taskId) {
+    throw new Error("Task retry requires a valid taskId");
+  }
+
+  return sql.begin(async (tx) => {
+    const taskRows = await tx<TaskRow[]>`
+      select *
+      from public.tasks
+      where id = ${taskId}::uuid
+      for update
+    `;
+
+    if (!taskRows[0]) {
+      throw new Error(`Task ${input.taskId} not found`);
+    }
+
+    const failedTask = mapTask(taskRows[0]);
+
+    if (failedTask.status !== "failed") {
+      throw new Error("Only failed tasks can be retried");
+    }
+
+    if (await taskHasLaterRetrySuccessorInTransaction(tx, failedTask)) {
+      throw new Error("Task already has a later retry attempt");
+    }
+
+    const retryAttempt = failedTask.retryAttempt + 1;
+    const retryRootTaskId = taskLineageRootId(failedTask);
+    const payload = { ...payloadRecord(failedTask.payload) };
+    delete payload[TASK_RETRY_METADATA_KEY];
+    const dependencyRows = await tx<DependencyRow[]>`
+      select
+        task_id::text,
+        depends_on_task_id::text,
+        dependency_type,
+        created_at
+      from public.task_dependencies
+      where task_id = ${failedTask.id}::uuid
+      order by created_at asc
+    `;
+    const created = await createTaskInTransaction(tx, {
+      actorType: failedTask.actorType,
+      createdByAgentId: input.agentId,
+      createdByTaskId: failedTask.id,
+      dependencies: dependencyRows.map((dependency) => ({
+        taskId: dependency.depends_on_task_id,
+        type: dependency.dependency_type
+      })),
+      description: failedTask.description,
+      goalId: failedTask.goalId,
+      idempotencyKey: failedTask.idempotencyKey,
+      idempotencyScope: "active",
+      initialComment: {
+        authorName: "MattaNutra admin",
+        authorType: "system",
+        body: `Manual retry ${retryAttempt} requested from failed task.`,
+        commentType: "status",
+        metadata: {
+          failedTaskId: failedTask.id,
+          retryAttempt
+        },
+        visibility: "worker"
+      },
+      maxAttempts: failedTask.maxAttempts,
+      maxRetries: retryAttempt,
+      payload,
+      planId: failedTask.planId,
+      priority: failedTask.priority,
+      reasoningEffort: failedTask.reasoningEffort,
+      requiredCapabilities: failedTask.requiredCapabilities,
+      retryAttempt,
+      retryOfTaskId: failedTask.id,
+      retryPolicy: {
+        ...retryPolicyForTask(failedTask),
+        maxRetries: retryAttempt
+      },
+      retryRootTaskId,
+      scheduledFor: new Date(),
+      taskType: failedTask.taskType,
+      title: failedTask.title
+    });
+
+    await addTaskEventInTransaction(tx, {
+      agentId: input.agentId,
+      eventPayload: {
+        failedTaskId: failedTask.id,
+        retryAttempt,
+        retryRootTaskId,
+        retryTaskId: created.task.id
+      },
+      eventStatus: created.created ? "requested" : "observed",
+      eventType: created.created
+        ? "task_manual_retry_requested"
+        : "task_manual_retry_already_exists",
+      goalId: failedTask.goalId,
+      severity: "medium",
+      taskId: failedTask.id
+    });
+
+    await refreshGoalStateInTransaction(tx, failedTask.goalId);
+
+    return {
+      created: created.created,
+      sourceTask: failedTask,
+      task: created.task
+    };
+  });
+}
+
 async function createTaskSequenceInTransaction(
   sql: Db,
   input: CreateTaskSequenceInput
@@ -1678,6 +1796,35 @@ async function taskHasSuccessfulRetryInTransaction(sql: Db, task: TaskRecord) {
         )
       )
     order by created_at desc
+    limit 1
+  `;
+
+  return Boolean(rows[0]);
+}
+
+async function taskHasLaterRetrySuccessorInTransaction(
+  sql: Db,
+  task: TaskRecord
+) {
+  const lineageRootId = taskLineageRootId(task);
+  const rows = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.tasks as successor
+    where successor.goal_id = ${task.goalId}::uuid
+      and successor.id <> ${task.id}::uuid
+      and successor.status <> 'cancelled'
+      and (
+        (
+          coalesce(successor.retry_root_task_id, successor.id) = ${lineageRootId}::uuid
+          and successor.retry_attempt > ${task.retryAttempt}
+        )
+        or (
+          ${task.idempotencyKey}::text is not null
+          and successor.idempotency_key = ${task.idempotencyKey}
+          and successor.created_at > ${new Date(task.createdAt)}
+        )
+      )
+    order by successor.created_at desc
     limit 1
   `;
 

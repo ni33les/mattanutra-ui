@@ -105,6 +105,7 @@ import type {
 import type {
   AdminGoalsData,
   AdminGoalRow,
+  AdminGoalTaskRow,
   AdminGoalStatus
 } from "@/lib/admin-goals";
 import type {
@@ -351,6 +352,7 @@ type AdminContent = Readonly<{
   goals: {
     active: string;
     approvals: string;
+    attempt: string;
     blocked: string;
     cancelled: string;
     comments: string;
@@ -366,6 +368,10 @@ type AdminContent = Readonly<{
     priority: string;
     processing: string;
     reservations: string;
+    retry: string;
+    retryFailed: string;
+    retrying: string;
+    retryOf: string;
     scheduled: string;
     source: string;
     succeeded: string;
@@ -707,6 +713,7 @@ const content = {
     goals: {
       active: "Active",
       approvals: "Approvals",
+      attempt: "Attempt",
       blocked: "Blocked",
       cancelled: "Cancelled",
       comments: "Comments",
@@ -722,6 +729,10 @@ const content = {
       priority: "Priority",
       processing: "Processing",
       reservations: "Reservations",
+      retry: "Retry",
+      retryFailed: "Could not retry this task.",
+      retrying: "Retrying...",
+      retryOf: "Retry of",
       scheduled: "Scheduled",
       source: "Source",
       succeeded: "Succeeded",
@@ -1142,6 +1153,7 @@ const content = {
     goals: {
       active: "กำลังทำ",
       approvals: "การอนุมัติ",
+      attempt: "ครั้งที่",
       blocked: "ติดขัด",
       cancelled: "ยกเลิก",
       comments: "ความคิดเห็น",
@@ -1157,6 +1169,10 @@ const content = {
       priority: "ความสำคัญ",
       processing: "กำลังดำเนินการ",
       reservations: "การจองงาน",
+      retry: "ลองอีกครั้ง",
+      retryFailed: "ไม่สามารถลองงานนี้อีกครั้งได้",
+      retrying: "กำลังลองอีกครั้ง...",
+      retryOf: "ลองจาก",
       scheduled: "ตั้งเวลาแล้ว",
       source: "แหล่งที่มา",
       succeeded: "สำเร็จ",
@@ -7698,6 +7714,39 @@ function GoalDetailPanel({
   locale: Locale;
   range: AdminDashboardRange;
 }>) {
+  const [retryingTaskId, setRetryingTaskId] = useState<string | null>(null);
+  const [retryErrorTaskId, setRetryErrorTaskId] = useState<string | null>(null);
+
+  async function retryTask(task: AdminGoalTaskRow) {
+    setRetryingTaskId(task.id);
+    setRetryErrorTaskId(null);
+
+    try {
+      const response = await fetch(`/api/admin/tasks/${task.id}/retry`, {
+        body: JSON.stringify({ accessToken }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+
+        throw new Error(errorPayload?.message ?? labels.goals.retryFailed);
+      }
+
+      window.location.reload();
+    } catch (error) {
+      console.error("Unable to retry task", error);
+      setRetryErrorTaskId(task.id);
+    } finally {
+      setRetryingTaskId(null);
+    }
+  }
+
   if (!goal) {
     return (
       <div className="rounded-2xl bg-white p-6 text-sm font-medium text-gray-500 shadow-sm ring-1 ring-gray-200">
@@ -7771,6 +7820,7 @@ function GoalDetailPanel({
                   reviewTaskId: task.id
                 })
               : null;
+            const retrying = retryingTaskId === task.id;
 
             return (
               <article
@@ -7791,6 +7841,20 @@ function GoalDetailPanel({
                         task.title
                       )}
                     </h3>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-gray-500">
+                      <span>
+                        {labels.goals.attempt}{" "}
+                        {formatNumber(task.retryAttempt + 1, locale)}
+                      </span>
+                      <span>{readableToken(task.taskType)}</span>
+                      <span>{compactId(task.id)}</span>
+                      {task.retryOfTaskId ? (
+                        <span>
+                          {labels.goals.retryOf}{" "}
+                          {compactId(task.retryOfTaskId)}
+                        </span>
+                      ) : null}
+                    </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
                     <span
@@ -7809,11 +7873,26 @@ function GoalDetailPanel({
                     >
                       {readableToken(task.status)}
                     </span>
+                    {task.canRetry ? (
+                      <button
+                        className="rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-300 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] disabled:cursor-wait disabled:opacity-60"
+                        disabled={Boolean(retryingTaskId)}
+                        onClick={() => void retryTask(task)}
+                        type="button"
+                      >
+                        {retrying ? labels.goals.retrying : labels.goals.retry}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
                 {task.errorMessage ? (
                   <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700 ring-1 ring-red-100">
                     {task.errorMessage}
+                  </p>
+                ) : null}
+                {retryErrorTaskId === task.id ? (
+                  <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 ring-1 ring-amber-100">
+                    {labels.goals.retryFailed}
                   </p>
                 ) : null}
               </article>
