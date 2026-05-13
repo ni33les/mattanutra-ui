@@ -2011,6 +2011,11 @@ function taskMatchesMetric(
   const leaseUntilTime = row.leaseUntil
     ? new Date(row.leaseUntil).getTime()
     : Number.POSITIVE_INFINITY;
+  const scheduledForTime = new Date(row.scheduledFor).getTime();
+  const isDue =
+    !Number.isFinite(generatedAtTime) ||
+    !Number.isFinite(scheduledForTime) ||
+    scheduledForTime <= generatedAtTime;
   const staleLease =
     (row.status === "reserved" || row.status === "running") &&
     Number.isFinite(generatedAtTime) &&
@@ -2033,7 +2038,17 @@ function taskMatchesMetric(
   }
 
   if (metricId === "tasksBlocked") {
-    return row.status === "blocked";
+    return (
+      row.status === "needs_review" ||
+      row.status === "waiting_approval" ||
+      (row.status === "queued" && isDue && row.blockedDependencyCount > 0) ||
+      (row.actorType === "human" &&
+        isDue &&
+        (row.status === "queued" ||
+          row.status === "reserved" ||
+          row.status === "running")) ||
+      staleLease
+    );
   }
 
   if (metricId === "tasksFailed") {

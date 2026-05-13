@@ -794,7 +794,7 @@ create table if not exists public.goals (
   ),
   title text not null,
   status text not null default 'open' check (
-    status in ('open', 'active', 'blocked', 'completed', 'cancelled', 'failed')
+    status in ('open', 'active', 'completed', 'cancelled', 'failed')
   ),
   priority integer not null default 2 check (
     priority >= 1 and priority <= 5
@@ -833,7 +833,8 @@ set
   end,
   title = coalesce(nullif(title, ''), 'Untitled goal'),
   status = case
-    when status in ('open', 'active', 'blocked', 'completed', 'cancelled', 'failed')
+    when status = 'blocked' then 'active'
+    when status in ('open', 'active', 'completed', 'cancelled', 'failed')
       then status
     else 'open'
   end,
@@ -847,7 +848,8 @@ where ray is null
   or title is null
   or title = ''
   or status is null
-  or status not in ('open', 'active', 'blocked', 'completed', 'cancelled', 'failed')
+  or status = 'blocked'
+  or status not in ('open', 'active', 'completed', 'cancelled', 'failed')
   or priority is null
   or priority < 1
   or priority > 5
@@ -883,16 +885,12 @@ begin
       check (goal_type in ('journey', 'goal', 'task_run', 'system'));
   end if;
 
-  if not exists (
-    select 1
-    from pg_constraint
-    where conrelid = 'public.goals'::regclass
-      and conname = 'goals_status_check'
-  ) then
-    alter table public.goals
-      add constraint goals_status_check
-      check (status in ('open', 'active', 'blocked', 'completed', 'cancelled', 'failed'));
-  end if;
+  alter table public.goals
+    drop constraint if exists goals_status_check;
+
+  alter table public.goals
+    add constraint goals_status_check
+    check (status in ('open', 'active', 'completed', 'cancelled', 'failed'));
 
   alter table public.goals
     drop constraint if exists goals_priority_check;
@@ -933,7 +931,6 @@ create table if not exists public.tasks (
       'queued',
       'reserved',
       'running',
-      'blocked',
       'needs_review',
       'waiting_approval',
       'completed',
@@ -1012,11 +1009,11 @@ set
     else 'system'
   end,
   status = case
+    when status = 'blocked' then 'queued'
     when status in (
       'queued',
       'reserved',
       'running',
-      'blocked',
       'needs_review',
       'waiting_approval',
       'completed',
@@ -1049,11 +1046,11 @@ where task_type is null
   or actor_type is null
   or actor_type not in ('human', 'ai', 'deterministic', 'external', 'system', 'worker')
   or status is null
+  or status = 'blocked'
   or status not in (
     'queued',
     'reserved',
     'running',
-    'blocked',
     'needs_review',
     'waiting_approval',
     'completed',
@@ -1159,29 +1156,24 @@ begin
       check (actor_type in ('human', 'ai', 'deterministic', 'external', 'system', 'worker'));
   end if;
 
-  if not exists (
-    select 1
-    from pg_constraint
-    where conrelid = 'public.tasks'::regclass
-      and conname = 'tasks_status_check'
-  ) then
-    alter table public.tasks
-      add constraint tasks_status_check
-      check (
-        status in (
-          'queued',
-          'reserved',
-          'running',
-          'blocked',
-          'needs_review',
-          'waiting_approval',
-          'completed',
-          'failed',
-          'cancelled',
-          'skipped'
-        )
-      );
-  end if;
+  alter table public.tasks
+    drop constraint if exists tasks_status_check;
+
+  alter table public.tasks
+    add constraint tasks_status_check
+    check (
+      status in (
+        'queued',
+        'reserved',
+        'running',
+        'needs_review',
+        'waiting_approval',
+        'completed',
+        'failed',
+        'cancelled',
+        'skipped'
+      )
+    );
 
   alter table public.tasks
     drop constraint if exists tasks_priority_check;
@@ -1322,6 +1314,57 @@ begin
       check (task_id <> depends_on_task_id);
   end if;
 end $$;
+
+create or replace function public.prevent_task_dependency_cycle()
+returns trigger
+language plpgsql
+as $$
+declare
+  previous_task_id uuid := null;
+  previous_depends_on_task_id uuid := null;
+begin
+  perform pg_advisory_xact_lock(1413563211, 1145393235);
+
+  if tg_op = 'UPDATE' then
+    previous_task_id := old.task_id;
+    previous_depends_on_task_id := old.depends_on_task_id;
+  end if;
+
+  if new.task_id = new.depends_on_task_id then
+    raise exception 'Task cannot depend on itself'
+      using errcode = '23514';
+  end if;
+
+  if exists (
+    with recursive dependency_path(task_id) as (
+      select new.depends_on_task_id
+      union
+      select task_dependencies.depends_on_task_id
+      from public.task_dependencies
+      inner join dependency_path
+        on dependency_path.task_id = task_dependencies.task_id
+      where previous_task_id is null
+        or task_dependencies.task_id <> previous_task_id
+        or task_dependencies.depends_on_task_id <> previous_depends_on_task_id
+    )
+    select 1
+    from dependency_path
+    where task_id = new.task_id
+  ) then
+    raise exception 'Task dependency cycle detected'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists task_dependencies_prevent_cycle on public.task_dependencies;
+
+create trigger task_dependencies_prevent_cycle
+before insert or update of task_id, depends_on_task_id
+on public.task_dependencies
+for each row execute function public.prevent_task_dependency_cycle();
 
 create index if not exists task_dependencies_waiting_idx
   on public.task_dependencies (depends_on_task_id, task_id);
@@ -4843,6 +4886,12 @@ begin
     execute 'alter table public.task_dependencies owner to mn';
   exception when others then
     raise notice 'Skipping task_dependencies owner change: %', sqlerrm;
+  end;
+
+  begin
+    execute 'alter function public.prevent_task_dependency_cycle() owner to mn';
+  exception when others then
+    raise notice 'Skipping prevent_task_dependency_cycle owner change: %', sqlerrm;
   end;
 
   begin

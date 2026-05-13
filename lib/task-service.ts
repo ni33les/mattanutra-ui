@@ -18,6 +18,9 @@ import {
   type TaskPriority
 } from "@/lib/task-service-utils";
 
+const TASK_DEPENDENCY_GRAPH_LOCK_CLASS = 1_413_563_211;
+const TASK_DEPENDENCY_GRAPH_LOCK_KEY = 1_145_393_235;
+
 export type AgentType =
   | "ai"
   | "deterministic"
@@ -29,7 +32,6 @@ export type AgentStatus = "active" | "offline" | "paused" | "retired";
 
 export type GoalStatus =
   | "active"
-  | "blocked"
   | "cancelled"
   | "completed"
   | "failed"
@@ -46,7 +48,6 @@ export type TaskActorType =
   | "worker";
 
 export type TaskStatus =
-  | "blocked"
   | "cancelled"
   | "completed"
   | "failed"
@@ -741,7 +742,6 @@ async function refreshGoalStateInTransaction(sql: Db, goalId: string) {
           'queued',
           'reserved',
           'running',
-          'blocked',
           'needs_review',
           'waiting_approval'
         )
@@ -756,7 +756,6 @@ async function refreshGoalStateInTransaction(sql: Db, goalId: string) {
                 'queued',
                 'reserved',
                 'running',
-                'blocked',
                 'needs_review',
                 'waiting_approval',
                 'completed',
@@ -1043,6 +1042,13 @@ async function ensureTaskDependenciesInTransaction(
   const saved: TaskDependency[] = [];
   const seen = new Set<string>();
 
+  await sql`
+    select pg_advisory_xact_lock(
+      ${TASK_DEPENDENCY_GRAPH_LOCK_CLASS},
+      ${TASK_DEPENDENCY_GRAPH_LOCK_KEY}
+    )
+  `;
+
   for (const dependency of dependencies) {
     const dependsOnTaskId = uuidOrNull(dependency.taskId);
     const dependencyType = normalizeTaskDependencyType(dependency.type);
@@ -1062,6 +1068,26 @@ async function ensureTaskDependenciesInTransaction(
     }
 
     seen.add(key);
+
+    const cycleRows = await sql<Array<{ has_cycle: boolean }>>`
+      with recursive dependency_path(task_id) as (
+        select ${dependsOnTaskId}::uuid
+        union
+        select task_dependencies.depends_on_task_id
+        from public.task_dependencies
+        inner join dependency_path
+          on dependency_path.task_id = task_dependencies.task_id
+      )
+      select exists (
+        select 1
+        from dependency_path
+        where task_id = ${taskUuid}::uuid
+      ) as has_cycle
+    `;
+
+    if (cycleRows[0]?.has_cycle) {
+      throw new Error("Task dependency cycle detected");
+    }
 
     const rows = await sql<DependencyRow[]>`
       insert into public.task_dependencies (
@@ -1648,8 +1674,7 @@ export async function listGoalTasks(input: Readonly<{ goalId: string }>) {
           'reserved',
           'running',
           'needs_review',
-          'waiting_approval',
-          'blocked'
+          'waiting_approval'
         ) then 0
         else 1
       end,

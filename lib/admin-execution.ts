@@ -300,7 +300,6 @@ export async function getAdminTaskVisibilityData(
   try {
     const start = adminDashboardRangeStart(range);
     const liveStatuses = [
-      "blocked",
       "needs_review",
       "queued",
       "reserved",
@@ -318,8 +317,42 @@ export async function getAdminTaskVisibilityData(
       (${whereClause}
         or (${taskId}::uuid is not null and tasks.id = ${taskId}::uuid))
     `;
+    const taskFlagsCte = sql`
+      task_flags as (
+        select
+          tasks.*,
+          (
+            select count(*)::int
+            from public.task_dependencies
+            inner join public.tasks dependency_tasks
+              on dependency_tasks.id = task_dependencies.depends_on_task_id
+            where task_dependencies.task_id = tasks.id
+              and (
+                (
+                  task_dependencies.dependency_type = 'complete'
+                  and dependency_tasks.status not in ('completed', 'skipped')
+                )
+                or (
+                  task_dependencies.dependency_type = 'successful'
+                  and dependency_tasks.status <> 'completed'
+                )
+                or (
+                  task_dependencies.dependency_type = 'approved'
+                  and not exists (
+                    select 1
+                    from public.task_approvals
+                    where task_approvals.task_id = dependency_tasks.id
+                      and task_approvals.status = 'approved'
+                  )
+                )
+              )
+          ) as blocked_dependency_count
+        from public.tasks
+      )
+    `;
     const [summaryRows, taskRows] = await Promise.all([
       sql<VisibilitySummaryDbRow[]>`
+        with ${taskFlagsCte}
         select
           count(*)::int as total,
           count(*) filter (where tasks.status = 'queued')::int as queued,
@@ -328,7 +361,24 @@ export async function getAdminTaskVisibilityData(
             where tasks.actor_type = 'human'
               or tasks.status in ('needs_review', 'waiting_approval')
           )::int as human,
-          count(*) filter (where tasks.status = 'blocked')::int as blocked,
+          count(*) filter (
+            where tasks.status in ('needs_review', 'waiting_approval')
+              or (
+                tasks.status = 'queued'
+                and tasks.scheduled_for <= now()
+                and tasks.blocked_dependency_count > 0
+              )
+              or (
+                tasks.actor_type = 'human'
+                and tasks.status in ('queued', 'reserved', 'running')
+                and tasks.scheduled_for <= now()
+              )
+              or (
+                tasks.status in ('reserved', 'running')
+                and tasks.lease_until is not null
+                and tasks.lease_until < now()
+              )
+          )::int as blocked,
           count(*) filter (
             where tasks.status = 'failed'
               or (
@@ -338,10 +388,11 @@ export async function getAdminTaskVisibilityData(
               )
           )::int as failed,
           count(*) filter (where tasks.status = 'completed')::int as completed
-        from public.tasks
+        from task_flags as tasks
         where ${whereClause}
       `,
       sql<VisibilityDbRow[]>`
+        with ${taskFlagsCte}
         select
           tasks.id::text,
           tasks.task_type,
@@ -367,15 +418,8 @@ export async function getAdminTaskVisibilityData(
           goals.ray::text,
           agents.id::text as agent_id,
           agents.name as agent_name,
-          (
-            select count(*)::int
-            from public.task_dependencies
-            inner join public.tasks dependency_tasks
-              on dependency_tasks.id = task_dependencies.depends_on_task_id
-            where task_dependencies.task_id = tasks.id
-              and dependency_tasks.status <> 'completed'
-          ) as blocked_dependency_count
-        from public.tasks
+          tasks.blocked_dependency_count
+        from task_flags as tasks
         inner join public.goals on goals.id = tasks.goal_id
         left join public.agents on agents.id = tasks.reserved_by_agent_id
         where ${taskRowsWhereClause}
@@ -390,8 +434,7 @@ export async function getAdminTaskVisibilityData(
               'reserved',
               'running',
               'needs_review',
-              'waiting_approval',
-              'blocked'
+              'waiting_approval'
             ) then 0
             else 1
           end,
@@ -404,7 +447,6 @@ export async function getAdminTaskVisibilityData(
             when 'running' then 2
             when 'needs_review' then 3
             when 'waiting_approval' then 3
-            when 'blocked' then 4
             when 'failed' then 5
             when 'completed' then 6
             when 'skipped' then 7
@@ -492,7 +534,6 @@ export async function getAdminAgentsData(
         from public.tasks
         where actor_type = 'human'
           and status in (
-            'blocked',
             'needs_review',
             'queued',
             'reserved',
@@ -519,7 +560,6 @@ export async function getAdminAgentsData(
         from public.tasks
         where actor_type = 'human'
           and status in (
-            'blocked',
             'needs_review',
             'queued',
             'reserved',

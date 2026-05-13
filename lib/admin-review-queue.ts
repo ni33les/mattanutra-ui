@@ -625,7 +625,7 @@ async function queueClientSafetyFollowupTask(
     where goal_id = ${input.goalId}::uuid
       and task_type = 'client_safety_followup'
       and coalesce(idempotency_key, '') <> ${idempotencyKey}
-      and status in ('queued', 'blocked', 'needs_review', 'waiting_approval')
+      and status in ('queued', 'needs_review', 'waiting_approval')
   `;
 
   const goalRows = await transaction<{ priority: number | string }[]>`

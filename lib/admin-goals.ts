@@ -323,7 +323,7 @@ function goalStatus(row: GoalDbRow): AdminGoalStatus {
     return "succeeded";
   }
 
-  if (numberValue(row.blocked_task_count) > 0 || row.raw_status === "blocked") {
+  if (numberValue(row.blocked_task_count) > 0) {
     return "blocked";
   }
 
@@ -478,7 +478,38 @@ export async function getAdminGoalsData(
   try {
     const start = adminDashboardRangeStart(range);
     const goalRows = await sql<GoalDbRow[]>`
-      with task_summary as (
+      with task_flags as (
+        select
+          tasks.*,
+          exists (
+            select 1
+            from public.task_dependencies
+            inner join public.tasks as dependency
+              on dependency.id = task_dependencies.depends_on_task_id
+            where task_dependencies.task_id = tasks.id
+              and (
+                (
+                  task_dependencies.dependency_type = 'complete'
+                  and dependency.status not in ('completed', 'skipped')
+                )
+                or (
+                  task_dependencies.dependency_type = 'successful'
+                  and dependency.status <> 'completed'
+                )
+                or (
+                  task_dependencies.dependency_type = 'approved'
+                  and not exists (
+                    select 1
+                    from public.task_approvals
+                    where task_approvals.task_id = dependency.id
+                      and task_approvals.status = 'approved'
+                  )
+                )
+              )
+          ) as has_blocking_dependency
+        from public.tasks
+      ),
+      task_summary as (
         select
           goal_id,
           count(*)::int as task_count,
@@ -487,6 +518,8 @@ export async function getAdminGoalsData(
               or (
                 status = 'queued'
                 and scheduled_for <= now()
+                and not has_blocking_dependency
+                and actor_type <> 'human'
               )
           )::int as active_task_count,
           count(*) filter (
@@ -494,18 +527,22 @@ export async function getAdminGoalsData(
               and scheduled_for > now()
           )::int as scheduled_task_count,
           count(*) filter (
-            where status in ('blocked', 'needs_review', 'waiting_approval')
+            where status in ('needs_review', 'waiting_approval')
+              or (
+                status = 'queued'
+                and scheduled_for <= now()
+                and has_blocking_dependency
+              )
               or (
                 status = 'failed'
                 and not exists (
                   select 1
-                  from public.tasks as successor
+                  from task_flags as successor
                   where successor.goal_id = tasks.goal_id
                     and successor.status in (
                       'queued',
                       'reserved',
                       'running',
-                      'blocked',
                       'needs_review',
                       'waiting_approval',
                       'completed',
@@ -540,13 +577,12 @@ export async function getAdminGoalsData(
             where status = 'failed'
               and not exists (
                 select 1
-                from public.tasks as successor
+                from task_flags as successor
                 where successor.goal_id = tasks.goal_id
                   and successor.status in (
                     'queued',
                     'reserved',
                     'running',
-                    'blocked',
                     'needs_review',
                     'waiting_approval',
                     'completed',
@@ -568,7 +604,7 @@ export async function getAdminGoalsData(
           )::int as failed_task_count,
           count(*) filter (where status = 'completed')::int as completed_task_count,
           max(updated_at) as task_updated_at
-        from public.tasks
+        from task_flags as tasks
         group by goal_id
       ),
       event_summary as (
@@ -689,8 +725,7 @@ export async function getAdminGoalsData(
               'reserved',
               'running',
               'needs_review',
-              'waiting_approval',
-              'blocked'
+              'waiting_approval'
             ) then 0
             else 1
           end,
