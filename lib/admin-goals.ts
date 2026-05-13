@@ -309,6 +309,10 @@ function goalStatus(row: GoalDbRow): AdminGoalStatus {
     return "failed";
   }
 
+  if (row.raw_status === "completed") {
+    return "succeeded";
+  }
+
   if (numberValue(row.blocked_task_count) > 0 || row.raw_status === "blocked") {
     return "blocked";
   }
@@ -475,7 +479,37 @@ export async function getAdminGoalsData(
               and scheduled_for > now()
           )::int as scheduled_task_count,
           count(*) filter (
-            where status in ('blocked', 'needs_review', 'waiting_approval', 'failed')
+            where status in ('blocked', 'needs_review', 'waiting_approval')
+              or (
+                status = 'failed'
+                and not exists (
+                  select 1
+                  from public.tasks as successor
+                  where successor.goal_id = tasks.goal_id
+                    and successor.status in (
+                      'queued',
+                      'reserved',
+                      'running',
+                      'blocked',
+                      'needs_review',
+                      'waiting_approval',
+                      'completed',
+                      'skipped'
+                    )
+                    and (
+                      (
+                        coalesce(successor.retry_root_task_id, successor.id)
+                          = coalesce(tasks.retry_root_task_id, tasks.id)
+                        and successor.retry_attempt > tasks.retry_attempt
+                      )
+                      or (
+                        tasks.idempotency_key is not null
+                        and successor.idempotency_key = tasks.idempotency_key
+                        and successor.created_at > tasks.created_at
+                      )
+                    )
+                )
+              )
               or (
                 actor_type = 'human'
                 and status in ('queued', 'reserved', 'running')
@@ -487,7 +521,36 @@ export async function getAdminGoalsData(
                 and lease_until < now()
               )
           )::int as blocked_task_count,
-          count(*) filter (where status = 'failed')::int as failed_task_count,
+          count(*) filter (
+            where status = 'failed'
+              and not exists (
+                select 1
+                from public.tasks as successor
+                where successor.goal_id = tasks.goal_id
+                  and successor.status in (
+                    'queued',
+                    'reserved',
+                    'running',
+                    'blocked',
+                    'needs_review',
+                    'waiting_approval',
+                    'completed',
+                    'skipped'
+                  )
+                  and (
+                    (
+                      coalesce(successor.retry_root_task_id, successor.id)
+                        = coalesce(tasks.retry_root_task_id, tasks.id)
+                      and successor.retry_attempt > tasks.retry_attempt
+                    )
+                    or (
+                      tasks.idempotency_key is not null
+                      and successor.idempotency_key = tasks.idempotency_key
+                      and successor.created_at > tasks.created_at
+                    )
+                  )
+              )
+          )::int as failed_task_count,
           count(*) filter (where status = 'completed')::int as completed_task_count,
           max(updated_at) as task_updated_at
         from public.tasks

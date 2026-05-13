@@ -13,8 +13,10 @@ import { isLocale, type Locale } from "@/lib/i18n";
 import { enqueueExampleEmailTask } from "@/lib/task-worker";
 import {
   addTaskEvent,
+  addTaskEventToTransaction,
   getTaskBundle,
   type ReservedTask,
+  type TaskServiceDb,
   type TaskRecord
 } from "@/lib/task-service";
 
@@ -32,6 +34,22 @@ function textValue(value: unknown) {
 
 function payloadText(payload: unknown, key: string) {
   return textValue(objectValue(payload)[key]);
+}
+
+async function inResultTransaction<T>(
+  sql: TaskServiceDb,
+  callback: (transaction: TaskServiceDb) => Promise<T>
+) {
+  const begin = (sql as { begin?: unknown }).begin;
+
+  if (typeof begin === "function") {
+    return (begin as (cb: (transaction: TaskServiceDb) => Promise<T>) => Promise<T>).call(
+      sql,
+      callback
+    );
+  }
+
+  return callback(sql);
 }
 
 function modelVersion(analysis: Record<string, unknown>, suffix = "") {
@@ -59,9 +77,10 @@ async function addWorkEvent(
   task: Pick<TaskRecord, "goalId" | "id">,
   eventType: string,
   level: AuditLevel = "low",
-  eventPayload: Record<string, unknown> = {}
+  eventPayload: Record<string, unknown> = {},
+  sql?: TaskServiceDb
 ) {
-  await addTaskEvent({
+  const event = {
     eventPayload,
     eventStatus:
       level === "critical" || level === "high" ? "observed" : "succeeded",
@@ -69,7 +88,14 @@ async function addWorkEvent(
     goalId: task.goalId,
     severity: level,
     taskId: task.id
-  });
+  } as const;
+
+  if (sql) {
+    await addTaskEventToTransaction(sql, event);
+    return;
+  }
+
+  await addTaskEvent(event);
 }
 
 async function recordTaskEmailCommunication(input: Readonly<{
@@ -78,6 +104,7 @@ async function recordTaskEmailCommunication(input: Readonly<{
   metadata?: Record<string, unknown>;
   messageType: string;
   payload: Record<string, unknown>;
+  sql?: TaskServiceDb;
   task: TaskRecord;
 }>) {
   if (!input.task.planId) {
@@ -104,18 +131,25 @@ async function recordTaskEmailCommunication(input: Readonly<{
       to: textValue(input.payload.to)
     });
   } catch (error) {
-    await addWorkEvent(input.task, "communication_record_failed", "medium", {
-      error: error instanceof Error ? error.message : "Unable to record email",
-      messageType: input.messageType
-    });
+    await addWorkEvent(
+      input.task,
+      "communication_record_failed",
+      "medium",
+      {
+        error: error instanceof Error ? error.message : "Unable to record email",
+        messageType: input.messageType
+      },
+      input.sql
+    );
   }
 }
 
 async function applyHealthScoreResult(
   task: TaskRecord,
-  resultPayload: unknown
+  resultPayload: unknown,
+  sqlOverride?: TaskServiceDb
 ) {
-  const sql = getSql();
+  const sql = sqlOverride ?? getSql();
   const payload = objectValue(resultPayload);
   const healthScore = payload.healthScore as HealthScoreResult | undefined;
   const fallbackUsed = payload.fallbackUsed === true;
@@ -158,15 +192,16 @@ async function applyHealthScoreResult(
     await addWorkEvent(task, "healthscore_analysis_fallback_used", "high", {
       errorMessage: fallbackErrorMessage,
       fallback: "static_healthscore_copy"
-    });
+    }, sql);
   }
 }
 
 async function applyPaidFormulationResult(
   task: TaskRecord,
-  resultPayload: unknown
+  resultPayload: unknown,
+  sqlOverride?: TaskServiceDb
 ) {
-  const sql = getSql();
+  const sql = sqlOverride ?? getSql();
   const planId = task.planId;
 
   if (!sql || !planId) {
@@ -190,7 +225,7 @@ async function applyPaidFormulationResult(
   const analysis = analysisPayload(resultPayload);
   const safeFormulation = await applyFormulationSafety(sql, {
     audit: async ({ eventType, level, payload }) =>
-      addWorkEvent(task, eventType, level ?? "low", payload),
+      addWorkEvent(task, eventType, level ?? "low", payload, sql),
     formulation: analysis.formulation,
     locale,
     plan: plan === "pro" ? "pro" : "precision",
@@ -198,7 +233,7 @@ async function applyPaidFormulationResult(
     taskId: task.id
   });
 
-  await sql.begin(async (transaction) => {
+  await inResultTransaction(sql, async (transaction) => {
     const versionRows = await transaction<{ version: number }[]>`
       select greatest(
         (
@@ -267,7 +302,7 @@ async function applyPaidFormulationResult(
     reasoningEffort: analysis.reasoningEffort,
     responseId: analysis.responseId,
     safetySummary: safeFormulation.safetySummary
-  });
+  }, sql);
   await writeBpmEvent({
     actorType: "worker",
     eventName: "formulation_ready",
@@ -290,9 +325,10 @@ async function applyPaidFormulationResult(
 
 async function applyExampleFormulationResult(
   task: TaskRecord,
-  resultPayload: unknown
+  resultPayload: unknown,
+  sqlOverride?: TaskServiceDb
 ) {
-  const sql = getSql();
+  const sql = sqlOverride ?? getSql();
   const planId = task.planId;
   const requestId = payloadText(task.payload, "requestId");
 
@@ -320,7 +356,7 @@ async function applyExampleFormulationResult(
   const analysis = analysisPayload(resultPayload);
   const safeFormulation = await applyFormulationSafety(sql, {
     audit: async ({ eventType, level, payload }) =>
-      addWorkEvent(task, eventType, level ?? "low", { ...payload, requestId }),
+      addWorkEvent(task, eventType, level ?? "low", { ...payload, requestId }, sql),
     formulation: analysis.formulation,
     locale,
     plan,
@@ -329,7 +365,7 @@ async function applyExampleFormulationResult(
     taskId: task.id
   });
 
-  await sql.begin(async (transaction) => {
+  await inResultTransaction(sql, async (transaction) => {
     const versionRows = await transaction<{ version: number }[]>`
       select coalesce(max(version), 0) + 1 as version
       from public.formulations
@@ -371,7 +407,7 @@ async function applyExampleFormulationResult(
     requestId,
     responseId: analysis.responseId,
     safetySummary: safeFormulation.safetySummary
-  });
+  }, sql);
   await enqueueExampleEmailTask(planId, requestId);
   await writeBpmEvent({
     actorType: "worker",
@@ -395,8 +431,12 @@ async function applyExampleFormulationResult(
   });
 }
 
-async function applyExampleEmailResult(task: TaskRecord, resultPayload: unknown) {
-  const sql = getSql();
+async function applyExampleEmailResult(
+  task: TaskRecord,
+  resultPayload: unknown,
+  sqlOverride?: TaskServiceDb
+) {
+  const sql = sqlOverride ?? getSql();
   const planId = task.planId;
   const requestId = payloadText(task.payload, "requestId");
   const payload = objectValue(resultPayload);
@@ -418,6 +458,7 @@ async function applyExampleEmailResult(task: TaskRecord, resultPayload: unknown)
     metadata: { requestId },
     messageType: "example_preview",
     payload,
+    sql,
     task
   });
   await addWorkEvent(
@@ -431,7 +472,8 @@ async function applyExampleEmailResult(task: TaskRecord, resultPayload: unknown)
       requestId,
       sent: payload.sent === true,
       to: payload.to
-    }
+    },
+    sql
   );
   await writeBpmEvent({
     actorType: "worker",
@@ -450,9 +492,10 @@ async function applyExampleEmailResult(task: TaskRecord, resultPayload: unknown)
 
 async function applyReassessmentEmailResult(
   task: TaskRecord,
-  resultPayload: unknown
+  resultPayload: unknown,
+  sqlOverride?: TaskServiceDb
 ) {
-  const sql = getSql();
+  const sql = sqlOverride ?? getSql();
   const planId = task.planId;
   const cronId = payloadText(task.payload, "cronId");
   const payload = objectValue(resultPayload);
@@ -496,6 +539,7 @@ async function applyReassessmentEmailResult(
     metadata: { cronId },
     messageType: "reassessment",
     payload,
+    sql,
     task
   });
   await addWorkEvent(
@@ -510,7 +554,8 @@ async function applyReassessmentEmailResult(
       recurrenceDays,
       sent: payload.sent === true,
       to: payload.to
-    }
+    },
+    sql
   );
   await writeBpmEvent({
     actorType: "worker",
@@ -585,7 +630,10 @@ function contentStatus(value: unknown) {
     : null;
 }
 
-async function applyContentStatusChangeResult(task: TaskRecord) {
+async function applyContentStatusChangeResult(
+  task: TaskRecord,
+  sqlOverride?: TaskServiceDb
+) {
   const payload = objectValue(task.payload);
   const contentType = payloadText(payload, "contentType");
   const contentId = payloadText(payload, "contentId");
@@ -619,7 +667,7 @@ async function applyContentStatusChangeResult(task: TaskRecord) {
     contentId,
     contentType,
     targetStatus
-  });
+  }, sqlOverride);
   await writeBpmEvent({
     actorType: "worker",
     eventName: "content_status_changed",
@@ -642,7 +690,8 @@ async function applyContentStatusChangeResult(task: TaskRecord) {
 
 async function applyDigitalOceanBillingSyncResult(
   task: TaskRecord,
-  resultPayload: unknown
+  resultPayload: unknown,
+  sqlOverride?: TaskServiceDb
 ) {
   const payload = objectValue(resultPayload);
   const digitalOcean = objectValue(payload.digitalOcean);
@@ -665,7 +714,8 @@ async function applyDigitalOceanBillingSyncResult(
       reason: reason || undefined,
       skipped,
       synced: Number.isFinite(synced) ? synced : 0
-    }
+    },
+    sqlOverride
   );
 
   return resultPayload;
@@ -674,37 +724,40 @@ async function applyDigitalOceanBillingSyncResult(
 export async function applyTaskCompletionResult({
   reservationId,
   resultPayload,
+  sql,
+  task: providedTask,
   taskId
 }: Readonly<{
   reservationId: string;
   resultPayload: unknown;
+  sql?: TaskServiceDb;
+  task?: TaskRecord;
   taskId: string;
 }>) {
-  const bundle = await getTaskBundle({ taskId });
-  const task = bundle.task;
+  const task = providedTask ?? (await getTaskBundle({ taskId })).task;
 
   if (task.taskType === "analyze_healthscore") {
-    await applyHealthScoreResult(task, resultPayload);
+    await applyHealthScoreResult(task, resultPayload, sql);
     return resultPayload;
   }
 
   if (task.taskType === "generate_formulation") {
-    await applyPaidFormulationResult(task, resultPayload);
+    await applyPaidFormulationResult(task, resultPayload, sql);
     return resultPayload;
   }
 
   if (task.taskType === "generate_example_formulation") {
-    await applyExampleFormulationResult(task, resultPayload);
+    await applyExampleFormulationResult(task, resultPayload, sql);
     return resultPayload;
   }
 
   if (task.taskType === "send_example_email") {
-    await applyExampleEmailResult(task, resultPayload);
+    await applyExampleEmailResult(task, resultPayload, sql);
     return resultPayload;
   }
 
   if (task.taskType === "send_reassessment_email") {
-    await applyReassessmentEmailResult(task, resultPayload);
+    await applyReassessmentEmailResult(task, resultPayload, sql);
     return resultPayload;
   }
 
@@ -713,11 +766,11 @@ export async function applyTaskCompletionResult({
   }
 
   if (task.taskType === "content_status_change") {
-    return applyContentStatusChangeResult(task);
+    return applyContentStatusChangeResult(task, sql);
   }
 
   if (task.taskType === "sync_digitalocean_billing") {
-    return applyDigitalOceanBillingSyncResult(task, resultPayload);
+    return applyDigitalOceanBillingSyncResult(task, resultPayload, sql);
   }
 
   return resultPayload;
@@ -726,15 +779,20 @@ export async function applyTaskCompletionResult({
 export async function applyTaskFailureResult({
   errorMessage,
   resultPayload,
+  retryWillBeScheduled = false,
+  sql: sqlOverride,
+  task: providedTask,
   taskId
 }: Readonly<{
   errorMessage: string;
   resultPayload: unknown;
+  retryWillBeScheduled?: boolean;
+  sql?: TaskServiceDb;
+  task?: TaskRecord;
   taskId: string;
 }>) {
-  const sql = getSql();
-  const bundle = await getTaskBundle({ taskId });
-  const task = bundle.task;
+  const sql = sqlOverride ?? getSql();
+  const task = providedTask ?? (await getTaskBundle({ taskId })).task;
   const requestId = payloadText(task.payload, "requestId");
   const cronId = payloadText(task.payload, "cronId");
 
@@ -742,12 +800,12 @@ export async function applyTaskFailureResult({
     return resultPayload;
   }
 
-  await sql.begin(async (transaction) => {
+  await inResultTransaction(sql, async (transaction) => {
     if (task.planId && task.taskType === "generate_formulation") {
       await transaction`
         update public.assessments set
-          status = 'failed',
-          error_message = ${errorMessage},
+          status = ${retryWillBeScheduled ? "queued" : "failed"},
+          error_message = ${retryWillBeScheduled ? null : errorMessage},
           updated_at = now()
         where plan_id = ${task.planId}::uuid
       `;
@@ -761,8 +819,12 @@ export async function applyTaskFailureResult({
     ) {
       await transaction`
         update public.assessment_example_requests set
-          status = 'failed',
-          error_message = ${errorMessage},
+          status = ${retryWillBeScheduled
+            ? task.taskType === "send_example_email"
+              ? "email_queued"
+              : "formulation_queued"
+            : "failed"},
+          error_message = ${retryWillBeScheduled ? null : errorMessage},
           updated_at = now()
         where id = ${requestId}::uuid
       `;
@@ -771,8 +833,8 @@ export async function applyTaskFailureResult({
     if (task.taskType === "send_reassessment_email" && isUuid(cronId)) {
       await transaction`
         update public.cron set
-          status = 'failed',
-          error_message = ${errorMessage},
+          status = ${retryWillBeScheduled ? "queued" : "failed"},
+          error_message = ${retryWillBeScheduled ? null : errorMessage},
           updated_at = now()
         where id = ${cronId}::uuid
       `;
@@ -783,14 +845,14 @@ export async function applyTaskFailureResult({
     actorType: "worker",
     errorCode: "task_failed",
     errorMessage,
-    eventName: "worker_task_failed",
+    eventName: retryWillBeScheduled ? "worker_task_retrying" : "worker_task_failed",
     eventType: "error",
     planId: task.planId,
     properties: {
       taskId: task.id,
       taskType: task.taskType
     },
-    severity: "critical"
+    severity: retryWillBeScheduled ? "medium" : "critical"
   });
 
   return resultPayload;

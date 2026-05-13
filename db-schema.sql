@@ -958,6 +958,10 @@ create table if not exists public.tasks (
   lease_until timestamptz null,
   attempts integer not null default 0 check (attempts >= 0),
   max_attempts integer not null default 3 check (max_attempts > 0),
+  retry_of_task_id uuid null references public.tasks(id) on delete set null,
+  retry_root_task_id uuid null references public.tasks(id) on delete set null,
+  retry_attempt integer not null default 0 check (retry_attempt >= 0),
+  max_retries integer not null default 0 check (max_retries >= 0),
   created_by_agent_id uuid null references public.agents(id) on delete set null,
   created_by_task_id uuid null references public.tasks(id) on delete set null,
   started_at timestamptz null,
@@ -987,6 +991,10 @@ alter table public.tasks
   add column if not exists lease_until timestamptz null,
   add column if not exists attempts integer default 0,
   add column if not exists max_attempts integer default 3,
+  add column if not exists retry_of_task_id uuid null references public.tasks(id) on delete set null,
+  add column if not exists retry_root_task_id uuid null references public.tasks(id) on delete set null,
+  add column if not exists retry_attempt integer default 0,
+  add column if not exists max_retries integer default 0,
   add column if not exists created_by_agent_id uuid null references public.agents(id) on delete set null,
   add column if not exists created_by_task_id uuid null references public.tasks(id) on delete set null,
   add column if not exists started_at timestamptz null,
@@ -1030,6 +1038,8 @@ set
   scheduled_for = coalesce(scheduled_for, now()),
   attempts = greatest(coalesce(attempts, 0), 0),
   max_attempts = greatest(coalesce(max_attempts, 3), 1),
+  retry_attempt = greatest(coalesce(retry_attempt, 0), 0),
+  max_retries = greatest(coalesce(max_retries, 0), 0),
   created_at = coalesce(created_at, now()),
   updated_at = coalesce(updated_at, now())
 where task_type is null
@@ -1064,8 +1074,44 @@ where task_type is null
   or attempts < 0
   or max_attempts is null
   or max_attempts < 1
+  or retry_attempt is null
+  or retry_attempt < 0
+  or max_retries is null
+  or max_retries < 0
   or created_at is null
   or updated_at is null;
+
+update public.tasks
+set
+  retry_of_task_id = case
+    when retry_of_task_id is null
+      and payload #>> '{__taskRetry,retryOfTaskId}' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+      then (payload #>> '{__taskRetry,retryOfTaskId}')::uuid
+    else retry_of_task_id
+  end,
+  retry_root_task_id = case
+    when retry_root_task_id is null
+      and payload #>> '{__taskRetry,rootTaskId}' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+      then (payload #>> '{__taskRetry,rootTaskId}')::uuid
+    else retry_root_task_id
+  end,
+  retry_attempt = greatest(
+    retry_attempt,
+    case
+      when payload #>> '{__taskRetry,retryAttempt}' ~ '^[0-9]+$'
+        then (payload #>> '{__taskRetry,retryAttempt}')::integer
+      else 0
+    end
+  ),
+  max_retries = greatest(
+    max_retries,
+    case
+      when payload #>> '{__taskRetry,policy,maxRetries}' ~ '^[0-9]+$'
+        then (payload #>> '{__taskRetry,policy,maxRetries}')::integer
+      else 0
+    end
+  )
+where payload ? '__taskRetry';
 
 alter table public.tasks
   alter column goal_id set not null,
@@ -1091,6 +1137,10 @@ alter table public.tasks
   alter column attempts set not null,
   alter column max_attempts set default 3,
   alter column max_attempts set not null,
+  alter column retry_attempt set default 0,
+  alter column retry_attempt set not null,
+  alter column max_retries set default 0,
+  alter column max_retries set not null,
   alter column created_at set default now(),
   alter column created_at set not null,
   alter column updated_at set default now(),
@@ -1161,6 +1211,17 @@ begin
       add constraint tasks_attempts_check
       check (attempts >= 0 and max_attempts > 0);
   end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.tasks'::regclass
+      and conname = 'tasks_retry_check'
+  ) then
+    alter table public.tasks
+      add constraint tasks_retry_check
+      check (retry_attempt >= 0 and max_retries >= 0);
+  end if;
 end $$;
 
 comment on table public.agents is
@@ -1189,6 +1250,9 @@ create index if not exists tasks_plan_idx
 create index if not exists tasks_parent_idx
   on public.tasks (parent_task_id, created_at asc)
   where parent_task_id is not null;
+
+create index if not exists tasks_retry_lineage_idx
+  on public.tasks (goal_id, (coalesce(retry_root_task_id, id)), retry_attempt, created_at asc);
 
 create index if not exists tasks_reserved_agent_idx
   on public.tasks (reserved_by_agent_id, lease_until)

@@ -7,7 +7,7 @@ import {
   textValue
 } from "@/lib/openclaw-api";
 import { applyTaskFailureResult } from "@/lib/task-result-applier";
-import { assertActiveTaskReservation, failTask } from "@/lib/task-service";
+import { failTask } from "@/lib/task-service";
 
 export const runtime = "nodejs";
 
@@ -39,23 +39,20 @@ export async function POST(request: Request, { params }: FailTaskRouteProps) {
     const errorMessage = textValue(body.errorMessage) ?? "Task failed.";
     const agentId = textValue(body.agentId);
 
-    await assertActiveTaskReservation({
-      agentId,
-      reservationId,
-      taskId: id
-    });
-    const resultPayload = objectValue(
-      await applyTaskFailureResult({
-        errorMessage,
-        resultPayload: objectValue(body.resultPayload),
-        taskId: id
-      })
-    );
     const task = await failTask({
       agentId,
+      applyFailure: (context) =>
+        applyTaskFailureResult({
+          errorMessage,
+          resultPayload: context.resultPayload,
+          retryWillBeScheduled: context.retryWillBeScheduled,
+          sql: context.sql,
+          task: context.task,
+          taskId: id
+        }),
       errorMessage,
       reservationId,
-      resultPayload,
+      resultPayload: objectValue(body.resultPayload),
       taskId: id
     });
 

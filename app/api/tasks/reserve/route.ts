@@ -6,6 +6,7 @@ import {
   taskApiError,
   textValue
 } from "@/lib/openclaw-api";
+import { applyTaskFailureResult } from "@/lib/task-result-applier";
 import { buildTaskWorkItem } from "@/lib/task-work-items";
 import { failTask, getTaskBundle, reserveNextTask } from "@/lib/task-service";
 import type { AgentType } from "@/lib/task-service";
@@ -49,6 +50,15 @@ export async function POST(request: Request) {
         name: textValue(agent.name) ?? "Unnamed OpenClaw agent",
         type: agentType(agent.type)
       },
+      applyExpiredFailure: (context) =>
+        applyTaskFailureResult({
+          errorMessage: context.errorMessage,
+          resultPayload: context.resultPayload,
+          retryWillBeScheduled: context.retryWillBeScheduled,
+          sql: context.sql,
+          task: context.task,
+          taskId: context.task.id
+        }),
       leaseSeconds: body.leaseSeconds,
       mustRequireCapability: textValue(body.mustRequireCapability),
       taskTypes: textArray(body.taskTypes)
@@ -66,6 +76,18 @@ export async function POST(request: Request) {
     } catch (error) {
       await failTask({
         agentId: reserved.agent.id,
+        applyFailure: (context) =>
+          applyTaskFailureResult({
+            errorMessage:
+              error instanceof Error
+                ? error.message
+                : "Unable to build task work item",
+            resultPayload: context.resultPayload,
+            retryWillBeScheduled: context.retryWillBeScheduled,
+            sql: context.sql,
+            task: context.task,
+            taskId: bundle.task.id
+          }),
         errorMessage:
           error instanceof Error
             ? error.message

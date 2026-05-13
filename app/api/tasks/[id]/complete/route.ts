@@ -7,7 +7,7 @@ import {
   textValue
 } from "@/lib/openclaw-api";
 import { applyTaskCompletionResult } from "@/lib/task-result-applier";
-import { assertActiveTaskReservation, completeTask } from "@/lib/task-service";
+import { completeTask } from "@/lib/task-service";
 
 export const runtime = "nodejs";
 
@@ -41,22 +41,18 @@ export async function POST(
   try {
     const agentId = textValue(body.agentId);
 
-    await assertActiveTaskReservation({
-      agentId,
-      reservationId,
-      taskId: id
-    });
-    const resultPayload = objectValue(
-      await applyTaskCompletionResult({
-        reservationId,
-        resultPayload: objectValue(body.resultPayload),
-        taskId: id
-      })
-    );
     const task = await completeTask({
       agentId,
+      applyResult: (context) =>
+        applyTaskCompletionResult({
+          reservationId,
+          resultPayload: context.resultPayload,
+          sql: context.sql,
+          task: context.task,
+          taskId: id
+        }),
       reservationId,
-      resultPayload,
+      resultPayload: objectValue(body.resultPayload),
       taskId: id
     });
 

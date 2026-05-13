@@ -1,4 +1,3 @@
-import type postgres from "postgres";
 import { createHash, randomUUID } from "node:crypto";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import { toJsonValue } from "@/lib/assessment-store";
@@ -11,7 +10,7 @@ import {
 } from "@/lib/dose-conversion";
 import type { FormulationBlueprint, FormulationIngredient, LocalizedText } from "@/lib/formulation-types";
 import type { Locale } from "@/lib/i18n";
-import { createGoal, createTask } from "@/lib/task-service";
+import { createGoal, createTask, type TaskServiceDb } from "@/lib/task-service";
 
 type SafetyAudit = (event: {
   eventType: string;
@@ -134,7 +133,7 @@ function reviewTaskPriority(kind: ReviewKind) {
   return 2;
 }
 
-async function loadSupplementLookup(sql: postgres.Sql) {
+async function loadSupplementLookup(sql: TaskServiceDb) {
   const rows = await sql<SupplementRow[]>`
     select
       supplements.id::text,
@@ -329,7 +328,7 @@ async function enqueueSupplementReviewWork(input: {
 }
 
 async function attachSafetyReviewWork(
-  sql: postgres.Sql,
+  sql: TaskServiceDb,
   input: {
     context?: Record<string, unknown>;
     goalId?: string | null;
@@ -358,7 +357,7 @@ async function attachSafetyReviewWork(
 }
 
 async function createSafetyReview(
-  sql: postgres.Sql,
+  sql: TaskServiceDb,
   input: {
     aiSuggestion: FormulationIngredient;
     context: Record<string, unknown>;
@@ -473,7 +472,7 @@ async function logSafetyBpm(
 }
 
 async function hideForReview(
-  sql: postgres.Sql,
+  sql: TaskServiceDb,
   input: SafetyInput,
   ingredient: FormulationIngredient,
   match: MatchedSupplement | null,
@@ -586,7 +585,7 @@ async function logRemoved(
 }
 
 async function reduceDose(
-  sql: postgres.Sql,
+  sql: TaskServiceDb,
   input: SafetyInput,
   ingredient: FormulationIngredient,
   match: MatchedSupplement,
@@ -662,7 +661,7 @@ async function reduceDose(
 }
 
 export async function applyFormulationSafety(
-  sql: postgres.Sql,
+  sql: TaskServiceDb,
   input: SafetyInput
 ) {
   const lookup = await loadSupplementLookup(sql);
