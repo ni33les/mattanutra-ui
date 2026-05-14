@@ -18,6 +18,33 @@ export async function GET(_request: Request, { params }: FormulationRouteProps) 
     return NextResponse.json({ message: "Plan not found" }, { status: 404 });
   }
 
+  if (snapshot.status === "ready") {
+    const storedResult = await getStoredFormulationResult(planId, {
+      mode: "full"
+    });
+
+    if (storedResult) {
+      return NextResponse.json(storedResult);
+    }
+
+    return NextResponse.json(
+      {
+        message: "Formulation result is missing or invalid",
+        status: snapshot.status,
+        steps: snapshot.steps
+      },
+      { status: 409 }
+    );
+  }
+
+  const previewResult = await getStoredFormulationResult(planId, {
+    mode: "preview"
+  });
+
+  if (previewResult) {
+    return NextResponse.json(previewResult);
+  }
+
   if (snapshot.status === "failed") {
     return NextResponse.json(
       {
@@ -29,29 +56,12 @@ export async function GET(_request: Request, { params }: FormulationRouteProps) 
     );
   }
 
-  if (snapshot.status !== "ready") {
-    return NextResponse.json(
-      {
-        message: "Formulation is still being prepared",
-        status: snapshot.status,
-        steps: snapshot.steps
-      },
-      { status: 202 }
-    );
-  }
-
-  const storedResult = await getStoredFormulationResult(planId);
-
-  if (storedResult) {
-    return NextResponse.json(storedResult);
-  }
-
   return NextResponse.json(
     {
-      message: "Formulation result is missing or invalid",
+      message: "Formulation is still being prepared",
       status: snapshot.status,
       steps: snapshot.steps
     },
-    { status: 409 }
+    { status: 202 }
   );
 }

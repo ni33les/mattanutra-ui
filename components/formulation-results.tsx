@@ -64,6 +64,12 @@ type CopyLabels = Record<
   | "loading"
   | "dailyDose"
   | "plan"
+  | "previewBadge"
+  | "previewBody"
+  | "previewCta"
+  | "previewLockedBody"
+  | "previewLockedTitle"
+  | "previewTitle"
   | "products"
   | "productsEmptyBody"
   | "productsEmptyTitle"
@@ -128,6 +134,14 @@ const copy = {
     loading: "Loading your formulation",
     dailyDose: "Dose",
     plan: "Plan",
+    previewBadge: "Free preview",
+    previewBody:
+      "Your full formulation is ready. The free preview shows the top three supplement recommendations; unlock the plan to reveal the remaining details and continue.",
+    previewCta: "Unlock full plan",
+    previewLockedBody:
+      "The rest of your personalised recommendations are ready and will be revealed after unlock.",
+    previewLockedTitle: "More recommendations locked",
+    previewTitle: "Preview first, unlock when you're ready",
     products: "Recommended products for you",
     productsEmptyBody:
       "Your formulation is ready. Product matching is still being prepared, so there are no marketplace recommendations attached to this plan yet.",
@@ -196,6 +210,14 @@ const copy = {
     loading: "กำลังโหลดสูตรของคุณ",
     dailyDose: "ขนาด",
     plan: "แผน",
+    previewBadge: "ตัวอย่างฟรี",
+    previewBody:
+      "สูตรฉบับเต็มของคุณพร้อมแล้ว ตัวอย่างฟรีแสดงคำแนะนำ 3 รายการแรก ปลดล็อกแผนเพื่อดูรายละเอียดที่เหลือและไปต่อ",
+    previewCta: "ปลดล็อกแผนฉบับเต็ม",
+    previewLockedBody:
+      "คำแนะนำเฉพาะบุคคลที่เหลือพร้อมแล้ว และจะแสดงหลังจากปลดล็อก",
+    previewLockedTitle: "ยังมีคำแนะนำเพิ่มเติมที่ล็อกอยู่",
+    previewTitle: "ดูตัวอย่างก่อน แล้วปลดล็อกเมื่อพร้อม",
     products: "ผลิตภัณฑ์ที่แนะนำสำหรับคุณ",
     productsEmptyBody:
       "สูตรของคุณพร้อมแล้ว แต่ระบบจับคู่ผลิตภัณฑ์ยังอยู่ระหว่างเตรียม จึงยังไม่มีคำแนะนำจาก marketplace สำหรับแผนนี้",
@@ -295,6 +317,10 @@ function pendingReviewCount(result: FormulationResult) {
 
 function planResultsHref(locale: Locale, planId: string) {
   return `/${locale}/assessment/results?plan=${encodeURIComponent(planId)}`;
+}
+
+function planPaywallHref(locale: Locale, planId: string) {
+  return `/${locale}/assessment?plan=${encodeURIComponent(planId)}`;
 }
 
 export function FormulationResults({ locale, planId }: FormulationResultsProps) {
@@ -462,6 +488,12 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
   ).format(new Date(result.generatedAt));
   const effectiveResultPlanId = result.planId || effectivePlanId;
   const hasPendingSafetyReview = pendingReviewCount(result) > 0;
+  const isPreview = result.access === "preview";
+  const lockedSupplementCount = Math.max(
+    0,
+    Number(result.lockedSupplementCount ?? 0)
+  );
+  const unlockHref = planPaywallHref(locale, effectiveResultPlanId);
 
   return (
     <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
@@ -547,13 +579,22 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
         result={result}
       />
 
+      {isPreview ? (
+        <PreviewPaywallPanel
+          labels={labels}
+          unlockHref={unlockHref}
+        />
+      ) : null}
+
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]">
         <FormulaPanel
           hasPendingSafetyReview={hasPendingSafetyReview}
           ingredients={orderedIngredients}
           labels={labels}
+          lockedSupplementCount={lockedSupplementCount}
           locale={locale}
           productReferencesByIngredientId={productReferencesByIngredientId}
+          unlockHref={unlockHref}
         />
 
         <ProductsPanel
@@ -564,11 +605,13 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
         />
       </div>
 
-      <ChatConnectPanel
-        labels={labels}
-        locale={locale}
-        planId={effectiveResultPlanId}
-      />
+      {isPreview ? null : (
+        <ChatConnectPanel
+          labels={labels}
+          locale={locale}
+          planId={effectiveResultPlanId}
+        />
+      )}
 
       <div className="mt-8 rounded-lg bg-[#20343A] p-6 text-sm leading-6 text-white/75">
         <div className="flex gap-3">
@@ -786,6 +829,38 @@ function ContextChips({
   );
 }
 
+function PreviewPaywallPanel({
+  labels,
+  unlockHref
+}: Readonly<{
+  labels: PanelLabels;
+  unlockHref: string;
+}>) {
+  return (
+    <section className="mt-8 overflow-hidden rounded-lg bg-white p-5 ring-1 ring-[#1FA77A]/20 sm:p-6">
+      <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#126b4f]">
+            {labels.previewBadge}
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-normal text-[#20343A] text-balance">
+            {labels.previewTitle}
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+            {labels.previewBody}
+          </p>
+        </div>
+        <a
+          className="inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188a65] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A]"
+          href={unlockHref}
+        >
+          {labels.previewCta}
+        </a>
+      </div>
+    </section>
+  );
+}
+
 function ChatConnectPanel({
   labels,
   locale,
@@ -839,14 +914,18 @@ function FormulaPanel({
   hasPendingSafetyReview,
   ingredients,
   labels,
+  lockedSupplementCount,
   locale,
-  productReferencesByIngredientId
+  productReferencesByIngredientId,
+  unlockHref
 }: Readonly<{
   hasPendingSafetyReview: boolean;
   ingredients: FormulationIngredient[];
   labels: PanelLabels;
+  lockedSupplementCount: number;
   locale: Locale;
   productReferencesByIngredientId: Map<string, ProductReference[]>;
+  unlockHref: string;
 }>) {
   return (
     <section className="rounded-lg bg-white p-5 ring-1 ring-foreground/10 sm:p-6">
@@ -934,8 +1013,65 @@ function FormulaPanel({
             </article>
           );
         })}
+
+        {lockedSupplementCount > 0 ? (
+          <LockedFormulaPreview
+            count={lockedSupplementCount}
+            labels={labels}
+            unlockHref={unlockHref}
+          />
+        ) : null}
       </div>
     </section>
+  );
+}
+
+function LockedFormulaPreview({
+  count,
+  labels,
+  unlockHref
+}: Readonly<{
+  count: number;
+  labels: PanelLabels;
+  unlockHref: string;
+}>) {
+  const placeholderRows = Array.from({ length: Math.min(count, 3) });
+
+  return (
+    <article className="rounded-lg border border-[#1FA77A]/20 bg-[#F3FBF7] p-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-[#20343A]">
+            {labels.previewLockedTitle}
+          </p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            {labels.previewLockedBody}
+          </p>
+        </div>
+        <a
+          className="inline-flex shrink-0 items-center justify-center rounded-md bg-[#1FA77A] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188a65] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A]"
+          href={unlockHref}
+        >
+          {labels.previewCta}
+        </a>
+      </div>
+
+      <div
+        aria-hidden={true}
+        className="mt-4 space-y-3 opacity-75 blur-[2px]"
+      >
+        {placeholderRows.map((_, index) => (
+          <div
+            key={index}
+            className="rounded-lg border border-white/80 bg-white/80 p-4"
+          >
+            <div className="h-4 w-40 rounded bg-[#20343A]/20" />
+            <div className="mt-3 h-3 w-full max-w-md rounded bg-[#20343A]/10" />
+            <div className="mt-2 h-3 w-3/4 rounded bg-[#20343A]/10" />
+          </div>
+        ))}
+      </div>
+    </article>
   );
 }
 

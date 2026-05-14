@@ -60,9 +60,13 @@ export type FormulationBlueprint = {
 };
 
 export type FormulationResult = FormulationBlueprint & {
+  access?: "full" | "preview";
   assessmentSummary: AssessmentSummary;
   generatedAt: string;
+  lockedSupplementCount?: number;
   planId: string;
+  previewLimit?: number;
   recommendations: RecommendedProduct[];
   schemaVersion: 1;
+  totalSupplementCount?: number;
 };

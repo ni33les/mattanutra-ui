@@ -73,6 +73,7 @@ export default async function AssessmentPage({
         exampleTestimonial={exampleTestimonial}
         locale={locale}
         prefillAnswers={prefill?.answers ?? null}
+        returningHealthScore={prefill?.healthScore ?? null}
         returningPlan={prefill?.plan ?? null}
         returningPlanId={prefill?.planId ?? undefined}
       />

@@ -9,6 +9,10 @@ import {
 } from "@/lib/assessment-snapshot";
 import { buildAssessmentSummary } from "@/lib/formulation-summary";
 import {
+  isExampleFormulationModelVersion,
+  toFreePreviewFormulationResult
+} from "@/lib/formulation-preview";
+import {
   type FormulationIngredient,
   type FormulationResult,
   type RecommendedProduct
@@ -552,6 +556,7 @@ export async function getStoredAssessmentPrefill(planId: string) {
   const rows = await sql`
     select
       answers,
+      health_score,
       selected_plan::text
     from assessments
     where plan_id = ${planId}::uuid
@@ -563,19 +568,42 @@ export async function getStoredAssessmentPrefill(planId: string) {
     return null;
   }
 
+  const healthScore = asRecord(row.health_score);
+
   return {
     answers: asRecord(row.answers),
+    healthScore:
+      typeof healthScore.score === "number"
+        ? (healthScore as AssessmentSnapshot["healthScore"])
+        : null,
     plan: row.selected_plan ? fromStoredPlan(row.selected_plan) : null,
     planId
   };
 }
 
-export async function getStoredFormulationResult(planId: string) {
+export async function getStoredFormulationResult(
+  planId: string,
+  options: Readonly<{
+    mode?: "full" | "preview";
+  }> = {}
+) {
   const sql = getSql();
 
   if (!sql || !isUuid(planId)) {
     return null;
   }
+
+  const mode = options.mode ?? "full";
+  const exampleModelPattern = "%:example";
+  const formulationModeFilter =
+    mode === "preview"
+      ? sql`and formulations.model_version like ${exampleModelPattern}`
+      : sql`and (
+          formulations.model_version is null
+          or formulations.model_version not like ${exampleModelPattern}
+        )`;
+  const assessmentAccessFilter =
+    mode === "preview" ? sql`and assessments.selected_plan is null` : sql``;
 
   const rows = await sql`
     select
@@ -584,12 +612,14 @@ export async function getStoredFormulationResult(planId: string) {
       assessments.selected_plan::text,
       formulations.formulation,
       formulations.generated_at,
+      formulations.model_version,
       recommendations.recommendations
     from assessments
     join lateral (
-      select formulation, generated_at
+      select formulation, generated_at, model_version
       from formulations
       where formulations.plan_id = assessments.plan_id
+        ${formulationModeFilter}
       order by version desc, generated_at desc
       limit 1
     ) formulations on true
@@ -601,6 +631,7 @@ export async function getStoredFormulationResult(planId: string) {
       limit 1
     ) recommendations on true
     where assessments.plan_id = ${planId}::uuid
+      ${assessmentAccessFilter}
     limit 1
   `;
   const row = rows[0];
@@ -623,7 +654,10 @@ export async function getStoredFormulationResult(planId: string) {
       ? row.generated_at.toISOString()
       : new Date(row.generated_at).toISOString();
 
-  return {
+  const result = {
+    access: isExampleFormulationModelVersion(row.model_version)
+      ? "preview"
+      : "full",
     assessmentSummary: buildAssessmentSummary({
       answers: row.answers,
       locale,
@@ -636,4 +670,6 @@ export async function getStoredFormulationResult(planId: string) {
     ...(safetySummary ? { safetySummary } : {}),
     supplementBreakdown
   } satisfies FormulationResult;
+
+  return mode === "preview" ? toFreePreviewFormulationResult(result) : result;
 }

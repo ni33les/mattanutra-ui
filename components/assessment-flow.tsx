@@ -1212,6 +1212,7 @@ type AssessmentFlowProps = Readonly<{
   exampleTestimonial?: BlogTestimonial | null;
   locale: Locale;
   prefillAnswers?: unknown;
+  returningHealthScore?: HealthScoreResult | null;
   returningPlan?: "precision" | "pro" | null;
   returningPlanId?: string;
 }>;
@@ -1342,6 +1343,27 @@ function buildExampleProcessingStatus(planId: string): ProcessingStatus {
       { id: "scoreAnalysis", state: "complete" },
       { id: "payment", state: "complete" },
       { id: "formulation", state: "active" },
+      { id: "safety", state: "pending" },
+      { id: "results", state: "pending" }
+    ]
+  };
+}
+
+function buildReturningScoreGateStatus(
+  planId: string,
+  healthScore: HealthScoreResult
+): ProcessingStatus {
+  return {
+    healthScore,
+    planId,
+    queuePosition: 0,
+    status: "ready",
+    steps: [
+      { id: "assessment", state: "complete" },
+      { id: "score", state: "complete" },
+      { id: "scoreAnalysis", state: "complete" },
+      { id: "payment", state: "pending" },
+      { id: "formulation", state: "pending" },
       { id: "safety", state: "pending" },
       { id: "results", state: "pending" }
     ]
@@ -1654,12 +1676,17 @@ export function AssessmentFlow({
   exampleTestimonial,
   locale,
   prefillAnswers,
+  returningHealthScore,
   returningPlan,
   returningPlanId
 }: AssessmentFlowProps) {
   const copy = copies[locale];
   const router = useRouter();
   const showDevShortcut = process.env.NEXT_PUBLIC_SHOW_DEV_SHORTCUT !== "false";
+  const returningScoreStatus =
+    returningPlanId && returningHealthScore
+      ? buildReturningScoreGateStatus(returningPlanId, returningHealthScore)
+      : null;
   const [answers, setAnswers] = useState<Answers>(() =>
     buildInitialAnswers(prefillAnswers)
   );
@@ -1671,14 +1698,16 @@ export function AssessmentFlow({
     useState<ProcessingStatus | null>(null);
   const [processingError, setProcessingError] = useState("");
   const [capturedStatus, setCapturedStatus] =
-    useState<ProcessingStatus | null>(null);
+    useState<ProcessingStatus | null>(returningScoreStatus);
   const [selectedPlan, setSelectedPlan] = useState("");
-  const [showPlans, setShowPlans] = useState(false);
+  const [showPlans, setShowPlans] = useState(
+    Boolean(returningScoreStatus && !returningPlan)
+  );
   const [showExampleExit, setShowExampleExit] = useState(false);
   const [processingMode, setProcessingMode] =
     useState<"example" | "formulation" | "score">("formulation");
   const [healthScore, setHealthScore] = useState<HealthScoreResult | null>(
-    null
+    returningHealthScore ?? null
   );
   const [exampleEmail, setExampleEmail] = useState("");
   const [exampleError, setExampleError] = useState("");
