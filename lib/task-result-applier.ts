@@ -17,11 +17,25 @@ import {
   addTaskEvent,
   addTaskEventToTransaction,
   getTaskBundle,
+  type TaskAfterCommitEffect,
   type TaskServiceDb,
   type TaskRecord
 } from "@/lib/task-service";
 
 type AuditLevel = "critical" | "high" | "low" | "medium";
+type AfterCommitScheduler = (effect: TaskAfterCommitEffect) => void;
+
+async function eventually(
+  afterCommit: AfterCommitScheduler | undefined,
+  effect: TaskAfterCommitEffect
+) {
+  if (afterCommit) {
+    afterCommit(effect);
+    return;
+  }
+
+  await effect();
+}
 
 function objectValue(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -35,22 +49,6 @@ function textValue(value: unknown) {
 
 function payloadText(payload: unknown, key: string) {
   return textValue(objectValue(payload)[key]);
-}
-
-async function inResultTransaction<T>(
-  sql: TaskServiceDb,
-  callback: (transaction: TaskServiceDb) => Promise<T>
-) {
-  const begin = (sql as { begin?: unknown }).begin;
-
-  if (typeof begin === "function") {
-    return (begin as (cb: (transaction: TaskServiceDb) => Promise<T>) => Promise<T>).call(
-      sql,
-      callback
-    );
-  }
-
-  return callback(sql);
 }
 
 function modelVersion(analysis: Record<string, unknown>, suffix = "") {
@@ -184,7 +182,8 @@ async function recordTaskEmailCommunication(input: Readonly<{
 async function applyHealthScoreResult(
   task: TaskRecord,
   resultPayload: unknown,
-  sqlOverride?: TaskServiceDb
+  sqlOverride?: TaskServiceDb,
+  afterCommit?: AfterCommitScheduler
 ) {
   const sql = sqlOverride ?? getSql();
   const payload = objectValue(resultPayload);
@@ -211,40 +210,45 @@ async function applyHealthScoreResult(
       updated_at = now()
     where plan_id = ${task.planId}::uuid
   `;
-  await recordTaskXaiUsageCost({
-    analysis: objectValue(payload.xaiUsage),
-    metadata: objectValue(objectValue(payload.xaiUsage).metadata),
-    purpose: textValue(objectValue(payload.xaiUsage).purpose) || "healthscore_advice",
-    sql,
-    task
+  await eventually(afterCommit, async () => {
+    await recordTaskXaiUsageCost({
+      analysis: objectValue(payload.xaiUsage),
+      metadata: objectValue(objectValue(payload.xaiUsage).metadata),
+      purpose: textValue(objectValue(payload.xaiUsage).purpose) || "healthscore_advice",
+      task
+    });
   });
-  await writeBpmEvent({
-    actorType: "worker",
-    eventName: "healthscore_analysis_completed",
-    eventType: "funnel",
-    locale,
-    planId: task.planId,
-    properties: {
-      cachedOrExisting: payload.cachedOrExisting === true,
-      errorMessage: fallbackUsed ? fallbackErrorMessage : undefined,
-      fallbackUsed,
-      taskId: task.id
-    },
-    sql
+  await eventually(afterCommit, async () => {
+    await writeBpmEvent({
+      actorType: "worker",
+      eventName: "healthscore_analysis_completed",
+      eventType: "funnel",
+      locale,
+      planId: task.planId,
+      properties: {
+        cachedOrExisting: payload.cachedOrExisting === true,
+        errorMessage: fallbackUsed ? fallbackErrorMessage : undefined,
+        fallbackUsed,
+        taskId: task.id
+      }
+    });
   });
 
   if (fallbackUsed) {
-    await addWorkEvent(task, "healthscore_analysis_fallback_used", "high", {
-      errorMessage: fallbackErrorMessage,
-      fallback: "static_healthscore_copy"
-    }, sql);
+    await eventually(afterCommit, async () => {
+      await addWorkEvent(task, "healthscore_analysis_fallback_used", "high", {
+        errorMessage: fallbackErrorMessage,
+        fallback: "static_healthscore_copy"
+      });
+    });
   }
 }
 
 async function applyPaidFormulationResult(
   task: TaskRecord,
   resultPayload: unknown,
-  sqlOverride?: TaskServiceDb
+  sqlOverride?: TaskServiceDb,
+  afterCommit?: AfterCommitScheduler
 ) {
   const sql = sqlOverride ?? getSql();
   const planId = task.planId;
@@ -268,19 +272,23 @@ async function applyPaidFormulationResult(
   const locale: Locale = isLocale(row.locale) ? row.locale : "en";
   const plan = textValue(row.selected_plan) || "precision";
   const analysis = analysisPayload(resultPayload);
-  await recordTaskXaiUsageCost({
-    analysis,
-    metadata: {
-      plan,
-      planId
-    },
-    purpose: "formulation_analysis",
-    sql,
-    task
+  await eventually(afterCommit, async () => {
+    await recordTaskXaiUsageCost({
+      analysis,
+      metadata: {
+        plan,
+        planId
+      },
+      purpose: "formulation_analysis",
+      task
+    });
   });
   const safeFormulation = await applyFormulationSafety(sql, {
+    afterCommit,
     audit: async ({ eventType, level, payload }) =>
-      addWorkEvent(task, eventType, level ?? "low", payload, sql),
+      eventually(afterCommit, async () =>
+        addWorkEvent(task, eventType, level ?? "low", payload)
+      ),
     formulation: analysis.formulation,
     locale,
     plan: plan === "pro" ? "pro" : "precision",
@@ -288,101 +296,103 @@ async function applyPaidFormulationResult(
     taskId: task.id
   });
 
-  await inResultTransaction(sql, async (transaction) => {
-    const versionRows = await transaction<{ version: number }[]>`
-      select greatest(
-        (
-          select coalesce(max(version), 0)
-          from public.formulations
-          where plan_id = ${planId}::uuid
-        ),
-        (
-          select coalesce(max(version), 0)
-          from public.recommendations
-          where plan_id = ${planId}::uuid
-        )
-      ) + 1 as version
-    `;
-    const version = Number(versionRows[0]?.version ?? 1);
+  const versionRows = await sql<{ version: number }[]>`
+    select greatest(
+      (
+        select coalesce(max(version), 0)
+        from public.formulations
+        where plan_id = ${planId}::uuid
+      ),
+      (
+        select coalesce(max(version), 0)
+        from public.recommendations
+        where plan_id = ${planId}::uuid
+      )
+    ) + 1 as version
+  `;
+  const version = Number(versionRows[0]?.version ?? 1);
 
-    await transaction`
-      insert into public.formulations (
-        plan_id,
-        version,
-        formulation,
-        model_version,
-        generated_at,
-        updated_at
-      )
-      values (
-        ${planId}::uuid,
-        ${version},
-        ${transaction.json(toJsonValue(safeFormulation))},
-        ${modelVersion(analysis)},
-        now(),
-        now()
-      )
-    `;
-    await transaction`
-      insert into public.recommendations (
-        plan_id,
-        version,
-        recommendations,
-        generated_at,
-        updated_at
-      )
-      values (
-        ${planId}::uuid,
-        ${version},
-        ${transaction.json(toJsonValue([]))},
-        now(),
-        now()
-      )
-    `;
-    await transaction`
-      update public.assessments set
-        status = 'ready',
-        queue_position = 0,
-        error_message = null,
-        completed_at = coalesce(completed_at, now()),
-        updated_at = now()
-      where plan_id = ${planId}::uuid
-    `;
-  });
+  await sql`
+    insert into public.formulations (
+      plan_id,
+      version,
+      formulation,
+      model_version,
+      generated_at,
+      updated_at
+    )
+    values (
+      ${planId}::uuid,
+      ${version},
+      ${sql.json(toJsonValue(safeFormulation))},
+      ${modelVersion(analysis)},
+      now(),
+      now()
+    )
+  `;
+  await sql`
+    insert into public.recommendations (
+      plan_id,
+      version,
+      recommendations,
+      generated_at,
+      updated_at
+    )
+    values (
+      ${planId}::uuid,
+      ${version},
+      ${sql.json(toJsonValue([]))},
+      now(),
+      now()
+    )
+  `;
+  await sql`
+    update public.assessments set
+      status = 'ready',
+      queue_position = 0,
+      error_message = null,
+      completed_at = coalesce(completed_at, now()),
+      updated_at = now()
+    where plan_id = ${planId}::uuid
+  `;
 
-  await addWorkEvent(task, "formulation_version_written", "medium", {
-    attempts: analysis.attempts,
-    model: analysis.model,
-    promptVersion: analysis.promptVersion,
-    reasoningEffort: analysis.reasoningEffort,
-    responseId: analysis.responseId,
-    safetySummary: safeFormulation.safetySummary
-  }, sql);
-  await writeBpmEvent({
-    actorType: "worker",
-    eventName: "formulation_ready",
-    eventType: "formulation",
-    locale,
-    metrics: {
-      attempts: analysis.attempts
-    },
-    planId,
-    properties: {
+  await eventually(afterCommit, async () => {
+    await addWorkEvent(task, "formulation_version_written", "medium", {
+      attempts: analysis.attempts,
       model: analysis.model,
       promptVersion: analysis.promptVersion,
       reasoningEffort: analysis.reasoningEffort,
       responseId: analysis.responseId,
-      taskId: task.id
-    },
-    selectedPlan: plan === "pro" ? "pro" : "precision",
-    sql
+      safetySummary: safeFormulation.safetySummary
+    });
+  });
+  await eventually(afterCommit, async () => {
+    await writeBpmEvent({
+      actorType: "worker",
+      eventName: "formulation_ready",
+      eventType: "formulation",
+      locale,
+      metrics: {
+        attempts: analysis.attempts
+      },
+      planId,
+      properties: {
+        model: analysis.model,
+        promptVersion: analysis.promptVersion,
+        reasoningEffort: analysis.reasoningEffort,
+        responseId: analysis.responseId,
+        taskId: task.id
+      },
+      selectedPlan: plan === "pro" ? "pro" : "precision"
+    });
   });
 }
 
 async function applyExampleFormulationResult(
   task: TaskRecord,
   resultPayload: unknown,
-  sqlOverride?: TaskServiceDb
+  sqlOverride?: TaskServiceDb,
+  afterCommit?: AfterCommitScheduler
 ) {
   const sql = sqlOverride ?? getSql();
   const planId = task.planId;
@@ -410,20 +420,24 @@ async function applyExampleFormulationResult(
   const locale: Locale = isLocale(row.locale) ? row.locale : "en";
   const plan = textValue(row.selected_plan) === "pro" ? "pro" : "precision";
   const analysis = analysisPayload(resultPayload);
-  await recordTaskXaiUsageCost({
-    analysis,
-    metadata: {
-      plan,
-      planId,
-      requestId
-    },
-    purpose: "formulation_analysis",
-    sql,
-    task
+  await eventually(afterCommit, async () => {
+    await recordTaskXaiUsageCost({
+      analysis,
+      metadata: {
+        plan,
+        planId,
+        requestId
+      },
+      purpose: "formulation_analysis",
+      task
+    });
   });
   const safeFormulation = await applyFormulationSafety(sql, {
+    afterCommit,
     audit: async ({ eventType, level, payload }) =>
-      addWorkEvent(task, eventType, level ?? "low", { ...payload, requestId }, sql),
+      eventually(afterCommit, async () =>
+        addWorkEvent(task, eventType, level ?? "low", { ...payload, requestId })
+      ),
     formulation: analysis.formulation,
     locale,
     plan,
@@ -432,77 +446,81 @@ async function applyExampleFormulationResult(
     taskId: task.id
   });
 
-  await inResultTransaction(sql, async (transaction) => {
-    const versionRows = await transaction<{ version: number }[]>`
-      select coalesce(max(version), 0) + 1 as version
-      from public.formulations
-      where plan_id = ${planId}::uuid
-    `;
-    const version = Number(versionRows[0]?.version ?? 1);
+  const versionRows = await sql<{ version: number }[]>`
+    select coalesce(max(version), 0) + 1 as version
+    from public.formulations
+    where plan_id = ${planId}::uuid
+  `;
+  const version = Number(versionRows[0]?.version ?? 1);
 
-    await transaction`
-      insert into public.formulations (
-        plan_id,
-        version,
-        formulation,
-        model_version,
-        generated_at,
-        updated_at
-      )
-      values (
-        ${planId}::uuid,
-        ${version},
-        ${transaction.json(toJsonValue(safeFormulation))},
-        ${modelVersion(analysis, ":example")},
-        now(),
-        now()
-      )
-    `;
-    await transaction`
-      update public.assessment_example_requests set
-        status = 'formulation_ready',
-        updated_at = now()
-      where id = ${requestId}::uuid
-    `;
-  });
+  await sql`
+    insert into public.formulations (
+      plan_id,
+      version,
+      formulation,
+      model_version,
+      generated_at,
+      updated_at
+    )
+    values (
+      ${planId}::uuid,
+      ${version},
+      ${sql.json(toJsonValue(safeFormulation))},
+      ${modelVersion(analysis, ":example")},
+      now(),
+      now()
+    )
+  `;
+  await sql`
+    update public.assessment_example_requests set
+      status = 'formulation_ready',
+      updated_at = now()
+    where id = ${requestId}::uuid
+  `;
 
-  await addWorkEvent(task, "example_formulation_version_written", "medium", {
-    attempts: analysis.attempts,
-    model: analysis.model,
-    promptVersion: analysis.promptVersion,
-    reasoningEffort: analysis.reasoningEffort,
-    requestId,
-    responseId: analysis.responseId,
-    safetySummary: safeFormulation.safetySummary
-  }, sql);
-  await enqueueExampleEmailTask(planId, requestId);
-  await writeBpmEvent({
-    actorType: "worker",
-    eventName: "free_example_formulation_ready",
-    eventType: "formulation",
-    exampleRequestId: requestId,
-    locale,
-    metrics: {
+  await eventually(afterCommit, async () => {
+    await addWorkEvent(task, "example_formulation_version_written", "medium", {
       attempts: analysis.attempts,
-      safetySummary: safeFormulation.safetySummary
-    },
-    planId,
-    properties: {
       model: analysis.model,
       promptVersion: analysis.promptVersion,
       reasoningEffort: analysis.reasoningEffort,
+      requestId,
       responseId: analysis.responseId,
-      taskId: task.id
-    },
-    selectedPlan: plan,
-    sql
+      safetySummary: safeFormulation.safetySummary
+    });
+  });
+  await eventually(afterCommit, async () => {
+    await enqueueExampleEmailTask(planId, requestId);
+  });
+  await eventually(afterCommit, async () => {
+    await writeBpmEvent({
+      actorType: "worker",
+      eventName: "free_example_formulation_ready",
+      eventType: "formulation",
+      exampleRequestId: requestId,
+      locale,
+      metrics: {
+        attempts: analysis.attempts,
+        safetySummary: safeFormulation.safetySummary
+      },
+      planId,
+      properties: {
+        model: analysis.model,
+        promptVersion: analysis.promptVersion,
+        reasoningEffort: analysis.reasoningEffort,
+        responseId: analysis.responseId,
+        taskId: task.id
+      },
+      selectedPlan: plan
+    });
   });
 }
 
 async function applyExampleEmailResult(
   task: TaskRecord,
   resultPayload: unknown,
-  sqlOverride?: TaskServiceDb
+  sqlOverride?: TaskServiceDb,
+  afterCommit?: AfterCommitScheduler
 ) {
   const sql = sqlOverride ?? getSql();
   const planId = task.planId;
@@ -520,49 +538,53 @@ async function applyExampleEmailResult(
       updated_at = now()
     where id = ${requestId}::uuid
   `;
-  await recordTaskEmailCommunication({
-    body: "Free nutrition plan email",
-    emailHtml: textValue(payload.emailHtml),
-    metadata: { requestId },
-    messageType: "example_preview",
-    payload,
-    sql,
-    task
+  await eventually(afterCommit, async () => {
+    await recordTaskEmailCommunication({
+      body: "Free nutrition plan email",
+      emailHtml: textValue(payload.emailHtml),
+      metadata: { requestId },
+      messageType: "example_preview",
+      payload,
+      task
+    });
   });
-  await addWorkEvent(
-    task,
-    payload.sent === true ? "example_email_sent" : "example_email_rendered_not_sent",
-    "medium",
-    {
-      emailType: "example_preview",
-      messageId: payload.messageId,
-      reason: payload.reason,
-      requestId,
-      sent: payload.sent === true,
-      to: payload.to
-    },
-    sql
-  );
-  await writeBpmEvent({
-    actorType: "worker",
-    email: textValue(payload.to),
-    eventName: payload.sent === true ? "free_email_sent" : "free_email_rendered",
-    eventType: "email",
-    exampleRequestId: requestId,
-    planId,
-    properties: {
-      messageId: payload.messageId,
-      reason: payload.reason,
-      taskId: task.id
-    },
-    sql
+  await eventually(afterCommit, async () => {
+    await addWorkEvent(
+      task,
+      payload.sent === true ? "example_email_sent" : "example_email_rendered_not_sent",
+      "medium",
+      {
+        emailType: "example_preview",
+        messageId: payload.messageId,
+        reason: payload.reason,
+        requestId,
+        sent: payload.sent === true,
+        to: payload.to
+      }
+    );
+  });
+  await eventually(afterCommit, async () => {
+    await writeBpmEvent({
+      actorType: "worker",
+      email: textValue(payload.to),
+      eventName: payload.sent === true ? "free_email_sent" : "free_email_rendered",
+      eventType: "email",
+      exampleRequestId: requestId,
+      planId,
+      properties: {
+        messageId: payload.messageId,
+        reason: payload.reason,
+        taskId: task.id
+      }
+    });
   });
 }
 
 async function applyReassessmentEmailResult(
   task: TaskRecord,
   resultPayload: unknown,
-  sqlOverride?: TaskServiceDb
+  sqlOverride?: TaskServiceDb,
+  afterCommit?: AfterCommitScheduler
 ) {
   const sql = sqlOverride ?? getSql();
   const planId = task.planId;
@@ -602,47 +624,50 @@ async function applyReassessmentEmailResult(
       updated_at = now()
     where id = ${cronId}::uuid
   `;
-  await recordTaskEmailCommunication({
-    body: "60-day reassessment invite",
-    emailHtml: textValue(payload.emailHtml),
-    metadata: { cronId },
-    messageType: "reassessment",
-    payload,
-    sql,
-    task
+  await eventually(afterCommit, async () => {
+    await recordTaskEmailCommunication({
+      body: "60-day reassessment invite",
+      emailHtml: textValue(payload.emailHtml),
+      metadata: { cronId },
+      messageType: "reassessment",
+      payload,
+      task
+    });
   });
-  await addWorkEvent(
-    task,
-    payload.sent === true ? "reassessment_email_sent" : "reassessment_rendered_not_sent",
-    "medium",
-    {
+  await eventually(afterCommit, async () => {
+    await addWorkEvent(
+      task,
+      payload.sent === true ? "reassessment_email_sent" : "reassessment_rendered_not_sent",
+      "medium",
+      {
+        cronId,
+        emailType: "reassessment",
+        messageId: payload.messageId,
+        reason: payload.reason,
+        recurrenceDays,
+        sent: payload.sent === true,
+        to: payload.to
+      }
+    );
+  });
+  await eventually(afterCommit, async () => {
+    await writeBpmEvent({
+      actorType: "worker",
       cronId,
-      emailType: "reassessment",
-      messageId: payload.messageId,
-      reason: payload.reason,
-      recurrenceDays,
-      sent: payload.sent === true,
-      to: payload.to
-    },
-    sql
-  );
-  await writeBpmEvent({
-    actorType: "worker",
-    cronId,
-    email: textValue(payload.to),
-    eventName:
-      payload.sent === true
-        ? "reassessment_email_sent"
-        : "reassessment_email_rendered",
-    eventType: "reassessment",
-    planId,
-    properties: {
-      messageId: payload.messageId,
-      reason: payload.reason,
-      recurrenceDays,
-      taskId: task.id
-    },
-    sql
+      email: textValue(payload.to),
+      eventName:
+        payload.sent === true
+          ? "reassessment_email_sent"
+          : "reassessment_email_rendered",
+      eventType: "reassessment",
+      planId,
+      properties: {
+        messageId: payload.messageId,
+        reason: payload.reason,
+        recurrenceDays,
+        taskId: task.id
+      }
+    });
   });
 }
 
@@ -665,7 +690,8 @@ function safetyReviewIdsFromTask(task: TaskRecord) {
 async function applyCommunicationFollowupResult(
   task: TaskRecord,
   resultPayload: unknown,
-  sqlOverride?: TaskServiceDb
+  sqlOverride?: TaskServiceDb,
+  afterCommit?: AfterCommitScheduler
 ) {
   const sql = sqlOverride ?? getSql();
   const payload = objectValue(resultPayload);
@@ -704,19 +730,20 @@ async function applyCommunicationFollowupResult(
     `;
   }
 
-  await addWorkEvent(
-    task,
-    status === "failed"
-      ? "communication_channel_unavailable"
-      : "communication_task_completed",
-    status === "failed" ? "medium" : "low",
-    {
-      channelType,
-      messageId,
-      status
-    },
-    sql ?? undefined
-  );
+  await eventually(afterCommit, async () => {
+    await addWorkEvent(
+      task,
+      status === "failed"
+        ? "communication_channel_unavailable"
+        : "communication_task_completed",
+      status === "failed" ? "medium" : "low",
+      {
+        channelType,
+        messageId,
+        status
+      }
+    );
+  });
 
   return {
     channelId: textValue(channel.id) || null,
@@ -737,7 +764,8 @@ function contentStatus(value: unknown) {
 
 async function applyContentStatusChangeResult(
   task: TaskRecord,
-  sqlOverride?: TaskServiceDb
+  sqlOverride?: TaskServiceDb,
+  afterCommit?: AfterCommitScheduler
 ) {
   const payload = objectValue(task.payload);
   const contentType = payloadText(payload, "contentType");
@@ -768,22 +796,25 @@ async function applyContentStatusChangeResult(
     throw new Error("Content item not found");
   }
 
-  await addWorkEvent(task, "content_status_changed", "medium", {
-    contentId,
-    contentType,
-    targetStatus
-  }, sqlOverride);
-  await writeBpmEvent({
-    actorType: "worker",
-    eventName: "content_status_changed",
-    eventType: "content",
-    properties: {
+  await eventually(afterCommit, async () => {
+    await addWorkEvent(task, "content_status_changed", "medium", {
       contentId,
       contentType,
-      targetStatus,
-      taskId: task.id
-    },
-    sql: sqlOverride
+      targetStatus
+    });
+  });
+  await eventually(afterCommit, async () => {
+    await writeBpmEvent({
+      actorType: "worker",
+      eventName: "content_status_changed",
+      eventType: "content",
+      properties: {
+        contentId,
+        contentType,
+        targetStatus,
+        taskId: task.id
+      }
+    });
   });
 
   return {
@@ -797,7 +828,8 @@ async function applyContentStatusChangeResult(
 async function applyDigitalOceanBillingSyncResult(
   task: TaskRecord,
   resultPayload: unknown,
-  sqlOverride?: TaskServiceDb
+  sqlOverride?: TaskServiceDb,
+  afterCommit?: AfterCommitScheduler
 ) {
   const payload = objectValue(resultPayload);
   const digitalOcean = objectValue(payload.digitalOcean);
@@ -834,33 +866,36 @@ async function applyDigitalOceanBillingSyncResult(
     }
   }
 
-  await addWorkEvent(
-    task,
-    skipped
-      ? "digitalocean_billing_sync_skipped"
-      : "digitalocean_billing_sync_completed",
-    errorMessage ? "medium" : "low",
-    {
-      error: errorMessage || undefined,
-      projectNames: Array.isArray(payload.projectNames)
-        ? payload.projectNames
-        : [],
-      reason: reason || undefined,
-      skipped,
-      synced: Number.isFinite(synced) ? synced : 0
-    },
-    sqlOverride
-  );
+  await eventually(afterCommit, async () => {
+    await addWorkEvent(
+      task,
+      skipped
+        ? "digitalocean_billing_sync_skipped"
+        : "digitalocean_billing_sync_completed",
+      errorMessage ? "medium" : "low",
+      {
+        error: errorMessage || undefined,
+        projectNames: Array.isArray(payload.projectNames)
+          ? payload.projectNames
+          : [],
+        reason: reason || undefined,
+        skipped,
+        synced: Number.isFinite(synced) ? synced : 0
+      }
+    );
+  });
 
   return resultPayload;
 }
 
 export async function applyTaskCompletionResult({
+  afterCommit,
   resultPayload,
   sql,
   task: providedTask,
   taskId
 }: Readonly<{
+  afterCommit?: AfterCommitScheduler;
   resultPayload: unknown;
   sql?: TaskServiceDb;
   task?: TaskRecord;
@@ -869,46 +904,47 @@ export async function applyTaskCompletionResult({
   const task = providedTask ?? (await getTaskBundle({ taskId })).task;
 
   if (task.taskType === "analyze_healthscore") {
-    await applyHealthScoreResult(task, resultPayload, sql);
+    await applyHealthScoreResult(task, resultPayload, sql, afterCommit);
     return resultPayload;
   }
 
   if (task.taskType === "generate_formulation") {
-    await applyPaidFormulationResult(task, resultPayload, sql);
+    await applyPaidFormulationResult(task, resultPayload, sql, afterCommit);
     return resultPayload;
   }
 
   if (task.taskType === "generate_example_formulation") {
-    await applyExampleFormulationResult(task, resultPayload, sql);
+    await applyExampleFormulationResult(task, resultPayload, sql, afterCommit);
     return resultPayload;
   }
 
   if (task.taskType === "send_example_email") {
-    await applyExampleEmailResult(task, resultPayload, sql);
+    await applyExampleEmailResult(task, resultPayload, sql, afterCommit);
     return resultPayload;
   }
 
   if (task.taskType === "send_reassessment_email") {
-    await applyReassessmentEmailResult(task, resultPayload, sql);
+    await applyReassessmentEmailResult(task, resultPayload, sql, afterCommit);
     return resultPayload;
   }
 
   if (task.taskType === "client_safety_followup") {
-    return applyCommunicationFollowupResult(task, resultPayload, sql);
+    return applyCommunicationFollowupResult(task, resultPayload, sql, afterCommit);
   }
 
   if (task.taskType === "content_status_change") {
-    return applyContentStatusChangeResult(task, sql);
+    return applyContentStatusChangeResult(task, sql, afterCommit);
   }
 
   if (task.taskType === "sync_digitalocean_billing") {
-    return applyDigitalOceanBillingSyncResult(task, resultPayload, sql);
+    return applyDigitalOceanBillingSyncResult(task, resultPayload, sql, afterCommit);
   }
 
   return resultPayload;
 }
 
 export async function applyTaskFailureResult({
+  afterCommit,
   errorMessage,
   resultPayload,
   retryWillBeScheduled = false,
@@ -916,6 +952,7 @@ export async function applyTaskFailureResult({
   task: providedTask,
   taskId
 }: Readonly<{
+  afterCommit?: AfterCommitScheduler;
   errorMessage: string;
   resultPayload: unknown;
   retryWillBeScheduled?: boolean;
@@ -932,60 +969,59 @@ export async function applyTaskFailureResult({
     return resultPayload;
   }
 
-  await inResultTransaction(sql, async (transaction) => {
-    if (task.planId && task.taskType === "generate_formulation") {
-      await transaction`
-        update public.assessments set
-          status = ${retryWillBeScheduled ? "queued" : "failed"},
-          error_message = ${retryWillBeScheduled ? null : errorMessage},
-          updated_at = now()
-        where plan_id = ${task.planId}::uuid
-      `;
-    }
+  if (task.planId && task.taskType === "generate_formulation") {
+    await sql`
+      update public.assessments set
+        status = ${retryWillBeScheduled ? "queued" : "failed"},
+        error_message = ${retryWillBeScheduled ? null : errorMessage},
+        updated_at = now()
+      where plan_id = ${task.planId}::uuid
+    `;
+  }
 
-    if (
-      task.planId &&
-      (task.taskType === "generate_example_formulation" ||
-        task.taskType === "send_example_email") &&
-      isUuid(requestId)
-    ) {
-      await transaction`
-        update public.assessment_example_requests set
-          status = ${retryWillBeScheduled
-            ? task.taskType === "send_example_email"
-              ? "email_queued"
-              : "formulation_queued"
-            : "failed"},
-          error_message = ${retryWillBeScheduled ? null : errorMessage},
-          updated_at = now()
-        where id = ${requestId}::uuid
-      `;
-    }
+  if (
+    task.planId &&
+    (task.taskType === "generate_example_formulation" ||
+      task.taskType === "send_example_email") &&
+    isUuid(requestId)
+  ) {
+    await sql`
+      update public.assessment_example_requests set
+        status = ${retryWillBeScheduled
+          ? task.taskType === "send_example_email"
+            ? "email_queued"
+            : "formulation_queued"
+          : "failed"},
+        error_message = ${retryWillBeScheduled ? null : errorMessage},
+        updated_at = now()
+      where id = ${requestId}::uuid
+    `;
+  }
 
-    if (task.taskType === "send_reassessment_email" && isUuid(cronId)) {
-      await transaction`
-        update public.cron set
-          status = ${retryWillBeScheduled ? "queued" : "failed"},
-          error_message = ${retryWillBeScheduled ? null : errorMessage},
-          updated_at = now()
-        where id = ${cronId}::uuid
-      `;
-    }
-  });
+  if (task.taskType === "send_reassessment_email" && isUuid(cronId)) {
+    await sql`
+      update public.cron set
+        status = ${retryWillBeScheduled ? "queued" : "failed"},
+        error_message = ${retryWillBeScheduled ? null : errorMessage},
+        updated_at = now()
+      where id = ${cronId}::uuid
+    `;
+  }
 
-  await writeBpmEvent({
-    actorType: "worker",
-    errorCode: "task_failed",
-    errorMessage,
-    eventName: retryWillBeScheduled ? "worker_task_retrying" : "worker_task_failed",
-    eventType: "error",
-    planId: task.planId,
-    properties: {
-      taskId: task.id,
-      taskType: task.taskType
-    },
-    severity: retryWillBeScheduled ? "medium" : "critical",
-    sql
+  await eventually(afterCommit, async () => {
+    await writeBpmEvent({
+      actorType: "worker",
+      errorCode: "task_failed",
+      errorMessage,
+      eventName: retryWillBeScheduled ? "worker_task_retrying" : "worker_task_failed",
+      eventType: "error",
+      planId: task.planId,
+      properties: {
+        taskId: task.id,
+        taskType: task.taskType
+      },
+      severity: retryWillBeScheduled ? "medium" : "critical"
+    });
   });
 
   return resultPayload;

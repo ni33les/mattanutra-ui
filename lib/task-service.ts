@@ -18,11 +18,6 @@ import {
   type TaskPriority
 } from "@/lib/task-service-utils";
 
-const TASK_DEPENDENCY_GRAPH_LOCK_CLASS = 1_413_563_211;
-const TASK_DEPENDENCY_GRAPH_LOCK_KEY = 1_145_393_235;
-const LEGACY_AGGREGATE_AGENT_CLEANUP_LOCK_CLASS = 1_413_563_211;
-const LEGACY_AGGREGATE_AGENT_CLEANUP_LOCK_KEY = 1_145_393_236;
-
 const globalTaskService = globalThis as typeof globalThis & {
   mattanutraWorkerSessionSchemaReady?: Promise<void>;
 };
@@ -407,7 +402,6 @@ export type ReserveNextTaskInput = Readonly<{
     name: string;
     type?: AgentType;
   }>;
-  applyExpiredFailure?: (context: TaskFailureContext) => Promise<unknown>;
   leaseSeconds?: unknown;
   mustRequireCapability?: string | null;
   taskTypes?: unknown;
@@ -432,6 +426,8 @@ export type CompleteTaskInput = Readonly<{
   workerSessionId?: string | null;
 }>;
 
+export type TaskAfterCommitEffect = () => Promise<void>;
+
 export type FailTaskInput = Readonly<{
   agentId?: string | null;
   applyFailure?: (context: TaskFailureContext) => Promise<unknown>;
@@ -443,6 +439,7 @@ export type FailTaskInput = Readonly<{
 }>;
 
 export type TaskCompletionContext = Readonly<{
+  afterCommit?: (effect: TaskAfterCommitEffect) => void;
   agentId?: string | null;
   reservationId?: string | null;
   resultPayload: Record<string, unknown>;
@@ -451,6 +448,7 @@ export type TaskCompletionContext = Readonly<{
 }>;
 
 export type TaskFailureContext = Readonly<{
+  afterCommit?: (effect: TaskAfterCommitEffect) => void;
   agentId?: string | null;
   errorMessage: string;
   reservationId?: string | null;
@@ -1045,7 +1043,8 @@ async function activeReservationInTransaction(
     reservationId?: string | null;
     taskId: string;
     workerSessionId?: string | null;
-  }>
+  }>,
+  options: Readonly<{ lock?: boolean }> = {}
 ) {
   const agentId = uuidOrNull(input.agentId);
   const reservationId = uuidOrNull(input.reservationId);
@@ -1067,24 +1066,42 @@ async function activeReservationInTransaction(
     return null;
   }
 
-  const rows = await sql<
-    Array<{
-      agent_id: string;
-      id: string;
-      worker_session_id: string | null;
-    }>
-  >`
-    select id::text, agent_id::text, worker_session_id::text
-    from public.task_reservations
-    where task_id = ${input.taskId}::uuid
-      and status = 'active'
-      and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
-      and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
-      and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
-    order by reserved_at desc
-    limit 1
-    for update
-  `;
+  const rows = options.lock
+    ? await sql<
+        Array<{
+          agent_id: string;
+          id: string;
+          worker_session_id: string | null;
+        }>
+      >`
+        select id::text, agent_id::text, worker_session_id::text
+        from public.task_reservations
+        where task_id = ${input.taskId}::uuid
+          and status = 'active'
+          and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
+          and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+          and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
+        order by reserved_at desc
+        limit 1
+        for update
+      `
+    : await sql<
+        Array<{
+          agent_id: string;
+          id: string;
+          worker_session_id: string | null;
+        }>
+      >`
+        select id::text, agent_id::text, worker_session_id::text
+        from public.task_reservations
+        where task_id = ${input.taskId}::uuid
+          and status = 'active'
+          and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
+          and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+          and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
+        order by reserved_at desc
+        limit 1
+      `;
 
   if (!rows[0]) {
     throw new Error(`Active reservation for task ${input.taskId} not found`);
@@ -1174,18 +1191,7 @@ async function upsertAgentInTransaction(
   return mapAgent(rows[0]);
 }
 
-async function hideLegacyAggregateWorkerAgentInTransaction(sql: Db) {
-  const lockRows = await sql<Array<{ locked: boolean }>>`
-    select pg_try_advisory_xact_lock(
-      ${LEGACY_AGGREGATE_AGENT_CLEANUP_LOCK_CLASS},
-      ${LEGACY_AGGREGATE_AGENT_CLEANUP_LOCK_KEY}
-    ) as locked
-  `;
-
-  if (!lockRows[0]?.locked) {
-    return;
-  }
-
+async function hideLegacyAggregateWorkerAgent(sql: Db) {
   const legacyRows = await sql<Array<{ id: string }>>`
     select id::text
     from public.agents
@@ -1340,13 +1346,6 @@ async function ensureTaskDependenciesInTransaction(
 
   const saved: TaskDependency[] = [];
   const seen = new Set<string>();
-
-  await sql`
-    select pg_advisory_xact_lock(
-      ${TASK_DEPENDENCY_GRAPH_LOCK_CLASS},
-      ${TASK_DEPENDENCY_GRAPH_LOCK_KEY}
-    )
-  `;
 
   for (const dependency of dependencies) {
     const dependsOnTaskId = uuidOrNull(dependency.taskId);
@@ -1632,7 +1631,7 @@ async function createTaskInTransaction(sql: Db, input: CreateTaskInput) {
 export async function upsertAgent(input: Parameters<typeof upsertAgentInTransaction>[1]) {
   const sql = getRequiredSql();
 
-  return sql.begin((tx) => upsertAgentInTransaction(tx, input));
+  return upsertAgentInTransaction(sql, input);
 }
 
 export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
@@ -1640,76 +1639,74 @@ export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
 
   await ensureWorkerSessionSchema(sql);
 
-  return sql.begin(async (tx) => {
-    await hideLegacyAggregateWorkerAgentInTransaction(tx);
+  await hideLegacyAggregateWorkerAgent(sql);
 
-    const capabilities = normalizeCapabilities(
-      input.capabilities ?? input.agent.capabilities
-    );
-    const taskTypes = normalizeCapabilities(input.taskTypes);
-    const agent = await upsertAgentInTransaction(tx, {
-      capabilities,
-      id: input.agent.id,
-      metadata: {
-        ...(input.agent.metadata ?? {}),
-        externalWorker: true
-      },
-      model: input.agent.model,
-      name: input.agent.name,
-      status: "active",
-      type: input.agent.type ?? "external"
-    });
-    const rows = await tx<WorkerSessionRow[]>`
-      insert into public.worker_sessions (
-        id,
-        agent_id,
-        instance_id,
-        status,
-        capabilities,
-        task_types,
-        concurrency,
-        worker_version,
-        metadata,
-        last_seen_at,
-        created_at,
-        updated_at
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${agent.id}::uuid,
-        ${cleanText(input.instanceId, agent.name)},
-        'idle',
-        ${capabilities},
-        ${taskTypes},
-        ${positiveInteger(input.concurrency, 1)},
-        ${optionalText(input.workerVersion)},
-        ${tx.json(toJsonValue(input.metadata ?? {}))},
-        now(),
-        now(),
-        now()
-      )
-      on conflict (agent_id, instance_id)
-      do update set
-        status = 'idle',
-        capabilities = excluded.capabilities,
-        task_types = excluded.task_types,
-        concurrency = excluded.concurrency,
-        worker_version = excluded.worker_version,
-        metadata = public.worker_sessions.metadata || excluded.metadata,
-        last_seen_at = now(),
-        updated_at = now()
-      returning *
-    `;
-
-    return {
-      agent,
-      polling: {
-        leaseSeconds: 600,
-        waitSeconds: 20
-      },
-      session: mapWorkerSession(rows[0])
-    };
+  const capabilities = normalizeCapabilities(
+    input.capabilities ?? input.agent.capabilities
+  );
+  const taskTypes = normalizeCapabilities(input.taskTypes);
+  const agent = await upsertAgentInTransaction(sql, {
+    capabilities,
+    id: input.agent.id,
+    metadata: {
+      ...(input.agent.metadata ?? {}),
+      externalWorker: true
+    },
+    model: input.agent.model,
+    name: input.agent.name,
+    status: "active",
+    type: input.agent.type ?? "external"
   });
+  const rows = await sql<WorkerSessionRow[]>`
+    insert into public.worker_sessions (
+      id,
+      agent_id,
+      instance_id,
+      status,
+      capabilities,
+      task_types,
+      concurrency,
+      worker_version,
+      metadata,
+      last_seen_at,
+      created_at,
+      updated_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${agent.id}::uuid,
+      ${cleanText(input.instanceId, agent.name)},
+      'idle',
+      ${capabilities},
+      ${taskTypes},
+      ${positiveInteger(input.concurrency, 1)},
+      ${optionalText(input.workerVersion)},
+      ${sql.json(toJsonValue(input.metadata ?? {}))},
+      now(),
+      now(),
+      now()
+    )
+    on conflict (agent_id, instance_id)
+    do update set
+      status = 'idle',
+      capabilities = excluded.capabilities,
+      task_types = excluded.task_types,
+      concurrency = excluded.concurrency,
+      worker_version = excluded.worker_version,
+      metadata = public.worker_sessions.metadata || excluded.metadata,
+      last_seen_at = now(),
+      updated_at = now()
+    returning *
+  `;
+
+  return {
+    agent,
+    polling: {
+      leaseSeconds: 600,
+      waitSeconds: 20
+    },
+    session: mapWorkerSession(rows[0])
+  };
 }
 
 export async function heartbeatWorkerSession(input: HeartbeatWorkerSessionInput) {
@@ -1724,49 +1721,47 @@ export async function heartbeatWorkerSession(input: HeartbeatWorkerSessionInput)
     throw new Error("Worker heartbeat requires a valid workerSessionId");
   }
 
-  return sql.begin(async (tx) => {
-    const status = workerSessionStatus(input.status);
-    const rows = await tx<WorkerSessionRow[]>`
-      update public.worker_sessions set
-        status = ${status},
-        current_task_id = case
-          when ${status} = 'offline' then null
-          else ${currentTaskId}::uuid
-        end,
-        metadata = metadata || ${tx.json(toJsonValue(input.metadata ?? {}))},
-        last_seen_at = now(),
-        updated_at = now()
-      where id = ${workerSessionId}::uuid
-        and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
-      returning *
-    `;
+  const status = workerSessionStatus(input.status);
+  const rows = await sql<WorkerSessionRow[]>`
+    update public.worker_sessions set
+      status = ${status},
+      current_task_id = case
+        when ${status} = 'offline' then null
+        else ${currentTaskId}::uuid
+      end,
+      metadata = metadata || ${sql.json(toJsonValue(input.metadata ?? {}))},
+      last_seen_at = now(),
+      updated_at = now()
+    where id = ${workerSessionId}::uuid
+      and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+    returning *
+  `;
 
-    if (!rows[0]) {
-      throw new Error("Worker session not found");
-    }
+  if (!rows[0]) {
+    throw new Error("Worker session not found");
+  }
 
-    await tx`
-      update public.agents
-      set
-        last_seen_at = now(),
-        updated_at = now()
-      where id = ${rows[0].agent_id}::uuid
-    `;
+  await sql`
+    update public.agents
+    set
+      last_seen_at = now(),
+      updated_at = now()
+    where id = ${rows[0].agent_id}::uuid
+  `;
 
-    return mapWorkerSession(rows[0]);
-  });
+  return mapWorkerSession(rows[0]);
 }
 
 export async function createGoal(input: CreateGoalInput) {
   const sql = getRequiredSql();
 
-  return sql.begin((tx) => createGoalInTransaction(tx, input));
+  return createGoalInTransaction(sql, input);
 }
 
 export async function createTask(input: CreateTaskInput) {
   const sql = getRequiredSql();
 
-  return sql.begin((tx) => createTaskInTransaction(tx, input));
+  return createTaskInTransaction(sql, input);
 }
 
 export async function retryFailedTask(input: RetryFailedTaskInput) {
@@ -1778,8 +1773,6 @@ export async function retryFailedTask(input: RetryFailedTaskInput) {
   }
 
   return sql.begin(async (tx) => {
-    await tx`select pg_advisory_xact_lock(hashtext(${taskId}))`;
-
     const taskRows = await tx<TaskRow[]>`
       select *
       from public.tasks
@@ -1981,19 +1974,19 @@ async function createTaskSequenceInTransaction(
 export async function createTaskSequence(input: CreateTaskSequenceInput) {
   const sql = getRequiredSql();
 
-  return sql.begin((tx) => createTaskSequenceInTransaction(tx, input));
+  return createTaskSequenceInTransaction(sql, input);
 }
 
 export async function addTaskComment(input: AddTaskCommentInput) {
   const sql = getRequiredSql();
 
-  return sql.begin((tx) => addTaskCommentInTransaction(tx, input));
+  return addTaskCommentInTransaction(sql, input);
 }
 
 export async function addTaskEvent(input: AddTaskEventInput) {
   const sql = getRequiredSql();
 
-  return sql.begin((tx) => addTaskEventInTransaction(tx, input));
+  return addTaskEventInTransaction(sql, input);
 }
 
 export async function getTaskBundle(input: Readonly<{ taskId: string }>) {
@@ -2065,7 +2058,7 @@ export async function assertActiveTaskReservation(
 
   await ensureWorkerSessionSchema(sql);
 
-  return sql.begin((tx) => activeReservationInTransaction(tx, input));
+  return activeReservationInTransaction(sql, input);
 }
 
 export async function listGoalTasks(input: Readonly<{ goalId: string }>) {
@@ -2410,14 +2403,32 @@ export async function reserveNextTask(
 
   await ensureWorkerSessionSchema(sql);
 
-  return sql.begin(async (tx) => {
-    const workerSessionId = uuidOrNull(input.workerSessionId);
+  const workerSessionId = uuidOrNull(input.workerSessionId);
 
-    if (input.workerSessionId && !workerSessionId) {
-      throw new Error("Task reservation requires a valid workerSessionId");
+  if (input.workerSessionId && !workerSessionId) {
+    throw new Error("Task reservation requires a valid workerSessionId");
+  }
+
+  let agent: TaskAgent;
+
+  if (workerSessionId) {
+    const agentRows = await sql<AgentRow[]>`
+      select agents.*
+      from public.worker_sessions
+      join public.agents on agents.id = worker_sessions.agent_id
+      where worker_sessions.id = ${workerSessionId}::uuid
+        and worker_sessions.status <> 'offline'
+        and agents.status = 'active'
+      limit 1
+    `;
+
+    if (!agentRows[0]) {
+      throw new Error("Worker session is not active for this agent");
     }
 
-    const agent = await upsertAgentInTransaction(tx, {
+    agent = mapAgent(agentRows[0]);
+  } else {
+    agent = await upsertAgentInTransaction(sql, {
       capabilities: input.agent.capabilities,
       id: input.agent.id,
       metadata: input.agent.metadata,
@@ -2425,32 +2436,13 @@ export async function reserveNextTask(
       name: input.agent.name,
       type: input.agent.type ?? "external"
     });
+  }
 
-    if (workerSessionId) {
-      const sessionRows = await tx<Array<{ id: string }>>`
-        update public.worker_sessions set
-          status = 'polling',
-          last_seen_at = now(),
-          updated_at = now()
-        where id = ${workerSessionId}::uuid
-          and agent_id = ${agent.id}::uuid
-          and status <> 'offline'
-        returning id::text
-      `;
-
-      if (!sessionRows[0]) {
-        throw new Error("Worker session is not active for this agent");
-      }
-    }
-
-    await releaseExpiredReservationsInTransaction(tx, {
-      applyFailure: input.applyExpiredFailure
-    });
-
-    const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
-    const mustRequireCapability =
-      normalizeCapabilities([input.mustRequireCapability])[0] ?? null;
-    const taskTypes = normalizeCapabilities(input.taskTypes);
+  const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
+  const mustRequireCapability =
+    normalizeCapabilities([input.mustRequireCapability])[0] ?? null;
+  const taskTypes = normalizeCapabilities(input.taskTypes);
+  const reserved = await sql.begin(async (tx) => {
     const rows = await tx<TaskRow[]>`
       with candidate as (
         select tasks.*
@@ -2582,34 +2574,43 @@ export async function reserveNextTask(
       taskId: task.id
     });
 
-    const commentRows = await tx<CommentRow[]>`
-      select *
-      from public.task_comments
-      where task_id = ${task.id}::uuid
-      order by created_at asc
-    `;
-
     return {
       agent,
-      comments: commentRows.map(mapComment),
       reservationId,
       task
     };
   });
+
+  if (!reserved) {
+    return null;
+  }
+
+  const commentRows = await sql<CommentRow[]>`
+    select *
+    from public.task_comments
+    where task_id = ${reserved.task.id}::uuid
+    order by created_at asc
+  `;
+
+  return {
+    ...reserved,
+    comments: commentRows.map(mapComment)
+  };
 }
 
 export async function completeTask(input: CompleteTaskInput) {
   const sql = getRequiredSql();
+  const afterCommitEffects: TaskAfterCommitEffect[] = [];
 
   await ensureWorkerSessionSchema(sql);
 
-  return sql.begin(async (tx) => {
+  const task = await sql.begin(async (tx) => {
     const activeReservation = await activeReservationInTransaction(tx, {
       agentId: input.agentId,
       reservationId: input.reservationId,
       taskId: input.taskId,
       workerSessionId: input.workerSessionId
-    });
+    }, { lock: true });
     const taskRows = await tx<TaskRow[]>`
       select *
       from public.tasks
@@ -2638,6 +2639,7 @@ export async function completeTask(input: CompleteTaskInput) {
     const resultPayload = payloadRecord(
       input.applyResult
         ? await input.applyResult({
+            afterCommit: (effect) => afterCommitEffects.push(effect),
             agentId: input.agentId ?? activeReservation?.agent_id,
             reservationId: activeReservation?.id ?? input.reservationId,
             resultPayload: input.resultPayload ?? {},
@@ -2707,6 +2709,31 @@ export async function completeTask(input: CompleteTaskInput) {
 
     return task;
   });
+
+  for (const effect of afterCommitEffects) {
+    try {
+      await effect();
+    } catch (error) {
+      console.warn("Task after-commit effect failed", error);
+      try {
+        await addTaskEvent({
+          agentId: input.agentId,
+          eventPayload: {
+            error: error instanceof Error ? error.message : "After-commit effect failed"
+          },
+          eventStatus: "failed",
+          eventType: "task_after_commit_effect_failed",
+          goalId: task.goalId,
+          severity: "medium",
+          taskId: task.id
+        });
+      } catch (eventError) {
+        console.warn("Unable to record task after-commit effect failure", eventError);
+      }
+    }
+  }
+
+  return task;
 }
 
 export async function renewTaskLease(input: RenewTaskLeaseInput) {
@@ -2809,16 +2836,17 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
 
 export async function failTask(input: FailTaskInput) {
   const sql = getRequiredSql();
+  const afterCommitEffects: TaskAfterCommitEffect[] = [];
 
   await ensureWorkerSessionSchema(sql);
 
-  return sql.begin(async (tx) => {
+  const task = await sql.begin(async (tx) => {
     const activeReservation = await activeReservationInTransaction(tx, {
       agentId: input.agentId,
       reservationId: input.reservationId,
       taskId: input.taskId,
       workerSessionId: input.workerSessionId
-    });
+    }, { lock: true });
     const taskRows = await tx<TaskRow[]>`
       select *
       from public.tasks
@@ -2842,6 +2870,7 @@ export async function failTask(input: FailTaskInput) {
     const resultPayload = payloadRecord(
       input.applyFailure
         ? await input.applyFailure({
+            afterCommit: (effect) => afterCommitEffects.push(effect),
             agentId: input.agentId ?? activeReservation?.agent_id,
             errorMessage: input.errorMessage,
             reservationId: activeReservation?.id ?? input.reservationId,
@@ -2923,44 +2952,67 @@ export async function failTask(input: FailTaskInput) {
 
     return task;
   });
+
+  for (const effect of afterCommitEffects) {
+    try {
+      await effect();
+    } catch (error) {
+      console.warn("Task failure after-commit effect failed", error);
+      try {
+        await addTaskEvent({
+          agentId: input.agentId,
+          eventPayload: {
+            error: error instanceof Error ? error.message : "After-commit effect failed"
+          },
+          eventStatus: "failed",
+          eventType: "task_after_commit_effect_failed",
+          goalId: task.goalId,
+          severity: "medium",
+          taskId: task.id
+        });
+      } catch (eventError) {
+        console.warn("Unable to record task failure after-commit effect failure", eventError);
+      }
+    }
+  }
+
+  return task;
 }
 
 export async function spawnChildTask(input: SpawnChildTaskInput) {
   const sql = getRequiredSql();
 
-  return sql.begin(async (tx) => {
-    const parentRows = await tx<TaskRow[]>`
-      select *
-      from public.tasks
-      where id = ${input.parentTaskId}::uuid
-      limit 1
-    `;
+  const parentRows = await sql<TaskRow[]>`
+    select *
+    from public.tasks
+    where id = ${input.parentTaskId}::uuid
+    limit 1
+  `;
 
-    if (!parentRows[0]) {
-      throw new Error(`Parent task ${input.parentTaskId} not found`);
-    }
+  if (!parentRows[0]) {
+    throw new Error(`Parent task ${input.parentTaskId} not found`);
+  }
 
-    const parent = mapTask(parentRows[0]);
-    const created = await createTaskInTransaction(tx, {
-      ...input,
-      createdByTaskId: parent.id,
-      parentTaskId: parent.id,
-      goalId: parent.goalId
-    });
-
-    await addTaskEventInTransaction(tx, {
-      agentId: input.createdByAgentId,
-      eventPayload: {
-        childTaskId: created.task.id,
-        childTaskType: created.task.taskType
-      },
-      eventType: "child_task_created",
-      goalId: parent.goalId,
-      taskId: parent.id
-    });
-
-    return created;
+  const parent = mapTask(parentRows[0]);
+  const created = await createTaskInTransaction(sql, {
+    ...input,
+    createdByTaskId: parent.id,
+    parentTaskId: parent.id,
+    goalId: parent.goalId
   });
+
+  await addTaskEventInTransaction(sql, {
+    agentId: input.createdByAgentId,
+    eventPayload: {
+      childTaskId: created.task.id,
+      childTaskType: created.task.taskType
+    },
+    eventType: "child_task_created",
+    goalId: parent.goalId,
+    taskId: parent.id
+  });
+
+  return created;
 }
 
 export {

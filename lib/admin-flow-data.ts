@@ -618,30 +618,28 @@ export async function updateAdminConversionTargets(input: Readonly<{
     throw new Error("At least one conversion target is required");
   }
 
-  await sql.begin(async (transaction) => {
-    for (const entry of entries) {
-      await transaction`
-        insert into public.admin_conversion_targets (
-          target_id,
-          target_rate,
-          updated_by,
-          created_at,
-          updated_at
-        )
-        values (
-          ${entry.id},
-          ${entry.value},
-          ${input.actor ?? "admin_dashboard"},
-          now(),
-          now()
-        )
-        on conflict (target_id) do update set
-          target_rate = excluded.target_rate,
-          updated_by = excluded.updated_by,
-          updated_at = now()
-      `;
-    }
-  });
+  for (const entry of entries) {
+    await sql`
+      insert into public.admin_conversion_targets (
+        target_id,
+        target_rate,
+        updated_by,
+        created_at,
+        updated_at
+      )
+      values (
+        ${entry.id},
+        ${entry.value},
+        ${input.actor ?? "admin_dashboard"},
+        now(),
+        now()
+      )
+      on conflict (target_id) do update set
+        target_rate = excluded.target_rate,
+        updated_by = excluded.updated_by,
+        updated_at = now()
+    `;
+  }
 
   await writeBpmEvent({
     actorType: "admin",

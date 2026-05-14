@@ -791,43 +791,40 @@ export async function dismissAdminReviewTask({
     throw new Error("Database is not configured");
   }
 
-  await sql.begin(async (transaction) => {
-    const tasks = await transaction<{ id: string }[]>`
-      select id::text
-      from public.tasks
-      where id = ${id}::uuid
-        and task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
-        and status not in ('completed', 'failed', 'cancelled', 'skipped')
-      for update
-    `;
+  const tasks = await sql<{ id: string }[]>`
+    select id::text
+    from public.tasks
+    where id = ${id}::uuid
+      and task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
+      and status not in ('completed', 'failed', 'cancelled', 'skipped')
+  `;
 
-    if (!tasks[0]) {
-      throw new Error("Review task not found");
-    }
+  if (!tasks[0]) {
+    throw new Error("Review task not found");
+  }
 
-    await transaction`
-      update public.safety_reviews
-      set
-        status = 'closed',
-        reviewed_at = coalesce(reviewed_at, now()),
-        closed_at = now(),
-        reviewer_id = ${actor ?? "admin_dashboard"},
-        reviewer_note = coalesce(reviewer_note, 'Dismissed from admin review queue.'),
-        client_notification_status = 'not_required',
-        updated_at = now()
-      where task_id = ${id}::uuid
-        and status in ('open', 'in_review', 'escalated')
-    `;
+  await sql`
+    update public.safety_reviews
+    set
+      status = 'closed',
+      reviewed_at = coalesce(reviewed_at, now()),
+      closed_at = now(),
+      reviewer_id = ${actor ?? "admin_dashboard"},
+      reviewer_note = coalesce(reviewer_note, 'Dismissed from admin review queue.'),
+      client_notification_status = 'not_required',
+      updated_at = now()
+    where task_id = ${id}::uuid
+      and status in ('open', 'in_review', 'escalated')
+  `;
 
-    await completeSupplementReviewTasks(transaction, {
-      actor,
-      commentBody: "Dismissed from admin review queue.",
-      eventPayload: {
-        taskId: id
-      },
-      eventType: "supplement_review_dismissed",
-      taskIds: [id]
-    });
+  await completeSupplementReviewTasks(sql, {
+    actor,
+    commentBody: "Dismissed from admin review queue.",
+    eventPayload: {
+      taskId: id
+    },
+    eventType: "supplement_review_dismissed",
+    taskIds: [id]
   });
 
   return getAdminReviewQueueData();
@@ -847,7 +844,8 @@ export async function resolveAdminReviewTask(input: ResolveAdminReviewTaskInput)
     throw new Error("Supplement name is required");
   }
 
-  await sql.begin(async (transaction) => {
+  {
+    const transaction = sql;
     const tasks = await transaction<
       Array<{
         id: string;
@@ -860,7 +858,6 @@ export async function resolveAdminReviewTask(input: ResolveAdminReviewTaskInput)
       where id = ${input.id}::uuid
         and task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
         and status not in ('completed', 'failed', 'cancelled', 'skipped')
-      for update
     `;
     const task = tasks[0];
 
@@ -882,7 +879,6 @@ export async function resolveAdminReviewTask(input: ResolveAdminReviewTaskInput)
         select id::text, name
         from public.supplements
         where id = ${associatedSupplementId}::uuid
-        for update
       `;
       const associatedSupplement = associatedRows[0];
 
@@ -1042,7 +1038,6 @@ export async function resolveAdminReviewTask(input: ResolveAdminReviewTaskInput)
           or trim(both '_' from regexp_replace(lower(coalesce(payload ->> 'normalizedSupplementName', '')), '[^a-z0-9]+', '_', 'g')) = ${normalizedSupplementName}
           or trim(both '_' from regexp_replace(lower(coalesce(payload ->> 'supplementName', '')), '[^a-z0-9]+', '_', 'g')) = ${normalizedSupplementName}
       )
-      for update
     `;
     const completedTaskIds = completedTasks.map((row) => row.id);
     const resolutionLabel = associatedSupplementName
@@ -1117,7 +1112,7 @@ export async function resolveAdminReviewTask(input: ResolveAdminReviewTaskInput)
         })}
       )
     `;
-  });
+  }
 
   return getAdminReviewQueueData();
 }
@@ -1291,7 +1286,8 @@ export async function decideAdminPlanReviewTask(
     throw new Error("Client dose is required to approve a review");
   }
 
-  await sql.begin(async (transaction) => {
+  {
+    const transaction = sql;
     const tasks = await transaction<
       Array<{
         id: string;
@@ -1304,7 +1300,6 @@ export async function decideAdminPlanReviewTask(
       where id = ${input.id}::uuid
         and task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
         and status not in ('completed', 'failed', 'cancelled', 'skipped')
-      for update
     `;
     const task = tasks[0];
 
@@ -1326,7 +1321,6 @@ export async function decideAdminPlanReviewTask(
         and status in ('open', 'in_review', 'escalated')
       order by opened_at asc
       limit 1
-      for update
     `;
     const review = safetyReviews[0];
 
@@ -1340,7 +1334,6 @@ export async function decideAdminPlanReviewTask(
       where plan_id = ${task.plan_id}::uuid
       order by version desc, generated_at desc
       limit 1
-      for update
     `;
     const formulation = formulations[0];
 
@@ -1464,7 +1457,7 @@ export async function decideAdminPlanReviewTask(
         )
       `;
     }
-  });
+  }
 
   return getAdminReviewQueueData();
 }

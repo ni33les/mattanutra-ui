@@ -1,6 +1,6 @@
 const encoder = new TextEncoder();
 
-const DEFAULT_SNAPSHOT_INTERVAL_MS = 2_000;
+const DEFAULT_SNAPSHOT_INTERVAL_MS = 10_000;
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 15_000;
 
 function sseEvent(name: string, data: unknown) {

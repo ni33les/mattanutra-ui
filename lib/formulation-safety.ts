@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import { toJsonValue } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
+import { getSql } from "@/lib/db";
 import {
   doseExceedsLimit,
   parseDose,
@@ -12,6 +13,8 @@ import type { FormulationBlueprint, FormulationIngredient, LocalizedText } from 
 import type { Locale } from "@/lib/i18n";
 import { createGoal, createTask, type TaskServiceDb } from "@/lib/task-service";
 
+type SafetyAfterCommit = (effect: () => Promise<void>) => void;
+
 type SafetyAudit = (event: {
   eventType: string;
   level?: "critical" | "high" | "low" | "medium";
@@ -19,6 +22,7 @@ type SafetyAudit = (event: {
 }) => Promise<void>;
 
 type SafetyInput = Readonly<{
+  afterCommit?: SafetyAfterCommit;
   audit?: SafetyAudit;
   formulation: FormulationBlueprint;
   locale: Locale;
@@ -248,6 +252,7 @@ function withReducedDose(
 }
 
 async function enqueueSupplementReviewWork(input: {
+  afterCommit?: SafetyAfterCommit;
   kind: ReviewKind;
   normalizedSupplementName: string;
   payload: Record<string, unknown>;
@@ -265,8 +270,9 @@ async function enqueueSupplementReviewWork(input: {
     ? "Review supplement"
     : "Review plan";
   const taskTitle = `Review supplement ${input.supplementName}`;
-
-  try {
+  const idempotencyKey = `supplement-review:${input.kind}:${globalUnknown ? "global" : input.planId}:${input.normalizedSupplementName}`;
+  const taskId = deterministicUuid(`mattanutra:task:${idempotencyKey}`);
+  const createReviewWork = async () => {
     const goal = await createGoal({
       context: {
         normalizedSupplementName: input.normalizedSupplementName,
@@ -280,10 +286,11 @@ async function enqueueSupplementReviewWork(input: {
       title: goalTitle,
       type: "goal"
     });
-    const { task } = await createTask({
+    await createTask({
       actorType: "human",
       goalId: goal.id,
-      idempotencyKey: `supplement-review:${input.kind}:${globalUnknown ? "global" : input.planId}:${input.normalizedSupplementName}`,
+      id: taskId,
+      idempotencyKey,
       initialComment: {
         authorName: "MattaNutra safety",
         authorType: "system",
@@ -308,11 +315,20 @@ async function enqueueSupplementReviewWork(input: {
       taskType: reviewTaskType(input.kind),
       title: taskTitle
     });
+  };
 
+  if (input.afterCommit) {
+    input.afterCommit(createReviewWork);
     return {
-      goalId: goal.id,
-      taskId: task.id
+      goalId,
+      taskId
     };
+  }
+
+  try {
+    await createReviewWork();
+
+    return { goalId, taskId };
   } catch (error) {
     console.warn("Unable to create task-backed supplement review work", {
       error,
@@ -356,9 +372,22 @@ async function attachSafetyReviewWork(
   }
 }
 
+async function attachSafetyReviewWorkAfterCommit(
+  input: Parameters<typeof attachSafetyReviewWork>[1]
+) {
+  const sql = getSql();
+
+  if (!sql) {
+    return;
+  }
+
+  await attachSafetyReviewWork(sql, input);
+}
+
 async function createSafetyReview(
   sql: TaskServiceDb,
   input: {
+    afterCommit?: SafetyAfterCommit;
     aiSuggestion: FormulationIngredient;
     context: Record<string, unknown>;
     dose?: ParsedDose | null;
@@ -385,12 +414,18 @@ async function createSafetyReview(
   `;
 
   if (existing[0]?.id) {
-    await attachSafetyReviewWork(sql, {
+    const attachInput = {
       context: input.context,
       goalId: input.goalId,
       reviewId: existing[0].id,
       taskId: input.taskId
-    });
+    };
+
+    if (input.afterCommit) {
+      input.afterCommit(() => attachSafetyReviewWorkAfterCommit(attachInput));
+    } else {
+      await attachSafetyReviewWork(sql, attachInput);
+    }
 
     return existing[0].id;
   }
@@ -435,12 +470,18 @@ async function createSafetyReview(
     )
   `;
 
-  await attachSafetyReviewWork(sql, {
+  const attachInput = {
     context: input.context,
     goalId: input.goalId,
     reviewId,
     taskId: input.taskId
-  });
+  };
+
+  if (input.afterCommit) {
+    input.afterCommit(() => attachSafetyReviewWorkAfterCommit(attachInput));
+  } else {
+    await attachSafetyReviewWork(sql, attachInput);
+  }
 
   return reviewId;
 }
@@ -455,20 +496,29 @@ async function logSafetyBpm(
   severity: "critical" | "high" | "low" | "medium",
   properties: Record<string, unknown>
 ) {
-  await writeBpmEvent({
-    actorType: "worker",
-    eventName,
-    eventType: "safety",
-    exampleRequestId: input.requestId,
-    locale: input.locale,
-    planId: input.planId,
-    properties: {
-      taskId: input.taskId,
-      ...properties
-    },
-    selectedPlan: input.plan,
-    severity
-  });
+  const effect = async () => {
+    await writeBpmEvent({
+      actorType: "worker",
+      eventName,
+      eventType: "safety",
+      exampleRequestId: input.requestId,
+      locale: input.locale,
+      planId: input.planId,
+      properties: {
+        taskId: input.taskId,
+        ...properties
+      },
+      selectedPlan: input.plan,
+      severity
+    });
+  };
+
+  if (input.afterCommit) {
+    input.afterCommit(effect);
+    return;
+  }
+
+  await effect();
 }
 
 async function hideForReview(
@@ -485,6 +535,7 @@ async function hideForReview(
   const supplementName = match?.name ?? textFromLocalized(ingredient.supplement);
   const normalizedSupplementName = match?.normalized_name ?? normalizeName(supplementName);
   const reviewWork = await enqueueSupplementReviewWork({
+    afterCommit: input.afterCommit,
     kind,
     normalizedSupplementName,
     payload: {
@@ -504,6 +555,7 @@ async function hideForReview(
     supplementName
   });
   const reviewId = await createSafetyReview(sql, {
+    afterCommit: input.afterCommit,
     aiSuggestion: ingredient,
     context: {
       goalId: reviewWork.goalId,
@@ -595,6 +647,7 @@ async function reduceDose(
   const reason = `Dose reduced from ${dose.amount} ${dose.unit} to the configured maximum of ${formatDose(limit.amount, match.max_unit)}.`;
   const normalizedSupplementName = match.normalized_name;
   const reviewWork = await enqueueSupplementReviewWork({
+    afterCommit: input.afterCommit,
     kind: "dose_reduced",
     normalizedSupplementName,
     payload: {
@@ -612,6 +665,7 @@ async function reduceDose(
   });
 
   await createSafetyReview(sql, {
+    afterCommit: input.afterCommit,
     aiSuggestion: ingredient,
     context: {
       goalId: reviewWork.goalId,

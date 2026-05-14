@@ -335,55 +335,53 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     throw new Error("Supplement not found");
   }
 
-  await sql.begin(async (transaction) => {
-    await transaction`
-      update public.supplements
-      set
-        is_active = ${input.listStatus !== "inactive"},
-        list_status = case
-          when ${input.listStatus} = 'inactive' then list_status
-          else ${input.listStatus}
-        end,
-        updated_at = now()
-      where id = ${input.id}::uuid
-    `;
+  await sql`
+    update public.supplements
+    set
+      is_active = ${input.listStatus !== "inactive"},
+      list_status = case
+        when ${input.listStatus} = 'inactive' then list_status
+        else ${input.listStatus}
+      end,
+      updated_at = now()
+    where id = ${input.id}::uuid
+  `;
 
-    await transaction`
-      update public.supplement_safety_limits
-      set
-        max_amount = ${input.maxAmount},
-        max_unit = ${input.maxUnit},
-        confidence = ${input.confidence},
-        safety_flags = ${input.safetyFlags},
-        safety_notes = ${input.safetyNotes},
-        updated_at = now()
-      where supplement_id = ${input.id}::uuid
-        and version = (
-          select max(version)
-          from public.supplement_safety_limits
-          where supplement_id = ${input.id}::uuid
-        )
-    `;
+  await sql`
+    update public.supplement_safety_limits
+    set
+      max_amount = ${input.maxAmount},
+      max_unit = ${input.maxUnit},
+      confidence = ${input.confidence},
+      safety_flags = ${input.safetyFlags},
+      safety_notes = ${input.safetyNotes},
+      updated_at = now()
+    where supplement_id = ${input.id}::uuid
+      and version = (
+        select max(version)
+        from public.supplement_safety_limits
+        where supplement_id = ${input.id}::uuid
+      )
+  `;
 
-    await transaction`
-      insert into public.supplement_admin_audit (
-        id,
-        supplement_id,
-        action,
-        actor,
-        before_payload,
-        after_payload
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${input.id}::uuid,
-        ${"updated"},
-        ${input.actor ?? "admin_dashboard"},
-        ${transaction.json(rowFromDb(before))},
-        ${transaction.json(input)}
-      )
-    `;
-  });
+  await sql`
+    insert into public.supplement_admin_audit (
+      id,
+      supplement_id,
+      action,
+      actor,
+      before_payload,
+      after_payload
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${input.id}::uuid,
+      ${"updated"},
+      ${input.actor ?? "admin_dashboard"},
+      ${sql.json(rowFromDb(before))},
+      ${sql.json(input)}
+    )
+  `;
 
   const data = await getAdminSupplementsData();
   const row = data.rows.find((item) => item.id === input.id);
@@ -404,62 +402,59 @@ export async function deleteAdminSupplementAlias(
     throw new Error("Database is not configured");
   }
 
-  const deletedRows = await sql.begin(async (transaction) => {
-    const aliasRows = await transaction<
-      {
-        alias: string;
-        id: string;
-        normalized_alias: string;
-        supplement_id: string;
-      }[]
-    >`
-      select
-        id::text,
-        supplement_id::text,
-        alias,
-        normalized_alias
-      from public.supplement_aliases
-      where id = ${input.aliasId}::uuid
-        and supplement_id = ${input.supplementId}::uuid
-      limit 1
-    `;
-    const alias = aliasRows[0];
+  const aliasRows = await sql<
+    {
+      alias: string;
+      id: string;
+      normalized_alias: string;
+      supplement_id: string;
+    }[]
+  >`
+    select
+      id::text,
+      supplement_id::text,
+      alias,
+      normalized_alias
+    from public.supplement_aliases
+    where id = ${input.aliasId}::uuid
+      and supplement_id = ${input.supplementId}::uuid
+    limit 1
+  `;
+  const alias = aliasRows[0];
 
-    if (!alias) {
-      throw new Error("Supplement association not found");
-    }
+  if (!alias) {
+    throw new Error("Supplement association not found");
+  }
 
-    await transaction`
-      delete from public.supplement_aliases
-      where id = ${input.aliasId}::uuid
-        and supplement_id = ${input.supplementId}::uuid
-    `;
-
-    await transaction`
-      insert into public.supplement_admin_audit (
-        id,
-        supplement_id,
-        action,
-        actor,
-        before_payload,
-        after_payload
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${input.supplementId}::uuid,
-        ${"alias_deleted"},
-        ${input.actor ?? "admin_dashboard"},
-        ${transaction.json(alias)},
-        ${transaction.json({ aliasId: input.aliasId })}
-      )
-    `;
-
-    return aliasRows;
-  });
+  const deletedRows = await sql<{ id: string }[]>`
+    delete from public.supplement_aliases
+    where id = ${input.aliasId}::uuid
+      and supplement_id = ${input.supplementId}::uuid
+    returning id::text
+  `;
 
   if (deletedRows.length === 0) {
     throw new Error("Supplement association not found");
   }
+
+  await sql`
+    insert into public.supplement_admin_audit (
+      id,
+      supplement_id,
+      action,
+      actor,
+      before_payload,
+      after_payload
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${input.supplementId}::uuid,
+      ${"alias_deleted"},
+      ${input.actor ?? "admin_dashboard"},
+      ${sql.json(alias)},
+      ${sql.json({ aliasId: input.aliasId })}
+    )
+  `;
 
   const data = await getAdminSupplementsData();
   const row = data.rows.find((item) => item.id === input.supplementId);
@@ -484,73 +479,71 @@ export async function addAdminSupplementAlias(input: AddAdminSupplementAliasInpu
     throw new Error("Supplement association requires a name");
   }
 
-  await sql.begin(async (transaction) => {
-    const supplementRows = await transaction<{ id: string; name: string }[]>`
-      select id::text, name
-      from public.supplements
-      where id = ${input.supplementId}::uuid
-      limit 1
-    `;
-    const supplement = supplementRows[0];
+  const supplementRows = await sql<{ id: string; name: string }[]>`
+    select id::text, name
+    from public.supplements
+    where id = ${input.supplementId}::uuid
+    limit 1
+  `;
+  const supplement = supplementRows[0];
 
-    if (!supplement) {
-      throw new Error("Supplement not found");
-    }
+  if (!supplement) {
+    throw new Error("Supplement not found");
+  }
 
-    const beforeRows = await transaction<
-      {
-        alias: string;
-        id: string;
-        normalized_alias: string;
-        supplement_id: string;
-      }[]
-    >`
-      select id::text, supplement_id::text, alias, normalized_alias
-      from public.supplement_aliases
-      where normalized_alias = ${normalizedAlias}
-      limit 1
-    `;
-    const before = beforeRows[0] ?? null;
+  const beforeRows = await sql<
+    {
+      alias: string;
+      id: string;
+      normalized_alias: string;
+      supplement_id: string;
+    }[]
+  >`
+    select id::text, supplement_id::text, alias, normalized_alias
+    from public.supplement_aliases
+    where normalized_alias = ${normalizedAlias}
+    limit 1
+  `;
+  const before = beforeRows[0] ?? null;
 
-    await transaction`
-      insert into public.supplement_aliases (
-        id,
-        supplement_id,
-        alias,
-        normalized_alias,
-        created_at
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${input.supplementId}::uuid,
-        ${alias},
-        ${normalizedAlias},
-        now()
-      )
-      on conflict (normalized_alias) do update set
-        supplement_id = excluded.supplement_id,
-        alias = excluded.alias
-    `;
+  await sql`
+    insert into public.supplement_aliases (
+      id,
+      supplement_id,
+      alias,
+      normalized_alias,
+      created_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${input.supplementId}::uuid,
+      ${alias},
+      ${normalizedAlias},
+      now()
+    )
+    on conflict (normalized_alias) do update set
+      supplement_id = excluded.supplement_id,
+      alias = excluded.alias
+  `;
 
-    await transaction`
-      insert into public.supplement_admin_audit (
-        id,
-        supplement_id,
-        action,
-        actor,
-        before_payload,
-        after_payload
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${input.supplementId}::uuid,
-        ${before ? "alias_reassigned" : "alias_added"},
-        ${input.actor ?? "admin_dashboard"},
-        ${transaction.json(before ?? {})},
-        ${transaction.json({ alias, normalizedAlias, supplementId: input.supplementId })}
-      )
-    `;
-  });
+  await sql`
+    insert into public.supplement_admin_audit (
+      id,
+      supplement_id,
+      action,
+      actor,
+      before_payload,
+      after_payload
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${input.supplementId}::uuid,
+      ${before ? "alias_reassigned" : "alias_added"},
+      ${input.actor ?? "admin_dashboard"},
+      ${sql.json(before ?? {})},
+      ${sql.json({ alias, normalizedAlias, supplementId: input.supplementId })}
+    )
+  `;
 
   const data = await getAdminSupplementsData();
   const row = data.rows.find((item) => item.id === input.supplementId);

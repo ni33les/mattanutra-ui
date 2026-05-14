@@ -282,22 +282,6 @@ function sqlOrThrow(sql?: Db) {
   return configured;
 }
 
-async function inCommunicationTransaction<T>(
-  sql: Db,
-  callback: (transaction: Db) => Promise<T>
-) {
-  const begin = (sql as { begin?: unknown }).begin;
-
-  if (typeof begin === "function") {
-    return (begin as (cb: (transaction: Db) => Promise<T>) => Promise<T>).call(
-      sql,
-      callback
-    );
-  }
-
-  return callback(sql);
-}
-
 export async function ensureCommunicationSchema(sql: Db = sqlOrThrow()) {
   if (globalCommunications.mattanutraCommunicationSchemaReady) {
     return globalCommunications.mattanutraCommunicationSchemaReady;
@@ -649,12 +633,10 @@ export async function ensurePlanCommunicationIdentity(input: Readonly<{
 
   await ensureCommunicationSchema(sql);
 
-  return sql.begin(async (tx) => {
-    const identityId = await ensurePlanIdentityInTransaction(tx, input.planId);
-    await seedKnownPlanChannelsInTransaction(tx, input.planId, identityId);
+  const identityId = await ensurePlanIdentityInTransaction(sql, input.planId);
+  await seedKnownPlanChannelsInTransaction(sql, input.planId, identityId);
 
-    return identityId;
-  });
+  return identityId;
 }
 
 export async function upsertCommunicationChannel(input: Readonly<{
@@ -677,31 +659,29 @@ export async function upsertCommunicationChannel(input: Readonly<{
 
   await ensureCommunicationSchema(sql);
 
-  return sql.begin(async (tx) => {
-    const identityId = isUuid(input.identityId ?? "")
-      ? input.identityId!
-      : isUuid(input.planId ?? "")
-        ? await ensurePlanIdentityInTransaction(tx, input.planId!)
-        : null;
+  const identityId = isUuid(input.identityId ?? "")
+    ? input.identityId!
+    : isUuid(input.planId ?? "")
+      ? await ensurePlanIdentityInTransaction(sql, input.planId!)
+      : null;
 
-    if (!identityId) {
-      throw new Error("Communication channel requires a planId or identityId");
-    }
+  if (!identityId) {
+    throw new Error("Communication channel requires a planId or identityId");
+  }
 
-    if (input.planId && isUuid(input.planId)) {
-      await seedKnownPlanChannelsInTransaction(tx, input.planId, identityId);
-    }
+  if (input.planId && isUuid(input.planId)) {
+    await seedKnownPlanChannelsInTransaction(sql, input.planId, identityId);
+  }
 
-    return upsertChannelInTransaction(tx, {
-      actorType: input.actorType,
-      address: input.address,
-      channelType,
-      displayName: input.displayName,
-      identityId,
-      metadata: input.metadata,
-      preferenceRank: input.preferenceRank,
-      status: input.status
-    });
+  return upsertChannelInTransaction(sql, {
+    actorType: input.actorType,
+    address: input.address,
+    channelType,
+    displayName: input.displayName,
+    identityId,
+    metadata: input.metadata,
+    preferenceRank: input.preferenceRank,
+    status: input.status
   });
 }
 
@@ -721,67 +701,65 @@ export async function updateCommunicationChannel(input: Readonly<{
 
   await ensureCommunicationSchema(sql);
 
-  return sql.begin(async (tx) => {
-    const existingRows = await tx<ChannelRow[]>`
-      select *
-      from public.communication_channels
-      where id = ${input.channelId}::uuid
-      limit 1
-    `;
-    const existing = existingRows[0];
+  const existingRows = await sql<ChannelRow[]>`
+    select *
+    from public.communication_channels
+    where id = ${input.channelId}::uuid
+    limit 1
+  `;
+  const existing = existingRows[0];
 
-    if (!existing) {
-      throw new Error("Communication channel not found");
+  if (!existing) {
+    throw new Error("Communication channel not found");
+  }
+
+  const nextAddress = input.address
+    ? normalizeAddress(existing.channel_type, input.address)
+    : existing.address;
+
+  if (existing.channel_type === "email") {
+    const validation = validateLeadEmail(nextAddress);
+
+    if (!validation.ok) {
+      throw new Error("Communication email channel is not valid");
     }
+  }
 
-    const nextAddress = input.address
-      ? normalizeAddress(existing.channel_type, input.address)
-      : existing.address;
+  const metadataPatch =
+    existing.channel_type === "line"
+      ? lineMetadata(nextAddress, input.metadata ?? {})
+      : (input.metadata ?? {});
+  const rows = await sql<ChannelRow[]>`
+    update public.communication_channels
+    set
+      address = ${nextAddress},
+      display_name = coalesce(${input.displayName ?? null}, display_name),
+      metadata = metadata || ${sql.json(toJsonValue(metadataPatch))}::jsonb,
+      preference_rank = coalesce(${input.preferenceRank ?? null}, preference_rank),
+      status = coalesce(${input.status ?? null}, status),
+      updated_at = now()
+    where id = ${input.channelId}::uuid
+    returning *
+  `;
 
-    if (existing.channel_type === "email") {
-      const validation = validateLeadEmail(nextAddress);
-
-      if (!validation.ok) {
-        throw new Error("Communication email channel is not valid");
-      }
-    }
-
-    const metadataPatch =
-      existing.channel_type === "line"
-        ? lineMetadata(nextAddress, input.metadata ?? {})
-        : (input.metadata ?? {});
-    const rows = await tx<ChannelRow[]>`
-      update public.communication_channels
+  if (
+    existing.channel_type === "line" &&
+    normalizeLineUserId(metadataPatch.lineUserId)
+  ) {
+    await sql`
+      update public.communication_messages
       set
-        address = ${nextAddress},
-        display_name = coalesce(${input.displayName ?? null}, display_name),
-        metadata = metadata || ${tx.json(toJsonValue(metadataPatch))}::jsonb,
-        preference_rank = coalesce(${input.preferenceRank ?? null}, preference_rank),
-        status = coalesce(${input.status ?? null}, status),
+        status = 'queued',
+        error_message = null,
         updated_at = now()
-      where id = ${input.channelId}::uuid
-      returning *
+      where channel_id = ${input.channelId}::uuid
+        and status = 'no_channel'
+        and provider = 'line'
+        and error_message = 'LINE channel needs a LINE user id mapping'
     `;
+  }
 
-    if (
-      existing.channel_type === "line" &&
-      normalizeLineUserId(metadataPatch.lineUserId)
-    ) {
-      await tx`
-        update public.communication_messages
-        set
-          status = 'queued',
-          error_message = null,
-          updated_at = now()
-        where channel_id = ${input.channelId}::uuid
-          and status = 'no_channel'
-          and provider = 'line'
-          and error_message = 'LINE channel needs a LINE user id mapping'
-      `;
-    }
-
-    return mapChannel(rows[0]);
-  });
+  return mapChannel(rows[0]);
 }
 
 export async function recordEmailCommunicationDelivery(input: Readonly<{
@@ -808,75 +786,73 @@ export async function recordEmailCommunicationDelivery(input: Readonly<{
 
   await ensureCommunicationSchema(sql);
 
-  return inCommunicationTransaction(sql, async (tx) => {
-    const planId = input.planId;
-    const goalId = isUuid(input.goalId ?? "") ? input.goalId! : null;
-    const taskId = isUuid(input.taskId ?? "") ? input.taskId! : null;
-    const status: CommunicationMessageStatus = input.sent ? "sent" : "failed";
-    const errorMessage = input.sent ? null : optionalText(input.reason);
-    const identityId = await ensurePlanIdentityInTransaction(tx, planId);
-    await seedKnownPlanChannelsInTransaction(tx, planId, identityId);
-    const channel = await upsertChannelInTransaction(tx, {
-      actorType: "human",
-      address: emailValidation.email,
-      channelType: "email",
-      displayName: "Email",
-      identityId,
-      metadata: {
-        source: "email_delivery"
-      },
-      preferenceRank: 80,
-      status: "active"
-    });
-    const sentAt = input.sent ? new Date() : null;
-    const rows = await tx<MessageRow[]>`
-      insert into public.communication_messages (
-        id,
-        identity_id,
-        channel_id,
-        plan_id,
-        goal_id,
-        task_id,
-        direction,
-        message_type,
-        status,
-        subject,
-        body,
-        html,
-        provider,
-        provider_message_id,
-        error_message,
-        metadata,
-        sent_at,
-        created_at,
-        updated_at
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${identityId}::uuid,
-        ${channel.id}::uuid,
-        ${planId}::uuid,
-        ${goalId}::uuid,
-        ${taskId}::uuid,
-        'outbound',
-        ${cleanText(input.messageType, "email")},
-        ${status},
-        ${optionalText(input.subject)},
-        ${cleanText(input.body, "Email sent from MattaNutra")},
-        ${optionalText(input.emailHtml)},
-        'email',
-        ${optionalText(input.messageId)},
-        ${errorMessage},
-        ${tx.json(toJsonValue(input.metadata ?? {}))},
-        ${sentAt},
-        now(),
-        now()
-      )
-      returning *
-    `;
-
-    return mapMessage(rows[0]);
+  const planId = input.planId;
+  const goalId = isUuid(input.goalId ?? "") ? input.goalId! : null;
+  const taskId = isUuid(input.taskId ?? "") ? input.taskId! : null;
+  const status: CommunicationMessageStatus = input.sent ? "sent" : "failed";
+  const errorMessage = input.sent ? null : optionalText(input.reason);
+  const identityId = await ensurePlanIdentityInTransaction(sql, planId);
+  await seedKnownPlanChannelsInTransaction(sql, planId, identityId);
+  const channel = await upsertChannelInTransaction(sql, {
+    actorType: "human",
+    address: emailValidation.email,
+    channelType: "email",
+    displayName: "Email",
+    identityId,
+    metadata: {
+      source: "email_delivery"
+    },
+    preferenceRank: 80,
+    status: "active"
   });
+  const sentAt = input.sent ? new Date() : null;
+  const rows = await sql<MessageRow[]>`
+    insert into public.communication_messages (
+      id,
+      identity_id,
+      channel_id,
+      plan_id,
+      goal_id,
+      task_id,
+      direction,
+      message_type,
+      status,
+      subject,
+      body,
+      html,
+      provider,
+      provider_message_id,
+      error_message,
+      metadata,
+      sent_at,
+      created_at,
+      updated_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${identityId}::uuid,
+      ${channel.id}::uuid,
+      ${planId}::uuid,
+      ${goalId}::uuid,
+      ${taskId}::uuid,
+      'outbound',
+      ${cleanText(input.messageType, "email")},
+      ${status},
+      ${optionalText(input.subject)},
+      ${cleanText(input.body, "Email sent from MattaNutra")},
+      ${optionalText(input.emailHtml)},
+      'email',
+      ${optionalText(input.messageId)},
+      ${errorMessage},
+      ${sql.json(toJsonValue(input.metadata ?? {}))},
+      ${sentAt},
+      now(),
+      now()
+    )
+    returning *
+  `;
+
+  return mapMessage(rows[0]);
 }
 
 export async function listCommunicationChannels(input: Readonly<{
@@ -887,30 +863,28 @@ export async function listCommunicationChannels(input: Readonly<{
 
   await ensureCommunicationSchema(sql);
 
-  return sql.begin(async (tx) => {
-    const identityId = isUuid(input.identityId ?? "")
-      ? input.identityId!
-      : isUuid(input.planId ?? "")
-        ? await ensurePlanIdentityInTransaction(tx, input.planId!)
-        : null;
+  const identityId = isUuid(input.identityId ?? "")
+    ? input.identityId!
+    : isUuid(input.planId ?? "")
+      ? await ensurePlanIdentityInTransaction(sql, input.planId!)
+      : null;
 
-    if (!identityId) {
-      return [];
-    }
+  if (!identityId) {
+    return [];
+  }
 
-    if (input.planId && isUuid(input.planId)) {
-      await seedKnownPlanChannelsInTransaction(tx, input.planId, identityId);
-    }
+  if (input.planId && isUuid(input.planId)) {
+    await seedKnownPlanChannelsInTransaction(sql, input.planId, identityId);
+  }
 
-    const rows = await tx<ChannelRow[]>`
-      select *
-      from public.communication_channels
-      where identity_id = ${identityId}::uuid
-      order by preference_rank asc, created_at asc
-    `;
+  const rows = await sql<ChannelRow[]>`
+    select *
+    from public.communication_channels
+    where identity_id = ${identityId}::uuid
+    order by preference_rank asc, created_at asc
+  `;
 
-    return rows.map(mapChannel);
-  });
+  return rows.map(mapChannel);
 }
 
 function plainTextEmailHtml(subject: string | null, body: string) {
@@ -947,84 +921,81 @@ export async function sendCommunication(input: Readonly<{
 
   await ensureCommunicationSchema(sql);
 
-  const prepared = await sql.begin(async (tx) => {
-    const identityId = isUuid(input.identityId ?? "")
-      ? input.identityId!
-      : planId
-        ? await ensurePlanIdentityInTransaction(tx, planId)
-        : null;
+  const identityId = isUuid(input.identityId ?? "")
+    ? input.identityId!
+    : planId
+      ? await ensurePlanIdentityInTransaction(sql, planId)
+      : null;
 
-    if (planId && identityId) {
-      await seedKnownPlanChannelsInTransaction(tx, planId, identityId);
-    }
+  if (planId && identityId) {
+    await seedKnownPlanChannelsInTransaction(sql, planId, identityId);
+  }
 
-    const channels = identityId
-      ? (
-          await tx<ChannelRow[]>`
-            select *
-            from public.communication_channels
-            where identity_id = ${identityId}::uuid
-            order by preference_rank asc, created_at asc
-          `
-        ).map(mapChannel)
-      : [];
-    const selected = selectBestCommunicationChannel<CommunicationChannel>(
-      channels,
-      forcedChannelType
-    );
-    const metadata = {
-      ...(input.metadata ?? {}),
-      selectedChannelType: selected?.channelType ?? forcedChannelType ?? null
-    };
-    const goalId = isUuid(input.goalId ?? "") ? input.goalId! : null;
-    const messageStatus = selected ? "queued" : "no_channel";
-    const provider = selected?.channelType ?? null;
-    const taskId = isUuid(input.taskId ?? "") ? input.taskId! : null;
-    const inserted = await tx<MessageRow[]>`
-      insert into public.communication_messages (
-        id,
-        identity_id,
-        channel_id,
-        plan_id,
-        goal_id,
-        task_id,
-        direction,
-        message_type,
-        status,
-        subject,
-        body,
-        html,
-        provider,
-        metadata,
-        created_at,
-        updated_at
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${identityId ?? null}::uuid,
-        ${selected?.id ?? null}::uuid,
-        ${planId ?? null}::uuid,
-        ${goalId}::uuid,
-        ${taskId}::uuid,
-        'outbound',
-        ${cleanText(input.messageType, "general")},
-        ${messageStatus},
-        ${optionalText(input.subject)},
-        ${cleanText(input.body, "Message")},
-        ${optionalText(input.html)},
-        ${provider},
-        ${tx.json(toJsonValue(metadata))},
-        now(),
-        now()
-      )
-      returning *
-    `;
-
-    return {
-      channel: selected,
-      message: mapMessage(inserted[0])
-    };
-  });
+  const channels = identityId
+    ? (
+        await sql<ChannelRow[]>`
+          select *
+          from public.communication_channels
+          where identity_id = ${identityId}::uuid
+          order by preference_rank asc, created_at asc
+        `
+      ).map(mapChannel)
+    : [];
+  const selected = selectBestCommunicationChannel<CommunicationChannel>(
+    channels,
+    forcedChannelType
+  );
+  const metadata = {
+    ...(input.metadata ?? {}),
+    selectedChannelType: selected?.channelType ?? forcedChannelType ?? null
+  };
+  const goalId = isUuid(input.goalId ?? "") ? input.goalId! : null;
+  const messageStatus = selected ? "queued" : "no_channel";
+  const provider = selected?.channelType ?? null;
+  const taskId = isUuid(input.taskId ?? "") ? input.taskId! : null;
+  const inserted = await sql<MessageRow[]>`
+    insert into public.communication_messages (
+      id,
+      identity_id,
+      channel_id,
+      plan_id,
+      goal_id,
+      task_id,
+      direction,
+      message_type,
+      status,
+      subject,
+      body,
+      html,
+      provider,
+      metadata,
+      created_at,
+      updated_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${identityId ?? null}::uuid,
+      ${selected?.id ?? null}::uuid,
+      ${planId ?? null}::uuid,
+      ${goalId}::uuid,
+      ${taskId}::uuid,
+      'outbound',
+      ${cleanText(input.messageType, "general")},
+      ${messageStatus},
+      ${optionalText(input.subject)},
+      ${cleanText(input.body, "Message")},
+      ${optionalText(input.html)},
+      ${provider},
+      ${sql.json(toJsonValue(metadata))},
+      now(),
+      now()
+    )
+    returning *
+  `;
+  const prepared = {
+    channel: selected,
+    message: mapMessage(inserted[0])
+  };
 
   if (!prepared.channel) {
     if (planId) {
@@ -1165,59 +1136,57 @@ export async function updateCommunicationMessageStatus(input: Readonly<{
 
   await ensureCommunicationSchema(sql);
 
-  return sql.begin(async (tx) => {
-    const rows = await tx<MessageRow[]>`
-      update public.communication_messages
-      set
-        status = ${input.status},
-        provider_message_id = coalesce(${input.providerMessageId ?? null}, provider_message_id),
-        error_message = ${input.errorMessage ?? null},
-        sent_at = case
-          when ${input.status} in ('sent', 'delivered') then coalesce(sent_at, now())
-          else sent_at
-        end,
-        delivered_at = case
-          when ${input.status} = 'delivered' then coalesce(delivered_at, now())
-          else delivered_at
-        end,
-        updated_at = now()
-      where id = ${input.messageId}::uuid
-      returning *
-    `;
+  const rows = await sql<MessageRow[]>`
+    update public.communication_messages
+    set
+      status = ${input.status},
+      provider_message_id = coalesce(${input.providerMessageId ?? null}, provider_message_id),
+      error_message = ${input.errorMessage ?? null},
+      sent_at = case
+        when ${input.status} in ('sent', 'delivered') then coalesce(sent_at, now())
+        else sent_at
+      end,
+      delivered_at = case
+        when ${input.status} = 'delivered' then coalesce(delivered_at, now())
+        else delivered_at
+      end,
+      updated_at = now()
+    where id = ${input.messageId}::uuid
+    returning *
+  `;
 
-    if (!rows[0]) {
-      throw new Error("Communication message not found");
+  if (!rows[0]) {
+    throw new Error("Communication message not found");
+  }
+
+  const message = mapMessage(rows[0]);
+  const metadata = objectValue(message.metadata);
+  const safetyReviewId = cleanText(metadata.safetyReviewId);
+
+  if (isUuid(safetyReviewId)) {
+    const nextStatus =
+      input.status === "delivered" || input.status === "sent"
+        ? "sent"
+        : input.status === "failed"
+          ? "failed"
+          : null;
+
+    if (nextStatus) {
+      await sql`
+        update public.safety_reviews
+        set
+          client_notification_status = ${nextStatus},
+          client_informed_at = case
+            when ${nextStatus} = 'sent' then coalesce(client_informed_at, now())
+            else client_informed_at
+          end,
+          updated_at = now()
+        where id = ${safetyReviewId}::uuid
+      `;
     }
+  }
 
-    const message = mapMessage(rows[0]);
-    const metadata = objectValue(message.metadata);
-    const safetyReviewId = cleanText(metadata.safetyReviewId);
-
-    if (isUuid(safetyReviewId)) {
-      const nextStatus =
-        input.status === "delivered" || input.status === "sent"
-          ? "sent"
-          : input.status === "failed"
-            ? "failed"
-            : null;
-
-      if (nextStatus) {
-        await tx`
-          update public.safety_reviews
-          set
-            client_notification_status = ${nextStatus},
-            client_informed_at = case
-              when ${nextStatus} = 'sent' then coalesce(client_informed_at, now())
-              else client_informed_at
-            end,
-            updated_at = now()
-          where id = ${safetyReviewId}::uuid
-        `;
-      }
-    }
-
-    return message;
-  });
+  return message;
 }
 
 async function sendPreparedEmailMessage(

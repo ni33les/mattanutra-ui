@@ -3223,6 +3223,7 @@ export function AssessmentFlow({
 
     const planId = processingStatus.planId;
     let cancelled = false;
+    let pollTimeout: number | undefined;
 
     async function pollStatus() {
       try {
@@ -3235,7 +3236,7 @@ export function AssessmentFlow({
             ? `/api/assessment/${encodeURIComponent(planId)}/example?requestId=${encodeURIComponent(exampleRequest?.requestId ?? "")}`
             : processingMode === "score"
               ? `/api/assessment/${encodeURIComponent(planId)}?mode=score`
-            : `/api/assessment/${encodeURIComponent(planId)}`;
+              : `/api/assessment/${encodeURIComponent(planId)}`;
         const response = await fetchWithTimeout(
           url,
           {
@@ -3268,14 +3269,20 @@ export function AssessmentFlow({
             setProcessingError(ui.processingError);
           }
         }
+      } finally {
+        if (!cancelled) {
+          pollTimeout = window.setTimeout(pollStatus, 1500);
+        }
       }
     }
 
-    const interval = window.setInterval(pollStatus, 1000);
+    pollTimeout = window.setTimeout(pollStatus, 0);
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      if (pollTimeout !== undefined) {
+        window.clearTimeout(pollTimeout);
+      }
     };
   }, [
     applyHealthScoreStatus,

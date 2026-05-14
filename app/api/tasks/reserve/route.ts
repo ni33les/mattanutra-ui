@@ -11,6 +11,7 @@ import {
   failTask,
   getTaskBundle,
   heartbeatWorkerSession,
+  releaseExpiredReservations,
   reserveNextTask
 } from "@/lib/task-service";
 import type { AgentType } from "@/lib/task-service";
@@ -67,6 +68,25 @@ export async function POST(request: Request) {
   }
 
   try {
+    await heartbeatWorkerSession({
+      agentId: textValue(agent.id),
+      status: "polling",
+      workerSessionId
+    });
+
+    await releaseExpiredReservations({
+      applyFailure: (context) =>
+        applyTaskFailureResult({
+          afterCommit: context.afterCommit,
+          errorMessage: context.errorMessage,
+          resultPayload: context.resultPayload,
+          retryWillBeScheduled: context.retryWillBeScheduled,
+          sql: context.sql,
+          task: context.task,
+          taskId: context.task.id
+        })
+    });
+
     while (true) {
       const reserved = await reserveNextTask({
         agent: {
@@ -77,15 +97,6 @@ export async function POST(request: Request) {
           name: textValue(agent.name) ?? "Unnamed worker agent",
           type: agentType(agent.type)
         },
-        applyExpiredFailure: (context) =>
-          applyTaskFailureResult({
-            errorMessage: context.errorMessage,
-            resultPayload: context.resultPayload,
-            retryWillBeScheduled: context.retryWillBeScheduled,
-            sql: context.sql,
-            task: context.task,
-            taskId: context.task.id
-          }),
         leaseSeconds: body.leaseSeconds,
         mustRequireCapability: textValue(body.mustRequireCapability),
         taskTypes: textArray(body.taskTypes),
@@ -119,6 +130,7 @@ export async function POST(request: Request) {
         agentId: reserved.agent.id,
         applyFailure: (context) =>
           applyTaskFailureResult({
+            afterCommit: context.afterCommit,
             errorMessage:
               error instanceof Error
                 ? error.message
@@ -128,7 +140,7 @@ export async function POST(request: Request) {
             sql: context.sql,
             task: context.task,
             taskId: bundle.task.id
-        }),
+          }),
         errorMessage:
           error instanceof Error
             ? error.message

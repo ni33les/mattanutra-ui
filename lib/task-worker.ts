@@ -415,7 +415,10 @@ async function enqueueExampleFormulationTask(
   return taskId;
 }
 
-export async function enqueueExampleEmailTask(planId: string, requestId: string) {
+export async function enqueueExampleEmailTask(
+  planId: string,
+  requestId: string
+) {
   const sql = getSql();
 
   if (!sql) {
@@ -816,24 +819,25 @@ export async function cancelReassessmentActionByToken(token: string) {
     };
   }
 
-  const cancelled = await sql.begin(async (transaction) => {
-    const updated = await transaction<Array<{ id: string }>>`
-      update public.cron set
-        status = 'cancelled',
-        unsubscribed_at = now(),
-        result_payload = coalesce(result_payload, '{}'::jsonb) || ${transaction.json(
-          toJsonValue({
-            cancelledReason: "email_unsubscribe",
-            unsubscribedAt: new Date().toISOString()
-          })
-        )}::jsonb,
-        updated_at = now()
-      where id = ${row.id}::uuid
-        and status in ('scheduled', 'queued')
-      returning id::text
-    `;
+  const updated = await sql<Array<{ id: string }>>`
+    update public.cron set
+      status = 'cancelled',
+      unsubscribed_at = now(),
+      result_payload = coalesce(result_payload, '{}'::jsonb) || ${sql.json(
+        toJsonValue({
+          cancelledReason: "email_unsubscribe",
+          unsubscribedAt: new Date().toISOString()
+        })
+      )}::jsonb,
+      updated_at = now()
+    where id = ${row.id}::uuid
+      and status in ('scheduled', 'queued')
+    returning id::text
+  `;
+  const cancelled = updated.length > 0;
 
-    await transaction`
+  if (cancelled) {
+    await sql`
       update public.tasks set
         status = 'cancelled',
         updated_at = now()
@@ -841,9 +845,7 @@ export async function cancelReassessmentActionByToken(token: string) {
         and status in ('queued', 'reserved', 'running')
         and payload ->> 'cronId' = ${row.id}
     `;
-
-    return updated.length > 0;
-  });
+  }
 
   await writeBpmEvent({
     actorType: "system",
@@ -905,39 +907,35 @@ async function enqueueReassessmentEmailTask({
 }
 
 async function claimDueCronActions(sql: postgres.Sql) {
-  return sql.begin(async (transaction) => {
-    const rows = await transaction<
-      Array<{
-        id: string;
-        plan_id: string | null;
-        recipient: unknown;
-        payload: unknown;
-      }>
-    >`
-      update public.cron set
-        status = 'queued',
-        attempts = attempts + 1,
-        updated_at = now()
-      where id in (
-        select id
-        from public.cron
-        where scheduled_for <= now()
-          and (
-            status = 'scheduled'
-            or (
-              status = 'queued'
-              and updated_at < now() - interval '10 minutes'
-            )
+  return sql<
+    Array<{
+      id: string;
+      plan_id: string | null;
+      recipient: unknown;
+      payload: unknown;
+    }>
+  >`
+    update public.cron set
+      status = 'queued',
+      attempts = attempts + 1,
+      updated_at = now()
+    where id in (
+      select id
+      from public.cron
+      where scheduled_for <= now()
+        and (
+          status = 'scheduled'
+          or (
+            status = 'queued'
+            and updated_at < now() - interval '10 minutes'
           )
-        order by scheduled_for asc
-        for update skip locked
-        limit 25
-      )
-      returning id::text, plan_id::text, recipient, payload
-    `;
-
-    return rows;
-  });
+        )
+      order by scheduled_for asc
+      for update skip locked
+      limit 25
+    )
+    returning id::text, plan_id::text, recipient, payload
+  `;
 }
 
 async function runCronWorker() {

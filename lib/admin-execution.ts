@@ -4,7 +4,20 @@ import {
 } from "@/lib/admin-dashboard-data";
 import { isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
+import { SYSTEM_AGENTS } from "@/lib/system-agents";
 import { ensureWorkerSessionSchema } from "@/lib/task-service";
+
+const ADMIN_AGENT_DISPLAY_ORDER = [
+  SYSTEM_AGENTS.healthScoreEngine.id,
+  SYSTEM_AGENTS.formulationWorker.id,
+  SYSTEM_AGENTS.safetyScanner.id,
+  SYSTEM_AGENTS.humanReviewer.id,
+  SYSTEM_AGENTS.emailDispatcher.id,
+  SYSTEM_AGENTS.communicationsCoordinator.id,
+  SYSTEM_AGENTS.chatDispatcher.id,
+  SYSTEM_AGENTS.contentPublisher.id,
+  SYSTEM_AGENTS.scheduler.id
+] as const;
 
 export type AdminTaskVisibilityRow = Readonly<{
   actorType: string;
@@ -715,9 +728,14 @@ export async function getAdminAgentsData(
       left join worker_session_stats on worker_session_stats.agent_id = agents.id
       where agents.metadata->>'hiddenFromDashboard' is distinct from 'true'
       order by
-        active_task_count desc,
-        agents.status asc,
-        agents.updated_at desc
+        case
+          when array_position(${ADMIN_AGENT_DISPLAY_ORDER}::uuid[], agents.id) is null
+            then 1
+          else 0
+        end,
+        array_position(${ADMIN_AGENT_DISPLAY_ORDER}::uuid[], agents.id),
+        lower(agents.name) asc,
+        agents.id asc
       limit 120
     `;
     const agentRows = rows.map(agentRowFromDb);

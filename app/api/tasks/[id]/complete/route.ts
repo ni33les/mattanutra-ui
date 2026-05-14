@@ -53,11 +53,12 @@ export async function POST(
       agentId,
       applyResult: (context) =>
         applyTaskCompletionResult({
+          afterCommit: context.afterCommit,
           resultPayload: context.resultPayload,
           sql: context.sql,
           task: context.task,
           taskId: id
-      }),
+        }),
       reservationId,
       resultPayload: objectValue(body.resultPayload),
       taskId: id,

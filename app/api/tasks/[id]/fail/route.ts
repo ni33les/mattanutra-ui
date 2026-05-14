@@ -51,13 +51,14 @@ export async function POST(request: Request, { params }: FailTaskRouteProps) {
       agentId,
       applyFailure: (context) =>
         applyTaskFailureResult({
+          afterCommit: context.afterCommit,
           errorMessage,
           resultPayload: context.resultPayload,
           retryWillBeScheduled: context.retryWillBeScheduled,
           sql: context.sql,
           task: context.task,
           taskId: id
-      }),
+        }),
       errorMessage,
       reservationId,
       resultPayload: objectValue(body.resultPayload),
