@@ -270,7 +270,9 @@ function mapMessage(row: MessageRow): CommunicationMessage {
   };
 }
 
-function sqlOrThrow(sql?: postgres.Sql) {
+function sqlOrThrow(): postgres.Sql;
+function sqlOrThrow(sql: Db): Db;
+function sqlOrThrow(sql?: Db) {
   const configured = sql ?? getSql();
 
   if (!configured) {
@@ -280,7 +282,23 @@ function sqlOrThrow(sql?: postgres.Sql) {
   return configured;
 }
 
-export async function ensureCommunicationSchema(sql = sqlOrThrow()) {
+async function inCommunicationTransaction<T>(
+  sql: Db,
+  callback: (transaction: Db) => Promise<T>
+) {
+  const begin = (sql as { begin?: unknown }).begin;
+
+  if (typeof begin === "function") {
+    return (begin as (cb: (transaction: Db) => Promise<T>) => Promise<T>).call(
+      sql,
+      callback
+    );
+  }
+
+  return callback(sql);
+}
+
+export async function ensureCommunicationSchema(sql: Db = sqlOrThrow()) {
   if (globalCommunications.mattanutraCommunicationSchemaReady) {
     return globalCommunications.mattanutraCommunicationSchemaReady;
   }
@@ -776,11 +794,12 @@ export async function recordEmailCommunicationDelivery(input: Readonly<{
   planId: string;
   reason?: string | null;
   sent: boolean;
+  sql?: Db;
   subject?: string | null;
   taskId?: string | null;
   to: string;
 }>) {
-  const sql = sqlOrThrow();
+  const sql = input.sql ? sqlOrThrow(input.sql) : sqlOrThrow();
   const emailValidation = validateLeadEmail(input.to);
 
   if (!emailValidation.ok || !isUuid(input.planId)) {
@@ -789,7 +808,7 @@ export async function recordEmailCommunicationDelivery(input: Readonly<{
 
   await ensureCommunicationSchema(sql);
 
-  return sql.begin(async (tx) => {
+  return inCommunicationTransaction(sql, async (tx) => {
     const planId = input.planId;
     const goalId = isUuid(input.goalId ?? "") ? input.goalId! : null;
     const taskId = isUuid(input.taskId ?? "") ? input.taskId! : null;
@@ -949,7 +968,10 @@ export async function sendCommunication(input: Readonly<{
           `
         ).map(mapChannel)
       : [];
-    const selected = selectBestCommunicationChannel(channels, forcedChannelType);
+    const selected = selectBestCommunicationChannel<CommunicationChannel>(
+      channels,
+      forcedChannelType
+    );
     const metadata = {
       ...(input.metadata ?? {}),
       selectedChannelType: selected?.channelType ?? forcedChannelType ?? null

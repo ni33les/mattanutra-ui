@@ -284,6 +284,7 @@ export async function getAdminTechnicalAlertsData(
     const [
       failedTasks,
       stuckTasks,
+      waitingWorkerTasks,
       failedCron,
       highTaskEvents,
       highBpmEvents
@@ -369,6 +370,71 @@ export async function getAdminTechnicalAlertsData(
           and coalesce(tasks.lease_until, tasks.updated_at) < now()
           ${start ? sql`and coalesce(tasks.started_at, tasks.updated_at, tasks.created_at) >= ${start}` : sql``}
         order by coalesce(tasks.started_at, tasks.updated_at, tasks.created_at) asc
+        limit 100
+      `,
+      sql<AlertDbRow[]>`
+        select
+          tasks.id::text as id,
+          'task'::text as source,
+          case
+            when coalesce(worker_state.online_capable_count, 0) = 0 then 'critical'
+            else 'medium'
+          end as severity,
+          tasks.title || ' is waiting for a capable worker' as title,
+          case
+            when coalesce(worker_state.online_capable_count, 0) = 0
+              then 'No online capable worker is registered for this queued task.'
+            else 'A capable worker exists, but none is currently idle or polling.'
+          end as message,
+          null::text as cron_id,
+          tasks.plan_id::text as plan_id,
+          tasks.id::text as task_id,
+          tasks.task_type,
+          tasks.status,
+          'task_waiting_for_worker'::text as event_type,
+          tasks.created_at as occurred_at,
+          jsonb_build_object(
+            'availableCapableWorkerCount', coalesce(worker_state.available_capable_count, 0),
+            'goalTitle', goals.title,
+            'onlineCapableWorkerCount', coalesce(worker_state.online_capable_count, 0),
+            'priority', tasks.priority,
+            'requiredCapabilities', tasks.required_capabilities,
+            'scheduledFor', tasks.scheduled_for,
+            'taskTitle', tasks.title,
+            'taskType', tasks.task_type
+          ) as details
+        from public.tasks
+        left join public.goals on goals.id = tasks.goal_id
+        left join lateral (
+          select
+            count(*) filter (
+              where worker_sessions.status <> 'offline'
+                and worker_sessions.last_seen_at >= now() - interval '2 minutes'
+            )::int as online_capable_count,
+            count(*) filter (
+              where worker_sessions.status in ('idle', 'polling')
+                and worker_sessions.last_seen_at >= now() - interval '90 seconds'
+            )::int as available_capable_count
+          from public.worker_sessions
+          where (
+              coalesce(cardinality(tasks.required_capabilities), 0) = 0
+              or tasks.required_capabilities <@ worker_sessions.capabilities
+            )
+            and (
+              coalesce(cardinality(worker_sessions.task_types), 0) = 0
+              or tasks.task_type = any(worker_sessions.task_types)
+            )
+        ) worker_state on true
+        where tasks.status = 'queued'
+          and tasks.scheduled_for <= now()
+          and tasks.created_at < now() - interval '10 seconds'
+          and coalesce(worker_state.available_capable_count, 0) = 0
+          ${start ? sql`and tasks.created_at >= ${start}` : sql``}
+        order by
+          case when coalesce(worker_state.online_capable_count, 0) = 0 then 0 else 1 end,
+          tasks.priority desc,
+          tasks.scheduled_for asc,
+          tasks.created_at asc
         limit 100
       `,
       sql<AlertDbRow[]>`
@@ -471,6 +537,7 @@ export async function getAdminTechnicalAlertsData(
     const rawRows = [
       ...failedTasks,
       ...stuckTasks,
+      ...waitingWorkerTasks,
       ...failedCron,
       ...highTaskEvents,
       ...highBpmEvents

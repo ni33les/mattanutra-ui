@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import type postgres from "postgres";
 
+type FinanceDb = postgres.Sql | postgres.TransactionSql;
+
 export type FinanceCategory = "ai" | "hosting" | "other";
 export type FinanceEntryType = "actual" | "nominal";
 
@@ -20,6 +22,7 @@ export type FinanceTransactionInput = Readonly<{
   metadata?: Record<string, unknown>;
   occurredAt?: Date | string | null;
   provider?: string | null;
+  sql?: FinanceDb;
   source: string;
   sourceRef?: string | null;
   taskId?: string | null;
@@ -36,6 +39,7 @@ type XaiUsageCostInput = Readonly<{
   purpose: string;
   reasoningEffort?: string | null;
   responseId?: string | null;
+  sql?: FinanceDb;
   taskId?: string | null;
   usage: unknown;
 }>;
@@ -185,8 +189,7 @@ function hashSourceRef(parts: unknown[]) {
 }
 
 export async function recordFinanceTransaction(input: FinanceTransactionInput) {
-  const { getSql } = await import("./db.ts");
-  const sql = getSql();
+  const sql = input.sql ?? (await import("./db.ts")).getSql();
 
   if (!sql) {
     return null;
@@ -347,6 +350,7 @@ export async function recordXaiUsageCost(input: XaiUsageCostInput) {
       provider: "xai",
       source: "xai",
       sourceRef,
+      sql: input.sql,
       taskId: input.taskId,
       to: "xai:grok",
       toAccountId: FINANCE_ACCOUNT_IDS.xai,

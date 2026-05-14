@@ -7,7 +7,10 @@ services:
       branch: main
       deploy_on_push: true
     build_command: npm run build
-    run_command: npm run start
+    # Runs Next.js plus a colocated external worker process in the same service
+    # container. This avoids the cost of a separate App Platform Worker
+    # component while still forcing work through the worker API.
+    run_command: npm run start:platform
     environment_slug: node-js
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-0.5gb

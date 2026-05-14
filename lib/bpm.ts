@@ -4,6 +4,8 @@ import { isUuid, toJsonValue } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
 import { isLocale } from "@/lib/i18n";
 
+type BpmDb = postgres.Sql | postgres.TransactionSql;
+
 export type BpmEventType =
   | "affiliate"
   | "chat"
@@ -79,6 +81,7 @@ export type BpmEventInput = Readonly<{
   scoreBand?: string | null;
   selectedPlan?: "precision" | "pro" | string | null;
   severity?: BpmSeverity;
+  sql?: BpmDb;
   valueAmount?: number | null;
   valueCurrency?: string | null;
 }>;
@@ -236,7 +239,7 @@ export function bpmContextFromBody(body: unknown) {
   return bodyBpmContext(body);
 }
 
-async function insertBpmEvent(sql: postgres.Sql, input: BpmEventInput) {
+async function insertBpmEvent(sql: BpmDb, input: BpmEventInput) {
   const attribution = input.attribution ?? {};
   const emailHash =
     input.email && typeof input.email === "string"
@@ -368,7 +371,7 @@ async function insertBpmEvent(sql: postgres.Sql, input: BpmEventInput) {
 }
 
 export async function writeBpmEvent(input: BpmEventInput) {
-  const sql = getSql();
+  const sql = input.sql ?? getSql();
 
   if (!sql) {
     return null;

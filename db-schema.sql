@@ -1,65 +1,71 @@
 -- MattaNutra database schema
--- Re-runnable PostgreSQL schema for UAT/production.
--- Intended for copy/paste into the DigitalOcean database console.
--- Creates or upgrades every app table, index, constraint, and seed content.
--- Seed rows are upserted by stable IDs/slugs; operational customer data is not
--- deleted when this script is reapplied.
+-- Destructive PostgreSQL rebuild script for local/dev/demo environments.
+-- Intended for copy/paste into the DigitalOcean database console or a local
+-- SQL client when you want a completely fresh MattaNutra database.
+--
+-- WARNING: this deletes all MattaNutra app tables and seeded app types before
+-- rebuilding tables, indexes, functions, seed rows, and grant metadata.
+-- It deliberately does not drop the whole public schema, so unrelated
+-- extensions or non-app objects in public are left alone.
 
-do $$
-begin
-  begin
-    execute 'create schema if not exists public';
-  exception when others then
-    raise notice 'Skipping public schema create: %', sqlerrm;
-  end;
-end $$;
+create schema if not exists public;
 
-do $$
-begin
-  if not exists (select 1 from pg_type where typname = 'assessment_plan') then
-    create type public.assessment_plan as enum ('precision', 'pro');
-  end if;
+drop table if exists
+  public.admin_alert_acknowledgements,
+  public.admin_conversion_targets,
+  public.ai_response_cache,
+  public.assessment_example_requests,
+  public.assessment_formulations,
+  public.assessment_submissions,
+  public.assessments,
+  public.blog_posts,
+  public.blog_testimonials,
+  public.bpm,
+  public.communication_channels,
+  public.communication_identities,
+  public.communication_messages,
+  public.cron,
+  public.finance_accounts,
+  public.finance_transactions,
+  public.formulations,
+  public.goals,
+  public.plan_communication_identities,
+  public.rays,
+  public.recommendations,
+  public.safety_reviews,
+  public.supplement_admin_audit,
+  public.supplement_aliases,
+  public.supplement_safety_limits,
+  public.supplements,
+  public.task_approvals,
+  public.task_comments,
+  public.task_dependencies,
+  public.task_events,
+  public.task_reservations,
+  public.tasks,
+  public.testimonials,
+  public.worker_sessions,
+  public.agents
+cascade;
 
-  if not exists (select 1 from pg_type where typname = 'assessment_status') then
-    create type public.assessment_status as enum (
-      'captured',
-      'queued',
-      'preparing',
-      'ready',
-      'failed'
-    );
-  end if;
-end $$;
+drop function if exists public.mattanutra_supplement_safety_flags(text) cascade;
+drop function if exists public.prevent_task_dependency_cycle() cascade;
+drop function if exists public.prevent_task_events_mutation() cascade;
 
-alter type public.assessment_plan add value if not exists 'precision';
-alter type public.assessment_plan add value if not exists 'pro';
+drop type if exists public.assessment_status cascade;
+drop type if exists public.assessment_plan cascade;
 
-alter type public.assessment_status add value if not exists 'captured';
-alter type public.assessment_status add value if not exists 'queued';
-alter type public.assessment_status add value if not exists 'preparing';
-alter type public.assessment_status add value if not exists 'ready';
-alter type public.assessment_status add value if not exists 'failed';
+create type public.assessment_plan as enum ('precision', 'pro');
 
--- Compatibility renames for earlier development table names.
-do $$
-begin
-  if to_regclass('public.assessment_submissions') is not null
-    and to_regclass('public.assessments') is null then
-    alter table public.assessment_submissions rename to assessments;
-  end if;
+create type public.assessment_status as enum (
+  'captured',
+  'queued',
+  'preparing',
+  'ready',
+  'failed'
+);
 
-  if to_regclass('public.assessment_formulations') is not null
-    and to_regclass('public.formulations') is null then
-    alter table public.assessment_formulations rename to formulations;
-  end if;
-
-  if to_regclass('public.blog_testimonials') is not null
-    and to_regclass('public.testimonials') is null then
-    alter table public.blog_testimonials rename to testimonials;
-  end if;
-end $$;
-
-create table if not exists public.assessments (
+create table public.assessments (
   plan_id uuid primary key,
   locale text not null default 'en' check (locale in ('en', 'th')),
   selected_plan public.assessment_plan null,
@@ -137,16 +143,16 @@ begin
   end if;
 end $$;
 
-create index if not exists assessments_status_idx
+create index assessments_status_idx
   on public.assessments (status, captured_at desc);
 
-create index if not exists assessments_plan_idx
+create index assessments_plan_idx
   on public.assessments (selected_plan, captured_at desc);
 
-create index if not exists assessments_answers_gin_idx
+create index assessments_answers_gin_idx
   on public.assessments using gin (answers jsonb_path_ops);
 
-create table if not exists public.ai_response_cache (
+create table public.ai_response_cache (
   cache_key text primary key,
   cache_type text not null,
   model text not null,
@@ -195,10 +201,10 @@ alter table public.ai_response_cache
   alter column updated_at set default now(),
   alter column updated_at set not null;
 
-create index if not exists ai_response_cache_type_expiry_idx
+create index ai_response_cache_type_expiry_idx
   on public.ai_response_cache (cache_type, expires_at desc);
 
-create table if not exists public.formulations (
+create table public.formulations (
   plan_id uuid not null references public.assessments(plan_id) on delete cascade,
   version integer not null default 1,
   formulation jsonb not null,
@@ -235,7 +241,7 @@ alter table public.formulations
   alter column updated_at set default now(),
   alter column updated_at set not null;
 
-create table if not exists public.recommendations (
+create table public.recommendations (
   plan_id uuid not null references public.assessments(plan_id) on delete cascade,
   version integer not null default 1,
   recommendations jsonb not null,
@@ -326,13 +332,13 @@ begin
   end if;
 end $$;
 
-create index if not exists formulations_latest_idx
+create index formulations_latest_idx
   on public.formulations (plan_id, version desc, generated_at desc);
 
-create index if not exists recommendations_latest_idx
+create index recommendations_latest_idx
   on public.recommendations (plan_id, version desc, generated_at desc);
 
-create table if not exists public.agents (
+create table public.agents (
   id uuid primary key,
   name text not null,
   agent_type text not null default 'system' check (
@@ -429,16 +435,16 @@ begin
   end if;
 end $$;
 
-create unique index if not exists agents_name_idx
+create unique index agents_name_idx
   on public.agents (lower(name));
 
-create index if not exists agents_status_idx
+create index agents_status_idx
   on public.agents (status, agent_type, updated_at desc);
 
-create index if not exists agents_capabilities_gin_idx
+create index agents_capabilities_gin_idx
   on public.agents using gin (capabilities);
 
-create table if not exists public.worker_sessions (
+create table public.worker_sessions (
   id uuid primary key,
   agent_id uuid not null references public.agents(id) on delete cascade,
   instance_id text not null,
@@ -523,13 +529,13 @@ begin
     check (status in ('idle', 'polling', 'working', 'offline'));
 end $$;
 
-create unique index if not exists worker_sessions_agent_instance_idx
+create unique index worker_sessions_agent_instance_idx
   on public.worker_sessions (agent_id, instance_id);
 
-create index if not exists worker_sessions_status_idx
+create index worker_sessions_status_idx
   on public.worker_sessions (status, last_seen_at desc);
 
-create index if not exists worker_sessions_capabilities_gin_idx
+create index worker_sessions_capabilities_gin_idx
   on public.worker_sessions using gin (capabilities);
 
 insert into public.agents (
@@ -701,182 +707,7 @@ on conflict ((lower(name))) do update set
   end,
   updated_at = now();
 
-do $$
-begin
-  if to_regclass('public.goals') is null
-    and to_regclass('public.rays') is not null then
-    alter table public.rays rename to goals;
-  end if;
-
-  if to_regclass('public.goals') is not null
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'goals'
-        and column_name = 'ray_type'
-    ) then
-    alter table public.goals rename column ray_type to goal_type;
-  end if;
-
-  if to_regclass('public.tasks') is not null
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'tasks'
-        and column_name = 'ray_id'
-    )
-    and not exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'tasks'
-        and column_name = 'goal_id'
-    ) then
-    alter table public.tasks rename column ray_id to goal_id;
-  end if;
-
-  if to_regclass('public.task_comments') is not null
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'task_comments'
-        and column_name = 'ray_id'
-    )
-    and not exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'task_comments'
-        and column_name = 'goal_id'
-    ) then
-    alter table public.task_comments rename column ray_id to goal_id;
-  end if;
-
-  if to_regclass('public.task_events') is not null
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'task_events'
-        and column_name = 'ray_id'
-    )
-    and not exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'task_events'
-        and column_name = 'goal_id'
-    ) then
-    alter table public.task_events rename column ray_id to goal_id;
-  end if;
-
-  if to_regclass('public.task_approvals') is not null
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'task_approvals'
-        and column_name = 'ray_id'
-    )
-    and not exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'task_approvals'
-        and column_name = 'goal_id'
-    ) then
-    alter table public.task_approvals rename column ray_id to goal_id;
-  end if;
-
-  if to_regclass('public.tasks') is not null
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'tasks'
-        and column_name = 'ray_id'
-    )
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'tasks'
-        and column_name = 'goal_id'
-    ) then
-    update public.tasks set goal_id = ray_id where goal_id is null;
-    alter table public.tasks drop column ray_id;
-  end if;
-
-  if to_regclass('public.task_comments') is not null
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'task_comments'
-        and column_name = 'ray_id'
-    )
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'task_comments'
-        and column_name = 'goal_id'
-    ) then
-    update public.task_comments set goal_id = ray_id where goal_id is null;
-    alter table public.task_comments drop column ray_id;
-  end if;
-
-  if to_regclass('public.task_events') is not null
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'task_events'
-        and column_name = 'ray_id'
-    )
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'task_events'
-        and column_name = 'goal_id'
-    ) then
-    update public.task_events set goal_id = ray_id where goal_id is null;
-    alter table public.task_events drop column ray_id;
-  end if;
-
-  if to_regclass('public.task_approvals') is not null
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'task_approvals'
-        and column_name = 'ray_id'
-    )
-    and exists (
-      select 1
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'task_approvals'
-        and column_name = 'goal_id'
-    ) then
-    update public.task_approvals set goal_id = ray_id where goal_id is null;
-    alter table public.task_approvals drop column ray_id;
-  end if;
-end $$;
-
-drop index if exists public.rays_status_idx;
-drop index if exists public.rays_plan_idx;
-drop index if exists public.rays_email_hash_idx;
-drop index if exists public.tasks_ray_idx;
-drop index if exists public.task_comments_ray_idx;
-drop index if exists public.task_events_ray_idx;
-drop index if exists public.task_approvals_ray_idx;
-
-create table if not exists public.goals (
+create table public.goals (
   id uuid primary key,
   ray uuid null,
   goal_type text not null default 'goal' check (
@@ -990,22 +821,22 @@ begin
     check (priority >= 1 and priority <= 5);
 end $$;
 
-create index if not exists goals_status_idx
+create index goals_status_idx
   on public.goals (status, priority desc, created_at asc);
 
-create index if not exists goals_ray_idx
+create index goals_ray_idx
   on public.goals (ray, created_at desc)
   where ray is not null;
 
-create index if not exists goals_plan_idx
+create index goals_plan_idx
   on public.goals (plan_id, created_at desc)
   where plan_id is not null;
 
-create index if not exists goals_email_hash_idx
+create index goals_email_hash_idx
   on public.goals (email_hash, created_at desc)
   where email_hash is not null;
 
-create table if not exists public.tasks (
+create table public.tasks (
   id uuid primary key,
   goal_id uuid not null references public.goals(id) on delete cascade,
   parent_task_id uuid null references public.tasks(id) on delete set null,
@@ -1319,36 +1150,36 @@ comment on column public.tasks.required_capabilities is
 comment on column public.tasks.reasoning_effort is
   'Declared reasoning level for AI or human work planning: none, low, medium, high, or xhigh.';
 
-create index if not exists tasks_queue_idx
+create index tasks_queue_idx
   on public.tasks (status, priority desc, scheduled_for asc, created_at asc);
 
-create index if not exists tasks_goal_idx
+create index tasks_goal_idx
   on public.tasks (goal_id, created_at asc);
 
-create index if not exists tasks_plan_idx
+create index tasks_plan_idx
   on public.tasks (plan_id, created_at desc)
   where plan_id is not null;
 
-create index if not exists tasks_parent_idx
+create index tasks_parent_idx
   on public.tasks (parent_task_id, created_at asc)
   where parent_task_id is not null;
 
-create index if not exists tasks_retry_lineage_idx
+create index tasks_retry_lineage_idx
   on public.tasks (goal_id, (coalesce(retry_root_task_id, id)), retry_attempt, created_at asc);
 
-create index if not exists tasks_reserved_agent_idx
+create index tasks_reserved_agent_idx
   on public.tasks (reserved_by_agent_id, lease_until)
   where reserved_by_agent_id is not null;
 
-create index if not exists tasks_required_capabilities_gin_idx
+create index tasks_required_capabilities_gin_idx
   on public.tasks using gin (required_capabilities);
 
-create unique index if not exists tasks_active_idempotency_idx
+create unique index tasks_active_idempotency_idx
   on public.tasks (goal_id, idempotency_key)
   where idempotency_key is not null
     and status not in ('completed', 'failed', 'cancelled', 'skipped');
 
-create table if not exists public.task_dependencies (
+create table public.task_dependencies (
   task_id uuid not null references public.tasks(id) on delete cascade,
   depends_on_task_id uuid not null references public.tasks(id) on delete cascade,
   dependency_type text not null default 'complete' check (
@@ -1456,10 +1287,10 @@ before insert or update of task_id, depends_on_task_id
 on public.task_dependencies
 for each row execute function public.prevent_task_dependency_cycle();
 
-create index if not exists task_dependencies_waiting_idx
+create index task_dependencies_waiting_idx
   on public.task_dependencies (depends_on_task_id, task_id);
 
-create table if not exists public.task_comments (
+create table public.task_comments (
   id uuid primary key,
   task_id uuid not null references public.tasks(id) on delete cascade,
   goal_id uuid not null references public.goals(id) on delete cascade,
@@ -1574,13 +1405,13 @@ end $$;
 comment on table public.task_comments is
   'Collaborative working notes for humans and agents. Comments explain what is needed or decided; task_events remains the immutable audit trail.';
 
-create index if not exists task_comments_task_idx
+create index task_comments_task_idx
   on public.task_comments (task_id, created_at asc);
 
-create index if not exists task_comments_goal_idx
+create index task_comments_goal_idx
   on public.task_comments (goal_id, created_at asc);
 
-create index if not exists task_comments_agent_idx
+create index task_comments_agent_idx
   on public.task_comments (agent_id, created_at desc)
   where agent_id is not null;
 
@@ -1591,7 +1422,7 @@ begin
   end if;
 end $$;
 
-create table if not exists public.task_events (
+create table public.task_events (
   id uuid primary key,
   task_id uuid null references public.tasks(id) on delete set null,
   goal_id uuid not null references public.goals(id) on delete cascade,
@@ -1699,21 +1530,21 @@ create trigger task_events_no_update_delete
 comment on table public.task_events is
   'Append-only audit trail for task lifecycle and causal events. Comments are working notes; events are the record.';
 
-create index if not exists task_events_task_idx
+create index task_events_task_idx
   on public.task_events (task_id, occurred_at asc)
   where task_id is not null;
 
-create index if not exists task_events_goal_idx
+create index task_events_goal_idx
   on public.task_events (goal_id, occurred_at asc);
 
-create index if not exists task_events_agent_idx
+create index task_events_agent_idx
   on public.task_events (agent_id, occurred_at desc)
   where agent_id is not null;
 
-create index if not exists task_events_type_idx
+create index task_events_type_idx
   on public.task_events (event_type, occurred_at desc);
 
-create table if not exists public.task_reservations (
+create table public.task_reservations (
   id uuid primary key,
   task_id uuid not null references public.tasks(id) on delete cascade,
   agent_id uuid not null references public.agents(id) on delete cascade,
@@ -1777,22 +1608,22 @@ begin
     check (status in ('active', 'released', 'completed', 'expired', 'failed', 'cancelled'));
 end $$;
 
-create unique index if not exists task_reservations_active_task_idx
+create unique index task_reservations_active_task_idx
   on public.task_reservations (task_id)
   where status = 'active';
 
-create index if not exists task_reservations_agent_idx
+create index task_reservations_agent_idx
   on public.task_reservations (agent_id, status, reserved_at desc);
 
-create index if not exists task_reservations_worker_session_idx
+create index task_reservations_worker_session_idx
   on public.task_reservations (worker_session_id, status, reserved_at desc)
   where worker_session_id is not null;
 
-create index if not exists task_reservations_lease_idx
+create index task_reservations_lease_idx
   on public.task_reservations (status, lease_until asc)
   where status = 'active';
 
-create table if not exists public.task_approvals (
+create table public.task_approvals (
   id uuid primary key,
   task_id uuid not null references public.tasks(id) on delete cascade,
   goal_id uuid not null references public.goals(id) on delete cascade,
@@ -1893,19 +1724,19 @@ begin
   end if;
 end $$;
 
-create index if not exists task_approvals_task_idx
+create index task_approvals_task_idx
   on public.task_approvals (task_id, requested_at desc);
 
-create index if not exists task_approvals_goal_idx
+create index task_approvals_goal_idx
   on public.task_approvals (goal_id, requested_at desc);
 
-create index if not exists task_approvals_status_idx
+create index task_approvals_status_idx
   on public.task_approvals (status, requested_at asc);
 
-create index if not exists task_approvals_capabilities_gin_idx
+create index task_approvals_capabilities_gin_idx
   on public.task_approvals using gin (required_capabilities);
 
-create table if not exists public.assessment_example_requests (
+create table public.assessment_example_requests (
   id uuid primary key,
   plan_id uuid not null references public.assessments(plan_id) on delete cascade,
   email text not null,
@@ -2017,13 +1848,13 @@ begin
     );
 end $$;
 
-create index if not exists assessment_example_requests_plan_idx
+create index assessment_example_requests_plan_idx
   on public.assessment_example_requests (plan_id, requested_at desc);
 
-create index if not exists assessment_example_requests_status_idx
+create index assessment_example_requests_status_idx
   on public.assessment_example_requests (status, requested_at asc);
 
-create table if not exists public.cron (
+create table public.cron (
   id uuid primary key,
   plan_id uuid null references public.assessments(plan_id) on delete cascade,
   action_type text not null,
@@ -2143,17 +1974,17 @@ begin
   end if;
 end $$;
 
-create index if not exists cron_due_idx
+create index cron_due_idx
   on public.cron (status, scheduled_for asc);
 
-create index if not exists cron_plan_action_idx
+create index cron_plan_action_idx
   on public.cron (plan_id, action_type, status);
 
-create unique index if not exists cron_unsubscribe_token_idx
+create unique index cron_unsubscribe_token_idx
   on public.cron (unsubscribe_token)
   where unsubscribe_token is not null;
 
-create table if not exists public.bpm (
+create table public.bpm (
   id uuid primary key,
   ray uuid not null,
   plan_id uuid null references public.assessments(plan_id) on delete set null,
@@ -2456,98 +2287,98 @@ comment on column public.bpm.properties is
 comment on column public.bpm.metrics is
   'Flexible numeric metrics such as counts, timings, scores, or model usage details.';
 
-create index if not exists bpm_occurred_idx
+create index bpm_occurred_idx
   on public.bpm (occurred_at desc);
 
-create index if not exists bpm_event_time_idx
+create index bpm_event_time_idx
   on public.bpm (event_type, event_name, occurred_at desc);
 
 drop index if exists public.bpm_goal_idx;
 
-create index if not exists bpm_ray_idx
+create index bpm_ray_idx
   on public.bpm (ray, occurred_at desc);
 
-create index if not exists bpm_plan_idx
+create index bpm_plan_idx
   on public.bpm (plan_id, occurred_at desc)
   where plan_id is not null;
 
-create index if not exists bpm_email_hash_idx
+create index bpm_email_hash_idx
   on public.bpm (email_hash, occurred_at desc)
   where email_hash is not null;
 
-create index if not exists bpm_locale_idx
+create index bpm_locale_idx
   on public.bpm (locale, occurred_at desc)
   where locale is not null;
 
-create index if not exists bpm_device_idx
+create index bpm_device_idx
   on public.bpm (lower(coalesce(device_type, '')), occurred_at desc)
   where device_type is not null;
 
-create index if not exists bpm_selected_plan_idx
+create index bpm_selected_plan_idx
   on public.bpm (selected_plan, occurred_at desc)
   where selected_plan is not null;
 
-create index if not exists bpm_source_idx
+create index bpm_source_idx
   on public.bpm (traffic_source, source_channel, occurred_at desc)
   where traffic_source is not null or source_channel is not null;
 
-create index if not exists bpm_utm_source_filter_idx
+create index bpm_utm_source_filter_idx
   on public.bpm (lower(coalesce(utm_source, '')), occurred_at desc)
   where utm_source is not null;
 
-create index if not exists bpm_traffic_source_filter_idx
+create index bpm_traffic_source_filter_idx
   on public.bpm (lower(coalesce(traffic_source, '')), occurred_at desc)
   where traffic_source is not null;
 
-create index if not exists bpm_source_channel_filter_idx
+create index bpm_source_channel_filter_idx
   on public.bpm (lower(coalesce(source_channel, '')), occurred_at desc)
   where source_channel is not null;
 
-create index if not exists bpm_utm_medium_filter_idx
+create index bpm_utm_medium_filter_idx
   on public.bpm (lower(utm_medium), occurred_at desc)
   where utm_medium is not null;
 
-create index if not exists bpm_campaign_idx
+create index bpm_campaign_idx
   on public.bpm (utm_campaign, campaign_id, occurred_at desc)
   where utm_campaign is not null or campaign_id is not null;
 
-create index if not exists bpm_utm_campaign_filter_idx
+create index bpm_utm_campaign_filter_idx
   on public.bpm (lower(coalesce(utm_campaign, '')), occurred_at desc)
   where utm_campaign is not null;
 
-create index if not exists bpm_campaign_name_filter_idx
+create index bpm_campaign_name_filter_idx
   on public.bpm (lower(coalesce(campaign_name, '')), occurred_at desc)
   where campaign_name is not null;
 
-create index if not exists bpm_campaign_id_filter_idx
+create index bpm_campaign_id_filter_idx
   on public.bpm (lower(campaign_id), occurred_at desc)
   where campaign_id is not null;
 
-create index if not exists bpm_affiliate_idx
+create index bpm_affiliate_idx
   on public.bpm (affiliate_id, affiliate_ref, occurred_at desc)
   where affiliate_id is not null or affiliate_ref is not null;
 
-create index if not exists bpm_affiliate_id_filter_idx
+create index bpm_affiliate_id_filter_idx
   on public.bpm (lower(coalesce(affiliate_id, '')), occurred_at desc)
   where affiliate_id is not null;
 
-create index if not exists bpm_affiliate_ref_filter_idx
+create index bpm_affiliate_ref_filter_idx
   on public.bpm (lower(coalesce(affiliate_ref, '')), occurred_at desc)
   where affiliate_ref is not null;
 
-create index if not exists bpm_affiliate_sub_id_filter_idx
+create index bpm_affiliate_sub_id_filter_idx
   on public.bpm (lower(coalesce(affiliate_sub_id, '')), occurred_at desc)
   where affiliate_sub_id is not null;
 
-create index if not exists bpm_promo_idx
+create index bpm_promo_idx
   on public.bpm (promo_code, occurred_at desc)
   where promo_code is not null;
 
-create index if not exists bpm_promo_code_filter_idx
+create index bpm_promo_code_filter_idx
   on public.bpm (lower(promo_code), occurred_at desc)
   where promo_code is not null;
 
-create table if not exists public.finance_accounts (
+create table public.finance_accounts (
   id uuid primary key,
   name text not null unique,
   description text not null,
@@ -2596,13 +2427,13 @@ alter table public.finance_accounts
   alter column updated_at set default now(),
   alter column updated_at set not null;
 
-create unique index if not exists finance_accounts_name_idx
+create unique index finance_accounts_name_idx
   on public.finance_accounts (lower(name));
 
 comment on table public.finance_accounts is
   'Account master table for providers and internal cost accounts. These are not bank accounts or payment instruments.';
 
-create table if not exists public.finance_transactions (
+create table public.finance_transactions (
   id uuid primary key,
   occurred_at timestamptz not null default now(),
   category text not null check (category in ('ai', 'hosting', 'other')),
@@ -2818,24 +2649,24 @@ comment on column public.finance_transactions.usd_rate is
 comment on column public.finance_transactions.task_id is
   'Task that caused this cost accrual, when the liability came from task-backed work.';
 
-create index if not exists finance_transactions_occurred_idx
+create index finance_transactions_occurred_idx
   on public.finance_transactions (occurred_at desc);
 
-create index if not exists finance_transactions_category_occurred_idx
+create index finance_transactions_category_occurred_idx
   on public.finance_transactions (category, occurred_at desc);
 
-create index if not exists finance_transactions_entry_type_occurred_idx
+create index finance_transactions_entry_type_occurred_idx
   on public.finance_transactions (entry_type, occurred_at desc);
 
-create index if not exists finance_transactions_task_idx
+create index finance_transactions_task_idx
   on public.finance_transactions (task_id, occurred_at desc)
   where task_id is not null;
 
-create unique index if not exists finance_transactions_source_ref_idx
+create unique index finance_transactions_source_ref_idx
   on public.finance_transactions (source, source_ref)
   where source_ref is not null;
 
-create table if not exists public.admin_alert_acknowledgements (
+create table public.admin_alert_acknowledgements (
   id uuid primary key,
   source text not null check (source in ('bpm', 'cron', 'task', 'task_event')),
   source_id text not null,
@@ -2934,21 +2765,21 @@ begin
   end if;
 end $$;
 
-create index if not exists admin_alert_acknowledgements_status_idx
+create index admin_alert_acknowledgements_status_idx
   on public.admin_alert_acknowledgements (status, updated_at desc);
 
-create index if not exists bpm_alerts_idx
+create index bpm_alerts_idx
   on public.bpm (severity, event_type, occurred_at desc)
   where severity in ('medium', 'high', 'critical')
     or event_type in ('safety', 'error');
 
-create index if not exists bpm_properties_gin_idx
+create index bpm_properties_gin_idx
   on public.bpm using gin (properties jsonb_path_ops);
 
-create index if not exists bpm_metrics_gin_idx
+create index bpm_metrics_gin_idx
   on public.bpm using gin (metrics jsonb_path_ops);
 
-create table if not exists public.admin_conversion_targets (
+create table public.admin_conversion_targets (
   target_id text primary key,
   target_rate numeric(5, 2) not null,
   description text null,
@@ -3018,7 +2849,7 @@ end $$;
 
 
 -- Supplement whitelist/blacklist governance.
-create table if not exists public.supplements (
+create table public.supplements (
   id uuid primary key,
   source_row_id integer null,
   name text not null,
@@ -3146,7 +2977,7 @@ begin
   end if;
 end $$;
 
-create table if not exists public.supplement_safety_limits (
+create table public.supplement_safety_limits (
   id uuid primary key,
   supplement_id uuid not null references public.supplements(id) on delete cascade,
   version integer not null default 1,
@@ -3347,7 +3178,7 @@ alter table public.supplement_safety_limits
 alter table public.supplement_safety_limits
   drop column if exists blocks_automated_use;
 
-create table if not exists public.supplement_aliases (
+create table public.supplement_aliases (
   id uuid primary key,
   supplement_id uuid not null references public.supplements(id) on delete cascade,
   alias text not null,
@@ -3390,7 +3221,7 @@ begin
   end if;
 end $$;
 
-create table if not exists public.supplement_admin_audit (
+create table public.supplement_admin_audit (
   id uuid primary key,
   supplement_id uuid null references public.supplements(id) on delete set null,
   action text not null,
@@ -3428,22 +3259,22 @@ alter table public.supplement_admin_audit
   alter column created_at set default now(),
   alter column created_at set not null;
 
-create index if not exists supplements_category_idx
+create index supplements_category_idx
   on public.supplements (category, list_status, name);
 
-create index if not exists supplements_list_status_idx
+create index supplements_list_status_idx
   on public.supplements (list_status, is_active, name);
 
-create index if not exists supplements_name_search_idx
+create index supplements_name_search_idx
   on public.supplements (normalized_name);
 
-create index if not exists supplement_safety_limits_supplement_idx
+create index supplement_safety_limits_supplement_idx
   on public.supplement_safety_limits (supplement_id, version desc);
 
-create index if not exists supplement_aliases_supplement_idx
+create index supplement_aliases_supplement_idx
   on public.supplement_aliases (supplement_id, alias);
 
-create index if not exists supplement_admin_audit_supplement_idx
+create index supplement_admin_audit_supplement_idx
   on public.supplement_admin_audit (supplement_id, created_at desc);
 
 with seed as (
@@ -3586,7 +3417,7 @@ set
   supplement_id = excluded.supplement_id,
   alias = excluded.alias;
 
-create table if not exists public.safety_reviews (
+create table public.safety_reviews (
   id uuid primary key,
   ray uuid null,
   plan_id uuid null references public.assessments(plan_id) on delete cascade,
@@ -3858,40 +3689,40 @@ comment on column public.safety_reviews.safety_context is
 comment on column public.safety_reviews.client_message is
   'Draft or final client-facing message after the human decision, localized where needed.';
 
-create index if not exists safety_reviews_status_idx
+create index safety_reviews_status_idx
   on public.safety_reviews (status, severity, opened_at asc);
 
-create index if not exists safety_reviews_plan_idx
+create index safety_reviews_plan_idx
   on public.safety_reviews (plan_id, opened_at desc)
   where plan_id is not null;
 
 drop index if exists public.safety_reviews_goal_idx;
 
-create index if not exists safety_reviews_goal_idx
+create index safety_reviews_goal_idx
   on public.safety_reviews (goal_id, opened_at desc)
   where goal_id is not null;
 
-create index if not exists safety_reviews_task_idx
+create index safety_reviews_task_idx
   on public.safety_reviews (task_id, opened_at desc)
   where task_id is not null;
 
-create index if not exists safety_reviews_ray_idx
+create index safety_reviews_ray_idx
   on public.safety_reviews (ray, opened_at desc)
   where ray is not null;
 
-create index if not exists safety_reviews_supplement_idx
+create index safety_reviews_supplement_idx
   on public.safety_reviews (lower(supplement_name), opened_at desc);
 
-create index if not exists safety_reviews_notification_idx
+create index safety_reviews_notification_idx
   on public.safety_reviews (client_notification_status, opened_at asc);
 
-create index if not exists safety_reviews_ai_suggestion_gin_idx
+create index safety_reviews_ai_suggestion_gin_idx
   on public.safety_reviews using gin (ai_suggestion jsonb_path_ops);
 
-create index if not exists safety_reviews_context_gin_idx
+create index safety_reviews_context_gin_idx
   on public.safety_reviews using gin (safety_context jsonb_path_ops);
 
-create table if not exists public.communication_identities (
+create table public.communication_identities (
   id uuid primary key,
   display_name text null,
   source text null,
@@ -3924,7 +3755,7 @@ alter table public.communication_identities
   alter column updated_at set default now(),
   alter column updated_at set not null;
 
-create table if not exists public.plan_communication_identities (
+create table public.plan_communication_identities (
   plan_id uuid not null references public.assessments(plan_id) on delete cascade,
   identity_id uuid not null references public.communication_identities(id) on delete cascade,
   relationship text not null default 'client',
@@ -3962,11 +3793,11 @@ alter table public.plan_communication_identities
   alter column created_at set default now(),
   alter column created_at set not null;
 
-create unique index if not exists plan_communication_primary_identity_idx
+create unique index plan_communication_primary_identity_idx
   on public.plan_communication_identities (plan_id)
   where is_primary;
 
-create table if not exists public.communication_channels (
+create table public.communication_channels (
   id uuid primary key,
   identity_id uuid not null references public.communication_identities(id) on delete cascade,
   channel_type text not null,
@@ -4077,10 +3908,10 @@ begin
   end if;
 end $$;
 
-create unique index if not exists communication_channels_identity_address_idx
+create unique index communication_channels_identity_address_idx
   on public.communication_channels (identity_id, channel_type, lower(address));
 
-create table if not exists public.communication_messages (
+create table public.communication_messages (
   id uuid primary key,
   identity_id uuid null references public.communication_identities(id) on delete set null,
   channel_id uuid null references public.communication_channels(id) on delete set null,
@@ -4196,14 +4027,14 @@ comment on table public.communication_channels is
 comment on table public.communication_messages is
   'Append-only-ish outbound and inbound communication records tied to plans, goals, and tasks.';
 
-create index if not exists communication_messages_plan_idx
+create index communication_messages_plan_idx
   on public.communication_messages (plan_id, created_at desc)
   where plan_id is not null;
 
-create index if not exists communication_messages_status_idx
+create index communication_messages_status_idx
   on public.communication_messages (status, created_at asc);
 
-create table if not exists public.testimonials (
+create table public.testimonials (
   id uuid primary key,
   locale text not null default 'en',
   status text not null default 'published',
@@ -4297,7 +4128,7 @@ begin
     check (status in ('draft', 'review', 'published', 'archived'));
 end $$;
 
-create table if not exists public.blog_posts (
+create table public.blog_posts (
   id uuid primary key,
   translation_group_id uuid not null,
   locale text not null default 'en',
@@ -4456,21 +4287,21 @@ begin
   end if;
 end $$;
 
-create index if not exists blog_posts_published_idx
+create index blog_posts_published_idx
   on public.blog_posts (locale, status, published_at desc nulls last, created_at desc);
 
-create index if not exists blog_posts_status_idx
+create index blog_posts_status_idx
   on public.blog_posts (status, updated_at desc);
 
-create index if not exists blog_posts_translation_group_idx
+create index blog_posts_translation_group_idx
   on public.blog_posts (translation_group_id);
 
-create index if not exists blog_posts_tags_idx
+create index blog_posts_tags_idx
   on public.blog_posts using gin (tags);
 
 drop index if exists public.blog_testimonials_status_idx;
 
-create index if not exists testimonials_status_idx
+create index testimonials_status_idx
   on public.testimonials (locale, status, sort_order asc, created_at desc);
 
 insert into public.testimonials (

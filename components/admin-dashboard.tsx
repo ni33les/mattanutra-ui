@@ -300,6 +300,7 @@ type AdminContent = Readonly<{
     offline: string;
     paused: string;
     retired: string;
+    sessions: string;
     status: string;
     successRate: string;
     total: string;
@@ -507,7 +508,7 @@ type AdminContent = Readonly<{
     status: string;
     task: string;
     total: string;
-    worker: string;
+    agent: string;
   };
   supplements: {
     allCategories: string;
@@ -669,6 +670,7 @@ const content = {
       offline: "Offline",
       paused: "Paused",
       retired: "Retired",
+      sessions: "Sessions",
       status: "Status",
       successRate: "Success",
       total: "Total",
@@ -950,7 +952,7 @@ const content = {
       status: "Status",
       task: "Task",
       total: "Total",
-      worker: "Worker"
+      agent: "Agent"
     },
     supplements: {
       allCategories: "All categories",
@@ -1117,6 +1119,7 @@ const content = {
       offline: "ออฟไลน์",
       paused: "พัก",
       retired: "เลิกใช้",
+      sessions: "เซสชัน",
       status: "สถานะ",
       successRate: "สำเร็จ",
       total: "ทั้งหมด",
@@ -1398,7 +1401,7 @@ const content = {
       status: "สถานะ",
       task: "งาน",
       total: "ทั้งหมด",
-      worker: "ผู้รับงาน"
+      agent: "Agent"
     },
     supplements: {
       allCategories: "ทุกหมวดหมู่",
@@ -6235,6 +6238,7 @@ function AdminReviewQueueView({
                   <p className="mt-0.5 text-xs font-medium text-gray-500">
                     <ReviewGoalAgeTimer
                       createdAt={group.createdAt}
+                      initialNow={queueData.generatedAt}
                       locale={locale}
                     />
                   </p>
@@ -6452,31 +6456,135 @@ function taskIsTerminal(status: string) {
   return ["cancelled", "completed", "failed", "skipped"].includes(status);
 }
 
-function useNowTimer(enabled: boolean) {
-  const [now, setNow] = useState(() => Date.now());
+function relativeDuration(
+  value: string | null,
+  snapshotAt: string,
+  locale: Locale
+) {
+  if (!value) {
+    return "";
+  }
+
+  const snapshotTime = new Date(snapshotAt).getTime();
+  const valueTime = new Date(value).getTime();
+
+  if (!Number.isFinite(snapshotTime) || !Number.isFinite(valueTime)) {
+    return "";
+  }
+
+  return formatTaskDuration(snapshotTime - valueTime, locale);
+}
+
+function taskRuntimeWarning(row: AdminTaskVisibilityRow, snapshotAt: string) {
+  const snapshotTime = new Date(snapshotAt).getTime();
+  const reservedAtTime = row.reservedAt
+    ? new Date(row.reservedAt).getTime()
+    : null;
+  const lastSeenTime = row.workerSessionLastSeenAt
+    ? new Date(row.workerSessionLastSeenAt).getTime()
+    : null;
+  const leaseUntilTime = row.leaseUntil
+    ? new Date(row.leaseUntil).getTime()
+    : null;
+  const active = row.status === "reserved" || row.status === "running";
+
+  if (!active || !Number.isFinite(snapshotTime)) {
+    return "";
+  }
+
+  if (
+    leaseUntilTime !== null &&
+    Number.isFinite(leaseUntilTime) &&
+    leaseUntilTime < snapshotTime
+  ) {
+    return "Lease expired before the agent completed the task.";
+  }
+
+  if (
+    lastSeenTime !== null &&
+    Number.isFinite(lastSeenTime) &&
+    snapshotTime - lastSeenTime > 120_000
+  ) {
+    return "Agent heartbeat is stale.";
+  }
+
+  if (
+    reservedAtTime !== null &&
+    Number.isFinite(reservedAtTime) &&
+    snapshotTime - reservedAtTime > 30_000 &&
+    (!row.latestEventType || row.latestEventType === "task_reserved")
+  ) {
+    return "Reserved, but no later progress event has been recorded.";
+  }
+
+  return "";
+}
+
+function taskRuntimeSummary(
+  row: AdminTaskVisibilityRow,
+  snapshotAt: string,
+  locale: Locale
+) {
+  const parts = [
+    row.agentName ?? null,
+    row.reservationStatus
+      ? `Reservation ${readableToken(row.reservationStatus)}`
+      : null,
+    row.reservedAt
+      ? `reserved ${relativeDuration(row.reservedAt, snapshotAt, locale)} ago`
+      : null,
+    row.workerSessionStatus
+      ? `session ${readableToken(row.workerSessionStatus)}`
+      : null,
+    row.workerSessionLastSeenAt
+      ? `seen ${relativeDuration(row.workerSessionLastSeenAt, snapshotAt, locale)} ago`
+      : null,
+    row.latestEventType
+      ? `last event ${readableToken(row.latestEventType)}`
+      : null
+  ].filter(Boolean);
+
+  return parts.join(" · ");
+}
+
+function timeValue(value: number | string) {
+  const parsed =
+    typeof value === "number" ? value : new Date(value).getTime();
+
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function useNowTimer(enabled: boolean, initialNow: number | string) {
+  const initialNowMs = timeValue(initialNow);
+  const [now, setNow] = useState(initialNowMs);
 
   useEffect(() => {
     if (!enabled) {
+      setNow(initialNowMs);
+
       return;
     }
 
+    setNow(Date.now());
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
 
     return () => window.clearInterval(interval);
-  }, [enabled]);
+  }, [enabled, initialNowMs]);
 
   return now;
 }
 
 function TaskAgeTimer({
+  initialNow,
   locale,
   row
 }: Readonly<{
+  initialNow: string;
   locale: Locale;
   row: Pick<AdminTaskVisibilityRow, "createdAt" | "status" | "updatedAt">;
 }>) {
   const terminal = taskIsTerminal(row.status);
-  const now = useNowTimer(!terminal);
+  const now = useNowTimer(!terminal, initialNow);
 
   const createdAt = new Date(row.createdAt).getTime();
   const endAt = terminal ? new Date(row.updatedAt).getTime() : now;
@@ -6490,15 +6598,17 @@ function TaskAgeTimer({
 
 function GoalAgeTimer({
   goal,
+  initialNow,
   locale
 }: Readonly<{
   goal: AdminGoalRow;
+  initialNow: string;
   locale: Locale;
 }>) {
   const terminal = ["cancelled", "failed", "stuck", "succeeded"].includes(
     goal.status
   );
-  const now = useNowTimer(!terminal);
+  const now = useNowTimer(!terminal, initialNow);
   const createdAt = new Date(goal.createdAt).getTime();
   const endAt = terminal ? new Date(goal.lastActivityAt).getTime() : now;
 
@@ -6511,12 +6621,14 @@ function GoalAgeTimer({
 
 function ReviewGoalAgeTimer({
   createdAt,
+  initialNow,
   locale
 }: Readonly<{
   createdAt: string;
+  initialNow: string;
   locale: Locale;
 }>) {
-  const now = useNowTimer(true);
+  const now = useNowTimer(true, initialNow);
   const startedAt = new Date(createdAt).getTime();
 
   if (!Number.isFinite(startedAt)) {
@@ -7119,9 +7231,20 @@ function AdminVisibilityView({
     );
   const [selectedMetricId, setSelectedMetricId] =
     useState<TaskMetricId>("tasksTotal");
+  const selectedTaskIdForRefresh = selectedTask?.id;
   const visibleRows = data.rows.filter((row) =>
     taskMatchesMetric(row, selectedMetricId, data.generatedAt)
   );
+  useEffect(() => {
+    if (!selectedTaskIdForRefresh) {
+      return;
+    }
+
+    setSelectedTask((current) =>
+      data.rows.find((row) => row.id === selectedTaskIdForRefresh) ??
+      current
+    );
+  }, [data.rows, selectedTaskIdForRefresh]);
   const selectMetric = (metricId: BusinessMetric["id"]) => {
     setSelectedMetricId(metricId as TaskMetricId);
     setSelectedTask(null);
@@ -7202,6 +7325,7 @@ function AdminVisibilityView({
                 locale={locale}
                 onClick={() => setSelectedTask(row)}
                 row={row}
+                snapshotAt={data.generatedAt}
               />
             ))}
           </div>
@@ -7218,6 +7342,7 @@ function AdminVisibilityView({
           locale={locale}
           onClose={() => setSelectedTask(null)}
           row={selectedTask}
+          snapshotAt={data.generatedAt}
         />
       ) : null}
     </section>
@@ -7228,13 +7353,18 @@ function VisibilityTaskRow({
   labels,
   locale,
   onClick,
-  row
+  row,
+  snapshotAt
 }: Readonly<{
   labels: AdminContent;
   locale: Locale;
   onClick: () => void;
   row: AdminTaskVisibilityRow;
+  snapshotAt: string;
 }>) {
+  const runtimeSummary = taskRuntimeSummary(row, snapshotAt, locale);
+  const runtimeWarning = taskRuntimeWarning(row, snapshotAt);
+
   return (
     <button
       aria-label={`${labels.supplements.details}: ${row.title}`}
@@ -7271,9 +7401,19 @@ function VisibilityTaskRow({
           {row.title}
         </h2>
         <span className="text-sm font-semibold tabular-nums text-gray-500 sm:justify-self-end">
-          <TaskAgeTimer locale={locale} row={row} />
+          <TaskAgeTimer initialNow={snapshotAt} locale={locale} row={row} />
         </span>
       </div>
+      {runtimeSummary || runtimeWarning ? (
+        <p
+          className={classNames(
+            "mt-2 truncate text-xs font-medium",
+            runtimeWarning ? "text-amber-700" : "text-gray-500"
+          )}
+        >
+          {runtimeWarning || runtimeSummary}
+        </p>
+      ) : null}
     </button>
   );
 }
@@ -7282,13 +7422,18 @@ function VisibilityTaskDetailsModal({
   labels,
   locale,
   onClose,
-  row
+  row,
+  snapshotAt
 }: Readonly<{
   labels: AdminContent;
   locale: Locale;
   onClose: () => void;
   row: AdminTaskVisibilityRow;
+  snapshotAt: string;
 }>) {
+  const runtimeSummary = taskRuntimeSummary(row, snapshotAt, locale);
+  const runtimeWarning = taskRuntimeWarning(row, snapshotAt);
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <button
@@ -7351,7 +7496,7 @@ function VisibilityTaskDetailsModal({
                 value={readableToken(row.actorType)}
               />
               <SupplementListMeta
-                label={labels.visibility.worker}
+                label={labels.visibility.agent}
                 value={row.agentName ?? ""}
               />
               <SupplementListMeta
@@ -7416,6 +7561,90 @@ function VisibilityTaskDetailsModal({
                 {row.errorMessage}
               </p>
             ) : null}
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+                Runtime
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <SupplementListMeta
+                  label="Reservation"
+                  value={
+                    row.reservationId
+                      ? `${readableToken(row.reservationStatus ?? "unknown")} · ${compactId(row.reservationId)}`
+                      : ""
+                  }
+                />
+                <SupplementListMeta
+                  label="Reserved"
+                  value={
+                    row.reservedAt
+                      ? `${formatGeneratedAt(row.reservedAt, locale)} · ${relativeDuration(row.reservedAt, snapshotAt, locale)} ago`
+                      : ""
+                  }
+                />
+                <SupplementListMeta
+                  label="Heartbeat"
+                  value={
+                    row.reservationHeartbeatAt
+                      ? `${formatGeneratedAt(row.reservationHeartbeatAt, locale)} · ${relativeDuration(row.reservationHeartbeatAt, snapshotAt, locale)} ago`
+                      : ""
+                  }
+                />
+                <SupplementListMeta
+                  label="Agent session"
+                  value={
+                    row.workerSessionId
+                      ? `${readableToken(row.workerSessionStatus ?? "unknown")} · ${compactId(row.workerSessionId)}`
+                      : ""
+                  }
+                />
+                <SupplementListMeta
+                  label="Agent seen"
+                  value={
+                    row.workerSessionLastSeenAt
+                      ? `${formatGeneratedAt(row.workerSessionLastSeenAt, locale)} · ${relativeDuration(row.workerSessionLastSeenAt, snapshotAt, locale)} ago`
+                      : ""
+                  }
+                />
+                <SupplementListMeta
+                  label="Last event"
+                  value={
+                    row.latestEventType
+                      ? [
+                          readableToken(row.latestEventType),
+                          readableToken(row.latestEventStatus ?? "observed"),
+                          row.latestEventSeverity
+                            ? readableToken(row.latestEventSeverity)
+                            : null,
+                          row.latestEventAt
+                            ? `${relativeDuration(row.latestEventAt, snapshotAt, locale)} ago`
+                            : null
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
+                      : ""
+                  }
+                />
+              </div>
+              {runtimeWarning || runtimeSummary ? (
+                <p
+                  className={classNames(
+                    "mt-4 rounded-xl px-3 py-2 text-sm font-medium ring-1",
+                    runtimeWarning
+                      ? "bg-amber-50 text-amber-800 ring-amber-100"
+                      : "bg-gray-50 text-gray-700 ring-gray-200"
+                  )}
+                >
+                  {runtimeWarning || runtimeSummary}
+                </p>
+              ) : null}
+              {row.latestEventPayload ? (
+                <pre className="mt-4 max-h-56 overflow-auto rounded-xl bg-gray-950 p-3 text-xs leading-5 text-gray-100">
+                  {JSON.stringify(row.latestEventPayload, null, 2)}
+                </pre>
+              ) : null}
+            </div>
           </div>
         </section>
       </div>
@@ -7568,6 +7797,10 @@ function AgentCard({
         <SupplementListMeta
           label={labels.agents.lastSeen}
           value={row.lastSeenAt ? formatGeneratedAt(row.lastSeenAt, locale) : ""}
+        />
+        <SupplementListMeta
+          label={labels.agents.sessions}
+          value={formatNumber(row.sessionCount, locale)}
         />
         <SupplementListMeta
           label={labels.agents.working}
@@ -7736,7 +7969,13 @@ function AdminGoalsView({
                   />
                   <SupplementListMeta
                     label={labels.goals.age}
-                    value={<GoalAgeTimer goal={goal} locale={locale} />}
+                    value={
+                      <GoalAgeTimer
+                        goal={goal}
+                        initialNow={data.generatedAt}
+                        locale={locale}
+                      />
+                    }
                   />
                 </div>
               </a>

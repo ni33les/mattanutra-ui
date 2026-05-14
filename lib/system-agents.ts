@@ -220,17 +220,3 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
     capabilitiesByTaskType[taskType] ?? []
   );
 }
-
-export function taskReservationAgent(agent: SystemAgentDefinition) {
-  return {
-    capabilities: normalizeCapabilities([...agent.capabilities]),
-    id: agent.id,
-    metadata: {
-      ...agent.metadata,
-      systemAgent: true
-    },
-    model: agent.model,
-    name: agent.name,
-    type: agent.type
-  };
-}

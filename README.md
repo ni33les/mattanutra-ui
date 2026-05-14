@@ -37,10 +37,12 @@ Expected commands:
 
 ```bash
 npm run build
-npm run start
+npm run start:platform
 ```
 
 The optional app spec example lives at `.do/app.yaml.example`; copy it to `.do/app.yaml` and replace the placeholder GitHub repo before using it directly.
+
+`npm run start:platform` starts Next.js and then starts `npm run worker:all` as a sibling process in the same App Platform service container. The worker talks to the app through `WORKER_API_BASE_URL`, which defaults to the local service port, so no separate paid Worker component is required. If you later want independent worker capacity, deploy `npm run worker:all` as a separate App Platform Worker component instead.
 
 ## Scheduled Work
 
@@ -53,7 +55,7 @@ Authorization: Bearer <ADMIN_CLAW_TOKEN>
 
 The cron endpoint scans due cron actions and queues task-backed work only. It does not execute worker tasks. Scheduled content publishing runs through the normal `content_status_change` task queue once its `scheduled_for` time is due.
 
-External worker processes must be running separately with `WORKER_API_TOKEN`. Start all local worker capabilities with `npm run worker:all`, or run one of the narrower `worker:*` scripts. Workers register with `/api/workers/register`, heartbeat with `/api/workers/heartbeat`, long-poll `/api/tasks/reserve`, and complete/fail tasks through the task API.
+A worker process must be running with `WORKER_API_TOKEN`. Start all local worker capabilities with `npm run worker:all`, or run one of the narrower `worker:*` scripts. Workers register with `/api/workers/register`, heartbeat with `/api/workers/heartbeat`, long-poll `/api/tasks/reserve`, and complete/fail tasks through the task API. In DigitalOcean App Platform, `npm run start:platform` is the no-extra-component deployment mode: the web service owns a colocated worker process, but task execution still goes through the protected worker API rather than web-app internals.
 
 The same tick queues a `sync_digitalocean_billing` worker task when `DIGITALOCEAN_ACCESS_TOKEN` and `DIGITALOCEAN_PROJECT_NAME` are configured. The external hosting worker calls `/v2/customers/my/invoices/preview`, returns invoice items to the platform, and the platform writes nominal `hosting` ledger rows with deterministic `source_ref` values so repeated 15-minute runs update existing rows.
 

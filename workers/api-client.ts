@@ -1,11 +1,20 @@
 type JsonRecord = Record<string, unknown>;
+const DEFAULT_WORKER_API_TIMEOUT_MS = 60_000;
+
+function positiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 export type WorkerAgentConfig = Readonly<{
   capabilities: readonly string[];
+  id: string;
+  metadata?: JsonRecord;
   model?: string | null;
   name: string;
   taskTypes: readonly string[];
-  type: "ai" | "deterministic" | "external" | "system";
+  type: "ai" | "deterministic" | "external" | "human" | "system";
 }>;
 
 export type WorkerRegistration = Readonly<{
@@ -27,30 +36,45 @@ export type WorkerRegistration = Readonly<{
 export class WorkerApiClient {
   readonly baseUrl: string;
   readonly token: string;
+  readonly timeoutMs: number;
 
-  constructor(input: Readonly<{ baseUrl: string; token: string }>) {
+  constructor(input: Readonly<{ baseUrl: string; timeoutMs?: number; token: string }>) {
     this.baseUrl = input.baseUrl.replace(/\/+$/, "");
+    this.timeoutMs =
+      input.timeoutMs ??
+      positiveInteger(
+        process.env.WORKER_API_TIMEOUT_MS,
+        DEFAULT_WORKER_API_TIMEOUT_MS
+      );
     this.token = input.token;
   }
 
   async post<T>(path: string, body: JsonRecord) {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      body: JSON.stringify(body),
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        "Content-Type": "application/json"
-      },
-      method: "POST"
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
+    try {
+      const response = await fetch(`${this.baseUrl}${path}`, {
+        body: JSON.stringify(body),
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/json"
+        },
+        method: "POST",
+        signal: controller.signal
+      });
 
-      throw new Error(`${path} failed with ${response.status}: ${text.slice(0, 500)}`);
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+
+        throw new Error(`${path} failed with ${response.status}: ${text.slice(0, 500)}`);
+      }
+
+      return (await response.json()) as T;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    return (await response.json()) as T;
   }
 
   register(input: Readonly<{
@@ -62,6 +86,8 @@ export class WorkerApiClient {
     return this.post<WorkerRegistration>("/api/workers/register", {
       agent: {
         capabilities: input.agent.capabilities,
+        id: input.agent.id,
+        metadata: input.agent.metadata ?? {},
         model: input.agent.model ?? null,
         name: input.agent.name,
         type: input.agent.type

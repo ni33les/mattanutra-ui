@@ -20,6 +20,12 @@ import {
 
 const TASK_DEPENDENCY_GRAPH_LOCK_CLASS = 1_413_563_211;
 const TASK_DEPENDENCY_GRAPH_LOCK_KEY = 1_145_393_235;
+const LEGACY_AGGREGATE_AGENT_CLEANUP_LOCK_CLASS = 1_413_563_211;
+const LEGACY_AGGREGATE_AGENT_CLEANUP_LOCK_KEY = 1_145_393_236;
+
+const globalTaskService = globalThis as typeof globalThis & {
+  mattanutraWorkerSessionSchemaReady?: Promise<void>;
+};
 
 export type AgentType =
   | "ai"
@@ -532,6 +538,140 @@ function getRequiredSql(sql?: postgres.Sql) {
   return configured;
 }
 
+export async function ensureWorkerSessionSchema(sql?: postgres.Sql) {
+  const configured = getRequiredSql(sql);
+
+  globalTaskService.mattanutraWorkerSessionSchemaReady ??= (async () => {
+    await configured`
+      create table if not exists public.worker_sessions (
+        id uuid primary key,
+        agent_id uuid not null references public.agents(id) on delete cascade,
+        instance_id text not null,
+        status text not null default 'idle',
+        capabilities text[] not null default '{}',
+        task_types text[] not null default '{}',
+        concurrency integer not null default 1,
+        worker_version text null,
+        current_task_id uuid null,
+        metadata jsonb not null default '{}'::jsonb,
+        last_seen_at timestamptz not null default now(),
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      )
+    `;
+    await configured`
+      alter table public.worker_sessions
+        add column if not exists agent_id uuid references public.agents(id) on delete cascade,
+        add column if not exists instance_id text,
+        add column if not exists status text default 'idle',
+        add column if not exists capabilities text[] default '{}',
+        add column if not exists task_types text[] default '{}',
+        add column if not exists concurrency integer default 1,
+        add column if not exists worker_version text,
+        add column if not exists current_task_id uuid,
+        add column if not exists metadata jsonb default '{}'::jsonb,
+        add column if not exists last_seen_at timestamptz default now(),
+        add column if not exists created_at timestamptz default now(),
+        add column if not exists updated_at timestamptz default now()
+    `;
+    await configured`
+      update public.worker_sessions
+      set
+        instance_id = coalesce(nullif(instance_id, ''), id::text),
+        status = case
+          when status in ('idle', 'offline', 'polling', 'working') then status
+          else 'idle'
+        end,
+        capabilities = coalesce(capabilities, '{}'),
+        task_types = coalesce(task_types, '{}'),
+        concurrency = greatest(1, coalesce(concurrency, 1)),
+        metadata = coalesce(metadata, '{}'::jsonb),
+        last_seen_at = coalesce(last_seen_at, now()),
+        created_at = coalesce(created_at, now()),
+        updated_at = coalesce(updated_at, now())
+    `;
+    await configured`
+      alter table public.worker_sessions
+        alter column agent_id set not null,
+        alter column instance_id set not null,
+        alter column status set default 'idle',
+        alter column status set not null,
+        alter column capabilities set default '{}',
+        alter column capabilities set not null,
+        alter column task_types set default '{}',
+        alter column task_types set not null,
+        alter column concurrency set default 1,
+        alter column concurrency set not null,
+        alter column metadata set default '{}'::jsonb,
+        alter column metadata set not null,
+        alter column last_seen_at set default now(),
+        alter column last_seen_at set not null,
+        alter column created_at set default now(),
+        alter column created_at set not null,
+        alter column updated_at set default now(),
+        alter column updated_at set not null
+    `;
+    await configured`
+      do $$
+      begin
+        alter table public.worker_sessions
+          drop constraint if exists worker_sessions_status_check;
+
+        alter table public.worker_sessions
+          add constraint worker_sessions_status_check
+          check (status in ('idle', 'offline', 'polling', 'working'));
+      end $$;
+    `;
+    await configured`
+      create unique index if not exists worker_sessions_agent_instance_idx
+        on public.worker_sessions (agent_id, instance_id)
+    `;
+    await configured`
+      create index if not exists worker_sessions_status_idx
+        on public.worker_sessions (status, last_seen_at desc)
+    `;
+    await configured`
+      create index if not exists worker_sessions_capabilities_gin_idx
+        on public.worker_sessions using gin (capabilities)
+    `;
+    await configured`
+      do $$
+      begin
+        if to_regclass('public.task_reservations') is not null then
+          alter table public.task_reservations
+            add column if not exists worker_session_id uuid null;
+
+          if not exists (
+            select 1
+            from pg_constraint
+            where conname = 'task_reservations_worker_session_id_fkey'
+              and conrelid = 'public.task_reservations'::regclass
+          ) then
+            alter table public.task_reservations
+              add constraint task_reservations_worker_session_id_fkey
+              foreign key (worker_session_id)
+              references public.worker_sessions(id)
+              on delete set null;
+          end if;
+        end if;
+      end $$;
+    `;
+    await configured`
+      do $$
+      begin
+        if to_regclass('public.task_reservations') is not null then
+          execute 'create index if not exists task_reservations_worker_session_idx on public.task_reservations (worker_session_id, status, reserved_at desc) where worker_session_id is not null';
+        end if;
+      end $$;
+    `;
+  })().catch((error) => {
+    globalTaskService.mattanutraWorkerSessionSchemaReady = undefined;
+    throw error;
+  });
+
+  await globalTaskService.mattanutraWorkerSessionSchemaReady;
+}
+
 function uuidOrNull(value: unknown) {
   return typeof value === "string" && isUuid(value) ? value : null;
 }
@@ -966,12 +1106,23 @@ async function upsertAgentInTransaction(
   }>
 ) {
   const name = cleanText(input.name, "Unnamed agent");
+  const requestedId = uuidOrNull(input.id);
   const hasCapabilitiesInput = Array.isArray(input.capabilities);
   const capabilities = normalizeCapabilities(input.capabilities);
   const existing = await sql<AgentRow[]>`
     select *
     from public.agents
-    where lower(name) = lower(${name})
+    where (
+        ${requestedId}::uuid is not null
+        and id = ${requestedId}::uuid
+      )
+      or lower(name) = lower(${name})
+    order by
+      case
+        when ${requestedId}::uuid is not null and id = ${requestedId}::uuid
+          then 0
+        else 1
+      end
     limit 1
   `;
 
@@ -1021,6 +1172,51 @@ async function upsertAgentInTransaction(
   `;
 
   return mapAgent(rows[0]);
+}
+
+async function hideLegacyAggregateWorkerAgentInTransaction(sql: Db) {
+  const lockRows = await sql<Array<{ locked: boolean }>>`
+    select pg_try_advisory_xact_lock(
+      ${LEGACY_AGGREGATE_AGENT_CLEANUP_LOCK_CLASS},
+      ${LEGACY_AGGREGATE_AGENT_CLEANUP_LOCK_KEY}
+    ) as locked
+  `;
+
+  if (!lockRows[0]?.locked) {
+    return;
+  }
+
+  const legacyRows = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.agents
+    where lower(name) = lower('MattaNutra External Worker')
+  `;
+  const legacyIds = legacyRows.map((row) => row.id);
+
+  if (legacyIds.length < 1) {
+    return;
+  }
+
+  await sql`
+    update public.worker_sessions set
+      status = 'offline',
+      current_task_id = null,
+      updated_at = now()
+    where agent_id = any(${legacyIds}::uuid[])
+  `;
+
+  await sql`
+    update public.agents set
+      status = 'retired',
+      metadata = metadata || ${sql.json(
+        toJsonValue({
+          hiddenFromDashboard: true,
+          legacyAggregateRuntime: true
+        })
+      )},
+      updated_at = now()
+    where id = any(${legacyIds}::uuid[])
+  `;
 }
 
 async function createGoalInTransaction(sql: Db, input: CreateGoalInput) {
@@ -1442,7 +1638,11 @@ export async function upsertAgent(input: Parameters<typeof upsertAgentInTransact
 export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
   const sql = getRequiredSql();
 
+  await ensureWorkerSessionSchema(sql);
+
   return sql.begin(async (tx) => {
+    await hideLegacyAggregateWorkerAgentInTransaction(tx);
+
     const capabilities = normalizeCapabilities(
       input.capabilities ?? input.agent.capabilities
     );
@@ -1517,6 +1717,8 @@ export async function heartbeatWorkerSession(input: HeartbeatWorkerSessionInput)
   const workerSessionId = uuidOrNull(input.workerSessionId);
   const agentId = uuidOrNull(input.agentId);
   const currentTaskId = uuidOrNull(input.currentTaskId);
+
+  await ensureWorkerSessionSchema(sql);
 
   if (!workerSessionId) {
     throw new Error("Worker heartbeat requires a valid workerSessionId");
@@ -1861,6 +2063,8 @@ export async function assertActiveTaskReservation(
 ) {
   const sql = getRequiredSql();
 
+  await ensureWorkerSessionSchema(sql);
+
   return sql.begin((tx) => activeReservationInTransaction(tx, input));
 }
 
@@ -2204,6 +2408,8 @@ export async function reserveNextTask(
 ): Promise<ReservedTask | null> {
   const sql = getRequiredSql();
 
+  await ensureWorkerSessionSchema(sql);
+
   return sql.begin(async (tx) => {
     const workerSessionId = uuidOrNull(input.workerSessionId);
 
@@ -2395,6 +2601,8 @@ export async function reserveNextTask(
 export async function completeTask(input: CompleteTaskInput) {
   const sql = getRequiredSql();
 
+  await ensureWorkerSessionSchema(sql);
+
   return sql.begin(async (tx) => {
     const activeReservation = await activeReservationInTransaction(tx, {
       agentId: input.agentId,
@@ -2512,6 +2720,8 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
     throw new Error("Task lease renewal requires a valid taskId and reservationId, agentId, or workerSessionId");
   }
 
+  await ensureWorkerSessionSchema(sql);
+
   return sql.begin(async (tx) => {
     const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
     const reservations = await tx<
@@ -2599,6 +2809,8 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
 
 export async function failTask(input: FailTaskInput) {
   const sql = getRequiredSql();
+
+  await ensureWorkerSessionSchema(sql);
 
   return sql.begin(async (tx) => {
     const activeReservation = await activeReservationInTransaction(tx, {

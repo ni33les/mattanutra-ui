@@ -53,6 +53,36 @@ describe("external worker boundaries", () => {
     }
   });
 
+  it("keeps worker:all registered as real agents, not an aggregate runtime", async () => {
+    const source = await readFile("workers/runner.ts", "utf8");
+
+    assert.equal(
+      source.includes("MattaNutra External Worker"),
+      false,
+      "worker:all must not register a fake aggregate agent"
+    );
+    assert.equal(
+      source.includes("allProfile"),
+      false,
+      "worker:all must run the real agent profiles directly"
+    );
+    assert.match(
+      source,
+      /runSupervisedAgentLoop\(profileMode, config\)/,
+      "worker:all must supervise each real agent profile independently"
+    );
+    assert.equal(
+      source.includes("Promise.all(modes.map((profileMode) => runAgentLoop"),
+      false,
+      "worker:all must not allow one crashed agent loop to stop every agent"
+    );
+    assert.match(
+      source,
+      /task lease renewal/,
+      "agent task lease renewals must be retried and logged"
+    );
+  });
+
   it("keeps worker execution modules free of static platform imports", async () => {
     const workerExecutionFiles = [
       "lib/finance-ledger.ts",

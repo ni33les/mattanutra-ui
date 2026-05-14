@@ -78,11 +78,13 @@ async function recordTaskXaiUsageCost({
   analysis,
   metadata,
   purpose,
+  sql,
   task
 }: Readonly<{
   analysis: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   purpose: string;
+  sql?: TaskServiceDb;
   task: TaskRecord;
 }>) {
   const usage = analysis.usage;
@@ -101,6 +103,7 @@ async function recordTaskXaiUsageCost({
     purpose,
     reasoningEffort: textValue(analysis.reasoningEffort),
     responseId: textValue(analysis.responseId),
+    sql,
     taskId: task.id,
     usage
   });
@@ -159,6 +162,7 @@ async function recordTaskEmailCommunication(input: Readonly<{
       planId: input.task.planId,
       reason: textValue(input.payload.reason),
       sent: input.payload.sent === true,
+      sql: input.sql,
       subject: textValue(input.payload.subject),
       taskId: input.task.id,
       to: textValue(input.payload.to)
@@ -211,6 +215,7 @@ async function applyHealthScoreResult(
     analysis: objectValue(payload.xaiUsage),
     metadata: objectValue(objectValue(payload.xaiUsage).metadata),
     purpose: textValue(objectValue(payload.xaiUsage).purpose) || "healthscore_advice",
+    sql,
     task
   });
   await writeBpmEvent({
@@ -224,7 +229,8 @@ async function applyHealthScoreResult(
       errorMessage: fallbackUsed ? fallbackErrorMessage : undefined,
       fallbackUsed,
       taskId: task.id
-    }
+    },
+    sql
   });
 
   if (fallbackUsed) {
@@ -269,6 +275,7 @@ async function applyPaidFormulationResult(
       planId
     },
     purpose: "formulation_analysis",
+    sql,
     task
   });
   const safeFormulation = await applyFormulationSafety(sql, {
@@ -367,7 +374,8 @@ async function applyPaidFormulationResult(
       responseId: analysis.responseId,
       taskId: task.id
     },
-    selectedPlan: plan === "pro" ? "pro" : "precision"
+    selectedPlan: plan === "pro" ? "pro" : "precision",
+    sql
   });
 }
 
@@ -410,6 +418,7 @@ async function applyExampleFormulationResult(
       requestId
     },
     purpose: "formulation_analysis",
+    sql,
     task
   });
   const safeFormulation = await applyFormulationSafety(sql, {
@@ -485,7 +494,8 @@ async function applyExampleFormulationResult(
       responseId: analysis.responseId,
       taskId: task.id
     },
-    selectedPlan: plan
+    selectedPlan: plan,
+    sql
   });
 }
 
@@ -544,7 +554,8 @@ async function applyExampleEmailResult(
       messageId: payload.messageId,
       reason: payload.reason,
       taskId: task.id
-    }
+    },
+    sql
   });
 }
 
@@ -630,7 +641,8 @@ async function applyReassessmentEmailResult(
       reason: payload.reason,
       recurrenceDays,
       taskId: task.id
-    }
+    },
+    sql
   });
 }
 
@@ -770,7 +782,8 @@ async function applyContentStatusChangeResult(
       contentType,
       targetStatus,
       taskId: task.id
-    }
+    },
+    sql: sqlOverride
   });
 
   return {
@@ -811,6 +824,7 @@ async function applyDigitalOceanBillingSyncResult(
     })) {
       const id = await recordFinanceTransaction({
         ...entry,
+        sql: sqlOverride,
         taskId: task.id
       });
 
@@ -970,7 +984,8 @@ export async function applyTaskFailureResult({
       taskId: task.id,
       taskType: task.taskType
     },
-    severity: retryWillBeScheduled ? "medium" : "critical"
+    severity: retryWillBeScheduled ? "medium" : "critical",
+    sql
   });
 
   return resultPayload;

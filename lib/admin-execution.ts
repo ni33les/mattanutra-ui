@@ -4,6 +4,7 @@ import {
 } from "@/lib/admin-dashboard-data";
 import { isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
+import { ensureWorkerSessionSchema } from "@/lib/task-service";
 
 export type AdminTaskVisibilityRow = Readonly<{
   actorType: string;
@@ -19,17 +20,30 @@ export type AdminTaskVisibilityRow = Readonly<{
   goalTitle: string;
   id: string;
   leaseUntil: string | null;
+  latestEventAt: string | null;
+  latestEventPayload: Record<string, unknown> | null;
+  latestEventSeverity: string | null;
+  latestEventStatus: string | null;
+  latestEventType: string | null;
   maxAttempts: number;
   planId: string | null;
   priority: number;
   ray: string | null;
   reasoningEffort: string;
+  reservationHeartbeatAt: string | null;
+  reservationId: string | null;
+  reservationLeaseUntil: string | null;
+  reservationStatus: string | null;
+  reservedAt: string | null;
   requiredCapabilities: string[];
   scheduledFor: string;
   status: string;
   taskType: string;
   title: string;
   updatedAt: string;
+  workerSessionId: string | null;
+  workerSessionLastSeenAt: string | null;
+  workerSessionStatus: string | null;
 }>;
 
 export type AdminTaskVisibilityData = Readonly<{
@@ -64,7 +78,7 @@ export type AdminAgentRow = Readonly<{
   totalFinished: number;
   type: string;
   updatedAt: string;
-  workerSessionCount: number;
+  sessionCount: number;
   workingSessionCount: number;
 }>;
 
@@ -96,19 +110,32 @@ type VisibilityDbRow = Readonly<{
   goal_title: string;
   id: string;
   lease_until: Date | string | null;
+  latest_event_at: Date | string | null;
+  latest_event_payload: Record<string, unknown> | null;
+  latest_event_severity: string | null;
+  latest_event_status: string | null;
+  latest_event_type: string | null;
   max_attempts: number | string;
   payload: Record<string, unknown> | null;
   plan_id: string | null;
   priority: number | string;
   ray: string | null;
   reasoning_effort: string;
+  reservation_heartbeat_at: Date | string | null;
+  reservation_id: string | null;
+  reservation_lease_until: Date | string | null;
+  reservation_status: string | null;
+  reserved_at: Date | string | null;
   required_capabilities: string[] | null;
   scheduled_for: Date | string;
   status: string;
   task_type: string;
   title: string;
   updated_at: Date | string;
+  worker_session_id: string | null;
   worker_session_count: number | string | null;
+  worker_session_last_seen_at: Date | string | null;
+  worker_session_status: string | null;
   working_session_count: number | string | null;
 }>;
 
@@ -252,17 +279,30 @@ function visibilityRowFromDb(row: VisibilityDbRow): AdminTaskVisibilityRow {
     goalTitle: displayGoalTitle(row.goal_title),
     id: row.id,
     leaseUntil: isoOrNull(row.lease_until),
+    latestEventAt: isoOrNull(row.latest_event_at),
+    latestEventPayload: row.latest_event_payload,
+    latestEventSeverity: row.latest_event_severity,
+    latestEventStatus: row.latest_event_status,
+    latestEventType: row.latest_event_type,
     maxAttempts: numberValue(row.max_attempts),
     planId: row.plan_id,
     priority: numberValue(row.priority),
     ray: row.ray,
     reasoningEffort: row.reasoning_effort,
+    reservationHeartbeatAt: isoOrNull(row.reservation_heartbeat_at),
+    reservationId: row.reservation_id,
+    reservationLeaseUntil: isoOrNull(row.reservation_lease_until),
+    reservationStatus: row.reservation_status,
+    reservedAt: isoOrNull(row.reserved_at),
     requiredCapabilities: row.required_capabilities ?? [],
     scheduledFor: iso(row.scheduled_for),
     status: row.status,
     taskType: row.task_type,
     title: displayTaskTitle(row.title, row.payload),
-    updatedAt: iso(row.updated_at)
+    updatedAt: iso(row.updated_at),
+    workerSessionId: row.worker_session_id,
+    workerSessionLastSeenAt: isoOrNull(row.worker_session_last_seen_at),
+    workerSessionStatus: row.worker_session_status
   };
 }
 
@@ -290,7 +330,7 @@ function agentRowFromDb(row: AgentDbRow): AdminAgentRow {
     totalFinished,
     type: row.agent_type,
     updatedAt: iso(row.updated_at),
-    workerSessionCount: numberValue(row.worker_session_count),
+    sessionCount: numberValue(row.worker_session_count),
     workingSessionCount: numberValue(row.working_session_count)
   };
 }
@@ -410,6 +450,19 @@ export async function getAdminTaskVisibilityData(
           tasks.error_message,
           tasks.created_at,
           tasks.updated_at,
+          latest_reservation.id::text as reservation_id,
+          latest_reservation.status as reservation_status,
+          latest_reservation.reserved_at,
+          latest_reservation.heartbeat_at as reservation_heartbeat_at,
+          latest_reservation.lease_until as reservation_lease_until,
+          worker_sessions.id::text as worker_session_id,
+          worker_sessions.status as worker_session_status,
+          worker_sessions.last_seen_at as worker_session_last_seen_at,
+          latest_event.event_type as latest_event_type,
+          latest_event.event_status as latest_event_status,
+          latest_event.severity as latest_event_severity,
+          latest_event.event_payload as latest_event_payload,
+          latest_event.occurred_at as latest_event_at,
           goals.id::text as goal_id,
           goals.title as goal_title,
           goals.status as goal_status,
@@ -421,7 +474,26 @@ export async function getAdminTaskVisibilityData(
           tasks.blocked_dependency_count
         from task_flags as tasks
         inner join public.goals on goals.id = tasks.goal_id
-        left join public.agents on agents.id = tasks.reserved_by_agent_id
+        left join lateral (
+          select *
+          from public.task_reservations
+          where task_reservations.task_id = tasks.id
+          order by
+            case when task_reservations.status = 'active' then 0 else 1 end,
+            task_reservations.reserved_at desc
+          limit 1
+        ) latest_reservation on true
+        left join public.worker_sessions
+          on worker_sessions.id = latest_reservation.worker_session_id
+        left join lateral (
+          select *
+          from public.task_events
+          where task_events.task_id = tasks.id
+          order by task_events.occurred_at desc
+          limit 1
+        ) latest_event on true
+        left join public.agents
+          on agents.id = coalesce(tasks.reserved_by_agent_id, latest_reservation.agent_id)
         where ${taskRowsWhereClause}
         order by
           case
@@ -490,6 +562,7 @@ export async function getAdminAgentsData(
 
   try {
     const start = adminDashboardRangeStart(range);
+    await ensureWorkerSessionSchema(sql);
     const rows = await sql<AgentDbRow[]>`
       with reservation_stats as (
         select
@@ -576,6 +649,7 @@ export async function getAdminAgentsData(
           count(*) filter (where status = 'working')::int as working_session_count
         from public.worker_sessions
         where status <> 'offline'
+          and last_seen_at >= now() - interval '2 minutes'
         group by agent_id
       )
       select
@@ -639,6 +713,7 @@ export async function getAdminAgentsData(
       left join human_active_tasks on agents.agent_type = 'human'
       left join human_latest_active_task on agents.agent_type = 'human'
       left join worker_session_stats on worker_session_stats.agent_id = agents.id
+      where agents.metadata->>'hiddenFromDashboard' is distinct from 'true'
       order by
         active_task_count desc,
         agents.status asc,

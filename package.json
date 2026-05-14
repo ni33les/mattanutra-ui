@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:platform": "node scripts/start-platform.mjs",
     "lint": "eslint .",
     "seed:campaigns": "node scripts/seed-campaign-bpm.mjs",
     "test": "node --test --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs test/*.test.ts",
