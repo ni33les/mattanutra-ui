@@ -6477,9 +6477,6 @@ function relativeDuration(
 
 function taskRuntimeWarning(row: AdminTaskVisibilityRow, snapshotAt: string) {
   const snapshotTime = new Date(snapshotAt).getTime();
-  const reservedAtTime = row.reservedAt
-    ? new Date(row.reservedAt).getTime()
-    : null;
   const lastSeenTime = row.workerSessionLastSeenAt
     ? new Date(row.workerSessionLastSeenAt).getTime()
     : null;
@@ -6506,15 +6503,6 @@ function taskRuntimeWarning(row: AdminTaskVisibilityRow, snapshotAt: string) {
     snapshotTime - lastSeenTime > 120_000
   ) {
     return "Agent heartbeat is stale.";
-  }
-
-  if (
-    reservedAtTime !== null &&
-    Number.isFinite(reservedAtTime) &&
-    snapshotTime - reservedAtTime > 30_000 &&
-    (!row.latestEventType || row.latestEventType === "task_reserved")
-  ) {
-    return "Reserved, but no later progress event has been recorded.";
   }
 
   return "";
@@ -6560,18 +6548,20 @@ function useNowTimer(enabled: boolean, initialNow: number | string) {
 
   useEffect(() => {
     if (!enabled) {
-      setNow(initialNowMs);
-
       return;
     }
 
-    setNow(Date.now());
-    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    const tick = () => setNow(Date.now());
+    const timeout = window.setTimeout(tick, 0);
+    const interval = window.setInterval(tick, 1000);
 
-    return () => window.clearInterval(interval);
-  }, [enabled, initialNowMs]);
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(interval);
+    };
+  }, [enabled]);
 
-  return now;
+  return enabled ? now : initialNowMs;
 }
 
 function TaskAgeTimer({
@@ -7223,31 +7213,24 @@ function AdminVisibilityView({
   locale: Locale;
   selectedTaskId?: string | null;
 }>) {
-  const [selectedTask, setSelectedTask] =
-    useState<AdminTaskVisibilityRow | null>(() =>
-      selectedTaskId
-        ? data.rows.find((row) => row.id === selectedTaskId) ?? null
-        : null
-    );
+  const [selectedTaskOverrideId, setSelectedTaskOverrideId] = useState<
+    string | null | undefined
+  >(undefined);
   const [selectedMetricId, setSelectedMetricId] =
     useState<TaskMetricId>("tasksTotal");
-  const selectedTaskIdForRefresh = selectedTask?.id;
+  const activeSelectedTaskId =
+    selectedTaskOverrideId === undefined
+      ? (selectedTaskId ?? null)
+      : selectedTaskOverrideId;
+  const selectedTask = activeSelectedTaskId
+    ? data.rows.find((row) => row.id === activeSelectedTaskId) ?? null
+    : null;
   const visibleRows = data.rows.filter((row) =>
     taskMatchesMetric(row, selectedMetricId, data.generatedAt)
   );
-  useEffect(() => {
-    if (!selectedTaskIdForRefresh) {
-      return;
-    }
-
-    setSelectedTask((current) =>
-      data.rows.find((row) => row.id === selectedTaskIdForRefresh) ??
-      current
-    );
-  }, [data.rows, selectedTaskIdForRefresh]);
   const selectMetric = (metricId: BusinessMetric["id"]) => {
     setSelectedMetricId(metricId as TaskMetricId);
-    setSelectedTask(null);
+    setSelectedTaskOverrideId(null);
   };
   const visibilityMetrics: BusinessMetric[] = [
     {
@@ -7323,7 +7306,7 @@ function AdminVisibilityView({
                 key={row.id}
                 labels={labels}
                 locale={locale}
-                onClick={() => setSelectedTask(row)}
+                onClick={() => setSelectedTaskOverrideId(row.id)}
                 row={row}
                 snapshotAt={data.generatedAt}
               />
@@ -7340,7 +7323,7 @@ function AdminVisibilityView({
         <VisibilityTaskDetailsModal
           labels={labels}
           locale={locale}
-          onClose={() => setSelectedTask(null)}
+          onClose={() => setSelectedTaskOverrideId(null)}
           row={selectedTask}
           snapshotAt={data.generatedAt}
         />

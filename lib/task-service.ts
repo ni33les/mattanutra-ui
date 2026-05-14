@@ -818,6 +818,12 @@ function mapWorkerSession(row: WorkerSessionRow): WorkerSession {
   };
 }
 
+function intersectCapabilities(left: readonly string[], right: readonly string[]) {
+  const rightSet = new Set(right);
+
+  return left.filter((item) => rightSet.has(item));
+}
+
 function mapGoal(row: GoalRow): TaskGoal {
   return {
     completedAt: isoDate(row.completed_at),
@@ -2349,7 +2355,7 @@ async function scheduleRetryForFailedTaskInTransaction(
     idempotencyKey: input.task.idempotencyKey,
     idempotencyScope: "active",
     initialComment: {
-      authorName: "MattaNutra worker",
+      authorName: "MattaNutra agent",
       authorType: "system",
       body: `Retry ${retryAttempt} of ${policy.maxRetries} scheduled after task failure.`,
       commentType: "status",
@@ -2410,10 +2416,17 @@ export async function reserveNextTask(
   }
 
   let agent: TaskAgent;
+  let registeredTaskTypes: string[] = [];
+  let reserveCapabilities: string[] = [];
 
   if (workerSessionId) {
-    const agentRows = await sql<AgentRow[]>`
-      select agents.*
+    const sessionRows = await sql<Array<{
+      agent: AgentRow;
+      session: WorkerSessionRow;
+    }>>`
+      select
+        to_jsonb(agents.*) as agent,
+        to_jsonb(worker_sessions.*) as session
       from public.worker_sessions
       join public.agents on agents.id = worker_sessions.agent_id
       where worker_sessions.id = ${workerSessionId}::uuid
@@ -2421,12 +2434,19 @@ export async function reserveNextTask(
         and agents.status = 'active'
       limit 1
     `;
+    const sessionRow = sessionRows[0];
 
-    if (!agentRows[0]) {
+    if (!sessionRow) {
       throw new Error("Worker session is not active for this agent");
     }
 
-    agent = mapAgent(agentRows[0]);
+    agent = mapAgent(sessionRow.agent);
+    const session = mapWorkerSession(sessionRow.session);
+    reserveCapabilities = intersectCapabilities(
+      agent.capabilities,
+      session.capabilities
+    );
+    registeredTaskTypes = session.taskTypes;
   } else {
     agent = await upsertAgentInTransaction(sql, {
       capabilities: input.agent.capabilities,
@@ -2436,12 +2456,26 @@ export async function reserveNextTask(
       name: input.agent.name,
       type: input.agent.type ?? "external"
     });
+    reserveCapabilities = agent.capabilities;
   }
 
   const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
   const mustRequireCapability =
     normalizeCapabilities([input.mustRequireCapability])[0] ?? null;
-  const taskTypes = normalizeCapabilities(input.taskTypes);
+  const requestedTaskTypes = normalizeCapabilities(input.taskTypes);
+  const taskTypes = registeredTaskTypes.length > 0
+    ? requestedTaskTypes.length > 0
+      ? intersectCapabilities(requestedTaskTypes, registeredTaskTypes)
+      : registeredTaskTypes
+    : requestedTaskTypes;
+
+  if (
+    (mustRequireCapability && !reserveCapabilities.includes(mustRequireCapability)) ||
+    (requestedTaskTypes.length > 0 && registeredTaskTypes.length > 0 && taskTypes.length < 1)
+  ) {
+    return null;
+  }
+
   const reserved = await sql.begin(async (tx) => {
     const rows = await tx<TaskRow[]>`
       with candidate as (
@@ -2454,7 +2488,7 @@ export async function reserveNextTask(
           and tasks.attempts < tasks.max_attempts
           and (
             coalesce(cardinality(tasks.required_capabilities), 0) = 0
-            or tasks.required_capabilities <@ ${agent.capabilities}::text[]
+            or tasks.required_capabilities <@ ${reserveCapabilities}::text[]
           )
           and (
             ${mustRequireCapability}::text is null
@@ -2543,7 +2577,9 @@ export async function reserveNextTask(
         ${new Date(task.leaseUntil ?? Date.now())},
         ${tx.json(
           toJsonValue({
-            capabilities: agent.capabilities,
+            capabilities: reserveCapabilities,
+            registeredTaskTypes,
+            requestedTaskTypes,
             workerSessionId
           })
         )}

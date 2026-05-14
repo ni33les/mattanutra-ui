@@ -380,11 +380,11 @@ export async function getAdminTechnicalAlertsData(
             when coalesce(worker_state.online_capable_count, 0) = 0 then 'critical'
             else 'medium'
           end as severity,
-          tasks.title || ' is waiting for a capable worker' as title,
+          tasks.title || ' is waiting for a capable agent' as title,
           case
             when coalesce(worker_state.online_capable_count, 0) = 0
-              then 'No online capable worker is registered for this queued task.'
-            else 'A capable worker exists, but none is currently idle or polling.'
+              then 'No online capable agent is registered for this queued task.'
+            else 'A capable agent exists, but none is currently idle or polling.'
           end as message,
           null::text as cron_id,
           tasks.plan_id::text as plan_id,
@@ -416,14 +416,19 @@ export async function getAdminTechnicalAlertsData(
                 and worker_sessions.last_seen_at >= now() - interval '90 seconds'
             )::int as available_capable_count
           from public.worker_sessions
+          join public.agents on agents.id = worker_sessions.agent_id
           where (
               coalesce(cardinality(tasks.required_capabilities), 0) = 0
-              or tasks.required_capabilities <@ worker_sessions.capabilities
+              or (
+                tasks.required_capabilities <@ worker_sessions.capabilities
+                and tasks.required_capabilities <@ agents.capabilities
+              )
             )
             and (
               coalesce(cardinality(worker_sessions.task_types), 0) = 0
               or tasks.task_type = any(worker_sessions.task_types)
             )
+            and agents.status = 'active'
         ) worker_state on true
         where tasks.status = 'queued'
           and tasks.scheduled_for <= now()

@@ -15,7 +15,7 @@ import { writeSkippedPaymentSuccessEvent } from "@/lib/payment-bpm";
 import {
   enqueueHealthScoreAnalysisTask,
   enqueueFormulationTask,
-  kickCronWorker,
+  enqueueDueScheduledActions,
   scheduleReassessmentAction
 } from "@/lib/task-worker";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
         locale: body.locale,
         planId: snapshot.planId
       });
-      void kickCronWorker();
+      void enqueueDueScheduledActions();
       await writeBpmEvent({
         actorType: "visitor",
         attribution: bpm.attribution,

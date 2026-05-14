@@ -28,6 +28,11 @@ describe("external worker boundaries", () => {
         false,
         `${file} must not import or call kickTaskWorker`
       );
+      assert.equal(
+        source.includes("kickCronWorker"),
+        false,
+        `${file} must not use worker-style cron queue naming`
+      );
     }
   });
 
@@ -80,6 +85,47 @@ describe("external worker boundaries", () => {
       source,
       /task lease renewal/,
       "agent task lease renewals must be retried and logged"
+    );
+  });
+
+  it("keeps reservation constrained by the registered worker session", async () => {
+    const source = await readFile("lib/task-service.ts", "utf8");
+    const alertsSource = await readFile("lib/admin-technical.ts", "utf8");
+
+    assert.match(
+      source,
+      /registeredTaskTypes/,
+      "task reservation must retain the worker session task type envelope"
+    );
+    assert.match(
+      source,
+      /reserveCapabilities/,
+      "task reservation must retain the worker session capability envelope"
+    );
+    assert.match(
+      source,
+      /tasks\.required_capabilities <@ \$\{reserveCapabilities\}::text\[\]/,
+      "task reservation must match tasks against session-scoped capabilities"
+    );
+    assert.match(
+      alertsSource,
+      /tasks\.required_capabilities <@ worker_sessions\.capabilities[\s\S]*and tasks\.required_capabilities <@ agents\.capabilities/,
+      "worker availability alerts must use the same session-plus-agent capability envelope"
+    );
+  });
+
+  it("does not leave assessments queued when successful formulation work is reused", async () => {
+    const source = await readFile("lib/task-worker.ts", "utf8");
+
+    assert.match(
+      source,
+      /SUCCESSFUL_TASK_REUSE_STATUSES/,
+      "formulation enqueueing must explicitly handle reused successful tasks"
+    );
+    assert.match(
+      source,
+      /status = \$\{formulationReady \? "ready" : "failed"\}::public\.assessment_status/,
+      "reused successful formulation work must resolve the assessment instead of leaving it queued"
     );
   });
 

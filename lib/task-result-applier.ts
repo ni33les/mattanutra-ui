@@ -828,7 +828,7 @@ async function applyContentStatusChangeResult(
 async function applyDigitalOceanBillingSyncResult(
   task: TaskRecord,
   resultPayload: unknown,
-  sqlOverride?: TaskServiceDb,
+  _sqlOverride?: TaskServiceDb,
   afterCommit?: AfterCommitScheduler
 ) {
   const payload = objectValue(resultPayload);
@@ -842,31 +842,32 @@ async function applyDigitalOceanBillingSyncResult(
   const projectNames = Array.isArray(payload.projectNames)
     ? payload.projectNames.filter((item): item is string => typeof item === "string")
     : [];
-  let synced = Number(digitalOcean.synced ?? 0);
+  const reportedSynced = Number(digitalOcean.synced ?? 0);
   const skipped = digitalOcean.skipped === true;
   const errorMessage = textValue(digitalOcean.error);
   const reason = textValue(digitalOcean.reason);
 
-  if (invoiceItems.length > 0 && projectNames.length > 0) {
-    synced = 0;
+  await eventually(afterCommit, async () => {
+    let synced = Number.isFinite(reportedSynced) ? reportedSynced : 0;
 
-    for (const entry of buildDigitalOceanBillingCostEntries({
-      items: invoiceItems,
-      projectNames
-    })) {
-      const id = await recordFinanceTransaction({
-        ...entry,
-        sql: sqlOverride,
-        taskId: task.id
-      });
+    if (invoiceItems.length > 0 && projectNames.length > 0) {
+      synced = 0;
 
-      if (id) {
-        synced += 1;
+      for (const entry of buildDigitalOceanBillingCostEntries({
+        items: invoiceItems,
+        projectNames
+      })) {
+        const id = await recordFinanceTransaction({
+          ...entry,
+          taskId: task.id
+        });
+
+        if (id) {
+          synced += 1;
+        }
       }
     }
-  }
 
-  await eventually(afterCommit, async () => {
     await addWorkEvent(
       task,
       skipped
@@ -880,7 +881,7 @@ async function applyDigitalOceanBillingSyncResult(
           : [],
         reason: reason || undefined,
         skipped,
-        synced: Number.isFinite(synced) ? synced : 0
+        synced
       }
     );
   });

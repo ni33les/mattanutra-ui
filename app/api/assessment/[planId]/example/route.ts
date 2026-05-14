@@ -7,7 +7,7 @@ import { validateLeadEmail } from "@/lib/email-validation";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
 import {
   getExampleBriefStatus,
-  kickCronWorker,
+  enqueueDueScheduledActions,
   requestExampleBrief,
   scheduleReassessmentAction
 } from "@/lib/task-worker";
@@ -216,7 +216,7 @@ export async function POST(request: Request, { params }: ExampleRouteProps) {
         locale: body.locale,
         planId
       });
-      void kickCronWorker();
+      void enqueueDueScheduledActions();
       await writeBpmEvent({
         actorType: "visitor",
         attribution: bpm.attribution,

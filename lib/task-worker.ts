@@ -24,8 +24,8 @@ type WorkTaskType =
   | "send_reassessment_email"
   | "sync_digitalocean_billing";
 
-const globalWorker = globalThis as typeof globalThis & {
-  mattanutraCronWorker?: Promise<{ queued: number }>;
+const globalScheduler = globalThis as typeof globalThis & {
+  mattanutraCronEnqueueRun?: Promise<{ queued: number }>;
 };
 
 const TASK_PRIORITIES = {
@@ -37,6 +37,7 @@ const TASK_PRIORITIES = {
   pro: 5,
   reassessment: 2
 } as const;
+const SUCCESSFUL_TASK_REUSE_STATUSES = new Set(["completed", "skipped"]);
 
 function priorityForPlan(plan: AssessmentPlan) {
   return plan === "pro" ? TASK_PRIORITIES.pro : TASK_PRIORITIES.precision;
@@ -171,7 +172,7 @@ async function createWorkTask(input: Readonly<{
     idempotencyKey: input.idempotencyKey,
     idempotencyScope: input.idempotencyScope,
     initialComment: {
-      authorName: "MattaNutra worker",
+      authorName: "MattaNutra agent",
       authorType: "system",
       body: `${input.taskTitle} queued for task-backed processing.`,
       commentType: "instruction",
@@ -362,6 +363,42 @@ export async function enqueueFormulationTask({
 
   if (!taskId) {
     return null;
+  }
+
+  const taskRows = await sql<Array<{ status: string }>>`
+    select status
+    from public.tasks
+    where id = ${taskId}::uuid
+    limit 1
+  `;
+  const taskStatus = taskRows[0]?.status ?? "";
+
+  if (SUCCESSFUL_TASK_REUSE_STATUSES.has(taskStatus)) {
+    const formulationRows = await sql<Array<{ exists: boolean }>>`
+      select exists (
+        select 1
+        from public.formulations
+        where plan_id = ${planId}::uuid
+      ) as exists
+    `;
+    const formulationReady = formulationRows[0]?.exists === true;
+
+    await sql`
+      update public.assessments set
+        selected_plan = ${plan},
+        status = ${formulationReady ? "ready" : "failed"}::public.assessment_status,
+        queue_position = 0,
+        error_message = ${formulationReady ? null : "A completed formulation task was found, but no formulation is available."},
+        plan_selected_at = coalesce(plan_selected_at, now()),
+        completed_at = case
+          when ${formulationReady} then coalesce(completed_at, now())
+          else completed_at
+        end,
+        updated_at = now()
+      where plan_id = ${planId}::uuid
+    `;
+
+    return taskId;
   }
 
   await sql`
@@ -938,7 +975,7 @@ async function claimDueCronActions(sql: postgres.Sql) {
   `;
 }
 
-async function runCronWorker() {
+async function enqueueDueCronTasks() {
   const sql = getSql();
 
   if (!sql) {
@@ -975,7 +1012,7 @@ async function runCronWorker() {
       queued += 1;
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Unknown cron worker error";
+        error instanceof Error ? error.message : "Unknown scheduled action error";
 
       await sql`
         update public.cron set
@@ -999,14 +1036,14 @@ async function runCronWorker() {
   return { queued };
 }
 
-export function kickCronWorker() {
-  if (globalWorker.mattanutraCronWorker) {
-    return globalWorker.mattanutraCronWorker;
+export function enqueueDueScheduledActions() {
+  if (globalScheduler.mattanutraCronEnqueueRun) {
+    return globalScheduler.mattanutraCronEnqueueRun;
   }
 
-  globalWorker.mattanutraCronWorker = runCronWorker().finally(() => {
-    globalWorker.mattanutraCronWorker = undefined;
+  globalScheduler.mattanutraCronEnqueueRun = enqueueDueCronTasks().finally(() => {
+    globalScheduler.mattanutraCronEnqueueRun = undefined;
   });
 
-  return globalWorker.mattanutraCronWorker;
+  return globalScheduler.mattanutraCronEnqueueRun;
 }

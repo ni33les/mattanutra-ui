@@ -2386,12 +2386,6 @@ create table public.finance_accounts (
   updated_at timestamptz not null default now()
 );
 
-alter table public.finance_accounts
-  add column if not exists name text,
-  add column if not exists description text,
-  add column if not exists created_at timestamptz default now(),
-  add column if not exists updated_at timestamptz default now();
-
 insert into public.finance_accounts (
   id,
   name,
@@ -2418,14 +2412,6 @@ on conflict (id) do update set
   name = excluded.name,
   description = excluded.description,
   updated_at = now();
-
-alter table public.finance_accounts
-  alter column name set not null,
-  alter column description set not null,
-  alter column created_at set default now(),
-  alter column created_at set not null,
-  alter column updated_at set default now(),
-  alter column updated_at set not null;
 
 create unique index finance_accounts_name_idx
   on public.finance_accounts (lower(name));
@@ -2455,178 +2441,6 @@ create table public.finance_transactions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
-alter table public.finance_transactions
-  add column if not exists occurred_at timestamptz default now(),
-  add column if not exists category text default 'other',
-  add column if not exists entry_type text default 'nominal',
-  add column if not exists source text default 'system',
-  add column if not exists source_ref text null,
-  add column if not exists provider text null,
-  add column if not exists task_id uuid null references public.tasks(id) on delete set null,
-  add column if not exists from_account_id uuid null references public.finance_accounts(id) on delete restrict,
-  add column if not exists to_account_id uuid null references public.finance_accounts(id) on delete restrict,
-  add column if not exists "from" text default 'unknown',
-  add column if not exists "to" text default 'unknown',
-  add column if not exists amount bigint,
-  add column if not exists amount_unit text default 'micros',
-  add column if not exists currency text default 'USD',
-  add column if not exists usd_rate numeric(20, 10) default 1,
-  add column if not exists description text default 'Unspecified platform cost',
-  add column if not exists metadata jsonb default '{}'::jsonb,
-  add column if not exists created_at timestamptz default now(),
-  add column if not exists updated_at timestamptz default now();
-
-alter table public.finance_transactions
-  drop constraint if exists finance_transactions_category_check;
-
-update public.finance_transactions
-set
-  occurred_at = coalesce(occurred_at, created_at, now()),
-  category = case
-    when category = 'infrastructure' then 'hosting'
-    when category in ('ai', 'hosting', 'other') then category
-    else 'other'
-  end,
-  entry_type = case
-    when entry_type in ('nominal', 'actual') then entry_type
-    else 'nominal'
-  end,
-  source = coalesce(nullif(source, ''), 'system'),
-  "from" = coalesce(nullif("from", ''), 'unknown'),
-  "to" = coalesce(nullif("to", ''), 'unknown'),
-  amount = greatest(coalesce(nullif(amount, 0), 1), 1),
-  amount_unit = 'micros',
-  currency = upper(coalesce(nullif(currency, ''), 'USD')),
-  usd_rate = coalesce(nullif(usd_rate, 0), 1),
-  description = coalesce(nullif(description, ''), 'Unspecified platform cost'),
-  to_account_id = case
-    when to_account_id is not null then to_account_id
-    when lower(coalesce(provider, '')) = 'xai' or lower(coalesce("to", '')) like '%xai%'
-      then '11111111-1111-4111-8111-111111111111'::uuid
-    when lower(coalesce(provider, '')) = 'digitalocean' or lower(coalesce("to", '')) like '%digitalocean%'
-      then '22222222-2222-4222-8222-222222222222'::uuid
-    else null
-  end,
-  metadata = coalesce(metadata, '{}'::jsonb),
-  created_at = coalesce(created_at, now()),
-  updated_at = coalesce(updated_at, now())
-where occurred_at is null
-  or category is null
-  or category not in ('ai', 'hosting', 'other')
-  or entry_type is null
-  or entry_type not in ('nominal', 'actual')
-  or source is null
-  or source = ''
-  or "from" is null
-  or "from" = ''
-  or "to" is null
-  or "to" = ''
-  or amount is null
-  or amount <= 0
-  or amount_unit is null
-  or amount_unit <> 'micros'
-  or currency is null
-  or currency = ''
-  or usd_rate is null
-  or usd_rate <= 0
-  or description is null
-  or description = ''
-  or metadata is null
-  or created_at is null
-  or updated_at is null;
-
-alter table public.finance_transactions
-  alter column occurred_at set default now(),
-  alter column occurred_at set not null,
-  alter column category set not null,
-  alter column entry_type set default 'nominal',
-  alter column entry_type set not null,
-  alter column source set not null,
-  alter column "from" set not null,
-  alter column "to" set not null,
-  alter column amount set not null,
-  alter column amount_unit set default 'micros',
-  alter column amount_unit set not null,
-  alter column currency set not null,
-  alter column usd_rate set default 1,
-  alter column usd_rate set not null,
-  alter column description set not null,
-  alter column metadata set default '{}'::jsonb,
-  alter column metadata set not null,
-  alter column created_at set default now(),
-  alter column created_at set not null,
-  alter column updated_at set default now(),
-  alter column updated_at set not null;
-
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_constraint
-    where conrelid = 'public.finance_transactions'::regclass
-      and conname = 'finance_transactions_category_check'
-  ) then
-    alter table public.finance_transactions
-      add constraint finance_transactions_category_check
-      check (category in ('ai', 'hosting', 'other'));
-  end if;
-
-  if not exists (
-    select 1
-    from pg_constraint
-    where conrelid = 'public.finance_transactions'::regclass
-      and conname = 'finance_transactions_amount_check'
-  ) then
-    alter table public.finance_transactions
-      add constraint finance_transactions_amount_check
-      check (amount > 0);
-  end if;
-
-  if not exists (
-    select 1
-    from pg_constraint
-    where conrelid = 'public.finance_transactions'::regclass
-      and conname = 'finance_transactions_entry_type_check'
-  ) then
-    alter table public.finance_transactions
-      add constraint finance_transactions_entry_type_check
-      check (entry_type in ('nominal', 'actual'));
-  end if;
-
-  if not exists (
-    select 1
-    from pg_constraint
-    where conrelid = 'public.finance_transactions'::regclass
-      and conname = 'finance_transactions_amount_unit_check'
-  ) then
-    alter table public.finance_transactions
-      add constraint finance_transactions_amount_unit_check
-      check (amount_unit = 'micros');
-  end if;
-
-  if not exists (
-    select 1
-    from pg_constraint
-    where conrelid = 'public.finance_transactions'::regclass
-      and conname = 'finance_transactions_currency_check'
-  ) then
-    alter table public.finance_transactions
-      add constraint finance_transactions_currency_check
-      check (currency ~ '^[A-Z]{3}$');
-  end if;
-
-  if not exists (
-    select 1
-    from pg_constraint
-    where conrelid = 'public.finance_transactions'::regclass
-      and conname = 'finance_transactions_usd_rate_check'
-  ) then
-    alter table public.finance_transactions
-      add constraint finance_transactions_usd_rate_check
-      check (usd_rate > 0);
-  end if;
-end $$;
 
 comment on table public.finance_transactions is
   'Positive-value platform finance ledger. entry_type distinguishes nominal fine-grained costs from actual money-flow rows.';

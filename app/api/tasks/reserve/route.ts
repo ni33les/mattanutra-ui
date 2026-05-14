@@ -94,7 +94,7 @@ export async function POST(request: Request) {
           id: textValue(agent.id),
           metadata: objectValue(agent.metadata),
           model: textValue(agent.model),
-          name: textValue(agent.name) ?? "Unnamed worker agent",
+          name: textValue(agent.name) ?? "Unnamed agent",
           type: agentType(agent.type)
         },
         leaseSeconds: body.leaseSeconds,
@@ -103,58 +103,58 @@ export async function POST(request: Request) {
         workerSessionId
       });
 
-    if (!reserved) {
-      if (Date.now() >= deadline) {
-        if (workerSessionId) {
-          await heartbeatWorkerSession({
-            agentId: textValue(agent.id),
-            status: "idle",
-            workerSessionId
-          });
+      if (!reserved) {
+        if (Date.now() >= deadline) {
+          if (workerSessionId) {
+            await heartbeatWorkerSession({
+              agentId: textValue(agent.id),
+              status: "idle",
+              workerSessionId
+            });
+          }
+
+          return openClawJson({ task: null });
         }
 
-        return openClawJson({ task: null });
+        await sleep(750);
+        continue;
       }
 
-      await sleep(750);
-      continue;
-    }
+      const bundle = await getTaskBundle({ taskId: reserved.task.id });
+      let workItem;
 
-    const bundle = await getTaskBundle({ taskId: reserved.task.id });
-    let workItem;
-
-    try {
-      workItem = await buildTaskWorkItem(bundle.task);
-    } catch (error) {
-      await failTask({
-        agentId: reserved.agent.id,
-        applyFailure: (context) =>
-          applyTaskFailureResult({
-            afterCommit: context.afterCommit,
-            errorMessage:
-              error instanceof Error
-                ? error.message
-                : "Unable to build task work item",
-            resultPayload: context.resultPayload,
-            retryWillBeScheduled: context.retryWillBeScheduled,
-            sql: context.sql,
-            task: context.task,
-            taskId: bundle.task.id
-          }),
-        errorMessage:
-          error instanceof Error
-            ? error.message
-            : "Unable to build task work item",
-        workerSessionId,
-        reservationId: reserved.reservationId,
-        resultPayload: {
-          stage: "work_item_build",
-          taskType: bundle.task.taskType
-        },
-        taskId: bundle.task.id
-      });
-      throw error;
-    }
+      try {
+        workItem = await buildTaskWorkItem(bundle.task);
+      } catch (error) {
+        await failTask({
+          agentId: reserved.agent.id,
+          applyFailure: (context) =>
+            applyTaskFailureResult({
+              afterCommit: context.afterCommit,
+              errorMessage:
+                error instanceof Error
+                  ? error.message
+                  : "Unable to build task work item",
+              resultPayload: context.resultPayload,
+              retryWillBeScheduled: context.retryWillBeScheduled,
+              sql: context.sql,
+              task: context.task,
+              taskId: bundle.task.id
+            }),
+          errorMessage:
+            error instanceof Error
+              ? error.message
+              : "Unable to build task work item",
+          workerSessionId,
+          reservationId: reserved.reservationId,
+          resultPayload: {
+            stage: "work_item_build",
+            taskType: bundle.task.taskType
+          },
+          taskId: bundle.task.id
+        });
+        throw error;
+      }
 
       return openClawJson({
         agent: reserved.agent,

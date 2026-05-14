@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireOpenClawRequest } from "@/lib/openclaw-api";
 import {
   enqueueDigitalOceanBillingSyncTask,
-  kickCronWorker
+  enqueueDueScheduledActions
 } from "@/lib/task-worker";
 
 export const runtime = "nodejs";
@@ -16,7 +16,7 @@ async function runDueWork(request: Request) {
 
   try {
     const [result, digitalOcean] = await Promise.all([
-      kickCronWorker(),
+      enqueueDueScheduledActions(),
       enqueueDigitalOceanBillingSyncTask()
     ]);
 
@@ -32,7 +32,7 @@ async function runDueWork(request: Request) {
       }
     );
   } catch (error) {
-    console.error("Unable to run scheduled workers", error);
+    console.error("Unable to queue scheduled actions", error);
 
     return NextResponse.json(
       { message: "Unable to run scheduled actions" },
