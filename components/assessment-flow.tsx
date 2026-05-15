@@ -1642,19 +1642,19 @@ function getPlanContent(locale: Locale): PlanContent {
       badge: "แนะนำ",
       eyebrow: "เลือกแผนบรีฟ",
       subtitle:
-        "ตอนนี้ทุกแผนจะพาไปยังคิวสร้างสูตรเดียวกัน เพื่อให้เราทดสอบขั้นตอนการชำระเงินได้ก่อน",
+        "เลือกความละเอียดของคำแนะนำ แล้วเราจะเปิดหน้าแผนให้คำแนะนำเติมเข้ามาเมื่อพร้อม",
       title: "เลือกความละเอียดของคำแนะนำ",
       tiers: [
         {
           cta: "ไปต่อ",
           description:
-            "บรีฟสูตรเต็ม พร้อมปรับขนาดและตัวเลือกผลิตภัณฑ์ให้เหมาะกับข้อมูลของคุณมากขึ้น",
+            "แผนอาหารและอาหารเสริมฉบับเต็ม พร้อมปรับขนาดและข้อควรระวังให้เข้ากับข้อมูลของคุณมากขึ้น",
           featured: true,
           features: [
-            "บรีฟสูตรอาหารเสริมแบบครบถ้วน",
+            "คำแนะนำอาหารและอาหารเสริมแบบครบถ้วน",
             "ช่วงปริมาณที่ปรับตามร่างกาย",
             "รวมข้อมูลยา แล็บ และข้อควรระวัง",
-            "ตัวเลือกผลิตภัณฑ์และทางเลือกทดแทน",
+            "ลำดับความสำคัญที่นำไปใช้ได้จริง",
             "พร้อมเช็คอินซ้ำใน 60 วัน"
           ],
           id: "precision",
@@ -1688,19 +1688,19 @@ function getPlanContent(locale: Locale): PlanContent {
     badge: "Recommended",
     eyebrow: "Choose your brief",
     subtitle:
-      "Choose the level of guidance you want before we prepare your formulation.",
+      "Choose the level of guidance you want, then we will open your plan page while each section fills in.",
     title: "Select the level of guidance",
     tiers: [
       {
         cta: "Go",
         description:
-          "The full formulation brief with more precise dosing logic and practical product matching.",
+          "The full food and supplement guidance pack with more precise dosing logic and safety checks.",
         featured: true,
         features: [
-          "Complete supplement formulation brief",
+          "Complete food and supplement guidance",
           "Body-size adjusted dose ranges",
           "Medication and lab flags included",
-          "Recommended products and alternatives",
+          "Practical priority order",
           "60-day reassessment prompt"
         ],
         id: "precision",
@@ -1864,27 +1864,27 @@ export function AssessmentFlow({
           processingQueue: (count: number) =>
             count > 0
               ? `มี ${count} คนอยู่ในคิวก่อนคุณ`
-              : "กำลังจัดเตรียมสูตรของคุณ",
+              : "กำลังเปิดแผนโภชนาการของคุณ",
           processingSteps: {
             assessment: "ทำแบบประเมินเสร็จแล้ว",
             score: "กำลังเตรียม HealthScore",
             scoreAnalysis: "กำลังวิเคราะห์ HealthScore",
-            payment: "กำลังประมวลผลการชำระเงิน",
-            formulation: "กำลังเตรียมสูตร",
-            safety: "กำลังปรับสูตรให้เหมาะสม",
-            results: "เสร็จสมบูรณ์"
+            payment: "ยืนยันสิทธิ์เข้าถึง",
+            formulation: "กำลังเปิดหน้าแผน",
+            safety: "คำแนะนำกำลังแสดงในหน้านั้น",
+            results: "หน้าแผนพร้อมใช้งาน"
           },
           processingSubtitle:
-            "เราได้รับคำตอบของคุณแล้ว และกำลังจัดคิวเพื่อสร้างสูตรอาหารเสริม",
-          processingTitle: "กำลังประมวลผลแบบประเมินของคุณ",
+            "เราจะเปิดหน้าแผนทันที จากนั้นคำแนะนำอาหารและอาหารเสริมจะเติมเข้ามาเมื่อแต่ละส่วนเสร็จ",
+          processingTitle: "กำลังเปิดแผนโภชนาการของคุณ",
           scoreProcessingQueue: "กำลังเตรียมคะแนนสุขภาพของคุณ",
           scoreProcessingSteps: {
             assessment: "ทำแบบประเมินเสร็จแล้ว",
             score: "กำลังเตรียม HealthScore",
             scoreAnalysis: "กำลังวิเคราะห์ HealthScore",
-            payment: "กำลังประมวลผลการชำระเงิน",
-            formulation: "กำลังเตรียมสูตร",
-            safety: "กำลังปรับสูตรให้เหมาะสม",
+            payment: "เลือกแผน",
+            formulation: "หน้าแผนโภชนาการ",
+            safety: "ตรวจสอบความปลอดภัย",
             results: "เสร็จสมบูรณ์"
           },
           scoreProcessingSubtitle:
@@ -1899,12 +1899,12 @@ export function AssessmentFlow({
             emailPlaceholder: "your@email.com",
             emailTitle: "ยังไม่พร้อมปลดล็อก?",
             planDescription:
-              "เลือกระดับคำแนะนำที่ต้องการ ก่อนที่เราจะเตรียมสูตรของคุณ",
+              "เลือกระดับคำแนะนำที่ต้องการ ก่อนที่เราจะเปิดแผนโภชนาการของคุณ",
             planTitle: "ปลดล็อกแผนโภชนาการเฉพาะตัวของคุณ",
             preparing: "กำลังเตรียม...",
             proContinueCta: "ไปต่อ",
             proContinueDescription:
-              "คุณมีสิทธิ์แผน Pro อยู่แล้ว เราจะไปต่อเพื่อสร้างสูตรเวอร์ชันใหม่โดยไม่แสดงตัวเลือกชำระเงิน",
+              "คุณมีสิทธิ์แผน Pro อยู่แล้ว เราจะเปิดแผนโภชนาการเวอร์ชันใหม่โดยไม่แสดงตัวเลือกชำระเงิน",
             proContinueTitle: "แผน Pro พร้อมใช้งาน",
             reassessmentDescription: "",
             reassessmentTitle:
@@ -1913,7 +1913,7 @@ export function AssessmentFlow({
           },
           exampleExit: {
             body:
-              "เรากำลังเตรียมสูตรฉบับเต็มอยู่เบื้องหลัง และจะส่งตัวอย่างแผนโภชนาการ 3 ข้อแบบสั้นไปยังอีเมลของคุณ",
+              "เรากำลังเตรียมแผนฉบับเต็มอยู่เบื้องหลัง และจะส่งตัวอย่างแผนโภชนาการ 3 ข้อแบบสั้นไปยังอีเมลของคุณ",
             chatBody:
               "เลือกช่องทางที่สะดวกเพื่อคุยต่อกับ AI advisor เฉพาะทาง WhatsApp สามารถเปิดพร้อม plan ได้ และ Telegram ทำได้เมื่อใช้ลิงก์ bot ส่วน LINE อาจต้องส่ง plan ที่แสดงอยู่ด้านล่าง หากยังไม่ได้ตั้งค่า LIFF deep link",
             chatButton: "เปิดแชต",
@@ -1931,12 +1931,12 @@ export function AssessmentFlow({
             score: "กำลังเตรียม HealthScore",
             scoreAnalysis: "กำลังวิเคราะห์ HealthScore",
             payment: "กำลังประมวลผลการชำระเงิน",
-            formulation: "กำลังส่งคำขอสูตร",
-            safety: "กำลังปรับสูตรให้เหมาะสม",
+            formulation: "กำลังส่งคำขอตัวอย่าง",
+            safety: "กำลังตรวจสอบความปลอดภัย",
             results: "เสร็จสมบูรณ์"
           },
           exampleProcessingSubtitle:
-            "เรากำลังเตรียมสูตรฉบับเต็มก่อนคัดส่วนสำคัญเป็นตัวอย่างทางอีเมล",
+            "เรากำลังเตรียมแผนฉบับเต็มก่อนคัดส่วนสำคัญเป็นตัวอย่างทางอีเมล",
           exampleProcessingTitle: "กำลังเตรียมตัวอย่างของคุณ",
           retry: "ลองอีกครั้ง",
           statusLabels: {
@@ -1967,27 +1967,27 @@ export function AssessmentFlow({
           processingQueue: (count: number) =>
             count > 0
               ? `${count} ${count === 1 ? "person is" : "people are"} queued ahead of you`
-              : "Your formulation is being prepared",
+              : "Opening your nutrition plan",
           processingSteps: {
             assessment: "Assessment complete",
             score: "Preparing your HealthScore",
             scoreAnalysis: "Analyzing HealthScore",
-            payment: "Processing Payment",
-            formulation: "Preparing Formulation",
-            safety: "Refining Formulation",
-            results: "Complete"
+            payment: "Confirming access",
+            formulation: "Opening plan page",
+            safety: "Guidance populates there",
+            results: "Plan page ready"
           },
           processingSubtitle:
-            "We have received your preferences and queued them for formulation.",
-          processingTitle: "Processing your assessment",
+            "We will open your plan page now, then food and supplement guidance will fill in as each section finishes.",
+          processingTitle: "Opening your nutrition plan",
           scoreProcessingQueue: "Preparing your HealthScore",
           scoreProcessingSteps: {
             assessment: "Assessment complete",
             score: "Preparing your HealthScore",
             scoreAnalysis: "Analyzing HealthScore",
-            payment: "Processing Payment",
-            formulation: "Preparing Formulation",
-            safety: "Refining Formulation",
+            payment: "Choose plan",
+            formulation: "Nutrition plan page",
+            safety: "Safety review",
             results: "Complete"
           },
           scoreProcessingSubtitle:
@@ -2002,12 +2002,12 @@ export function AssessmentFlow({
             emailPlaceholder: "your@email.com",
             emailTitle: "Not ready to unlock?",
             planDescription:
-              "Choose the level of guidance you want before we prepare your formulation.",
+              "Choose the level of guidance you want before we open your nutrition plan.",
             planTitle: "Unlock your bespoke nutrition plan",
             preparing: "Preparing...",
             proContinueCta: "Continue",
             proContinueDescription:
-              "Your Pro access is active, so we can prepare a new formulation version without showing payment options.",
+              "Your Pro access is active, so we can open a new nutrition plan version without showing payment options.",
             proContinueTitle: "Pro plan active",
             reassessmentDescription: "",
             reassessmentTitle:
@@ -2016,7 +2016,7 @@ export function AssessmentFlow({
           },
           exampleExit: {
             body:
-              "We are preparing the full formulation in the background and sending a focused 3-point nutrition example to your inbox.",
+              "We are preparing the full plan in the background and sending a focused 3-point nutrition example to your inbox.",
             chatBody:
               "Choose your preferred channel to continue with the specialist AI advisor. WhatsApp can open with your plan attached, and Telegram can do the same when it uses a bot link. LINE may need you to send the plan shown below unless a LIFF deep link is configured.",
             chatButton: "Open chat",
@@ -2034,12 +2034,12 @@ export function AssessmentFlow({
             score: "Preparing your HealthScore",
             scoreAnalysis: "Analyzing HealthScore",
             payment: "Processing Payment",
-            formulation: "Requesting Formulation",
-            safety: "Refining Formulation",
+            formulation: "Requesting example",
+            safety: "Safety review",
             results: "Complete"
           },
           exampleProcessingSubtitle:
-            "We are preparing the full formulation first, then selecting the key points for your email example.",
+            "We are preparing the full plan first, then selecting the key points for your email example.",
           exampleProcessingTitle: "Preparing your example",
           retry: "Try again",
           statusLabels: {
@@ -3160,6 +3160,13 @@ export function AssessmentFlow({
 
       const status = (await response.json()) as ProcessingStatus;
       setCapturedStatus(status);
+      clearProcessingStatus();
+
+      if (status.planId) {
+        router.push(`/${locale}/assessment/results?plan=${status.planId}`);
+        return;
+      }
+
       setProcessingStatus(status);
     } catch {
       setProcessingError(ui.processingError);

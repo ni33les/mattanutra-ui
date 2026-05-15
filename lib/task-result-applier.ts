@@ -1237,7 +1237,7 @@ export async function applyTaskCompletionResult({
     return resultPayload;
   }
 
-  if (task.taskType === "generate_formulation") {
+  if (task.taskType === "generate_supplement_guidance") {
     await applyPaidFormulationResult(task, resultPayload, sql, afterCommit);
     return resultPayload;
   }
@@ -1247,7 +1247,7 @@ export async function applyTaskCompletionResult({
     return resultPayload;
   }
 
-  if (task.taskType === "generate_example_formulation") {
+  if (task.taskType === "generate_example_supplement_guidance") {
     await applyExampleFormulationResult(task, resultPayload, sql, afterCommit);
     return resultPayload;
   }
@@ -1310,7 +1310,7 @@ export async function applyTaskFailureResult({
 
   if (
     task.planId &&
-    (task.taskType === "generate_formulation" ||
+    (task.taskType === "generate_supplement_guidance" ||
       task.taskType === "generate_food_guidance")
   ) {
     await sql`
@@ -1324,7 +1324,7 @@ export async function applyTaskFailureResult({
 
   if (
     task.planId &&
-    (task.taskType === "generate_example_formulation" ||
+    (task.taskType === "generate_example_supplement_guidance" ||
       task.taskType === "generate_example_food_guidance" ||
       task.taskType === "send_example_email") &&
     isUuid(requestId)
@@ -1338,7 +1338,7 @@ export async function applyTaskFailureResult({
           : "failed"},
         error_message = ${retryWillBeScheduled ? null : errorMessage},
         formulation_status = case
-          when ${task.taskType} = 'generate_example_formulation'
+          when ${task.taskType} = 'generate_example_supplement_guidance'
           then ${retryWillBeScheduled ? "queued" : "failed"}
           else formulation_status
         end,

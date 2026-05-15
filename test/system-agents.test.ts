@@ -36,9 +36,9 @@ describe("system agents", () => {
       "client_safety_followup",
       "content_status_change",
       "generate_example_food_guidance",
-      "generate_example_formulation",
+      "generate_example_supplement_guidance",
       "generate_food_guidance",
-      "generate_formulation",
+      "generate_supplement_guidance",
       "send_example_email",
       "send_reassessment_email",
       "sync_digitalocean_billing"

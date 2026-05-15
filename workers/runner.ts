@@ -17,8 +17,9 @@ type WorkerMode =
   | "food"
   | "formulation"
   | "healthscore"
-  | "hosting";
-type WorkerProfileMode = Exclude<WorkerMode, "all">;
+  | "hosting"
+  | "supplement";
+type WorkerProfileMode = Exclude<WorkerMode, "all" | "supplement">;
 
 const DEFAULT_POLL_WAIT_SECONDS = 20;
 const DEFAULT_LEASE_SECONDS = 900;
@@ -102,6 +103,10 @@ async function retryApiCall<T>(
 }
 
 function workerMode(value: string | undefined): WorkerMode {
+  if (value === "supplement") {
+    return "formulation";
+  }
+
   return value === "communications" ||
     value === "content" ||
     value === "email" ||
@@ -158,8 +163,8 @@ const WORKER_PROFILES: Record<WorkerProfileMode, WorkerAgentConfig> = {
     "generate_example_food_guidance"
   ]),
   formulation: agentProfile("formulationWorker", [
-    "generate_formulation",
-    "generate_example_formulation"
+    "generate_supplement_guidance",
+    "generate_example_supplement_guidance"
   ]),
   healthscore: agentProfile("healthScoreEngine", ["analyze_healthscore"]),
   hosting: agentProfile("scheduler", ["sync_digitalocean_billing"])

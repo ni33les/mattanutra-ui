@@ -208,9 +208,9 @@ export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
   analyze_healthscore: "healthScoreEngine",
   client_safety_followup: "communicationsCoordinator",
   generate_example_food_guidance: "foodGuidanceWorker",
-  generate_example_formulation: "formulationWorker",
+  generate_example_supplement_guidance: "formulationWorker",
   generate_food_guidance: "foodGuidanceWorker",
-  generate_formulation: "formulationWorker",
+  generate_supplement_guidance: "formulationWorker",
   content_status_change: "contentPublisher",
   send_example_email: "emailDispatcher",
   send_reassessment_email: "emailDispatcher",
@@ -232,11 +232,11 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
     generate_example_food_guidance: [
       AGENT_CAPABILITIES.freeExampleFoodGuidance
     ],
-    generate_example_formulation: [
+    generate_example_supplement_guidance: [
       AGENT_CAPABILITIES.freeExampleFormulation
     ],
     generate_food_guidance: [AGENT_CAPABILITIES.foodGuidanceGeneration],
-    generate_formulation: [AGENT_CAPABILITIES.formulationGeneration],
+    generate_supplement_guidance: [AGENT_CAPABILITIES.formulationGeneration],
     content_status_change: [AGENT_CAPABILITIES.contentPublish],
     send_example_email: [AGENT_CAPABILITIES.freeEmailSend],
     send_reassessment_email: [AGENT_CAPABILITIES.reassessmentEmailSend],

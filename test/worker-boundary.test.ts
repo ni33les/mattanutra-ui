@@ -168,7 +168,7 @@ describe("external worker boundaries", () => {
 
     assert.match(
       source,
-      /INTERACTIVE_TASK_TYPES[\s\S]*analyze_healthscore[\s\S]*generate_food_guidance[\s\S]*generate_formulation/,
+      /INTERACTIVE_TASK_TYPES[\s\S]*analyze_healthscore[\s\S]*generate_food_guidance[\s\S]*generate_supplement_guidance/,
       "blocking UI task types must be on the interactive reserve path"
     );
     assert.match(
@@ -202,7 +202,7 @@ describe("external worker boundaries", () => {
       "interactive fallback polling should avoid hammering the database"
     );
     assert.equal(
-      /INTERACTIVE_TASK_TYPES[\s\S]*generate_example_formulation/.test(source) ||
+      /INTERACTIVE_TASK_TYPES[\s\S]*generate_example_supplement_guidance/.test(source) ||
         /INTERACTIVE_TASK_TYPES[\s\S]*generate_example_food_guidance/.test(source),
       false,
       "free example nutrition plan tasks must stay off the interactive path because they do not block UX"
@@ -216,6 +216,45 @@ describe("external worker boundaries", () => {
       taskWorkerSource,
       /exampleFoodGuidance: 150/,
       "free example food guidance must remain a low-value background task"
+    );
+  });
+
+  it("uses supplement guidance task names in active runtime code", async () => {
+    const activeFiles = [
+      ...(await filesUnder("app")),
+      ...(await filesUnder("components")),
+      ...(await filesUnder("lib")),
+      ...(await filesUnder("workers")),
+      "package.json"
+    ];
+    const oldTaskTypes = [
+      "generate_formulation",
+      "generate_example_formulation"
+    ];
+
+    for (const file of activeFiles) {
+      const source = await readFile(file, "utf8");
+
+      for (const taskType of oldTaskTypes) {
+        assert.equal(
+          source.includes(taskType),
+          false,
+          `${file} must use the supplement guidance task type name instead of ${taskType}`
+        );
+      }
+    }
+
+    const schemaSource = await readFile("db-schema.sql", "utf8");
+
+    assert.match(
+      schemaSource,
+      /when 'generate_formulation' then 'generate_supplement_guidance'/,
+      "db-schema.sql should keep the compatibility rewrite for old paid supplement tasks"
+    );
+    assert.match(
+      schemaSource,
+      /when 'generate_example_formulation' then 'generate_example_supplement_guidance'/,
+      "db-schema.sql should keep the compatibility rewrite for old free supplement tasks"
     );
   });
 

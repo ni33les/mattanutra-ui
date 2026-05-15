@@ -559,6 +559,23 @@ create index worker_sessions_status_idx
 create index worker_sessions_capabilities_gin_idx
   on public.worker_sessions using gin (capabilities);
 
+update public.worker_sessions
+set
+  task_types = array_replace(
+    array_replace(
+      task_types,
+      'generate_formulation',
+      'generate_supplement_guidance'
+    ),
+    'generate_example_formulation',
+    'generate_example_supplement_guidance'
+  ),
+  updated_at = now()
+where task_types && array[
+  'generate_formulation',
+  'generate_example_formulation'
+]::text[];
+
 insert into public.agents (
   id,
   name,
@@ -849,6 +866,17 @@ create unique index tasks_active_idempotency_idx
   on public.tasks (idempotency_scope_key, idempotency_key)
   where idempotency_key is not null
     and status not in ('completed', 'failed', 'cancelled', 'skipped');
+
+update public.tasks
+set task_type = case task_type
+  when 'generate_formulation' then 'generate_supplement_guidance'
+  when 'generate_example_formulation' then 'generate_example_supplement_guidance'
+  else task_type
+end
+where task_type in (
+  'generate_formulation',
+  'generate_example_formulation'
+);
 
 create table public.task_dependencies (
   task_id uuid not null references public.tasks(id) on delete cascade,

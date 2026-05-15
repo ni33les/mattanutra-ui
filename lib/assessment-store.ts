@@ -351,9 +351,9 @@ export async function getStoredAssessmentSnapshot(planId: string) {
         from public.tasks
         where status = 'queued'
           and task_type in (
-            'generate_formulation',
+            'generate_supplement_guidance',
             'generate_food_guidance',
-            'generate_example_formulation',
+            'generate_example_supplement_guidance',
             'generate_example_food_guidance'
           )
       ),
@@ -518,13 +518,16 @@ export async function getStoredFormulationResult(
           or food_guidance.model_version not like ${exampleModelPattern}
         )`;
   const assessmentAccessFilter =
-    mode === "preview" ? sql`and assessments.selected_plan is null` : sql``;
+    mode === "preview"
+      ? sql`and assessments.selected_plan is null`
+      : sql`and assessments.selected_plan is not null`;
 
   const rows = await sql`
     select
       assessments.answers,
       assessments.locale,
       assessments.selected_plan::text,
+      assessments.updated_at as assessment_updated_at,
       formulations.formulation,
       formulations.generated_at,
       formulations.model_version,
@@ -533,7 +536,7 @@ export async function getStoredFormulationResult(
       food_guidance.model_version as food_guidance_model_version,
       recommendations.recommendations
     from assessments
-    join lateral (
+    left join lateral (
       select formulation, generated_at, model_version
       from formulations
       where formulations.plan_id = assessments.plan_id
@@ -541,7 +544,7 @@ export async function getStoredFormulationResult(
       order by version desc, generated_at desc
       limit 1
     ) formulations on true
-    join lateral (
+    left join lateral (
       select guidance, generated_at, model_version
       from food_guidance
       where food_guidance.plan_id = assessments.plan_id
@@ -566,6 +569,10 @@ export async function getStoredFormulationResult(
     return null;
   }
 
+  if (mode === "preview" && (!row.formulation || !row.food_guidance)) {
+    return null;
+  }
+
   const locale = normalizeLocale(row.locale);
   const plan = fromStoredPlan(row.selected_plan);
   const storedFormulation = asRecord(row.formulation);
@@ -585,15 +592,25 @@ export async function getStoredFormulationResult(
   );
 
   const recommendations = asArray<RecommendedProduct>(row.recommendations);
-  const generatedAt =
-    row.generated_at instanceof Date
-      ? row.generated_at.toISOString()
-      : new Date(row.generated_at).toISOString();
+  const generatedDates = [row.generated_at, row.food_guidance_generated_at]
+    .filter(Boolean)
+    .map((value) => (value instanceof Date ? value : new Date(value)))
+    .filter((date) => Number.isFinite(date.getTime()));
+  const generatedAt = (
+    generatedDates.length > 0
+      ? new Date(Math.max(...generatedDates.map((date) => date.getTime())))
+      : row.assessment_updated_at instanceof Date
+        ? row.assessment_updated_at
+        : new Date(row.assessment_updated_at)
+  ).toISOString();
+  const supplementsReady = Boolean(row.formulation);
+  const foodsReady = Boolean(row.food_guidance);
 
   const result = {
-    access: isExampleFormulationModelVersion(row.model_version)
-      ? "preview"
-      : "full",
+    access:
+      mode === "preview" || isExampleFormulationModelVersion(row.model_version)
+        ? "preview"
+        : "full",
     assessmentSummary: buildAssessmentSummary({
       answers: row.answers,
       locale,
@@ -603,6 +620,10 @@ export async function getStoredFormulationResult(
     planId,
     recommendations,
     schemaVersion: 1,
+    sectionStatuses: {
+      foods: foodsReady ? "ready" : "pending",
+      supplements: supplementsReady ? "ready" : "pending"
+    },
     ...(safetySummary ? { safetySummary } : {}),
     ...(foodSafetySummary ? { foodSafetySummary } : {}),
     ...(marketingPoints.length > 0 ? { marketingPoints } : {}),

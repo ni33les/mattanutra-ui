@@ -81,8 +81,8 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
   }
 
   if (
-    workItem.taskType === "generate_formulation" ||
-    workItem.taskType === "generate_example_formulation"
+    workItem.taskType === "generate_supplement_guidance" ||
+    workItem.taskType === "generate_example_supplement_guidance"
   ) {
     const analysis = await analyzeFormulationWithGrok({
       answers: workItem.answers,

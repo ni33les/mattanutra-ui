@@ -19,7 +19,8 @@
     "worker:food": "node --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts food",
     "worker:formulation": "node --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts formulation",
     "worker:healthscore": "node --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts healthscore",
-    "worker:hosting": "node --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts hosting"
+    "worker:hosting": "node --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts hosting",
+    "worker:supplement": "node --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts supplement"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",

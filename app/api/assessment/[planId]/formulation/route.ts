@@ -18,15 +18,15 @@ export async function GET(_request: Request, { params }: FormulationRouteProps) 
     return NextResponse.json({ message: "Plan not found" }, { status: 404 });
   }
 
+  const storedResult = await getStoredFormulationResult(planId, {
+    mode: "full"
+  });
+
+  if (storedResult) {
+    return NextResponse.json(storedResult);
+  }
+
   if (snapshot.status === "ready") {
-    const storedResult = await getStoredFormulationResult(planId, {
-      mode: "full"
-    });
-
-    if (storedResult) {
-      return NextResponse.json(storedResult);
-    }
-
     return NextResponse.json(
       {
         message: "Formulation result is missing or invalid",

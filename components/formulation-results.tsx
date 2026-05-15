@@ -108,6 +108,12 @@ type CopyLabels = Record<
   | "heroSubtitle"
   | "heroTitle"
   | "loading"
+  | "nutritionProgressBody"
+  | "nutritionProgressFoods"
+  | "nutritionProgressPending"
+  | "nutritionProgressReady"
+  | "nutritionProgressSupplements"
+  | "nutritionProgressTitle"
   | "dailyDose"
   | "plan"
   | "previewBadge"
@@ -180,9 +186,16 @@ const copy = {
     generated: "Generated",
     goals: "Goals",
     heroSubtitle:
-      "A concise wellness formulation and marketplace search guide based on the completed assessment.",
+      "A concise food and supplement guidance pack based on the completed assessment.",
     heroTitle: "Your personalised nutritional formulation",
     loading: "Loading your formulation",
+    nutritionProgressBody:
+      "Your plan is being assembled in sections. Food and supplement guidance will appear here as each engine finishes.",
+    nutritionProgressFoods: "Food guidance",
+    nutritionProgressPending: "Preparing",
+    nutritionProgressReady: "Ready",
+    nutritionProgressSupplements: "Supplement guidance",
+    nutritionProgressTitle: "Preparing your nutrition plan",
     dailyDose: "Dose",
     plan: "Plan",
     previewBadge: "Free preview",
@@ -260,9 +273,16 @@ const copy = {
     generated: "สร้างเมื่อ",
     goals: "เป้าหมาย",
     heroSubtitle:
-      "บรีฟสูตรเพื่อสุขภาพและคู่มือค้นหาผลิตภัณฑ์จากคำตอบในแบบประเมินของคุณ",
+      "บรีฟคำแนะนำอาหารและอาหารเสริมจากคำตอบในแบบประเมินของคุณ",
     heroTitle: "สูตรโภชนาการเฉพาะบุคคลของคุณ",
     loading: "กำลังโหลดสูตรของคุณ",
+    nutritionProgressBody:
+      "ระบบกำลังประกอบแผนเป็นส่วน ๆ คำแนะนำอาหารและอาหารเสริมจะแสดงในหน้านี้เมื่อแต่ละส่วนเสร็จ",
+    nutritionProgressFoods: "คำแนะนำอาหาร",
+    nutritionProgressPending: "กำลังเตรียม",
+    nutritionProgressReady: "พร้อมแล้ว",
+    nutritionProgressSupplements: "คำแนะนำอาหารเสริม",
+    nutritionProgressTitle: "กำลังเตรียมแผนโภชนาการของคุณ",
     dailyDose: "ขนาด",
     plan: "แผน",
     previewBadge: "ตัวอย่างฟรี",
@@ -360,6 +380,15 @@ function planPaywallHref(locale: Locale, planId: string) {
   return `/${locale}/assessment?plan=${encodeURIComponent(planId)}`;
 }
 
+function resultHasPendingSections(result: FormulationResult) {
+  const statuses = result.sectionStatuses;
+
+  return Boolean(
+    statuses &&
+      (statuses.foods === "pending" || statuses.supplements === "pending")
+  );
+}
+
 export function FormulationResults({ locale, planId }: FormulationResultsProps) {
   const labels = copy[locale];
   const effectivePlanId = planId;
@@ -391,6 +420,10 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
         if (!cancelled) {
           setResult(payload);
           setLoadState("ready");
+
+          if (resultHasPendingSections(payload)) {
+            retryTimer = window.setTimeout(fetchFormulation, 1500);
+          }
         }
       } catch {
         if (!cancelled) {
@@ -458,6 +491,13 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
   const effectiveResultPlanId = result.planId || effectivePlanId;
   const hasPendingSafetyReview = pendingReviewCount(result) > 0;
   const isPreview = result.access === "preview";
+  const sectionStatuses = result.sectionStatuses ?? {
+    foods: orderedFoods.length > 0 ? "ready" : "pending",
+    supplements: orderedIngredients.length > 0 ? "ready" : "pending"
+  };
+  const nutritionPending =
+    sectionStatuses.foods !== "ready" ||
+    sectionStatuses.supplements !== "ready";
   const lockedSupplementCount = Math.max(
     0,
     Number(result.lockedSupplementCount ?? 0)
@@ -549,6 +589,13 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
         result={result}
       />
 
+      {nutritionPending ? (
+        <NutritionProgressPanel
+          labels={labels}
+          statuses={sectionStatuses}
+        />
+      ) : null}
+
       {isPreview ? (
         <PreviewPaywallPanel
           labels={labels}
@@ -560,6 +607,7 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
         <FoodGuidancePanel
           foods={orderedFoods}
           hasPendingSafetyReview={hasPendingSafetyReview}
+          isPending={sectionStatuses.foods !== "ready"}
           labels={labels}
           lockedFoodCount={lockedFoodCount}
           locale={locale}
@@ -569,6 +617,7 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
         <FormulaPanel
           hasPendingSafetyReview={hasPendingSafetyReview}
           ingredients={orderedIngredients}
+          isPending={sectionStatuses.supplements !== "ready"}
           labels={labels}
           lockedSupplementCount={lockedSupplementCount}
           locale={locale}
@@ -608,9 +657,82 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
 
 type PanelLabels = (typeof copy)["en"];
 
+function NutritionProgressPanel({
+  labels,
+  statuses
+}: Readonly<{
+  labels: PanelLabels;
+  statuses: NonNullable<FormulationResult["sectionStatuses"]>;
+}>) {
+  const sections = [
+    {
+      label: labels.nutritionProgressFoods,
+      status: statuses.foods
+    },
+    {
+      label: labels.nutritionProgressSupplements,
+      status: statuses.supplements
+    }
+  ];
+  const readyCount = sections.filter((section) => section.status === "ready").length;
+  const progress = Math.max(10, Math.round((readyCount / sections.length) * 100));
+
+  return (
+    <section className="mt-8 rounded-lg bg-white p-5 ring-1 ring-[#3A7BD5]/15 sm:p-6">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="flex items-center gap-3">
+            <ArrowPathIcon
+              aria-hidden={true}
+              className="size-5 animate-spin text-[#3A7BD5]"
+            />
+            <h2 className="text-xl font-semibold tracking-normal text-[#20343A]">
+              {labels.nutritionProgressTitle}
+            </h2>
+          </div>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            {labels.nutritionProgressBody}
+          </p>
+        </div>
+
+        <div className="w-full lg:w-72">
+          <div className="h-2 rounded-full bg-[#E5EDF8]">
+            <div
+              className="h-full rounded-full bg-[#3A7BD5] transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {sections.map((section) => {
+              const ready = section.status === "ready";
+
+              return (
+                <span
+                  className={
+                    ready
+                      ? "rounded-full bg-[#ECFDF5] px-2.5 py-1 text-xs font-semibold text-[#126B4F] ring-1 ring-[#A7F3D0]"
+                      : "rounded-full bg-[#F3F8FF] px-2.5 py-1 text-xs font-semibold text-[#2F67B8] ring-1 ring-[#BFDBFE]"
+                  }
+                  key={section.label}
+                >
+                  {section.label}:{" "}
+                  {ready
+                    ? labels.nutritionProgressReady
+                    : labels.nutritionProgressPending}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function FoodGuidancePanel({
   foods,
   hasPendingSafetyReview,
+  isPending,
   labels,
   lockedFoodCount,
   locale,
@@ -618,6 +740,7 @@ function FoodGuidancePanel({
 }: Readonly<{
   foods: FoodGuidanceItem[];
   hasPendingSafetyReview: boolean;
+  isPending: boolean;
   labels: PanelLabels;
   lockedFoodCount: number;
   locale: Locale;
@@ -641,7 +764,9 @@ function FoodGuidancePanel({
       </div>
 
       <div className="mt-6 space-y-3">
-        {foods.length < 1 ? (
+        {foods.length < 1 && isPending ? (
+          <SectionLoadingCards accent="green" />
+        ) : foods.length < 1 ? (
           <div className="rounded-lg border border-dashed border-foreground/15 bg-background/60 p-6 text-center">
             <SparklesIcon
               aria-hidden={true}
@@ -1021,6 +1146,7 @@ function ChatConnectPanel({
 function FormulaPanel({
   hasPendingSafetyReview,
   ingredients,
+  isPending,
   labels,
   lockedSupplementCount,
   locale,
@@ -1028,6 +1154,7 @@ function FormulaPanel({
 }: Readonly<{
   hasPendingSafetyReview: boolean;
   ingredients: FormulationIngredient[];
+  isPending: boolean;
   labels: PanelLabels;
   lockedSupplementCount: number;
   locale: Locale;
@@ -1051,7 +1178,9 @@ function FormulaPanel({
       </div>
 
       <div className="mt-6 space-y-3">
-        {ingredients.length < 1 ? (
+        {ingredients.length < 1 && isPending ? (
+          <SectionLoadingCards accent="blue" />
+        ) : ingredients.length < 1 ? (
           <div className="rounded-lg border border-dashed border-foreground/15 bg-background/60 p-6 text-center">
             <BeakerIcon
               aria-hidden={true}
@@ -1134,6 +1263,39 @@ function FormulaPanel({
         ) : null}
       </div>
     </section>
+  );
+}
+
+function SectionLoadingCards({
+  accent
+}: Readonly<{
+  accent: "blue" | "green";
+}>) {
+  const rows = Array.from({ length: 3 });
+  const tint =
+    accent === "green"
+      ? "bg-[#ECFDF5] ring-[#A7F3D0]"
+      : "bg-[#EFF6FF] ring-[#BFDBFE]";
+
+  return (
+    <>
+      {rows.map((_, index) => (
+        <article
+          className="rounded-lg border border-foreground/10 bg-white p-4"
+          key={index}
+        >
+          <div className="animate-pulse">
+            <div className={`h-4 w-32 rounded-md ring-1 ${tint}`} />
+            <div className="mt-3 h-3 w-full rounded-md bg-foreground/10" />
+            <div className="mt-2 h-3 w-4/5 rounded-md bg-foreground/10" />
+            <div className="mt-4 flex gap-2">
+              <div className={`h-5 w-20 rounded-full ring-1 ${tint}`} />
+              <div className={`h-5 w-24 rounded-full ring-1 ${tint}`} />
+            </div>
+          </div>
+        </article>
+      ))}
+    </>
   );
 }
 

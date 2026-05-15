@@ -19,9 +19,9 @@ type WorkTaskType =
   | "analyze_healthscore"
   | "client_safety_followup"
   | "generate_example_food_guidance"
-  | "generate_example_formulation"
+  | "generate_example_supplement_guidance"
   | "generate_food_guidance"
-  | "generate_formulation"
+  | "generate_supplement_guidance"
   | "send_example_email"
   | "send_reassessment_email"
   | "sync_digitalocean_billing";
@@ -360,7 +360,7 @@ export async function enqueueNutritionPlanTasks({
     source: "assessment",
     taskGroupId,
     taskTitle: "Generate supplement plan",
-    taskType: "generate_formulation"
+    taskType: "generate_supplement_guidance"
   });
   const foodGuidanceTaskId = await createWorkTask({
     actorType: "ai",
@@ -490,8 +490,8 @@ async function enqueueExampleFormulationTask(
     reasoningEffort: "medium",
     source: "free_example",
     taskGroupId,
-    taskTitle: "Generate free supplement preview",
-    taskType: "generate_example_formulation"
+    taskTitle: "Generate free supplement guidance",
+    taskType: "generate_example_supplement_guidance"
   });
 
   if (taskId) {
@@ -602,7 +602,7 @@ async function activePaidNutritionTaskId(sql: postgres.Sql, planId: string) {
     select id::text
     from public.tasks
     where plan_id = ${planId}::uuid
-      and task_type in ('generate_formulation', 'generate_food_guidance')
+      and task_type in ('generate_supplement_guidance', 'generate_food_guidance')
       and status not in ('completed', 'failed', 'cancelled', 'skipped')
     order by business_value desc, scheduled_for asc, created_at asc
     limit 1
@@ -872,7 +872,7 @@ export async function requestExampleBrief({
         where tasks.plan_id = assessment_example_requests.plan_id
           and tasks.payload ->> 'requestId' = assessment_example_requests.id::text
           and tasks.task_type in (
-            'generate_example_formulation',
+            'generate_example_supplement_guidance',
             'generate_example_food_guidance',
             'send_example_email'
           )

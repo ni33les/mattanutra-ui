@@ -33,7 +33,7 @@ export type FormulationWorkItem = Readonly<{
   planId: string;
   requestId?: string;
   taskId: string;
-  taskType: "generate_example_formulation" | "generate_formulation";
+  taskType: "generate_example_supplement_guidance" | "generate_supplement_guidance";
 }>;
 
 export type FoodGuidanceWorkItem = Readonly<{
@@ -255,7 +255,7 @@ async function buildFormulationWorkItem(task: TaskRecord) {
     throw new Error("Assessment submission not found");
   }
 
-  if (task.taskType === "generate_formulation") {
+  if (task.taskType === "generate_supplement_guidance") {
     await sql`
       update public.assessments set
         status = 'preparing',
@@ -275,8 +275,8 @@ async function buildFormulationWorkItem(task: TaskRecord) {
     requestId: payloadText(task.payload, "requestId") || undefined,
     taskId: task.id,
     taskType: task.taskType as
-      | "generate_example_formulation"
-      | "generate_formulation"
+      | "generate_example_supplement_guidance"
+      | "generate_supplement_guidance"
   } satisfies FormulationWorkItem;
 }
 
@@ -489,8 +489,8 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
   }
 
   if (
-    task.taskType === "generate_formulation" ||
-    task.taskType === "generate_example_formulation"
+    task.taskType === "generate_supplement_guidance" ||
+    task.taskType === "generate_example_supplement_guidance"
   ) {
     return buildFormulationWorkItem(task);
   }

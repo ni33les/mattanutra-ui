@@ -85,6 +85,32 @@ export type MarketingPoint = {
   title: LocalizedText;
 };
 
+export type PlanChatMessage = {
+  body: string;
+  createdAt: string;
+  id: string;
+  role: "assistant" | "user";
+  status: "failed" | "queued" | "ready";
+};
+
+export type NutritionReportSection = {
+  body: LocalizedText;
+  id: string;
+  title: LocalizedText;
+};
+
+export type NutritionReport = {
+  dailyFocus: NutritionReportSection[];
+  generatedAt?: string;
+  nextSteps: NutritionReportSection[];
+  planId?: string;
+  safetyNotes: LocalizedText[];
+  summary: LocalizedText;
+  synergies: NutritionReportSection[];
+  title: LocalizedText;
+  version?: number;
+};
+
 export type AssessmentSummary = {
   constraints: string[];
   goals: string[];
@@ -114,16 +140,24 @@ export type FoodGuidanceBlueprint = {
   };
 };
 
+export type NutritionSectionStatus = "failed" | "pending" | "ready";
+
 export type FormulationResult = FormulationBlueprint & FoodGuidanceBlueprint & {
   access?: "full" | "preview";
   assessmentSummary: AssessmentSummary;
   generatedAt: string;
   lockedFoodCount?: number;
   lockedSupplementCount?: number;
+  nutritionReport?: NutritionReport | null;
   planId: string;
   previewLimit?: number;
   recommendations: RecommendedProduct[];
   schemaVersion: 1;
+  sectionStatuses?: {
+    foods: NutritionSectionStatus;
+    report?: NutritionSectionStatus;
+    supplements: NutritionSectionStatus;
+  };
   totalFoodCount?: number;
   totalSupplementCount?: number;
 };
