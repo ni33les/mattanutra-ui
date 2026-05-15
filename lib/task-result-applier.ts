@@ -140,6 +140,34 @@ async function updateAssessmentReadyIfNutritionReady(
   return ready;
 }
 
+async function refreshAssessmentReadyIfNutritionReady(planId: string) {
+  const sql = getSql();
+
+  if (!sql) {
+    return false;
+  }
+
+  return updateAssessmentReadyIfNutritionReady(sql, planId);
+}
+
+async function refreshPaidNutritionReadinessAfterCommit(
+  task: TaskRecord,
+  planId: string,
+  initiallyReady: boolean
+) {
+  const ready = await refreshAssessmentReadyIfNutritionReady(planId);
+
+  if (ready && !initiallyReady) {
+    await addWorkEvent(task, "nutrition_plan_ready", "medium", {
+      source: "post_commit_readiness_refresh"
+    });
+  }
+
+  if (ready) {
+    await enqueueExampleEmailsForReadyFullPlan(planId);
+  }
+}
+
 async function recordTaskXaiUsageCost({
   analysis,
   metadata,
@@ -425,11 +453,9 @@ async function applyPaidFormulationResult(
       nutritionReady
     });
   });
-  if (nutritionReady) {
-    await eventually(afterCommit, async () => {
-      await enqueueExampleEmailsForReadyFullPlan(planId);
-    });
-  }
+  await eventually(afterCommit, async () => {
+    await refreshPaidNutritionReadinessAfterCommit(task, planId, nutritionReady);
+  });
   await eventually(afterCommit, async () => {
     await writeBpmEvent({
       actorType: "worker",
@@ -538,11 +564,9 @@ async function applyPaidFoodGuidanceResult(
       responseId: analysis.responseId
     });
   });
-  if (nutritionReady) {
-    await eventually(afterCommit, async () => {
-      await enqueueExampleEmailsForReadyFullPlan(planId);
-    });
-  }
+  await eventually(afterCommit, async () => {
+    await refreshPaidNutritionReadinessAfterCommit(task, planId, nutritionReady);
+  });
   await eventually(afterCommit, async () => {
     await writeBpmEvent({
       actorType: "worker",

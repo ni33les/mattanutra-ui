@@ -122,6 +122,12 @@ type PreparedRetryMessage = Readonly<{
   message: CommunicationMessage;
 }>;
 
+type CommunicationRetryClaimInput = Readonly<{
+  identityId: string | null;
+  messageId: string;
+  selected: CommunicationChannel | null;
+}>;
+
 const MESSAGE_STATUSES = new Set<string>([
   "delivered",
   "failed",
@@ -285,143 +291,87 @@ export async function ensureCommunicationSchema(sql: Db = sqlOrThrow()) {
   }
 
   globalCommunications.mattanutraCommunicationSchemaReady = (async () => {
-    await sql`
-      create table if not exists public.communication_identities (
-        id uuid primary key,
-        display_name text null,
-        source text null,
-        metadata jsonb not null default '{}'::jsonb,
-        created_at timestamptz not null default now(),
-        updated_at timestamptz not null default now()
-      )
+    const requiredColumns = {
+      communication_channels: [
+        "id",
+        "identity_id",
+        "channel_type",
+        "address",
+        "status",
+        "preference_rank",
+        "actor_type",
+        "metadata",
+        "created_at",
+        "updated_at"
+      ],
+      communication_identities: [
+        "id",
+        "source",
+        "metadata",
+        "created_at",
+        "updated_at"
+      ],
+      communication_messages: [
+        "id",
+        "identity_id",
+        "channel_id",
+        "plan_id",
+        "task_id",
+        "direction",
+        "message_type",
+        "status",
+        "subject",
+        "body",
+        "html",
+        "provider",
+        "provider_message_id",
+        "error_message",
+        "metadata",
+        "scheduled_for",
+        "sent_at",
+        "delivered_at",
+        "created_at",
+        "updated_at"
+      ],
+      plan_communication_identities: [
+        "plan_id",
+        "identity_id",
+        "relationship",
+        "is_primary",
+        "metadata",
+        "created_at"
+      ]
+    } as const;
+    const rows = await sql<Array<{
+      column_name: string;
+      table_name: string;
+    }>>`
+      select table_name, column_name
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = any(${Object.keys(requiredColumns)}::text[])
     `;
-    await sql`
-      create table if not exists public.plan_communication_identities (
-        plan_id uuid not null references public.assessments(plan_id) on delete cascade,
-        identity_id uuid not null references public.communication_identities(id) on delete cascade,
-        relationship text not null default 'client',
-        is_primary boolean not null default true,
-        metadata jsonb not null default '{}'::jsonb,
-        created_at timestamptz not null default now(),
-        primary key (plan_id, identity_id)
-      )
-    `;
-    await sql`
-      create unique index if not exists plan_communication_primary_identity_idx
-        on public.plan_communication_identities (plan_id)
-        where is_primary
-    `;
-    await sql`
-      create table if not exists public.communication_channels (
-        id uuid primary key,
-        identity_id uuid not null references public.communication_identities(id) on delete cascade,
-        channel_type text not null,
-        address text not null,
-        display_name text null,
-        status text not null default 'active',
-        preference_rank integer not null default 100,
-        actor_type text not null default 'human',
-        metadata jsonb not null default '{}'::jsonb,
-        created_at timestamptz not null default now(),
-        updated_at timestamptz not null default now()
-      )
-    `;
-    await sql`
-      create unique index if not exists communication_channels_identity_address_idx
-        on public.communication_channels (identity_id, channel_type, lower(address))
-    `;
-    await sql`
-      create table if not exists public.communication_messages (
-        id uuid primary key,
-        identity_id uuid null references public.communication_identities(id) on delete set null,
-        channel_id uuid null references public.communication_channels(id) on delete set null,
-        plan_id uuid null references public.assessments(plan_id) on delete set null,
-        task_id uuid null references public.tasks(id) on delete set null,
-        direction text not null default 'outbound',
-        message_type text not null default 'general',
-        status text not null default 'queued',
-        subject text null,
-        body text not null,
-        html text null,
-        provider text null,
-        provider_message_id text null,
-        error_message text null,
-        metadata jsonb not null default '{}'::jsonb,
-        scheduled_for timestamptz null,
-        sent_at timestamptz null,
-        delivered_at timestamptz null,
-        created_at timestamptz not null default now(),
-        updated_at timestamptz not null default now()
-      )
-    `;
-    await sql`
-      do $$
-      begin
-        if not exists (
-          select 1
-          from pg_constraint
-          where conrelid = 'public.communication_channels'::regclass
-            and conname = 'communication_channels_type_check'
-        ) then
-          alter table public.communication_channels
-            add constraint communication_channels_type_check
-            check (channel_type in ('email', 'line', 'manual', 'sms', 'telegram', 'wechat', 'whatsapp'));
-        end if;
+    const available = new Map<string, Set<string>>();
 
-        if not exists (
-          select 1
-          from pg_constraint
-          where conrelid = 'public.communication_channels'::regclass
-            and conname = 'communication_channels_status_check'
-        ) then
-          alter table public.communication_channels
-            add constraint communication_channels_status_check
-            check (status in ('active', 'unverified', 'disabled', 'failed'));
-        end if;
+    for (const row of rows) {
+      const columns = available.get(row.table_name) ?? new Set<string>();
+      columns.add(row.column_name);
+      available.set(row.table_name, columns);
+    }
 
-        if not exists (
-          select 1
-          from pg_constraint
-          where conrelid = 'public.communication_channels'::regclass
-            and conname = 'communication_channels_actor_check'
-        ) then
-          alter table public.communication_channels
-            add constraint communication_channels_actor_check
-            check (actor_type in ('ai', 'human', 'system', 'unknown'));
-        end if;
+    const missing = Object.entries(requiredColumns).flatMap(([table, columns]) => {
+      const availableColumns = available.get(table) ?? new Set<string>();
 
-        if not exists (
-          select 1
-          from pg_constraint
-          where conrelid = 'public.communication_messages'::regclass
-            and conname = 'communication_messages_status_check'
-        ) then
-          alter table public.communication_messages
-            add constraint communication_messages_status_check
-            check (status in ('queued', 'sent', 'delivered', 'failed', 'skipped', 'no_channel'));
-        end if;
+      return [...columns]
+        .filter((column) => !availableColumns.has(column))
+        .map((column) => `public.${table}.${column}`);
+    });
 
-        if not exists (
-          select 1
-          from pg_constraint
-          where conrelid = 'public.communication_messages'::regclass
-            and conname = 'communication_messages_direction_check'
-        ) then
-          alter table public.communication_messages
-            add constraint communication_messages_direction_check
-            check (direction in ('inbound', 'outbound'));
-        end if;
-      end $$
-    `;
-    await sql`
-      create index if not exists communication_messages_plan_idx
-        on public.communication_messages (plan_id, created_at desc)
-        where plan_id is not null
-    `;
-    await sql`
-      create index if not exists communication_messages_status_idx
-        on public.communication_messages (status, created_at asc)
-    `;
+    if (missing.length > 0) {
+      throw new Error(
+        `Communication schema is incomplete. Apply db-schema.sql before using communication APIs. Missing: ${missing.join(", ")}`
+      );
+    }
   })().catch((error) => {
     globalCommunications.mattanutraCommunicationSchemaReady = undefined;
     throw error;
@@ -1224,14 +1174,14 @@ async function sendPreparedEmailMessage(
   };
 }
 
-async function prepareCommunicationRetry(
+async function claimCommunicationRetry(
   tx: Db,
-  messageId: string
+  input: CommunicationRetryClaimInput
 ): Promise<PreparedRetryMessage> {
   const rows = await tx<MessageRow[]>`
     select *
     from public.communication_messages
-    where id = ${messageId}::uuid
+    where id = ${input.messageId}::uuid
     limit 1
     for update
   `;
@@ -1248,40 +1198,17 @@ async function prepareCommunicationRetry(
     };
   }
 
-  const planId = isUuid(row.plan_id ?? "") ? row.plan_id : null;
-  const identityId = isUuid(row.identity_id ?? "")
-    ? row.identity_id
-    : planId
-      ? await ensurePlanIdentityInTransaction(tx, planId)
-      : null;
-
-  if (planId && identityId) {
-    await seedKnownPlanChannelsInTransaction(tx, planId, identityId);
-  }
-
-  const channels = identityId
-    ? (
-        await tx<ChannelRow[]>`
-          select *
-          from public.communication_channels
-          where identity_id = ${identityId}::uuid
-          order by preference_rank asc, created_at asc
-        `
-      ).map(mapChannel)
-    : [];
-  const selected = selectBestCommunicationChannel(channels);
-
-  if (!selected) {
+  if (!input.selected) {
     const updated = await tx<MessageRow[]>`
       update public.communication_messages
       set
-        identity_id = coalesce(${identityId ?? null}::uuid, identity_id),
+        identity_id = coalesce(${input.identityId ?? null}::uuid, identity_id),
         channel_id = null,
         provider = null,
         status = 'no_channel',
         error_message = 'Awaiting a contact channel for this plan',
         updated_at = now()
-      where id = ${messageId}::uuid
+      where id = ${input.messageId}::uuid
       returning *
     `;
 
@@ -1294,24 +1221,24 @@ async function prepareCommunicationRetry(
   const updated = await tx<MessageRow[]>`
     update public.communication_messages
     set
-      identity_id = coalesce(${identityId ?? null}::uuid, identity_id),
-      channel_id = ${selected.id}::uuid,
-      provider = ${selected.channelType},
+      identity_id = coalesce(${input.identityId ?? null}::uuid, identity_id),
+      channel_id = ${input.selected.id}::uuid,
+      provider = ${input.selected.channelType},
       status = 'queued',
       error_message = null,
       metadata = metadata || ${tx.json(
         toJsonValue({
-          retrySelectedChannelType: selected.channelType,
+          retrySelectedChannelType: input.selected.channelType,
           retryStartedAt: new Date().toISOString()
         })
       )}::jsonb,
       updated_at = now()
-    where id = ${messageId}::uuid
+    where id = ${input.messageId}::uuid
     returning *
   `;
 
   return {
-    channel: selected,
+    channel: input.selected,
     message: mapMessage(updated[0])
   };
 }
@@ -1325,8 +1252,56 @@ export async function retryCommunicationMessage(messageId: string) {
 
   await ensureCommunicationSchema(sql);
 
+  const initialRows = await sql<MessageRow[]>`
+    select *
+    from public.communication_messages
+    where id = ${messageId}::uuid
+    limit 1
+  `;
+  const initial = initialRows[0];
+
+  if (!initial) {
+    throw new Error("Communication message not found");
+  }
+
+  if (initial.status === "sent" || initial.status === "delivered") {
+    return {
+      attempted: false,
+      configured: true,
+      message: mapMessage(initial),
+      provider: initial.provider,
+      reason: "Message is already complete"
+    } satisfies CommunicationDispatchResult;
+  }
+
+  const planId = isUuid(initial.plan_id ?? "") ? initial.plan_id : null;
+  const identityId = isUuid(initial.identity_id ?? "")
+    ? initial.identity_id
+    : planId
+      ? await ensurePlanIdentityInTransaction(sql, planId)
+      : null;
+
+  if (planId && identityId) {
+    await seedKnownPlanChannelsInTransaction(sql, planId, identityId);
+  }
+
+  const channels = identityId
+    ? (
+        await sql<ChannelRow[]>`
+          select *
+          from public.communication_channels
+          where identity_id = ${identityId}::uuid
+          order by preference_rank asc, created_at asc
+        `
+      ).map(mapChannel)
+    : [];
+  const selected = selectBestCommunicationChannel(channels);
   const prepared = await sql.begin((tx) =>
-    prepareCommunicationRetry(tx, messageId)
+    claimCommunicationRetry(tx, {
+      identityId,
+      messageId,
+      selected
+    })
   );
 
   if (!prepared.channel) {

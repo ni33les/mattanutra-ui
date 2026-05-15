@@ -1,5 +1,8 @@
 import { spawn } from "node:child_process";
 import net from "node:net";
+import nextEnv from "@next/env";
+
+nextEnv.loadEnvConfig(process.cwd());
 
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const port = Number(process.env.PORT || process.env.NEXT_PORT || 3000);

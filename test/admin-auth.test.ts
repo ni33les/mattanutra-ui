@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { after, before, describe, it } from "node:test";
 import {
   adminClawRequestAllowed,
@@ -120,5 +121,88 @@ describe("admin claw token auth", () => {
       ),
       false
     );
+  });
+});
+
+describe("API auth boundaries", () => {
+  it("keeps worker task APIs on worker-only auth", async () => {
+    const workerApiRoutes = [
+      "app/api/tasks/reserve/route.ts",
+      "app/api/tasks/[id]/comment/route.ts",
+      "app/api/tasks/[id]/complete/route.ts",
+      "app/api/tasks/[id]/fail/route.ts",
+      "app/api/tasks/[id]/renew/route.ts",
+      "app/api/tasks/[id]/spawn/route.ts",
+      "app/api/workers/heartbeat/route.ts",
+      "app/api/workers/register/route.ts"
+    ];
+
+    for (const file of workerApiRoutes) {
+      const source = await readFile(file, "utf8");
+
+      assert.match(
+        source,
+        /requireWorkerRequest/,
+        `${file} must require WORKER_API_TOKEN`
+      );
+      assert.doesNotMatch(
+        source,
+        /adminDashboardOrClawRequestAllowed/,
+        `${file} must not accept dashboard/admin mutation tokens`
+      );
+    }
+  });
+
+  it("keeps OpenClaw/admin integration reads off public access", async () => {
+    const openClawRoutes = [
+      "app/api/admin/query/[view]/route.ts",
+      "app/api/blog/posts/route.ts",
+      "app/api/blog/posts/[idOrSlug]/route.ts",
+      "app/api/blog/testimonials/route.ts",
+      "app/api/blog/testimonials/[id]/route.ts",
+      "app/api/communications/channels/route.ts",
+      "app/api/communications/channels/[id]/route.ts",
+      "app/api/communications/messages/route.ts",
+      "app/api/communications/messages/[id]/route.ts",
+      "app/api/cron/route.ts",
+      "app/api/tasks/[id]/route.ts"
+    ];
+
+    for (const file of openClawRoutes) {
+      const source = await readFile(file, "utf8");
+
+      assert.match(
+        source,
+        /requireOpenClawRequest/,
+        `${file} must require ADMIN_CLAW_TOKEN`
+      );
+    }
+  });
+
+  it("keeps communication send actions limited to worker or OpenClaw callers", async () => {
+    const sendActionRoutes = [
+      "app/api/communications/send/route.ts",
+      "app/api/communications/messages/[id]/dispatch/route.ts"
+    ];
+
+    for (const file of sendActionRoutes) {
+      const source = await readFile(file, "utf8");
+
+      assert.match(
+        source,
+        /adminClawRequestAllowed/,
+        `${file} must accept protected OpenClaw callers`
+      );
+      assert.match(
+        source,
+        /workerRequestAllowed/,
+        `${file} must accept protected worker callers`
+      );
+      assert.doesNotMatch(
+        source,
+        /adminDashboardOrClawRequestAllowed/,
+        `${file} must not accept dashboard tokens for provider sends`
+      );
+    }
   });
 });

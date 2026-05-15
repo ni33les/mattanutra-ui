@@ -1,5 +1,4 @@
 import type {
-  FoodGuidanceItem,
   FormulationIngredient,
   FormulationResult,
   RecommendedProduct
@@ -10,14 +9,6 @@ export const FREE_PREVIEW_SUPPLEMENT_LIMIT = 3;
 
 export function isExampleFormulationModelVersion(value: unknown) {
   return typeof value === "string" && value.endsWith(":example");
-}
-
-function visibleIngredient(ingredient: FormulationIngredient) {
-  return ingredient.safety?.visibility !== "hidden";
-}
-
-function visibleFood(item: FoodGuidanceItem) {
-  return item.safety?.visibility !== "hidden";
 }
 
 function effectivenessRank(
@@ -55,7 +46,6 @@ export function toFreePreviewFormulationResult(
       ingredient,
       rank: effectivenessRank(ingredient, index)
     }))
-    .filter(({ ingredient }) => visibleIngredient(ingredient))
     .sort((first, second) => first.rank - second.rank);
   const previewIngredientIds = new Set(
     visibleRankedIngredients
@@ -70,7 +60,6 @@ export function toFreePreviewFormulationResult(
       item,
       rank: effectivenessRank(item, index)
     }))
-    .filter(({ item }) => visibleFood(item))
     .sort((first, second) => first.rank - second.rank);
   const previewFoodIds = new Set(
     visibleRankedFoods.slice(0, foodLimit).map(({ item }) => item.id)

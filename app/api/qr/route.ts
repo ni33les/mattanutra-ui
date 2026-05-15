@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 
+const maxQrDataLength = 2048;
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const data = searchParams.get("data")?.trim();
 
   if (!data) {
     return NextResponse.json({ error: "Missing QR data" }, { status: 400 });
+  }
+
+  if (data.length > maxQrDataLength) {
+    return NextResponse.json({ error: "QR data is too long" }, { status: 400 });
   }
 
   const qrUrl = new URL("https://api.qrserver.com/v1/create-qr-code/");

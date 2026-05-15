@@ -19,6 +19,7 @@ export type LocalizedText =
     };
 
 export type FormulationIngredient = {
+  benefitTags?: string[];
   category: string;
   dailyDose: LocalizedText;
   effectivenessRank: number;

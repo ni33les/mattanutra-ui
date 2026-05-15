@@ -98,6 +98,22 @@ describe("external worker boundaries", () => {
     );
   });
 
+  it("loads local env before starting platform workers", async () => {
+    const platformSource = await readFile("scripts/start-platform.mjs", "utf8");
+    const runnerSource = await readFile("workers/runner.ts", "utf8");
+
+    assert.match(
+      platformSource,
+      /nextEnv\.loadEnvConfig\(process\.cwd\(\)\)/,
+      "start:platform must load .env.local before checking WORKER_API_TOKEN and spawning workers"
+    );
+    assert.match(
+      runnerSource,
+      /nextEnv\.loadEnvConfig\(process\.cwd\(\)\)/,
+      "direct worker commands must load .env.local before registering with the worker API"
+    );
+  });
+
   it("keeps reservation constrained by the registered worker session", async () => {
     const source = await readFile("lib/task-service.ts", "utf8");
     const alertsSource = await readFile("lib/admin-technical.ts", "utf8");
@@ -215,6 +231,21 @@ describe("external worker boundaries", () => {
       source,
       /status = \$\{planReady \? "ready" : "failed"\}::public\.assessment_status/,
       "reused successful nutrition plan work must resolve the assessment instead of leaving it queued"
+    );
+  });
+
+  it("refreshes paid nutrition readiness after overlapping completion transactions commit", async () => {
+    const source = await readFile("lib/task-result-applier.ts", "utf8");
+
+    assert.match(
+      source,
+      /refreshPaidNutritionReadinessAfterCommit/,
+      "paid food and supplement completions must re-check readiness after commit"
+    );
+    assert.match(
+      source,
+      /post_commit_readiness_refresh/,
+      "post-commit readiness repair should be visible in task events"
     );
   });
 

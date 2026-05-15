@@ -161,137 +161,38 @@ export async function ensureAssessmentSchema() {
   }
 
   schemaReady ??= (async () => {
-    await sql`
-      do $$
-      declare
-        constraint_names text[][] := array[
-          ['assessment_submissions_pkey', 'assessments_pkey'],
-          ['assessment_submissions_plan_id_not_null', 'assessments_plan_id_not_null'],
-          ['assessment_submissions_locale_not_null', 'assessments_locale_not_null'],
-          ['assessment_submissions_status_not_null', 'assessments_status_not_null'],
-          ['assessment_submissions_answers_not_null', 'assessments_answers_not_null'],
-          ['assessment_submissions_answer_summary_not_null', 'assessments_answer_summary_not_null'],
-          ['assessment_submissions_captured_at_not_null', 'assessments_captured_at_not_null'],
-          ['assessment_submissions_updated_at_not_null', 'assessments_updated_at_not_null']
-        ];
-        index_names text[][] := array[
-          ['assessment_submissions_status_idx', 'assessments_status_idx'],
-          ['assessment_submissions_plan_idx', 'assessments_plan_idx'],
-          ['assessment_submissions_answers_gin_idx', 'assessments_answers_gin_idx']
-        ];
-        name_pair text[];
-      begin
-        if not exists (select 1 from pg_type where typname = 'assessment_plan') then
-          create type assessment_plan as enum ('precision', 'pro');
-        end if;
+    const requiredColumns = [
+      "plan_id",
+      "locale",
+      "selected_plan",
+      "status",
+      "answers",
+      "answer_summary",
+      "health_score",
+      "queue_position",
+      "error_message",
+      "captured_at",
+      "plan_selected_at",
+      "processing_started_at",
+      "completed_at",
+      "updated_at"
+    ];
+    const rows = await sql<Array<{ column_name: string }>>`
+      select column_name
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'assessments'
+    `;
+    const available = new Set(rows.map((row) => row.column_name));
+    const missing = requiredColumns
+      .filter((column) => !available.has(column))
+      .map((column) => `public.assessments.${column}`);
 
-        if not exists (select 1 from pg_type where typname = 'assessment_status') then
-          create type assessment_status as enum (
-            'captured',
-            'queued',
-            'preparing',
-            'ready',
-            'failed'
-          );
-        end if;
-
-        if to_regclass('public.assessment_submissions') is not null
-          and to_regclass('public.assessments') is null then
-          alter table public.assessment_submissions rename to assessments;
-        end if;
-
-        if to_regclass('public.assessments') is not null then
-          foreach name_pair slice 1 in array constraint_names loop
-            if exists (
-              select 1 from pg_constraint
-              where conrelid = 'public.assessments'::regclass
-                and conname = name_pair[1]
-            ) and not exists (
-              select 1 from pg_constraint
-              where conrelid = 'public.assessments'::regclass
-                and conname = name_pair[2]
-            ) then
-              execute format(
-                'alter table public.assessments rename constraint %I to %I',
-                name_pair[1],
-                name_pair[2]
-              );
-            end if;
-          end loop;
-        end if;
-
-        foreach name_pair slice 1 in array index_names loop
-          if to_regclass('public.' || name_pair[1]) is not null
-            and to_regclass('public.' || name_pair[2]) is null then
-            execute format(
-              'alter index public.%I rename to %I',
-              name_pair[1],
-              name_pair[2]
-            );
-          end if;
-        end loop;
-      end $$;
-    `;
-
-    await sql`
-      alter type assessment_plan add value if not exists 'precision'
-    `;
-    await sql`
-      alter type assessment_plan add value if not exists 'pro'
-    `;
-    await sql`
-      alter type assessment_status add value if not exists 'captured'
-    `;
-    await sql`
-      alter type assessment_status add value if not exists 'queued'
-    `;
-    await sql`
-      alter type assessment_status add value if not exists 'preparing'
-    `;
-    await sql`
-      alter type assessment_status add value if not exists 'ready'
-    `;
-    await sql`
-      alter type assessment_status add value if not exists 'failed'
-    `;
-
-    await sql`
-      create table if not exists assessments (
-        plan_id uuid primary key,
-        locale text not null default 'en' check (locale in ('en', 'th')),
-        selected_plan assessment_plan null,
-        status assessment_status not null default 'captured',
-        answers jsonb not null default '{}'::jsonb,
-        answer_summary jsonb not null default '{}'::jsonb,
-        health_score jsonb not null default '{}'::jsonb,
-        queue_position integer null,
-        error_message text null,
-        captured_at timestamptz not null default now(),
-        plan_selected_at timestamptz null,
-        processing_started_at timestamptz null,
-        completed_at timestamptz null,
-        updated_at timestamptz not null default now()
-      )
-    `;
-
-    await sql`
-      alter table assessments
-        add column if not exists error_message text null,
-        add column if not exists health_score jsonb not null default '{}'::jsonb
-    `;
-
-    await sql`
-      create index if not exists assessments_status_idx
-        on assessments (status, captured_at desc)
-    `;
-    await sql`
-      create index if not exists assessments_plan_idx
-        on assessments (selected_plan, captured_at desc)
-    `;
-    await sql`
-      create index if not exists assessments_answers_gin_idx
-        on assessments using gin (answers jsonb_path_ops)
-    `;
+    if (missing.length > 0) {
+      throw new Error(
+        `Assessment schema is incomplete. Apply db-schema.sql before using assessment APIs. Missing: ${missing.join(", ")}`
+      );
+    }
   })().catch((error) => {
     schemaReady = null;
     throw error;

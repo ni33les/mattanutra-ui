@@ -24,6 +24,8 @@ const globalTaskService = globalThis as typeof globalThis & {
   mattanutraWorkerSessionSchemaReady?: Promise<void>;
 };
 
+const TASK_FINALIZATION_LEASE_SECONDS = 300;
+
 export type AgentType =
   | "ai"
   | "deterministic"
@@ -290,6 +292,14 @@ type ExpiredReservationRow = TaskRow & {
   reservation_id: string;
   reservation_worker_session_id: string | null;
 };
+
+type ExpiredReservationClaim = Readonly<{
+  exhausted: boolean;
+  reservationAgentId: string;
+  reservationId: string;
+  retryWillBeScheduled: boolean;
+  task: TaskRecord;
+}>;
 
 export type CreateTaskInput = Readonly<{
   actorType?: TaskActorType;
@@ -565,6 +575,10 @@ function cleanText(value: unknown, fallback: string) {
   const trimmed = value.trim();
 
   return trimmed ? trimmed : fallback;
+}
+
+function errorMessage(error: unknown, fallback = "Task side effect failed.") {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function optionalText(value: unknown) {
@@ -1776,22 +1790,50 @@ export async function releaseExpiredReservations(
   input: ReleaseExpiredReservationsInput = {}
 ) {
   const sql = getRequiredSql();
+  const afterCommitEffects: TaskAfterCommitEffect[] = [];
 
-  const releasedCount = await sql.begin((tx) =>
-    releaseExpiredReservationsInTransaction(tx, input)
+  const released = await sql.begin((tx) =>
+    claimExpiredReservationsInTransaction(tx)
   );
 
-  if (releasedCount > 0) {
+  for (const claim of released) {
+    if (!claim.exhausted) {
+      continue;
+    }
+
+    const resultPayload = await applyExpiredReservationFailure(sql, {
+      afterCommitEffects,
+      applyFailure: input.applyFailure,
+      claim
+    });
+
+    await updateExpiredFailureResultPayload(sql, {
+      resultPayload,
+      taskId: claim.task.id
+    });
+
+    await scheduleRetryForFailedTask(sql, {
+      errorMessage: "Task lease expired after maximum attempts.",
+      failedByAgentId: claim.reservationAgentId,
+      resultPayload,
+      task: claim.task
+    });
+  }
+
+  if (released.length > 0) {
     notifyTaskQueueChanged();
   }
 
-  return releasedCount;
+  await runTaskAfterCommitEffects({
+    agentId: null,
+    effects: afterCommitEffects,
+    taskId: null
+  });
+
+  return released.length;
 }
 
-async function releaseExpiredReservationsInTransaction(
-  sql: Db,
-  input: ReleaseExpiredReservationsInput = {}
-) {
+async function claimExpiredReservationsInTransaction(sql: Db) {
   const expired = await sql<ExpiredReservationRow[]>`
     select
       task_reservations.id::text as reservation_id,
@@ -1806,25 +1848,13 @@ async function releaseExpiredReservationsInTransaction(
     order by task_reservations.lease_until asc
     for update skip locked
   `;
+  const claims: ExpiredReservationClaim[] = [];
 
   for (const row of expired) {
     const exhausted = row.attempts >= row.max_attempts;
     const pendingTask = mapTask(row);
     const retryWillBeScheduled =
       exhausted && taskRetryWillBeScheduled(pendingTask);
-    const resultPayload = payloadRecord(
-      exhausted && input.applyFailure
-        ? await input.applyFailure({
-            agentId: row.reservation_agent_id,
-            errorMessage: "Task lease expired after maximum attempts.",
-            reservationId: row.reservation_id,
-            resultPayload: {},
-            retryWillBeScheduled,
-            sql,
-            task: pendingTask
-          })
-        : {}
-    );
 
     await sql`
       update public.task_reservations set
@@ -1850,7 +1880,7 @@ async function releaseExpiredReservationsInTransaction(
         lease_until = null,
         error_message = ${exhausted ? "Task lease expired after maximum attempts." : null},
         result_payload = case
-          when ${exhausted} then ${sql.json(toJsonValue(resultPayload))}
+          when ${exhausted} then ${sql.json(toJsonValue({}))}
           else result_payload
         end,
         updated_at = now()
@@ -1864,7 +1894,7 @@ async function releaseExpiredReservationsInTransaction(
       eventPayload: {
         exhausted,
         reservationId: row.reservation_id,
-        resultPayload
+        retryWillBeScheduled
       },
       eventStatus: exhausted ? "failed" : "observed",
       eventType: exhausted ? "task_failed_after_lease_expiry" : "lease_expired",
@@ -1872,17 +1902,18 @@ async function releaseExpiredReservationsInTransaction(
       taskId: row.id
     });
 
-    if (exhausted && updatedTasks[0]) {
-      await scheduleRetryForFailedTaskInTransaction(sql, {
-        errorMessage: "Task lease expired after maximum attempts.",
-        failedByAgentId: row.reservation_agent_id,
-        resultPayload,
+    if (updatedTasks[0]) {
+      claims.push({
+        exhausted,
+        reservationAgentId: row.reservation_agent_id,
+        reservationId: row.reservation_id,
+        retryWillBeScheduled,
         task: mapTask(updatedTasks[0])
       });
     }
   }
 
-  return expired.length;
+  return claims;
 }
 
 async function taskHasSuccessfulRetryInTransaction(sql: Db, task: TaskRecord) {
@@ -2051,6 +2082,143 @@ async function scheduleRetryForFailedTaskInTransaction(
   });
 
   return created.task;
+}
+
+async function scheduleRetryForFailedTask(
+  sql: postgres.Sql,
+  input: Readonly<{
+    errorMessage: string;
+    failedByAgentId?: string | null;
+    resultPayload?: Record<string, unknown>;
+    task: TaskRecord;
+  }>
+) {
+  try {
+    return await sql.begin(async (tx) => {
+      const taskRows = await tx<TaskRow[]>`
+        select *
+        from public.tasks
+        where id = ${input.task.id}::uuid
+          and status = 'failed'
+        for update
+      `;
+
+      if (!taskRows[0]) {
+        return null;
+      }
+
+      return scheduleRetryForFailedTaskInTransaction(tx, {
+        ...input,
+        task: mapTask(taskRows[0])
+      });
+    });
+  } catch (error) {
+    await addTaskEvent({
+      agentId: input.failedByAgentId,
+      eventPayload: {
+        error: errorMessage(error, "Unable to schedule retry."),
+        failedTaskId: input.task.id
+      },
+      eventStatus: "failed",
+      eventType: "task_retry_schedule_failed",
+      severity: "high",
+      taskId: input.task.id
+    });
+    return null;
+  }
+}
+
+async function applyExpiredReservationFailure(
+  sql: postgres.Sql,
+  input: Readonly<{
+    afterCommitEffects: TaskAfterCommitEffect[];
+    applyFailure?: (context: TaskFailureContext) => Promise<unknown>;
+    claim: ExpiredReservationClaim;
+  }>
+) {
+  if (!input.applyFailure) {
+    return {};
+  }
+
+  try {
+    return payloadRecord(
+      await input.applyFailure({
+        afterCommit: (effect) => input.afterCommitEffects.push(effect),
+        agentId: input.claim.reservationAgentId,
+        errorMessage: "Task lease expired after maximum attempts.",
+        reservationId: input.claim.reservationId,
+        resultPayload: {},
+        retryWillBeScheduled: input.claim.retryWillBeScheduled,
+        sql,
+        task: input.claim.task
+      })
+    );
+  } catch (error) {
+    const message = errorMessage(error, "Task failure side effect failed.");
+
+    await addTaskEvent({
+      agentId: input.claim.reservationAgentId,
+      eventPayload: {
+        error: message,
+        reservationId: input.claim.reservationId,
+        stage: "expired_reservation_failure_application"
+      },
+      eventStatus: "failed",
+      eventType: "task_failure_result_apply_failed",
+      severity: "high",
+      taskId: input.claim.task.id
+    });
+
+    return {
+      failureApplicationError: message
+    };
+  }
+}
+
+async function updateExpiredFailureResultPayload(
+  sql: postgres.Sql,
+  input: Readonly<{
+    resultPayload: Record<string, unknown>;
+    taskId: string;
+  }>
+) {
+  await sql`
+    update public.tasks set
+      result_payload = ${sql.json(toJsonValue(input.resultPayload))},
+      updated_at = now()
+    where id = ${input.taskId}::uuid
+      and status = 'failed'
+  `;
+}
+
+async function runTaskAfterCommitEffects(
+  input: Readonly<{
+    agentId?: string | null;
+    effects: readonly TaskAfterCommitEffect[];
+    taskId?: string | null;
+  }>
+) {
+  for (const effect of input.effects) {
+    try {
+      await effect();
+    } catch (error) {
+      console.warn("Task after-commit effect failed", error);
+      try {
+        await addTaskEvent({
+          agentId: input.agentId,
+          eventPayload: {
+            error: errorMessage(error, "After-commit effect failed.")
+          },
+          eventStatus: "failed",
+          eventType: "task_after_commit_effect_failed",
+          severity: "medium",
+          taskId: input.taskId
+        });
+      } catch (eventError) {
+        console.warn("Unable to record task after-commit effect failure", eventError);
+      }
+    }
+  }
 }
 
 export async function reserveNextTask(
@@ -2284,13 +2452,33 @@ export async function reserveNextTask(
   };
 }
 
-export async function completeTask(input: CompleteTaskInput) {
-  const sql = getRequiredSql();
-  const afterCommitEffects: TaskAfterCommitEffect[] = [];
+async function extendFinalizationLeaseInTransaction(
+  sql: Db,
+  reservation: Awaited<ReturnType<typeof activeReservationInTransaction>>
+) {
+  if (!reservation) {
+    return;
+  }
 
-  await ensureWorkerSessionSchema(sql);
+  await sql`
+    update public.task_reservations set
+      lease_until = greatest(
+        lease_until,
+        now() + make_interval(secs => ${TASK_FINALIZATION_LEASE_SECONDS})
+      ),
+      heartbeat_at = now(),
+      metadata = metadata || jsonb_build_object(
+        'finalizationLeaseExtendedAt', now()
+      )
+    where id = ${reservation.id}::uuid
+  `;
+}
 
-  const task = await sql.begin(async (tx) => {
+async function claimTaskCompletionApplication(
+  sql: postgres.Sql,
+  input: CompleteTaskInput
+) {
+  return sql.begin(async (tx) => {
     const activeReservation = await activeReservationInTransaction(tx, {
       agentId: input.agentId,
       reservationId: input.reservationId,
@@ -2322,25 +2510,15 @@ export async function completeTask(input: CompleteTaskInput) {
       throw new Error(`Task ${input.taskId} could not be completed`);
     }
 
-    const resultPayload = payloadRecord(
-      input.applyResult
-        ? await input.applyResult({
-            afterCommit: (effect) => afterCommitEffects.push(effect),
-            agentId: input.agentId ?? activeReservation?.agent_id,
-            reservationId: activeReservation?.id ?? input.reservationId,
-            resultPayload: input.resultPayload ?? {},
-            sql: tx,
-            task: pendingTask
-          })
-        : (input.resultPayload ?? {})
-    );
+    await extendFinalizationLeaseInTransaction(tx, activeReservation);
+
     const rows = await tx<TaskRow[]>`
       update public.tasks set
-        status = 'completed',
-        result_payload = ${tx.json(toJsonValue(resultPayload))},
-        completed_at = now(),
-        lease_until = null,
-        reserved_by_agent_id = null,
+        status = 'running',
+        lease_until = greatest(
+          coalesce(lease_until, now()),
+          now() + make_interval(secs => ${TASK_FINALIZATION_LEASE_SECONDS})
+        ),
         updated_at = now()
       where id = ${input.taskId}::uuid
         and status in ('queued', 'reserved', 'running', 'needs_review', 'waiting_approval')
@@ -2357,6 +2535,68 @@ export async function completeTask(input: CompleteTaskInput) {
 
     const task = mapTask(rows[0]);
 
+    await addTaskEventInTransaction(tx, {
+      agentId: input.agentId ?? activeReservation?.agent_id,
+      eventPayload: {
+        reservationId: activeReservation?.id,
+        stage: "completion_result_application"
+      },
+      eventStatus: "accepted",
+      eventType: "task_completion_result_applying",
+      taskId: task.id
+    });
+
+    return { activeReservation, task };
+  });
+}
+
+async function finalizeTaskCompletion(
+  sql: postgres.Sql,
+  input: Readonly<{
+    claim: Awaited<ReturnType<typeof claimTaskCompletionApplication>>;
+    completionInput: CompleteTaskInput;
+    resultPayload: Record<string, unknown>;
+  }>
+) {
+  return sql.begin(async (tx) => {
+    const activeReservation = await activeReservationInTransaction(tx, {
+      agentId: input.completionInput.agentId,
+      reservationId: input.completionInput.reservationId,
+      taskId: input.completionInput.taskId,
+      workerSessionId: input.completionInput.workerSessionId
+    }, { lock: true });
+    const agentId =
+      input.completionInput.agentId ??
+      activeReservation?.agent_id ??
+      input.claim.activeReservation?.agent_id;
+    const reservationId =
+      activeReservation?.id ?? input.claim.activeReservation?.id;
+    const workerSessionId =
+      activeReservation?.worker_session_id ??
+      input.claim.activeReservation?.worker_session_id;
+    const rows = await tx<TaskRow[]>`
+      update public.tasks set
+        status = 'completed',
+        result_payload = ${tx.json(toJsonValue(input.resultPayload))},
+        completed_at = now(),
+        lease_until = null,
+        reserved_by_agent_id = null,
+        updated_at = now()
+      where id = ${input.completionInput.taskId}::uuid
+        and status = 'running'
+        and (
+          ${activeReservation?.agent_id ?? null}::uuid is null
+          or reserved_by_agent_id = ${activeReservation?.agent_id ?? null}::uuid
+        )
+      returning *
+    `;
+
+    if (!rows[0]) {
+      throw new Error(`Task ${input.completionInput.taskId} could not be completed`);
+    }
+
+    const task = mapTask(rows[0]);
+
     await tx`
       update public.task_reservations set
         status = 'completed',
@@ -2364,27 +2604,27 @@ export async function completeTask(input: CompleteTaskInput) {
       where task_id = ${task.id}::uuid
         and status = 'active'
         and (
-          ${activeReservation?.id ?? null}::uuid is null
-          or id = ${activeReservation?.id ?? null}::uuid
+          ${reservationId ?? null}::uuid is null
+          or id = ${reservationId ?? null}::uuid
         )
     `;
 
-    if (activeReservation?.worker_session_id) {
+    if (workerSessionId) {
       await tx`
         update public.worker_sessions set
           status = 'idle',
           current_task_id = null,
           last_seen_at = now(),
           updated_at = now()
-        where id = ${activeReservation.worker_session_id}::uuid
+        where id = ${workerSessionId}::uuid
       `;
     }
 
     await addTaskEventInTransaction(tx, {
-      agentId: input.agentId ?? activeReservation?.agent_id,
+      agentId,
       eventPayload: {
-        ...resultPayload,
-        reservationId: activeReservation?.id
+        ...input.resultPayload,
+        reservationId
       },
       eventStatus: "succeeded",
       eventType: "task_completed",
@@ -2393,30 +2633,60 @@ export async function completeTask(input: CompleteTaskInput) {
 
     return task;
   });
+}
+
+export async function completeTask(input: CompleteTaskInput) {
+  const sql = getRequiredSql();
+  const afterCommitEffects: TaskAfterCommitEffect[] = [];
+
+  await ensureWorkerSessionSchema(sql);
+
+  const claim = await claimTaskCompletionApplication(sql, input);
+  let resultPayload: Record<string, unknown>;
+
+  try {
+    resultPayload = payloadRecord(
+      input.applyResult
+        ? await input.applyResult({
+            afterCommit: (effect) => afterCommitEffects.push(effect),
+            agentId: input.agentId ?? claim.activeReservation?.agent_id,
+            reservationId: claim.activeReservation?.id ?? input.reservationId,
+            resultPayload: input.resultPayload ?? {},
+            sql,
+            task: claim.task
+          })
+        : (input.resultPayload ?? {})
+    );
+  } catch (error) {
+    await addTaskEvent({
+      agentId: input.agentId ?? claim.activeReservation?.agent_id,
+      eventPayload: {
+        error: errorMessage(error, "Task completion side effect failed."),
+        reservationId: claim.activeReservation?.id,
+        stage: "completion_result_application"
+      },
+      eventStatus: "failed",
+      eventType: "task_completion_result_apply_failed",
+      severity: "high",
+      taskId: claim.task.id
+    });
+    notifyTaskQueueChanged();
+    throw error;
+  }
+
+  const task = await finalizeTaskCompletion(sql, {
+    claim,
+    completionInput: input,
+    resultPayload
+  });
 
   notifyTaskQueueChanged();
 
-  for (const effect of afterCommitEffects) {
-    try {
-      await effect();
-    } catch (error) {
-      console.warn("Task after-commit effect failed", error);
-      try {
-        await addTaskEvent({
-          agentId: input.agentId,
-          eventPayload: {
-            error: error instanceof Error ? error.message : "After-commit effect failed"
-          },
-          eventStatus: "failed",
-          eventType: "task_after_commit_effect_failed",
-          severity: "medium",
-          taskId: task.id
-        });
-      } catch (eventError) {
-        console.warn("Unable to record task after-commit effect failure", eventError);
-      }
-    }
-  }
+  await runTaskAfterCommitEffects({
+    agentId: input.agentId ?? claim.activeReservation?.agent_id,
+    effects: afterCommitEffects,
+    taskId: task.id
+  });
 
   return task;
 }
@@ -2518,13 +2788,11 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
   });
 }
 
-export async function failTask(input: FailTaskInput) {
-  const sql = getRequiredSql();
-  const afterCommitEffects: TaskAfterCommitEffect[] = [];
-
-  await ensureWorkerSessionSchema(sql);
-
-  const task = await sql.begin(async (tx) => {
+async function claimTaskFailureApplication(
+  sql: postgres.Sql,
+  input: FailTaskInput
+) {
+  return sql.begin(async (tx) => {
     const activeReservation = await activeReservationInTransaction(tx, {
       agentId: input.agentId,
       reservationId: input.reservationId,
@@ -2550,28 +2818,15 @@ export async function failTask(input: FailTaskInput) {
       throw new Error(`Task ${input.taskId} could not be failed`);
     }
 
-    const retryWillBeScheduled = taskRetryWillBeScheduled(pendingTask);
-    const resultPayload = payloadRecord(
-      input.applyFailure
-        ? await input.applyFailure({
-            afterCommit: (effect) => afterCommitEffects.push(effect),
-            agentId: input.agentId ?? activeReservation?.agent_id,
-            errorMessage: input.errorMessage,
-            reservationId: activeReservation?.id ?? input.reservationId,
-            resultPayload: input.resultPayload ?? {},
-            retryWillBeScheduled,
-            sql: tx,
-            task: pendingTask
-          })
-        : (input.resultPayload ?? {})
-    );
+    await extendFinalizationLeaseInTransaction(tx, activeReservation);
+
     const rows = await tx<TaskRow[]>`
       update public.tasks set
-        status = 'failed',
-        error_message = ${cleanText(input.errorMessage, "Task failed.")},
-        result_payload = ${tx.json(toJsonValue(resultPayload))},
-        lease_until = null,
-        reserved_by_agent_id = null,
+        status = 'running',
+        lease_until = greatest(
+          coalesce(lease_until, now()),
+          now() + make_interval(secs => ${TASK_FINALIZATION_LEASE_SECONDS})
+        ),
         updated_at = now()
       where id = ${input.taskId}::uuid
         and status not in ('completed', 'cancelled', 'skipped')
@@ -2588,6 +2843,69 @@ export async function failTask(input: FailTaskInput) {
 
     const task = mapTask(rows[0]);
 
+    await addTaskEventInTransaction(tx, {
+      agentId: input.agentId ?? activeReservation?.agent_id,
+      eventPayload: {
+        reservationId: activeReservation?.id,
+        stage: "failure_result_application"
+      },
+      eventStatus: "accepted",
+      eventType: "task_failure_result_applying",
+      severity: "medium",
+      taskId: task.id
+    });
+
+    return { activeReservation, task };
+  });
+}
+
+async function finalizeTaskFailure(
+  sql: postgres.Sql,
+  input: Readonly<{
+    claim: Awaited<ReturnType<typeof claimTaskFailureApplication>>;
+    failureInput: FailTaskInput;
+    resultPayload: Record<string, unknown>;
+  }>
+) {
+  return sql.begin(async (tx) => {
+    const activeReservation = await activeReservationInTransaction(tx, {
+      agentId: input.failureInput.agentId,
+      reservationId: input.failureInput.reservationId,
+      taskId: input.failureInput.taskId,
+      workerSessionId: input.failureInput.workerSessionId
+    }, { lock: true });
+    const agentId =
+      input.failureInput.agentId ??
+      activeReservation?.agent_id ??
+      input.claim.activeReservation?.agent_id;
+    const reservationId =
+      activeReservation?.id ?? input.claim.activeReservation?.id;
+    const workerSessionId =
+      activeReservation?.worker_session_id ??
+      input.claim.activeReservation?.worker_session_id;
+    const rows = await tx<TaskRow[]>`
+      update public.tasks set
+        status = 'failed',
+        error_message = ${cleanText(input.failureInput.errorMessage, "Task failed.")},
+        result_payload = ${tx.json(toJsonValue(input.resultPayload))},
+        lease_until = null,
+        reserved_by_agent_id = null,
+        updated_at = now()
+      where id = ${input.failureInput.taskId}::uuid
+        and status = 'running'
+        and (
+          ${activeReservation?.agent_id ?? null}::uuid is null
+          or reserved_by_agent_id = ${activeReservation?.agent_id ?? null}::uuid
+        )
+      returning *
+    `;
+
+    if (!rows[0]) {
+      throw new Error(`Task ${input.failureInput.taskId} could not be failed`);
+    }
+
+    const task = mapTask(rows[0]);
+
     await tx`
       update public.task_reservations set
         status = 'failed',
@@ -2595,28 +2913,28 @@ export async function failTask(input: FailTaskInput) {
       where task_id = ${task.id}::uuid
         and status = 'active'
         and (
-          ${activeReservation?.id ?? null}::uuid is null
-          or id = ${activeReservation?.id ?? null}::uuid
+          ${reservationId ?? null}::uuid is null
+          or id = ${reservationId ?? null}::uuid
         )
     `;
 
-    if (activeReservation?.worker_session_id) {
+    if (workerSessionId) {
       await tx`
         update public.worker_sessions set
           status = 'idle',
           current_task_id = null,
           last_seen_at = now(),
           updated_at = now()
-        where id = ${activeReservation.worker_session_id}::uuid
+        where id = ${workerSessionId}::uuid
       `;
     }
 
     await addTaskEventInTransaction(tx, {
-      agentId: input.agentId ?? activeReservation?.agent_id,
+      agentId,
       eventPayload: {
-        errorMessage: input.errorMessage,
-        reservationId: activeReservation?.id,
-        resultPayload
+        errorMessage: input.failureInput.errorMessage,
+        reservationId,
+        resultPayload: input.resultPayload
       },
       eventStatus: "failed",
       eventType: "task_failed",
@@ -2624,38 +2942,76 @@ export async function failTask(input: FailTaskInput) {
       taskId: task.id
     });
 
-    await scheduleRetryForFailedTaskInTransaction(tx, {
-      errorMessage: input.errorMessage,
-      failedByAgentId: input.agentId ?? activeReservation?.agent_id,
-      resultPayload,
-      task
-    });
     return task;
+  });
+}
+
+export async function failTask(input: FailTaskInput) {
+  const sql = getRequiredSql();
+  const afterCommitEffects: TaskAfterCommitEffect[] = [];
+
+  await ensureWorkerSessionSchema(sql);
+
+  const claim = await claimTaskFailureApplication(sql, input);
+  const retryWillBeScheduled = taskRetryWillBeScheduled(claim.task);
+  let resultPayload: Record<string, unknown>;
+
+  try {
+    resultPayload = payloadRecord(
+      input.applyFailure
+        ? await input.applyFailure({
+            afterCommit: (effect) => afterCommitEffects.push(effect),
+            agentId: input.agentId ?? claim.activeReservation?.agent_id,
+            errorMessage: input.errorMessage,
+            reservationId: claim.activeReservation?.id ?? input.reservationId,
+            resultPayload: input.resultPayload ?? {},
+            retryWillBeScheduled,
+            sql,
+            task: claim.task
+          })
+        : (input.resultPayload ?? {})
+    );
+  } catch (error) {
+    const message = errorMessage(error, "Task failure side effect failed.");
+
+    resultPayload = {
+      ...payloadRecord(input.resultPayload ?? {}),
+      failureApplicationError: message
+    };
+    await addTaskEvent({
+      agentId: input.agentId ?? claim.activeReservation?.agent_id,
+      eventPayload: {
+        error: message,
+        reservationId: claim.activeReservation?.id,
+        stage: "failure_result_application"
+      },
+      eventStatus: "failed",
+      eventType: "task_failure_result_apply_failed",
+      severity: "high",
+      taskId: claim.task.id
+    });
+  }
+
+  const task = await finalizeTaskFailure(sql, {
+    claim,
+    failureInput: input,
+    resultPayload
+  });
+
+  await scheduleRetryForFailedTask(sql, {
+    errorMessage: input.errorMessage,
+    failedByAgentId: input.agentId ?? claim.activeReservation?.agent_id,
+    resultPayload,
+    task
   });
 
   notifyTaskQueueChanged();
 
-  for (const effect of afterCommitEffects) {
-    try {
-      await effect();
-    } catch (error) {
-      console.warn("Task failure after-commit effect failed", error);
-      try {
-        await addTaskEvent({
-          agentId: input.agentId,
-          eventPayload: {
-            error: error instanceof Error ? error.message : "After-commit effect failed"
-          },
-          eventStatus: "failed",
-          eventType: "task_after_commit_effect_failed",
-          severity: "medium",
-          taskId: task.id
-        });
-      } catch (eventError) {
-        console.warn("Unable to record task failure after-commit effect failure", eventError);
-      }
-    }
-  }
+  await runTaskAfterCommitEffects({
+    agentId: input.agentId ?? claim.activeReservation?.agent_id,
+    effects: afterCommitEffects,
+    taskId: task.id
+  });
 
   return task;
 }

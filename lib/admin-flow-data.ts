@@ -547,16 +547,27 @@ async function ensureAdminConversionTargetsSchema() {
     return false;
   }
 
-  await sql`
-    create table if not exists public.admin_conversion_targets (
-      target_id text primary key,
-      target_rate numeric(5, 2) not null,
-      description text null,
-      updated_by text null,
-      updated_at timestamptz not null default now(),
-      created_at timestamptz not null default now()
-    )
+  const requiredColumns = [
+    "target_id",
+    "target_rate",
+    "description",
+    "updated_by",
+    "updated_at",
+    "created_at"
+  ];
+  const rows = await sql<Array<{ column_name: string }>>`
+    select column_name
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'admin_conversion_targets'
   `;
+  const available = new Set(rows.map((row) => row.column_name));
+
+  if (!requiredColumns.every((column) => available.has(column))) {
+    throw new Error(
+      "Admin conversion target schema is incomplete. Apply db-schema.sql before using conversion targets."
+    );
+  }
 
   return true;
 }

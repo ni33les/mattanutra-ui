@@ -811,22 +811,32 @@ async function ensureCacheSchema() {
   }
 
   globalHealthScoreCache.mattanutraHealthScoreCacheSchemaReady ??= (async () => {
-    await sql`
-      create table if not exists public.ai_response_cache (
-        cache_key text primary key,
-        cache_type text not null,
-        model text not null,
-        prompt_version text not null,
-        response jsonb not null,
-        expires_at timestamptz not null,
-        created_at timestamptz not null default now(),
-        updated_at timestamptz not null default now()
-      )
+    const requiredColumns = [
+      "cache_key",
+      "cache_type",
+      "model",
+      "prompt_version",
+      "response",
+      "expires_at",
+      "created_at",
+      "updated_at"
+    ];
+    const rows = await sql<Array<{ column_name: string }>>`
+      select column_name
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'ai_response_cache'
     `;
-    await sql`
-      create index if not exists ai_response_cache_type_expiry_idx
-        on public.ai_response_cache (cache_type, expires_at desc)
-    `;
+    const available = new Set(rows.map((row) => row.column_name));
+    const missing = requiredColumns
+      .filter((column) => !available.has(column))
+      .map((column) => `public.ai_response_cache.${column}`);
+
+    if (missing.length > 0) {
+      throw new Error(
+        `HealthScore cache schema is incomplete. Apply db-schema.sql before using the advice cache. Missing: ${missing.join(", ")}`
+      );
+    }
   })().catch((error) => {
     globalHealthScoreCache.mattanutraHealthScoreCacheSchemaReady = undefined;
     throw error;

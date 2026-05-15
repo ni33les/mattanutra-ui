@@ -5,6 +5,7 @@ import {
   ArrowPathIcon,
   BeakerIcon,
   ExclamationTriangleIcon,
+  HeartIcon,
   InformationCircleIcon,
   SparklesIcon
 } from "@heroicons/react/20/solid";
@@ -27,13 +28,56 @@ type LoadState = "loading" | "ready" | "error";
 
 const formulationHeroBackgroundImage = "/formulation-couple.jpg";
 
-function formatNutrientValue(value: number, unit: string, locale: Locale) {
-  const formatted = new Intl.NumberFormat(locale === "th" ? "th-TH" : "en-US", {
-    maximumFractionDigits: value < 1 ? 2 : value < 10 ? 1 : 0
-  }).format(value);
-
-  return `${formatted} ${unit}`;
-}
+const supplementBenefitRules = [
+  {
+    patterns: ["inflamm", "omega", "curcumin", "turmeric", "boswellia", "quercetin", "resveratrol", "pine bark"],
+    tag: "anti_inflammatory"
+  },
+  {
+    patterns: ["stress", "calm", "relax", "adaptogen", "ashwagandha", "rhodiola", "theanine", "gaba"],
+    tag: "stress_support"
+  },
+  {
+    patterns: ["sleep", "melatonin", "magnesium", "glycine", "gaba", "theanine", "cherry"],
+    tag: "sleep_support"
+  },
+  {
+    patterns: ["energy", "fatigue", "mitochond", "coq10", "creatine", "carnitine", "nad", "b12", "iron"],
+    tag: "energy_support"
+  },
+  {
+    patterns: ["brain", "cognition", "focus", "memory", "nootropic", "threonate", "omega"],
+    tag: "cognitive_support"
+  },
+  {
+    patterns: ["heart", "cardio", "blood pressure", "cholesterol", "omega", "coq10"],
+    tag: "heart_health"
+  },
+  {
+    patterns: ["gut", "digest", "microbiome", "probiotic", "prebiotic", "fiber", "colostrum"],
+    tag: "gut_health"
+  },
+  {
+    patterns: ["immune", "vitamin c", "vitamin d", "zinc", "selenium", "colostrum"],
+    tag: "immune_support"
+  },
+  {
+    patterns: ["skin", "hair", "nail", "collagen", "hyaluronic", "ceramide"],
+    tag: "skin_health"
+  },
+  {
+    patterns: ["recovery", "muscle", "joint", "training", "protein", "collagen", "creatine"],
+    tag: "recovery_support"
+  },
+  {
+    patterns: ["bone", "calcium", "vitamin d", "vitamin k", "k2", "magnesium"],
+    tag: "bone_health"
+  },
+  {
+    patterns: ["hormone", "estrogen", "testosterone", "cycle", "pms", "dht", "vitex", "dim"],
+    tag: "hormone_support"
+  }
+] as const;
 
 type CopyLabels = Record<
   | "connectChatBody"
@@ -91,7 +135,9 @@ type CopyLabels = Record<
   | "safetyReviewBody"
   | "safetyReviewTitle"
   | "foodSafetyReviewBody"
-  | "foodSafetyReviewTitle",
+  | "foodSafetyReviewTitle"
+  | "foodUnderReview"
+  | "supplementUnderReview",
   string
 > & {
   safetyNotes: string[];
@@ -166,11 +212,13 @@ const copy = {
     safetyChannelTelegram: "Telegram",
     safetyChannelWhatsapp: "WhatsApp",
     safetyReviewBody:
-      "A few supplement suggestions need a human safety check before we show them. They are hidden for now and the review team has been notified.",
+      "A few supplement suggestions need a human safety check. We show them as review placeholders until the team approves the details.",
     safetyReviewTitle: "Safety review active",
     foodSafetyReviewBody:
-      "A few food suggestions need a human safety check before we show them. They are hidden for now and the review team has been notified.",
+      "A few food suggestions need a human safety check. We show them as review placeholders until the team approves the details.",
     foodSafetyReviewTitle: "Food safety review active",
+    foodUnderReview: "This food is under review by our team.",
+    supplementUnderReview: "This supplement is under review by our team.",
     safetyNotes: [
       "These are optional wellness product suggestions, not medical advice.",
       "Review all labels for allergens, ingredients, and daily use instructions before purchase.",
@@ -244,11 +292,13 @@ const copy = {
     safetyChannelTelegram: "Telegram",
     safetyChannelWhatsapp: "WhatsApp",
     safetyReviewBody:
-      "คำแนะนำอาหารเสริมบางรายการต้องผ่านการตรวจสอบความปลอดภัยโดยทีมงานก่อนแสดง ตอนนี้รายการเหล่านั้นถูกซ่อนไว้และส่งให้ทีมรีวิวแล้ว",
+      "คำแนะนำอาหารเสริมบางรายการต้องผ่านการตรวจสอบความปลอดภัยโดยทีมงาน เราจะแสดงเป็นรายการรอตรวจสอบจนกว่าทีมจะอนุมัติรายละเอียด",
     safetyReviewTitle: "มีการตรวจสอบความปลอดภัย",
     foodSafetyReviewBody:
-      "คำแนะนำอาหารบางรายการต้องผ่านการตรวจสอบความปลอดภัยโดยทีมงานก่อนแสดง ตอนนี้รายการเหล่านั้นถูกซ่อนไว้และส่งให้ทีมรีวิวแล้ว",
+      "คำแนะนำอาหารบางรายการต้องผ่านการตรวจสอบความปลอดภัยโดยทีมงาน เราจะแสดงเป็นรายการรอตรวจสอบจนกว่าทีมจะอนุมัติรายละเอียด",
     foodSafetyReviewTitle: "มีการตรวจสอบความปลอดภัยด้านอาหาร",
+    foodUnderReview: "อาหารรายการนี้อยู่ระหว่างการตรวจสอบโดยทีมของเรา",
+    supplementUnderReview: "อาหารเสริมรายการนี้อยู่ระหว่างการตรวจสอบโดยทีมของเรา",
     safetyNotes: [
       "คำแนะนำเหล่านี้เป็นตัวเลือกผลิตภัณฑ์เพื่อสุขภาพ ไม่ใช่คำแนะนำทางการแพทย์",
       "ตรวจฉลากทั้งหมดเพื่อดูสารก่อแพ้ ส่วนผสม และวิธีใช้ต่อวันก่อนซื้อ",
@@ -263,6 +313,30 @@ function getLocalizedText(value: LocalizedText, locale: Locale) {
   }
 
   return value[locale] || value.en || value.th;
+}
+
+function searchableLocalizedText(value: LocalizedText) {
+  return typeof value === "string" ? value : `${value.en} ${value.th}`;
+}
+
+function supplementBenefitTags(ingredient: FormulationIngredient) {
+  const explicitTags = Array.isArray(ingredient.benefitTags)
+    ? ingredient.benefitTags
+    : [];
+  const searchText = [
+    ingredient.category,
+    searchableLocalizedText(ingredient.supplement),
+    searchableLocalizedText(ingredient.rationale)
+  ]
+    .join(" ")
+    .toLowerCase();
+  const derivedTags = supplementBenefitRules
+    .filter((rule) =>
+      rule.patterns.some((pattern) => searchText.includes(pattern))
+    )
+    .map((rule) => rule.tag);
+
+  return [...new Set([...explicitTags, ...derivedTags])].slice(0, 4);
 }
 
 function pendingReviewCount(result: FormulationResult) {
@@ -368,16 +442,10 @@ export function FormulationResults({ locale, planId }: FormulationResultsProps) 
     );
   }
 
-  const visibleIngredients = result.supplementBreakdown.filter(
-    (ingredient) => ingredient.safety?.visibility !== "hidden"
-  );
-  const orderedIngredients = [...visibleIngredients].sort(
+  const orderedIngredients = [...result.supplementBreakdown].sort(
     (first, second) => first.effectivenessRank - second.effectivenessRank
   );
-  const visibleFoods = (result.foodGuidance ?? []).filter(
-    (item) => item.safety?.visibility !== "hidden"
-  );
-  const orderedFoods = [...visibleFoods].sort(
+  const orderedFoods = [...(result.foodGuidance ?? [])].sort(
     (first, second) => first.effectivenessRank - second.effectivenessRank
   );
   const formattedDate = new Intl.DateTimeFormat(
@@ -592,14 +660,21 @@ function FoodGuidancePanel({
           </div>
         ) : foods.map((item) => {
           const food = getLocalizedText(item.food, locale);
+          const underReview = item.safety?.visibility === "hidden";
           const rationale = getLocalizedText(item.rationale, locale);
           const serving = getLocalizedText(item.serving, locale);
           const frequency = getLocalizedText(item.frequency, locale);
           const tags = [...(item.benefitTags ?? []), ...(item.nutrientTags ?? [])];
-          const nutrientFacts = (item.nutrientFacts ?? [])
-            .filter((fact) => fact.amountPerServing > 0)
-            .filter((fact) => fact.nutrientId !== "energy_kcal")
-            .slice(0, 4);
+
+          if (underReview) {
+            return (
+              <ReviewPlaceholderCard
+                key={item.id}
+                message={labels.foodUnderReview}
+                title={food}
+              />
+            );
+          }
 
           return (
             <article
@@ -623,27 +698,6 @@ function FoodGuidancePanel({
                         >
                           {foodTagLabel(tag)}
                         </span>
-                      ))}
-                    </div>
-                  ) : null}
-                  {nutrientFacts.length > 0 ? (
-                    <div className="mt-3 grid grid-cols-2 gap-2 sm:max-w-md">
-                      {nutrientFacts.map((fact) => (
-                        <div
-                          className="rounded-md bg-[#F8FAFC] px-2 py-1.5 ring-1 ring-foreground/10"
-                          key={fact.nutrientId}
-                        >
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                            {fact.label}
-                          </p>
-                          <p className="text-xs font-semibold text-[#20343A]">
-                            {formatNutrientValue(
-                              fact.amountPerServing,
-                              fact.unit,
-                              locale
-                            )}
-                          </p>
-                        </div>
                       ))}
                     </div>
                   ) : null}
@@ -1016,8 +1070,20 @@ function FormulaPanel({
           </div>
         ) : ingredients.map((ingredient) => {
           const supplement = getLocalizedText(ingredient.supplement, locale);
+          const underReview = ingredient.safety?.visibility === "hidden";
           const rationale = getLocalizedText(ingredient.rationale, locale);
           const dailyDose = getLocalizedText(ingredient.dailyDose, locale);
+          const benefitTags = supplementBenefitTags(ingredient);
+
+          if (underReview) {
+            return (
+              <ReviewPlaceholderCard
+                key={ingredient.id}
+                message={labels.supplementUnderReview}
+                title={supplement}
+              />
+            );
+          }
 
           return (
             <article
@@ -1032,6 +1098,18 @@ function FormulaPanel({
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     {rationale}
                   </p>
+                  {benefitTags.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {benefitTags.map((tag) => (
+                        <span
+                          className="rounded-full bg-[#EFF6FF] px-2 py-0.5 text-xs font-semibold text-[#2F67B8] ring-1 ring-[#BFDBFE]"
+                          key={tag}
+                        >
+                          {foodTagLabel(tag)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="shrink-0 sm:w-44">
@@ -1056,6 +1134,32 @@ function FormulaPanel({
         ) : null}
       </div>
     </section>
+  );
+}
+
+function ReviewPlaceholderCard({
+  message,
+  title
+}: Readonly<{
+  message: string;
+  title: string;
+}>) {
+  return (
+    <article className="rounded-lg border border-amber-200 bg-amber-50/70 p-4">
+      <div className="flex gap-3">
+        <span className="flex size-9 flex-none items-center justify-center rounded-full bg-white text-amber-600 ring-1 ring-amber-200">
+          <HeartIcon aria-hidden={true} className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <h4 className="text-base font-semibold text-[#20343A]">
+            {title}
+          </h4>
+          <p className="mt-1 text-sm leading-6 text-amber-800">
+            {message}
+          </p>
+        </div>
+      </div>
+    </article>
   );
 }
 

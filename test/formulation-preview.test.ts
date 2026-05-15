@@ -143,13 +143,13 @@ describe("free formulation preview", () => {
     assert.equal(isExampleFormulationModelVersion(null), false);
   });
 
-  it("keeps only the top three visible supplements and filters products", () => {
+  it("keeps the top three supplements and filters products", () => {
     const preview = toFreePreviewFormulationResult(baseResult);
 
     assert.equal(preview.access, "preview");
     assert.equal(preview.previewLimit, 3);
-    assert.equal(preview.totalSupplementCount, 4);
-    assert.equal(preview.lockedSupplementCount, 1);
+    assert.equal(preview.totalSupplementCount, 5);
+    assert.equal(preview.lockedSupplementCount, 2);
     assert.equal(preview.totalFoodCount, 4);
     assert.equal(preview.lockedFoodCount, 1);
     assert.deepEqual(
