@@ -45,7 +45,7 @@ import {
 } from "@/lib/task-worker";
 import {
   addTaskEvent,
-  addTaskEventToTransaction,
+  addTaskEventWithDb,
   getTaskBundle,
   type TaskAfterCommitEffect,
   type TaskServiceDb,
@@ -195,7 +195,7 @@ async function addWorkEvent(
   } as const;
 
   if (sql) {
-    await addTaskEventToTransaction(sql, event);
+    await addTaskEventWithDb(sql, event);
     return;
   }
 

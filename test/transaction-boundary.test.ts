@@ -62,24 +62,7 @@ function functionBody(source: string, functionName: string) {
 }
 
 describe("database transaction boundaries", () => {
-  it("keeps explicit transactions limited to deliberate claim/lease paths", async () => {
-    const allowedTransactions = new Map<string, readonly string[]>([
-      ["lib/communications.ts", ["retryCommunicationMessage"]],
-      [
-        "lib/task-service.ts",
-        [
-          "retryFailedTask",
-          "releaseExpiredReservations",
-          "scheduleRetryForFailedTask",
-          "reserveNextTask",
-          "claimTaskCompletionApplication",
-          "finalizeTaskCompletion",
-          "renewTaskLease",
-          "claimTaskFailureApplication",
-          "finalizeTaskFailure"
-        ]
-      ]
-    ]);
+  it("keeps runtime code free of explicit app-level transactions", async () => {
     const files = [
       ...(await filesUnder("app")),
       ...(await filesUnder("lib")),
@@ -91,11 +74,10 @@ describe("database transaction boundaries", () => {
       const actual = [...source.matchAll(/\bsql\.begin\s*\(/g)].map((match) =>
         enclosingFunctionName(source, match.index ?? 0)
       );
-      const allowed = [...(allowedTransactions.get(file) ?? [])];
 
       assert.deepEqual(
         actual.sort(),
-        allowed.sort(),
+        [],
         `${file} has unexpected explicit sql.begin call sites`
       );
     }
@@ -118,7 +100,7 @@ describe("database transaction boundaries", () => {
     for (const functionName of [
       "claimTaskFailureApplication",
       "finalizeTaskFailure",
-      "claimExpiredReservationsInTransaction"
+      "claimExpiredReservationsBatch"
     ]) {
       assert.equal(
         functionBody(source, functionName).includes("applyFailure"),
@@ -144,14 +126,14 @@ describe("database transaction boundaries", () => {
     );
     assert.match(
       functionBody(source, "releaseExpiredReservations"),
-      /claimExpiredReservationsInTransaction[\s\S]*applyExpiredReservationFailure[\s\S]*updateExpiredFailureResultPayload[\s\S]*scheduleRetryForFailedTask/,
+      /claimExpiredReservationsBatch[\s\S]*applyExpiredReservationFailure[\s\S]*updateExpiredFailureResultPayload[\s\S]*scheduleRetryForFailedTask/,
       "expired lease failure side effects and retry scheduling must run after the short expiry claim transaction"
     );
   });
 
-  it("keeps expired reservation sweeps bounded inside the transaction", async () => {
+  it("keeps expired reservation sweeps bounded inside the single claim statement", async () => {
     const source = await readFile("lib/task-service.ts", "utf8");
-    const claimBody = functionBody(source, "claimExpiredReservationsInTransaction");
+    const claimBody = functionBody(source, "claimExpiredReservationsBatch");
 
     assert.match(
       claimBody,
@@ -160,44 +142,64 @@ describe("database transaction boundaries", () => {
     );
   });
 
-  it("keeps communication retry preparation outside the message claim transaction", async () => {
+  it("keeps common task lifecycle transitions out of explicit app transactions", async () => {
+    const source = await readFile("lib/task-service.ts", "utf8");
+
+    for (const functionName of [
+      "releaseExpiredReservations",
+      "reserveNextTask",
+      "claimTaskCompletionApplication",
+      "finalizeTaskCompletion",
+      "renewTaskLease",
+      "claimTaskFailureApplication",
+      "finalizeTaskFailure",
+      "retryFailedTask",
+      "scheduleRetryForFailedTask"
+    ]) {
+      assert.equal(
+        functionBody(source, functionName).includes("sql.begin"),
+        false,
+        `${functionName} should use single SQL statements plus eventual follow-up work, not an explicit app transaction`
+      );
+    }
+  });
+
+  it("keeps communication retry transaction-free", async () => {
     const source = await readFile("lib/communications.ts", "utf8");
     const claimBody = functionBody(source, "claimCommunicationRetry");
     const retryBody = functionBody(source, "retryCommunicationMessage");
 
     for (const sideEffect of [
-      "ensurePlanIdentityInTransaction",
-      "seedKnownPlanChannelsInTransaction",
+      "ensurePlanIdentity",
+      "seedKnownPlanChannels",
       "selectBestCommunicationChannel"
     ]) {
       assert.equal(
         claimBody.includes(sideEffect),
         false,
-        `claimCommunicationRetry must not run ${sideEffect} while holding the message row lock`
+        `claimCommunicationRetry must not run ${sideEffect} during the atomic message status update`
       );
     }
 
     assert.match(
       retryBody,
-      /ensurePlanIdentityInTransaction[\s\S]*seedKnownPlanChannelsInTransaction[\s\S]*selectBestCommunicationChannel[\s\S]*sql\.begin[\s\S]*claimCommunicationRetry/,
-      "communication retry should prepare identity/channels before the short claim transaction"
+      /ensurePlanIdentity[\s\S]*seedKnownPlanChannels[\s\S]*selectBestCommunicationChannel[\s\S]*claimCommunicationRetry/,
+      "communication retry should prepare identity/channels before the atomic status update"
+    );
+    assert.equal(
+      retryBody.includes("sql.begin"),
+      false,
+      "communication retry must not open an explicit app transaction"
     );
   });
 
   it("keeps row locks limited to short atomic claim paths", async () => {
     const allowedRowLocks = new Map<string, readonly string[]>([
-      ["lib/communications.ts", ["claimCommunicationRetry"]],
       [
         "lib/task-service.ts",
         [
-          "activeReservationInTransaction",
-          "retryFailedTask",
-          "claimExpiredReservationsInTransaction",
-          "scheduleRetryForFailedTask",
-          "reserveNextTask",
-          "claimTaskCompletionApplication",
-          "renewTaskLease",
-          "claimTaskFailureApplication"
+          "claimExpiredReservationsBatch",
+          "reserveNextTask"
         ]
       ],
       ["lib/task-worker.ts", ["claimDueCronActions"]]

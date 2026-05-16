@@ -276,6 +276,7 @@ export type ExpiredReservationClaim = Readonly<{
   exhausted: boolean;
   reservationAgentId: string;
   reservationId: string;
+  reservationWorkerSessionId?: string | null;
   retryWillBeScheduled: boolean;
   task: TaskRecord;
 }>;

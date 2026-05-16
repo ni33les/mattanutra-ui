@@ -103,6 +103,20 @@ const EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT = 50;
 const EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT_MAX = 100;
 
 type Db = TaskServiceDb;
+type ActiveReservationRow = {
+  agent_id: string;
+  id: string;
+  worker_session_id: string | null;
+};
+type TaskReservationResultRow = TaskRow & {
+  reservation_agent_id: string | null;
+  reservation_id: string | null;
+  reservation_worker_session_id: string | null;
+};
+type ExpiredReservationClaimRow = ExpiredReservationRow & {
+  exhausted: boolean;
+  retry_will_be_scheduled: boolean;
+};
 
 function getRequiredSql(sql?: postgres.Sql) {
   const configured = sql ?? getSql();
@@ -123,6 +137,10 @@ function normalizeExpiredReservationSweepLimit(value: number | undefined) {
     EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT_MAX,
     Math.max(1, Math.floor(value))
   );
+}
+
+function uniqueUuids(values: ReadonlyArray<string | null | undefined>) {
+  return [...new Set(values.flatMap((value) => uuidOrNull(value) ?? []))];
 }
 
 export async function ensureWorkerSessionSchema(sql?: postgres.Sql) {
@@ -406,7 +424,7 @@ function mapDependency(row: DependencyRow): TaskDependency {
   };
 }
 
-async function addTaskEventInTransaction(sql: Db, input: AddTaskEventInput) {
+async function insertTaskEvent(sql: Db, input: AddTaskEventInput) {
   const taskId = uuidOrNull(input.taskId);
 
   const id = randomUUID();
@@ -439,22 +457,21 @@ async function addTaskEventInTransaction(sql: Db, input: AddTaskEventInput) {
   return id;
 }
 
-export async function addTaskEventToTransaction(
+export async function addTaskEventWithDb(
   sql: TaskServiceDb,
   input: AddTaskEventInput
 ) {
-  return addTaskEventInTransaction(sql, input);
+  return insertTaskEvent(sql, input);
 }
 
-async function activeReservationInTransaction(
+async function getActiveReservation(
   sql: Db,
   input: Readonly<{
     agentId?: string | null;
     reservationId?: string | null;
     taskId: string;
     workerSessionId?: string | null;
-  }>,
-  options: Readonly<{ lock?: boolean }> = {}
+  }>
 ) {
   const agentId = uuidOrNull(input.agentId);
   const reservationId = uuidOrNull(input.reservationId);
@@ -476,42 +493,17 @@ async function activeReservationInTransaction(
     return null;
   }
 
-  const rows = options.lock
-    ? await sql<
-        Array<{
-          agent_id: string;
-          id: string;
-          worker_session_id: string | null;
-        }>
-      >`
-        select id::text, agent_id::text, worker_session_id::text
-        from public.task_reservations
-        where task_id = ${input.taskId}::uuid
-          and status = 'active'
-          and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
-          and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
-          and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
-        order by reserved_at desc
-        limit 1
-        for update
-      `
-    : await sql<
-        Array<{
-          agent_id: string;
-          id: string;
-          worker_session_id: string | null;
-        }>
-      >`
-        select id::text, agent_id::text, worker_session_id::text
-        from public.task_reservations
-        where task_id = ${input.taskId}::uuid
-          and status = 'active'
-          and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
-          and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
-          and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
-        order by reserved_at desc
-        limit 1
-      `;
+  const rows = await sql<ActiveReservationRow[]>`
+    select id::text, agent_id::text, worker_session_id::text
+    from public.task_reservations
+    where task_id = ${input.taskId}::uuid
+      and status = 'active'
+      and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
+      and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+      and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
+    order by reserved_at desc
+    limit 1
+  `;
 
   if (!rows[0]) {
     throw new Error(`Active reservation for task ${input.taskId} not found`);
@@ -520,7 +512,7 @@ async function activeReservationInTransaction(
   return rows[0];
 }
 
-async function upsertAgentInTransaction(
+async function upsertAgentRecord(
   sql: Db,
   input: Readonly<{
     capabilities?: unknown;
@@ -635,7 +627,7 @@ async function hideLegacyAggregateWorkerAgent(sql: Db) {
   `;
 }
 
-async function addTaskCommentInTransaction(
+async function insertTaskComment(
   sql: Db,
   input: AddTaskCommentInput
 ) {
@@ -674,7 +666,7 @@ async function addTaskCommentInTransaction(
     returning *
   `;
 
-  await addTaskEventInTransaction(sql, {
+  await insertTaskEvent(sql, {
     agentId: input.agentId,
     eventPayload: {
       commentId: id,
@@ -688,7 +680,7 @@ async function addTaskCommentInTransaction(
   return mapComment(rows[0]);
 }
 
-async function ensureTaskDependenciesInTransaction(
+async function ensureTaskDependencies(
   sql: Db,
   taskId: string,
   dependencies: ReadonlyArray<{
@@ -775,7 +767,7 @@ async function ensureTaskDependenciesInTransaction(
   return saved;
 }
 
-async function createTaskInTransaction(sql: Db, input: CreateTaskInput) {
+async function createTaskRecord(sql: Db, input: CreateTaskInput) {
   const taskId = uuidOrNew(input.id);
   const parentTaskId = uuidOrNull(input.parentTaskId);
   const createdByTaskId = uuidOrNull(input.createdByTaskId);
@@ -962,14 +954,14 @@ async function createTaskInTransaction(sql: Db, input: CreateTaskInput) {
   const task = mapTask(taskRow);
 
   if (!inserted[0]) {
-    await ensureTaskDependenciesInTransaction(sql, task.id, input.dependencies ?? []);
+    await ensureTaskDependencies(sql, task.id, input.dependencies ?? []);
 
     return { created: false, task };
   }
 
-  await ensureTaskDependenciesInTransaction(sql, task.id, input.dependencies ?? []);
+  await ensureTaskDependencies(sql, task.id, input.dependencies ?? []);
 
-  await addTaskEventInTransaction(sql, {
+  await insertTaskEvent(sql, {
     agentId: input.createdByAgentId,
     eventPayload: {
       businessValue: task.businessValue,
@@ -988,7 +980,7 @@ async function createTaskInTransaction(sql: Db, input: CreateTaskInput) {
   });
 
   if (input.initialComment) {
-    await addTaskCommentInTransaction(sql, {
+    await insertTaskComment(sql, {
       ...input.initialComment,
       taskId: task.id
     });
@@ -999,10 +991,10 @@ async function createTaskInTransaction(sql: Db, input: CreateTaskInput) {
   return { created: true, task };
 }
 
-export async function upsertAgent(input: Parameters<typeof upsertAgentInTransaction>[1]) {
+export async function upsertAgent(input: Parameters<typeof upsertAgentRecord>[1]) {
   const sql = getRequiredSql();
 
-  return upsertAgentInTransaction(sql, input);
+  return upsertAgentRecord(sql, input);
 }
 
 export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
@@ -1016,7 +1008,7 @@ export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
     input.capabilities ?? input.agent.capabilities
   );
   const taskTypes = normalizeCapabilities(input.taskTypes);
-  const agent = await upsertAgentInTransaction(sql, {
+  const agent = await upsertAgentRecord(sql, {
     capabilities,
     id: input.agent.id,
     metadata: {
@@ -1126,7 +1118,7 @@ export async function heartbeatWorkerSession(input: HeartbeatWorkerSessionInput)
 export async function createTask(input: CreateTaskInput) {
   const sql = getRequiredSql();
 
-  return createTaskInTransaction(sql, input);
+  return createTaskRecord(sql, input);
 }
 
 export async function retryFailedTask(input: RetryFailedTaskInput) {
@@ -1137,112 +1129,134 @@ export async function retryFailedTask(input: RetryFailedTaskInput) {
     throw new Error("Task retry requires a valid taskId");
   }
 
-  return sql.begin(async (tx) => {
-    const taskRows = await tx<TaskRow[]>`
-      select *
-      from public.tasks
-      where id = ${taskId}::uuid
-      for update
-    `;
+  const taskRows = await sql<TaskRow[]>`
+    select *
+    from public.tasks
+    where id = ${taskId}::uuid
+    limit 1
+  `;
 
-    if (!taskRows[0]) {
-      throw new Error(`Task ${input.taskId} not found`);
-    }
+  if (!taskRows[0]) {
+    throw new Error(`Task ${input.taskId} not found`);
+  }
 
-    const failedTask = mapTask(taskRows[0]);
+  const failedTask = mapTask(taskRows[0]);
 
-    if (failedTask.status !== "failed") {
-      throw new Error("Only failed tasks can be retried");
-    }
+  if (failedTask.status !== "failed") {
+    throw new Error("Only failed tasks can be retried");
+  }
 
-    if (await taskHasLaterRetrySuccessorInTransaction(tx, failedTask)) {
-      throw new Error("Task already has a later retry attempt");
-    }
+  const existingRetry = await findLaterRetrySuccessor(sql, failedTask);
 
-    const retryAttempt = failedTask.retryAttempt + 1;
-    const retryRootTaskId = taskLineageRootId(failedTask);
-    const payload = { ...payloadRecord(failedTask.payload) };
-    const dependencyRows = await tx<DependencyRow[]>`
-      select
-        task_id::text,
-        depends_on_task_id::text,
-        dependency_type,
-        created_at
-      from public.task_dependencies
-      where task_id = ${failedTask.id}::uuid
-      order by created_at asc
-    `;
-    const created = await createTaskInTransaction(tx, {
-      actorType: failedTask.actorType,
-      createdByAgentId: input.agentId,
-      createdByTaskId: failedTask.id,
-      dependencies: dependencyRows.map((dependency) => ({
-        taskId: dependency.depends_on_task_id,
-        type: dependency.dependency_type
-      })),
-      description: failedTask.description,
-      idempotencyKey: failedTask.idempotencyKey,
-      idempotencyScope: "active",
-      idempotencyScopeKey: failedTask.idempotencyScopeKey,
-      initialComment: {
-        authorName: "MattaNutra admin",
-        authorType: "system",
-        body: `Manual retry ${retryAttempt} requested from failed task.`,
-        commentType: "status",
-        metadata: {
-          failedTaskId: failedTask.id,
-          retryAttempt
-        },
-        visibility: "worker"
-      },
-      maxAttempts: failedTask.maxAttempts,
-      maxRetries: retryAttempt,
-      payload,
-      planId: failedTask.planId,
-      rayId: failedTask.rayId,
-      businessValue: failedTask.businessValue,
-      context: payloadRecord(failedTask.context),
-      groupLabel: failedTask.groupLabel,
-      taskGroupId: failedTask.taskGroupId,
-      reasoningEffort: failedTask.reasoningEffort,
-      requiredCapabilities: failedTask.requiredCapabilities,
-      retryAttempt,
-      retryOfTaskId: failedTask.id,
-      retryPolicy: {
-        ...retryPolicyForTask(failedTask),
-        maxRetries: retryAttempt
-      },
-      retryRootTaskId,
-      scheduledFor: new Date(),
-      taskType: failedTask.taskType,
-      title: failedTask.title
-    });
-
-    await addTaskEventInTransaction(tx, {
+  if (existingRetry) {
+    await insertTaskEvent(sql, {
       agentId: input.agentId,
       eventPayload: {
         failedTaskId: failedTask.id,
-        retryAttempt,
-        retryRootTaskId,
-        retryTaskId: created.task.id
+        retryAttempt: existingRetry.retryAttempt,
+        retryRootTaskId: taskLineageRootId(failedTask),
+        retryTaskId: existingRetry.id
       },
-      eventStatus: created.created ? "requested" : "observed",
-      eventType: created.created
-        ? "task_manual_retry_requested"
-        : "task_manual_retry_already_exists",
+      eventStatus: "observed",
+      eventType: "task_manual_retry_already_exists",
       severity: "medium",
       taskId: failedTask.id
     });
 
     return {
-      created: created.created,
+      created: false,
       sourceTask: failedTask,
-      task: created.task
+      task: existingRetry
     };
+  }
+
+  const retryAttempt = failedTask.retryAttempt + 1;
+  const retryRootTaskId = taskLineageRootId(failedTask);
+  const retryIdempotencyKey =
+    failedTask.idempotencyKey ?? `manual-retry:${retryRootTaskId}:${retryAttempt}`;
+  const retryIdempotencyScopeKey =
+    failedTask.idempotencyKey ? failedTask.idempotencyScopeKey : `manual-retry:${retryRootTaskId}`;
+  const payload = { ...payloadRecord(failedTask.payload) };
+  const dependencyRows = await sql<DependencyRow[]>`
+    select
+      task_id::text,
+      depends_on_task_id::text,
+      dependency_type,
+      created_at
+    from public.task_dependencies
+    where task_id = ${failedTask.id}::uuid
+    order by created_at asc
+  `;
+  const created = await createTaskRecord(sql, {
+    actorType: failedTask.actorType,
+    createdByAgentId: input.agentId,
+    createdByTaskId: failedTask.id,
+    dependencies: dependencyRows.map((dependency) => ({
+      taskId: dependency.depends_on_task_id,
+      type: dependency.dependency_type
+    })),
+    description: failedTask.description,
+    idempotencyKey: retryIdempotencyKey,
+    idempotencyScope: "active",
+    idempotencyScopeKey: retryIdempotencyScopeKey,
+    initialComment: {
+      authorName: "MattaNutra admin",
+      authorType: "system",
+      body: `Manual retry ${retryAttempt} requested from failed task.`,
+      commentType: "status",
+      metadata: {
+        failedTaskId: failedTask.id,
+        retryAttempt
+      },
+      visibility: "worker"
+    },
+    maxAttempts: failedTask.maxAttempts,
+    maxRetries: retryAttempt,
+    payload,
+    planId: failedTask.planId,
+    rayId: failedTask.rayId,
+    businessValue: failedTask.businessValue,
+    context: payloadRecord(failedTask.context),
+    groupLabel: failedTask.groupLabel,
+    taskGroupId: failedTask.taskGroupId,
+    reasoningEffort: failedTask.reasoningEffort,
+    requiredCapabilities: failedTask.requiredCapabilities,
+    retryAttempt,
+    retryOfTaskId: failedTask.id,
+    retryPolicy: {
+      ...retryPolicyForTask(failedTask),
+      maxRetries: retryAttempt
+    },
+    retryRootTaskId,
+    scheduledFor: new Date(),
+    taskType: failedTask.taskType,
+    title: failedTask.title
   });
+
+  await insertTaskEvent(sql, {
+    agentId: input.agentId,
+    eventPayload: {
+      failedTaskId: failedTask.id,
+      retryAttempt,
+      retryRootTaskId,
+      retryTaskId: created.task.id
+    },
+    eventStatus: created.created ? "requested" : "observed",
+    eventType: created.created
+      ? "task_manual_retry_requested"
+      : "task_manual_retry_already_exists",
+    severity: "medium",
+    taskId: failedTask.id
+  });
+
+  return {
+    created: created.created,
+    sourceTask: failedTask,
+    task: created.task
+  };
 }
 
-async function createTaskSequenceInTransaction(
+async function createTaskSequenceRecord(
   sql: Db,
   input: CreateTaskSequenceInput
 ): Promise<CreatedTaskSequence> {
@@ -1291,7 +1305,7 @@ async function createTaskSequenceInTransaction(
         type: dependency.type
       };
     });
-    const created = await createTaskInTransaction(sql, {
+    const created = await createTaskRecord(sql, {
       ...taskInput,
       createdByAgentId: taskInput.createdByAgentId ?? input.createdByAgentId,
       dependencies: [],
@@ -1302,7 +1316,7 @@ async function createTaskSequenceInTransaction(
       taskGroupId: taskGroupId ?? undefined
     });
     taskGroupId ??= created.task.taskGroupId;
-    const savedDependencies = await ensureTaskDependenciesInTransaction(
+    const savedDependencies = await ensureTaskDependencies(
       sql,
       created.task.id,
       resolvedDependencies
@@ -1313,7 +1327,7 @@ async function createTaskSequenceInTransaction(
     dependencies.push(...savedDependencies);
   }
 
-  await addTaskEventInTransaction(sql, {
+  await insertTaskEvent(sql, {
     agentId: input.createdByAgentId,
     eventPayload: {
       dependencyCount: dependencies.length,
@@ -1336,19 +1350,19 @@ async function createTaskSequenceInTransaction(
 export async function createTaskSequence(input: CreateTaskSequenceInput) {
   const sql = getRequiredSql();
 
-  return createTaskSequenceInTransaction(sql, input);
+  return createTaskSequenceRecord(sql, input);
 }
 
 export async function addTaskComment(input: AddTaskCommentInput) {
   const sql = getRequiredSql();
 
-  return addTaskCommentInTransaction(sql, input);
+  return insertTaskComment(sql, input);
 }
 
 export async function addTaskEvent(input: AddTaskEventInput) {
   const sql = getRequiredSql();
 
-  return addTaskEventInTransaction(sql, input);
+  return insertTaskEvent(sql, input);
 }
 
 export async function getTaskBundle(input: Readonly<{ taskId: string }>) {
@@ -1409,7 +1423,7 @@ export async function assertActiveTaskReservation(
 
   await ensureWorkerSessionSchema(sql);
 
-  return activeReservationInTransaction(sql, input);
+  return getActiveReservation(sql, input);
 }
 
 export async function releaseExpiredReservations(
@@ -1419,9 +1433,21 @@ export async function releaseExpiredReservations(
   const afterCommitEffects: TaskAfterCommitEffect[] = [];
   const batchLimit = normalizeExpiredReservationSweepLimit(input.batchLimit);
 
-  const released = await sql.begin((tx) =>
-    claimExpiredReservationsInTransaction(tx, batchLimit)
+  const released = await claimExpiredReservationsBatch(sql, batchLimit);
+
+  const releasedWorkerSessionIds = uniqueUuids(
+    released.map((claim) => claim.reservationWorkerSessionId)
   );
+
+  if (releasedWorkerSessionIds.length > 0) {
+    await sql`
+      update public.worker_sessions set
+        status = 'idle',
+        current_task_id = null,
+        updated_at = now()
+      where id = any(${releasedWorkerSessionIds}::uuid[])
+    `;
+  }
 
   for (const claim of released) {
     if (!claim.exhausted) {
@@ -1460,94 +1486,117 @@ export async function releaseExpiredReservations(
   return released.length;
 }
 
-async function claimExpiredReservationsInTransaction(
+async function claimExpiredReservationsBatch(
   sql: Db,
   batchLimit: number
 ) {
-  const expired = await sql<ExpiredReservationRow[]>`
-    select
-      task_reservations.id::text as reservation_id,
-      task_reservations.agent_id::text as reservation_agent_id,
-      task_reservations.worker_session_id::text as reservation_worker_session_id,
-      tasks.*
-    from public.task_reservations
-    join public.tasks on tasks.id = task_reservations.task_id
-    where task_reservations.status = 'active'
-      and task_reservations.lease_until < now()
-      and tasks.status in ('reserved', 'running')
-    order by task_reservations.lease_until asc
-    limit ${batchLimit}
-    for update skip locked
-  `;
-  const claims: ExpiredReservationClaim[] = [];
-
-  for (const row of expired) {
-    const exhausted = row.attempts >= row.max_attempts;
-    const pendingTask = mapTask(row);
-    const retryWillBeScheduled =
-      exhausted && taskRetryWillBeScheduled(pendingTask);
-
-    await sql`
+  const rows = await sql<ExpiredReservationClaimRow[]>`
+    with expired as (
+      select
+        task_reservations.id as reservation_id,
+        task_reservations.agent_id as reservation_agent_id,
+        task_reservations.worker_session_id as reservation_worker_session_id,
+        tasks.id as task_id,
+        (tasks.attempts >= tasks.max_attempts) as exhausted,
+        (
+          tasks.idempotency_key is not null
+          and tasks.retry_attempt < tasks.max_retries
+        ) as retry_will_be_scheduled
+      from public.task_reservations
+      join public.tasks on tasks.id = task_reservations.task_id
+      where task_reservations.status = 'active'
+        and task_reservations.lease_until < now()
+        and tasks.status in ('reserved', 'running')
+      order by task_reservations.lease_until asc
+      limit ${batchLimit}
+      for update skip locked
+    ),
+    released as (
       update public.task_reservations set
         status = 'expired',
         released_at = now()
-      where id = ${row.reservation_id}::uuid
-    `;
-
-    if (row.reservation_worker_session_id) {
-      await sql`
-        update public.worker_sessions set
-          status = 'idle',
-          current_task_id = null,
-          updated_at = now()
-        where id = ${row.reservation_worker_session_id}::uuid
-      `;
-    }
-
-    const updatedTasks = await sql<TaskRow[]>`
+      from expired
+      where task_reservations.id = expired.reservation_id
+      returning
+        expired.reservation_id,
+        expired.reservation_agent_id,
+        expired.reservation_worker_session_id,
+        expired.task_id,
+        expired.exhausted,
+        expired.retry_will_be_scheduled
+    ),
+    updated_tasks as (
       update public.tasks set
-        status = ${exhausted ? "failed" : "queued"},
+        status = case when released.exhausted then 'failed' else 'queued' end,
         reserved_by_agent_id = null,
         lease_until = null,
-        error_message = ${exhausted ? "Task lease expired after maximum attempts." : null},
+        error_message = case
+          when released.exhausted then 'Task lease expired after maximum attempts.'
+          else null
+        end,
         result_payload = case
-          when ${exhausted} then ${sql.json(toJsonValue({}))}
-          else result_payload
+          when released.exhausted then '{}'::jsonb
+          else public.tasks.result_payload
         end,
         updated_at = now()
-      where id = ${row.id}::uuid
-        and status in ('reserved', 'running')
-      returning *
-    `;
+      from released
+      where public.tasks.id = released.task_id
+        and public.tasks.status in ('reserved', 'running')
+      returning
+        public.tasks.*,
+        released.reservation_id::text as reservation_id,
+        released.reservation_agent_id::text as reservation_agent_id,
+        released.reservation_worker_session_id::text as reservation_worker_session_id,
+        released.exhausted,
+        released.retry_will_be_scheduled
+    ),
+    task_events as (
+      insert into public.task_events (
+        id,
+        task_id,
+        agent_id,
+        event_type,
+        event_status,
+        severity,
+        event_payload,
+        occurred_at,
+        created_at
+      )
+      select
+        gen_random_uuid(),
+        updated_tasks.id,
+        updated_tasks.reservation_agent_id::uuid,
+        case
+          when updated_tasks.exhausted then 'task_failed_after_lease_expiry'
+          else 'lease_expired'
+        end,
+        case when updated_tasks.exhausted then 'failed' else 'observed' end,
+        case when updated_tasks.exhausted then 'high' else 'medium' end,
+        jsonb_build_object(
+          'exhausted', updated_tasks.exhausted,
+          'reservationId', updated_tasks.reservation_id,
+          'retryWillBeScheduled', updated_tasks.retry_will_be_scheduled
+        ),
+        now(),
+        now()
+      from updated_tasks
+      returning id
+    )
+    select *
+    from updated_tasks
+  `;
 
-    await addTaskEventInTransaction(sql, {
-      agentId: row.reservation_agent_id,
-      eventPayload: {
-        exhausted,
-        reservationId: row.reservation_id,
-        retryWillBeScheduled
-      },
-      eventStatus: exhausted ? "failed" : "observed",
-      eventType: exhausted ? "task_failed_after_lease_expiry" : "lease_expired",
-      severity: exhausted ? "high" : "medium",
-      taskId: row.id
-    });
-
-    if (updatedTasks[0]) {
-      claims.push({
-        exhausted,
-        reservationAgentId: row.reservation_agent_id,
-        reservationId: row.reservation_id,
-        retryWillBeScheduled,
-        task: mapTask(updatedTasks[0])
-      });
-    }
-  }
-
-  return claims;
+  return rows.map((row) => ({
+    exhausted: row.exhausted,
+    reservationAgentId: row.reservation_agent_id,
+    reservationId: row.reservation_id,
+    reservationWorkerSessionId: row.reservation_worker_session_id,
+    retryWillBeScheduled: row.retry_will_be_scheduled,
+    task: mapTask(row)
+  }));
 }
 
-async function taskHasSuccessfulRetryInTransaction(sql: Db, task: TaskRecord) {
+async function taskHasSuccessfulRetry(sql: Db, task: TaskRecord) {
   if (!task.idempotencyKey) {
     return false;
   }
@@ -1575,13 +1624,13 @@ async function taskHasSuccessfulRetryInTransaction(sql: Db, task: TaskRecord) {
   return Boolean(rows[0]);
 }
 
-async function taskHasLaterRetrySuccessorInTransaction(
+async function findLaterRetrySuccessor(
   sql: Db,
   task: TaskRecord
 ) {
   const lineageRootId = taskLineageRootId(task);
-  const rows = await sql<Array<{ id: string }>>`
-    select id::text
+  const rows = await sql<TaskRow[]>`
+    select successor.*
     from public.tasks as successor
     where successor.id <> ${task.id}::uuid
       and successor.status <> 'cancelled'
@@ -1601,10 +1650,10 @@ async function taskHasLaterRetrySuccessorInTransaction(
     limit 1
   `;
 
-  return Boolean(rows[0]);
+  return rows[0] ? mapTask(rows[0]) : null;
 }
 
-async function scheduleRetryForFailedTaskInTransaction(
+async function scheduleRetryForFailedTaskFromRecord(
   sql: Db,
   input: Readonly<{
     errorMessage: string;
@@ -1619,8 +1668,8 @@ async function scheduleRetryForFailedTaskInTransaction(
     return null;
   }
 
-  if (await taskHasSuccessfulRetryInTransaction(sql, input.task)) {
-    await addTaskEventInTransaction(sql, {
+  if (await taskHasSuccessfulRetry(sql, input.task)) {
+    await insertTaskEvent(sql, {
       agentId: input.failedByAgentId,
       eventPayload: {
         idempotencyKey: input.task.idempotencyKey,
@@ -1637,7 +1686,7 @@ async function scheduleRetryForFailedTaskInTransaction(
   const retryAttempt = input.task.retryAttempt + 1;
 
   if (retryAttempt > policy.maxRetries) {
-    await addTaskEventInTransaction(sql, {
+    await insertTaskEvent(sql, {
       agentId: input.failedByAgentId,
       eventPayload: {
         maxRetries: policy.maxRetries,
@@ -1656,7 +1705,7 @@ async function scheduleRetryForFailedTaskInTransaction(
   const scheduledFor = new Date(Date.now() + delaySeconds * 1000);
   const payload = payloadRecord(input.task.payload);
   const retryRootTaskId = taskLineageRootId(input.task);
-  const created = await createTaskInTransaction(sql, {
+  const created = await createTaskRecord(sql, {
     actorType: input.task.actorType,
     createdByAgentId: input.failedByAgentId,
     createdByTaskId: input.task.id,
@@ -1695,7 +1744,7 @@ async function scheduleRetryForFailedTaskInTransaction(
     title: input.task.title
   });
 
-  await addTaskEventInTransaction(sql, {
+  await insertTaskEvent(sql, {
     agentId: input.failedByAgentId,
     eventPayload: {
       delaySeconds,
@@ -1725,23 +1774,21 @@ async function scheduleRetryForFailedTask(
   }>
 ) {
   try {
-    return await sql.begin(async (tx) => {
-      const taskRows = await tx<TaskRow[]>`
-        select *
-        from public.tasks
-        where id = ${input.task.id}::uuid
-          and status = 'failed'
-        for update
-      `;
+    const taskRows = await sql<TaskRow[]>`
+      select *
+      from public.tasks
+      where id = ${input.task.id}::uuid
+        and status = 'failed'
+      limit 1
+    `;
 
-      if (!taskRows[0]) {
-        return null;
-      }
+    if (!taskRows[0]) {
+      return null;
+    }
 
-      return scheduleRetryForFailedTaskInTransaction(tx, {
-        ...input,
-        task: mapTask(taskRows[0])
-      });
+    return scheduleRetryForFailedTaskFromRecord(sql, {
+      ...input,
+      task: mapTask(taskRows[0])
     });
   } catch (error) {
     await addTaskEvent({
@@ -1815,7 +1862,7 @@ async function updateExpiredFailureResultPayload(
 ) {
   await sql`
     update public.tasks set
-      result_payload = ${sql.json(toJsonValue(input.resultPayload))},
+      result_payload = ${sql.json(toJsonValue(input.resultPayload))}::jsonb,
       updated_at = now()
     where id = ${input.taskId}::uuid
       and status = 'failed'
@@ -1898,7 +1945,7 @@ export async function reserveNextTask(
     );
     registeredTaskTypes = session.taskTypes;
   } else {
-    agent = await upsertAgentInTransaction(sql, {
+    agent = await upsertAgentRecord(sql, {
       capabilities: input.agent.capabilities,
       id: input.agent.id,
       metadata: input.agent.metadata,
@@ -1926,65 +1973,72 @@ export async function reserveNextTask(
     return null;
   }
 
-  const reserved = await sql.begin(async (tx) => {
-    const rows = await tx<TaskRow[]>`
-      with candidate as (
-        select tasks.*
-        from public.tasks
-        where tasks.status = 'queued'
-          and tasks.scheduled_for <= now()
-          and tasks.attempts < tasks.max_attempts
-          and (
-            coalesce(cardinality(tasks.required_capabilities), 0) = 0
-            or tasks.required_capabilities <@ ${reserveCapabilities}::text[]
-          )
-          and (
-            ${mustRequireCapability}::text is null
-            or ${mustRequireCapability} = any(tasks.required_capabilities)
-          )
-          and (
-            ${taskTypes.length < 1}
-            or tasks.task_type = any(${taskTypes}::text[])
-          )
-          and not exists (
-            select 1
-            from public.task_dependencies
-            join public.tasks as dependency
-              on dependency.id = task_dependencies.depends_on_task_id
-            where task_dependencies.task_id = tasks.id
-              and (
-                (
-                  task_dependencies.dependency_type = 'complete'
-                  and dependency.status not in ('completed', 'skipped')
-                )
-                or (
-                  task_dependencies.dependency_type = 'successful'
-                  and dependency.status <> 'completed'
-                )
-                or (
-                  task_dependencies.dependency_type = 'approved'
-                  and not exists (
-                    select 1
-                    from public.task_approvals
-                    where task_approvals.task_id = dependency.id
-                      and task_approvals.status = 'approved'
-                  )
+  const reservationId = randomUUID();
+  const rows = await sql<Array<TaskRow & { reservation_id: string }>>`
+    with candidate as (
+      select tasks.*
+      from public.tasks
+      where tasks.status = 'queued'
+        and tasks.scheduled_for <= now()
+        and tasks.attempts < tasks.max_attempts
+        and not exists (
+          select 1
+          from public.task_reservations
+          where task_reservations.task_id = tasks.id
+            and task_reservations.status = 'active'
+        )
+        and (
+          coalesce(cardinality(tasks.required_capabilities), 0) = 0
+          or tasks.required_capabilities <@ ${reserveCapabilities}::text[]
+        )
+        and (
+          ${mustRequireCapability}::text is null
+          or ${mustRequireCapability} = any(tasks.required_capabilities)
+        )
+        and (
+          ${taskTypes.length < 1}
+          or tasks.task_type = any(${taskTypes}::text[])
+        )
+        and not exists (
+          select 1
+          from public.task_dependencies
+          join public.tasks as dependency
+            on dependency.id = task_dependencies.depends_on_task_id
+          where task_dependencies.task_id = tasks.id
+            and (
+              (
+                task_dependencies.dependency_type = 'complete'
+                and dependency.status not in ('completed', 'skipped')
+              )
+              or (
+                task_dependencies.dependency_type = 'successful'
+                and dependency.status <> 'completed'
+              )
+              or (
+                task_dependencies.dependency_type = 'approved'
+                and not exists (
+                  select 1
+                  from public.task_approvals
+                  where task_approvals.task_id = dependency.id
+                    and task_approvals.status = 'approved'
                 )
               )
-          )
-        order by
-          (
-            tasks.business_value
-            + least(
-              200,
-              floor(greatest(0, extract(epoch from now() - tasks.scheduled_for) - 300) / 900) * 10
             )
-          ) desc,
-          tasks.scheduled_for asc,
-          tasks.created_at asc
-        limit 1
-        for update skip locked
-      )
+        )
+      order by
+        (
+          tasks.business_value
+          + least(
+            200,
+            floor(greatest(0, extract(epoch from now() - tasks.scheduled_for) - 300) / 900) * 10
+          )
+        ) desc,
+        tasks.scheduled_for asc,
+        tasks.created_at asc
+      limit 1
+      for update skip locked
+    ),
+    claimed_task as (
       update public.tasks set
         status = 'reserved',
         reserved_by_agent_id = ${agent.id}::uuid,
@@ -1995,16 +2049,8 @@ export async function reserveNextTask(
       from candidate
       where public.tasks.id = candidate.id
       returning public.tasks.*
-    `;
-
-    if (!rows[0]) {
-      return null;
-    }
-
-    const task = mapTask(rows[0]);
-    const reservationId = randomUUID();
-
-    await tx`
+    ),
+    reservation as (
       insert into public.task_reservations (
         id,
         task_id,
@@ -2015,57 +2061,82 @@ export async function reserveNextTask(
         lease_until,
         metadata
       )
-      values (
+      select
         ${reservationId}::uuid,
-        ${task.id}::uuid,
+        claimed_task.id,
         ${agent.id}::uuid,
         ${workerSessionId}::uuid,
         'active',
         now(),
-        ${new Date(task.leaseUntil ?? Date.now())},
-        ${tx.json(
+        coalesce(claimed_task.lease_until, now()),
+        ${sql.json(
           toJsonValue({
             capabilities: reserveCapabilities,
             registeredTaskTypes,
             requestedTaskTypes,
             workerSessionId
           })
-        )}
+        )}::jsonb
+      from claimed_task
+      returning id::text
+    ),
+    task_event as (
+      insert into public.task_events (
+        id,
+        task_id,
+        agent_id,
+        event_type,
+        event_status,
+        severity,
+        event_payload,
+        occurred_at,
+        created_at
       )
-    `;
+      select
+        gen_random_uuid(),
+        claimed_task.id,
+        ${agent.id}::uuid,
+        'task_reserved',
+        'accepted',
+        'low',
+        jsonb_build_object(
+          'leaseSeconds', ${leaseSeconds}::integer,
+          'reservationId', reservation.id,
+          'workerSessionId', ${workerSessionId}::text
+        ),
+        now(),
+        now()
+      from claimed_task
+      join reservation on true
+      returning id
+    )
+    select claimed_task.*, reservation.id as reservation_id
+    from claimed_task
+    join reservation on true
+  `;
 
-    if (workerSessionId) {
-      await tx`
-        update public.worker_sessions set
-          status = 'working',
-          current_task_id = ${task.id}::uuid,
-          last_seen_at = now(),
-          updated_at = now()
-        where id = ${workerSessionId}::uuid
-      `;
-    }
-
-    await addTaskEventInTransaction(tx, {
-      agentId: agent.id,
-      eventPayload: {
-        leaseSeconds,
-        reservationId,
-        workerSessionId
-      },
-      eventStatus: "accepted",
-      eventType: "task_reserved",
-      taskId: task.id
-    });
-
-    return {
-      agent,
-      reservationId,
-      task
-    };
-  });
+  const reserved = rows[0]
+    ? {
+        agent,
+        reservationId: rows[0].reservation_id,
+        task: mapTask(rows[0])
+      }
+    : null;
 
   if (!reserved) {
     return null;
+  }
+
+  if (workerSessionId) {
+    await sql`
+      update public.worker_sessions set
+        status = 'working',
+        current_task_id = ${reserved.task.id}::uuid,
+        last_seen_at = now(),
+        updated_at = now()
+      where id = ${workerSessionId}::uuid
+        and agent_id = ${agent.id}::uuid
+    `;
   }
 
   notifyTaskQueueChanged();
@@ -2083,102 +2154,136 @@ export async function reserveNextTask(
   };
 }
 
-async function extendFinalizationLeaseInTransaction(
-  sql: Db,
-  reservation: Awaited<ReturnType<typeof activeReservationInTransaction>>
-) {
-  if (!reservation) {
-    return;
-  }
-
-  await sql`
-    update public.task_reservations set
-      lease_until = greatest(
-        lease_until,
-        now() + make_interval(secs => ${TASK_FINALIZATION_LEASE_SECONDS})
-      ),
-      heartbeat_at = now(),
-      metadata = metadata || jsonb_build_object(
-        'finalizationLeaseExtendedAt', now()
-      )
-    where id = ${reservation.id}::uuid
-  `;
-}
-
 async function claimTaskCompletionApplication(
   sql: postgres.Sql,
   input: CompleteTaskInput
 ) {
-  return sql.begin(async (tx) => {
-    const activeReservation = await activeReservationInTransaction(tx, {
-      agentId: input.agentId,
-      reservationId: input.reservationId,
-      taskId: input.taskId,
-      workerSessionId: input.workerSessionId
-    }, { lock: true });
-    const taskRows = await tx<TaskRow[]>`
-      select *
-      from public.tasks
-      where id = ${input.taskId}::uuid
-      for update
-    `;
-    const pendingTask = taskRows[0] ? mapTask(taskRows[0]) : null;
+  const taskId = uuidOrNull(input.taskId);
+  const reservationId = uuidOrNull(input.reservationId);
+  const agentId = uuidOrNull(input.agentId);
+  const workerSessionId = uuidOrNull(input.workerSessionId);
 
-    if (
-      !pendingTask ||
-      ![
-        "queued",
-        "reserved",
-        "running",
-        "needs_review",
-        "waiting_approval"
-      ].includes(pendingTask.status) ||
-      (
-        activeReservation?.agent_id &&
-        pendingTask.reservedByAgentId !== activeReservation.agent_id
-      )
-    ) {
-      throw new Error(`Task ${input.taskId} could not be completed`);
-    }
+  if (!taskId) {
+    throw new Error("Task completion requires a valid taskId");
+  }
 
-    await extendFinalizationLeaseInTransaction(tx, activeReservation);
+  if (input.reservationId && !reservationId) {
+    throw new Error("Task completion requires a valid reservationId");
+  }
 
-    const rows = await tx<TaskRow[]>`
+  if (input.agentId && !agentId) {
+    throw new Error("Task completion requires a valid agentId");
+  }
+
+  if (input.workerSessionId && !workerSessionId) {
+    throw new Error("Task completion requires a valid workerSessionId");
+  }
+
+  const requiresReservation = Boolean(reservationId || agentId || workerSessionId);
+  const rows = await sql<TaskReservationResultRow[]>`
+    with active_reservation as (
+      select id, agent_id, worker_session_id
+      from public.task_reservations
+      where task_id = ${taskId}::uuid
+        and status = 'active'
+        and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
+        and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+        and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
+      order by reserved_at desc
+      limit 1
+    ),
+    extended_reservation as (
+      update public.task_reservations set
+        lease_until = greatest(
+          lease_until,
+          now() + make_interval(secs => ${TASK_FINALIZATION_LEASE_SECONDS})
+        ),
+        heartbeat_at = now(),
+        metadata = metadata || jsonb_build_object(
+          'finalizationLeaseExtendedAt', now()
+        )
+      from active_reservation
+      where task_reservations.id = active_reservation.id
+      returning
+        active_reservation.id::text,
+        active_reservation.agent_id::text,
+        active_reservation.worker_session_id::text
+    ),
+    reservation_info as (
+      select * from extended_reservation
+      union all
+      select null::text, null::text, null::text
+      where ${!requiresReservation}
+    ),
+    updated_task as (
       update public.tasks set
         status = 'running',
         lease_until = greatest(
-          coalesce(lease_until, now()),
+          coalesce(public.tasks.lease_until, now()),
           now() + make_interval(secs => ${TASK_FINALIZATION_LEASE_SECONDS})
         ),
         updated_at = now()
-      where id = ${input.taskId}::uuid
-        and status in ('queued', 'reserved', 'running', 'needs_review', 'waiting_approval')
+      from reservation_info
+      where public.tasks.id = ${taskId}::uuid
+        and public.tasks.status in ('queued', 'reserved', 'running', 'needs_review', 'waiting_approval')
+        and (${!requiresReservation} or reservation_info.id is not null)
         and (
-          ${activeReservation?.agent_id ?? null}::uuid is null
-          or reserved_by_agent_id = ${activeReservation?.agent_id ?? null}::uuid
+          reservation_info.agent_id is null
+          or public.tasks.reserved_by_agent_id = reservation_info.agent_id::uuid
         )
-      returning *
-    `;
+      returning
+        public.tasks.*,
+        reservation_info.id as reservation_id,
+        reservation_info.agent_id as reservation_agent_id,
+        reservation_info.worker_session_id as reservation_worker_session_id
+    ),
+    task_event as (
+      insert into public.task_events (
+        id,
+        task_id,
+        agent_id,
+        event_type,
+        event_status,
+        severity,
+        event_payload,
+        occurred_at,
+        created_at
+      )
+      select
+        gen_random_uuid(),
+        updated_task.id,
+        coalesce(${agentId}::uuid, updated_task.reservation_agent_id::uuid),
+        'task_completion_result_applying',
+        'accepted',
+        'low',
+        jsonb_build_object(
+          'reservationId', updated_task.reservation_id,
+          'stage', 'completion_result_application'
+        ),
+        now(),
+        now()
+      from updated_task
+      returning id
+    )
+    select *
+    from updated_task
+  `;
+  const row = rows[0];
 
-    if (!rows[0]) {
-      throw new Error(`Task ${input.taskId} could not be completed`);
-    }
+  if (!row) {
+    throw new Error(`Task ${input.taskId} could not be completed`);
+  }
 
-    const task = mapTask(rows[0]);
-
-    await addTaskEventInTransaction(tx, {
-      agentId: input.agentId ?? activeReservation?.agent_id,
-      eventPayload: {
-        reservationId: activeReservation?.id,
-        stage: "completion_result_application"
-      },
-      eventStatus: "accepted",
-      eventType: "task_completion_result_applying",
-      taskId: task.id
-    });
-
-    return { activeReservation, task };
-  });
+  return {
+    activeReservation: row.reservation_id
+      ? {
+          agent_id: row.reservation_agent_id ?? "",
+          id: row.reservation_id,
+          worker_session_id: row.reservation_worker_session_id
+        }
+      : null,
+    task: mapTask(row)
+  };
 }
 
 async function finalizeTaskCompletion(
@@ -2189,81 +2294,122 @@ async function finalizeTaskCompletion(
     resultPayload: Record<string, unknown>;
   }>
 ) {
-  return sql.begin(async (tx) => {
-    const activeReservation = await activeReservationInTransaction(tx, {
-      agentId: input.completionInput.agentId,
-      reservationId: input.completionInput.reservationId,
-      taskId: input.completionInput.taskId,
-      workerSessionId: input.completionInput.workerSessionId
-    }, { lock: true });
-    const agentId =
-      input.completionInput.agentId ??
-      activeReservation?.agent_id ??
-      input.claim.activeReservation?.agent_id;
-    const reservationId =
-      activeReservation?.id ?? input.claim.activeReservation?.id;
-    const workerSessionId =
-      activeReservation?.worker_session_id ??
-      input.claim.activeReservation?.worker_session_id;
-    const rows = await tx<TaskRow[]>`
+  const taskId = uuidOrNull(input.completionInput.taskId);
+  const agentId =
+    uuidOrNull(input.completionInput.agentId) ??
+    input.claim.activeReservation?.agent_id ??
+    null;
+  const reservationId =
+    uuidOrNull(input.completionInput.reservationId) ??
+    input.claim.activeReservation?.id ??
+    null;
+  const workerSessionId =
+    uuidOrNull(input.completionInput.workerSessionId) ??
+    input.claim.activeReservation?.worker_session_id ??
+    null;
+  const requiresReservation = Boolean(reservationId || agentId || workerSessionId);
+
+  if (!taskId) {
+    throw new Error("Task completion requires a valid taskId");
+  }
+
+  const rows = await sql<TaskReservationResultRow[]>`
+    with active_reservation as (
+      select id, agent_id, worker_session_id
+      from public.task_reservations
+      where task_id = ${taskId}::uuid
+        and status = 'active'
+        and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
+        and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+        and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
+      order by reserved_at desc
+      limit 1
+    ),
+    reservation_info as (
+      select id::text, agent_id::text, worker_session_id::text
+      from active_reservation
+      union all
+      select null::text, null::text, null::text
+      where ${!requiresReservation}
+    ),
+    updated_task as (
       update public.tasks set
         status = 'completed',
-        result_payload = ${tx.json(toJsonValue(input.resultPayload))},
+        result_payload = ${sql.json(toJsonValue(input.resultPayload))}::jsonb,
         completed_at = now(),
         lease_until = null,
         reserved_by_agent_id = null,
         updated_at = now()
-      where id = ${input.completionInput.taskId}::uuid
-        and status = 'running'
+      from reservation_info
+      where public.tasks.id = ${taskId}::uuid
+        and public.tasks.status = 'running'
+        and (${!requiresReservation} or reservation_info.id is not null)
         and (
-          ${activeReservation?.agent_id ?? null}::uuid is null
-          or reserved_by_agent_id = ${activeReservation?.agent_id ?? null}::uuid
+          reservation_info.agent_id is null
+          or public.tasks.reserved_by_agent_id = reservation_info.agent_id::uuid
         )
-      returning *
-    `;
-
-    if (!rows[0]) {
-      throw new Error(`Task ${input.completionInput.taskId} could not be completed`);
-    }
-
-    const task = mapTask(rows[0]);
-
-    await tx`
+      returning
+        public.tasks.*,
+        reservation_info.id as reservation_id,
+        reservation_info.agent_id as reservation_agent_id,
+        reservation_info.worker_session_id as reservation_worker_session_id
+    ),
+    updated_reservation as (
       update public.task_reservations set
         status = 'completed',
         completed_at = now()
-      where task_id = ${task.id}::uuid
-        and status = 'active'
-        and (
-          ${reservationId ?? null}::uuid is null
-          or id = ${reservationId ?? null}::uuid
-        )
+      from updated_task
+      where task_reservations.id = updated_task.reservation_id::uuid
+        and task_reservations.status = 'active'
+      returning task_reservations.id
+    ),
+    task_event as (
+      insert into public.task_events (
+        id,
+        task_id,
+        agent_id,
+        event_type,
+        event_status,
+        severity,
+        event_payload,
+        occurred_at,
+        created_at
+      )
+      select
+        gen_random_uuid(),
+        updated_task.id,
+        coalesce(${agentId}::uuid, updated_task.reservation_agent_id::uuid),
+        'task_completed',
+        'succeeded',
+        'low',
+        ${sql.json(toJsonValue(input.resultPayload))}::jsonb ||
+          jsonb_build_object('reservationId', updated_task.reservation_id),
+        now(),
+        now()
+      from updated_task
+      returning id
+    )
+    select *
+    from updated_task
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error(`Task ${input.completionInput.taskId} could not be completed`);
+  }
+
+  if (row.reservation_worker_session_id) {
+    await sql`
+      update public.worker_sessions set
+        status = 'idle',
+        current_task_id = null,
+        last_seen_at = now(),
+        updated_at = now()
+      where id = ${row.reservation_worker_session_id}::uuid
     `;
+  }
 
-    if (workerSessionId) {
-      await tx`
-        update public.worker_sessions set
-          status = 'idle',
-          current_task_id = null,
-          last_seen_at = now(),
-          updated_at = now()
-        where id = ${workerSessionId}::uuid
-      `;
-    }
-
-    await addTaskEventInTransaction(tx, {
-      agentId,
-      eventPayload: {
-        ...input.resultPayload,
-        reservationId
-      },
-      eventStatus: "succeeded",
-      eventType: "task_completed",
-      taskId: task.id
-    });
-
-    return task;
-  });
+  return mapTask(row);
 }
 
 export async function completeTask(input: CompleteTaskInput) {
@@ -2335,15 +2481,10 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
 
   await ensureWorkerSessionSchema(sql);
 
-  return sql.begin(async (tx) => {
-    const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
-    const reservations = await tx<
-      Array<{
-        agent_id: string;
-        id: string;
-      }>
-    >`
-      select id::text, agent_id::text
+  const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
+  const rows = await sql<TaskReservationResultRow[]>`
+    with active_reservation as (
+      select id, agent_id, worker_session_id
       from public.task_reservations
       where task_id = ${taskId}::uuid
         and status = 'active'
@@ -2352,142 +2493,224 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
         and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
       order by reserved_at desc
       limit 1
-      for update
-    `;
-
-    if (!reservations[0]) {
-      throw new Error(`Active reservation for task ${taskId} not found`);
-    }
-
-    const reservation = reservations[0];
-    const taskRows = await tx<TaskRow[]>`
+    ),
+    updated_task as (
       update public.tasks set
         lease_until = now() + make_interval(secs => ${leaseSeconds}),
         updated_at = now()
-      where id = ${taskId}::uuid
-        and reserved_by_agent_id = ${reservation.agent_id}::uuid
-        and status in ('reserved', 'running')
-      returning *
-    `;
-
-    if (!taskRows[0]) {
-      throw new Error(`Task ${taskId} is not currently renewable`);
-    }
-
-    await tx`
+      from active_reservation
+      where public.tasks.id = ${taskId}::uuid
+        and public.tasks.reserved_by_agent_id = active_reservation.agent_id
+        and public.tasks.status in ('reserved', 'running')
+      returning
+        public.tasks.*,
+        active_reservation.id::text as reservation_id,
+        active_reservation.agent_id::text as reservation_agent_id,
+        active_reservation.worker_session_id::text as reservation_worker_session_id
+    ),
+    updated_reservation as (
       update public.task_reservations set
-        lease_until = ${taskRows[0].lease_until},
+        lease_until = updated_task.lease_until,
         heartbeat_at = now()
-      where id = ${reservation.id}::uuid
+      from updated_task
+      where task_reservations.id = updated_task.reservation_id::uuid
+      returning task_reservations.id
+    ),
+    task_event as (
+      insert into public.task_events (
+        id,
+        task_id,
+        agent_id,
+        event_type,
+        event_status,
+        severity,
+        event_payload,
+        occurred_at,
+        created_at
+      )
+      select
+        gen_random_uuid(),
+        updated_task.id,
+        updated_task.reservation_agent_id::uuid,
+        'task_lease_renewed',
+        'accepted',
+        'low',
+        jsonb_build_object(
+          'leaseSeconds', ${leaseSeconds}::integer,
+          'reservationId', updated_task.reservation_id
+        ),
+        now(),
+        now()
+      from updated_task
+      returning id
+    )
+    select *
+    from updated_task
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error(`Task ${taskId} is not currently renewable`);
+  }
+
+  if (workerSessionId) {
+    await sql`
+      update public.worker_sessions
+      set
+        status = 'working',
+        current_task_id = ${taskId}::uuid,
+        last_seen_at = now(),
+        updated_at = now()
+      where id = ${workerSessionId}::uuid
     `;
-    if (workerSessionId) {
-      await tx`
-        update public.worker_sessions
-        set
-          status = 'working',
-          current_task_id = ${taskId}::uuid,
-          last_seen_at = now(),
-          updated_at = now()
-        where id = ${workerSessionId}::uuid
-      `;
-    }
-    await tx`
+  }
+
+  if (row.reservation_agent_id) {
+    await sql`
       update public.agents
       set
         last_seen_at = now(),
         updated_at = now()
-      where id = ${reservation.agent_id}::uuid
+      where id = ${row.reservation_agent_id}::uuid
     `;
+  }
 
-    const task = mapTask(taskRows[0]);
-
-    await addTaskEventInTransaction(tx, {
-      agentId: reservation.agent_id,
-      eventPayload: {
-        leaseSeconds,
-        reservationId: reservation.id
-      },
-      eventStatus: "accepted",
-      eventType: "task_lease_renewed",
-      taskId: task.id
-    });
-
-    return {
-      reservationId: reservation.id,
-      task
-    };
-  });
+  return {
+    reservationId: row.reservation_id ?? "",
+    task: mapTask(row)
+  };
 }
 
 async function claimTaskFailureApplication(
   sql: postgres.Sql,
   input: FailTaskInput
 ) {
-  return sql.begin(async (tx) => {
-    const activeReservation = await activeReservationInTransaction(tx, {
-      agentId: input.agentId,
-      reservationId: input.reservationId,
-      taskId: input.taskId,
-      workerSessionId: input.workerSessionId
-    }, { lock: true });
-    const taskRows = await tx<TaskRow[]>`
-      select *
-      from public.tasks
-      where id = ${input.taskId}::uuid
-      for update
-    `;
-    const pendingTask = taskRows[0] ? mapTask(taskRows[0]) : null;
+  const taskId = uuidOrNull(input.taskId);
+  const reservationId = uuidOrNull(input.reservationId);
+  const agentId = uuidOrNull(input.agentId);
+  const workerSessionId = uuidOrNull(input.workerSessionId);
 
-    if (
-      !pendingTask ||
-      ["completed", "cancelled", "skipped"].includes(pendingTask.status) ||
-      (
-        activeReservation?.agent_id &&
-        pendingTask.reservedByAgentId !== activeReservation.agent_id
-      )
-    ) {
-      throw new Error(`Task ${input.taskId} could not be failed`);
-    }
+  if (!taskId) {
+    throw new Error("Task failure requires a valid taskId");
+  }
 
-    await extendFinalizationLeaseInTransaction(tx, activeReservation);
+  if (input.reservationId && !reservationId) {
+    throw new Error("Task failure requires a valid reservationId");
+  }
 
-    const rows = await tx<TaskRow[]>`
+  if (input.agentId && !agentId) {
+    throw new Error("Task failure requires a valid agentId");
+  }
+
+  if (input.workerSessionId && !workerSessionId) {
+    throw new Error("Task failure requires a valid workerSessionId");
+  }
+
+  const requiresReservation = Boolean(reservationId || agentId || workerSessionId);
+  const rows = await sql<TaskReservationResultRow[]>`
+    with active_reservation as (
+      select id, agent_id, worker_session_id
+      from public.task_reservations
+      where task_id = ${taskId}::uuid
+        and status = 'active'
+        and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
+        and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+        and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
+      order by reserved_at desc
+      limit 1
+    ),
+    extended_reservation as (
+      update public.task_reservations set
+        lease_until = greatest(
+          lease_until,
+          now() + make_interval(secs => ${TASK_FINALIZATION_LEASE_SECONDS})
+        ),
+        heartbeat_at = now(),
+        metadata = metadata || jsonb_build_object(
+          'finalizationLeaseExtendedAt', now()
+        )
+      from active_reservation
+      where task_reservations.id = active_reservation.id
+      returning
+        active_reservation.id::text,
+        active_reservation.agent_id::text,
+        active_reservation.worker_session_id::text
+    ),
+    reservation_info as (
+      select * from extended_reservation
+      union all
+      select null::text, null::text, null::text
+      where ${!requiresReservation}
+    ),
+    updated_task as (
       update public.tasks set
         status = 'running',
         lease_until = greatest(
-          coalesce(lease_until, now()),
+          coalesce(public.tasks.lease_until, now()),
           now() + make_interval(secs => ${TASK_FINALIZATION_LEASE_SECONDS})
         ),
         updated_at = now()
-      where id = ${input.taskId}::uuid
-        and status not in ('completed', 'cancelled', 'skipped')
+      from reservation_info
+      where public.tasks.id = ${taskId}::uuid
+        and public.tasks.status not in ('completed', 'cancelled', 'skipped')
+        and (${!requiresReservation} or reservation_info.id is not null)
         and (
-          ${activeReservation?.agent_id ?? null}::uuid is null
-          or reserved_by_agent_id = ${activeReservation?.agent_id ?? null}::uuid
+          reservation_info.agent_id is null
+          or public.tasks.reserved_by_agent_id = reservation_info.agent_id::uuid
         )
-      returning *
-    `;
+      returning
+        public.tasks.*,
+        reservation_info.id as reservation_id,
+        reservation_info.agent_id as reservation_agent_id,
+        reservation_info.worker_session_id as reservation_worker_session_id
+    ),
+    task_event as (
+      insert into public.task_events (
+        id,
+        task_id,
+        agent_id,
+        event_type,
+        event_status,
+        severity,
+        event_payload,
+        occurred_at,
+        created_at
+      )
+      select
+        gen_random_uuid(),
+        updated_task.id,
+        coalesce(${agentId}::uuid, updated_task.reservation_agent_id::uuid),
+        'task_failure_result_applying',
+        'accepted',
+        'medium',
+        jsonb_build_object(
+          'reservationId', updated_task.reservation_id,
+          'stage', 'failure_result_application'
+        ),
+        now(),
+        now()
+      from updated_task
+      returning id
+    )
+    select *
+    from updated_task
+  `;
+  const row = rows[0];
 
-    if (!rows[0]) {
-      throw new Error(`Task ${input.taskId} could not be failed`);
-    }
+  if (!row) {
+    throw new Error(`Task ${input.taskId} could not be failed`);
+  }
 
-    const task = mapTask(rows[0]);
-
-    await addTaskEventInTransaction(tx, {
-      agentId: input.agentId ?? activeReservation?.agent_id,
-      eventPayload: {
-        reservationId: activeReservation?.id,
-        stage: "failure_result_application"
-      },
-      eventStatus: "accepted",
-      eventType: "task_failure_result_applying",
-      severity: "medium",
-      taskId: task.id
-    });
-
-    return { activeReservation, task };
-  });
+  return {
+    activeReservation: row.reservation_id
+      ? {
+          agent_id: row.reservation_agent_id ?? "",
+          id: row.reservation_id,
+          worker_session_id: row.reservation_worker_session_id
+        }
+      : null,
+    task: mapTask(row)
+  };
 }
 
 async function finalizeTaskFailure(
@@ -2498,83 +2721,125 @@ async function finalizeTaskFailure(
     resultPayload: Record<string, unknown>;
   }>
 ) {
-  return sql.begin(async (tx) => {
-    const activeReservation = await activeReservationInTransaction(tx, {
-      agentId: input.failureInput.agentId,
-      reservationId: input.failureInput.reservationId,
-      taskId: input.failureInput.taskId,
-      workerSessionId: input.failureInput.workerSessionId
-    }, { lock: true });
-    const agentId =
-      input.failureInput.agentId ??
-      activeReservation?.agent_id ??
-      input.claim.activeReservation?.agent_id;
-    const reservationId =
-      activeReservation?.id ?? input.claim.activeReservation?.id;
-    const workerSessionId =
-      activeReservation?.worker_session_id ??
-      input.claim.activeReservation?.worker_session_id;
-    const rows = await tx<TaskRow[]>`
+  const taskId = uuidOrNull(input.failureInput.taskId);
+  const agentId =
+    uuidOrNull(input.failureInput.agentId) ??
+    input.claim.activeReservation?.agent_id ??
+    null;
+  const reservationId =
+    uuidOrNull(input.failureInput.reservationId) ??
+    input.claim.activeReservation?.id ??
+    null;
+  const workerSessionId =
+    uuidOrNull(input.failureInput.workerSessionId) ??
+    input.claim.activeReservation?.worker_session_id ??
+    null;
+  const requiresReservation = Boolean(reservationId || agentId || workerSessionId);
+
+  if (!taskId) {
+    throw new Error("Task failure requires a valid taskId");
+  }
+
+  const rows = await sql<TaskReservationResultRow[]>`
+    with active_reservation as (
+      select id, agent_id, worker_session_id
+      from public.task_reservations
+      where task_id = ${taskId}::uuid
+        and status = 'active'
+        and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
+        and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+        and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
+      order by reserved_at desc
+      limit 1
+    ),
+    reservation_info as (
+      select id::text, agent_id::text, worker_session_id::text
+      from active_reservation
+      union all
+      select null::text, null::text, null::text
+      where ${!requiresReservation}
+    ),
+    updated_task as (
       update public.tasks set
         status = 'failed',
         error_message = ${cleanText(input.failureInput.errorMessage, "Task failed.")},
-        result_payload = ${tx.json(toJsonValue(input.resultPayload))},
+        result_payload = ${sql.json(toJsonValue(input.resultPayload))}::jsonb,
         lease_until = null,
         reserved_by_agent_id = null,
         updated_at = now()
-      where id = ${input.failureInput.taskId}::uuid
-        and status = 'running'
+      from reservation_info
+      where public.tasks.id = ${taskId}::uuid
+        and public.tasks.status = 'running'
+        and (${!requiresReservation} or reservation_info.id is not null)
         and (
-          ${activeReservation?.agent_id ?? null}::uuid is null
-          or reserved_by_agent_id = ${activeReservation?.agent_id ?? null}::uuid
+          reservation_info.agent_id is null
+          or public.tasks.reserved_by_agent_id = reservation_info.agent_id::uuid
         )
-      returning *
-    `;
-
-    if (!rows[0]) {
-      throw new Error(`Task ${input.failureInput.taskId} could not be failed`);
-    }
-
-    const task = mapTask(rows[0]);
-
-    await tx`
+      returning
+        public.tasks.*,
+        reservation_info.id as reservation_id,
+        reservation_info.agent_id as reservation_agent_id,
+        reservation_info.worker_session_id as reservation_worker_session_id
+    ),
+    updated_reservation as (
       update public.task_reservations set
         status = 'failed',
         released_at = now()
-      where task_id = ${task.id}::uuid
-        and status = 'active'
-        and (
-          ${reservationId ?? null}::uuid is null
-          or id = ${reservationId ?? null}::uuid
-        )
+      from updated_task
+      where task_reservations.id = updated_task.reservation_id::uuid
+        and task_reservations.status = 'active'
+      returning task_reservations.id
+    ),
+    task_event as (
+      insert into public.task_events (
+        id,
+        task_id,
+        agent_id,
+        event_type,
+        event_status,
+        severity,
+        event_payload,
+        occurred_at,
+        created_at
+      )
+      select
+        gen_random_uuid(),
+        updated_task.id,
+        coalesce(${agentId}::uuid, updated_task.reservation_agent_id::uuid),
+        'task_failed',
+        'failed',
+        'high',
+        jsonb_build_object(
+          'errorMessage', ${input.failureInput.errorMessage}::text,
+          'reservationId', updated_task.reservation_id,
+          'resultPayload', ${sql.json(toJsonValue(input.resultPayload))}::jsonb
+        ),
+        now(),
+        now()
+      from updated_task
+      returning id
+    )
+    select *
+    from updated_task
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error(`Task ${input.failureInput.taskId} could not be failed`);
+  }
+
+  if (row.reservation_worker_session_id) {
+    await sql`
+      update public.worker_sessions set
+        status = 'idle',
+        current_task_id = null,
+        last_seen_at = now(),
+        updated_at = now()
+      where id = ${row.reservation_worker_session_id}::uuid
     `;
+  }
 
-    if (workerSessionId) {
-      await tx`
-        update public.worker_sessions set
-          status = 'idle',
-          current_task_id = null,
-          last_seen_at = now(),
-          updated_at = now()
-        where id = ${workerSessionId}::uuid
-      `;
-    }
-
-    await addTaskEventInTransaction(tx, {
-      agentId,
-      eventPayload: {
-        errorMessage: input.failureInput.errorMessage,
-        reservationId,
-        resultPayload: input.resultPayload
-      },
-      eventStatus: "failed",
-      eventType: "task_failed",
-      severity: "high",
-      taskId: task.id
-    });
-
-    return task;
-  });
+  return mapTask(row);
 }
 
 export async function failTask(input: FailTaskInput) {
@@ -2662,7 +2927,7 @@ export async function spawnChildTask(input: SpawnChildTaskInput) {
   }
 
   const parent = mapTask(parentRows[0]);
-  const created = await createTaskInTransaction(sql, {
+  const created = await createTaskRecord(sql, {
     ...input,
     createdByTaskId: parent.id,
     parentTaskId: parent.id,
@@ -2672,7 +2937,7 @@ export async function spawnChildTask(input: SpawnChildTaskInput) {
     groupLabel: input.groupLabel ?? parent.groupLabel
   });
 
-  await addTaskEventInTransaction(sql, {
+  await insertTaskEvent(sql, {
     agentId: input.createdByAgentId,
     eventPayload: {
       childTaskId: created.task.id,

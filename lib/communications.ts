@@ -380,7 +380,7 @@ export async function ensureCommunicationSchema(sql: Db = sqlOrThrow()) {
   return globalCommunications.mattanutraCommunicationSchemaReady;
 }
 
-async function ensurePlanIdentityInTransaction(
+async function ensurePlanIdentity(
   sql: Db,
   planId: string
 ): Promise<string> {
@@ -452,7 +452,7 @@ async function ensurePlanIdentityInTransaction(
   return rows[0].identity_id;
 }
 
-async function upsertChannelInTransaction(
+async function upsertChannel(
   sql: Db,
   input: Readonly<{
     actorType?: CommunicationChannel["actorType"] | null;
@@ -535,7 +535,7 @@ async function upsertChannelInTransaction(
   return mapChannel(rows[0]);
 }
 
-async function seedKnownPlanChannelsInTransaction(
+async function seedKnownPlanChannels(
   sql: Db,
   planId: string,
   identityId: string
@@ -557,7 +557,7 @@ async function seedKnownPlanChannelsInTransaction(
     const validation = validateLeadEmail(row.email ?? "");
 
     if (validation.ok) {
-      await upsertChannelInTransaction(sql, {
+      await upsertChannel(sql, {
         address: validation.email,
         channelType: "email",
         displayName: "Email",
@@ -579,8 +579,8 @@ export async function ensurePlanCommunicationIdentity(input: Readonly<{
 
   await ensureCommunicationSchema(sql);
 
-  const identityId = await ensurePlanIdentityInTransaction(sql, input.planId);
-  await seedKnownPlanChannelsInTransaction(sql, input.planId, identityId);
+  const identityId = await ensurePlanIdentity(sql, input.planId);
+  await seedKnownPlanChannels(sql, input.planId, identityId);
 
   return identityId;
 }
@@ -608,7 +608,7 @@ export async function upsertCommunicationChannel(input: Readonly<{
   const identityId = isUuid(input.identityId ?? "")
     ? input.identityId!
     : isUuid(input.planId ?? "")
-      ? await ensurePlanIdentityInTransaction(sql, input.planId!)
+      ? await ensurePlanIdentity(sql, input.planId!)
       : null;
 
   if (!identityId) {
@@ -616,10 +616,10 @@ export async function upsertCommunicationChannel(input: Readonly<{
   }
 
   if (input.planId && isUuid(input.planId)) {
-    await seedKnownPlanChannelsInTransaction(sql, input.planId, identityId);
+    await seedKnownPlanChannels(sql, input.planId, identityId);
   }
 
-  return upsertChannelInTransaction(sql, {
+  return upsertChannel(sql, {
     actorType: input.actorType,
     address: input.address,
     channelType,
@@ -735,9 +735,9 @@ export async function recordEmailCommunicationDelivery(input: Readonly<{
   const taskId = isUuid(input.taskId ?? "") ? input.taskId! : null;
   const status: CommunicationMessageStatus = input.sent ? "sent" : "failed";
   const errorMessage = input.sent ? null : optionalText(input.reason);
-  const identityId = await ensurePlanIdentityInTransaction(sql, planId);
-  await seedKnownPlanChannelsInTransaction(sql, planId, identityId);
-  const channel = await upsertChannelInTransaction(sql, {
+  const identityId = await ensurePlanIdentity(sql, planId);
+  await seedKnownPlanChannels(sql, planId, identityId);
+  const channel = await upsertChannel(sql, {
     actorType: "human",
     address: emailValidation.email,
     channelType: "email",
@@ -808,7 +808,7 @@ export async function listCommunicationChannels(input: Readonly<{
   const identityId = isUuid(input.identityId ?? "")
     ? input.identityId!
     : isUuid(input.planId ?? "")
-      ? await ensurePlanIdentityInTransaction(sql, input.planId!)
+      ? await ensurePlanIdentity(sql, input.planId!)
       : null;
 
   if (!identityId) {
@@ -816,7 +816,7 @@ export async function listCommunicationChannels(input: Readonly<{
   }
 
   if (input.planId && isUuid(input.planId)) {
-    await seedKnownPlanChannelsInTransaction(sql, input.planId, identityId);
+    await seedKnownPlanChannels(sql, input.planId, identityId);
   }
 
   const rows = await sql<ChannelRow[]>`
@@ -865,11 +865,11 @@ export async function sendCommunication(input: Readonly<{
   const identityId = isUuid(input.identityId ?? "")
     ? input.identityId!
     : planId
-      ? await ensurePlanIdentityInTransaction(sql, planId)
+      ? await ensurePlanIdentity(sql, planId)
       : null;
 
   if (planId && identityId) {
-    await seedKnownPlanChannelsInTransaction(sql, planId, identityId);
+    await seedKnownPlanChannels(sql, planId, identityId);
   }
 
   const channels = identityId
@@ -1175,31 +1175,11 @@ async function sendPreparedEmailMessage(
 }
 
 async function claimCommunicationRetry(
-  tx: Db,
+  sql: Db,
   input: CommunicationRetryClaimInput
 ): Promise<PreparedRetryMessage> {
-  const rows = await tx<MessageRow[]>`
-    select *
-    from public.communication_messages
-    where id = ${input.messageId}::uuid
-    limit 1
-    for update
-  `;
-  const row = rows[0];
-
-  if (!row) {
-    throw new Error("Communication message not found");
-  }
-
-  if (row.status === "sent" || row.status === "delivered") {
-    return {
-      channel: null,
-      message: mapMessage(row)
-    };
-  }
-
   if (!input.selected) {
-    const updated = await tx<MessageRow[]>`
+    const updated = await sql<MessageRow[]>`
       update public.communication_messages
       set
         identity_id = coalesce(${input.identityId ?? null}::uuid, identity_id),
@@ -1209,37 +1189,60 @@ async function claimCommunicationRetry(
         error_message = 'Awaiting a contact channel for this plan',
         updated_at = now()
       where id = ${input.messageId}::uuid
+        and status not in ('sent', 'delivered')
       returning *
     `;
 
-    return {
-      channel: null,
-      message: mapMessage(updated[0])
-    };
+    if (updated[0]) {
+      return {
+        channel: null,
+        message: mapMessage(updated[0])
+      };
+    }
+  } else {
+    const updated = await sql<MessageRow[]>`
+      update public.communication_messages
+      set
+        identity_id = coalesce(${input.identityId ?? null}::uuid, identity_id),
+        channel_id = ${input.selected.id}::uuid,
+        provider = ${input.selected.channelType},
+        status = 'queued',
+        error_message = null,
+        metadata = metadata || ${sql.json(
+          toJsonValue({
+            retrySelectedChannelType: input.selected.channelType,
+            retryStartedAt: new Date().toISOString()
+          })
+        )}::jsonb,
+        updated_at = now()
+      where id = ${input.messageId}::uuid
+        and status not in ('sent', 'delivered')
+      returning *
+    `;
+
+    if (updated[0]) {
+      return {
+        channel: input.selected,
+        message: mapMessage(updated[0])
+      };
+    }
   }
 
-  const updated = await tx<MessageRow[]>`
-    update public.communication_messages
-    set
-      identity_id = coalesce(${input.identityId ?? null}::uuid, identity_id),
-      channel_id = ${input.selected.id}::uuid,
-      provider = ${input.selected.channelType},
-      status = 'queued',
-      error_message = null,
-      metadata = metadata || ${tx.json(
-        toJsonValue({
-          retrySelectedChannelType: input.selected.channelType,
-          retryStartedAt: new Date().toISOString()
-        })
-      )}::jsonb,
-      updated_at = now()
+  const rows = await sql<MessageRow[]>`
+    select *
+    from public.communication_messages
     where id = ${input.messageId}::uuid
-    returning *
+    limit 1
   `;
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error("Communication message not found");
+  }
 
   return {
-    channel: input.selected,
-    message: mapMessage(updated[0])
+    channel: null,
+    message: mapMessage(row)
   };
 }
 
@@ -1278,11 +1281,11 @@ export async function retryCommunicationMessage(messageId: string) {
   const identityId = isUuid(initial.identity_id ?? "")
     ? initial.identity_id
     : planId
-      ? await ensurePlanIdentityInTransaction(sql, planId)
+      ? await ensurePlanIdentity(sql, planId)
       : null;
 
   if (planId && identityId) {
-    await seedKnownPlanChannelsInTransaction(sql, planId, identityId);
+    await seedKnownPlanChannels(sql, planId, identityId);
   }
 
   const channels = identityId
@@ -1296,13 +1299,11 @@ export async function retryCommunicationMessage(messageId: string) {
       ).map(mapChannel)
     : [];
   const selected = selectBestCommunicationChannel(channels);
-  const prepared = await sql.begin((tx) =>
-    claimCommunicationRetry(tx, {
-      identityId,
-      messageId,
-      selected
-    })
-  );
+  const prepared = await claimCommunicationRetry(sql, {
+    identityId,
+    messageId,
+    selected
+  });
 
   if (!prepared.channel) {
     return {
