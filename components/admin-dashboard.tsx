@@ -16,6 +16,7 @@ import {
   Bars3Icon,
   XMarkIcon
 } from "@heroicons/react/24/outline";
+import { HeartIcon } from "@heroicons/react/24/solid";
 import type {
   AdminDashboardData,
   AdminDashboardRange
@@ -778,6 +779,72 @@ function agentStatusClass(status: string) {
   return "bg-gray-50 text-gray-700 ring-gray-200";
 }
 
+function agentHeartbeatState(row: AdminAgentRow, generatedAt: string) {
+  if (row.sessionCount <= 0 || !row.lastSeenAt) {
+    return "offline";
+  }
+
+  const generatedAtTime = new Date(generatedAt).getTime();
+  const lastSeenTime = new Date(row.lastSeenAt).getTime();
+
+  if (!Number.isFinite(generatedAtTime) || !Number.isFinite(lastSeenTime)) {
+    return "offline";
+  }
+
+  const ageMs = generatedAtTime - lastSeenTime;
+
+  if (ageMs <= 45_000) {
+    return "live";
+  }
+
+  if (ageMs <= 120_000) {
+    return "idle";
+  }
+
+  return "offline";
+}
+
+function AgentHeartbeatIcon({
+  generatedAt,
+  locale,
+  row
+}: Readonly<{
+  generatedAt: string;
+  locale: Locale;
+  row: AdminAgentRow;
+}>) {
+  const state = agentHeartbeatState(row, generatedAt);
+  const active = state !== "offline";
+
+  return (
+    <span
+      className={classNames(
+        "inline-flex size-8 shrink-0 items-center justify-center rounded-full ring-1",
+        state === "live" && "bg-rose-50 text-rose-600 ring-rose-100",
+        state === "idle" && "bg-amber-50 text-amber-600 ring-amber-100",
+        state === "offline" && "bg-gray-50 text-gray-300 ring-gray-200"
+      )}
+      title={
+        row.lastSeenAt
+          ? `Last heartbeat ${formatGeneratedAt(row.lastSeenAt, locale)}`
+          : "No worker heartbeat"
+      }
+    >
+      <HeartIcon
+        aria-hidden="true"
+        className={classNames(
+          "size-4",
+          active && "animate-[worker-heartbeat_700ms_ease-out]"
+        )}
+        key={`${row.id}:${row.lastSeenAt ?? "none"}`}
+      />
+      <span className="sr-only">
+        {active ? "Worker heartbeat received" : "No worker heartbeat"}
+      </span>
+    </span>
+  );
+}
+
 function CapabilityList({ values }: Readonly<{ values: string[] }>) {
   if (values.length === 0) {
     return null;
@@ -1329,7 +1396,13 @@ function AdminAgentsView({
       {data.rows.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {data.rows.map((row) => (
-            <AgentCard key={row.id} labels={labels} locale={locale} row={row} />
+            <AgentCard
+              generatedAt={data.generatedAt}
+              key={row.id}
+              labels={labels}
+              locale={locale}
+              row={row}
+            />
           ))}
         </div>
       ) : (
@@ -1342,10 +1415,12 @@ function AdminAgentsView({
 }
 
 function AgentCard({
+  generatedAt,
   labels,
   locale,
   row
 }: Readonly<{
+  generatedAt: string;
   labels: AdminContent;
   locale: Locale;
   row: AdminAgentRow;
@@ -1361,14 +1436,21 @@ function AgentCard({
             {readableToken(row.type)} · {compactId(row.id)}
           </p>
         </div>
-        <span
-          className={classNames(
-            agentStatusClass(row.status),
-            "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
-          )}
-        >
-          {readableToken(row.status)}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <AgentHeartbeatIcon
+            generatedAt={generatedAt}
+            locale={locale}
+            row={row}
+          />
+          <span
+            className={classNames(
+              agentStatusClass(row.status),
+              "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+            )}
+          >
+            {readableToken(row.status)}
+          </span>
+        </div>
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">

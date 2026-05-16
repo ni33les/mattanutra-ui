@@ -24,6 +24,7 @@ type WorkerProfileMode = Exclude<WorkerMode, "all" | "supplement">;
 
 const DEFAULT_POLL_WAIT_SECONDS = 20;
 const DEFAULT_LEASE_SECONDS = 900;
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 15_000;
 const INITIAL_AGENT_RESTART_BACKOFF_MS = 1_000;
 const MAX_AGENT_RESTART_BACKOFF_MS = 30_000;
 const MAX_POLLING_BACKOFF_MS = 30_000;
@@ -44,6 +45,8 @@ type ActiveSession = Readonly<{
   client: WorkerApiClient;
   workerSessionId: string;
 }>;
+
+type WorkerHeartbeatStatus = "idle" | "working";
 
 const activeSessions = new Map<string, ActiveSession>();
 let shuttingDown = false;
@@ -80,6 +83,10 @@ function jitter(ms: number) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error";
+}
+
+function isStaleWorkerSessionError(error: unknown) {
+  return errorMessage(error).toLowerCase().includes("worker session not found");
 }
 
 async function retryApiCall<T>(
@@ -267,10 +274,41 @@ async function runAgentLoop(
       process.env.WORKER_POLL_WAIT_SECONDS,
       registration.polling.waitSeconds
     ) || DEFAULT_POLL_WAIT_SECONDS;
+  const heartbeatIntervalMs = positiveInteger(
+    process.env.WORKER_HEARTBEAT_INTERVAL_MS,
+    DEFAULT_HEARTBEAT_INTERVAL_MS
+  );
 
   activeSession = { agentId: agent.id, client, workerSessionId };
   activeSessionKey = sessionKey;
   activeSessions.set(sessionKey, activeSession);
+
+  let heartbeatStatus: WorkerHeartbeatStatus = "idle";
+  let heartbeatTaskId: string | null = null;
+  let staleHeartbeatError: Error | null = null;
+  const heartbeat = setInterval(() => {
+    void retryApiCall(`${agent.name} heartbeat`, () =>
+      client.heartbeat({
+        agentId: agent.id,
+        currentTaskId: heartbeatTaskId,
+        status: heartbeatStatus,
+        workerSessionId
+      }),
+      2
+    ).catch((error) => {
+      if (isStaleWorkerSessionError(error)) {
+        staleHeartbeatError = new Error(
+          `${agent.name} worker session ${workerSessionId} no longer exists; re-registering`
+        );
+        return;
+      }
+
+      console.error(
+        `[agent] ${agent.name} heartbeat failed: ${errorMessage(error)}`
+      );
+    });
+  }, heartbeatIntervalMs);
+  (heartbeat as ReturnType<typeof setInterval> & { unref?: () => void }).unref?.();
 
   try {
     await retryApiCall(`${agent.name} initial heartbeat`, () =>
@@ -288,9 +326,15 @@ async function runAgentLoop(
     let pollingBackoffMs = 1_000;
 
     while (!shuttingDown) {
+      if (staleHeartbeatError) {
+        throw staleHeartbeatError;
+      }
+
       let reserved: Awaited<ReturnType<WorkerApiClient["reserve"]>>;
 
       try {
+        heartbeatStatus = "idle";
+        heartbeatTaskId = null;
         reserved = await client.reserve({
           agent,
           leaseSeconds,
@@ -300,6 +344,15 @@ async function runAgentLoop(
         });
         pollingBackoffMs = 1_000;
       } catch (error) {
+        heartbeatStatus = "idle";
+        heartbeatTaskId = null;
+
+        if (isStaleWorkerSessionError(error)) {
+          throw new Error(
+            `${agent.name} worker session ${workerSessionId} no longer exists; re-registering`
+          );
+        }
+
         console.error(
           `[agent] ${agent.name} polling failed: ${errorMessage(error)}`
         );
@@ -309,6 +362,8 @@ async function runAgentLoop(
       }
 
       if (!reserved.task || !reserved.reservationId || !reserved.workItem) {
+        heartbeatStatus = "idle";
+        heartbeatTaskId = null;
         continue;
       }
 
@@ -317,6 +372,8 @@ async function runAgentLoop(
       const taskId = task.id;
       const taskType = task.taskType;
       const workItem = reserved.workItem;
+      heartbeatStatus = "working";
+      heartbeatTaskId = taskId;
       const renew = setInterval(() => {
         void retryApiCall(`${agent.name} task lease renewal`, () =>
           client.renew({
@@ -348,8 +405,12 @@ async function runAgentLoop(
             workerSessionId
           })
         );
+        heartbeatStatus = "idle";
+        heartbeatTaskId = null;
       } catch (error) {
         clearInterval(renew);
+        let staleSession = isStaleWorkerSessionError(error);
+
         await retryApiCall(`${agent.name} task failure`, () =>
           client.fail({
             agentId: agent.id,
@@ -362,13 +423,25 @@ async function runAgentLoop(
             workerSessionId
           })
         ).catch((failureError) => {
+          staleSession ||= isStaleWorkerSessionError(failureError);
           console.error(
             `[agent] ${agent.name} could not mark task failed: ${errorMessage(failureError)}`
           );
         });
+
+        if (staleSession) {
+          throw new Error(
+            `${agent.name} worker session ${workerSessionId} went stale while handling task ${taskId}; re-registering`
+          );
+        }
+
+        heartbeatStatus = "idle";
+        heartbeatTaskId = null;
       }
     }
   } finally {
+    clearInterval(heartbeat);
+
     if (!shuttingDown && activeSessionKey && activeSession) {
       await markSessionOffline(activeSessionKey, activeSession);
     }
