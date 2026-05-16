@@ -4,16 +4,24 @@ import { writeBpmEvent } from "@/lib/bpm";
 import { recordEmailCommunicationDelivery } from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import {
+  analysisPayload,
+  foodGuidanceAnalysisPayload,
+  modelVersion,
+  nutritionChatAnalysisPayload,
+  nutritionReportAnalysisPayload,
+  objectValue,
+  payloadText,
+  refinementQueuedReply,
+  textValue
+} from "@/lib/task-result-payloads";
+import {
   buildDigitalOceanBillingCostEntries,
   recordFinanceTransaction,
   recordXaiUsageCost
 } from "@/lib/finance-ledger";
 import { applyFoodGuidanceSafety } from "@/lib/food-guidance-safety";
 import { applyFormulationSafety } from "@/lib/formulation-safety";
-import {
-  inferGuidanceRemovalAdjustments,
-  normalizeGuidanceAdjustments,
-} from "@/lib/plan-guidance-adjustments";
+import { inferGuidanceRemovalAdjustments } from "@/lib/plan-guidance-adjustments";
 import {
   insertFoodGuidanceVersion,
   insertFormulationVersion
@@ -21,13 +29,11 @@ import {
 import {
   inferPlanFeedbackFromMessage,
   isPlanRefinementRequest,
-  normalizePlanFeedbackItems,
   savePlanFeedback
 } from "@/lib/plan-feedback";
 import type {
   FoodGuidanceBlueprint,
-  FormulationBlueprint,
-  NutritionReport
+  FormulationBlueprint
 } from "@/lib/formulation-types";
 import type { HealthScoreResult } from "@/lib/health-score";
 import { isLocale, type Locale } from "@/lib/i18n";
@@ -59,96 +65,6 @@ async function eventually(
   }
 
   await effect();
-}
-
-function objectValue(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function textValue(value: unknown) {
-  return typeof value === "string" ? value : "";
-}
-
-function payloadText(payload: unknown, key: string) {
-  return textValue(objectValue(payload)[key]);
-}
-
-function modelVersion(analysis: Record<string, unknown>, suffix = "") {
-  const model = textValue(analysis.model) || "unknown";
-  const reasoningEffort = textValue(analysis.reasoningEffort) || "unknown";
-  const promptVersion = textValue(analysis.promptVersion) || "unknown";
-
-  return `xai:${model}:${reasoningEffort}:${promptVersion}${suffix}`;
-}
-
-function analysisPayload(resultPayload: unknown) {
-  const analysis = objectValue(objectValue(resultPayload).analysis);
-  const formulation = objectValue(analysis.formulation);
-
-  if (!Array.isArray(formulation.supplementBreakdown)) {
-    throw new Error("Task completion result is missing formulation analysis");
-  }
-
-  return analysis as Record<string, unknown> & {
-    formulation: FormulationBlueprint;
-  };
-}
-
-function foodGuidanceAnalysisPayload(resultPayload: unknown) {
-  const analysis = objectValue(objectValue(resultPayload).analysis);
-  const foodGuidance = objectValue(analysis.foodGuidance);
-
-  if (!Array.isArray(foodGuidance.foodGuidance)) {
-    throw new Error("Task completion result is missing food guidance analysis");
-  }
-
-  return analysis as Record<string, unknown> & {
-    foodGuidance: FoodGuidanceBlueprint;
-  };
-}
-
-function nutritionChatAnalysisPayload(resultPayload: unknown) {
-  const analysis = objectValue(objectValue(resultPayload).analysis);
-  const reply = textValue(analysis.reply).trim();
-
-  if (!reply) {
-    throw new Error("Task completion result is missing chat reply analysis");
-  }
-
-  return {
-    ...analysis,
-    adjustments: normalizeGuidanceAdjustments(analysis.adjustments),
-    feedback: normalizePlanFeedbackItems(analysis.feedback),
-    reply
-  } as Record<string, unknown> & {
-    adjustments: ReturnType<typeof normalizeGuidanceAdjustments>;
-    feedback: ReturnType<typeof normalizePlanFeedbackItems>;
-    reply: string;
-  };
-}
-
-function refinementQueuedReply(userMessage: string) {
-  if (/[ก-๙]/u.test(userMessage)) {
-    return "รับทราบครับ ผมจะปรับแผนใหม่โดยใช้บทสนทนานี้เป็นบริบท แล้วจะแสดงคำแนะนำอาหาร อาหารเสริม และแผนสรุปฉบับใหม่เมื่อเสร็จ";
-  }
-
-  return "Got it. I’ll regenerate your plan now using this conversation as context. The food guidance, supplement guidance, and final plan will update here as each step finishes.";
-}
-
-function nutritionReportAnalysisPayload(resultPayload: unknown) {
-  const analysis = objectValue(objectValue(resultPayload).analysis);
-  const report = objectValue(analysis.report) as NutritionReport;
-
-  if (!report || typeof report !== "object" || Array.isArray(report)) {
-    throw new Error("Task completion result is missing nutrition report analysis");
-  }
-
-  return {
-    ...analysis,
-    report
-  } as Record<string, unknown> & { report: NutritionReport };
 }
 
 async function updateAssessmentReadyIfNutritionReady(

@@ -1,13 +1,19 @@
 import {
   adminDashboardRangeStart,
-  normalizeAdminDashboardRange,
   type AdminDashboardRange
 } from "@/lib/admin-dashboard-data";
 import {
   adminDashboardFilterSql,
-  normalizeAdminDashboardFilters,
   type AdminDashboardFilters
 } from "@/lib/admin-dashboard-filters";
+import {
+  adminQueryEnvelope,
+  dashboardQueryParams,
+  normalizeAdminQueryParams,
+  paginateAdminRows,
+  type AdminQueryPagination,
+  type AdminQueryParams
+} from "@/lib/admin-query-helpers";
 import { getAdminCommunicationsData } from "@/lib/admin-communications";
 import {
   getAdminAgentsData,
@@ -37,19 +43,9 @@ export type AdminExternalQueryView =
   | "supplements"
   | "tasks";
 
-type QueryParams = Readonly<{
-  cursor: number;
-  filters: AdminDashboardFilters;
-  limit: number;
-  range: AdminDashboardRange;
-  status: string;
-}>;
+type QueryParams = AdminQueryParams;
 
-export type AdminQueryPagination = Readonly<{
-  cursor: string | null;
-  limit: number;
-  nextCursor: string | null;
-}>;
+export type { AdminQueryPagination } from "@/lib/admin-query-helpers";
 
 export type AdminCampaignRow = Readonly<{
   affiliate: string | null;
@@ -250,102 +246,6 @@ export function normalizeAdminExternalQueryView(
     : null;
 }
 
-function paramsRecord(searchParams: URLSearchParams) {
-  const record: Record<string, string> = {};
-
-  searchParams.forEach((value, key) => {
-    record[key] = value;
-  });
-
-  return record;
-}
-
-function normalizeLimit(value: string | null) {
-  const parsed = value ? Number(value) : 50;
-
-  if (!Number.isFinite(parsed)) {
-    return 50;
-  }
-
-  return Math.max(1, Math.min(100, Math.round(parsed)));
-}
-
-function normalizeCursor(value: string | null) {
-  const parsed = value ? Number(value) : 0;
-
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
-}
-
-function normalizeQueryParams(searchParams: URLSearchParams): QueryParams {
-  const record = paramsRecord(searchParams);
-
-  return {
-    cursor: normalizeCursor(searchParams.get("cursor")),
-    filters: normalizeAdminDashboardFilters(record),
-    limit: normalizeLimit(searchParams.get("limit")),
-    range: normalizeAdminDashboardRange(searchParams.get("range") ?? undefined),
-    status: (searchParams.get("status") ?? "").trim().slice(0, 80)
-  };
-}
-
-function paginate<T>(rows: readonly T[], params: QueryParams) {
-  const start = params.cursor;
-  const pageRows = rows.slice(start, start + params.limit);
-  const nextCursor =
-    start + params.limit < rows.length ? String(start + params.limit) : null;
-
-  return {
-    pageRows,
-    pagination: {
-      cursor: start > 0 ? String(start) : null,
-      limit: params.limit,
-      nextCursor
-    } satisfies AdminQueryPagination
-  };
-}
-
-function queryEnvelope(
-  data: unknown,
-  params: QueryParams,
-  pagination?: AdminQueryPagination
-) {
-  return {
-    data,
-    filters: {
-      ...params.filters,
-      range: params.range,
-      status: params.status || undefined
-    },
-    generatedAt: new Date().toISOString(),
-    pagination:
-      pagination ?? {
-        cursor: params.cursor > 0 ? String(params.cursor) : null,
-        limit: params.limit,
-        nextCursor: null
-      }
-  };
-}
-
-function dashboardQueryParams({
-  filters,
-  limit,
-  range,
-  status = ""
-}: Readonly<{
-  filters: AdminDashboardFilters;
-  limit: number;
-  range: AdminDashboardRange;
-  status?: string;
-}>): QueryParams {
-  return {
-    cursor: 0,
-    filters,
-    limit: Math.max(1, Math.min(100, Math.round(limit))),
-    range,
-    status: status.trim().slice(0, 80)
-  };
-}
-
 function flowNodeCount(flow: AdminFlowData, id: string) {
   return flow.nodes.find((node) => node.id === id)?.count ?? 0;
 }
@@ -515,7 +415,7 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
     promoCode: row.promo_code,
     source: row.source
   }));
-  const { pageRows, pagination } = paginate(mappedRows, params);
+  const { pageRows, pagination } = paginateAdminRows(mappedRows, params);
 
   return {
     databaseAvailable: true,
@@ -668,7 +568,7 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
       subject: row.subject
     }))
     .filter((row) => !params.status || row.currentStage === params.status);
-  const { pageRows, pagination } = paginate(mappedRows, params);
+  const { pageRows, pagination } = paginateAdminRows(mappedRows, params);
   const subjects = pageRows.map((row) => row.subject);
   const eventRows = subjects.length
     ? await sql<
@@ -1057,7 +957,7 @@ async function getContentInventory(params: QueryParams) {
       total: 0
     }
   );
-  const { pageRows, pagination } = paginate(rows, params);
+  const { pageRows, pagination } = paginateAdminRows(rows, params);
 
   return {
     databaseAvailable: true,
@@ -1080,10 +980,10 @@ export async function getAdminExternalQueryData(
   view: AdminExternalQueryView,
   searchParams: URLSearchParams
 ) {
-  const params = normalizeQueryParams(searchParams);
+  const params = normalizeAdminQueryParams(searchParams);
 
   if (view === "conversions") {
-    return queryEnvelope(await getAdminFlowData(params.range, params.filters), params);
+    return adminQueryEnvelope(await getAdminFlowData(params.range, params.filters), params);
   }
 
   if (view === "glance") {
@@ -1097,7 +997,7 @@ export async function getAdminExternalQueryData(
     const nodeSeries = (id: AdminFlowNodeId) =>
       flow.series.nodes[id] ?? emptySeries;
 
-    return queryEnvelope(
+    return adminQueryEnvelope(
       {
         attention: {
           communicationIssues:
@@ -1140,19 +1040,19 @@ export async function getAdminExternalQueryData(
   if (view === "campaigns") {
     const data = await getCampaigns(params);
 
-    return queryEnvelope(data, params, data.pagination);
+    return adminQueryEnvelope(data, params, data.pagination);
   }
 
   if (view === "leads") {
     const data = await getLeads(params);
 
-    return queryEnvelope(data, params, data.pagination);
+    return adminQueryEnvelope(data, params, data.pagination);
   }
 
   if (view === "content") {
     const data = await getContentInventory(params);
 
-    return queryEnvelope(data, params, data.pagination);
+    return adminQueryEnvelope(data, params, data.pagination);
   }
 
   if (view === "reviews") {
@@ -1160,9 +1060,9 @@ export async function getAdminExternalQueryData(
     const rows = data.rows.filter(
       (row) => !params.status || row.status === params.status
     );
-    const { pageRows, pagination } = paginate(rows, params);
+    const { pageRows, pagination } = paginateAdminRows(rows, params);
 
-    return queryEnvelope({ ...data, rows: pageRows }, params, pagination);
+    return adminQueryEnvelope({ ...data, rows: pageRows }, params, pagination);
   }
 
   if (view === "supplements") {
@@ -1170,9 +1070,9 @@ export async function getAdminExternalQueryData(
     const rows = data.rows.filter(
       (row) => !params.status || row.listStatus === params.status
     );
-    const { pageRows, pagination } = paginate(rows, params);
+    const { pageRows, pagination } = paginateAdminRows(rows, params);
 
-    return queryEnvelope({ ...data, rows: pageRows }, params, pagination);
+    return adminQueryEnvelope({ ...data, rows: pageRows }, params, pagination);
   }
 
   if (view === "communications") {
@@ -1180,9 +1080,9 @@ export async function getAdminExternalQueryData(
     const rows = data.rows.filter(
       (row) => !params.status || row.status === params.status
     );
-    const { pageRows, pagination } = paginate(rows, params);
+    const { pageRows, pagination } = paginateAdminRows(rows, params);
 
-    return queryEnvelope({ ...data, rows: pageRows }, params, pagination);
+    return adminQueryEnvelope({ ...data, rows: pageRows }, params, pagination);
   }
 
   if (view === "alerts") {
@@ -1193,9 +1093,9 @@ export async function getAdminExternalQueryData(
         row.adminStatus === params.status ||
         row.status === params.status
     );
-    const { pageRows, pagination } = paginate(rows, params);
+    const { pageRows, pagination } = paginateAdminRows(rows, params);
 
-    return queryEnvelope({ ...data, rows: pageRows }, params, pagination);
+    return adminQueryEnvelope({ ...data, rows: pageRows }, params, pagination);
   }
 
   if (view === "tasks") {
@@ -1203,16 +1103,16 @@ export async function getAdminExternalQueryData(
     const rows = data.rows.filter(
       (row) => !params.status || row.status === params.status
     );
-    const { pageRows, pagination } = paginate(rows, params);
+    const { pageRows, pagination } = paginateAdminRows(rows, params);
 
-    return queryEnvelope({ ...data, rows: pageRows }, params, pagination);
+    return adminQueryEnvelope({ ...data, rows: pageRows }, params, pagination);
   }
 
   const data = await getAdminAgentsData(params.range);
   const rows = data.rows.filter(
     (row) => !params.status || row.status === params.status
   );
-  const { pageRows, pagination } = paginate(rows, params);
+  const { pageRows, pagination } = paginateAdminRows(rows, params);
 
-  return queryEnvelope({ ...data, rows: pageRows }, params, pagination);
+  return adminQueryEnvelope({ ...data, rows: pageRows }, params, pagination);
 }
