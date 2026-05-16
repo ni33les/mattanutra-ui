@@ -16,7 +16,7 @@ import {
   Bars3Icon,
   XMarkIcon
 } from "@heroicons/react/24/outline";
-import { HeartIcon } from "@heroicons/react/24/solid";
+import { HeartIcon, UserIcon } from "@heroicons/react/24/solid";
 import type {
   AdminDashboardData,
   AdminDashboardRange
@@ -780,6 +780,14 @@ function agentStatusClass(status: string) {
 }
 
 function agentHeartbeatState(row: AdminAgentRow, generatedAt: string) {
+  if (row.type === "human") {
+    return "human";
+  }
+
+  if (row.sessionCount <= 0 && !row.lastSeenAt && row.activeTaskCount <= 0) {
+    return "undeployed";
+  }
+
   if (row.sessionCount <= 0 || !row.lastSeenAt) {
     return "offline";
   }
@@ -804,16 +812,42 @@ function agentHeartbeatState(row: AdminAgentRow, generatedAt: string) {
   return "offline";
 }
 
-function AgentHeartbeatIcon({
+function AgentHeartbeatIndicator({
   generatedAt,
+  labels,
   locale,
   row
 }: Readonly<{
   generatedAt: string;
+  labels: AdminContent;
   locale: Locale;
   row: AdminAgentRow;
 }>) {
   const state = agentHeartbeatState(row, generatedAt);
+
+  if (state === "human") {
+    return (
+      <span
+        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-violet-50 px-2.5 text-xs font-semibold text-violet-700 ring-1 ring-violet-100"
+        title={labels.agents.humanQueue}
+      >
+        <UserIcon aria-hidden="true" className="size-4" />
+        {row.activeTaskCount > 0
+          ? formatNumber(row.activeTaskCount, locale)
+          : labels.agents.humanQueue}
+        <span className="sr-only">{labels.agents.humanQueue}</span>
+      </span>
+    );
+  }
+
+  if (state === "undeployed") {
+    return (
+      <span className="inline-flex h-8 shrink-0 items-center rounded-full bg-gray-50 px-2.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
+        {labels.agents.undeployed}
+      </span>
+    );
+  }
+
   const active = state !== "offline";
 
   return (
@@ -839,7 +873,7 @@ function AgentHeartbeatIcon({
         key={`${row.id}:${row.lastSeenAt ?? "none"}`}
       />
       <span className="sr-only">
-        {active ? "Worker heartbeat received" : "No worker heartbeat"}
+        {active ? labels.agents.heartbeat : "No worker heartbeat"}
       </span>
     </span>
   );
@@ -1425,6 +1459,8 @@ function AgentCard({
   locale: Locale;
   row: AdminAgentRow;
 }>) {
+  const runtimeState = agentHeartbeatState(row, generatedAt);
+
   return (
     <article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
       <div className="flex items-start justify-between gap-4">
@@ -1437,19 +1473,22 @@ function AgentCard({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <AgentHeartbeatIcon
+          <AgentHeartbeatIndicator
             generatedAt={generatedAt}
+            labels={labels}
             locale={locale}
             row={row}
           />
-          <span
-            className={classNames(
-              agentStatusClass(row.status),
-              "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
-            )}
-          >
-            {readableToken(row.status)}
-          </span>
+          {runtimeState !== "undeployed" ? (
+            <span
+              className={classNames(
+                agentStatusClass(row.status),
+                "rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
+              )}
+            >
+              {readableToken(row.status)}
+            </span>
+          ) : null}
         </div>
       </div>
 

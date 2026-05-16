@@ -185,6 +185,8 @@ export type AdminContent = Readonly<{
     empty: string;
     failed: string;
     failureRate: string;
+    heartbeat: string;
+    humanQueue: string;
     lastSeen: string;
     model: string;
     offline: string;
@@ -195,6 +197,7 @@ export type AdminContent = Readonly<{
     successRate: string;
     total: string;
     type: string;
+    undeployed: string;
     working: string;
   };
   generated: string;
@@ -528,6 +531,8 @@ export const content = {
       empty: "No agents have registered yet.",
       failed: "Failed",
       failureRate: "Failure",
+      heartbeat: "Worker heartbeat received",
+      humanQueue: "Human review queue",
       lastSeen: "Last seen",
       model: "Model",
       offline: "Offline",
@@ -538,6 +543,7 @@ export const content = {
       successRate: "Success",
       total: "Total",
       type: "Type",
+      undeployed: "Undeployed",
       working: "Working"
     },
     generated: "Generated",
@@ -949,6 +955,8 @@ export const content = {
       empty: "ยังไม่มี agent ลงทะเบียน",
       failed: "ล้มเหลว",
       failureRate: "ล้มเหลว",
+      heartbeat: "ได้รับ heartbeat จาก worker",
+      humanQueue: "คิวตรวจโดยคน",
       lastSeen: "พบล่าสุด",
       model: "โมเดล",
       offline: "ออฟไลน์",
@@ -959,6 +967,7 @@ export const content = {
       successRate: "สำเร็จ",
       total: "ทั้งหมด",
       type: "ประเภท",
+      undeployed: "ยังไม่ deploy",
       working: "กำลังทำ"
     },
     generated: "สร้างเมื่อ",
