@@ -246,4 +246,60 @@ describe("database transaction boundaries", () => {
       );
     }
   });
+
+  it("keeps supplement safety limits append-only in runtime code", async () => {
+    const files = [
+      ...(await filesUnder("app")),
+      ...(await filesUnder("lib")),
+      ...(await filesUnder("workers"))
+    ];
+
+    for (const file of files) {
+      const source = await readFile(file, "utf8");
+
+      assert.equal(
+        /\bupdate\s+public\.supplement_safety_limits\b/i.test(source),
+        false,
+        `${file} must append a new supplement safety limit version instead of updating history`
+      );
+    }
+
+    const helper = await readFile(
+      "lib/supplement-safety-limit-versions.ts",
+      "utf8"
+    );
+
+    assert.match(
+      helper,
+      /insert\s+into\s+public\.supplement_safety_limits[\s\S]*coalesce\(max\(version\),\s*0\)\s*\+\s*1/i,
+      "supplement safety limit changes should allocate a new version in one insert statement"
+    );
+  });
+
+  it("keeps generated plan version allocation inside insert statements", async () => {
+    const applier = await readFile("lib/task-result-applier.ts", "utf8");
+    const reviewQueue = await readFile("lib/admin-review-queue.ts", "utf8");
+    const helper = await readFile("lib/plan-version-writes.ts", "utf8");
+
+    assert.equal(
+      /select\s+coalesce\(max\(version\),\s*0\)\s+\+\s+1\s+as\s+version/i.test(applier),
+      false,
+      "task result appliers must not allocate formulation or food versions in a separate select"
+    );
+    assert.equal(
+      /select\s+coalesce\(max\(version\),\s*0\)\s+\+\s+1\s+as\s+version/i.test(reviewQueue),
+      false,
+      "admin review decisions must not allocate formulation or food versions in a separate select"
+    );
+    assert.match(
+      helper,
+      /insert\s+into\s+public\.formulations[\s\S]*coalesce\(max\(version\),\s*0\)\s+\+\s+1/i,
+      "formulation versions should be allocated by the insert statement"
+    );
+    assert.match(
+      helper,
+      /insert\s+into\s+public\.food_guidance[\s\S]*coalesce\(max\(version\),\s*0\)\s+\+\s+1/i,
+      "food guidance versions should be allocated by the insert statement"
+    );
+  });
 });

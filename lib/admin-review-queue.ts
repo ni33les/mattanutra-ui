@@ -10,6 +10,11 @@ import {
   normalizeSupplementSafetyFlags,
   type SupplementSafetyFlag
 } from "@/lib/supplement-safety-flags";
+import {
+  insertFoodGuidanceVersion,
+  insertFormulationVersion
+} from "@/lib/plan-version-writes";
+import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
 import { safetyReviewItemColumnsAvailable } from "@/lib/safety-review-schema";
 import { notifyTaskQueueChanged } from "@/lib/task-wakeup";
 
@@ -585,37 +590,16 @@ async function appendReviewedFormulationVersion(
     reviewEvent: string;
   }>
 ) {
-  const versionRows = await transaction<{ version: number }[]>`
-    select coalesce(max(version), 0) + 1 as version
-    from public.formulations
-    where plan_id = ${input.planId}::uuid
-  `;
-  const version = Number(versionRows[0]?.version ?? 1);
   const modelVersion = [
     input.previousModelVersion ?? "manual",
     input.reviewEvent
   ].join(":");
 
-  await transaction`
-    insert into public.formulations (
-      plan_id,
-      version,
-      formulation,
-      model_version,
-      generated_at,
-      updated_at
-    )
-    values (
-      ${input.planId}::uuid,
-      ${version},
-      ${transaction.json(toJsonValue(input.formulation))},
-      ${modelVersion},
-      now(),
-      now()
-    )
-  `;
-
-  return version;
+  return insertFormulationVersion(transaction, {
+    formulation: input.formulation,
+    modelVersion,
+    planId: input.planId
+  });
 }
 
 async function appendReviewedFoodGuidanceVersion(
@@ -627,37 +611,16 @@ async function appendReviewedFoodGuidanceVersion(
     reviewEvent: string;
   }>
 ) {
-  const versionRows = await transaction<{ version: number }[]>`
-    select coalesce(max(version), 0) + 1 as version
-    from public.food_guidance
-    where plan_id = ${input.planId}::uuid
-  `;
-  const version = Number(versionRows[0]?.version ?? 1);
   const modelVersion = [
     input.previousModelVersion ?? "manual",
     input.reviewEvent
   ].join(":");
 
-  await transaction`
-    insert into public.food_guidance (
-      plan_id,
-      version,
-      guidance,
-      model_version,
-      generated_at,
-      updated_at
-    )
-    values (
-      ${input.planId}::uuid,
-      ${version},
-      ${transaction.json(toJsonValue(input.foodGuidance))},
-      ${modelVersion},
-      now(),
-      now()
-    )
-  `;
-
-  return version;
+  return insertFoodGuidanceVersion(transaction, {
+    foodGuidance: input.foodGuidance,
+    modelVersion,
+    planId: input.planId
+  });
 }
 
 async function queueClientSafetyFollowupTask(
@@ -821,8 +784,6 @@ async function queueClientSafetyFollowupTask(
     )
   `;
 
-  notifyTaskQueueChanged();
-
   await transaction`
     update public.safety_reviews
     set
@@ -885,6 +846,8 @@ async function queueClientSafetyFollowupTask(
       now()
     )
   `;
+
+  notifyTaskQueueChanged();
 
   return taskId;
 }
@@ -962,8 +925,8 @@ export async function resolveAdminReviewTask(
   let completedTaskIds: string[] = [];
 
   {
-    const transaction = sql;
-    const tasks = await transaction<
+    const db = sql;
+    const tasks = await db<
       Array<{
         id: string;
         payload: Record<string, unknown>;
@@ -988,7 +951,7 @@ export async function resolveAdminReviewTask(
     const associatedSupplementId = input.associatedSupplementId ?? null;
 
     if (associatedSupplementId) {
-      const associatedRows = await transaction<
+      const associatedRows = await db<
         Array<{
           id: string;
           name: string;
@@ -1007,7 +970,7 @@ export async function resolveAdminReviewTask(
       supplementId = associatedSupplement.id;
       associatedSupplementName = associatedSupplement.name;
 
-      await transaction`
+      await db`
         insert into public.supplement_aliases (
           id,
           supplement_id,
@@ -1028,7 +991,7 @@ export async function resolveAdminReviewTask(
           supplement_id = excluded.supplement_id
       `;
     } else {
-      const supplementRows = await transaction<{ id: string }[]>`
+      const supplementRows = await db<{ id: string }[]>`
         insert into public.supplements (
           id,
           name,
@@ -1053,7 +1016,7 @@ export async function resolveAdminReviewTask(
           ${input.listStatus},
           ${input.listStatus !== "inactive"},
           'admin_review_queue',
-          ${transaction.json({
+          ${db.json({
             normalizedSupplementName,
             resolvedBy: input.actor ?? "admin_dashboard"
           })},
@@ -1089,57 +1052,17 @@ export async function resolveAdminReviewTask(
     const safetyFlags = normalizeSupplementSafetyFlags(input.safetyFlags);
 
     if (!associatedSupplementId) {
-      const latestLimit = await transaction<{ version: number | null }[]>`
-        select max(version)::integer as version
-        from public.supplement_safety_limits
-        where supplement_id = ${supplementId}::uuid
-      `;
-      const version = latestLimit[0]?.version ?? null;
-
-      if (version) {
-        await transaction`
-          update public.supplement_safety_limits
-          set
-            max_amount = ${input.maxAmount},
-            max_unit = ${input.maxUnit},
-            confidence = ${input.confidence},
-            safety_flags = ${safetyFlags},
-            safety_notes = ${input.safetyNotes},
-            updated_at = now()
-          where supplement_id = ${supplementId}::uuid
-            and version = ${version}
-        `;
-      } else {
-        await transaction`
-          insert into public.supplement_safety_limits (
-            id,
-            supplement_id,
-            version,
-            max_amount,
-            max_unit,
-            confidence,
-            safety_flags,
-            safety_notes,
-            created_at,
-            updated_at
-          )
-          values (
-            ${randomUUID()}::uuid,
-            ${supplementId}::uuid,
-            1,
-            ${input.maxAmount},
-            ${input.maxUnit},
-            ${input.confidence},
-            ${safetyFlags},
-            ${input.safetyNotes},
-            now(),
-            now()
-          )
-        `;
-      }
+      await appendSupplementSafetyLimitVersion(db, {
+        confidence: input.confidence,
+        maxAmount: input.maxAmount,
+        maxUnit: input.maxUnit,
+        safetyFlags,
+        safetyNotes: input.safetyNotes,
+        supplementId
+      });
     }
 
-    const completedTasks = await transaction<
+    const completedTasks = await db<
       Array<{
         id: string;
         plan_id: string | null;
@@ -1168,7 +1091,7 @@ export async function resolveAdminReviewTask(
       ? "supplement_review_associated"
       : "supplement_review_resolved";
 
-    await transaction`
+    await db`
       update public.safety_reviews
       set
         status = 'closed',
@@ -1188,7 +1111,7 @@ export async function resolveAdminReviewTask(
         )
     `;
 
-    await completeSupplementReviewTasks(transaction, {
+    await completeSupplementReviewTasks(db, {
       actor: input.actor,
       commentBody: resolutionLabel,
       eventPayload: {
@@ -1202,7 +1125,7 @@ export async function resolveAdminReviewTask(
       taskIds: completedTaskIds
     });
 
-    await transaction`
+    await db`
       insert into public.supplement_admin_audit (
         id,
         supplement_id,
@@ -1216,8 +1139,8 @@ export async function resolveAdminReviewTask(
         ${supplementId}::uuid,
         ${auditAction},
         ${input.actor ?? "admin_dashboard"},
-        ${transaction.json(toJsonValue(task.payload ?? {}))},
-        ${transaction.json({
+        ${db.json(toJsonValue(task.payload ?? {}))},
+        ${db.json({
           associatedSupplementName,
           completedTaskIds,
           confidence: input.confidence,
@@ -1541,8 +1464,8 @@ export async function decideAdminPlanReviewTask(
   let followupTaskId: string | null = null;
 
   {
-    const transaction = sql;
-    const tasks = await transaction<
+    const db = sql;
+    const tasks = await db<
       Array<{
         id: string;
         payload: Record<string, unknown>;
@@ -1573,9 +1496,9 @@ export async function decideAdminPlanReviewTask(
       throw new Error("Plan-specific review task not found");
     }
 
-    const itemColumnsAvailable = await safetyReviewItemColumnsAvailable(transaction);
+    const itemColumnsAvailable = await safetyReviewItemColumnsAvailable(db);
     const safetyReviews = itemColumnsAvailable
-      ? await transaction<SafetyReviewDecisionRow[]>`
+      ? await db<SafetyReviewDecisionRow[]>`
           select
             client_notification_status,
             id::text,
@@ -1591,7 +1514,7 @@ export async function decideAdminPlanReviewTask(
           order by opened_at asc
           limit 1
         `
-      : await transaction<SafetyReviewDecisionRow[]>`
+      : await db<SafetyReviewDecisionRow[]>`
           select
             client_notification_status,
             id::text,
@@ -1621,7 +1544,7 @@ export async function decideAdminPlanReviewTask(
     const reviewedItemName = review.item_name ?? review.supplement_name;
 
     if (itemType === "food") {
-      const foodGuidanceRows = await transaction<FoodGuidanceRow[]>`
+      const foodGuidanceRows = await db<FoodGuidanceRow[]>`
         select guidance, model_version, version
         from public.food_guidance
         where plan_id = ${task.plan_id}::uuid
@@ -1647,7 +1570,7 @@ export async function decideAdminPlanReviewTask(
           reviewTaskId: input.id
         }
       );
-      const nextVersion = await appendReviewedFoodGuidanceVersion(transaction, {
+      const nextVersion = await appendReviewedFoodGuidanceVersion(db, {
         foodGuidance: nextFoodGuidance,
         planId: task.plan_id,
         previousModelVersion: foodGuidance.model_version,
@@ -1657,7 +1580,7 @@ export async function decideAdminPlanReviewTask(
             : "human_review_disapproved"
       });
 
-      await transaction`
+      await db`
         update public.safety_reviews
         set
           status = ${input.decision === "approve" ? "accepted" : "rejected"},
@@ -1665,7 +1588,7 @@ export async function decideAdminPlanReviewTask(
           closed_at = now(),
           reviewer_id = ${input.actor ?? "admin_dashboard"},
           reviewer_note = ${input.reviewerNote ?? null},
-          client_message = ${transaction.json(
+          client_message = ${db.json(
             toJsonValue({
               decision: input.decision,
               frequency: input.foodFrequency,
@@ -1677,7 +1600,7 @@ export async function decideAdminPlanReviewTask(
             when client_notification_status = 'not_required' then 'not_required'
             else 'queued'
           end,
-          safety_context = safety_context || ${transaction.json(
+          safety_context = safety_context || ${db.json(
             toJsonValue({
               reviewedFoodGuidanceVersion: nextVersion
             })
@@ -1686,7 +1609,7 @@ export async function decideAdminPlanReviewTask(
         where id = ${review.id}::uuid
       `;
 
-      await completeSupplementReviewTasks(transaction, {
+      await completeSupplementReviewTasks(db, {
         actor: input.actor,
         commentBody:
           input.decision === "approve"
@@ -1708,7 +1631,7 @@ export async function decideAdminPlanReviewTask(
       followupTaskId =
         review.client_notification_status === "not_required"
           ? null
-          : await queueClientSafetyFollowupTask(transaction, {
+          : await queueClientSafetyFollowupTask(db, {
               actor: input.actor,
               parentTaskId: review.task_id,
               planId: task.plan_id
@@ -1731,7 +1654,7 @@ export async function decideAdminPlanReviewTask(
       throw new Error("Client dose is required to approve a review");
     }
 
-    const formulations = await transaction<FormulationRow[]>`
+    const formulations = await db<FormulationRow[]>`
       select formulation, model_version, version
       from public.formulations
       where plan_id = ${task.plan_id}::uuid
@@ -1761,7 +1684,7 @@ export async function decideAdminPlanReviewTask(
         ? clientDoseText(input.clientDoseAmount, input.clientDoseUnit)
         : null;
 
-    const nextVersion = await appendReviewedFormulationVersion(transaction, {
+    const nextVersion = await appendReviewedFormulationVersion(db, {
       formulation: nextFormulation,
       planId: task.plan_id,
       previousModelVersion: formulation.model_version,
@@ -1771,7 +1694,7 @@ export async function decideAdminPlanReviewTask(
           : "human_review_disapproved"
     });
 
-    await transaction`
+    await db`
       update public.safety_reviews
       set
         status = ${input.decision === "approve" ? "accepted" : "rejected"},
@@ -1780,7 +1703,7 @@ export async function decideAdminPlanReviewTask(
         closed_at = now(),
         reviewer_id = ${input.actor ?? "admin_dashboard"},
         reviewer_note = ${input.reviewerNote ?? null},
-        client_message = ${transaction.json(
+        client_message = ${db.json(
           toJsonValue({
             decision: input.decision,
             dose: clientDose
@@ -1790,7 +1713,7 @@ export async function decideAdminPlanReviewTask(
           when client_notification_status = 'not_required' then 'not_required'
           else 'queued'
         end,
-        safety_context = safety_context || ${transaction.json(
+        safety_context = safety_context || ${db.json(
           toJsonValue({
             reviewedFormulationVersion: nextVersion
           })
@@ -1799,7 +1722,7 @@ export async function decideAdminPlanReviewTask(
       where id = ${review.id}::uuid
     `;
 
-    await completeSupplementReviewTasks(transaction, {
+    await completeSupplementReviewTasks(db, {
       actor: input.actor,
       commentBody:
         input.decision === "approve"
@@ -1822,14 +1745,14 @@ export async function decideAdminPlanReviewTask(
     followupTaskId =
       review.client_notification_status === "not_required"
         ? null
-        : await queueClientSafetyFollowupTask(transaction, {
+        : await queueClientSafetyFollowupTask(db, {
             actor: input.actor,
             parentTaskId: review.task_id,
             planId: task.plan_id
           });
 
     if (followupTaskId) {
-      await transaction`
+      await db`
         insert into public.task_events (
           id,
           task_id,
@@ -1846,7 +1769,7 @@ export async function decideAdminPlanReviewTask(
           'client_safety_followup_grouped',
           'requested',
           'medium',
-          ${transaction.json(
+          ${db.json(
             toJsonValue({
               followupTaskId,
               planId: task.plan_id

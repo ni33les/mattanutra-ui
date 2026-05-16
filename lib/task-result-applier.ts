@@ -15,6 +15,10 @@ import {
   normalizeGuidanceAdjustments,
 } from "@/lib/plan-guidance-adjustments";
 import {
+  insertFoodGuidanceVersion,
+  insertFormulationVersion
+} from "@/lib/plan-version-writes";
+import {
   inferPlanFeedbackFromMessage,
   isPlanRefinementRequest,
   normalizePlanFeedbackItems,
@@ -445,56 +449,12 @@ async function applyPaidFormulationResult(
     taskId: task.id
   });
 
-  const versionRows = await sql<{ version: number }[]>`
-    select greatest(
-      (
-        select coalesce(max(version), 0)
-        from public.formulations
-        where plan_id = ${planId}::uuid
-      ),
-      (
-        select coalesce(max(version), 0)
-        from public.recommendations
-        where plan_id = ${planId}::uuid
-      )
-    ) + 1 as version
-  `;
-  const version = Number(versionRows[0]?.version ?? 1);
-
-  await sql`
-    insert into public.formulations (
-      plan_id,
-      version,
-      formulation,
-      model_version,
-      generated_at,
-      updated_at
-    )
-    values (
-      ${planId}::uuid,
-      ${version},
-      ${sql.json(toJsonValue(safeFormulation))},
-      ${modelVersion(analysis)},
-      now(),
-      now()
-    )
-  `;
-  await sql`
-    insert into public.recommendations (
-      plan_id,
-      version,
-      recommendations,
-      generated_at,
-      updated_at
-    )
-    values (
-      ${planId}::uuid,
-      ${version},
-      ${sql.json(toJsonValue([]))},
-      now(),
-      now()
-    )
-  `;
+  const version = await insertFormulationVersion(sql, {
+    formulation: safeFormulation,
+    includeEmptyRecommendations: true,
+    modelVersion: modelVersion(analysis),
+    planId
+  });
   const nutritionReady = await updateAssessmentReadyIfNutritionReady(sql, planId);
 
   await eventually(afterCommit, async () => {
@@ -505,7 +465,8 @@ async function applyPaidFormulationResult(
       reasoningEffort: analysis.reasoningEffort,
       responseId: analysis.responseId,
       safetySummary: safeFormulation.safetySummary,
-      nutritionReady
+      nutritionReady,
+      version
     });
   });
   await eventually(afterCommit, async () => {
@@ -527,7 +488,8 @@ async function applyPaidFormulationResult(
         reasoningEffort: analysis.reasoningEffort,
         responseId: analysis.responseId,
         nutritionReady,
-        taskId: task.id
+        taskId: task.id,
+        version
       },
       selectedPlan: plan === "pro" ? "pro" : "precision"
     });
@@ -581,31 +543,11 @@ async function applyPaidFoodGuidanceResult(
     planId,
     taskId: task.id
   });
-  const versionRows = await sql<{ version: number }[]>`
-    select coalesce(max(version), 0) + 1 as version
-    from public.food_guidance
-    where plan_id = ${planId}::uuid
-  `;
-  const version = Number(versionRows[0]?.version ?? 1);
-
-  await sql`
-    insert into public.food_guidance (
-      plan_id,
-      version,
-      guidance,
-      model_version,
-      generated_at,
-      updated_at
-    )
-    values (
-      ${planId}::uuid,
-      ${version},
-      ${sql.json(toJsonValue(safeFoodGuidance))},
-      ${modelVersion(analysis)},
-      now(),
-      now()
-    )
-  `;
+  const version = await insertFoodGuidanceVersion(sql, {
+    foodGuidance: safeFoodGuidance,
+    modelVersion: modelVersion(analysis),
+    planId
+  });
   const nutritionReady = await updateAssessmentReadyIfNutritionReady(sql, planId);
 
   await eventually(afterCommit, async () => {
@@ -616,7 +558,8 @@ async function applyPaidFoodGuidanceResult(
       nutritionReady,
       promptVersion: analysis.promptVersion,
       reasoningEffort: analysis.reasoningEffort,
-      responseId: analysis.responseId
+      responseId: analysis.responseId,
+      version
     });
   });
   await eventually(afterCommit, async () => {
@@ -639,7 +582,8 @@ async function applyPaidFoodGuidanceResult(
         promptVersion: analysis.promptVersion,
         reasoningEffort: analysis.reasoningEffort,
         responseId: analysis.responseId,
-        taskId: task.id
+        taskId: task.id,
+        version
       }
     });
   });
@@ -703,31 +647,11 @@ async function applyExampleFormulationResult(
     taskId: task.id
   });
 
-  const versionRows = await sql<{ version: number }[]>`
-    select coalesce(max(version), 0) + 1 as version
-    from public.formulations
-    where plan_id = ${planId}::uuid
-  `;
-  const version = Number(versionRows[0]?.version ?? 1);
-
-  await sql`
-    insert into public.formulations (
-      plan_id,
-      version,
-      formulation,
-      model_version,
-      generated_at,
-      updated_at
-    )
-    values (
-      ${planId}::uuid,
-      ${version},
-      ${sql.json(toJsonValue(safeFormulation))},
-      ${modelVersion(analysis, ":example")},
-      now(),
-      now()
-    )
-  `;
+  const version = await insertFormulationVersion(sql, {
+    formulation: safeFormulation,
+    modelVersion: modelVersion(analysis, ":example"),
+    planId
+  });
   await sql`
     update public.assessment_example_requests set
       status = 'formulation_ready',
@@ -744,7 +668,8 @@ async function applyExampleFormulationResult(
       reasoningEffort: analysis.reasoningEffort,
       requestId,
       responseId: analysis.responseId,
-      safetySummary: safeFormulation.safetySummary
+      safetySummary: safeFormulation.safetySummary,
+      version
     });
   });
   await eventually(afterCommit, async () => {
@@ -767,7 +692,8 @@ async function applyExampleFormulationResult(
         promptVersion: analysis.promptVersion,
         reasoningEffort: analysis.reasoningEffort,
         responseId: analysis.responseId,
-        taskId: task.id
+        taskId: task.id,
+        version
       },
       selectedPlan: plan
     });
@@ -829,31 +755,11 @@ async function applyExampleFoodGuidanceResult(
     requestId,
     taskId: task.id
   });
-  const versionRows = await sql<{ version: number }[]>`
-    select coalesce(max(version), 0) + 1 as version
-    from public.food_guidance
-    where plan_id = ${planId}::uuid
-  `;
-  const version = Number(versionRows[0]?.version ?? 1);
-
-  await sql`
-    insert into public.food_guidance (
-      plan_id,
-      version,
-      guidance,
-      model_version,
-      generated_at,
-      updated_at
-    )
-    values (
-      ${planId}::uuid,
-      ${version},
-      ${sql.json(toJsonValue(safeFoodGuidance))},
-      ${modelVersion(analysis, ":example")},
-      now(),
-      now()
-    )
-  `;
+  const version = await insertFoodGuidanceVersion(sql, {
+    foodGuidance: safeFoodGuidance,
+    modelVersion: modelVersion(analysis, ":example"),
+    planId
+  });
   await sql`
     update public.assessment_example_requests set
       status = 'formulation_ready',
@@ -870,7 +776,8 @@ async function applyExampleFoodGuidanceResult(
       promptVersion: analysis.promptVersion,
       reasoningEffort: analysis.reasoningEffort,
       requestId,
-      responseId: analysis.responseId
+      responseId: analysis.responseId,
+      version
     });
   });
   await eventually(afterCommit, async () => {
@@ -893,7 +800,8 @@ async function applyExampleFoodGuidanceResult(
         promptVersion: analysis.promptVersion,
         reasoningEffort: analysis.reasoningEffort,
         responseId: analysis.responseId,
-        taskId: task.id
+        taskId: task.id,
+        version
       }
     });
   });

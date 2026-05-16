@@ -172,7 +172,7 @@ export async function POST(request: Request) {
           },
           taskId: bundle.task.id
         });
-        throw error;
+        continue;
       }
 
       return openClawJson({

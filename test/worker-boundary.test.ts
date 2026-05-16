@@ -177,6 +177,11 @@ describe("external worker boundaries", () => {
       "long-polling workers should wake immediately when the task queue changes"
     );
     assert.match(
+      source,
+      /buildTaskWorkItem[\s\S]*failTask[\s\S]*continue;/,
+      "a malformed reserved task should be failed and skipped without turning reserve into a worker-visible 500"
+    );
+    assert.match(
       serviceSource,
       /notifyTaskQueueChanged\(\)/,
       "task creation should notify waiting workers without constant DB polling"

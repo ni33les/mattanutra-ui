@@ -4,6 +4,7 @@ import {
   normalizeSupplementSafetyFlags,
   type SupplementSafetyFlag
 } from "@/lib/supplement-safety-flags";
+import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
 export type { SupplementSafetyFlag } from "@/lib/supplement-safety-flags";
 
 export type SupplementListStatus =
@@ -347,22 +348,14 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     where id = ${input.id}::uuid
   `;
 
-  await sql`
-    update public.supplement_safety_limits
-    set
-      max_amount = ${input.maxAmount},
-      max_unit = ${input.maxUnit},
-      confidence = ${input.confidence},
-      safety_flags = ${input.safetyFlags},
-      safety_notes = ${input.safetyNotes},
-      updated_at = now()
-    where supplement_id = ${input.id}::uuid
-      and version = (
-        select max(version)
-        from public.supplement_safety_limits
-        where supplement_id = ${input.id}::uuid
-      )
-  `;
+  await appendSupplementSafetyLimitVersion(sql, {
+    confidence: input.confidence,
+    maxAmount: input.maxAmount,
+    maxUnit: input.maxUnit,
+    safetyFlags: input.safetyFlags,
+    safetyNotes: input.safetyNotes,
+    supplementId: input.id
+  });
 
   await sql`
     insert into public.supplement_admin_audit (
