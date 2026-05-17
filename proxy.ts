@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { defaultLocale, isLocale, type Locale } from "@/lib/i18n";
+import { shouldRedirectToHttps } from "@/lib/https-redirect";
 
 const publicFile = /\.(.*)$/;
 const removedLocales = new Set(["es"]);
@@ -70,6 +71,20 @@ export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   if (
+    shouldRedirectToHttps({
+      host: request.headers.get("host"),
+      nodeEnv: process.env.NODE_ENV,
+      protocol: request.nextUrl.protocol,
+      xForwardedProto: request.headers.get("x-forwarded-proto")
+    })
+  ) {
+    const url = request.nextUrl.clone();
+    url.protocol = "https:";
+
+    return NextResponse.redirect(url, 308);
+  }
+
+  if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/api") ||
@@ -98,5 +113,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next|admin|api|.*\\..*).*)"]
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"]
 };
