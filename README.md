@@ -78,6 +78,10 @@ x-admin-claw-token: <ADMIN_CLAW_TOKEN>
 
 Dashboard URL tokens are only for browser dashboard access and are not accepted by machine APIs.
 
+`BPM_HASH_SALT` is not an auth token. It is the stable salt used when hashing
+email/IP values before they are written to BPM analytics. Keep it stable across
+deploys so historical and future hashes continue to match.
+
 OpenClaw concierge plan APIs:
 
 ```txt
