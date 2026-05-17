@@ -211,10 +211,7 @@ function requestUserAgent(request?: Request) {
 }
 
 function hashValue(value: string) {
-  const salt =
-    process.env.BPM_HASH_SALT ||
-    process.env.ADMIN_TOKEN ||
-    "mattanutra-bpm-default-salt";
+  const salt = process.env.BPM_HASH_SALT || "mattanutra-bpm-default-salt";
 
   return createHash("sha256")
     .update(`${salt}:${value.trim().toLowerCase()}`)
