@@ -20,7 +20,7 @@ export function BlogSection({
     <div className="bg-white py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-4xl font-semibold tracking-tight text-balance text-gray-900 sm:text-5xl">
+          <h2 className="text-4xl font-semibold tracking-tight text-balance text-[var(--brand-navy)] sm:text-5xl">
             {content.title}
           </h2>
           <p className="mt-2 text-lg/8 text-gray-600">
@@ -44,7 +44,7 @@ export function BlogSection({
                   />
                 </>
               ) : (
-                <div className="absolute inset-0 -z-10 bg-linear-to-br from-[#20343A] via-[#3A7BD5] to-[#1FA77A]" />
+                <div className="absolute inset-0 -z-10 bg-linear-to-br from-[var(--brand-navy)] via-[var(--brand-blue)] to-[var(--brand-green)]" />
               )}
               <div className="absolute inset-0 -z-10 bg-linear-to-t from-gray-900 via-gray-900/40" />
               <div className="absolute inset-0 -z-10 rounded-2xl inset-ring inset-ring-gray-900/10" />

@@ -5,13 +5,13 @@ export function HighlightedBrandText({ text }: Readonly<{ text: string }>) {
     <>
       {parts.map((part, index) =>
         part.toLowerCase() === "healthscore" ? (
-          <span key={`${part}-${index}`} className="text-[#1FA77A]">
+          <span key={`${part}-${index}`} className="text-[var(--brand-green)]">
             {part}
           </span>
         ) : part.toLowerCase() === "mattanutra" ? (
           <span
             key={`${part}-${index}`}
-            className="font-semibold text-[#3A7BD5]"
+            className="font-semibold text-[var(--brand-blue)]"
           >
             {part}
           </span>
