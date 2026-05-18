@@ -16,7 +16,7 @@ const ctaBackgroundImage = "/cta-athletes.jpg";
 
 export function CtaSection({ content, ctaHref }: CtaSectionProps) {
   return (
-    <section className="relative overflow-hidden bg-[#F3F8FF]">
+    <section className="relative overflow-hidden bg-[var(--brand-soft-turquoise)]">
       <div
         aria-hidden={true}
         className="absolute inset-0 bg-cover bg-center opacity-34"
@@ -27,10 +27,10 @@ export function CtaSection({ content, ctaHref }: CtaSectionProps) {
       />
       <div
         aria-hidden={true}
-        className="absolute inset-0 bg-gradient-to-b from-[#F3F8FF]/76 via-[#F3F8FF]/58 to-[#F3F8FF]/84"
+        className="absolute inset-0 bg-gradient-to-b from-[#eefbfa]/82 via-[#edf6ff]/64 to-[#effaf4]/86"
       />
       <div className="relative mx-auto flex min-h-[28rem] max-w-7xl flex-col items-center justify-center px-6 py-24 text-center sm:py-32 lg:px-8">
-        <h2 className="max-w-2xl text-4xl font-semibold tracking-normal text-balance text-gray-900 sm:text-5xl">
+        <h2 className="max-w-2xl text-4xl font-semibold tracking-normal text-balance text-[var(--brand-navy)] sm:text-5xl">
           {content.titleLine1}
           {content.titleLine2 ? (
             <>
@@ -46,15 +46,15 @@ export function CtaSection({ content, ctaHref }: CtaSectionProps) {
             data-bpm-label={content.button}
             data-bpm-target={ctaHref}
             data-bpm-type="funnel"
-            className="inline-flex items-center gap-2 rounded-md bg-[#1FA77A] px-5 py-3 text-[15px] font-semibold uppercase tracking-[0.08em] text-white shadow-sm hover:bg-[#188a65] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A]"
+            className="inline-flex items-center gap-2 rounded-md bg-[var(--brand-blue)] px-5 py-3 text-[15px] font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition hover:bg-[var(--brand-blue-dark)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-turquoise)]"
           >
             {content.button}
           </a>
         </div>
-        <div className="mt-5 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-gray-900">
+        <div className="mt-5 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--brand-navy)]">
           <LockClosedIcon
             aria-hidden={true}
-            className="size-3.5 flex-none text-gray-900"
+            className="size-3.5 flex-none text-[var(--brand-green-dark)]"
           />
           <span>{content.reassurance}</span>
         </div>

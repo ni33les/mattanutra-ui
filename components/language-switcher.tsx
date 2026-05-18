@@ -30,7 +30,7 @@ export function LanguageSwitcher({
   return (
     <nav
       aria-label="Language"
-      className="flex items-center gap-1 rounded-md border border-[#1FA77A]/20 bg-background/60 p-1"
+      className="flex items-center gap-1 rounded-md border border-[#44c3c7]/30 bg-background/70 p-1"
     >
       {locales.map((locale) => {
         const isActive = locale === currentLocale;
@@ -45,8 +45,8 @@ export function LanguageSwitcher({
             className={cn(
               "rounded px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition",
               isActive
-                ? "bg-[#1FA77A] text-white"
-                : "text-muted-foreground hover:bg-[#1FA77A]/10 hover:text-[#20343A]"
+                ? "bg-[var(--brand-blue)] text-white"
+                : "text-muted-foreground hover:bg-[#44c3c7]/12 hover:text-[var(--brand-blue)]"
             )}
           >
             {label}

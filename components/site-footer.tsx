@@ -5,7 +5,7 @@ function StarIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-5 w-5 text-[#F4C430]"
+      className="h-5 w-5 text-[var(--brand-green)]"
       aria-hidden="true"
     >
       <path
@@ -33,7 +33,7 @@ function LazadaLogo() {
         <path d="M3 9.8 16 17.2v8.4L3 18.2V9.8Z" fill="#C6367A" />
         <path d="M29 9.8 16 17.2v8.4l13-7.4V9.8Z" fill="#7B2CBF" />
       </svg>
-      <span className="text-base font-semibold tracking-normal text-[#20343A]">
+      <span className="text-base font-semibold tracking-normal text-[var(--brand-navy)]">
         Lazada
       </span>
     </span>
@@ -71,7 +71,7 @@ function ShopeeLogo() {
           strokeWidth="2"
         />
       </svg>
-      <span className="text-base font-semibold tracking-normal text-[#20343A]">
+      <span className="text-base font-semibold tracking-normal text-[var(--brand-navy)]">
         Shopee
       </span>
     </span>
@@ -95,7 +95,7 @@ export function SiteFooter({
   return (
     <footer className="border-t border-foreground/10 bg-background">
       <div className="mx-auto grid min-h-28 w-full max-w-6xl grid-cols-1 items-center gap-7 px-4 py-7 sm:px-6 md:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.65fr)] md:gap-4 lg:px-8">
-        <div className="flex min-w-0 flex-col items-center gap-3 text-center text-[#20343A] sm:flex-row sm:justify-center md:justify-start md:text-left">
+        <div className="flex min-w-0 flex-col items-center gap-3 text-center text-[var(--brand-navy)] sm:flex-row sm:justify-center md:justify-start md:text-left">
           <p className="max-w-full text-wrap text-[10px] font-semibold uppercase leading-5 tracking-[0.06em] sm:text-[11px] lg:text-xs">
             {content.recommended}
           </p>
@@ -115,7 +115,7 @@ export function SiteFooter({
                 <StarIcon key={index} />
               ))}
             </div>
-            <p className="mt-3 text-sm font-semibold uppercase leading-5 tracking-[0.08em] text-[#20343A]">
+            <p className="mt-3 text-sm font-semibold uppercase leading-5 tracking-[0.08em] text-[var(--brand-navy)]">
               {content.trustedLine1}
               <br />
               {content.trustedLine2}
@@ -134,7 +134,7 @@ export function SiteFooter({
             data-bpm-label={content.terms}
             data-bpm-target={`/${locale}/terms`}
             data-bpm-type="content"
-            className="transition hover:text-[#3A7BD5]"
+            className="transition hover:text-[var(--brand-blue)]"
           >
             {content.terms}
           </Link>
@@ -144,7 +144,7 @@ export function SiteFooter({
             data-bpm-label={content.privacy}
             data-bpm-target={`/${locale}/privacy`}
             data-bpm-type="content"
-            className="transition hover:text-[#3A7BD5]"
+            className="transition hover:text-[var(--brand-blue)]"
           >
             {content.privacy}
           </Link>

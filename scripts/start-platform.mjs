@@ -9,7 +9,7 @@ const port = Number(process.env.PORT || process.env.NEXT_PORT || 3000);
 const host = "127.0.0.1";
 const workerMode = process.env.PLATFORM_WORKER_MODE || "all";
 const workerApiBaseUrl =
-  process.env.WORKER_API_BASE_URL || `http://${host}:${port}`;
+  process.env.PLATFORM_WORKER_API_BASE_URL || `http://${host}:${port}`;
 const startupTimeoutMs = Number(process.env.PLATFORM_STARTUP_TIMEOUT_MS || 120_000);
 const shutdownTimeoutMs = Number(process.env.PLATFORM_SHUTDOWN_TIMEOUT_MS || 10_000);
 

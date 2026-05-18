@@ -27,16 +27,21 @@ const featureIcons: ComponentType<FeatureIconProps>[] = [
   Brain,
   ShoppingBagIcon
 ];
+const featureIconColors = [
+  "text-[var(--brand-blue)]",
+  "text-[var(--brand-turquoise)]",
+  "text-[var(--brand-green)]"
+] as const;
 
 export function FeatureRow({ content }: Readonly<{ content: FeatureRowContent }>) {
   return (
     <section id="features" className="bg-white py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl lg:text-center">
-          <h2 className="text-base/7 font-semibold text-[#3A7BD5]">
+          <h2 className="text-base/7 font-semibold text-[var(--brand-blue)]">
             {content.eyebrow}
           </h2>
-          <p className="mt-2 text-4xl font-semibold tracking-normal text-pretty text-gray-900 sm:text-5xl lg:text-balance">
+          <p className="mt-2 text-4xl font-semibold tracking-normal text-pretty text-[var(--brand-navy)] sm:text-5xl lg:text-balance">
             {content.title}
           </p>
           <p className="mt-6 text-lg/8 text-gray-600">{content.description}</p>
@@ -48,10 +53,10 @@ export function FeatureRow({ content }: Readonly<{ content: FeatureRowContent }>
 
               return (
                 <div key={feature.name} className="flex flex-col">
-                  <dt className="flex items-center gap-x-3 text-base/7 font-semibold text-gray-900">
+                  <dt className="flex items-center gap-x-3 text-base/7 font-semibold text-[var(--brand-navy)]">
                     <Icon
                       aria-hidden={true}
-                      className="size-5 flex-none text-[#3A7BD5]"
+                      className={`size-5 flex-none ${featureIconColors[index] ?? "text-[var(--brand-blue)]"}`}
                     />
                     {feature.name}
                   </dt>

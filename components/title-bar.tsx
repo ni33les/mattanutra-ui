@@ -16,7 +16,7 @@ export function TitleBar({
   title
 }: TitleBarProps) {
   return (
-    <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background/90 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-[#44c3c7]/20 bg-background/90 backdrop-blur">
       <div className="mx-auto flex h-18 w-full max-w-6xl items-center justify-between gap-4 px-6 sm:px-8">
         <a
           href={`/${currentLocale}`}
