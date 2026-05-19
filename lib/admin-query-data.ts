@@ -1061,20 +1061,20 @@ async function getProductRecommendationHistory(params: QueryParams) {
       coalesce(to_jsonb(product_recommendation_runs) ->> 'total_coverage_percent', product_recommendation_runs.stack_coverage_percent::text) as total_coverage_percent,
       coalesce(to_jsonb(product_recommendation_runs) -> 'diagnostics', '{}'::jsonb) as diagnostics,
       product_recommendation_items.product_id::text,
-      marketplace_products.title as product_title,
-      marketplace_products.platform,
+      products.title as product_title,
+      products.platform,
       product_recommendation_items.rank,
       product_recommendation_items.product_coverage_percent,
       product_recommendation_items.stack_contribution_percent,
       product_recommendation_items.url_used,
       product_recommendation_items.unknown_at_recommendation,
-      product_recommendation_items.affiliate_link_id is not null as affiliate,
+      product_recommendation_items.offer_id is not null as affiliate,
       product_recommendation_items.created_at
     from public.product_recommendation_items
     join public.product_recommendation_runs
       on product_recommendation_runs.id = product_recommendation_items.run_id
-    join public.marketplace_products
-      on marketplace_products.id = product_recommendation_items.product_id
+    join public.products
+      on products.id = product_recommendation_items.product_id
     where (${planFilter}::uuid is null or product_recommendation_runs.plan_id = ${planFilter}::uuid)
       and (${rayFilter}::uuid is null or product_recommendation_runs.ray_id = ${rayFilter}::uuid)
       and (${params.status || null}::text is null or product_recommendation_runs.status = ${params.status || null})
@@ -1228,7 +1228,7 @@ export async function getAdminExternalQueryData(
     const data = await getAdminProductsData();
     const rows = data.rows.filter(
       (row) =>
-        (!params.status || row.listStatus === params.status) &&
+        (!params.status || row.status === params.status) &&
         (!params.filters.source || row.platform === params.filters.source)
     );
     const { pageRows, pagination } = paginateAdminRows(rows, params);

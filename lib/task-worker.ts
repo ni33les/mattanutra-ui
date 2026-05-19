@@ -24,7 +24,7 @@ type StepState = "active" | "complete" | "failed" | "pending";
 type WorkTaskType =
   | "analyze_healthscore"
   | "client_safety_followup"
-  | "discover_marketplace_products"
+  | "discover_products"
   | "generate_example_food_guidance"
   | "generate_example_supplement_guidance"
   | "generate_food_guidance"
@@ -815,14 +815,14 @@ export async function enqueueProductRecommendationsTask({
       ), 0) as report_version,
       coalesce((
         select count(*)
-        from public.marketplace_products
-        where list_status = 'whitelisted'
+        from public.products
+        where status = 'approved'
           and availability_status <> 'unavailable'
       ), 0)::int as product_catalog_count,
       (
         select max(updated_at)::text
-        from public.marketplace_products
-        where list_status = 'whitelisted'
+        from public.products
+        where status = 'approved'
           and availability_status <> 'unavailable'
       ) as product_catalog_updated_at,
       coalesce((
@@ -879,6 +879,62 @@ export async function enqueueProductRecommendationsTask({
     taskTitle: "Match product catalogue",
     taskType: "generate_product_recommendations"
   });
+}
+
+export async function enqueueMissingProductRecommendationsForReadyPlans({
+  limit = 10
+}: Readonly<{ limit?: number }> = {}) {
+  const sql = getSql();
+
+  if (!sql) {
+    return { checked: 0, queued: 0 };
+  }
+
+  const boundedLimit = Math.min(25, Math.max(1, Math.round(limit)));
+  const rows = await sql<Array<{ plan_id: string }>>`
+    select assessments.plan_id::text
+    from public.assessments
+    where assessments.status = 'ready'
+      and exists (
+        select 1
+        from public.formulations
+        where formulations.plan_id = assessments.plan_id
+          and (
+            formulations.model_version is null
+            or formulations.model_version not like '%:example'
+          )
+      )
+      and exists (
+        select 1
+        from public.food_guidance
+        where food_guidance.plan_id = assessments.plan_id
+          and (
+            food_guidance.model_version is null
+            or food_guidance.model_version not like '%:example'
+          )
+      )
+      and not exists (
+        select 1
+        from public.tasks
+        where tasks.plan_id = assessments.plan_id
+          and tasks.task_type = 'generate_product_recommendations'
+      )
+    order by assessments.updated_at desc
+    limit ${boundedLimit}
+  `;
+  let queued = 0;
+
+  for (const row of rows) {
+    const taskId = await enqueueProductRecommendationsTask({
+      planId: row.plan_id
+    });
+
+    if (taskId) {
+      queued += 1;
+    }
+  }
+
+  return { checked: rows.length, queued };
 }
 
 export async function enqueueRefinedNutritionPlanTasks({

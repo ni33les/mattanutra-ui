@@ -1,5 +1,5 @@
 import { getSql } from "@/lib/db";
-import type { MarketplaceProductSnapshot } from "@/lib/marketplace-adapters";
+import type { ProductSnapshot } from "@/lib/product-adapters";
 import { toJsonValue } from "@/lib/assessment-store";
 import {
   comparableDoseAmount,
@@ -20,19 +20,20 @@ import {
   type ProductCandidateFact,
   type ProductConfidence,
   type ProductKind,
-  type ProductListStatus,
+  type ProductStatus,
   type ProductRecommendationNeed,
   type ProductPlatform
 } from "@/lib/product-recommendations";
 import {
-  validateProductQuality,
-  type ProductQualityResult
-} from "@/lib/product-quality";
+  validateProduct,
+  type ValidationResult
+} from "@/lib/product-validation";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import { createTask } from "@/lib/task-service";
 
 export type ProductAffiliateStatus = "active" | "flagged_stale" | "none";
 export type ProductLabelStatus = "failed" | "missing" | "parsed" | "stale";
+type ProductFactSupplementStatus = "active" | "blocked";
 
 export type AdminProductFact = ProductCandidateFact & Readonly<{
   id: string;
@@ -41,10 +42,10 @@ export type AdminProductFact = ProductCandidateFact & Readonly<{
   source: string | null;
   sourceText: string | null;
   sourceUrl: string | null;
-  supplementStatus: ProductListStatus | null;
+  supplementStatus: ProductFactSupplementStatus | null;
 }>;
 
-export type AdminProductAffiliateLink = Readonly<{
+export type AdminProductOffer = Readonly<{
   availabilityStatus: ProductAvailabilityStatus;
   commissionRate: number | null;
   currency: string;
@@ -59,12 +60,11 @@ export type AdminProductAffiliateLink = Readonly<{
 }>;
 
 export type AdminProductRow = Readonly<{
-  affiliateLinks: AdminProductAffiliateLink[];
   affiliateStatus: ProductAffiliateStatus;
   aiCorrectionNotes: string | null;
   availabilityStatus: ProductAvailabilityStatus;
   brandName: string | null;
-  brandStatus: ProductListStatus | null;
+  brandStatus: ProductStatus | null;
   category: string | null;
   currency: string;
   description: string | null;
@@ -77,9 +77,9 @@ export type AdminProductRow = Readonly<{
   importReviewTaskId: string | null;
   importStatus: string | null;
   labelStatus: ProductLabelStatus;
-  listStatus: ProductListStatus;
-  productQuality: ProductQualityResult;
-  productQualityLabel: string;
+  status: ProductStatus;
+  validation: ValidationResult;
+  validationLabel: string;
   productAudience: ProductAudience;
   platform: ProductPlatform;
   priceAmount: number | null;
@@ -93,7 +93,14 @@ export type AdminProductRow = Readonly<{
     chosenCount: number;
     lastRecommendedAt: string | null;
   };
+  offers: AdminProductOffer[];
   region: string;
+  sourceEvidence: {
+    importId: string | null;
+    importReviewTaskId: string | null;
+    importStatus: string | null;
+    sourceUrl: string | null;
+  };
   title: string;
   titleEn: string | null;
   titleTh: string | null;
@@ -107,28 +114,45 @@ export type AdminProductsData = Readonly<{
   rows: AdminProductRow[];
   summary: {
     activeAffiliate: number;
-    blacklisted: number;
     dirtyData: number;
+    ignored: number;
     missingFacts: number;
     missingImage: number;
-    reviewRequired: number;
+    pendingReview: number;
     total: number;
-    unknown: number;
-    whitelisted: number;
+    approved: number;
   };
 }>;
 
+export type ProductImportRunRow = Readonly<{
+  approvedCount: number;
+  brandName: string;
+  completedAt: string | null;
+  failedCount: number;
+  id: string;
+  notes: string | null;
+  requestedAutoApprove: boolean;
+  source: string;
+  stagedCount: number;
+  startedAt: string;
+  status: "completed" | "failed" | "running";
+  totalProducts: number;
+}>;
+
 type ProductDbRow = Readonly<{
-  active_affiliate_link_id: string | null;
+  active_offer_id: string | null;
+  active_offer_availability_status: ProductAvailabilityStatus | null;
   active_affiliate_commission_rate: string | number | null;
+  active_offer_currency: string | null;
   active_affiliate_priority: string | number | null;
+  active_offer_price_amount: string | number | null;
   active_affiliate_type: "affiliate" | "direct" | null;
   active_affiliate_url: string | null;
-  affiliate_links: unknown;
+  offers: unknown;
   affiliate_status: ProductAffiliateStatus;
   availability_status: ProductAvailabilityStatus;
   brand_name: string | null;
-  brand_status: ProductListStatus | null;
+  brand_status: ProductStatus | null;
   category: string | null;
   currency: string;
   current_version: string | number | null;
@@ -148,17 +172,17 @@ type ProductDbRow = Readonly<{
   import_review_task_id: string | null;
   import_status: string | null;
   label_status: ProductLabelStatus;
-  list_status: ProductListStatus;
+  status: ProductStatus;
   platform: ProductPlatform;
   price_amount: string | number | null;
   product_audience: ProductAudience | null;
   product_kind: ProductKind;
   product_data_expires_at: Date | string | null;
   product_url: string;
-  quality_checked_at: Date | string | null;
-  quality_reasons: string[] | null;
-  quality_status: ProductQualityResult["status"] | null;
-  quality_summary: string | null;
+  validation_checked_at: Date | string | null;
+  validation_reasons: string[] | null;
+  validation_status: ValidationResult["status"] | null;
+  validation_summary: string | null;
   region: string;
   source_snapshot: unknown;
   source_url: string | null;
@@ -185,16 +209,14 @@ type FactDbPayload = Readonly<{
   sourceText?: string | null;
   sourceUrl?: string | null;
   supplementId?: string | null;
-  supplementStatus?: ProductListStatus | null;
+  supplementStatus?: ProductFactSupplementStatus | null;
   unit?: string | null;
 }>;
 
-const productStatuses = new Set<ProductListStatus>([
-  "blacklisted",
-  "inactive",
-  "review_required",
-  "unknown",
-  "whitelisted"
+const productStatuses = new Set<ProductStatus>([
+  "approved",
+  "ignored",
+  "pending_review"
 ]);
 const productPlatforms = new Set<ProductPlatform>(["lazada", "manual", "shopee"]);
 const productLabelStatuses = new Set<ProductLabelStatus>([
@@ -211,8 +233,8 @@ const productAvailabilityStatuses = new Set<ProductAvailabilityStatus>([
 ]);
 const productAudiences = new Set<ProductAudience>(["both", "female", "male"]);
 
-export function isProductListStatus(value: string): value is ProductListStatus {
-  return productStatuses.has(value as ProductListStatus);
+export function isProductStatus(value: string): value is ProductStatus {
+  return productStatuses.has(value as ProductStatus);
 }
 
 export function isProductPlatform(value: string): value is ProductPlatform {
@@ -241,14 +263,13 @@ export function emptyAdminProductsData(): AdminProductsData {
     rows: [],
     summary: {
       activeAffiliate: 0,
-      blacklisted: 0,
       dirtyData: 0,
+      ignored: 0,
       missingFacts: 0,
       missingImage: 0,
-      reviewRequired: 0,
+      pendingReview: 0,
       total: 0,
-      unknown: 0,
-      whitelisted: 0
+      approved: 0
     }
   };
 }
@@ -329,7 +350,7 @@ function productSafetyPasses(facts: readonly AdminProductFact[], rawFacts: unkno
   for (const [index, fact] of facts.entries()) {
     const payload = payloads[index];
 
-    if (payload?.supplementStatus === "blacklisted") {
+    if (payload?.supplementStatus === "blocked") {
       return false;
     }
 
@@ -396,40 +417,40 @@ function aiCorrectionNotesFromSnapshot(value: unknown) {
   return typeof notes === "string" && notes.trim() ? notes.trim() : null;
 }
 
-function productQualityLabel(quality: ProductQualityResult) {
-  if (quality.reasons.includes("missing_image")) {
+function validationLabel(validation: ValidationResult) {
+  if (validation.reasons.includes("missing_image")) {
     return "Missing Image";
   }
 
   if (
-    quality.reasons.includes("no_dosed_facts") ||
-    quality.reasons.includes("no_canonical_match")
+    validation.reasons.includes("no_dosed_facts") ||
+    validation.reasons.includes("no_canonical_match")
   ) {
     return "Missing Facts";
   }
 
   if (
-    quality.reasons.includes("dirty_name") ||
-    quality.reasons.includes("concentration_only") ||
-    quality.reasons.includes("source_conflict")
+    validation.reasons.includes("dirty_name") ||
+    validation.reasons.includes("concentration_only") ||
+    validation.reasons.includes("source_conflict")
   ) {
     return "Dirty Data";
   }
 
-  if (quality.status === "pass") {
+  if (validation.status === "pass") {
     return "Approved";
   }
 
   return "Needs Review";
 }
 
-function productQualityForRow(
+function validationForRow(
   row: Pick<ProductDbRow, "image_url" | "label_status" | "product_url" | "source_url">,
   facts: readonly AdminProductFact[],
   rawFacts: unknown
 ) {
   const payloads = arrayPayload(rawFacts) as FactDbPayload[];
-  const qualityFacts = facts.map((fact, index) => {
+  const validationFacts = facts.map((fact, index) => {
     const payload = payloads[index] ?? {};
 
     return {
@@ -450,8 +471,8 @@ function productQualityForRow(
     };
   });
 
-  return validateProductQuality({
-    facts: qualityFacts,
+  return validateProduct({
+    facts: validationFacts,
     imageUrl: row.image_url,
     labelStatus: row.label_status,
     productUrl: row.product_url,
@@ -461,12 +482,12 @@ function productQualityForRow(
 
 function rowFromDb(row: ProductDbRow): AdminProductRow {
   const facts = (arrayPayload(row.facts) as FactDbPayload[]).map(normalizeFact);
-  const productQuality = productQualityForRow(row, facts, row.facts);
+  const validation = validationForRow(row, facts, row.facts);
   const effectiveListStatus =
-    row.list_status === "whitelisted" && productQuality.status !== "pass"
-      ? "review_required"
-      : row.list_status;
-  const affiliateLinks = arrayPayload(row.affiliate_links).map((item) => {
+    row.status === "approved" && validation.status !== "pass"
+      ? "pending_review"
+      : row.status;
+  const offers = arrayPayload(row.offers).map((item) => {
     const record = item && typeof item === "object"
       ? item as Record<string, unknown>
       : {};
@@ -491,18 +512,24 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
           ? record.status
           : "active",
       url: typeof record.url === "string" ? record.url : ""
-    } satisfies AdminProductAffiliateLink;
+    } satisfies AdminProductOffer;
   });
+  const activeAffiliateStatus =
+    offers.some((offer) => offer.status === "active" && offer.linkType === "affiliate")
+      ? "active"
+      : "none";
+  const activeOfferPriceAmount = numberOrNull(row.active_offer_price_amount);
+  const activeOfferCurrency = row.active_offer_currency || "THB";
+  const activeOfferAvailability = row.active_offer_availability_status ?? "unknown";
 
   return {
-    affiliateLinks,
-    affiliateStatus: row.affiliate_status,
+    affiliateStatus: activeAffiliateStatus,
     aiCorrectionNotes: aiCorrectionNotesFromSnapshot(row.source_snapshot),
-    availabilityStatus: row.availability_status,
+    availabilityStatus: activeOfferAvailability,
     brandName: row.brand_name,
     brandStatus: row.brand_status,
     category: row.category,
-    currency: row.currency || "THB",
+    currency: activeOfferCurrency,
     description: row.description,
     descriptionEn: row.description_en,
     descriptionTh: row.description_th,
@@ -511,14 +538,15 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
     id: row.id,
     imageUrl: row.image_url,
     labelStatus: row.label_status,
-    listStatus: effectiveListStatus,
-    productQuality,
-    productQualityLabel: productQualityLabel(productQuality),
+    status: effectiveListStatus,
+    validation,
+    validationLabel: validationLabel(validation),
     productAudience: row.product_audience ?? "both",
     importReviewTaskId: row.import_review_task_id,
     importStatus: row.import_status,
+    offers,
     platform: row.platform,
-    priceAmount: numberOrNull(row.price_amount),
+    priceAmount: activeOfferPriceAmount,
     productImportDuplicateProductIds: row.import_duplicate_product_ids ?? [],
     productImportId: row.import_id,
     productKind: row.product_kind ?? "supplement",
@@ -534,6 +562,12 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
       lastRecommendedAt: isoOrNull(row.history_last_recommended_at)
     },
     region: row.region,
+    sourceEvidence: {
+      importId: row.import_id,
+      importReviewTaskId: row.import_review_task_id,
+      importStatus: row.import_status,
+      sourceUrl: row.source_url ?? row.product_url
+    },
     title: row.title,
     titleEn: row.title_en,
     titleTh: row.title_th,
@@ -541,7 +575,7 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
   };
 }
 
-async function refreshAndPersistProductQuality(
+async function refreshAndPersistProductValidation(
   sql: NonNullable<ReturnType<typeof getSql>>,
   productId: string
 ) {
@@ -549,33 +583,33 @@ async function refreshAndPersistProductQuality(
   const sourceRow = rows?.[0];
 
   if (!sourceRow) {
-    throw new Error("Product not found for quality check");
+    throw new Error("Product not found for validation check");
   }
 
   const row = rowFromDb(sourceRow);
-  const quality = row.productQuality;
+  const validation = row.validation;
   const safeListStatus =
-    row.listStatus === "whitelisted" && quality.status !== "pass"
-      ? "review_required"
-      : row.listStatus;
+    row.status === "approved" && validation.status !== "pass"
+      ? "pending_review"
+      : row.status;
   const safeLabelStatus =
-    quality.status === "pass" && row.facts.length > 0
+    validation.status === "pass" && row.facts.length > 0
       ? "parsed"
-      : quality.reasons.includes("no_dosed_facts")
+      : validation.reasons.includes("no_dosed_facts")
       ? row.facts.length > 0
         ? "failed"
         : "missing"
       : row.labelStatus;
-  const qualityPayload = toJsonValue(quality);
+  const validationPayload = toJsonValue(validation);
 
   await sql`
-    update public.marketplace_products
+    update public.products
     set
-      list_status = ${safeListStatus},
+      status = ${safeListStatus},
       label_status = ${safeLabelStatus},
       source_snapshot = source_snapshot || jsonb_build_object(
-        'productQuality',
-        ${sql.json(qualityPayload)}::jsonb
+        'validation',
+        ${sql.json(validationPayload)}::jsonb
       ),
       updated_at = now()
     where id = ${productId}::uuid
@@ -583,12 +617,12 @@ async function refreshAndPersistProductQuality(
 
   try {
     await sql`
-      update public.marketplace_products
+      update public.products
       set
-        quality_status = ${quality.status},
-        quality_reasons = ${quality.reasons}::text[],
-        quality_summary = ${quality.summary},
-        quality_checked_at = ${quality.checkedAt}::timestamptz,
+        validation_status = ${validation.status},
+        validation_reasons = ${validation.reasons}::text[],
+        validation_summary = ${validation.summary},
+        validation_checked_at = ${validation.checkedAt}::timestamptz,
         updated_at = now()
       where id = ${productId}::uuid
     `;
@@ -604,12 +638,12 @@ async function refreshAndPersistProductQuality(
 
   return {
     labelStatus: safeLabelStatus,
-    listStatus: safeListStatus,
-    productQuality: quality
+    status: safeListStatus,
+    validation
   };
 }
 
-export async function runProductQualityCheck(input: Readonly<{
+export async function runProductValidationCheck(input: Readonly<{
   actor?: string | null;
   productId: string;
 }>) {
@@ -619,7 +653,7 @@ export async function runProductQualityCheck(input: Readonly<{
     throw new Error("Database is not configured");
   }
 
-  const quality = await refreshAndPersistProductQuality(sql, input.productId);
+  const validation = await refreshAndPersistProductValidation(sql, input.productId);
 
   await sql`
     insert into public.product_admin_audit (
@@ -631,8 +665,8 @@ export async function runProductQualityCheck(input: Readonly<{
     values (
       ${input.productId}::uuid,
       ${input.actor ?? "admin_dashboard"},
-      'product_quality_checked',
-      ${sql.json(toJsonValue(quality.productQuality))}::jsonb
+      'product_validation_checked',
+      ${sql.json(toJsonValue(validation.validation))}::jsonb
     )
   `;
 
@@ -640,7 +674,7 @@ export async function runProductQualityCheck(input: Readonly<{
   const row = rows?.[0] ? rowFromDb(rows[0]) : null;
 
   if (!row) {
-    throw new Error("Product not found after quality check");
+    throw new Error("Product not found after validation check");
   }
 
   return row;
@@ -651,14 +685,12 @@ function summaryFromRows(rows: AdminProductRow[]) {
     (summary, row) => {
       summary.total += 1;
 
-      if (row.listStatus === "blacklisted") {
-        summary.blacklisted += 1;
-      } else if (row.listStatus === "review_required") {
-        summary.reviewRequired += 1;
-      } else if (row.listStatus === "unknown") {
-        summary.unknown += 1;
-      } else if (row.listStatus === "whitelisted") {
-        summary.whitelisted += 1;
+      if (row.status === "ignored") {
+        summary.ignored += 1;
+      } else if (row.status === "pending_review") {
+        summary.pendingReview += 1;
+      } else if (row.status === "approved") {
+        summary.approved += 1;
       }
 
       if (row.affiliateStatus === "active") {
@@ -669,11 +701,11 @@ function summaryFromRows(rows: AdminProductRow[]) {
         summary.missingFacts += 1;
       }
 
-      if (row.productQualityLabel === "Missing Image") {
+      if (row.validationLabel === "Missing Image") {
         summary.missingImage += 1;
       }
 
-      if (row.productQualityLabel === "Dirty Data") {
+      if (row.validationLabel === "Dirty Data") {
         summary.dirtyData += 1;
       }
 
@@ -681,14 +713,13 @@ function summaryFromRows(rows: AdminProductRow[]) {
     },
     {
       activeAffiliate: 0,
-      blacklisted: 0,
       dirtyData: 0,
+      ignored: 0,
       missingFacts: 0,
       missingImage: 0,
-      reviewRequired: 0,
+      pendingReview: 0,
       total: 0,
-      unknown: 0,
-      whitelisted: 0
+      approved: 0
     }
   );
 }
@@ -702,59 +733,65 @@ async function loadProductRows(productId?: string | null) {
 
   return sql<ProductDbRow[]>`
     select
-      marketplace_products.id::text,
-      marketplace_products.platform,
-      marketplace_products.region,
-      marketplace_products.title,
-      marketplace_products.title_en,
-      marketplace_products.title_th,
-      marketplace_products.brand_name,
-      marketplace_products.image_url,
-      marketplace_products.product_url,
-      marketplace_products.source_url,
-      marketplace_products.source_snapshot,
-      marketplace_products.description,
-      coalesce(to_jsonb(marketplace_products) ->> 'description_en', marketplace_products.source_snapshot ->> 'descriptionEn') as description_en,
-      coalesce(to_jsonb(marketplace_products) ->> 'description_th', marketplace_products.source_snapshot ->> 'descriptionTh') as description_th,
-      marketplace_products.category,
-      marketplace_products.fda_approval_number,
-      coalesce(to_jsonb(marketplace_products) ->> 'product_audience', 'both') as product_audience,
-      marketplace_products.product_kind,
-      marketplace_products.list_status,
-      marketplace_products.label_status,
-      marketplace_products.availability_status,
-      marketplace_products.affiliate_status,
-      marketplace_products.price_amount,
-      marketplace_products.currency,
-      marketplace_products.current_version,
-      marketplace_products.product_data_expires_at,
-      coalesce(to_jsonb(marketplace_products) ->> 'quality_status', marketplace_products.source_snapshot #>> '{productQuality,status}') as quality_status,
-      coalesce(to_jsonb(marketplace_products) ->> 'quality_summary', marketplace_products.source_snapshot #>> '{productQuality,summary}') as quality_summary,
-      coalesce(to_jsonb(marketplace_products) -> 'quality_reasons', marketplace_products.source_snapshot #> '{productQuality,reasons}', '[]'::jsonb) as quality_reasons,
+      products.id::text,
+      products.platform,
+      products.region,
+      products.title,
+      products.title_en,
+      products.title_th,
+      products.brand_name,
+      products.image_url,
+      products.product_url,
+      products.source_url,
+      products.source_snapshot,
+      products.description,
+      coalesce(to_jsonb(products) ->> 'description_en', products.source_snapshot ->> 'descriptionEn') as description_en,
+      coalesce(to_jsonb(products) ->> 'description_th', products.source_snapshot ->> 'descriptionTh') as description_th,
+      products.category,
+      products.fda_approval_number,
+      coalesce(to_jsonb(products) ->> 'product_audience', 'both') as product_audience,
+      products.product_kind,
+      products.status,
+      products.label_status,
+      coalesce(active_offer.availability_status, 'unknown') as availability_status,
+      case
+        when active_offer.link_type = 'affiliate' then 'active'
+        else 'none'
+      end as affiliate_status,
+      active_offer.price_amount,
+      products.currency,
+      products.current_version,
+      products.product_data_expires_at,
+      coalesce(to_jsonb(products) ->> 'validation_status', products.source_snapshot #>> '{validation,status}') as validation_status,
+      coalesce(to_jsonb(products) ->> 'validation_summary', products.source_snapshot #>> '{validation,summary}') as validation_summary,
+      coalesce(to_jsonb(products) -> 'validation_reasons', products.source_snapshot #> '{validation,reasons}', '[]'::jsonb) as validation_reasons,
       coalesce(
-        to_jsonb(marketplace_products) ->> 'quality_checked_at',
-        marketplace_products.source_snapshot #>> '{productQuality,checkedAt}'
-      ) as quality_checked_at,
-      marketplace_products.updated_at,
+        to_jsonb(products) ->> 'validation_checked_at',
+        products.source_snapshot #>> '{validation,checkedAt}'
+      ) as validation_checked_at,
+      products.updated_at,
       import_review.id::text as import_id,
       import_review.status as import_status,
       import_review.review_task_id::text as import_review_task_id,
       import_review.duplicate_product_ids::text[] as import_duplicate_product_ids,
-      product_brands.list_status as brand_status,
-      active_affiliate.id::text as active_affiliate_link_id,
-      active_affiliate.url as active_affiliate_url,
-      active_affiliate.link_type as active_affiliate_type,
-      active_affiliate.commission_rate as active_affiliate_commission_rate,
-      active_affiliate.admin_priority as active_affiliate_priority,
+      product_brands.status as brand_status,
+      active_offer.id::text as active_offer_id,
+      active_offer.availability_status as active_offer_availability_status,
+      active_offer.currency as active_offer_currency,
+      active_offer.link_type as active_affiliate_type,
+      active_offer.price_amount as active_offer_price_amount,
+      active_offer.url as active_affiliate_url,
+      active_offer.commission_rate as active_affiliate_commission_rate,
+      active_offer.admin_priority as active_affiliate_priority,
       coalesce(fact_rows.facts, '[]'::jsonb) as facts,
-      coalesce(affiliate_rows.affiliate_links, '[]'::jsonb) as affiliate_links,
+      coalesce(offer_rows.offers, '[]'::jsonb) as offers,
       coalesce(history.chosen_count, 0) as history_chosen_count,
       history.last_recommended_at as history_last_recommended_at,
       history.average_product_coverage_percent,
       history.average_stack_coverage_percent
-    from public.marketplace_products
+    from public.products
     left join public.product_brands
-      on product_brands.id = marketplace_products.brand_id
+      on product_brands.id = products.brand_id
     left join lateral (
       select
         product_imports.id,
@@ -762,24 +799,32 @@ async function loadProductRows(productId?: string | null) {
         product_imports.review_task_id,
         product_imports.duplicate_product_ids
       from public.product_imports
-      where product_imports.product_id = marketplace_products.id
-        and product_imports.status = 'needs_review'
+      where product_imports.product_id = products.id
+        and product_imports.status = 'pending_review'
       order by product_imports.updated_at desc
       limit 1
     ) import_review on true
     left join lateral (
-      select id, url, link_type, commission_rate, admin_priority
-      from public.product_affiliate_links
-      where product_affiliate_links.product_id = marketplace_products.id
-        and product_affiliate_links.status = 'active'
-        and product_affiliate_links.availability_status <> 'unavailable'
+      select
+        id,
+        url,
+        link_type,
+        commission_rate,
+        admin_priority,
+        price_amount,
+        currency,
+        availability_status
+      from public.product_offers
+      where product_offers.product_id = products.id
+        and product_offers.status = 'active'
+        and product_offers.availability_status not in ('out_of_stock', 'unavailable')
       order by
-        case when product_affiliate_links.link_type = 'affiliate' then 0 else 1 end,
-        product_affiliate_links.commission_rate desc nulls last,
-        product_affiliate_links.admin_priority desc,
-        product_affiliate_links.updated_at desc
+        case when product_offers.link_type = 'affiliate' then 0 else 1 end,
+        product_offers.commission_rate desc nulls last,
+        product_offers.admin_priority desc,
+        product_offers.updated_at desc
       limit 1
-    ) active_affiliate on true
+    ) active_offer on true
     left join lateral (
       select coalesce(
         jsonb_agg(
@@ -822,36 +867,36 @@ async function loadProductRows(productId?: string | null) {
         order by version desc
         limit 1
       ) supplement_safety_limits on true
-      where product_facts.product_id = marketplace_products.id
+      where product_facts.product_id = products.id
     ) fact_rows on true
     left join lateral (
       select coalesce(
         jsonb_agg(
           jsonb_build_object(
-            'id', product_affiliate_links.id,
-            'availabilityStatus', product_affiliate_links.availability_status,
-            'commissionRate', product_affiliate_links.commission_rate,
-            'currency', product_affiliate_links.currency,
-            'linkType', product_affiliate_links.link_type,
-            'network', product_affiliate_links.network,
-            'platform', product_affiliate_links.platform,
-            'priceAmount', product_affiliate_links.price_amount,
-            'priority', product_affiliate_links.admin_priority,
-            'status', product_affiliate_links.status,
-            'url', product_affiliate_links.url
+            'id', product_offers.id,
+            'availabilityStatus', product_offers.availability_status,
+            'commissionRate', product_offers.commission_rate,
+            'currency', product_offers.currency,
+            'linkType', product_offers.link_type,
+            'network', product_offers.network,
+            'platform', product_offers.platform,
+            'priceAmount', product_offers.price_amount,
+            'priority', product_offers.admin_priority,
+            'status', product_offers.status,
+            'url', product_offers.url
           )
           order by
-            case when product_affiliate_links.status = 'active' then 0 else 1 end,
-            case when product_affiliate_links.link_type = 'affiliate' then 0 else 1 end,
-            product_affiliate_links.commission_rate desc nulls last,
-            product_affiliate_links.admin_priority desc,
-            product_affiliate_links.updated_at desc
+            case when product_offers.status = 'active' then 0 else 1 end,
+            case when product_offers.link_type = 'affiliate' then 0 else 1 end,
+            product_offers.commission_rate desc nulls last,
+            product_offers.admin_priority desc,
+            product_offers.updated_at desc
         ),
         '[]'::jsonb
-      ) as affiliate_links
-      from public.product_affiliate_links
-      where product_affiliate_links.product_id = marketplace_products.id
-    ) affiliate_rows on true
+      ) as offers
+      from public.product_offers
+      where product_offers.product_id = products.id
+    ) offer_rows on true
     left join lateral (
       select
         count(*)::int as chosen_count,
@@ -861,10 +906,10 @@ async function loadProductRows(productId?: string | null) {
       from public.product_recommendation_items
       join public.product_recommendation_runs
         on product_recommendation_runs.id = product_recommendation_items.run_id
-      where product_recommendation_items.product_id = marketplace_products.id
+      where product_recommendation_items.product_id = products.id
     ) history on true
-    where (${productId ?? null}::uuid is null or marketplace_products.id = ${productId ?? null}::uuid)
-    order by marketplace_products.updated_at desc, marketplace_products.title asc
+    where (${productId ?? null}::uuid is null or products.id = ${productId ?? null}::uuid)
+    order by products.updated_at desc, products.title asc
   `;
 }
 
@@ -892,7 +937,7 @@ export async function getAdminProductsData(): Promise<AdminProductsData> {
       summary: summaryFromRows(mappedRows)
     };
   } catch (error) {
-    console.error("Unable to load marketplace products", error);
+    console.error("Unable to load products", error);
     return emptyAdminProductsData();
   }
 }
@@ -907,11 +952,14 @@ export async function getProductRecommendationCandidates() {
   return rows.map((row) => {
     const adminRow = rowFromDb(row);
     const activeAffiliateUrl =
-      typeof row.active_affiliate_url === "string" ? row.active_affiliate_url : null;
+      row.active_affiliate_type === "affiliate" &&
+      typeof row.active_affiliate_url === "string"
+        ? row.active_affiliate_url
+        : null;
     const productDataExpiresAt = isoOrNull(row.product_data_expires_at);
 
     return {
-      activeAffiliateLinkId: row.active_affiliate_link_id,
+      activeOfferId: row.active_offer_id,
       activeAffiliateCommissionRate: numberOrNull(row.active_affiliate_commission_rate),
       activeAffiliatePriority: numberOrNull(row.active_affiliate_priority),
       activeAffiliateType: row.active_affiliate_type,
@@ -926,12 +974,12 @@ export async function getProductRecommendationCandidates() {
       id: adminRow.id,
       imageUrl: adminRow.imageUrl,
       labelStatus: adminRow.labelStatus,
-      listStatus: adminRow.listStatus,
+      status: adminRow.status,
       platform: adminRow.platform,
       productAudience: adminRow.productAudience,
       productKind: adminRow.productKind,
-      productQuality: adminRow.productQuality,
-      priceAmount: adminRow.priceAmount,
+      validation: adminRow.validation,
+      priceAmount: numberOrNull(row.active_offer_price_amount),
       productDataExpiresAt,
       productUrl: adminRow.productUrl,
       region: adminRow.region,
@@ -956,7 +1004,7 @@ export type UpdateAdminProductInput = Readonly<{
   id: string;
   imageUrl?: string | null;
   labelStatus?: ProductLabelStatus;
-  listStatus?: ProductListStatus;
+  status?: ProductStatus;
   priceAmount?: number | null;
   productAudience?: ProductAudience;
   productKind?: ProductKind;
@@ -971,7 +1019,7 @@ export type CreateAdminProductInput = Readonly<{
   actor?: string | null;
   affiliateUrl?: string | null;
   availabilityStatus?: ProductAvailabilityStatus;
-  brandListStatus?: ProductListStatus;
+  brandStatus?: ProductStatus;
   brandName?: string | null;
   currency?: string | null;
   description?: string | null;
@@ -981,8 +1029,8 @@ export type CreateAdminProductInput = Readonly<{
   imageUrl?: string | null;
   fdaApprovalNumber?: string | null;
   labelStatus?: ProductLabelStatus;
-  listStatus?: ProductListStatus;
-  marketplaceProductId?: string | null;
+  status?: ProductStatus;
+  externalProductId?: string | null;
   platform: ProductPlatform;
   priceAmount?: number | null;
   productAudience?: ProductAudience;
@@ -1019,6 +1067,7 @@ export type StageProductImportInput = Readonly<{
   duplicateProductIds?: readonly string[];
   fdaApprovalNumber?: string | null;
   imageUrls?: readonly string[];
+  importRunId?: string | null;
   parsedFacts?: readonly ProductImportFactInput[];
   parseConfidence?: ProductConfidence;
   productTitle: string;
@@ -1029,8 +1078,24 @@ export type StageProductImportInput = Readonly<{
   titleTh?: string | null;
 }>;
 
+export type StartProductImportRunInput = Readonly<{
+  autoApprove?: boolean;
+  brandName: string;
+  source?: string | null;
+  totalProducts?: number;
+}>;
+
+export type FinishProductImportRunInput = Readonly<{
+  approvedCount?: number;
+  failedCount?: number;
+  importRunId: string;
+  notes?: string | null;
+  stagedCount?: number;
+  status: "completed" | "failed";
+}>;
+
 export type ResolveProductImportReviewInput = Readonly<{
-  action: "approve" | "blacklist" | "ignore" | "merge" | "needs_more_data";
+  action: "approve" | "duplicate" | "ignore";
   actor?: string | null;
   brandName?: string | null;
   description?: string | null;
@@ -1050,7 +1115,7 @@ export type ResolveProductImportReviewInput = Readonly<{
   titleTh?: string | null;
 }>;
 
-export type UpsertProductAffiliateLinkInput = Readonly<{
+export type UpsertProductOfferInput = Readonly<{
   actor?: string | null;
   availabilityStatus?: ProductAvailabilityStatus;
   commissionRate?: number | null;
@@ -1066,9 +1131,9 @@ export type UpsertProductAffiliateLinkInput = Readonly<{
   url: string;
 }>;
 
-export type RemoveProductAffiliateLinkInput = Readonly<{
+export type RemoveProductOfferInput = Readonly<{
   actor?: string | null;
-  linkId: string;
+  offerId: string;
   productId: string;
 }>;
 
@@ -1092,6 +1157,129 @@ function normalizedUrl(value: string) {
   } catch {
     return value.trim().toLowerCase();
   }
+}
+
+export async function startProductImportRun(input: StartProductImportRunInput) {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const brandName = input.brandName.trim();
+
+  if (!brandName) {
+    throw new Error("Product import run requires a brand");
+  }
+
+  const rows = await sql<Array<{ id: string }>>`
+    insert into public.product_import_runs (
+      brand_name,
+      normalized_brand_name,
+      source,
+      requested_auto_approve,
+      total_products,
+      created_at,
+      updated_at
+    )
+    values (
+      ${brandName},
+      ${normalizeProductKey(brandName)},
+      ${cleanNullableText(input.source, 200) ?? "manufacturer_scrape"},
+      ${Boolean(input.autoApprove)},
+      ${Math.max(0, Math.round(input.totalProducts ?? 0))},
+      now(),
+      now()
+    )
+    returning id::text
+  `;
+
+  const id = rows[0]?.id;
+
+  if (!id) {
+    throw new Error("Product import run was not created");
+  }
+
+  return id;
+}
+
+export async function finishProductImportRun(input: FinishProductImportRunInput) {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  await sql`
+    update public.product_import_runs
+    set
+      status = ${input.status},
+      staged_count = ${Math.max(0, Math.round(input.stagedCount ?? 0))},
+      approved_count = ${Math.max(0, Math.round(input.approvedCount ?? 0))},
+      failed_count = ${Math.max(0, Math.round(input.failedCount ?? 0))},
+      notes = ${cleanNullableText(input.notes, 2000)},
+      completed_at = now(),
+      updated_at = now()
+    where id = ${input.importRunId}::uuid
+  `;
+}
+
+export async function getProductImportRuns(input: Readonly<{
+  limit?: number;
+}> = {}) {
+  const sql = getSql();
+
+  if (!sql) {
+    return [];
+  }
+
+  const limit = Math.min(100, Math.max(1, Math.round(input.limit ?? 50)));
+  const rows = await sql<Array<{
+    approved_count: string | number;
+    brand_name: string;
+    completed_at: Date | string | null;
+    failed_count: string | number;
+    id: string;
+    notes: string | null;
+    requested_auto_approve: boolean;
+    source: string;
+    staged_count: string | number;
+    started_at: Date | string;
+    status: ProductImportRunRow["status"];
+    total_products: string | number;
+  }>>`
+    select
+      id::text,
+      brand_name,
+      source,
+      status,
+      requested_auto_approve,
+      total_products,
+      staged_count,
+      approved_count,
+      failed_count,
+      notes,
+      started_at,
+      completed_at
+    from public.product_import_runs
+    order by started_at desc
+    limit ${limit}
+  `;
+
+  return rows.map((row): ProductImportRunRow => ({
+    approvedCount: Math.max(0, Math.round(numberOrNull(row.approved_count) ?? 0)),
+    brandName: row.brand_name,
+    completedAt: isoOrNull(row.completed_at),
+    failedCount: Math.max(0, Math.round(numberOrNull(row.failed_count) ?? 0)),
+    id: row.id,
+    notes: row.notes,
+    requestedAutoApprove: row.requested_auto_approve,
+    source: row.source,
+    stagedCount: Math.max(0, Math.round(numberOrNull(row.staged_count) ?? 0)),
+    startedAt: new Date(row.started_at).toISOString(),
+    status: row.status,
+    totalProducts: Math.max(0, Math.round(numberOrNull(row.total_products) ?? 0))
+  }));
 }
 
 function isUuidValue(value: string | null | undefined): value is string {
@@ -1164,6 +1352,11 @@ async function replaceProductFacts(
         isUuidValue(fact.supplementId) && existingSupplementIds.has(fact.supplementId)
           ? fact.supplementId
           : null;
+      const supplementId = explicitSupplementId ?? supplementMatch?.id ?? null;
+
+      if (!supplementId) {
+        return null;
+      }
 
       return {
         amount: numberOrNull(fact.amount),
@@ -1175,10 +1368,7 @@ async function replaceProductFacts(
         source: input.source,
         source_text: cleanNullableText(fact.sourceText, 1000),
         source_url: cleanNullableText(fact.sourceUrl, 2000),
-        supplement_id:
-          explicitSupplementId ??
-          supplementMatch?.id ??
-          null,
+        supplement_id: supplementId,
         unit: cleanNullableText(fact.unit, 40)
       };
     })
@@ -1256,7 +1446,7 @@ async function recordProductVersion(
 ) {
   const rows = await sql<Array<{ version: number }>>`
     with next_product as (
-      update public.marketplace_products
+      update public.products
       set
         current_version = coalesce(current_version, 0) + 1,
         updated_at = now()
@@ -1283,16 +1473,16 @@ async function recordProductVersion(
         fda_approval_number,
         product_kind,
         product_audience,
-        list_status,
+        status,
         label_status,
         availability_status,
         affiliate_status,
         price_amount,
         currency,
-        quality_status,
-        quality_reasons,
-        quality_summary,
-        quality_checked_at,
+        validation_status,
+        validation_reasons,
+        validation_summary,
+        validation_checked_at,
         facts_snapshot,
         source_snapshot,
         created_at
@@ -1316,24 +1506,24 @@ async function recordProductVersion(
         next_product.fda_approval_number,
         next_product.product_kind,
         coalesce(to_jsonb(next_product) ->> 'product_audience', 'both'),
-        next_product.list_status,
+        next_product.status,
         next_product.label_status,
         next_product.availability_status,
         next_product.affiliate_status,
         next_product.price_amount,
         next_product.currency,
-        coalesce(to_jsonb(next_product) ->> 'quality_status', next_product.source_snapshot #>> '{productQuality,status}', 'needs_review'),
+        coalesce(to_jsonb(next_product) ->> 'validation_status', next_product.source_snapshot #>> '{validation,status}', 'needs_review'),
         coalesce(
           array(
             select jsonb_array_elements_text(
-              coalesce(to_jsonb(next_product) -> 'quality_reasons', next_product.source_snapshot #> '{productQuality,reasons}', '[]'::jsonb)
+              coalesce(to_jsonb(next_product) -> 'validation_reasons', next_product.source_snapshot #> '{validation,reasons}', '[]'::jsonb)
             )
           ),
           '{}'::text[]
         ),
-        coalesce(to_jsonb(next_product) ->> 'quality_summary', next_product.source_snapshot #>> '{productQuality,summary}'),
+        coalesce(to_jsonb(next_product) ->> 'validation_summary', next_product.source_snapshot #>> '{validation,summary}'),
         nullif(
-          coalesce(to_jsonb(next_product) ->> 'quality_checked_at', next_product.source_snapshot #>> '{productQuality,checkedAt}'),
+          coalesce(to_jsonb(next_product) ->> 'validation_checked_at', next_product.source_snapshot #>> '{validation,checkedAt}'),
           ''
         )::timestamptz,
         coalesce(fact_rows.facts, '[]'::jsonb),
@@ -1489,8 +1679,91 @@ async function supplementIdsForFacts(
   return byKey;
 }
 
+export async function validateProductImportForApproval(input: Readonly<{
+  facts: readonly ProductImportFactInput[];
+  imageUrl?: string | null;
+  labelStatus?: string | null;
+  productUrl?: string | null;
+  sourceUrl?: string | null;
+}>) {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const facts = normalizedFactsForStorage(input.facts);
+  const supplementMatchesByFactName = await supplementIdsForFacts(sql, facts);
+  const supplementIds = [...new Set(facts.flatMap((fact) => {
+    const explicitSupplementId = isUuidValue(fact.supplementId)
+      ? fact.supplementId
+      : null;
+    const matchedSupplementId =
+      supplementMatchesByFactName.get(normalizeProductFactKey(fact.name))?.id ??
+      null;
+
+    return explicitSupplementId ?? matchedSupplementId
+      ? [explicitSupplementId ?? matchedSupplementId!]
+      : [];
+  }))];
+  const supplementRows = supplementIds.length > 0
+    ? await sql<Array<{
+      id: string;
+      list_status: string | null;
+      max_amount: string | number | null;
+      max_unit: string | null;
+    }>>`
+      select
+        supplements.id::text,
+        supplements.list_status,
+        supplement_safety_limits.max_amount,
+        supplement_safety_limits.max_unit
+      from public.supplements
+      left join lateral (
+        select max_amount, max_unit
+        from public.supplement_safety_limits
+        where supplement_safety_limits.supplement_id = supplements.id
+        order by version desc
+        limit 1
+      ) supplement_safety_limits on true
+      where supplements.id = any(${supplementIds}::uuid[])
+    `
+    : [];
+  const supplementsById = new Map(supplementRows.map((row) => [row.id, row]));
+  const validationFacts = facts.map((fact) => {
+    const supplementMatch =
+      supplementMatchesByFactName.get(normalizeProductFactKey(fact.name));
+    const explicitSupplementId = isUuidValue(fact.supplementId)
+      ? fact.supplementId
+      : null;
+    const supplementId = explicitSupplementId ?? supplementMatch?.id ?? null;
+    const supplementRow = supplementId ? supplementsById.get(supplementId) : null;
+
+    return {
+      amount: fact.amount,
+      confidence: fact.confidence,
+      itemType: fact.itemType,
+      maxAmount: supplementRow?.max_amount ?? null,
+      maxUnit: supplementRow?.max_unit ?? null,
+      name: supplementMatch?.name ?? fact.name,
+      sourceText: fact.sourceText,
+      supplementId,
+      supplementStatus: supplementRow?.list_status ?? null,
+      unit: fact.unit
+    };
+  });
+
+  return validateProduct({
+    facts: validationFacts,
+    imageUrl: input.imageUrl,
+    labelStatus: input.labelStatus,
+    productUrl: input.productUrl,
+    sourceUrl: input.sourceUrl
+  });
+}
+
 function factsFromMarketplaceSnapshot(
-  snapshot: MarketplaceProductSnapshot,
+  snapshot: ProductSnapshot,
   needs: readonly ProductRecommendationNeed[],
   supplementIds: ReadonlyMap<string, string>
 ) {
@@ -1548,32 +1821,32 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
         insert into public.product_brands (
           name,
           normalized_name,
-          list_status,
+          status,
           created_at,
           updated_at
         )
         values (
           ${brandName},
           ${normalizedBrandName},
-          ${input.brandListStatus ?? "unknown"},
+          ${input.brandStatus ?? "pending_review"},
           now(),
           now()
         )
         on conflict (normalized_name) do update set
-          list_status = case
-            when public.product_brands.list_status = 'blacklisted' then public.product_brands.list_status
-            when ${input.brandListStatus ?? null}::text is null then public.product_brands.list_status
-            else ${input.brandListStatus ?? null}
+          status = case
+            when public.product_brands.status = 'ignored' then public.product_brands.status
+            when ${input.brandStatus ?? null}::text is null then public.product_brands.status
+            else ${input.brandStatus ?? null}
           end,
           updated_at = now()
         returning id::text
       `;
   }
   const productRows = await sql<Array<{ id: string }>>`
-    insert into public.marketplace_products (
+    insert into public.products (
       platform,
       region,
-      marketplace_product_id,
+      external_product_id,
       title,
       normalized_title,
       brand_id,
@@ -1590,7 +1863,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       source_snapshot,
       product_kind,
       product_audience,
-      list_status,
+      status,
       label_status,
       availability_status,
       affiliate_status,
@@ -1603,7 +1876,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
     values (
       ${input.platform},
       ${input.region?.trim() || "TH"},
-      ${cleanNullableText(input.marketplaceProductId, 300)},
+      ${cleanNullableText(input.externalProductId, 300)},
       ${title},
       ${normalizeProductKey(title)},
       ${brandRows[0]?.id ?? null}::uuid,
@@ -1620,11 +1893,11 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       ${sql.json(toJsonValue(sourceSnapshot))}::jsonb,
       ${input.productKind ?? "supplement"},
       ${input.productAudience ?? productAudienceFromSnapshot(sourceSnapshot)},
-      ${input.listStatus ?? "unknown"},
+      ${input.status ?? "pending_review"},
       ${input.labelStatus ?? (input.facts?.length ? "parsed" : "missing")},
-      ${input.availabilityStatus ?? "unknown"},
-      ${input.affiliateUrl ? "active" : "none"},
-      ${input.priceAmount ?? null},
+      'unknown',
+      'none',
+      null,
       ${input.currency?.trim() || "THB"},
       ${input.source ?? "admin"},
       now(),
@@ -1633,24 +1906,24 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
     on conflict (normalized_url) do update set
       title = excluded.title,
       normalized_title = excluded.normalized_title,
-      marketplace_product_id = coalesce(excluded.marketplace_product_id, marketplace_products.marketplace_product_id),
+      external_product_id = coalesce(excluded.external_product_id, products.external_product_id),
       brand_id = excluded.brand_id,
       brand_name = excluded.brand_name,
       normalized_brand_name = excluded.normalized_brand_name,
-      image_url = coalesce(excluded.image_url, marketplace_products.image_url),
-      description = coalesce(excluded.description, marketplace_products.description),
-      title_en = coalesce(excluded.title_en, marketplace_products.title_en),
-      title_th = coalesce(excluded.title_th, marketplace_products.title_th),
-      fda_approval_number = coalesce(excluded.fda_approval_number, marketplace_products.fda_approval_number),
-      source_url = coalesce(excluded.source_url, marketplace_products.source_url),
-      source_snapshot = marketplace_products.source_snapshot || excluded.source_snapshot,
+      image_url = coalesce(excluded.image_url, products.image_url),
+      description = coalesce(excluded.description, products.description),
+      title_en = coalesce(excluded.title_en, products.title_en),
+      title_th = coalesce(excluded.title_th, products.title_th),
+      fda_approval_number = coalesce(excluded.fda_approval_number, products.fda_approval_number),
+      source_url = coalesce(excluded.source_url, products.source_url),
+      source_snapshot = products.source_snapshot || excluded.source_snapshot,
       product_kind = excluded.product_kind,
       product_audience = excluded.product_audience,
-      list_status = excluded.list_status,
+      status = excluded.status,
       label_status = excluded.label_status,
-      availability_status = excluded.availability_status,
-      affiliate_status = excluded.affiliate_status,
-      price_amount = excluded.price_amount,
+      availability_status = 'unknown',
+      affiliate_status = 'none',
+      price_amount = null,
       currency = excluded.currency,
       updated_at = now()
     returning id::text
@@ -1664,7 +1937,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
   if (descriptionEn || descriptionTh) {
     try {
       await sql`
-        update public.marketplace_products
+        update public.products
         set
           description_en = coalesce(${descriptionEn}, description_en),
           description_th = coalesce(${descriptionTh}, description_th),
@@ -1694,7 +1967,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
 
   if (input.affiliateUrl) {
     await sql`
-      insert into public.product_affiliate_links (
+      insert into public.product_offers (
         product_id,
         url,
         link_type,
@@ -1713,7 +1986,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
     `;
   }
 
-  const productQuality = await refreshAndPersistProductQuality(sql, productId);
+  const validation = await refreshAndPersistProductValidation(sql, productId);
   const version = await recordProductVersion(sql, {
     actor: input.actor,
     changeNote: "product_saved",
@@ -1734,7 +2007,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       ${sql.json({
         platform: input.platform,
         productUrl,
-        productQuality: productQuality.productQuality,
+        validation: validation.validation,
         title,
         version
       })}::jsonb
@@ -1750,10 +2023,32 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
   return row;
 }
 
+export async function deletePendingManufacturerImportProduct(productId: string) {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  if (!isUuidValue(productId)) {
+    return false;
+  }
+
+  const rows = await sql<Array<{ id: string }>>`
+    delete from public.products
+    where id = ${productId}::uuid
+      and status = 'pending_review'
+      and source = 'manufacturer_import'
+    returning id::text
+  `;
+
+  return Boolean(rows[0]);
+}
+
 export async function importDiscoveredMarketplaceProducts(input: Readonly<{
   actor?: string | null;
   needs: readonly ProductRecommendationNeed[];
-  products: readonly MarketplaceProductSnapshot[];
+  products: readonly ProductSnapshot[];
 }>) {
   const sql = getSql();
 
@@ -1780,8 +2075,8 @@ export async function importDiscoveredMarketplaceProducts(input: Readonly<{
         facts,
         imageUrl: snapshot.imageUrl,
         labelStatus: facts.length > 0 ? "parsed" : "missing",
-        listStatus: "unknown",
-        marketplaceProductId: snapshot.marketplaceProductId,
+        status: "pending_review",
+        externalProductId: snapshot.externalProductId,
         platform: snapshot.platform,
         priceAmount: snapshot.priceAmount ?? null,
         productUrl: snapshot.productUrl,
@@ -1835,7 +2130,7 @@ export async function stageProductImport(input: StageProductImportInput) {
 
   const duplicateRows = await sql<Array<{ id: string }>>`
     select id::text
-    from public.marketplace_products
+    from public.products
     where normalized_url = ${normalizedUrl(sourceUrl)}
       or (
         normalized_title = ${normalizedProductTitle}
@@ -1852,6 +2147,7 @@ export async function stageProductImport(input: StageProductImportInput) {
   ];
   const importRows = await sql<Array<{ id: string }>>`
     insert into public.product_imports (
+      import_run_id,
       brand_name,
       normalized_brand_name,
       product_title,
@@ -1869,6 +2165,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       updated_at
     )
     values (
+      ${isUuidValue(input.importRunId) ? input.importRunId : null}::uuid,
       ${brandName},
       ${normalizedBrandName},
       ${productTitle},
@@ -1888,12 +2185,13 @@ export async function stageProductImport(input: StageProductImportInput) {
       }))}::jsonb,
       ${duplicateProductIds}::uuid[],
       ${input.parseConfidence ?? "moderate"},
-      'needs_review',
+      'pending_review',
       now(),
       now()
     )
     on conflict (normalized_brand_name, normalized_product_title, source_url)
     do update set
+      import_run_id = coalesce(excluded.import_run_id, public.product_imports.import_run_id),
       image_urls = excluded.image_urls,
       fda_approval_number = coalesce(excluded.fda_approval_number, public.product_imports.fda_approval_number),
       parsed_facts = excluded.parsed_facts,
@@ -1901,9 +2199,9 @@ export async function stageProductImport(input: StageProductImportInput) {
       duplicate_product_ids = excluded.duplicate_product_ids,
       parse_confidence = excluded.parse_confidence,
       status = case
-        when public.product_imports.status in ('approved', 'blacklisted', 'ignored', 'merged')
+        when public.product_imports.status in ('approved', 'ignored', 'duplicate')
           then public.product_imports.status
-        else 'needs_review'
+        else 'pending_review'
       end,
       updated_at = now()
     returning id::text
@@ -1920,7 +2218,7 @@ export async function stageProductImport(input: StageProductImportInput) {
     const draftProduct = await createAdminProduct({
       actor: input.actor ?? "manufacturer_scraper",
       availabilityStatus: "unknown",
-      brandListStatus: "unknown",
+      brandStatus: "pending_review",
       brandName,
       description,
       descriptionEn,
@@ -1929,7 +2227,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       fdaApprovalNumber: cleanNullableText(input.fdaApprovalNumber, 100),
       imageUrl: imageUrls[0] ?? null,
       labelStatus: parsedFacts.length > 0 ? "parsed" : "missing",
-      listStatus: "unknown",
+      status: "pending_review",
       platform: "manual",
       productAudience: productAudienceFromSnapshot(input.rawSnapshot),
       productKind: parsedFacts.length >= 6 ? "multi" : "supplement",
@@ -2008,8 +2306,6 @@ export async function stageProductImport(input: StageProductImportInput) {
         "approve_product",
         "edit_then_approve",
         "mark_duplicate",
-        "request_more_data",
-        "blacklist_product",
         "ignore_import"
       ],
       brandName,
@@ -2036,7 +2332,7 @@ export async function stageProductImport(input: StageProductImportInput) {
     ],
     retryPolicy: false,
     taskType: "review_product_import",
-    title: `Review product import ${productTitle}`
+    title: `Review Product ${productTitle}`
   });
 
   await sql`
@@ -2060,6 +2356,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       ${sql.json(toJsonValue({
         brandName,
         importId,
+        importRunId: input.importRunId ?? null,
         productTitle,
         productId: draftProductId,
         reviewTaskId: task.id,
@@ -2070,6 +2367,7 @@ export async function stageProductImport(input: StageProductImportInput) {
 
   return {
     importId,
+    importRunId: input.importRunId ?? null,
     productId: draftProductId,
     reviewTaskId: task.id
   };
@@ -2198,7 +2496,7 @@ export async function resolveProductImportReview(
       duplicate_product_ids::text[]
     from public.product_imports
     where review_task_id = ${input.taskId}::uuid
-      and status = 'needs_review'
+      and status = 'pending_review'
     limit 1
   `;
   const productImport = importRows[0];
@@ -2207,15 +2505,11 @@ export async function resolveProductImportReview(
     throw new Error("Product import review task not found");
   }
 
-  const nowStatus = input.action === "blacklist"
-    ? "blacklisted"
-    : input.action === "ignore"
+  const nowStatus = input.action === "ignore"
       ? "ignored"
-      : input.action === "merge"
-        ? "merged"
-        : input.action === "needs_more_data"
-          ? "needs_more_data"
-          : "approved";
+      : input.action === "duplicate"
+        ? "duplicate"
+        : "approved";
   const draftProductId = productImport.product_id;
   let productId = input.mergeProductId ?? draftProductId ?? null;
   const reviewFacts = input.parsedFacts
@@ -2252,11 +2546,11 @@ export async function resolveProductImportReview(
   const reviewProductUrl = cleanNullableText(input.productUrl) ??
     productImport.source_url;
 
-  if (input.action === "approve" || input.action === "blacklist") {
+  if (input.action === "approve") {
     const row = await createAdminProduct({
       actor: input.actor ?? "admin_dashboard",
       availabilityStatus: "in_stock",
-      brandListStatus: input.action === "approve" ? "whitelisted" : "unknown",
+      brandStatus: "approved",
       brandName: reviewBrandName,
       description: reviewDescription,
       descriptionEn: reviewDescriptionEn,
@@ -2265,7 +2559,7 @@ export async function resolveProductImportReview(
       fdaApprovalNumber: reviewFdaApprovalNumber,
       imageUrl: reviewImageUrl,
       labelStatus: reviewFacts.length > 0 ? "parsed" : "missing",
-      listStatus: input.action === "approve" ? "whitelisted" : "blacklisted",
+      status: "approved",
       platform: "manual",
       productAudience: input.productAudience ?? productAudienceFromSnapshot(productImport.raw_snapshot),
       productKind: reviewFacts.length >= 6 ? "multi" : "supplement",
@@ -2286,19 +2580,19 @@ export async function resolveProductImportReview(
     });
     productId = row.id;
 
-    if (input.action === "approve" && row.productQuality.status !== "pass") {
-      throw new Error(`Product still needs review: ${row.productQuality.summary}`);
+    if (input.action === "approve" && row.validation.status !== "pass") {
+      throw new Error(`Product still needs review: ${row.validation.summary}`);
     }
   }
 
-  if (input.action === "merge") {
+  if (input.action === "duplicate") {
     if (!isUuidValue(productId)) {
       throw new Error("Mark duplicate requires an existing product");
     }
 
     const existing = await sql<Array<{ id: string }>>`
       select id::text
-      from public.marketplace_products
+      from public.products
       where id = ${productId}::uuid
       limit 1
     `;
@@ -2309,22 +2603,21 @@ export async function resolveProductImportReview(
   }
 
   if (
-    (input.action === "ignore" || input.action === "merge") &&
+    (input.action === "ignore" || input.action === "duplicate") &&
     isUuidValue(draftProductId) &&
     (input.action === "ignore" || draftProductId !== productId)
   ) {
     await sql`
-      update public.marketplace_products
+      update public.products
       set
-        list_status = 'inactive',
-        availability_status = 'unavailable',
+        status = 'ignored',
         updated_at = now()
       where id = ${draftProductId}::uuid
-        and list_status in ('unknown', 'review_required', 'inactive')
+        and status in ('pending_review', 'ignored')
         and (
           (source_snapshot ->> 'productImportId') = ${productImport.id}
           or (
-            list_status = 'unknown'
+            status = 'pending_review'
             and (source_snapshot ->> 'productImportId') is null
           )
         )
@@ -2386,8 +2679,8 @@ export async function resolveProductImportReview(
   };
 }
 
-export async function upsertProductAffiliateLink(
-  input: UpsertProductAffiliateLinkInput
+export async function upsertProductOffer(
+  input: UpsertProductOfferInput
 ) {
   const sql = getSql();
   const productId = isUuidValue(input.productId) ? input.productId : null;
@@ -2402,7 +2695,7 @@ export async function upsertProductAffiliateLink(
   }
 
   const rows = await sql<Array<{ id: string }>>`
-    insert into public.product_affiliate_links (
+    insert into public.product_offers (
       product_id,
       network,
       url,
@@ -2449,24 +2742,7 @@ export async function upsertProductAffiliateLink(
       updated_at = now()
     returning id::text
   `;
-  const linkId = rows[0]?.id;
-
-  await sql`
-    update public.marketplace_products
-    set
-      affiliate_status = case
-        when exists (
-          select 1
-          from public.product_affiliate_links
-          where product_id = ${productId}::uuid
-            and status = 'active'
-            and link_type = 'affiliate'
-        ) then 'active'
-        else affiliate_status
-      end,
-      updated_at = now()
-    where id = ${productId}::uuid
-  `;
+  const offerId = rows[0]?.id;
 
   await sql`
     insert into public.product_admin_audit (
@@ -2477,11 +2753,11 @@ export async function upsertProductAffiliateLink(
     )
     values (
       ${productId}::uuid,
-      'product_affiliate_link_upserted',
+      'product_offer_upserted',
       ${input.actor ?? "admin_dashboard"},
       ${sql.json(toJsonValue({
         commissionRate: input.commissionRate ?? null,
-        linkId,
+        offerId,
         linkType: input.linkType ?? "affiliate",
         platform: input.platform ?? null,
         priority: input.priority ?? 0,
@@ -2493,41 +2769,24 @@ export async function upsertProductAffiliateLink(
   return loadAdminProductRow(productId);
 }
 
-export async function removeProductAffiliateLink(
-  input: RemoveProductAffiliateLinkInput
+export async function removeProductOffer(
+  input: RemoveProductOfferInput
 ) {
   const sql = getSql();
   const productId = isUuidValue(input.productId) ? input.productId : null;
-  const linkId = isUuidValue(input.linkId) ? input.linkId : null;
+  const offerId = isUuidValue(input.offerId) ? input.offerId : null;
 
-  if (!sql || !productId || !linkId) {
+  if (!sql || !productId || !offerId) {
     throw new Error("Product link removal requires valid ids");
   }
 
   await sql`
-    update public.product_affiliate_links
+    update public.product_offers
     set
       status = 'inactive',
       updated_at = now()
-    where id = ${linkId}::uuid
+    where id = ${offerId}::uuid
       and product_id = ${productId}::uuid
-  `;
-
-  await sql`
-    update public.marketplace_products
-    set
-      affiliate_status = case
-        when exists (
-          select 1
-          from public.product_affiliate_links
-          where product_id = ${productId}::uuid
-            and status = 'active'
-            and link_type = 'affiliate'
-        ) then 'active'
-        else 'none'
-      end,
-      updated_at = now()
-    where id = ${productId}::uuid
   `;
 
   await sql`
@@ -2539,9 +2798,9 @@ export async function removeProductAffiliateLink(
     )
     values (
       ${productId}::uuid,
-      'product_affiliate_link_removed',
+      'product_offer_removed',
       ${input.actor ?? "admin_dashboard"},
-      ${sql.json(toJsonValue({ linkId }))}::jsonb
+      ${sql.json(toJsonValue({ offerId }))}::jsonb
     )
   `;
 
@@ -2556,8 +2815,8 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
   }
 
   const beforeRows = await sql`
-    select to_jsonb(marketplace_products.*) as before_payload
-    from public.marketplace_products
+    select to_jsonb(products.*) as before_payload
+    from public.products
     where id = ${input.id}::uuid
     limit 1
   `;
@@ -2607,14 +2866,14 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
         insert into public.product_brands (
           name,
           normalized_name,
-          list_status,
+          status,
           created_at,
           updated_at
         )
         values (
           ${brandName},
           ${normalizedBrandName},
-          'unknown',
+          'pending_review',
           now(),
           now()
         )
@@ -2640,7 +2899,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
   const normalizedProductUrlParam = productUrl ? normalizedUrl(productUrl) : null;
 
   const rows = await sql`
-    update public.marketplace_products set
+    update public.products set
       title = case
         when ${input.title === undefined} then title
         else ${titleParam}
@@ -2681,10 +2940,8 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
         when ${input.productUrl === undefined} then normalized_url
         else ${normalizedProductUrlParam}
       end,
-      list_status = coalesce(${input.listStatus ?? null}, list_status),
+      status = coalesce(${input.status ?? null}, status),
       label_status = coalesce(${input.labelStatus ?? null}, label_status),
-      availability_status = coalesce(${input.availabilityStatus ?? null}, availability_status),
-      affiliate_status = coalesce(${input.affiliateStatus ?? null}, affiliate_status),
       description = case
         when ${input.description === undefined} then description
         else ${cleanNullableText(input.description, 4000)}
@@ -2696,10 +2953,6 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
       end,
       product_kind = coalesce(${input.productKind ?? null}, product_kind),
       product_audience = coalesce(${input.productAudience ?? null}, product_audience),
-      price_amount = case
-        when ${input.priceAmount === undefined} then price_amount
-        else ${input.priceAmount ?? null}
-      end,
       admin_notes = coalesce(${input.adminNotes ?? null}, admin_notes),
       updated_at = now()
     where id = ${input.id}::uuid
@@ -2722,7 +2975,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
   if (input.descriptionEn !== undefined || input.descriptionTh !== undefined) {
     try {
       await sql`
-        update public.marketplace_products
+        update public.products
         set
           description_en = case
             when ${input.descriptionEn === undefined} then description_en
@@ -2746,7 +2999,14 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
     }
   }
 
-  const productQuality = await refreshAndPersistProductQuality(sql, input.id);
+  const validation = await refreshAndPersistProductValidation(sql, input.id);
+
+  if (input.status === "approved" && validation.validation.status !== "pass") {
+    throw new Error(
+      `Product validation blocks approval: ${validation.validation.summary}`
+    );
+  }
+
   const version = await recordProductVersion(sql, {
     actor: input.actor,
     changeNote: input.changeNote?.trim() || "product_admin_save",
@@ -2767,8 +3027,6 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
       'product_updated',
       ${sql.json(beforeRows[0].before_payload ?? {})}::jsonb,
       ${sql.json({
-        affiliateStatus: input.affiliateStatus,
-        availabilityStatus: input.availabilityStatus,
         brandName: input.brandName,
         changeNote: input.changeNote,
         description: input.description,
@@ -2779,12 +3037,11 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
         fdaApprovalNumber: input.fdaApprovalNumber,
         imageUrl: input.imageUrl,
         labelStatus: input.labelStatus,
-        listStatus: input.listStatus,
-        productQuality: productQuality.productQuality,
+        status: input.status,
+        validation: validation.validation,
         productAudience: input.productAudience,
         productKind: input.productKind,
         productUrl: input.productUrl,
-        priceAmount: input.priceAmount,
         sourceSnapshotPatch: toJsonValue(input.sourceSnapshotPatch ?? null),
         title: input.title,
         titleEn: input.titleEn,

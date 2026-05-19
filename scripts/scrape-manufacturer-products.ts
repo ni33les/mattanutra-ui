@@ -1,13 +1,17 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  createAdminProduct,
+  deletePendingManufacturerImportProduct,
+  finishProductImportRun,
   resolveProductImportReview,
   stageProductImport,
+  startProductImportRun,
   updateAdminProduct,
+  validateProductImportForApproval,
   type ProductImportFactInput
 } from "@/lib/admin-products";
 import { correctDraftProductFactsWithAi } from "@/lib/product-fact-correction";
-import { validateProductQuality } from "@/lib/product-quality";
 import {
   normalizeProductFactKey,
   normalizeProductFactName
@@ -936,8 +940,8 @@ function productAudienceFromRawSnapshot(snapshot: Record<string, unknown>) {
     : null;
 }
 
-function canAutoApproveProduct(product: ScrapedManufacturerProduct) {
-  const quality = validateProductQuality({
+async function canAutoApproveProduct(product: ScrapedManufacturerProduct) {
+  const validation = await validateProductImportForApproval({
     facts: product.parsedFacts,
     imageUrl: product.imageUrls[0] ?? null,
     labelStatus: product.parsedFacts.length > 0 ? "parsed" : "missing",
@@ -945,9 +949,65 @@ function canAutoApproveProduct(product: ScrapedManufacturerProduct) {
     sourceUrl: product.sourceUrl
   });
 
-  return quality.status === "pass" &&
+  return validation.status === "pass" &&
     hasSuccessfulAiFactCorrection(product) &&
     !hasFailedAiFactCorrection(product);
+}
+
+async function importCleanApprovedProduct(product: ScrapedManufacturerProduct) {
+  const productTitle = decodeEntities(product.productTitle);
+  const titleEn = product.titleEn ? decodeEntities(product.titleEn) : null;
+  const titleTh = product.titleTh ? decodeEntities(product.titleTh) : null;
+
+  const row = await createAdminProduct({
+    actor: "manufacturer_scraper_clean_import",
+    brandStatus: "approved",
+    brandName: product.brandName,
+    description: product.description,
+    descriptionEn: product.descriptionEn,
+    descriptionTh: product.descriptionTh,
+    facts: product.parsedFacts,
+    fdaApprovalNumber: product.fdaApprovalNumber,
+    imageUrl: product.imageUrls[0] ?? null,
+    labelStatus: product.parsedFacts.length > 0 ? "parsed" : "missing",
+    status: "pending_review",
+    platform: "manual",
+    productAudience: productAudienceFromRawSnapshot(product.rawSnapshot) ?? undefined,
+    productKind: product.parsedFacts.length >= 6 ? "multi" : "supplement",
+    productUrl: product.sourceUrl,
+    region: "TH",
+    replaceFacts: true,
+    source: "manufacturer_import",
+    sourceSnapshot: {
+      ...product.rawSnapshot,
+      productImportMode: "clean_auto_approve"
+    },
+    sourceUrl: product.sourceUrl,
+    title: productTitle,
+    titleEn,
+    titleTh
+  });
+
+  if (row.validation.status !== "pass") {
+    await deletePendingManufacturerImportProduct(row.id);
+    return {
+      approved: false,
+      reason: row.validation.summary
+    };
+  }
+
+  const approvedRow = await updateAdminProduct({
+    actor: "manufacturer_scraper_clean_import",
+    changeNote: "manufacturer_import_clean_auto_approved",
+    id: row.id,
+    status: "approved"
+  });
+
+  return {
+    approved: approvedRow.status === "approved" &&
+      approvedRow.validation.status === "pass",
+    reason: approvedRow.validation.summary
+  };
 }
 
 async function correctProductWithAi(
@@ -1121,24 +1181,40 @@ async function main() {
   const normalizedBrand = normalizeBrand(brandName);
   const apply = hasArg("apply");
   const autoApprove = hasArg("auto-approve");
+  const cleanOnly = hasArg("clean-only");
   const delayMs = Math.min(5_000, positiveInt(argValue("delay-ms"), 750));
   const startAt = positiveInt(argValue("start-at"), 1);
   const inputPath = argValue("input");
   const outputPath = argValue("out");
-  const aiCorrectFacts = hasArg("ai-correct-facts");
   const aiCorrectionStrict = hasArg("ai-correction-strict");
   const aiCorrectionDelayMs = Math.min(
     10_000,
     positiveInt(argValue("ai-correction-delay-ms"), Math.max(delayMs, 750))
   );
-  const aiStartAt = positiveInt(argValue("ai-start-at"), apply ? startAt : 1);
   const inputProducts = await readInput(inputPath);
+  const inputHasAiCorrection = inputProducts
+    ? inputProducts.every((product) => Boolean(product.rawSnapshot.aiFactCorrection))
+    : false;
+  const aiCorrectFacts = hasArg("ai-correct-facts") || (apply && !inputHasAiCorrection);
+  const aiStartAt = positiveInt(argValue("ai-start-at"), apply ? startAt : 1);
   const urls = inputProducts ? [] : await productUrlsFromArgs(normalizedBrand);
 
   if (!INITIAL_BRANDS.has(normalizedBrand)) {
     throw new Error(
       `--brand must be one of: ${[...INITIAL_BRANDS].sort().join(", ")}`
     );
+  }
+
+  if (apply && !inputProducts) {
+    throw new Error("--apply is snapshot-first: pass --input=<snapshot.json> instead of scraping and writing DB in one run");
+  }
+
+  if (cleanOnly && !autoApprove) {
+    throw new Error("--clean-only requires --auto-approve so skipped products do not create review tasks");
+  }
+
+  if (!apply && !outputPath) {
+    throw new Error("--out=<snapshot.json> is required so scrape runs produce a repeatable import snapshot");
   }
 
   if (!inputProducts && urls.length < 1) {
@@ -1169,13 +1245,59 @@ async function main() {
     : { corrected: 0, failed: 0, products };
   products = [...aiCorrection.products];
 
+  let stagedImportCount = 0;
+  let autoApprovedImportCount = 0;
+  let pendingReviewImportCount = 0;
+  let skippedInvalidImportCount = 0;
+
   if (apply) {
     let appliedCount = Math.max(0, startAt - 1);
     let autoApprovedCount = 0;
+    let failedCount = 0;
+    let stagedCount = 0;
+    let skippedInvalidCount = 0;
+    const productsToApply = products.slice(Math.max(0, startAt - 1));
+    const importRunId = await startProductImportRun({
+      autoApprove,
+      brandName,
+      source: "manufacturer_import_file",
+      totalProducts: productsToApply.length
+    });
 
-    for (const product of products.slice(Math.max(0, startAt - 1))) {
+    for (const product of productsToApply) {
       appliedCount += 1;
       console.log(`[apply] ${appliedCount}/${products.length} ${product.productTitle}`);
+      const cleanAutoApproval = autoApprove
+        ? await canAutoApproveProduct(product)
+        : false;
+
+      if (cleanOnly && !cleanAutoApproval) {
+        skippedInvalidCount += 1;
+        console.warn(
+          `[apply] skipped ${product.productTitle}; not clean enough for auto-approval`
+        );
+        continue;
+      }
+
+      if (cleanOnly) {
+        await withApplyRetries(product.productTitle, async () => {
+          const result = await importCleanApprovedProduct(product);
+
+          if (result.approved) {
+            stagedCount += 1;
+            autoApprovedCount += 1;
+            autoApprovedImportCount = autoApprovedCount;
+            return;
+          }
+
+          skippedInvalidCount += 1;
+          console.warn(
+            `[apply] skipped ${product.productTitle}; ${result.reason}`
+          );
+        });
+        continue;
+      }
+
       await withApplyRetries(product.productTitle, async () => {
         const staged = await stageProductImport({
           actor: "manufacturer_scraper",
@@ -1185,6 +1307,7 @@ async function main() {
           descriptionTh: product.descriptionTh,
           fdaApprovalNumber: product.fdaApprovalNumber,
           imageUrls: product.imageUrls,
+          importRunId,
           parsedFacts: product.parsedFacts,
           parseConfidence: product.parsedFacts.length > 0 ? "moderate" : "low",
           productTitle: product.productTitle,
@@ -1194,8 +1317,9 @@ async function main() {
           titleEn: product.titleEn,
           titleTh: product.titleTh
         });
+        stagedCount += 1;
 
-        if (autoApprove && canAutoApproveProduct(product)) {
+        if (autoApprove && cleanAutoApproval) {
           try {
             await resolveProductImportReview({
               action: "approve",
@@ -1205,13 +1329,14 @@ async function main() {
               taskId: staged.reviewTaskId
             });
             autoApprovedCount += 1;
+            autoApprovedImportCount = autoApprovedCount;
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
 
             if (!/Product import review task not found/i.test(message)) {
               if (/Product still needs review/i.test(message)) {
                 console.warn(
-                  `[apply] kept review required for ${product.productTitle}; ${message}`
+                  `[apply] kept pending review for ${product.productTitle}; ${message}`
                 );
 
                 if (staged.productId) {
@@ -1220,10 +1345,11 @@ async function main() {
                     adminNotes: message,
                     changeNote: "manufacturer_import_needs_review",
                     id: staged.productId,
-                    listStatus: "review_required"
+                    status: "pending_review"
                   });
                 }
 
+                failedCount += 1;
                 return;
               }
 
@@ -1232,7 +1358,7 @@ async function main() {
           }
         } else if (autoApprove) {
           console.warn(
-            `[apply] kept review required for ${product.productTitle}; AI cleanup failed or no usable facts were parsed`
+            `[apply] kept pending review for ${product.productTitle}; AI cleanup failed or no usable facts were parsed`
           );
 
           if (staged.productId) {
@@ -1244,14 +1370,29 @@ async function main() {
               changeNote: "manufacturer_import_needs_review",
               id: staged.productId,
               labelStatus: product.parsedFacts.length > 0 ? "failed" : "missing",
-              listStatus: "review_required"
+              status: "pending_review"
             });
           }
+
+          failedCount += 1;
         }
       });
     }
 
-    console.log(`[apply] staged=${appliedCount} autoApproved=${autoApprovedCount}`);
+    await finishProductImportRun({
+      approvedCount: autoApprovedCount,
+      failedCount,
+      importRunId,
+      notes: `Applied ${stagedCount} ${brandName} products from snapshot ${inputPath}; skipped ${skippedInvalidCount} products that were not clean enough for auto-approval.`,
+      stagedCount,
+      status: "completed"
+    });
+
+    stagedImportCount = stagedCount;
+    autoApprovedImportCount = autoApprovedCount;
+    pendingReviewImportCount = Math.max(0, stagedCount - autoApprovedCount);
+    skippedInvalidImportCount = skippedInvalidCount;
+    console.log(`[apply] staged=${stagedCount} autoApproved=${autoApprovedCount} pendingReview=${pendingReviewImportCount} skippedInvalid=${skippedInvalidCount}`);
   }
 
   const wroteFile = await writeOutput(outputPath, products);
@@ -1263,8 +1404,14 @@ async function main() {
     aiCorrectionFailures: aiCorrection.failed,
     aiCorrections: aiCorrection.corrected,
     brandName,
+    discovered: urls.length,
     products: products.length,
-    stagedImports: apply ? products.length : 0,
+    scraped,
+    skipped: Math.max(0, urls.length - scraped),
+    skippedInvalidImports: skippedInvalidImportCount,
+    stagedImports: stagedImportCount,
+    autoApprovedImports: autoApprovedImportCount,
+    pendingReview: pendingReviewImportCount,
     wroteFile
   }, null, 2));
 }

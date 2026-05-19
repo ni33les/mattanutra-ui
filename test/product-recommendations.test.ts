@@ -38,15 +38,15 @@ function product(input: Readonly<{
   audience?: ProductCandidate["productAudience"];
   id: string;
   name: string;
-  status?: ProductCandidate["listStatus"];
+  status?: ProductCandidate["status"];
 }>): ProductCandidate {
   return {
-    activeAffiliateLinkId: input.affiliate ? `${input.id}-affiliate` : null,
+    activeOfferId: input.affiliate ? `${input.id}-affiliate` : null,
     activeAffiliateUrl: input.affiliate ? `https://affiliate.example/${input.id}` : null,
     affiliateStatus: input.affiliate ? "active" : "none",
     automatedSafetyPassed: true,
     availabilityStatus: "in_stock",
-    brandStatus: "whitelisted",
+    brandStatus: "approved",
     currency: "THB",
     facts: [
       {
@@ -61,7 +61,7 @@ function product(input: Readonly<{
     ],
     id: input.id,
     labelStatus: "parsed",
-    listStatus: input.status ?? "whitelisted",
+    status: input.status ?? "approved",
     platform: "shopee",
     productAudience: input.audience ?? "both",
     priceAmount: 100,
@@ -204,6 +204,45 @@ describe("product recommendation scoring", () => {
     assert.deepEqual(recommendedIds, ["one", "two", "three", "four"]);
   });
 
+  it("skips weak top-ups after the target count to cover an unmet need", () => {
+    const noisyWeakTopUp: ProductCandidate = {
+      ...product({ amount: 0.95, id: "weak-top-up", name: "Vitamin D" }),
+      facts: [
+        ...product({ amount: 0.95, id: "weak-top-up", name: "Vitamin D" }).facts,
+        ...Array.from({ length: 40 }, (_, index) => ({
+          amount: 1,
+          comparableAmount: 1000,
+          confidence: "high" as const,
+          itemType: "supplement" as const,
+          name: `Extra ${index}`,
+          normalizedName: `extra_${index}`,
+          unit: "mg"
+        }))
+      ]
+    };
+    const result = recommendProductStack({
+      candidates: [
+        product({ amount: 0.85, id: "one", name: "Vitamin D" }),
+        product({ amount: 0.9, id: "two", name: "Magnesium" }),
+        product({ amount: 0.9, id: "three", name: "Omega-3" }),
+        noisyWeakTopUp,
+        product({ amount: 1, id: "ashwagandha", name: "Ashwagandha" })
+      ],
+      maxProducts: 6,
+      needs: [
+        need("vitamin_d", "Vitamin D", 10),
+        need("magnesium", "Magnesium", 10),
+        need("omega_3", "Omega-3", 10),
+        need("ashwagandha", "Ashwagandha", 1)
+      ],
+      targetProducts: 3
+    });
+    const recommendedIds = result.recommendations.map((item) => item.product.id);
+
+    assert.equal(recommendedIds.includes("ashwagandha"), true);
+    assert.equal(recommendedIds.includes("weak-top-up"), false);
+  });
+
   it("keeps low-priority requested needs visible when a valid product exists", () => {
     const result = recommendProductStack({
       candidates: [
@@ -211,16 +250,14 @@ describe("product recommendation scoring", () => {
         product({ amount: 1, id: "two", name: "Magnesium" }),
         product({ amount: 1, id: "three", name: "Omega-3" }),
         product({ amount: 1, id: "four", name: "Ashwagandha" }),
-        product({ amount: 1, id: "five", name: "Curcumin" }),
-        product({ amount: 1, id: "six", name: "Multi-strain probiotics" }),
-        product({ amount: 0.25, id: "seven", name: "L-Theanine" })
+        product({ amount: 1, id: "five", name: "Multi-strain probiotics" }),
+        product({ amount: 0.25, id: "six", name: "L-Theanine" })
       ],
       needs: [
         need("vitamin_d", "Vitamin D", 10),
         need("magnesium", "Magnesium", 10),
         need("omega_3", "Omega-3", 10),
         need("ashwagandha", "Ashwagandha", 4),
-        need("curcumin", "Curcumin", 3),
         need("multi_strain_probiotics", "Multi-strain probiotics", 2),
         need("theanine", "Theanine", 1)
       ],
@@ -228,7 +265,7 @@ describe("product recommendation scoring", () => {
     });
 
     assert.equal(
-      result.recommendations.some((item) => item.product.id === "seven"),
+      result.recommendations.some((item) => item.product.id === "six"),
       true
     );
     assert.equal(
@@ -237,7 +274,7 @@ describe("product recommendation scoring", () => {
     );
   });
 
-  it("excludes blacklisted and missing-label products", () => {
+  it("excludes ignored and missing-label products", () => {
     const missingFacts = {
       ...product({ amount: 1, id: "missing", name: "Iron" }),
       facts: [],
@@ -247,7 +284,7 @@ describe("product recommendation scoring", () => {
       amount: 1,
       id: "blocked",
       name: "Iron",
-      status: "blacklisted"
+      status: "ignored"
     });
     const result = recommendProductStack({
       candidates: [missingFacts, blocked],
@@ -265,7 +302,7 @@ describe("product recommendation scoring", () => {
           amount: 1,
           id: "unknown",
           name: "CoQ10",
-          status: "unknown"
+          status: "pending_review"
         })
       ],
       needs: [need("coq10", "CoQ10", 5)]
@@ -275,12 +312,12 @@ describe("product recommendation scoring", () => {
     assert.equal(result.exclusions[0]?.reason, "Product is not approved yet");
   });
 
-  it("keeps review-required product quality out of matching", () => {
+  it("keeps review-required product validation out of matching", () => {
     const result = recommendProductStack({
       candidates: [
         {
           ...product({ amount: 1, id: "dirty", name: "Curcumin" }),
-          productQuality: {
+          validation: {
             checkedAt: new Date().toISOString(),
             matchableFactCount: 0,
             reasons: ["dirty_name"],
@@ -293,7 +330,7 @@ describe("product recommendation scoring", () => {
     });
 
     assert.equal(result.recommendations.length, 0);
-    assert.match(result.exclusions[0]?.reason ?? "", /quality/i);
+    assert.match(result.exclusions[0]?.reason ?? "", /validation/i);
   });
 
   it("reports supplement coverage separately from food coverage", () => {
@@ -423,6 +460,11 @@ describe("product recommendation scoring", () => {
       productFactAliasKeys("Theanine (AlphaWave L-theanine)").includes("l_theanine"),
       true
     );
+    assert.equal(productKeysMatch("Ashwaganda root extract", "Ashwagandha"), true);
+    assert.equal(productKeysMatch("Curacumin", "Curcumin"), true);
+    assert.equal(productKeysMatch("Probiotic blend", "Multi-strain probiotics"), true);
+    assert.equal(productKeysMatch("Glutamine", "L-Glutamine"), true);
+    assert.equal(productKeysMatch("Magnesium bisglycinate", "Magnesium"), true);
     assert.equal(
       result.recommendations.some((item) => item.product.id === "d3-form"),
       true
@@ -447,6 +489,10 @@ describe("product recommendation scoring", () => {
       ["vitamin_d3", "Vitamin D3"],
       ["omega_3", "Omega-3"],
       ["curcumin", "Curcumin"],
+      ["ashwagandha", "Ashwagandha"],
+      ["multi_strain_probiotics", "Multi-strain probiotics"],
+      ["theanine", "Theanine"],
+      ["l_glutamine", "L-Glutamine"],
       ["coq10", "CoQ10"],
       ["zinc", "Zinc"],
       ["b_complex", "B Complex"],
@@ -457,7 +503,9 @@ describe("product recommendation scoring", () => {
         product({ amount: 1, id: `product-${id}`, name })
       ),
       maxProducts: 6,
-      needs: expected.map(([id, name], index) => need(id, name, 8 - index))
+      needs: expected.map(([id, name], index) =>
+        need(id, name, expected.length - index)
+      )
     });
     const recommendedIds = new Set(
       result.recommendations.map((item) => item.product.id)

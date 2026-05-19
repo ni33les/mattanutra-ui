@@ -1629,13 +1629,13 @@ function trackMarketplaceClick(
 
   if (navigator.sendBeacon) {
     navigator.sendBeacon(
-      "/api/marketplace-products/click",
+      "/api/products/click",
       new Blob([payload], { type: "application/json" })
     );
     return;
   }
 
-  void fetch("/api/marketplace-products/click", {
+  void fetch("/api/products/click", {
     body: payload,
     headers: {
       "Content-Type": "application/json"

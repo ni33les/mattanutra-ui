@@ -380,10 +380,11 @@ export type AdminContent = Readonly<{
     agent: string;
   };
   supplements: {
+    active: string;
     allCategories: string;
     allStatuses: string;
     addSupplement: string;
-    blacklisted: string;
+    blocked: string;
     category: string;
     confidence: string;
     close: string;
@@ -392,14 +393,12 @@ export type AdminContent = Readonly<{
     details: string;
     dose: string;
     empty: string;
-    inactive: string;
     maxAmount: string;
     maxUnit: string;
     name: string;
     newSupplement: string;
     newSupplementHint: string;
     none: string;
-    reviewRequired: string;
     safetyFlag: string;
     safetyFlagOptions: Record<SupplementSafetyFlag, string>;
     safetyNotes: string;
@@ -423,7 +422,6 @@ export type AdminContent = Readonly<{
     total: string;
     updateError: string;
     doseValidationError: string;
-    whitelisted: string;
   };
   title: string;
 }>;
@@ -812,10 +810,11 @@ export const content = {
       agent: "Agent"
     },
     supplements: {
+      active: "Active",
       allCategories: "All categories",
       allStatuses: "All statuses",
       addSupplement: "Add supplement",
-      blacklisted: "Blacklisted",
+      blocked: "Blocked",
       category: "Category",
       confidence: "Confidence",
       close: "Close",
@@ -824,7 +823,6 @@ export const content = {
       details: "Details",
       dose: "Max dose",
       empty: "No supplements match these filters.",
-      inactive: "Inactive",
       maxAmount: "Amount",
       maxUnit: "Unit",
       name: "Name",
@@ -832,7 +830,6 @@ export const content = {
       newSupplementHint:
         "Create the canonical supplement, then add dose, safety notes and associations.",
       none: "None",
-      reviewRequired: "Review required",
       safetyFlag: "Safety flags",
       safetyFlagOptions: {
         allergy_caution: "Allergy caution",
@@ -872,8 +869,7 @@ export const content = {
       total: "Total",
       updateError: "Could not save this supplement.",
       doseValidationError:
-        "Enter a positive amount and unit for whitelisted or review-required supplements.",
-      whitelisted: "Whitelisted"
+        "Enter a positive amount and unit for active supplements."
     },
     title: "Performance"
   },
@@ -1249,10 +1245,11 @@ export const content = {
       agent: "Agent"
     },
     supplements: {
+      active: "ใช้งาน",
       allCategories: "ทุกหมวดหมู่",
       allStatuses: "ทุกสถานะ",
       addSupplement: "เพิ่มอาหารเสริม",
-      blacklisted: "บัญชีดำ",
+      blocked: "บล็อก",
       category: "หมวดหมู่",
       confidence: "ความมั่นใจ",
       close: "ปิด",
@@ -1261,7 +1258,6 @@ export const content = {
       details: "รายละเอียด",
       dose: "ขนาดสูงสุด",
       empty: "ไม่พบอาหารเสริมตามตัวกรองนี้",
-      inactive: "ปิดใช้",
       maxAmount: "ปริมาณ",
       maxUnit: "หน่วย",
       name: "ชื่อ",
@@ -1269,7 +1265,6 @@ export const content = {
       newSupplementHint:
         "สร้างอาหารเสริมหลักก่อน จากนั้นเพิ่มขนาด หมายเหตุความปลอดภัย และชื่อเชื่อมโยง",
       none: "ไม่มี",
-      reviewRequired: "ต้องรีวิว",
       safetyFlag: "ธงความปลอดภัย",
       safetyFlagOptions: {
         allergy_caution: "ข้อควรระวังเรื่องแพ้",
@@ -1309,8 +1304,7 @@ export const content = {
       total: "ทั้งหมด",
       updateError: "ไม่สามารถบันทึกอาหารเสริมนี้ได้",
       doseValidationError:
-        "กรอกปริมาณที่มากกว่า 0 และหน่วยสำหรับรายการที่อนุญาตหรือต้องรีวิว",
-      whitelisted: "อนุญาต"
+        "กรอกปริมาณที่มากกว่า 0 และหน่วยสำหรับอาหารเสริมที่ใช้งาน"
     },
     title: "Performance"
   }

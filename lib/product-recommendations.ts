@@ -12,14 +12,12 @@ import type {
   LocalizedText,
   RecommendedProduct
 } from "@/lib/formulation-types";
-import type { ProductQualityResult } from "@/lib/product-quality";
+import type { ValidationResult } from "@/lib/product-validation";
 
-export type ProductListStatus =
-  | "blacklisted"
-  | "inactive"
-  | "review_required"
-  | "unknown"
-  | "whitelisted";
+export type ProductStatus =
+  | "approved"
+  | "ignored"
+  | "pending_review";
 
 export type ProductPlatform = "lazada" | "manual" | "shopee";
 export type ProductKind = "food" | "multi" | "other" | "supplement";
@@ -62,7 +60,7 @@ export type ProductCandidateFact = Readonly<{
 }>;
 
 export type ProductCandidate = Readonly<{
-  activeAffiliateLinkId?: string | null;
+  activeOfferId?: string | null;
   activeAffiliateUrl?: string | null;
   activeAffiliateCommissionRate?: number | null;
   activeAffiliatePriority?: number | null;
@@ -71,17 +69,17 @@ export type ProductCandidate = Readonly<{
   automatedSafetyPassed: boolean;
   availabilityStatus: ProductAvailabilityStatus;
   brandName?: string | null;
-  brandStatus?: ProductListStatus | null;
+  brandStatus?: ProductStatus | null;
   currency: string;
   facts: ProductCandidateFact[];
   id: string;
   imageUrl?: string | null;
   labelStatus: "failed" | "missing" | "parsed" | "stale";
-  listStatus: ProductListStatus;
+  status: ProductStatus;
   platform: ProductPlatform;
   productAudience?: ProductAudience | null;
   productKind?: ProductKind | null;
-  productQuality?: ProductQualityResult | null;
+  validation?: ValidationResult | null;
   priceAmount?: number | null;
   productDataExpiresAt?: string | null;
   productUrl: string;
@@ -125,7 +123,7 @@ export type ProductRecommendationDiagnostics = Readonly<{
 
 export type ProductRecommendationSelection = Readonly<{
   affiliate: boolean;
-  affiliateLinkId: string | null;
+  offerId: string | null;
   coveredNeeds: ProductRecommendationNeed[];
   product: ProductCandidate;
   productCoveragePercent: number;
@@ -155,7 +153,7 @@ type CoverageResult = Readonly<{
 }>;
 
 const DEFAULT_TARGET_COUNT = 3;
-const DEFAULT_MAX_COUNT = 8;
+const DEFAULT_MAX_COUNT = 6;
 const MIN_USEFUL_MARGINAL_COVERAGE = 0.02;
 const STOP_AFTER_TARGET_MARGINAL_COVERAGE = 0.08;
 const TARGET_DOSE_SWEET_SPOT_MIN = 0.7;
@@ -169,9 +167,14 @@ const GENERIC_BASE_PRODUCT_QUERIES = [
   "อาหารเสริม วิตามินรวม"
 ];
 const SEARCH_TOKEN_REPLACEMENTS: Record<string, string[]> = {
+  ashwagandha: ["ashwagandha", "withania somnifera"],
   coq10: ["coq10", "coenzyme q10"],
+  curcumin: ["curcumin", "turmeric extract", "curcuminoids"],
+  l_glutamine: ["l-glutamine", "glutamine"],
   magnesium: ["magnesium", "magnesium glycinate", "แมกนีเซียม"],
+  multi_strain_probiotics: ["probiotics", "probiotic blend"],
   omega_3: ["omega 3", "fish oil", "น้ำมันปลา"],
+  theanine: ["l-theanine", "theanine"],
   vitamin_b12: ["vitamin b12", "b12"],
   vitamin_c: ["vitamin c", "วิตามินซี"],
   vitamin_d: ["vitamin d3", "vitamin d", "วิตามินดี"],
@@ -213,6 +216,9 @@ const MATCH_ALIAS_GROUPS: readonly (readonly string[])[] = [
   ["vitamin_k2", "menaquinone", "mk_7", "mk7"],
   ["coq10", "coenzyme_q10", "ubiquinone", "ubiquinol"],
   ["pea", "palmidrol", "palmitoylethanolamide"],
+  ["ashwagandha", "ashwaganda", "withania_somnifera", "ashwagandha_root_extract"],
+  ["curcumin", "curacumin", "curcuminoids", "turmeric_extract", "curcuma_longa"],
+  ["multi_strain_probiotics", "probiotics", "probiotic", "probiotic_blend"],
   [
     "omega_3",
     "omega_3_fatty_acids",
@@ -223,7 +229,8 @@ const MATCH_ALIAS_GROUPS: readonly (readonly string[])[] = [
     "docosahexaenoic_acid"
   ],
   ["theanine", "l_theanine", "alpha_wave_l_theanine"],
-  ["magnesium", "magnesium_citrate", "magnesium_glycinate", "magnesium_oxide", "magnesium_threonate"],
+  ["l_glutamine", "glutamine"],
+  ["magnesium", "magnesium_citrate", "magnesium_glycinate", "magnesium_bisglycinate", "magnesium_glyconate", "magnesium_oxide", "magnesium_threonate"],
   ["iron", "ferrous_fumarate", "ferrous_sulfate", "ferrous_bisglycinate"],
   ["zinc", "zinc_amino_acid_chelate", "zinc_citrate", "zinc_gluconate", "zinc_oxide", "zinc_sulfate"],
   ["selenium", "selenomethionine", "sodium_selenite"],
@@ -696,34 +703,27 @@ function productCoverage(product: ProductCandidate, needs: ProductRecommendation
 }
 
 function exclusionReason(product: ProductCandidate) {
-  if (product.brandStatus === "blacklisted" || product.brandStatus === "inactive") {
-    return "Brand is blocked";
+  if (product.brandStatus === "ignored") {
+    return "Brand is ignored";
   }
 
-  if (product.listStatus === "blacklisted" || product.listStatus === "inactive") {
-    return "Product is blocked";
+  if (product.status === "ignored") {
+    return "Product is ignored";
   }
 
   if (
-    product.listStatus !== "whitelisted" ||
-    product.brandStatus !== "whitelisted"
+    product.status !== "approved" ||
+    product.brandStatus !== "approved"
   ) {
     return "Product is not approved yet";
-  }
-
-  if (
-    product.availabilityStatus === "out_of_stock" ||
-    product.availabilityStatus === "unavailable"
-  ) {
-    return "Product is unavailable";
   }
 
   if (product.labelStatus !== "parsed" || product.facts.length < 1) {
     return "Product label facts are missing";
   }
 
-  if (product.productQuality && product.productQuality.status !== "pass") {
-    return `Product data quality needs review: ${product.productQuality.summary}`;
+  if (product.validation && product.validation.status !== "pass") {
+    return `Product validation needs review: ${product.validation.summary}`;
   }
 
   if (
@@ -760,10 +760,6 @@ function productPenalty(product: ProductCandidate, budgetAmount?: number | null)
 
   if (product.labelStatus === "stale") {
     penalty += 4;
-  }
-
-  if (product.availabilityStatus === "unknown") {
-    penalty += 3;
   }
 
   if (budgetAmount && product.priceAmount && product.priceAmount > budgetAmount) {
@@ -904,7 +900,7 @@ function diagnosticNeeds(
 
 function factIssueExclusions(exclusions: ProductRecommendationExclusion[]) {
   return exclusions.filter((item) =>
-    /quality|label|fact|safety|cache|approved|unavailable|blocked/i.test(item.reason)
+    /validation|label|fact|safety|cache|approved|unavailable|blocked/i.test(item.reason)
   );
 }
 
@@ -922,9 +918,7 @@ function whyProductMatches(
   stackContributionPercent: number
 ) {
   const names = coveredNeeds.slice(0, 3).map((need) => need.displayName);
-  const prefix = product.listStatus === "unknown"
-    ? "Strong unreviewed match"
-    : "Strong match";
+  const prefix = "Strong match";
   const contribution = safePercent(stackContributionPercent);
 
   if (names.length < 1) {
@@ -1066,17 +1060,16 @@ export function recommendProductStack(input: Readonly<{
         return (first.product.priceAmount ?? Number.MAX_SAFE_INTEGER) -
           (second.product.priceAmount ?? Number.MAX_SAFE_INTEGER);
       });
-    const best = ranked[0];
+    const eligibleRanked =
+      selected.length >= targetCount
+        ? ranked.filter((item) =>
+            item.marginal / 100 >= STOP_AFTER_TARGET_MARGINAL_COVERAGE ||
+            coversCurrentlyUnmatchedNeed(item.coverage, stackCoverage)
+          )
+        : ranked;
+    const best = eligibleRanked[0];
 
     if (!best) {
-      break;
-    }
-
-    if (
-      selected.length >= targetCount &&
-      best.marginal / 100 < STOP_AFTER_TARGET_MARGINAL_COVERAGE &&
-      !coversCurrentlyUnmatchedNeed(best.coverage, stackCoverage)
-    ) {
       break;
     }
 
@@ -1084,7 +1077,7 @@ export function recommendProductStack(input: Readonly<{
     applyCoverage(stackCoverage, best.coverage);
     selected.push({
       affiliate: Boolean(best.product.activeAffiliateUrl),
-      affiliateLinkId: best.product.activeAffiliateLinkId ?? null,
+      offerId: best.product.activeOfferId ?? null,
       coveredNeeds: best.coverage.coveredNeeds,
       product: best.product,
       productCoveragePercent: visibleCoveragePercent(

@@ -528,6 +528,7 @@ function reviewMakesItemVisible(row: SafetyReviewResolutionRow) {
   return (
     row.status === "accepted" ||
     reviewDecision(row) === "approve" ||
+    note.includes("resolved as active") ||
     note.includes("resolved as whitelisted") ||
     note.includes("associated with") ||
     note.includes("approved")
@@ -541,8 +542,7 @@ function reviewRemovesItem(row: SafetyReviewResolutionRow) {
 function reviewCanBeSatisfiedByWhitelist(row: SafetyReviewResolutionRow) {
   return (
     row.rule_code === "unknown_food" ||
-    row.rule_code === "unknown_supplement" ||
-    row.rule_code === "review_required"
+    row.rule_code === "unknown_supplement"
   );
 }
 
@@ -604,7 +604,7 @@ function itemIsWhitelisted(
   lookup: ReadonlyMap<string, string>,
   name: string
 ) {
-  return lookup.get(normalizeReviewName(name)) === "whitelisted";
+  return lookup.get(normalizeReviewName(name)) === "active";
 }
 
 function makeFoodVisible(
@@ -1278,7 +1278,7 @@ export async function getStoredFormulationResult(
         jsonb_agg(
           jsonb_build_object(
             'affiliate',
-              product_recommendation_items.affiliate_link_id is not null,
+              product_recommendation_items.offer_id is not null,
             'covers',
               coalesce(
                 (
@@ -1290,20 +1290,20 @@ export async function getStoredFormulationResult(
             'description',
               coalesce(product_recommendation_items.why, ''),
             'id',
-              marketplace_products.id::text,
+              products.id::text,
             'imageUrl',
               coalesce(
-                marketplace_products.image_url,
+                products.image_url,
                 product_recommendation_items.image_url
               ),
             'marketplace',
-              case marketplace_products.platform
+              case products.platform
                 when 'lazada' then 'Lazada Thailand'
                 when 'shopee' then 'Shopee Thailand'
                 else 'Imported product'
               end,
             'name',
-              marketplace_products.title,
+              products.title,
             'price',
               case
                 when product_recommendation_items.price_amount is not null
@@ -1321,7 +1321,7 @@ export async function getStoredFormulationResult(
             'productCoveragePercent',
               product_recommendation_items.product_coverage_percent,
             'productId',
-              marketplace_products.id::text,
+              products.id::text,
             'rank',
               product_recommendation_items.rank,
             'recommendationRunId',
@@ -1332,7 +1332,7 @@ export async function getStoredFormulationResult(
               product_recommendation_run.stack_coverage_percent,
             'tag',
               case
-                when product_recommendation_items.affiliate_link_id is not null
+                when product_recommendation_items.offer_id is not null
                   then 'Best match + affiliate'
                 else 'Best match'
               end,
@@ -1344,8 +1344,8 @@ export async function getStoredFormulationResult(
         '[]'::jsonb
       ) as recommendations
       from product_recommendation_items
-      join marketplace_products
-        on marketplace_products.id = product_recommendation_items.product_id
+      join products
+        on products.id = product_recommendation_items.product_id
       where product_recommendation_run.id is not null
         and product_recommendation_items.run_id = product_recommendation_run.id
     ) product_recommendation_items_payload on true

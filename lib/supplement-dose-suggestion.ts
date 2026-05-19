@@ -96,24 +96,20 @@ function listStatusValue(
   fallback: string | null | undefined
 ): SupplementListStatus {
   if (
-    value === "blacklisted" ||
-    value === "inactive" ||
-    value === "review_required" ||
-    value === "whitelisted"
+    value === "active" ||
+    value === "blocked"
   ) {
     return value;
   }
 
   if (
-    fallback === "blacklisted" ||
-    fallback === "inactive" ||
-    fallback === "review_required" ||
-    fallback === "whitelisted"
+    fallback === "active" ||
+    fallback === "blocked"
   ) {
     return fallback;
   }
 
-  return "review_required";
+  return "active";
 }
 
 function numberOrNull(value: unknown) {
@@ -184,13 +180,11 @@ async function callGrok(input: SupplementDoseSuggestionInput) {
               "Do not echo the request, allowedUnits, contract, supplement, or schema.",
               "Use one maxUnit from allowedUnits exactly.",
               "Use only safetyFlags from allowedSafetyFlags.",
-              "Choose listStatus from whitelisted, review_required, blacklisted, inactive.",
-              "Choose blacklisted only for broadly unsafe, illegal, unsuitable, or strongly contraindicated items.",
-              "Choose review_required when useful but caution, interaction, dose uncertainty, or low evidence needs human attention.",
-              "Choose whitelisted when generally suitable for automated use with the suggested conservative max dose.",
-              "Choose inactive only when the item is not a usable supplement entry.",
-              "For whitelisted or review_required, return a positive numeric maxAmount and an allowed maxUnit.",
-              "For blacklisted or inactive, maxAmount may be null and maxUnit may be an empty string.",
+              "Choose listStatus from active or blocked.",
+              "Choose blocked only for broadly unsafe, illegal, unsuitable, non-supplement, or strongly contraindicated items.",
+              "Choose active when generally suitable for catalogue use with the suggested conservative max dose.",
+              "For active, return a positive numeric maxAmount and an allowed maxUnit.",
+              "For blocked, maxAmount may be null and maxUnit may be an empty string.",
               "If evidence is uncertain, choose a conservative ceiling and confidence low.",
               "Never suggest a dose range.",
               "Write safetyNotes as concise admin-facing notes explaining the status, flags, and dose choice."
@@ -204,9 +198,8 @@ async function callGrok(input: SupplementDoseSuggestionInput) {
                 allowedSafetyFlags: supplementSafetyFlags,
                 output: {
                   confidence: "high | moderate | low",
-                  listStatus:
-                    "whitelisted | review_required | blacklisted | inactive",
-                  maxAmount: "positive number, or null for blacklisted/inactive",
+                  listStatus: "active | blocked",
+                  maxAmount: "positive number, or null for blocked",
                   maxUnit: "one allowedUnits value",
                   safetyFlags: ["zero or more allowedSafetyFlags values"],
                   safetyNotes: "short admin-facing notes"
@@ -274,8 +267,7 @@ export async function suggestSupplementDose(
   const listStatus = listStatusValue(parsed.listStatus, input.listStatus);
   const maxAmount = numberOrNull(parsed.maxAmount);
   const maxUnit = normalizeUnit(parsed.maxUnit);
-  const doseRequired =
-    listStatus === "review_required" || listStatus === "whitelisted";
+  const doseRequired = listStatus === "active";
 
   if (doseRequired && (!maxAmount || maxAmount <= 0 || !maxUnit)) {
     throw new Error("Model returned an invalid dose suggestion");

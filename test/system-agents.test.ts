@@ -37,7 +37,7 @@ describe("system agents", () => {
       "analyze_healthscore",
       "client_safety_followup",
       "content_status_change",
-      "discover_marketplace_products",
+      "discover_products",
       "generate_example_food_guidance",
       "generate_example_supplement_guidance",
       "generate_food_guidance",

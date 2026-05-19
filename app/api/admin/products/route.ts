@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import {
   createAdminProduct,
-  isProductAvailabilityStatus,
   isProductAudience,
   isProductLabelStatus,
-  isProductListStatus,
+  isProductStatus,
   isProductPlatform
 } from "@/lib/admin-products";
 import type {
@@ -106,9 +105,8 @@ export async function POST(request: Request) {
   }
 
   const platform = normalizedKey(body.platform);
-  const listStatus = normalizedKey(body.listStatus);
+  const status = normalizedKey(body.status);
   const labelStatus = normalizedKey(body.labelStatus);
-  const availabilityStatus = normalizedKey(body.availabilityStatus);
   const productKind = parseProductKind(body.productKind);
   const productAudience = parseProductAudience(body.productAudience);
   const title = textOrNull(body.title);
@@ -118,10 +116,8 @@ export async function POST(request: Request) {
     !title ||
     !productUrl ||
     !isProductPlatform(platform) ||
-    (body.listStatus !== undefined && !isProductListStatus(listStatus)) ||
+    (body.status !== undefined && !isProductStatus(status)) ||
     (body.labelStatus !== undefined && !isProductLabelStatus(labelStatus)) ||
-    (body.availabilityStatus !== undefined &&
-      !isProductAvailabilityStatus(availabilityStatus)) ||
     (body.productKind !== undefined && !productKind) ||
     (body.productAudience !== undefined && !productAudience)
   ) {
@@ -139,19 +135,14 @@ export async function POST(request: Request) {
   try {
     const row = await createAdminProduct({
       actor: "admin_dashboard",
-      affiliateUrl: textOrNull(body.affiliateUrl),
-      availabilityStatus: isProductAvailabilityStatus(availabilityStatus)
-        ? availabilityStatus
-        : undefined,
       brandName: textOrNull(body.brandName),
       currency: textOrNull(body.currency) ?? "THB",
       facts: factsFromBody(body.facts),
       fdaApprovalNumber: textOrNull(body.fdaApprovalNumber),
       imageUrl: textOrNull(body.imageUrl),
       labelStatus: isProductLabelStatus(labelStatus) ? labelStatus : undefined,
-      listStatus: isProductListStatus(listStatus) ? listStatus : undefined,
+      status: isProductStatus(status) ? status : undefined,
       platform,
-      priceAmount: numberOrNull(body.priceAmount),
       productAudience,
       productKind,
       productUrl,
@@ -169,10 +160,10 @@ export async function POST(request: Request) {
       }
     );
   } catch (error) {
-    console.error("Unable to import marketplace product", error);
+    console.error("Unable to import product", error);
 
     return NextResponse.json(
-      { message: "Unable to import marketplace product" },
+      { message: "Unable to import product" },
       {
         headers: {
           "Cache-Control": "no-store"

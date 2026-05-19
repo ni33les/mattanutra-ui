@@ -247,7 +247,7 @@ export const SYSTEM_AGENT_LIST = Object.values(SYSTEM_AGENTS);
 export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
   analyze_healthscore: "healthScoreEngine",
   client_safety_followup: "communicationsCoordinator",
-  discover_marketplace_products: "productMatcher",
+  discover_products: "productMatcher",
   generate_example_food_guidance: "foodGuidanceWorker",
   generate_example_supplement_guidance: "formulationWorker",
   generate_food_guidance: "foodGuidanceWorker",
@@ -276,7 +276,7 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
   const capabilitiesByTaskType: Record<string, readonly string[]> = {
     analyze_healthscore: [AGENT_CAPABILITIES.healthScoreAnalysis],
     client_safety_followup: [AGENT_CAPABILITIES.clientSafetyFollowup],
-    discover_marketplace_products: [
+    discover_products: [
       AGENT_CAPABILITIES.productRecommendation
     ],
     generate_example_food_guidance: [

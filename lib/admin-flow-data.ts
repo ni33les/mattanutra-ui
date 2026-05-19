@@ -501,7 +501,7 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
     return ["chatClicked"];
   }
 
-  if (row.event_name === "marketplace_product_clicked") {
+  if (row.event_name === "product_clicked") {
     return ["marketplaceClicked"];
   }
 
@@ -706,7 +706,7 @@ export async function getAdminFlowData(
                 'free_email_sent',
                 'healthscore_viewed',
                 'home_viewed',
-                'marketplace_product_clicked',
+                'product_clicked',
                 'plan_selected'
               )
               or event_name in (
@@ -749,7 +749,7 @@ export async function getAdminFlowData(
               'free_email_sent',
               'healthscore_viewed',
               'home_viewed',
-              'marketplace_product_clicked',
+              'product_clicked',
               'plan_selected'
             )
             or event_name in (

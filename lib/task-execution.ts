@@ -234,7 +234,7 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
   }
 
   if (
-    workItem.taskType === "discover_marketplace_products" ||
+    workItem.taskType === "discover_products" ||
     workItem.taskType === "parse_product_label" ||
     workItem.taskType === "refresh_marketplace_product"
   ) {

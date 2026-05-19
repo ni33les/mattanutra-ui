@@ -8,10 +8,8 @@ import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limi
 export type { SupplementSafetyFlag } from "@/lib/supplement-safety-flags";
 
 export type SupplementListStatus =
-  | "blacklisted"
-  | "inactive"
-  | "review_required"
-  | "whitelisted";
+  | "active"
+  | "blocked";
 
 export type SupplementConfidence = "high" | "low" | "moderate";
 
@@ -43,11 +41,9 @@ export type AdminSupplementsData = Readonly<{
   generatedAt: string;
   rows: AdminSupplementRow[];
   summary: {
-    blacklisted: number;
-    inactive: number;
-    reviewRequired: number;
+    active: number;
+    blocked: number;
     total: number;
-    whitelisted: number;
   };
 }>;
 
@@ -105,10 +101,8 @@ export type AddAdminSupplementAliasInput = Readonly<{
 }>;
 
 const listStatuses = new Set<SupplementListStatus>([
-  "blacklisted",
-  "inactive",
-  "review_required",
-  "whitelisted"
+  "active",
+  "blocked"
 ]);
 
 const confidences = new Set<SupplementConfidence>(["high", "low", "moderate"]);
@@ -120,11 +114,9 @@ export function emptyAdminSupplementsData(): AdminSupplementsData {
     generatedAt: new Date().toISOString(),
     rows: [],
     summary: {
-      blacklisted: 0,
-      inactive: 0,
-      reviewRequired: 0,
-      total: 0,
-      whitelisted: 0
+      active: 0,
+      blocked: 0,
+      total: 0
     }
   };
 }
@@ -175,7 +167,7 @@ function rowFromDb(row: SupplementDbRow): AdminSupplementRow {
     confidence: row.confidence,
     id: row.id,
     ingredientType: row.ingredient_type,
-    listStatus: row.is_active ? row.list_status : "inactive",
+    listStatus: row.is_active ? row.list_status : "blocked",
     maxAmount: numberOrNull(row.max_amount),
     maxUnit: row.max_unit,
     name: row.name,
@@ -192,24 +184,18 @@ function buildSummary(rows: AdminSupplementRow[]) {
     (summary, row) => {
       summary.total += 1;
 
-      if (row.listStatus === "whitelisted") {
-        summary.whitelisted += 1;
-      } else if (row.listStatus === "blacklisted") {
-        summary.blacklisted += 1;
-      } else if (row.listStatus === "inactive") {
-        summary.inactive += 1;
+      if (row.listStatus === "active") {
+        summary.active += 1;
       } else {
-        summary.reviewRequired += 1;
+        summary.blocked += 1;
       }
 
       return summary;
     },
     {
-      blacklisted: 0,
-      inactive: 0,
-      reviewRequired: 0,
-      total: 0,
-      whitelisted: 0
+      active: 0,
+      blocked: 0,
+      total: 0
     }
   );
 }
@@ -351,11 +337,8 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
   await sql`
     update public.supplements
     set
-      is_active = ${input.listStatus !== "inactive"},
-      list_status = case
-        when ${input.listStatus} = 'inactive' then list_status
-        else ${input.listStatus}
-      end,
+      is_active = ${input.listStatus === "active"},
+      list_status = ${input.listStatus},
       updated_at = now()
     where id = ${input.id}::uuid
   `;
@@ -403,7 +386,7 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
   const name = input.name.trim().slice(0, 200);
   const normalizedName = normalizeAlias(name);
   const category = input.category?.trim().slice(0, 120) || "Manual";
-  const listStatus = input.listStatus ?? "review_required";
+  const listStatus = input.listStatus ?? "active";
   const confidence = input.confidence ?? "low";
   const maxUnit = input.maxUnit?.trim().slice(0, 80) ?? "";
   const safetyFlags = normalizeSupplementSafetyFlags(input.safetyFlags);
@@ -477,8 +460,8 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
       null,
       null,
       null,
-      ${listStatus === "inactive" ? "review_required" : listStatus},
-      ${listStatus !== "inactive"},
+      ${listStatus},
+      ${listStatus === "active"},
       'admin_dashboard',
       ${sql.json({
         createdBy: input.actor ?? "admin_dashboard",

@@ -86,35 +86,19 @@ export function supplementStatusLabel(
   labels: AdminContent,
   status: SupplementListStatus
 ) {
-  if (status === "whitelisted") {
-    return labels.supplements.whitelisted;
+  if (status === "active") {
+    return labels.supplements.active;
   }
 
-  if (status === "blacklisted") {
-    return labels.supplements.blacklisted;
-  }
-
-  if (status === "inactive") {
-    return labels.supplements.inactive;
-  }
-
-  return labels.supplements.reviewRequired;
+  return labels.supplements.blocked;
 }
 
 export function supplementStatusClass(status: SupplementListStatus) {
-  if (status === "whitelisted") {
+  if (status === "active") {
     return "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]";
   }
 
-  if (status === "blacklisted") {
-    return "bg-red-50 text-red-700 ring-red-100";
-  }
-
-  if (status === "inactive") {
-    return "bg-gray-50 text-gray-700 ring-gray-200";
-  }
-
-  return "bg-amber-50 text-amber-800 ring-amber-200";
+  return "bg-gray-50 text-gray-700 ring-gray-200";
 }
 
 export function supplementSafetyFlagLabel(
@@ -302,8 +286,12 @@ export function listStatusSummary<
 
       if (row.listStatus === "whitelisted") {
         counts.whitelisted += 1;
+      } else if (row.listStatus === "active") {
+        counts.active += 1;
       } else if (row.listStatus === "blacklisted") {
         counts.blacklisted += 1;
+      } else if (row.listStatus === "blocked") {
+        counts.blocked += 1;
       } else if (row.listStatus === "inactive") {
         counts.inactive += 1;
       } else {
@@ -313,7 +301,9 @@ export function listStatusSummary<
       return counts;
     },
     {
+      active: 0,
       blacklisted: 0,
+      blocked: 0,
       inactive: 0,
       reviewRequired: 0,
       total: 0,

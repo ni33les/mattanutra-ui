@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import {
-  isProductAvailabilityStatus,
   isProductAudience,
   isProductLabelStatus,
-  isProductListStatus,
-  updateAdminProduct,
-  type ProductAffiliateStatus
+  isProductStatus,
+  updateAdminProduct
 } from "@/lib/admin-products";
 import type {
   ProductAudience,
@@ -37,16 +35,6 @@ function normalizedKey(value: unknown) {
   return typeof value === "string"
     ? value.trim().toLowerCase().replaceAll("-", "_")
     : "";
-}
-
-function parseAffiliateStatus(value: unknown): ProductAffiliateStatus | undefined {
-  const normalized = normalizedKey(value);
-
-  return normalized === "active" ||
-    normalized === "flagged_stale" ||
-    normalized === "none"
-    ? normalized
-    : undefined;
 }
 
 function parseOptionalNumber(value: unknown) {
@@ -145,10 +133,8 @@ export async function PATCH(
     );
   }
 
-  const listStatus = normalizedKey(body.listStatus);
+  const status = normalizedKey(body.status);
   const labelStatus = normalizedKey(body.labelStatus);
-  const availabilityStatus = normalizedKey(body.availabilityStatus);
-  const priceAmount = parseOptionalNumber(body.priceAmount);
   const productKind = parseProductKind(body.productKind);
   const productAudience = parseProductAudience(body.productAudience);
   const title = body.title === undefined ? undefined : textOrNull(body.title, 500);
@@ -159,13 +145,10 @@ export async function PATCH(
   if (
     (body.title !== undefined && !title) ||
     (body.productUrl !== undefined && !productUrl) ||
-    (body.listStatus !== undefined && !isProductListStatus(listStatus)) ||
+    (body.status !== undefined && !isProductStatus(status)) ||
     (body.labelStatus !== undefined && !isProductLabelStatus(labelStatus)) ||
-    (body.availabilityStatus !== undefined &&
-      !isProductAvailabilityStatus(availabilityStatus)) ||
     (body.productKind !== undefined && !productKind) ||
-    (body.productAudience !== undefined && !productAudience) ||
-    (priceAmount === undefined && body.priceAmount !== undefined)
+    (body.productAudience !== undefined && !productAudience)
   ) {
     return NextResponse.json(
       { message: "Invalid product governance payload" },
@@ -182,10 +165,6 @@ export async function PATCH(
     const row = await updateAdminProduct({
       actor: "admin_dashboard",
       adminNotes: textOrNull(body.adminNotes),
-      affiliateStatus: parseAffiliateStatus(body.affiliateStatus),
-      availabilityStatus: isProductAvailabilityStatus(availabilityStatus)
-        ? availabilityStatus
-        : undefined,
       brandName: body.brandName === undefined
         ? undefined
         : textOrNull(body.brandName, 200),
@@ -207,8 +186,7 @@ export async function PATCH(
         ? undefined
         : textOrNull(body.imageUrl, 2000),
       labelStatus: isProductLabelStatus(labelStatus) ? labelStatus : undefined,
-      listStatus: isProductListStatus(listStatus) ? listStatus : undefined,
-      priceAmount,
+      status: isProductStatus(status) ? status : undefined,
       productAudience,
       productKind,
       productUrl,
@@ -226,15 +204,18 @@ export async function PATCH(
       }
     );
   } catch (error) {
-    console.error("Unable to update marketplace product", error);
+    console.error("Unable to update product", error);
+    const message =
+      error instanceof Error ? error.message : "Unable to update product";
+    const blocked = message.startsWith("Product validation blocks approval:");
 
     return NextResponse.json(
-      { message: "Unable to update marketplace product" },
+      { message },
       {
         headers: {
           "Cache-Control": "no-store"
         },
-        status: 500
+        status: blocked ? 400 : 500
       }
     );
   }

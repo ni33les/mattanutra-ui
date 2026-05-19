@@ -221,11 +221,21 @@ export function emptyAdminReviewQueueData(): AdminReviewQueueData {
 }
 
 function reviewGroupLabel(label: string | null, payload: Record<string, unknown>) {
+  const reviewKind = textOrNull(payload.reviewKind);
+
   if (
     label === "Review product imports" ||
-    textOrNull(payload.reviewKind) === "product_import"
+    reviewKind === "product_import"
   ) {
     return "Review Product";
+  }
+
+  if (reviewKind === "unknown_supplement") {
+    return "Review supplement";
+  }
+
+  if (reviewKind === "unknown_food") {
+    return "Review food";
   }
 
   return label;
@@ -234,9 +244,10 @@ function reviewGroupLabel(label: string | null, payload: Record<string, unknown>
 function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
   const payload = row.payload ?? {};
   const aiSuggestion = row.ai_suggestion ?? {};
-  const itemType = textOrNull(payload.itemType) === "product"
+  const reviewKind = textOrNull(payload.reviewKind) ?? "review_required";
+  const itemType = reviewKind === "product_import" || textOrNull(payload.itemType) === "product"
     ? "product"
-    : row.item_type === "food"
+    : reviewKind === "unknown_food" || row.item_type === "food"
       ? "food"
       : "supplement";
   const clientDoseAmount =
@@ -274,7 +285,7 @@ function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
     queuedAt: new Date(row.queued_at).toISOString(),
     requiredFields: textArray(payload.requiredFields),
     reviewId: row.review_id,
-    reviewKind: textOrNull(payload.reviewKind) ?? "review_required",
+    reviewKind,
     status: row.status,
     supplementName:
       textOrNull(row.item_name) ??
@@ -912,6 +923,7 @@ export async function resolveAdminReviewTask(
   }
 
   let completedTaskIds: string[] = [];
+  let affectedPlanIds: string[] = [];
 
   {
     const db = sql;
@@ -1003,7 +1015,7 @@ export async function resolveAdminReviewTask(
           'recommended_add',
           null,
           ${input.listStatus},
-          ${input.listStatus !== "inactive"},
+          ${input.listStatus === "active"},
           'admin_review_queue',
           ${db.json({
             normalizedSupplementName,
@@ -1070,6 +1082,23 @@ export async function resolveAdminReviewTask(
       )
     `;
     completedTaskIds = completedTasks.map((row) => row.id);
+    const reviewPlanRows = await db<Array<{ plan_id: string | null }>>`
+      select distinct safety_reviews.plan_id::text as plan_id
+      from public.safety_reviews
+      where safety_reviews.status in ('open', 'in_review', 'escalated')
+        and (
+          lower(safety_reviews.supplement_name) = lower(${supplementName})
+          or trim(both '_' from regexp_replace(lower(coalesce(safety_reviews.supplement_name, '')), '[^a-z0-9]+', '_', 'g')) = ${normalizedSupplementName}
+        )
+    `;
+    affectedPlanIds = [
+      ...new Set(
+        [
+          ...completedTasks.map((row) => row.plan_id),
+          ...reviewPlanRows.map((row) => row.plan_id)
+        ].filter((planId): planId is string => Boolean(planId))
+      )
+    ];
     const resolutionLabel = associatedSupplementName
       ? `Associated with ${associatedSupplementName}.`
       : `Resolved as ${input.listStatus}.`;
@@ -1143,6 +1172,15 @@ export async function resolveAdminReviewTask(
       )
     `;
   }
+
+  await Promise.all(
+    affectedPlanIds.map((planId) =>
+      queueProductMatchAfterPlanReview({
+        parentTaskId: input.id,
+        planId
+      })
+    )
+  );
 
   return {
     removedTaskIds: completedTaskIds.length > 0 ? completedTaskIds : [input.id]

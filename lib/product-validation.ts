@@ -10,9 +10,9 @@ import {
   productFactLooksLikeConcentration
 } from "@/lib/product-recommendations";
 
-export type ProductQualityStatus = "failed" | "needs_review" | "pass";
+export type ValidationStatus = "failed" | "needs_review" | "pass";
 
-export type ProductQualityReason =
+export type ValidationReason =
   | "concentration_only"
   | "dirty_name"
   | "missing_image"
@@ -22,7 +22,7 @@ export type ProductQualityReason =
   | "source_conflict"
   | "unsafe_dose";
 
-export type ProductQualityFact = Readonly<{
+export type ValidationFact = Readonly<{
   amount?: number | null;
   confidence?: string | null;
   foodId?: string | null;
@@ -39,19 +39,19 @@ export type ProductQualityFact = Readonly<{
   unit?: string | null;
 }>;
 
-export type ProductQualityInput = Readonly<{
-  facts: readonly ProductQualityFact[];
+export type ValidationInput = Readonly<{
+  facts: readonly ValidationFact[];
   imageUrl?: string | null;
   labelStatus?: string | null;
   productUrl?: string | null;
   sourceUrl?: string | null;
 }>;
 
-export type ProductQualityResult = Readonly<{
+export type ValidationResult = Readonly<{
   checkedAt: string;
   matchableFactCount: number;
-  reasons: ProductQualityReason[];
-  status: ProductQualityStatus;
+  reasons: ValidationReason[];
+  status: ValidationStatus;
   summary: string;
 }>;
 
@@ -94,19 +94,19 @@ function hasUsableText(value: string | null | undefined) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function hasCanonicalMatch(fact: ProductQualityFact) {
+function hasCanonicalMatch(fact: ValidationFact) {
   return Boolean(fact.supplementId || fact.foodId || fact.nutrientId);
 }
 
-function hasDose(fact: ProductQualityFact) {
+function hasDose(fact: ValidationFact) {
   return numberOrNull(fact.amount) !== null && hasUsableText(fact.unit);
 }
 
-function factName(fact: ProductQualityFact) {
+function factName(fact: ValidationFact) {
   return String(fact.name ?? fact.normalizedName ?? "");
 }
 
-export function productFactLooksDirtyForMatching(fact: ProductQualityFact) {
+export function productFactLooksDirtyForMatching(fact: ValidationFact) {
   const rawName = factName(fact);
   const normalized = normalizeProductFactKey(rawName);
   const sourceText = String(fact.sourceText ?? "");
@@ -135,8 +135,8 @@ export function productFactLooksDirtyForMatching(fact: ProductQualityFact) {
     tokens.length > 1;
 }
 
-function unsafeDose(fact: ProductQualityFact) {
-  if (fact.supplementStatus === "blacklisted") {
+function unsafeDose(fact: ValidationFact) {
+  if (fact.supplementStatus === "blocked") {
     return true;
   }
 
@@ -161,7 +161,7 @@ function unsafeDose(fact: ProductQualityFact) {
   ) === true;
 }
 
-function matchableFact(fact: ProductQualityFact) {
+function matchableFact(fact: ValidationFact) {
   if (!hasCanonicalMatch(fact) || !hasDose(fact)) {
     return false;
   }
@@ -185,9 +185,9 @@ function matchableFact(fact: ProductQualityFact) {
     ) !== null;
 }
 
-function qualitySummary(
-  status: ProductQualityStatus,
-  reasons: readonly ProductQualityReason[],
+function validationSummary(
+  status: ValidationStatus,
+  reasons: readonly ValidationReason[],
   matchableFactCount: number
 ) {
   if (status === "pass") {
@@ -217,8 +217,8 @@ function qualitySummary(
   return "Product data needs review before matching.";
 }
 
-export function validateProductQuality(input: ProductQualityInput): ProductQualityResult {
-  const reasons = new Set<ProductQualityReason>();
+export function validateProduct(input: ValidationInput): ValidationResult {
+  const reasons = new Set<ValidationReason>();
   const facts = input.facts ?? [];
 
   if (!hasUsableText(input.imageUrl)) {
@@ -275,7 +275,7 @@ export function validateProductQuality(input: ProductQualityInput): ProductQuali
   const hardFailed =
     reasonList.includes("unsafe_dose") ||
     (reasonList.includes("no_dosed_facts") && facts.length < 1);
-  const status: ProductQualityStatus =
+  const status: ValidationStatus =
     reasonList.length < 1 && matchableFactCount > 0
       ? "pass"
       : hardFailed
@@ -287,12 +287,12 @@ export function validateProductQuality(input: ProductQualityInput): ProductQuali
     matchableFactCount,
     reasons: reasonList,
     status,
-    summary: qualitySummary(status, reasonList, matchableFactCount)
+    summary: validationSummary(status, reasonList, matchableFactCount)
   };
 }
 
-export function productQualityBlocksMatching(
-  quality: ProductQualityResult | null | undefined
+export function validationBlocksMatching(
+  validation: ValidationResult | null | undefined
 ) {
-  return Boolean(quality && quality.status !== "pass");
+  return Boolean(validation && validation.status !== "pass");
 }

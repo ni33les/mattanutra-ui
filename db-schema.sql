@@ -43,13 +43,16 @@ drop table if exists
   public.plan_communication_identities,
   public.product_admin_audit,
   public.product_affiliate_links,
+  public.product_offers,
   public.product_brands,
   public.product_facts,
+  public.product_import_runs,
   public.product_imports,
+  public.marketplace_products,
   public.product_recommendation_items,
   public.product_recommendation_runs,
   public.product_versions,
-  public.marketplace_products,
+  public.products,
   public.rays,
   public.recommendations,
   public.nutrients,
@@ -3104,7 +3107,7 @@ create table public.supplements (
   ingredient_type text null,
   primary_use_case text null,
   notes text null,
-  list_status text not null default 'review_required',
+  list_status text not null default 'active',
   is_active boolean not null default true,
   source text null,
   source_payload jsonb not null default '{}'::jsonb,
@@ -3121,7 +3124,7 @@ alter table public.supplements
   add column if not exists ingredient_type text null,
   add column if not exists primary_use_case text null,
   add column if not exists notes text null,
-  add column if not exists list_status text default 'review_required',
+  add column if not exists list_status text default 'active',
   add column if not exists is_active boolean default true,
   add column if not exists source text null,
   add column if not exists source_payload jsonb default '{}'::jsonb,
@@ -3146,12 +3149,12 @@ set
     else 'core'
   end,
   list_status = case
-    when coalesce(is_active, true) = false then 'inactive'
-    when list_status in ('whitelisted', 'review_required', 'blacklisted', 'inactive') then list_status
-    else 'review_required'
+    when coalesce(is_active, true) = false then 'blocked'
+    when list_status in ('blocked', 'blacklisted', 'inactive') then 'blocked'
+    else 'active'
   end,
   is_active = case
-    when coalesce(is_active, true) = false or list_status = 'inactive' then false
+    when coalesce(is_active, true) = false or list_status = 'blocked' then false
     else true
   end,
   source_payload = coalesce(source_payload, '{}'::jsonb),
@@ -3163,7 +3166,7 @@ where name is null
   or source_status is null
   or source_status not in ('core', 'recommended_add')
   or list_status is null
-  or list_status not in ('whitelisted', 'review_required', 'blacklisted', 'inactive')
+  or list_status not in ('active', 'blocked')
   or is_active is null
   or source_payload is null
   or created_at is null
@@ -3171,17 +3174,17 @@ where name is null
 
 update public.supplements
 set
-  list_status = 'inactive',
+  list_status = 'blocked',
   is_active = false,
   updated_at = now()
 where coalesce(is_active, true) = false
-  and list_status <> 'inactive';
+  and list_status <> 'blocked';
 
 update public.supplements
 set
   is_active = false,
   updated_at = now()
-where list_status = 'inactive'
+where list_status = 'blocked'
   and coalesce(is_active, true) = true;
 
 alter table public.supplements
@@ -3190,7 +3193,7 @@ alter table public.supplements
   alter column category set not null,
   alter column source_status set default 'core',
   alter column source_status set not null,
-  alter column list_status set default 'review_required',
+  alter column list_status set default 'active',
   alter column list_status set not null,
   alter column is_active set default true,
   alter column is_active set not null,
@@ -3209,7 +3212,7 @@ begin
 
   alter table public.supplements
     add constraint supplements_list_status_check
-    check (list_status in ('whitelisted', 'review_required', 'blacklisted', 'inactive'));
+    check (list_status in ('active', 'blocked'));
 
   if not exists (
     select 1
@@ -3527,12 +3530,10 @@ create table public.product_brands (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   normalized_name text not null unique,
-  list_status text not null default 'unknown' check (list_status in (
-    'unknown',
-    'whitelisted',
-    'review_required',
-    'blacklisted',
-    'inactive'
+  status text not null default 'pending_review' check (status in (
+    'approved',
+    'ignored',
+    'pending_review'
   )),
   country_code text not null default 'TH',
   official_url text null,
@@ -3557,7 +3558,7 @@ alter table public.product_brands
 insert into public.product_brands (
   name,
   normalized_name,
-  list_status,
+  status,
   country_code,
   created_at,
   updated_at
@@ -3565,7 +3566,7 @@ insert into public.product_brands (
 select
   seed.name,
   seed.normalized_name,
-  'whitelisted',
+  'approved',
   'TH',
   now(),
   now()
@@ -3580,18 +3581,18 @@ from (
     ('Nature Made', 'nature_made')
 ) as seed(name, normalized_name)
 on conflict (normalized_name) do update set
-  list_status = case
-    when public.product_brands.list_status = 'blacklisted' then public.product_brands.list_status
-    else 'whitelisted'
+  status = case
+    when public.product_brands.status = 'ignored' then public.product_brands.status
+    else 'approved'
   end,
   country_code = coalesce(public.product_brands.country_code, 'TH'),
   updated_at = now();
 
-create table public.marketplace_products (
+create table public.products (
   id uuid primary key default gen_random_uuid(),
   platform text not null check (platform in ('lazada', 'manual', 'shopee')),
   region text not null default 'TH',
-  marketplace_product_id text null,
+  external_product_id text null,
   title text not null,
   normalized_title text not null,
   brand_id uuid null references public.product_brands(id) on delete set null,
@@ -3621,12 +3622,10 @@ create table public.marketplace_products (
     'female',
     'male'
   )),
-  list_status text not null default 'unknown' check (list_status in (
-    'unknown',
-    'whitelisted',
-    'review_required',
-    'blacklisted',
-    'inactive'
+  status text not null default 'pending_review' check (status in (
+    'approved',
+    'ignored',
+    'pending_review'
   )),
   label_status text not null default 'missing' check (label_status in (
     'failed',
@@ -3653,20 +3652,20 @@ create table public.marketplace_products (
   product_data_expires_at timestamptz null,
   source text not null default 'admin',
   admin_notes text null,
-  quality_status text not null default 'needs_review' check (quality_status in (
+  validation_status text not null default 'needs_review' check (validation_status in (
     'failed',
     'needs_review',
     'pass'
   )),
-  quality_reasons text[] not null default '{}',
-  quality_summary text null,
-  quality_checked_at timestamptz null,
+  validation_reasons text[] not null default '{}',
+  validation_summary text null,
+  validation_checked_at timestamptz null,
   current_version integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
-alter table public.marketplace_products
+alter table public.products
   add column if not exists description text null,
   add column if not exists title_en text null,
   add column if not exists title_th text null,
@@ -3678,13 +3677,13 @@ alter table public.marketplace_products
   add column if not exists source_snapshot jsonb default '{}'::jsonb,
   add column if not exists product_kind text default 'supplement',
   add column if not exists product_audience text default 'both',
-  add column if not exists quality_status text default 'needs_review',
-  add column if not exists quality_reasons text[] default '{}',
-  add column if not exists quality_summary text null,
-  add column if not exists quality_checked_at timestamptz null,
+  add column if not exists validation_status text default 'needs_review',
+  add column if not exists validation_reasons text[] default '{}',
+  add column if not exists validation_summary text null,
+  add column if not exists validation_checked_at timestamptz null,
   add column if not exists current_version integer default 0;
 
-update public.marketplace_products
+update public.products
 set
   source_snapshot = coalesce(source_snapshot, '{}'::jsonb),
   current_version = coalesce(current_version, 0),
@@ -3696,79 +3695,79 @@ set
     when product_audience in ('both', 'female', 'male') then product_audience
     else 'both'
   end,
-  quality_status = case
-    when quality_status in ('failed', 'needs_review', 'pass') then quality_status
+  validation_status = case
+    when validation_status in ('failed', 'needs_review', 'pass') then validation_status
     else 'needs_review'
   end,
-  quality_reasons = coalesce(quality_reasons, '{}')
+  validation_reasons = coalesce(validation_reasons, '{}')
 where source_snapshot is null
   or current_version is null
   or product_kind is null
   or product_kind not in ('food', 'multi', 'other', 'supplement')
   or product_audience is null
   or product_audience not in ('both', 'female', 'male')
-  or quality_status is null
-  or quality_status not in ('failed', 'needs_review', 'pass')
-  or quality_reasons is null;
+  or validation_status is null
+  or validation_status not in ('failed', 'needs_review', 'pass')
+  or validation_reasons is null;
 
 do $$
 begin
-  alter table public.marketplace_products
-    drop constraint if exists marketplace_products_product_kind_check;
+  alter table public.products
+    drop constraint if exists products_product_kind_check;
 
-  alter table public.marketplace_products
-    add constraint marketplace_products_product_kind_check
+  alter table public.products
+    add constraint products_product_kind_check
     check (product_kind in ('food', 'multi', 'other', 'supplement'));
 
-  alter table public.marketplace_products
-    drop constraint if exists marketplace_products_product_audience_check;
+  alter table public.products
+    drop constraint if exists products_product_audience_check;
 
-  alter table public.marketplace_products
-    add constraint marketplace_products_product_audience_check
+  alter table public.products
+    add constraint products_product_audience_check
     check (product_audience in ('both', 'female', 'male'));
 
-  alter table public.marketplace_products
-    drop constraint if exists marketplace_products_quality_status_check;
+  alter table public.products
+    drop constraint if exists products_validation_status_check;
 
-  alter table public.marketplace_products
-    add constraint marketplace_products_quality_status_check
-    check (quality_status in ('failed', 'needs_review', 'pass'));
+  alter table public.products
+    add constraint products_validation_status_check
+    check (validation_status in ('failed', 'needs_review', 'pass'));
 end $$;
 
-alter table public.marketplace_products
+alter table public.products
   alter column source_snapshot set default '{}'::jsonb,
   alter column source_snapshot set not null,
   alter column product_kind set default 'supplement',
   alter column product_kind set not null,
   alter column product_audience set default 'both',
   alter column product_audience set not null,
-  alter column quality_status set default 'needs_review',
-  alter column quality_status set not null,
-  alter column quality_reasons set default '{}',
-  alter column quality_reasons set not null,
+  alter column validation_status set default 'needs_review',
+  alter column validation_status set not null,
+  alter column validation_reasons set default '{}',
+  alter column validation_reasons set not null,
   alter column current_version set default 0,
   alter column current_version set not null;
 
-create unique index marketplace_products_platform_identifier_idx
-  on public.marketplace_products (platform, region, marketplace_product_id)
-  where marketplace_product_id is not null;
+create unique index products_platform_identifier_idx
+  on public.products (platform, region, external_product_id)
+  where external_product_id is not null;
 
-create index marketplace_products_status_idx
-  on public.marketplace_products (list_status, availability_status, label_status, updated_at desc);
+create index products_status_idx
+  on public.products (status, availability_status, label_status, updated_at desc);
 
-create index marketplace_products_brand_idx
-  on public.marketplace_products (brand_id, list_status, title);
+create index products_brand_idx
+  on public.products (brand_id, status, title);
 
-create index marketplace_products_title_search_idx
-  on public.marketplace_products (normalized_title);
+create index products_title_search_idx
+  on public.products (normalized_title);
 
-create index marketplace_products_fda_idx
-  on public.marketplace_products (fda_approval_number)
+create index products_fda_idx
+  on public.products (fda_approval_number)
   where fda_approval_number is not null;
 
 create table public.product_facts (
   id uuid primary key default gen_random_uuid(),
-  product_id uuid not null references public.marketplace_products(id) on delete cascade,
+  product_id uuid not null references public.products(id) on delete cascade,
   item_type text not null check (item_type in ('food', 'nutrient', 'supplement')),
   supplement_id uuid null references public.supplements(id) on delete set null,
   food_id uuid null references public.foods(id) on delete set null,
@@ -3806,7 +3805,7 @@ create index product_facts_nutrient_idx
   where nutrient_id is not null;
 
 create table public.product_versions (
-  product_id uuid not null references public.marketplace_products(id) on delete cascade,
+  product_id uuid not null references public.products(id) on delete cascade,
   version integer not null,
   actor text null,
   change_note text null,
@@ -3824,16 +3823,16 @@ create table public.product_versions (
   fda_approval_number text null,
   product_kind text not null default 'supplement',
   product_audience text not null default 'both',
-  list_status text not null default 'unknown',
+  status text not null default 'pending_review',
   label_status text not null default 'missing',
   availability_status text not null default 'unknown',
   affiliate_status text not null default 'none',
   price_amount numeric null,
   currency text not null default 'THB',
-  quality_status text not null default 'needs_review',
-  quality_reasons text[] not null default '{}',
-  quality_summary text null,
-  quality_checked_at timestamptz null,
+  validation_status text not null default 'needs_review',
+  validation_reasons text[] not null default '{}',
+  validation_summary text null,
+  validation_checked_at timestamptz null,
   facts_snapshot jsonb not null default '[]'::jsonb,
   source_snapshot jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
@@ -3857,16 +3856,16 @@ alter table public.product_versions
   add column if not exists fda_approval_number text null,
   add column if not exists product_kind text default 'supplement',
   add column if not exists product_audience text default 'both',
-  add column if not exists list_status text default 'unknown',
+  add column if not exists status text default 'pending_review',
   add column if not exists label_status text default 'missing',
   add column if not exists availability_status text default 'unknown',
   add column if not exists affiliate_status text default 'none',
   add column if not exists price_amount numeric null,
   add column if not exists currency text default 'THB',
-  add column if not exists quality_status text default 'needs_review',
-  add column if not exists quality_reasons text[] default '{}',
-  add column if not exists quality_summary text null,
-  add column if not exists quality_checked_at timestamptz null,
+  add column if not exists validation_status text default 'needs_review',
+  add column if not exists validation_reasons text[] default '{}',
+  add column if not exists validation_summary text null,
+  add column if not exists validation_checked_at timestamptz null,
   add column if not exists facts_snapshot jsonb default '[]'::jsonb,
   add column if not exists source_snapshot jsonb default '{}'::jsonb,
   add column if not exists created_at timestamptz default now();
@@ -3884,9 +3883,11 @@ set
     when product_audience in ('both', 'female', 'male') then product_audience
     else 'both'
   end,
-  list_status = case
-    when list_status in ('unknown', 'whitelisted', 'review_required', 'blacklisted', 'inactive') then list_status
-    else 'unknown'
+  status = case
+    when status in ('approved', 'pending_review', 'ignored') then status
+    when status = 'whitelisted' then 'approved'
+    when status in ('blacklisted', 'inactive') then 'ignored'
+    else 'pending_review'
   end,
   label_status = case
     when label_status in ('failed', 'missing', 'parsed', 'stale') then label_status
@@ -3901,11 +3902,11 @@ set
     else 'none'
   end,
   currency = coalesce(nullif(currency, ''), 'THB'),
-  quality_status = case
-    when quality_status in ('failed', 'needs_review', 'pass') then quality_status
+  validation_status = case
+    when validation_status in ('failed', 'needs_review', 'pass') then validation_status
     else 'needs_review'
   end,
-  quality_reasons = coalesce(quality_reasons, '{}'),
+  validation_reasons = coalesce(validation_reasons, '{}'),
   facts_snapshot = coalesce(facts_snapshot, '[]'::jsonb),
   source_snapshot = coalesce(source_snapshot, '{}'::jsonb),
   created_at = coalesce(created_at, now())
@@ -3916,8 +3917,8 @@ where title is null
   or product_kind not in ('food', 'multi', 'other', 'supplement')
   or product_audience is null
   or product_audience not in ('both', 'female', 'male')
-  or list_status is null
-  or list_status not in ('unknown', 'whitelisted', 'review_required', 'blacklisted', 'inactive')
+  or status is null
+  or status not in ('approved', 'pending_review', 'ignored')
   or label_status is null
   or label_status not in ('failed', 'missing', 'parsed', 'stale')
   or availability_status is null
@@ -3926,9 +3927,9 @@ where title is null
   or affiliate_status not in ('active', 'flagged_stale', 'none')
   or currency is null
   or currency = ''
-  or quality_status is null
-  or quality_status not in ('failed', 'needs_review', 'pass')
-  or quality_reasons is null
+  or validation_status is null
+  or validation_status not in ('failed', 'needs_review', 'pass')
+  or validation_reasons is null
   or facts_snapshot is null
   or source_snapshot is null
   or created_at is null;
@@ -3941,8 +3942,8 @@ alter table public.product_versions
   alter column product_kind set not null,
   alter column product_audience set default 'both',
   alter column product_audience set not null,
-  alter column list_status set default 'unknown',
-  alter column list_status set not null,
+  alter column status set default 'pending_review',
+  alter column status set not null,
   alter column label_status set default 'missing',
   alter column label_status set not null,
   alter column availability_status set default 'unknown',
@@ -3951,10 +3952,10 @@ alter table public.product_versions
   alter column affiliate_status set not null,
   alter column currency set default 'THB',
   alter column currency set not null,
-  alter column quality_status set default 'needs_review',
-  alter column quality_status set not null,
-  alter column quality_reasons set default '{}',
-  alter column quality_reasons set not null,
+  alter column validation_status set default 'needs_review',
+  alter column validation_status set not null,
+  alter column validation_reasons set default '{}',
+  alter column validation_reasons set not null,
   alter column facts_snapshot set default '[]'::jsonb,
   alter column facts_snapshot set not null,
   alter column source_snapshot set default '{}'::jsonb,
@@ -3965,9 +3966,9 @@ alter table public.product_versions
 create index product_versions_latest_idx
   on public.product_versions (product_id, version desc);
 
-create table public.product_affiliate_links (
+create table public.product_offers (
   id uuid primary key default gen_random_uuid(),
-  product_id uuid not null references public.marketplace_products(id) on delete cascade,
+  product_id uuid not null references public.products(id) on delete cascade,
   network text null,
   url text not null,
   link_type text not null default 'affiliate' check (link_type in (
@@ -3998,7 +3999,7 @@ create table public.product_affiliate_links (
   updated_at timestamptz not null default now()
 );
 
-alter table public.product_affiliate_links
+alter table public.product_offers
   add column if not exists link_type text default 'affiliate',
   add column if not exists platform text null,
   add column if not exists commission_rate numeric null,
@@ -4013,18 +4014,18 @@ begin
     select 1
     from information_schema.columns
     where table_schema = 'public'
-      and table_name = 'product_affiliate_links'
+      and table_name = 'product_offers'
       and column_name = 'priority'
   ) then
-    update public.product_affiliate_links
+    update public.product_offers
     set admin_priority = coalesce(admin_priority, priority);
 
-    alter table public.product_affiliate_links
+    alter table public.product_offers
       drop column priority;
   end if;
 end $$;
 
-update public.product_affiliate_links
+update public.product_offers
 set
   link_type = case when link_type in ('affiliate', 'direct') then link_type else 'affiliate' end,
   admin_priority = coalesce(admin_priority, 0),
@@ -4043,22 +4044,22 @@ where link_type is null
 
 do $$
 begin
-  alter table public.product_affiliate_links
-    drop constraint if exists product_affiliate_links_link_type_check;
+  alter table public.product_offers
+    drop constraint if exists product_offers_link_type_check;
 
-  alter table public.product_affiliate_links
-    add constraint product_affiliate_links_link_type_check
+  alter table public.product_offers
+    add constraint product_offers_link_type_check
     check (link_type in ('affiliate', 'direct'));
 
-  alter table public.product_affiliate_links
-    drop constraint if exists product_affiliate_links_availability_status_check;
+  alter table public.product_offers
+    drop constraint if exists product_offers_availability_status_check;
 
-  alter table public.product_affiliate_links
-    add constraint product_affiliate_links_availability_status_check
+  alter table public.product_offers
+    add constraint product_offers_availability_status_check
     check (availability_status in ('in_stock', 'out_of_stock', 'unavailable', 'unknown'));
 end $$;
 
-alter table public.product_affiliate_links
+alter table public.product_offers
   alter column link_type set default 'affiliate',
   alter column link_type set not null,
   alter column admin_priority set default 0,
@@ -4068,11 +4069,11 @@ alter table public.product_affiliate_links
   alter column availability_status set default 'unknown',
   alter column availability_status set not null;
 
-create index product_affiliate_links_product_idx
-  on public.product_affiliate_links (product_id, status, updated_at desc);
+create index product_offers_product_idx
+  on public.product_offers (product_id, status, updated_at desc);
 
-create index product_affiliate_links_priority_idx
-  on public.product_affiliate_links (
+create index product_offers_priority_idx
+  on public.product_offers (
     product_id,
     status,
     link_type,
@@ -4081,11 +4082,40 @@ create index product_affiliate_links_priority_idx
     updated_at desc
   );
 
-create unique index product_affiliate_links_product_url_idx
-  on public.product_affiliate_links (product_id, url);
+create unique index product_offers_product_url_idx
+  on public.product_offers (product_id, url);
+
+create table public.product_import_runs (
+  id uuid primary key default gen_random_uuid(),
+  brand_name text not null,
+  normalized_brand_name text not null,
+  source text not null default 'manufacturer_scrape',
+  status text not null default 'running' check (status in (
+    'completed',
+    'failed',
+    'running'
+  )),
+  requested_auto_approve boolean not null default false,
+  total_products integer not null default 0,
+  staged_count integer not null default 0,
+  approved_count integer not null default 0,
+  failed_count integer not null default 0,
+  notes text null,
+  started_at timestamptz not null default now(),
+  completed_at timestamptz null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index product_import_runs_brand_idx
+  on public.product_import_runs (normalized_brand_name, started_at desc);
+
+create index product_import_runs_status_idx
+  on public.product_import_runs (status, started_at desc);
 
 create table public.product_imports (
   id uuid primary key default gen_random_uuid(),
+  import_run_id uuid null references public.product_import_runs(id) on delete set null,
   brand_name text not null,
   normalized_brand_name text not null,
   product_title text not null,
@@ -4103,16 +4133,14 @@ create table public.product_imports (
   raw_snapshot jsonb not null default '{}'::jsonb,
   duplicate_product_ids uuid[] not null default '{}',
   parse_confidence text not null default 'moderate' check (parse_confidence in ('high', 'low', 'moderate')),
-  status text not null default 'needs_review' check (status in (
+  status text not null default 'pending_review' check (status in (
     'approved',
-    'blacklisted',
+    'duplicate',
     'ignored',
-    'merged',
-    'needs_more_data',
-    'needs_review'
+    'pending_review'
   )),
   review_task_id uuid null references public.tasks(id) on delete set null,
-  product_id uuid null references public.marketplace_products(id) on delete set null,
+  product_id uuid null references public.products(id) on delete set null,
   reviewer_note text null,
   reviewed_by text null,
   reviewed_at timestamptz null,
@@ -4122,6 +4150,7 @@ create table public.product_imports (
 );
 
 alter table public.product_imports
+  add column if not exists import_run_id uuid null references public.product_import_runs(id) on delete set null,
   add column if not exists title_en text null,
   add column if not exists title_th text null,
   add column if not exists description text null,
@@ -4134,6 +4163,10 @@ create index product_imports_status_idx
 create index product_imports_review_task_idx
   on public.product_imports (review_task_id)
   where review_task_id is not null;
+
+create index product_imports_run_idx
+  on public.product_imports (import_run_id, created_at asc)
+  where import_run_id is not null;
 
 create table public.product_recommendation_runs (
   id uuid primary key default gen_random_uuid(),
@@ -4191,14 +4224,14 @@ create index product_recommendation_runs_task_idx
 create table public.product_recommendation_items (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null references public.product_recommendation_runs(id) on delete cascade,
-  product_id uuid not null references public.marketplace_products(id) on delete restrict,
+  product_id uuid not null references public.products(id) on delete restrict,
   rank integer not null,
   score numeric not null default 0,
   product_coverage_percent numeric not null default 0,
   stack_contribution_percent numeric not null default 0,
   covered_needs jsonb not null default '[]'::jsonb,
   why text null,
-  affiliate_link_id uuid null references public.product_affiliate_links(id) on delete set null,
+  offer_id uuid null references public.product_offers(id) on delete set null,
   url_used text not null,
   price_amount numeric null,
   currency text not null default 'THB',
@@ -4214,7 +4247,7 @@ create index product_recommendation_items_product_idx
 
 create table public.product_admin_audit (
   id uuid primary key default gen_random_uuid(),
-  product_id uuid null references public.marketplace_products(id) on delete set null,
+  product_id uuid null references public.products(id) on delete set null,
   brand_id uuid null references public.product_brands(id) on delete set null,
   action text not null,
   actor text null,
@@ -4282,8 +4315,11 @@ with seed as (
     seed.ingredient_type,
     seed.primary_use_case,
     seed.notes,
-    seed.list_status,
-    seed.is_active,
+    case
+      when seed.list_status = 'blacklisted' then 'blocked'
+      else 'active'
+    end,
+    seed.list_status <> 'blacklisted',
     seed.source,
     jsonb_build_object('seed', true, 'source_file', seed.source, 'source_row_id', seed.source_row_id)
   from seed
@@ -4384,7 +4420,22 @@ from (
   values
     ('58f6d2cb-9035-4a24-a726-f0786a85ba90'::uuid, 'Magnesium glycinate', 'magnesium_glycinate', 'magnesium'),
     ('d06db169-3572-4bb4-b06d-2de81f4083fc'::uuid, 'Magnesium gluconate', 'magnesium_gluconate', 'magnesium'),
-    ('3c8f6e63-9641-4a24-87c4-8fcf5e323751'::uuid, 'Magnesium glyconate', 'magnesium_glyconate', 'magnesium')
+    ('3c8f6e63-9641-4a24-87c4-8fcf5e323751'::uuid, 'Magnesium glyconate', 'magnesium_glyconate', 'magnesium'),
+    ('4a0f858c-2841-45c2-af5d-10cd3545a257'::uuid, 'Magnesium bisglycinate', 'magnesium_bisglycinate', 'magnesium'),
+    ('54bbda7b-f025-40b4-a9cd-678e1531b861'::uuid, 'Chelated magnesium', 'chelated_magnesium', 'magnesium'),
+    ('7f91a0ec-3fbe-4b4f-b8c7-749866d3a014'::uuid, 'Ashwaganda', 'ashwaganda', 'ashwagandha'),
+    ('8a331c0d-5d6b-4660-84c2-14bf482405a0'::uuid, 'Withania somnifera', 'withania_somnifera', 'ashwagandha'),
+    ('954a8a2b-c2ec-45b7-aa5b-c0fbc361cba7'::uuid, 'Ashwagandha root extract', 'ashwagandha_root_extract', 'ashwagandha'),
+    ('a9f83da4-676a-4dfd-b716-cf94b02be5c8'::uuid, 'Curacumin', 'curacumin', 'curcumin'),
+    ('b7196ffd-4ddc-48f2-8e19-0d0272a48f0e'::uuid, 'Curcuminoids', 'curcuminoids', 'curcumin'),
+    ('cf2cbb5c-f95b-4c9e-9765-88c797cdac7a'::uuid, 'Turmeric extract', 'turmeric_extract', 'curcumin'),
+    ('d2fc3e99-c056-4289-97f3-0c9e657ed923'::uuid, 'Curcuma longa', 'curcuma_longa', 'curcumin'),
+    ('e95f0216-3f2e-4185-bd6a-f9339c949a03'::uuid, 'Probiotics', 'probiotics', 'multi_strain_probiotics'),
+    ('f6f1a29f-7e8f-414d-9992-7d78ef67cd36'::uuid, 'Probiotic', 'probiotic', 'multi_strain_probiotics'),
+    ('03e91abc-5169-4389-9e43-b33a6dbfbb4a'::uuid, 'Probiotic blend', 'probiotic_blend', 'multi_strain_probiotics'),
+    ('1444c41e-fd37-43b9-9278-8c2b58852cb8'::uuid, 'L-Theanine', 'l_theanine', 'theanine'),
+    ('2e03cad3-d57f-489b-b8e3-45fe6c3dd082'::uuid, 'AlphaWave L-theanine', 'alpha_wave_l_theanine', 'theanine'),
+    ('3715ab83-d836-4444-a197-1323288c6035'::uuid, 'Glutamine', 'glutamine', 'l_glutamine')
 ) as alias_seed(id, alias, normalized_alias, supplement_normalized_name)
 join public.supplements supplements
   on supplements.normalized_name = alias_seed.supplement_normalized_name
@@ -6028,6 +6079,16 @@ begin
          public.food_serving_sizes,
          public.food_nutrient_profiles,
          public.food_admin_audit,
+         public.product_brands,
+         public.products,
+         public.product_facts,
+         public.product_versions,
+         public.product_offers,
+         public.product_import_runs,
+         public.product_imports,
+         public.product_recommendation_runs,
+         public.product_recommendation_items,
+         public.product_admin_audit,
          public.admin_alert_acknowledgements,
          public.safety_reviews,
          public.communication_identities,

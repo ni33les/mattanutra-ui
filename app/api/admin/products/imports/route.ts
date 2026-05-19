@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import {
+  getProductImportRuns,
   stageProductImport,
   type ProductImportFactInput
 } from "@/lib/admin-products";
@@ -75,6 +76,37 @@ function recordPayload(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
+}
+
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const accessToken =
+    request.headers.get("x-admin-dashboard-token") ??
+    textOrNull(url.searchParams.get("access_token"));
+
+  if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {
+    return NextResponse.json(
+      { message: "Not found" },
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        },
+        status: 404
+      }
+    );
+  }
+
+  const limit = numberOrNull(url.searchParams.get("limit")) ?? 50;
+  const data = await getProductImportRuns({ limit });
+
+  return NextResponse.json(
+    { data, generatedAt: new Date().toISOString() },
+    {
+      headers: {
+        "Cache-Control": "no-store"
+      }
+    }
+  );
 }
 
 export async function POST(request: Request) {

@@ -7,6 +7,7 @@ import {
 } from "@/lib/openclaw-api";
 import { applyTaskFailureResult } from "@/lib/task-result-applier";
 import { buildTaskWorkItem } from "@/lib/task-work-items";
+import { enqueueMissingProductRecommendationsForReadyPlans } from "@/lib/task-worker";
 import {
   failTask,
   getTaskBundle,
@@ -103,6 +104,10 @@ export async function POST(request: Request) {
           taskId: context.task.id
         })
     });
+
+    if (taskTypes.includes("generate_product_recommendations")) {
+      await enqueueMissingProductRecommendationsForReadyPlans();
+    }
 
     while (true) {
       const reserved = await reserveNextTask({

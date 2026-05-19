@@ -180,7 +180,7 @@ export type MarketplaceProductMaintenanceWorkItem = Readonly<{
   planId: string | null;
   taskId: string;
   taskType:
-    | "discover_marketplace_products"
+    | "discover_products"
     | "parse_product_label"
     | "refresh_marketplace_product";
 }>;
@@ -725,7 +725,7 @@ async function loadCanonicalSupplementOptions(
       limit 1
     ) safety on true
     where supplements.is_active = true
-      and supplements.list_status in ('whitelisted', 'review_required')
+      and supplements.list_status = 'active'
     group by
       supplements.id,
       supplements.name,
@@ -736,7 +736,7 @@ async function loadCanonicalSupplementOptions(
       safety.max_unit
     order by
       case supplements.list_status
-        when 'whitelisted' then 0
+        when 'active' then 0
         else 1
       end,
       supplements.name
@@ -951,7 +951,7 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
   }
 
   if (
-    task.taskType === "discover_marketplace_products" ||
+    task.taskType === "discover_products" ||
     task.taskType === "parse_product_label" ||
     task.taskType === "refresh_marketplace_product"
   ) {

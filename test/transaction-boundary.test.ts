@@ -332,7 +332,7 @@ describe("database transaction boundaries", () => {
     );
     assert.match(
       helper,
-      /with\s+next_product\s+as\s*\([\s\S]*update\s+public\.marketplace_products[\s\S]*current_version\s*=\s*coalesce\(current_version,\s*0\)\s*\+\s*1[\s\S]*insert\s+into\s+public\.product_versions/i,
+      /with\s+next_product\s+as\s*\([\s\S]*update\s+public\.products[\s\S]*current_version\s*=\s*coalesce\(current_version,\s*0\)\s*\+\s*1[\s\S]*insert\s+into\s+public\.product_versions/i,
       "product version writes should increment the current projection and append the version in one SQL statement"
     );
   });

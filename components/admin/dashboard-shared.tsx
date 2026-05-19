@@ -655,10 +655,8 @@ export function optionalLabel(value: string | null | undefined) {
 }
 
 export const supplementListStatuses: SupplementListStatus[] = [
-  "whitelisted",
-  "review_required",
-  "blacklisted",
-  "inactive"
+  "active",
+  "blocked"
 ];
 
 export const supplementConfidences: SupplementConfidence[] = [

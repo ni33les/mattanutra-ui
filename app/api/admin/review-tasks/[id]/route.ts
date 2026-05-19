@@ -190,12 +190,10 @@ export async function PATCH(
   if (
     action !== "approve" &&
     action !== "approve_product" &&
-    action !== "blacklist_product" &&
     action !== "disapprove" &&
     action !== "dismiss" &&
     action !== "ignore_import" &&
     action !== "merge_product" &&
-    action !== "request_more_data" &&
     action !== "resolve"
   ) {
     return NextResponse.json(
@@ -239,21 +237,15 @@ export async function PATCH(
   try {
     const result =
       action === "approve_product" ||
-      action === "blacklist_product" ||
       action === "ignore_import" ||
-      action === "merge_product" ||
-      action === "request_more_data"
+      action === "merge_product"
         ? await resolveProductImportReview({
             action:
               action === "approve_product"
                 ? "approve"
-                : action === "blacklist_product"
-                  ? "blacklist"
-                  : action === "ignore_import"
-                    ? "ignore"
-                    : action === "merge_product"
-                      ? "merge"
-                      : "needs_more_data",
+                : action === "ignore_import"
+                  ? "ignore"
+                  : "duplicate",
             actor: "admin_dashboard",
             brandName: body.brandName === undefined
               ? undefined
@@ -308,7 +300,7 @@ export async function PATCH(
             category: textOrNull(body.category),
             confidence: parseConfidence(body.confidence) ?? "low",
             id,
-            listStatus: parseListStatus(body.listStatus) ?? "review_required",
+            listStatus: parseListStatus(body.listStatus) ?? "active",
             maxAmount: amountValue(body.maxAmount),
             maxUnit: textOrNull(body.maxUnit) ?? "",
             safetyFlags: normalizeSupplementSafetyFlags(body.safetyFlags),

@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "start:platform": "node scripts/start-platform.mjs",
+    "db:reset:dev": "node --env-file-if-exists=.env.local scripts/reset-dev-db.mjs --confirm-blitz",
     "lint": "eslint .",
     "import:thai-fda-products": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/import-thai-fda-products.ts",
     "scrape:levitamins-products": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/scrape-levitaminsasia-products.ts",

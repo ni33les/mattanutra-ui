@@ -7,9 +7,9 @@ import {
   getProductRecommendationCandidates
 } from "@/lib/admin-products";
 import type {
-  MarketplaceProductSnapshot,
+  ProductSnapshot,
   MarketplaceSearchDiagnostic
-} from "@/lib/marketplace-adapters";
+} from "@/lib/product-adapters";
 import {
   analysisPayload,
   foodGuidanceAnalysisPayload,
@@ -1450,7 +1450,7 @@ function productRecommendationPayload(value: unknown): ProductRecommendationResu
   };
 }
 
-function marketplaceSnapshotPayload(value: unknown): MarketplaceProductSnapshot[] {
+function marketplaceSnapshotPayload(value: unknown): ProductSnapshot[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -1479,13 +1479,13 @@ function marketplaceSnapshotPayload(value: unknown): MarketplaceProductSnapshot[
       brandName: payloadText(record, "brandName") || null,
       currency: "THB",
       imageUrl: payloadText(record, "imageUrl") || null,
-      marketplaceProductId: payloadText(record, "marketplaceProductId") || null,
+      externalProductId: payloadText(record, "externalProductId") || null,
       platform,
       priceAmount: Number(record.priceAmount) || null,
       productUrl,
       region: "TH",
       title
-    } satisfies MarketplaceProductSnapshot];
+    } satisfies ProductSnapshot];
   });
 }
 
@@ -1544,7 +1544,7 @@ async function queueUnknownProductReviewTasks(
       businessValue: 420,
       context: {
         source: "product_recommendations",
-        taskType: "review_marketplace_product"
+        taskType: "review_product"
       },
       createdByTaskId: task.id,
       groupLabel: "Review product recommendations",
@@ -1582,7 +1582,7 @@ async function queueUnknownProductReviewTasks(
       ],
       retryPolicy: false,
       taskGroupId: task.taskGroupId,
-      taskType: "review_marketplace_product",
+      taskType: "review_product",
       title: `Review product ${item.product.title}`
     });
   }
@@ -1693,7 +1693,7 @@ async function applyProductRecommendationsResult(
         stack_contribution_percent,
         covered_needs,
         why,
-        affiliate_link_id,
+        offer_id,
         url_used,
         price_amount,
         currency,
@@ -1710,7 +1710,7 @@ async function applyProductRecommendationsResult(
         ${item.stackContributionPercent},
         ${sql.json(toJsonValue(item.coveredNeeds))}::jsonb,
         ${item.why},
-        ${item.affiliateLinkId}::uuid,
+        ${item.offerId}::uuid,
         ${item.url},
         ${item.product.priceAmount ?? null},
         ${item.product.currency || "THB"},

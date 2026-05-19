@@ -34,9 +34,7 @@ import type {
 } from "@/lib/admin-foods";
 import type {
   AdminProductRow,
-  AdminProductsData,
-  ProductAffiliateStatus,
-  ProductLabelStatus
+  AdminProductsData
 } from "@/lib/admin-products";
 import {
   doseExceedsLimit,
@@ -50,7 +48,7 @@ import {
   foodTagLabel
 } from "@/lib/food-tags";
 import type { Locale } from "@/lib/i18n";
-import { productFactLooksDirtyForMatching } from "@/lib/product-quality";
+import { productFactLooksDirtyForMatching } from "@/lib/product-validation";
 import {
   foodReviewSuggestionTimeoutMs,
   supplementDoseSuggestionTimeoutMs,
@@ -95,18 +93,6 @@ import {
   updateFoodNutrientProfileValue
 } from "@/components/admin/safety-view-helpers";
 
-const productLabelStatuses = ["parsed", "missing", "stale", "failed"] as const;
-const productAvailabilityStatuses = [
-  "in_stock",
-  "unknown",
-  "out_of_stock",
-  "unavailable"
-] as const;
-const productAffiliateStatuses = [
-  "active",
-  "flagged_stale",
-  "none"
-] as const;
 const productKinds = ["supplement", "multi", "food", "other"] as const;
 const productAudiences = ["both", "female", "male"] as const;
 const productBusinessStates = [
@@ -118,18 +104,18 @@ const productBusinessStates = [
 type ProductBusinessState = (typeof productBusinessStates)[number];
 type ProductMetricFilter =
   | "productsAffiliates"
+  | "productsApproved"
   | "productsIgnored"
   | "productsMissingFacts"
   | "productsMissingImages"
   | "productsPendingReview"
-  | "productsTotal"
-  | "productsWhitelisted";
+  | "productsTotal";
 
 function productMetricForBusinessState(
   state: ProductBusinessState | ""
 ): ProductMetricFilter {
   if (state === "approved") {
-    return "productsWhitelisted";
+    return "productsApproved";
   }
 
   if (state === "ignored") {
@@ -146,7 +132,7 @@ function productMetricForBusinessState(
 function productBusinessStateForMetric(
   metric: ProductMetricFilter
 ): ProductBusinessState | "" {
-  if (metric === "productsWhitelisted") {
+  if (metric === "productsApproved") {
     return "approved";
   }
 
@@ -215,15 +201,13 @@ function productMatchesSearch(row: AdminProductRow, search: string) {
     row.productAudience,
     row.platform,
     row.region,
-    row.listStatus,
+    row.status,
     row.labelStatus,
-    row.availabilityStatus,
-    row.affiliateStatus,
-    ...row.affiliateLinks.flatMap((link) => [
-      link.linkType,
-      link.network,
-      link.platform,
-      link.status
+    ...row.offers.flatMap((offer) => [
+      offer.linkType,
+      offer.network,
+      offer.platform,
+      offer.status
     ])
   ];
   const factFields = row.facts.flatMap((fact) => [
@@ -242,19 +226,15 @@ function productMatchesSearch(row: AdminProductRow, search: string) {
 }
 
 function productStatusLabel(status: string) {
-  if (status === "whitelisted") {
+  if (status === "approved") {
     return "Approved";
   }
 
-  if (status === "review_required") {
-    return "Review Required";
+  if (status === "pending_review") {
+    return "Pending Review";
   }
 
-  if (status === "unknown") {
-    return "Unknown";
-  }
-
-  if (status === "inactive" || status === "blacklisted") {
+  if (status === "ignored") {
     return "Ignored";
   }
 
@@ -274,21 +254,21 @@ function productStatusLabel(status: string) {
 }
 
 function productBusinessState(
-  productOrStatus: AdminProductRow | AdminProductRow["listStatus"]
+  productOrStatus: AdminProductRow | AdminProductRow["status"]
 ): ProductBusinessState {
   if (typeof productOrStatus !== "string") {
     if (productOrStatus.importReviewTaskId) {
       return "pending_review";
     }
 
-    return productBusinessState(productOrStatus.listStatus);
+    return productBusinessState(productOrStatus.status);
   }
 
-  if (productOrStatus === "whitelisted") {
+  if (productOrStatus === "approved") {
     return "approved";
   }
 
-  if (productOrStatus === "inactive" || productOrStatus === "blacklisted") {
+  if (productOrStatus === "ignored") {
     return "ignored";
   }
 
@@ -304,7 +284,7 @@ function productBusinessStateLabel(state: ProductBusinessState) {
     return "Ignored";
   }
 
-  return "Review Required";
+  return "Pending Review";
 }
 
 function productBusinessStateClass(state: ProductBusinessState) {
@@ -323,7 +303,7 @@ function productMatchesMetricFilter(
   row: AdminProductRow,
   metric: ProductMetricFilter
 ) {
-  if (metric === "productsWhitelisted") {
+  if (metric === "productsApproved") {
     return productBusinessState(row) === "approved";
   }
 
@@ -336,11 +316,11 @@ function productMatchesMetricFilter(
   }
 
   if (metric === "productsMissingFacts") {
-    return row.productQualityLabel === "Missing Facts";
+    return row.validationLabel === "Missing Facts";
   }
 
   if (metric === "productsMissingImages") {
-    return row.productQualityLabel === "Missing Image";
+    return row.validationLabel === "Missing Image";
   }
 
   if (metric === "productsAffiliates") {
@@ -396,7 +376,7 @@ function productFactIssueMessages(fact: AdminProductRow["facts"][number]) {
     issues.push("Fact name or source text needs cleanup before matching");
   }
 
-  if (fact.supplementStatus === "blacklisted") {
+  if (fact.supplementStatus === "blocked") {
     issues.push("Canonical supplement is ignored");
   }
 
@@ -462,9 +442,9 @@ export function AdminProductsView({
 
       counts.total += 1;
       counts.activeAffiliate += row.affiliateStatus === "active" ? 1 : 0;
-      counts.dirtyData += row.productQualityLabel === "Dirty Data" ? 1 : 0;
-      counts.missingFacts += row.productQualityLabel === "Missing Facts" ? 1 : 0;
-      counts.missingImage += row.productQualityLabel === "Missing Image" ? 1 : 0;
+      counts.dirtyData += row.validationLabel === "Dirty Data" ? 1 : 0;
+      counts.missingFacts += row.validationLabel === "Missing Facts" ? 1 : 0;
+      counts.missingImage += row.validationLabel === "Missing Image" ? 1 : 0;
       counts.approved += state === "approved" ? 1 : 0;
       counts.ignored += state === "ignored" ? 1 : 0;
       counts.pendingReview += state === "pending_review" ? 1 : 0;
@@ -492,7 +472,7 @@ export function AdminProductsView({
     }),
     safetyMetric({
       color: businessMetricColors.succeeded,
-      id: "productsWhitelisted",
+      id: "productsApproved",
       label: "Approved",
       locale,
       value: summary.approved
@@ -500,7 +480,7 @@ export function AdminProductsView({
     safetyMetric({
       color: businessMetricColors.pendingReviews,
       id: "productsPendingReview",
-      label: "Review Required",
+      label: "Pending Review",
       locale,
       value: summary.pendingReview
     }),
@@ -561,8 +541,6 @@ export function AdminProductsView({
       const response = await fetch(`/api/admin/products/${row.id}`, {
         body: JSON.stringify({
           accessToken,
-          affiliateStatus: row.affiliateStatus,
-          availabilityStatus: row.availabilityStatus,
           brandName: row.brandName,
           description: row.description,
           descriptionEn: row.descriptionEn,
@@ -581,8 +559,7 @@ export function AdminProductsView({
           fdaApprovalNumber: row.fdaApprovalNumber,
           imageUrl: row.imageUrl,
           labelStatus: row.labelStatus,
-          listStatus: row.listStatus,
-          priceAmount: row.priceAmount,
+          status: row.status,
           productAudience: row.productAudience,
           productKind: row.productKind,
           productUrl: row.productUrl,
@@ -743,8 +720,6 @@ export function AdminProductsView({
       };
       const fallbackRow: AdminProductRow = {
         ...row,
-        availabilityStatus:
-          action === "ignore_import" ? "unavailable" : row.availabilityStatus,
         importReviewTaskId: null,
         importStatus:
           action === "approve_product"
@@ -752,12 +727,12 @@ export function AdminProductsView({
             : action === "ignore_import"
               ? "ignored"
               : "duplicate",
-        listStatus:
+        status:
           action === "approve_product"
-            ? "whitelisted"
+            ? "approved"
             : action === "ignore_import"
-              ? "inactive"
-              : row.listStatus
+              ? "ignored"
+              : row.status
       };
       const savedRow = payload.result?.row ?? fallbackRow;
 
@@ -957,17 +932,17 @@ function ProductModal({
   saving: boolean;
   setDraft: (row: AdminProductRow) => void;
 }>) {
-  const [newAffiliateUrl, setNewAffiliateUrl] = useState("");
-  const [newAffiliateCommissionRate, setNewAffiliateCommissionRate] = useState("");
-  const [affiliateBusy, setAffiliateBusy] = useState(false);
+  const [newOfferUrl, setNewOfferUrl] = useState("");
+  const [newOfferCommissionRate, setNewOfferCommissionRate] = useState("");
+  const [offerBusy, setOfferBusy] = useState(false);
   const [mergeProductId, setMergeProductId] = useState(
     draft.productImportDuplicateProductIds.find((id) => id !== draft.id) ?? ""
   );
   const [reviewerNote, setReviewerNote] = useState("");
   const hasOpenImportReview = Boolean(draft.importReviewTaskId);
   const approvalBlockedMessage =
-    draft.productQuality.status !== "pass"
-      ? `Approval is blocked until data quality passes: ${draft.productQuality.summary}`
+    draft.validation.status !== "pass"
+      ? `Approval is blocked until validation passes: ${draft.validation.summary}`
       : null;
   const duplicateOptions = products.filter((product) =>
     draft.productImportDuplicateProductIds.includes(product.id) &&
@@ -980,23 +955,23 @@ function ProductModal({
     ? duplicateOptions
     : products.filter((product) => product.id !== draft.id).slice(0, 80);
 
-  async function addAffiliateLink() {
-    const url = newAffiliateUrl.trim();
+  async function addOffer() {
+    const url = newOfferUrl.trim();
 
     if (!url) {
       return;
     }
 
-    setAffiliateBusy(true);
+    setOfferBusy(true);
 
     try {
       const response = await fetch(
-        `/api/admin/products/${draft.id}/affiliate-links`,
+        `/api/admin/products/${draft.id}/offers`,
         {
           body: JSON.stringify({
             accessToken,
-            commissionRate: newAffiliateCommissionRate
-              ? Number(newAffiliateCommissionRate) / 100
+            commissionRate: newOfferCommissionRate
+              ? Number(newOfferCommissionRate) / 100
               : null,
             linkType: "affiliate",
             url
@@ -1009,27 +984,27 @@ function ProductModal({
       );
 
       if (!response.ok) {
-        throw new Error("Unable to add affiliate link");
+        throw new Error("Unable to add offer");
       }
 
       const payload = (await response.json()) as { row?: AdminProductRow };
 
       if (payload.row) {
         setDraft(payload.row);
-        setNewAffiliateUrl("");
-        setNewAffiliateCommissionRate("");
+        setNewOfferUrl("");
+        setNewOfferCommissionRate("");
       }
     } finally {
-      setAffiliateBusy(false);
+      setOfferBusy(false);
     }
   }
 
-  async function removeAffiliateLink(linkId: string) {
-    setAffiliateBusy(true);
+  async function removeOffer(offerId: string) {
+    setOfferBusy(true);
 
     try {
       const response = await fetch(
-        `/api/admin/products/${draft.id}/affiliate-links/${linkId}`,
+        `/api/admin/products/${draft.id}/offers/${offerId}`,
         {
           body: JSON.stringify({ accessToken }),
           headers: {
@@ -1040,7 +1015,7 @@ function ProductModal({
       );
 
       if (!response.ok) {
-        throw new Error("Unable to remove affiliate link");
+        throw new Error("Unable to remove offer");
       }
 
       const payload = (await response.json()) as { row?: AdminProductRow };
@@ -1049,7 +1024,7 @@ function ProductModal({
         setDraft(payload.row);
       }
     } finally {
-      setAffiliateBusy(false);
+      setOfferBusy(false);
     }
   }
 
@@ -1090,6 +1065,46 @@ function ProductModal({
           >
             <XMarkIcon className="size-5" />
           </button>
+        </div>
+
+        <div className="mt-5 grid gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">
+          {draft.validation.status !== "pass" ? (
+            <div>
+              <p className="font-semibold text-gray-900">Validation blockers</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {draft.validation.reasons.map((reason) => (
+                  <span
+                    className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-800"
+                    key={reason}
+                  >
+                    {readableToken(reason)}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-sm text-gray-600">
+                {draft.validation.summary}
+              </p>
+            </div>
+          ) : null}
+          {draft.aiCorrectionNotes ? (
+            <p>
+              <span className="font-semibold text-gray-900">AI notes: </span>
+              {draft.aiCorrectionNotes}
+            </p>
+          ) : null}
+          {draft.sourceEvidence.sourceUrl ? (
+            <p>
+              <span className="font-semibold text-gray-900">Source: </span>
+              <a
+                className="text-[#2563EB] hover:text-[#1D4ED8]"
+                href={draft.sourceEvidence.sourceUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {draft.sourceEvidence.sourceUrl}
+              </a>
+            </p>
+          ) : null}
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -1176,63 +1191,6 @@ function ProductModal({
               type="url"
               value={draft.imageUrl ?? ""}
             />
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Label facts
-            <select
-              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  labelStatus: event.target.value as ProductLabelStatus
-                })
-              }
-              value={draft.labelStatus}
-            >
-              {productLabelStatuses.map((item) => (
-                <option key={item} value={item}>
-                  {productStatusLabel(item)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Availability
-            <select
-              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  availabilityStatus: event.target.value as AdminProductRow["availabilityStatus"]
-                })
-              }
-              value={draft.availabilityStatus}
-            >
-              {productAvailabilityStatuses.map((item) => (
-                <option key={item} value={item}>
-                  {productStatusLabel(item)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Affiliate
-            <select
-              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  affiliateStatus: event.target.value as ProductAffiliateStatus
-                })
-              }
-              value={draft.affiliateStatus}
-            >
-              {productAffiliateStatuses.map((item) => (
-                <option key={item} value={item}>
-                  {productStatusLabel(item)}
-                </option>
-              ))}
-            </select>
           </label>
           <label className="text-sm font-medium text-gray-700">
             Product type
@@ -1507,41 +1465,41 @@ function ProductModal({
         </div>
 
         <div className="mt-5">
-          <h3 className="text-sm font-semibold text-gray-900">Affiliate links</h3>
-          {draft.affiliateLinks.length > 0 ? (
+          <h3 className="text-sm font-semibold text-gray-900">Offers</h3>
+          {draft.offers.length > 0 ? (
             <div className="mt-2 space-y-2">
-              {draft.affiliateLinks.map((link) => (
+              {draft.offers.map((offer) => (
                 <div
                   className="flex items-start justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2"
-                  key={link.id}
+                  key={offer.id}
                 >
                   <div className="min-w-0">
                     <a
                       className="block truncate text-sm font-medium text-[#2563EB] hover:text-[#1D4ED8]"
-                      href={link.url}
+                      href={offer.url}
                       rel="noreferrer"
                       target="_blank"
                     >
-                      {link.url}
+                      {offer.url}
                     </a>
                     <p className="mt-0.5 text-xs text-gray-500">
                       {[
-                        productStatusLabel(link.linkType),
-                        link.platform,
-                        link.commissionRate !== null
-                          ? `${(link.commissionRate * 100).toFixed(1)}% commission`
+                        productStatusLabel(offer.linkType),
+                        offer.platform,
+                        offer.commissionRate !== null
+                          ? `${(offer.commissionRate * 100).toFixed(1)}% commission`
                           : null,
-                        link.priceAmount !== null
-                          ? `${link.priceAmount} ${link.currency}`
+                        offer.priceAmount !== null
+                          ? `${offer.priceAmount} ${offer.currency}`
                           : null,
-                        productStatusLabel(link.availabilityStatus)
+                        productStatusLabel(offer.availabilityStatus)
                       ].filter(Boolean).join(" · ")}
                     </p>
                   </div>
                   <button
                     className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={affiliateBusy}
-                    onClick={() => void removeAffiliateLink(link.id)}
+                    disabled={offerBusy}
+                    onClick={() => void removeOffer(offer.id)}
                     type="button"
                   >
                     Remove
@@ -1551,33 +1509,33 @@ function ProductModal({
             </div>
           ) : (
             <p className="mt-2 text-sm text-gray-500">
-              No affiliate links yet. The product can still be recommended if it
-              is the best match.
+              No offers yet. The product can still be recommended if it is the
+              best match.
             </p>
           )}
           <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto]">
             <input
               className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
-              onChange={(event) => setNewAffiliateUrl(event.target.value)}
-              placeholder="Affiliate URL"
+              onChange={(event) => setNewOfferUrl(event.target.value)}
+              placeholder="Offer URL"
               type="url"
-              value={newAffiliateUrl}
+              value={newOfferUrl}
             />
             <input
               className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
               min="0"
               onChange={(event) =>
-                setNewAffiliateCommissionRate(event.target.value)
+                setNewOfferCommissionRate(event.target.value)
               }
               placeholder="%"
               step="0.01"
               type="number"
-              value={newAffiliateCommissionRate}
+              value={newOfferCommissionRate}
             />
             <button
               className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={affiliateBusy || !newAffiliateUrl.trim()}
-              onClick={() => void addAffiliateLink()}
+              disabled={offerBusy || !newOfferUrl.trim()}
+              onClick={() => void addOffer()}
               type="button"
             >
               Add
@@ -1691,8 +1649,7 @@ function ProductModal({
                 onClick={async () => {
                   const ignoredDraft: AdminProductRow = {
                     ...draft,
-                    availabilityStatus: "unavailable",
-                    listStatus: "inactive"
+                    status: "ignored"
                   };
 
                   if (hasOpenImportReview) {
@@ -1724,12 +1681,8 @@ function ProductModal({
                 onClick={async () => {
                   const approvedDraft: AdminProductRow = {
                     ...draft,
-                    availabilityStatus:
-                      draft.availabilityStatus === "unavailable"
-                        ? "unknown"
-                        : draft.availabilityStatus,
                     labelStatus: draft.facts.length > 0 ? "parsed" : draft.labelStatus,
-                    listStatus: "whitelisted"
+                    status: "approved"
                   };
 
                   if (hasOpenImportReview) {
@@ -2412,15 +2365,11 @@ export function AdminSupplementsView({
   const summary = listStatusSummary(rows);
   const categories = [...new Set(rows.map((row) => row.category))].sort();
   const selectedSupplementMetricId =
-    status === "whitelisted"
-      ? "supplementsWhitelisted"
-      : status === "review_required"
-        ? "supplementsReviewRequired"
-        : status === "blacklisted"
-          ? "supplementsBlacklisted"
-          : status === "inactive"
-            ? "supplementsInactive"
-            : "supplementsTotal";
+    status === "active"
+      ? "supplementsActive"
+      : status === "blocked"
+        ? "supplementsBlocked"
+        : "supplementsTotal";
   const normalizedSearch = search.trim().toLowerCase();
   const filteredRows = rows.filter((row) => {
     const matchesSearch =
@@ -2446,23 +2395,13 @@ export function AdminSupplementsView({
   }
 
   function selectSupplementMetric(metricId: BusinessMetric["id"]) {
-    if (metricId === "supplementsWhitelisted") {
-      setStatus("whitelisted");
+    if (metricId === "supplementsActive") {
+      setStatus("active");
       return;
     }
 
-    if (metricId === "supplementsReviewRequired") {
-      setStatus("review_required");
-      return;
-    }
-
-    if (metricId === "supplementsBlacklisted") {
-      setStatus("blacklisted");
-      return;
-    }
-
-    if (metricId === "supplementsInactive") {
-      setStatus("inactive");
+    if (metricId === "supplementsBlocked") {
+      setStatus("blocked");
       return;
     }
 
@@ -2631,31 +2570,17 @@ export function AdminSupplementsView({
     }),
     safetyMetric({
       color: businessMetricColors.succeeded,
-      id: "supplementsWhitelisted",
-      label: labels.supplements.whitelisted,
+      id: "supplementsActive",
+      label: labels.supplements.active,
       locale,
-      value: summary.whitelisted
-    }),
-    safetyMetric({
-      color: businessMetricColors.pendingReviews,
-      id: "supplementsReviewRequired",
-      label: labels.supplements.reviewRequired,
-      locale,
-      value: summary.reviewRequired
-    }),
-    safetyMetric({
-      color: businessMetricColors.failed,
-      id: "supplementsBlacklisted",
-      label: labels.supplements.blacklisted,
-      locale,
-      value: summary.blacklisted
+      value: summary.active
     }),
     safetyMetric({
       color: businessMetricColors.offline,
-      id: "supplementsInactive",
-      label: labels.supplements.inactive,
+      id: "supplementsBlocked",
+      label: labels.supplements.blocked,
       locale,
-      value: summary.inactive
+      value: summary.blocked
     })
   ];
 
@@ -3061,8 +2986,7 @@ function SupplementDetailsModal({
   const associationLocked = Boolean(associatedSupplementId);
   const associationEnabled =
     Boolean(onAssociateSupplement) && Boolean(associationOptions?.length);
-  const doseRequired =
-    draft.listStatus === "review_required" || draft.listStatus === "whitelisted";
+  const doseRequired = draft.listStatus === "active";
   const doseValid =
     !doseRequired ||
     (draft.maxAmount !== null &&
@@ -3136,9 +3060,7 @@ function SupplementDetailsModal({
       const suggestedStatus = suggestion?.listStatus ?? draft.listStatus;
       const suggestedMaxAmount = suggestion?.maxAmount;
       const suggestedMaxUnit = suggestion?.maxUnit;
-      const suggestedDoseRequired =
-        suggestedStatus === "review_required" ||
-        suggestedStatus === "whitelisted";
+      const suggestedDoseRequired = suggestedStatus === "active";
 
       if (
         !suggestion ||
@@ -3708,9 +3630,38 @@ function reviewKindLabel(labels: AdminContent, row: AdminReviewTaskRow) {
   return labels.reviewQueue.reviewRequired;
 }
 
+function isProductReviewRow(row: AdminReviewTaskRow) {
+  return row.itemType === "product" || row.reviewKind === "product_import";
+}
+
+function isUnknownSupplementReviewRow(row: AdminReviewTaskRow) {
+  return row.itemType === "supplement" && row.reviewKind === "unknown_supplement";
+}
+
+function isUnknownFoodReviewRow(row: AdminReviewTaskRow) {
+  return row.itemType === "food" && row.reviewKind === "unknown_food";
+}
+
+function isPlanReviewRow(row: AdminReviewTaskRow) {
+  return (
+    Boolean(row.planId) &&
+    !isProductReviewRow(row) &&
+    !isUnknownSupplementReviewRow(row) &&
+    !isUnknownFoodReviewRow(row)
+  );
+}
+
 function reviewScopeLabel(labels: AdminContent, row: AdminReviewTaskRow) {
-  if (row.itemType === "product") {
+  if (isProductReviewRow(row)) {
     return labels.reviewQueue.productReview;
+  }
+
+  if (isUnknownSupplementReviewRow(row)) {
+    return labels.reviewQueue.supplementReview;
+  }
+
+  if (isUnknownFoodReviewRow(row)) {
+    return labels.reviewQueue.foodReview;
   }
 
   if (row.itemType === "food") {
@@ -3733,18 +3684,18 @@ function reviewMatchesMetric(row: AdminReviewTaskRow, metricId: ReviewMetricFilt
   }
 
   if (metricId === "reviewsProduct") {
-    return row.itemType === "product";
+    return isProductReviewRow(row);
   }
 
   if (metricId === "reviewsPlan") {
-    return row.itemType !== "product" && Boolean(row.planId);
+    return isPlanReviewRow(row);
   }
 
   if (metricId === "reviewsFood") {
-    return row.itemType === "food" && !row.planId;
+    return row.itemType === "food" && !isPlanReviewRow(row);
   }
 
-  return row.itemType === "supplement" && !row.planId;
+  return row.itemType === "supplement" && !isPlanReviewRow(row);
 }
 
 function reviewMetricCounts(rows: readonly AdminReviewTaskRow[]) {
@@ -3752,9 +3703,9 @@ function reviewMetricCounts(rows: readonly AdminReviewTaskRow[]) {
     (counts, row) => {
       counts.total += 1;
 
-      if (row.itemType === "product") {
+      if (isProductReviewRow(row)) {
         counts.product += 1;
-      } else if (row.planId) {
+      } else if (isPlanReviewRow(row)) {
         counts.plan += 1;
       } else if (row.itemType === "food") {
         counts.food += 1;
@@ -3778,6 +3729,7 @@ type ReviewTaskGroup = Readonly<{
   createdAt: string;
   key: string;
   planId: string | null;
+  planReview: boolean;
   businessValue: number;
   rows: AdminReviewTaskRow[];
   title: string;
@@ -3813,6 +3765,7 @@ function groupReviewRows(
       createdAt,
       key,
       planId: existing?.planId ?? row.planId,
+      planReview: Boolean(existing?.planReview || isPlanReviewRow(row)),
       rows: [...(existing?.rows ?? []), row],
       title: existing?.title ?? row.groupLabel ?? reviewScopeLabel(labels, row)
     });
@@ -3888,7 +3841,7 @@ function reviewRowToSupplementDraft(
         : "moderate",
     id: row.id,
     ingredientType: `${reviewKindLabel(labels, row)} · ${value.label}`,
-    listStatus: "review_required",
+    listStatus: "active",
     maxAmount: row.maxAmount,
     maxUnit: row.maxUnit ?? "",
     name: row.supplementName,
@@ -5164,7 +5117,7 @@ export function AdminReviewQueueView({
               <div className="flex flex-wrap items-center justify-between gap-3 px-1">
                 <div className="min-w-0">
                   <h3 className="flex flex-wrap items-baseline gap-x-1 text-sm font-semibold text-gray-900">
-                    {group.planId ? (
+                    {group.planReview && group.planId ? (
                       <>
                         <span>Review nutrition safety for plan</span>
                         <PlanIdLink

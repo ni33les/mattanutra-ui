@@ -11,6 +11,7 @@ import {
 } from "@/lib/dose-conversion";
 import type { FormulationBlueprint, FormulationIngredient, LocalizedText } from "@/lib/formulation-types";
 import type { Locale } from "@/lib/i18n";
+import { productFactAliasKeys, productKeysMatch } from "@/lib/product-recommendations";
 import { createTask, type TaskServiceDb } from "@/lib/task-service";
 
 type SafetyAfterCommit = (effect: () => Promise<void>) => void;
@@ -37,7 +38,7 @@ type SupplementRow = Readonly<{
   confidence: string | null;
   id: string;
   is_active: boolean;
-  list_status: "blacklisted" | "inactive" | "review_required" | "whitelisted";
+  list_status: "active" | "blocked";
   max_amount: number | string | null;
   max_unit: string | null;
   name: string;
@@ -53,7 +54,6 @@ type MatchedSupplement = SupplementRow & {
 type ReviewKind =
   | "dose_reduced"
   | "dose_unverified"
-  | "review_required"
   | "unknown_supplement";
 
 type SupplementReviewWork = Readonly<{
@@ -112,7 +112,7 @@ function reviewTaskBusinessValue(kind: ReviewKind) {
     return 500;
   }
 
-  if (kind === "unknown_supplement" || kind === "review_required") {
+  if (kind === "unknown_supplement") {
     return 400;
   }
 
@@ -126,7 +126,7 @@ async function loadSupplementLookup(sql: TaskServiceDb) {
       supplements.name,
       supplements.normalized_name,
       case
-        when supplements.is_active = false then 'inactive'
+        when supplements.is_active = false then 'blocked'
         else supplements.list_status
       end as list_status,
       supplements.is_active,
@@ -177,6 +177,8 @@ function matchSupplement(
 ): MatchedSupplement | null {
   const requestedName = textFromLocalized(ingredient.supplement);
   const candidates = [
+    ...productFactAliasKeys(requestedName),
+    ...productFactAliasKeys(ingredient.id.replaceAll("-", "_")),
     normalizeName(requestedName),
     normalizeName(ingredient.id.replaceAll("-", "_"))
   ].filter(Boolean);
@@ -185,6 +187,12 @@ function matchSupplement(
     const match = lookup.get(candidate);
 
     if (match) {
+      return { ...match, requestedName };
+    }
+  }
+
+  for (const [key, match] of lookup.entries()) {
+    if (candidates.some((candidate) => productKeysMatch(candidate, key))) {
       return { ...match, requestedName };
     }
   }
@@ -221,7 +229,8 @@ function withAutomatedSafetyStatus(
     return ingredient;
   }
 
-  const { safety: _safety, ...safeIngredient } = ingredient;
+  const safeIngredient = { ...ingredient };
+  delete safeIngredient.safety;
 
   return {
     ...safeIngredient,
@@ -257,9 +266,10 @@ async function enqueueSupplementReviewWork(input: {
   planId: string | null;
   supplementName: string;
 }): Promise<SupplementReviewWork> {
-  const globalUnknown = input.kind === "unknown_supplement" && !input.planId;
+  const unknownSupplement = input.kind === "unknown_supplement";
+  const globalUnknown = unknownSupplement && !input.planId;
   const businessValue = reviewTaskBusinessValue(input.kind);
-  const groupLabel = globalUnknown
+  const groupLabel = unknownSupplement
     ? "Review supplement"
     : "Review plan";
   const taskTitle = `Review supplement ${input.supplementName}`;
@@ -505,8 +515,8 @@ async function hideForReview(
     payload: {
       actionOptions:
         kind === "unknown_supplement"
-          ? ["whitelist", "review_required", "blacklist", "ignore"]
-          : ["accept", "revise", "blacklist", "ignore"],
+          ? ["add_active", "block", "ignore"]
+          : ["accept", "revise", "block", "ignore"],
       confidence: match?.confidence,
       maxAmount: numberOrNull(match?.max_amount ?? null),
       maxUnit: match?.max_unit,
@@ -705,7 +715,7 @@ export async function applyFormulationSafety(
           ingredient,
           null,
           "unknown_supplement",
-          "This supplement is not yet in the MattaNutra whitelist.",
+        "This supplement is not yet in the MattaNutra supplement catalogue.",
           "medium",
           dose,
           null
@@ -714,34 +724,13 @@ export async function applyFormulationSafety(
       continue;
     }
 
-    if (match.list_status === "blacklisted" || match.list_status === "inactive") {
+    if (match.list_status === "blocked") {
       summary.removedCount += 1;
       await logRemoved(
         input,
         ingredient,
         match,
-        `Supplement is ${match.list_status} in the MattaNutra supplement list.`
-      );
-      continue;
-    }
-
-    // Supplement governance is authoritative. AI review flags cannot override a
-    // whitelisted supplement that passes the configured dose checks below.
-    if (match.list_status === "review_required") {
-      summary.hiddenCount += 1;
-      summary.reviewCount += 1;
-      supplementBreakdown.push(
-        await hideForReview(
-          sql,
-          input,
-          ingredient,
-          match,
-          "review_required",
-          "This supplement needs human review before we show it.",
-          "medium",
-          dose,
-          limit
-        )
+        "Supplement is blocked in the MattaNutra supplement catalogue."
       );
       continue;
     }

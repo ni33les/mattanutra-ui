@@ -204,19 +204,19 @@ async function loadProduct(
 ) {
   const rows = await sql<ProductForCorrection[]>`
     select
-      marketplace_products.id::text,
-      marketplace_products.title,
-      marketplace_products.title_en as "titleEn",
-      marketplace_products.title_th as "titleTh",
-      marketplace_products.brand_name as "brandName",
-      coalesce(to_jsonb(marketplace_products) ->> 'product_audience', 'both') as "productAudience",
-      marketplace_products.product_url as "productUrl",
-      marketplace_products.description,
-      marketplace_products.description_en as "descriptionEn",
-      marketplace_products.description_th as "descriptionTh",
-      marketplace_products.source_snapshot as "sourceSnapshot",
+      products.id::text,
+      products.title,
+      products.title_en as "titleEn",
+      products.title_th as "titleTh",
+      products.brand_name as "brandName",
+      coalesce(to_jsonb(products) ->> 'product_audience', 'both') as "productAudience",
+      products.product_url as "productUrl",
+      products.description,
+      products.description_en as "descriptionEn",
+      products.description_th as "descriptionTh",
+      products.source_snapshot as "sourceSnapshot",
       coalesce(fact_rows.facts, '[]'::jsonb) as facts
-    from public.marketplace_products
+    from public.products
     left join lateral (
       select coalesce(
         jsonb_agg(
@@ -234,9 +234,9 @@ async function loadProduct(
         '[]'::jsonb
       ) as facts
       from public.product_facts
-      where product_facts.product_id = marketplace_products.id
+      where product_facts.product_id = products.id
     ) fact_rows on true
-    where marketplace_products.id = ${productId}::uuid
+    where products.id = ${productId}::uuid
     limit 1
   `;
 
@@ -305,7 +305,7 @@ async function loadCanonicalSupplements(
       limit 1
     ) safety on true
     where supplements.is_active = true
-      and supplements.list_status in ('whitelisted', 'review_required', 'blacklisted')
+      and supplements.list_status in ('active', 'blocked')
     group by
       supplements.id,
       supplements.name,
@@ -316,8 +316,7 @@ async function loadCanonicalSupplements(
       safety.max_unit
     order by
       case supplements.list_status
-        when 'whitelisted' then 0
-        when 'review_required' then 1
+        when 'active' then 0
         else 2
       end,
       supplements.name
@@ -647,7 +646,7 @@ export async function correctProductFactsWithAi(input: Readonly<{
         productAudience,
         responseId: completion.id
       },
-      reviewRequired: row.productQuality.status !== "pass",
+      reviewRequired: row.validation.status !== "pass",
       row
     };
   } catch (error) {
@@ -655,10 +654,10 @@ export async function correctProductFactsWithAi(input: Readonly<{
     const row = await updateAdminProduct({
       actor: input.actor ?? "ai_product_fact_correction",
       adminNotes: `AI fact correction needs review: ${message}`,
-      changeNote: "product_ai_fact_correction_review_required",
+      changeNote: "product_ai_fact_correction_pending_review",
       id: input.productId,
       labelStatus: "failed",
-      listStatus: "review_required",
+      status: "pending_review",
       sourceSnapshotPatch: {
         aiFactCorrection: {
           failedAt: new Date().toISOString(),

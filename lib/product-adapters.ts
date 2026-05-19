@@ -3,12 +3,12 @@ import type { ProductPlatform } from "@/lib/product-recommendations";
 
 export type MarketplaceRegion = "TH";
 
-export type MarketplaceProductSnapshot = Readonly<{
+export type ProductSnapshot = Readonly<{
   availabilityStatus: "in_stock" | "out_of_stock" | "unavailable" | "unknown";
   brandName?: string | null;
   currency: "THB";
   imageUrl?: string | null;
-  marketplaceProductId?: string | null;
+  externalProductId?: string | null;
   platform: ProductPlatform;
   priceAmount?: number | null;
   productUrl: string;
@@ -32,7 +32,7 @@ export type MarketplaceProductSearchInput = Readonly<{
 }>;
 
 export type MarketplaceProductRefreshInput = Readonly<{
-  marketplaceProductId?: string | null;
+  externalProductId?: string | null;
   productUrl: string;
   region?: MarketplaceRegion;
 }>;
@@ -43,10 +43,10 @@ export interface MarketplaceAdapter {
   isConfigured(): boolean;
   refreshProduct(
     input: MarketplaceProductRefreshInput
-  ): Promise<MarketplaceProductSnapshot | null>;
+  ): Promise<ProductSnapshot | null>;
   searchProducts(
     input: MarketplaceProductSearchInput
-  ): Promise<MarketplaceProductSnapshot[]>;
+  ): Promise<ProductSnapshot[]>;
 }
 
 class UnconfiguredOfficialAdapter implements MarketplaceAdapter {
@@ -174,12 +174,12 @@ class ShopeeAffiliateAdapter implements MarketplaceAdapter {
     return {
       availabilityStatus: "unknown",
       currency: "THB",
-      marketplaceProductId: input.marketplaceProductId ?? null,
+      externalProductId: input.externalProductId ?? null,
       platform: this.platform,
       productUrl: input.productUrl,
       region: input.region ?? "TH",
       title: input.productUrl
-    } satisfies MarketplaceProductSnapshot;
+    } satisfies ProductSnapshot;
   }
 
   async searchProducts(input: MarketplaceProductSearchInput) {
@@ -259,13 +259,13 @@ class ShopeeAffiliateAdapter implements MarketplaceAdapter {
         availabilityStatus: "unknown",
         currency: "THB",
         imageUrl: textFromRecord(row, ["imageUrl", "image_url", "image"]),
-        marketplaceProductId: shopId && itemId ? `${shopId}:${itemId}` : itemId,
+        externalProductId: shopId && itemId ? `${shopId}:${itemId}` : itemId,
         platform: this.platform,
         priceAmount: price,
         productUrl,
         region,
         title
-      } satisfies MarketplaceProductSnapshot];
+      } satisfies ProductSnapshot];
     });
   }
 }
@@ -304,12 +304,12 @@ class LazadaSellerCenterAdapter implements MarketplaceAdapter {
     return {
       availabilityStatus: "unknown",
       currency: "THB",
-      marketplaceProductId: input.marketplaceProductId ?? null,
+      externalProductId: input.externalProductId ?? null,
       platform: this.platform,
       productUrl: input.productUrl,
       region: input.region ?? "TH",
       title: input.productUrl
-    } satisfies MarketplaceProductSnapshot;
+    } satisfies ProductSnapshot;
   }
 
   async searchProducts(input: MarketplaceProductSearchInput) {
@@ -354,13 +354,13 @@ class LazadaSellerCenterAdapter implements MarketplaceAdapter {
         brandName: textFromRecord(row, ["Brand", "brand"]),
         currency: "THB",
         imageUrl: textFromRecord(row, ["MainImage", "main_image", "image"]),
-        marketplaceProductId: sellerSku,
+        externalProductId: sellerSku,
         platform: this.platform,
         priceAmount: numberFromRecord(row, ["Price", "price", "SalePrice"]),
         productUrl: normalizeUrl(url, `https://www.lazada.co.th/catalog/?q=${encodeURIComponent(title)}`),
         region,
         title
-      } satisfies MarketplaceProductSnapshot];
+      } satisfies ProductSnapshot];
     });
   }
 }
@@ -377,12 +377,12 @@ class ShopeeSearchScrapeAdapter implements MarketplaceAdapter {
     return {
       availabilityStatus: "unknown",
       currency: "THB",
-      marketplaceProductId: input.marketplaceProductId ?? null,
+      externalProductId: input.externalProductId ?? null,
       platform: this.platform,
       productUrl: input.productUrl,
       region: input.region ?? "TH",
       title: input.productUrl
-    } satisfies MarketplaceProductSnapshot;
+    } satisfies ProductSnapshot;
   }
 
   async searchProducts(input: MarketplaceProductSearchInput) {
@@ -436,13 +436,13 @@ class ShopeeSearchScrapeAdapter implements MarketplaceAdapter {
         imageUrl: textFromRecord(basic, ["image"])
           ? `https://cf.shopee.co.th/file/${textFromRecord(basic, ["image"])}`
           : null,
-        marketplaceProductId: `${shopId}:${itemId}`,
+        externalProductId: `${shopId}:${itemId}`,
         platform: this.platform,
         priceAmount: normalizedPrice,
         productUrl: `https://shopee.co.th/product/${shopId}/${itemId}`,
         region,
         title
-      } satisfies MarketplaceProductSnapshot];
+      } satisfies ProductSnapshot];
     });
   }
 }
@@ -456,7 +456,7 @@ export async function searchMarketplaceProducts(input: MarketplaceProductSearchI
       : [])
   ];
   const diagnostics: MarketplaceSearchDiagnostic[] = [];
-  const products: MarketplaceProductSnapshot[] = [];
+  const products: ProductSnapshot[] = [];
 
   for (const adapter of adapters) {
     const configuredAdapter = adapter.isConfigured();
