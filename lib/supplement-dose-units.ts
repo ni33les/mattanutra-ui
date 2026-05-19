@@ -3,6 +3,9 @@ export const supplementDoseUnits = [
   "mg/day",
   "g/day",
   "IU/day",
+  "CFU/day",
+  "million CFU/day",
+  "billion CFU/day",
   "ml/day",
   "tablet/day",
   "capsule/day",
@@ -10,10 +13,12 @@ export const supplementDoseUnits = [
   "mg",
   "g",
   "IU",
+  "CFU",
+  "million CFU",
+  "billion CFU",
   "ml",
   "tablet",
   "capsule"
 ] as const;
 
 export type SupplementDoseUnit = (typeof supplementDoseUnits)[number];
-

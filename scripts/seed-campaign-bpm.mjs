@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import nextEnv from "@next/env";
-import postgres from "postgres";
+import { closeSqlPool, getSql } from "../lib/db.ts";
 
 const { loadEnvConfig } = nextEnv;
 
@@ -337,35 +337,14 @@ function createRows() {
   );
 }
 
-function shouldUseSsl(connection) {
-  try {
-    const url = new URL(connection);
-    const sslMode = url.searchParams.get("sslmode")?.toLowerCase();
-
-    return (
-      url.hostname.endsWith(".db.ondigitalocean.com") ||
-      sslMode === "require" ||
-      sslMode === "verify-ca" ||
-      sslMode === "verify-full"
-    );
-  } catch {
-    return false;
-  }
-}
-
 async function main() {
-  const connection = process.env.DB_CONNECTION;
+  const sql = getSql();
 
-  if (!connection) {
+  if (!sql) {
     throw new Error("DB_CONNECTION is required.");
   }
 
   const rows = createRows();
-  const sql = postgres(connection, {
-    max: 1,
-    prepare: false,
-    ...(shouldUseSsl(connection) ? { ssl: "require" } : {})
-  });
 
   try {
     if (dryRun) {
@@ -496,7 +475,7 @@ async function main() {
     console.log(`Inserted ${rows.length} seed BPM rows across ${campaigns.length} campaigns.`);
     console.log("Open the admin dashboard with view=campaigns or view=leads.");
   } finally {
-    await sql.end();
+    await closeSqlPool();
   }
 }
 

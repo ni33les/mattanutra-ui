@@ -168,9 +168,17 @@ export type NutritionReport = {
 
 export type ProductRecommendationStatus = "failed" | "partial" | "pending" | "ready";
 
+export type ProductNeedCoverage = {
+  coveragePercent: number;
+  displayName: string;
+  id: string;
+  itemType: "food" | "supplement";
+};
+
 export type ProductRecommendationSummary = {
   generatedAt?: string;
   matchedCount: number;
+  needCoverage?: ProductNeedCoverage[];
   needsCount: number;
   notes?: string;
   runId?: string;

@@ -177,6 +177,39 @@ export type AdminContentInventoryData = Readonly<{
   }>;
 }>;
 
+export function emptyCampaignsData(): AdminCampaignsData {
+  return {
+    databaseAvailable: false,
+    rows: [],
+    summary: campaignSummary([])
+  };
+}
+
+export function emptyLeadsData(): AdminLeadsData {
+  return {
+    databaseAvailable: false,
+    rows: [],
+    summary: { total: 0 }
+  };
+}
+
+export function emptyContentData(): AdminContentInventoryData {
+  return {
+    databaseAvailable: false,
+    rows: [],
+    summary: {
+      blogPosts: 0,
+      deleted: 0,
+      draft: 0,
+      pageViews: 0,
+      published: 0,
+      scheduled: 0,
+      testimonials: 0,
+      total: 0
+    }
+  };
+}
+
 const views = new Set<AdminExternalQueryView>([
   "agents",
   "alerts",
@@ -325,11 +358,7 @@ async function getCampaigns(params: QueryParams): Promise<AdminCampaignsData> {
   const sql = getSql();
 
   if (!sql) {
-    return {
-      databaseAvailable: false,
-      rows: [],
-      summary: campaignSummary([])
-    };
+    return emptyCampaignsData();
   }
 
   const start = adminDashboardRangeStart(params.range);
@@ -434,11 +463,7 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
   const sql = getSql();
 
   if (!sql) {
-    return {
-      databaseAvailable: false,
-      rows: [],
-      summary: { total: 0 }
-    };
+    return emptyLeadsData();
   }
 
   const start = adminDashboardRangeStart(params.range);
@@ -698,7 +723,12 @@ export async function getAdminCampaignsData(
   filters: AdminDashboardFilters,
   limit = 100
 ) {
-  return getCampaigns(dashboardQueryParams({ filters, limit, range }));
+  try {
+    return await getCampaigns(dashboardQueryParams({ filters, limit, range }));
+  } catch (error) {
+    console.error("Unable to load admin campaigns data", error);
+    return emptyCampaignsData();
+  }
 }
 
 export async function getAdminLeadsData(
@@ -707,27 +737,19 @@ export async function getAdminLeadsData(
   status = "",
   limit = 100
 ) {
-  return getLeads(dashboardQueryParams({ filters, limit, range, status }));
+  try {
+    return await getLeads(dashboardQueryParams({ filters, limit, range, status }));
+  } catch (error) {
+    console.error("Unable to load admin leads data", error);
+    return emptyLeadsData();
+  }
 }
 
 async function getContentInventory(params: QueryParams) {
   const sql = getSql();
 
   if (!sql) {
-    return {
-      databaseAvailable: false,
-      rows: [],
-      summary: {
-        blogPosts: 0,
-        deleted: 0,
-        draft: 0,
-        pageViews: 0,
-        published: 0,
-        scheduled: 0,
-        testimonials: 0,
-        total: 0
-      }
-    };
+    return emptyContentData();
   }
 
   const locale = params.filters.locale || null;
@@ -978,7 +1000,14 @@ export async function getAdminContentData(
   status = "",
   limit = 100
 ) {
-  return getContentInventory(dashboardQueryParams({ filters, limit, range, status }));
+  try {
+    return await getContentInventory(
+      dashboardQueryParams({ filters, limit, range, status })
+    );
+  } catch (error) {
+    console.error("Unable to load admin content data", error);
+    return emptyContentData();
+  }
 }
 
 async function getProductRecommendationHistory(params: QueryParams) {
@@ -1005,6 +1034,8 @@ async function getProductRecommendationHistory(params: QueryParams) {
   const rows = await sql<Array<{
     affiliate: boolean;
     created_at: Date | string;
+    diagnostics: unknown;
+    food_coverage_percent: string | number;
     platform: string;
     plan_id: string | null;
     product_coverage_percent: string | number;
@@ -1014,7 +1045,9 @@ async function getProductRecommendationHistory(params: QueryParams) {
     run_id: string;
     stack_contribution_percent: string | number;
     stack_coverage_percent: string | number;
+    supplement_product_coverage_percent: string | number;
     status: string;
+    total_coverage_percent: string | number;
     unknown_at_recommendation: boolean;
     url_used: string;
   }>>`
@@ -1023,6 +1056,10 @@ async function getProductRecommendationHistory(params: QueryParams) {
       product_recommendation_runs.plan_id::text,
       product_recommendation_runs.status,
       product_recommendation_runs.stack_coverage_percent,
+      coalesce(to_jsonb(product_recommendation_runs) ->> 'supplement_product_coverage_percent', product_recommendation_runs.stack_coverage_percent::text) as supplement_product_coverage_percent,
+      coalesce(to_jsonb(product_recommendation_runs) ->> 'food_coverage_percent', '0') as food_coverage_percent,
+      coalesce(to_jsonb(product_recommendation_runs) ->> 'total_coverage_percent', product_recommendation_runs.stack_coverage_percent::text) as total_coverage_percent,
+      coalesce(to_jsonb(product_recommendation_runs) -> 'diagnostics', '{}'::jsonb) as diagnostics,
       product_recommendation_items.product_id::text,
       marketplace_products.title as product_title,
       marketplace_products.platform,
@@ -1048,6 +1085,8 @@ async function getProductRecommendationHistory(params: QueryParams) {
   const mappedRows = rows.map((row) => ({
     affiliate: row.affiliate,
     createdAt: new Date(row.created_at).toISOString(),
+    diagnostics: row.diagnostics,
+    foodCoveragePercent: Number(row.food_coverage_percent) || 0,
     platform: row.platform,
     planId: row.plan_id,
     productCoveragePercent: Number(row.product_coverage_percent) || 0,
@@ -1058,6 +1097,9 @@ async function getProductRecommendationHistory(params: QueryParams) {
     stackContributionPercent: Number(row.stack_contribution_percent) || 0,
     stackCoveragePercent: Number(row.stack_coverage_percent) || 0,
     status: row.status,
+    supplementProductCoveragePercent:
+      Number(row.supplement_product_coverage_percent) || 0,
+    totalCoveragePercent: Number(row.total_coverage_percent) || 0,
     unknownAtRecommendation: row.unknown_at_recommendation,
     urlUsed: row.url_used
   }));

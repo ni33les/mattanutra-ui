@@ -408,7 +408,9 @@ function trendFor(series: number[]): "down" | "flat" | "up" {
   return "flat";
 }
 
-function emptyData(range: AdminDashboardRange): AdminDashboardData {
+export function emptyAdminDashboardData(
+  range: AdminDashboardRange
+): AdminDashboardData {
   const buckets = buildBuckets(range, []);
   const emptySeries = buckets.map(() => 0);
 
@@ -460,7 +462,7 @@ export async function getAdminDashboardData(
   const sql = getSql();
 
   if (!sql) {
-    return emptyData(range);
+    return emptyAdminDashboardData(range);
   }
 
   try {
@@ -644,6 +646,6 @@ export async function getAdminDashboardData(
     };
   } catch (error) {
     console.error("Unable to load admin dashboard data", error);
-    return emptyData(range);
+    return emptyAdminDashboardData(range);
   }
 }

@@ -91,7 +91,7 @@ function communicationStatus(value: string): AdminCommunicationStatus {
     : "queued";
 }
 
-function emptyCommunicationsData(): AdminCommunicationsData {
+export function emptyCommunicationsData(): AdminCommunicationsData {
   return {
     databaseAvailable: false,
     generatedAt: new Date().toISOString(),

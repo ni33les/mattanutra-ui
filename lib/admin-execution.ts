@@ -228,7 +228,7 @@ function displayTaskTitle(value: string, payload: Record<string, unknown> | null
   return value;
 }
 
-function emptyVisibilityData(): AdminTaskVisibilityData {
+export function emptyVisibilityData(): AdminTaskVisibilityData {
   return {
     databaseAvailable: false,
     generatedAt: new Date().toISOString(),
@@ -245,7 +245,7 @@ function emptyVisibilityData(): AdminTaskVisibilityData {
   };
 }
 
-function emptyAgentsData(): AdminAgentsData {
+export function emptyAgentsData(): AdminAgentsData {
   return {
     databaseAvailable: false,
     generatedAt: new Date().toISOString(),

@@ -3,27 +3,51 @@ import { notFound } from "next/navigation";
 import { AdminDashboard } from "@/components/admin-dashboard";
 import { adminDashboardTokenAllowed } from "@/lib/admin-auth";
 import {
+  emptyAdminDashboardData,
   getAdminDashboardData,
   normalizeAdminDashboardRange
 } from "@/lib/admin-dashboard-data";
-import { getAdminCommunicationsData } from "@/lib/admin-communications";
+import {
+  emptyCommunicationsData,
+  getAdminCommunicationsData
+} from "@/lib/admin-communications";
 import { normalizeAdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import {
+  emptyAgentsData,
+  emptyVisibilityData,
   getAdminAgentsData,
   getAdminTaskVisibilityData
 } from "@/lib/admin-execution";
-import { getAdminFlowData } from "@/lib/admin-flow-data";
-import { getAdminFinancialsData } from "@/lib/admin-financials";
-import { getAdminFoodsData } from "@/lib/admin-foods";
-import { getAdminProductsData } from "@/lib/admin-products";
+import { emptyFlow, getAdminFlowData } from "@/lib/admin-flow-data";
 import {
+  emptyFinancials,
+  getAdminFinancialsData
+} from "@/lib/admin-financials";
+import { emptyAdminFoodsData, getAdminFoodsData } from "@/lib/admin-foods";
+import {
+  emptyAdminProductsData,
+  getAdminProductsData
+} from "@/lib/admin-products";
+import {
+  emptyCampaignsData,
+  emptyContentData,
+  emptyLeadsData,
   getAdminCampaignsData,
   getAdminContentData,
   getAdminLeadsData
 } from "@/lib/admin-query-data";
-import { getAdminReviewQueueData } from "@/lib/admin-review-queue";
-import { getAdminSupplementsData } from "@/lib/admin-supplements";
-import { getAdminTechnicalAlertsData } from "@/lib/admin-technical";
+import {
+  emptyAdminReviewQueueData,
+  getAdminReviewQueueData
+} from "@/lib/admin-review-queue";
+import {
+  emptyAdminSupplementsData,
+  getAdminSupplementsData
+} from "@/lib/admin-supplements";
+import {
+  emptyAlertsData,
+  getAdminTechnicalAlertsData
+} from "@/lib/admin-technical";
 import { isLocale, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -91,37 +115,60 @@ export default async function LocalizedAdminDashboardPage({
     notFound();
   }
 
-  const [
-    alertsData,
-    agentsData,
-    campaignsData,
-    contentData,
-    communicationsData,
-    data,
-    financialsData,
-    foodsData,
-    flowData,
-    leadsData,
-    productsData,
-    reviewQueueData,
-    supplementsData,
-    visibilityData
-  ] = await Promise.all([
-    getAdminTechnicalAlertsData(range),
-    getAdminAgentsData(range),
-    getAdminCampaignsData(range, filters),
-    getAdminContentData(range, filters),
-    getAdminCommunicationsData(range),
-    getAdminDashboardData(range, filters),
-    getAdminFinancialsData(range),
-    getAdminFoodsData(),
-    getAdminFlowData(range, filters),
-    getAdminLeadsData(range, filters),
-    getAdminProductsData(),
-    getAdminReviewQueueData(),
-    getAdminSupplementsData(),
-    getAdminTaskVisibilityData(range, selectedTaskId)
-  ]);
+  let alertsData = emptyAlertsData();
+  let agentsData = emptyAgentsData();
+  let campaignsData = emptyCampaignsData();
+  let contentData = emptyContentData();
+  let communicationsData = emptyCommunicationsData();
+  let data = emptyAdminDashboardData(range);
+  let financialsData = emptyFinancials(range);
+  let foodsData = emptyAdminFoodsData();
+  let flowData = emptyFlow(range);
+  let leadsData = emptyLeadsData();
+  let productsData = emptyAdminProductsData();
+  let reviewQueueData = emptyAdminReviewQueueData();
+  let supplementsData = emptyAdminSupplementsData();
+  let visibilityData = emptyVisibilityData();
+
+  if (view === "glance") {
+    data = await getAdminDashboardData(range, filters);
+    flowData = await getAdminFlowData(range, filters);
+    reviewQueueData = await getAdminReviewQueueData();
+    communicationsData = await getAdminCommunicationsData(range);
+    alertsData = await getAdminTechnicalAlertsData(range);
+  } else if (view === "agents") {
+    agentsData = await getAdminAgentsData(range);
+  } else if (view === "alerts") {
+    alertsData = await getAdminTechnicalAlertsData(range);
+  } else if (view === "campaigns") {
+    campaignsData = await getAdminCampaignsData(range, filters);
+  } else if (
+    view === "blogs" ||
+    view === "content" ||
+    view === "testimonials"
+  ) {
+    contentData = await getAdminContentData(range, filters);
+  } else if (view === "communications") {
+    communicationsData = await getAdminCommunicationsData(range);
+  } else if (view === "financials") {
+    financialsData = await getAdminFinancialsData(range);
+  } else if (view === "flow") {
+    flowData = await getAdminFlowData(range, filters);
+  } else if (view === "foods") {
+    foodsData = await getAdminFoodsData();
+  } else if (view === "leads") {
+    leadsData = await getAdminLeadsData(range, filters);
+  } else if (view === "products") {
+    productsData = await getAdminProductsData();
+  } else if (view === "reviews") {
+    reviewQueueData = await getAdminReviewQueueData();
+    productsData = await getAdminProductsData();
+    supplementsData = await getAdminSupplementsData();
+  } else if (view === "supplements") {
+    supplementsData = await getAdminSupplementsData();
+  } else if (view === "visibility") {
+    visibilityData = await getAdminTaskVisibilityData(range, selectedTaskId);
+  }
 
   return (
     <AdminDashboard

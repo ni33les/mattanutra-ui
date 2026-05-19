@@ -250,7 +250,7 @@ function objectValue(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function emptyFinancials(range: AdminDashboardRange): AdminFinancialsData {
+export function emptyFinancials(range: AdminDashboardRange): AdminFinancialsData {
   const buckets = buildBuckets(range, []);
   const empty = buckets.map(() => 0);
 

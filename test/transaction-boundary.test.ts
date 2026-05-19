@@ -315,4 +315,46 @@ describe("database transaction boundaries", () => {
       "food guidance versions should be allocated by the insert statement"
     );
   });
+
+  it("keeps product version writes transaction-free and statement-atomic", async () => {
+    const source = await readFile("lib/admin-products.ts", "utf8");
+    const helper = functionBody(source, "recordProductVersion");
+
+    assert.equal(
+      helper.includes("sql.begin"),
+      false,
+      "product version writes must not open an explicit app transaction"
+    );
+    assert.equal(
+      /max\s*\(\s*product_versions\.version\s*\)/i.test(helper),
+      false,
+      "product version writes should not allocate versions by scanning max(version)"
+    );
+    assert.match(
+      helper,
+      /with\s+next_product\s+as\s*\([\s\S]*update\s+public\.marketplace_products[\s\S]*current_version\s*=\s*coalesce\(current_version,\s*0\)\s*\+\s*1[\s\S]*insert\s+into\s+public\.product_versions/i,
+      "product version writes should increment the current projection and append the version in one SQL statement"
+    );
+  });
+
+  it("keeps product fact replacement transaction-free and statement-atomic", async () => {
+    const source = await readFile("lib/admin-products.ts", "utf8");
+    const helper = functionBody(source, "replaceProductFacts");
+
+    assert.equal(
+      helper.includes("sql.begin"),
+      false,
+      "product fact replacement must not open an explicit app transaction"
+    );
+    assert.equal(
+      /for\s*\(\s*const\s+fact\s+of\s+facts\s*\)/.test(helper),
+      false,
+      "product fact replacement should not hold many per-fact statements"
+    );
+    assert.match(
+      helper,
+      /with\s+deleted\s+as\s*\([\s\S]*delete\s+from\s+public\.product_facts[\s\S]*jsonb_to_recordset[\s\S]*insert\s+into\s+public\.product_facts/i,
+      "product fact replacement should delete and insert facts in one SQL statement"
+    );
+  });
 });

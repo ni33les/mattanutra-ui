@@ -39,6 +39,7 @@ type LoadState = "loading" | "ready" | "error";
 
 const formulationHeroBackgroundImage = "/formulation-couple.jpg";
 const MAX_PLAN_CHAT_ROUNDS = 8;
+const MAX_PRODUCT_MATCHING_POLLS = 80;
 
 const supplementBenefitRules = [
   {
@@ -103,6 +104,7 @@ type CopyLabels = Record<
   | "context"
   | "coveragePrefix"
   | "coverageSuffix"
+  | "productCoverage"
   | "doseAdjustedBody"
   | "error"
   | "formula"
@@ -200,6 +202,7 @@ export const formulationResultsCopy = {
     context: "Assessment summary",
     coveragePrefix: "Covers",
     coverageSuffix: "of the recommended supplements",
+    productCoverage: "Product coverage",
     doseAdjustedBody:
       "One or more doses were automatically reduced to stay within the configured MattaNutra safety ceiling.",
     error:
@@ -316,6 +319,7 @@ export const formulationResultsCopy = {
     context: "สรุปแบบประเมิน",
     coveragePrefix: "ครอบคลุม",
     coverageSuffix: "ของรายการอาหารเสริมที่แนะนำ",
+    productCoverage: "ความครอบคลุมจากผลิตภัณฑ์",
     doseAdjustedBody:
       "มีการลดขนาดรับประทานบางรายการให้อยู่ในเพดานความปลอดภัยของ MattaNutra โดยอัตโนมัติ",
     error: "ไม่สามารถโหลดสูตรได้ กรุณารีเฟรชหน้าและลองอีกครั้ง",
@@ -488,6 +492,47 @@ function resultHasPendingSections(result: FormulationResult) {
   );
 }
 
+function resultHasPendingProductRecommendations(result: FormulationResult) {
+  if (result.access === "preview") {
+    return false;
+  }
+
+  const productStatus = result.productRecommendations?.status;
+
+  if (productStatus === "pending") {
+    return true;
+  }
+
+  return Boolean(
+    !productStatus &&
+      result.sectionStatuses?.foods === "ready" &&
+      result.sectionStatuses?.supplements === "ready"
+  );
+}
+
+function supplementProductCoverageById(
+  productRecommendations: FormulationResult["productRecommendations"] | undefined
+) {
+  const coverage = new Map<string, number>();
+
+  for (const item of productRecommendations?.needCoverage ?? []) {
+    if (item.itemType !== "supplement") {
+      continue;
+    }
+
+    const supplementId = item.id.startsWith("supplement:")
+      ? item.id.slice("supplement:".length)
+      : item.id;
+
+    coverage.set(
+      supplementId,
+      Math.min(100, Math.max(0, Math.round(item.coveragePercent)))
+    );
+  }
+
+  return coverage;
+}
+
 export function FormulationResults({
   initialResult = null,
   locale,
@@ -504,10 +549,12 @@ export function FormulationResults({
   const [deliveryHandoffPlanId, setDeliveryHandoffPlanId] = useState<
     string | null
   >(null);
+  const productPollAttemptsRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
     let retryTimer: number | undefined;
+    productPollAttemptsRef.current = 0;
 
     async function fetchFormulation() {
       try {
@@ -531,7 +578,17 @@ export function FormulationResults({
           setResult(payload);
           setLoadState("ready");
 
-          if (resultHasPendingSections(payload)) {
+          const productMatchingPending =
+            resultHasPendingProductRecommendations(payload);
+          const shouldPollProductMatching =
+            productMatchingPending &&
+            productPollAttemptsRef.current < MAX_PRODUCT_MATCHING_POLLS;
+
+          if (productMatchingPending) {
+            productPollAttemptsRef.current += 1;
+          }
+
+          if (resultHasPendingSections(payload) || shouldPollProductMatching) {
             retryTimer = window.setTimeout(fetchFormulation, 1500);
           }
         }
@@ -627,6 +684,9 @@ export function FormulationResults({
   );
   const lockedFoodCount = Math.max(0, Number(result.lockedFoodCount ?? 0));
   const unlockHref = planPaywallHref(locale, effectiveResultPlanId);
+  const productCoverageBySupplementId = supplementProductCoverageById(
+    result.productRecommendations
+  );
 
   if (deliveryHandoffPlanId === effectiveResultPlanId) {
     return (
@@ -755,9 +815,19 @@ export function FormulationResults({
           labels={labels}
           lockedSupplementCount={lockedSupplementCount}
           locale={locale}
+          productCoverageBySupplementId={productCoverageBySupplementId}
           unlockHref={unlockHref}
         />
       </div>
+
+      {isPreview ? null : (
+        <ProductRecommendationsPanel
+          locale={locale}
+          planId={effectiveResultPlanId}
+          productRecommendations={result.productRecommendations}
+          recommendations={result.recommendations}
+        />
+      )}
 
       {isPreview ? null : (
         <PlanChatPanel
@@ -1515,7 +1585,8 @@ const productRecommendationCopy = {
     failedTitle: "Product matching needs review",
     matched: "Matched",
     needsReviewed: "client needs reviewed",
-    needs: "Meets",
+    needs: "Adds",
+    ofYourNeeds: "to product coverage",
     stack: "Stack coverage",
     title: "Recommended products",
     view: "View product"
@@ -1532,7 +1603,8 @@ const productRecommendationCopy = {
     failedTitle: "ต้องตรวจสอบการจับคู่สินค้า",
     matched: "จับคู่แล้ว",
     needsReviewed: "ความต้องการที่ตรวจแล้ว",
-    needs: "ตรงกับความต้องการ",
+    needs: "เพิ่ม",
+    ofYourNeeds: "ให้ความครอบคลุมของสินค้า",
     stack: "ความครอบคลุมของชุดสินค้า",
     title: "สินค้าแนะนำ",
     view: "ดูสินค้า"
@@ -1587,7 +1659,10 @@ export function ProductRecommendationsPanel({
   const labels = productRecommendationCopy[locale];
   const stackCoverage = Math.max(
     0,
-    ...recommendations.map((item) => item.stackCoveragePercent ?? 0)
+    Math.round(
+      productRecommendations?.stackCoveragePercent ??
+        Math.max(0, ...recommendations.map((item) => item.stackCoveragePercent ?? 0))
+    )
   );
   const emptyTitle =
     productRecommendations?.status === "failed"
@@ -1683,11 +1758,13 @@ export function ProductRecommendationsPanel({
                   {product.name}
                 </h4>
                 <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
-                  {product.productCoveragePercent ?? 0}%
+                  {product.stackContributionPercent ?? product.productCoveragePercent ?? 0}%
                 </span>
               </div>
               <p className="mt-2 text-sm text-gray-500">
-                {labels.needs} {product.productCoveragePercent ?? 0}% · {product.marketplace}
+                {labels.needs}{" "}
+                {product.stackContributionPercent ?? product.productCoveragePercent ?? 0}%{" "}
+                {labels.ofYourNeeds} · {product.marketplace}
               </p>
               <p className="mt-3 flex-1 text-sm leading-6 text-muted-foreground">
                 {product.description}
@@ -1723,6 +1800,7 @@ function FormulaPanel({
   labels,
   lockedSupplementCount,
   locale,
+  productCoverageBySupplementId,
   unlockHref
 }: Readonly<{
   hasPendingSafetyReview: boolean;
@@ -1731,6 +1809,7 @@ function FormulaPanel({
   labels: PanelLabels;
   lockedSupplementCount: number;
   locale: Locale;
+  productCoverageBySupplementId: ReadonlyMap<string, number>;
   unlockHref: string;
 }>) {
   return (
@@ -1776,6 +1855,8 @@ function FormulaPanel({
           const rationale = getLocalizedText(ingredient.rationale, locale);
           const dailyDose = getLocalizedText(ingredient.dailyDose, locale);
           const benefitTags = supplementBenefitTags(ingredient);
+          const productCoverage =
+            productCoverageBySupplementId.get(ingredient.id) ?? 0;
 
           if (underReview) {
             return (
@@ -1800,6 +1881,21 @@ function FormulaPanel({
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     {rationale}
                   </p>
+                  <div className="mt-4 max-w-md">
+                    <div className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      <span>{labels.productCoverage}</span>
+                      <span className="text-[#20343A]">
+                        {productCoverage}%
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E5EEF7]">
+                      <div
+                        aria-hidden={true}
+                        className="h-full rounded-full bg-[#1FA77A] transition-[width] duration-500"
+                        style={{ width: `${productCoverage}%` }}
+                      />
+                    </div>
+                  </div>
                   {benefitTags.length > 0 ? (
                     <div className="mt-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">

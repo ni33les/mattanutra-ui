@@ -512,7 +512,7 @@ function edgeKey(from: AdminFlowNodeId, to: AdminFlowNodeId) {
   return `${from}->${to}`;
 }
 
-function emptyFlow(range: AdminDashboardRange): AdminFlowData {
+export function emptyFlow(range: AdminDashboardRange): AdminFlowData {
   return {
     databaseAvailable: false,
     edges: edgeDefinitions,

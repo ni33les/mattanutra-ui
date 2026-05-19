@@ -2484,6 +2484,7 @@ export function AdminDashboard({
               data={reviewQueueData}
               labels={labels}
               locale={locale}
+              productsData={productsData}
               selectedReviewTaskId={selectedReviewTaskId}
               supplementsData={supplementsData}
             />

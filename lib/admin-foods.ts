@@ -102,7 +102,7 @@ export function isFoodConfidence(value: string): value is FoodConfidence {
   return confidences.has(value as FoodConfidence);
 }
 
-function emptyAdminFoodsData(): AdminFoodsData {
+export function emptyAdminFoodsData(): AdminFoodsData {
   return {
     categories: [],
     databaseAvailable: false,

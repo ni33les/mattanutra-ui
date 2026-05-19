@@ -782,9 +782,12 @@ export async function enqueueProductRecommendationsTask({
   }
 
   const rows = await sql<Array<{
+    product_catalog_count: number;
+    product_catalog_updated_at: string | null;
     food_version: number;
     formulation_version: number;
     report_version: number;
+    safety_review_state: unknown;
   }>>`
     select
       coalesce((
@@ -809,15 +812,41 @@ export async function enqueueProductRecommendationsTask({
         select max(version)
         from public.nutrition_reports
         where plan_id = ${planId}::uuid
-      ), 0) as report_version
+      ), 0) as report_version,
+      coalesce((
+        select count(*)
+        from public.marketplace_products
+        where list_status = 'whitelisted'
+          and availability_status <> 'unavailable'
+      ), 0)::int as product_catalog_count,
+      (
+        select max(updated_at)::text
+        from public.marketplace_products
+        where list_status = 'whitelisted'
+          and availability_status <> 'unavailable'
+      ) as product_catalog_updated_at,
+      coalesce((
+        select jsonb_agg(
+          jsonb_build_object(
+            'closedAt', closed_at,
+            'id', id,
+            'reviewedAt', reviewed_at,
+            'status', status,
+            'updatedAt', updated_at
+          )
+          order by id
+        )
+        from public.safety_reviews
+        where plan_id = ${planId}::uuid
+          and status in ('accepted', 'closed', 'rejected')
+      ), '[]'::jsonb) as safety_review_state
   `;
   const row = rows[0];
 
   if (
     !row ||
     row.formulation_version < 1 ||
-    row.food_version < 1 ||
-    row.report_version < 1
+    row.food_version < 1
   ) {
     return null;
   }
@@ -847,7 +876,7 @@ export async function enqueueProductRecommendationsTask({
     reasoningEffort: "none",
     source: "product_recommendations",
     taskGroupId: groupId,
-    taskTitle: "Match marketplace products",
+    taskTitle: "Match product catalogue",
     taskType: "generate_product_recommendations"
   });
 }

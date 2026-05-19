@@ -2,11 +2,17 @@ import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import {
   isProductAvailabilityStatus,
+  isProductAudience,
   isProductLabelStatus,
   isProductListStatus,
   updateAdminProduct,
   type ProductAffiliateStatus
 } from "@/lib/admin-products";
+import type {
+  ProductAudience,
+  ProductConfidence,
+  ProductKind
+} from "@/lib/product-recommendations";
 import { isUuid } from "@/lib/assessment-store";
 
 export const runtime = "nodejs";
@@ -17,14 +23,14 @@ type AdminProductRouteProps = Readonly<{
   }>;
 }>;
 
-function textOrNull(value: unknown) {
+function textOrNull(value: unknown, max = 2000) {
   if (typeof value !== "string") {
     return null;
   }
 
   const trimmed = value.trim();
 
-  return trimmed ? trimmed.slice(0, 2000) : null;
+  return trimmed ? trimmed.slice(0, max) : null;
 }
 
 function normalizedKey(value: unknown) {
@@ -55,6 +61,55 @@ function parseOptionalNumber(value: unknown) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function parseProductKind(value: unknown): ProductKind | undefined {
+  const normalized = normalizedKey(value);
+
+  return normalized === "food" ||
+    normalized === "multi" ||
+    normalized === "other" ||
+    normalized === "supplement"
+    ? normalized
+    : undefined;
+}
+
+function parseProductAudience(value: unknown): ProductAudience | undefined {
+  const normalized = normalizedKey(value);
+
+  return isProductAudience(normalized) ? normalized : undefined;
+}
+
+function factsFromBody(value: unknown) {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value
+    .map((item) => (item && typeof item === "object" ? item as Record<string, unknown> : null))
+    .filter((item): item is Record<string, unknown> => Boolean(item))
+    .map((item) => {
+      const itemType: "food" | "nutrient" | "supplement" =
+        item.itemType === "food" || item.itemType === "nutrient"
+          ? item.itemType
+          : "supplement";
+
+      return {
+        amount: parseOptionalNumber(item.amount) ?? null,
+        confidence:
+          item.confidence === "high" || item.confidence === "low"
+            ? item.confidence as ProductConfidence
+            : "moderate" as ProductConfidence,
+        itemType,
+        name: textOrNull(item.name, 500) ?? "",
+        servingLabel: textOrNull(item.servingLabel, 200),
+        sourceText: textOrNull(item.sourceText, 1000),
+        sourceUrl: textOrNull(item.sourceUrl, 2000),
+        supplementId: textOrNull(item.supplementId),
+        unit: textOrNull(item.unit, 40)
+      };
+    })
+    .filter((item) => item.name);
 }
 
 export async function PATCH(
@@ -94,12 +149,22 @@ export async function PATCH(
   const labelStatus = normalizedKey(body.labelStatus);
   const availabilityStatus = normalizedKey(body.availabilityStatus);
   const priceAmount = parseOptionalNumber(body.priceAmount);
+  const productKind = parseProductKind(body.productKind);
+  const productAudience = parseProductAudience(body.productAudience);
+  const title = body.title === undefined ? undefined : textOrNull(body.title, 500);
+  const productUrl = body.productUrl === undefined
+    ? undefined
+    : textOrNull(body.productUrl, 2000);
 
   if (
+    (body.title !== undefined && !title) ||
+    (body.productUrl !== undefined && !productUrl) ||
     (body.listStatus !== undefined && !isProductListStatus(listStatus)) ||
     (body.labelStatus !== undefined && !isProductLabelStatus(labelStatus)) ||
     (body.availabilityStatus !== undefined &&
       !isProductAvailabilityStatus(availabilityStatus)) ||
+    (body.productKind !== undefined && !productKind) ||
+    (body.productAudience !== undefined && !productAudience) ||
     (priceAmount === undefined && body.priceAmount !== undefined)
   ) {
     return NextResponse.json(
@@ -121,10 +186,35 @@ export async function PATCH(
       availabilityStatus: isProductAvailabilityStatus(availabilityStatus)
         ? availabilityStatus
         : undefined,
+      brandName: body.brandName === undefined
+        ? undefined
+        : textOrNull(body.brandName, 200),
+      description: body.description === undefined
+        ? undefined
+        : textOrNull(body.description, 4000),
+      descriptionEn: body.descriptionEn === undefined
+        ? undefined
+        : textOrNull(body.descriptionEn, 4000),
+      descriptionTh: body.descriptionTh === undefined
+        ? undefined
+        : textOrNull(body.descriptionTh, 4000),
+      fdaApprovalNumber: body.fdaApprovalNumber === undefined
+        ? undefined
+        : textOrNull(body.fdaApprovalNumber),
+      facts: factsFromBody(body.facts),
       id,
+      imageUrl: body.imageUrl === undefined
+        ? undefined
+        : textOrNull(body.imageUrl, 2000),
       labelStatus: isProductLabelStatus(labelStatus) ? labelStatus : undefined,
       listStatus: isProductListStatus(listStatus) ? listStatus : undefined,
-      priceAmount
+      priceAmount,
+      productAudience,
+      productKind,
+      productUrl,
+      title,
+      titleEn: body.titleEn === undefined ? undefined : textOrNull(body.titleEn, 500),
+      titleTh: body.titleTh === undefined ? undefined : textOrNull(body.titleTh, 500)
     });
 
     return NextResponse.json(

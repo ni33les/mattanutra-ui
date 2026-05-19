@@ -1,5 +1,9 @@
 import { normalizeAssessmentPlan, type AssessmentPlan } from "@/lib/assessment-snapshot";
-import { isUuid } from "@/lib/assessment-store";
+import {
+  isUuid,
+  reconcileResolvedSafetyReviewFlags
+} from "@/lib/assessment-store";
+import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
 import { getSql } from "@/lib/db";
 import type {
   FoodGuidanceBlueprint,
@@ -22,7 +26,10 @@ import { loadActivePlanGuidanceAdjustments } from "@/lib/plan-guidance-adjustmen
 import {
   buildMarketplaceSearchQueries,
   buildProductNeeds,
+  productFactAliasKeys,
+  productKeysMatch,
   type ProductCandidate,
+  type ProductClientSex,
   type ProductRecommendationNeed
 } from "@/lib/product-recommendations";
 import {
@@ -42,6 +49,7 @@ export type HealthScoreWorkItem = Readonly<{
 
 export type FormulationWorkItem = Readonly<{
   answers: unknown;
+  canonicalSupplements: CanonicalSupplementOption[];
   chatMessages: PlanChatMessage[];
   locale: Locale;
   plan: AssessmentPlan;
@@ -159,6 +167,7 @@ export type NutritionPlanRefinementWorkItem = Readonly<{
 
 export type ProductRecommendationsWorkItem = Readonly<{
   candidates: ProductCandidate[];
+  clientSex: ProductClientSex | null;
   needs: ProductRecommendationNeed[];
   planId: string;
   searchQueries: string[];
@@ -201,6 +210,12 @@ function payloadRecord(payload: unknown) {
   return payload && typeof payload === "object" && !Array.isArray(payload)
     ? (payload as Record<string, unknown>)
     : {};
+}
+
+function productClientSexFromAnswers(value: unknown): ProductClientSex | null {
+  const record = payloadRecord(value);
+
+  return record.sex === "female" || record.sex === "male" ? record.sex : null;
 }
 
 function payloadText(payload: unknown, key: string) {
@@ -325,7 +340,10 @@ async function buildFormulationWorkItem(task: TaskRecord) {
   if (!sql || !task.planId) {
     throw new Error("Formulation work item is missing a plan");
   }
-  const context = await loadPlanGenerationContext(sql, task.planId);
+  const [context, canonicalSupplements] = await Promise.all([
+    loadPlanGenerationContext(sql, task.planId),
+    loadCanonicalSupplementOptions(sql)
+  ]);
 
   if (task.taskType === "generate_supplement_guidance") {
     await sql`
@@ -341,6 +359,7 @@ async function buildFormulationWorkItem(task: TaskRecord) {
 
   return {
     answers: context.answers,
+    canonicalSupplements,
     chatMessages: context.chatMessages,
     locale: context.locale,
     plan: context.plan,
@@ -622,21 +641,121 @@ async function loadPlanGenerationContext(sql: NonNullable<ReturnType<typeof getS
   );
   const planFeedback = await loadActivePlanFeedback(sql, planId);
 
+  let formulation = row.formulation
+    ? row.formulation as FormulationBlueprint
+    : null;
+  let foodGuidance = row.food_guidance
+    ? row.food_guidance as FoodGuidanceBlueprint
+    : null;
+
+  if (formulation && foodGuidance) {
+    const reconciledSafety = await reconcileResolvedSafetyReviewFlags(
+      sql,
+      planId,
+      {
+        foodGuidance: foodGuidance.foodGuidance ?? [],
+        foodSafetySummary: foodGuidance.foodSafetySummary,
+        safetySummary: formulation.safetySummary,
+        supplementBreakdown: formulation.supplementBreakdown ?? []
+      }
+    );
+
+    formulation = {
+      ...formulation,
+      safetySummary: reconciledSafety.safetySummary,
+      supplementBreakdown: reconciledSafety.supplementBreakdown
+    };
+    foodGuidance = {
+      ...foodGuidance,
+      foodGuidance: reconciledSafety.foodGuidance,
+      foodSafetySummary: reconciledSafety.foodSafetySummary
+    };
+  }
+
   return {
     answers: row.answers,
     chatMessages: chatRows.map(mapChatMessage),
-    foodGuidance: row.food_guidance
-      ? row.food_guidance as FoodGuidanceBlueprint
-      : null,
-    formulation: row.formulation
-      ? row.formulation as FormulationBlueprint
-      : null,
+    foodGuidance,
+    formulation,
     guidanceAdjustments,
     locale: isLocale(row.locale) ? row.locale : "en",
     plan: normalizeAssessmentPlan(row.selected_plan),
     planFeedback,
     planId
   };
+}
+
+async function loadCanonicalSupplementOptions(
+  sql: NonNullable<ReturnType<typeof getSql>>
+): Promise<CanonicalSupplementOption[]> {
+  const rows = await sql<Array<{
+    aliases: string[];
+    category: string;
+    id: string;
+    list_status: string;
+    max_amount: string | number | null;
+    max_unit: string | null;
+    name: string;
+    normalized_name: string;
+  }>>`
+    select
+      supplements.id::text,
+      supplements.name,
+      supplements.normalized_name,
+      supplements.category,
+      supplements.list_status,
+      safety.max_amount,
+      safety.max_unit,
+      coalesce(
+        array_agg(distinct supplement_aliases.alias)
+          filter (
+            where supplement_aliases.alias is not null
+              and supplement_aliases.normalized_alias <> supplements.normalized_name
+          ),
+        '{}'::text[]
+      ) as aliases
+    from public.supplements
+    left join public.supplement_aliases
+      on supplement_aliases.supplement_id = supplements.id
+    left join lateral (
+      select max_amount, max_unit
+      from public.supplement_safety_limits
+      where supplement_safety_limits.supplement_id = supplements.id
+      order by version desc, updated_at desc
+      limit 1
+    ) safety on true
+    where supplements.is_active = true
+      and supplements.list_status in ('whitelisted', 'review_required')
+    group by
+      supplements.id,
+      supplements.name,
+      supplements.normalized_name,
+      supplements.category,
+      supplements.list_status,
+      safety.max_amount,
+      safety.max_unit
+    order by
+      case supplements.list_status
+        when 'whitelisted' then 0
+        else 1
+      end,
+      supplements.name
+    limit 220
+  `;
+
+  return rows.map((row) => ({
+    aliases: row.aliases ?? [],
+    category: row.category,
+    id: row.id,
+    listStatus: row.list_status,
+    maxAmount:
+      row.max_amount === null || row.max_amount === undefined
+        ? null
+        : Number(row.max_amount),
+    maxUnit: row.max_unit,
+    name: row.name,
+    normalizedName: row.normalized_name
+  }));
 }
 
 async function buildNutritionAdvisorContext(task: TaskRecord) {
@@ -708,19 +827,71 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
   if (!task.planId || !context.formulation || !context.foodGuidance) {
     throw new Error("Product recommendation task requires a finalized plan");
   }
-  const needs = buildProductNeeds({
+  const needs = await enrichProductNeedsWithAliases(buildProductNeeds({
     foodGuidance: context.foodGuidance,
     formulation: context.formulation
-  });
+  }));
 
   return {
     candidates: await getProductRecommendationCandidates(),
+    clientSex: productClientSexFromAnswers(context.answers),
     needs,
     planId: task.planId,
     searchQueries: buildMarketplaceSearchQueries(needs),
     taskId: task.id,
     taskType: "generate_product_recommendations"
   } satisfies ProductRecommendationsWorkItem;
+}
+
+async function enrichProductNeedsWithAliases(
+  needs: readonly ProductRecommendationNeed[]
+): Promise<ProductRecommendationNeed[]> {
+  const sql = getSql();
+
+  if (!sql || needs.length < 1) {
+    return [...needs];
+  }
+
+  const rows = await sql<Array<{
+    normalized_aliases: string[];
+    normalized_name: string;
+  }>>`
+    select
+      supplements.normalized_name,
+      array_remove(array_agg(distinct supplement_aliases.normalized_alias), null) as normalized_aliases
+    from public.supplements
+    left join public.supplement_aliases
+      on supplement_aliases.supplement_id = supplements.id
+    group by supplements.id, supplements.normalized_name
+  `;
+
+  return needs.map((need) => {
+    if (need.itemType !== "supplement") {
+      return need;
+    }
+
+    const needAliases = productFactAliasKeys(need.displayName, need.aliasKeys);
+    const matches = rows.filter((row) =>
+      productKeysMatch(
+        need.displayName,
+        row.normalized_name,
+        needAliases,
+        row.normalized_aliases
+      )
+    );
+    const aliasKeys = [
+      ...needAliases,
+      ...matches.flatMap((row) => [
+        row.normalized_name,
+        ...row.normalized_aliases
+      ])
+    ];
+
+    return {
+      ...need,
+      aliasKeys: [...new Set(aliasKeys.flatMap((alias) => productFactAliasKeys(alias)))]
+    };
+  });
 }
 
 async function buildNutritionPlanRefinementWorkItem(task: TaskRecord) {

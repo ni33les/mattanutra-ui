@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { toJsonValue } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
 import { getSql } from "@/lib/db";
@@ -75,23 +75,6 @@ export function normalizeFoodName(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
-}
-
-function deterministicUuid(seed: string) {
-  const bytes = Buffer.from(createHash("sha256").update(seed).digest().subarray(0, 16));
-
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-  const hex = bytes.toString("hex");
-
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    hex.slice(12, 16),
-    hex.slice(16, 20),
-    hex.slice(20)
-  ].join("-");
 }
 
 function objectValue(value: unknown) {
@@ -374,12 +357,11 @@ async function enqueueFoodReviewWork(input: {
   payload: Record<string, unknown>;
   planId: string | null;
 }) {
-  const globalUnknown = input.kind === "unknown_food";
+  const globalUnknown = input.kind === "unknown_food" && !input.planId;
   const taskTitle = `Review food ${input.foodName}`;
   const idempotencyKey = `food-review:${input.kind}:${globalUnknown ? "global" : input.planId}:${input.normalizedFoodName}`;
-  const taskId = deterministicUuid(`mattanutra:task:${idempotencyKey}`);
   const createReviewWork = async () => {
-    await createTask({
+    const result = await createTask({
       actorType: "human",
       businessValue: globalUnknown ? 350 : 400,
       context: {
@@ -388,7 +370,7 @@ async function enqueueFoodReviewWork(input: {
         source: "food_guidance_safety"
       },
       groupLabel: globalUnknown ? "Review food" : "Review food guidance",
-      id: taskId,
+      id: randomUUID(),
       idempotencyKey,
       idempotencyScopeKey: globalUnknown
         ? `food:${input.normalizedFoodName}`
@@ -417,25 +399,11 @@ async function enqueueFoodReviewWork(input: {
       taskType: input.kind === "unknown_food" ? "classify_food" : "review_food_for_plan",
       title: taskTitle
     });
+
+    return { taskId: result.task.id };
   };
 
-  if (input.afterCommit) {
-    input.afterCommit(createReviewWork);
-    return { taskId };
-  }
-
-  try {
-    await createReviewWork();
-    return { taskId };
-  } catch (error) {
-    console.warn("Unable to create task-backed food review work", {
-      error,
-      foodName: input.foodName,
-      reviewKind: input.kind
-    });
-
-    return { taskId: null };
-  }
+  return createReviewWork();
 }
 
 async function attachSafetyReviewWork(

@@ -2,6 +2,7 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { getSql } from "@/lib/db";
+import { stageProductImport } from "@/lib/admin-products";
 
 type FdaSearchRow = Readonly<{
   Addr?: unknown;
@@ -113,17 +114,6 @@ function normalizeKey(value: string) {
     .replace(/&/g, " and ")
     .replace(/[^a-z0-9ก-๙]+/g, "_")
     .replace(/^_+|_+$/g, "");
-}
-
-function normalizedUrl(value: string) {
-  try {
-    const url = new URL(value);
-    url.hash = "";
-
-    return url.toString().toLowerCase();
-  } catch {
-    return value.trim().toLowerCase();
-  }
 }
 
 function titleFromNames(thai: string | null, english: string | null) {
@@ -287,167 +277,36 @@ async function writeOutput(
   return absolute;
 }
 
-async function upsertBrand(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  brandName: string | null
-) {
-  if (!brandName) {
-    return null;
-  }
-
-  const rows = await sql<Array<{ id: string }>>`
-    insert into public.product_brands (
-      name,
-      normalized_name,
-      list_status,
-      created_at,
-      updated_at
-    )
-    values (
-      ${brandName},
-      ${normalizeKey(brandName)},
-      'unknown',
-      now(),
-      now()
-    )
-    on conflict (normalized_name) do update set
-      name = excluded.name,
-      updated_at = now()
-    returning id::text
-  `;
-
-  return rows[0]?.id ?? null;
-}
-
-async function upsertProduct(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  product: NormalizedFdaProduct
-) {
-  const brandId = await upsertBrand(sql, product.holderName);
-  const normalized = normalizedUrl(product.productUrl);
-  const adminNotes = [
-    "Imported from Thai FDA public product search.",
-    product.licenseNumber ? `License: ${product.licenseNumber}.` : null,
-    product.newCode ? `Newcode: ${product.newCode}.` : null,
-    product.statusText ? `FDA status: ${product.statusText}.` : null,
-    product.marketAuthorizationType
-      ? `Authorization type: ${product.marketAuthorizationType}.`
-      : null
-  ].filter(Boolean).join(" ");
-
-  const rows = await sql<Array<{ id: string; inserted: boolean }>>`
-    insert into public.marketplace_products (
-      platform,
-      region,
-      marketplace_product_id,
-      title,
-      normalized_title,
-      brand_id,
-      brand_name,
-      normalized_brand_name,
-      product_url,
-      normalized_url,
-      description,
-      category,
-      list_status,
-      label_status,
-      availability_status,
-      affiliate_status,
-      currency,
-      source,
-      admin_notes,
-      created_at,
-      updated_at
-    )
-    values (
-      'manual',
-      'TH',
-      ${product.newCode ?? product.licenseNumber ?? product.fdaId},
-      ${product.title},
-      ${normalizeKey(product.title)},
-      ${brandId}::uuid,
-      ${product.holderName},
-      ${product.holderName ? normalizeKey(product.holderName) : null},
-      ${product.productUrl},
-      ${normalized},
-      ${product.productNameThai && product.productNameEnglish
-        ? `${product.productNameThai}\n${product.productNameEnglish}`
-        : product.productNameThai ?? product.productNameEnglish},
-      ${product.category},
-      'unknown',
-      'missing',
-      'unknown',
-      'none',
-      'THB',
-      'thai_fda',
-      ${adminNotes},
-      now(),
-      now()
-    )
-    on conflict (normalized_url) do update set
-      marketplace_product_id = coalesce(excluded.marketplace_product_id, marketplace_products.marketplace_product_id),
-      title = excluded.title,
-      normalized_title = excluded.normalized_title,
-      brand_id = excluded.brand_id,
-      brand_name = excluded.brand_name,
-      normalized_brand_name = excluded.normalized_brand_name,
-      description = coalesce(excluded.description, marketplace_products.description),
-      category = coalesce(excluded.category, marketplace_products.category),
-      source = case
-        when marketplace_products.source = 'admin' then marketplace_products.source
-        else excluded.source
-      end,
-      admin_notes = excluded.admin_notes,
-      updated_at = now()
-    returning id::text, (xmax = 0) as inserted
-  `;
-  const row = rows[0];
-
-  if (!row) {
-    throw new Error(`Thai FDA product import failed for ${product.title}`);
-  }
-
-  await sql`
-    insert into public.product_admin_audit (
-      product_id,
-      actor,
-      action,
-      after_payload
-    )
-    values (
-      ${row.id}::uuid,
-      'thai_fda_importer',
-      ${row.inserted ? "thai_fda_product_imported" : "thai_fda_product_refreshed"},
-      ${sql.json({
-        category: product.category,
-        licenseNumber: product.licenseNumber,
-        newCode: product.newCode,
-        productUrl: product.productUrl,
-        sourceTerm: product.sourceTerm,
-        statusText: product.statusText,
-        title: product.title
-      })}::jsonb
-    )
-  `;
-
-  return row.id;
-}
-
 async function applyProducts(products: readonly NormalizedFdaProduct[]) {
-  const sql = getSql();
-
-  if (!sql) {
-    throw new Error("DB_CONNECTION is required when --apply is used");
-  }
-
   let importedOrUpdated = 0;
 
   for (const product of products) {
-    await upsertProduct(sql, product);
+    await stageProductImport({
+      actor: "thai_fda_importer",
+      brandName: product.holderName || "Unknown FDA holder",
+      fdaApprovalNumber: product.licenseNumber ?? product.newCode ?? product.fdaId,
+      parsedFacts: [],
+      parseConfidence: "low",
+      productTitle: product.title,
+      rawSnapshot: {
+        category: product.category,
+        licenseNumber: product.licenseNumber,
+        marketAuthorizationType: product.marketAuthorizationType,
+        newCode: product.newCode,
+        productNameEnglish: product.productNameEnglish,
+        productNameThai: product.productNameThai,
+        sourceTerm: product.sourceTerm,
+        statusText: product.statusText
+      },
+      source: "thai_fda",
+      sourceUrl: product.productUrl
+    });
     importedOrUpdated += 1;
   }
 
-  await sql.end({ timeout: 5 });
+  const sql = getSql();
+
+  await sql?.end({ timeout: 5 });
 
   return importedOrUpdated;
 }

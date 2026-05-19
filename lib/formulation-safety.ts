@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import { toJsonValue } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
@@ -57,7 +57,7 @@ type ReviewKind =
   | "unknown_supplement";
 
 type SupplementReviewWork = Readonly<{
-  taskId: string | null;
+  taskId: string;
 }>;
 
 function textFromLocalized(value: LocalizedText) {
@@ -75,23 +75,6 @@ function normalizeName(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
-}
-
-function deterministicUuid(seed: string) {
-  const bytes = Buffer.from(createHash("sha256").update(seed).digest().subarray(0, 16));
-
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-  const hex = bytes.toString("hex");
-
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    hex.slice(12, 16),
-    hex.slice(16, 20),
-    hex.slice(20)
-  ].join("-");
 }
 
 function numberOrNull(value: number | string | null) {
@@ -234,9 +217,16 @@ function withHiddenSafety(
 function withAutomatedSafetyStatus(
   ingredient: FormulationIngredient
 ): FormulationIngredient {
-  return ingredient.status === "review"
-    ? { ...ingredient, status: "add" }
-    : ingredient;
+  if (ingredient.status !== "review" && !ingredient.safety) {
+    return ingredient;
+  }
+
+  const { safety: _safety, ...safeIngredient } = ingredient;
+
+  return {
+    ...safeIngredient,
+    status: ingredient.status === "review" ? "add" : ingredient.status
+  };
 }
 
 function withReducedDose(
@@ -267,16 +257,15 @@ async function enqueueSupplementReviewWork(input: {
   planId: string | null;
   supplementName: string;
 }): Promise<SupplementReviewWork> {
-  const globalUnknown = input.kind === "unknown_supplement";
+  const globalUnknown = input.kind === "unknown_supplement" && !input.planId;
   const businessValue = reviewTaskBusinessValue(input.kind);
   const groupLabel = globalUnknown
     ? "Review supplement"
     : "Review plan";
   const taskTitle = `Review supplement ${input.supplementName}`;
   const idempotencyKey = `supplement-review:${input.kind}:${globalUnknown ? "global" : input.planId}:${input.normalizedSupplementName}`;
-  const taskId = deterministicUuid(`mattanutra:task:${idempotencyKey}`);
   const createReviewWork = async () => {
-    await createTask({
+    const result = await createTask({
       actorType: "human",
       businessValue,
       context: {
@@ -285,7 +274,7 @@ async function enqueueSupplementReviewWork(input: {
         source: "formulation_safety"
       },
       groupLabel,
-      id: taskId,
+      id: randomUUID(),
       idempotencyKey,
       idempotencyScopeKey: globalUnknown
         ? `supplement:${input.normalizedSupplementName}`
@@ -314,30 +303,13 @@ async function enqueueSupplementReviewWork(input: {
       taskType: reviewTaskType(input.kind),
       title: taskTitle
     });
+
+    return {
+      taskId: result.task.id
+    };
   };
 
-  if (input.afterCommit) {
-    input.afterCommit(createReviewWork);
-    return {
-      taskId
-    };
-  }
-
-  try {
-    await createReviewWork();
-
-    return { taskId };
-  } catch (error) {
-    console.warn("Unable to create task-backed supplement review work", {
-      error,
-      reviewKind: input.kind,
-      supplementName: input.supplementName
-    });
-
-    return {
-      taskId: null
-    };
-  }
+  return createReviewWork();
 }
 
 async function attachSafetyReviewWork(

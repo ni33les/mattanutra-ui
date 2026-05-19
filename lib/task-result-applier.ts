@@ -4,8 +4,7 @@ import { writeBpmEvent } from "@/lib/bpm";
 import { recordEmailCommunicationDelivery } from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import {
-  getProductRecommendationCandidates,
-  importDiscoveredMarketplaceProducts
+  getProductRecommendationCandidates
 } from "@/lib/admin-products";
 import type {
   MarketplaceProductSnapshot,
@@ -55,6 +54,7 @@ import {
 import {
   recommendProductStack,
   toRecommendedProduct,
+  type ProductClientSex,
   type ProductRecommendationResult
 } from "@/lib/product-recommendations";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
@@ -152,6 +152,21 @@ async function refreshPaidNutritionReadinessAfterCommit(
     await addWorkEvent(task, "nutrition_plan_ready", "medium", {
       source: "post_commit_readiness_refresh"
     });
+
+    try {
+      await enqueueProductRecommendationsTask({
+        parentTaskId: task.id,
+        planId,
+        taskGroupId: task.taskGroupId
+      });
+    } catch (error) {
+      console.error("Unable to queue product recommendations", error);
+      await addWorkEvent(task, "product_recommendations_queue_failed", "medium", {
+        errorMessage:
+          error instanceof Error ? error.message : "Unknown product queue error",
+        source: "post_commit_readiness_refresh"
+      });
+    }
   }
 
   if (ready) {
@@ -403,6 +418,17 @@ async function applyPaidFormulationResult(
   });
   await eventually(afterCommit, async () => {
     await refreshPaidNutritionReadinessAfterCommit(task, planId, nutritionReady);
+    if (nutritionReady) {
+      try {
+        await enqueueProductRecommendationsTask({
+          parentTaskId: task.id,
+          planId,
+          taskGroupId: task.taskGroupId
+        });
+      } catch (error) {
+        console.error("Unable to queue product recommendations", error);
+      }
+    }
   });
   await eventually(afterCommit, async () => {
     await writeBpmEvent({
@@ -496,6 +522,17 @@ async function applyPaidFoodGuidanceResult(
   });
   await eventually(afterCommit, async () => {
     await refreshPaidNutritionReadinessAfterCommit(task, planId, nutritionReady);
+    if (nutritionReady) {
+      try {
+        await enqueueProductRecommendationsTask({
+          parentTaskId: task.id,
+          planId,
+          taskGroupId: task.taskGroupId
+        });
+      } catch (error) {
+        console.error("Unable to queue product recommendations", error);
+      }
+    }
   });
   await eventually(afterCommit, async () => {
     await writeBpmEvent({
@@ -1388,18 +1425,28 @@ function productRecommendationPayload(value: unknown): ProductRecommendationResu
   const recommendations = Array.isArray(payload.recommendations)
     ? payload
     : objectValue(payload.recommendations);
+  const stackCoveragePercent = Number(recommendations.stackCoveragePercent) || 0;
+  const supplementProductCoveragePercent =
+    Number(recommendations.supplementProductCoveragePercent) || stackCoveragePercent;
+  const foodCoveragePercent = Number(recommendations.foodCoveragePercent) || 0;
+  const totalPlanCoveragePercent =
+    Number(recommendations.totalPlanCoveragePercent) || stackCoveragePercent;
 
   return {
     clientNeeds: Array.isArray(recommendations.clientNeeds)
       ? recommendations.clientNeeds as ProductRecommendationResult["clientNeeds"]
       : [],
+    diagnostics: objectValue(recommendations.diagnostics) as ProductRecommendationResult["diagnostics"],
     exclusions: Array.isArray(recommendations.exclusions)
       ? recommendations.exclusions as ProductRecommendationResult["exclusions"]
       : [],
+    foodCoveragePercent,
     recommendations: Array.isArray(recommendations.recommendations)
       ? recommendations.recommendations as ProductRecommendationResult["recommendations"]
       : [],
-    stackCoveragePercent: Number(recommendations.stackCoveragePercent) || 0
+    stackCoveragePercent,
+    supplementProductCoveragePercent,
+    totalPlanCoveragePercent
   };
 }
 
@@ -1541,6 +1588,22 @@ async function queueUnknownProductReviewTasks(
   }
 }
 
+async function loadProductRecommendationClientSex(
+  sql: TaskServiceDb,
+  planId: string
+): Promise<ProductClientSex | null> {
+  const rows = await sql<Array<{ sex: string | null }>>`
+    select answers ->> 'sex' as sex
+    from public.assessments
+    where plan_id = ${planId}::uuid
+    order by updated_at desc
+    limit 1
+  `;
+  const sex = rows[0]?.sex;
+
+  return sex === "female" || sex === "male" ? sex : null;
+}
+
 async function applyProductRecommendationsResult(
   task: TaskRecord,
   resultPayload: unknown,
@@ -1554,17 +1617,14 @@ async function applyProductRecommendationsResult(
   if (!sql || !task.planId) {
     throw new Error("Product recommendation result is missing plan");
   }
-  const importSummary = await importDiscoveredMarketplaceProducts({
-    actor: "product_matcher",
-    needs: initialResult.clientNeeds,
-    products: discovery.products
-  });
-  const result = importSummary.withInferredFacts > 0
-    ? recommendProductStack({
+  const clientSex = await loadProductRecommendationClientSex(sql, task.planId);
+  const result = initialResult.recommendations.length > 0
+    ? initialResult
+    : recommendProductStack({
         candidates: await getProductRecommendationCandidates(),
+        clientSex,
         needs: initialResult.clientNeeds
-      })
-    : initialResult;
+      });
   const configuredAdapters = discovery.diagnostics.filter(
     (item) => item.configured
   ).length;
@@ -1574,10 +1634,10 @@ async function applyProductRecommendationsResult(
   );
   const discoveryNotes =
     discovery.diagnostics.length < 1
-      ? "Marketplace discovery was not attempted."
+      ? "Matched against the approved curated product catalogue."
       : configuredAdapters < 1
         ? "Marketplace discovery adapters are not configured."
-        : `Marketplace discovery returned ${discoveryResults} products; imported ${importSummary.imported}.`;
+        : `Marketplace discovery returned ${discoveryResults} products.`;
 
   const runRows = await sql<Array<{ id: string }>>`
     insert into public.product_recommendation_runs (
@@ -1587,8 +1647,12 @@ async function applyProductRecommendationsResult(
       status,
       market_region,
       stack_coverage_percent,
+      supplement_product_coverage_percent,
+      food_coverage_percent,
+      total_coverage_percent,
       client_needs,
       exclusions,
+      diagnostics,
       notes,
       generated_at,
       created_at
@@ -1600,8 +1664,12 @@ async function applyProductRecommendationsResult(
       ${result.recommendations.length > 0 ? "completed" : "partial"},
       'TH',
       ${result.stackCoveragePercent},
+      ${result.supplementProductCoveragePercent},
+      ${result.foodCoveragePercent},
+      ${result.totalPlanCoveragePercent},
       ${sql.json(toJsonValue(result.clientNeeds))}::jsonb,
       ${sql.json(toJsonValue(result.exclusions))}::jsonb,
+      ${sql.json(toJsonValue(result.diagnostics))}::jsonb,
       ${discoveryNotes},
       now(),
       now()
@@ -1684,10 +1752,12 @@ async function applyProductRecommendationsResult(
       planId: task.planId,
       properties: {
         discoveredProductCount: discovery.products.length,
-        importedProductCount: importSummary.imported,
+        importedProductCount: 0,
         productCount: result.recommendations.length,
         recommendationRunId: runId,
-        stackCoveragePercent: result.stackCoveragePercent
+        stackCoveragePercent: result.stackCoveragePercent,
+        supplementProductCoveragePercent: result.supplementProductCoveragePercent,
+        totalPlanCoveragePercent: result.totalPlanCoveragePercent
       },
       severity: "medium"
     });
@@ -1695,10 +1765,12 @@ async function applyProductRecommendationsResult(
       configuredMarketplaceAdapters: configuredAdapters,
       discoveredProductCount: discovery.products.length,
       discoveryNotes,
-      importedProductCount: importSummary.imported,
+      importedProductCount: 0,
       productCount: result.recommendations.length,
       recommendationRunId: runId,
-      stackCoveragePercent: result.stackCoveragePercent
+      stackCoveragePercent: result.stackCoveragePercent,
+      supplementProductCoveragePercent: result.supplementProductCoveragePercent,
+      totalPlanCoveragePercent: result.totalPlanCoveragePercent
     });
     await queueUnknownProductReviewTasks(task, runId, result);
   });

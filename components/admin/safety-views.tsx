@@ -8,7 +8,7 @@ import {
   ComboboxOption,
   ComboboxOptions
 } from "@headlessui/react";
-import { SparklesIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, SparklesIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { ChevronDownIcon as ChevronDownSolidIcon } from "@heroicons/react/20/solid";
 import type {
   AdminReviewLocalizedText,
@@ -38,6 +38,11 @@ import type {
   ProductAffiliateStatus,
   ProductLabelStatus
 } from "@/lib/admin-products";
+import {
+  doseExceedsLimit,
+  normalizeDoseUnit,
+  parseDoseLimit
+} from "@/lib/dose-conversion";
 import { foodNutrientCatalog } from "@/lib/food-nutrients";
 import {
   foodBenefitTags,
@@ -45,6 +50,7 @@ import {
   foodTagLabel
 } from "@/lib/food-tags";
 import type { Locale } from "@/lib/i18n";
+import { productFactLooksDirtyForMatching } from "@/lib/product-quality";
 import {
   foodReviewSuggestionTimeoutMs,
   supplementDoseSuggestionTimeoutMs,
@@ -89,13 +95,6 @@ import {
   updateFoodNutrientProfileValue
 } from "@/components/admin/safety-view-helpers";
 
-const productListStatuses = [
-  "unknown",
-  "whitelisted",
-  "review_required",
-  "blacklisted",
-  "inactive"
-] as const;
 const productLabelStatuses = ["parsed", "missing", "stale", "failed"] as const;
 const productAvailabilityStatuses = [
   "in_stock",
@@ -108,45 +107,334 @@ const productAffiliateStatuses = [
   "flagged_stale",
   "none"
 ] as const;
+const productKinds = ["supplement", "multi", "food", "other"] as const;
+const productAudiences = ["both", "female", "male"] as const;
+const productBusinessStates = [
+  "pending_review",
+  "approved",
+  "ignored"
+] as const;
 
-function productSearchText(row: AdminProductRow) {
-  return [
+type ProductBusinessState = (typeof productBusinessStates)[number];
+type ProductMetricFilter =
+  | "productsAffiliates"
+  | "productsIgnored"
+  | "productsMissingFacts"
+  | "productsMissingImages"
+  | "productsPendingReview"
+  | "productsTotal"
+  | "productsWhitelisted";
+
+function productMetricForBusinessState(
+  state: ProductBusinessState | ""
+): ProductMetricFilter {
+  if (state === "approved") {
+    return "productsWhitelisted";
+  }
+
+  if (state === "ignored") {
+    return "productsIgnored";
+  }
+
+  if (state === "pending_review") {
+    return "productsPendingReview";
+  }
+
+  return "productsTotal";
+}
+
+function productBusinessStateForMetric(
+  metric: ProductMetricFilter
+): ProductBusinessState | "" {
+  if (metric === "productsWhitelisted") {
+    return "approved";
+  }
+
+  if (metric === "productsIgnored") {
+    return "ignored";
+  }
+
+  if (metric === "productsPendingReview") {
+    return "pending_review";
+  }
+
+  return "";
+}
+
+function searchTerms(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function searchField(value: unknown) {
+  return String(value ?? "").toLowerCase();
+}
+
+function searchTokens(value: unknown) {
+  return searchField(value)
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+}
+
+function fieldContainsSearchTerm(value: unknown, term: string) {
+  return searchField(value).includes(term);
+}
+
+function factFieldMatchesSearchTerm(value: unknown, term: string) {
+  const field = searchField(value);
+
+  if (!field) {
+    return false;
+  }
+
+  if (searchTokens(value).includes(term)) {
+    return true;
+  }
+
+  return term.length >= 4 || /\d/.test(term) ? field.includes(term) : false;
+}
+
+function productMatchesSearch(row: AdminProductRow, search: string) {
+  const terms = searchTerms(search);
+
+  if (terms.length < 1) {
+    return true;
+  }
+
+  const productFields = [
     row.title,
+    row.titleEn,
+    row.titleTh,
     row.brandName,
+    row.category,
+    row.fdaApprovalNumber,
+    row.productKind,
+    row.productAudience,
     row.platform,
+    row.region,
     row.listStatus,
+    row.labelStatus,
+    row.availabilityStatus,
     row.affiliateStatus,
-    ...row.facts.map((fact) => fact.name)
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+    ...row.affiliateLinks.flatMap((link) => [
+      link.linkType,
+      link.network,
+      link.platform,
+      link.status
+    ])
+  ];
+  const factFields = row.facts.flatMap((fact) => [
+    fact.name,
+    fact.normalizedName,
+    fact.itemType,
+    fact.confidence,
+    ...(fact.aliasKeys ?? [])
+  ]);
+
+  return terms.every(
+    (term) =>
+      productFields.some((field) => fieldContainsSearchTerm(field, term)) ||
+      factFields.some((field) => factFieldMatchesSearchTerm(field, term))
+  );
 }
 
 function productStatusLabel(status: string) {
+  if (status === "whitelisted") {
+    return "Approved";
+  }
+
+  if (status === "review_required") {
+    return "Review Required";
+  }
+
+  if (status === "unknown") {
+    return "Unknown";
+  }
+
+  if (status === "inactive" || status === "blacklisted") {
+    return "Ignored";
+  }
+
+  if (status === "both") {
+    return "Both";
+  }
+
+  if (status === "female") {
+    return "Female only";
+  }
+
+  if (status === "male") {
+    return "Male only";
+  }
+
   return readableToken(status);
 }
 
-function productStatusClass(status: string) {
-  if (status === "whitelisted" || status === "active" || status === "in_stock") {
+function productBusinessState(
+  productOrStatus: AdminProductRow | AdminProductRow["listStatus"]
+): ProductBusinessState {
+  if (typeof productOrStatus !== "string") {
+    if (productOrStatus.importReviewTaskId) {
+      return "pending_review";
+    }
+
+    return productBusinessState(productOrStatus.listStatus);
+  }
+
+  if (productOrStatus === "whitelisted") {
+    return "approved";
+  }
+
+  if (productOrStatus === "inactive" || productOrStatus === "blacklisted") {
+    return "ignored";
+  }
+
+  return "pending_review";
+}
+
+function productBusinessStateLabel(state: ProductBusinessState) {
+  if (state === "approved") {
+    return "Approved";
+  }
+
+  if (state === "ignored") {
+    return "Ignored";
+  }
+
+  return "Review Required";
+}
+
+function productBusinessStateClass(state: ProductBusinessState) {
+  if (state === "approved") {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
-  if (status === "blacklisted" || status === "failed" || status === "unavailable") {
-    return "border-red-200 bg-red-50 text-red-700";
+  if (state === "ignored") {
+    return "border-gray-200 bg-gray-50 text-gray-700";
   }
 
-  if (
-    status === "review_required" ||
-    status === "flagged_stale" ||
-    status === "missing" ||
-    status === "stale" ||
-    status === "out_of_stock"
-  ) {
-    return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-amber-200 bg-amber-50 text-amber-700";
+}
+
+function productMatchesMetricFilter(
+  row: AdminProductRow,
+  metric: ProductMetricFilter
+) {
+  if (metric === "productsWhitelisted") {
+    return productBusinessState(row) === "approved";
   }
 
-  return "border-gray-200 bg-gray-50 text-gray-700";
+  if (metric === "productsPendingReview") {
+    return productBusinessState(row) === "pending_review";
+  }
+
+  if (metric === "productsIgnored") {
+    return productBusinessState(row) === "ignored";
+  }
+
+  if (metric === "productsMissingFacts") {
+    return row.productQualityLabel === "Missing Facts";
+  }
+
+  if (metric === "productsMissingImages") {
+    return row.productQualityLabel === "Missing Image";
+  }
+
+  if (metric === "productsAffiliates") {
+    return row.affiliateStatus === "active";
+  }
+
+  return true;
+}
+
+async function adminResponseErrorMessage(
+  response: Response,
+  fallback: string
+) {
+  const payload = (await response.json().catch(() => null)) as
+    | { message?: string }
+    | null;
+
+  return payload?.message ?? fallback;
+}
+
+function formatProductFactLimit(fact: AdminProductRow["facts"][number]) {
+  if (fact.maxAmount === null || !fact.maxUnit) {
+    return null;
+  }
+
+  return `${Number.isInteger(fact.maxAmount) ? fact.maxAmount.toFixed(0) : fact.maxAmount} ${fact.maxUnit}`;
+}
+
+function productFactIssueMessages(fact: AdminProductRow["facts"][number]) {
+  const issues: string[] = [];
+  const amount = fact.amount;
+  const unit = fact.unit ? normalizeDoseUnit(fact.unit) : null;
+  const limit = parseDoseLimit(fact.maxAmount, fact.maxUnit);
+  const hasCanonicalMatch = Boolean(
+    fact.supplementId || fact.foodId || fact.nutrientId
+  );
+
+  if (!fact.name.trim()) {
+    issues.push("Missing ingredient name");
+  }
+
+  if (!hasCanonicalMatch) {
+    issues.push("No canonical match");
+  }
+
+  if (amount === null || !fact.unit?.trim()) {
+    issues.push("Missing usable dose");
+  } else if (!unit) {
+    issues.push(`Unit ${fact.unit} cannot be compared`);
+  }
+
+  if (productFactLooksDirtyForMatching(fact)) {
+    issues.push("Fact name or source text needs cleanup before matching");
+  }
+
+  if (fact.supplementStatus === "blacklisted") {
+    issues.push("Canonical supplement is ignored");
+  }
+
+  if (amount !== null && unit && limit) {
+    const exceedsLimit = doseExceedsLimit(
+      {
+        amount,
+        originalText: `${amount} ${unit}`,
+        unit
+      },
+      limit,
+      fact.normalizedName || fact.name
+    );
+
+    if (exceedsLimit === true) {
+      const formattedLimit = formatProductFactLimit(fact);
+
+      issues.push(
+        formattedLimit
+          ? `Exceeds configured safe dose of ${formattedLimit}`
+          : "Exceeds configured safe dose"
+      );
+    }
+  }
+
+  if (amount !== null && unit && !limit && hasCanonicalMatch) {
+    issues.push("No configured safe dose to compare against");
+  }
+
+  return issues;
+}
+
+function productFactIssueSeverity(issues: readonly string[]) {
+  return issues.some((issue) => issue.toLowerCase().includes("exceeds"))
+    ? "high"
+    : issues.length > 0
+      ? "medium"
+      : "none";
 }
 
 export function AdminProductsView({
@@ -162,27 +450,36 @@ export function AdminProductsView({
   const [draft, setDraft] = useState<AdminProductRow | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<ProductBusinessState | "">("");
+  const [metricFilter, setMetricFilter] =
+    useState<ProductMetricFilter>("productsTotal");
   const normalizedSearch = search.trim().toLowerCase();
   const summary = rows.reduce(
     (counts, row) => {
+      const state = productBusinessState(row);
+
       counts.total += 1;
       counts.activeAffiliate += row.affiliateStatus === "active" ? 1 : 0;
-      counts.missingFacts += row.facts.length < 1 || row.labelStatus !== "parsed" ? 1 : 0;
-      counts.reviewRequired += row.listStatus === "review_required" ? 1 : 0;
-      counts.unknown += row.listStatus === "unknown" ? 1 : 0;
-      counts.whitelisted += row.listStatus === "whitelisted" ? 1 : 0;
+      counts.dirtyData += row.productQualityLabel === "Dirty Data" ? 1 : 0;
+      counts.missingFacts += row.productQualityLabel === "Missing Facts" ? 1 : 0;
+      counts.missingImage += row.productQualityLabel === "Missing Image" ? 1 : 0;
+      counts.approved += state === "approved" ? 1 : 0;
+      counts.ignored += state === "ignored" ? 1 : 0;
+      counts.pendingReview += state === "pending_review" ? 1 : 0;
 
       return counts;
     },
     {
       activeAffiliate: 0,
+      approved: 0,
+      dirtyData: 0,
+      ignored: 0,
       missingFacts: 0,
-      reviewRequired: 0,
+      missingImage: 0,
+      pendingReview: 0,
       total: 0,
-      unknown: 0,
-      whitelisted: 0
     }
   );
   const metrics: BusinessMetric[] = [
@@ -196,16 +493,23 @@ export function AdminProductsView({
     safetyMetric({
       color: businessMetricColors.succeeded,
       id: "productsWhitelisted",
-      label: "Whitelisted",
+      label: "Approved",
       locale,
-      value: summary.whitelisted
+      value: summary.approved
     }),
     safetyMetric({
       color: businessMetricColors.pendingReviews,
-      id: "productsUnknown",
-      label: "Unknown",
+      id: "productsPendingReview",
+      label: "Review Required",
       locale,
-      value: summary.unknown
+      value: summary.pendingReview
+    }),
+    safetyMetric({
+      color: businessMetricColors.offline,
+      id: "productsIgnored",
+      label: "Ignored",
+      locale,
+      value: summary.ignored
     }),
     safetyMetric({
       color: businessMetricColors.failed,
@@ -215,6 +519,13 @@ export function AdminProductsView({
       value: summary.missingFacts
     }),
     safetyMetric({
+      color: businessMetricColors.medium,
+      id: "productsMissingImages",
+      label: "Missing images",
+      locale,
+      value: summary.missingImage
+    }),
+    safetyMetric({
       color: businessMetricColors.active,
       id: "productsAffiliates",
       label: "Active affiliates",
@@ -222,17 +533,29 @@ export function AdminProductsView({
       value: summary.activeAffiliate
     })
   ];
-  const filteredRows = rows.filter((row) => {
-    const matchesSearch =
-      !normalizedSearch || productSearchText(row).includes(normalizedSearch);
-    const matchesStatus = !status || row.listStatus === status;
+  function handleMetricSelect(metricId: BusinessMetric["id"]) {
+    const nextMetric = metricId as ProductMetricFilter;
 
-    return matchesSearch && matchesStatus;
+    setMetricFilter(nextMetric);
+    setStatus(productBusinessStateForMetric(nextMetric));
+  }
+
+  function handleStatusChange(nextStatus: ProductBusinessState | "") {
+    setStatus(nextStatus);
+    setMetricFilter(productMetricForBusinessState(nextStatus));
+  }
+
+  const filteredRows = rows.filter((row) => {
+    const matchesSearch = productMatchesSearch(row, normalizedSearch);
+    const matchesMetric = productMatchesMetricFilter(row, metricFilter);
+
+    return matchesSearch && matchesMetric;
   });
 
   async function saveProduct(row: AdminProductRow) {
     setSavingId(row.id);
     setErrorId(null);
+    setErrorMessage(null);
 
     try {
       const response = await fetch(`/api/admin/products/${row.id}`, {
@@ -240,9 +563,32 @@ export function AdminProductsView({
           accessToken,
           affiliateStatus: row.affiliateStatus,
           availabilityStatus: row.availabilityStatus,
+          brandName: row.brandName,
+          description: row.description,
+          descriptionEn: row.descriptionEn,
+          descriptionTh: row.descriptionTh,
+          facts: row.facts.map((fact) => ({
+            amount: fact.amount,
+            confidence: fact.confidence,
+            itemType: fact.itemType,
+            name: fact.name,
+            servingLabel: fact.servingLabel ?? null,
+            sourceText: fact.sourceText ?? null,
+            sourceUrl: fact.sourceUrl ?? null,
+            supplementId: fact.supplementId ?? null,
+            unit: fact.unit
+          })),
+          fdaApprovalNumber: row.fdaApprovalNumber,
+          imageUrl: row.imageUrl,
           labelStatus: row.labelStatus,
           listStatus: row.listStatus,
-          priceAmount: row.priceAmount
+          priceAmount: row.priceAmount,
+          productAudience: row.productAudience,
+          productKind: row.productKind,
+          productUrl: row.productUrl,
+          title: row.title,
+          titleEn: row.titleEn,
+          titleTh: row.titleTh
         }),
         headers: {
           "Content-Type": "application/json"
@@ -251,7 +597,9 @@ export function AdminProductsView({
       });
 
       if (!response.ok) {
-        throw new Error("Unable to save product");
+        throw new Error(
+          await adminResponseErrorMessage(response, "Unable to save product")
+        );
       }
 
       const payload = (await response.json()) as { row?: AdminProductRow };
@@ -264,8 +612,180 @@ export function AdminProductsView({
         currentDraft?.id === row.id ? savedRow : currentDraft
       );
       return true;
-    } catch {
+    } catch (error) {
       setErrorId(row.id);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to save product"
+      );
+      return false;
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function correctProductFacts(row: AdminProductRow) {
+    setSavingId(row.id);
+    setErrorId(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/products/${row.id}/correct-facts`, {
+        body: JSON.stringify({ accessToken }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await adminResponseErrorMessage(
+            response,
+            "Unable to correct product facts"
+          )
+        );
+      }
+
+      const payload = (await response.json()) as { row?: AdminProductRow };
+      const correctedRow = payload.row;
+
+      if (!correctedRow) {
+        throw new Error("AI correction did not return a product row");
+      }
+
+      setRows((currentRows) =>
+        currentRows.map((item) =>
+          item.id === correctedRow.id ? correctedRow : item
+        )
+      );
+      setDraft(correctedRow);
+
+      return correctedRow;
+    } catch (error) {
+      setErrorId(row.id);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to correct product facts"
+      );
+      return null;
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function decideProductImportFromProduct(
+    row: AdminProductRow,
+    action: "approve_product" | "ignore_import" | "merge_product",
+    mergeProductId: string | null,
+    reviewerNote: string | null
+  ) {
+    if (!row.importReviewTaskId) {
+      return false;
+    }
+
+    setSavingId(row.id);
+    setErrorId(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(
+        `/api/admin/review-tasks/${row.importReviewTaskId}`,
+        {
+          body: JSON.stringify({
+            accessToken,
+            action,
+            brandName: row.brandName,
+            description: row.description,
+            descriptionEn: row.descriptionEn,
+            descriptionTh: row.descriptionTh,
+            fdaApprovalNumber: row.fdaApprovalNumber,
+            imageUrl: row.imageUrl,
+            mergeProductId,
+            parsedFacts: row.facts.map((fact) => ({
+              amount: fact.amount,
+              confidence: fact.confidence,
+              itemType: fact.itemType,
+              name: fact.name,
+              servingLabel: fact.servingLabel ?? null,
+              sourceText: fact.sourceText ?? null,
+              sourceUrl: fact.sourceUrl ?? null,
+              supplementId: fact.supplementId ?? null,
+              unit: fact.unit
+            })),
+            productAudience: row.productAudience,
+            productUrl: row.productUrl,
+            reviewerNote,
+            title: row.title,
+            titleEn: row.titleEn,
+            titleTh: row.titleTh
+          }),
+          headers: {
+            "Content-Type": "application/json"
+          },
+          method: "PATCH"
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          await adminResponseErrorMessage(
+            response,
+            "Unable to update product review"
+          )
+        );
+      }
+
+      const payload = (await response.json()) as {
+        result?: {
+          row?: AdminProductRow | null;
+        };
+      };
+      const fallbackRow: AdminProductRow = {
+        ...row,
+        availabilityStatus:
+          action === "ignore_import" ? "unavailable" : row.availabilityStatus,
+        importReviewTaskId: null,
+        importStatus:
+          action === "approve_product"
+            ? "approved"
+            : action === "ignore_import"
+              ? "ignored"
+              : "duplicate",
+        listStatus:
+          action === "approve_product"
+            ? "whitelisted"
+            : action === "ignore_import"
+              ? "inactive"
+              : row.listStatus
+      };
+      const savedRow = payload.result?.row ?? fallbackRow;
+
+      setRows((currentRows) => {
+        const nextRows = currentRows.map((item) =>
+          item.id === row.id
+            ? savedRow.id === row.id
+              ? savedRow
+              : fallbackRow
+            : item.id === savedRow.id
+              ? savedRow
+              : item
+        );
+
+        return nextRows.some((item) => item.id === savedRow.id)
+          ? nextRows
+          : [savedRow, ...nextRows];
+      });
+      setDraft(savedRow.id === row.id ? savedRow : null);
+
+      return true;
+    } catch (error) {
+      setErrorId(row.id);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to update product review"
+      );
       return false;
     } finally {
       setSavingId(null);
@@ -274,7 +794,11 @@ export function AdminProductsView({
 
   return (
     <section className="mt-8 space-y-6">
-      <BusinessStatsGrid metrics={metrics} />
+      <BusinessStatsGrid
+        metrics={metrics}
+        onMetricSelect={handleMetricSelect}
+        selectedMetricId={metricFilter}
+      />
 
       <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_14rem]">
@@ -289,23 +813,25 @@ export function AdminProductsView({
           <select
             aria-label="Status"
             className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-            onChange={(event) => setStatus(event.target.value)}
+            onChange={(event) =>
+              handleStatusChange(event.target.value as ProductBusinessState | "")
+            }
             value={status}
           >
-            <option value="">All statuses</option>
-            {productListStatuses.map((item) => (
+            <option value="">All states</option>
+            {productBusinessStates.map((item) => (
               <option key={item} value={item}>
-                {productStatusLabel(item)}
+                {productBusinessStateLabel(item)}
               </option>
             ))}
           </select>
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         {filteredRows.map((row) => (
           <button
-            className="rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-gray-200 transition hover:-translate-y-0.5 hover:shadow-md"
+            className="self-start rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-gray-200 transition hover:-translate-y-0.5 hover:shadow-md"
             key={row.id}
             onClick={() => setDraft(row)}
             type="button"
@@ -329,7 +855,15 @@ export function AdminProductsView({
                       {row.title}
                     </h3>
                     <p className="mt-1 text-sm text-gray-500">
-                      {[row.brandName, readableToken(row.platform), row.priceAmount ? `${row.priceAmount} ${row.currency}` : null]
+                      {[
+                        row.brandName,
+                        productStatusLabel(row.productKind),
+                        row.productAudience === "both"
+                          ? null
+                          : productStatusLabel(row.productAudience),
+                        row.fdaApprovalNumber ? `FDA ${row.fdaApprovalNumber}` : null,
+                        row.priceAmount ? `${row.priceAmount} ${row.currency}` : null
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
@@ -337,10 +871,10 @@ export function AdminProductsView({
                   <span
                     className={classNames(
                       "rounded-full border px-2.5 py-1 text-xs font-medium",
-                      productStatusClass(row.listStatus)
+                      productBusinessStateClass(productBusinessState(row))
                     )}
                   >
-                    {productStatusLabel(row.listStatus)}
+                    {productBusinessStateLabel(productBusinessState(row))}
                   </span>
                 </div>
                 {row.facts.length > 0 ? (
@@ -372,10 +906,19 @@ export function AdminProductsView({
 
       {draft ? (
         <ProductModal
+          accessToken={accessToken}
           draft={draft}
           error={errorId === draft.id}
-          onClose={() => setDraft(null)}
+          errorMessage={errorId === draft.id ? errorMessage : null}
+          onImportDecision={decideProductImportFromProduct}
+          onCorrectFacts={correctProductFacts}
+          onClose={() => {
+            setDraft(null);
+            setErrorId(null);
+            setErrorMessage(null);
+          }}
           onSave={saveProduct}
+          products={rows}
           saving={savingId === draft.id}
           setDraft={setDraft}
         />
@@ -385,28 +928,156 @@ export function AdminProductsView({
 }
 
 function ProductModal({
+  accessToken,
   draft,
   error,
+  errorMessage,
+  onImportDecision,
+  onCorrectFacts,
   onClose,
   onSave,
+  products,
   saving,
   setDraft
 }: Readonly<{
+  accessToken: string;
   draft: AdminProductRow;
   error: boolean;
+  errorMessage: string | null;
+  onImportDecision: (
+    row: AdminProductRow,
+    action: "approve_product" | "ignore_import" | "merge_product",
+    mergeProductId: string | null,
+    reviewerNote: string | null
+  ) => Promise<boolean>;
+  onCorrectFacts: (row: AdminProductRow) => Promise<AdminProductRow | null>;
   onClose: () => void;
   onSave: (row: AdminProductRow) => Promise<boolean>;
+  products: AdminProductRow[];
   saving: boolean;
   setDraft: (row: AdminProductRow) => void;
 }>) {
+  const [newAffiliateUrl, setNewAffiliateUrl] = useState("");
+  const [newAffiliateCommissionRate, setNewAffiliateCommissionRate] = useState("");
+  const [affiliateBusy, setAffiliateBusy] = useState(false);
+  const [mergeProductId, setMergeProductId] = useState(
+    draft.productImportDuplicateProductIds.find((id) => id !== draft.id) ?? ""
+  );
+  const [reviewerNote, setReviewerNote] = useState("");
+  const hasOpenImportReview = Boolean(draft.importReviewTaskId);
+  const approvalBlockedMessage =
+    draft.productQuality.status !== "pass"
+      ? `Approval is blocked until data quality passes: ${draft.productQuality.summary}`
+      : null;
+  const duplicateOptions = products.filter((product) =>
+    draft.productImportDuplicateProductIds.includes(product.id) &&
+    product.id !== draft.id
+  );
+  const currentBusinessState = productBusinessState(draft);
+  const approveDisabled =
+    saving || currentBusinessState === "approved" || Boolean(approvalBlockedMessage);
+  const mergeOptions = duplicateOptions.length > 0
+    ? duplicateOptions
+    : products.filter((product) => product.id !== draft.id).slice(0, 80);
+
+  async function addAffiliateLink() {
+    const url = newAffiliateUrl.trim();
+
+    if (!url) {
+      return;
+    }
+
+    setAffiliateBusy(true);
+
+    try {
+      const response = await fetch(
+        `/api/admin/products/${draft.id}/affiliate-links`,
+        {
+          body: JSON.stringify({
+            accessToken,
+            commissionRate: newAffiliateCommissionRate
+              ? Number(newAffiliateCommissionRate) / 100
+              : null,
+            linkType: "affiliate",
+            url
+          }),
+          headers: {
+            "Content-Type": "application/json"
+          },
+          method: "POST"
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to add affiliate link");
+      }
+
+      const payload = (await response.json()) as { row?: AdminProductRow };
+
+      if (payload.row) {
+        setDraft(payload.row);
+        setNewAffiliateUrl("");
+        setNewAffiliateCommissionRate("");
+      }
+    } finally {
+      setAffiliateBusy(false);
+    }
+  }
+
+  async function removeAffiliateLink(linkId: string) {
+    setAffiliateBusy(true);
+
+    try {
+      const response = await fetch(
+        `/api/admin/products/${draft.id}/affiliate-links/${linkId}`,
+        {
+          body: JSON.stringify({ accessToken }),
+          headers: {
+            "Content-Type": "application/json"
+          },
+          method: "DELETE"
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to remove affiliate link");
+      }
+
+      const payload = (await response.json()) as { row?: AdminProductRow };
+
+      if (payload.row) {
+        setDraft(payload.row);
+      }
+    } finally {
+      setAffiliateBusy(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-950/40 px-4 py-8">
       <div className="mx-auto max-w-3xl rounded-2xl bg-white p-6 shadow-xl ring-1 ring-gray-200">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">{draft.title}</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-xl font-semibold text-gray-900">{draft.title}</h2>
+              <span
+                className={classNames(
+                  "rounded-full border px-2.5 py-1 text-xs font-medium",
+                  productBusinessStateClass(currentBusinessState)
+                )}
+              >
+                {productBusinessStateLabel(currentBusinessState)}
+              </span>
+            </div>
             <p className="mt-1 text-sm text-gray-500">
-              {[draft.brandName, readableToken(draft.platform), draft.region]
+              {[
+                draft.brandName,
+                productStatusLabel(draft.productKind),
+                draft.productAudience === "both"
+                  ? null
+                  : productStatusLabel(draft.productAudience),
+                draft.region
+              ]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
@@ -423,23 +1094,88 @@ function ProductModal({
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <label className="text-sm font-medium text-gray-700">
-            Product status
-            <select
+            Product name
+            <input
               className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
               onChange={(event) =>
                 setDraft({
                   ...draft,
-                  listStatus: event.target.value as AdminProductRow["listStatus"]
+                  title: event.target.value
                 })
               }
-              value={draft.listStatus}
-            >
-              {productListStatuses.map((item) => (
-                <option key={item} value={item}>
-                  {productStatusLabel(item)}
-                </option>
-              ))}
-            </select>
+              type="text"
+              value={draft.title}
+            />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Brand
+            <input
+              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  brandName: event.target.value.trim() || null
+                })
+              }
+              type="text"
+              value={draft.brandName ?? ""}
+            />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Title EN
+            <input
+              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  titleEn: event.target.value.trim() || null
+                })
+              }
+              type="text"
+              value={draft.titleEn ?? ""}
+            />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Title TH
+            <input
+              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  titleTh: event.target.value.trim() || null
+                })
+              }
+              type="text"
+              value={draft.titleTh ?? ""}
+            />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Product URL
+            <input
+              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  productUrl: event.target.value
+                })
+              }
+              type="url"
+              value={draft.productUrl}
+            />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Image URL
+            <input
+              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  imageUrl: event.target.value.trim() || null
+                })
+              }
+              type="url"
+              value={draft.imageUrl ?? ""}
+            />
           </label>
           <label className="text-sm font-medium text-gray-700">
             Label facts
@@ -498,70 +1234,530 @@ function ProductModal({
               ))}
             </select>
           </label>
+          <label className="text-sm font-medium text-gray-700">
+            Product type
+            <select
+              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  productKind: event.target.value as AdminProductRow["productKind"]
+                })
+              }
+              value={draft.productKind}
+            >
+              {productKinds.map((item) => (
+                <option key={item} value={item}>
+                  {productStatusLabel(item)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Audience
+            <select
+              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  productAudience: event.target.value as AdminProductRow["productAudience"]
+                })
+              }
+              value={draft.productAudience}
+            >
+              {productAudiences.map((item) => (
+                <option key={item} value={item}>
+                  {productStatusLabel(item)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            FDA approval number
+            <input
+              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  fdaApprovalNumber: event.target.value.trim() || null
+                })
+              }
+              type="text"
+              value={draft.fdaApprovalNumber ?? ""}
+            />
+          </label>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm font-medium text-gray-700">
+            Description EN
+            <textarea
+              className="min-h-24 resize-y rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+              onChange={(event) => {
+                const value = event.target.value;
+
+                setDraft({
+                  ...draft,
+                  description: value || null,
+                  descriptionEn: value || null
+                });
+              }}
+              value={draft.descriptionEn ?? draft.description ?? ""}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-gray-700">
+            Description TH
+            <textarea
+              className="min-h-24 resize-y rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  descriptionTh: event.target.value || null
+                })
+              }
+              value={draft.descriptionTh ?? ""}
+            />
+          </label>
         </div>
 
         <div className="mt-5">
-          <h3 className="text-sm font-semibold text-gray-900">Parsed facts</h3>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {draft.facts.length > 0 ? draft.facts.map((fact) => (
-              <span
-                className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-gray-900">Parsed facts</h3>
+            <button
+              className="rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50"
+              onClick={() =>
+                setDraft({
+                  ...draft,
+                  facts: [
+                    ...draft.facts,
+                    {
+                      amount: null,
+                      comparableAmount: null,
+                      confidence: "moderate",
+                      id: crypto.randomUUID(),
+                      itemType: "supplement",
+                      maxAmount: null,
+                      maxUnit: null,
+                      name: "",
+                      normalizedName: "",
+                      source: "admin",
+                      sourceText: null,
+                      sourceUrl: null,
+                      supplementStatus: null,
+                      unit: null
+                    }
+                  ]
+                })
+              }
+              type="button"
+            >
+              Add fact
+            </button>
+          </div>
+          <div className="mt-2 space-y-2">
+            {draft.facts.length > 0 ? draft.facts.map((fact, index) => {
+              const factIssues = productFactIssueMessages(fact);
+              const issueSeverity = productFactIssueSeverity(factIssues);
+              const hasIssues = issueSeverity !== "none";
+              const highSeverity = issueSeverity === "high";
+
+              return (
+              <div
+                className={classNames(
+                  "grid gap-2 rounded-xl border p-3 sm:grid-cols-[minmax(0,1fr)_6rem_6rem_8rem_auto]",
+                  highSeverity
+                    ? "border-red-200 bg-red-50 ring-1 ring-red-100"
+                    : hasIssues
+                      ? "border-amber-200 bg-amber-50 ring-1 ring-amber-100"
+                      : "border-gray-100 bg-gray-50"
+                )}
                 key={fact.id}
               >
-                {fact.name}
-                {fact.amount ? ` ${fact.amount}${fact.unit ? ` ${fact.unit}` : ""}` : ""}
-              </span>
-            )) : (
+                <input
+                  className={classNames(
+                    "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 outline-none focus:ring-2 focus:ring-[#1FA77A]",
+                    hasIssues ? "ring-amber-200" : "ring-gray-200"
+                  )}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      facts: draft.facts.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, name: event.target.value }
+                          : item
+                      )
+                    })
+                  }
+                  placeholder="Ingredient"
+                  value={fact.name}
+                />
+                <input
+                  className={classNames(
+                    "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 outline-none focus:ring-2 focus:ring-[#1FA77A]",
+                    hasIssues ? "ring-amber-200" : "ring-gray-200"
+                  )}
+                  inputMode="decimal"
+                  onChange={(event) => {
+                    const parsed = Number(event.target.value);
+
+                    setDraft({
+                      ...draft,
+                      facts: draft.facts.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? {
+                              ...item,
+                              amount: event.target.value.trim() &&
+                                Number.isFinite(parsed) &&
+                                parsed >= 0
+                                ? parsed
+                                : null
+                            }
+                          : item
+                      )
+                    });
+                  }}
+                  placeholder="Amount"
+                  value={fact.amount ?? ""}
+                />
+                <input
+                  className={classNames(
+                    "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 outline-none focus:ring-2 focus:ring-[#1FA77A]",
+                    hasIssues ? "ring-amber-200" : "ring-gray-200"
+                  )}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      facts: draft.facts.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, unit: event.target.value.trim() || null }
+                          : item
+                      )
+                    })
+                  }
+                  placeholder="Unit"
+                  value={fact.unit ?? ""}
+                />
+                <select
+                  className={classNames(
+                    "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 outline-none focus:ring-2 focus:ring-[#1FA77A]",
+                    hasIssues ? "ring-amber-200" : "ring-gray-200"
+                  )}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      facts: draft.facts.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? {
+                              ...item,
+                              confidence: event.target.value as AdminProductRow["facts"][number]["confidence"]
+                            }
+                          : item
+                      )
+                    })
+                  }
+                  value={fact.confidence}
+                >
+                  <option value="high">High</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="low">Low</option>
+                </select>
+                <button
+                  className="rounded-md px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                  onClick={() =>
+                    setDraft({
+                      ...draft,
+                      facts: draft.facts.filter((_, itemIndex) => itemIndex !== index)
+                    })
+                  }
+                  type="button"
+                >
+                  Remove
+                </button>
+                {fact.sourceText ? (
+                  <p className="text-xs text-gray-500 sm:col-span-5">
+                    {fact.sourceText}
+                  </p>
+                ) : null}
+                {factIssues.length > 0 ? (
+                  <div
+                    className={classNames(
+                      "flex flex-wrap gap-1.5 text-xs font-medium sm:col-span-5",
+                      highSeverity ? "text-red-800" : "text-amber-800"
+                    )}
+                  >
+                    {factIssues.map((issue) => (
+                      <span
+                        className={classNames(
+                          "rounded-full border bg-white px-2 py-1",
+                          highSeverity ? "border-red-200" : "border-amber-200"
+                        )}
+                        key={issue}
+                      >
+                        {issue}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              );
+            }) : (
               <span className="text-sm text-amber-700">No parsed facts yet.</span>
             )}
           </div>
         </div>
 
-        {draft.affiliateLinks.length > 0 ? (
-          <div className="mt-5">
-            <h3 className="text-sm font-semibold text-gray-900">Affiliate links</h3>
+        <div className="mt-5">
+          <h3 className="text-sm font-semibold text-gray-900">Affiliate links</h3>
+          {draft.affiliateLinks.length > 0 ? (
             <div className="mt-2 space-y-2">
               {draft.affiliateLinks.map((link) => (
-                <a
-                  className="block truncate text-sm font-medium text-[#2563EB] hover:text-[#1D4ED8]"
-                  href={link.url}
+                <div
+                  className="flex items-start justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2"
                   key={link.id}
-                  rel="noreferrer"
-                  target="_blank"
                 >
-                  {link.url}
-                </a>
+                  <div className="min-w-0">
+                    <a
+                      className="block truncate text-sm font-medium text-[#2563EB] hover:text-[#1D4ED8]"
+                      href={link.url}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {link.url}
+                    </a>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {[
+                        productStatusLabel(link.linkType),
+                        link.platform,
+                        link.commissionRate !== null
+                          ? `${(link.commissionRate * 100).toFixed(1)}% commission`
+                          : null,
+                        link.priceAmount !== null
+                          ? `${link.priceAmount} ${link.currency}`
+                          : null,
+                        productStatusLabel(link.availabilityStatus)
+                      ].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <button
+                    className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={affiliateBusy}
+                    onClick={() => void removeAffiliateLink(link.id)}
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                </div>
               ))}
             </div>
+          ) : (
+            <p className="mt-2 text-sm text-gray-500">
+              No affiliate links yet. The product can still be recommended if it
+              is the best match.
+            </p>
+          )}
+          <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto]">
+            <input
+              className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
+              onChange={(event) => setNewAffiliateUrl(event.target.value)}
+              placeholder="Affiliate URL"
+              type="url"
+              value={newAffiliateUrl}
+            />
+            <input
+              className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
+              min="0"
+              onChange={(event) =>
+                setNewAffiliateCommissionRate(event.target.value)
+              }
+              placeholder="%"
+              step="0.01"
+              type="number"
+              value={newAffiliateCommissionRate}
+            />
+            <button
+              className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={affiliateBusy || !newAffiliateUrl.trim()}
+              onClick={() => void addAffiliateLink()}
+              type="button"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+
+        {hasOpenImportReview ? (
+          <div className="mt-5 space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Import review
+              </h3>
+              <p className="mt-1 text-sm text-gray-600">
+                This draft has an open review task. Use these actions to finish
+                the review and update the catalogue.
+              </p>
+              {approvalBlockedMessage ? (
+                <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+                  {approvalBlockedMessage}
+                </p>
+              ) : null}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <select
+                aria-label="Duplicate of product"
+                className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                onChange={(event) => setMergeProductId(event.target.value)}
+                value={mergeProductId}
+              >
+                <option value="">Duplicate of existing product</option>
+                {mergeOptions.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {[product.title, product.brandName].filter(Boolean).join(" · ")}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving || !mergeProductId}
+                onClick={async () => {
+                  if (
+                    await onImportDecision(
+                      draft,
+                      "merge_product",
+                      mergeProductId,
+                      reviewerNote.trim() || null
+                    )
+                  ) {
+                    onClose();
+                  }
+                }}
+                type="button"
+              >
+                Mark duplicate
+              </button>
+            </div>
+            <label className="grid gap-2 text-sm font-medium text-gray-700">
+              Reviewer note
+              <textarea
+                className="min-h-20 resize-y rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                onChange={(event) => setReviewerNote(event.target.value)}
+                value={reviewerNote}
+              />
+            </label>
           </div>
         ) : null}
 
         {error ? (
           <p className="mt-4 text-sm font-medium text-red-700">
-            Could not save this product.
+            {errorMessage ?? "Could not save this product."}
           </p>
         ) : null}
 
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
-            onClick={onClose}
-            type="button"
-          >
-            Cancel
-          </button>
-          <button
-            className="rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white hover:bg-[#168763] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={saving}
-            onClick={async () => {
-              if (await onSave(draft)) {
-                onClose();
-              }
-            }}
-            type="button"
-          >
-            {saving ? "Saving" : "Save"}
-          </button>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              aria-label="Correct facts with AI"
+              className="inline-flex size-9 items-center justify-center rounded-md bg-[#2563EB] text-white ring-1 ring-[#2563EB] hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={saving}
+              onClick={() => void onCorrectFacts(draft)}
+              title="Correct facts with AI"
+              type="button"
+            >
+              <SparklesIcon className="size-5" />
+            </button>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <span className="isolate inline-flex rounded-md shadow-xs">
+              <button
+                className="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving}
+                onClick={onClose}
+                type="button"
+              >
+                Close
+              </button>
+              <button
+                className="relative -ml-px inline-flex items-center rounded-r-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving}
+                onClick={() => void onSave(draft)}
+                type="button"
+              >
+                {saving ? "Saving" : "Save"}
+              </button>
+            </span>
+            <span className="isolate inline-flex rounded-md shadow-xs">
+              <button
+                className="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving || currentBusinessState === "ignored"}
+                onClick={async () => {
+                  const ignoredDraft: AdminProductRow = {
+                    ...draft,
+                    availabilityStatus: "unavailable",
+                    listStatus: "inactive"
+                  };
+
+                  if (hasOpenImportReview) {
+                    if (
+                      await onImportDecision(
+                        ignoredDraft,
+                        "ignore_import",
+                        null,
+                        reviewerNote.trim() || null
+                      )
+                    ) {
+                      onClose();
+                    }
+
+                    return;
+                  }
+
+                  if (await onSave(ignoredDraft)) {
+                    onClose();
+                  }
+                }}
+                type="button"
+              >
+                Ignore
+              </button>
+              <button
+                className="relative -ml-px inline-flex items-center rounded-r-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={approveDisabled}
+                onClick={async () => {
+                  const approvedDraft: AdminProductRow = {
+                    ...draft,
+                    availabilityStatus:
+                      draft.availabilityStatus === "unavailable"
+                        ? "unknown"
+                        : draft.availabilityStatus,
+                    labelStatus: draft.facts.length > 0 ? "parsed" : draft.labelStatus,
+                    listStatus: "whitelisted"
+                  };
+
+                  if (hasOpenImportReview) {
+                    if (
+                      await onImportDecision(
+                        approvedDraft,
+                        "approve_product",
+                        null,
+                        reviewerNote.trim() || null
+                      )
+                    ) {
+                      onClose();
+                    }
+
+                    return;
+                  }
+
+                  if (await onSave(approvedDraft)) {
+                    onClose();
+                  }
+                }}
+                title={approvalBlockedMessage ?? undefined}
+                type="button"
+              >
+                Approve
+              </button>
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -1200,7 +2396,13 @@ export function AdminSupplementsView({
   locale: Locale;
 }>) {
   const [rows, setRows] = useState(data.rows);
+  const [addingAliasForId, setAddingAliasForId] = useState<string | null>(null);
   const [category, setCategory] = useState("");
+  const [createCategory, setCreateCategory] = useState("");
+  const [createError, setCreateError] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [deletingAliasId, setDeletingAliasId] = useState<string | null>(null);
   const [draft, setDraft] = useState<AdminSupplementRow | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
@@ -1208,6 +2410,17 @@ export function AdminSupplementsView({
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const summary = listStatusSummary(rows);
+  const categories = [...new Set(rows.map((row) => row.category))].sort();
+  const selectedSupplementMetricId =
+    status === "whitelisted"
+      ? "supplementsWhitelisted"
+      : status === "review_required"
+        ? "supplementsReviewRequired"
+        : status === "blacklisted"
+          ? "supplementsBlacklisted"
+          : status === "inactive"
+            ? "supplementsInactive"
+            : "supplementsTotal";
   const normalizedSearch = search.trim().toLowerCase();
   const filteredRows = rows.filter((row) => {
     const matchesSearch =
@@ -1221,11 +2434,39 @@ export function AdminSupplementsView({
 
   function syncRow(row: AdminSupplementRow) {
     setRows((currentRows) =>
-      currentRows.map((item) => (item.id === row.id ? row : item))
+      currentRows.some((item) => item.id === row.id)
+        ? currentRows.map((item) => (item.id === row.id ? row : item))
+        : [...currentRows, row].sort((left, right) =>
+            left.name.localeCompare(right.name)
+          )
     );
     setDraft((currentDraft) =>
       currentDraft?.id === row.id ? row : currentDraft
     );
+  }
+
+  function selectSupplementMetric(metricId: BusinessMetric["id"]) {
+    if (metricId === "supplementsWhitelisted") {
+      setStatus("whitelisted");
+      return;
+    }
+
+    if (metricId === "supplementsReviewRequired") {
+      setStatus("review_required");
+      return;
+    }
+
+    if (metricId === "supplementsBlacklisted") {
+      setStatus("blacklisted");
+      return;
+    }
+
+    if (metricId === "supplementsInactive") {
+      setStatus("inactive");
+      return;
+    }
+
+    setStatus("");
   }
 
   async function saveRow(row: AdminSupplementRow): Promise<boolean> {
@@ -1297,6 +2538,89 @@ export function AdminSupplementsView({
     }
   }
 
+  async function addAssociation(
+    row: AdminSupplementRow,
+    alias: string
+  ): Promise<boolean> {
+    setAddingAliasForId(row.id);
+    setErrorId(null);
+
+    try {
+      const response = await fetch(`/api/admin/supplements/${row.id}/aliases`, {
+        body: JSON.stringify({ accessToken, alias }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to add supplement association");
+      }
+
+      const payload = (await response.json()) as { row?: AdminSupplementRow };
+
+      if (payload.row) {
+        syncRow(payload.row);
+      }
+
+      return true;
+    } catch {
+      setErrorId(row.id);
+      return false;
+    } finally {
+      setAddingAliasForId(null);
+    }
+  }
+
+  async function createSupplement(): Promise<boolean> {
+    const name = createName.trim();
+
+    if (!name || creating) {
+      return false;
+    }
+
+    setCreating(true);
+    setCreateError(false);
+    setErrorId(null);
+
+    try {
+      const response = await fetch("/api/admin/supplements", {
+        body: JSON.stringify({
+          accessToken,
+          category: createCategory,
+          name
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to create supplement");
+      }
+
+      const payload = (await response.json()) as { row?: AdminSupplementRow };
+
+      if (!payload.row) {
+        throw new Error("Supplement create response was empty");
+      }
+
+      syncRow(payload.row);
+      setDraft(payload.row);
+      setCreateName("");
+      setCreateCategory("");
+      setCreateOpen(false);
+      return true;
+    } catch {
+      setCreateError(true);
+      return false;
+    } finally {
+      setCreating(false);
+    }
+  }
+
   const supplementMetrics: BusinessMetric[] = [
     safetyMetric({
       color: businessMetricColors.total,
@@ -1337,10 +2661,14 @@ export function AdminSupplementsView({
 
   return (
     <section className="mt-8 space-y-6">
-      <BusinessStatsGrid metrics={supplementMetrics} />
+      <BusinessStatsGrid
+        metrics={supplementMetrics}
+        onMetricSelect={selectSupplementMetric}
+        selectedMetricId={selectedSupplementMetricId}
+      />
 
       <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_14rem_14rem]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_14rem_14rem_auto]">
           <input
             aria-label={labels.supplements.search}
             className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
@@ -1356,7 +2684,7 @@ export function AdminSupplementsView({
             value={category}
           >
             <option value="">{labels.supplements.allCategories}</option>
-            {data.categories.map((item) => (
+            {categories.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
@@ -1375,6 +2703,17 @@ export function AdminSupplementsView({
               </option>
             ))}
           </select>
+          <button
+            aria-label={labels.supplements.addSupplement}
+            className="inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
+            onClick={() => {
+              setCreateOpen(true);
+              setCreateError(false);
+            }}
+            type="button"
+          >
+            <PlusIcon aria-hidden={true} className="size-5" />
+          </button>
         </div>
       </div>
 
@@ -1474,6 +2813,7 @@ export function AdminSupplementsView({
               setErrorId(null);
             }
           }}
+          onAddAssociation={(alias) => addAssociation(draft, alias)}
           onDeleteAssociation={(aliasId) => void deleteAssociation(draft, aliasId)}
           onSave={() => {
             void saveRow(draft).then((saved) => {
@@ -1483,10 +2823,160 @@ export function AdminSupplementsView({
             });
           }}
           saving={savingId === draft.id}
+          addingAssociation={addingAliasForId === draft.id}
           deletingAssociationId={deletingAliasId}
         />
       ) : null}
+      {createOpen ? (
+        <CreateSupplementModal
+          category={createCategory}
+          categories={categories}
+          error={createError}
+          labels={labels}
+          name={createName}
+          onCategoryChange={setCreateCategory}
+          onClose={() => {
+            if (!creating) {
+              setCreateOpen(false);
+              setCreateError(false);
+            }
+          }}
+          onCreate={() => void createSupplement()}
+          onNameChange={setCreateName}
+          saving={creating}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function CreateSupplementModal({
+  categories,
+  category,
+  error,
+  labels,
+  name,
+  onCategoryChange,
+  onClose,
+  onCreate,
+  onNameChange,
+  saving
+}: Readonly<{
+  categories: string[];
+  category: string;
+  error: boolean;
+  labels: AdminContent;
+  name: string;
+  onCategoryChange: (value: string) => void;
+  onClose: () => void;
+  onCreate: () => void;
+  onNameChange: (value: string) => void;
+  saving: boolean;
+}>) {
+  const canCreate = name.trim().length > 0 && !saving;
+  const categoryListId = "supplement-category-options";
+  const inputClass =
+    "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]";
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <button
+        aria-label={labels.supplements.close}
+        className="fixed inset-0 cursor-default bg-gray-900/40"
+        disabled={saving}
+        onClick={onClose}
+        type="button"
+      />
+      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
+        <section
+          aria-modal={true}
+          className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-900/10"
+          role="dialog"
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">
+                {labels.supplements.newSupplement}
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                {labels.supplements.newSupplementHint}
+              </p>
+            </div>
+            <button
+              aria-label={labels.supplements.close}
+              className="rounded-md p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={saving}
+              onClick={onClose}
+              type="button"
+            >
+              <XMarkIcon aria-hidden={true} className="size-5" />
+            </button>
+          </div>
+
+          <form
+            className="space-y-5 px-6 py-6"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (canCreate) {
+                onCreate();
+              }
+            }}
+          >
+            <label className="grid gap-2 text-sm font-medium text-gray-700">
+              {labels.supplements.name}
+              <input
+                autoFocus={true}
+                className={inputClass}
+                disabled={saving}
+                onChange={(event) => onNameChange(event.target.value)}
+                value={name}
+              />
+            </label>
+
+            <label className="grid gap-2 text-sm font-medium text-gray-700">
+              {labels.supplements.category}
+              <input
+                className={inputClass}
+                disabled={saving}
+                list={categoryListId}
+                onChange={(event) => onCategoryChange(event.target.value)}
+                placeholder="Manual"
+                value={category}
+              />
+              <datalist id={categoryListId}>
+                {categories.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+            </label>
+
+            {error ? (
+              <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700 ring-1 ring-red-100">
+                {labels.supplements.createError}
+              </p>
+            ) : null}
+
+            <div className="flex justify-end gap-3">
+              <button
+                className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving}
+                onClick={onClose}
+                type="button"
+              >
+                {labels.supplements.close}
+              </button>
+              <button
+                className="rounded-md bg-[#1FA77A] px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#188865] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!canCreate}
+                type="submit"
+              >
+                {saving ? "..." : labels.supplements.create}
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -1528,6 +3018,7 @@ export function SupplementListMeta({
 
 function SupplementDetailsModal({
   accessToken,
+  addingAssociation,
   associatedSupplementId,
   associationOptions,
   deletingAssociationId,
@@ -1537,6 +3028,7 @@ function SupplementDetailsModal({
   labels,
   locale,
   onAssociateSupplement,
+  onAddAssociation,
   onChange,
   onClose,
   onDeleteAssociation,
@@ -1544,6 +3036,7 @@ function SupplementDetailsModal({
   saving
 }: Readonly<{
   accessToken: string;
+  addingAssociation?: boolean;
   associatedSupplementId?: string;
   associationOptions?: AdminSupplementRow[];
   deletingAssociationId?: string | null;
@@ -1553,12 +3046,14 @@ function SupplementDetailsModal({
   labels: AdminContent;
   locale: Locale;
   onAssociateSupplement?: (supplementId: string) => void;
+  onAddAssociation?: (alias: string) => Promise<boolean>;
   onChange: (patch: Partial<AdminSupplementRow>) => void;
   onClose: () => void;
   onDeleteAssociation?: (aliasId: string) => void;
   onSave: () => void;
   saving: boolean;
 }>) {
+  const [newAlias, setNewAlias] = useState("");
   const [suggestingDose, setSuggestingDose] = useState(false);
   const [suggestDoseError, setSuggestDoseError] = useState(false);
   const inputClass =
@@ -1579,6 +3074,19 @@ function SupplementDetailsModal({
     !(supplementDoseUnits as readonly string[]).includes(draft.maxUnit)
       ? [draft.maxUnit, ...supplementDoseUnits]
       : supplementDoseUnits;
+  const trimmedNewAlias = newAlias.trim();
+
+  async function addAssociation() {
+    if (!onAddAssociation || !trimmedNewAlias || addingAssociation) {
+      return;
+    }
+
+    const added = await onAddAssociation(trimmedNewAlias);
+
+    if (added) {
+      setNewAlias("");
+    }
+  }
 
   async function suggestDose() {
     setSuggestingDose(true);
@@ -1743,11 +3251,13 @@ function SupplementDetailsModal({
               </div>
             ) : null}
 
-            {draft.aliases.length > 0 ? (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
-                  {labels.supplements.associations}
-                </p>
+            {draft.aliases.length > 0 || onAddAssociation ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                    {labels.supplements.associations}
+                  </p>
+                </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {draft.aliases.map((alias) => (
                     <span
@@ -1769,6 +3279,31 @@ function SupplementDetailsModal({
                     </span>
                   ))}
                 </div>
+                {onAddAssociation ? (
+                  <form
+                    className="flex flex-col gap-2 sm:flex-row"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void addAssociation();
+                    }}
+                  >
+                    <input
+                      aria-label={labels.supplements.associationPlaceholder}
+                      className={classNames(inputClass, "min-w-0 flex-1")}
+                      disabled={addingAssociation}
+                      onChange={(event) => setNewAlias(event.target.value)}
+                      placeholder={labels.supplements.associationPlaceholder}
+                      value={newAlias}
+                    />
+                    <button
+                      className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={!trimmedNewAlias || addingAssociation}
+                      type="submit"
+                    >
+                      {addingAssociation ? "..." : labels.supplements.addAssociation}
+                    </button>
+                  </form>
+                ) : null}
               </div>
             ) : null}
 
@@ -2174,11 +3709,69 @@ function reviewKindLabel(labels: AdminContent, row: AdminReviewTaskRow) {
 }
 
 function reviewScopeLabel(labels: AdminContent, row: AdminReviewTaskRow) {
+  if (row.itemType === "product") {
+    return labels.reviewQueue.productReview;
+  }
+
   if (row.itemType === "food") {
-    return row.planId ? labels.reviewQueue.planReview : "Food review";
+    return row.planId ? labels.reviewQueue.planReview : labels.reviewQueue.foodReview;
   }
 
   return row.planId ? labels.reviewQueue.planReview : labels.reviewQueue.supplementReview;
+}
+
+type ReviewMetricFilter =
+  | "reviewsFood"
+  | "reviewsPlan"
+  | "reviewsProduct"
+  | "reviewsSupplement"
+  | "reviewsTotal";
+
+function reviewMatchesMetric(row: AdminReviewTaskRow, metricId: ReviewMetricFilter) {
+  if (metricId === "reviewsTotal") {
+    return true;
+  }
+
+  if (metricId === "reviewsProduct") {
+    return row.itemType === "product";
+  }
+
+  if (metricId === "reviewsPlan") {
+    return row.itemType !== "product" && Boolean(row.planId);
+  }
+
+  if (metricId === "reviewsFood") {
+    return row.itemType === "food" && !row.planId;
+  }
+
+  return row.itemType === "supplement" && !row.planId;
+}
+
+function reviewMetricCounts(rows: readonly AdminReviewTaskRow[]) {
+  return rows.reduce(
+    (counts, row) => {
+      counts.total += 1;
+
+      if (row.itemType === "product") {
+        counts.product += 1;
+      } else if (row.planId) {
+        counts.plan += 1;
+      } else if (row.itemType === "food") {
+        counts.food += 1;
+      } else {
+        counts.supplement += 1;
+      }
+
+      return counts;
+    },
+    {
+      food: 0,
+      plan: 0,
+      product: 0,
+      supplement: 0,
+      total: 0
+    }
+  );
 }
 
 type ReviewTaskGroup = Readonly<{
@@ -2327,6 +3920,10 @@ function formatReviewQueueDose(
 }
 
 function reviewProposedDose(row: AdminReviewTaskRow, locale: Locale) {
+  if (row.itemType === "product") {
+    return row.productImport?.fdaApprovalNumber ?? "";
+  }
+
   if (row.itemType === "food") {
     return localizedReviewValue(row.foodServing, locale);
   }
@@ -2753,11 +4350,393 @@ function PlanSafetyReviewModal({
   );
 }
 
+type ProductImportFactDraft = {
+  amount: string;
+  confidence: "high" | "low" | "moderate";
+  name: string;
+  unit: string;
+};
+
+function ProductImportReviewModal({
+  error,
+  labels,
+  onClose,
+  onDecision,
+  productsData,
+  row,
+  saving
+}: Readonly<{
+  error: boolean;
+  labels: AdminContent;
+  onClose: () => void;
+  onDecision: (
+    action: "approve_product" | "ignore_import" | "merge_product",
+    mergeProductId: string | null,
+    reviewerNote: string | null,
+    parsedFacts?: Array<{
+      amount: number | null;
+      confidence: "high" | "low" | "moderate";
+      name: string;
+      unit: string | null;
+    }>,
+    description?: string | null,
+    descriptionEn?: string | null,
+    descriptionTh?: string | null
+  ) => void;
+  productsData: AdminProductsData;
+  row: AdminReviewTaskRow;
+  saving: boolean;
+}>) {
+  const [mergeProductId, setMergeProductId] = useState(
+    row.productImport?.duplicateProductIds[0] ?? ""
+  );
+  const [description, setDescription] = useState(
+    row.productImport?.description ?? ""
+  );
+  const [descriptionEn, setDescriptionEn] = useState(
+    row.productImport?.descriptionEn ?? row.productImport?.description ?? ""
+  );
+  const [descriptionTh, setDescriptionTh] = useState(
+    row.productImport?.descriptionTh ?? ""
+  );
+  const [facts, setFacts] = useState<ProductImportFactDraft[]>(() =>
+    (row.productImport?.parsedFacts ?? []).map((fact) => ({
+      amount: fact.amount === null ? "" : String(fact.amount),
+      confidence:
+        fact.confidence === "high" || fact.confidence === "low"
+          ? fact.confidence
+          : "moderate" as const,
+      name: fact.name,
+      unit: fact.unit ?? ""
+    }))
+  );
+  const [reviewerNote, setReviewerNote] = useState("");
+  const sourceUrl = row.productImport?.sourceUrl;
+  const imageUrl = row.productImport?.imageUrls[0] ?? null;
+  const duplicateOptions = productsData.rows.filter((product) =>
+    row.productImport?.duplicateProductIds.includes(product.id)
+  );
+  const mergeOptions = duplicateOptions.length > 0
+    ? duplicateOptions
+    : productsData.rows.slice(0, 80);
+  const inputClass =
+    "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]";
+  const parsedFacts = facts.flatMap((fact) => {
+    const name = fact.name.trim();
+
+    if (!name) {
+      return [];
+    }
+
+    const amount = fact.amount.trim() ? Number(fact.amount) : null;
+
+    return [{
+      amount: amount !== null && Number.isFinite(amount) && amount >= 0
+        ? amount
+        : null,
+      confidence: fact.confidence,
+      name,
+      unit: fact.unit.trim() || null
+    }];
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <button
+        aria-label={labels.supplements.close}
+        className="fixed inset-0 cursor-default bg-gray-900/40"
+        onClick={onClose}
+        type="button"
+      />
+      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
+        <section
+          aria-modal={true}
+          className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-900/10"
+          role="dialog"
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+            <div className="min-w-0">
+              <h2 className="text-xl font-semibold text-gray-900">
+                {row.supplementName}
+              </h2>
+              {row.productImport?.fdaApprovalNumber ? (
+                <p className="mt-1 text-sm text-gray-500">
+                  FDA {row.productImport.fdaApprovalNumber}
+                </p>
+              ) : null}
+            </div>
+            <button
+              aria-label={labels.supplements.close}
+              className="rounded-md p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
+              onClick={onClose}
+              type="button"
+            >
+              <XMarkIcon aria-hidden={true} className="size-5" />
+            </button>
+          </div>
+
+          <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">
+            <div className="flex gap-4">
+              {imageUrl ? (
+                <img
+                  alt=""
+                  className="size-24 rounded-xl object-cover ring-1 ring-gray-200"
+                  src={imageUrl}
+                />
+              ) : (
+                <div className="flex size-24 items-center justify-center rounded-xl bg-gray-50 text-xs font-semibold text-gray-400 ring-1 ring-gray-200">
+                  Product
+                </div>
+              )}
+              <div className="min-w-0 flex-1 space-y-2 text-sm text-gray-600">
+                {sourceUrl ? (
+                  <a
+                    className="block truncate font-semibold text-[#2563EB] hover:text-[#1D4ED8]"
+                    href={sourceUrl}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {sourceUrl}
+                  </a>
+                ) : null}
+                <p>
+                  Review the imported label facts before this product can be
+                  recommended.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-2 text-sm font-medium text-gray-700">
+                Description EN
+                <textarea
+                  className={classNames(inputClass, "min-h-24 resize-y")}
+                  onChange={(event) => {
+                    setDescriptionEn(event.target.value);
+                    setDescription(event.target.value);
+                  }}
+                  value={descriptionEn}
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-gray-700">
+                Description TH
+                <textarea
+                  className={classNames(inputClass, "min-h-24 resize-y")}
+                  onChange={(event) => setDescriptionTh(event.target.value)}
+                  value={descriptionTh}
+                />
+              </label>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-gray-900">
+                  Parsed facts
+                </h3>
+                <button
+                  className="rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50"
+                  onClick={() =>
+                    setFacts((current) => [
+                      ...current,
+                      {
+                        amount: "",
+                        confidence: "moderate",
+                        name: "",
+                        unit: ""
+                      }
+                    ])
+                  }
+                  type="button"
+                >
+                  Add fact
+                </button>
+              </div>
+              <div className="mt-2 space-y-2">
+                {facts.length ? facts.map((fact, index) => (
+                  <div
+                    className="grid gap-2 rounded-xl border border-gray-100 bg-gray-50 p-3 sm:grid-cols-[minmax(0,1fr)_6rem_6rem_8rem_auto]"
+                    key={`${index}:${fact.name}`}
+                  >
+                    <input
+                      className={inputClass}
+                      onChange={(event) =>
+                        setFacts((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, name: event.target.value }
+                              : item
+                          )
+                        )
+                      }
+                      placeholder="Ingredient"
+                      value={fact.name}
+                    />
+                    <input
+                      className={inputClass}
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setFacts((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, amount: event.target.value }
+                              : item
+                          )
+                        )
+                      }
+                      placeholder="Amount"
+                      value={fact.amount}
+                    />
+                    <input
+                      className={inputClass}
+                      onChange={(event) =>
+                        setFacts((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, unit: event.target.value }
+                              : item
+                          )
+                        )
+                      }
+                      placeholder="Unit"
+                      value={fact.unit}
+                    />
+                    <select
+                      className={inputClass}
+                      onChange={(event) =>
+                        setFacts((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? {
+                                  ...item,
+                                  confidence: event.target.value as "high" | "low" | "moderate"
+                                }
+                              : item
+                          )
+                        )
+                      }
+                      value={fact.confidence}
+                    >
+                      <option value="high">High</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="low">Low</option>
+                    </select>
+                    <button
+                      className="rounded-md bg-white px-2.5 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50"
+                      onClick={() =>
+                        setFacts((current) =>
+                          current.filter((_, itemIndex) => itemIndex !== index)
+                        )
+                      }
+                      type="button"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )) : (
+                  <span className="text-sm text-amber-700">No parsed facts yet.</span>
+                )}
+              </div>
+            </div>
+
+            <label className="grid gap-2 text-sm font-medium text-gray-700">
+              Duplicate of existing product
+              <select
+                className={inputClass}
+                onChange={(event) => setMergeProductId(event.target.value)}
+                value={mergeProductId}
+              >
+                <option value="">Select product</option>
+                {mergeOptions.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {[product.title, product.brandName].filter(Boolean).join(" · ")}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="grid gap-2 text-sm font-medium text-gray-700">
+              Reviewer note
+              <textarea
+                className={classNames(inputClass, "min-h-24 resize-y")}
+                onChange={(event) => setReviewerNote(event.target.value)}
+                value={reviewerNote}
+              />
+            </label>
+
+            {error ? (
+              <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700 ring-1 ring-red-100">
+                {labels.supplements.updateError}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <button
+              className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+              onClick={onClose}
+              type="button"
+            >
+              {labels.supplements.close}
+            </button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <button
+                className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saving || !mergeProductId}
+                onClick={() =>
+                  onDecision(
+                    "merge_product",
+                    mergeProductId,
+                    reviewerNote.trim() || null
+                  )
+                }
+                type="button"
+              >
+                Mark duplicate
+              </button>
+              <span className="isolate inline-flex rounded-md shadow-xs">
+                <button
+                  className="relative inline-flex items-center rounded-l-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() =>
+                    onDecision("ignore_import", null, reviewerNote.trim() || null)
+                  }
+                  type="button"
+                >
+                  Ignore
+                </button>
+                <button
+                  className="relative -ml-px inline-flex items-center rounded-r-md bg-[#1FA77A] px-3.5 py-2.5 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#188865] focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() =>
+                    onDecision(
+                      "approve_product",
+                      null,
+                      reviewerNote.trim() || null,
+                      parsedFacts,
+                      description.trim() || descriptionEn.trim() || descriptionTh.trim() || null,
+                      descriptionEn.trim() || null,
+                      descriptionTh.trim() || null
+                    )
+                  }
+                  type="button"
+                >
+                  {saving ? "..." : "Approve"}
+                </button>
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 export function AdminReviewQueueView({
   accessToken,
   data,
   labels,
   locale,
+  productsData,
   selectedReviewTaskId,
   supplementsData
 }: Readonly<{
@@ -2765,6 +4744,7 @@ export function AdminReviewQueueView({
   data: AdminReviewQueueData;
   labels: AdminContent;
   locale: Locale;
+  productsData: AdminProductsData;
   selectedReviewTaskId?: string | null;
   supplementsData: AdminSupplementsData;
 }>) {
@@ -2783,12 +4763,18 @@ export function AdminReviewQueueView({
     queuedLabel: string;
     row: AdminReviewTaskRow;
   } | null>(null);
+  const [selectedReviewMetricId, setSelectedReviewMetricId] =
+    useState<ReviewMetricFilter>("reviewsTotal");
   const [dismissedReviewTaskId, setDismissedReviewTaskId] = useState<
     string | null
   >(null);
   const queueData =
     queueState.generatedAt === data.generatedAt ? queueState.data : data;
-  const reviewGroups = groupReviewRows(labels, queueData.rows);
+  const reviewMetricSummary = reviewMetricCounts(queueData.rows);
+  const visibleReviewRows = queueData.rows.filter((row) =>
+    reviewMatchesMetric(row, selectedReviewMetricId)
+  );
+  const reviewGroups = groupReviewRows(labels, visibleReviewRows);
 
   function setLocalQueueData(
     next:
@@ -2998,6 +4984,101 @@ export function AdminReviewQueueView({
     }
   }
 
+  async function decideProductImportReview(
+    row: AdminReviewTaskRow,
+    action: "approve_product" | "ignore_import" | "merge_product",
+    mergeProductId: string | null,
+    reviewerNote: string | null,
+    parsedFacts?: Array<{
+      amount: number | null;
+      confidence: "high" | "low" | "moderate";
+      name: string;
+      unit: string | null;
+    }>,
+    description?: string | null,
+    descriptionEn?: string | null,
+    descriptionTh?: string | null
+  ) {
+    setSavingReviewId(row.id);
+    setErrorReviewId(null);
+
+    try {
+      const response = await fetch(`/api/admin/review-tasks/${row.id}`, {
+        body: JSON.stringify({
+          accessToken,
+          action,
+          description,
+          descriptionEn,
+          descriptionTh,
+          mergeProductId,
+          parsedFacts,
+          reviewerNote
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "PATCH"
+      });
+
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+
+        throw new Error(
+          errorPayload?.message ?? "Unable to update product import review"
+        );
+      }
+
+      const payload = (await response.json()) as {
+        result?: {
+          removedTaskIds?: string[];
+        };
+      };
+      const removedTaskIds = new Set(
+        payload.result?.removedTaskIds?.length
+          ? payload.result.removedTaskIds
+          : [row.id]
+      );
+
+      setLocalQueueData((currentData) => {
+        const rows = currentData.rows.filter(
+          (item) => !removedTaskIds.has(item.id)
+        );
+
+        return {
+          ...currentData,
+          rows,
+          summary: {
+            doseReduced: rows.filter(
+              (item) => item.reviewKind === "dose_reduced"
+            ).length,
+            reviewRequired: rows.filter(
+              (item) =>
+                item.reviewKind !== "dose_reduced" &&
+                item.reviewKind !== "unknown_supplement" &&
+                item.reviewKind !== "unknown_food"
+            ).length,
+            total: rows.length,
+            unknown: rows.filter(
+              (item) =>
+                item.reviewKind === "unknown_supplement" ||
+                item.reviewKind === "unknown_food"
+            ).length
+          }
+        };
+      });
+
+      setDismissedReviewTaskId(row.id);
+      setSelectedReview(null);
+    } catch (decisionError) {
+      console.error("Unable to update product import review", decisionError);
+      setErrorReviewId(row.id);
+    } finally {
+      setSavingReviewId(null);
+    }
+  }
+
   function selectReview(row: AdminReviewTaskRow) {
     setDismissedReviewTaskId(null);
     setSelectedReview({
@@ -3034,27 +5115,47 @@ export function AdminReviewQueueView({
       id: "reviewsTotal",
       label: labels.reviewQueue.total,
       locale,
-      value: queueData.summary.total
-    }),
-    safetyMetric({
-      color: businessMetricColors.stuck,
-      id: "reviewsUnknown",
-      label: labels.reviewQueue.unknown,
-      locale,
-      value: queueData.summary.unknown
+      value: reviewMetricSummary.total
     }),
     safetyMetric({
       color: businessMetricColors.pendingReviews,
-      id: "reviewsRequired",
-      label: labels.reviewQueue.reviewRequired,
+      id: "reviewsPlan",
+      label: labels.reviewQueue.plan,
       locale,
-      value: queueData.summary.reviewRequired
+      value: reviewMetricSummary.plan
+    }),
+    safetyMetric({
+      color: businessMetricColors.succeeded,
+      id: "reviewsSupplement",
+      label: labels.pageTitles.supplements,
+      locale,
+      value: reviewMetricSummary.supplement
+    }),
+    safetyMetric({
+      color: businessMetricColors.queued,
+      id: "reviewsFood",
+      label: labels.pageTitles.foods,
+      locale,
+      value: reviewMetricSummary.food
+    }),
+    safetyMetric({
+      color: businessMetricColors.active,
+      id: "reviewsProduct",
+      label: labels.pageTitles.products,
+      locale,
+      value: reviewMetricSummary.product
     })
   ];
 
   return (
     <section className="mt-8 space-y-6">
-      <BusinessStatsGrid metrics={reviewMetrics} />
+      <BusinessStatsGrid
+        metrics={reviewMetrics}
+        onMetricSelect={(metricId) =>
+          setSelectedReviewMetricId(metricId as ReviewMetricFilter)
+        }
+        selectedMetricId={selectedReviewMetricId}
+      />
 
       {reviewGroups.length > 0 ? (
         <div className="space-y-7">
@@ -3138,8 +5239,12 @@ export function AdminReviewQueueView({
                     </span>
                     <h3 className="min-w-0 truncate text-sm font-semibold text-gray-900 sm:text-base">
                       <span className="mr-2 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">
-                        {row.itemType === "food" ? "Food" : "Supp"}
-                      </span>
+                      {row.itemType === "food"
+                        ? "Food"
+                        : row.itemType === "product"
+                          ? "Product"
+                          : "Supp"}
+                      </span>{" "}
                       {row.supplementName}
                     </h3>
                     {row.planId ? (
@@ -3172,7 +5277,29 @@ export function AdminReviewQueueView({
         </div>
       )}
 
-      {visibleReview?.row.reviewKind === "unknown_supplement" &&
+      {visibleReview?.row.reviewKind === "product_import" &&
+      visibleReview.row.itemType === "product" ? (
+        <ProductImportReviewModal
+          error={errorReviewId === visibleReview.row.id}
+          labels={labels}
+          onClose={closeReviewModal}
+          onDecision={(action, mergeProductId, reviewerNote, parsedFacts, description, descriptionEn, descriptionTh) =>
+            void decideProductImportReview(
+              visibleReview.row,
+              action,
+              mergeProductId,
+              reviewerNote,
+              parsedFacts,
+              description,
+              descriptionEn,
+              descriptionTh
+            )
+          }
+          productsData={productsData}
+          row={visibleReview.row}
+          saving={savingReviewId === visibleReview.row.id}
+        />
+      ) : visibleReview?.row.reviewKind === "unknown_supplement" &&
       visibleReview.row.itemType === "supplement" ? (
         <SupplementDetailsModal
           accessToken={accessToken}

@@ -336,8 +336,10 @@ export type AdminContent = Readonly<{
     plan: string;
     planLink: string;
     planReview: string;
+    productReview: string;
     queued: string;
     doseUnverified: string;
+    foodReview: string;
     supplementReview: string;
     reviewerNote: string;
     reviewRequired: string;
@@ -380,16 +382,22 @@ export type AdminContent = Readonly<{
   supplements: {
     allCategories: string;
     allStatuses: string;
+    addSupplement: string;
     blacklisted: string;
     category: string;
     confidence: string;
     close: string;
+    create: string;
+    createError: string;
     details: string;
     dose: string;
     empty: string;
     inactive: string;
     maxAmount: string;
     maxUnit: string;
+    name: string;
+    newSupplement: string;
+    newSupplementHint: string;
     none: string;
     reviewRequired: string;
     safetyFlag: string;
@@ -400,6 +408,8 @@ export type AdminContent = Readonly<{
     associationHint: string;
     associatedWith: string;
     clearAssociation: string;
+    addAssociation: string;
+    associationPlaceholder: string;
     noAssociationMatches: string;
     removeAssociation: string;
     save: string;
@@ -701,7 +711,6 @@ export const content = {
     ],
     contentTitle: "Content",
     governance: [
-      { icon: ExclamationTriangleIcon, name: "Reviews", view: "reviews" },
       { icon: SparklesIcon, name: "Foods", view: "foods" },
       { icon: ShoppingBagIcon, name: "Products", view: "products" },
       { icon: BeakerIcon, name: "Supplements", view: "supplements" }
@@ -709,6 +718,7 @@ export const content = {
     governanceTitle: "Safety",
     openSidebar: "Open sidebar",
     execution: [
+      { icon: ExclamationTriangleIcon, name: "Reviews", view: "reviews" },
       { icon: QueueListIcon, name: "Tasks", view: "visibility" },
       { icon: CpuChipIcon, name: "Agents", view: "agents" },
       { icon: ExclamationTriangleIcon, name: "Alerts", view: "alerts" }
@@ -758,8 +768,10 @@ export const content = {
       plan: "Plan",
       planLink: "Open plan",
       planReview: "Plan review",
+      productReview: "Product review",
       queued: "Queued",
       doseUnverified: "Dose unverified",
+      foodReview: "Food review",
       supplementReview: "Supplement review",
       reviewerNote: "Reviewer note",
       reviewRequired: "Review required",
@@ -802,16 +814,23 @@ export const content = {
     supplements: {
       allCategories: "All categories",
       allStatuses: "All statuses",
+      addSupplement: "Add supplement",
       blacklisted: "Blacklisted",
       category: "Category",
       confidence: "Confidence",
       close: "Close",
+      create: "Create",
+      createError: "Could not create this supplement.",
       details: "Details",
       dose: "Max dose",
       empty: "No supplements match these filters.",
       inactive: "Inactive",
       maxAmount: "Amount",
       maxUnit: "Unit",
+      name: "Name",
+      newSupplement: "New supplement",
+      newSupplementHint:
+        "Create the canonical supplement, then add dose, safety notes and associations.",
       none: "None",
       reviewRequired: "Review required",
       safetyFlag: "Safety flags",
@@ -838,6 +857,8 @@ export const content = {
         "Use this when the unknown item is just another name for a supplement already in the database.",
       associatedWith: "Associated with",
       clearAssociation: "Clear",
+      addAssociation: "Add",
+      associationPlaceholder: "Add another name",
       noAssociationMatches: "No matching supplements.",
       removeAssociation: "Remove association",
       save: "Save",
@@ -1127,7 +1148,6 @@ export const content = {
     ],
     contentTitle: "คอนเทนต์",
     governance: [
-      { icon: ExclamationTriangleIcon, name: "รีวิว", view: "reviews" },
       { icon: SparklesIcon, name: "อาหาร", view: "foods" },
       { icon: ShoppingBagIcon, name: "สินค้า", view: "products" },
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplements" }
@@ -1135,6 +1155,7 @@ export const content = {
     governanceTitle: "ความปลอดภัย",
     openSidebar: "เปิดแถบเมนู",
     execution: [
+      { icon: ExclamationTriangleIcon, name: "รีวิว", view: "reviews" },
       { icon: QueueListIcon, name: "Tasks", view: "visibility" },
       { icon: CpuChipIcon, name: "Agents", view: "agents" },
       { icon: ExclamationTriangleIcon, name: "แจ้งเตือน", view: "alerts" }
@@ -1184,8 +1205,10 @@ export const content = {
       plan: "แผน",
       planLink: "เปิดแผน",
       planReview: "รีวิวแผน",
+      productReview: "รีวิวสินค้า",
       queued: "เข้าคิว",
       doseUnverified: "ยังตรวจขนาดไม่ได้",
+      foodReview: "รีวิวอาหาร",
       supplementReview: "รีวิวอาหารเสริม",
       reviewerNote: "หมายเหตุผู้รีวิว",
       reviewRequired: "ต้องรีวิว",
@@ -1228,16 +1251,23 @@ export const content = {
     supplements: {
       allCategories: "ทุกหมวดหมู่",
       allStatuses: "ทุกสถานะ",
+      addSupplement: "เพิ่มอาหารเสริม",
       blacklisted: "บัญชีดำ",
       category: "หมวดหมู่",
       confidence: "ความมั่นใจ",
       close: "ปิด",
+      create: "สร้าง",
+      createError: "ไม่สามารถสร้างอาหารเสริมนี้ได้",
       details: "รายละเอียด",
       dose: "ขนาดสูงสุด",
       empty: "ไม่พบอาหารเสริมตามตัวกรองนี้",
       inactive: "ปิดใช้",
       maxAmount: "ปริมาณ",
       maxUnit: "หน่วย",
+      name: "ชื่อ",
+      newSupplement: "อาหารเสริมใหม่",
+      newSupplementHint:
+        "สร้างอาหารเสริมหลักก่อน จากนั้นเพิ่มขนาด หมายเหตุความปลอดภัย และชื่อเชื่อมโยง",
       none: "ไม่มี",
       reviewRequired: "ต้องรีวิว",
       safetyFlag: "ธงความปลอดภัย",
@@ -1264,6 +1294,8 @@ export const content = {
         "ใช้เมื่อรายการใหม่นี้เป็นอีกชื่อหนึ่งของอาหารเสริมที่มีอยู่ในฐานข้อมูลแล้ว",
       associatedWith: "เชื่อมกับ",
       clearAssociation: "ล้าง",
+      addAssociation: "เพิ่ม",
+      associationPlaceholder: "เพิ่มชื่ออื่น",
       noAssociationMatches: "ไม่พบอาหารเสริมที่ตรงกัน",
       removeAssociation: "ลบชื่อเชื่อมโยง",
       save: "บันทึก",

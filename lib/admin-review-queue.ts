@@ -17,6 +17,7 @@ import {
 import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
 import { safetyReviewItemColumnsAvailable } from "@/lib/safety-review-schema";
 import { notifyTaskQueueChanged } from "@/lib/task-wakeup";
+import { enqueueProductRecommendationsTask } from "@/lib/task-worker";
 import {
   applyReviewDecisionToFoodGuidance,
   applyReviewDecisionToFormulation,
@@ -45,7 +46,7 @@ export type AdminReviewTaskRow = Readonly<{
   taskGroupId: string | null;
   groupLabel: string | null;
   id: string;
-  itemType: "food" | "supplement";
+  itemType: "food" | "product" | "supplement";
   limitAmount: number | null;
   limitUnit: string | null;
   maxAmount: number | null;
@@ -59,6 +60,22 @@ export type AdminReviewTaskRow = Readonly<{
   reviewKind: string;
   status: string;
   supplementName: string;
+  productImport: {
+    description: string | null;
+    descriptionEn: string | null;
+    descriptionTh: string | null;
+    duplicateProductIds: string[];
+    fdaApprovalNumber: string | null;
+    imageUrls: string[];
+    parsedFacts: Array<{
+      amount: number | null;
+      confidence: string;
+      name: string;
+      unit: string | null;
+    }>;
+    productImportId: string | null;
+    sourceUrl: string | null;
+  } | null;
   foodFrequency: AdminReviewLocalizedText | null;
   foodRationale: AdminReviewLocalizedText | null;
   foodServing: AdminReviewLocalizedText | null;
@@ -136,11 +153,30 @@ type SafetyFollowupReviewRow = Readonly<{
   supplement_name: string;
 }>;
 
+async function queueProductMatchAfterPlanReview(input: Readonly<{
+  parentTaskId: string;
+  planId: string | null;
+}>) {
+  if (!input.planId) {
+    return;
+  }
+
+  try {
+    await enqueueProductRecommendationsTask({
+      parentTaskId: input.parentTaskId,
+      planId: input.planId
+    });
+  } catch (error) {
+    console.error("Unable to queue product recommendations after review", error);
+  }
+}
+
 const REVIEW_TASK_TYPES = [
   "classify_food",
   "classify_supplement",
   "review_food_for_plan",
   "review_supplement_for_plan",
+  "review_product_import",
   "dose_reduction_notice"
 ] as const;
 
@@ -170,7 +206,7 @@ export type DecideAdminPlanReviewTaskInput = Readonly<{
   reviewerNote?: string | null;
 }>;
 
-function emptyAdminReviewQueueData(): AdminReviewQueueData {
+export function emptyAdminReviewQueueData(): AdminReviewQueueData {
   return {
     databaseAvailable: false,
     generatedAt: new Date().toISOString(),
@@ -184,10 +220,25 @@ function emptyAdminReviewQueueData(): AdminReviewQueueData {
   };
 }
 
+function reviewGroupLabel(label: string | null, payload: Record<string, unknown>) {
+  if (
+    label === "Review product imports" ||
+    textOrNull(payload.reviewKind) === "product_import"
+  ) {
+    return "Review Product";
+  }
+
+  return label;
+}
+
 function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
   const payload = row.payload ?? {};
   const aiSuggestion = row.ai_suggestion ?? {};
-  const itemType = row.item_type === "food" ? "food" : "supplement";
+  const itemType = textOrNull(payload.itemType) === "product"
+    ? "product"
+    : row.item_type === "food"
+      ? "food"
+      : "supplement";
   const clientDoseAmount =
     numberOrNull(row.suggested_dose_value) ??
     numberOrNull(payload.suggestedDoseAmount) ??
@@ -210,7 +261,7 @@ function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
     flagReason: row.flag_reason,
     businessValue: Number(row.business_value) || 0,
     taskGroupId: row.task_group_id,
-    groupLabel: row.group_label,
+    groupLabel: reviewGroupLabel(row.group_label, payload),
     id: row.id,
     itemType,
     limitAmount: numberOrNull(row.limit_value),
@@ -227,11 +278,50 @@ function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
     status: row.status,
     supplementName:
       textOrNull(row.item_name) ??
+      textOrNull(payload.productName) ??
       textOrNull(payload.foodName) ??
       textOrNull(payload.normalizedFoodName) ??
       textOrNull(payload.supplementName) ??
       textOrNull(payload.normalizedSupplementName) ??
-      (itemType === "food" ? "Unknown food" : "Unknown supplement"),
+      (itemType === "food"
+        ? "Unknown food"
+        : itemType === "product"
+          ? "Unknown product"
+          : "Unknown supplement"),
+    productImport: itemType === "product"
+      ? {
+          description: textOrNull(payload.description),
+          descriptionEn: textOrNull(payload.descriptionEn),
+          descriptionTh: textOrNull(payload.descriptionTh),
+          duplicateProductIds: textArray(payload.duplicateProductIds),
+          fdaApprovalNumber: textOrNull(payload.fdaApprovalNumber),
+          imageUrls: textArray(payload.imageUrls),
+          parsedFacts: Array.isArray(payload.parsedFacts)
+            ? payload.parsedFacts.flatMap((item) => {
+                const record = item && typeof item === "object"
+                  ? item as Record<string, unknown>
+                  : null;
+
+                if (!record) {
+                  return [];
+                }
+
+                const name = textOrNull(record.name);
+
+                return name
+                  ? [{
+                      amount: numberOrNull(record.amount),
+                      confidence: textOrNull(record.confidence) ?? "moderate",
+                      name,
+                      unit: textOrNull(record.unit)
+                    }]
+                  : [];
+              })
+            : [],
+          productImportId: textOrNull(payload.productImportId),
+          sourceUrl: textOrNull(payload.sourceUrl)
+        }
+      : null,
     foodFrequency: localizedReviewText(aiSuggestion.frequency),
     foodRationale: localizedReviewText(aiSuggestion.rationale),
     foodServing: localizedReviewText(aiSuggestion.serving)
@@ -1245,6 +1335,10 @@ export async function decideAdminPlanReviewTask(
             });
 
       notifyTaskQueueChanged();
+      await queueProductMatchAfterPlanReview({
+        parentTaskId: input.id,
+        planId: task.plan_id
+      });
 
       return {
         followupTaskId,
@@ -1387,6 +1481,11 @@ export async function decideAdminPlanReviewTask(
         )
       `;
     }
+
+    await queueProductMatchAfterPlanReview({
+      parentTaskId: input.id,
+      planId: task.plan_id
+    });
   }
 
   return {

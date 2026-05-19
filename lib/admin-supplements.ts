@@ -80,6 +80,18 @@ export type UpdateAdminSupplementInput = Readonly<{
   safetyNotes: string | null;
 }>;
 
+export type CreateAdminSupplementInput = Readonly<{
+  actor?: string | null;
+  category?: string | null;
+  confidence?: SupplementConfidence | null;
+  listStatus?: SupplementListStatus | null;
+  maxAmount?: number | null;
+  maxUnit?: string | null;
+  name: string;
+  safetyFlags?: SupplementSafetyFlag[] | null;
+  safetyNotes?: string | null;
+}>;
+
 export type DeleteAdminSupplementAliasInput = Readonly<{
   actor?: string | null;
   aliasId: string;
@@ -101,7 +113,7 @@ const listStatuses = new Set<SupplementListStatus>([
 
 const confidences = new Set<SupplementConfidence>(["high", "low", "moderate"]);
 
-function emptyAdminSupplementsData(): AdminSupplementsData {
+export function emptyAdminSupplementsData(): AdminSupplementsData {
   return {
     categories: [],
     databaseAvailable: false,
@@ -381,6 +393,163 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
 
   if (!row) {
     throw new Error("Supplement update could not be reloaded");
+  }
+
+  return row;
+}
+
+export async function createAdminSupplement(input: CreateAdminSupplementInput) {
+  const sql = getSql();
+  const name = input.name.trim().slice(0, 200);
+  const normalizedName = normalizeAlias(name);
+  const category = input.category?.trim().slice(0, 120) || "Manual";
+  const listStatus = input.listStatus ?? "review_required";
+  const confidence = input.confidence ?? "low";
+  const maxUnit = input.maxUnit?.trim().slice(0, 80) ?? "";
+  const safetyFlags = normalizeSupplementSafetyFlags(input.safetyFlags);
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  if (!name || !normalizedName) {
+    throw new Error("Supplement name is required");
+  }
+
+  if (!listStatuses.has(listStatus)) {
+    throw new Error("Invalid supplement list status");
+  }
+
+  if (!confidences.has(confidence)) {
+    throw new Error("Invalid supplement confidence");
+  }
+
+  const existingRows = await sql<{ id: string }[]>`
+    select supplements.id::text
+    from public.supplements supplements
+    left join public.supplement_aliases aliases
+      on aliases.supplement_id = supplements.id
+    where supplements.normalized_name = ${normalizedName}
+       or aliases.normalized_alias = ${normalizedName}
+    order by
+      (supplements.normalized_name = ${normalizedName}) desc,
+      supplements.name asc
+    limit 1
+  `;
+  const existingId = existingRows[0]?.id;
+
+  if (existingId) {
+    const data = await getAdminSupplementsData();
+    const row = data.rows.find((item) => item.id === existingId);
+
+    if (!row) {
+      throw new Error("Supplement could not be reloaded");
+    }
+
+    return row;
+  }
+
+  const supplementId = randomUUID();
+
+  await sql`
+    insert into public.supplements (
+      id,
+      name,
+      normalized_name,
+      category,
+      source_status,
+      ingredient_type,
+      primary_use_case,
+      notes,
+      list_status,
+      is_active,
+      source,
+      source_payload,
+      created_at,
+      updated_at
+    )
+    values (
+      ${supplementId}::uuid,
+      ${name},
+      ${normalizedName},
+      ${category},
+      'recommended_add',
+      null,
+      null,
+      null,
+      ${listStatus === "inactive" ? "review_required" : listStatus},
+      ${listStatus !== "inactive"},
+      'admin_dashboard',
+      ${sql.json({
+        createdBy: input.actor ?? "admin_dashboard",
+        createdVia: "supplements_plus"
+      })}::jsonb,
+      now(),
+      now()
+    )
+  `;
+
+  await sql`
+    insert into public.supplement_aliases (
+      id,
+      supplement_id,
+      alias,
+      normalized_alias,
+      created_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${supplementId}::uuid,
+      ${name},
+      ${normalizedName},
+      now()
+    )
+    on conflict (normalized_alias) do nothing
+  `;
+
+  await appendSupplementSafetyLimitVersion(sql, {
+    confidence,
+    maxAmount: input.maxAmount ?? null,
+    maxUnit,
+    safetyFlags,
+    safetyNotes: input.safetyNotes?.trim() || null,
+    supplementId
+  });
+
+  await sql`
+    insert into public.supplement_admin_audit (
+      id,
+      supplement_id,
+      action,
+      actor,
+      before_payload,
+      after_payload
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${supplementId}::uuid,
+      ${"created"},
+      ${input.actor ?? "admin_dashboard"},
+      '{}'::jsonb,
+      ${sql.json({
+        category,
+        confidence,
+        listStatus,
+        maxAmount: input.maxAmount ?? null,
+        maxUnit,
+        name,
+        normalizedName,
+        safetyFlags,
+        safetyNotes: input.safetyNotes?.trim() || null
+      })}::jsonb
+    )
+  `;
+
+  const data = await getAdminSupplementsData();
+  const row = data.rows.find((item) => item.id === supplementId);
+
+  if (!row) {
+    throw new Error("Supplement create could not be reloaded");
   }
 
   return row;

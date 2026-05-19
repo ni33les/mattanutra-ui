@@ -2,11 +2,19 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { getSql } from "@/lib/db";
-import { normalizeProductKey } from "@/lib/product-recommendations";
+import {
+  stageProductImport,
+  type ProductImportFactInput
+} from "@/lib/admin-products";
+import { correctDraftProductFactsWithAi } from "@/lib/product-fact-correction";
+import {
+  normalizeProductFactName,
+  normalizeProductKey
+} from "@/lib/product-recommendations";
 
 type ScrapedFact = Readonly<{
   amount: number | null;
-  confidence: "low" | "moderate";
+  confidence: "high" | "low" | "moderate";
   name: string;
   rawAmount: string | null;
   unit: string | null;
@@ -38,6 +46,9 @@ type ProductLink = {
 
 type ImportSummary = {
   applied: boolean;
+  aiCorrectionFailures: number;
+  aiCorrections: number;
+  aiCorrected: boolean;
   categoryUrls: number;
   discoveredProducts: number;
   importedOrUpdated: number;
@@ -90,6 +101,10 @@ function positiveInt(value: string | null, fallback: number) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function sleep(ms: number) {
@@ -166,17 +181,6 @@ function absoluteUrl(value: string | null) {
     return new URL(value, BASE_URL).toString();
   } catch {
     return null;
-  }
-}
-
-function normalizedUrl(value: string) {
-  try {
-    const url = new URL(value);
-    url.hash = "";
-
-    return url.toString().toLowerCase();
-  } catch {
-    return value.trim().toLowerCase();
   }
 }
 
@@ -307,22 +311,15 @@ function parseAmount(value: string | null) {
 }
 
 function cleanIngredientName(value: string) {
-  return stripTags(value)
+  const stripped = stripTags(value)
     .replace(/\[[^\]]+\]/g, " ")
     .replace(/\(?\s*provid(?:ing|es)?\b[\s\S]*$/i, " ")
     .replace(/\([^)]+%\)/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/[.,;:]+$/g, "");
-}
 
-function matchingFactName(value: string) {
-  return value
-    .replace(/\[[^\]]+\]/g, " ")
-    .replace(/\([^)]*\)/g, " ")
-    .replace(/[®™]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return normalizeProductFactName(stripped) || stripped;
 }
 
 function providedFacts(ingredientText: string) {
@@ -333,9 +330,11 @@ function providedFacts(ingredientText: string) {
 
   for (const match of text.matchAll(pattern)) {
     const name = cleanText(
-      match[3]
-        .replace(/\s*\[[\s\S]*$/g, " ")
-        .replace(/\s*\([\s\S]*$/g, " "),
+      normalizeProductFactName(
+        match[3]
+          .replace(/\s*\[[\s\S]*$/g, " ")
+          .replace(/\s*\([\s\S]*$/g, " ")
+      ),
       200
     );
     const amount = Number(match[1].replace(/,/g, ""));
@@ -549,6 +548,128 @@ async function scrapeProducts(
   return products;
 }
 
+function productFactsForAi(product: ScrapedProduct): ProductImportFactInput[] {
+  return product.facts.map((fact) => ({
+    amount: fact.amount,
+    confidence: fact.confidence,
+    itemType: "supplement",
+    name: fact.name,
+    unit: fact.unit
+  }));
+}
+
+function aiCorrectedFactsForProduct(
+  facts: readonly ProductImportFactInput[]
+): ScrapedFact[] {
+  return facts.map((fact) => ({
+    amount: fact.amount ?? null,
+    confidence: fact.confidence ?? "moderate",
+    name: fact.name,
+    rawAmount:
+      fact.amount !== null && fact.amount !== undefined && fact.unit
+        ? `${fact.amount} ${fact.unit}`
+        : null,
+    unit: fact.unit ?? null
+  }));
+}
+
+async function correctProductWithAi(
+  product: ScrapedProduct,
+  index: number,
+  total: number,
+  failOpen: boolean
+): Promise<{ corrected: boolean; failed: boolean; product: ScrapedProduct }> {
+  console.log(`[ai] ${index}/${total} ${product.title}`);
+
+  try {
+    const correction = await correctDraftProductFactsWithAi({
+      brandName: BRAND_NAME,
+      currentFacts: productFactsForAi(product),
+      description: product.description,
+      descriptionEn: product.description,
+      descriptionTh: null,
+      productTitle: product.title,
+      productTitleEn: product.title,
+      productTitleTh: null,
+      productUrl: product.canonicalUrl,
+      sourceSnapshot: {
+        benefits: product.benefits,
+        categories: product.categories,
+        caution: product.caution,
+        description: product.description,
+        dosage: product.dosage,
+        language: "en",
+        otherIngredients: product.otherIngredients,
+        rawServingSize: product.rawServingSize,
+        sku: product.sku
+      }
+    });
+
+    return {
+      corrected: true,
+      failed: false,
+      product: {
+        ...product,
+        facts: aiCorrectedFactsForProduct(correction.facts)
+      }
+    };
+  } catch (error) {
+    const message = errorMessage(error);
+    console.warn(`[ai] ${product.title} failed: ${message}`);
+
+    if (!failOpen) {
+      throw error;
+    }
+
+    return {
+      corrected: false,
+      failed: true,
+      product
+    };
+  }
+}
+
+async function correctProductsWithAi(input: Readonly<{
+  delayMs: number;
+  failOpen: boolean;
+  products: readonly ScrapedProduct[];
+  startAt: number;
+}>) {
+  let corrected = 0;
+  let failed = 0;
+  const products: ScrapedProduct[] = [];
+
+  for (let index = 0; index < input.products.length; index += 1) {
+    const product = input.products[index];
+    const productNumber = index + 1;
+
+    if (productNumber < input.startAt) {
+      products.push(product);
+      continue;
+    }
+
+    const result = await correctProductWithAi(
+      product,
+      productNumber,
+      input.products.length,
+      input.failOpen
+    );
+    products.push(result.product);
+
+    if (result.corrected) {
+      corrected += 1;
+    }
+
+    if (result.failed) {
+      failed += 1;
+    }
+
+    await sleep(input.delayMs);
+  }
+
+  return { corrected, failed, products };
+}
+
 async function writeOutput(
   outputPath: string | null,
   products: readonly ScrapedProduct[]
@@ -567,245 +688,39 @@ async function writeOutput(
   return absolute;
 }
 
-async function supplementIdMap(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  facts: readonly ScrapedFact[]
-) {
-  const names = [...new Set(
-    facts.map((fact) => normalizeProductKey(matchingFactName(fact.name)))
-  )];
-
-  if (names.length < 1) {
-    return new Map<string, string>();
-  }
-
-  const rows = await sql<Array<{ id: string; normalized_alias: string }>>`
-    select supplements.id::text, supplement_aliases.normalized_alias
-    from public.supplement_aliases
-    join public.supplements
-      on supplements.id = supplement_aliases.supplement_id
-    where supplement_aliases.normalized_alias = any(${names}::text[])
-  `;
-
-  return new Map(rows.map((row) => [row.normalized_alias, row.id]));
-}
-
-async function upsertBrand(sql: NonNullable<ReturnType<typeof getSql>>) {
-  const rows = await sql<Array<{ id: string }>>`
-    insert into public.product_brands (
-      name,
-      normalized_name,
-      list_status,
-      created_at,
-      updated_at
-    )
-    values (
-      ${BRAND_NAME},
-      ${normalizeProductKey(BRAND_NAME)},
-      'unknown',
-      now(),
-      now()
-    )
-    on conflict (normalized_name) do update set
-      name = excluded.name,
-      updated_at = now()
-    returning id::text
-  `;
-
-  return rows[0]?.id ?? null;
-}
-
-async function upsertProduct(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  product: ScrapedProduct,
-  brandId: string | null
-) {
-  const normalized = normalizedUrl(product.canonicalUrl);
-  const rows = await sql<Array<{ id: string; inserted: boolean }>>`
-    insert into public.marketplace_products (
-      platform,
-      region,
-      marketplace_product_id,
-      title,
-      normalized_title,
-      brand_id,
-      brand_name,
-      normalized_brand_name,
-      image_url,
-      product_url,
-      normalized_url,
-      description,
-      category,
-      list_status,
-      label_status,
-      availability_status,
-      affiliate_status,
-      price_amount,
-      currency,
-      price_cached_at,
-      availability_cached_at,
-      product_data_expires_at,
-      source,
-      admin_notes,
-      created_at,
-      updated_at
-    )
-    values (
-      'manual',
-      'TH',
-      ${product.productId},
-      ${product.title},
-      ${normalizeProductKey(product.title)},
-      ${brandId}::uuid,
-      ${BRAND_NAME},
-      ${normalizeProductKey(BRAND_NAME)},
-      ${product.imageUrl},
-      ${product.canonicalUrl},
-      ${normalized},
-      ${product.description},
-      ${product.categories.join(", ") || null},
-      'unknown',
-      ${product.facts.length > 0 ? "parsed" : "missing"},
-      ${product.availabilityStatus},
-      'none',
-      ${product.priceAmount},
-      'USD',
-      now(),
-      now(),
-      now() + interval '24 hours',
-      ${SOURCE},
-      ${[
-        "Imported from LE Vitamins Asia public product pages.",
-        product.sku ? `SKU: ${product.sku}.` : null,
-        product.rawServingSize ? `Serving size: ${product.rawServingSize}.` : null,
-        product.dosage ? `Dosage: ${product.dosage}` : null,
-        product.caution ? `Caution: ${product.caution}` : null,
-        product.otherIngredients ? product.otherIngredients : null
-      ].filter(Boolean).join("\n")},
-      now(),
-      now()
-    )
-    on conflict (normalized_url) do update set
-      marketplace_product_id = excluded.marketplace_product_id,
-      title = excluded.title,
-      normalized_title = excluded.normalized_title,
-      brand_id = excluded.brand_id,
-      brand_name = excluded.brand_name,
-      normalized_brand_name = excluded.normalized_brand_name,
-      image_url = coalesce(excluded.image_url, marketplace_products.image_url),
-      description = coalesce(excluded.description, marketplace_products.description),
-      category = coalesce(excluded.category, marketplace_products.category),
-      label_status = excluded.label_status,
-      availability_status = excluded.availability_status,
-      price_amount = excluded.price_amount,
-      currency = excluded.currency,
-      price_cached_at = excluded.price_cached_at,
-      availability_cached_at = excluded.availability_cached_at,
-      product_data_expires_at = excluded.product_data_expires_at,
-      source = case
-        when marketplace_products.source = 'admin' then marketplace_products.source
-        else excluded.source
-      end,
-      admin_notes = excluded.admin_notes,
-      updated_at = now()
-    returning id::text, (xmax = 0) as inserted
-  `;
-  const row = rows[0];
-
-  if (!row) {
-    throw new Error(`Unable to upsert product ${product.title}`);
-  }
-
-  return row;
-}
-
-async function replaceFacts(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  productId: string,
-  facts: readonly ScrapedFact[]
-) {
-  const supplementIds = await supplementIdMap(sql, facts);
-
-  await sql`
-    delete from public.product_facts
-    where product_id = ${productId}::uuid
-      and source = ${SOURCE}
-  `;
-
-  for (const fact of facts) {
-    const normalizedName = normalizeProductKey(matchingFactName(fact.name));
-
-    await sql`
-      insert into public.product_facts (
-        product_id,
-        item_type,
-        supplement_id,
-        name,
-        normalized_name,
-        amount,
-        unit,
-        serving_label,
-        confidence,
-        source,
-        created_at,
-        updated_at
-      )
-      values (
-        ${productId}::uuid,
-        'supplement',
-        ${supplementIds.get(normalizedName) ?? null}::uuid,
-        ${fact.name},
-        ${normalizedName},
-        ${fact.amount},
-        ${fact.unit},
-        ${fact.rawAmount},
-        ${fact.confidence},
-        ${SOURCE},
-        now(),
-        now()
-      )
-    `;
-  }
-}
-
 async function applyProducts(products: readonly ScrapedProduct[]) {
-  const sql = getSql();
-
-  if (!sql) {
-    throw new Error("DB_CONNECTION is required when --apply is used");
-  }
-
-  const brandId = await upsertBrand(sql);
   let importedOrUpdated = 0;
 
   for (const product of products) {
-    const row = await upsertProduct(sql, product, brandId);
-    await replaceFacts(sql, row.id, product.facts);
-    await sql`
-      insert into public.product_admin_audit (
-        product_id,
-        actor,
-        action,
-        after_payload
-      )
-      values (
-        ${row.id}::uuid,
-        ${SOURCE},
-        ${row.inserted ? "le_vitamins_asia_product_imported" : "le_vitamins_asia_product_refreshed"},
-        ${sql.json({
-          canonicalUrl: product.canonicalUrl,
-          categories: product.categories,
-          factCount: product.facts.length,
-          priceAmount: product.priceAmount,
-          sku: product.sku,
-          title: product.title
-        })}::jsonb
-      )
-    `;
+    await stageProductImport({
+      actor: SOURCE,
+      brandName: BRAND_NAME,
+      fdaApprovalNumber: null,
+      imageUrls: product.imageUrl ? [product.imageUrl] : [],
+      parsedFacts: productFactsForAi(product),
+      parseConfidence: product.facts.length > 0 ? "moderate" : "low",
+      productTitle: product.title,
+      rawSnapshot: {
+        availabilityStatus: product.availabilityStatus,
+        benefits: product.benefits,
+        categories: product.categories,
+        caution: product.caution,
+        description: product.description,
+        dosage: product.dosage,
+        otherIngredients: product.otherIngredients,
+        priceAmount: product.priceAmount,
+        rawServingSize: product.rawServingSize,
+        sku: product.sku
+      },
+      source: SOURCE,
+      sourceUrl: product.canonicalUrl
+    });
     importedOrUpdated += 1;
   }
 
-  await sql.end({ timeout: 5 });
+  const sql = getSql();
+
+  await sql?.end({ timeout: 5 });
 
   return importedOrUpdated;
 }
@@ -833,17 +748,36 @@ async function main() {
   const limit = positiveInt(argValue("limit"), DEFAULT_LIMIT);
   const categoryLimit = positiveInt(argValue("category-limit"), 999);
   const outputPath = argValue("out");
+  const aiCorrectFacts = hasArg("ai-correct-facts");
+  const aiCorrectionStrict = hasArg("ai-correction-strict");
+  const aiCorrectionDelayMs = positiveInt(
+    argValue("ai-correction-delay-ms"),
+    Math.max(delayMs, 750)
+  );
+  const aiStartAt = positiveInt(argValue("ai-start-at"), 1);
   const manualLinks = await productLinksFromArgs();
   const sitemapXml = manualLinks ? "" : await fetchText(SITEMAP_URL);
   const categoryUrls = manualLinks
     ? []
     : sitemapCategoryUrls(sitemapXml).slice(0, categoryLimit);
   const links = manualLinks ?? await discoverProducts(categoryUrls, limit, delayMs);
-  const products = await scrapeProducts(links.slice(0, limit), delayMs);
+  const scrapedProducts = await scrapeProducts(links.slice(0, limit), delayMs);
+  const aiCorrection = aiCorrectFacts
+    ? await correctProductsWithAi({
+      delayMs: aiCorrectionDelayMs,
+      failOpen: !aiCorrectionStrict,
+      products: scrapedProducts,
+      startAt: aiStartAt
+    })
+    : { corrected: 0, failed: 0, products: scrapedProducts };
+  const products = aiCorrection.products;
   const wroteFile = await writeOutput(outputPath, products);
   const importedOrUpdated = apply ? await applyProducts(products) : 0;
   const summary: ImportSummary = {
     applied: apply,
+    aiCorrectionFailures: aiCorrection.failed,
+    aiCorrections: aiCorrection.corrected,
+    aiCorrected: aiCorrectFacts,
     categoryUrls: categoryUrls.length,
     discoveredProducts: links.length,
     importedOrUpdated,

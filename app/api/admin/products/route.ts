@@ -3,11 +3,16 @@ import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import {
   createAdminProduct,
   isProductAvailabilityStatus,
+  isProductAudience,
   isProductLabelStatus,
   isProductListStatus,
   isProductPlatform
 } from "@/lib/admin-products";
-import type { ProductConfidence } from "@/lib/product-recommendations";
+import type {
+  ProductAudience,
+  ProductConfidence,
+  ProductKind
+} from "@/lib/product-recommendations";
 
 export const runtime = "nodejs";
 
@@ -35,6 +40,23 @@ function numberOrNull(value: unknown) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function parseProductKind(value: unknown): ProductKind | undefined {
+  const normalized = normalizedKey(value);
+
+  return normalized === "food" ||
+    normalized === "multi" ||
+    normalized === "other" ||
+    normalized === "supplement"
+    ? normalized
+    : undefined;
+}
+
+function parseProductAudience(value: unknown): ProductAudience | undefined {
+  const normalized = normalizedKey(value);
+
+  return isProductAudience(normalized) ? normalized : undefined;
 }
 
 function factsFromBody(value: unknown) {
@@ -87,6 +109,8 @@ export async function POST(request: Request) {
   const listStatus = normalizedKey(body.listStatus);
   const labelStatus = normalizedKey(body.labelStatus);
   const availabilityStatus = normalizedKey(body.availabilityStatus);
+  const productKind = parseProductKind(body.productKind);
+  const productAudience = parseProductAudience(body.productAudience);
   const title = textOrNull(body.title);
   const productUrl = textOrNull(body.productUrl);
 
@@ -97,7 +121,9 @@ export async function POST(request: Request) {
     (body.listStatus !== undefined && !isProductListStatus(listStatus)) ||
     (body.labelStatus !== undefined && !isProductLabelStatus(labelStatus)) ||
     (body.availabilityStatus !== undefined &&
-      !isProductAvailabilityStatus(availabilityStatus))
+      !isProductAvailabilityStatus(availabilityStatus)) ||
+    (body.productKind !== undefined && !productKind) ||
+    (body.productAudience !== undefined && !productAudience)
   ) {
     return NextResponse.json(
       { message: "Invalid product import payload" },
@@ -120,11 +146,14 @@ export async function POST(request: Request) {
       brandName: textOrNull(body.brandName),
       currency: textOrNull(body.currency) ?? "THB",
       facts: factsFromBody(body.facts),
+      fdaApprovalNumber: textOrNull(body.fdaApprovalNumber),
       imageUrl: textOrNull(body.imageUrl),
       labelStatus: isProductLabelStatus(labelStatus) ? labelStatus : undefined,
       listStatus: isProductListStatus(listStatus) ? listStatus : undefined,
       platform,
       priceAmount: numberOrNull(body.priceAmount),
+      productAudience,
+      productKind,
       productUrl,
       region: textOrNull(body.region) ?? "TH",
       title

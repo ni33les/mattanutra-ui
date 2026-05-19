@@ -1,4 +1,5 @@
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
+import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
 import type { Locale } from "@/lib/i18n";
 import type {
   FoodGuidanceBlueprint,
@@ -20,6 +21,7 @@ type AnalysisAuditEvent = {
 type AnalysisInput = Readonly<{
   answers: unknown;
   audit?: (event: AnalysisAuditEvent) => Promise<void>;
+  canonicalSupplements?: CanonicalSupplementOption[];
   chatMessages?: PlanChatMessage[];
   locale: Locale;
   plan: AssessmentPlan;
@@ -92,6 +94,7 @@ function systemPrompt(promptVersion: string) {
     "You are generating a wellness-oriented nutritional formulation brief.",
     "This is not medical advice, a prescription, a diagnosis, or a treatment plan.",
     "Use the completed assessment to produce a concise supplement breakdown.",
+    "Prefer the supplied canonical supplement names exactly when they fit the assessment.",
     "Also produce concise, personalized marketing points that explain why the user's full MattaNutra plan is worth opening.",
     "Do not include product recommendations, marketplace links, personal contact data, markdown, explanations outside JSON, or medical claims.",
     "The first character of your response must be { and the last character must be }.",
@@ -103,6 +106,7 @@ function systemPrompt(promptVersion: string) {
 
 function userPrompt({
   answers,
+  canonicalSupplements,
   chatMessages,
   locale,
   plan,
@@ -113,6 +117,7 @@ function userPrompt({
 }: Pick<
   AnalysisInput,
   | "answers"
+  | "canonicalSupplements"
   | "chatMessages"
   | "locale"
   | "plan"
@@ -134,6 +139,16 @@ function userPrompt({
         previousFoodGuidance,
         previousSupplementGuidance: previousFormulation
       },
+      canonicalSupplementCatalogue: (canonicalSupplements ?? []).map((supplement) => ({
+        aliases: supplement.aliases.slice(0, 8),
+        category: supplement.category,
+        maxDose:
+          supplement.maxAmount && supplement.maxUnit
+            ? `${supplement.maxAmount} ${supplement.maxUnit}/day`
+            : null,
+        name: supplement.name,
+        status: supplement.listStatus
+      })),
       contract: {
         supplementBreakdown: [
           {
@@ -180,6 +195,10 @@ function userPrompt({
         "Marketing copy must be truthful, benefit-led, and calm. Do not invent discounts, urgency, guarantees, cures, diagnosis, treatment claims, or product availability.",
         "Use marketingPoints to explain why the full bespoke plan is more useful than the free preview: for example prioritization, dose/safety checks, and food-plus-supplement fit.",
         "When currentPlanContext.planFeedback is present, treat it as client-stated preferences and constraints for this new version.",
+        "Use canonicalSupplementCatalogue as the preferred naming vocabulary. When a listed canonical supplement fits, set supplement.en exactly to its name.",
+        "Use canonical aliases only to recognize equivalent ingredients; do not output aliases when a canonical name exists.",
+        "If a useful supplement is not in canonicalSupplementCatalogue, use a plain English ingredient name and set status=review so it can be checked.",
+        "Do not output manufacturer product names, brand names, raw material concentrations, or label-strength text such as 100000 IU/g as supplement names.",
         "Do not reintroduce supplements the client asked to remove or avoid unless safety or clarity requires status=review with a conservative explanation.",
         "Use previousSupplementGuidance only as context; this response must be a fresh full version, not a patch.",
         "Every supplementBreakdown array entry must be an object. Do not put plain strings in the array.",

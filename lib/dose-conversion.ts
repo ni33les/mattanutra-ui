@@ -1,4 +1,11 @@
-export type DoseUnit = "g" | "iu" | "mcg" | "mg";
+export type DoseUnit =
+  | "billion_cfu"
+  | "cfu"
+  | "g"
+  | "iu"
+  | "mcg"
+  | "mg"
+  | "million_cfu";
 
 export type ParsedDose = Readonly<{
   amount: number;
@@ -6,16 +13,22 @@ export type ParsedDose = Readonly<{
   unit: DoseUnit;
 }>;
 
-const MASS_TO_MCG: Record<Exclude<DoseUnit, "iu">, number> = {
+const MASS_TO_MCG: Record<"g" | "mcg" | "mg", number> = {
   g: 1_000_000,
   mcg: 1,
   mg: 1_000
 };
 
+const CFU_TO_UNITS: Record<"billion_cfu" | "cfu" | "million_cfu", number> = {
+  billion_cfu: 1_000_000_000,
+  cfu: 1,
+  million_cfu: 1_000_000
+};
+
 type IuConversionRule = Readonly<{
   aliases: readonly string[];
   iuToUnitFactor: number;
-  unit: Exclude<DoseUnit, "iu">;
+  unit: "g" | "mcg" | "mg";
 }>;
 
 const IU_CONVERSION_RULES: readonly IuConversionRule[] = [
@@ -23,6 +36,18 @@ const IU_CONVERSION_RULES: readonly IuConversionRule[] = [
     aliases: ["vitamin_d", "vitamin_d3", "cholecalciferol"],
     iuToUnitFactor: 1 / 40,
     unit: "mcg"
+  },
+  {
+    aliases: [
+      "alpha_tocopherol",
+      "d_alpha_tocopherol",
+      "tocopherol",
+      "vitamin_e"
+    ],
+    // Use the natural alpha-tocopherol conversion when the label only says IU.
+    // It is the more conservative comparison against mg safety limits.
+    iuToUnitFactor: 0.67,
+    unit: "mg"
   }
 ];
 
@@ -36,10 +61,29 @@ function normalizeKey(value: string) {
 }
 
 export function normalizeDoseUnit(value: string): DoseUnit | null {
-  const unit = value.toLowerCase().replace("µg", "mcg").replace("ug", "mcg");
+  const unit = value
+    .toLowerCase()
+    .replace("µg", "mcg")
+    .replace("ug", "mcg")
+    .replace(/colony\s*forming\s*units?/g, "cfu")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, "_");
 
   if (unit === "g" || unit === "iu" || unit === "mcg" || unit === "mg") {
     return unit;
+  }
+
+  if (unit === "cfu") {
+    return "cfu";
+  }
+
+  if (unit === "billion_cfu" || unit === "bn_cfu") {
+    return "billion_cfu";
+  }
+
+  if (unit === "million_cfu" || unit === "m_cfu") {
+    return "million_cfu";
   }
 
   return null;
@@ -59,7 +103,17 @@ function iuConversionRule(supplementKey?: string | null) {
 }
 
 function massInMcg(dose: ParsedDose) {
-  return dose.unit === "iu" ? null : dose.amount * MASS_TO_MCG[dose.unit];
+  return dose.unit === "g" || dose.unit === "mcg" || dose.unit === "mg"
+    ? dose.amount * MASS_TO_MCG[dose.unit]
+    : null;
+}
+
+function cfuAmount(dose: ParsedDose) {
+  return dose.unit === "billion_cfu" ||
+    dose.unit === "cfu" ||
+    dose.unit === "million_cfu"
+    ? dose.amount * CFU_TO_UNITS[dose.unit]
+    : null;
 }
 
 export function comparableDoseAmount(
@@ -67,7 +121,7 @@ export function comparableDoseAmount(
   supplementKey?: string | null
 ) {
   if (dose.unit !== "iu") {
-    return massInMcg(dose);
+    return massInMcg(dose) ?? cfuAmount(dose);
   }
 
   const rule = iuConversionRule(supplementKey);
@@ -93,7 +147,7 @@ export function parseDose(
       .replaceAll(",", "")
       .replaceAll("µg", "mcg")
       .replaceAll("ug", "mcg")
-      .matchAll(/(\d+(?:\.\d+)?)\s*(mcg|mg|g|iu)\b/g)
+      .matchAll(/(\d+(?:\.\d+)?)\s*(billion\s*cfu|million\s*cfu|bn\s*cfu|m\s*cfu|cfu|mcg|mg|g|iu)\b/g)
   ];
 
   const parsed = matches
@@ -129,7 +183,7 @@ export function parseDoseLimit(
     maxUnit
       .toLowerCase()
       .replace("mcg rae", "mcg")
-      .match(/\b(mcg|µg|ug|mg|g|iu)\b/)?.[1] ?? ""
+      .match(/\b(billion\s*cfu|million\s*cfu|bn\s*cfu|m\s*cfu|cfu|mcg|µg|ug|mg|g|iu)\b/)?.[1] ?? ""
   );
 
   return unit ? { amount: maxAmount, originalText: maxUnit, unit } : null;

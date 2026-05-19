@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
+import { isProductAudience, resolveProductImportReview } from "@/lib/admin-products";
+import type { ProductImportFactInput } from "@/lib/admin-products";
+import type { ProductAudience } from "@/lib/product-recommendations";
 import {
   decideAdminPlanReviewTask,
   dismissAdminReviewTask,
@@ -43,6 +46,42 @@ function amountValue(value: unknown) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
+function productImportFactsFromBody(value: unknown): ProductImportFactInput[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    const record = item && typeof item === "object"
+      ? item as Record<string, unknown>
+      : null;
+    const name = record ? textOrNull(record.name) : null;
+
+    if (!record || !name) {
+      return [];
+    }
+
+    return [{
+      amount: amountValue(record.amount),
+      confidence:
+        record.confidence === "high" || record.confidence === "low"
+          ? record.confidence
+          : "moderate",
+      itemType:
+        record.itemType === "food" || record.itemType === "nutrient"
+          ? record.itemType
+          : "supplement",
+      name,
+      supplementId: textOrNull(record.supplementId),
+      unit: textOrNull(record.unit)
+    }];
+  });
+}
+
 function localizedTextValue(value: unknown): AdminReviewLocalizedText | null {
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -78,6 +117,12 @@ function parseConfidence(value: unknown): SupplementConfidence | null {
   const normalized = normalizedKey(value);
 
   return isSupplementConfidence(normalized) ? normalized : null;
+}
+
+function parseProductAudience(value: unknown): ProductAudience | undefined {
+  const normalized = normalizedKey(value);
+
+  return isProductAudience(normalized) ? normalized : undefined;
 }
 
 function errorDetails(error: unknown) {
@@ -144,8 +189,13 @@ export async function PATCH(
 
   if (
     action !== "approve" &&
+    action !== "approve_product" &&
+    action !== "blacklist_product" &&
     action !== "disapprove" &&
     action !== "dismiss" &&
+    action !== "ignore_import" &&
+    action !== "merge_product" &&
+    action !== "request_more_data" &&
     action !== "resolve"
   ) {
     return NextResponse.json(
@@ -160,6 +210,19 @@ export async function PATCH(
   }
 
   const associatedSupplementId = textOrNull(body.associatedSupplementId);
+  const productAudience = parseProductAudience(body.productAudience);
+
+  if (body.productAudience !== undefined && !productAudience) {
+    return NextResponse.json(
+      { message: "Invalid product audience" },
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        },
+        status: 400
+      }
+    );
+  }
 
   if (associatedSupplementId && !isUuid(associatedSupplementId)) {
     return NextResponse.json(
@@ -175,7 +238,54 @@ export async function PATCH(
 
   try {
     const result =
-      action === "dismiss"
+      action === "approve_product" ||
+      action === "blacklist_product" ||
+      action === "ignore_import" ||
+      action === "merge_product" ||
+      action === "request_more_data"
+        ? await resolveProductImportReview({
+            action:
+              action === "approve_product"
+                ? "approve"
+                : action === "blacklist_product"
+                  ? "blacklist"
+                  : action === "ignore_import"
+                    ? "ignore"
+                    : action === "merge_product"
+                      ? "merge"
+                      : "needs_more_data",
+            actor: "admin_dashboard",
+            brandName: body.brandName === undefined
+              ? undefined
+              : textOrNull(body.brandName),
+            description: body.description === undefined
+              ? undefined
+              : textOrNull(body.description),
+            descriptionEn: body.descriptionEn === undefined
+              ? undefined
+              : textOrNull(body.descriptionEn),
+            descriptionTh: body.descriptionTh === undefined
+              ? undefined
+              : textOrNull(body.descriptionTh),
+            fdaApprovalNumber: body.fdaApprovalNumber === undefined
+              ? undefined
+              : textOrNull(body.fdaApprovalNumber),
+            imageUrl: body.imageUrl === undefined
+              ? undefined
+              : textOrNull(body.imageUrl),
+            mergeProductId: textOrNull(body.mergeProductId),
+            parsedFacts: productImportFactsFromBody(body.parsedFacts),
+            productAudience,
+            productUrl: body.productUrl === undefined
+              ? undefined
+              : textOrNull(body.productUrl),
+            reviewerNote: textOrNull(body.reviewerNote),
+            taskId: id,
+            title: body.title === undefined ? undefined : textOrNull(body.title),
+            titleEn: body.titleEn === undefined ? undefined : textOrNull(body.titleEn),
+            titleTh: body.titleTh === undefined ? undefined : textOrNull(body.titleTh)
+          })
+        : action === "dismiss"
         ? await dismissAdminReviewTask({
             actor: "admin_dashboard",
             id
@@ -215,6 +325,10 @@ export async function PATCH(
       }
     );
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to update review task";
+    const status = message.startsWith("Product still needs review") ? 400 : 500;
+
     console.error("Unable to update review task", {
       error: errorDetails(error),
       reviewTaskId: id
@@ -224,13 +338,13 @@ export async function PATCH(
       {
         details:
           process.env.NODE_ENV === "production" ? undefined : errorDetails(error),
-        message: "Unable to update review task"
+        message
       },
       {
         headers: {
           "Cache-Control": "no-store"
         },
-        status: 500
+        status
       }
     );
   }

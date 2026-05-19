@@ -165,7 +165,7 @@ function explainRootCause({
   return rawCause;
 }
 
-function emptyAlertsData(): AdminTechnicalAlertsData {
+export function emptyAlertsData(): AdminTechnicalAlertsData {
   return {
     databaseAvailable: false,
     generatedAt: new Date().toISOString(),
@@ -281,15 +281,7 @@ export async function getAdminTechnicalAlertsData(
 
   try {
     const start = adminDashboardRangeStart(range);
-    const [
-      failedTasks,
-      stuckTasks,
-      waitingWorkerTasks,
-      failedCron,
-      highTaskEvents,
-      highBpmEvents
-    ] = await Promise.all([
-      sql<AlertDbRow[]>`
+    const failedTasks = await sql<AlertDbRow[]>`
         select
           tasks.id::text as id,
           'task'::text as source,
@@ -334,8 +326,8 @@ export async function getAdminTechnicalAlertsData(
           ${start ? sql`and coalesce(tasks.completed_at, tasks.updated_at, tasks.created_at) >= ${start}` : sql``}
         order by coalesce(tasks.completed_at, tasks.updated_at, tasks.created_at) desc
         limit 100
-      `,
-      sql<AlertDbRow[]>`
+      `;
+    const stuckTasks = await sql<AlertDbRow[]>`
         select
           tasks.id::text as id,
           'task'::text as source,
@@ -367,8 +359,8 @@ export async function getAdminTechnicalAlertsData(
           ${start ? sql`and coalesce(tasks.started_at, tasks.updated_at, tasks.created_at) >= ${start}` : sql``}
         order by coalesce(tasks.started_at, tasks.updated_at, tasks.created_at) asc
         limit 100
-      `,
-      sql<AlertDbRow[]>`
+      `;
+    const waitingWorkerTasks = await sql<AlertDbRow[]>`
         select
           tasks.id::text as id,
           'task'::text as source,
@@ -435,8 +427,8 @@ export async function getAdminTechnicalAlertsData(
           tasks.scheduled_for asc,
           tasks.created_at asc
         limit 100
-      `,
-      sql<AlertDbRow[]>`
+      `;
+    const failedCron = await sql<AlertDbRow[]>`
         select
           cron.id::text as id,
           'cron'::text as source,
@@ -462,8 +454,8 @@ export async function getAdminTechnicalAlertsData(
           ${start ? sql`and coalesce(cron.updated_at, cron.scheduled_for, cron.created_at) >= ${start}` : sql``}
         order by coalesce(cron.updated_at, cron.scheduled_for, cron.created_at) desc
         limit 100
-      `,
-      sql<AlertDbRow[]>`
+      `;
+    const highTaskEvents = await sql<AlertDbRow[]>`
         select
           task_events.id::text as id,
           'task_event'::text as source,
@@ -495,8 +487,8 @@ export async function getAdminTechnicalAlertsData(
           ${start ? sql`and task_events.created_at >= ${start}` : sql``}
         order by task_events.created_at desc
         limit 100
-      `,
-      sql<AlertDbRow[]>`
+      `;
+    const highBpmEvents = await sql<AlertDbRow[]>`
         select
           bpm.id::text as id,
           'bpm'::text as source,
@@ -529,8 +521,7 @@ export async function getAdminTechnicalAlertsData(
           ${start ? sql`and bpm.occurred_at >= ${start}` : sql``}
         order by bpm.occurred_at desc
         limit 100
-      `
-    ]);
+      `;
     const rawRows = [
       ...failedTasks,
       ...stuckTasks,
