@@ -30,6 +30,7 @@ import {
   productKeysMatch,
   type ProductCandidate,
   type ProductClientSex,
+  type ProductRecommendationClientContext,
   type ProductRecommendationNeed
 } from "@/lib/product-recommendations";
 import {
@@ -167,6 +168,7 @@ export type NutritionPlanRefinementWorkItem = Readonly<{
 
 export type ProductRecommendationsWorkItem = Readonly<{
   candidates: ProductCandidate[];
+  clientContext: ProductRecommendationClientContext;
   clientSex: ProductClientSex | null;
   needs: ProductRecommendationNeed[];
   planId: string;
@@ -216,6 +218,49 @@ function productClientSexFromAnswers(value: unknown): ProductClientSex | null {
   const record = payloadRecord(value);
 
   return record.sex === "female" || record.sex === "male" ? record.sex : null;
+}
+
+function textFromRecord(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function stringArrayFromRecord(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+
+  return Array.isArray(value)
+    ? value.filter((item): item is string =>
+        typeof item === "string" && item.trim().length > 0
+      )
+    : [];
+}
+
+function productRecommendationClientContextFromPlan(
+  answers: unknown,
+  planFeedback: readonly PlanFeedbackItem[],
+  guidanceAdjustments: readonly PlanGuidanceAdjustment[]
+): ProductRecommendationClientContext {
+  const record = payloadRecord(answers);
+
+  return {
+    budgetPreference: textFromRecord(record, "budget"),
+    conditions: stringArrayFromRecord(record, "conditions"),
+    currentSupplements: textFromRecord(record, "supps"),
+    guidanceAdjustmentCount: guidanceAdjustments.length,
+    lifestage: textFromRecord(record, "lifestage"),
+    medicationTypes: stringArrayFromRecord(record, "medTypes"),
+    medications: textFromRecord(record, "meds"),
+    pillLimit: textFromRecord(record, "pills"),
+    planFeedbackTypes: [
+      ...new Set(
+        planFeedback
+          .map((item) => item.feedbackType)
+          .filter((item): item is PlanFeedbackItem["feedbackType"] => Boolean(item))
+      )
+    ],
+    preferredForm: textFromRecord(record, "form")
+  };
 }
 
 function payloadText(payload: unknown, key: string) {
@@ -834,6 +879,11 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
 
   return {
     candidates: await getProductRecommendationCandidates(),
+    clientContext: productRecommendationClientContextFromPlan(
+      context.answers,
+      context.planFeedback,
+      context.guidanceAdjustments
+    ),
     clientSex: productClientSexFromAnswers(context.answers),
     needs,
     planId: task.planId,

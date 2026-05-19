@@ -1298,6 +1298,7 @@ function ProductModal({
                       maxUnit: null,
                       name: "",
                       normalizedName: "",
+                      safetyFlags: [],
                       source: "admin",
                       sourceText: null,
                       sourceUrl: null,

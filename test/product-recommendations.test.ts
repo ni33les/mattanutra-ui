@@ -6,7 +6,10 @@ import {
   productFactAliasKeys,
   productFactLooksLikeConcentration,
   productKeysMatch,
-  recommendProductStack,
+  recommendProductStack as recommendProductStackDefault,
+  recommendProductStackFullBeam,
+  recommendProductStackLegacy as recommendProductStack,
+  recommendProductStackV2,
   type ProductCandidate,
   type ProductRecommendationNeed
 } from "../lib/product-recommendations.ts";
@@ -36,9 +39,11 @@ function product(input: Readonly<{
   affiliate?: boolean;
   amount: number;
   audience?: ProductCandidate["productAudience"];
+  factAudience?: NonNullable<ProductCandidate["facts"][number]["supplementAudience"]>;
   id: string;
   name: string;
   status?: ProductCandidate["status"];
+  priceAmount?: number | null;
 }>): ProductCandidate {
   return {
     activeOfferId: input.affiliate ? `${input.id}-affiliate` : null,
@@ -56,6 +61,7 @@ function product(input: Readonly<{
         itemType: "supplement",
         name: input.name,
         normalizedName: input.name.toLowerCase().replace(/\s+/g, "_"),
+        supplementAudience: input.factAudience ?? "both",
         unit: "mg"
       }
     ],
@@ -64,7 +70,7 @@ function product(input: Readonly<{
     status: input.status ?? "approved",
     platform: "shopee",
     productAudience: input.audience ?? "both",
-    priceAmount: 100,
+    priceAmount: input.priceAmount ?? 100,
     productUrl: `https://example.com/${input.id}`,
     region: "TH",
     title: input.name
@@ -531,5 +537,369 @@ describe("product recommendation scoring", () => {
     });
 
     assert.equal(result.recommendations.length, 0);
+  });
+});
+
+describe("product recommendation scoring v2 exact shortlist", () => {
+  it("uses full-beam as the active default matcher and emits v2 diagnostics", () => {
+    const result = recommendProductStackDefault({
+      candidates: [product({ amount: 1, id: "magnesium", name: "Magnesium" })],
+      needs: [need("magnesium", "Magnesium", 5)]
+    });
+
+    assert.equal(result.diagnostics.algorithmVersion, "v2-full-beam");
+    assert.equal(result.recommendations[0]?.product.id, "magnesium");
+  });
+
+  it("scores stacks order-independently", () => {
+    const candidates = [
+      product({ amount: 0.8, id: "d3", name: "Vitamin D" }),
+      product({ amount: 0.8, id: "magnesium", name: "Magnesium" }),
+      product({ amount: 0.8, id: "omega", name: "Omega-3" })
+    ];
+    const needs = [
+      need("vitamin_d", "Vitamin D", 8),
+      need("magnesium", "Magnesium", 7),
+      need("omega_3", "Omega-3", 6)
+    ];
+    const forward = recommendProductStackV2({ candidates, needs });
+    const reverse = recommendProductStackV2({
+      candidates: [...candidates].reverse(),
+      needs
+    });
+
+    assert.deepEqual(
+      forward.recommendations.map((item) => item.product.id),
+      reverse.recommendations.map((item) => item.product.id)
+    );
+    assert.equal(
+      forward.diagnostics.trace?.utilityScore,
+      reverse.diagnostics.trace?.utilityScore
+    );
+  });
+
+  it("finds the exact best stack from the deterministic shortlist", () => {
+    const broadMulti: ProductCandidate = {
+      ...product({ amount: 1, id: "broad", name: "Vitamin D" }),
+      facts: [
+        product({ amount: 1, id: "broad-d3", name: "Vitamin D" }).facts[0]!,
+        product({ amount: 1, id: "broad-mag", name: "Magnesium" }).facts[0]!,
+        product({ amount: 1, id: "broad-omega", name: "Omega-3" }).facts[0]!
+      ],
+      productKind: "multi",
+      priceAmount: 450
+    };
+    const result = recommendProductStackV2({
+      candidates: [
+        product({ amount: 1, id: "d3", name: "Vitamin D", priceAmount: 250 }),
+        product({ amount: 1, id: "magnesium", name: "Magnesium", priceAmount: 250 }),
+        product({ amount: 1, id: "omega", name: "Omega-3", priceAmount: 250 }),
+        broadMulti
+      ],
+      clientContext: { pillLimit: "1-3" },
+      needs: [
+        need("vitamin_d", "Vitamin D", 8),
+        need("magnesium", "Magnesium", 7),
+        need("omega_3", "Omega-3", 6)
+      ]
+    });
+
+    assert.deepEqual(
+      result.recommendations.map((item) => item.product.id),
+      ["broad"]
+    );
+    assert.equal(result.stackCoveragePercent, 100);
+  });
+
+  it("caps duplicate coverage and reports contribution from the same final math", () => {
+    const first: ProductCandidate = {
+      ...product({ amount: 0.8, id: "first", name: "Zinc" }),
+      facts: [
+        product({ amount: 0.8, id: "first-zinc", name: "Zinc" }).facts[0]!,
+        product({ amount: 1, id: "first-magnesium", name: "Magnesium" }).facts[0]!
+      ]
+    };
+    const second: ProductCandidate = {
+      ...product({ amount: 0.8, id: "second", name: "Zinc" }),
+      facts: [
+        product({ amount: 0.8, id: "second-zinc", name: "Zinc" }).facts[0]!,
+        product({ amount: 1, id: "second-d3", name: "Vitamin D" }).facts[0]!
+      ]
+    };
+    const result = recommendProductStackV2({
+      candidates: [first, second],
+      needs: [
+        need("zinc", "Zinc", 5),
+        need("magnesium", "Magnesium", 5),
+        need("vitamin_d", "Vitamin D", 5)
+      ]
+    });
+    const contributionTotal = result.recommendations.reduce(
+      (total, item) => total + (item.stackContributionPercent ?? 0),
+      0
+    );
+
+    assert.equal(result.stackCoveragePercent, 100);
+    assert.equal(contributionTotal, 100);
+  });
+
+  it("matches expected hits including ashwagandha, probiotics, and curcumin", () => {
+    const result = recommendProductStackV2({
+      candidates: [
+        product({ amount: 1, id: "ashwagandha", name: "Ashwaganda root extract" }),
+        product({ amount: 1, id: "probiotics", name: "Probiotic blend" }),
+        product({ amount: 1, id: "curcumin", name: "Curacumin" })
+      ],
+      maxProducts: 6,
+      needs: [
+        need("ashwagandha", "Ashwagandha", 5),
+        need("multi_strain_probiotics", "Multi-strain probiotics", 5),
+        need("curcumin", "Curcumin", 5)
+      ]
+    });
+    const recommendedIds = new Set(
+      result.recommendations.map((item) => item.product.id)
+    );
+
+    assert.equal(recommendedIds.has("ashwagandha"), true);
+    assert.equal(recommendedIds.has("probiotics"), true);
+    assert.equal(recommendedIds.has("curcumin"), true);
+  });
+
+  it("uses affiliate links only as a near-equivalent tie-breaker", () => {
+    const betterNutrition = recommendProductStackV2({
+      candidates: [
+        product({ affiliate: true, amount: 0.4, id: "affiliate", name: "CoQ10" }),
+        product({ amount: 1, id: "best", name: "CoQ10" })
+      ],
+      needs: [need("coq10", "CoQ10", 5)]
+    });
+    const equivalent = recommendProductStackV2({
+      candidates: [
+        product({ amount: 1, id: "plain", name: "CoQ10" }),
+        product({ affiliate: true, amount: 1, id: "affiliate", name: "CoQ10" })
+      ],
+      needs: [need("coq10", "CoQ10", 5)]
+    });
+
+    assert.equal(betterNutrition.recommendations[0]?.product.id, "best");
+    assert.equal(equivalent.recommendations[0]?.product.id, "affiliate");
+  });
+
+  it("modulates utility from budget and pill-limit context", () => {
+    const singleExpensive: ProductCandidate = {
+      ...product({ amount: 1, id: "single", name: "Vitamin D", priceAmount: 4000 }),
+      facts: [
+        product({ amount: 1, id: "single-d3", name: "Vitamin D" }).facts[0]!,
+        product({ amount: 1, id: "single-mag", name: "Magnesium" }).facts[0]!
+      ],
+      productKind: "multi"
+    };
+    const twoCheap = [
+      product({ amount: 1, id: "cheap-d3", name: "Vitamin D", priceAmount: 300 }),
+      product({ amount: 1, id: "cheap-mag", name: "Magnesium", priceAmount: 300 })
+    ];
+    const needs = [
+      need("vitamin_d", "Vitamin D", 5),
+      need("magnesium", "Magnesium", 5)
+    ];
+    const convenience = recommendProductStackV2({
+      candidates: [singleExpensive, ...twoCheap],
+      clientContext: { budgetPreference: "high", pillLimit: "1-3" },
+      needs
+    });
+    const budget = recommendProductStackV2({
+      candidates: [singleExpensive, ...twoCheap],
+      clientContext: { budgetPreference: "low", pillLimit: "unlimited" },
+      needs
+    });
+
+    assert.equal(convenience.diagnostics.trace?.weights.simplicity > budget.diagnostics.trace?.weights.simplicity, true);
+    assert.equal(budget.diagnostics.trace?.weights.cost > convenience.diagnostics.trace?.weights.cost, true);
+  });
+
+  it("excludes unsafe or wrong-audience candidates before exact scoring", () => {
+    const result = recommendProductStackV2({
+      candidates: [
+        product({
+          amount: 1,
+          audience: "female",
+          id: "female-only",
+          name: "Folate"
+        }),
+        product({
+          amount: 1,
+          id: "pending",
+          name: "Folate",
+          status: "pending_review"
+        }),
+        product({ amount: 1, id: "safe", name: "Folate" })
+      ],
+      clientSex: "male",
+      needs: [need("folate", "Folate", 5)]
+    });
+
+    assert.equal(result.recommendations[0]?.product.id, "safe");
+    assert.equal(
+      result.diagnostics.blockedProducts.some((item) => item.productId === "female-only"),
+      true
+    );
+    assert.equal(
+      result.diagnostics.blockedProducts.some((item) => item.productId === "pending"),
+      true
+    );
+  });
+
+  it("uses canonical supplement audience flags inside otherwise general products", () => {
+    const maleResult = recommendProductStackV2({
+      candidates: [
+        product({
+          amount: 1,
+          audience: "both",
+          factAudience: "female",
+          id: "female-fact",
+          name: "Vitex"
+        }),
+        product({
+          amount: 0.8,
+          audience: "both",
+          id: "general",
+          name: "Vitex"
+        })
+      ],
+      clientSex: "male",
+      needs: [need("vitex", "Vitex", 5)]
+    });
+    const femaleResult = recommendProductStackV2({
+      candidates: [
+        product({
+          amount: 1,
+          audience: "both",
+          factAudience: "female",
+          id: "female-fact",
+          name: "Vitex"
+        })
+      ],
+      clientSex: "female",
+      needs: [need("vitex", "Vitex", 5)]
+    });
+
+    assert.equal(maleResult.recommendations[0]?.product.id, "general");
+    assert.equal(
+      maleResult.exclusions.some(
+        (item) =>
+          item.productId === "female-fact" &&
+          item.reason === "Supplement is for women only"
+      ),
+      true
+    );
+    assert.equal(femaleResult.recommendations[0]?.product.id, "female-fact");
+  });
+
+  it("keeps a full-pool beam comparison matcher available", () => {
+    const candidates = Array.from({ length: 36 }, (_, index) =>
+      product({
+        amount: index % 2 === 0 ? 1 : 0.7,
+        id: `candidate-${index}`,
+        name: index % 3 === 0 ? "Vitamin D" : "Magnesium"
+      })
+    );
+    const needs = [
+      need("vitamin_d", "Vitamin D", 5),
+      need("magnesium", "Magnesium", 5)
+    ];
+    const shortlist = recommendProductStackV2({ candidates, maxProducts: 2, needs });
+    const fullBeam = recommendProductStackFullBeam({
+      candidates,
+      maxProducts: 2,
+      needs
+    });
+
+    assert.equal(fullBeam.diagnostics.algorithmVersion, "v2-full-beam");
+    assert.equal(fullBeam.diagnostics.trace?.searchMode, "full-beam");
+    assert.equal(fullBeam.diagnostics.trace?.candidatePoolSize, 36);
+    assert.equal(fullBeam.diagnostics.trace?.shortlistSize, 36);
+    assert.equal(
+      (fullBeam.diagnostics.trace?.evaluatedStackCount ?? 0) >
+        (shortlist.diagnostics.trace?.evaluatedStackCount ?? 0),
+      true
+    );
+    assert.equal(
+      fullBeam.supplementProductCoveragePercent >=
+        shortlist.supplementProductCoveragePercent,
+      true
+    );
+  });
+
+  it("keeps low-rank distinct need candidates alive during full-pool beam search", () => {
+    const candidates = [
+      ...Array.from({ length: 50 }, (_, index) =>
+        product({
+          amount: 1,
+          id: `vitamin-d-${index}`,
+          name: "Vitamin D"
+        })
+      ),
+      ...Array.from({ length: 50 }, (_, index) =>
+        product({
+          amount: 1,
+          id: `magnesium-${index}`,
+          name: "Magnesium"
+        })
+      ),
+      product({ amount: 1, id: "ashwagandha", name: "Ashwagandha" }),
+      product({ amount: 1, id: "curcumin", name: "Curcumin" })
+    ];
+    const result = recommendProductStackFullBeam({
+      candidates,
+      maxProducts: 4,
+      needs: [
+        need("vitamin_d", "Vitamin D", 8),
+        need("magnesium", "Magnesium", 8),
+        need("ashwagandha", "Ashwagandha", 5),
+        need("curcumin", "Curcumin", 5)
+      ]
+    });
+    const recommendedIds = new Set(
+      result.recommendations.map((item) => item.product.id)
+    );
+
+    assert.equal(recommendedIds.has("ashwagandha"), true);
+    assert.equal(recommendedIds.has("curcumin"), true);
+    assert.deepEqual(
+      result.diagnostics.unmatchedNeeds.map((item) => item.displayName),
+      []
+    );
+  });
+
+  it("prefers materially higher coverage over a tiny clean single-product stack", () => {
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        product({
+          amount: 1,
+          id: "perfect-probiotic",
+          name: "Probiotics"
+        }),
+        product({ amount: 1, id: "d3", name: "Vitamin D" }),
+        product({ amount: 1, id: "magnesium", name: "Magnesium" }),
+        product({ amount: 1, id: "curcumin", name: "Curcumin" }),
+        product({ amount: 1, id: "glucosamine", name: "Glucosamine" })
+      ],
+      maxProducts: 5,
+      needs: [
+        need("vitamin_d", "Vitamin D", 8),
+        need("magnesium", "Magnesium", 8),
+        need("curcumin", "Curcumin", 7),
+        need("glucosamine", "Glucosamine", 7),
+        need("probiotics", "Probiotics", 2)
+      ]
+    });
+
+    assert.equal(result.supplementProductCoveragePercent, 100);
+    assert.deepEqual(
+      result.diagnostics.unmatchedNeeds.map((item) => item.displayName),
+      []
+    );
+    assert.equal(result.recommendations.length > 1, true);
   });
 });

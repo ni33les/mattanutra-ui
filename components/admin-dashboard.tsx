@@ -783,6 +783,74 @@ function agentStatusClass(status: string) {
   return "bg-gray-50 text-gray-700 ring-gray-200";
 }
 
+function agentDescription(row: AdminAgentRow, locale: Locale) {
+  const thai = locale === "th";
+
+  if (row.name === "Product Matcher") {
+    return thai
+      ? "ตัวทำงานแบบ deterministic สำหรับจับคู่แผนโภชนาการกับสินค้าที่อนุมัติแล้ว โดยใช้ full-beam matcher"
+      : "Deterministic product recommendation worker. Matches nutrition plans to approved catalogue products using the full-beam matcher.";
+  }
+
+  if (row.name === "Nutrition Plan Formulator") {
+    return thai
+      ? "สร้างคำแนะนำอาหารเสริมจาก HealthScore และบริบทของลูกค้า"
+      : "Builds supplement guidance from the HealthScore and client context.";
+  }
+
+  if (row.name === "Food Guidance Engine") {
+    return thai
+      ? "สร้างคำแนะนำอาหารและช่องว่างที่อาหารควรช่วยเติม"
+      : "Builds food guidance and the food-based gap plan.";
+  }
+
+  if (row.name === "HealthScore Engine") {
+    return thai
+      ? "วิเคราะห์คำตอบแบบประเมินและสร้างคำอธิบาย HealthScore"
+      : "Analyzes assessment answers and produces HealthScore advice.";
+  }
+
+  if (row.name === "Nutrition Plan Advisor") {
+    return thai
+      ? "ปรับแต่งแผน ตอบแชต และสรุปแผนโภชนาการฉบับสุดท้าย"
+      : "Handles plan refinement, chat replies, and final nutrition reports.";
+  }
+
+  if (row.name === "Communications Coordinator") {
+    return thai
+      ? "ประสานงานข้อความติดตามผลและการแจ้งเตือนลูกค้า"
+      : "Coordinates follow-up messages and client notifications.";
+  }
+
+  if (row.name === "Email Dispatcher") {
+    return thai
+      ? "ส่งอีเมลธุรกรรมและอีเมลประเมินซ้ำ"
+      : "Sends transactional and reassessment emails.";
+  }
+
+  if (row.name === "Content Publisher") {
+    return thai
+      ? "จัดการงานเผยแพร่เนื้อหา"
+      : "Runs content publishing workflow tasks.";
+  }
+
+  if (row.name === "Scheduler") {
+    return thai
+      ? "ดูแลงานตามกำหนดเวลาและงานแพลตฟอร์มเบื้องหลัง"
+      : "Runs scheduled platform and housekeeping work.";
+  }
+
+  if (row.type === "human") {
+    return thai
+      ? "คิวงานตรวจสอบโดยคนสำหรับเคสที่ต้องใช้วิจารณญาณ"
+      : "Human review queue for cases that need judgement.";
+  }
+
+  return thai
+    ? "ตัวทำงานของแพลตฟอร์มสำหรับงานที่มีความสามารถเฉพาะ"
+    : "Platform worker for capability-scoped operational tasks.";
+}
+
 function agentHeartbeatState(row: AdminAgentRow, generatedAt: string) {
   if (row.type === "human") {
     return "human";
@@ -1464,6 +1532,7 @@ function AgentCard({
   row: AdminAgentRow;
 }>) {
   const runtimeState = agentHeartbeatState(row, generatedAt);
+  const description = agentDescription(row, locale);
 
   return (
     <article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
@@ -1472,9 +1541,14 @@ function AgentCard({
           <h2 className="truncate text-base font-semibold text-gray-900">
             {row.name}
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            {readableToken(row.type)} · {compactId(row.id)}
-          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-[#1FA77A]/10 px-2.5 py-1 text-xs font-semibold text-[#126B4F] ring-1 ring-[#1FA77A]/20">
+              {readableToken(row.type)}
+            </span>
+            <span className="text-xs font-medium text-gray-400">
+              {compactId(row.id)}
+            </span>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <AgentHeartbeatIndicator
@@ -1495,6 +1569,10 @@ function AgentCard({
           ) : null}
         </div>
       </div>
+
+      <p className="mt-4 text-sm leading-6 text-gray-600">
+        {description}
+      </p>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <SupplementListMeta

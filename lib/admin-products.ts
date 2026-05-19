@@ -39,6 +39,7 @@ export type AdminProductFact = ProductCandidateFact & Readonly<{
   id: string;
   maxAmount: number | null;
   maxUnit: string | null;
+  safetyFlags: readonly string[];
   source: string | null;
   sourceText: string | null;
   sourceUrl: string | null;
@@ -209,7 +210,9 @@ type FactDbPayload = Readonly<{
   sourceText?: string | null;
   sourceUrl?: string | null;
   supplementId?: string | null;
+  supplementAudience?: ProductAudience | null;
   supplementStatus?: ProductFactSupplementStatus | null;
+  safetyFlags?: string[] | null;
   unit?: string | null;
 }>;
 
@@ -334,10 +337,14 @@ function normalizeFact(fact: FactDbPayload): AdminProductFact {
     name: name || normalizedName,
     normalizedName,
     nutrientId: fact.nutrientId ?? null,
+    safetyFlags: Array.isArray(fact.safetyFlags)
+      ? fact.safetyFlags.filter((item): item is string => typeof item === "string")
+      : [],
     servingLabel: fact.servingLabel ?? null,
     source: typeof fact.source === "string" ? fact.source : null,
     sourceText: typeof fact.sourceText === "string" ? fact.sourceText : null,
     sourceUrl: typeof fact.sourceUrl === "string" ? fact.sourceUrl : null,
+    supplementAudience: productAudienceFromUnknown(fact.supplementAudience) ?? "both",
     supplementId: fact.supplementId ?? null,
     supplementStatus: fact.supplementStatus ?? null,
     unit
@@ -400,6 +407,32 @@ function productAudienceFromUnknown(value: unknown): ProductAudience | null {
     : "";
 
   return isProductAudience(normalized) ? normalized : null;
+}
+
+function productAudienceFromText(...values: readonly unknown[]): ProductAudience | null {
+  const text = values
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  if (!text) {
+    return null;
+  }
+
+  const malePattern =
+    /\b(men|mens|men's|male|prostate|testosterone)\b|conceive\s+well\s+men/;
+  const femalePattern =
+    /\b(women|womens|women's|female|pregnancy|pregnant|breast[ -]?feeding|breastfeeding|prenatal|postnatal|menopause)\b|conceive\s+well(?!\s+men)/;
+
+  if (malePattern.test(text)) {
+    return "male";
+  }
+
+  if (femalePattern.test(text)) {
+    return "female";
+  }
+
+  return null;
 }
 
 function productAudienceFromSnapshot(value: unknown) {
@@ -541,7 +574,17 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
     status: effectiveListStatus,
     validation,
     validationLabel: validationLabel(validation),
-    productAudience: row.product_audience ?? "both",
+    productAudience:
+      row.product_audience && row.product_audience !== "both"
+        ? row.product_audience
+        : productAudienceFromText(
+            row.title,
+            row.title_en,
+            row.title_th,
+            row.description,
+            row.description_en,
+            row.description_th
+          ) ?? row.product_audience ?? "both",
     importReviewTaskId: row.import_review_task_id,
     importStatus: row.import_status,
     offers,
@@ -844,9 +887,33 @@ async function loadProductRows(productId?: string | null) {
             'source', product_facts.source,
             'sourceUrl', product_facts.source_url,
             'sourceText', product_facts.source_text,
+            'supplementAudience',
+              case
+                when coalesce(
+                  to_jsonb(supplements) ->> 'audience',
+                  supplements.source_payload ->> 'audience',
+                  supplements.source_payload ->> 'productAudience'
+                ) in ('both', 'female', 'male')
+                  then coalesce(
+                    to_jsonb(supplements) ->> 'audience',
+                    supplements.source_payload ->> 'audience',
+                    supplements.source_payload ->> 'productAudience'
+                  )
+                when lower(coalesce(supplements.primary_use_case, '')) ~ '(male vitality|male fertility|prostate|testosterone|dht)'
+                  or lower(coalesce(supplements.name, '')) ~ '(saw palmetto|tongkat)'
+                  then 'male'
+                when lower(coalesce(supplements.category, '')) like '%gender%'
+                  and (
+                    lower(coalesce(supplements.primary_use_case, '')) ~ '(female|pms|cycle|estrogen|menopause)'
+                    or lower(coalesce(supplements.name, '')) ~ '(vitex|chasteberry|evening primrose)'
+                  )
+                  then 'female'
+                else 'both'
+              end,
             'supplementStatus', supplements.list_status,
             'maxAmount', supplement_safety_limits.max_amount,
-            'maxUnit', supplement_safety_limits.max_unit
+            'maxUnit', supplement_safety_limits.max_unit,
+            'safetyFlags', coalesce(supplement_safety_limits.safety_flags, '{}'::text[])
           )
           order by product_facts.created_at asc
         ),
@@ -861,7 +928,7 @@ async function loadProductRows(productId?: string | null) {
         where supplement_aliases.supplement_id = product_facts.supplement_id
       ) supplement_alias_rows on true
       left join lateral (
-        select max_amount, max_unit
+        select max_amount, max_unit, safety_flags
         from public.supplement_safety_limits
         where supplement_safety_limits.supplement_id = product_facts.supplement_id
         order by version desc

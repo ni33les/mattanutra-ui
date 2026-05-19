@@ -52,7 +52,7 @@ import {
   enqueueRefinedNutritionPlanTasks
 } from "@/lib/task-worker";
 import {
-  recommendProductStack,
+  recommendProductStackFullBeam,
   toRecommendedProduct,
   type ProductClientSex,
   type ProductRecommendationResult
@@ -1620,7 +1620,7 @@ async function applyProductRecommendationsResult(
   const clientSex = await loadProductRecommendationClientSex(sql, task.planId);
   const result = initialResult.recommendations.length > 0
     ? initialResult
-    : recommendProductStack({
+    : recommendProductStackFullBeam({
         candidates: await getProductRecommendationCandidates(),
         clientSex,
         needs: initialResult.clientNeeds

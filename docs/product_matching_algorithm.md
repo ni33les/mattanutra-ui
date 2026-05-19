@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The product matcher turns a finalised nutrition plan into a small, honest set of recommended products. It is not a marketplace search engine. It matches the client's supplement needs against our approved product catalogue, then explains how much of the client's needs are covered, what remains uncovered, and why products were selected or rejected.
+The active product matcher is `v2-exact-shortlist`. It turns a finalised nutrition plan into a small, honest set of recommended products. It is not a marketplace search engine. It matches the client's supplement needs against our approved product catalogue, then explains how much of the client's needs are covered, what remains uncovered, and why products were selected or rejected.
 
 The current implementation lives mainly in:
 
@@ -10,6 +10,8 @@ The current implementation lives mainly in:
 - `lib/task-execution.ts`
 - `lib/task-result-applier.ts`
 - `lib/task-work-items.ts`
+
+The older greedy matcher is kept as `recommendProductStackLegacy` for rollback and regression comparison. Product recommendation tasks call `recommendProductStackV2`.
 
 ## The Matching Problem
 
@@ -187,10 +189,14 @@ max(existing need coverage, product need coverage)
 
 This prevents double-counting overlap.
 
-The product's stack contribution is:
+The product's stack contribution is now order-independent. For each need, the achieved coverage is shared across products in proportion to each product's contribution to that need. This means displayed product contributions sum back to the same capped stack coverage used for the need bars.
 
 ```text
-new capped stack coverage - previous capped stack coverage
+product share for need =
+  product need coverage / sum(product coverages for that need)
+
+product stack contribution =
+  sum(product share for each need * capped achieved coverage * need weight)
 ```
 
 This answers:
@@ -199,18 +205,20 @@ This answers:
 How much did this product add to the selected stack?
 ```
 
-## Selection Algorithm
+## Active Selection Algorithm
 
-The matcher uses deterministic greedy selection with beam-like scoring behaviour. It does not call AI during recommendation scoring.
+The active matcher uses deterministic shortlisting plus exact combination scoring. It does not call AI, query the database, or perform side effects during recommendation scoring.
 
 Default product count settings:
 
 | Setting | Value |
 | --- | ---: |
-| Target products | `3` |
 | Hard maximum | `6` |
-| Minimum useful marginal coverage | `2%` |
-| Stop-after-target marginal threshold | `8%` |
+| Shortlist cap | `32` |
+| Per-need shortlist candidates | `4` |
+| Top overall shortlist candidates | `16` |
+| Top broad/multi candidates | `8` |
+| Top affiliate candidates | `8` |
 
 ### Step 1. Build needs
 
@@ -227,74 +235,79 @@ Every candidate is checked for approval, validation, safety, label facts, audien
 
 Rejected products are stored with reasons for diagnostics.
 
-### Step 3. Score remaining candidates
+### Step 3. Build the deterministic shortlist
 
-For each candidate, the matcher calculates:
+The shortlist is built from eligible products only:
 
-- standalone product coverage
-- marginal contribution to the current stack
-- product penalty
-- extra ingredient penalty
-- broad base bonus
-- tiny affiliate bonus for sorting only
+- top candidates per need
+- strong broad multi-products
+- top overall coverage products
+- active affiliate products that are otherwise nutritionally competitive
 
-The current score shape is:
+Shortlist ordering is deterministic: utility, coverage, confidence, price, title, then product id.
+
+### Step 4. Score every possible stack in the shortlist
+
+The matcher exhaustively scores every stack of size `1..6` from the shortlist. Exactness is guaranteed inside the deterministic shortlist.
+
+The v2 utility score is a normalized weighted sum:
 
 ```text
-score =
-  marginal coverage * 2
-  + standalone coverage * 0.3
-  - product penalty
-  + broad base bonus
-  - loose-fit extra penalty
-  + tiny affiliate bonus
+utility =
+  coverage weight * clipped weighted coverage
+  + dose weight * weighted dose precision
+  + simplicity weight * product-count simplicity
+  + cost weight * affordability-adjusted coverage
+  + extras weight * safe useful extras
+  + confidence weight * match confidence
+  - penalties
 ```
 
-This makes marginal contribution the main driver.
+Every component is normalized to `0..1` before scoring. This keeps price, confidence, extras, and product count from accidentally overpowering coverage.
 
-### Step 4. Prefer a broad base first
+### Step 5. Apply deterministic context weights
 
-The first selected product may receive a broad-base bonus when it is a multi or has several facts. This helps a safe multivitamin or multi-supplement become the base product when it gives useful broad coverage.
+The default weights are:
 
-### Step 5. Add targeted fillers
+| Component | Default |
+| --- | ---: |
+| Coverage | `0.45` |
+| Dose precision | `0.20` |
+| Simplicity | `0.15` |
+| Cost | `0.10` |
+| Extras | `0.05` |
+| Confidence | `0.05` |
 
-After the base product, the matcher keeps adding products that improve capped stack coverage. It can continue beyond three products when another product covers an unmet need.
+Weights are modulated by current known context:
 
-This matters for cases like:
+- budget preference
+- pill/capsule limit
+- medication and condition flags
+- lifestage such as pregnancy/nursing
+- active plan feedback such as budget, capsule-limit, and safety disclosures
 
-- base multi
-- omega-3
-- CoQ10
-- probiotic
-- Ashwagandha
+The final weights and deltas are stored in diagnostics.
 
-The target of three is a preference, not a hard stop.
+### Step 6. Pick the best stack and keep alternatives
 
-### Step 6. Stop when nothing useful remains
-
-Before the target count is reached, a product can be selected if it has at least minimal marginal value or covers an unmet need.
-
-After the target count is reached, the matcher becomes stricter:
-
-- select products with at least `8%` marginal contribution, or
-- select products that cover a currently unmatched need
-
-This avoids endless weak top-ups while still allowing important low-weight needs like Ashwagandha to be included.
+The selected customer stack is the highest-utility valid stack. The next three stacks are stored as alternatives in diagnostics for debugging and agent review, but they are not shown as separate customer choices yet.
 
 ### Step 7. Affiliate tie-break only
 
 Affiliate links do not override materially better nutrition.
 
-Affiliate preference is used only when candidates are nutritionally similar. The ordering is:
+Affiliate preference is used only when final stack utility is effectively tied. The ordering is:
 
-1. better nutrition score
-2. if nutritionally similar, active affiliate link wins
-3. then higher affiliate tie score
-4. then lower price
+1. higher utility
+2. higher supplement-product coverage
+3. active affiliate present
+4. fewer products
+5. lower price
+6. deterministic product id order
 
-## The Ashwagandha Bug
+## Legacy Greedy Matcher
 
-The previous implementation had a subtle stopping bug.
+The previous greedy matcher remains available as `recommendProductStackLegacy`.
 
 Once the stack already had three products, it sorted all remaining candidates and looked only at the top candidate. If that top candidate was a weak top-up that did not meet the stricter post-target threshold, the algorithm stopped immediately.
 
@@ -321,7 +334,7 @@ else:
 select best eligible candidate
 ```
 
-This preserves the "do not add weak noise" rule while allowing the matcher to continue when a product covers a genuine gap.
+The legacy matcher was patched to filter eligible post-target candidates before choosing the best one. The active v2 matcher avoids the class of bug entirely by scoring complete stacks rather than relying on insertion order.
 
 ## Diagnostics
 

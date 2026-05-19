@@ -10,6 +10,10 @@ import { getSql } from "@/lib/db";
 import { validateLeadEmail } from "@/lib/email-validation";
 import { digitalOceanBillingSyncConfiguration } from "@/lib/finance-ledger";
 import { isLocale, type Locale } from "@/lib/i18n";
+import {
+  ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION,
+  ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION
+} from "@/lib/product-recommendations";
 import { requiredCapabilitiesForWorkTaskType } from "@/lib/system-agents";
 import { createTask, type TaskDependencyType } from "@/lib/task-service";
 import {
@@ -851,7 +855,15 @@ export async function enqueueProductRecommendationsTask({
     return null;
   }
 
-  const inputHash = stableHash(row);
+  const matcherAlgorithmVersion =
+    ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION;
+  const matcherImplementationVersion =
+    ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION;
+  const inputHash = stableHash({
+    matcherAlgorithmVersion,
+    matcherImplementationVersion,
+    row
+  });
   const groupId =
     taskGroupId ??
     (await latestNutritionTaskGroupId(sql, planId)) ??
@@ -869,6 +881,8 @@ export async function enqueueProductRecommendationsTask({
     idempotencyScopeKey: `product-recommendations:${planId}:${inputHash}`,
     payload: {
       inputHash,
+      matcherAlgorithmVersion,
+      matcherImplementationVersion,
       parentTaskId,
       row
     },
@@ -918,6 +932,9 @@ export async function enqueueMissingProductRecommendationsForReadyPlans({
         from public.tasks
         where tasks.plan_id = assessments.plan_id
           and tasks.task_type = 'generate_product_recommendations'
+          and tasks.payload ->> 'matcherAlgorithmVersion' = ${ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION}
+          and tasks.payload ->> 'matcherImplementationVersion' = ${ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION}
+          and tasks.status not in ('failed', 'cancelled', 'skipped')
       )
     order by assessments.updated_at desc
     limit ${boundedLimit}

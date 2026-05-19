@@ -25,6 +25,7 @@ export const AGENT_CAPABILITIES = {
   nutritionPlanRefinement: "nutrition_plan_refinement",
   nutritionReportGeneration: "nutrition_report_generation",
   productRecommendation: "product_recommendation",
+  productRecommendationFullBeam: "product_recommendation_full_beam",
   productRefresh: "product_refresh",
   productReview: "product_review",
   reassessmentEmailSend: "reassessment_email_send",
@@ -199,6 +200,7 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
   productMatcher: {
     capabilities: [
       AGENT_CAPABILITIES.doseNormalization,
+      AGENT_CAPABILITIES.productRecommendationFullBeam,
       AGENT_CAPABILITIES.productRecommendation,
       AGENT_CAPABILITIES.productRefresh,
       AGENT_CAPABILITIES.supplementSafetyScan
@@ -291,6 +293,7 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
       AGENT_CAPABILITIES.nutritionReportGeneration
     ],
     generate_product_recommendations: [
+      AGENT_CAPABILITIES.productRecommendationFullBeam,
       AGENT_CAPABILITIES.productRecommendation
     ],
     nutrition_plan_chat_reply: [AGENT_CAPABILITIES.nutritionPlanChat],

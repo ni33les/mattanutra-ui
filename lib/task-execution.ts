@@ -8,7 +8,7 @@ import {
   analyzeNutritionPlanChatWithGrok,
   analyzeNutritionReportWithGrok
 } from "@/lib/nutrition-plan-advisor-analysis";
-import { recommendProductStack } from "@/lib/product-recommendations";
+import { recommendProductStackFullBeam } from "@/lib/product-recommendations";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 import type { TaskWorkItem } from "@/lib/task-work-items";
 import type { SendTransactionalEmailResult } from "@/lib/smtp-email";
@@ -218,8 +218,9 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
   }
 
   if (workItem.taskType === "generate_product_recommendations") {
-    const recommendations = recommendProductStack({
+    const recommendations = recommendProductStackFullBeam({
       candidates: workItem.candidates,
+      clientContext: workItem.clientContext,
       clientSex: workItem.clientSex,
       needs: workItem.needs
     });
