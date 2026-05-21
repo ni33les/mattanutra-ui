@@ -7,6 +7,7 @@ import {
 } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
 import { getSql } from "@/lib/db";
+import { appendAssessmentEvent } from "@/lib/domain-history";
 import { validateLeadEmail } from "@/lib/email-validation";
 import { digitalOceanBillingSyncConfiguration } from "@/lib/finance-ledger";
 import { isLocale, type Locale } from "@/lib/i18n";
@@ -361,6 +362,27 @@ export async function enqueueNutritionPlanTasks({
     `;
     const formulationReady = formulationRows[0]?.exists === true;
 
+    await appendAssessmentEvent(sql, {
+      afterPayload: {
+        completedAt: formulationReady ? "coalesce_current_or_now" : "unchanged",
+        errorMessage: formulationReady
+          ? null
+          : "Completed supplement task was found, but the supplement output is missing.",
+        planSelectedAt: "coalesce_current_or_now",
+        queuePosition: 0,
+        selectedPlan: plan,
+        status: formulationReady ? "ready" : "failed"
+      },
+      changeReason: "plan_selected_reused_tasks",
+      eventPayload: {
+        formulationReady,
+        formulationTaskId
+      },
+      eventType: "plan_selection_projection_update",
+      planId,
+      source: "task_worker"
+    });
+
     await sql`
       update public.assessments set
         selected_plan = ${plan},
@@ -381,6 +403,23 @@ export async function enqueueNutritionPlanTasks({
       formulationTaskId
     };
   }
+
+  await appendAssessmentEvent(sql, {
+    afterPayload: {
+      errorMessage: null,
+      planSelectedAt: "coalesce_current_or_now",
+      queuePosition: "coalesce_current_or_1",
+      selectedPlan: plan,
+      status: "queued"
+    },
+    changeReason: "plan_selected_tasks_queued",
+    eventPayload: {
+      formulationTaskId
+    },
+    eventType: "plan_selection_projection_update",
+    planId,
+    source: "task_worker"
+  });
 
   await sql`
     update public.assessments set

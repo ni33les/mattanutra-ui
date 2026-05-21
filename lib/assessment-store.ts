@@ -940,6 +940,55 @@ export async function persistAssessmentSubmission({
   }
 
   await ensureAssessmentSchema();
+  const normalizedLocale = normalizeLocale(locale);
+  const storedPlan = toStoredPlan(selectedPlan);
+  const storedAnswers = toJsonValue(answers);
+  const storedAnswerSummary = toJsonValue(buildAnswerSummary(answers));
+  const storedHealthScore = toJsonValue(snapshot.healthScore);
+  const beforeRows = await sql<Array<{ before_payload: unknown }>>`
+    select to_jsonb(assessments.*) as before_payload
+    from public.assessments assessments
+    where assessments.plan_id = ${snapshot.planId}::uuid
+    limit 1
+  `;
+
+  await sql`
+    insert into public.assessment_events (
+      plan_id,
+      event_type,
+      actor,
+      change_reason,
+      source,
+      before_payload,
+      after_payload,
+      event_payload,
+      occurred_at,
+      created_at
+    )
+    values (
+      ${snapshot.planId}::uuid,
+      'assessment_submission_persisted',
+      'assessment_api',
+      'assessment_submission',
+      'assessment_store',
+      ${sql.json(toJsonValue(beforeRows[0]?.before_payload ?? {}))}::jsonb,
+      ${sql.json(toJsonValue({
+        answers: storedAnswers,
+        answerSummary: storedAnswerSummary,
+        healthScore: storedHealthScore,
+        locale: normalizedLocale,
+        queuePosition: snapshot.queuePosition,
+        selectedPlan,
+        status
+      }))}::jsonb,
+      ${sql.json(toJsonValue({
+        selectedPlan: storedPlan,
+        status
+      }))}::jsonb,
+      now(),
+      now()
+    )
+  `;
 
   await sql`
     insert into assessments (
@@ -958,12 +1007,12 @@ export async function persistAssessmentSubmission({
     )
     values (
       ${snapshot.planId}::uuid,
-      ${normalizeLocale(locale)},
-      ${toStoredPlan(selectedPlan)},
+      ${normalizedLocale},
+      ${storedPlan},
       ${status},
-      ${sql.json(toJsonValue(answers))},
-      ${sql.json(toJsonValue(buildAnswerSummary(answers)))},
-      ${sql.json(toJsonValue(snapshot.healthScore))},
+      ${sql.json(storedAnswers)},
+      ${sql.json(storedAnswerSummary)},
+      ${sql.json(storedHealthScore)},
       ${snapshot.queuePosition},
       ${selectedPlan ? sql`now()` : null},
       ${status === "queued" || status === "preparing" || status === "ready"

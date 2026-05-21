@@ -3,6 +3,7 @@ import { updateBlogPost, updateTestimonial } from "@/lib/blog";
 import { writeBpmEvent } from "@/lib/bpm";
 import { recordEmailCommunicationDelivery } from "@/lib/communications";
 import { getSql } from "@/lib/db";
+import { appendAssessmentEvent } from "@/lib/domain-history";
 import {
   getProductRecommendationCandidates
 } from "@/lib/admin-products";
@@ -109,6 +110,20 @@ async function updateAssessmentReadyIfNutritionReady(
       ) as formulation_ready
   `;
   const ready = rows[0]?.formulation_ready === true;
+
+  await appendAssessmentEvent(sql, {
+    afterPayload: {
+      completedAt: ready ? "coalesce_current_or_now" : "unchanged",
+      errorMessage: null,
+      queuePosition: 0,
+      status: ready ? "ready" : "preparing"
+    },
+    changeReason: "nutrition_readiness_refreshed",
+    eventPayload: { formulationReady: ready },
+    eventType: "assessment_status_projection_update",
+    planId,
+    source: "task_result_applier"
+  });
 
   await sql`
     update public.assessments set
@@ -316,6 +331,25 @@ async function applyHealthScoreResult(
     limit 1
   `;
   const locale: Locale = isLocale(rows[0]?.locale) ? rows[0].locale : "en";
+
+  await appendAssessmentEvent(sql, {
+    actor: task.reservedByAgentId,
+    afterPayload: {
+      healthScore,
+      updatedAt: "now"
+    },
+    changeReason: "healthscore_completed",
+    eventPayload: {
+      fallbackErrorMessage,
+      fallbackUsed,
+      locale,
+      taskType: task.taskType
+    },
+    eventType: "healthscore_snapshot_recorded",
+    planId: task.planId,
+    source: "task_result_applier",
+    taskId: task.id
+  });
 
   await sql`
     update public.assessments set
@@ -2068,6 +2102,23 @@ export async function applyTaskFailureResult({
     (task.taskType === "generate_supplement_guidance" ||
       task.taskType === "generate_food_guidance")
   ) {
+    await appendAssessmentEvent(sql, {
+      actor: task.reservedByAgentId,
+      afterPayload: {
+        errorMessage: retryWillBeScheduled ? null : errorMessage,
+        status: retryWillBeScheduled ? "queued" : "failed"
+      },
+      changeReason: "task_failure_projection_update",
+      eventPayload: {
+        retryWillBeScheduled,
+        taskType: task.taskType
+      },
+      eventType: "assessment_status_projection_update",
+      planId: task.planId,
+      source: "task_result_applier",
+      taskId: task.id
+    });
+
     await sql`
       update public.assessments set
         status = ${retryWillBeScheduled ? "queued" : "failed"},

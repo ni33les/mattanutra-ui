@@ -16,6 +16,8 @@
     "import:vistra-products": "node scripts/import-vistra-products.mjs",
     "import:dhc-products": "node scripts/import-dhc-products.mjs",
     "products:validation-consistency": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/check-product-validation-consistency.ts",
+    "history:append-only:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-append-only-history-schema.ts",
+    "history:append-only:check": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/check-append-only-history-consistency.ts",
     "scrape:levitamins-products": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/scrape-levitaminsasia-products.ts",
     "scrape:manufacturer-products": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/scrape-manufacturer-products.ts",
     "seed:campaigns": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/seed-campaign-bpm.mjs",

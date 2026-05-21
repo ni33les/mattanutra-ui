@@ -1,4 +1,5 @@
 import { getSql } from "@/lib/db";
+import { appendProductFactVersion } from "@/lib/domain-history";
 import type { ProductSnapshot } from "@/lib/product-adapters";
 import { toJsonValue } from "@/lib/assessment-store";
 import {
@@ -2385,6 +2386,8 @@ function normalizedFactsForStorage(
 async function replaceProductFacts(
   sql: NonNullable<ReturnType<typeof getSql>>,
   input: Readonly<{
+    actor?: string | null;
+    changeReason?: string | null;
     deleteSources?: readonly string[];
     facts: readonly ProductImportFactInput[];
     productId: string;
@@ -2445,6 +2448,39 @@ async function replaceProductFacts(
       ? sql`and source = any(${input.deleteSources}::text[])`
       : sql``
     : sql`and false`;
+  const beforeFactRows = await sql<Array<{ fact: unknown }>>`
+    select jsonb_build_object(
+      'id', product_facts.id::text,
+      'itemType', product_facts.item_type,
+      'supplementId', product_facts.supplement_id::text,
+      'foodId', product_facts.food_id::text,
+      'nutrientId', product_facts.nutrient_id::text,
+      'name', product_facts.name,
+      'normalizedName', product_facts.normalized_name,
+      'amount', product_facts.amount,
+      'unit', product_facts.unit,
+      'servingLabel', product_facts.serving_label,
+      'confidence', product_facts.confidence,
+      'source', product_facts.source,
+      'sourceUrl', product_facts.source_url,
+      'sourceText', product_facts.source_text,
+      'createdAt', product_facts.created_at,
+      'updatedAt', product_facts.updated_at
+    ) as fact
+    from public.product_facts
+    where product_id = ${input.productId}::uuid
+    order by created_at asc, id asc
+  `;
+
+  await appendProductFactVersion(sql, {
+    action: "facts_replaced",
+    actor: input.actor,
+    afterFacts: facts,
+    beforeFacts: beforeFactRows.map((row) => row.fact),
+    changeReason: input.changeReason?.trim() || "product_facts_replaced",
+    productId: input.productId,
+    source: input.source
+  });
 
   await sql`
     with deleted as (
@@ -3052,6 +3088,8 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
   if (input.replaceFacts || facts.length > 0) {
     await replaceProductFacts(sql, {
       ...(input.replaceFacts ? { deleteSources: ["marketplace_discovery", "admin"] } : {}),
+      actor: input.actor,
+      changeReason: "product_create_facts",
       facts,
       productId,
       source: input.source === "marketplace_discovery" ? "marketplace_discovery" : "admin",
@@ -3133,7 +3171,16 @@ export async function deletePendingManufacturerImportProduct(productId: string) 
   }
 
   const rows = await sql<Array<{ id: string }>>`
-    delete from public.products
+    update public.products
+    set
+      status = 'ignored',
+      availability_status = 'unavailable',
+      admin_notes = concat_ws(
+        E'\n',
+        nullif(admin_notes, ''),
+        'Ignored instead of deleting pending manufacturer import.'
+      ),
+      updated_at = now()
     where id = ${productId}::uuid
       and status = 'pending_review'
       and source = 'manufacturer_import'
@@ -4223,6 +4270,8 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	    const supplementMatchesByFactName = await supplementIdsForFacts(sql, facts);
 
     await replaceProductFacts(sql, {
+      actor: input.actor,
+      changeReason: input.changeNote?.trim() || "product_admin_save_facts",
       deleteSources: [],
       facts,
       productId: input.id,

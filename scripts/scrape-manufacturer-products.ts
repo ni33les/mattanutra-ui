@@ -3206,28 +3206,36 @@ async function clearBrandCatalogue(brandName: string) {
       ...taskRows.map((row) => row.id)
     ])
   ];
-  let recommendationItemsDeleted = 0;
-  let productsDeleted = 0;
-  let importsDeleted = 0;
-  let importRunsDeleted = 0;
+  let recommendationItemsRetained = 0;
+  let productsMarkedIgnored = 0;
+  let importsMarkedIgnored = 0;
+  let importRunsArchived = 0;
   let reviewTasksCancelled = 0;
 
   if (productIds.length > 0) {
     const itemRows = await sql<Array<{ id: string }>>`
-      delete from public.product_recommendation_items
+      select id::text
+      from public.product_recommendation_items
       where product_id = any(${productIds}::uuid[])
-      returning id::text
     `;
-    recommendationItemsDeleted = itemRows.length;
+    recommendationItemsRetained = itemRows.length;
   }
 
   if (importIds.length > 0) {
-    const importDeleteRows = await sql<Array<{ id: string }>>`
-      delete from public.product_imports
+    const importRows = await sql<Array<{ id: string }>>`
+      update public.product_imports
+      set
+        status = 'ignored',
+        reviewer_note = concat_ws(
+          E'\n',
+          nullif(reviewer_note, ''),
+          'Archived by manufacturer brand catalogue refresh.'
+        ),
+        updated_at = now()
       where id = any(${importIds}::uuid[])
       returning id::text
     `;
-    importsDeleted = importDeleteRows.length;
+    importsMarkedIgnored = importRows.length;
   }
 
   if (taskIds.length > 0) {
@@ -3250,21 +3258,39 @@ async function clearBrandCatalogue(brandName: string) {
   }
 
   if (productIds.length > 0) {
-    const productDeleteRows = await sql<Array<{ id: string }>>`
-      delete from public.products
+    const productRows = await sql<Array<{ id: string }>>`
+      update public.products
+      set
+        status = 'ignored',
+        availability_status = 'unavailable',
+        admin_notes = concat_ws(
+          E'\n',
+          nullif(admin_notes, ''),
+          'Ignored by manufacturer brand catalogue refresh.'
+        ),
+        updated_at = now()
       where id = any(${productIds}::uuid[])
       returning id::text
     `;
-    productsDeleted = productDeleteRows.length;
+    productsMarkedIgnored = productRows.length;
   }
 
-  const runDeleteRows = await sql<Array<{ id: string }>>`
-    delete from public.product_import_runs
+  const runRows = await sql<Array<{ id: string }>>`
+    update public.product_import_runs
+    set
+      status = 'completed',
+      notes = concat_ws(
+        E'\n',
+        nullif(notes, ''),
+        'Archived by manufacturer brand catalogue refresh.'
+      ),
+      completed_at = coalesce(completed_at, now()),
+      updated_at = now()
     where normalized_brand_name = ${normalizedBrandName}
        or lower(coalesce(brand_name, '')) = ${lowerBrandName}
     returning id::text
   `;
-  importRunsDeleted = runDeleteRows.length;
+  importRunsArchived = runRows.length;
 
   await sql`
     insert into public.product_admin_audit (
@@ -3277,20 +3303,20 @@ async function clearBrandCatalogue(brandName: string) {
       'manufacturer_scraper',
       ${sql.json({
         brandName,
-        importRunsDeleted,
-        importsDeleted,
-        productsDeleted,
-        recommendationItemsDeleted,
+        importRunsArchived,
+        importsMarkedIgnored,
+        productsMarkedIgnored,
+        recommendationItemsRetained,
         reviewTasksCancelled
       })}::jsonb
     )
   `;
 
   return {
-    importRunsDeleted,
-    importsDeleted,
-    productsDeleted,
-    recommendationItemsDeleted,
+    importRunsArchived,
+    importsMarkedIgnored,
+    productsMarkedIgnored,
+    recommendationItemsRetained,
     reviewTasksCancelled
   };
 }

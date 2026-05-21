@@ -5,6 +5,7 @@ import {
 } from "@/lib/assessment-store";
 import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
 import { getSql } from "@/lib/db";
+import { appendAssessmentEvent } from "@/lib/domain-history";
 import type {
   FoodGuidanceBlueprint,
   FormulationBlueprint,
@@ -410,6 +411,22 @@ async function buildFormulationWorkItem(task: TaskRecord) {
   ]);
 
   if (task.taskType === "generate_supplement_guidance") {
+    await appendAssessmentEvent(sql, {
+      actor: task.reservedByAgentId,
+      afterPayload: {
+        errorMessage: null,
+        processingStartedAt: "coalesce_current_or_now",
+        queuePosition: 0,
+        status: "preparing"
+      },
+      changeReason: "supplement_guidance_started",
+      eventPayload: { taskType: task.taskType },
+      eventType: "assessment_status_projection_update",
+      planId: task.planId,
+      source: "task_work_item",
+      taskId: task.id
+    });
+
     await sql`
       update public.assessments set
         status = 'preparing',
@@ -448,6 +465,22 @@ async function buildFoodGuidanceWorkItem(task: TaskRecord) {
   const context = await loadPlanGenerationContext(sql, task.planId);
 
   if (task.taskType === "generate_food_guidance") {
+    await appendAssessmentEvent(sql, {
+      actor: task.reservedByAgentId,
+      afterPayload: {
+        errorMessage: null,
+        processingStartedAt: "coalesce_current_or_now",
+        queuePosition: 0,
+        status: "preparing"
+      },
+      changeReason: "food_guidance_started",
+      eventPayload: { taskType: task.taskType },
+      eventType: "assessment_status_projection_update",
+      planId: task.planId,
+      source: "task_work_item",
+      taskId: task.id
+    });
+
     await sql`
       update public.assessments set
         status = 'preparing',

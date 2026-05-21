@@ -7,6 +7,10 @@ import type {
 } from "@/lib/admin-supplements";
 import { toJsonValue } from "@/lib/assessment-store";
 import {
+  appendSupplementAliasEvent,
+  appendSupplementVersion
+} from "@/lib/domain-history";
+import {
   normalizeSupplementSafetyFlags,
   type SupplementSafetyFlag
 } from "@/lib/supplement-safety-flags";
@@ -970,6 +974,38 @@ export async function resolveAdminReviewTask(
 
       supplementId = associatedSupplement.id;
       associatedSupplementName = associatedSupplement.name;
+      const aliasRows = await db<
+        Array<{
+          alias: string;
+          id: string;
+          normalized_alias: string;
+          supplement_id: string;
+        }>
+      >`
+        select id::text, supplement_id::text, alias, normalized_alias
+        from public.supplement_aliases
+        where normalized_alias = ${normalizedSupplementName}
+        limit 1
+      `;
+      const beforeAlias = aliasRows[0] ?? null;
+      const aliasId = beforeAlias?.id ?? randomUUID();
+
+      await appendSupplementAliasEvent(db, {
+        action: beforeAlias ? "alias_reassigned" : "alias_added",
+        actor: input.actor,
+        afterPayload: {
+          alias: supplementName,
+          aliasId,
+          normalizedAlias: normalizedSupplementName,
+          supplementId
+        },
+        aliasId,
+        beforePayload: beforeAlias ?? {},
+        changeReason: "review_task_associated_supplement_alias",
+        normalizedAlias: normalizedSupplementName,
+        source: "admin_review_queue",
+        supplementId
+      });
 
       await db`
         insert into public.supplement_aliases (
@@ -980,7 +1016,7 @@ export async function resolveAdminReviewTask(
           created_at
         )
         values (
-          ${randomUUID()}::uuid,
+          ${aliasId}::uuid,
           ${supplementId}::uuid,
           ${supplementName},
           ${normalizedSupplementName},
@@ -992,6 +1028,34 @@ export async function resolveAdminReviewTask(
           supplement_id = excluded.supplement_id
       `;
     } else {
+      const existingSupplementRows = await db<Array<{
+        before_payload: unknown;
+        id: string;
+      }>>`
+        select to_jsonb(supplements.*) as before_payload, id::text
+        from public.supplements
+        where normalized_name = ${normalizedSupplementName}
+        limit 1
+      `;
+      const existingSupplement = existingSupplementRows[0] ?? null;
+      const supplementIdForInsert = existingSupplement?.id ?? randomUUID();
+
+      await appendSupplementVersion(db, {
+        action: existingSupplement ? "updated" : "created",
+        actor: input.actor,
+        afterPayload: {
+          category: supplementCategory(input.category),
+          listStatus: input.listStatus,
+          name: supplementName,
+          normalizedName: normalizedSupplementName,
+          sourceStatus: "recommended_add"
+        },
+        beforePayload: existingSupplement?.before_payload ?? {},
+        changeReason: "review_task_approved_supplement",
+        source: "admin_review_queue",
+        supplementId: supplementIdForInsert
+      });
+
       const supplementRows = await db<{ id: string }[]>`
         insert into public.supplements (
           id,
@@ -1008,7 +1072,7 @@ export async function resolveAdminReviewTask(
           updated_at
         )
         values (
-          ${randomUUID()}::uuid,
+          ${supplementIdForInsert}::uuid,
           ${supplementName},
           ${normalizedSupplementName},
           ${supplementCategory(input.category)},

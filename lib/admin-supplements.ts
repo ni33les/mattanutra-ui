@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { getSql } from "@/lib/db";
 import {
+  appendSupplementAliasEvent,
+  appendSupplementVersion
+} from "@/lib/domain-history";
+import {
   normalizeSupplementSafetyFlags,
   type SupplementSafetyFlag
 } from "@/lib/supplement-safety-flags";
@@ -334,6 +338,24 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     throw new Error("Supplement not found");
   }
 
+  await appendSupplementVersion(sql, {
+    action: "updated",
+    actor: input.actor,
+    afterPayload: {
+      ...rowFromDb(before),
+      confidence: input.confidence,
+      listStatus: input.listStatus,
+      maxAmount: input.maxAmount,
+      maxUnit: input.maxUnit,
+      safetyFlags: input.safetyFlags,
+      safetyNotes: input.safetyNotes
+    },
+    beforePayload: rowFromDb(before),
+    changeReason: "supplement_admin_update",
+    source: "admin_dashboard",
+    supplementId: input.id
+  });
+
   await sql`
     update public.supplements
     set
@@ -440,6 +462,46 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
   }
 
   const supplementId = randomUUID();
+  const aliasId = randomUUID();
+  const afterPayload = {
+    category,
+    confidence,
+    listStatus,
+    maxAmount: input.maxAmount ?? null,
+    maxUnit,
+    name,
+    normalizedName,
+    safetyFlags,
+    safetyNotes: input.safetyNotes?.trim() || null,
+    sourceStatus: "recommended_add"
+  };
+
+  await appendSupplementVersion(sql, {
+    action: "created",
+    actor: input.actor,
+    afterPayload,
+    beforePayload: {},
+    changeReason: "supplement_created",
+    source: "admin_dashboard",
+    supplementId
+  });
+
+  await appendSupplementAliasEvent(sql, {
+    action: "alias_added",
+    actor: input.actor,
+    afterPayload: {
+      alias: name,
+      aliasId,
+      normalizedAlias: normalizedName,
+      supplementId
+    },
+    aliasId,
+    beforePayload: {},
+    changeReason: "supplement_created_primary_alias",
+    normalizedAlias: normalizedName,
+    source: "admin_dashboard",
+    supplementId
+  });
 
   await sql`
     insert into public.supplements (
@@ -488,7 +550,7 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
       created_at
     )
     values (
-      ${randomUUID()}::uuid,
+      ${aliasId}::uuid,
       ${supplementId}::uuid,
       ${name},
       ${normalizedName},
@@ -521,17 +583,7 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
       ${"created"},
       ${input.actor ?? "admin_dashboard"},
       '{}'::jsonb,
-      ${sql.json({
-        category,
-        confidence,
-        listStatus,
-        maxAmount: input.maxAmount ?? null,
-        maxUnit,
-        name,
-        normalizedName,
-        safetyFlags,
-        safetyNotes: input.safetyNotes?.trim() || null
-      })}::jsonb
+      ${sql.json(afterPayload)}::jsonb
     )
   `;
 
@@ -577,6 +629,18 @@ export async function deleteAdminSupplementAlias(
   if (!alias) {
     throw new Error("Supplement association not found");
   }
+
+  await appendSupplementAliasEvent(sql, {
+    action: "alias_deleted",
+    actor: input.actor,
+    afterPayload: { aliasId: input.aliasId },
+    aliasId: input.aliasId,
+    beforePayload: alias,
+    changeReason: "supplement_alias_deleted",
+    normalizedAlias: alias.normalized_alias,
+    source: "admin_dashboard",
+    supplementId: input.supplementId
+  });
 
   const deletedRows = await sql<{ id: string }[]>`
     delete from public.supplement_aliases
@@ -657,6 +721,27 @@ export async function addAdminSupplementAlias(input: AddAdminSupplementAliasInpu
     limit 1
   `;
   const before = beforeRows[0] ?? null;
+  const aliasId = before?.id ?? randomUUID();
+  const action = before ? "alias_reassigned" : "alias_added";
+
+  await appendSupplementAliasEvent(sql, {
+    action,
+    actor: input.actor,
+    afterPayload: {
+      alias,
+      aliasId,
+      normalizedAlias,
+      supplementId: input.supplementId
+    },
+    aliasId,
+    beforePayload: before ?? {},
+    changeReason: before
+      ? "supplement_alias_reassigned"
+      : "supplement_alias_added",
+    normalizedAlias,
+    source: "admin_dashboard",
+    supplementId: input.supplementId
+  });
 
   await sql`
     insert into public.supplement_aliases (
@@ -667,7 +752,7 @@ export async function addAdminSupplementAlias(input: AddAdminSupplementAliasInpu
       created_at
     )
     values (
-      ${randomUUID()}::uuid,
+      ${aliasId}::uuid,
       ${input.supplementId}::uuid,
       ${alias},
       ${normalizedAlias},
@@ -690,10 +775,10 @@ export async function addAdminSupplementAlias(input: AddAdminSupplementAliasInpu
     values (
       ${randomUUID()}::uuid,
       ${input.supplementId}::uuid,
-      ${before ? "alias_reassigned" : "alias_added"},
+      ${action},
       ${input.actor ?? "admin_dashboard"},
       ${sql.json(before ?? {})},
-      ${sql.json({ alias, normalizedAlias, supplementId: input.supplementId })}
+      ${sql.json({ alias, aliasId, normalizedAlias, supplementId: input.supplementId })}
     )
   `;
 
