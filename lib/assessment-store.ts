@@ -1278,7 +1278,6 @@ export async function getStoredFormulationResult(
         and task_type in (
           'refine_nutrition_plan',
           'generate_supplement_guidance',
-          'generate_food_guidance',
           'generate_nutrition_report'
         )
         and context ->> 'source' = 'plan_refinement'
@@ -1528,7 +1527,7 @@ export async function getStoredFormulationResult(
         : new Date(row.assessment_updated_at)
   ).toISOString();
   const supplementsReady = Boolean(row.formulation);
-  const foodsReady = Boolean(row.food_guidance);
+  const foodsReady = true;
   const reportTaskStatus =
     typeof row.report_task_status === "string" ? row.report_task_status : "";
   const refinementTaskStatus =

@@ -45,6 +45,10 @@ import {
 } from "@/lib/reassessment-email";
 import type { TaskRecord } from "@/lib/task-service";
 
+const EMPTY_FOOD_GUIDANCE: FoodGuidanceBlueprint = {
+  foodGuidance: []
+};
+
 export type HealthScoreWorkItem = Readonly<{
   answers: unknown;
   healthScore: HealthScoreResult;
@@ -497,7 +501,7 @@ async function buildExampleEmailWorkItem(task: TaskRecord) {
       order by version desc, generated_at desc
       limit 1
     ) formulations on true
-    join lateral (
+    left join lateral (
       select guidance
       from public.food_guidance
       where food_guidance.plan_id = assessment_example_requests.plan_id
@@ -540,7 +544,9 @@ async function buildExampleEmailWorkItem(task: TaskRecord) {
 
   const email = typeof row.email === "string" ? row.email : "";
   const formulation = row.formulation as FormulationBlueprint;
-  const foodGuidance = row.food_guidance as FoodGuidanceBlueprint;
+  const foodGuidance = row.food_guidance
+    ? row.food_guidance as FoodGuidanceBlueprint
+    : EMPTY_FOOD_GUIDANCE;
   const healthScore = row.health_score as HealthScoreResult;
   const locale: Locale = isLocale(row.locale) ? row.locale : "en";
 
@@ -868,13 +874,13 @@ async function buildNutritionPlanChatWorkItem(task: TaskRecord) {
 async function buildNutritionReportWorkItem(task: TaskRecord) {
   const context = await buildNutritionAdvisorContext(task);
 
-  if (!context.formulation || !context.foodGuidance) {
-    throw new Error("Nutrition report requires food and supplement guidance");
+  if (!context.formulation) {
+    throw new Error("Nutrition report requires supplement guidance");
   }
 
   return {
     ...context,
-    foodGuidance: context.foodGuidance,
+    foodGuidance: context.foodGuidance ?? EMPTY_FOOD_GUIDANCE,
     formulation: context.formulation,
     taskId: task.id,
     taskType: "generate_nutrition_report"
@@ -884,11 +890,11 @@ async function buildNutritionReportWorkItem(task: TaskRecord) {
 async function buildProductRecommendationsWorkItem(task: TaskRecord) {
   const context = await buildNutritionAdvisorContext(task);
 
-  if (!task.planId || !context.formulation || !context.foodGuidance) {
+  if (!task.planId || !context.formulation) {
     throw new Error("Product recommendation task requires a finalized plan");
   }
   const needs = await enrichProductNeedsWithAliases(buildProductNeeds({
-    foodGuidance: context.foodGuidance,
+    foodGuidance: null,
     formulation: context.formulation
   }));
   const countryCode = productCountryCodeFromAnswers(context.answers);

@@ -278,8 +278,8 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /status = \$\{planReady \? "ready" : "failed"\}::public\.assessment_status/,
-      "reused successful nutrition plan work must resolve the assessment instead of leaving it queued"
+      /status = \$\{formulationReady \? "ready" : "failed"\}::public\.assessment_status/,
+      "reused successful supplement plan work must resolve the assessment instead of leaving it queued"
     );
   });
 

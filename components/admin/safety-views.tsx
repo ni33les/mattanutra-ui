@@ -261,6 +261,58 @@ function productMatchesMetricFilter(
   return true;
 }
 
+const unknownProductManufacturerKey = "__unknown_manufacturer__";
+const unknownProductManufacturerLabel = "Unknown manufacturer";
+
+type ProductManufacturerStat = {
+  approved: number;
+  ignored: number;
+  key: string;
+  label: string;
+  pendingReview: number;
+  total: number;
+};
+
+function productManufacturerLabel(row: AdminProductRow) {
+  return row.brandName?.trim() || unknownProductManufacturerLabel;
+}
+
+function productManufacturerKey(row: AdminProductRow) {
+  const label = productManufacturerLabel(row);
+
+  return label === unknownProductManufacturerLabel
+    ? unknownProductManufacturerKey
+    : label.toLowerCase();
+}
+
+function productManufacturerStats(rows: readonly AdminProductRow[]) {
+  const stats = new Map<string, ProductManufacturerStat>();
+
+  for (const row of rows) {
+    const key = productManufacturerKey(row);
+    const current =
+      stats.get(key) ?? {
+        approved: 0,
+        ignored: 0,
+        key,
+        label: productManufacturerLabel(row),
+        pendingReview: 0,
+        total: 0
+      };
+    const state = productBusinessState(row);
+
+    current.total += 1;
+    current.approved += state === "approved" ? 1 : 0;
+    current.ignored += state === "ignored" ? 1 : 0;
+    current.pendingReview += state === "pending_review" ? 1 : 0;
+    stats.set(key, current);
+  }
+
+  return [...stats.values()].sort((first, second) =>
+    second.total - first.total || first.label.localeCompare(second.label)
+  );
+}
+
 async function adminResponseErrorMessage(
   response: Response,
   fallback: string
@@ -473,7 +525,12 @@ export function AdminProductsView({
   const [status, setStatus] = useState<ProductBusinessState | "">("");
   const [metricFilter, setMetricFilter] =
     useState<ProductMetricFilter>("productsTotal");
+  const [manufacturerFilter, setManufacturerFilter] = useState("");
   const normalizedSearch = search.trim().toLowerCase();
+  const productNumberFormatter = new Intl.NumberFormat(
+    locale === "th" ? "th-TH" : "en-GB"
+  );
+  const manufacturerStats = productManufacturerStats(rows);
   const summary = rows.reduce(
     (counts, row) => {
       const state = productBusinessState(row);
@@ -566,8 +623,10 @@ export function AdminProductsView({
   const filteredRows = rows.filter((row) => {
     const matchesSearch = productMatchesSearch(row, normalizedSearch);
     const matchesMetric = productMatchesMetricFilter(row, metricFilter);
+    const matchesManufacturer =
+      !manufacturerFilter || productManufacturerKey(row) === manufacturerFilter;
 
-    return matchesSearch && matchesMetric;
+    return matchesSearch && matchesMetric && matchesManufacturer;
   });
 
   async function saveProduct(row: AdminProductRow) {
@@ -886,6 +945,75 @@ export function AdminProductsView({
         onMetricSelect={handleMetricSelect}
         selectedMetricId={metricFilter}
       />
+
+      <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">
+              Manufacturers
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Filter products by manufacturer.
+            </p>
+          </div>
+          {manufacturerFilter ? (
+            <button
+              className="rounded-md px-3 py-2 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50"
+              onClick={() => setManufacturerFilter("")}
+              type="button"
+            >
+              Clear manufacturer
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+          <button
+            className={classNames(
+              "min-w-40 rounded-lg border px-3 py-2 text-left transition focus:outline-2 focus:-outline-offset-2 focus:outline-[#1FA77A]",
+              manufacturerFilter
+                ? "border-gray-200 bg-white hover:bg-gray-50"
+                : "border-[#1FA77A] bg-emerald-50"
+            )}
+            onClick={() => setManufacturerFilter("")}
+            type="button"
+          >
+            <span className="block text-sm font-semibold text-gray-900">
+              All manufacturers
+            </span>
+            <span className="mt-1 block text-xs text-gray-500">
+              {productNumberFormatter.format(summary.total)} products
+            </span>
+          </button>
+          {manufacturerStats.map((manufacturer) => {
+            const selected = manufacturerFilter === manufacturer.key;
+
+            return (
+              <button
+                className={classNames(
+                  "min-w-48 rounded-lg border px-3 py-2 text-left transition focus:outline-2 focus:-outline-offset-2 focus:outline-[#1FA77A]",
+                  selected
+                    ? "border-[#1FA77A] bg-emerald-50"
+                    : "border-gray-200 bg-white hover:bg-gray-50"
+                )}
+                key={manufacturer.key}
+                onClick={() => setManufacturerFilter(manufacturer.key)}
+                type="button"
+              >
+                <span className="block truncate text-sm font-semibold text-gray-900">
+                  {manufacturer.label}
+                </span>
+                <span className="mt-1 block text-xs text-gray-500">
+                  {productNumberFormatter.format(manufacturer.total)} products
+                </span>
+                <span className="mt-1 block text-xs text-gray-500">
+                  {productNumberFormatter.format(manufacturer.approved)} approved ·{" "}
+                  {productNumberFormatter.format(manufacturer.pendingReview)} review
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_14rem]">

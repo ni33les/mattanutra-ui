@@ -109,7 +109,6 @@ export function NutritionPlanDelivery({
         }
 
         const readyForReport =
-          payload.sectionStatuses?.foods === "ready" &&
           payload.sectionStatuses?.supplements === "ready";
 
         if (

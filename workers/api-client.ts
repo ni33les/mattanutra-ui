@@ -52,9 +52,10 @@ export class WorkerApiClient {
   async post<T>(path: string, body: JsonRecord) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const url = `${this.baseUrl}${path}`;
 
     try {
-      const response = await fetch(`${this.baseUrl}${path}`, {
+      const response = await fetch(url, {
         body: JSON.stringify(body),
         cache: "no-store",
         headers: {
@@ -72,6 +73,18 @@ export class WorkerApiClient {
       }
 
       return (await response.json()) as T;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      const cause =
+        error instanceof Error &&
+        error.cause &&
+        typeof error.cause === "object" &&
+        "message" in error.cause
+          ? String(error.cause.message)
+          : "";
+      const suffix = cause && cause !== message ? `: ${cause}` : "";
+
+      throw new Error(`${path} fetch failed for ${url}: ${message}${suffix}`);
     } finally {
       clearTimeout(timeout);
     }

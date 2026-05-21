@@ -1297,6 +1297,8 @@ type ProcessingStatus = Readonly<{
 const PROCESSING_STEP_MIN_MS = 1000;
 const PROCESSING_COMPLETE_HOLD_MS = 1000;
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
+const HEALTH_SCORE_ANALYSIS_POLL_INTERVAL_MS = 1500;
+const HEALTH_SCORE_ANALYSIS_MAX_POLLS = 160;
 
 async function fetchWithTimeout(
   input: RequestInfo | URL,
@@ -1316,6 +1318,12 @@ async function fetchWithTimeout(
   } finally {
     window.clearTimeout(timeout);
   }
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 function getProcessingStepIndex(status: ProcessingStatus) {
@@ -3014,13 +3022,54 @@ export function AssessmentFlow({
       applyHealthScoreStatus(captured);
       setCapturedStatus(captured);
       setProcessingStatus(captured);
-      router.replace(nutritionHealthScorePath(locale, captured.planId));
+
+      const readyScoreStatus = await waitForHealthScoreAnalysis(captured);
+
+      applyHealthScoreStatus(readyScoreStatus);
+      setCapturedStatus(readyScoreStatus);
+      setProcessingStatus(readyScoreStatus);
+      router.replace(nutritionHealthScorePath(locale, readyScoreStatus.planId));
 
     } catch {
       window.clearTimeout(analysisStepTimeout);
       clearProcessingStatus();
       setProcessingError(ui.processingError);
     }
+  }
+
+  async function waitForHealthScoreAnalysis(initialStatus: ProcessingStatus) {
+    let status = initialStatus;
+
+    for (let attempt = 0; attempt <= HEALTH_SCORE_ANALYSIS_MAX_POLLS; attempt += 1) {
+      if (status.status === "ready") {
+        return status;
+      }
+
+      if (status.status === "failed") {
+        throw new Error("HealthScore analysis failed");
+      }
+
+      if (attempt > 0) {
+        applyHealthScoreStatus(status);
+        setCapturedStatus(status);
+        setProcessingStatus(status);
+      }
+
+      await sleep(HEALTH_SCORE_ANALYSIS_POLL_INTERVAL_MS);
+
+      const response = await fetchWithTimeout(
+        `/api/assessment/${encodeURIComponent(status.planId)}?mode=score`,
+        { cache: "no-store" }
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to fetch HealthScore analysis status");
+      }
+
+      status = (await response.json()) as ProcessingStatus;
+    }
+
+    throw new Error("HealthScore analysis timed out");
   }
 
   async function captureAssessment(force = false, answerPayload = answers) {

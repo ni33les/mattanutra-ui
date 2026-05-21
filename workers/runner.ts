@@ -30,6 +30,7 @@ const INITIAL_AGENT_RESTART_BACKOFF_MS = 1_000;
 const MAX_AGENT_RESTART_BACKOFF_MS = 30_000;
 const MAX_POLLING_BACKOFF_MS = 30_000;
 const MAX_WORKER_PROFILE_CONCURRENCY = 8;
+const WORKER_PROFILE_STARTUP_STAGGER_MS = 350;
 const WORKER_PROFILE_MODES: readonly WorkerProfileMode[] = [
   "advisor",
   "communications",
@@ -493,11 +494,16 @@ async function runSupervisedAgentLoop(
   mode: WorkerProfileMode,
   config: Readonly<{ baseUrl: string; token: string }>,
   slotIndex = 0,
-  slotCount = 1
+  slotCount = 1,
+  startupDelayMs = 0
 ) {
   const agentName = profileForMode(mode).name;
   const slotLabel = slotCount > 1 ? ` slot ${slotIndex + 1}/${slotCount}` : "";
   let restartBackoffMs = INITIAL_AGENT_RESTART_BACKOFF_MS;
+
+  if (startupDelayMs > 0) {
+    await sleep(jitter(startupDelayMs));
+  }
 
   while (!shuttingDown) {
     try {
@@ -533,11 +539,17 @@ async function runWorker(mode: WorkerMode) {
   const config = requireConfig();
   const modes =
     mode === "all" ? WORKER_PROFILE_MODES : ([mode] as readonly WorkerProfileMode[]);
-  const loops = modes.flatMap((profileMode) => {
+  const loops = modes.flatMap((profileMode, profileIndex) => {
     const concurrency = workerConcurrency(profileMode);
 
     return Array.from({ length: concurrency }, (_, slotIndex) =>
-      runSupervisedAgentLoop(profileMode, config, slotIndex, concurrency)
+      runSupervisedAgentLoop(
+        profileMode,
+        config,
+        slotIndex,
+        concurrency,
+        (profileIndex + slotIndex) * WORKER_PROFILE_STARTUP_STAGGER_MS
+      )
     );
   });
 

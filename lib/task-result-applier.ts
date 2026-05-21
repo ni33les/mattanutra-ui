@@ -93,7 +93,6 @@ async function updateAssessmentReadyIfNutritionReady(
   planId: string
 ) {
   const rows = await sql<Array<{
-    food_guidance_ready: boolean;
     formulation_ready: boolean;
   }>>`
     select
@@ -105,20 +104,9 @@ async function updateAssessmentReadyIfNutritionReady(
             model_version is null
             or model_version not like '%:example'
           )
-      ) as formulation_ready,
-      exists (
-        select 1
-        from public.food_guidance
-        where plan_id = ${planId}::uuid
-          and (
-            model_version is null
-            or model_version not like '%:example'
-          )
-      ) as food_guidance_ready
+      ) as formulation_ready
   `;
-  const ready =
-    rows[0]?.formulation_ready === true &&
-    rows[0]?.food_guidance_ready === true;
+  const ready = rows[0]?.formulation_ready === true;
 
   await sql`
     update public.assessments set
