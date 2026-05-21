@@ -12,7 +12,9 @@ import { digitalOceanBillingSyncConfiguration } from "@/lib/finance-ledger";
 import { isLocale, type Locale } from "@/lib/i18n";
 import {
   ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION,
-  ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION
+  ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION,
+  normalizeProductStackPreference,
+  type ProductStackPreference
 } from "@/lib/product-recommendations";
 import { requiredCapabilitiesForWorkTaskType } from "@/lib/system-agents";
 import { createTask, type TaskDependencyType } from "@/lib/task-service";
@@ -771,12 +773,16 @@ export async function enqueueNutritionReportTask({
 }
 
 export async function enqueueProductRecommendationsTask({
+  forceNew,
   parentTaskId,
   planId,
+  stackPreference,
   taskGroupId
 }: Readonly<{
+  forceNew?: boolean;
   parentTaskId?: string | null;
   planId: string;
+  stackPreference?: ProductStackPreference | null;
   taskGroupId?: string | null;
 }>) {
   const sql = getSql();
@@ -859,32 +865,43 @@ export async function enqueueProductRecommendationsTask({
     ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION;
   const matcherImplementationVersion =
     ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION;
+  const normalizedStackPreference =
+    normalizeProductStackPreference(stackPreference);
   const inputHash = stableHash({
     matcherAlgorithmVersion,
     matcherImplementationVersion,
+    normalizedStackPreference,
     row
   });
   const groupId =
     taskGroupId ??
     (await latestNutritionTaskGroupId(sql, planId)) ??
     deterministicUuid(`mattanutra:task-group:nutrition-plan:${planId}`);
+  const forcedRunKey = forceNew ? crypto.randomUUID() : null;
 
   return createWorkTask({
     actorType: "deterministic",
     businessValue: TASK_BUSINESS_VALUES.productRecommendations,
     groupLabel: "Match products",
-    id: deterministicUuid(
-      `mattanutra:task:product-recommendations:${planId}:${inputHash}`
-    ),
-    idempotencyKey: `product-recommendations:${planId}:${inputHash}`,
-    idempotencyScope: "successful",
-    idempotencyScopeKey: `product-recommendations:${planId}:${inputHash}`,
+    id: forcedRunKey
+      ? crypto.randomUUID()
+      : deterministicUuid(
+          `mattanutra:task:product-recommendations:${planId}:${inputHash}`
+        ),
+    idempotencyKey: forcedRunKey
+      ? `product-recommendations:${planId}:${inputHash}:${forcedRunKey}`
+      : `product-recommendations:${planId}:${inputHash}`,
+    idempotencyScope: forcedRunKey ? "active" : "successful",
+    idempotencyScopeKey: forcedRunKey
+      ? `product-recommendations:${planId}:${inputHash}:${forcedRunKey}`
+      : `product-recommendations:${planId}:${inputHash}`,
     payload: {
       inputHash,
       matcherAlgorithmVersion,
       matcherImplementationVersion,
       parentTaskId,
-      row
+      row,
+      stackPreference: normalizedStackPreference
     },
     planId,
     reasoningEffort: "none",

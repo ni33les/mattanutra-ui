@@ -6,6 +6,10 @@ import { getSql } from "@/lib/db";
 import {
   getProductRecommendationCandidates
 } from "@/lib/admin-products";
+import {
+  defaultProductCountryCode,
+  normalizeProductCountryCode
+} from "@/lib/product-countries";
 import type {
   ProductSnapshot,
   MarketplaceSearchDiagnostic
@@ -52,6 +56,7 @@ import {
   enqueueRefinedNutritionPlanTasks
 } from "@/lib/task-worker";
 import {
+  normalizeProductStackPreference,
   recommendProductStackFullBeam,
   toRecommendedProduct,
   type ProductClientSex,
@@ -141,6 +146,33 @@ async function refreshAssessmentReadyIfNutritionReady(planId: string) {
   return updateAssessmentReadyIfNutritionReady(sql, planId);
 }
 
+async function queueProductRecommendationsForReadyPlan({
+  planId,
+  source,
+  task
+}: Readonly<{
+  planId: string;
+  source: string;
+  task: TaskRecord;
+}>) {
+  try {
+    return await enqueueProductRecommendationsTask({
+      parentTaskId: task.id,
+      planId,
+      taskGroupId: task.taskGroupId
+    });
+  } catch (error) {
+    console.error("Unable to queue product recommendations", error);
+    await addWorkEvent(task, "product_recommendations_queue_failed", "medium", {
+      errorMessage:
+        error instanceof Error ? error.message : "Unknown product queue error",
+      source
+    });
+
+    return null;
+  }
+}
+
 async function refreshPaidNutritionReadinessAfterCommit(
   task: TaskRecord,
   planId: string,
@@ -153,20 +185,11 @@ async function refreshPaidNutritionReadinessAfterCommit(
       source: "post_commit_readiness_refresh"
     });
 
-    try {
-      await enqueueProductRecommendationsTask({
-        parentTaskId: task.id,
-        planId,
-        taskGroupId: task.taskGroupId
-      });
-    } catch (error) {
-      console.error("Unable to queue product recommendations", error);
-      await addWorkEvent(task, "product_recommendations_queue_failed", "medium", {
-        errorMessage:
-          error instanceof Error ? error.message : "Unknown product queue error",
-        source: "post_commit_readiness_refresh"
-      });
-    }
+    await queueProductRecommendationsForReadyPlan({
+      planId,
+      source: "post_commit_readiness_refresh",
+      task
+    });
   }
 
   if (ready) {
@@ -403,6 +426,15 @@ async function applyPaidFormulationResult(
     planId
   });
   const nutritionReady = await updateAssessmentReadyIfNutritionReady(sql, planId);
+  const productRecommendationsQueued = nutritionReady
+    ? Boolean(
+        await queueProductRecommendationsForReadyPlan({
+          planId,
+          source: "formulation_completion",
+          task
+        })
+      )
+    : false;
 
   await eventually(afterCommit, async () => {
     await addWorkEvent(task, "formulation_version_written", "medium", {
@@ -418,16 +450,12 @@ async function applyPaidFormulationResult(
   });
   await eventually(afterCommit, async () => {
     await refreshPaidNutritionReadinessAfterCommit(task, planId, nutritionReady);
-    if (nutritionReady) {
-      try {
-        await enqueueProductRecommendationsTask({
-          parentTaskId: task.id,
-          planId,
-          taskGroupId: task.taskGroupId
-        });
-      } catch (error) {
-        console.error("Unable to queue product recommendations", error);
-      }
+    if (nutritionReady && !productRecommendationsQueued) {
+      await queueProductRecommendationsForReadyPlan({
+        planId,
+        source: "formulation_completion_recovery",
+        task
+      });
     }
   });
   await eventually(afterCommit, async () => {
@@ -507,6 +535,15 @@ async function applyPaidFoodGuidanceResult(
     planId
   });
   const nutritionReady = await updateAssessmentReadyIfNutritionReady(sql, planId);
+  const productRecommendationsQueued = nutritionReady
+    ? Boolean(
+        await queueProductRecommendationsForReadyPlan({
+          planId,
+          source: "food_guidance_completion",
+          task
+        })
+      )
+    : false;
 
   await eventually(afterCommit, async () => {
     await addWorkEvent(task, "food_guidance_version_written", "medium", {
@@ -522,16 +559,12 @@ async function applyPaidFoodGuidanceResult(
   });
   await eventually(afterCommit, async () => {
     await refreshPaidNutritionReadinessAfterCommit(task, planId, nutritionReady);
-    if (nutritionReady) {
-      try {
-        await enqueueProductRecommendationsTask({
-          parentTaskId: task.id,
-          planId,
-          taskGroupId: task.taskGroupId
-        });
-      } catch (error) {
-        console.error("Unable to queue product recommendations", error);
-      }
+    if (nutritionReady && !productRecommendationsQueued) {
+      await queueProductRecommendationsForReadyPlan({
+        planId,
+        source: "food_guidance_completion_recovery",
+        task
+      });
     }
   });
   await eventually(afterCommit, async () => {
@@ -1390,6 +1423,15 @@ async function applyNutritionReportResult(
       model_version = excluded.model_version,
       updated_at = now()
   `;
+  const productRecommendationsQueued = task.planId
+    ? Boolean(
+        await queueProductRecommendationsForReadyPlan({
+          planId: task.planId,
+          source: "nutrition_report_completion",
+          task
+        })
+      )
+    : false;
 
   await recordTaskXaiUsageCost({
     analysis,
@@ -1402,17 +1444,11 @@ async function applyNutritionReportResult(
     await addWorkEvent(task, "nutrition_report_completed", "medium", {
       planId: task.planId
     });
-    try {
-      await enqueueProductRecommendationsTask({
-        parentTaskId: task.id,
-        planId: task.planId!,
-        taskGroupId: task.taskGroupId
-      });
-    } catch (error) {
-      console.error("Unable to queue product recommendations", error);
-      await addWorkEvent(task, "product_recommendations_queue_failed", "medium", {
-        errorMessage:
-          error instanceof Error ? error.message : "Unknown product queue error"
+    if (task.planId && !productRecommendationsQueued) {
+      await queueProductRecommendationsForReadyPlan({
+        planId: task.planId,
+        source: "nutrition_report_completion_recovery",
+        task
       });
     }
   });
@@ -1604,6 +1640,21 @@ async function loadProductRecommendationClientSex(
   return sex === "female" || sex === "male" ? sex : null;
 }
 
+async function loadProductRecommendationCountryCode(
+  sql: TaskServiceDb,
+  planId: string
+) {
+  const rows = await sql<Array<{ country: string | null }>>`
+    select answers ->> 'country' as country
+    from public.assessments
+    where plan_id = ${planId}::uuid
+    order by updated_at desc
+    limit 1
+  `;
+
+  return normalizeProductCountryCode(rows[0]?.country) ?? defaultProductCountryCode;
+}
+
 async function applyProductRecommendationsResult(
   task: TaskRecord,
   resultPayload: unknown,
@@ -1618,12 +1669,22 @@ async function applyProductRecommendationsResult(
     throw new Error("Product recommendation result is missing plan");
   }
   const clientSex = await loadProductRecommendationClientSex(sql, task.planId);
+  const countryCode = await loadProductRecommendationCountryCode(sql, task.planId);
+  const stackPreference = normalizeProductStackPreference(
+    initialResult.diagnostics?.stackPreference ??
+      payloadText(task.payload, "stackPreference")
+  );
   const result = initialResult.recommendations.length > 0
     ? initialResult
     : recommendProductStackFullBeam({
-        candidates: await getProductRecommendationCandidates(),
+        candidates: await getProductRecommendationCandidates({
+          countryCode,
+          includeIneligible: true
+        }),
+        countryCode,
         clientSex,
-        needs: initialResult.clientNeeds
+        needs: initialResult.clientNeeds,
+        stackPreference
       });
   const configuredAdapters = discovery.diagnostics.filter(
     (item) => item.configured
@@ -1662,7 +1723,7 @@ async function applyProductRecommendationsResult(
       ${task.id}::uuid,
       ${task.rayId ?? null}::uuid,
       ${result.recommendations.length > 0 ? "completed" : "partial"},
-      'TH',
+      ${result.diagnostics.marketRegion ?? countryCode},
       ${result.stackCoveragePercent},
       ${result.supplementProductCoveragePercent},
       ${result.foodCoveragePercent},

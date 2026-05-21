@@ -36,6 +36,14 @@ import type {
   AdminProductRow,
   AdminProductsData
 } from "@/lib/admin-products";
+import { productMatchesSearch } from "@/lib/admin-product-search";
+import {
+  defaultProductCountryCode,
+  normalizeProductCountryCode,
+  productCountryLabel,
+  productCountryOptions,
+  type ProductCountryCode
+} from "@/lib/product-countries";
 import {
   doseExceedsLimit,
   normalizeDoseUnit,
@@ -145,84 +153,6 @@ function productBusinessStateForMetric(
   }
 
   return "";
-}
-
-function searchTerms(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
-function searchField(value: unknown) {
-  return String(value ?? "").toLowerCase();
-}
-
-function searchTokens(value: unknown) {
-  return searchField(value)
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter(Boolean);
-}
-
-function fieldContainsSearchTerm(value: unknown, term: string) {
-  return searchField(value).includes(term);
-}
-
-function factFieldMatchesSearchTerm(value: unknown, term: string) {
-  const field = searchField(value);
-
-  if (!field) {
-    return false;
-  }
-
-  if (searchTokens(value).includes(term)) {
-    return true;
-  }
-
-  return term.length >= 4 || /\d/.test(term) ? field.includes(term) : false;
-}
-
-function productMatchesSearch(row: AdminProductRow, search: string) {
-  const terms = searchTerms(search);
-
-  if (terms.length < 1) {
-    return true;
-  }
-
-  const productFields = [
-    row.title,
-    row.titleEn,
-    row.titleTh,
-    row.brandName,
-    row.category,
-    row.fdaApprovalNumber,
-    row.productKind,
-    row.productAudience,
-    row.platform,
-    row.region,
-    row.status,
-    row.labelStatus,
-    ...row.offers.flatMap((offer) => [
-      offer.linkType,
-      offer.network,
-      offer.platform,
-      offer.status
-    ])
-  ];
-  const factFields = row.facts.flatMap((fact) => [
-    fact.name,
-    fact.normalizedName,
-    fact.itemType,
-    fact.confidence,
-    ...(fact.aliasKeys ?? [])
-  ]);
-
-  return terms.every(
-    (term) =>
-      productFields.some((field) => fieldContainsSearchTerm(field, term)) ||
-      factFields.some((field) => factFieldMatchesSearchTerm(field, term))
-  );
 }
 
 function productStatusLabel(status: string) {
@@ -417,6 +347,167 @@ function productFactIssueSeverity(issues: readonly string[]) {
       : "none";
 }
 
+function productFactSafetyLimitIncreaseLabel(
+  fact: AdminProductRow["facts"][number]
+) {
+  if (fact.amount === null || fact.amount <= 0 || !fact.unit || !fact.maxUnit) {
+    return null;
+  }
+
+  const doseUnit = normalizeDoseUnit(fact.unit);
+  const limit = parseDoseLimit(fact.maxAmount, fact.maxUnit);
+
+  if (!doseUnit || !limit || doseUnit !== limit.unit) {
+    return null;
+  }
+
+  const exceedsLimit = doseExceedsLimit(
+    {
+      amount: fact.amount,
+      originalText: `${fact.amount} ${doseUnit}`,
+      unit: doseUnit
+    },
+    limit,
+    fact.normalizedName || fact.name
+  );
+
+  if (exceedsLimit !== true) {
+    return null;
+  }
+
+  return `Increase limit to ${fact.amount} ${fact.maxUnit}`;
+}
+
+const productDoseUnitOptions = supplementDoseUnits.filter(
+  (unit) => !unit.endsWith("/day")
+);
+
+function productDoseUnitSelectOptions(currentUnit: string | null | undefined) {
+  const trimmedCurrentUnit = currentUnit?.trim();
+
+  return trimmedCurrentUnit &&
+    !productDoseUnitOptions.includes(
+      trimmedCurrentUnit as (typeof productDoseUnitOptions)[number]
+    )
+    ? [trimmedCurrentUnit, ...productDoseUnitOptions]
+    : productDoseUnitOptions;
+}
+
+function normalizedProductCountryCodes(
+  countryCodes: readonly string[] | null | undefined,
+  fallback: readonly string[] = [defaultProductCountryCode]
+): ProductCountryCode[] {
+  const codes = [
+    ...new Set((countryCodes ?? [])
+      .map((code) => normalizeProductCountryCode(code))
+      .filter((code): code is ProductCountryCode => Boolean(code)))
+  ];
+
+  return codes.length > 0
+    ? codes
+    : [
+        ...new Set(fallback
+          .map((code) => normalizeProductCountryCode(code))
+          .filter((code): code is ProductCountryCode => Boolean(code)))
+      ];
+}
+
+function addProductCountryCode(
+  countryCodes: readonly string[],
+  countryCode: string
+): ProductCountryCode[] {
+  return normalizedProductCountryCodes([...countryCodes, countryCode], countryCodes);
+}
+
+function removeProductCountryCode(
+  countryCodes: readonly string[],
+  countryCode: string
+): ProductCountryCode[] {
+  if (countryCodes.length <= 1) {
+    return normalizedProductCountryCodes(countryCodes);
+  }
+
+  return normalizedProductCountryCodes(
+    countryCodes.filter((code) => code !== countryCode),
+    [countryCodes[0] ?? defaultProductCountryCode]
+  );
+}
+
+function ProductCountryManager({
+  allowedCountryCodes,
+  countryCodes,
+  disabledReason,
+  label,
+  onAdd,
+  onRemove
+}: Readonly<{
+  allowedCountryCodes?: readonly string[];
+  countryCodes: readonly string[];
+  disabledReason?: string | null;
+  label: string;
+  onAdd: (countryCode: string) => void;
+  onRemove: (countryCode: string) => void;
+}>) {
+  const allowedSet = allowedCountryCodes
+    ? new Set(allowedCountryCodes)
+    : null;
+  const availableOptions = productCountryOptions.filter((country) =>
+    !countryCodes.includes(country.code) &&
+    (!allowedSet || allowedSet.has(country.code))
+  );
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-gray-900">{label}</h3>
+        <select
+          aria-label={`Add ${label.toLowerCase()}`}
+          className="rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={Boolean(disabledReason) || availableOptions.length < 1}
+          onChange={(event) => {
+            if (event.target.value) {
+              onAdd(event.target.value);
+              event.target.value = "";
+            }
+          }}
+          value=""
+        >
+          <option value="">Add country</option>
+          {availableOptions.map((country) => (
+            <option key={country.code} value={country.code}>
+              {country.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {countryCodes.map((countryCode) => (
+          <span
+            className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700"
+            key={countryCode}
+          >
+            {productCountryLabel(countryCode)}
+            <button
+              aria-label={`Remove ${productCountryLabel(countryCode)}`}
+              className="rounded-full p-0.5 text-emerald-500 hover:bg-emerald-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={countryCodes.length <= 1}
+              onClick={() => onRemove(countryCode)}
+              type="button"
+            >
+              <XMarkIcon aria-hidden={true} className="size-3.5" />
+            </button>
+          </span>
+        ))}
+      </div>
+      {disabledReason ? (
+        <p className="mt-2 text-xs font-medium text-amber-700">
+          {disabledReason}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function AdminProductsView({
   accessToken,
   data,
@@ -542,6 +633,7 @@ export function AdminProductsView({
         body: JSON.stringify({
           accessToken,
           brandName: row.brandName,
+          availableCountryCodes: row.availableCountryCodes,
           description: row.description,
           descriptionEn: row.descriptionEn,
           descriptionTh: row.descriptionTh,
@@ -559,6 +651,7 @@ export function AdminProductsView({
           fdaApprovalNumber: row.fdaApprovalNumber,
           imageUrl: row.imageUrl,
           labelStatus: row.labelStatus,
+          manufacturerCountryCodes: row.manufacturerCountryCodes,
           status: row.status,
           productAudience: row.productAudience,
           productKind: row.productKind,
@@ -651,6 +744,61 @@ export function AdminProductsView({
     }
   }
 
+  async function increaseProductSafetyLimit(
+    row: AdminProductRow,
+    factId: string
+  ) {
+    setSavingId(row.id);
+    setErrorId(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/products/${row.id}/safety-limit`, {
+        body: JSON.stringify({
+          accessToken,
+          factId
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await adminResponseErrorMessage(
+            response,
+            "Unable to increase safety limit"
+          )
+        );
+      }
+
+      const payload = (await response.json()) as { row?: AdminProductRow };
+      const savedRow = payload.row;
+
+      if (!savedRow) {
+        throw new Error("Safety limit update did not return a product row");
+      }
+
+      setRows((currentRows) =>
+        currentRows.map((item) => (item.id === savedRow.id ? savedRow : item))
+      );
+      setDraft(savedRow);
+
+      return true;
+    } catch (error) {
+      setErrorId(row.id);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to increase safety limit"
+      );
+      return false;
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   async function decideProductImportFromProduct(
     row: AdminProductRow,
     action: "approve_product" | "ignore_import" | "merge_product",
@@ -672,12 +820,14 @@ export function AdminProductsView({
           body: JSON.stringify({
             accessToken,
             action,
+            availableCountryCodes: row.availableCountryCodes,
             brandName: row.brandName,
             description: row.description,
             descriptionEn: row.descriptionEn,
             descriptionTh: row.descriptionTh,
             fdaApprovalNumber: row.fdaApprovalNumber,
             imageUrl: row.imageUrl,
+            manufacturerCountryCodes: row.manufacturerCountryCodes,
             mergeProductId,
             parsedFacts: row.facts.map((fact) => ({
               amount: fact.amount,
@@ -781,7 +931,7 @@ export function AdminProductsView({
             aria-label="Search products"
             className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search products, brands, ingredients"
+            placeholder="Search products, brands, ingredients, aliases"
             type="search"
             value={search}
           />
@@ -837,6 +987,9 @@ export function AdminProductsView({
                           ? null
                           : productStatusLabel(row.productAudience),
                         row.fdaApprovalNumber ? `FDA ${row.fdaApprovalNumber}` : null,
+                        row.availableCountryCodes.length > 0
+                          ? `Markets ${row.availableCountryCodes.join(", ")}`
+                          : null,
                         row.priceAmount ? `${row.priceAmount} ${row.currency}` : null
                       ]
                         .filter(Boolean)
@@ -887,6 +1040,7 @@ export function AdminProductsView({
           errorMessage={errorId === draft.id ? errorMessage : null}
           onImportDecision={decideProductImportFromProduct}
           onCorrectFacts={correctProductFacts}
+          onIncreaseSafetyLimit={increaseProductSafetyLimit}
           onClose={() => {
             setDraft(null);
             setErrorId(null);
@@ -909,6 +1063,7 @@ function ProductModal({
   errorMessage,
   onImportDecision,
   onCorrectFacts,
+  onIncreaseSafetyLimit,
   onClose,
   onSave,
   products,
@@ -926,6 +1081,10 @@ function ProductModal({
     reviewerNote: string | null
   ) => Promise<boolean>;
   onCorrectFacts: (row: AdminProductRow) => Promise<AdminProductRow | null>;
+  onIncreaseSafetyLimit: (
+    row: AdminProductRow,
+    factId: string
+  ) => Promise<boolean>;
   onClose: () => void;
   onSave: (row: AdminProductRow) => Promise<boolean>;
   products: AdminProductRow[];
@@ -954,6 +1113,70 @@ function ProductModal({
   const mergeOptions = duplicateOptions.length > 0
     ? duplicateOptions
     : products.filter((product) => product.id !== draft.id).slice(0, 80);
+  const manufacturerCountryCodes = normalizedProductCountryCodes(
+    draft.manufacturerCountryCodes
+  );
+  const productCountryCodes = normalizedProductCountryCodes(
+    draft.availableCountryCodes,
+    manufacturerCountryCodes
+  ).filter((countryCode) => manufacturerCountryCodes.includes(countryCode));
+  const safeProductCountryCodes = productCountryCodes.length > 0
+    ? productCountryCodes
+    : [manufacturerCountryCodes[0] ?? defaultProductCountryCode];
+
+  function addManufacturerCountry(countryCode: string) {
+    setDraft({
+      ...draft,
+      manufacturerCountryCodes: addProductCountryCode(
+        manufacturerCountryCodes,
+        countryCode
+      )
+    });
+  }
+
+  function removeManufacturerCountry(countryCode: string) {
+    const nextManufacturerCountryCodes = removeProductCountryCode(
+      manufacturerCountryCodes,
+      countryCode
+    );
+    const nextProductCountryCodes = safeProductCountryCodes.filter((code) =>
+      nextManufacturerCountryCodes.includes(code)
+    );
+
+    setDraft({
+      ...draft,
+      availableCountryCodes: nextProductCountryCodes.length > 0
+        ? nextProductCountryCodes
+        : [nextManufacturerCountryCodes[0] ?? defaultProductCountryCode],
+      manufacturerCountryCodes: nextManufacturerCountryCodes
+    });
+  }
+
+  function addAvailableCountry(countryCode: string) {
+    const normalizedCountryCode = normalizeProductCountryCode(countryCode);
+
+    if (!normalizedCountryCode || !manufacturerCountryCodes.includes(normalizedCountryCode)) {
+      return;
+    }
+
+    setDraft({
+      ...draft,
+      availableCountryCodes: addProductCountryCode(
+        safeProductCountryCodes,
+        normalizedCountryCode
+      )
+    });
+  }
+
+  function removeAvailableCountry(countryCode: string) {
+    setDraft({
+      ...draft,
+      availableCountryCodes: removeProductCountryCode(
+        safeProductCountryCodes,
+        countryCode
+      )
+    });
+  }
 
   async function addOffer() {
     const url = newOfferUrl.trim();
@@ -1051,7 +1274,9 @@ function ProductModal({
                 draft.productAudience === "both"
                   ? null
                   : productStatusLabel(draft.productAudience),
-                draft.region
+                safeProductCountryCodes.length > 0
+                  ? `Markets ${safeProductCountryCodes.join(", ")}`
+                  : draft.region
               ]
                 .filter(Boolean)
                 .join(" · ")}
@@ -1105,6 +1330,27 @@ function ProductModal({
               </a>
             </p>
           ) : null}
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <ProductCountryManager
+            countryCodes={manufacturerCountryCodes}
+            label="Manufacturer countries"
+            onAdd={addManufacturerCountry}
+            onRemove={removeManufacturerCountry}
+          />
+          <ProductCountryManager
+            allowedCountryCodes={manufacturerCountryCodes}
+            countryCodes={safeProductCountryCodes}
+            disabledReason={
+              manufacturerCountryCodes.length < 1
+                ? "Add a manufacturer country first."
+                : null
+            }
+            label="Product countries"
+            onAdd={addAvailableCountry}
+            onRemove={removeAvailableCountry}
+          />
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -1319,11 +1565,13 @@ function ProductModal({
               const issueSeverity = productFactIssueSeverity(factIssues);
               const hasIssues = issueSeverity !== "none";
               const highSeverity = issueSeverity === "high";
+              const safetyLimitIncreaseLabel =
+                productFactSafetyLimitIncreaseLabel(fact);
 
               return (
               <div
                 className={classNames(
-                  "grid gap-2 rounded-xl border p-3 sm:grid-cols-[minmax(0,1fr)_6rem_6rem_8rem_auto]",
+                  "grid gap-2 rounded-xl border p-3 sm:grid-cols-[minmax(0,1fr)_6rem_6rem_8rem_8rem]",
                   highSeverity
                     ? "border-red-200 bg-red-50 ring-1 ring-red-100"
                     : hasIssues
@@ -1378,7 +1626,7 @@ function ProductModal({
                   placeholder="Amount"
                   value={fact.amount ?? ""}
                 />
-                <input
+                <select
                   className={classNames(
                     "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 outline-none focus:ring-2 focus:ring-[#1FA77A]",
                     hasIssues ? "ring-amber-200" : "ring-gray-200"
@@ -1393,9 +1641,15 @@ function ProductModal({
                       )
                     })
                   }
-                  placeholder="Unit"
                   value={fact.unit ?? ""}
-                />
+                >
+                  <option value="">Unit</option>
+                  {productDoseUnitSelectOptions(fact.unit).map((unit) => (
+                    <option key={unit} value={unit}>
+                      {unit}
+                    </option>
+                  ))}
+                </select>
                 <select
                   className={classNames(
                     "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 outline-none focus:ring-2 focus:ring-[#1FA77A]",
@@ -1420,18 +1674,30 @@ function ProductModal({
                   <option value="moderate">Moderate</option>
                   <option value="low">Low</option>
                 </select>
-                <button
-                  className="rounded-md px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
-                  onClick={() =>
-                    setDraft({
-                      ...draft,
-                      facts: draft.facts.filter((_, itemIndex) => itemIndex !== index)
-                    })
-                  }
-                  type="button"
-                >
-                  Remove
-                </button>
+                <div className="flex items-center justify-end gap-2">
+                  {safetyLimitIncreaseLabel ? (
+                    <button
+                      className="rounded-md px-2 py-1 text-xs font-semibold text-[#126B4F] hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={saving}
+                      onClick={() => void onIncreaseSafetyLimit(draft, fact.id)}
+                      type="button"
+                    >
+                      Increase limit
+                    </button>
+                  ) : null}
+                  <button
+                    className="rounded-md px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        facts: draft.facts.filter((_, itemIndex) => itemIndex !== index)
+                      })
+                    }
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                </div>
                 {fact.sourceText ? (
                   <p className="text-xs text-gray-500 sm:col-span-5">
                     {fact.sourceText}
@@ -1440,7 +1706,7 @@ function ProductModal({
                 {factIssues.length > 0 ? (
                   <div
                     className={classNames(
-                      "flex flex-wrap gap-1.5 text-xs font-medium sm:col-span-5",
+                      "flex flex-wrap items-center gap-1.5 text-xs font-medium sm:col-span-5",
                       highSeverity ? "text-red-800" : "text-amber-800"
                     )}
                   >
@@ -4540,7 +4806,7 @@ function ProductImportReviewModal({
                       placeholder="Amount"
                       value={fact.amount}
                     />
-                    <input
+                    <select
                       className={inputClass}
                       onChange={(event) =>
                         setFacts((current) =>
@@ -4551,9 +4817,15 @@ function ProductImportReviewModal({
                           )
                         )
                       }
-                      placeholder="Unit"
                       value={fact.unit}
-                    />
+                    >
+                      <option value="">Unit</option>
+                      {productDoseUnitSelectOptions(fact.unit).map((unit) => (
+                        <option key={unit} value={unit}>
+                          {unit}
+                        </option>
+                      ))}
+                    </select>
                     <select
                       className={inputClass}
                       onChange={(event) =>

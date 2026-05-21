@@ -19,7 +19,8 @@ import type {
   FormulationResult,
   LocalizedText,
   PlanChatMessage,
-  RecommendedProduct
+  RecommendedProduct,
+  ProductStackPreference
 } from "@/lib/formulation-types";
 import { foodTagLabel } from "@/lib/food-tags";
 import type { Locale } from "@/lib/i18n";
@@ -40,6 +41,9 @@ type LoadState = "loading" | "ready" | "error";
 const formulationHeroBackgroundImage = "/formulation-couple.jpg";
 const MAX_PLAN_CHAT_ROUNDS = 8;
 const MAX_PRODUCT_MATCHING_POLLS = 80;
+const PENDING_SECTION_POLL_INTERVAL_MS = 1_000;
+const PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS = 750;
+const FOOD_GUIDANCE_VISIBLE = false;
 
 const supplementBenefitRules = [
   {
@@ -226,20 +230,20 @@ export const formulationResultsCopy = {
     finalizeError: "We could not deliver the nutrition plan. Please try again.",
     finalizePlan: "Deliver Nutrition Plan",
     finalizeReady: "Nutrition plan delivered",
-    finalizeWaiting: "Food and supplement guidance must finish before delivery.",
+    finalizeWaiting: "Supplement guidance must finish before delivery.",
     finalizingPlan: "Delivering plan",
     finalReportDailyFocus: "Daily focus",
     finalReportNextSteps: "Next steps",
     finalReportSafetyNotes: "Safety notes",
-    finalReportSynergies: "Food + supplement fit",
+    finalReportSynergies: "Supplement fit",
     generated: "Generated",
     goals: "Goals",
     heroSubtitle:
-      "Review the foods and supplements, tell us what to change, then refine the plan around your preferences.",
+      "Review the supplements, tell us what to change, then refine the plan around your preferences.",
     heroTitle: "Let's refine your nutrition guidance",
     loading: "Loading your formulation",
     nutritionProgressBody:
-      "We’re preparing your food and supplement guidance. The refinement tools will appear here as soon as everything is ready.",
+      "We’re preparing your supplement guidance. The refinement tools will appear here as soon as everything is ready.",
     nutritionProgressFoods: "Food guidance",
     nutritionProgressPending: "Preparing",
     nutritionProgressReady: "Ready",
@@ -259,10 +263,10 @@ export const formulationResultsCopy = {
     planChatThinking: "Thinking through your note...",
     planChatTitle: "Anything you'd like to change?",
     planChatWaiting:
-      "Chat will unlock when your food and supplement guidance is ready.",
+      "Chat will unlock when your supplement guidance is ready.",
     dailyDose: "Dose",
     deliveryHandoffBody:
-      "We’re tailoring the final plan from your food guidance, supplements, and refinement notes.",
+      "We’re tailoring the final plan from your supplement guidance and refinement notes.",
     deliveryHandoffTitle: "Delivering your nutrition plan",
     plan: "Plan",
     previewBadge: "Free preview",
@@ -343,20 +347,20 @@ export const formulationResultsCopy = {
     finalizePlan: "ส่งมอบแผนโภชนาการ",
     finalizeReady: "ส่งมอบแผนโภชนาการแล้ว",
     finalizeWaiting:
-      "ต้องรอคำแนะนำอาหารและอาหารเสริมให้เสร็จก่อนส่งมอบแผน",
+      "ต้องรอคำแนะนำอาหารเสริมให้เสร็จก่อนส่งมอบแผน",
     finalizingPlan: "กำลังส่งมอบแผน",
     finalReportDailyFocus: "สิ่งที่ควรโฟกัสในแต่ละวัน",
     finalReportNextSteps: "ขั้นตอนถัดไป",
     finalReportSafetyNotes: "หมายเหตุด้านความปลอดภัย",
-    finalReportSynergies: "การใช้ร่วมกันของอาหารและอาหารเสริม",
+    finalReportSynergies: "ความเหมาะสมของอาหารเสริม",
     generated: "สร้างเมื่อ",
     goals: "เป้าหมาย",
     heroSubtitle:
-      "ตรวจคำแนะนำอาหารและอาหารเสริม บอกเราว่าต้องการเปลี่ยนอะไร แล้วปรับแผนให้เข้ากับคุณ",
+      "ตรวจคำแนะนำอาหารเสริม บอกเราว่าต้องการเปลี่ยนอะไร แล้วปรับแผนให้เข้ากับคุณ",
     heroTitle: "มาปรับคำแนะนำโภชนาการของคุณกัน",
     loading: "กำลังโหลดสูตรของคุณ",
     nutritionProgressBody:
-      "เรากำลังเตรียมคำแนะนำอาหารและอาหารเสริม เครื่องมือปรับแผนจะแสดงที่นี่เมื่อทุกอย่างพร้อม",
+      "เรากำลังเตรียมคำแนะนำอาหารเสริม เครื่องมือปรับแผนจะแสดงที่นี่เมื่อทุกอย่างพร้อม",
     nutritionProgressFoods: "คำแนะนำอาหาร",
     nutritionProgressPending: "กำลังเตรียม",
     nutritionProgressReady: "พร้อมแล้ว",
@@ -376,10 +380,10 @@ export const formulationResultsCopy = {
     planChatThinking: "กำลังพิจารณาข้อความของคุณ...",
     planChatTitle: "มีอะไรที่อยากเปลี่ยนไหม?",
     planChatWaiting:
-      "แชตจะใช้งานได้เมื่อคำแนะนำอาหารและอาหารเสริมพร้อมแล้ว",
+      "แชตจะใช้งานได้เมื่อคำแนะนำอาหารเสริมพร้อมแล้ว",
     dailyDose: "ขนาด",
     deliveryHandoffBody:
-      "เรากำลังออกแบบแผนสุดท้ายจากคำแนะนำอาหาร อาหารเสริม และบันทึกการปรับแต่งของคุณ",
+      "เรากำลังออกแบบแผนสุดท้ายจากคำแนะนำอาหารเสริมและบันทึกการปรับแต่งของคุณ",
     deliveryHandoffTitle: "กำลังส่งมอบแผนโภชนาการของคุณ",
     plan: "แผน",
     previewBadge: "ตัวอย่างฟรี",
@@ -589,7 +593,12 @@ export function FormulationResults({
           }
 
           if (resultHasPendingSections(payload) || shouldPollProductMatching) {
-            retryTimer = window.setTimeout(fetchFormulation, 1500);
+            retryTimer = window.setTimeout(
+              fetchFormulation,
+              shouldPollProductMatching
+                ? PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS
+                : PENDING_SECTION_POLL_INTERVAL_MS
+            );
           }
         }
       } catch {
@@ -676,7 +685,7 @@ export function FormulationResults({
     supplements: orderedIngredients.length > 0 ? "ready" : "pending"
   };
   const nutritionPending =
-    sectionStatuses.foods !== "ready" ||
+    (FOOD_GUIDANCE_VISIBLE && sectionStatuses.foods !== "ready") ||
     sectionStatuses.supplements !== "ready";
   const lockedSupplementCount = Math.max(
     0,
@@ -797,16 +806,18 @@ export function FormulationResults({
         />
       ) : null}
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-2">
-        <FoodGuidancePanel
-          foods={orderedFoods}
-          hasPendingSafetyReview={hasPendingSafetyReview}
-          isPending={sectionStatuses.foods !== "ready"}
-          labels={labels}
-          lockedFoodCount={lockedFoodCount}
-          locale={locale}
-          unlockHref={unlockHref}
-        />
+      <div className={`mt-8 grid gap-8 ${FOOD_GUIDANCE_VISIBLE ? "lg:grid-cols-2" : ""}`}>
+        {FOOD_GUIDANCE_VISIBLE ? (
+          <FoodGuidancePanel
+            foods={orderedFoods}
+            hasPendingSafetyReview={hasPendingSafetyReview}
+            isPending={sectionStatuses.foods !== "ready"}
+            labels={labels}
+            lockedFoodCount={lockedFoodCount}
+            locale={locale}
+            unlockHref={unlockHref}
+          />
+        ) : null}
 
         <FormulaPanel
           hasPendingSafetyReview={hasPendingSafetyReview}
@@ -823,6 +834,7 @@ export function FormulationResults({
       {isPreview ? null : (
         <ProductRecommendationsPanel
           locale={locale}
+          onRefreshRequested={() => setRefreshNonce((value) => value + 1)}
           planId={effectiveResultPlanId}
           productRecommendations={result.productRecommendations}
           recommendations={result.recommendations}
@@ -1587,8 +1599,16 @@ const productRecommendationCopy = {
     needsReviewed: "client needs reviewed",
     needs: "Adds",
     ofYourNeeds: "to product coverage",
+    preferenceCompact: "Compact",
+    preferenceCompactHint: "Fewest products within a small coverage tolerance",
+    preferenceBalanced: "Balanced",
+    preferenceBalancedHint: "Best overall mix of coverage, simplicity, dose and cost",
+    preferenceMaxCoverage: "Max coverage",
+    preferenceMaxCoverageHint: "Prioritise every extra point of coverage",
+    preferenceUpdating: "Updating product stack...",
     stack: "Stack coverage",
     title: "Recommended products",
+    unmatchedTitle: "Unmet supplement needs",
     view: "View product"
   },
   th: {
@@ -1605,11 +1625,49 @@ const productRecommendationCopy = {
     needsReviewed: "ความต้องการที่ตรวจแล้ว",
     needs: "เพิ่ม",
     ofYourNeeds: "ให้ความครอบคลุมของสินค้า",
+    preferenceCompact: "ชุดเล็ก",
+    preferenceCompactHint: "เลือกจำนวนสินค้าน้อยที่สุดเมื่อความครอบคลุมใกล้เคียงกัน",
+    preferenceBalanced: "สมดุล",
+    preferenceBalancedHint: "สมดุลระหว่างความครอบคลุม ความง่าย ปริมาณ และราคา",
+    preferenceMaxCoverage: "ครอบคลุมสูงสุด",
+    preferenceMaxCoverageHint: "ให้ความสำคัญกับความครอบคลุมสูงสุด",
+    preferenceUpdating: "กำลังอัปเดตชุดสินค้า...",
     stack: "ความครอบคลุมของชุดสินค้า",
     title: "สินค้าแนะนำ",
+    unmatchedTitle: "ความต้องการอาหารเสริมที่ยังไม่ครอบคลุม",
     view: "ดูสินค้า"
   }
 } satisfies Record<Locale, Record<string, string>>;
+
+const productStackPreferenceOptions: Array<Readonly<{
+  id: ProductStackPreference;
+  labelKey: "preferenceBalanced" | "preferenceCompact" | "preferenceMaxCoverage";
+  titleKey: "preferenceBalancedHint" | "preferenceCompactHint" | "preferenceMaxCoverageHint";
+}>> = [
+  {
+    id: "balanced",
+    labelKey: "preferenceBalanced",
+    titleKey: "preferenceBalancedHint"
+  },
+  {
+    id: "compact",
+    labelKey: "preferenceCompact",
+    titleKey: "preferenceCompactHint"
+  },
+  {
+    id: "max_coverage",
+    labelKey: "preferenceMaxCoverage",
+    titleKey: "preferenceMaxCoverageHint"
+  }
+];
+
+function normalizeProductStackPreference(
+  value: unknown
+): ProductStackPreference {
+  return value === "compact" || value === "max_coverage" || value === "balanced"
+    ? value
+    : "balanced";
+}
 
 function trackMarketplaceClick(
   planId: string,
@@ -1647,16 +1705,23 @@ function trackMarketplaceClick(
 
 export function ProductRecommendationsPanel({
   locale,
+  onRefreshRequested,
   planId,
   productRecommendations,
   recommendations
 }: Readonly<{
   locale: Locale;
+  onRefreshRequested?: () => void;
   planId: string;
   productRecommendations?: FormulationResult["productRecommendations"];
   recommendations: RecommendedProduct[];
 }>) {
   const labels = productRecommendationCopy[locale];
+  const activeStackPreference = normalizeProductStackPreference(
+    productRecommendations?.stackPreference
+  );
+  const [pendingStackPreference, setPendingStackPreference] =
+    useState<ProductStackPreference | null>(null);
   const stackCoverage = Math.max(
     0,
     Math.round(
@@ -1682,6 +1747,97 @@ export function ProductRecommendationsPanel({
     productRecommendations?.status === "partial" ||
     productRecommendations?.status === "ready" ||
     productRecommendations?.status === "failed";
+  const selectedStackPreference =
+    pendingStackPreference ?? activeStackPreference;
+  const unmetSupplementNeeds =
+    productRecommendations?.needCoverage
+      ?.filter((need) =>
+        need.itemType === "supplement" && need.coveragePercent <= 0
+      )
+      .slice(0, 5) ?? [];
+
+  useEffect(() => {
+    if (pendingStackPreference === activeStackPreference) {
+      setPendingStackPreference(null);
+    }
+  }, [activeStackPreference, pendingStackPreference]);
+
+  async function updateStackPreference(
+    stackPreference: ProductStackPreference
+  ) {
+    if (pendingStackPreference || stackPreference === activeStackPreference) {
+      return;
+    }
+
+    setPendingStackPreference(stackPreference);
+
+    try {
+      const response = await fetch(
+        `/api/assessment/${encodeURIComponent(planId)}/product-recommendations`,
+        {
+          body: JSON.stringify({ stackPreference }),
+          headers: {
+            "Content-Type": "application/json"
+          },
+          method: "POST"
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to update product matching preference");
+      }
+
+      for (const delay of [0, 750, 1500, 3000, 5000]) {
+        window.setTimeout(() => onRefreshRequested?.(), delay);
+      }
+
+      window.setTimeout(() => {
+        setPendingStackPreference((current) =>
+          current === stackPreference ? null : current
+        );
+      }, 10000);
+    } catch {
+      setPendingStackPreference(null);
+    }
+  }
+
+  const preferenceControl = (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="inline-flex rounded-md shadow-xs ring-1 ring-gray-200">
+        {productStackPreferenceOptions.map((option, index) => {
+          const selected = selectedStackPreference === option.id;
+
+          return (
+            <button
+              className={[
+                "px-3 py-2 text-xs font-semibold transition",
+                index === 0 ? "rounded-l-md" : "-ml-px",
+                index === productStackPreferenceOptions.length - 1
+                  ? "rounded-r-md"
+                  : "",
+                selected
+                  ? "relative z-10 bg-[#20343A] text-white"
+                  : "bg-white text-gray-600 hover:bg-gray-50",
+                pendingStackPreference ? "cursor-wait opacity-70" : ""
+              ].join(" ")}
+              disabled={Boolean(pendingStackPreference)}
+              key={option.id}
+              onClick={() => void updateStackPreference(option.id)}
+              title={labels[option.titleKey]}
+              type="button"
+            >
+              {labels[option.labelKey]}
+            </button>
+          );
+        })}
+      </div>
+      {pendingStackPreference ? (
+        <span className="text-xs font-medium text-gray-500">
+          {labels.preferenceUpdating}
+        </span>
+      ) : null}
+    </div>
+  );
 
   if (recommendations.length < 1) {
     return (
@@ -1696,6 +1852,7 @@ export function ProductRecommendationsPanel({
             </span>
           ) : null}
         </div>
+        <div className="mt-4">{preferenceControl}</div>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
           {emptyBody}
         </p>
@@ -1703,6 +1860,21 @@ export function ProductRecommendationsPanel({
           <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
             {productRecommendations.notes}
           </p>
+        ) : null}
+        {unmetSupplementNeeds.length > 0 ? (
+          <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm ring-1 ring-amber-100">
+            <p className="font-semibold text-amber-950">
+              {labels.unmatchedTitle}
+            </p>
+            <ul className="mt-2 space-y-1 text-amber-900">
+              {unmetSupplementNeeds.map((need) => (
+                <li key={need.id}>
+                  <span className="font-medium">{need.displayName}</span>
+                  {need.bestRejectedReason ? `: ${need.bestRejectedReason}` : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         {productRecommendations ? (
           <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
@@ -1734,6 +1906,22 @@ export function ProductRecommendationsPanel({
           {labels.stack}: <span className="text-[#20343A]">{stackCoverage}%</span>
         </p>
       </div>
+      <div className="mt-4">{preferenceControl}</div>
+      {unmetSupplementNeeds.length > 0 ? (
+        <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm ring-1 ring-amber-100">
+          <p className="font-semibold text-amber-950">
+            {labels.unmatchedTitle}
+          </p>
+          <ul className="mt-2 space-y-1 text-amber-900">
+            {unmetSupplementNeeds.map((need) => (
+              <li key={need.id}>
+                <span className="font-medium">{need.displayName}</span>
+                {need.bestRejectedReason ? `: ${need.bestRejectedReason}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
         {recommendations.map((product) => (

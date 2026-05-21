@@ -125,6 +125,16 @@ function parseProductAudience(value: unknown): ProductAudience | undefined {
   return isProductAudience(normalized) ? normalized : undefined;
 }
 
+function countryCodesFromBody(value: unknown) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
 function errorDetails(error: unknown) {
   if (!(error instanceof Error)) {
     return error;
@@ -247,6 +257,7 @@ export async function PATCH(
                   ? "ignore"
                   : "duplicate",
             actor: "admin_dashboard",
+            availableCountryCodes: countryCodesFromBody(body.availableCountryCodes),
             brandName: body.brandName === undefined
               ? undefined
               : textOrNull(body.brandName),
@@ -265,6 +276,7 @@ export async function PATCH(
             imageUrl: body.imageUrl === undefined
               ? undefined
               : textOrNull(body.imageUrl),
+            manufacturerCountryCodes: countryCodesFromBody(body.manufacturerCountryCodes),
             mergeProductId: textOrNull(body.mergeProductId),
             parsedFacts: productImportFactsFromBody(body.parsedFacts),
             productAudience,

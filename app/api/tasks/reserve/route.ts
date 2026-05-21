@@ -22,10 +22,11 @@ import { requireWorkerRequest } from "@/lib/worker-auth";
 export const runtime = "nodejs";
 
 const DEFAULT_RESERVE_POLL_INTERVAL_MS = 5_000;
-const INTERACTIVE_RESERVE_POLL_INTERVAL_MS = 2_000;
+const INTERACTIVE_RESERVE_POLL_INTERVAL_MS = 1_000;
 const INTERACTIVE_TASK_TYPES = new Set([
   "analyze_healthscore",
   "generate_food_guidance",
+  "generate_product_recommendations",
   "generate_nutrition_report",
   "generate_supplement_guidance",
   "nutrition_plan_chat_reply",

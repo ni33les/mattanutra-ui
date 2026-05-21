@@ -41,6 +41,16 @@ function numberOrNull(value: unknown) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
+function countryCodesFromBody(value: unknown) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
 function parseProductKind(value: unknown): ProductKind | undefined {
   const normalized = normalizedKey(value);
 
@@ -136,12 +146,14 @@ export async function POST(request: Request) {
     const row = await createAdminProduct({
       actor: "admin_dashboard",
       brandName: textOrNull(body.brandName),
-      currency: textOrNull(body.currency) ?? "THB",
-      facts: factsFromBody(body.facts),
-      fdaApprovalNumber: textOrNull(body.fdaApprovalNumber),
-      imageUrl: textOrNull(body.imageUrl),
-      labelStatus: isProductLabelStatus(labelStatus) ? labelStatus : undefined,
-      status: isProductStatus(status) ? status : undefined,
+	      currency: textOrNull(body.currency) ?? "THB",
+	      availableCountryCodes: countryCodesFromBody(body.availableCountryCodes),
+	      facts: factsFromBody(body.facts),
+	      fdaApprovalNumber: textOrNull(body.fdaApprovalNumber),
+	      imageUrl: textOrNull(body.imageUrl),
+	      labelStatus: isProductLabelStatus(labelStatus) ? labelStatus : undefined,
+	      manufacturerCountryCodes: countryCodesFromBody(body.manufacturerCountryCodes),
+	      status: isProductStatus(status) ? status : undefined,
       platform,
       productAudience,
       productKind,
@@ -163,12 +175,16 @@ export async function POST(request: Request) {
     console.error("Unable to import product", error);
 
     return NextResponse.json(
-      { message: "Unable to import product" },
+      {
+        message: error instanceof Error
+          ? error.message
+          : "Unable to import product"
+      },
       {
         headers: {
           "Cache-Control": "no-store"
         },
-        status: 500
+        status: 400
       }
     );
   }

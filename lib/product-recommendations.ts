@@ -2,6 +2,7 @@ import {
   comparableDoseAmount,
   normalizeDoseUnit,
   parseDose,
+  parseDoseLimit,
   type ParsedDose
 } from "@/lib/dose-conversion";
 import type {
@@ -72,6 +73,7 @@ export type ProductCandidate = Readonly<{
   affiliateStatus: "active" | "flagged_stale" | "none";
   automatedSafetyPassed: boolean;
   availabilityStatus: ProductAvailabilityStatus;
+  availableCountryCodes?: readonly string[];
   brandName?: string | null;
   brandStatus?: ProductStatus | null;
   currency: string;
@@ -110,6 +112,7 @@ export type ProductRecommendationAlgorithmVersion =
   | "legacy-greedy"
   | "v2-exact-shortlist"
   | "v2-full-beam";
+export type ProductStackPreference = "balanced" | "compact" | "max_coverage";
 
 export type ProductRecommendationDiagnostics = Readonly<{
   algorithmVersion?: ProductRecommendationAlgorithmVersion;
@@ -121,6 +124,7 @@ export type ProductRecommendationDiagnostics = Readonly<{
   };
   factIssues: ProductRecommendationExclusion[];
   matchedNeeds: ProductRecommendationNeedDiagnostic[];
+  marketRegion?: string;
   nearMisses: Array<Readonly<{
     coveragePercent: number;
     productId: string;
@@ -128,6 +132,7 @@ export type ProductRecommendationDiagnostics = Readonly<{
     title: string;
   }>>;
   productsConsidered: number;
+  stackPreference?: ProductStackPreference;
   trace?: ProductRecommendationTrace;
   unmatchedNeeds: ProductRecommendationNeedDiagnostic[];
 }>;
@@ -140,6 +145,7 @@ export type ProductRecommendationSelection = Readonly<{
   productCoveragePercent: number;
   rank: number;
   score: number;
+  servingMultiplier: number;
   stackContributionPercent: number;
   url: string;
   unknownAtRecommendation: boolean;
@@ -176,8 +182,10 @@ export type ProductRecommendationInput = Readonly<{
   candidates: ProductCandidate[];
   clientContext?: ProductRecommendationClientContext | null;
   clientSex?: ProductClientSex | null;
+  countryCode?: string | null;
   maxProducts?: number;
   needs: ProductRecommendationNeed[];
+  stackPreference?: ProductStackPreference | null;
   targetProducts?: number;
 }>;
 
@@ -202,6 +210,8 @@ export type ProductRecommendationTrace = Readonly<{
     shortfallPercent: number;
   }>>;
   shortlistSize: number;
+  stackPreference?: ProductStackPreference;
+  timingMs?: Record<string, number>;
   utilityScore: number;
   weightDeltas: Record<string, number>;
   weights: Record<string, number>;
@@ -548,6 +558,12 @@ function effectWeight(rank: number, itemType: "food" | "nutrient" | "supplement"
   return itemType === "food" ? base * 0.8 : base;
 }
 
+function supplementProductNeeds(
+  needs: readonly ProductRecommendationNeed[]
+) {
+  return needs.filter((need) => need.itemType === "supplement");
+}
+
 function visibleSafetyStatus(
   item: Pick<FormulationIngredient | FoodGuidanceItem, "safety">,
 ) {
@@ -583,28 +599,7 @@ export function buildProductNeeds(input: Readonly<{
           weight: effectWeight(item.effectivenessRank, "supplement")
         } satisfies ProductRecommendationNeed;
       }) ?? [];
-  const foodNeeds =
-    input.foodGuidance?.foodGuidance
-      ?.filter((item) => visibleSafetyStatus(item))
-      .filter((item) => item.status === "add" || item.status === "review")
-      .map((item) => {
-        const displayName = textValue(item.food);
-
-        return {
-          category: item.category,
-          displayName,
-          id: `food:${item.id}`,
-          itemType: "food" as const,
-          normalizedName: normalizeProductFactKey(displayName),
-          sourceId: item.id,
-          targetComparableAmount: null,
-          targetDose: null,
-          targetText: textValue(item.serving),
-          weight: effectWeight(item.effectivenessRank, "food")
-        } satisfies ProductRecommendationNeed;
-      }) ?? [];
-
-  return [...supplementNeeds, ...foodNeeds];
+  return supplementNeeds;
 }
 
 function humanSearchName(need: ProductRecommendationNeed) {
@@ -628,7 +623,7 @@ export function buildMarketplaceSearchQueries(
   needs: readonly ProductRecommendationNeed[],
   limit = 16
 ) {
-  const weightedNeeds = [...needs]
+  const weightedNeeds = supplementProductNeeds(needs)
     .sort((first, second) => second.weight - first.weight);
   const queries: string[] = [...GENERIC_BASE_PRODUCT_QUERIES];
 
@@ -817,19 +812,19 @@ function exclusionReason(product: ProductCandidate) {
     return "Product is ignored";
   }
 
-  if (
-    product.status !== "approved" ||
-    product.brandStatus !== "approved"
-  ) {
-    return "Product is not approved yet";
-  }
-
   if (product.labelStatus !== "parsed" || product.facts.length < 1) {
     return "Product label facts are missing";
   }
 
   if (product.validation && product.validation.status !== "pass") {
     return `Product validation needs review: ${product.validation.summary}`;
+  }
+
+  if (
+    product.status !== "approved" ||
+    product.brandStatus !== "approved"
+  ) {
+    return "Product is not approved yet";
   }
 
   if (
@@ -992,11 +987,15 @@ function diagnosticNeeds(
 ) {
   return needs.map((need) => {
     const bestRejected = bestRejectedByNeed.get(need.id);
+    const coveragePercent = safePercent((coverage.get(need.id) ?? 0) * 100);
 
     return {
       bestRejectedProductId: bestRejected?.productId ?? null,
-      bestRejectedReason: bestRejected?.reason ?? null,
-      coveragePercent: safePercent((coverage.get(need.id) ?? 0) * 100),
+      bestRejectedReason: bestRejected?.reason ??
+        (coveragePercent <= 0
+          ? "No approved product in the catalogue covers this need"
+          : null),
+      coveragePercent,
       displayName: need.displayName,
       id: need.id,
       itemType: need.itemType
@@ -1021,10 +1020,14 @@ function marketplaceName(platform: ProductPlatform): RecommendedProduct["marketp
 function whyProductMatches(
   product: ProductCandidate,
   coveredNeeds: ProductRecommendationNeed[],
-  stackContributionPercent: number
+  stackContributionPercent: number,
+  servingMultiplier = 1
 ) {
   const names = coveredNeeds.slice(0, 3).map((need) => need.displayName);
-  const prefix = "Strong match";
+  const servingPrefix = servingMultiplier > 1
+    ? `Use ${servingMultiplier} servings; `
+    : "";
+  const prefix = `${servingPrefix}Strong match`;
   const contribution = safePercent(stackContributionPercent);
 
   if (names.length < 1) {
@@ -1044,11 +1047,11 @@ export function recommendProductStackLegacy(input: ProductRecommendationInput) {
     DEFAULT_MAX_COUNT,
     Math.max(1, input.maxProducts ?? DEFAULT_MAX_COUNT)
   );
-  const productNeeds = input.needs.filter((need) => need.itemType !== "food");
-  const scoringNeeds = productNeeds.length > 0 ? productNeeds : input.needs;
+  const scoringNeeds = supplementProductNeeds(input.needs);
   const exclusions: ProductRecommendationExclusion[] = [];
   const bestRejectedByNeed = new Map<string, ProductRecommendationExclusion>();
   const bestRejectedCoverageByNeed = new Map<string, number>();
+  const selectedVariantKeys = new Set<string>();
   const scored = input.candidates
     .map((product) => {
       const coverage = productCoverage(product, scoringNeeds, input.clientSex);
@@ -1111,6 +1114,7 @@ export function recommendProductStackLegacy(input: ProductRecommendationInput) {
   while (selected.length < maxProducts) {
     const ranked = scored
       .filter((item) => !selectedProductIds.has(item.product.id))
+      .filter((item) => !selectedVariantKeys.has(productVariantKey(item.product)))
       .map((item) => {
         const marginal = marginalCoveragePercent(
           item.coverage,
@@ -1178,6 +1182,7 @@ export function recommendProductStackLegacy(input: ProductRecommendationInput) {
     }
 
     selectedProductIds.add(best.product.id);
+    selectedVariantKeys.add(productVariantKey(best.product));
     applyCoverage(stackCoverage, best.coverage);
     selected.push({
       affiliate: Boolean(best.product.activeAffiliateUrl),
@@ -1190,6 +1195,7 @@ export function recommendProductStackLegacy(input: ProductRecommendationInput) {
       ),
       rank: selected.length + 1,
       score: Number(best.score.toFixed(4)),
+      servingMultiplier: 1,
       stackContributionPercent: visibleCoveragePercent(best.marginal, best.marginal > 0),
       unknownAtRecommendation: false,
       url: best.product.activeAffiliateUrl || best.product.productUrl,
@@ -1202,18 +1208,13 @@ export function recommendProductStackLegacy(input: ProductRecommendationInput) {
   }
 
   const supplementProductCoveragePercent = safePercent(
-    stackCoveragePercent(stackCoverage, productNeeds)
+    stackCoveragePercent(stackCoverage, scoringNeeds)
   );
-  const foodCoveragePercent = safePercent(
-    stackCoveragePercent(
-      stackCoverage,
-      input.needs.filter((need) => need.itemType === "food")
-    )
-  );
+  const foodCoveragePercent = 0;
   const totalPlanCoveragePercent = safePercent(
-    stackCoveragePercent(stackCoverage, input.needs)
+    stackCoveragePercent(stackCoverage, scoringNeeds)
   );
-  const needDiagnostics = diagnosticNeeds(input.needs, stackCoverage, bestRejectedByNeed);
+  const needDiagnostics = diagnosticNeeds(scoringNeeds, stackCoverage, bestRejectedByNeed);
   const selectedIds = new Set(selected.map((item) => item.product.id));
   const nearMisses = scored
     .filter((item) => !selectedIds.has(item.product.id))
@@ -1228,7 +1229,7 @@ export function recommendProductStackLegacy(input: ProductRecommendationInput) {
     .slice(0, 12);
 
   return {
-    clientNeeds: input.needs,
+    clientNeeds: scoringNeeds,
     diagnostics: {
       algorithmVersion: "legacy-greedy",
       blockedProducts: exclusions.filter(
@@ -1239,9 +1240,10 @@ export function recommendProductStackLegacy(input: ProductRecommendationInput) {
         supplementProductCoveragePercent,
         totalPlanCoveragePercent
       },
-      factIssues: factIssueExclusions(exclusions),
-      matchedNeeds: needDiagnostics.filter((item) => item.coveragePercent > 0),
-      nearMisses,
+	      factIssues: factIssueExclusions(exclusions),
+	      matchedNeeds: needDiagnostics.filter((item) => item.coveragePercent > 0),
+	      marketRegion: input.countryCode ?? undefined,
+	      nearMisses,
       productsConsidered: input.candidates.length,
       unmatchedNeeds: needDiagnostics.filter((item) => item.coveragePercent <= 0)
     },
@@ -1279,6 +1281,7 @@ type V2ProductEntry = Readonly<{
   extrasCount: number;
   metricsByNeed: Map<string, V2NeedMetrics>;
   product: ProductCandidate;
+  servingMultiplier: number;
 }>;
 
 type V2StackScore = Readonly<{
@@ -1292,6 +1295,7 @@ type V2StackScore = Readonly<{
   rawRatioByNeed: Map<string, number>;
   safetyContextPenalty: number;
   score: number;
+  servingCount: number;
   supplementProductCoveragePercent: number;
   totalPlanCoveragePercent: number;
 }>;
@@ -1301,6 +1305,7 @@ type V2BeamState = Readonly<{
   comparableSums: number[];
   componentScores: Record<string, number>;
   confidenceCoverageSums: number[];
+  coverageProductCounts: number[];
   coverageSums: number[];
   entries: V2ProductEntry[];
   extrasCount: number;
@@ -1316,6 +1321,7 @@ type V2BeamState = Readonly<{
   safetyContextPenalty: number;
   safetyMask: number;
   score: number;
+  servingCount: number;
   supplementProductCoveragePercent: number;
   totalPlanCoveragePercent: number;
 }>;
@@ -1332,16 +1338,21 @@ const V2_FULL_BEAM_ALGORITHM_VERSION = "v2-full-beam" as const;
 export const ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION =
   V2_FULL_BEAM_ALGORITHM_VERSION;
 export const ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION =
-  "coverage-dominance-1";
+  "stack-preference-1";
 const V2_FULL_BEAM_WIDTH = 32;
 const V2_SHORTLIST_LIMIT = 32;
 const V2_PER_NEED_SHORTLIST = 4;
 const V2_TOP_OVERALL_SHORTLIST = 16;
 const V2_TOP_BROAD_SHORTLIST = 8;
 const V2_TOP_AFFILIATE_SHORTLIST = 8;
+const V2_MAX_SERVING_MULTIPLIER = 3;
 const V2_SCORE_EPSILON = 0.000001;
 const V2_DIVERSITY_SCORE_EPSILON = 0.005;
 const V2_MATERIAL_COVERAGE_DELTA_PERCENT = 3;
+const V2_COMPACT_COVERAGE_TOLERANCE_PERCENT = 3;
+const V2_COMPACT_CRITICAL_NEED_LOSS_TOLERANCE = 0.1;
+const V2_EXTRA_SERVING_SIMPLICITY_PENALTY = 0.02;
+const V2_DUPLICATE_NEED_PRODUCT_PENALTY_WEIGHT = 0.24;
 const SAFETY_FLAG_PREGNANCY_CAUTION = 1;
 const SAFETY_FLAG_MEDICATION_INTERACTION = 2;
 const SAFETY_FLAG_BLEEDING_RISK = 4;
@@ -1354,6 +1365,14 @@ const V2_BASE_WEIGHTS: V2Weights = {
   extras: 0.05,
   simplicity: 0.15
 };
+
+export function normalizeProductStackPreference(
+  value: unknown
+): ProductStackPreference {
+  return value === "compact" || value === "max_coverage" || value === "balanced"
+    ? value
+    : "balanced";
+}
 
 function clamp(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) {
@@ -1571,18 +1590,39 @@ function comparableLimitAmount(
   fact: ProductCandidateFact,
   need: ProductRecommendationNeed
 ) {
+  return comparableLimitAmountForName(fact, need.normalizedName);
+}
+
+function comparableLimitAmountForName(
+  fact: ProductCandidateFact,
+  normalizedName: string
+) {
   const maxAmount = positiveNumber(fact.maxAmount);
   const maxUnit = fact.maxUnit ?? null;
-  const limitDose = doseFromAmount(maxAmount, maxUnit);
+  const limitDose = parseDoseLimit(maxAmount, maxUnit);
 
-  return limitDose
-    ? comparableDoseAmount(limitDose, need.normalizedName)
+  if (!limitDose) {
+    return null;
+  }
+
+  const comparableLimit = comparableDoseAmount(limitDose, normalizedName);
+
+  if (comparableLimit !== null) {
+    return comparableLimit;
+  }
+
+  const factUnit = normalizeDoseUnit(fact.unit ?? "");
+  const limitUnit = normalizeDoseUnit(maxUnit ?? "");
+
+  return factUnit && limitUnit && factUnit === limitUnit
+    ? maxAmount
     : null;
 }
 
 function factNeedMetric(
   fact: ProductCandidateFact,
-  need: ProductRecommendationNeed
+  need: ProductRecommendationNeed,
+  servingMultiplier = 1
 ): V2NeedMetrics | null {
   if (
     productFactLooksLikeConcentration(fact.name) ||
@@ -1598,7 +1638,11 @@ function factNeedMetric(
   }
 
   const confidence = confidenceMultiplier(fact.confidence);
-  const comparableAmount = factComparableAmount(fact);
+  const baseComparableAmount = factComparableAmount(fact);
+  const comparableAmount =
+    baseComparableAmount !== null
+      ? baseComparableAmount * Math.max(1, servingMultiplier)
+      : null;
   const limitComparableAmount = comparableLimitAmount(fact, need);
 
   if (
@@ -1685,7 +1729,8 @@ function combineNeedMetrics(metrics: V2NeedMetrics[]): V2NeedMetrics | null {
 function productCoverageV2(
   product: ProductCandidate,
   needs: ProductRecommendationNeed[],
-  clientSex?: ProductClientSex | null
+  clientSex?: ProductClientSex | null,
+  servingMultiplier = 1
 ): V2ProductEntry {
   const metricsByNeed = new Map<string, V2NeedMetrics>();
   const coverageByNeed = new Map<string, number>();
@@ -1699,7 +1744,7 @@ function productCoverageV2(
 
   for (const need of needs) {
     const metrics = facts
-      .map((fact) => factNeedMetric(fact, need))
+      .map((fact) => factNeedMetric(fact, need, servingMultiplier))
       .filter((metric): metric is V2NeedMetrics => Boolean(metric));
     const combined = combineNeedMetrics(metrics);
 
@@ -1739,8 +1784,47 @@ function productCoverageV2(
     },
     extrasCount,
     metricsByNeed,
-    product
+    product,
+    servingMultiplier
   };
+}
+
+function productServingMultiplierAllowed(
+  product: ProductCandidate,
+  servingMultiplier: number
+) {
+  if (servingMultiplier <= 1) {
+    return true;
+  }
+
+  for (const fact of product.facts) {
+    const comparableAmount = factComparableAmount(fact);
+    const limitComparableAmount = comparableLimitAmountForName(
+      fact,
+      fact.normalizedName || normalizeProductFactKey(fact.name)
+    );
+
+    if (comparableAmount !== null && limitComparableAmount === null) {
+      return false;
+    }
+
+    if (
+      comparableAmount !== null &&
+      limitComparableAmount !== null &&
+      comparableAmount * servingMultiplier > limitComparableAmount + V2_SCORE_EPSILON
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function productServingMultipliers(product: ProductCandidate) {
+  return Array.from({ length: V2_MAX_SERVING_MULTIPLIER }, (_, index) => index + 1)
+    .filter((servingMultiplier) =>
+      productServingMultiplierAllowed(product, servingMultiplier)
+    );
 }
 
 function compareProductEntries(
@@ -1768,9 +1852,47 @@ function compareProductEntries(
     return priceDelta;
   }
 
+  if (first.servingMultiplier !== second.servingMultiplier) {
+    return first.servingMultiplier - second.servingMultiplier;
+  }
+
   const titleDelta = first.product.title.localeCompare(second.product.title);
 
   return titleDelta || first.product.id.localeCompare(second.product.id);
+}
+
+function productVariantTitleKey(product: ProductCandidate) {
+  let key = normalizeProductKey(product.title);
+
+  key = key
+    .replace(/_(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)_packs?$/g, "")
+    .replace(/_packs?_of_(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)$/g, "")
+    .replace(/_(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)_bottles?$/g, "")
+    .replace(/_bundle$/g, "")
+    .replace(/_set$/g, "");
+
+  return key || normalizeProductKey(product.title);
+}
+
+function productFactSignature(product: ProductCandidate) {
+  return product.facts
+    .filter((fact) => fact.itemType === "supplement" || fact.itemType === "nutrient")
+    .map((fact) => [
+      fact.supplementId ?? "",
+      fact.normalizedName || normalizeProductFactKey(fact.name),
+      String(fact.amount ?? ""),
+      normalizeDoseUnit(fact.unit ?? "") ?? fact.unit ?? ""
+    ].join(":"))
+    .sort()
+    .join("|");
+}
+
+function productVariantKey(product: ProductCandidate) {
+  return [
+    normalizeProductKey(product.brandName ?? ""),
+    productVariantTitleKey(product),
+    productFactSignature(product)
+  ].join("|");
 }
 
 function shortlistEntries(
@@ -1781,7 +1903,14 @@ function shortlistEntries(
   const addEntry = (entry: V2ProductEntry, priority: number) => {
     const current = selected.get(entry.product.id);
 
-    if (!current || priority < current.priority) {
+    if (
+      !current ||
+      priority < current.priority ||
+      (
+        priority === current.priority &&
+        compareProductEntries(entry, current.entry) < 0
+      )
+    ) {
       selected.set(entry.product.id, { entry, priority });
     }
   };
@@ -2045,6 +2174,92 @@ function compareStackScores(first: V2StackScore, second: V2StackScore) {
     .localeCompare(second.entries.map((entry) => entry.product.id).join("|"));
 }
 
+function compareMaxCoverageStackScores(
+  first: V2StackScore,
+  second: V2StackScore
+) {
+  const coverageDelta =
+    second.supplementProductCoveragePercent - first.supplementProductCoveragePercent;
+
+  if (Math.abs(coverageDelta) > V2_SCORE_EPSILON) {
+    return coverageDelta;
+  }
+
+  return compareStackScores(first, second);
+}
+
+function preservesCriticalNeedsForCompactMode(
+  candidate: V2StackScore,
+  bestCoverageStack: V2StackScore,
+  needs: readonly ProductRecommendationNeed[]
+) {
+  const maxWeight = Math.max(0, ...needs.map((need) => need.weight));
+  const criticalWeight = Math.max(4, maxWeight * 0.75);
+
+  return needs
+    .filter((need) => need.weight >= criticalWeight)
+    .every((need) => {
+      const bestCoverage = bestCoverageStack.achievedCoverage.get(need.id) ?? 0;
+
+      if (bestCoverage <= V2_SCORE_EPSILON) {
+        return true;
+      }
+
+      const candidateCoverage = candidate.achievedCoverage.get(need.id) ?? 0;
+
+      return (
+        bestCoverage - candidateCoverage <=
+        V2_COMPACT_CRITICAL_NEED_LOSS_TOLERANCE
+      );
+    });
+}
+
+function compareCompactStackScores(
+  first: V2StackScore,
+  second: V2StackScore
+) {
+  if (first.entries.length !== second.entries.length) {
+    return first.entries.length - second.entries.length;
+  }
+
+  if (first.servingCount !== second.servingCount) {
+    return first.servingCount - second.servingCount;
+  }
+
+  return compareStackScores(first, second);
+}
+
+function selectStackForPreference(
+  scores: readonly V2StackScore[],
+  needs: readonly ProductRecommendationNeed[],
+  stackPreference: ProductStackPreference
+) {
+  if (scores.length < 1) {
+    return null;
+  }
+
+  if (stackPreference === "max_coverage") {
+    return [...scores].sort(compareMaxCoverageStackScores)[0] ?? null;
+  }
+
+  if (stackPreference !== "compact") {
+    return scores[0] ?? null;
+  }
+
+  const bestCoverageStack = [...scores].sort(compareMaxCoverageStackScores)[0] ?? scores[0]!;
+  const minimumCoverage =
+    bestCoverageStack.supplementProductCoveragePercent -
+    V2_COMPACT_COVERAGE_TOLERANCE_PERCENT;
+  const compactCandidates = scores.filter(
+    (score) =>
+      score.supplementProductCoveragePercent >= minimumCoverage &&
+      preservesCriticalNeedsForCompactMode(score, bestCoverageStack, needs)
+  );
+
+  return [...(compactCandidates.length > 0 ? compactCandidates : scores)]
+    .sort(compareCompactStackScores)[0] ?? null;
+}
+
 function compareBeamStates(first: V2BeamState, second: V2BeamState) {
   const coverageDelta =
     second.supplementProductCoveragePercent - first.supplementProductCoveragePercent;
@@ -2182,6 +2397,7 @@ function beamStateToStackScore(
     rawRatioByNeed,
     safetyContextPenalty: state.safetyContextPenalty,
     score: state.score,
+    servingCount: state.servingCount,
     supplementProductCoveragePercent: state.supplementProductCoveragePercent,
     totalPlanCoveragePercent: state.totalPlanCoveragePercent
   };
@@ -2204,12 +2420,13 @@ function beamSearchStackScores(
   const entrySafetyMasks = orderedEntries.map(productSafetyMask);
   const safetyContext = safetyContextFromClientContext(input.clientContext);
   const totalWeight = normalizedNeedWeightTotal(scoringNeeds);
-  const productNeeds = allNeeds.filter((need) => need.itemType !== "food");
+  const productNeeds = supplementProductNeeds(allNeeds);
   const productNeedsWeight = normalizedNeedWeightTotal(productNeeds);
   const allNeedsWeight = normalizedNeedWeightTotal(allNeeds);
   const budgetAmount = budgetAmountFromContext(input);
   const seen = new Set<string>();
   const topStates: V2BeamState[] = [];
+  const topStatesBySize = new Map<number, V2BeamState[]>();
   let evaluatedStackCount = 0;
   const topStateLimit = Math.max(keepTop, beamWidth);
   const keepState = (state: V2BeamState) => {
@@ -2219,11 +2436,58 @@ function beamSearchStackScores(
     if (topStates.length > topStateLimit) {
       topStates.length = topStateLimit;
     }
+
+    const size = state.entries.length;
+    const sizeStates = topStatesBySize.get(size) ?? [];
+    sizeStates.push(state);
+    sizeStates.sort(compareBeamStates);
+
+    if (sizeStates.length > Math.max(8, Math.ceil(beamWidth / 2))) {
+      sizeStates.length = Math.max(8, Math.ceil(beamWidth / 2));
+    }
+
+    topStatesBySize.set(size, sizeStates);
   };
   const buildState = (
     previous: V2BeamState | null,
     entryIndex: number
   ): V2BeamState | null => {
+    const entry = orderedEntries[entryIndex]!;
+
+    if (previous?.entries.some((item) => item.product.id === entry.product.id)) {
+      return null;
+    }
+
+    if (
+      previous?.entries.some((item) =>
+        productVariantKey(item.product) === productVariantKey(entry.product)
+      )
+    ) {
+      return null;
+    }
+
+    if (previous) {
+      const coveredNeedIndexes = metricsMatrix[entryIndex]!
+        .map((metric, needIndex) =>
+          metric && metric.coverage > V2_SCORE_EPSILON ? needIndex : null
+        )
+        .filter((needIndex): needIndex is number => needIndex !== null);
+
+      if (
+        coveredNeedIndexes.length > 0 &&
+        coveredNeedIndexes.every((needIndex) =>
+          (previous.coverageSums[needIndex] ?? 0) > V2_SCORE_EPSILON
+        ) &&
+        coveredNeedIndexes.every((needIndex) =>
+          (previous.coverageSums[needIndex] ?? 0) >= TARGET_DOSE_SWEET_SPOT_MIN ||
+          (metricsMatrix[entryIndex]![needIndex]?.coverage ?? 0) >=
+            TARGET_DOSE_SWEET_SPOT_MIN
+        )
+      ) {
+        return null;
+      }
+    }
+
     const nextIndices = previous
       ? [...previous.indices, entryIndex].sort((first, second) => first - second)
       : [entryIndex];
@@ -2238,6 +2502,9 @@ function beamSearchStackScores(
 
     const coverageSums = previous
       ? [...previous.coverageSums]
+      : scoringNeeds.map(() => 0);
+    const coverageProductCounts = previous
+      ? [...previous.coverageProductCounts]
       : scoringNeeds.map(() => 0);
     const comparableSums = previous
       ? [...previous.comparableSums]
@@ -2257,13 +2524,14 @@ function beamSearchStackScores(
     const limitMins = previous
       ? [...previous.limitMins]
       : scoringNeeds.map((): number | null => null);
-    const entry = orderedEntries[entryIndex]!;
     let extrasCount = previous?.extrasCount ?? 0;
     let priceCount = previous?.priceCount ?? 0;
     let priceSum = previous?.priceSum ?? 0;
+    let servingCount = previous?.servingCount ?? 0;
     const safetyMask = (previous?.safetyMask ?? 0) | (entrySafetyMasks[entryIndex] ?? 0);
 
     extrasCount += entry.extrasCount;
+    servingCount += entry.servingMultiplier;
 
     if (typeof entry.product.priceAmount === "number" && entry.product.priceAmount > 0) {
       priceCount += 1;
@@ -2276,6 +2544,9 @@ function beamSearchStackScores(
       }
 
       coverageSums[needIndex] += metric.coverage;
+      if (metric.coverage > V2_SCORE_EPSILON) {
+        coverageProductCounts[needIndex] += 1;
+      }
       confidenceCoverageSums[needIndex] += metric.confidence * metric.coverage;
 
       if (metric.comparableAmount !== null) {
@@ -2304,6 +2575,7 @@ function beamSearchStackScores(
     let confidenceDenominator = 0;
     let overlapNumerator = 0;
     let overageNumerator = 0;
+    let duplicateNeedProductNumerator = 0;
     let matchedNeedCount = 0;
     let matchedNeedWeight = 0;
 
@@ -2344,6 +2616,11 @@ function beamSearchStackScores(
       if (rawRatio !== null && rawRatio > TARGET_DOSE_SOFT_MAX) {
         overageNumerator += Math.min(1, rawRatio - TARGET_DOSE_SOFT_MAX) * need.weight;
       }
+
+      const coverageProductCount = coverageProductCounts[needIndex] ?? 0;
+      if (coverageProductCount > 1) {
+        duplicateNeedProductNumerator += (coverageProductCount - 1) * need.weight;
+      }
     }
 
     const coverage = totalWeight > 0 ? coverageNumerator / totalWeight : 0;
@@ -2351,7 +2628,12 @@ function beamSearchStackScores(
     const confidence = confidenceDenominator > 0
       ? confidenceNumerator / confidenceDenominator
       : 0;
-    const simplicity = clamp01(1 - 0.12 * Math.max(0, selectedEntries.length - 3));
+    const extraServings = Math.max(0, servingCount - selectedEntries.length);
+    const simplicity = clamp01(
+      1 -
+        0.12 * Math.max(0, selectedEntries.length - 3) -
+        V2_EXTRA_SERVING_SIMPLICITY_PENALTY * extraServings
+    );
     const price = priceCount > 0 ? priceSum : null;
     const affordability =
       budgetAmount && price
@@ -2361,12 +2643,16 @@ function beamSearchStackScores(
     const extras = clamp01(extrasCount / 8);
     const overlapPenalty = totalWeight > 0 ? overlapNumerator / totalWeight : 0;
     const overagePenalty = totalWeight > 0 ? overageNumerator / totalWeight : 0;
+    const duplicateNeedProductPenalty = totalWeight > 0
+      ? duplicateNeedProductNumerator / totalWeight
+      : 0;
     const safetyContextPenalty = safetyContextPenaltyForMask(
       safetyMask,
       safetyContext
     );
     const penalty = clamp01(
       0.3 * overlapPenalty +
+      V2_DUPLICATE_NEED_PRODUCT_PENALTY_WEIGHT * duplicateNeedProductPenalty +
       0.4 * overagePenalty +
       safetyContextPenalty
     );
@@ -2375,6 +2661,7 @@ function beamSearchStackScores(
       cost: roundScore(costEfficiency),
       coverage: roundScore(coverage),
       dose: roundScore(dosePrecision),
+      duplicateNeedProductPenalty: roundScore(duplicateNeedProductPenalty),
       extras: roundScore(extras),
       overagePenalty: roundScore(overagePenalty),
       penalty: roundScore(penalty),
@@ -2401,6 +2688,7 @@ function beamSearchStackScores(
       comparableSums,
       componentScores,
       confidenceCoverageSums,
+      coverageProductCounts,
       coverageSums,
       entries: selectedEntries,
       extrasCount,
@@ -2416,6 +2704,7 @@ function beamSearchStackScores(
       safetyContextPenalty,
       safetyMask,
       score,
+      servingCount,
       supplementProductCoveragePercent,
       totalPlanCoveragePercent
     };
@@ -2452,9 +2741,14 @@ function beamSearchStackScores(
     beam = selectDiverseBeamStates(nextBeam, beamWidth, scoringNeeds);
   }
 
+  const mergedStates = [
+    ...topStates,
+    ...[...topStatesBySize.values()].flat()
+  ];
+
   return {
     evaluatedStackCount,
-    scores: selectDiverseBeamStates(topStates, keepTop, scoringNeeds)
+    scores: selectDiverseBeamStates(mergedStates, keepTop, scoringNeeds)
       .map((state) => beamStateToStackScore(state, scoringNeeds))
   };
 }
@@ -2486,6 +2780,7 @@ function enumerateStackScores(
   let priceCount = 0;
   let priceSum = 0;
   let safetyMask = 0;
+  let servingCount = 0;
   const previousSafetyMasks: number[] = [];
   let evaluatedStackCount = 0;
   const keepScore = (score: V2StackScore) => {
@@ -2509,6 +2804,7 @@ function enumerateStackScores(
     let confidenceDenominator = 0;
     let overlapNumerator = 0;
     let overageNumerator = 0;
+    let duplicateNeedProductNumerator = 0;
     let matchedNeedCount = 0;
     let matchedNeedWeight = 0;
 
@@ -2557,6 +2853,16 @@ function enumerateStackScores(
       if (rawRatio !== null && rawRatio > TARGET_DOSE_SOFT_MAX) {
         overageNumerator += Math.min(1, rawRatio - TARGET_DOSE_SOFT_MAX) * need.weight;
       }
+
+      const coverageProductCount = stack.reduce((count, stackEntry) => {
+        const metric = stackEntry.metricsByNeed.get(need.id) ?? null;
+
+        return metric && metric.coverage > V2_SCORE_EPSILON ? count + 1 : count;
+      }, 0);
+
+      if (coverageProductCount > 1) {
+        duplicateNeedProductNumerator += (coverageProductCount - 1) * need.weight;
+      }
     }
 
     const coverage = totalWeight > 0 ? coverageNumerator / totalWeight : 0;
@@ -2564,7 +2870,12 @@ function enumerateStackScores(
     const confidence = confidenceDenominator > 0
       ? confidenceNumerator / confidenceDenominator
       : 0;
-    const simplicity = clamp01(1 - 0.12 * Math.max(0, stack.length - 3));
+    const extraServings = Math.max(0, servingCount - stack.length);
+    const simplicity = clamp01(
+      1 -
+        0.12 * Math.max(0, stack.length - 3) -
+        V2_EXTRA_SERVING_SIMPLICITY_PENALTY * extraServings
+    );
     const budgetAmount = budgetAmountFromContext(input);
     const price = priceCount > 0 ? priceSum : null;
     const affordability =
@@ -2575,12 +2886,16 @@ function enumerateStackScores(
     const extras = clamp01(extrasCount / 8);
     const overlapPenalty = totalWeight > 0 ? overlapNumerator / totalWeight : 0;
     const overagePenalty = totalWeight > 0 ? overageNumerator / totalWeight : 0;
+    const duplicateNeedProductPenalty = totalWeight > 0
+      ? duplicateNeedProductNumerator / totalWeight
+      : 0;
     const safetyContextPenalty = safetyContextPenaltyForMask(
       safetyMask,
       safetyContext
     );
     const penalty = clamp01(
       0.3 * overlapPenalty +
+      V2_DUPLICATE_NEED_PRODUCT_PENALTY_WEIGHT * duplicateNeedProductPenalty +
       0.4 * overagePenalty +
       safetyContextPenalty
     );
@@ -2589,6 +2904,7 @@ function enumerateStackScores(
       cost: roundScore(costEfficiency),
       coverage: roundScore(coverage),
       dose: roundScore(dosePrecision),
+      duplicateNeedProductPenalty: roundScore(duplicateNeedProductPenalty),
       extras: roundScore(extras),
       overagePenalty: roundScore(overagePenalty),
       penalty: roundScore(penalty),
@@ -2603,7 +2919,7 @@ function enumerateStackScores(
       weights.extras * extras +
       weights.confidence * confidence -
       penalty;
-    const productNeeds = allNeeds.filter((need) => need.itemType !== "food");
+    const productNeeds = supplementProductNeeds(allNeeds);
 
     return {
       achievedCoverage,
@@ -2616,6 +2932,7 @@ function enumerateStackScores(
       rawRatioByNeed,
       safetyContextPenalty,
       score,
+      servingCount,
       supplementProductCoveragePercent: safePercent(
         stackCoveragePercent(achievedCoverage, productNeeds)
       ),
@@ -2629,6 +2946,7 @@ function enumerateStackScores(
 
     stack.push(entry);
     extrasCount += entry.extrasCount;
+    servingCount += entry.servingMultiplier;
 
     if (typeof entry.product.priceAmount === "number" && entry.product.priceAmount > 0) {
       priceCount += 1;
@@ -2666,6 +2984,7 @@ function enumerateStackScores(
 
     stack.pop();
     extrasCount -= entry.extrasCount;
+    servingCount -= entry.servingMultiplier;
 
     if (typeof entry.product.priceAmount === "number" && entry.product.priceAmount > 0) {
       priceCount -= 1;
@@ -2711,6 +3030,38 @@ function enumerateStackScores(
     }
 
     for (let index = startIndex; index < entries.length; index += 1) {
+      if (stack.some((entry) => entry.product.id === entries[index]!.product.id)) {
+        continue;
+      }
+
+      if (
+        stack.some((entry) =>
+          productVariantKey(entry.product) === productVariantKey(entries[index]!.product)
+        )
+      ) {
+        continue;
+      }
+
+      const coveredNeedIndexes = metricsMatrix[index]!
+        .map((metric, needIndex) =>
+          metric && metric.coverage > V2_SCORE_EPSILON ? needIndex : null
+        )
+        .filter((needIndex): needIndex is number => needIndex !== null);
+
+      if (
+        coveredNeedIndexes.length > 0 &&
+        coveredNeedIndexes.every((needIndex) =>
+          (coverageSums[needIndex] ?? 0) > V2_SCORE_EPSILON
+        ) &&
+        coveredNeedIndexes.every((needIndex) =>
+          (coverageSums[needIndex] ?? 0) >= TARGET_DOSE_SWEET_SPOT_MIN ||
+          (metricsMatrix[index]![needIndex]?.coverage ?? 0) >=
+            TARGET_DOSE_SWEET_SPOT_MIN
+        )
+      ) {
+        continue;
+      }
+
       pushEntry(index);
       visit(index + 1);
       popEntry(index);
@@ -2793,10 +3144,16 @@ function recommendationsFromV2Stack(
         ),
         rank: index + 1,
         score: roundScore(contribution),
+        servingMultiplier: entry.servingMultiplier,
         stackContributionPercent: visibleCoveragePercent(contribution, contribution > 0),
         unknownAtRecommendation: false,
         url: entry.product.activeAffiliateUrl || entry.product.productUrl,
-        why: whyProductMatches(entry.product, coveredNeeds, contribution)
+        why: whyProductMatches(
+          entry.product,
+          coveredNeeds,
+          contribution,
+          entry.servingMultiplier
+        )
       } satisfies ProductRecommendationSelection;
     });
 }
@@ -2824,19 +3181,19 @@ function recommendProductStackExact(
     searchMode: "full-beam" | "shortlist";
   }>
 ) {
+  const stackPreference = normalizeProductStackPreference(input.stackPreference);
   const maxProducts = Math.min(
     DEFAULT_MAX_COUNT,
     Math.max(1, input.maxProducts ?? DEFAULT_MAX_COUNT)
   );
-  const productNeeds = input.needs.filter((need) => need.itemType !== "food");
-  const scoringNeeds = productNeeds.length > 0 ? productNeeds : input.needs;
+  const scoringNeeds = supplementProductNeeds(input.needs);
   const exclusions: ProductRecommendationExclusion[] = [];
   const bestRejectedByNeed = new Map<string, ProductRecommendationExclusion>();
   const bestRejectedCoverageByNeed = new Map<string, number>();
   const { deltas, weights } = normalizedV2Weights(input.clientContext);
   const entries = input.candidates
-    .map((product) => {
-      const entry = productCoverageV2(product, scoringNeeds, input.clientSex);
+    .flatMap((product) => {
+      const baseEntry = productCoverageV2(product, scoringNeeds, input.clientSex);
       const reason =
         exclusionReason(product) ??
         productAudienceMismatchReason(product, input.clientSex);
@@ -2850,9 +3207,9 @@ function recommendProductStackExact(
 
         exclusions.push(exclusion);
 
-        for (const need of entry.coverage.coveredNeeds) {
+        for (const need of baseEntry.coverage.coveredNeeds) {
           const current = bestRejectedCoverageByNeed.get(need.id) ?? 0;
-          const next = entry.coverage.coverageByNeed.get(need.id) ?? 0;
+          const next = baseEntry.coverage.coverageByNeed.get(need.id) ?? 0;
 
           if (next > current) {
             bestRejectedCoverageByNeed.set(need.id, next);
@@ -2860,10 +3217,16 @@ function recommendProductStackExact(
           }
         }
 
-        return null;
+        return [];
       }
 
-      if (entry.coverage.percent <= 0) {
+      const productEntries = productServingMultipliers(product)
+        .map((servingMultiplier) =>
+          productCoverageV2(product, scoringNeeds, input.clientSex, servingMultiplier)
+        )
+        .filter((entry) => entry.coverage.percent > 0);
+
+      if (productEntries.length <= 0) {
         exclusions.push({
           productId: product.id,
           reason:
@@ -2874,10 +3237,10 @@ function recommendProductStackExact(
             ) ?? "Product does not cover current client needs",
           title: product.title
         });
-        return null;
+        return [];
       }
 
-      return entry;
+      return productEntries;
     })
     .filter((entry): entry is V2ProductEntry => Boolean(entry));
   const candidatePool = options.searchMode === "shortlist"
@@ -2888,45 +3251,44 @@ function recommendProductStackExact(
         candidatePool,
         input,
         scoringNeeds,
-        input.needs,
+        scoringNeeds,
         weights,
-        maxProducts
+        maxProducts,
+        V2_FULL_BEAM_WIDTH,
+        stackPreference === "compact" ? 128 : 32
       )
     : enumerateStackScores(
         candidatePool,
         input,
         scoringNeeds,
-        input.needs,
+        scoringNeeds,
         weights,
         maxProducts
       );
   const stackScores = stackSearch.scores;
-  const bestStack = stackScores[0] ?? null;
+  const bestStack = selectStackForPreference(
+    stackScores,
+    scoringNeeds,
+    stackPreference
+  );
   const finalCoverage = bestStack
-    ? stackCoverageForNeeds(bestStack.entries, input.needs)
+    ? stackCoverageForNeeds(bestStack.entries, scoringNeeds)
     : new Map<string, number>();
   const productNeedsCoverage = bestStack
-    ? stackCoverageForNeeds(bestStack.entries, productNeeds)
-    : new Map<string, number>();
-  const foodCoverage = bestStack
-    ? stackCoverageForNeeds(
-        bestStack.entries,
-        input.needs.filter((need) => need.itemType === "food")
-      )
+    ? stackCoverageForNeeds(bestStack.entries, scoringNeeds)
     : new Map<string, number>();
   const supplementProductCoveragePercent = safePercent(
-    stackCoveragePercent(productNeedsCoverage, productNeeds)
+    stackCoveragePercent(productNeedsCoverage, scoringNeeds)
   );
-  const foodCoveragePercent = safePercent(
-    stackCoveragePercent(
-      foodCoverage,
-      input.needs.filter((need) => need.itemType === "food")
-    )
-  );
+  const foodCoveragePercent = 0;
   const totalPlanCoveragePercent = safePercent(
-    stackCoveragePercent(finalCoverage, input.needs)
+    stackCoveragePercent(finalCoverage, scoringNeeds)
   );
-  const needDiagnostics = diagnosticNeeds(input.needs, finalCoverage, bestRejectedByNeed);
+  const needDiagnostics = diagnosticNeeds(
+    scoringNeeds,
+    finalCoverage,
+    bestRejectedByNeed
+  );
   const selectedIds = new Set(
     bestStack?.entries.map((entry) => entry.product.id) ?? []
   );
@@ -2950,7 +3312,10 @@ function recommendProductStackExact(
     )
     .slice(0, 12);
   const trace: ProductRecommendationTrace = {
-    alternativeStacks: stackScores.slice(1, 4).map((stack) => ({
+    alternativeStacks: stackScores
+      .filter((stack) => stack !== bestStack)
+      .slice(0, 3)
+      .map((stack) => ({
       productIds: stack.entries.map((entry) => entry.product.id),
       productTitles: stack.entries.map((entry) => entry.product.title),
       score: roundScore(stack.score),
@@ -2965,15 +3330,16 @@ function recommendProductStackExact(
       (item) => item.reason !== "Product does not cover current client needs"
     ),
     searchMode: options.searchMode,
-    shortfalls: v2Shortfalls(input.needs, finalCoverage),
+    shortfalls: v2Shortfalls(scoringNeeds, finalCoverage),
     shortlistSize: candidatePool.length,
+    stackPreference,
     utilityScore: roundScore(bestStack?.score ?? 0),
     weightDeltas: deltas,
     weights
   };
 
   return {
-    clientNeeds: input.needs,
+    clientNeeds: scoringNeeds,
     diagnostics: {
       algorithmVersion: options.algorithmVersion,
       blockedProducts: exclusions.filter(
@@ -2986,8 +3352,10 @@ function recommendProductStackExact(
       },
       factIssues: factIssueExclusions(exclusions),
       matchedNeeds: needDiagnostics.filter((item) => item.coveragePercent > 0),
+      marketRegion: input.countryCode ?? undefined,
       nearMisses,
       productsConsidered: input.candidates.length,
+      stackPreference,
       trace,
       unmatchedNeeds: needDiagnostics.filter((item) => item.coveragePercent <= 0)
     },
@@ -3045,6 +3413,9 @@ export function toRecommendedProduct(
     productId: selection.product.id,
     rank: selection.rank,
     recommendationRunId,
+    servingMultiplier: selection.servingMultiplier > 1
+      ? selection.servingMultiplier
+      : undefined,
     stackContributionPercent: selection.stackContributionPercent,
     stackCoveragePercent,
     tag: selection.affiliate ? "Best match + affiliate" : "Best match",

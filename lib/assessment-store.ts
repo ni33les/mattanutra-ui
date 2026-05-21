@@ -125,12 +125,22 @@ function productNeedCoverageFromDiagnostics(
           ? item.itemType
           : null;
       const coveragePercent = Number(item.coveragePercent);
+      const bestRejectedProductId =
+        typeof item.bestRejectedProductId === "string"
+          ? item.bestRejectedProductId
+          : null;
+      const bestRejectedReason =
+        typeof item.bestRejectedReason === "string"
+          ? item.bestRejectedReason
+          : null;
 
       if (!id || !displayName || !itemType || !Number.isFinite(coveragePercent)) {
         return null;
       }
 
       return {
+        bestRejectedProductId,
+        bestRejectedReason,
         coveragePercent: Math.min(100, Math.max(0, Math.round(coveragePercent))),
         displayName,
         id,
@@ -158,6 +168,18 @@ function productCoverageLookup(items: readonly ProductNeedCoverage[]) {
   return lookup;
 }
 
+function productCoverageReasonLookup(items: readonly ProductNeedCoverage[]) {
+  const lookup = new Map<string, ProductNeedCoverage>();
+
+  for (const item of items) {
+    lookup.set(item.id, item);
+    lookup.set(sourceIdFromNeedId(item.id), item);
+    lookup.set(normalizeReviewName(item.displayName), item);
+  }
+
+  return lookup;
+}
+
 function addRecommendationCoverageFallback(
   lookup: Map<string, number>,
   recommendations: readonly RecommendedProduct[]
@@ -175,7 +197,8 @@ function addRecommendationCoverageFallback(
 
 function currentNeedCoverage(
   needs: readonly ProductRecommendationNeed[],
-  coverageLookup: ReadonlyMap<string, number>
+  coverageLookup: ReadonlyMap<string, number>,
+  reasonLookup: ReadonlyMap<string, ProductNeedCoverage> = new Map()
 ) {
   return needs
     .filter(
@@ -183,7 +206,15 @@ function currentNeedCoverage(
         itemType: "food" | "supplement";
       } => need.itemType === "food" || need.itemType === "supplement"
     )
-    .map((need) => ({
+    .map((need) => {
+      const matchedReason =
+        reasonLookup.get(need.id) ??
+        reasonLookup.get(need.sourceId) ??
+        reasonLookup.get(normalizeReviewName(need.displayName));
+
+      return {
+      bestRejectedProductId: matchedReason?.bestRejectedProductId ?? null,
+      bestRejectedReason: matchedReason?.bestRejectedReason ?? null,
       coveragePercent: Math.min(
         100,
         Math.max(
@@ -199,7 +230,8 @@ function currentNeedCoverage(
       displayName: need.displayName,
       id: need.id,
       itemType: need.itemType
-    } satisfies ProductNeedCoverage));
+    } satisfies ProductNeedCoverage;
+    });
 }
 
 function weightedCoveragePercent(
@@ -274,11 +306,12 @@ function reconcileProductRecommendationCoverage(input: Readonly<{
     formulation: { supplementBreakdown: [...input.supplementBreakdown] }
   });
   const coverageLookup = productCoverageLookup(input.rawNeedCoverage);
+  const reasonLookup = productCoverageReasonLookup(input.rawNeedCoverage);
 
   if (input.rawNeedCoverage.length < 1) {
     addRecommendationCoverageFallback(coverageLookup, input.recommendations);
   }
-  const needCoverage = currentNeedCoverage(currentNeeds, coverageLookup);
+  const needCoverage = currentNeedCoverage(currentNeeds, coverageLookup, reasonLookup);
   const productNeeds = currentNeeds.filter((need) => need.itemType === "supplement");
   const stackCoveragePercent = weightedCoveragePercent(productNeeds, coverageLookup);
 
@@ -1203,6 +1236,7 @@ export async function getStoredFormulationResult(
       product_recommendation_run.generated_at as product_recommendation_generated_at,
       product_recommendation_run.notes as product_recommendation_notes,
       product_recommendation_run.diagnostics as product_recommendation_diagnostics,
+      product_recommendation_run.stack_preference as product_recommendation_stack_preference,
       product_recommendation_items_payload.recommendations as product_recommendation_items_payload,
       product_recommendation_task.status as product_recommendation_task_status
     from assessments
@@ -1266,6 +1300,7 @@ export async function getStoredFormulationResult(
         stack_coverage_percent,
         jsonb_array_length(client_needs) as client_needs_count,
         diagnostics,
+        diagnostics ->> 'stackPreference' as stack_preference,
         notes,
         generated_at
       from product_recommendation_runs
@@ -1458,6 +1493,12 @@ export async function getStoredFormulationResult(
       : row.product_recommendation_generated_at
         ? new Date(row.product_recommendation_generated_at).toISOString()
         : undefined;
+  const productRecommendationStackPreference =
+    row.product_recommendation_stack_preference === "compact" ||
+    row.product_recommendation_stack_preference === "max_coverage" ||
+    row.product_recommendation_stack_preference === "balanced"
+      ? row.product_recommendation_stack_preference
+      : undefined;
   const nutritionReport =
     hasNutritionReportRecord
       ? ({
@@ -1548,6 +1589,9 @@ export async function getStoredFormulationResult(
               : {}),
             ...(typeof row.product_recommendation_run_id === "string"
               ? { runId: row.product_recommendation_run_id }
+              : {}),
+            ...(productRecommendationStackPreference
+              ? { stackPreference: productRecommendationStackPreference }
               : {}),
             ...(productNeedCoverage.length > 0
               ? { needCoverage: productNeedCoverage }

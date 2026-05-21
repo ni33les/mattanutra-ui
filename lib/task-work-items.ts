@@ -21,17 +21,23 @@ import { isLocale, type Locale } from "@/lib/i18n";
 import {
   getProductRecommendationCandidates
 } from "@/lib/admin-products";
+import {
+  defaultProductCountryCode,
+  normalizeProductCountryCode
+} from "@/lib/product-countries";
 import { loadActivePlanFeedback } from "@/lib/plan-feedback";
 import { loadActivePlanGuidanceAdjustments } from "@/lib/plan-guidance-adjustments";
 import {
   buildMarketplaceSearchQueries,
   buildProductNeeds,
+  normalizeProductStackPreference,
   productFactAliasKeys,
   productKeysMatch,
   type ProductCandidate,
   type ProductClientSex,
   type ProductRecommendationClientContext,
-  type ProductRecommendationNeed
+  type ProductRecommendationNeed,
+  type ProductStackPreference
 } from "@/lib/product-recommendations";
 import {
   buildReassessmentEmailHtml,
@@ -168,11 +174,14 @@ export type NutritionPlanRefinementWorkItem = Readonly<{
 
 export type ProductRecommendationsWorkItem = Readonly<{
   candidates: ProductCandidate[];
+  candidateLoadMs?: number;
   clientContext: ProductRecommendationClientContext;
   clientSex: ProductClientSex | null;
+  countryCode: string;
   needs: ProductRecommendationNeed[];
   planId: string;
   searchQueries: string[];
+  stackPreference: ProductStackPreference;
   taskId: string;
   taskType: "generate_product_recommendations";
 }>;
@@ -218,6 +227,12 @@ function productClientSexFromAnswers(value: unknown): ProductClientSex | null {
   const record = payloadRecord(value);
 
   return record.sex === "female" || record.sex === "male" ? record.sex : null;
+}
+
+function productCountryCodeFromAnswers(value: unknown) {
+  const record = payloadRecord(value);
+
+  return normalizeProductCountryCode(record.country) ?? defaultProductCountryCode;
 }
 
 function textFromRecord(record: Record<string, unknown>, key: string) {
@@ -876,18 +891,29 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
     foodGuidance: context.foodGuidance,
     formulation: context.formulation
   }));
+  const countryCode = productCountryCodeFromAnswers(context.answers);
+  const candidateLoadStartedAt = Date.now();
+  const candidates = await getProductRecommendationCandidates({
+    countryCode,
+    includeIneligible: true
+  });
 
   return {
-    candidates: await getProductRecommendationCandidates(),
+    candidates,
+    candidateLoadMs: Date.now() - candidateLoadStartedAt,
     clientContext: productRecommendationClientContextFromPlan(
       context.answers,
       context.planFeedback,
       context.guidanceAdjustments
     ),
     clientSex: productClientSexFromAnswers(context.answers),
+    countryCode,
     needs,
     planId: task.planId,
     searchQueries: buildMarketplaceSearchQueries(needs),
+    stackPreference: normalizeProductStackPreference(
+      payloadText(task.payload, "stackPreference")
+    ),
     taskId: task.id,
     taskType: "generate_product_recommendations"
   } satisfies ProductRecommendationsWorkItem;

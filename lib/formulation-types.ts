@@ -85,6 +85,7 @@ export type RecommendedProduct = {
   productId?: string;
   rank?: number;
   recommendationRunId?: string;
+  servingMultiplier?: number;
   stackContributionPercent?: number;
   stackCoveragePercent?: number;
   tag: string;
@@ -167,8 +168,11 @@ export type NutritionReport = {
 };
 
 export type ProductRecommendationStatus = "failed" | "partial" | "pending" | "ready";
+export type ProductStackPreference = "balanced" | "compact" | "max_coverage";
 
 export type ProductNeedCoverage = {
+  bestRejectedProductId: string | null;
+  bestRejectedReason: string | null;
   coveragePercent: number;
   displayName: string;
   id: string;
@@ -183,6 +187,7 @@ export type ProductRecommendationSummary = {
   notes?: string;
   runId?: string;
   stackCoveragePercent: number;
+  stackPreference?: ProductStackPreference;
   status: ProductRecommendationStatus;
 };
 

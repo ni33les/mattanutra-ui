@@ -3765,6 +3765,60 @@ create index products_fda_idx
   on public.products (fda_approval_number)
   where fda_approval_number is not null;
 
+create table if not exists public.product_brand_countries (
+  brand_id uuid not null references public.product_brands(id) on delete cascade,
+  country_code text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (brand_id, country_code),
+  constraint product_brand_countries_code_check
+    check (country_code ~ '^[A-Z]{2}$')
+);
+
+insert into public.product_brand_countries (
+  brand_id,
+  country_code,
+  created_at,
+  updated_at
+)
+select
+  product_brands.id,
+  upper(coalesce(nullif(product_brands.country_code, ''), 'TH')),
+  now(),
+  now()
+from public.product_brands
+on conflict (brand_id, country_code) do nothing;
+
+create index if not exists product_brand_countries_country_idx
+  on public.product_brand_countries (country_code, brand_id);
+
+create table if not exists public.product_countries (
+  product_id uuid not null references public.products(id) on delete cascade,
+  country_code text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (product_id, country_code),
+  constraint product_countries_code_check
+    check (country_code ~ '^[A-Z]{2}$')
+);
+
+insert into public.product_countries (
+  product_id,
+  country_code,
+  created_at,
+  updated_at
+)
+select
+  products.id,
+  upper(coalesce(nullif(products.region, ''), 'TH')),
+  now(),
+  now()
+from public.products
+on conflict (product_id, country_code) do nothing;
+
+create index if not exists product_countries_country_idx
+  on public.product_countries (country_code, product_id);
+
 create table public.product_facts (
   id uuid primary key default gen_random_uuid(),
   product_id uuid not null references public.products(id) on delete cascade,

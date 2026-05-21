@@ -51,6 +51,16 @@ function parseOptionalNumber(value: unknown) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
+function countryCodesFromBody(value: unknown) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
 function parseProductKind(value: unknown): ProductKind | undefined {
   const normalized = normalizedKey(value);
 
@@ -186,6 +196,8 @@ export async function PATCH(
         ? undefined
         : textOrNull(body.imageUrl, 2000),
       labelStatus: isProductLabelStatus(labelStatus) ? labelStatus : undefined,
+      availableCountryCodes: countryCodesFromBody(body.availableCountryCodes),
+      manufacturerCountryCodes: countryCodesFromBody(body.manufacturerCountryCodes),
       status: isProductStatus(status) ? status : undefined,
       productAudience,
       productKind,

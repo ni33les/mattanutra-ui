@@ -1,275 +1,315 @@
 # Product Matching Algorithm
 
-## Purpose
+## Summary
 
-The active product matcher is `v2-exact-shortlist`. It turns a finalised nutrition plan into a small, honest set of recommended products. It is not a marketplace search engine. It matches the client's supplement needs against our approved product catalogue, then explains how much of the client's needs are covered, what remains uncovered, and why products were selected or rejected.
+The active customer matcher is `v2-full-beam`.
 
-The current implementation lives mainly in:
+It turns a finalised nutrition plan into a compact stack of approved catalogue products. It does not search marketplaces live, call AI, mutate the database, or make network calls while scoring. It receives already-loaded product candidates and already-built client needs, then runs deterministic scoring locally.
 
-- `lib/product-recommendations.ts`
-- `lib/task-execution.ts`
-- `lib/task-result-applier.ts`
-- `lib/task-work-items.ts`
+The active path is:
 
-The older greedy matcher is kept as `recommendProductStackLegacy` for rollback and regression comparison. Product recommendation tasks call `recommendProductStackV2`.
+- `lib/task-worker.ts` enqueues `generate_product_recommendations` with matcher version metadata.
+- `lib/task-work-items.ts` builds client needs, aliases, client context, sex, and product candidates.
+- `lib/task-execution.ts` calls `recommendProductStackFullBeam`.
+- `lib/task-result-applier.ts` persists the recommendation run, items, diagnostics, and review tasks.
+- `lib/product-recommendations.ts` contains the matcher.
+
+The older matchers remain available:
+
+| Function | Role |
+| --- | --- |
+| `recommendProductStackLegacy` | old greedy baseline for rollback/regression comparison |
+| `recommendProductStackV2` | exact scoring over a deterministic shortlist |
+| `recommendProductStackFullBeam` | active customer matcher, beam search over the full eligible pool |
+| `recommendProductStack` | default export path, currently delegates to full beam |
+
+## End-To-End Flow
+
+```mermaid
+flowchart TD
+  A["Finalised nutrition plan"] --> B["Build product needs"]
+  B --> C["Enrich supplement needs with aliases"]
+  C --> D["Load approved catalogue candidates"]
+  D --> E["Create generate_product_recommendations task"]
+  E --> F["Worker reserves task"]
+  F --> G["Run v2-full-beam matcher"]
+  G --> H["Persist recommendation run"]
+  H --> I["Persist product recommendation items"]
+  H --> J["Persist diagnostics and trace"]
+  I --> K["Refine and delivery pages render products"]
+  J --> L["Admin debugging and why-no-hit analysis"]
+```
 
 ## The Matching Problem
 
-The core problem is not simply "find a product with the same name." A real supplement plan and a real product catalogue differ in several difficult ways.
+The hard part is not finding a product whose title contains a supplement name. Product matching has to bridge four messy realities:
 
-### 1. The plan uses canonical needs
+1. The nutrition plan contains client-specific supplement and food needs, ranked by importance and often carrying target doses.
+2. Product labels contain commercial wording, Thai and English names, spelling variants, compound names, extract forms, and occasionally bad dose evidence.
+3. A single product can cover several needs, especially multivitamins and multi-supplements.
+4. Coverage must be honest: two products covering the same need cannot double-count past 100 percent.
 
-The nutrition plan may ask for things such as:
+The matcher therefore works only with canonical, validated product facts. Raw manufacturer facts and AI/import notes are evidence for review, not matchable facts.
 
-- Ashwagandha
-- Curcumin
-- Probiotic blend
-- Magnesium glycinate
-- L-Theanine
-- L-Glutamine
-- Vitamin D3
+## Inputs
 
-Those needs come from formulation guidance and can have priority, dose, safety state, and review status.
+### Needs
 
-### 2. Products use messy commercial label data
+Needs are built by `buildProductNeeds` from:
 
-Product labels may contain:
+- supplement formulation guidance
+- food guidance
 
-- spelling variants, such as `Ashwaganda`
-- compound names, such as `Magnesium bisglycinate`
-- marketing names, such as `Probiotics+ Daily Health`
-- chemistry/source forms, such as `Curcuma longa extract dry conc`
-- potency artefacts, such as `Vitamin D3 100000 IU/g`
-- Thai and English names
-- incomplete or inconsistent serving information
+Only visible guidance with status `add` or `review` becomes a need.
 
-The matcher must not treat dirty label text as trustworthy matchable data. Only validated canonical product facts should be used for scoring.
+Each need contains:
 
-### 3. Products can cover several needs at once
-
-A multivitamin or multi-supplement may cover many needs, but it may also include extras outside the client's profile. Extras are allowed when safe, because a loose-fit multi can be a better customer experience than six tiny products.
-
-The matcher must balance:
-
-- coverage
-- safety
-- dose fit
-- product count
-- useful extras
-- duplicate overlap
-- confidence
-- budget
-- sex/audience fit
-- affiliate availability as a tie-breaker only
-
-### 4. Coverage must be capped
-
-Two products covering the same need cannot double-count. If product A covers 80 percent of magnesium and product B covers 60 percent of magnesium, the stack covers magnesium at 80 percent, not 140 percent.
-
-This is why the algorithm tracks coverage per need and applies each product's marginal contribution to the current stack.
-
-### 5. Missing matches must be explainable
-
-When a product is not selected, we need to know why:
-
-- product is not approved
-- brand is not approved
-- label facts are missing
-- validation failed
-- audience mismatch
-- product does not cover current needs
-- product was a near miss but another stack contributed more
-
-This is essential for admin debugging and for improving catalogue quality.
-
-## Data Preconditions
-
-The matcher should only consider products that meet all of these conditions:
-
-| Check | Rule |
+| Field | Meaning |
 | --- | --- |
-| Product status | `approved` |
-| Brand status | `approved` |
-| Label status | `parsed` |
-| Validation | `pass` |
-| Product facts | at least one canonical matchable fact |
-| Safety | automated safety checks passed |
-| Audience | `both`, or matching client sex |
-| Expiry | product cache not expired |
+| `id` | stable run-local need id, such as `supplement:<id>` |
+| `sourceId` | canonical supplement or food id from the source guidance |
+| `displayName` | human-readable need name |
+| `normalizedName` | normalized matching key |
+| `targetDose` | parsed dose where available |
+| `targetComparableAmount` | dose converted into comparable units where possible |
+| `weight` | importance derived from effectiveness rank |
+| `aliasKeys` | canonical/alias keys added from `supplement_aliases` |
 
-Products that fail these checks are recorded as exclusions and may appear in diagnostics, but they are not recommended.
+Supplement needs are the main scoring denominator. Food needs are retained for diagnostics and total plan coverage, so product coverage is not unfairly diluted by food advice.
+
+### Candidates
+
+Candidates come from `getProductRecommendationCandidates`.
+
+Each product candidate contains:
+
+- product and brand status
+- validation result
+- label status
+- product facts
+- product audience: `both`, `male`, or `female`
+- safety flags
+- image, URL, offer, price, and affiliate data
+- cache expiry where available
+
+## Hard Filters
+
+Before a product can score, it must pass the product-level gates in `exclusionReason` and `productAudienceMismatchReason`.
+
+```mermaid
+flowchart TD
+  A["Candidate product"] --> B{"Brand ignored?"}
+  B -- yes --> X1["Exclude: Brand is ignored"]
+  B -- no --> C{"Product ignored?"}
+  C -- yes --> X2["Exclude: Product is ignored"]
+  C -- no --> D{"Product and brand approved?"}
+  D -- no --> X3["Exclude: Product is not approved yet"]
+  D -- yes --> E{"Parsed label facts present?"}
+  E -- no --> X4["Exclude: Product label facts are missing"]
+  E -- yes --> F{"Validation pass?"}
+  F -- no --> X5["Exclude: Product validation needs review"]
+  F -- yes --> G{"Cache expired?"}
+  G -- yes --> X6["Exclude: Product cache expired"]
+  G -- no --> H{"Automated safety pass?"}
+  H -- no --> X7["Exclude: Product failed automated safety checks"]
+  H -- yes --> I{"Audience matches client sex?"}
+  I -- no --> X8["Exclude: Product is for another audience"]
+  I -- yes --> J["Eligible for scoring"]
+```
+
+These exclusions are persisted in diagnostics. Products that fail the gates never reach customer recommendations.
 
 ## Canonicalisation
 
-The matcher uses canonical keys and aliases before scoring. This lets product facts and plan needs match even when their display names differ.
+Needs and product facts are matched by deterministic ontology-style keys.
 
-Examples:
+`factNeedMatchScore` assigns:
 
-| Plan Need | Product Label Variants |
+| Match type | Score |
+| --- | ---: |
+| exact canonical supplement or food id | `1.0` |
+| direct normalized key equality | `1.0` |
+| alias overlap | `0.9` |
+| bounded fuzzy token match | `0.7` |
+| no deterministic match | `0.0` |
+
+Important examples:
+
+| Client need | Product fact variants that can match |
 | --- | --- |
-| Ashwagandha | `Ashwaganda`, `Withania somnifera`, `Ashwagandha root extract` |
+| Ashwagandha | `Ashwaganda`, `Withania somnifera`, root extract aliases |
 | Curcumin | `Curacumin`, `Curcuminoids`, `Turmeric extract`, `Curcuma longa` |
-| Multi-strain probiotics | `Probiotic`, `Probiotics`, `Probiotic blend` |
-| L-Glutamine | `Glutamine` |
-| Magnesium | `Magnesium glycinate`, `Magnesium bisglycinate`, `Magnesium glyconate` |
-| Theanine | `L-Theanine`, `AlphaWave L-Theanine` |
+| Probiotics | `Probiotic`, `Probiotics`, `Probiotic blend` |
+| Magnesium glycinate | `Magnesium glycinate`, `Magnesium bisglycinate`, common misspellings |
+| Theanine | `L-Theanine`, `Theanine` |
+| L-Glutamine | `Glutamine`, `L-Glutamine` |
 
-The matching function checks:
-
-1. direct canonical key equality
-2. known alias groups
-3. explicit alias keys from catalogue data
-4. bounded fuzzy token matching
-
-The bounded fuzzy step is intentionally conservative. It helps with spelling problems, but should not allow unrelated minerals, compounds, or botanicals to cross-match.
+The bounded fuzzy step is deliberately conservative. It helps spelling variants, but it should not let unrelated compounds cross-match.
 
 ## Dose Coverage
 
-For each product fact and client need, the matcher calculates a coverage ratio where possible:
+Each matching fact/need pair becomes a metric with:
 
-```text
-ratio = product comparable amount / target comparable amount
-```
+- match score
+- confidence multiplier
+- comparable dose amount where possible
+- raw target ratio where possible
+- coverage contribution
+- safety limit amount where available
 
-The current dose scoring policy is:
+Concentration-like facts are ignored as matchable serving doses.
 
-| Ratio | Meaning | Score Behaviour |
-| --- | --- | --- |
-| `< 70%` | under target | partial credit, discounted |
-| `70-130%` | preferred range | strong credit |
-| `130-150%` | modest overage | allowed but penalised |
-| `> 150%` | high overage | heavily penalised unless safety still allows |
-| unsafe | above safety limit | blocked before matching |
-
-If no comparable dose exists, but the fact clearly matches the need, the matcher can give partial coverage based on confidence. This is useful for some label facts, but approved product facts should normally have usable doses.
-
-Concentration-only facts are not usable as serving doses. For example:
+Example of evidence that must not score directly:
 
 ```text
 Vitamin D3 100000 IU/g
 ```
 
-This is evidence about ingredient potency, not the customer's per-serving dose. It must not be used directly as matchable dose coverage.
+That describes ingredient potency, not the client's per-serving dose.
+
+### Dose Band
+
+For stack scoring, summed raw ratios are passed through `doseBandScore`.
+
+| Ratio | Dose score |
+| --- | ---: |
+| no ratio | `0.8` |
+| below `0.70` | `0.4` |
+| `0.70` to `1.30` | `1.0` |
+| `1.30` to `1.50` | `0.8` |
+| above `1.50` | `0.0` |
+
+Coverage itself is capped to `0..1` per need. Overage beyond the soft maximum is penalised, and facts above a known safety limit can make a stack invalid.
 
 ## Product Coverage
 
-Each product is scored against all product-matchable needs.
+For every eligible product:
 
-For each need:
+1. Drop facts that do not match the client sex/audience.
+2. Create safe serving variants: `1x`, `2x`, and `3x`.
+3. Match remaining facts against every scoring need.
+4. Combine multiple facts for the same need.
+5. Cap the product's coverage for each need at `1.0`.
+6. Calculate weighted standalone coverage.
 
-1. Find the best matching fact on the product.
-2. Calculate fact-to-need coverage between `0` and `1`.
-3. Cap coverage for that need at `1`.
+Serving variants let the matcher recommend a higher serving count when a clean single product underdoses a need. For example, a product that supplies about 25 percent of a target can be considered at `2x` or `3x` serving levels.
 
-The product's standalone coverage percentage is then:
+The multiplier is only allowed when every contained dosed fact has a comparable safety limit and remains within that limit. This check includes facts that are not target needs for the client. If a magnesium product also contains iron, then `3x` magnesium is rejected when the iron dose would exceed its configured max. If the matcher cannot compare a dosed fact to a known max, it does not create the multi-serving variant.
+
+Formula:
 
 ```text
-sum(need weight * product coverage for need) / sum(all need weights)
+product coverage percent =
+  sum(need weight * product coverage for need)
+  / sum(scoring need weights)
+  * 100
 ```
 
-This answers:
-
-```text
-How much of the client's product-matchable supplement needs does this product cover on its own?
-```
+This is the number shown as "meets X percent of your needs" for the product on its own.
 
 ## Stack Coverage
 
-The stack tracks a map:
+The active v2 matcher scores complete stacks. For each need, it sums product coverage contributions and clips the achieved value at `1.0`.
 
 ```text
-need id -> current best coverage
+achieved coverage for need =
+  min(1.0, sum(product coverage for that need across stack))
 ```
 
-When a product is selected, the stack updates each covered need with:
+This is order-independent. It avoids the old problem where product insertion order affected the final answer.
+
+Stack coverage is then:
 
 ```text
-max(existing need coverage, product need coverage)
+stack coverage percent =
+  sum(need weight * achieved coverage for need)
+  / sum(scoring need weights)
+  * 100
 ```
 
-This prevents double-counting overlap.
+### Product Stack Contribution
 
-The product's stack contribution is now order-independent. For each need, the achieved coverage is shared across products in proportion to each product's contribution to that need. This means displayed product contributions sum back to the same capped stack coverage used for the need bars.
+Displayed stack contribution is also order-independent.
+
+For a selected product and need:
 
 ```text
 product share for need =
-  product need coverage / sum(product coverages for that need)
-
-product stack contribution =
-  sum(product share for each need * capped achieved coverage * need weight)
+  product coverage for need / sum(all selected product coverages for need)
 ```
 
-This answers:
+The product receives that share of the capped achieved coverage for the need.
 
-```text
-How much did this product add to the selected stack?
-```
+This means:
 
-## Active Selection Algorithm
+- per-need bars use the same coverage math as total coverage
+- product contribution percentages are proportional and capped
+- overlapping products do not inflate the stack total
 
-The active matcher uses deterministic shortlisting plus exact combination scoring. It does not call AI, query the database, or perform side effects during recommendation scoring.
+## Active Full-Beam Search
 
-Default product count settings:
+The active matcher uses `recommendProductStackFullBeam`.
+
+It is not the old greedy picker. It does not choose one product, update state, and then stop too early. It builds and scores whole stacks up to six products.
+
+It is also not a true exhaustive search over every possible product combination in a large catalogue. Instead, it uses deterministic beam search across the full eligible product/serving-variant pool.
+
+Settings:
 
 | Setting | Value |
 | --- | ---: |
-| Hard maximum | `6` |
-| Shortlist cap | `32` |
-| Per-need shortlist candidates | `4` |
-| Top overall shortlist candidates | `16` |
-| Top broad/multi candidates | `8` |
-| Top affiliate candidates | `8` |
+| target shape | prefer around 3 products through simplicity score |
+| hard maximum | `6` products |
+| serving variants | `1x`, `2x`, `3x` when safe |
+| full-beam width | `32` states |
+| alternatives kept | top 4 states |
+| material coverage threshold for ordering | `3` percentage points |
 
-### Step 1. Build needs
+```mermaid
+flowchart TD
+  A["Eligible product entries"] --> B["Sort deterministically"]
+  B --> C["Create singleton stack states"]
+  C --> D["Select diverse beam"]
+  D --> E{"Depth < max products?"}
+  E -- yes --> F["Append each non-selected product to each beam state"]
+  F --> G["Reject invalid stacks"]
+  G --> H["Score complete stack utility"]
+  H --> I["Keep global top states"]
+  I --> J["Select diverse beam for next depth"]
+  J --> E
+  E -- no --> K["Return best stack plus alternatives"]
+```
 
-The matcher builds needs from:
+### Diversity Guard
 
-- visible supplement guidance
-- food guidance, for diagnostics and total plan coverage
+The beam keeps more than just the top utility states.
 
-Product selection currently scores primarily against supplement needs. Food guidance is kept separate so product coverage does not look artificially weak because food needs are included in the denominator.
+`selectDiverseBeamStates` reserves slots for:
 
-### Step 2. Exclude invalid products
+- top utility states
+- at least one leading state per covered need where possible
+- deterministic fill from the remaining ranked states
 
-Every candidate is checked for approval, validation, safety, label facts, audience, and expiry.
+This protects distinct unmet needs. A lower-ranked Ashwagandha or Curcumin candidate should stay alive if it covers a need that broad products are missing.
 
-Rejected products are stored with reasons for diagnostics.
+## Utility Function
 
-### Step 3. Build the deterministic shortlist
-
-The shortlist is built from eligible products only:
-
-- top candidates per need
-- strong broad multi-products
-- top overall coverage products
-- active affiliate products that are otherwise nutritionally competitive
-
-Shortlist ordering is deterministic: utility, coverage, confidence, price, title, then product id.
-
-### Step 4. Score every possible stack in the shortlist
-
-The matcher exhaustively scores every stack of size `1..6` from the shortlist. Exactness is guaranteed inside the deterministic shortlist.
-
-The v2 utility score is a normalized weighted sum:
+Each complete stack receives component scores from `0..1`.
 
 ```text
 utility =
-  coverage weight * clipped weighted coverage
-  + dose weight * weighted dose precision
-  + simplicity weight * product-count simplicity
-  + cost weight * affordability-adjusted coverage
-  + extras weight * safe useful extras
-  + confidence weight * match confidence
-  - penalties
+  coverageWeight * coverage
+  + doseWeight * dosePrecision
+  + simplicityWeight * simplicity
+  + costWeight * costEfficiency
+  + extrasWeight * extras
+  + confidenceWeight * confidence
+  - penalty
 ```
 
-Every component is normalized to `0..1` before scoring. This keeps price, confidence, extras, and product count from accidentally overpowering coverage.
+Default base weights:
 
-### Step 5. Apply deterministic context weights
-
-The default weights are:
-
-| Component | Default |
+| Component | Base weight |
 | --- | ---: |
 | Coverage | `0.45` |
 | Dose precision | `0.20` |
@@ -278,146 +318,202 @@ The default weights are:
 | Extras | `0.05` |
 | Confidence | `0.05` |
 
-Weights are modulated by current known context:
+The weights are adjusted deterministically from client context, then normalised.
+
+### Context Weight Modulation
+
+Inputs that can alter weights:
 
 - budget preference
-- pill/capsule limit
-- medication and condition flags
-- lifestage such as pregnancy/nursing
-- active plan feedback such as budget, capsule-limit, and safety disclosures
+- pill or capsule limit
+- explicit budget/capsule/safety feedback
+- medications
+- medication types
+- conditions
+- pregnancy/lifestage
 
-The final weights and deltas are stored in diagnostics.
+Examples:
 
-### Step 6. Pick the best stack and keep alternatives
+| Context | Effect |
+| --- | --- |
+| low budget | raises cost, slightly lowers coverage/extras |
+| strict pill limit | raises simplicity, lowers coverage/dose/extras slightly |
+| safety context | raises dose and confidence, lowers extras/coverage slightly |
+| unlimited pills | raises coverage, lowers simplicity slightly |
 
-The selected customer stack is the highest-utility valid stack. The next three stacks are stored as alternatives in diagnostics for debugging and agent review, but they are not shown as separate customer choices yet.
+All final weights and deltas are stored in `diagnostics.trace`.
 
-### Step 7. Affiliate tie-break only
+## Penalties And Blocks
 
-Affiliate links do not override materially better nutrition.
+Some problems block a stack entirely:
 
-Affiliate preference is used only when final stack utility is effectively tied. The ordering is:
+- summed comparable dose exceeds known safety limit for a need
+- product-level hard filters fail
 
-1. higher utility
-2. higher supplement-product coverage
-3. active affiliate present
-4. fewer products
-5. lower price
-6. deterministic product id order
+Other problems reduce utility:
 
-## Legacy Greedy Matcher
+| Penalty | Meaning |
+| --- | --- |
+| overlap penalty | two products duplicate the same need beyond the capped value |
+| overage penalty | summed dose ratio exceeds the soft maximum |
+| safety context penalty | product safety flags collide with pregnancy, medication, blood-thinner, or condition context |
+| extra serving simplicity penalty | higher serving counts are allowed but not free |
 
-The previous greedy matcher remains available as `recommendProductStackLegacy`.
+Extras are not automatically bad. Safe extras can contribute mildly to the extras score. Excessive or duplicated extras are indirectly discouraged by overlap, overage, and simplicity penalties.
 
-Once the stack already had three products, it sorted all remaining candidates and looked only at the top candidate. If that top candidate was a weak top-up that did not meet the stricter post-target threshold, the algorithm stopped immediately.
+## Ordering And Affiliate Tie-Breaks
 
-That meant it could miss lower-ranked candidates that covered completely unmet needs.
+Nutrition comes first.
 
-Example failure:
+Stack comparison order is:
 
-1. The stack already had a base product, omega-3, and CoQ10.
-2. A weak vitamin/mineral top-up ranked above Ashwagandha.
-3. The weak top-up added less than the post-target threshold.
-4. The matcher stopped.
-5. Ashwagandha was never considered, even though it covered an unmet need.
+1. supplement-product coverage, when the coverage difference is at least 3 percentage points
+2. matched need weight
+3. matched need count
+4. smaller coverage differences
+5. utility score
+6. affiliate presence
+7. fewer products
+8. lower total price
+9. deterministic product id order
 
-The fix is to filter eligible post-target candidates before choosing the best one:
-
-```text
-if selected count >= target count:
-  eligible candidates =
-    candidates with meaningful marginal coverage
-    OR candidates that cover a currently unmatched need
-else:
-  eligible candidates = all ranked candidates
-
-select best eligible candidate
-```
-
-The legacy matcher was patched to filter eligible post-target candidates before choosing the best one. The active v2 matcher avoids the class of bug entirely by scoring complete stacks rather than relying on insertion order.
+Affiliate links only help after nutrition and utility are materially similar. An affiliate product must not beat a materially better nutritional fit.
 
 ## Diagnostics
 
-Each recommendation run records diagnostic information:
+Every run emits diagnostics:
 
 | Diagnostic | Meaning |
 | --- | --- |
-| `productsConsidered` | total candidate products supplied to matcher |
-| `matchedNeeds` | needs with non-zero stack coverage |
-| `unmatchedNeeds` | needs still uncovered after selection |
-| `blockedProducts` | products excluded for approval, validation, safety, audience, or cache reasons |
-| `factIssues` | exclusions linked to validation, labels, facts, safety, or approval |
-| `nearMisses` | valid products with coverage that lost to selected products |
-| coverage split | supplement-product, food, and total plan coverage |
+| `algorithmVersion` | currently `v2-full-beam` |
+| `productsConsidered` | all products supplied to matcher |
+| `matchedNeeds` | needs with non-zero final coverage |
+| `unmatchedNeeds` | needs still uncovered |
+| `blockedProducts` | products excluded by status, validation, safety, audience, cache, or label state |
+| `factIssues` | blocked products with fact/label/validation/safety-style reasons |
+| `nearMisses` | valid products that covered needs but lost to the selected stack |
+| `coverage` | supplement-product, food, and total plan coverage split |
+| `trace` | utility components, weights, shortfalls, alternatives, exclusions, and evaluated stack count |
 
-This should support a "why no hit?" admin view for a plan.
+```mermaid
+flowchart LR
+  A["Matcher result"] --> B["Recommendations"]
+  A --> C["Coverage split"]
+  A --> D["Diagnostics"]
+  D --> E["Matched needs"]
+  D --> F["Unmatched needs"]
+  D --> G["Blocked products"]
+  D --> H["Near misses"]
+  D --> I["Trace"]
+  I --> J["Weights and deltas"]
+  I --> K["Utility components"]
+  I --> L["Shortfalls"]
+  I --> M["Alternative stacks"]
+```
 
-## Customer-Facing Outputs
+These diagnostics are the foundation for "why no hit?" debugging.
 
-Each selected product should show:
+## Persisted Output
 
-- product image
-- product title
-- marketplace/import source
-- price, if available
+The task result applier stores:
+
+- one `product_recommendation_runs` row
+- selected `product_recommendation_items`
+- client needs
+- exclusions
+- diagnostics
+- stack, supplement, food, and total coverage percentages
+
+If a task payload has no recommendations, the applier can rerun `recommendProductStackFullBeam` from the current approved catalogue before persisting the run.
+
+## Customer Output
+
+Each selected product can show:
+
+- image
+- title
 - direct or affiliate URL
-- "meets X% of your needs" from standalone product coverage
-- "adds X% to this stack" from marginal contribution
+- offer id where available
+- standalone product coverage percent
+- stack contribution percent
 - covered needs
-- short "why this matches" copy
+- short "why this matches" text
 
-The stack should show:
+The plan pages should show:
 
+- per-need coverage bars
 - supplement-product coverage
 - food coverage separately
 - total plan coverage
 - remaining gaps
 
+## Legacy Greedy Matcher
+
+The legacy matcher selected products one at a time. It used marginal coverage and stopped once remaining candidates looked weak after the target count.
+
+That caused a known failure mode:
+
+1. A stack already had three products.
+2. A weak top-up ranked above a product that covered an unmet need.
+3. The weak top-up failed the post-target threshold.
+4. The algorithm stopped.
+5. The unmet need product was never selected.
+
+The active full-beam matcher avoids this class of bug by scoring complete stacks and keeping diverse states alive for distinct needs.
+
+## Shortlist Matcher
+
+`recommendProductStackV2` still exists. It builds a deterministic shortlist and exhaustively scores combinations inside that shortlist.
+
+It is useful for tests and comparisons, but it is not the customer default.
+
+## Practical Debugging Checklist
+
+When a known product does not match a known need, check in this order:
+
+1. Is the product `approved`?
+2. Is the brand `approved`?
+3. Is `labelStatus` `parsed`?
+4. Did validation pass?
+5. Does the product have at least one canonical matchable fact?
+6. Does the fact map to the same supplement/food id or alias group as the plan need?
+7. Is the dose usable and comparable?
+8. Is the product or fact blocked by sex/audience?
+9. Is the product blocked by safety or expired cache?
+10. Did the product appear as a near miss?
+11. Did another selected product already cover the same need?
+12. Does `diagnostics.trace.shortfalls` show the need still uncovered?
+
+If the answer is unclear, the problem is usually catalogue data quality, not the scoring step. The matcher can only score canonical, validated, matchable facts.
+
 ## Safety Guarantees
 
-The matcher should never recommend:
+The matcher must not recommend:
 
 - ignored products
 - ignored brands
-- unapproved products
+- pending-review products
 - products with missing parsed facts
 - products whose validation failed
-- products above safety limits
-- products with audience mismatch
-- concentration-only facts as per-serving dose matches
+- products that fail automated safety checks
+- products above known safety limits
+- products for the wrong audience
+- concentration-only facts as per-serving dose coverage
 
-If a product looks promising but cannot pass validation, it belongs in review, not in customer recommendations.
+Questionable data belongs in product review. It should not enter customer recommendations until it is approved and validated.
 
-## Regression Coverage
+## Regression Areas
 
-The test suite now includes matcher cases for:
+The test suite should continue to cover:
 
-- nutritional score beating affiliate-only products
-- affiliate links winning only among equivalent safe options
+- active default is `v2-full-beam`
+- legacy matcher remains callable
+- shortlist matcher remains callable
 - sex/audience filtering
-- stack size cap and duplicate coverage capping
-- continuing past the target count for unmet needs
-- skipping weak post-target top-ups in favour of unmet needs
-- unapproved and ignored products being excluded
-- validation failures being excluded
-- supplement, food, and total coverage split
-- potency artefacts being stripped from matchable names
-- alias matching for Ashwagandha, Curcumin, Probiotics, Theanine, L-Glutamine, and Magnesium variants
-- expected-hit regression products
-
-## Practical Operating Rule
-
-When a known product does not match a known need, debug in this order:
-
-1. Is the product approved?
-2. Is the brand approved?
-3. Did validation pass?
-4. Does the product have at least one canonical matchable fact?
-5. Does the fact alias resolve to the plan need?
-6. Is the dose usable and comparable?
-7. Is the product blocked by audience or safety?
-8. Was the product a near miss with low marginal contribution?
-9. Did another product already cover the same need?
-10. Does the run diagnostics show the best rejected candidate?
-
-This keeps the problem tractable: either the catalogue data is not matchable, or the algorithm can explain the selection.
+- affiliate as tie-break only
+- capped duplicate coverage
+- order-independent stack scoring
+- expected hits for Ashwagandha, Curcumin, Probiotics, Theanine, L-Glutamine, Magnesium variants, Omega-3, Vitamin D3, Zinc, B-complex, and multivitamins
+- low-rank distinct-need candidates survive beam pruning
+- validation failures and pending-review products are excluded
+- per-need bars and total coverage use the same capped coverage math

@@ -173,6 +173,11 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
+      /INTERACTIVE_TASK_TYPES[\s\S]*generate_product_recommendations/,
+      "product matching must be on the interactive reserve path because the refine page waits for it"
+    );
+    assert.match(
+      source,
       /waitForTaskQueueChange/,
       "long-polling workers should wake immediately when the task queue changes"
     );
@@ -203,8 +208,8 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /INTERACTIVE_RESERVE_POLL_INTERVAL_MS = 2_000/,
-      "interactive fallback polling should avoid hammering the database"
+      /INTERACTIVE_RESERVE_POLL_INTERVAL_MS = 1_000/,
+      "interactive fallback polling should keep user-visible tasks responsive"
     );
     assert.equal(
       /INTERACTIVE_TASK_TYPES[\s\S]*generate_example_supplement_guidance/.test(source) ||
@@ -290,6 +295,11 @@ describe("external worker boundaries", () => {
       source,
       /post_commit_readiness_refresh/,
       "post-commit readiness repair should be visible in task events"
+    );
+    assert.match(
+      source,
+      /formulation_completion[\s\S]*food_guidance_completion/,
+      "product recommendations should be queued immediately once paid nutrition guidance is ready"
     );
   });
 

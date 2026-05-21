@@ -41,6 +41,8 @@ function product(input: Readonly<{
   audience?: ProductCandidate["productAudience"];
   factAudience?: NonNullable<ProductCandidate["facts"][number]["supplementAudience"]>;
   id: string;
+  maxAmount?: number | null;
+  maxUnit?: string | null;
   name: string;
   status?: ProductCandidate["status"];
   priceAmount?: number | null;
@@ -59,6 +61,8 @@ function product(input: Readonly<{
         comparableAmount: input.amount * 1000,
         confidence: "high",
         itemType: "supplement",
+        maxAmount: input.maxAmount ?? null,
+        maxUnit: input.maxUnit ?? "mg",
         name: input.name,
         normalizedName: input.name.toLowerCase().replace(/\s+/g, "_"),
         supplementAudience: input.factAudience ?? "both",
@@ -88,7 +92,7 @@ describe("product recommendation scoring", () => {
     assert.equal(queries.includes("multivitamin"), true);
     assert.equal(queries.includes("vitamin d3"), true);
     assert.equal(queries.includes("coenzyme q10"), true);
-    assert.equal(queries.includes("chia seeds"), true);
+    assert.equal(queries.includes("chia seeds"), false);
     assert.equal(queries.includes("chia seeds supplement"), false);
     assert.equal(
       queries.some((query) => /\d+\s*(mg|mcg|iu)/i.test(query)),
@@ -339,7 +343,7 @@ describe("product recommendation scoring", () => {
     assert.match(result.exclusions[0]?.reason ?? "", /validation/i);
   });
 
-  it("reports supplement coverage separately from food coverage", () => {
+  it("keeps food needs out of product matching coverage", () => {
     const result = recommendProductStack({
       candidates: [
         product({ amount: 1, id: "d3", name: "Vitamin D" })
@@ -352,8 +356,10 @@ describe("product recommendation scoring", () => {
 
     assert.equal(result.stackCoveragePercent, 100);
     assert.equal(result.supplementProductCoveragePercent, 100);
-    assert.equal(result.totalPlanCoveragePercent, 50);
-    assert.equal(result.diagnostics.unmatchedNeeds[0]?.displayName, "Chia Seeds");
+    assert.equal(result.foodCoveragePercent, 0);
+    assert.equal(result.totalPlanCoveragePercent, 100);
+    assert.equal(result.clientNeeds.some((item) => item.itemType === "food"), false);
+    assert.equal(result.diagnostics.unmatchedNeeds.length, 0);
   });
 
   it("allows approved multis with safe extra ingredients as a loose fit", () => {
@@ -549,6 +555,182 @@ describe("product recommendation scoring v2 exact shortlist", () => {
 
     assert.equal(result.diagnostics.algorithmVersion, "v2-full-beam");
     assert.equal(result.recommendations[0]?.product.id, "magnesium");
+  });
+
+  it("can recommend multiple servings when a safe single product underdoses a need", () => {
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        product({
+          amount: 0.25,
+          id: "low-dose-magnesium",
+          maxAmount: 5000,
+          name: "Magnesium"
+        })
+      ],
+      needs: [need("magnesium", "Magnesium", 5)]
+    });
+
+    assert.equal(result.recommendations[0]?.product.id, "low-dose-magnesium");
+    assert.equal(result.recommendations[0]?.servingMultiplier, 3);
+    assert.equal(result.recommendations[0]?.productCoveragePercent, 75);
+    assert.match(result.recommendations[0]?.why ?? "", /Use 3 servings/i);
+  });
+
+  it("prefers safe multiple servings over stacking separate products for the same need", () => {
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        product({
+          amount: 0.5,
+          id: "single-low-dose",
+          maxAmount: 5000,
+          maxUnit: "mg/day",
+          name: "Magnesium"
+        }),
+        product({
+          amount: 0.5,
+          id: "second-low-dose",
+          maxAmount: 5000,
+          maxUnit: "mg/day",
+          name: "Magnesium"
+        })
+      ],
+      needs: [need("magnesium", "Magnesium", 5)]
+    });
+
+    assert.equal(result.recommendations.length, 1);
+    assert.equal(result.recommendations[0]?.servingMultiplier, 2);
+    assert.equal(result.recommendations[0]?.stackContributionPercent, 100);
+  });
+
+  it("supports compact and max-coverage stack preferences", () => {
+    const multi: ProductCandidate = {
+      ...product({ amount: 0.98, id: "near-complete-multi", name: "Vitamin D" }),
+      facts: [
+        product({ amount: 0.98, id: "multi-d3", name: "Vitamin D" }).facts[0]!,
+        product({ amount: 0.98, id: "multi-mag", name: "Magnesium" }).facts[0]!
+      ],
+      productKind: "multi"
+    };
+    const candidates = [
+      multi,
+      product({ amount: 1, id: "perfect-d3", name: "Vitamin D" }),
+      product({ amount: 1, id: "perfect-magnesium", name: "Magnesium" })
+    ];
+    const needs = [
+      need("vitamin_d", "Vitamin D", 8),
+      need("magnesium", "Magnesium", 8)
+    ];
+    const compact = recommendProductStackFullBeam({
+      candidates,
+      needs,
+      stackPreference: "compact"
+    });
+    const maxCoverage = recommendProductStackFullBeam({
+      candidates,
+      needs,
+      stackPreference: "max_coverage"
+    });
+
+    assert.deepEqual(
+      compact.recommendations.map((item) => item.product.id),
+      ["near-complete-multi"]
+    );
+    assert.equal(compact.supplementProductCoveragePercent, 98);
+    assert.equal(maxCoverage.supplementProductCoveragePercent, 100);
+    assert.equal(maxCoverage.recommendations.length, 2);
+    assert.equal(compact.diagnostics.stackPreference, "compact");
+    assert.equal(maxCoverage.diagnostics.stackPreference, "max_coverage");
+  });
+
+  it("does not add a second product only to top up an already adequate need", () => {
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        product({
+          amount: 0.8,
+          id: "adequate-primary",
+          name: "Vitamin D"
+        }),
+        product({
+          amount: 0.4,
+          id: "duplicate-top-up",
+          name: "Vitamin D"
+        })
+      ],
+      needs: [need("vitamin_d", "Vitamin D", 5)]
+    });
+
+    assert.equal(result.recommendations.length, 1);
+    assert.equal(result.recommendations[0]?.product.id, "adequate-primary");
+    assert.equal(result.recommendations[0]?.stackContributionPercent, 80);
+  });
+
+  it("does not increase serving count when another fact would exceed its safety limit", () => {
+    const base = product({
+      amount: 0.25,
+      id: "combo",
+      maxAmount: 5000,
+      name: "Magnesium"
+    });
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        {
+          ...base,
+          facts: [
+            base.facts[0]!,
+            {
+              amount: 1,
+              comparableAmount: 1000,
+              confidence: "high",
+              itemType: "supplement",
+              maxAmount: 2,
+              maxUnit: "mg",
+              name: "Iron",
+              normalizedName: "iron",
+              supplementAudience: "both",
+              unit: "mg"
+            }
+          ]
+        }
+      ],
+      needs: [need("magnesium", "Magnesium", 5)]
+    });
+
+    assert.equal(result.recommendations[0]?.product.id, "combo");
+    assert.equal(result.recommendations[0]?.servingMultiplier, 2);
+    assert.equal(result.recommendations[0]?.productCoveragePercent, 50);
+  });
+
+  it("does not stack duplicate pack variants of the same product", () => {
+    const singlePack = {
+      ...product({
+        amount: 0.25,
+        id: "dhc-turmeric-single",
+        maxAmount: 5000,
+        name: "Curcumin"
+      }),
+      brandName: "DHC",
+      title: "DHC Concentrated Turmeric 30-Day Supply"
+    };
+    const twoPack = {
+      ...product({
+        amount: 0.25,
+        id: "dhc-turmeric-two-pack",
+        maxAmount: 5000,
+        name: "Curcumin"
+      }),
+      brandName: "DHC",
+      title: "DHC Concentrated Turmeric 30-Day Supply 2-Pack"
+    };
+    const result = recommendProductStackFullBeam({
+      candidates: [singlePack, twoPack],
+      needs: [need("curcumin", "Curcumin", 5)]
+    });
+
+    assert.equal(result.recommendations.length, 1);
+    assert.equal(
+      result.recommendations.filter((item) => /turmeric/i.test(item.product.title)).length,
+      1
+    );
   });
 
   it("scores stacks order-independently", () => {

@@ -28,6 +28,14 @@ import {
   validateProduct,
   type ValidationResult
 } from "@/lib/product-validation";
+import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
+import { normalizeSupplementSafetyFlags } from "@/lib/supplement-safety-flags";
+import {
+  defaultProductCountryCode,
+  normalizeProductCountryCode,
+  normalizeProductCountryCodes,
+  type ProductCountryCode
+} from "@/lib/product-countries";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import { createTask } from "@/lib/task-service";
 
@@ -64,6 +72,8 @@ export type AdminProductRow = Readonly<{
   affiliateStatus: ProductAffiliateStatus;
   aiCorrectionNotes: string | null;
   availabilityStatus: ProductAvailabilityStatus;
+  availableCountryCodes: ProductCountryCode[];
+  brandId: string | null;
   brandName: string | null;
   brandStatus: ProductStatus | null;
   category: string | null;
@@ -78,6 +88,7 @@ export type AdminProductRow = Readonly<{
   importReviewTaskId: string | null;
   importStatus: string | null;
   labelStatus: ProductLabelStatus;
+  manufacturerCountryCodes: ProductCountryCode[];
   status: ProductStatus;
   validation: ValidationResult;
   validationLabel: string;
@@ -152,6 +163,8 @@ type ProductDbRow = Readonly<{
   offers: unknown;
   affiliate_status: ProductAffiliateStatus;
   availability_status: ProductAvailabilityStatus;
+  available_country_codes: string[] | null;
+  brand_id: string | null;
   brand_name: string | null;
   brand_status: ProductStatus | null;
   category: string | null;
@@ -173,6 +186,7 @@ type ProductDbRow = Readonly<{
   import_review_task_id: string | null;
   import_status: string | null;
   label_status: ProductLabelStatus;
+  manufacturer_country_codes: string[] | null;
   status: ProductStatus;
   platform: ProductPlatform;
   price_amount: string | number | null;
@@ -191,6 +205,40 @@ type ProductDbRow = Readonly<{
   title_en: string | null;
   title_th: string | null;
   updated_at: Date | string;
+}>;
+
+type ProductRecommendationDbRow = Readonly<{
+  active_offer_id: string | null;
+  active_offer_availability_status: ProductAvailabilityStatus | null;
+  active_affiliate_commission_rate: string | number | null;
+  active_offer_currency: string | null;
+  active_affiliate_priority: string | number | null;
+  active_offer_price_amount: string | number | null;
+  active_affiliate_type: "affiliate" | "direct" | null;
+  active_affiliate_url: string | null;
+  available_country_codes: string[] | null;
+  brand_name: string | null;
+  brand_status: ProductStatus | null;
+  currency: string;
+  description: string | null;
+  description_en: string | null;
+  description_th: string | null;
+  facts: unknown;
+  id: string;
+  image_url: string | null;
+  label_status: ProductLabelStatus;
+  manufacturer_country_codes: string[] | null;
+  status: ProductStatus;
+  platform: ProductPlatform;
+  product_audience: ProductAudience | null;
+  product_kind: ProductKind;
+  product_data_expires_at: Date | string | null;
+  product_url: string;
+  region: string;
+  source_url: string | null;
+  title: string;
+  title_en: string | null;
+  title_th: string | null;
 }>;
 
 type FactDbPayload = Readonly<{
@@ -295,6 +343,177 @@ function isoOrNull(value: unknown) {
 
 function arrayPayload(value: unknown) {
   return Array.isArray(value) ? value : [];
+}
+
+function productCountryCodesFromDb(
+  value: unknown,
+  fallback: readonly string[] = [defaultProductCountryCode]
+): ProductCountryCode[] {
+  return normalizeProductCountryCodes(Array.isArray(value) ? value : [], fallback);
+}
+
+function normalizeSubmittedProductCountryCodes(
+  countryCodes: readonly string[],
+  label: string
+): ProductCountryCode[] {
+  if (countryCodes.length < 1) {
+    throw new Error(`${label} requires at least one country`);
+  }
+
+  const codes = [
+    ...new Set(countryCodes
+      .map((countryCode) => normalizeProductCountryCode(countryCode))
+      .filter((countryCode): countryCode is ProductCountryCode => Boolean(countryCode)))
+  ];
+
+  if (codes.length < 1) {
+    throw new Error(`${label} requires at least one valid country`);
+  }
+
+  return codes;
+}
+
+async function loadBrandCountryCodes(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  brandId: string | null | undefined,
+  fallback: readonly string[] = [defaultProductCountryCode]
+): Promise<ProductCountryCode[]> {
+  if (!brandId) {
+    return normalizeProductCountryCodes([], fallback);
+  }
+
+  const rows = await sql<Array<{ country_code: string }>>`
+    select country_code
+    from public.product_brand_countries
+    where brand_id = ${brandId}::uuid
+    order by country_code asc
+  `;
+
+  return normalizeProductCountryCodes(
+    rows.map((row) => row.country_code),
+    fallback
+  );
+}
+
+async function loadProductCountryCodes(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  productId: string,
+  fallback: readonly string[] = [defaultProductCountryCode]
+): Promise<ProductCountryCode[]> {
+  const rows = await sql<Array<{ country_code: string }>>`
+    select country_code
+    from public.product_countries
+    where product_id = ${productId}::uuid
+    order by country_code asc
+  `;
+
+  return normalizeProductCountryCodes(
+    rows.map((row) => row.country_code),
+    fallback
+  );
+}
+
+async function ensureBrandCountryCodes(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  brandId: string | null | undefined,
+  countryCodes: readonly string[]
+): Promise<ProductCountryCode[]> {
+  if (!brandId) {
+    return normalizeProductCountryCodes(countryCodes);
+  }
+
+  const codes = normalizeProductCountryCodes(countryCodes);
+
+  await sql`
+    insert into public.product_brand_countries (
+      brand_id,
+      country_code,
+      created_at,
+      updated_at
+    )
+    select
+      ${brandId}::uuid,
+      country_code,
+      now(),
+      now()
+    from unnest(${codes}::text[]) as input(country_code)
+    on conflict (brand_id, country_code) do update set
+      updated_at = excluded.updated_at
+  `;
+
+  return loadBrandCountryCodes(sql, brandId, codes);
+}
+
+async function replaceBrandCountryCodes(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  brandId: string,
+  countryCodes: readonly string[]
+): Promise<ProductCountryCode[]> {
+  const codes = normalizeSubmittedProductCountryCodes(
+    countryCodes,
+    "Manufacturer countries"
+  );
+
+  await sql`
+    delete from public.product_brand_countries
+    where brand_id = ${brandId}::uuid
+      and country_code <> all(${codes}::text[])
+  `;
+
+  await ensureBrandCountryCodes(sql, brandId, codes);
+
+  return codes;
+}
+
+async function replaceProductCountryCodes(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  productId: string,
+  countryCodes: readonly string[]
+): Promise<ProductCountryCode[]> {
+  const codes = normalizeSubmittedProductCountryCodes(
+    countryCodes,
+    "Product countries"
+  );
+
+  await sql`
+    delete from public.product_countries
+    where product_id = ${productId}::uuid
+      and country_code <> all(${codes}::text[])
+  `;
+
+  await sql`
+    insert into public.product_countries (
+      product_id,
+      country_code,
+      created_at,
+      updated_at
+    )
+    select
+      ${productId}::uuid,
+      country_code,
+      now(),
+      now()
+    from unnest(${codes}::text[]) as input(country_code)
+    on conflict (product_id, country_code) do update set
+      updated_at = excluded.updated_at
+  `;
+
+  return codes;
+}
+
+function assertProductCountriesAllowedByBrand(
+  productCountryCodes: readonly string[],
+  brandCountryCodes: readonly string[],
+  brandName?: string | null
+) {
+  const brandCountries = new Set(brandCountryCodes);
+  const disallowed = productCountryCodes.filter((code) => !brandCountries.has(code));
+
+  if (disallowed.length > 0) {
+    throw new Error(
+      `Product countries must be enabled on manufacturer${brandName ? ` ${brandName}` : ""}: ${disallowed.join(", ")}`
+    );
+  }
 }
 
 function normalizeFact(fact: FactDbPayload): AdminProductFact {
@@ -438,8 +657,11 @@ function productAudienceFromText(...values: readonly unknown[]): ProductAudience
 function productAudienceFromSnapshot(value: unknown) {
   const snapshot = recordFromUnknown(value);
   const correction = recordFromUnknown(snapshot.aiFactCorrection);
+  const qualityEnrichment = recordFromUnknown(snapshot.qualityEnrichment);
 
-  return productAudienceFromUnknown(correction.productAudience) ?? "both";
+  return productAudienceFromUnknown(correction.productAudience) ??
+    productAudienceFromUnknown(qualityEnrichment.productAudience) ??
+    "both";
 }
 
 function aiCorrectionNotesFromSnapshot(value: unknown) {
@@ -556,11 +778,16 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
   const activeOfferAvailability = row.active_offer_availability_status ?? "unknown";
 
   return {
-    affiliateStatus: activeAffiliateStatus,
-    aiCorrectionNotes: aiCorrectionNotesFromSnapshot(row.source_snapshot),
-    availabilityStatus: activeOfferAvailability,
-    brandName: row.brand_name,
-    brandStatus: row.brand_status,
+	    affiliateStatus: activeAffiliateStatus,
+	    aiCorrectionNotes: aiCorrectionNotesFromSnapshot(row.source_snapshot),
+	    availabilityStatus: activeOfferAvailability,
+	    availableCountryCodes: productCountryCodesFromDb(
+	      row.available_country_codes,
+	      [row.region]
+	    ),
+	    brandId: row.brand_id,
+	    brandName: row.brand_name,
+	    brandStatus: row.brand_status,
     category: row.category,
     currency: activeOfferCurrency,
     description: row.description,
@@ -585,9 +812,13 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
             row.description_en,
             row.description_th
           ) ?? row.product_audience ?? "both",
-    importReviewTaskId: row.import_review_task_id,
-    importStatus: row.import_status,
-    offers,
+	    importReviewTaskId: row.import_review_task_id,
+	    importStatus: row.import_status,
+	    manufacturerCountryCodes: productCountryCodesFromDb(
+	      row.manufacturer_country_codes,
+	      [row.region]
+	    ),
+	    offers,
     platform: row.platform,
     priceAmount: activeOfferPriceAmount,
     productImportDuplicateProductIds: row.import_duplicate_product_ids ?? [],
@@ -723,6 +954,176 @@ export async function runProductValidationCheck(input: Readonly<{
   return row;
 }
 
+export async function increaseProductFactSafetyLimit(input: Readonly<{
+  actor?: string | null;
+  factId: string;
+  productId: string;
+}>) {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  if (!isUuidValue(input.productId) || !isUuidValue(input.factId)) {
+    throw new Error("Product fact was not found");
+  }
+
+  const rows = await sql<Array<{
+    amount: string | number | null;
+    confidence: "high" | "low" | "moderate" | null;
+    fact_name: string;
+    max_amount: string | number | null;
+    max_unit: string | null;
+    normalized_name: string;
+    safety_flags: string[] | null;
+    safety_notes: string | null;
+    supplement_id: string | null;
+    supplement_name: string | null;
+    unit: string | null;
+  }>>`
+    select
+      product_facts.name as fact_name,
+      product_facts.normalized_name,
+      product_facts.amount,
+      product_facts.unit,
+      product_facts.supplement_id::text,
+      supplements.name as supplement_name,
+      limits.max_amount,
+      limits.max_unit,
+      limits.confidence,
+      limits.safety_flags,
+      limits.safety_notes
+    from public.product_facts
+    left join public.supplements
+      on supplements.id = product_facts.supplement_id
+    left join lateral (
+      select *
+      from public.supplement_safety_limits
+      where supplement_safety_limits.supplement_id = product_facts.supplement_id
+      order by version desc
+      limit 1
+    ) limits on true
+    where product_facts.id = ${input.factId}::uuid
+      and product_facts.product_id = ${input.productId}::uuid
+    limit 1
+  `;
+  const fact = rows[0];
+
+  if (!fact || !isUuidValue(fact.supplement_id)) {
+    throw new Error("Safety limit can only be changed for a canonical supplement fact");
+  }
+
+  const amount = numberOrNull(fact.amount);
+  const doseUnit = fact.unit ? normalizeDoseUnit(fact.unit) : null;
+
+  if (amount === null || amount <= 0 || !doseUnit) {
+    throw new Error("Fact has no comparable dose for a safety limit update");
+  }
+
+  const currentLimit = parseDoseLimit(numberOrNull(fact.max_amount), fact.max_unit);
+
+  if (currentLimit && currentLimit.unit !== doseUnit) {
+    throw new Error(
+      "Safety limit unit differs from the product fact unit; update this supplement from the Supplements screen"
+    );
+  }
+
+  if (currentLimit && amount <= currentLimit.amount) {
+    throw new Error("The configured safety limit already covers this dose");
+  }
+
+  const maxUnit = fact.max_unit?.trim() || `${doseUnit}/day`;
+  const beforePayload = {
+    factId: input.factId,
+    factName: fact.fact_name,
+    maxAmount: numberOrNull(fact.max_amount),
+    maxUnit: fact.max_unit,
+    productId: input.productId,
+    supplementId: fact.supplement_id,
+    supplementName: fact.supplement_name
+  };
+  const safetyNotes = [
+    fact.safety_notes?.trim() || null,
+    `Raised from product review to cover ${amount} ${fact.unit ?? doseUnit} in ${fact.fact_name}.`
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const version = await appendSupplementSafetyLimitVersion(sql, {
+    confidence: fact.confidence ?? "moderate",
+    maxAmount: amount,
+    maxUnit,
+    safetyFlags: normalizeSupplementSafetyFlags(fact.safety_flags ?? []),
+    safetyNotes,
+    supplementId: fact.supplement_id
+  });
+
+  await sql`
+    insert into public.supplement_admin_audit (
+      id,
+      supplement_id,
+      action,
+      actor,
+      before_payload,
+      after_payload
+    )
+    values (
+      ${crypto.randomUUID()}::uuid,
+      ${fact.supplement_id}::uuid,
+      'safety_limit_increased_from_product',
+      ${input.actor ?? "admin_dashboard"},
+      ${sql.json(toJsonValue(beforePayload))}::jsonb,
+      ${sql.json(toJsonValue({
+        ...beforePayload,
+        maxAmount: amount,
+        maxUnit,
+        version
+      }))}::jsonb
+    )
+  `;
+
+  const validation = await refreshAndPersistProductValidation(sql, input.productId);
+  const productVersion = await recordProductVersion(sql, {
+    actor: input.actor,
+    changeNote: "product_safety_limit_increased",
+    productId: input.productId
+  });
+
+  await sql`
+    insert into public.product_admin_audit (
+      product_id,
+      actor,
+      action,
+      after_payload
+    )
+    values (
+      ${input.productId}::uuid,
+      ${input.actor ?? "admin_dashboard"},
+      'product_safety_limit_increased',
+      ${sql.json(toJsonValue({
+        factId: input.factId,
+        maxAmount: amount,
+        maxUnit,
+        productVersion,
+        supplementId: fact.supplement_id,
+        validation: validation.validation,
+        version
+      }))}::jsonb
+    )
+  `;
+
+  const row = await loadAdminProductRow(input.productId);
+
+  if (!row) {
+    throw new Error("Product not found after safety limit update");
+  }
+
+  clearProductRecommendationCandidateCache();
+
+  return row;
+}
+
 function summaryFromRows(rows: AdminProductRow[]) {
   return rows.reduce(
     (summary, row) => {
@@ -795,8 +1196,9 @@ async function loadProductRows(productId?: string | null) {
       coalesce(to_jsonb(products) ->> 'product_audience', 'both') as product_audience,
       products.product_kind,
       products.status,
-      products.label_status,
-      coalesce(active_offer.availability_status, 'unknown') as availability_status,
+	      products.label_status,
+	      coalesce(product_country_rows.country_codes, array[upper(coalesce(nullif(products.region, ''), 'TH'))]) as available_country_codes,
+	      coalesce(active_offer.availability_status, 'unknown') as availability_status,
       case
         when active_offer.link_type = 'affiliate' then 'active'
         else 'none'
@@ -817,8 +1219,10 @@ async function loadProductRows(productId?: string | null) {
       import_review.status as import_status,
       import_review.review_task_id::text as import_review_task_id,
       import_review.duplicate_product_ids::text[] as import_duplicate_product_ids,
-      product_brands.status as brand_status,
-      active_offer.id::text as active_offer_id,
+	      product_brands.id::text as brand_id,
+	      product_brands.status as brand_status,
+	      coalesce(brand_country_rows.country_codes, array[upper(coalesce(nullif(product_brands.country_code, ''), 'TH'))]) as manufacturer_country_codes,
+	      active_offer.id::text as active_offer_id,
       active_offer.availability_status as active_offer_availability_status,
       active_offer.currency as active_offer_currency,
       active_offer.link_type as active_affiliate_type,
@@ -833,8 +1237,18 @@ async function loadProductRows(productId?: string | null) {
       history.average_product_coverage_percent,
       history.average_stack_coverage_percent
     from public.products
-    left join public.product_brands
-      on product_brands.id = products.brand_id
+	    left join public.product_brands
+	      on product_brands.id = products.brand_id
+	    left join lateral (
+	      select array_agg(product_countries.country_code order by product_countries.country_code) as country_codes
+	      from public.product_countries
+	      where product_countries.product_id = products.id
+	    ) product_country_rows on true
+	    left join lateral (
+	      select array_agg(product_brand_countries.country_code order by product_brand_countries.country_code) as country_codes
+	      from public.product_brand_countries
+	      where product_brand_countries.brand_id = product_brands.id
+	    ) brand_country_rows on true
     left join lateral (
       select
         product_imports.id,
@@ -1009,20 +1423,210 @@ export async function getAdminProductsData(): Promise<AdminProductsData> {
   }
 }
 
-export async function getProductRecommendationCandidates() {
-  const rows = await loadProductRows();
+const PRODUCT_RECOMMENDATION_CANDIDATE_CACHE_MS = 15_000;
+const productRecommendationCandidateCache = new Map<string, Readonly<{
+  loadedAt: number;
+  rows: ProductCandidate[];
+}>>();
 
-  if (!rows) {
+export function clearProductRecommendationCandidateCache() {
+  productRecommendationCandidateCache.clear();
+}
+
+export async function getProductRecommendationCandidates(input: Readonly<{
+  countryCode?: string | null;
+  includeIneligible?: boolean;
+}> = {}) {
+  const sql = getSql();
+
+  if (!sql) {
     return [];
   }
 
-  return rows.map((row) => {
-    const adminRow = rowFromDb(row);
+  const now = Date.now();
+  const countryCode =
+    normalizeProductCountryCode(input.countryCode) ?? defaultProductCountryCode;
+  const includeIneligible = input.includeIneligible === true;
+  const cacheKey = `${countryCode}:${includeIneligible ? "diagnostic" : "eligible"}`;
+  const cached = productRecommendationCandidateCache.get(cacheKey);
+
+  if (
+    cached &&
+    now - cached.loadedAt <
+      PRODUCT_RECOMMENDATION_CANDIDATE_CACHE_MS
+  ) {
+    return cached.rows;
+  }
+
+  const rows = await sql<ProductRecommendationDbRow[]>`
+    select
+      products.id::text,
+      products.platform,
+      products.region,
+      products.title,
+      products.title_en,
+      products.title_th,
+      products.brand_name,
+      products.image_url,
+      coalesce(nullif(products.product_url, ''), products.source_url, '') as product_url,
+      products.source_url,
+      products.description,
+      coalesce(to_jsonb(products) ->> 'description_en', products.source_snapshot ->> 'descriptionEn') as description_en,
+      coalesce(to_jsonb(products) ->> 'description_th', products.source_snapshot ->> 'descriptionTh') as description_th,
+      coalesce(to_jsonb(products) ->> 'product_audience', 'both') as product_audience,
+      products.product_kind,
+      products.status,
+      products.label_status,
+      coalesce(product_country_rows.country_codes, array[upper(coalesce(nullif(products.region, ''), 'TH'))]) as available_country_codes,
+      products.currency,
+      products.product_data_expires_at,
+      coalesce(product_brands.status, 'approved') as brand_status,
+      coalesce(brand_country_rows.country_codes, array[upper(coalesce(nullif(product_brands.country_code, ''), 'TH'))]) as manufacturer_country_codes,
+      active_offer.id::text as active_offer_id,
+      active_offer.availability_status as active_offer_availability_status,
+      active_offer.currency as active_offer_currency,
+      active_offer.link_type as active_affiliate_type,
+      active_offer.price_amount as active_offer_price_amount,
+      active_offer.url as active_affiliate_url,
+      active_offer.commission_rate as active_affiliate_commission_rate,
+      active_offer.admin_priority as active_affiliate_priority,
+      coalesce(fact_rows.facts, '[]'::jsonb) as facts
+    from public.products
+    left join public.product_brands
+      on product_brands.id = products.brand_id
+    left join lateral (
+      select array_agg(product_countries.country_code order by product_countries.country_code) as country_codes
+      from public.product_countries
+      where product_countries.product_id = products.id
+    ) product_country_rows on true
+    left join lateral (
+      select array_agg(product_brand_countries.country_code order by product_brand_countries.country_code) as country_codes
+      from public.product_brand_countries
+      where product_brand_countries.brand_id = product_brands.id
+    ) brand_country_rows on true
+    left join lateral (
+      select
+        id,
+        url,
+        link_type,
+        commission_rate,
+        admin_priority,
+        price_amount,
+        currency,
+        availability_status
+      from public.product_offers
+      where product_offers.product_id = products.id
+        and product_offers.status = 'active'
+        and product_offers.availability_status not in ('out_of_stock', 'unavailable')
+      order by
+        case when product_offers.link_type = 'affiliate' then 0 else 1 end,
+        product_offers.commission_rate desc nulls last,
+        product_offers.admin_priority desc,
+        product_offers.updated_at desc
+      limit 1
+    ) active_offer on true
+    join lateral (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', product_facts.id,
+            'itemType', product_facts.item_type,
+            'supplementId', product_facts.supplement_id,
+            'foodId', product_facts.food_id,
+            'nutrientId', product_facts.nutrient_id,
+            'name', product_facts.name,
+            'normalizedName', product_facts.normalized_name,
+            'aliases', coalesce(supplement_alias_rows.aliases, '[]'::jsonb),
+            'amount', product_facts.amount,
+            'unit', product_facts.unit,
+            'servingLabel', product_facts.serving_label,
+            'confidence', product_facts.confidence,
+            'source', product_facts.source,
+            'sourceUrl', product_facts.source_url,
+            'sourceText', product_facts.source_text,
+            'supplementAudience',
+              case
+                when coalesce(
+                  to_jsonb(supplements) ->> 'audience',
+                  supplements.source_payload ->> 'audience',
+                  supplements.source_payload ->> 'productAudience'
+                ) in ('both', 'female', 'male')
+                  then coalesce(
+                    to_jsonb(supplements) ->> 'audience',
+                    supplements.source_payload ->> 'audience',
+                    supplements.source_payload ->> 'productAudience'
+                  )
+                when lower(coalesce(supplements.primary_use_case, '')) ~ '(male vitality|male fertility|prostate|testosterone|dht)'
+                  or lower(coalesce(supplements.name, '')) ~ '(saw palmetto|tongkat)'
+                  then 'male'
+                when lower(coalesce(supplements.category, '')) like '%gender%'
+                  and (
+                    lower(coalesce(supplements.primary_use_case, '')) ~ '(female|pms|cycle|estrogen|menopause)'
+                    or lower(coalesce(supplements.name, '')) ~ '(vitex|chasteberry|evening primrose)'
+                  )
+                  then 'female'
+                else 'both'
+              end,
+            'supplementStatus', supplements.list_status,
+            'maxAmount', supplement_safety_limits.max_amount,
+            'maxUnit', supplement_safety_limits.max_unit,
+            'safetyFlags', coalesce(supplement_safety_limits.safety_flags, '{}'::text[])
+          )
+          order by product_facts.created_at asc
+        ),
+        '[]'::jsonb
+      ) as facts
+      from public.product_facts
+      left join public.supplements
+        on supplements.id = product_facts.supplement_id
+      left join lateral (
+        select jsonb_agg(supplement_aliases.normalized_alias order by supplement_aliases.normalized_alias) as aliases
+        from public.supplement_aliases
+        where supplement_aliases.supplement_id = product_facts.supplement_id
+      ) supplement_alias_rows on true
+      left join lateral (
+        select max_amount, max_unit, safety_flags
+        from public.supplement_safety_limits
+        where supplement_safety_limits.supplement_id = product_facts.supplement_id
+        order by version desc
+        limit 1
+      ) supplement_safety_limits on true
+      where product_facts.product_id = products.id
+    ) fact_rows on jsonb_array_length(fact_rows.facts) > 0
+    where (${includeIneligible} or products.status = 'approved')
+      and (${includeIneligible} or coalesce(product_brands.status, 'approved') = 'approved')
+      and ${countryCode} = any(
+        coalesce(product_country_rows.country_codes, array[upper(coalesce(nullif(products.region, ''), 'TH'))])
+      )
+      and (
+        products.brand_id is null
+        or ${countryCode} = any(
+          coalesce(brand_country_rows.country_codes, array[upper(coalesce(nullif(product_brands.country_code, ''), 'TH'))])
+        )
+      )
+      and (${includeIneligible} or products.label_status = 'parsed')
+      and (${includeIneligible} or coalesce(
+        to_jsonb(products) ->> 'validation_status',
+        products.source_snapshot #>> '{validation,status}'
+      ) = 'pass')
+      and (
+        products.product_data_expires_at is null
+        or products.product_data_expires_at > now()
+      )
+    order by products.updated_at desc, products.title asc
+  `;
+
+  const candidates = rows.map((row) => {
+    const facts = (arrayPayload(row.facts) as FactDbPayload[]).map(normalizeFact);
+    const validation = validationForRow(row, facts, row.facts);
     const activeAffiliateUrl =
       row.active_affiliate_type === "affiliate" &&
       typeof row.active_affiliate_url === "string"
         ? row.active_affiliate_url
         : null;
+    const activeOfferAvailability =
+      row.active_offer_availability_status ?? "unknown";
+    const activeOfferCurrency = row.active_offer_currency || row.currency || "THB";
     const productDataExpiresAt = isoOrNull(row.product_data_expires_at);
 
     return {
@@ -1031,28 +1635,49 @@ export async function getProductRecommendationCandidates() {
       activeAffiliatePriority: numberOrNull(row.active_affiliate_priority),
       activeAffiliateType: row.active_affiliate_type,
       activeAffiliateUrl,
-      affiliateStatus: adminRow.affiliateStatus,
-      automatedSafetyPassed: productSafetyPasses(adminRow.facts, row.facts),
-      availabilityStatus: adminRow.availabilityStatus,
-      brandName: adminRow.brandName,
-      brandStatus: adminRow.brandStatus,
-      currency: adminRow.currency,
-      facts: adminRow.facts,
-      id: adminRow.id,
-      imageUrl: adminRow.imageUrl,
-      labelStatus: adminRow.labelStatus,
-      status: adminRow.status,
-      platform: adminRow.platform,
-      productAudience: adminRow.productAudience,
-      productKind: adminRow.productKind,
-      validation: adminRow.validation,
-      priceAmount: numberOrNull(row.active_offer_price_amount),
-      productDataExpiresAt,
-      productUrl: adminRow.productUrl,
-      region: adminRow.region,
-      title: adminRow.title
-    } satisfies ProductCandidate;
-  });
+      affiliateStatus: row.active_affiliate_type === "affiliate" ? "active" : "none",
+      automatedSafetyPassed: productSafetyPasses(facts, row.facts),
+      availabilityStatus: activeOfferAvailability,
+      brandName: row.brand_name,
+      brandStatus: row.brand_status,
+      currency: activeOfferCurrency,
+      facts,
+      id: row.id,
+      imageUrl: row.image_url,
+      labelStatus: row.label_status,
+      status: validation.status === "pass" ? row.status : "pending_review",
+      platform: row.platform,
+      productAudience:
+        row.product_audience && row.product_audience !== "both"
+          ? row.product_audience
+          : productAudienceFromText(
+              row.title,
+              row.title_en,
+              row.title_th,
+              row.description,
+              row.description_en,
+              row.description_th
+            ) ?? row.product_audience ?? "both",
+      productKind: row.product_kind ?? "supplement",
+      validation,
+	      priceAmount: numberOrNull(row.active_offer_price_amount),
+	      productDataExpiresAt,
+	      productUrl: row.product_url,
+	      region: row.region,
+	      availableCountryCodes: productCountryCodesFromDb(
+	        row.available_country_codes,
+	        [row.region]
+	      ),
+	      title: row.title
+	    } satisfies ProductCandidate;
+	  });
+
+	  productRecommendationCandidateCache.set(cacheKey, {
+	    loadedAt: Date.now(),
+	    rows: candidates
+	  });
+
+  return candidates;
 }
 
 export type UpdateAdminProductInput = Readonly<{
@@ -1060,7 +1685,9 @@ export type UpdateAdminProductInput = Readonly<{
   adminNotes?: string | null;
   affiliateStatus?: ProductAffiliateStatus;
   availabilityStatus?: ProductAvailabilityStatus;
+  availableCountryCodes?: readonly string[];
   brandName?: string | null;
+  manufacturerCountryCodes?: readonly string[];
   changeNote?: string | null;
   description?: string | null;
   descriptionEn?: string | null;
@@ -1086,8 +1713,10 @@ export type CreateAdminProductInput = Readonly<{
   actor?: string | null;
   affiliateUrl?: string | null;
   availabilityStatus?: ProductAvailabilityStatus;
+  availableCountryCodes?: readonly string[];
   brandStatus?: ProductStatus;
   brandName?: string | null;
+  manufacturerCountryCodes?: readonly string[];
   currency?: string | null;
   description?: string | null;
   descriptionEn?: string | null;
@@ -1164,12 +1793,14 @@ export type FinishProductImportRunInput = Readonly<{
 export type ResolveProductImportReviewInput = Readonly<{
   action: "approve" | "duplicate" | "ignore";
   actor?: string | null;
+  availableCountryCodes?: readonly string[];
   brandName?: string | null;
   description?: string | null;
   descriptionEn?: string | null;
   descriptionTh?: string | null;
   fdaApprovalNumber?: string | null;
   imageUrl?: string | null;
+  manufacturerCountryCodes?: readonly string[];
   mergeProductId?: string | null;
   parsedFacts?: readonly ProductImportFactInput[];
   productAudience?: ProductAudience;
@@ -1212,6 +1843,34 @@ function cleanNullableText(value: unknown, max = 2000) {
   const trimmed = value.trim();
 
   return trimmed ? trimmed.slice(0, max) : null;
+}
+
+function productTitleLooksEnglish(value: string) {
+  const text = value.trim();
+
+  if (!text) {
+    return false;
+  }
+
+  if (/[\u0E00-\u0E7F\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/u.test(text)) {
+    return false;
+  }
+
+  return /[A-Za-z]/.test(text);
+}
+
+export function preferredProductTitle(input: Readonly<{
+  title: string;
+  titleEn?: string | null;
+}>) {
+  const title = input.title.trim();
+  const titleEn = cleanNullableText(input.titleEn, 500);
+
+  if (titleEn && !productTitleLooksEnglish(title)) {
+    return titleEn;
+  }
+
+  return title;
 }
 
 function normalizedUrl(value: string) {
@@ -1859,7 +2518,10 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
     throw new Error("Database is not configured");
   }
 
-  const title = input.title.trim();
+  const rawTitle = input.title.trim();
+  const titleEn = cleanNullableText(input.titleEn, 500);
+  const titleTh = cleanNullableText(input.titleTh, 500);
+  const title = preferredProductTitle({ title: rawTitle, titleEn });
   const productUrl = input.productUrl.trim();
   const descriptionEn = cleanNullableText(input.descriptionEn, 4000);
   const descriptionTh = cleanNullableText(input.descriptionTh, 4000);
@@ -1869,6 +2531,9 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
   );
   const sourceSnapshot = {
     ...(input.sourceSnapshot ?? {}),
+    ...(rawTitle !== title ? { originalProductTitle: rawTitle } : {}),
+    ...(titleEn ? { titleEn } : {}),
+    ...(titleTh ? { titleTh } : {}),
     ...(descriptionEn ? { descriptionEn } : {}),
     ...(descriptionTh ? { descriptionTh } : {})
   };
@@ -1877,11 +2542,15 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
     throw new Error("Product title and URL are required");
   }
 
-  const facts = input.facts ?? [];
-  const supplementMatchesByFactName = await supplementIdsForFacts(sql, facts);
-  const brandName = cleanNullableText(input.brandName, 200);
-  const normalizedBrandName = brandName ? normalizeProductKey(brandName) : null;
-  let brandRows: Array<{ id: string }> = [];
+	  const facts = input.facts ?? [];
+	  const supplementMatchesByFactName = await supplementIdsForFacts(sql, facts);
+	  const brandName = cleanNullableText(input.brandName, 200);
+	  const normalizedBrandName = brandName ? normalizeProductKey(brandName) : null;
+	  const regionCountryCodes = normalizeProductCountryCodes(
+	    [input.region],
+	    [defaultProductCountryCode]
+	  );
+	  let brandRows: Array<{ id: string }> = [];
 
   if (normalizedBrandName && brandName) {
     brandRows = await sql<Array<{ id: string }>>`
@@ -1902,14 +2571,39 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
         on conflict (normalized_name) do update set
           status = case
             when public.product_brands.status = 'ignored' then public.product_brands.status
+            when ${input.brandStatus ?? null} = 'approved' then 'approved'
+            when public.product_brands.status = 'approved' then public.product_brands.status
             when ${input.brandStatus ?? null}::text is null then public.product_brands.status
             else ${input.brandStatus ?? null}
           end,
           updated_at = now()
         returning id::text
       `;
-  }
-  const productRows = await sql<Array<{ id: string }>>`
+	  }
+	  const brandId = brandRows[0]?.id ?? null;
+	  const manufacturerCountryCodes = brandId
+	    ? input.manufacturerCountryCodes !== undefined
+	      ? await replaceBrandCountryCodes(sql, brandId, input.manufacturerCountryCodes)
+	      : await ensureBrandCountryCodes(sql, brandId, regionCountryCodes)
+	    : [];
+	  const productCountryCodes = input.availableCountryCodes !== undefined
+	    ? normalizeSubmittedProductCountryCodes(
+	        input.availableCountryCodes,
+	        "Product countries"
+	      )
+	    : normalizeProductCountryCodes(
+	        [],
+	        brandId ? manufacturerCountryCodes : regionCountryCodes
+	      );
+
+	  if (brandId) {
+	    assertProductCountriesAllowedByBrand(
+	      productCountryCodes,
+	      manufacturerCountryCodes,
+	      brandName
+	    );
+	  }
+	  const productRows = await sql<Array<{ id: string }>>`
     insert into public.products (
       platform,
       region,
@@ -1946,15 +2640,15 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       ${cleanNullableText(input.externalProductId, 300)},
       ${title},
       ${normalizeProductKey(title)},
-      ${brandRows[0]?.id ?? null}::uuid,
+	      ${brandId}::uuid,
       ${brandName},
       ${normalizedBrandName},
       ${cleanNullableText(input.imageUrl)},
       ${productUrl},
       ${normalizedUrl(productUrl)},
       ${description},
-      ${cleanNullableText(input.titleEn, 500)},
-      ${cleanNullableText(input.titleTh, 500)},
+      ${titleEn},
+      ${titleTh},
       ${cleanNullableText(input.fdaApprovalNumber, 100)},
       ${cleanNullableText(input.sourceUrl) ?? productUrl},
       ${sql.json(toJsonValue(sourceSnapshot))}::jsonb,
@@ -1997,11 +2691,13 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
   `;
   const productId = productRows[0]?.id;
 
-  if (!productId) {
-    throw new Error("Product was not created");
-  }
+	  if (!productId) {
+	    throw new Error("Product was not created");
+	  }
 
-  if (descriptionEn || descriptionTh) {
+	  await replaceProductCountryCodes(sql, productId, productCountryCodes);
+	
+	  if (descriptionEn || descriptionTh) {
     try {
       await sql`
         update public.products
@@ -2071,8 +2767,10 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       ${productId}::uuid,
       ${input.actor ?? "admin_dashboard"},
       'product_created',
-      ${sql.json({
-        platform: input.platform,
+	      ${sql.json({
+	        availableCountryCodes: productCountryCodes,
+	        manufacturerCountryCodes,
+	        platform: input.platform,
         productUrl,
         validation: validation.validation,
         title,
@@ -2086,6 +2784,8 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
   if (!row) {
     throw new Error("Product not found after creation");
   }
+
+  clearProductRecommendationCandidateCache();
 
   return row;
 }
@@ -2108,6 +2808,10 @@ export async function deletePendingManufacturerImportProduct(productId: string) 
       and source = 'manufacturer_import'
     returning id::text
   `;
+
+  if (rows[0]) {
+    clearProductRecommendationCandidateCache();
+  }
 
   return Boolean(rows[0]);
 }
@@ -2137,11 +2841,13 @@ export async function importDiscoveredMarketplaceProducts(input: Readonly<{
       await createAdminProduct({
         actor: input.actor ?? "product_matcher",
         availabilityStatus: snapshot.availabilityStatus,
+        availableCountryCodes: [snapshot.region],
         brandName: snapshot.brandName,
         currency: snapshot.currency,
         facts,
         imageUrl: snapshot.imageUrl,
         labelStatus: facts.length > 0 ? "parsed" : "missing",
+        manufacturerCountryCodes: [snapshot.region],
         status: "pending_review",
         externalProductId: snapshot.externalProductId,
         platform: snapshot.platform,
@@ -2174,10 +2880,14 @@ export async function stageProductImport(input: StageProductImportInput) {
   }
 
   const brandName = input.brandName.trim();
-  const productTitle = input.productTitle.trim();
+  const rawProductTitle = input.productTitle.trim();
   const sourceUrl = input.sourceUrl.trim();
   const titleEn = cleanNullableText(input.titleEn, 500);
   const titleTh = cleanNullableText(input.titleTh, 500);
+  const productTitle = preferredProductTitle({
+    title: rawProductTitle,
+    titleEn
+  });
   const descriptionEn = cleanNullableText(input.descriptionEn, 4000);
   const descriptionTh = cleanNullableText(input.descriptionTh, 4000);
   const description = cleanNullableText(
@@ -2244,6 +2954,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       ${sql.json(toJsonValue(parsedFacts))}::jsonb,
       ${sql.json(toJsonValue({
         ...(input.rawSnapshot ?? {}),
+        ...(rawProductTitle !== productTitle ? { originalProductTitle: rawProductTitle } : {}),
         ...(titleEn ? { titleEn } : {}),
         ...(titleTh ? { titleTh } : {}),
         ...(description ? { description } : {}),
@@ -2285,6 +2996,7 @@ export async function stageProductImport(input: StageProductImportInput) {
     const draftProduct = await createAdminProduct({
       actor: input.actor ?? "manufacturer_scraper",
       availabilityStatus: "unknown",
+      availableCountryCodes: [defaultProductCountryCode],
       brandStatus: "pending_review",
       brandName,
       description,
@@ -2294,6 +3006,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       fdaApprovalNumber: cleanNullableText(input.fdaApprovalNumber, 100),
       imageUrl: imageUrls[0] ?? null,
       labelStatus: parsedFacts.length > 0 ? "parsed" : "missing",
+      manufacturerCountryCodes: [defaultProductCountryCode],
       status: "pending_review",
       platform: "manual",
       productAudience: productAudienceFromSnapshot(input.rawSnapshot),
@@ -2304,6 +3017,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       source: "manufacturer_import",
       sourceSnapshot: {
         ...(input.rawSnapshot ?? {}),
+        ...(rawProductTitle !== productTitle ? { originalProductTitle: rawProductTitle } : {}),
         ...(titleEn ? { titleEn } : {}),
         ...(titleTh ? { titleTh } : {}),
         ...(description ? { description } : {}),
@@ -2361,6 +3075,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       commentType: "instruction",
       metadata: {
         duplicateProductIds,
+        ...(rawProductTitle !== productTitle ? { originalProductTitle: rawProductTitle } : {}),
         importId,
         parseConfidence: input.parseConfidence ?? "moderate",
         sourceUrl
@@ -2386,6 +3101,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       parsedFacts,
       productImportId: importId,
       productName: productTitle,
+      ...(rawProductTitle !== productTitle ? { originalProductTitle: rawProductTitle } : {}),
       productTitleEn: titleEn,
       productTitleTh: titleTh,
       reviewKind: "product_import",
@@ -2424,6 +3140,7 @@ export async function stageProductImport(input: StageProductImportInput) {
         brandName,
         importId,
         importRunId: input.importRunId ?? null,
+        ...(rawProductTitle !== productTitle ? { originalProductTitle: rawProductTitle } : {}),
         productTitle,
         productId: draftProductId,
         reviewTaskId: task.id,
@@ -2617,6 +3334,7 @@ export async function resolveProductImportReview(
     const row = await createAdminProduct({
       actor: input.actor ?? "admin_dashboard",
       availabilityStatus: "in_stock",
+      availableCountryCodes: input.availableCountryCodes,
       brandStatus: "approved",
       brandName: reviewBrandName,
       description: reviewDescription,
@@ -2626,6 +3344,7 @@ export async function resolveProductImportReview(
       fdaApprovalNumber: reviewFdaApprovalNumber,
       imageUrl: reviewImageUrl,
       labelStatus: reviewFacts.length > 0 ? "parsed" : "missing",
+      manufacturerCountryCodes: input.manufacturerCountryCodes,
       status: "approved",
       platform: "manual",
       productAudience: input.productAudience ?? productAudienceFromSnapshot(productImport.raw_snapshot),
@@ -2739,6 +3458,8 @@ export async function resolveProductImportReview(
     ? null
     : await loadAdminProductRow(productId);
 
+  clearProductRecommendationCandidateCache();
+
   return {
     productId,
     removedTaskIds: [input.taskId],
@@ -2833,6 +3554,8 @@ export async function upsertProductOffer(
     )
   `;
 
+  clearProductRecommendationCandidateCache();
+
   return loadAdminProductRow(productId);
 }
 
@@ -2871,7 +3594,106 @@ export async function removeProductOffer(
     )
   `;
 
-  return loadAdminProductRow(productId);
+  clearProductRecommendationCandidateCache();
+
+	  return loadAdminProductRow(productId);
+	}
+	
+export async function updateProductBrandCountries(input: Readonly<{
+  actor?: string | null;
+  brandId: string;
+  countryCodes: readonly string[];
+}>) {
+  const sql = getSql();
+  const brandId = isUuidValue(input.brandId) ? input.brandId : null;
+
+  if (!sql || !brandId) {
+    throw new Error("Manufacturer country update requires a valid brand id");
+  }
+
+  const beforeRows = await sql<Array<{
+    before_payload: unknown;
+    name: string;
+  }>>`
+    select to_jsonb(product_brands.*) as before_payload, name
+    from public.product_brands
+    where id = ${brandId}::uuid
+    limit 1
+  `;
+
+  if (!beforeRows[0]) {
+    throw new Error("Manufacturer not found");
+  }
+
+  const countryCodes = await replaceBrandCountryCodes(
+    sql,
+    brandId,
+    input.countryCodes
+  );
+
+  await sql`
+    update public.product_brands
+    set
+      country_code = ${countryCodes[0] ?? defaultProductCountryCode},
+      updated_at = now()
+    where id = ${brandId}::uuid
+  `;
+
+  await sql`
+    delete from public.product_countries
+    using public.products
+    where product_countries.product_id = products.id
+      and products.brand_id = ${brandId}::uuid
+      and product_countries.country_code <> all(${countryCodes}::text[])
+  `;
+
+  await sql`
+    insert into public.product_countries (
+      product_id,
+      country_code,
+      created_at,
+      updated_at
+    )
+    select
+      products.id,
+      ${countryCodes[0] ?? defaultProductCountryCode},
+      now(),
+      now()
+    from public.products
+    where products.brand_id = ${brandId}::uuid
+      and not exists (
+        select 1
+        from public.product_countries
+        where product_countries.product_id = products.id
+      )
+    on conflict (product_id, country_code) do update set
+      updated_at = excluded.updated_at
+  `;
+
+  await sql`
+    insert into public.product_admin_audit (
+      brand_id,
+      action,
+      actor,
+      before_payload,
+      after_payload
+    )
+    values (
+      ${brandId}::uuid,
+      'product_brand_countries_updated',
+      ${input.actor ?? "admin_dashboard"},
+      ${sql.json(toJsonValue(beforeRows[0].before_payload ?? {}))}::jsonb,
+      ${sql.json(toJsonValue({ countryCodes }))}::jsonb
+    )
+  `;
+
+  clearProductRecommendationCandidateCache();
+
+  return {
+    brandId,
+    countryCodes,
+    name: beforeRows[0].name
+  };
 }
 
 export async function updateAdminProduct(input: UpdateAdminProductInput) {
@@ -2881,8 +3703,17 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
     throw new Error("Database is not configured");
   }
 
-  const beforeRows = await sql`
-    select to_jsonb(products.*) as before_payload
+  const beforeRows = await sql<Array<{
+    before_payload: unknown;
+    brand_id: string | null;
+    brand_name: string | null;
+    region: string;
+  }>>`
+    select
+      to_jsonb(products.*) as before_payload,
+      products.brand_id::text,
+      products.brand_name,
+      products.region
     from public.products
     where id = ${input.id}::uuid
     limit 1
@@ -2950,12 +3781,50 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
         returning id::text
       `;
   }
-  const brandId = normalizedBrandName === undefined
-    ? undefined
-    : normalizedBrandName
-      ? brandRows[0]?.id ?? null
-      : null;
-  const titleParam = title ?? null;
+	  const brandId = normalizedBrandName === undefined
+	    ? undefined
+	    : normalizedBrandName
+	      ? brandRows[0]?.id ?? null
+	      : null;
+	  const effectiveBrandId = brandId === undefined ? beforeRows[0].brand_id : brandId;
+	  const effectiveBrandName = brandName === undefined
+	    ? beforeRows[0].brand_name
+	    : brandName;
+	  const existingProductCountryCodes = await loadProductCountryCodes(
+	    sql,
+	    input.id,
+	    [beforeRows[0].region]
+	  );
+	  let manufacturerCountryCodes: ProductCountryCode[] = [];
+
+	  if (effectiveBrandId) {
+	    manufacturerCountryCodes = input.manufacturerCountryCodes !== undefined
+	      ? await replaceBrandCountryCodes(
+	          sql,
+	          effectiveBrandId,
+	          input.manufacturerCountryCodes
+	        )
+	      : await ensureBrandCountryCodes(
+	          sql,
+	          effectiveBrandId,
+	          existingProductCountryCodes
+	        );
+	  }
+	  const productCountryCodes = input.availableCountryCodes !== undefined
+	    ? normalizeSubmittedProductCountryCodes(
+	        input.availableCountryCodes,
+	        "Product countries"
+	      )
+	    : existingProductCountryCodes;
+
+	  if (effectiveBrandId) {
+	    assertProductCountriesAllowedByBrand(
+	      productCountryCodes,
+	      manufacturerCountryCodes,
+	      effectiveBrandName
+	    );
+	  }
+	  const titleParam = title ?? null;
   const titleEnParam = titleEn ?? null;
   const titleThParam = titleTh ?? null;
   const brandNameParam = brandName ?? null;
@@ -3026,20 +3895,24 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
     returning id::text
   `;
 
-  if (input.facts !== undefined) {
-    const facts = normalizedFactsForStorage(input.facts);
-    const supplementMatchesByFactName = await supplementIdsForFacts(sql, facts);
+	  if (input.facts !== undefined) {
+	    const facts = normalizedFactsForStorage(input.facts);
+	    const supplementMatchesByFactName = await supplementIdsForFacts(sql, facts);
 
     await replaceProductFacts(sql, {
       deleteSources: [],
       facts,
       productId: input.id,
       source: input.factsSource?.trim() || "admin",
-      supplementMatchesByFactName
-    });
-  }
+	      supplementMatchesByFactName
+	    });
+	  }
 
-  if (input.descriptionEn !== undefined || input.descriptionTh !== undefined) {
+	  if (input.availableCountryCodes !== undefined) {
+	    await replaceProductCountryCodes(sql, input.id, productCountryCodes);
+	  }
+	
+	  if (input.descriptionEn !== undefined || input.descriptionTh !== undefined) {
     try {
       await sql`
         update public.products
@@ -3092,19 +3965,25 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
       ${input.id}::uuid,
       ${input.actor ?? "admin_dashboard"},
       'product_updated',
-      ${sql.json(beforeRows[0].before_payload ?? {})}::jsonb,
-      ${sql.json({
-        brandName: input.brandName,
-        changeNote: input.changeNote,
+      ${sql.json(toJsonValue(beforeRows[0].before_payload ?? {}))}::jsonb,
+	      ${sql.json({
+	        availableCountryCodes: input.availableCountryCodes === undefined
+	          ? undefined
+	          : productCountryCodes,
+	        brandName: input.brandName,
+	        changeNote: input.changeNote,
         description: input.description,
         descriptionEn: input.descriptionEn,
         descriptionTh: input.descriptionTh,
         facts: input.facts,
-        factsSource: input.factsSource,
-        fdaApprovalNumber: input.fdaApprovalNumber,
-        imageUrl: input.imageUrl,
-        labelStatus: input.labelStatus,
-        status: input.status,
+	        factsSource: input.factsSource,
+	        fdaApprovalNumber: input.fdaApprovalNumber,
+	        imageUrl: input.imageUrl,
+	        labelStatus: input.labelStatus,
+	        manufacturerCountryCodes: input.manufacturerCountryCodes === undefined
+	          ? undefined
+	          : manufacturerCountryCodes,
+	        status: input.status,
         validation: validation.validation,
         productAudience: input.productAudience,
         productKind: input.productKind,
@@ -3127,6 +4006,8 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
   if (!row) {
     throw new Error("Product not found after update");
   }
+
+  clearProductRecommendationCandidateCache();
 
   return row;
 }

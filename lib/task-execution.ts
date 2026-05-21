@@ -218,19 +218,36 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
   }
 
   if (workItem.taskType === "generate_product_recommendations") {
+    const matcherStartedAt = Date.now();
     const recommendations = recommendProductStackFullBeam({
       candidates: workItem.candidates,
       clientContext: workItem.clientContext,
       clientSex: workItem.clientSex,
-      needs: workItem.needs
+      countryCode: workItem.countryCode,
+      needs: workItem.needs,
+      stackPreference: workItem.stackPreference
     });
+    const matcherMs = Date.now() - matcherStartedAt;
 
     return {
       discovery: {
         diagnostics: [],
         products: []
       },
-      recommendations
+      recommendations: {
+        ...recommendations,
+        diagnostics: {
+          ...recommendations.diagnostics,
+          trace: {
+            ...recommendations.diagnostics.trace,
+            timingMs: {
+              ...(recommendations.diagnostics.trace?.timingMs ?? {}),
+              candidateLoadMs: workItem.candidateLoadMs ?? 0,
+              matcherMs
+            }
+          }
+        }
+      }
     };
   }
 

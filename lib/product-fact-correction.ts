@@ -83,6 +83,33 @@ export type ProductFactCorrectionDraftResult = Readonly<{
   responseId?: string;
 }>;
 
+export type ProductCatalogueEnrichmentDraftInput = Readonly<{
+  brandName?: string | null;
+  currentFacts?: unknown;
+  description?: string | null;
+  descriptionEn?: string | null;
+  descriptionTh?: string | null;
+  imageUrls?: readonly string[];
+  productTitle: string;
+  productTitleEn?: string | null;
+  productTitleTh?: string | null;
+  productUrl: string;
+  productAudience?: ProductAudience | null;
+  sourceSnapshot?: unknown;
+}>;
+
+export type ProductCatalogueEnrichmentDraftResult = Readonly<{
+  descriptionEn: string | null;
+  descriptionTh: string | null;
+  facts: ProductImportFactInput[];
+  notes: string | null;
+  productAudience: ProductAudience;
+  responseId?: string;
+  titleEn: string | null;
+  titleTh: string | null;
+  warnings: string[];
+}>;
+
 const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
 const DEFAULT_GROK_MODEL = "grok-4.3";
 const DEFAULT_REASONING_EFFORT = "low";
@@ -407,11 +434,14 @@ function sanitizedFacts(
     const canonical = findCanonical(normalizedName, requestedSupplementId, lookup);
     const unit = textOrNull(payload.unit, 40);
     const concentrationUnit = Boolean(unit && /(?:\/|\bper\b)/i.test(unit));
+    const evidenceSource = textOrNull(payload.evidenceSource, 80);
+    const sourceText = textOrNull(payload.sourceText, 900);
     const fact: ProductImportFactInput = {
       amount: concentrationUnit ? null : numberOrNull(payload.amount),
       confidence: concentrationUnit ? "low" : confidenceValue(payload.confidence),
       itemType: "supplement",
       name: canonical?.name ?? normalizedName,
+      sourceText: [evidenceSource, sourceText].filter(Boolean).join(": ") || null,
       supplementId: canonical?.id ?? null,
       unit: concentrationUnit ? null : unit
     };
@@ -431,12 +461,26 @@ function sanitizedFacts(
 }
 
 async function callGrok(input: Readonly<{
+  allowPublicKnowledgeFallback?: boolean;
   catalogue: readonly CanonicalSupplementForCorrection[];
   product: ProductForCorrection;
+  purpose?: string;
 }>) {
   const grok = config();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const fallbackInstructions = input.allowPublicKnowledgeFallback
+    ? [
+      "Fallback mode is enabled because deterministic page parsing and strict correction did not produce usable facts.",
+      "You may use well-known public manufacturer/product knowledge together with the supplied product URL, title, and page text to propose likely active ingredients.",
+      "Only include a dose when you are confident it is the product's per serving, per tablet, per capsule, or per daily dose amount.",
+      "When dose is uncertain, include the active ingredient with amount null and unit null.",
+      "Use low confidence unless the supplied source evidence or widely published label data clearly supports both identity and dose.",
+      "These fallback facts are review-required and must not be treated as approved without human review."
+    ]
+    : [
+      "Never invent ingredients or doses that are not supported by the supplied product page data."
+    ];
 
   try {
     const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
@@ -463,7 +507,7 @@ async function callGrok(input: Readonly<{
               "When structured active ingredient rows are supplied in sourceSnapshot, treat them as the most authoritative source for ingredient identity and dose.",
               "If marketing description claims extra active ingredients that do not appear in structured rows, include them only with null amount/unit and moderate or low confidence.",
               "Recognize PEA, Palmidrol, Levagen+ and palmitoylethanolamide as the same active ingredient family.",
-              "Never invent ingredients or doses that are not supported by the supplied product page data.",
+              ...fallbackInstructions,
               "Use confidence high only when both identity and dose are explicit; moderate for clear identity with uncertain dose; low for weak or inferred identity."
             ].join("\n"),
             role: "system"
@@ -544,7 +588,7 @@ async function callGrok(input: Readonly<{
         productUrl: input.product.productUrl
       },
       model: completion.model ?? grok.model,
-      purpose: "product_fact_correction",
+      purpose: input.purpose ?? "product_fact_correction",
       reasoningEffort: grok.reasoningEffort,
       responseId: completion.id,
       usage: completion.usage
@@ -554,6 +598,226 @@ async function callGrok(input: Readonly<{
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function callGrokCatalogueEnrichment(input: Readonly<{
+  catalogue: readonly CanonicalSupplementForCorrection[];
+  imageUrls: readonly string[];
+  product: ProductForCorrection;
+}>) {
+  const grok = config();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const systemMessage = {
+    content: [
+      "You enrich a supplement product catalogue for MattaNutra product matching.",
+      "This is internal catalogue data extraction, not customer advice.",
+      "Return JSON only. No markdown and no prose outside JSON.",
+      "Return exactly one root JSON object with keys: titleEn, titleTh, descriptionEn, descriptionTh, facts, productAudience, notes, warnings.",
+      "Use the supplied source page, label image URLs, and public manufacturer/product knowledge.",
+      "A faithful Thai/English translation or neutral catalogue summary is allowed.",
+      "Do not make medical treatment claims. Keep descriptions neutral and concise.",
+      "Use canonicalSupplementCatalogue as the vocabulary. If a canonical supplement fits, set name and supplementId exactly.",
+      "Only produce high confidence when identity and dose are clear from source page, label image/OCR, or well-known manufacturer-public label data.",
+      "Set evidenceSource to page_text, label_image, manufacturer_public, or inferred_name_only for every fact.",
+      "For manufacturer_public facts, include dose only when you are confident in the per serving, per capsule, per tablet, or per daily dose amount.",
+      "Do not treat concentrations like IU/g, percentages, excipients, colours, capsule shells, or flavours as usable product doses.",
+      "If the product clearly contains an active but dose is unavailable, keep amount and unit null and confidence low or moderate.",
+      "Default productAudience to both unless clearly sex-specific."
+    ].join("\n"),
+    role: "system"
+  };
+  const textContent = JSON.stringify(
+    {
+      canonicalSupplementCatalogue: input.catalogue.map((item) => ({
+        aliases: item.aliases,
+        category: item.category,
+        id: item.id,
+        listStatus: item.listStatus,
+        maxAmount: item.maxAmount,
+        maxUnit: item.maxUnit,
+        name: item.name,
+        normalizedName: item.normalizedName
+      })),
+      output: {
+        descriptionEn: "short neutral English catalogue description",
+        descriptionTh: "short neutral Thai catalogue description",
+        facts: [
+          {
+            amount: "number or null",
+            confidence: "high | moderate | low",
+            evidenceSource: "page_text | label_image | manufacturer_public | inferred_name_only",
+            name: "canonical supplement name where possible",
+            sourceText: "short evidence phrase",
+            supplementId: "canonical supplement id where possible, else null",
+            unit: "mg | mcg | IU | g | billion CFU | etc, or null"
+          }
+        ],
+        notes: "short admin-facing enrichment notes",
+        productAudience: "both | male | female",
+        titleEn: "English product title",
+        titleTh: "Thai product title",
+        warnings: ["short warnings if evidence is weak"]
+      },
+      product: {
+        brandName: input.product.brandName,
+        currentDescription: input.product.description,
+        currentDescriptionEn: input.product.descriptionEn,
+        currentDescriptionTh: input.product.descriptionTh,
+        currentFacts: input.product.facts,
+        currentProductAudience: input.product.productAudience,
+        currentTitle: input.product.title,
+        currentTitleEn: input.product.titleEn,
+        currentTitleTh: input.product.titleTh,
+        imageUrls: input.imageUrls,
+        productUrl: input.product.productUrl,
+        sourceSnapshot: compactJson(input.product.sourceSnapshot, 26_000)
+      }
+    },
+    null,
+    2
+  );
+  const imageParts = input.imageUrls.slice(0, 2).flatMap((url) => {
+    if (!/^https?:\/\//i.test(url)) {
+      return [];
+    }
+
+    return [{
+      image_url: { url },
+      type: "image_url"
+    }];
+  });
+  const textUserMessage = {
+    content: textContent,
+    role: "user"
+  };
+  const visionUserMessage = imageParts.length > 0
+    ? {
+      content: [
+        { text: textContent, type: "text" },
+        ...imageParts
+      ],
+      role: "user"
+    }
+    : textUserMessage;
+
+  async function request(messages: unknown[]) {
+    const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
+      body: JSON.stringify({
+        messages,
+        model: grok.model,
+        max_tokens: 2600,
+        reasoning_effort: grok.reasoningEffort,
+        response_format: { type: "json_object" },
+        stream: false,
+        temperature: 0
+      }),
+      headers: {
+        Authorization: `Bearer ${grok.apiKey}`,
+        "Content-Type": "application/json"
+      },
+      method: "POST",
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(
+        `xAI product catalogue enrichment failed with ${response.status}: ${body.slice(0, 500)}`
+      );
+    }
+
+    return (await response.json()) as XaiChatCompletion;
+  }
+
+  try {
+    let imageRetry = false;
+    let completion: XaiChatCompletion;
+
+    try {
+      completion = await request([systemMessage, visionUserMessage]);
+    } catch (error) {
+      if (imageParts.length < 1) {
+        throw error;
+      }
+
+      imageRetry = true;
+      completion = await request([systemMessage, textUserMessage]);
+    }
+
+    await recordXaiUsageCost({
+      metadata: {
+        imageRetry,
+        productId: input.product.id,
+        productTitle: input.product.title,
+        productUrl: input.product.productUrl
+      },
+      model: completion.model ?? grok.model,
+      purpose: "product_catalogue_enrichment",
+      reasoningEffort: grok.reasoningEffort,
+      responseId: completion.id,
+      usage: completion.usage
+    });
+
+    return completion;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function warningsValue(value: unknown) {
+  return Array.isArray(value)
+    ? value.flatMap((warning) => {
+      const text = textOrNull(warning, 300);
+
+      return text ? [text] : [];
+    })
+    : [];
+}
+
+export async function enrichDraftProductCatalogueWithAi(
+  input: ProductCatalogueEnrichmentDraftInput
+): Promise<ProductCatalogueEnrichmentDraftResult> {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const catalogue = await loadCanonicalSupplements(sql);
+  const product: ProductForCorrection = {
+    brandName: input.brandName ?? null,
+    description: input.description ?? null,
+    descriptionEn: input.descriptionEn ?? null,
+    descriptionTh: input.descriptionTh ?? null,
+    facts: input.currentFacts ?? [],
+    id: null,
+    productAudience: input.productAudience ?? "both",
+    productUrl: input.productUrl,
+    sourceSnapshot: input.sourceSnapshot ?? null,
+    title: input.productTitle,
+    titleEn: input.productTitleEn ?? null,
+    titleTh: input.productTitleTh ?? null
+  };
+  const completion = await callGrokCatalogueEnrichment({
+    catalogue,
+    imageUrls: input.imageUrls ?? [],
+    product
+  });
+  const parsed = parseJsonObject(completion.choices?.[0]?.message?.content);
+  const facts = sanitizedFacts(parsed, catalogue);
+
+  return {
+    descriptionEn: textOrNull(parsed.descriptionEn, 1600),
+    descriptionTh: textOrNull(parsed.descriptionTh, 1600),
+    facts,
+    notes: textOrNull(parsed.notes, 1000),
+    productAudience: productAudienceValue(parsed.productAudience),
+    responseId: completion.id,
+    titleEn: textOrNull(parsed.titleEn, 500),
+    titleTh: textOrNull(parsed.titleTh, 500),
+    warnings: warningsValue(parsed.warnings)
+  };
 }
 
 export async function correctDraftProductFactsWithAi(
@@ -586,6 +850,51 @@ export async function correctDraftProductFactsWithAi(
 
   if (facts.length < 1) {
     throw new Error("AI returned no usable product facts");
+  }
+
+  return {
+    facts,
+    notes: textOrNull(parsed.notes, 1000),
+    productAudience: productAudienceValue(parsed.productAudience),
+    responseId: completion.id
+  };
+}
+
+export async function recoverDraftProductFactsWithAi(
+  input: ProductFactCorrectionDraftInput
+): Promise<ProductFactCorrectionDraftResult> {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const catalogue = await loadCanonicalSupplements(sql);
+  const product: ProductForCorrection = {
+    brandName: input.brandName ?? null,
+    description: input.description ?? null,
+    descriptionEn: input.descriptionEn ?? null,
+    descriptionTh: input.descriptionTh ?? null,
+    facts: input.currentFacts ?? [],
+    id: null,
+    productAudience: input.productAudience ?? "both",
+    productUrl: input.productUrl,
+    sourceSnapshot: input.sourceSnapshot ?? null,
+    title: input.productTitle,
+    titleEn: input.productTitleEn ?? null,
+    titleTh: input.productTitleTh ?? null
+  };
+  const completion = await callGrok({
+    allowPublicKnowledgeFallback: true,
+    catalogue,
+    product,
+    purpose: "product_fact_recovery"
+  });
+  const parsed = parseJsonObject(completion.choices?.[0]?.message?.content);
+  const facts = sanitizedFacts(parsed, catalogue);
+
+  if (facts.length < 1) {
+    throw new Error("AI fallback returned no usable product facts");
   }
 
   return {
