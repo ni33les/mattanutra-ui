@@ -191,6 +191,13 @@ export type ProductRecommendationSummary = {
   status: ProductRecommendationStatus;
 };
 
+export type ProductRecommendationOption = {
+  id: ProductStackPreference;
+  maxProducts?: number | null;
+  productRecommendations: ProductRecommendationSummary;
+  recommendations: RecommendedProduct[];
+};
+
 export type AssessmentSummary = {
   constraints: string[];
   goals: string[];
@@ -231,6 +238,7 @@ export type FormulationResult = FormulationBlueprint & FoodGuidanceBlueprint & {
   nutritionReport?: NutritionReport | null;
   planId: string;
   previewLimit?: number;
+  productRecommendationOptions?: ProductRecommendationOption[];
   productRecommendations?: ProductRecommendationSummary;
   recommendations: RecommendedProduct[];
   schemaVersion: 1;

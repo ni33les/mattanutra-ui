@@ -19,6 +19,8 @@ import {
   type MarketingPoint,
   type NutritionReport,
   type ProductNeedCoverage,
+  type ProductRecommendationOption,
+  type ProductStackPreference,
   type RecommendedProduct
 } from "@/lib/formulation-types";
 import {
@@ -78,6 +80,12 @@ export function hasHealthScoreAdvice(value: unknown) {
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function asProductStackPreference(value: unknown): ProductStackPreference | undefined {
+  return value === "compact" || value === "max_coverage" || value === "balanced"
+    ? value
+    : undefined;
 }
 
 function safetySummaryFromRecord(
@@ -1238,6 +1246,7 @@ export async function getStoredFormulationResult(
       product_recommendation_run.diagnostics as product_recommendation_diagnostics,
       product_recommendation_run.stack_preference as product_recommendation_stack_preference,
       product_recommendation_items_payload.recommendations as product_recommendation_items_payload,
+      product_recommendation_options_payload.options as product_recommendation_options_payload,
       product_recommendation_task.status as product_recommendation_task_status
     from assessments
     left join lateral (
@@ -1384,6 +1393,136 @@ export async function getStoredFormulationResult(
         and product_recommendation_items.run_id = product_recommendation_run.id
     ) product_recommendation_items_payload on true
     left join lateral (
+      with latest_runs as (
+        select distinct on (coalesce(diagnostics ->> 'stackPreference', 'balanced'))
+          id,
+          status,
+          stack_coverage_percent,
+          jsonb_array_length(client_needs) as client_needs_count,
+          diagnostics,
+          coalesce(diagnostics ->> 'stackPreference', 'balanced') as stack_preference,
+          notes,
+          generated_at
+        from product_recommendation_runs
+        where product_recommendation_runs.plan_id = assessments.plan_id
+        order by
+          coalesce(diagnostics ->> 'stackPreference', 'balanced'),
+          generated_at desc
+      )
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'generatedAt',
+              latest_runs.generated_at,
+            'maxProducts',
+              coalesce(
+                latest_runs.diagnostics #>> '{trace,maxProducts}',
+                latest_runs.diagnostics ->> 'maxProducts'
+              ),
+            'needsCount',
+              latest_runs.client_needs_count,
+            'notes',
+              latest_runs.notes,
+            'recommendations',
+              coalesce(option_items.recommendations, '[]'::jsonb),
+            'runId',
+              latest_runs.id::text,
+            'stackCoveragePercent',
+              latest_runs.stack_coverage_percent,
+            'stackPreference',
+              latest_runs.stack_preference,
+            'status',
+              latest_runs.status,
+            'diagnostics',
+              latest_runs.diagnostics
+          )
+          order by case latest_runs.stack_preference
+            when 'compact' then 1
+            when 'balanced' then 2
+            when 'max_coverage' then 3
+            else 4
+          end
+        ),
+        '[]'::jsonb
+      ) as options
+      from latest_runs
+      left join lateral (
+        select coalesce(
+          jsonb_agg(
+            jsonb_build_object(
+              'affiliate',
+                product_recommendation_items.offer_id is not null,
+              'covers',
+                coalesce(
+                  (
+                    select jsonb_agg(covered_need.value ->> 'sourceId')
+                    from jsonb_array_elements(product_recommendation_items.covered_needs) as covered_need(value)
+                  ),
+                  '[]'::jsonb
+                ),
+              'description',
+                coalesce(product_recommendation_items.why, ''),
+              'id',
+                products.id::text,
+              'imageUrl',
+                coalesce(
+                  products.image_url,
+                  product_recommendation_items.image_url
+                ),
+              'marketplace',
+                case products.platform
+                  when 'lazada' then 'Lazada Thailand'
+                  when 'shopee' then 'Shopee Thailand'
+                  else 'Imported product'
+                end,
+              'name',
+                products.title,
+              'price',
+                case
+                  when product_recommendation_items.price_amount is not null
+                    and product_recommendation_items.price_amount > 0
+                    then jsonb_build_object(
+                      'amount',
+                        product_recommendation_items.price_amount,
+                      'currency',
+                        product_recommendation_items.currency
+                    )
+                  else null
+                end,
+              'priority',
+                product_recommendation_items.rank,
+              'productCoveragePercent',
+                product_recommendation_items.product_coverage_percent,
+              'productId',
+                products.id::text,
+              'rank',
+                product_recommendation_items.rank,
+              'recommendationRunId',
+                product_recommendation_items.run_id::text,
+              'stackContributionPercent',
+                product_recommendation_items.stack_contribution_percent,
+              'stackCoveragePercent',
+                latest_runs.stack_coverage_percent,
+              'tag',
+                case
+                  when product_recommendation_items.offer_id is not null
+                    then 'Best match + affiliate'
+                  else 'Best match'
+                end,
+              'url',
+                product_recommendation_items.url_used
+            )
+            order by product_recommendation_items.rank
+          ),
+          '[]'::jsonb
+        ) as recommendations
+        from product_recommendation_items
+        join products
+          on products.id = product_recommendation_items.product_id
+        where product_recommendation_items.run_id = latest_runs.id
+      ) option_items on true
+    ) product_recommendation_options_payload on true
+    left join lateral (
       select status
       from tasks
       where tasks.plan_id = assessments.plan_id
@@ -1493,11 +1632,74 @@ export async function getStoredFormulationResult(
         ? new Date(row.product_recommendation_generated_at).toISOString()
         : undefined;
   const productRecommendationStackPreference =
-    row.product_recommendation_stack_preference === "compact" ||
-    row.product_recommendation_stack_preference === "max_coverage" ||
-    row.product_recommendation_stack_preference === "balanced"
-      ? row.product_recommendation_stack_preference
-      : undefined;
+    asProductStackPreference(row.product_recommendation_stack_preference);
+  const productRecommendationOptions = asArray<Record<string, unknown>>(
+    row.product_recommendation_options_payload
+  )
+    .flatMap((option): ProductRecommendationOption[] => {
+      const stackPreference = asProductStackPreference(option.stackPreference);
+      const optionRecommendations = asArray<RecommendedProduct>(
+        option.recommendations
+      );
+      const diagnostics = option.diagnostics;
+      const optionRunStatus =
+        typeof option.status === "string" ? option.status : "";
+      const optionStatus =
+        optionRunStatus === "completed"
+          ? "ready"
+          : optionRunStatus === "partial"
+            ? "partial"
+            : optionRunStatus === "failed"
+              ? "failed"
+              : undefined;
+
+      if (!stackPreference || !optionStatus) {
+        return [];
+      }
+
+      const coverage = reconcileProductRecommendationCoverage({
+        foodGuidance,
+        rawNeedCoverage: productNeedCoverageFromDiagnostics(diagnostics),
+        recommendations: optionRecommendations,
+        supplementBreakdown
+      });
+      const generatedAt =
+        option.generatedAt instanceof Date
+          ? option.generatedAt.toISOString()
+          : option.generatedAt
+            ? new Date(option.generatedAt as string).toISOString()
+            : undefined;
+      const maxProducts = Number(option.maxProducts);
+
+      return [{
+        id: stackPreference,
+        ...(Number.isFinite(maxProducts) && maxProducts > 0
+          ? { maxProducts }
+          : {}),
+        productRecommendations: {
+          ...(generatedAt ? { generatedAt } : {}),
+          matchedCount: coverage.recommendations.length,
+          needsCount:
+            coverage.needCoverage.length ||
+            Number(option.needsCount) ||
+            0,
+          ...(typeof option.notes === "string" && option.notes.trim()
+            ? { notes: option.notes.trim() }
+            : {}),
+          ...(typeof option.runId === "string" ? { runId: option.runId } : {}),
+          ...(coverage.needCoverage.length > 0
+            ? { needCoverage: coverage.needCoverage }
+            : {}),
+          stackCoveragePercent:
+            coverage.needCoverage.length > 0
+              ? coverage.stackCoveragePercent
+              : Number(option.stackCoveragePercent) || 0,
+          stackPreference,
+          status: optionStatus
+        },
+        recommendations: coverage.recommendations
+      }];
+    });
   const nutritionReport =
     hasNutritionReportRecord
       ? ({
@@ -1599,6 +1801,9 @@ export async function getStoredFormulationResult(
             status: productRecommendationStatus
           }
         }
+      : {}),
+    ...(productRecommendationOptions.length > 0
+      ? { productRecommendationOptions }
       : {}),
     recommendations: reconciledRecommendations,
     schemaVersion: 1,

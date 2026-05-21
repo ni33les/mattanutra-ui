@@ -202,6 +202,7 @@ export type ProductRecommendationTrace = Readonly<{
   contextSignals: Record<string, unknown>;
   evaluatedStackCount?: number;
   excludedPredicates: ProductRecommendationExclusion[];
+  maxProducts?: number;
   searchMode?: "full-beam" | "shortlist";
   shortfalls: Array<Readonly<{
     coveragePercent: number;
@@ -211,6 +212,7 @@ export type ProductRecommendationTrace = Readonly<{
   }>>;
   shortlistSize: number;
   stackPreference?: ProductStackPreference;
+  targetProducts?: number;
   timingMs?: Record<string, number>;
   utilityScore: number;
   weightDeltas: Record<string, number>;
@@ -225,6 +227,7 @@ type CoverageResult = Readonly<{
 
 const DEFAULT_TARGET_COUNT = 3;
 const DEFAULT_MAX_COUNT = 6;
+const EXPANDED_MAX_COUNT = 12;
 const MIN_USEFUL_MARGINAL_COVERAGE = 0.02;
 const STOP_AFTER_TARGET_MARGINAL_COVERAGE = 0.08;
 const TARGET_DOSE_SWEET_SPOT_MIN = 0.7;
@@ -983,7 +986,8 @@ function stackCoveragePercent(
 function diagnosticNeeds(
   needs: ProductRecommendationNeed[],
   coverage: Map<string, number>,
-  bestRejectedByNeed: ReadonlyMap<string, ProductRecommendationExclusion>
+  bestRejectedByNeed: ReadonlyMap<string, ProductRecommendationExclusion>,
+  availableCoverageByNeed: ReadonlyMap<string, number> = new Map()
 ) {
   return needs.map((need) => {
     const bestRejected = bestRejectedByNeed.get(need.id);
@@ -993,7 +997,9 @@ function diagnosticNeeds(
       bestRejectedProductId: bestRejected?.productId ?? null,
       bestRejectedReason: bestRejected?.reason ??
         (coveragePercent <= 0
-          ? "No approved product in the catalogue covers this need"
+          ? (availableCoverageByNeed.get(need.id) ?? 0) > 0
+            ? "Available in the catalogue but not selected by this stack preference"
+            : "No approved product in the catalogue covers this need"
           : null),
       coveragePercent,
       displayName: need.displayName,
@@ -1007,6 +1013,24 @@ function factIssueExclusions(exclusions: ProductRecommendationExclusion[]) {
   return exclusions.filter((item) =>
     /validation|label|fact|safety|cache|approved|unavailable|blocked/i.test(item.reason)
   );
+}
+
+function bestAvailableCoverageByNeed(entries: readonly V2ProductEntry[]) {
+  const coverageByNeed = new Map<string, number>();
+
+  for (const entry of entries) {
+    for (const need of entry.coverage.coveredNeeds) {
+      coverageByNeed.set(
+        need.id,
+        Math.max(
+          coverageByNeed.get(need.id) ?? 0,
+          entry.coverage.coverageByNeed.get(need.id) ?? 0
+        )
+      );
+    }
+  }
+
+  return coverageByNeed;
 }
 
 function marketplaceName(platform: ProductPlatform): RecommendedProduct["marketplace"] {
@@ -1367,6 +1391,30 @@ const V2_BASE_WEIGHTS: V2Weights = {
   extras: 0.05,
   simplicity: 0.15
 };
+
+export type ProductStackVariantConfig = Readonly<{
+  maxProducts: number;
+  stackPreference: ProductStackPreference;
+  targetProducts: number;
+}>;
+
+export const PRODUCT_STACK_VARIANT_CONFIGS: readonly ProductStackVariantConfig[] = [
+  {
+    maxProducts: 3,
+    stackPreference: "compact",
+    targetProducts: 3
+  },
+  {
+    maxProducts: 6,
+    stackPreference: "balanced",
+    targetProducts: 3
+  },
+  {
+    maxProducts: EXPANDED_MAX_COUNT,
+    stackPreference: "max_coverage",
+    targetProducts: 6
+  }
+];
 
 export function normalizeProductStackPreference(
   value: unknown
@@ -2222,6 +2270,22 @@ function compareBalancedStackScores(first: V2StackScore, second: V2StackScore) {
     return coverageDelta;
   }
 
+  const matchedWeightDelta = second.matchedNeedWeight - first.matchedNeedWeight;
+
+  if (Math.abs(matchedWeightDelta) > V2_SCORE_EPSILON) {
+    return matchedWeightDelta;
+  }
+
+  const matchedCountDelta = second.matchedNeedCount - first.matchedNeedCount;
+
+  if (matchedCountDelta !== 0) {
+    return matchedCountDelta;
+  }
+
+  if (Math.abs(coverageDelta) > V2_SCORE_EPSILON) {
+    return coverageDelta;
+  }
+
   const scoreDelta = second.score - first.score;
 
   if (Math.abs(scoreDelta) > V2_DIVERSITY_SCORE_EPSILON) {
@@ -2652,6 +2716,15 @@ function beamSearchStackScores(
           metric && metric.coverage > V2_SCORE_EPSILON ? needIndex : null
         )
         .filter((needIndex): needIndex is number => needIndex !== null);
+
+      if (
+        coveredNeedIndexes.length > 0 &&
+        coveredNeedIndexes.every((needIndex) =>
+          (previous.coverageProductCounts[needIndex] ?? 0) > 0
+        )
+      ) {
+        return null;
+      }
 
       if (
         coveredNeedIndexes.length > 0 &&
@@ -3236,6 +3309,18 @@ function enumerateStackScores(
       if (
         coveredNeedIndexes.length > 0 &&
         coveredNeedIndexes.every((needIndex) =>
+          stack.some((stackEntry) =>
+            (stackEntry.metricsByNeed.get(scoringNeeds[needIndex]!.id)?.coverage ?? 0) >
+            V2_SCORE_EPSILON
+          )
+        )
+      ) {
+        continue;
+      }
+
+      if (
+        coveredNeedIndexes.length > 0 &&
+        coveredNeedIndexes.every((needIndex) =>
           (coverageSums[needIndex] ?? 0) > V2_SCORE_EPSILON
         ) &&
         coveredNeedIndexes.every((needIndex) =>
@@ -3368,7 +3453,7 @@ function recommendProductStackExact(
 ) {
   const stackPreference = normalizeProductStackPreference(input.stackPreference);
   const maxProducts = Math.min(
-    DEFAULT_MAX_COUNT,
+    EXPANDED_MAX_COUNT,
     Math.max(1, input.maxProducts ?? DEFAULT_MAX_COUNT)
   );
   const scoringNeeds = supplementProductNeeds(input.needs);
@@ -3472,7 +3557,8 @@ function recommendProductStackExact(
   const needDiagnostics = diagnosticNeeds(
     scoringNeeds,
     finalCoverage,
-    bestRejectedByNeed
+    bestRejectedByNeed,
+    bestAvailableCoverageByNeed(entries)
   );
   const selectedIds = new Set(
     bestStack?.entries.map((entry) => entry.product.id) ?? []
@@ -3516,10 +3602,12 @@ function recommendProductStackExact(
     excludedPredicates: exclusions.filter(
       (item) => item.reason !== "Product does not cover current client needs"
     ),
+    maxProducts,
     searchMode: options.searchMode,
     shortfalls: v2Shortfalls(scoringNeeds, finalCoverage),
     shortlistSize: candidatePool.length,
     stackPreference,
+    targetProducts: input.targetProducts ?? undefined,
     utilityScore: roundScore(bestStack?.score ?? 0),
     weightDeltas: deltas,
     weights

@@ -738,6 +738,29 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(result.recommendations[0]?.stackContributionPercent, 80);
   });
 
+  it("does not add a second product only to top up the same unmet need", () => {
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        product({
+          amount: 0.6,
+          id: "curcumin-primary",
+          name: "Curcumin"
+        }),
+        product({
+          amount: 0.6,
+          id: "curcumin-top-up",
+          name: "Curcumin"
+        })
+      ],
+      maxProducts: 6,
+      needs: [need("curcumin", "Curcumin", 5)]
+    });
+
+    assert.equal(result.recommendations.length, 1);
+    assert.equal(result.recommendations[0]?.product.id, "curcumin-primary");
+    assert.equal(result.recommendations[0]?.stackContributionPercent, 60);
+  });
+
   it("does not increase serving count when another fact would exceed its safety limit", () => {
     const base = product({
       amount: 0.25,

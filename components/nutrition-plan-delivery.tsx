@@ -8,7 +8,11 @@ import {
   formulationResultsCopy
 } from "@/components/formulation-results";
 import { NutritionProgress } from "@/components/nutrition-progress";
-import type { FormulationResult } from "@/lib/formulation-types";
+import type {
+  FormulationResult,
+  ProductRecommendationOption,
+  ProductStackPreference
+} from "@/lib/formulation-types";
 import type { Locale } from "@/lib/i18n";
 
 type NutritionPlanDeliveryProps = Readonly<{
@@ -45,6 +49,33 @@ const copy = {
   Record<"error" | "loadingBody" | "loadingTitle" | "subtitle" | "title", string>
 >;
 
+function productRecommendationOptionsForResult(result: FormulationResult) {
+  if (result.productRecommendationOptions?.length) {
+    return result.productRecommendationOptions;
+  }
+
+  if (!result.productRecommendations) {
+    return [];
+  }
+
+  return [{
+    id: result.productRecommendations.stackPreference ?? "balanced",
+    productRecommendations: result.productRecommendations,
+    recommendations: result.recommendations
+  }] satisfies ProductRecommendationOption[];
+}
+
+function selectProductRecommendationOption(
+  options: readonly ProductRecommendationOption[],
+  selectedPreference: ProductStackPreference | null
+) {
+  return (
+    options.find((option) => option.id === selectedPreference) ??
+    options.find((option) => option.id === "balanced") ??
+    options[0]
+  );
+}
+
 export function NutritionPlanDelivery({
   initialResult = null,
   locale,
@@ -56,6 +87,9 @@ export function NutritionPlanDelivery({
     initialResult?.nutritionReport ? "ready" : "loading"
   );
   const [result, setResult] = useState<FormulationResult | null>(initialResult);
+  const [selectedProductStackPreference, setSelectedProductStackPreference] =
+    useState<ProductStackPreference | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const finalizationRequestedRef = useRef(false);
   const productPollAttemptsRef = useRef(0);
 
@@ -152,7 +186,27 @@ export function NutritionPlanDelivery({
         window.clearTimeout(timer);
       }
     };
-  }, [locale, planId]);
+  }, [locale, planId, refreshNonce]);
+
+  useEffect(() => {
+    if (!result) {
+      setSelectedProductStackPreference(null);
+      return;
+    }
+
+    const options = productRecommendationOptionsForResult(result);
+    const defaultPreference =
+      result.productRecommendations?.stackPreference ??
+      options.find((option) => option.id === "balanced")?.id ??
+      options[0]?.id ??
+      null;
+
+    setSelectedProductStackPreference((current) =>
+      current && options.some((option) => option.id === current)
+        ? current
+        : defaultPreference
+    );
+  }, [result]);
 
   if (state === "error") {
     return (
@@ -199,6 +253,17 @@ export function NutritionPlanDelivery({
     );
   }
 
+  const productRecommendationOptions = productRecommendationOptionsForResult(result);
+  const selectedProductRecommendationOption = selectProductRecommendationOption(
+    productRecommendationOptions,
+    selectedProductStackPreference
+  );
+  const activeProductRecommendations =
+    selectedProductRecommendationOption?.productRecommendations ??
+    result.productRecommendations;
+  const activeProductRecommendationItems =
+    selectedProductRecommendationOption?.recommendations ?? result.recommendations;
+
   return (
     <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
       <NutritionProgress
@@ -223,9 +288,16 @@ export function NutritionPlanDelivery({
       />
       <ProductRecommendationsPanel
         locale={locale}
+        onRefreshRequested={() => setRefreshNonce((value) => value + 1)}
+        onStackPreferenceChange={setSelectedProductStackPreference}
         planId={planId}
-        productRecommendations={result.productRecommendations}
-        recommendations={result.recommendations}
+        productRecommendationOptions={productRecommendationOptions}
+        productRecommendations={activeProductRecommendations}
+        recommendations={activeProductRecommendationItems}
+        selectedStackPreference={
+          selectedProductRecommendationOption?.id ??
+          selectedProductStackPreference
+        }
       />
     </section>
   );

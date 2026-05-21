@@ -8,7 +8,10 @@ import {
   analyzeNutritionPlanChatWithGrok,
   analyzeNutritionReportWithGrok
 } from "@/lib/nutrition-plan-advisor-analysis";
-import { recommendProductStackFullBeam } from "@/lib/product-recommendations";
+import {
+  PRODUCT_STACK_VARIANT_CONFIGS,
+  recommendProductStackFullBeam
+} from "@/lib/product-recommendations";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 import type { TaskWorkItem } from "@/lib/task-work-items";
 import type { SendTransactionalEmailResult } from "@/lib/smtp-email";
@@ -219,14 +222,47 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
 
   if (workItem.taskType === "generate_product_recommendations") {
     const matcherStartedAt = Date.now();
-    const recommendations = recommendProductStackFullBeam({
-      candidates: workItem.candidates,
-      clientContext: workItem.clientContext,
-      clientSex: workItem.clientSex,
-      countryCode: workItem.countryCode,
-      needs: workItem.needs,
-      stackPreference: workItem.stackPreference
+    const recommendationVariants = PRODUCT_STACK_VARIANT_CONFIGS.map((config) => {
+      const variantStartedAt = Date.now();
+      const recommendations = recommendProductStackFullBeam({
+        candidates: workItem.candidates,
+        clientContext: workItem.clientContext,
+        clientSex: workItem.clientSex,
+        countryCode: workItem.countryCode,
+        maxProducts: config.maxProducts,
+        needs: workItem.needs,
+        stackPreference: config.stackPreference,
+        targetProducts: config.targetProducts
+      });
+      const variantMatcherMs = Date.now() - variantStartedAt;
+
+      return {
+        maxProducts: config.maxProducts,
+        recommendations: {
+          ...recommendations,
+          diagnostics: {
+            ...recommendations.diagnostics,
+            stackPreference: config.stackPreference,
+            trace: {
+              ...recommendations.diagnostics.trace,
+              maxProducts: config.maxProducts,
+              targetProducts: config.targetProducts,
+              timingMs: {
+                ...(recommendations.diagnostics.trace?.timingMs ?? {}),
+                candidateLoadMs: workItem.candidateLoadMs ?? 0,
+                matcherMs: variantMatcherMs
+              }
+            }
+          }
+        },
+        stackPreference: config.stackPreference
+      };
     });
+    const recommendations =
+      recommendationVariants.find((variant) =>
+        variant.stackPreference === workItem.stackPreference
+      )?.recommendations ?? recommendationVariants[1]?.recommendations ??
+      recommendationVariants[0].recommendations;
     const matcherMs = Date.now() - matcherStartedAt;
 
     return {
@@ -234,6 +270,7 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
         diagnostics: [],
         products: []
       },
+      recommendationVariants,
       recommendations: {
         ...recommendations,
         diagnostics: {

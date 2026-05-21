@@ -510,14 +510,32 @@ export async function getAdminTaskVisibilityData(
             ) then 0
             else 1
           end,
-          (
-            tasks.business_value
-            + least(
-              200,
-              floor(greatest(0, extract(epoch from now() - tasks.scheduled_for) - 300) / 900) * 10
+          case
+            when tasks.status in (
+              'queued',
+              'reserved',
+              'running',
+              'needs_review',
+              'waiting_approval'
+            ) then (
+              tasks.business_value
+              + least(
+                200,
+                floor(greatest(0, extract(epoch from now() - tasks.scheduled_for) - 300) / 900) * 10
+              )
             )
-          ) desc,
-          tasks.scheduled_for asc,
+            else 0
+          end desc,
+          case
+            when tasks.status in (
+              'queued',
+              'reserved',
+              'running',
+              'needs_review',
+              'waiting_approval'
+            ) then tasks.scheduled_for
+            else null
+          end asc,
           case tasks.status
             when 'queued' then 0
             when 'reserved' then 1
@@ -530,8 +548,9 @@ export async function getAdminTaskVisibilityData(
             when 'cancelled' then 8
             else 9
           end,
-          tasks.created_at asc
-        limit 120
+          tasks.updated_at desc,
+          tasks.created_at desc
+        limit 200
       `
     ]);
     const summaryRow = summaryRows[0];

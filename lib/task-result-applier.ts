@@ -56,11 +56,13 @@ import {
   enqueueRefinedNutritionPlanTasks
 } from "@/lib/task-worker";
 import {
+  PRODUCT_STACK_VARIANT_CONFIGS,
   normalizeProductStackPreference,
   recommendProductStackFullBeam,
   toRecommendedProduct,
   type ProductClientSex,
-  type ProductRecommendationResult
+  type ProductRecommendationResult,
+  type ProductStackPreference
 } from "@/lib/product-recommendations";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import {
@@ -1474,6 +1476,46 @@ function productRecommendationPayload(value: unknown): ProductRecommendationResu
   };
 }
 
+type ProductRecommendationVariantPayload = Readonly<{
+  maxProducts: number | null;
+  result: ProductRecommendationResult;
+  stackPreference: ProductStackPreference;
+}>;
+
+function productRecommendationVariantPayloads(
+  value: unknown
+): ProductRecommendationVariantPayload[] {
+  const payload = objectValue(value);
+  const variants = Array.isArray(payload.recommendationVariants)
+    ? payload.recommendationVariants
+    : [];
+
+  return variants.flatMap((item) => {
+    const record = objectValue(item);
+    const rawResult =
+      "recommendations" in record ? record.recommendations : record;
+    const result = productRecommendationPayload(rawResult);
+    const stackPreference = normalizeProductStackPreference(
+      record.stackPreference ?? result.diagnostics?.stackPreference
+    );
+    const maxProducts = Number(record.maxProducts);
+
+    return [{
+      maxProducts: Number.isFinite(maxProducts) && maxProducts > 0
+        ? maxProducts
+        : null,
+      result: {
+        ...result,
+        diagnostics: {
+          ...result.diagnostics,
+          stackPreference
+        }
+      },
+      stackPreference
+    }];
+  });
+}
+
 function marketplaceSnapshotPayload(value: unknown): ProductSnapshot[] {
   if (!Array.isArray(value)) {
     return [];
@@ -1643,51 +1685,33 @@ async function loadProductRecommendationCountryCode(
   return normalizeProductCountryCode(rows[0]?.country) ?? defaultProductCountryCode;
 }
 
-async function applyProductRecommendationsResult(
-  task: TaskRecord,
-  resultPayload: unknown,
-  sqlOverride?: TaskServiceDb,
-  afterCommit?: AfterCommitScheduler
-) {
-  const sql = sqlOverride ?? getSql();
-  const initialResult = productRecommendationPayload(resultPayload);
-  const discovery = productDiscoveryPayload(resultPayload);
-
-  if (!sql || !task.planId) {
-    throw new Error("Product recommendation result is missing plan");
-  }
-  const clientSex = await loadProductRecommendationClientSex(sql, task.planId);
-  const countryCode = await loadProductRecommendationCountryCode(sql, task.planId);
-  const stackPreference = normalizeProductStackPreference(
-    initialResult.diagnostics?.stackPreference ??
-      payloadText(task.payload, "stackPreference")
-  );
-  const result = initialResult.recommendations.length > 0
-    ? initialResult
-    : recommendProductStackFullBeam({
-        candidates: await getProductRecommendationCandidates({
-          countryCode,
-          includeIneligible: true
-        }),
-        countryCode,
-        clientSex,
-        needs: initialResult.clientNeeds,
-        stackPreference
-      });
-  const configuredAdapters = discovery.diagnostics.filter(
-    (item) => item.configured
-  ).length;
-  const discoveryResults = discovery.diagnostics.reduce(
-    (total, item) => total + item.resultCount,
-    0
-  );
-  const discoveryNotes =
-    discovery.diagnostics.length < 1
-      ? "Matched against the approved curated product catalogue."
-      : configuredAdapters < 1
-        ? "Marketplace discovery adapters are not configured."
-        : `Marketplace discovery returned ${discoveryResults} products.`;
-
+async function insertProductRecommendationResult({
+  countryCode,
+  discoveryNotes,
+  maxProducts,
+  result,
+  sql,
+  stackPreference,
+  task
+}: Readonly<{
+  countryCode: string;
+  discoveryNotes: string;
+  maxProducts: number | null;
+  result: ProductRecommendationResult;
+  sql: TaskServiceDb;
+  stackPreference: ProductStackPreference;
+  task: TaskRecord;
+}>) {
+  const diagnostics = {
+    ...result.diagnostics,
+    maxProducts,
+    stackPreference,
+    trace: {
+      ...result.diagnostics.trace,
+      ...(maxProducts ? { maxProducts } : {}),
+      stackPreference
+    }
+  };
   const runRows = await sql<Array<{ id: string }>>`
     insert into public.product_recommendation_runs (
       plan_id,
@@ -1718,7 +1742,7 @@ async function applyProductRecommendationsResult(
       ${result.totalPlanCoveragePercent},
       ${sql.json(toJsonValue(result.clientNeeds))}::jsonb,
       ${sql.json(toJsonValue(result.exclusions))}::jsonb,
-      ${sql.json(toJsonValue(result.diagnostics))}::jsonb,
+      ${sql.json(toJsonValue(diagnostics))}::jsonb,
       ${discoveryNotes},
       now(),
       now()
@@ -1769,6 +1793,108 @@ async function applyProductRecommendationsResult(
       )
       on conflict (run_id, product_id) do nothing
     `;
+  }
+
+  return runId;
+}
+
+async function applyProductRecommendationsResult(
+  task: TaskRecord,
+  resultPayload: unknown,
+  sqlOverride?: TaskServiceDb,
+  afterCommit?: AfterCommitScheduler
+) {
+  const sql = sqlOverride ?? getSql();
+  const initialResult = productRecommendationPayload(resultPayload);
+  const discovery = productDiscoveryPayload(resultPayload);
+
+  if (!sql || !task.planId) {
+    throw new Error("Product recommendation result is missing plan");
+  }
+  const clientSex = await loadProductRecommendationClientSex(sql, task.planId);
+  const countryCode = await loadProductRecommendationCountryCode(sql, task.planId);
+  const stackPreference = normalizeProductStackPreference(
+    initialResult.diagnostics?.stackPreference ??
+      payloadText(task.payload, "stackPreference")
+  );
+  let variants = productRecommendationVariantPayloads(resultPayload);
+
+  if (variants.length < 1 && initialResult.recommendations.length > 0) {
+    variants = [{
+      maxProducts: Number(initialResult.diagnostics?.trace?.maxProducts) || null,
+      result: initialResult,
+      stackPreference
+    }];
+  }
+
+  if (variants.length < 1) {
+    const candidates = await getProductRecommendationCandidates({
+      countryCode,
+      includeIneligible: true
+    });
+
+    variants = PRODUCT_STACK_VARIANT_CONFIGS.map((config) => ({
+      maxProducts: config.maxProducts,
+      result: recommendProductStackFullBeam({
+        candidates,
+        countryCode,
+        clientSex,
+        maxProducts: config.maxProducts,
+        needs: initialResult.clientNeeds,
+        stackPreference: config.stackPreference,
+        targetProducts: config.targetProducts
+      }),
+      stackPreference: config.stackPreference
+    }));
+  }
+
+  const selectedVariant =
+    variants.find((variant) => variant.stackPreference === stackPreference) ??
+    variants.find((variant) => variant.stackPreference === "balanced") ??
+    variants[0];
+  const result = selectedVariant.result;
+  const configuredAdapters = discovery.diagnostics.filter(
+    (item) => item.configured
+  ).length;
+  const discoveryResults = discovery.diagnostics.reduce(
+    (total, item) => total + item.resultCount,
+    0
+  );
+  const discoveryNotes =
+    discovery.diagnostics.length < 1
+      ? "Matched against the approved curated product catalogue."
+      : configuredAdapters < 1
+        ? "Marketplace discovery adapters are not configured."
+        : `Marketplace discovery returned ${discoveryResults} products.`;
+
+  const runIds = new Map<ProductStackPreference, string>();
+
+  const variantsToPersist = [
+    ...variants.filter((variant) =>
+      variant.stackPreference !== selectedVariant.stackPreference
+    ),
+    selectedVariant
+  ];
+
+  for (const variant of variantsToPersist) {
+    runIds.set(
+      variant.stackPreference,
+      await insertProductRecommendationResult({
+        countryCode,
+        discoveryNotes,
+        maxProducts: variant.maxProducts,
+        result: variant.result,
+        sql,
+        stackPreference: variant.stackPreference,
+        task
+      })
+    );
+  }
+  const runId =
+    runIds.get(selectedVariant.stackPreference) ?? [...runIds.values()][0];
+
+  if (!runId) {
+    throw new Error("Product recommendation run was not created");
   }
 
   const legacyRecommendations = result.recommendations.map((item) =>

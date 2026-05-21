@@ -263,6 +263,7 @@ function productMatchesMetricFilter(
 
 const unknownProductManufacturerKey = "__unknown_manufacturer__";
 const unknownProductManufacturerLabel = "Unknown manufacturer";
+const productManufacturerMetricPrefix = "productsManufacturer:";
 
 type ProductManufacturerStat = {
   approved: number;
@@ -283,6 +284,22 @@ function productManufacturerKey(row: AdminProductRow) {
   return label === unknownProductManufacturerLabel
     ? unknownProductManufacturerKey
     : label.toLowerCase();
+}
+
+function productManufacturerMetricId(key: string) {
+  return `${productManufacturerMetricPrefix}${encodeURIComponent(key)}`;
+}
+
+function productManufacturerKeyFromMetricId(id: string) {
+  if (!id.startsWith(productManufacturerMetricPrefix)) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(id.slice(productManufacturerMetricPrefix.length));
+  } catch {
+    return id.slice(productManufacturerMetricPrefix.length);
+  }
 }
 
 function productManufacturerStats(rows: readonly AdminProductRow[]) {
@@ -527,9 +544,6 @@ export function AdminProductsView({
     useState<ProductMetricFilter>("productsTotal");
   const [manufacturerFilter, setManufacturerFilter] = useState("");
   const normalizedSearch = search.trim().toLowerCase();
-  const productNumberFormatter = new Intl.NumberFormat(
-    locale === "th" ? "th-TH" : "en-GB"
-  );
   const manufacturerStats = productManufacturerStats(rows);
   const summary = rows.reduce(
     (counts, row) => {
@@ -606,16 +620,36 @@ export function AdminProductsView({
       label: "Active affiliates",
       locale,
       value: summary.activeAffiliate
-    })
+    }),
+    ...manufacturerStats.map((manufacturer) =>
+      safetyMetric({
+        color: businessMetricColors.active,
+        id: productManufacturerMetricId(manufacturer.key),
+        label: manufacturer.label,
+        locale,
+        value: manufacturer.total
+      })
+    )
   ];
   function handleMetricSelect(metricId: BusinessMetric["id"]) {
+    const manufacturerKey = productManufacturerKeyFromMetricId(metricId);
+
+    if (manufacturerKey) {
+      setManufacturerFilter(manufacturerKey);
+      setMetricFilter("productsTotal");
+      setStatus("");
+      return;
+    }
+
     const nextMetric = metricId as ProductMetricFilter;
 
+    setManufacturerFilter("");
     setMetricFilter(nextMetric);
     setStatus(productBusinessStateForMetric(nextMetric));
   }
 
   function handleStatusChange(nextStatus: ProductBusinessState | "") {
+    setManufacturerFilter("");
     setStatus(nextStatus);
     setMetricFilter(productMetricForBusinessState(nextStatus));
   }
@@ -943,77 +977,12 @@ export function AdminProductsView({
       <BusinessStatsGrid
         metrics={metrics}
         onMetricSelect={handleMetricSelect}
-        selectedMetricId={metricFilter}
+        selectedMetricId={
+          manufacturerFilter
+            ? productManufacturerMetricId(manufacturerFilter)
+            : metricFilter
+        }
       />
-
-      <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">
-              Manufacturers
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Filter products by manufacturer.
-            </p>
-          </div>
-          {manufacturerFilter ? (
-            <button
-              className="rounded-md px-3 py-2 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50"
-              onClick={() => setManufacturerFilter("")}
-              type="button"
-            >
-              Clear manufacturer
-            </button>
-          ) : null}
-        </div>
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-          <button
-            className={classNames(
-              "min-w-40 rounded-lg border px-3 py-2 text-left transition focus:outline-2 focus:-outline-offset-2 focus:outline-[#1FA77A]",
-              manufacturerFilter
-                ? "border-gray-200 bg-white hover:bg-gray-50"
-                : "border-[#1FA77A] bg-emerald-50"
-            )}
-            onClick={() => setManufacturerFilter("")}
-            type="button"
-          >
-            <span className="block text-sm font-semibold text-gray-900">
-              All manufacturers
-            </span>
-            <span className="mt-1 block text-xs text-gray-500">
-              {productNumberFormatter.format(summary.total)} products
-            </span>
-          </button>
-          {manufacturerStats.map((manufacturer) => {
-            const selected = manufacturerFilter === manufacturer.key;
-
-            return (
-              <button
-                className={classNames(
-                  "min-w-48 rounded-lg border px-3 py-2 text-left transition focus:outline-2 focus:-outline-offset-2 focus:outline-[#1FA77A]",
-                  selected
-                    ? "border-[#1FA77A] bg-emerald-50"
-                    : "border-gray-200 bg-white hover:bg-gray-50"
-                )}
-                key={manufacturer.key}
-                onClick={() => setManufacturerFilter(manufacturer.key)}
-                type="button"
-              >
-                <span className="block truncate text-sm font-semibold text-gray-900">
-                  {manufacturer.label}
-                </span>
-                <span className="mt-1 block text-xs text-gray-500">
-                  {productNumberFormatter.format(manufacturer.total)} products
-                </span>
-                <span className="mt-1 block text-xs text-gray-500">
-                  {productNumberFormatter.format(manufacturer.approved)} approved ·{" "}
-                  {productNumberFormatter.format(manufacturer.pendingReview)} review
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_14rem]">

@@ -19,8 +19,9 @@ import type {
   FormulationResult,
   LocalizedText,
   PlanChatMessage,
-  RecommendedProduct,
-  ProductStackPreference
+  ProductRecommendationOption,
+  ProductStackPreference,
+  RecommendedProduct
 } from "@/lib/formulation-types";
 import { foodTagLabel } from "@/lib/food-tags";
 import type { Locale } from "@/lib/i18n";
@@ -537,6 +538,33 @@ function supplementProductCoverageById(
   return coverage;
 }
 
+function productRecommendationOptionsForResult(result: FormulationResult) {
+  if (result.productRecommendationOptions?.length) {
+    return result.productRecommendationOptions;
+  }
+
+  if (!result.productRecommendations) {
+    return [];
+  }
+
+  return [{
+    id: result.productRecommendations.stackPreference ?? "balanced",
+    productRecommendations: result.productRecommendations,
+    recommendations: result.recommendations
+  }] satisfies ProductRecommendationOption[];
+}
+
+function selectProductRecommendationOption(
+  options: readonly ProductRecommendationOption[],
+  selectedPreference: ProductStackPreference | null
+) {
+  return (
+    options.find((option) => option.id === selectedPreference) ??
+    options.find((option) => option.id === "balanced") ??
+    options[0]
+  );
+}
+
 export function FormulationResults({
   initialResult = null,
   locale,
@@ -550,6 +578,8 @@ export function FormulationResults({
   );
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [result, setResult] = useState<FormulationResult | null>(initialResult);
+  const [selectedProductStackPreference, setSelectedProductStackPreference] =
+    useState<ProductStackPreference | null>(null);
   const [deliveryHandoffPlanId, setDeliveryHandoffPlanId] = useState<
     string | null
   >(null);
@@ -618,6 +648,26 @@ export function FormulationResults({
       }
     };
   }, [effectivePlanId, locale, refreshNonce]);
+
+  useEffect(() => {
+    if (!result) {
+      setSelectedProductStackPreference(null);
+      return;
+    }
+
+    const options = productRecommendationOptionsForResult(result);
+    const defaultPreference =
+      result.productRecommendations?.stackPreference ??
+      options.find((option) => option.id === "balanced")?.id ??
+      options[0]?.id ??
+      null;
+
+    setSelectedProductStackPreference((current) =>
+      current && options.some((option) => option.id === current)
+        ? current
+        : defaultPreference
+    );
+  }, [result]);
 
   useEffect(() => {
     if (
@@ -693,8 +743,18 @@ export function FormulationResults({
   );
   const lockedFoodCount = Math.max(0, Number(result.lockedFoodCount ?? 0));
   const unlockHref = planPaywallHref(locale, effectiveResultPlanId);
+  const productRecommendationOptions = productRecommendationOptionsForResult(result);
+  const selectedProductRecommendationOption = selectProductRecommendationOption(
+    productRecommendationOptions,
+    selectedProductStackPreference
+  );
+  const activeProductRecommendations =
+    selectedProductRecommendationOption?.productRecommendations ??
+    result.productRecommendations;
+  const activeProductRecommendationItems =
+    selectedProductRecommendationOption?.recommendations ?? result.recommendations;
   const productCoverageBySupplementId = supplementProductCoverageById(
-    result.productRecommendations
+    activeProductRecommendations
   );
 
   if (deliveryHandoffPlanId === effectiveResultPlanId) {
@@ -835,9 +895,15 @@ export function FormulationResults({
         <ProductRecommendationsPanel
           locale={locale}
           onRefreshRequested={() => setRefreshNonce((value) => value + 1)}
+          onStackPreferenceChange={setSelectedProductStackPreference}
           planId={effectiveResultPlanId}
-          productRecommendations={result.productRecommendations}
-          recommendations={result.recommendations}
+          productRecommendationOptions={productRecommendationOptions}
+          productRecommendations={activeProductRecommendations}
+          recommendations={activeProductRecommendationItems}
+          selectedStackPreference={
+            selectedProductRecommendationOption?.id ??
+            selectedProductStackPreference
+          }
         />
       )}
 
@@ -1605,7 +1671,7 @@ const productRecommendationCopy = {
     preferenceBalancedHint: "Best overall mix of coverage, simplicity, dose and cost",
     preferenceMaxCoverage: "Max coverage",
     preferenceMaxCoverageHint: "Prioritise every extra point of coverage",
-    preferenceUpdating: "Updating product stack...",
+    preferenceUpdating: "Switching product stack...",
     stack: "Stack coverage",
     title: "Recommended products",
     unmatchedTitle: "Unmet supplement needs",
@@ -1631,7 +1697,7 @@ const productRecommendationCopy = {
     preferenceBalancedHint: "สมดุลระหว่างความครอบคลุม ความง่าย ปริมาณ และราคา",
     preferenceMaxCoverage: "ครอบคลุมสูงสุด",
     preferenceMaxCoverageHint: "ให้ความสำคัญกับความครอบคลุมสูงสุด",
-    preferenceUpdating: "กำลังอัปเดตชุดสินค้า...",
+    preferenceUpdating: "กำลังเปลี่ยนชุดสินค้า...",
     stack: "ความครอบคลุมของชุดสินค้า",
     title: "สินค้าแนะนำ",
     unmatchedTitle: "ความต้องการอาหารเสริมที่ยังไม่ครอบคลุม",
@@ -1639,35 +1705,11 @@ const productRecommendationCopy = {
   }
 } satisfies Record<Locale, Record<string, string>>;
 
-const productStackPreferenceOptions: Array<Readonly<{
-  id: ProductStackPreference;
-  labelKey: "preferenceBalanced" | "preferenceCompact" | "preferenceMaxCoverage";
-  titleKey: "preferenceBalancedHint" | "preferenceCompactHint" | "preferenceMaxCoverageHint";
-}>> = [
-  {
-    id: "balanced",
-    labelKey: "preferenceBalanced",
-    titleKey: "preferenceBalancedHint"
-  },
-  {
-    id: "compact",
-    labelKey: "preferenceCompact",
-    titleKey: "preferenceCompactHint"
-  },
-  {
-    id: "max_coverage",
-    labelKey: "preferenceMaxCoverage",
-    titleKey: "preferenceMaxCoverageHint"
-  }
+const productStackPreferenceOrder: ProductStackPreference[] = [
+  "compact",
+  "balanced",
+  "max_coverage"
 ];
-
-function normalizeProductStackPreference(
-  value: unknown
-): ProductStackPreference {
-  return value === "compact" || value === "max_coverage" || value === "balanced"
-    ? value
-    : "balanced";
-}
 
 function trackMarketplaceClick(
   planId: string,
@@ -1706,22 +1748,112 @@ function trackMarketplaceClick(
 export function ProductRecommendationsPanel({
   locale,
   onRefreshRequested,
+  onStackPreferenceChange,
   planId,
+  productRecommendationOptions = [],
   productRecommendations,
-  recommendations
+  recommendations,
+  selectedStackPreference
 }: Readonly<{
   locale: Locale;
   onRefreshRequested?: () => void;
+  onStackPreferenceChange?: (preference: ProductStackPreference) => void;
   planId: string;
+  productRecommendationOptions?: ProductRecommendationOption[];
   productRecommendations?: FormulationResult["productRecommendations"];
   recommendations: RecommendedProduct[];
+  selectedStackPreference?: ProductStackPreference | null;
 }>) {
   const labels = productRecommendationCopy[locale];
-  const activeStackPreference = normalizeProductStackPreference(
-    productRecommendations?.stackPreference
-  );
   const [pendingStackPreference, setPendingStackPreference] =
     useState<ProductStackPreference | null>(null);
+  const stackOptionsById = new Map(
+    productRecommendationOptions.map((option) => [option.id, option])
+  );
+  const stackOptions = productStackPreferenceOrder.flatMap((preference) => {
+    const option = stackOptionsById.get(preference);
+
+    return option ? [option] : [];
+  });
+  const controlPreferences =
+    productRecommendations || productRecommendationOptions.length > 0
+      ? productStackPreferenceOrder
+      : stackOptions.map((option) => option.id);
+  const preferenceLabels = {
+    balanced: labels.preferenceBalanced,
+    compact: labels.preferenceCompact,
+    max_coverage: labels.preferenceMaxCoverage
+  } satisfies Record<ProductStackPreference, string>;
+  const preferenceHints = {
+    balanced: labels.preferenceBalancedHint,
+    compact: labels.preferenceCompactHint,
+    max_coverage: labels.preferenceMaxCoverageHint
+  } satisfies Record<ProductStackPreference, string>;
+  const preferenceControl =
+    controlPreferences.length > 1 ? (
+      <div className="inline-flex overflow-hidden rounded-md border border-gray-200 bg-white text-xs font-semibold shadow-sm">
+        {controlPreferences.map((preference) => {
+          const selected = preference === selectedStackPreference;
+          const available = stackOptionsById.has(preference);
+          const pending = preference === pendingStackPreference;
+
+          return (
+            <button
+              aria-pressed={selected}
+              disabled={pending}
+              className={`px-3 py-2 transition ${
+                selected
+                  ? "bg-[#1FA77A] text-white"
+                  : available
+                    ? "bg-white text-[#20343A] hover:bg-gray-50"
+                    : "bg-white text-gray-400 hover:bg-gray-50"
+              } disabled:cursor-wait disabled:opacity-70`}
+              key={preference}
+              onClick={async () => {
+                if (available) {
+                  onStackPreferenceChange?.(preference);
+                  return;
+                }
+
+                setPendingStackPreference(preference);
+
+                try {
+                  const response = await fetch(
+                    `/api/assessment/${encodeURIComponent(planId)}/product-recommendations`,
+                    {
+                      body: JSON.stringify({ stackPreference: preference }),
+                      cache: "no-store",
+                      headers: {
+                        "Content-Type": "application/json"
+                      },
+                      method: "POST"
+                    }
+                  );
+
+                  if (response.ok) {
+                    window.setTimeout(() => onRefreshRequested?.(), 1000);
+                    window.setTimeout(() => onRefreshRequested?.(), 3000);
+                    window.setTimeout(() => onRefreshRequested?.(), 6000);
+                  }
+                } finally {
+                  window.setTimeout(() => {
+                    setPendingStackPreference((current) =>
+                      current === preference ? null : current
+                    );
+                  }, 1200);
+                }
+              }}
+              title={
+                pending ? labels.preferenceUpdating : preferenceHints[preference]
+              }
+              type="button"
+            >
+              {pending ? labels.preferenceUpdating : preferenceLabels[preference]}
+            </button>
+          );
+        })}
+      </div>
+    ) : null;
   const stackCoverage = Math.max(
     0,
     Math.round(
@@ -1747,97 +1879,6 @@ export function ProductRecommendationsPanel({
     productRecommendations?.status === "partial" ||
     productRecommendations?.status === "ready" ||
     productRecommendations?.status === "failed";
-  const selectedStackPreference =
-    pendingStackPreference ?? activeStackPreference;
-  const unmetSupplementNeeds =
-    productRecommendations?.needCoverage
-      ?.filter((need) =>
-        need.itemType === "supplement" && need.coveragePercent <= 0
-      )
-      .slice(0, 5) ?? [];
-
-  useEffect(() => {
-    if (pendingStackPreference === activeStackPreference) {
-      setPendingStackPreference(null);
-    }
-  }, [activeStackPreference, pendingStackPreference]);
-
-  async function updateStackPreference(
-    stackPreference: ProductStackPreference
-  ) {
-    if (pendingStackPreference || stackPreference === activeStackPreference) {
-      return;
-    }
-
-    setPendingStackPreference(stackPreference);
-
-    try {
-      const response = await fetch(
-        `/api/assessment/${encodeURIComponent(planId)}/product-recommendations`,
-        {
-          body: JSON.stringify({ stackPreference }),
-          headers: {
-            "Content-Type": "application/json"
-          },
-          method: "POST"
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Unable to update product matching preference");
-      }
-
-      for (const delay of [0, 750, 1500, 3000, 5000]) {
-        window.setTimeout(() => onRefreshRequested?.(), delay);
-      }
-
-      window.setTimeout(() => {
-        setPendingStackPreference((current) =>
-          current === stackPreference ? null : current
-        );
-      }, 10000);
-    } catch {
-      setPendingStackPreference(null);
-    }
-  }
-
-  const preferenceControl = (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="inline-flex rounded-md shadow-xs ring-1 ring-gray-200">
-        {productStackPreferenceOptions.map((option, index) => {
-          const selected = selectedStackPreference === option.id;
-
-          return (
-            <button
-              className={[
-                "px-3 py-2 text-xs font-semibold transition",
-                index === 0 ? "rounded-l-md" : "-ml-px",
-                index === productStackPreferenceOptions.length - 1
-                  ? "rounded-r-md"
-                  : "",
-                selected
-                  ? "relative z-10 bg-[#20343A] text-white"
-                  : "bg-white text-gray-600 hover:bg-gray-50",
-                pendingStackPreference ? "cursor-wait opacity-70" : ""
-              ].join(" ")}
-              disabled={Boolean(pendingStackPreference)}
-              key={option.id}
-              onClick={() => void updateStackPreference(option.id)}
-              title={labels[option.titleKey]}
-              type="button"
-            >
-              {labels[option.labelKey]}
-            </button>
-          );
-        })}
-      </div>
-      {pendingStackPreference ? (
-        <span className="text-xs font-medium text-gray-500">
-          {labels.preferenceUpdating}
-        </span>
-      ) : null}
-    </div>
-  );
 
   if (recommendations.length < 1) {
     return (
@@ -1846,13 +1887,15 @@ export function ProductRecommendationsPanel({
           <h3 className="text-xl font-semibold tracking-normal text-[#20343A]">
             {emptyTitle}
           </h3>
-          {isTerminal ? (
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
-              {productRecommendations?.stackCoveragePercent ?? 0}%
-            </span>
-          ) : null}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {preferenceControl}
+            {isTerminal ? (
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                {productRecommendations?.stackCoveragePercent ?? 0}%
+              </span>
+            ) : null}
+          </div>
         </div>
-        <div className="mt-4">{preferenceControl}</div>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
           {emptyBody}
         </p>
@@ -1860,21 +1903,6 @@ export function ProductRecommendationsPanel({
           <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
             {productRecommendations.notes}
           </p>
-        ) : null}
-        {unmetSupplementNeeds.length > 0 ? (
-          <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm ring-1 ring-amber-100">
-            <p className="font-semibold text-amber-950">
-              {labels.unmatchedTitle}
-            </p>
-            <ul className="mt-2 space-y-1 text-amber-900">
-              {unmetSupplementNeeds.map((need) => (
-                <li key={need.id}>
-                  <span className="font-medium">{need.displayName}</span>
-                  {need.bestRejectedReason ? `: ${need.bestRejectedReason}` : ""}
-                </li>
-              ))}
-            </ul>
-          </div>
         ) : null}
         {productRecommendations ? (
           <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
@@ -1902,26 +1930,13 @@ export function ProductRecommendationsPanel({
         <h3 className="text-2xl font-semibold tracking-normal text-[#20343A]">
           {labels.title}
         </h3>
-        <p className="text-sm font-medium text-gray-500">
-          {labels.stack}: <span className="text-[#20343A]">{stackCoverage}%</span>
-        </p>
-      </div>
-      <div className="mt-4">{preferenceControl}</div>
-      {unmetSupplementNeeds.length > 0 ? (
-        <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm ring-1 ring-amber-100">
-          <p className="font-semibold text-amber-950">
-            {labels.unmatchedTitle}
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {preferenceControl}
+          <p className="text-sm font-medium text-gray-500">
+            {labels.stack}: <span className="text-[#20343A]">{stackCoverage}%</span>
           </p>
-          <ul className="mt-2 space-y-1 text-amber-900">
-            {unmetSupplementNeeds.map((need) => (
-              <li key={need.id}>
-                <span className="font-medium">{need.displayName}</span>
-                {need.bestRejectedReason ? `: ${need.bestRejectedReason}` : ""}
-              </li>
-            ))}
-          </ul>
         </div>
-      ) : null}
+      </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
         {recommendations.map((product) => (
