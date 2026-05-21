@@ -55,6 +55,13 @@ export type ValidationResult = Readonly<{
   summary: string;
 }>;
 
+export type PersistedValidationCache = Readonly<{
+  checkedAt?: string | null;
+  reasons?: readonly string[] | null;
+  status?: string | null;
+  summary?: string | null;
+}>;
+
 const SOURCE_FORM_TOKENS = new Set([
   "acetate",
   "anhydrous",
@@ -110,21 +117,36 @@ export function productFactLooksDirtyForMatching(fact: ValidationFact) {
   const rawName = factName(fact);
   const normalized = normalizeProductFactKey(rawName);
   const sourceText = String(fact.sourceText ?? "");
-  const haystack = `${rawName} ${sourceText}`.toLowerCase();
+  const cleanCanonicalDose = hasCanonicalMatch(fact) && hasDose(fact);
 
   if (!rawName.trim()) {
     return true;
   }
 
-  if (productFactLooksLikeConcentration(rawName) || productFactLooksLikeConcentration(sourceText)) {
+  if (productFactLooksLikeConcentration(rawName)) {
     return true;
   }
 
-  if (/\b\d+(?:[,.]\d+)?\s*%/.test(haystack)) {
+  if (productFactLooksLikeConcentration(sourceText) && !cleanCanonicalDose) {
     return true;
   }
 
-  if (/\b(?:equivalent|eq\.?|dry|fresh)\b.*\b(?:extract|fruit|root|leaf|herb)\b/.test(haystack)) {
+  if (/\b\d+(?:[,.]\d+)?\s*%/.test(rawName)) {
+    return true;
+  }
+
+  if (/\b\d+(?:[,.]\d+)?\s*%/.test(sourceText) && !cleanCanonicalDose) {
+    return true;
+  }
+
+  if (/\b(?:equivalent|eq\.?|dry|fresh)\b.*\b(?:extract|fruit|root|leaf|herb)\b/i.test(rawName)) {
+    return true;
+  }
+
+  if (
+    /\b(?:equivalent|eq\.?|dry|fresh)\b.*\b(?:extract|fruit|root|leaf|herb)\b/i.test(sourceText) &&
+    !cleanCanonicalDose
+  ) {
     return true;
   }
 
@@ -215,6 +237,99 @@ function validationSummary(
   }
 
   return "Product data needs review before matching.";
+}
+
+function formattedDoseLimit(fact: ValidationFact) {
+  const maxAmount = numberOrNull(fact.maxAmount);
+
+  if (maxAmount === null || !hasUsableText(fact.maxUnit)) {
+    return null;
+  }
+
+  return `${Number.isInteger(maxAmount) ? maxAmount.toFixed(0) : maxAmount} ${fact.maxUnit}`;
+}
+
+export function productFactObservableIssueMessages(fact: ValidationFact) {
+  const issues: string[] = [];
+  const amount = numberOrNull(fact.amount);
+  const unit = hasUsableText(fact.unit) ? normalizeDoseUnit(fact.unit!) : null;
+  const limit = parseDoseLimit(numberOrNull(fact.maxAmount), fact.maxUnit ?? null);
+  const canonicalMatch = hasCanonicalMatch(fact);
+
+  if (!factName(fact).trim()) {
+    issues.push("Missing ingredient name");
+  }
+
+  if (!canonicalMatch) {
+    issues.push("No canonical match");
+  }
+
+  if (amount === null || !hasUsableText(fact.unit)) {
+    issues.push("Missing usable dose");
+  } else if (!unit) {
+    issues.push(`Unit ${fact.unit} cannot be compared`);
+  }
+
+  if (productFactLooksDirtyForMatching(fact)) {
+    issues.push("Fact name or source text needs cleanup before matching");
+  }
+
+  if (fact.supplementStatus === "blocked") {
+    issues.push("Canonical supplement is ignored");
+  }
+
+  if (amount !== null && unit && limit) {
+    const exceedsLimit = doseExceedsLimit(
+      {
+        amount,
+        originalText: `${amount} ${unit}`,
+        unit
+      },
+      limit,
+      normalizeProductFactKey(factName(fact))
+    );
+
+    if (exceedsLimit === true) {
+      const formattedLimit = formattedDoseLimit(fact);
+
+      issues.push(
+        formattedLimit
+          ? `Exceeds configured safe dose of ${formattedLimit}`
+          : "Exceeds configured safe dose"
+      );
+    }
+  }
+
+  if (amount !== null && unit && !limit && canonicalMatch) {
+    issues.push("No configured safe dose to compare against");
+  }
+
+  return issues;
+}
+
+export function validationCacheMismatchReasons(
+  persisted: PersistedValidationCache,
+  recomputed: ValidationResult
+) {
+  const reasons: string[] = [];
+  const persistedReasons = [...(persisted.reasons ?? [])].sort();
+  const recomputedReasons = [...recomputed.reasons].sort();
+
+  if (!persisted.status) {
+    reasons.push("missing_status");
+  } else if (persisted.status !== recomputed.status) {
+    reasons.push("status");
+  }
+
+  if (persistedReasons.join("|") !== recomputedReasons.join("|")) {
+    reasons.push("reasons");
+  }
+
+  if ((persisted.summary ?? "") !== recomputed.summary) {
+    reasons.push("summary");
+  }
+
+  return reasons;
 }
 
 export function validateProduct(input: ValidationInput): ValidationResult {

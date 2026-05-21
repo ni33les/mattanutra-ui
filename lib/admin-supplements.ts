@@ -371,6 +371,13 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     )
   `;
 
+  const { revalidateProductsForSupplement } = await import("@/lib/admin-products");
+
+  await revalidateProductsForSupplement({
+    actor: input.actor,
+    supplementId: input.id
+  });
+
   const data = await getAdminSupplementsData();
   const row = data.rows.find((item) => item.id === input.id);
 

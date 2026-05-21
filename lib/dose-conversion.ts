@@ -205,3 +205,27 @@ export function doseExceedsLimit(
     ? doseAmount > limitAmount
     : null;
 }
+
+export function doseAmountInLimitUnit(
+  dose: ParsedDose,
+  limit: ParsedDose,
+  supplementKey?: string | null
+) {
+  if (dose.unit === limit.unit) {
+    return dose.amount;
+  }
+
+  const doseAmount = comparableDoseAmount(dose, supplementKey);
+  const oneLimitUnitAmount = comparableDoseAmount(
+    {
+      amount: 1,
+      originalText: limit.originalText,
+      unit: limit.unit
+    },
+    supplementKey
+  );
+
+  return doseAmount !== null && oneLimitUnitAmount !== null && oneLimitUnitAmount > 0
+    ? doseAmount / oneLimitUnitAmount
+    : null;
+}

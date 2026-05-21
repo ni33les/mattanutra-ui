@@ -45,6 +45,7 @@ import {
   type ProductCountryCode
 } from "@/lib/product-countries";
 import {
+  doseAmountInLimitUnit,
   doseExceedsLimit,
   normalizeDoseUnit,
   parseDoseLimit
@@ -56,7 +57,7 @@ import {
   foodTagLabel
 } from "@/lib/food-tags";
 import type { Locale } from "@/lib/i18n";
-import { productFactLooksDirtyForMatching } from "@/lib/product-validation";
+import { productFactObservableIssueMessages } from "@/lib/product-validation";
 import {
   foodReviewSuggestionTimeoutMs,
   supplementDoseSuggestionTimeoutMs,
@@ -271,72 +272,8 @@ async function adminResponseErrorMessage(
   return payload?.message ?? fallback;
 }
 
-function formatProductFactLimit(fact: AdminProductRow["facts"][number]) {
-  if (fact.maxAmount === null || !fact.maxUnit) {
-    return null;
-  }
-
-  return `${Number.isInteger(fact.maxAmount) ? fact.maxAmount.toFixed(0) : fact.maxAmount} ${fact.maxUnit}`;
-}
-
 function productFactIssueMessages(fact: AdminProductRow["facts"][number]) {
-  const issues: string[] = [];
-  const amount = fact.amount;
-  const unit = fact.unit ? normalizeDoseUnit(fact.unit) : null;
-  const limit = parseDoseLimit(fact.maxAmount, fact.maxUnit);
-  const hasCanonicalMatch = Boolean(
-    fact.supplementId || fact.foodId || fact.nutrientId
-  );
-
-  if (!fact.name.trim()) {
-    issues.push("Missing ingredient name");
-  }
-
-  if (!hasCanonicalMatch) {
-    issues.push("No canonical match");
-  }
-
-  if (amount === null || !fact.unit?.trim()) {
-    issues.push("Missing usable dose");
-  } else if (!unit) {
-    issues.push(`Unit ${fact.unit} cannot be compared`);
-  }
-
-  if (productFactLooksDirtyForMatching(fact)) {
-    issues.push("Fact name or source text needs cleanup before matching");
-  }
-
-  if (fact.supplementStatus === "blocked") {
-    issues.push("Canonical supplement is ignored");
-  }
-
-  if (amount !== null && unit && limit) {
-    const exceedsLimit = doseExceedsLimit(
-      {
-        amount,
-        originalText: `${amount} ${unit}`,
-        unit
-      },
-      limit,
-      fact.normalizedName || fact.name
-    );
-
-    if (exceedsLimit === true) {
-      const formattedLimit = formatProductFactLimit(fact);
-
-      issues.push(
-        formattedLimit
-          ? `Exceeds configured safe dose of ${formattedLimit}`
-          : "Exceeds configured safe dose"
-      );
-    }
-  }
-
-  if (amount !== null && unit && !limit && hasCanonicalMatch) {
-    issues.push("No configured safe dose to compare against");
-  }
-
-  return issues;
+  return productFactObservableIssueMessages(fact);
 }
 
 function productFactIssueSeverity(issues: readonly string[]) {
@@ -357,25 +294,35 @@ function productFactSafetyLimitIncreaseLabel(
   const doseUnit = normalizeDoseUnit(fact.unit);
   const limit = parseDoseLimit(fact.maxAmount, fact.maxUnit);
 
-  if (!doseUnit || !limit || doseUnit !== limit.unit) {
+  if (!doseUnit || !limit) {
     return null;
   }
 
+  const factDose = {
+    amount: fact.amount,
+    originalText: `${fact.amount} ${fact.unit}`,
+    unit: doseUnit
+  };
+  const supplementKey = fact.normalizedName || fact.name;
   const exceedsLimit = doseExceedsLimit(
-    {
-      amount: fact.amount,
-      originalText: `${fact.amount} ${doseUnit}`,
-      unit: doseUnit
-    },
+    factDose,
     limit,
-    fact.normalizedName || fact.name
+    supplementKey
   );
 
   if (exceedsLimit !== true) {
     return null;
   }
 
-  return `Increase limit to ${fact.amount} ${fact.maxUnit}`;
+  const nextLimitAmount = doseAmountInLimitUnit(factDose, limit, supplementKey);
+
+  if (nextLimitAmount === null) {
+    return null;
+  }
+
+  const roundedAmount = Math.ceil(nextLimitAmount * 1_000_000) / 1_000_000;
+
+  return `Increase limit to ${Number.isInteger(roundedAmount) ? roundedAmount.toFixed(0) : roundedAmount} ${fact.maxUnit}`;
 }
 
 const productDoseUnitOptions = supplementDoseUnits.filter(
@@ -672,11 +619,18 @@ export function AdminProductsView({
         );
       }
 
-      const payload = (await response.json()) as { row?: AdminProductRow };
+      const payload = (await response.json()) as {
+        row?: AdminProductRow;
+        rows?: AdminProductRow[];
+      };
       const savedRow = payload.row ?? row;
+      const updatedRows = new Map(
+        (payload.rows && payload.rows.length > 0 ? payload.rows : [savedRow])
+          .map((item) => [item.id, item])
+      );
 
       setRows((currentRows) =>
-        currentRows.map((item) => (item.id === row.id ? savedRow : item))
+        currentRows.map((item) => updatedRows.get(item.id) ?? item)
       );
       setDraft((currentDraft) =>
         currentDraft?.id === row.id ? savedRow : currentDraft
@@ -773,15 +727,23 @@ export function AdminProductsView({
         );
       }
 
-      const payload = (await response.json()) as { row?: AdminProductRow };
+      const payload = (await response.json()) as {
+        row?: AdminProductRow;
+        rows?: AdminProductRow[];
+      };
       const savedRow = payload.row;
 
       if (!savedRow) {
         throw new Error("Safety limit update did not return a product row");
       }
 
+      const updatedRows = new Map(
+        (payload.rows && payload.rows.length > 0 ? payload.rows : [savedRow])
+          .map((item) => [item.id, item])
+      );
+
       setRows((currentRows) =>
-        currentRows.map((item) => (item.id === savedRow.id ? savedRow : item))
+        currentRows.map((item) => updatedRows.get(item.id) ?? item)
       );
       setDraft(savedRow);
 
@@ -1293,6 +1255,16 @@ function ProductModal({
         </div>
 
         <div className="mt-5 grid gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">
+          {draft.validationCacheStatus === "stale" ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-800">
+                Validation stale
+              </span>
+              <span className="text-xs text-gray-500">
+                Saved validation cache differs from current facts and limits.
+              </span>
+            </div>
+          ) : null}
           {draft.validation.status !== "pass" ? (
             <div>
               <p className="font-semibold text-gray-900">Validation blockers</p>

@@ -1338,7 +1338,7 @@ const V2_FULL_BEAM_ALGORITHM_VERSION = "v2-full-beam" as const;
 export const ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION =
   V2_FULL_BEAM_ALGORITHM_VERSION;
 export const ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION =
-  "stack-preference-1";
+  "stack-preference-2";
 const V2_FULL_BEAM_WIDTH = 32;
 const V2_SHORTLIST_LIMIT = 32;
 const V2_PER_NEED_SHORTLIST = 4;
@@ -1349,8 +1349,10 @@ const V2_MAX_SERVING_MULTIPLIER = 3;
 const V2_SCORE_EPSILON = 0.000001;
 const V2_DIVERSITY_SCORE_EPSILON = 0.005;
 const V2_MATERIAL_COVERAGE_DELTA_PERCENT = 3;
-const V2_COMPACT_COVERAGE_TOLERANCE_PERCENT = 3;
-const V2_COMPACT_CRITICAL_NEED_LOSS_TOLERANCE = 0.1;
+const V2_BALANCED_MATERIAL_COVERAGE_DELTA_PERCENT = 15;
+const V2_COMPACT_MIN_COVERAGE_RATIO = 0.65;
+const V2_COMPACT_CRITICAL_WEIGHT_FLOOR = 9;
+const V2_COMPACT_CRITICAL_NEED_LOSS_TOLERANCE = 0.35;
 const V2_EXTRA_SERVING_SIMPLICITY_PENALTY = 0.02;
 const V2_DUPLICATE_NEED_PRODUCT_PENALTY_WEIGHT = 0.24;
 const SAFETY_FLAG_PREGNANCY_CAUTION = 1;
@@ -2122,6 +2124,44 @@ function stackCoverageForNeeds(
   return stackContributionMaps(entries, needs).achievedCoverage;
 }
 
+function stackFingerprint(stack: V2StackScore) {
+  return stack.entries
+    .map((entry) => `${entry.product.id}:${entry.servingMultiplier}`)
+    .sort()
+    .join("|");
+}
+
+function stackCoverageFingerprint(
+  stack: V2StackScore,
+  needs: readonly ProductRecommendationNeed[]
+) {
+  return needs
+    .map((need) => {
+      const achieved = stack.achievedCoverage.get(need.id) ?? 0;
+
+      return `${need.id}:${Math.round(achieved * 1000)}`;
+    })
+    .join("|");
+}
+
+function uniqueStackScores(scores: readonly V2StackScore[]) {
+  const seen = new Set<string>();
+  const unique: V2StackScore[] = [];
+
+  for (const score of scores) {
+    const key = stackFingerprint(score);
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    unique.push(score);
+  }
+
+  return unique;
+}
+
 function compareStackScores(first: V2StackScore, second: V2StackScore) {
   const coverageDelta =
     second.supplementProductCoveragePercent - first.supplementProductCoveragePercent;
@@ -2174,6 +2214,23 @@ function compareStackScores(first: V2StackScore, second: V2StackScore) {
     .localeCompare(second.entries.map((entry) => entry.product.id).join("|"));
 }
 
+function compareBalancedStackScores(first: V2StackScore, second: V2StackScore) {
+  const coverageDelta =
+    second.supplementProductCoveragePercent - first.supplementProductCoveragePercent;
+
+  if (Math.abs(coverageDelta) >= V2_BALANCED_MATERIAL_COVERAGE_DELTA_PERCENT) {
+    return coverageDelta;
+  }
+
+  const scoreDelta = second.score - first.score;
+
+  if (Math.abs(scoreDelta) > V2_DIVERSITY_SCORE_EPSILON) {
+    return scoreDelta;
+  }
+
+  return compareStackScores(first, second);
+}
+
 function compareMaxCoverageStackScores(
   first: V2StackScore,
   second: V2StackScore
@@ -2194,7 +2251,10 @@ function preservesCriticalNeedsForCompactMode(
   needs: readonly ProductRecommendationNeed[]
 ) {
   const maxWeight = Math.max(0, ...needs.map((need) => need.weight));
-  const criticalWeight = Math.max(4, maxWeight * 0.75);
+  const criticalWeight = Math.max(
+    V2_COMPACT_CRITICAL_WEIGHT_FLOOR,
+    maxWeight * 0.9
+  );
 
   return needs
     .filter((need) => need.weight >= criticalWeight)
@@ -2234,30 +2294,101 @@ function selectStackForPreference(
   needs: readonly ProductRecommendationNeed[],
   stackPreference: ProductStackPreference
 ) {
-  if (scores.length < 1) {
+  const uniqueScores = uniqueStackScores(scores);
+
+  if (uniqueScores.length < 1) {
     return null;
   }
 
   if (stackPreference === "max_coverage") {
-    return [...scores].sort(compareMaxCoverageStackScores)[0] ?? null;
+    const balancedStack = [...uniqueScores].sort(compareBalancedStackScores)[0] ?? null;
+    const maxCoverageStack =
+      [...uniqueScores].sort(compareMaxCoverageStackScores)[0] ?? null;
+
+    if (!balancedStack || !maxCoverageStack) {
+      return maxCoverageStack;
+    }
+
+    const maxCoverage = maxCoverageStack.supplementProductCoveragePercent;
+    const balancedKey = stackFingerprint(balancedStack);
+    const distinctCoverageTie = uniqueScores
+      .filter((score) =>
+        stackFingerprint(score) !== balancedKey &&
+        Math.abs(score.supplementProductCoveragePercent - maxCoverage) <=
+          V2_SCORE_EPSILON
+      )
+      .sort(compareMaxCoverageStackScores)[0];
+
+    return distinctCoverageTie ?? maxCoverageStack;
   }
 
   if (stackPreference !== "compact") {
-    return scores[0] ?? null;
+    return [...uniqueScores].sort(compareBalancedStackScores)[0] ?? null;
   }
 
-  const bestCoverageStack = [...scores].sort(compareMaxCoverageStackScores)[0] ?? scores[0]!;
+  const bestCoverageStack =
+    [...uniqueScores].sort(compareMaxCoverageStackScores)[0] ?? uniqueScores[0]!;
   const minimumCoverage =
-    bestCoverageStack.supplementProductCoveragePercent -
-    V2_COMPACT_COVERAGE_TOLERANCE_PERCENT;
-  const compactCandidates = scores.filter(
+    bestCoverageStack.supplementProductCoveragePercent *
+    V2_COMPACT_MIN_COVERAGE_RATIO;
+  const compactCandidates = uniqueScores.filter(
     (score) =>
       score.supplementProductCoveragePercent >= minimumCoverage &&
       preservesCriticalNeedsForCompactMode(score, bestCoverageStack, needs)
   );
 
-  return [...(compactCandidates.length > 0 ? compactCandidates : scores)]
+  return [...(compactCandidates.length > 0 ? compactCandidates : uniqueScores)]
     .sort(compareCompactStackScores)[0] ?? null;
+}
+
+function distinctAlternativeStacks(
+  scores: readonly V2StackScore[],
+  bestStack: V2StackScore | null,
+  needs: readonly ProductRecommendationNeed[],
+  limit = 3
+) {
+  const bestKey = bestStack ? stackFingerprint(bestStack) : null;
+  const selected: V2StackScore[] = [];
+  const selectedKeys = new Set<string>();
+  const selectedCoverageKeys = new Set<string>();
+  const addStack = (stack: V2StackScore, requireCoverageDifference: boolean) => {
+    if (selected.length >= limit) {
+      return;
+    }
+
+    const key = stackFingerprint(stack);
+
+    if (key === bestKey || selectedKeys.has(key)) {
+      return;
+    }
+
+    const coverageKey = stackCoverageFingerprint(stack, needs);
+
+    if (
+      requireCoverageDifference &&
+      (
+        (bestStack && coverageKey === stackCoverageFingerprint(bestStack, needs)) ||
+        selectedCoverageKeys.has(coverageKey)
+      )
+    ) {
+      return;
+    }
+
+    selectedKeys.add(key);
+    selectedCoverageKeys.add(coverageKey);
+    selected.push(stack);
+  };
+  const uniqueScores = uniqueStackScores(scores).sort(compareStackScores);
+
+  for (const stack of uniqueScores) {
+    addStack(stack, true);
+  }
+
+  for (const stack of uniqueScores) {
+    addStack(stack, false);
+  }
+
+  return selected;
 }
 
 function compareBeamStates(first: V2BeamState, second: V2BeamState) {
@@ -2364,6 +2495,55 @@ function selectDiverseBeamStates(
   }
 
   return selected;
+}
+
+function selectFinalBeamStates(
+  states: readonly V2BeamState[],
+  statesBySize: ReadonlyMap<number, readonly V2BeamState[]>,
+  keepTop: number,
+  scoringNeeds: readonly ProductRecommendationNeed[]
+) {
+  const selected: V2BeamState[] = [];
+  const selectedKeys = new Set<string>();
+  const addState = (state: V2BeamState | undefined) => {
+    if (!state || selected.length >= keepTop) {
+      return;
+    }
+
+    const key = beamStateKey(state.indices);
+
+    if (selectedKeys.has(key)) {
+      return;
+    }
+
+    selectedKeys.add(key);
+    selected.push(state);
+  };
+  const sizeLeaders = [...statesBySize.entries()]
+    .sort(([firstSize], [secondSize]) => firstSize - secondSize)
+    .flatMap(([, sizeStates]) =>
+      [...sizeStates].sort(compareBeamStates).slice(0, 4)
+    );
+  const utilityLeaders = selectDiverseBeamStates(
+    states,
+    keepTop,
+    scoringNeeds
+  );
+  const sortedStates = [...states].sort(compareBeamStates);
+
+  for (const state of sizeLeaders) {
+    addState(state);
+  }
+
+  for (const state of utilityLeaders) {
+    addState(state);
+  }
+
+  for (const state of sortedStates) {
+    addState(state);
+  }
+
+  return selected.sort(compareBeamStates);
 }
 
 function beamStateToStackScore(
@@ -2748,7 +2928,12 @@ function beamSearchStackScores(
 
   return {
     evaluatedStackCount,
-    scores: selectDiverseBeamStates(mergedStates, keepTop, scoringNeeds)
+    scores: selectFinalBeamStates(
+      mergedStates,
+      topStatesBySize,
+      keepTop,
+      scoringNeeds
+    )
       .map((state) => beamStateToStackScore(state, scoringNeeds))
   };
 }
@@ -3312,16 +3497,18 @@ function recommendProductStackExact(
     )
     .slice(0, 12);
   const trace: ProductRecommendationTrace = {
-    alternativeStacks: stackScores
-      .filter((stack) => stack !== bestStack)
-      .slice(0, 3)
+    alternativeStacks: distinctAlternativeStacks(
+      stackScores,
+      bestStack,
+      scoringNeeds
+    )
       .map((stack) => ({
-      productIds: stack.entries.map((entry) => entry.product.id),
-      productTitles: stack.entries.map((entry) => entry.product.title),
-      score: roundScore(stack.score),
-      supplementProductCoveragePercent: stack.supplementProductCoveragePercent,
-      totalPlanCoveragePercent: stack.totalPlanCoveragePercent
-    })),
+        productIds: stack.entries.map((entry) => entry.product.id),
+        productTitles: stack.entries.map((entry) => entry.product.title),
+        score: roundScore(stack.score),
+        supplementProductCoveragePercent: stack.supplementProductCoveragePercent,
+        totalPlanCoveragePercent: stack.totalPlanCoveragePercent
+      })),
     candidatePoolSize: entries.length,
     componentScores: bestStack?.componentScores ?? {},
     contextSignals: v2ContextSignals(input),

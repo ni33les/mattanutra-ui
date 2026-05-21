@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   comparableDoseAmount,
+  doseAmountInLimitUnit,
   doseExceedsLimit,
   parseDose,
   parseDoseLimit
@@ -75,5 +76,25 @@ describe("dose conversion", () => {
     assert.ok(dose);
     assert.ok(limit);
     assert.equal(doseExceedsLimit(dose, limit), false);
+  });
+
+  it("converts a product dose into the configured limit unit without changing labels", () => {
+    const dose = parseDose("4 mg daily");
+    const limit = parseDoseLimit(3000, "mcg RAE/day");
+
+    assert.ok(dose);
+    assert.ok(limit);
+    assert.equal(doseExceedsLimit(dose, limit, "vitamin_a"), true);
+    assert.equal(doseAmountInLimitUnit(dose, limit, "vitamin_a"), 4000);
+    assert.equal(limit.originalText, "mcg RAE/day");
+  });
+
+  it("converts comparable CFU limits into the stored configured unit", () => {
+    const dose = parseDose("2.3 billion CFU per serve", "probiotics");
+    const limit = parseDoseLimit(1500, "million CFU/day");
+
+    assert.ok(dose);
+    assert.ok(limit);
+    assert.equal(doseAmountInLimitUnit(dose, limit, "probiotics"), 2300);
   });
 });

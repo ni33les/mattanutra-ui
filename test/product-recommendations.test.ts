@@ -642,6 +642,80 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(maxCoverage.diagnostics.stackPreference, "max_coverage");
   });
 
+  it("lets compact mode trade some coverage for a smaller stack", () => {
+    const broad: ProductCandidate = {
+      ...product({ amount: 0.67, id: "broad-multi", name: "Vitamin D" }),
+      facts: [
+        product({ amount: 0.67, id: "broad-d3", name: "Vitamin D" }).facts[0]!,
+        product({ amount: 0.67, id: "broad-mag", name: "Magnesium" }).facts[0]!,
+        product({ amount: 0.67, id: "broad-zinc", name: "Zinc" }).facts[0]!
+      ],
+      productKind: "multi"
+    };
+    const candidates = [
+      broad,
+      product({ amount: 1, id: "perfect-d3", name: "Vitamin D" }),
+      product({ amount: 1, id: "perfect-magnesium", name: "Magnesium" }),
+      product({ amount: 1, id: "perfect-zinc", name: "Zinc" })
+    ];
+    const needs = [
+      need("vitamin_d", "Vitamin D", 5),
+      need("magnesium", "Magnesium", 5),
+      need("zinc", "Zinc", 5)
+    ];
+    const compact = recommendProductStackFullBeam({
+      candidates,
+      needs,
+      stackPreference: "compact"
+    });
+    const maxCoverage = recommendProductStackFullBeam({
+      candidates,
+      needs,
+      stackPreference: "max_coverage"
+    });
+
+    assert.deepEqual(
+      compact.recommendations.map((item) => item.product.id),
+      ["broad-multi"]
+    );
+    assert.equal(compact.supplementProductCoveragePercent, 67);
+    assert.equal(maxCoverage.supplementProductCoveragePercent, 100);
+    assert.equal(maxCoverage.recommendations.length, 3);
+  });
+
+  it("reports distinct alternative stack fingerprints", () => {
+    const broad: ProductCandidate = {
+      ...product({ amount: 0.67, id: "broad-multi", name: "Vitamin D" }),
+      facts: [
+        product({ amount: 0.67, id: "broad-d3", name: "Vitamin D" }).facts[0]!,
+        product({ amount: 0.67, id: "broad-mag", name: "Magnesium" }).facts[0]!,
+        product({ amount: 0.67, id: "broad-zinc", name: "Zinc" }).facts[0]!
+      ],
+      productKind: "multi"
+    };
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        broad,
+        product({ amount: 1, id: "perfect-d3", name: "Vitamin D" }),
+        product({ amount: 1, id: "perfect-magnesium", name: "Magnesium" }),
+        product({ amount: 1, id: "perfect-zinc", name: "Zinc" }),
+        product({ amount: 1, id: "backup-zinc", name: "Zinc" })
+      ],
+      needs: [
+        need("vitamin_d", "Vitamin D", 5),
+        need("magnesium", "Magnesium", 5),
+        need("zinc", "Zinc", 5)
+      ]
+    });
+    const alternatives = result.diagnostics.trace?.alternativeStacks ?? [];
+    const fingerprints = alternatives.map((stack) =>
+      [...stack.productIds].sort().join("|")
+    );
+
+    assert.equal(new Set(fingerprints).size, fingerprints.length);
+    assert.ok(alternatives.length > 0);
+  });
+
   it("does not add a second product only to top up an already adequate need", () => {
     const result = recommendProductStackFullBeam({
       candidates: [

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  productFactObservableIssueMessages,
   productFactLooksDirtyForMatching,
-  validateProduct
+  validateProduct,
+  validationCacheMismatchReasons
 } from "../lib/product-validation.ts";
 
 const supplementId = "11111111-1111-4111-8111-111111111111";
@@ -79,6 +81,39 @@ describe("product validation", () => {
     assert.equal(validation.reasons.includes("no_canonical_match"), true);
   });
 
+  it("does not dirty a clean canonical dosed fact because source evidence contains potency text", () => {
+    const validation = validateProduct({
+      facts: [
+        {
+          amount: 0.001,
+          itemType: "supplement",
+          name: "Vitamin B12",
+          normalizedName: "vitamin_b12",
+          sourceText: "วิตามิน บี 12 0.1% 0.001 มก.",
+          supplementId,
+          unit: "mg"
+        }
+      ],
+      imageUrl: "https://example.com/vistra-lysine.jpg",
+      labelStatus: "parsed",
+      productUrl: "https://example.com/vistra-lysine"
+    });
+
+    assert.equal(
+      productFactLooksDirtyForMatching({
+        amount: 0.001,
+        itemType: "supplement",
+        name: "Vitamin B12",
+        normalizedName: "vitamin_b12",
+        sourceText: "วิตามิน บี 12 0.1% 0.001 มก.",
+        supplementId,
+        unit: "mg"
+      }),
+      false
+    );
+    assert.equal(validation.status, "pass");
+  });
+
   it("requires product images before approval validation can pass", () => {
     const validation = validateProduct({
       facts: [
@@ -143,5 +178,65 @@ describe("product validation", () => {
 
     assert.equal(validation.status, "pass");
     assert.equal(validation.matchableFactCount, 1);
+  });
+
+  it("derives safe-dose warnings from the current fact and latest limit", () => {
+    const unsafe = productFactObservableIssueMessages({
+      amount: 25,
+      itemType: "supplement",
+      maxAmount: 12,
+      maxUnit: "mg/day",
+      name: "Vitamin B6",
+      supplementId,
+      unit: "mg"
+    });
+    const safeAfterLimitIncrease = productFactObservableIssueMessages({
+      amount: 25,
+      itemType: "supplement",
+      maxAmount: 25,
+      maxUnit: "mg/day",
+      name: "Vitamin B6",
+      supplementId,
+      unit: "mg"
+    });
+
+    assert.equal(
+      unsafe.includes("Exceeds configured safe dose of 12 mg/day"),
+      true
+    );
+    assert.equal(
+      safeAfterLimitIncrease.some((issue) => issue.includes("Exceeds configured safe dose")),
+      false
+    );
+  });
+
+  it("detects stale persisted validation cache against recomputed validation", () => {
+    const recomputed = validateProduct({
+      facts: [
+        {
+          amount: 25,
+          itemType: "supplement",
+          maxAmount: 25,
+          maxUnit: "mg/day",
+          name: "Vitamin B6",
+          supplementId,
+          unit: "mg"
+        }
+      ],
+      imageUrl: "https://example.com/b6.jpg",
+      labelStatus: "parsed",
+      productUrl: "https://example.com/b6"
+    });
+    const mismatchReasons = validationCacheMismatchReasons(
+      {
+        reasons: ["unsafe_dose"],
+        status: "failed",
+        summary: "One or more facts exceed safety limits."
+      },
+      recomputed
+    );
+
+    assert.equal(recomputed.status, "pass");
+    assert.deepEqual(mismatchReasons, ["status", "reasons", "summary"]);
   });
 });

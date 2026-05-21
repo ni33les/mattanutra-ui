@@ -4,6 +4,7 @@ import {
   isProductAudience,
   isProductLabelStatus,
   isProductStatus,
+  loadAdminProductRowsForBrand,
   updateAdminProduct
 } from "@/lib/admin-products";
 import type {
@@ -206,9 +207,12 @@ export async function PATCH(
       titleEn: body.titleEn === undefined ? undefined : textOrNull(body.titleEn, 500),
       titleTh: body.titleTh === undefined ? undefined : textOrNull(body.titleTh, 500)
     });
+    const rows = body.manufacturerCountryCodes !== undefined && row.brandId
+      ? await loadAdminProductRowsForBrand(row.brandId)
+      : [row];
 
     return NextResponse.json(
-      { row },
+      { row, rows },
       {
         headers: {
           "Cache-Control": "no-store"

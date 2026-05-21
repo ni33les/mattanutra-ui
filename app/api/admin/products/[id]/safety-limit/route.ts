@@ -57,14 +57,18 @@ export async function POST(
   }
 
   try {
-    const row = await increaseProductFactSafetyLimit({
+    const result = await increaseProductFactSafetyLimit({
       actor: "admin_dashboard",
       factId: factId!,
       productId: id
     });
 
     return NextResponse.json(
-      { row },
+      {
+        revalidatedProductIds: result.revalidatedProductIds,
+        rows: result.revalidatedRows,
+        row: result.row
+      },
       {
         headers: {
           "Cache-Control": "no-store"

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
+import { checkProductValidationConsistency } from "@/lib/admin-products";
 import { getSql } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -44,7 +45,12 @@ export async function GET(request: Request) {
     );
   }
 
-  const [invalidProducts, openReviewsWithoutTasks, recommendationRuns] =
+  const [
+    invalidProducts,
+    openReviewsWithoutTasks,
+    recommendationRuns,
+    validationConsistency
+  ] =
     await Promise.all([
       sql<Array<{
         id: string;
@@ -102,7 +108,8 @@ export async function GET(request: Request) {
         from public.product_recommendation_runs
         order by generated_at desc
         limit 20
-      `
+      `,
+      checkProductValidationConsistency({ limit: 1000 })
     ]);
 
   const unmatchedNeeds = recommendationRuns.flatMap((run) => {
@@ -139,8 +146,10 @@ export async function GET(request: Request) {
         invalidApprovedProducts: invalidProducts.length,
         missingCanonicalSupplements: missingCanonicalSupplements.length,
         openReviewsWithoutTasks: openReviewsWithoutTasks.length,
+        staleValidationCache: validationConsistency.staleCount,
         unmatchedProductNeeds: unmatchedNeeds.length
       },
+      staleValidationCache: validationConsistency.staleRows.slice(0, 100),
       unmatchedProductNeeds: unmatchedNeeds.slice(0, 100)
     },
     { headers: { "Cache-Control": "no-store" } }

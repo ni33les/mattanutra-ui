@@ -3,6 +3,7 @@ import type { ProductSnapshot } from "@/lib/product-adapters";
 import { toJsonValue } from "@/lib/assessment-store";
 import {
   comparableDoseAmount,
+  doseAmountInLimitUnit,
   doseExceedsLimit,
   normalizeDoseUnit,
   parseDoseLimit
@@ -25,7 +26,9 @@ import {
   type ProductPlatform
 } from "@/lib/product-recommendations";
 import {
+  productFactObservableIssueMessages,
   validateProduct,
+  validationCacheMismatchReasons,
   type ValidationResult
 } from "@/lib/product-validation";
 import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
@@ -42,6 +45,7 @@ import { createTask } from "@/lib/task-service";
 export type ProductAffiliateStatus = "active" | "flagged_stale" | "none";
 export type ProductLabelStatus = "failed" | "missing" | "parsed" | "stale";
 type ProductFactSupplementStatus = "active" | "blocked";
+export type ProductValidationCacheStatus = "fresh" | "missing" | "stale";
 
 export type AdminProductFact = ProductCandidateFact & Readonly<{
   id: string;
@@ -91,6 +95,8 @@ export type AdminProductRow = Readonly<{
   manufacturerCountryCodes: ProductCountryCode[];
   status: ProductStatus;
   validation: ValidationResult;
+  validationCacheStatus: ProductValidationCacheStatus;
+  validationCacheStaleReasons: string[];
   validationLabel: string;
   productAudience: ProductAudience;
   platform: ProductPlatform;
@@ -501,6 +507,57 @@ async function replaceProductCountryCodes(
   return codes;
 }
 
+function sameProductCountryCodes(
+  left: readonly ProductCountryCode[],
+  right: readonly ProductCountryCode[]
+) {
+  const normalizedLeft = normalizeProductCountryCodes(left).sort();
+  const normalizedRight = normalizeProductCountryCodes(right).sort();
+
+  return normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((countryCode, index) => countryCode === normalizedRight[index]);
+}
+
+async function reconcileProductsForBrandCountryCodes(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  brandId: string,
+  countryCodes: readonly ProductCountryCode[]
+) {
+  const codes = normalizeSubmittedProductCountryCodes(
+    countryCodes,
+    "Manufacturer countries"
+  );
+
+  await sql`
+    delete from public.product_countries
+    using public.products
+    where product_countries.product_id = products.id
+      and products.brand_id = ${brandId}::uuid
+      and product_countries.country_code <> all(${codes}::text[])
+  `;
+
+  await sql`
+    insert into public.product_countries (
+      product_id,
+      country_code,
+      created_at,
+      updated_at
+    )
+    select
+      products.id,
+      input.country_code,
+      now(),
+      now()
+    from public.products
+    cross join unnest(${codes}::text[]) as input(country_code)
+    where products.brand_id = ${brandId}::uuid
+    on conflict (product_id, country_code) do update set
+      updated_at = excluded.updated_at
+  `;
+
+  return codes;
+}
+
 function assertProductCountriesAllowedByBrand(
   productCountryCodes: readonly string[],
   brandCountryCodes: readonly string[],
@@ -614,6 +671,10 @@ function productSafetyPasses(facts: readonly AdminProductFact[], rawFacts: unkno
   return true;
 }
 
+function roundedDoseAmount(value: number) {
+  return Math.ceil(value * 1_000_000) / 1_000_000;
+}
+
 function recordFromUnknown(value: unknown) {
   return value && typeof value === "object"
     ? value as Record<string, unknown>
@@ -699,6 +760,30 @@ function validationLabel(validation: ValidationResult) {
   return "Needs Review";
 }
 
+function validationCacheStatusForRow(
+  row: Pick<ProductDbRow, "validation_reasons" | "validation_status" | "validation_summary">,
+  validation: ValidationResult
+) {
+  const staleReasons = validationCacheMismatchReasons(
+    {
+      reasons: row.validation_reasons ?? [],
+      status: row.validation_status,
+      summary: row.validation_summary
+    },
+    validation
+  );
+  const status: ProductValidationCacheStatus = !row.validation_status
+    ? "missing"
+    : staleReasons.length > 0
+      ? "stale"
+      : "fresh";
+
+  return {
+    staleReasons,
+    status
+  };
+}
+
 function validationForRow(
   row: Pick<ProductDbRow, "image_url" | "label_status" | "product_url" | "source_url">,
   facts: readonly AdminProductFact[],
@@ -738,6 +823,7 @@ function validationForRow(
 function rowFromDb(row: ProductDbRow): AdminProductRow {
   const facts = (arrayPayload(row.facts) as FactDbPayload[]).map(normalizeFact);
   const validation = validationForRow(row, facts, row.facts);
+  const validationCache = validationCacheStatusForRow(row, validation);
   const effectiveListStatus =
     row.status === "approved" && validation.status !== "pass"
       ? "pending_review"
@@ -800,6 +886,8 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
     labelStatus: row.label_status,
     status: effectiveListStatus,
     validation,
+    validationCacheStatus: validationCache.status,
+    validationCacheStaleReasons: validationCache.staleReasons,
     validationLabel: validationLabel(validation),
     productAudience:
       row.product_audience && row.product_audience !== "both"
@@ -917,6 +1005,213 @@ async function refreshAndPersistProductValidation(
   };
 }
 
+async function productIdsUsingSupplement(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  supplementId: string
+) {
+  if (!isUuidValue(supplementId)) {
+    return [];
+  }
+
+  const rows = await sql<Array<{ product_id: string }>>`
+    select distinct product_facts.product_id::text
+    from public.product_facts
+    where product_facts.supplement_id = ${supplementId}::uuid
+    order by product_facts.product_id::text
+  `;
+
+  return rows.map((row) => row.product_id);
+}
+
+async function refreshAndPersistProductValidations(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  productIds: readonly string[]
+) {
+  const uniqueProductIds = [...new Set(productIds.filter(isUuidValue))];
+  const refreshed: Array<{
+    labelStatus: ProductLabelStatus;
+    productId: string;
+    status: ProductStatus;
+    validation: ValidationResult;
+  }> = [];
+
+  for (const productId of uniqueProductIds) {
+    const result = await refreshAndPersistProductValidation(sql, productId);
+
+    refreshed.push({
+      productId,
+      ...result
+    });
+  }
+
+  if (refreshed.length > 0) {
+    clearProductRecommendationCandidateCache();
+  }
+
+  return refreshed;
+}
+
+export async function revalidateProductsForSupplement(input: Readonly<{
+  actor?: string | null;
+  supplementId: string;
+}>) {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const productIds = await productIdsUsingSupplement(sql, input.supplementId);
+  const refreshed = await refreshAndPersistProductValidations(sql, productIds);
+
+  if (refreshed.length > 0) {
+    await sql`
+      insert into public.product_admin_audit (
+        actor,
+        action,
+        after_payload
+      )
+      values (
+        ${input.actor ?? "admin_dashboard"},
+        'product_validation_revalidated_for_supplement',
+        ${sql.json(toJsonValue({
+          productIds,
+          revalidatedCount: refreshed.length,
+          supplementId: input.supplementId
+        }))}::jsonb
+      )
+    `;
+  }
+
+  return {
+    productIds,
+    revalidatedCount: refreshed.length,
+    refreshed,
+    supplementId: input.supplementId
+  };
+}
+
+function persistedValidationForRow(row: ProductDbRow) {
+  return {
+    checkedAt: row.validation_checked_at
+      ? new Date(row.validation_checked_at).toISOString()
+      : null,
+    reasons: row.validation_reasons ?? [],
+    status: row.validation_status,
+    summary: row.validation_summary
+  };
+}
+
+export type ProductValidationConsistencyRow = Readonly<{
+  factIssues: Array<{
+    factId: string;
+    factName: string;
+    issues: string[];
+    supplementId: string | null;
+  }>;
+  mismatchReasons: string[];
+  persisted: ReturnType<typeof persistedValidationForRow>;
+  productId: string;
+  recomputed: ValidationResult;
+  status: ProductStatus;
+  title: string;
+}>;
+
+export async function checkProductValidationConsistency(input: Readonly<{
+  limit?: number | null;
+  productId?: string | null;
+}> = {}) {
+  const rows = await loadProductRows(input.productId ?? null);
+
+  if (!rows) {
+    throw new Error("Database is not configured");
+  }
+
+  const limit = Math.max(1, Math.min(5000, Math.round(input.limit ?? 1000)));
+  const checkedRows = rows.slice(0, limit);
+  const mismatches: ProductValidationConsistencyRow[] = [];
+
+  for (const row of checkedRows) {
+    const adminRow = rowFromDb(row);
+    const persisted = persistedValidationForRow(row);
+    const mismatchReasons = validationCacheMismatchReasons(
+      persisted,
+      adminRow.validation
+    );
+
+    if (mismatchReasons.length < 1) {
+      continue;
+    }
+
+    mismatches.push({
+      factIssues: adminRow.facts
+        .map((fact) => ({
+          factId: fact.id,
+          factName: fact.name,
+          issues: productFactObservableIssueMessages(fact),
+          supplementId: fact.supplementId ?? null
+        }))
+        .filter((fact) => fact.issues.length > 0),
+      mismatchReasons,
+      persisted,
+      productId: adminRow.id,
+      recomputed: adminRow.validation,
+      status: adminRow.status,
+      title: adminRow.title
+    });
+  }
+
+  return {
+    checkedCount: checkedRows.length,
+    generatedAt: new Date().toISOString(),
+    limit,
+    staleCount: mismatches.length,
+    staleRows: mismatches
+  };
+}
+
+export async function repairProductValidationConsistency(input: Readonly<{
+  actor?: string | null;
+  limit?: number | null;
+  productId?: string | null;
+}> = {}) {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const report = await checkProductValidationConsistency(input);
+  const refreshed = await refreshAndPersistProductValidations(
+    sql,
+    report.staleRows.map((row) => row.productId)
+  );
+
+  if (refreshed.length > 0) {
+    await sql`
+      insert into public.product_admin_audit (
+        actor,
+        action,
+        after_payload
+      )
+      values (
+        ${input.actor ?? "admin_dashboard"},
+        'product_validation_cache_repaired',
+        ${sql.json(toJsonValue({
+          productIds: refreshed.map((row) => row.productId),
+          repairedCount: refreshed.length
+        }))}::jsonb
+      )
+    `;
+  }
+
+  return {
+    ...report,
+    repairedCount: refreshed.length,
+    repairedProductIds: refreshed.map((row) => row.productId)
+  };
+}
+
 export async function runProductValidationCheck(input: Readonly<{
   actor?: string | null;
   productId: string;
@@ -1016,24 +1311,45 @@ export async function increaseProductFactSafetyLimit(input: Readonly<{
 
   const amount = numberOrNull(fact.amount);
   const doseUnit = fact.unit ? normalizeDoseUnit(fact.unit) : null;
+  const supplementKey = fact.normalized_name || fact.fact_name;
 
   if (amount === null || amount <= 0 || !doseUnit) {
     throw new Error("Fact has no comparable dose for a safety limit update");
   }
 
   const currentLimit = parseDoseLimit(numberOrNull(fact.max_amount), fact.max_unit);
+  const factDose = {
+    amount,
+    originalText: `${amount} ${fact.unit ?? doseUnit}`,
+    unit: doseUnit
+  };
 
-  if (currentLimit && currentLimit.unit !== doseUnit) {
-    throw new Error(
-      "Safety limit unit differs from the product fact unit; update this supplement from the Supplements screen"
-    );
-  }
+  if (currentLimit) {
+    const exceedsLimit = doseExceedsLimit(factDose, currentLimit, supplementKey);
 
-  if (currentLimit && amount <= currentLimit.amount) {
-    throw new Error("The configured safety limit already covers this dose");
+    if (exceedsLimit === null) {
+      throw new Error(
+        "Safety limit unit cannot be compared with this product fact unit; update this supplement from the Supplements screen"
+      );
+    }
+
+    if (!exceedsLimit) {
+      throw new Error("The configured safety limit already covers this dose");
+    }
   }
 
   const maxUnit = fact.max_unit?.trim() || `${doseUnit}/day`;
+  const nextMaxAmount = currentLimit
+    ? doseAmountInLimitUnit(factDose, currentLimit, supplementKey)
+    : amount;
+
+  if (nextMaxAmount === null) {
+    throw new Error(
+      "Safety limit unit cannot be converted without changing the configured unit"
+    );
+  }
+
+  const nextMaxAmountRounded = roundedDoseAmount(nextMaxAmount);
   const beforePayload = {
     factId: input.factId,
     factName: fact.fact_name,
@@ -1052,7 +1368,7 @@ export async function increaseProductFactSafetyLimit(input: Readonly<{
 
   const version = await appendSupplementSafetyLimitVersion(sql, {
     confidence: fact.confidence ?? "moderate",
-    maxAmount: amount,
+    maxAmount: nextMaxAmountRounded,
     maxUnit,
     safetyFlags: normalizeSupplementSafetyFlags(fact.safety_flags ?? []),
     safetyNotes,
@@ -1076,14 +1392,21 @@ export async function increaseProductFactSafetyLimit(input: Readonly<{
       ${sql.json(toJsonValue(beforePayload))}::jsonb,
       ${sql.json(toJsonValue({
         ...beforePayload,
-        maxAmount: amount,
+        factAmount: amount,
+        factUnit: fact.unit ?? doseUnit,
+        maxAmount: nextMaxAmountRounded,
         maxUnit,
         version
       }))}::jsonb
     )
   `;
 
-  const validation = await refreshAndPersistProductValidation(sql, input.productId);
+  const revalidation = await refreshAndPersistProductValidations(
+    sql,
+    await productIdsUsingSupplement(sql, fact.supplement_id)
+  );
+  const validation = revalidation.find((row) => row.productId === input.productId) ??
+    await refreshAndPersistProductValidation(sql, input.productId);
   const productVersion = await recordProductVersion(sql, {
     actor: input.actor,
     changeNote: "product_safety_limit_increased",
@@ -1103,9 +1426,12 @@ export async function increaseProductFactSafetyLimit(input: Readonly<{
       'product_safety_limit_increased',
       ${sql.json(toJsonValue({
         factId: input.factId,
-        maxAmount: amount,
+        factAmount: amount,
+        factUnit: fact.unit ?? doseUnit,
+        maxAmount: nextMaxAmountRounded,
         maxUnit,
         productVersion,
+        revalidatedProductCount: revalidation.length,
         supplementId: fact.supplement_id,
         validation: validation.validation,
         version
@@ -1119,9 +1445,19 @@ export async function increaseProductFactSafetyLimit(input: Readonly<{
     throw new Error("Product not found after safety limit update");
   }
 
+  const revalidatedRows = (
+    await Promise.all(
+      revalidation.map((item) => loadAdminProductRow(item.productId))
+    )
+  ).filter((item): item is AdminProductRow => Boolean(item));
+
   clearProductRecommendationCandidateCache();
 
-  return row;
+  return {
+    revalidatedProductIds: revalidation.map((item) => item.productId),
+    revalidatedRows,
+    row
+  };
 }
 
 function summaryFromRows(rows: AdminProductRow[]) {
@@ -1207,13 +1543,10 @@ async function loadProductRows(productId?: string | null) {
       products.currency,
       products.current_version,
       products.product_data_expires_at,
-      coalesce(to_jsonb(products) ->> 'validation_status', products.source_snapshot #>> '{validation,status}') as validation_status,
-      coalesce(to_jsonb(products) ->> 'validation_summary', products.source_snapshot #>> '{validation,summary}') as validation_summary,
-      coalesce(to_jsonb(products) -> 'validation_reasons', products.source_snapshot #> '{validation,reasons}', '[]'::jsonb) as validation_reasons,
-      coalesce(
-        to_jsonb(products) ->> 'validation_checked_at',
-        products.source_snapshot #>> '{validation,checkedAt}'
-      ) as validation_checked_at,
+      products.validation_status,
+      products.validation_summary,
+      products.validation_reasons,
+      products.validation_checked_at,
       products.updated_at,
       import_review.id::text as import_id,
       import_review.status as import_status,
@@ -1398,6 +1731,18 @@ async function loadAdminProductRow(productId: string) {
   const rows = await loadProductRows(productId);
 
   return rows?.[0] ? rowFromDb(rows[0]) : null;
+}
+
+export async function loadAdminProductRowsForBrand(brandId: string) {
+  if (!isUuidValue(brandId)) {
+    return [];
+  }
+
+  const rows = await loadProductRows();
+
+  return rows
+    ? rows.map(rowFromDb).filter((row) => row.brandId === brandId)
+    : [];
 }
 
 export async function getAdminProductsData(): Promise<AdminProductsData> {
@@ -1605,10 +1950,6 @@ export async function getProductRecommendationCandidates(input: Readonly<{
         )
       )
       and (${includeIneligible} or products.label_status = 'parsed')
-      and (${includeIneligible} or coalesce(
-        to_jsonb(products) ->> 'validation_status',
-        products.source_snapshot #>> '{validation,status}'
-      ) = 'pass')
       and (
         products.product_data_expires_at is null
         or products.product_data_expires_at > now()
@@ -2238,20 +2579,10 @@ async function recordProductVersion(
         next_product.affiliate_status,
         next_product.price_amount,
         next_product.currency,
-        coalesce(to_jsonb(next_product) ->> 'validation_status', next_product.source_snapshot #>> '{validation,status}', 'needs_review'),
-        coalesce(
-          array(
-            select jsonb_array_elements_text(
-              coalesce(to_jsonb(next_product) -> 'validation_reasons', next_product.source_snapshot #> '{validation,reasons}', '[]'::jsonb)
-            )
-          ),
-          '{}'::text[]
-        ),
-        coalesce(to_jsonb(next_product) ->> 'validation_summary', next_product.source_snapshot #>> '{validation,summary}'),
-        nullif(
-          coalesce(to_jsonb(next_product) ->> 'validation_checked_at', next_product.source_snapshot #>> '{validation,checkedAt}'),
-          ''
-        )::timestamptz,
+        next_product.validation_status,
+        next_product.validation_reasons,
+        next_product.validation_summary,
+        next_product.validation_checked_at,
         coalesce(fact_rows.facts, '[]'::jsonb),
         next_product.source_snapshot,
         now()
@@ -3639,36 +3970,7 @@ export async function updateProductBrandCountries(input: Readonly<{
     where id = ${brandId}::uuid
   `;
 
-  await sql`
-    delete from public.product_countries
-    using public.products
-    where product_countries.product_id = products.id
-      and products.brand_id = ${brandId}::uuid
-      and product_countries.country_code <> all(${countryCodes}::text[])
-  `;
-
-  await sql`
-    insert into public.product_countries (
-      product_id,
-      country_code,
-      created_at,
-      updated_at
-    )
-    select
-      products.id,
-      ${countryCodes[0] ?? defaultProductCountryCode},
-      now(),
-      now()
-    from public.products
-    where products.brand_id = ${brandId}::uuid
-      and not exists (
-        select 1
-        from public.product_countries
-        where product_countries.product_id = products.id
-      )
-    on conflict (product_id, country_code) do update set
-      updated_at = excluded.updated_at
-  `;
+  await reconcileProductsForBrandCountryCodes(sql, brandId, countryCodes);
 
   await sql`
     insert into public.product_admin_audit (
@@ -3689,10 +3991,13 @@ export async function updateProductBrandCountries(input: Readonly<{
 
   clearProductRecommendationCandidateCache();
 
+  const productRows = await loadAdminProductRowsForBrand(brandId);
+
   return {
     brandId,
     countryCodes,
-    name: beforeRows[0].name
+    name: beforeRows[0].name,
+    productRows
   };
 }
 
@@ -3795,6 +4100,13 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	    input.id,
 	    [beforeRows[0].region]
 	  );
+	  const existingManufacturerCountryCodes = effectiveBrandId
+	    ? await loadBrandCountryCodes(
+	        sql,
+	        effectiveBrandId,
+	        existingProductCountryCodes
+	      )
+	    : [];
 	  let manufacturerCountryCodes: ProductCountryCode[] = [];
 
 	  if (effectiveBrandId) {
@@ -3810,12 +4122,23 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	          existingProductCountryCodes
 	        );
 	  }
-	  const productCountryCodes = input.availableCountryCodes !== undefined
+	  const manufacturerCountriesChanged = Boolean(
+	    effectiveBrandId &&
+	    input.manufacturerCountryCodes !== undefined &&
+	    !sameProductCountryCodes(
+	      existingManufacturerCountryCodes,
+	      manufacturerCountryCodes
+	    )
+	  );
+	  const requestedProductCountryCodes = input.availableCountryCodes !== undefined
 	    ? normalizeSubmittedProductCountryCodes(
 	        input.availableCountryCodes,
 	        "Product countries"
 	      )
 	    : existingProductCountryCodes;
+	  const productCountryCodes = manufacturerCountriesChanged
+	    ? manufacturerCountryCodes
+	    : requestedProductCountryCodes;
 
 	  if (effectiveBrandId) {
 	    assertProductCountriesAllowedByBrand(
@@ -3911,7 +4234,15 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	  if (input.availableCountryCodes !== undefined) {
 	    await replaceProductCountryCodes(sql, input.id, productCountryCodes);
 	  }
-	
+
+	  if (manufacturerCountriesChanged && effectiveBrandId) {
+	    await reconcileProductsForBrandCountryCodes(
+	      sql,
+	      effectiveBrandId,
+	      manufacturerCountryCodes
+	    );
+	  }
+		
 	  if (input.descriptionEn !== undefined || input.descriptionTh !== undefined) {
     try {
       await sql`
@@ -3983,6 +4314,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	        manufacturerCountryCodes: input.manufacturerCountryCodes === undefined
 	          ? undefined
 	          : manufacturerCountryCodes,
+	        manufacturerCountriesChanged,
 	        status: input.status,
         validation: validation.validation,
         productAudience: input.productAudience,

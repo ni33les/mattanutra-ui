@@ -68,7 +68,10 @@ export async function PATCH(
     });
 
     return NextResponse.json(
-      { row },
+      {
+        row,
+        rows: row.productRows
+      },
       {
         headers: {
           "Cache-Control": "no-store"
