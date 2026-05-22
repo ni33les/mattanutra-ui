@@ -85,7 +85,7 @@ function asArray<T>(value: unknown): T[] {
 }
 
 function asProductStackPreference(value: unknown): ProductStackPreference | undefined {
-  return value === "compact" || value === "max_coverage" || value === "balanced"
+  return value === "compact" || value === "balanced"
     ? value
     : undefined;
 }
@@ -1346,6 +1346,7 @@ export async function getStoredFormulationResult(
         generated_at
       from product_recommendation_runs
       where product_recommendation_runs.plan_id = assessments.plan_id
+        and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
       order by generated_at desc
       limit 1
     ) product_recommendation_run on true
@@ -1438,6 +1439,7 @@ export async function getStoredFormulationResult(
           generated_at
         from product_recommendation_runs
         where product_recommendation_runs.plan_id = assessments.plan_id
+          and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
         order by
           coalesce(diagnostics ->> 'stackPreference', 'balanced'),
           generated_at desc
@@ -1472,8 +1474,7 @@ export async function getStoredFormulationResult(
           order by case latest_runs.stack_preference
             when 'compact' then 1
             when 'balanced' then 2
-            when 'max_coverage' then 3
-            else 4
+            else 3
           end
         ),
         '[]'::jsonb

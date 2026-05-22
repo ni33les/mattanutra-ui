@@ -83,6 +83,21 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
+      /WORKER_PROFILE_MODES[\s\S]*"advisor"[\s\S]*"formulation"[\s\S]*"healthscore"[\s\S]*"products"/,
+      "worker:all must include every active customer task profile"
+    );
+    assert.match(
+      source,
+      /formulation:\s*agentProfile\("formulationWorker",\s*\[[\s\S]*"generate_supplement_guidance"[\s\S]*\]\)/,
+      "formulation workers must explicitly claim formulation tasks"
+    );
+    assert.match(
+      source,
+      /healthscore:\s*agentProfile\("healthScoreEngine",\s*\[\s*"analyze_healthscore"\s*\]\)/,
+      "healthscore workers must explicitly claim healthscore tasks"
+    );
+    assert.match(
+      source,
       /WORKER_\$\{[a-zA-Z]+\.toUpperCase\(\)\}_CONCURRENCY/,
       "workers must allow profile-specific concurrency overrides"
     );

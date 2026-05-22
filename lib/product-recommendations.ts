@@ -111,7 +111,7 @@ export type ProductRecommendationNeedDiagnostic = Readonly<{
 export type ProductRecommendationAlgorithmVersion =
   | "v2-exact-shortlist"
   | "v2-full-beam";
-export type ProductStackPreference = "balanced" | "compact" | "max_coverage";
+export type ProductStackPreference = "balanced" | "compact";
 
 export type ProductRecommendationDiagnostics = Readonly<{
   algorithmVersion?: ProductRecommendationAlgorithmVersion;
@@ -226,7 +226,6 @@ type CoverageResult = Readonly<{
 
 const DEFAULT_TARGET_COUNT = 3;
 const DEFAULT_MAX_COUNT = 6;
-const EXPANDED_MAX_COUNT = 12;
 const MIN_USEFUL_MARGINAL_COVERAGE = 0.02;
 const STOP_AFTER_TARGET_MARGINAL_COVERAGE = 0.08;
 const TARGET_DOSE_SWEET_SPOT_MIN = 0.7;
@@ -579,7 +578,6 @@ export function buildProductNeeds(input: Readonly<{
   const supplementNeeds =
     input.formulation?.supplementBreakdown
       ?.filter((item) => visibleSafetyStatus(item))
-      .filter((item) => item.status === "add" || item.status === "review")
       .map((item) => {
         const displayName = textValue(item.supplement);
         const normalizedName = normalizeProductFactKey(displayName);
@@ -1195,18 +1193,13 @@ export const PRODUCT_STACK_VARIANT_CONFIGS: readonly ProductStackVariantConfig[]
     maxProducts: 6,
     stackPreference: "balanced",
     targetProducts: 3
-  },
-  {
-    maxProducts: EXPANDED_MAX_COUNT,
-    stackPreference: "max_coverage",
-    targetProducts: 6
   }
 ];
 
 export function normalizeProductStackPreference(
   value: unknown
 ): ProductStackPreference {
-  return value === "compact" || value === "max_coverage" || value === "balanced"
+  return value === "compact" || value === "balanced"
     ? value
     : "balanced";
 }
@@ -2093,7 +2086,7 @@ function compareBalancedStackScores(first: V2StackScore, second: V2StackScore) {
   return compareStackScores(first, second);
 }
 
-function compareMaxCoverageStackScores(
+function compareCoverageStackScores(
   first: V2StackScore,
   second: V2StackScore
 ) {
@@ -2162,34 +2155,12 @@ function selectStackForPreference(
     return null;
   }
 
-  if (stackPreference === "max_coverage") {
-    const balancedStack = [...uniqueScores].sort(compareBalancedStackScores)[0] ?? null;
-    const maxCoverageStack =
-      [...uniqueScores].sort(compareMaxCoverageStackScores)[0] ?? null;
-
-    if (!balancedStack || !maxCoverageStack) {
-      return maxCoverageStack;
-    }
-
-    const maxCoverage = maxCoverageStack.supplementProductCoveragePercent;
-    const balancedKey = stackFingerprint(balancedStack);
-    const distinctCoverageTie = uniqueScores
-      .filter((score) =>
-        stackFingerprint(score) !== balancedKey &&
-        Math.abs(score.supplementProductCoveragePercent - maxCoverage) <=
-          V2_SCORE_EPSILON
-      )
-      .sort(compareMaxCoverageStackScores)[0];
-
-    return distinctCoverageTie ?? maxCoverageStack;
-  }
-
   if (stackPreference !== "compact") {
     return [...uniqueScores].sort(compareBalancedStackScores)[0] ?? null;
   }
 
   const bestCoverageStack =
-    [...uniqueScores].sort(compareMaxCoverageStackScores)[0] ?? uniqueScores[0]!;
+    [...uniqueScores].sort(compareCoverageStackScores)[0] ?? uniqueScores[0]!;
   const minimumCoverage =
     bestCoverageStack.supplementProductCoveragePercent *
     V2_COMPACT_MIN_COVERAGE_RATIO;
@@ -3257,7 +3228,7 @@ function recommendProductStackExact(
 ) {
   const stackPreference = normalizeProductStackPreference(input.stackPreference);
   const maxProducts = Math.min(
-    EXPANDED_MAX_COUNT,
+    DEFAULT_MAX_COUNT,
     Math.max(1, input.maxProducts ?? DEFAULT_MAX_COUNT)
   );
   const scoringNeeds = supplementProductNeeds(input.needs);

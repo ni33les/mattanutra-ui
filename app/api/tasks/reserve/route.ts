@@ -24,6 +24,8 @@ export const runtime = "nodejs";
 const DEFAULT_RESERVE_POLL_INTERVAL_MS = 5_000;
 const INTERACTIVE_RESERVE_POLL_INTERVAL_MS = 1_000;
 const INTERACTIVE_TASK_TYPES = new Set([
+  "analyze_healthscore",
+  "generate_supplement_guidance",
   "generate_product_recommendations"
 ]);
 

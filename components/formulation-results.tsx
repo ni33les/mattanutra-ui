@@ -1232,9 +1232,7 @@ function RevealProductsSection({
                   onClick={() => onProductStackPreferenceChange(option.id)}
                   type="button"
                 >
-                  {option.id === "max_coverage"
-                    ? labels.preferenceMaxCoverage
-                    : option.id === "compact"
+                  {option.id === "compact"
                       ? labels.preferenceCompact
                       : labels.preferenceBalanced}
                 </button>
@@ -1727,11 +1725,9 @@ const productRecommendationCopy = {
     needs: "Adds",
     ofYourNeeds: "to product coverage",
     preferenceCompact: "Compact",
-    preferenceCompactHint: "Fewest products within a small coverage tolerance",
+    preferenceCompactHint: "Up to 3 products",
     preferenceBalanced: "Balanced",
-    preferenceBalancedHint: "Best overall mix of coverage, simplicity, dose and cost",
-    preferenceMaxCoverage: "Max coverage",
-    preferenceMaxCoverageHint: "Prioritise every extra point of coverage",
+    preferenceBalancedHint: "Up to 6 products, balancing coverage, simplicity, dose and cost",
     preferenceUpdating: "Switching product stack...",
     stack: "Stack coverage",
     title: "Recommended products",
@@ -1753,11 +1749,9 @@ const productRecommendationCopy = {
     needs: "เพิ่ม",
     ofYourNeeds: "ให้ความครอบคลุมของสินค้า",
     preferenceCompact: "ชุดเล็ก",
-    preferenceCompactHint: "เลือกจำนวนสินค้าน้อยที่สุดเมื่อความครอบคลุมใกล้เคียงกัน",
+    preferenceCompactHint: "สูงสุด 3 รายการ",
     preferenceBalanced: "สมดุล",
-    preferenceBalancedHint: "สมดุลระหว่างความครอบคลุม ความง่าย ปริมาณ และราคา",
-    preferenceMaxCoverage: "ครอบคลุมสูงสุด",
-    preferenceMaxCoverageHint: "ให้ความสำคัญกับความครอบคลุมสูงสุด",
+    preferenceBalancedHint: "สูงสุด 6 รายการ โดยสมดุลระหว่างความครอบคลุม ความง่าย ปริมาณ และราคา",
     preferenceUpdating: "กำลังเปลี่ยนชุดสินค้า...",
     stack: "ความครอบคลุมของชุดสินค้า",
     title: "สินค้าแนะนำ",
@@ -1768,8 +1762,7 @@ const productRecommendationCopy = {
 
 const productStackPreferenceOrder: ProductStackPreference[] = [
   "compact",
-  "balanced",
-  "max_coverage"
+  "balanced"
 ];
 
 function trackMarketplaceClick(
@@ -1842,13 +1835,11 @@ export function ProductRecommendationsPanel({
       : stackOptions.map((option) => option.id);
   const preferenceLabels = {
     balanced: labels.preferenceBalanced,
-    compact: labels.preferenceCompact,
-    max_coverage: labels.preferenceMaxCoverage
+    compact: labels.preferenceCompact
   } satisfies Record<ProductStackPreference, string>;
   const preferenceHints = {
     balanced: labels.preferenceBalancedHint,
-    compact: labels.preferenceCompactHint,
-    max_coverage: labels.preferenceMaxCoverageHint
+    compact: labels.preferenceCompactHint
   } satisfies Record<ProductStackPreference, string>;
   const preferenceControl =
     controlPreferences.length > 1 ? (

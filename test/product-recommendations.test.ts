@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  buildProductNeeds,
   buildProductSearchQueries,
   normalizeProductFactKey,
   productFactAliasKeys,
@@ -81,6 +82,53 @@ function product(input: Readonly<{
 }
 
 describe("product recommendation scoring", () => {
+  it("builds product needs from every visible supplement status", () => {
+    const needs = buildProductNeeds({
+      foodGuidance: null,
+      formulation: {
+        supplementBreakdown: [
+          {
+            category: "Fatty Acids",
+            dailyDose: { en: "1000 mg/day", th: "1000 mg/day" },
+            effectivenessRank: 1,
+            id: "omega-3",
+            rationale: { en: "Supports low fish intake.", th: "Supports low fish intake." },
+            status: "covered",
+            supplement: { en: "Omega-3", th: "Omega-3" }
+          },
+          {
+            category: "Minerals",
+            dailyDose: { en: "300 mg/day", th: "300 mg/day" },
+            effectivenessRank: 2,
+            id: "magnesium",
+            rationale: { en: "Supports recovery.", th: "Supports recovery." },
+            status: "add",
+            supplement: { en: "Magnesium", th: "Magnesium" }
+          },
+          {
+            category: "Herbals",
+            dailyDose: { en: "300 mg/day", th: "300 mg/day" },
+            effectivenessRank: 3,
+            id: "ashwagandha",
+            rationale: { en: "Supports calm.", th: "Supports calm." },
+            safety: {
+              action: "human_review",
+              message: { en: "Hidden review.", th: "Hidden review." },
+              visibility: "hidden"
+            },
+            status: "review",
+            supplement: { en: "Ashwagandha", th: "Ashwagandha" }
+          }
+        ]
+      }
+    });
+
+    assert.deepEqual(
+      needs.map((item) => item.sourceId),
+      ["omega-3", "magnesium"]
+    );
+  });
+
   it("builds broad product search queries instead of exact dose strings", () => {
     const queries = buildProductSearchQueries([
       need("vitamin_d", "Vitamin D3", 7, 1000),
@@ -601,7 +649,7 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(result.recommendations[0]?.stackContributionPercent, 100);
   });
 
-  it("supports compact and max-coverage stack preferences", () => {
+  it("supports compact and balanced stack preferences", () => {
     const multi: ProductCandidate = {
       ...product({ amount: 0.98, id: "near-complete-multi", name: "Vitamin D" }),
       facts: [
@@ -624,10 +672,10 @@ describe("product recommendation scoring v2 exact shortlist", () => {
       needs,
       stackPreference: "compact"
     });
-    const maxCoverage = recommendProductStackFullBeam({
+    const balanced = recommendProductStackFullBeam({
       candidates,
       needs,
-      stackPreference: "max_coverage"
+      stackPreference: "balanced"
     });
 
     assert.deepEqual(
@@ -635,10 +683,10 @@ describe("product recommendation scoring v2 exact shortlist", () => {
       ["near-complete-multi"]
     );
     assert.equal(compact.supplementProductCoveragePercent, 98);
-    assert.equal(maxCoverage.supplementProductCoveragePercent, 100);
-    assert.equal(maxCoverage.recommendations.length, 2);
+    assert.equal(balanced.supplementProductCoveragePercent, 100);
+    assert.equal(balanced.recommendations.length, 2);
     assert.equal(compact.diagnostics.stackPreference, "compact");
-    assert.equal(maxCoverage.diagnostics.stackPreference, "max_coverage");
+    assert.equal(balanced.diagnostics.stackPreference, "balanced");
   });
 
   it("lets compact mode trade some coverage for a smaller stack", () => {
@@ -667,10 +715,10 @@ describe("product recommendation scoring v2 exact shortlist", () => {
       needs,
       stackPreference: "compact"
     });
-    const maxCoverage = recommendProductStackFullBeam({
+    const balanced = recommendProductStackFullBeam({
       candidates,
       needs,
-      stackPreference: "max_coverage"
+      stackPreference: "balanced"
     });
 
     assert.deepEqual(
@@ -678,8 +726,8 @@ describe("product recommendation scoring v2 exact shortlist", () => {
       ["broad-multi"]
     );
     assert.equal(compact.supplementProductCoveragePercent, 67);
-    assert.equal(maxCoverage.supplementProductCoveragePercent, 100);
-    assert.equal(maxCoverage.recommendations.length, 3);
+    assert.equal(balanced.supplementProductCoveragePercent, 100);
+    assert.equal(balanced.recommendations.length, 3);
   });
 
   it("reports distinct alternative stack fingerprints", () => {
