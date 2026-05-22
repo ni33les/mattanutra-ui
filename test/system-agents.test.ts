@@ -20,7 +20,6 @@ describe("system agents", () => {
         "Communications Coordinator",
         "Content Publisher",
         "Email Dispatcher",
-        "Food Guidance Engine",
         "HealthScore Engine",
         "Human Reviewer",
         "Nutrition Plan Advisor",
@@ -37,17 +36,12 @@ describe("system agents", () => {
       "analyze_healthscore",
       "client_safety_followup",
       "content_status_change",
-      "discover_products",
-      "generate_example_food_guidance",
       "generate_example_supplement_guidance",
-      "generate_food_guidance",
       "generate_nutrition_report",
       "generate_product_recommendations",
       "generate_supplement_guidance",
       "nutrition_plan_chat_reply",
-      "parse_product_label",
       "refine_nutrition_plan",
-      "refresh_marketplace_product",
       "send_example_email",
       "send_reassessment_email",
       "sync_digitalocean_billing"
@@ -60,6 +54,18 @@ describe("system agents", () => {
         true,
         `${agent.name} should satisfy ${taskType}`
       );
+    }
+  });
+
+  it("keeps food guidance and marketplace-era refresh tasks out of the active roster", () => {
+    for (const inactiveTaskType of [
+      "generate_example_food_guidance",
+      "generate_food_guidance",
+      "discover_products",
+      "parse_product_label",
+      "refresh_marketplace_product"
+    ]) {
+      assert.deepEqual(requiredCapabilitiesForWorkTaskType(inactiveTaskType), []);
     }
   });
 });

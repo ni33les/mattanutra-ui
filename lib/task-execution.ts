@@ -1,5 +1,4 @@
 import { validateLeadEmail } from "@/lib/email-validation";
-import { analyzeFoodGuidanceWithGrok } from "@/lib/food-guidance-analysis";
 import { analyzeFormulationWithGrok } from "@/lib/formulation-analysis";
 import { fetchDigitalOceanInvoicePreview } from "@/lib/finance-ledger";
 import type { HealthScoreResult } from "@/lib/health-score";
@@ -96,26 +95,6 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
       answers: workItem.answers,
       audit: async () => undefined,
       canonicalSupplements: workItem.canonicalSupplements,
-      chatMessages: workItem.chatMessages,
-      locale: workItem.locale,
-      plan: workItem.plan,
-      planFeedback: workItem.planFeedback,
-      planId: workItem.planId,
-      previousFoodGuidance: workItem.previousFoodGuidance,
-      previousFormulation: workItem.previousFormulation,
-      taskId: workItem.taskId
-    });
-
-    return { analysis };
-  }
-
-  if (
-    workItem.taskType === "generate_food_guidance" ||
-    workItem.taskType === "generate_example_food_guidance"
-  ) {
-    const analysis = await analyzeFoodGuidanceWithGrok({
-      answers: workItem.answers,
-      audit: async () => undefined,
       chatMessages: workItem.chatMessages,
       locale: workItem.locale,
       plan: workItem.plan,
@@ -285,19 +264,6 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
           }
         }
       }
-    };
-  }
-
-  if (
-    workItem.taskType === "discover_products" ||
-    workItem.taskType === "parse_product_label" ||
-    workItem.taskType === "refresh_marketplace_product"
-  ) {
-    return {
-      accepted: true,
-      reason: "Marketplace official adapter is not configured yet.",
-      skipped: true,
-      taskType: workItem.taskType
     };
   }
 

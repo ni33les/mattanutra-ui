@@ -1083,9 +1083,7 @@ export async function getStoredAssessmentSnapshot(planId: string) {
         where status = 'queued'
           and task_type in (
             'generate_supplement_guidance',
-            'generate_food_guidance',
-            'generate_example_supplement_guidance',
-            'generate_example_food_guidance'
+            'generate_example_supplement_guidance'
           )
       ),
       current_task as (

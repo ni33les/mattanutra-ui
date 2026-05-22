@@ -780,21 +780,6 @@ values
     now()
   ),
   (
-    '6b58c999-ec78-471e-b179-17bdb42538a7'::uuid,
-    'Food Guidance Engine',
-    'ai',
-    'active',
-    array[
-      'food_guidance_generation',
-      'free_example_food_guidance'
-    ]::text[],
-    'grok:food-guidance',
-    '{"seeded": true, "usesModel": true}'::jsonb,
-    null,
-    now(),
-    now()
-  ),
-  (
     'b955a43d-2506-4f31-8955-ec7dd599a5f5'::uuid,
     'Nutrition Plan Advisor',
     'ai',
@@ -834,7 +819,6 @@ values
     array[
       'dose_normalization',
       'product_recommendation',
-      'product_refresh',
       'supplement_safety_scan'
     ]::text[],
     null,

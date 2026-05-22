@@ -1,14 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  buildMarketplaceSearchQueries,
+  buildProductSearchQueries,
   normalizeProductFactKey,
   productFactAliasKeys,
   productFactLooksLikeConcentration,
   productKeysMatch,
-  recommendProductStack as recommendProductStackDefault,
+  recommendProductStack,
   recommendProductStackFullBeam,
-  recommendProductStackLegacy as recommendProductStack,
   recommendProductStackV2,
   type ProductCandidate,
   type ProductRecommendationNeed
@@ -82,8 +81,8 @@ function product(input: Readonly<{
 }
 
 describe("product recommendation scoring", () => {
-  it("builds broad marketplace search queries instead of exact dose strings", () => {
-    const queries = buildMarketplaceSearchQueries([
+  it("builds broad product search queries instead of exact dose strings", () => {
+    const queries = buildProductSearchQueries([
       need("vitamin_d", "Vitamin D3", 7, 1000),
       need("coq10", "CoQ10", 6, 1000),
       need("chia", "Chia Seeds", 5, 0, "food")
@@ -211,7 +210,7 @@ describe("product recommendation scoring", () => {
     });
     const recommendedIds = result.recommendations.map((item) => item.product.id);
 
-    assert.deepEqual(recommendedIds, ["one", "two", "three", "four"]);
+    assert.deepEqual(new Set(recommendedIds), new Set(["one", "two", "three", "four"]));
   });
 
   it("skips weak top-ups after the target count to cover an unmet need", () => {
@@ -435,8 +434,8 @@ describe("product recommendation scoring", () => {
       "nicotinamide"
     );
     assert.equal(result.recommendations[0]?.product.id, "serving-dose");
-    assert.equal(potencyOnlyResult.recommendations[0]?.product.id, "potency");
-    assert.equal(potencyOnlyResult.stackCoveragePercent, 80);
+    assert.equal(potencyOnlyResult.recommendations.length, 0);
+    assert.equal(potencyOnlyResult.stackCoveragePercent, 0);
   });
 
   it("matches curated ingredient aliases and bounded typos", () => {
@@ -548,7 +547,7 @@ describe("product recommendation scoring", () => {
 
 describe("product recommendation scoring v2 exact shortlist", () => {
   it("uses full-beam as the active default matcher and emits v2 diagnostics", () => {
-    const result = recommendProductStackDefault({
+    const result = recommendProductStack({
       candidates: [product({ amount: 1, id: "magnesium", name: "Magnesium" })],
       needs: [need("magnesium", "Magnesium", 5)]
     });

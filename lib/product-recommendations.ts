@@ -109,7 +109,6 @@ export type ProductRecommendationNeedDiagnostic = Readonly<{
 }>;
 
 export type ProductRecommendationAlgorithmVersion =
-  | "legacy-greedy"
   | "v2-exact-shortlist"
   | "v2-full-beam";
 export type ProductStackPreference = "balanced" | "compact" | "max_coverage";
@@ -622,7 +621,7 @@ function humanSearchName(need: ProductRecommendationNeed) {
   ].filter(Boolean);
 }
 
-export function buildMarketplaceSearchQueries(
+export function buildProductSearchQueries(
   needs: readonly ProductRecommendationNeed[],
   limit = 16
 ) {
@@ -1065,221 +1064,6 @@ function whyProductMatches(
     : `${prefix} for ${names.join(", ")}; fills an otherwise uncovered need.`;
 }
 
-export function recommendProductStackLegacy(input: ProductRecommendationInput) {
-  const targetCount = input.targetProducts ?? DEFAULT_TARGET_COUNT;
-  const maxProducts = Math.min(
-    DEFAULT_MAX_COUNT,
-    Math.max(1, input.maxProducts ?? DEFAULT_MAX_COUNT)
-  );
-  const scoringNeeds = supplementProductNeeds(input.needs);
-  const exclusions: ProductRecommendationExclusion[] = [];
-  const bestRejectedByNeed = new Map<string, ProductRecommendationExclusion>();
-  const bestRejectedCoverageByNeed = new Map<string, number>();
-  const selectedVariantKeys = new Set<string>();
-  const scored = input.candidates
-    .map((product) => {
-      const coverage = productCoverage(product, scoringNeeds, input.clientSex);
-      const reason =
-        exclusionReason(product) ??
-        productAudienceMismatchReason(product, input.clientSex);
-
-      if (reason) {
-        const exclusion = {
-          productId: product.id,
-          reason,
-          title: product.title
-        };
-
-        exclusions.push(exclusion);
-
-        for (const need of coverage.coveredNeeds) {
-          const current = bestRejectedCoverageByNeed.get(need.id) ?? 0;
-          const next = coverage.coverageByNeed.get(need.id) ?? 0;
-
-          if (next > current) {
-            bestRejectedCoverageByNeed.set(need.id, next);
-            bestRejectedByNeed.set(need.id, exclusion);
-          }
-        }
-
-        return null;
-      }
-
-      const penalty = productPenalty(product, input.budgetAmount);
-
-      if (coverage.percent <= 0) {
-        const exclusion = {
-          productId: product.id,
-          reason:
-            productFactAudienceMismatchReason(
-              product,
-              scoringNeeds,
-              input.clientSex
-            ) ?? "Product does not cover current client needs",
-          title: product.title
-        };
-
-        exclusions.push(exclusion);
-        return null;
-      }
-
-      return {
-        coverage,
-        penalty,
-        product
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => Boolean(item));
-
-  const selected: ProductRecommendationSelection[] = [];
-  const selectedProductIds = new Set<string>();
-  const stackCoverage = new Map<string, number>();
-
-  while (selected.length < maxProducts) {
-    const ranked = scored
-      .filter((item) => !selectedProductIds.has(item.product.id))
-      .filter((item) => !selectedVariantKeys.has(productVariantKey(item.product)))
-      .map((item) => {
-        const marginal = marginalCoveragePercent(
-          item.coverage,
-          stackCoverage,
-          scoringNeeds
-        );
-        const affiliateBonus = item.product.activeAffiliateUrl ? 0.05 : 0;
-        const looseFitPenalty = extraIngredientPenalty(item.product, scoringNeeds);
-        const baseBonus = broadBaseBonus(item.product, item.coverage, selected.length);
-
-        return {
-          ...item,
-          affiliateBonus,
-          baseBonus,
-          looseFitPenalty,
-          marginal,
-          score:
-            marginal * 2 +
-            item.coverage.percent * 0.3 -
-            item.penalty +
-            baseBonus -
-            looseFitPenalty +
-            affiliateBonus
-        };
-      })
-      .filter((item) =>
-        item.marginal / 100 >= MIN_USEFUL_MARGINAL_COVERAGE ||
-        coversCurrentlyUnmatchedNeed(item.coverage, stackCoverage)
-      )
-      .sort((first, second) => {
-        const scoreDelta = second.score - first.score;
-
-        if (
-          Math.abs(scoreDelta) > 0.5 &&
-          !productsAreNutritionallySimilar(first, second)
-        ) {
-          return scoreDelta;
-        }
-
-        if (first.product.activeAffiliateUrl !== second.product.activeAffiliateUrl) {
-          return first.product.activeAffiliateUrl ? -1 : 1;
-        }
-
-        const affiliateDelta =
-          affiliateTieScore(second.product) - affiliateTieScore(first.product);
-
-        if (affiliateDelta !== 0) {
-          return affiliateDelta;
-        }
-
-        return (first.product.priceAmount ?? Number.MAX_SAFE_INTEGER) -
-          (second.product.priceAmount ?? Number.MAX_SAFE_INTEGER);
-      });
-    const eligibleRanked =
-      selected.length >= targetCount
-        ? ranked.filter((item) =>
-            item.marginal / 100 >= STOP_AFTER_TARGET_MARGINAL_COVERAGE ||
-            coversCurrentlyUnmatchedNeed(item.coverage, stackCoverage)
-          )
-        : ranked;
-    const best = eligibleRanked[0];
-
-    if (!best) {
-      break;
-    }
-
-    selectedProductIds.add(best.product.id);
-    selectedVariantKeys.add(productVariantKey(best.product));
-    applyCoverage(stackCoverage, best.coverage);
-    selected.push({
-      affiliate: Boolean(best.product.activeAffiliateUrl),
-      offerId: best.product.activeOfferId ?? null,
-      coveredNeeds: best.coverage.coveredNeeds,
-      product: best.product,
-      productCoveragePercent: visibleCoveragePercent(
-        best.coverage.percent,
-        best.coverage.coveredNeeds.length > 0
-      ),
-      rank: selected.length + 1,
-      score: Number(best.score.toFixed(4)),
-      servingMultiplier: 1,
-      stackContributionPercent: visibleCoveragePercent(best.marginal, best.marginal > 0),
-      unknownAtRecommendation: false,
-      url: best.product.activeAffiliateUrl || best.product.productUrl,
-      why: whyProductMatches(
-        best.product,
-        best.coverage.coveredNeeds,
-        best.marginal
-      )
-    });
-  }
-
-  const supplementProductCoveragePercent = safePercent(
-    stackCoveragePercent(stackCoverage, scoringNeeds)
-  );
-  const foodCoveragePercent = 0;
-  const totalPlanCoveragePercent = safePercent(
-    stackCoveragePercent(stackCoverage, scoringNeeds)
-  );
-  const needDiagnostics = diagnosticNeeds(scoringNeeds, stackCoverage, bestRejectedByNeed);
-  const selectedIds = new Set(selected.map((item) => item.product.id));
-  const nearMisses = scored
-    .filter((item) => !selectedIds.has(item.product.id))
-    .map((item) => ({
-      coveragePercent: safePercent(item.coverage.percent),
-      productId: item.product.id,
-      reason: "Lower marginal fit than selected products",
-      title: item.product.title
-    }))
-    .filter((item) => item.coveragePercent > 0)
-    .sort((first, second) => second.coveragePercent - first.coveragePercent)
-    .slice(0, 12);
-
-  return {
-    clientNeeds: scoringNeeds,
-    diagnostics: {
-      algorithmVersion: "legacy-greedy",
-      blockedProducts: exclusions.filter(
-        (item) => item.reason !== "Product does not cover current client needs"
-      ),
-      coverage: {
-        foodCoveragePercent,
-        supplementProductCoveragePercent,
-        totalPlanCoveragePercent
-      },
-	      factIssues: factIssueExclusions(exclusions),
-	      matchedNeeds: needDiagnostics.filter((item) => item.coveragePercent > 0),
-	      marketRegion: input.countryCode ?? undefined,
-	      nearMisses,
-      productsConsidered: input.candidates.length,
-      unmatchedNeeds: needDiagnostics.filter((item) => item.coveragePercent <= 0)
-    },
-    exclusions,
-    recommendations: selected,
-    foodCoveragePercent,
-    stackCoveragePercent: supplementProductCoveragePercent,
-    supplementProductCoveragePercent,
-    totalPlanCoveragePercent
-  } satisfies ProductRecommendationResult;
-}
-
 type V2Weights = Readonly<{
   confidence: number;
   cost: number;
@@ -1379,6 +1163,9 @@ const V2_COMPACT_CRITICAL_WEIGHT_FLOOR = 9;
 const V2_COMPACT_CRITICAL_NEED_LOSS_TOLERANCE = 0.35;
 const V2_EXTRA_SERVING_SIMPLICITY_PENALTY = 0.02;
 const V2_DUPLICATE_NEED_PRODUCT_PENALTY_WEIGHT = 0.24;
+const V2_USEFUL_EXTRAS_LIMIT = 8;
+const V2_EXCESSIVE_EXTRAS_PENALTY_WEIGHT = 0.4;
+const V2_EXCESSIVE_EXTRAS_PENALTY_RANGE = 24;
 const SAFETY_FLAG_PREGNANCY_CAUTION = 1;
 const SAFETY_FLAG_MEDICATION_INTERACTION = 2;
 const SAFETY_FLAG_BLEEDING_RISK = 4;
@@ -1434,6 +1221,17 @@ function clamp(value: number, min: number, max: number) {
 
 function clamp01(value: number) {
   return clamp(value, 0, 1);
+}
+
+function usefulExtrasScore(extrasCount: number) {
+  return clamp01(Math.min(extrasCount, V2_USEFUL_EXTRAS_LIMIT) / V2_USEFUL_EXTRAS_LIMIT);
+}
+
+function excessiveExtrasPenalty(extrasCount: number) {
+  return clamp01(
+    Math.max(0, extrasCount - V2_USEFUL_EXTRAS_LIMIT) /
+      V2_EXCESSIVE_EXTRAS_PENALTY_RANGE
+  );
 }
 
 function roundScore(value: number) {
@@ -2282,14 +2080,14 @@ function compareBalancedStackScores(first: V2StackScore, second: V2StackScore) {
     return matchedCountDelta;
   }
 
-  if (Math.abs(coverageDelta) > V2_SCORE_EPSILON) {
-    return coverageDelta;
-  }
-
   const scoreDelta = second.score - first.score;
 
   if (Math.abs(scoreDelta) > V2_DIVERSITY_SCORE_EPSILON) {
     return scoreDelta;
+  }
+
+  if (Math.abs(coverageDelta) > V2_SCORE_EPSILON) {
+    return coverageDelta;
   }
 
   return compareStackScores(first, second);
@@ -2893,9 +2691,10 @@ function beamSearchStackScores(
         ? clamp01(1 - Math.max(0, price - budgetAmount) / budgetAmount)
         : 0.5;
     const costEfficiency = clamp01(coverage * 0.7 + affordability * 0.3);
-    const extras = clamp01(extrasCount / 8);
+    const extras = usefulExtrasScore(extrasCount);
     const overlapPenalty = totalWeight > 0 ? overlapNumerator / totalWeight : 0;
     const overagePenalty = totalWeight > 0 ? overageNumerator / totalWeight : 0;
+    const extraFactPenalty = excessiveExtrasPenalty(extrasCount);
     const duplicateNeedProductPenalty = totalWeight > 0
       ? duplicateNeedProductNumerator / totalWeight
       : 0;
@@ -2907,6 +2706,7 @@ function beamSearchStackScores(
       0.3 * overlapPenalty +
       V2_DUPLICATE_NEED_PRODUCT_PENALTY_WEIGHT * duplicateNeedProductPenalty +
       0.4 * overagePenalty +
+      V2_EXCESSIVE_EXTRAS_PENALTY_WEIGHT * extraFactPenalty +
       safetyContextPenalty
     );
     const componentScores = {
@@ -2915,6 +2715,7 @@ function beamSearchStackScores(
       coverage: roundScore(coverage),
       dose: roundScore(dosePrecision),
       duplicateNeedProductPenalty: roundScore(duplicateNeedProductPenalty),
+      extraFactPenalty: roundScore(extraFactPenalty),
       extras: roundScore(extras),
       overagePenalty: roundScore(overagePenalty),
       penalty: roundScore(penalty),
@@ -3141,9 +2942,10 @@ function enumerateStackScores(
         ? clamp01(1 - Math.max(0, price - budgetAmount) / budgetAmount)
         : 0.5;
     const costEfficiency = clamp01(coverage * 0.7 + affordability * 0.3);
-    const extras = clamp01(extrasCount / 8);
+    const extras = usefulExtrasScore(extrasCount);
     const overlapPenalty = totalWeight > 0 ? overlapNumerator / totalWeight : 0;
     const overagePenalty = totalWeight > 0 ? overageNumerator / totalWeight : 0;
+    const extraFactPenalty = excessiveExtrasPenalty(extrasCount);
     const duplicateNeedProductPenalty = totalWeight > 0
       ? duplicateNeedProductNumerator / totalWeight
       : 0;
@@ -3155,6 +2957,7 @@ function enumerateStackScores(
       0.3 * overlapPenalty +
       V2_DUPLICATE_NEED_PRODUCT_PENALTY_WEIGHT * duplicateNeedProductPenalty +
       0.4 * overagePenalty +
+      V2_EXCESSIVE_EXTRAS_PENALTY_WEIGHT * extraFactPenalty +
       safetyContextPenalty
     );
     const componentScores = {
@@ -3163,6 +2966,7 @@ function enumerateStackScores(
       coverage: roundScore(coverage),
       dose: roundScore(dosePrecision),
       duplicateNeedProductPenalty: roundScore(duplicateNeedProductPenalty),
+      extraFactPenalty: roundScore(extraFactPenalty),
       extras: roundScore(extras),
       overagePenalty: roundScore(overagePenalty),
       penalty: roundScore(penalty),

@@ -17,7 +17,6 @@ import type {
 } from "@/lib/product-adapters";
 import {
   analysisPayload,
-  foodGuidanceAnalysisPayload,
   modelVersion,
   nutritionChatAnalysisPayload,
   nutritionReportAnalysisPayload,
@@ -31,13 +30,9 @@ import {
   recordFinanceTransaction,
   recordXaiUsageCost
 } from "@/lib/finance-ledger";
-import { applyFoodGuidanceSafety } from "@/lib/food-guidance-safety";
 import { applyFormulationSafety } from "@/lib/formulation-safety";
 import { inferGuidanceRemovalAdjustments } from "@/lib/plan-guidance-adjustments";
-import {
-  insertFoodGuidanceVersion,
-  insertFormulationVersion
-} from "@/lib/plan-version-writes";
+import { insertFormulationVersion } from "@/lib/plan-version-writes";
 import {
   inferPlanFeedbackFromMessage,
   isPlanRefinementRequest,
@@ -506,115 +501,6 @@ async function applyPaidFormulationResult(
   });
 }
 
-async function applyPaidFoodGuidanceResult(
-  task: TaskRecord,
-  resultPayload: unknown,
-  sqlOverride?: TaskServiceDb,
-  afterCommit?: AfterCommitScheduler
-) {
-  const sql = sqlOverride ?? getSql();
-  const planId = task.planId;
-
-  if (!sql || !planId) {
-    throw new Error("Food guidance completion result is missing a plan");
-  }
-
-  const rows = await sql`
-    select answers, locale
-    from public.assessments
-    where plan_id = ${planId}::uuid
-    limit 1
-  `;
-  const row = rows[0];
-
-  if (!row) {
-    throw new Error("Assessment submission not found");
-  }
-
-  const locale: Locale = isLocale(row.locale) ? row.locale : "en";
-  const analysis = foodGuidanceAnalysisPayload(resultPayload);
-  await eventually(afterCommit, async () => {
-    await recordTaskXaiUsageCost({
-      analysis,
-      metadata: { planId },
-      purpose: "food_guidance_analysis",
-      task
-    });
-  });
-  const safeFoodGuidance = await applyFoodGuidanceSafety(sql, {
-    afterCommit,
-    answers: row.answers,
-    audit: async ({ eventType, level, payload }) =>
-      eventually(afterCommit, async () =>
-        addWorkEvent(task, eventType, level ?? "low", payload)
-      ),
-    foodGuidance: analysis.foodGuidance,
-    locale,
-    planId,
-    taskId: task.id
-  });
-  const version = await insertFoodGuidanceVersion(sql, {
-    foodGuidance: safeFoodGuidance,
-    modelVersion: modelVersion(analysis),
-    planId
-  });
-  const nutritionReady = await updateAssessmentReadyIfNutritionReady(sql, planId);
-  const productRecommendationsQueued = nutritionReady
-    ? Boolean(
-        await queueProductRecommendationsForReadyPlan({
-          planId,
-          source: "food_guidance_completion",
-          task
-        })
-      )
-    : false;
-
-  await eventually(afterCommit, async () => {
-    await addWorkEvent(task, "food_guidance_version_written", "medium", {
-      attempts: analysis.attempts,
-      foodSafetySummary: safeFoodGuidance.foodSafetySummary,
-      model: analysis.model,
-      nutritionReady,
-      promptVersion: analysis.promptVersion,
-      reasoningEffort: analysis.reasoningEffort,
-      responseId: analysis.responseId,
-      version
-    });
-  });
-  await eventually(afterCommit, async () => {
-    await refreshPaidNutritionReadinessAfterCommit(task, planId, nutritionReady);
-    if (nutritionReady && !productRecommendationsQueued) {
-      await queueProductRecommendationsForReadyPlan({
-        planId,
-        source: "food_guidance_completion_recovery",
-        task
-      });
-    }
-  });
-  await eventually(afterCommit, async () => {
-    await writeBpmEvent({
-      actorType: "worker",
-      eventName: "food_guidance_ready",
-      eventType: "formulation",
-      locale,
-      metrics: {
-        attempts: analysis.attempts
-      },
-      planId,
-      properties: {
-        foodSafetySummary: safeFoodGuidance.foodSafetySummary,
-        model: analysis.model,
-        nutritionReady,
-        promptVersion: analysis.promptVersion,
-        reasoningEffort: analysis.reasoningEffort,
-        responseId: analysis.responseId,
-        taskId: task.id,
-        version
-      }
-    });
-  });
-}
-
 async function applyExampleFormulationResult(
   task: TaskRecord,
   resultPayload: unknown,
@@ -722,113 +608,6 @@ async function applyExampleFormulationResult(
         version
       },
       selectedPlan: plan
-    });
-  });
-}
-
-async function applyExampleFoodGuidanceResult(
-  task: TaskRecord,
-  resultPayload: unknown,
-  sqlOverride?: TaskServiceDb,
-  afterCommit?: AfterCommitScheduler
-) {
-  const sql = sqlOverride ?? getSql();
-  const planId = task.planId;
-  const requestId = payloadText(task.payload, "requestId");
-
-  if (!sql || !planId || !isUuid(requestId)) {
-    throw new Error("Example food guidance completion result is missing identifiers");
-  }
-
-  const rows = await sql`
-    select assessments.answers, assessments.locale
-    from public.assessments
-    join public.assessment_example_requests
-      on assessment_example_requests.plan_id = assessments.plan_id
-    where assessments.plan_id = ${planId}::uuid
-      and assessment_example_requests.id = ${requestId}::uuid
-    limit 1
-  `;
-  const row = rows[0];
-
-  if (!row) {
-    throw new Error("Example request not found");
-  }
-
-  const locale: Locale = isLocale(row.locale) ? row.locale : "en";
-  const analysis = foodGuidanceAnalysisPayload(resultPayload);
-  await eventually(afterCommit, async () => {
-    await recordTaskXaiUsageCost({
-      analysis,
-      metadata: {
-        planId,
-        requestId
-      },
-      purpose: "food_guidance_analysis",
-      task
-    });
-  });
-  const safeFoodGuidance = await applyFoodGuidanceSafety(sql, {
-    afterCommit,
-    answers: row.answers,
-    audit: async ({ eventType, level, payload }) =>
-      eventually(afterCommit, async () =>
-        addWorkEvent(task, eventType, level ?? "low", { ...payload, requestId })
-      ),
-    foodGuidance: analysis.foodGuidance,
-    locale,
-    planId,
-    requestId,
-    taskId: task.id
-  });
-  const version = await insertFoodGuidanceVersion(sql, {
-    foodGuidance: safeFoodGuidance,
-    modelVersion: modelVersion(analysis, ":example"),
-    planId
-  });
-  await sql`
-    update public.assessment_example_requests set
-      status = 'formulation_ready',
-      food_guidance_status = 'ready',
-      updated_at = now()
-    where id = ${requestId}::uuid
-  `;
-
-  await eventually(afterCommit, async () => {
-    await addWorkEvent(task, "example_food_guidance_version_written", "medium", {
-      attempts: analysis.attempts,
-      foodSafetySummary: safeFoodGuidance.foodSafetySummary,
-      model: analysis.model,
-      promptVersion: analysis.promptVersion,
-      reasoningEffort: analysis.reasoningEffort,
-      requestId,
-      responseId: analysis.responseId,
-      version
-    });
-  });
-  await eventually(afterCommit, async () => {
-    await enqueueExampleEmailIfPreviewReady(planId, requestId);
-  });
-  await eventually(afterCommit, async () => {
-    await writeBpmEvent({
-      actorType: "worker",
-      eventName: "free_example_food_guidance_ready",
-      eventType: "formulation",
-      exampleRequestId: requestId,
-      locale,
-      metrics: {
-        attempts: analysis.attempts,
-        foodSafetySummary: safeFoodGuidance.foodSafetySummary
-      },
-      planId,
-      properties: {
-        model: analysis.model,
-        promptVersion: analysis.promptVersion,
-        reasoningEffort: analysis.reasoningEffort,
-        responseId: analysis.responseId,
-        taskId: task.id,
-        version
-      }
     });
   });
 }
@@ -1391,7 +1170,6 @@ async function applyNutritionPlanRefinementResult(
 
   await eventually(afterCommit, async () => {
     await addWorkEvent(task, "nutrition_plan_refinement_queued", "medium", {
-      foodGuidanceTaskId: queued.foodGuidanceTaskId,
       nutritionReportTaskId: queued.nutritionReportTaskId,
       refinementHash,
       supplementGuidanceTaskId: queued.supplementGuidanceTaskId
@@ -1550,7 +1328,7 @@ function productRecommendationVariantPayloads(
   });
 }
 
-function marketplaceSnapshotPayload(value: unknown): ProductSnapshot[] {
+function productSnapshotPayload(value: unknown): ProductSnapshot[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -1589,7 +1367,7 @@ function marketplaceSnapshotPayload(value: unknown): ProductSnapshot[] {
   });
 }
 
-function marketplaceDiagnosticsPayload(value: unknown): MarketplaceSearchDiagnostic[] {
+function productDiagnosticsPayload(value: unknown): MarketplaceSearchDiagnostic[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -1624,8 +1402,8 @@ function productDiscoveryPayload(value: unknown) {
   const discovery = objectValue(payload.discovery);
 
   return {
-    diagnostics: marketplaceDiagnosticsPayload(discovery.diagnostics),
-    products: marketplaceSnapshotPayload(discovery.products)
+    diagnostics: productDiagnosticsPayload(discovery.diagnostics),
+    products: productSnapshotPayload(discovery.products)
   };
 }
 
@@ -1648,9 +1426,9 @@ async function queueUnknownProductReviewTasks(
       },
       createdByTaskId: task.id,
       groupLabel: "Review product recommendations",
-      idempotencyKey: `review-marketplace-product:${item.product.id}`,
+      idempotencyKey: `review-product:${item.product.id}`,
       idempotencyScope: "active",
-      idempotencyScopeKey: `review-marketplace-product:${item.product.id}`,
+      idempotencyScopeKey: `review-product:${item.product.id}`,
       initialComment: {
         authorName: "Product Matcher",
         authorType: "deterministic",
@@ -1898,8 +1676,8 @@ async function applyProductRecommendationsResult(
     discovery.diagnostics.length < 1
       ? "Matched against the approved curated product catalogue."
       : configuredAdapters < 1
-        ? "Marketplace discovery adapters are not configured."
-        : `Marketplace discovery returned ${discoveryResults} products.`;
+        ? "Product discovery adapters are not configured."
+        : `Product discovery returned ${discoveryResults} products.`;
 
   const runIds = new Map<ProductStackPreference, string>();
 
@@ -2015,18 +1793,8 @@ export async function applyTaskCompletionResult({
     return resultPayload;
   }
 
-  if (task.taskType === "generate_food_guidance") {
-    await applyPaidFoodGuidanceResult(task, resultPayload, sql, afterCommit);
-    return resultPayload;
-  }
-
   if (task.taskType === "generate_example_supplement_guidance") {
     await applyExampleFormulationResult(task, resultPayload, sql, afterCommit);
-    return resultPayload;
-  }
-
-  if (task.taskType === "generate_example_food_guidance") {
-    await applyExampleFoodGuidanceResult(task, resultPayload, sql, afterCommit);
     return resultPayload;
   }
 
@@ -2099,8 +1867,7 @@ export async function applyTaskFailureResult({
 
   if (
     task.planId &&
-    (task.taskType === "generate_supplement_guidance" ||
-      task.taskType === "generate_food_guidance")
+    task.taskType === "generate_supplement_guidance"
   ) {
     await appendAssessmentVersion(sql, {
       actor: task.reservedByAgentId,
@@ -2146,7 +1913,6 @@ export async function applyTaskFailureResult({
   if (
     task.planId &&
     (task.taskType === "generate_example_supplement_guidance" ||
-      task.taskType === "generate_example_food_guidance" ||
       task.taskType === "send_example_email") &&
     isUuid(requestId)
   ) {
@@ -2162,11 +1928,6 @@ export async function applyTaskFailureResult({
           when ${task.taskType} = 'generate_example_supplement_guidance'
           then ${retryWillBeScheduled ? "queued" : "failed"}
           else formulation_status
-        end,
-        food_guidance_status = case
-          when ${task.taskType} = 'generate_example_food_guidance'
-          then ${retryWillBeScheduled ? "queued" : "failed"}
-          else food_guidance_status
         end,
         updated_at = now()
       where id = ${requestId}::uuid

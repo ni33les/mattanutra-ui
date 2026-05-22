@@ -9,13 +9,11 @@ export const AGENT_CAPABILITIES = {
   communicationRoute: "communication_route",
   doseNormalization: "dose_normalization",
   emailSend: "email_send",
-  foodGuidanceGeneration: "food_guidance_generation",
   foodGuidanceReview: "food_guidance_review",
   foodReview: "food_review",
   formulationGeneration: "formulation_generation",
   formulationReview: "formulation_review",
   freeEmailSend: "free_email_send",
-  freeExampleFoodGuidance: "free_example_food_guidance",
   freeExampleFormulation: "free_example_formulation",
   healthScoreAnalysis: "healthscore_analysis",
   hostingCostSync: "hosting_cost_sync",
@@ -26,7 +24,6 @@ export const AGENT_CAPABILITIES = {
   nutritionReportGeneration: "nutrition_report_generation",
   productRecommendation: "product_recommendation",
   productRecommendationFullBeam: "product_recommendation_full_beam",
-  productRefresh: "product_refresh",
   productReview: "product_review",
   reassessmentEmailSend: "reassessment_email_send",
   safetyReview: "safety_review",
@@ -45,7 +42,6 @@ export type SystemAgentKey =
   | "communicationsCoordinator"
   | "contentPublisher"
   | "emailDispatcher"
-  | "foodGuidanceWorker"
   | "formulationWorker"
   | "healthScoreEngine"
   | "humanReviewer"
@@ -121,20 +117,6 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
     name: "Email Dispatcher",
     type: "deterministic"
   },
-  foodGuidanceWorker: {
-    capabilities: [
-      AGENT_CAPABILITIES.foodGuidanceGeneration,
-      AGENT_CAPABILITIES.freeExampleFoodGuidance
-    ],
-    id: "6b58c999-ec78-471e-b179-17bdb42538a7",
-    metadata: {
-      seeded: true,
-      usesModel: true
-    },
-    model: "grok:food-guidance",
-    name: "Food Guidance Engine",
-    type: "ai"
-  },
   formulationWorker: {
     capabilities: [
       AGENT_CAPABILITIES.formulationGeneration,
@@ -202,7 +184,6 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
       AGENT_CAPABILITIES.doseNormalization,
       AGENT_CAPABILITIES.productRecommendationFullBeam,
       AGENT_CAPABILITIES.productRecommendation,
-      AGENT_CAPABILITIES.productRefresh,
       AGENT_CAPABILITIES.supplementSafetyScan
     ],
     id: "28e0d3fd-4f6f-4877-92bc-bb77024496d4",
@@ -249,17 +230,12 @@ export const SYSTEM_AGENT_LIST = Object.values(SYSTEM_AGENTS);
 export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
   analyze_healthscore: "healthScoreEngine",
   client_safety_followup: "communicationsCoordinator",
-  discover_products: "productMatcher",
-  generate_example_food_guidance: "foodGuidanceWorker",
   generate_example_supplement_guidance: "formulationWorker",
-  generate_food_guidance: "foodGuidanceWorker",
   generate_supplement_guidance: "formulationWorker",
   generate_nutrition_report: "nutritionPlanAdvisor",
   generate_product_recommendations: "productMatcher",
   nutrition_plan_chat_reply: "nutritionPlanAdvisor",
-  parse_product_label: "productMatcher",
   refine_nutrition_plan: "nutritionPlanAdvisor",
-  refresh_marketplace_product: "productMatcher",
   content_status_change: "contentPublisher",
   send_example_email: "emailDispatcher",
   send_reassessment_email: "emailDispatcher",
@@ -278,16 +254,9 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
   const capabilitiesByTaskType: Record<string, readonly string[]> = {
     analyze_healthscore: [AGENT_CAPABILITIES.healthScoreAnalysis],
     client_safety_followup: [AGENT_CAPABILITIES.clientSafetyFollowup],
-    discover_products: [
-      AGENT_CAPABILITIES.productRecommendation
-    ],
-    generate_example_food_guidance: [
-      AGENT_CAPABILITIES.freeExampleFoodGuidance
-    ],
     generate_example_supplement_guidance: [
       AGENT_CAPABILITIES.freeExampleFormulation
     ],
-    generate_food_guidance: [AGENT_CAPABILITIES.foodGuidanceGeneration],
     generate_supplement_guidance: [AGENT_CAPABILITIES.formulationGeneration],
     generate_nutrition_report: [
       AGENT_CAPABILITIES.nutritionReportGeneration
@@ -297,9 +266,7 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
       AGENT_CAPABILITIES.productRecommendation
     ],
     nutrition_plan_chat_reply: [AGENT_CAPABILITIES.nutritionPlanChat],
-    parse_product_label: [AGENT_CAPABILITIES.productRecommendation],
     refine_nutrition_plan: [AGENT_CAPABILITIES.nutritionPlanRefinement],
-    refresh_marketplace_product: [AGENT_CAPABILITIES.productRefresh],
     content_status_change: [AGENT_CAPABILITIES.contentPublish],
     send_example_email: [AGENT_CAPABILITIES.freeEmailSend],
     send_reassessment_email: [AGENT_CAPABILITIES.reassessmentEmailSend],

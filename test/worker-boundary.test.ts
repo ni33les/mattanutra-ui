@@ -168,7 +168,7 @@ describe("external worker boundaries", () => {
 
     assert.match(
       source,
-      /INTERACTIVE_TASK_TYPES[\s\S]*analyze_healthscore[\s\S]*generate_food_guidance[\s\S]*generate_supplement_guidance/,
+      /INTERACTIVE_TASK_TYPES[\s\S]*analyze_healthscore[\s\S]*generate_supplement_guidance/,
       "blocking UI task types must be on the interactive reserve path"
     );
     assert.match(
@@ -212,8 +212,7 @@ describe("external worker boundaries", () => {
       "interactive fallback polling should keep user-visible tasks responsive"
     );
     assert.equal(
-      /INTERACTIVE_TASK_TYPES[\s\S]*generate_example_supplement_guidance/.test(source) ||
-        /INTERACTIVE_TASK_TYPES[\s\S]*generate_example_food_guidance/.test(source),
+      /INTERACTIVE_TASK_TYPES[\s\S]*generate_example_supplement_guidance/.test(source),
       false,
       "free example nutrition plan tasks must stay off the interactive path because they do not block UX"
     );
@@ -222,10 +221,10 @@ describe("external worker boundaries", () => {
       /exampleFormulation: 150/,
       "free example formulation must remain a low-value background task"
     );
-    assert.match(
-      taskWorkerSource,
-      /exampleFoodGuidance: 150/,
-      "free example food guidance must remain a low-value background task"
+    assert.equal(
+      /exampleFoodGuidance|generate_example_food_guidance|generate_food_guidance/.test(taskWorkerSource),
+      false,
+      "food guidance tasks must stay out of the active customer worker chain"
     );
   });
 
@@ -289,7 +288,7 @@ describe("external worker boundaries", () => {
     assert.match(
       source,
       /refreshPaidNutritionReadinessAfterCommit/,
-      "paid food and supplement completions must re-check readiness after commit"
+      "paid supplement completion must re-check readiness after commit"
     );
     assert.match(
       source,
@@ -298,8 +297,8 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /formulation_completion[\s\S]*food_guidance_completion/,
-      "product recommendations should be queued immediately once paid nutrition guidance is ready"
+      /formulation_completion[\s\S]*queueProductRecommendationsForReadyPlan/,
+      "product recommendations should be queued immediately once paid supplement guidance is ready"
     );
   });
 

@@ -29,7 +29,7 @@ import {
 import { loadActivePlanFeedback } from "@/lib/plan-feedback";
 import { loadActivePlanGuidanceAdjustments } from "@/lib/plan-guidance-adjustments";
 import {
-  buildMarketplaceSearchQueries,
+  buildProductSearchQueries,
   buildProductNeeds,
   normalizeProductStackPreference,
   productFactAliasKeys,
@@ -72,20 +72,6 @@ export type FormulationWorkItem = Readonly<{
   requestId?: string;
   taskId: string;
   taskType: "generate_example_supplement_guidance" | "generate_supplement_guidance";
-}>;
-
-export type FoodGuidanceWorkItem = Readonly<{
-  answers: unknown;
-  chatMessages: PlanChatMessage[];
-  locale: Locale;
-  plan: AssessmentPlan;
-  planFeedback: PlanFeedbackItem[];
-  planId: string;
-  previousFoodGuidance: FoodGuidanceBlueprint | null;
-  previousFormulation: FormulationBlueprint | null;
-  requestId?: string;
-  taskId: string;
-  taskType: "generate_example_food_guidance" | "generate_food_guidance";
 }>;
 
 export type ExampleEmailWorkItem = Readonly<{
@@ -191,25 +177,13 @@ export type ProductRecommendationsWorkItem = Readonly<{
   taskType: "generate_product_recommendations";
 }>;
 
-export type MarketplaceProductMaintenanceWorkItem = Readonly<{
-  payload: Record<string, unknown>;
-  planId: string | null;
-  taskId: string;
-  taskType:
-    | "discover_products"
-    | "parse_product_label"
-    | "refresh_marketplace_product";
-}>;
-
 export type TaskWorkItem =
   | CommunicationFollowupWorkItem
   | ContentStatusChangeWorkItem
   | DigitalOceanBillingSyncWorkItem
   | ExampleEmailWorkItem
-  | FoodGuidanceWorkItem
   | FormulationWorkItem
   | HealthScoreWorkItem
-  | MarketplaceProductMaintenanceWorkItem
   | NutritionPlanChatWorkItem
   | NutritionPlanRefinementWorkItem
   | NutritionReportWorkItem
@@ -454,59 +428,6 @@ async function buildFormulationWorkItem(task: TaskRecord) {
       | "generate_example_supplement_guidance"
       | "generate_supplement_guidance"
   } satisfies FormulationWorkItem;
-}
-
-async function buildFoodGuidanceWorkItem(task: TaskRecord) {
-  const sql = getSql();
-
-  if (!sql || !task.planId) {
-    throw new Error("Food guidance work item is missing a plan");
-  }
-  const context = await loadPlanGenerationContext(sql, task.planId);
-
-  if (task.taskType === "generate_food_guidance") {
-    await appendAssessmentVersion(sql, {
-      actor: task.reservedByAgentId,
-      afterPayload: {
-        errorMessage: null,
-        processingStartedAt: "coalesce_current_or_now",
-        queuePosition: 0,
-        status: "preparing"
-      },
-      changeReason: "food_guidance_started",
-      eventPayload: { taskType: task.taskType },
-      eventType: "assessment_status_projection_update",
-      planId: task.planId,
-      source: "task_work_item",
-      taskId: task.id
-    });
-
-    await sql`
-      update public.assessments set
-        status = 'preparing',
-        queue_position = 0,
-        error_message = null,
-        processing_started_at = coalesce(processing_started_at, now()),
-        updated_at = now()
-      where plan_id = ${task.planId}::uuid
-    `;
-  }
-
-  return {
-    answers: context.answers,
-    chatMessages: context.chatMessages,
-    locale: context.locale,
-    plan: context.plan,
-    planFeedback: context.planFeedback,
-    planId: task.planId,
-    previousFoodGuidance: context.foodGuidance,
-    previousFormulation: context.formulation,
-    requestId: payloadText(task.payload, "requestId") || undefined,
-    taskId: task.id,
-    taskType: task.taskType as
-      | "generate_example_food_guidance"
-      | "generate_food_guidance"
-  } satisfies FoodGuidanceWorkItem;
 }
 
 async function buildExampleEmailWorkItem(task: TaskRecord) {
@@ -949,7 +870,7 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
     countryCode,
     needs,
     planId: task.planId,
-    searchQueries: buildMarketplaceSearchQueries(needs),
+    searchQueries: buildProductSearchQueries(needs),
     stackPreference: normalizeProductStackPreference(
       payloadText(task.payload, "stackPreference")
     ),
@@ -1034,13 +955,6 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
     return buildFormulationWorkItem(task);
   }
 
-  if (
-    task.taskType === "generate_food_guidance" ||
-    task.taskType === "generate_example_food_guidance"
-  ) {
-    return buildFoodGuidanceWorkItem(task);
-  }
-
   if (task.taskType === "send_example_email") {
     return buildExampleEmailWorkItem(task);
   }
@@ -1063,19 +977,6 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
 
   if (task.taskType === "generate_product_recommendations") {
     return buildProductRecommendationsWorkItem(task);
-  }
-
-  if (
-    task.taskType === "discover_products" ||
-    task.taskType === "parse_product_label" ||
-    task.taskType === "refresh_marketplace_product"
-  ) {
-    return {
-      payload: payloadRecord(task.payload),
-      planId: task.planId,
-      taskId: task.id,
-      taskType: task.taskType
-    } satisfies MarketplaceProductMaintenanceWorkItem;
   }
 
   if (task.taskType === "client_safety_followup") {

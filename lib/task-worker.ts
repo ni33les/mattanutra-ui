@@ -31,17 +31,12 @@ type StepState = "active" | "complete" | "failed" | "pending";
 type WorkTaskType =
   | "analyze_healthscore"
   | "client_safety_followup"
-  | "discover_products"
-  | "generate_example_food_guidance"
   | "generate_example_supplement_guidance"
-  | "generate_food_guidance"
   | "generate_nutrition_report"
   | "generate_product_recommendations"
   | "generate_supplement_guidance"
   | "nutrition_plan_chat_reply"
-  | "parse_product_label"
   | "refine_nutrition_plan"
-  | "refresh_marketplace_product"
   | "send_example_email"
   | "send_reassessment_email"
   | "sync_digitalocean_billing";
@@ -53,9 +48,7 @@ const globalScheduler = globalThis as typeof globalThis & {
 const TASK_BUSINESS_VALUES = {
   billingSync: 100,
   exampleEmail: 350,
-  exampleFoodGuidance: 150,
   exampleFormulation: 150,
-  foodGuidance: 450,
   healthScoreAnalysis: 500,
   nutritionPlanChatReply: 430,
   nutritionPlanRefinement: 520,
@@ -173,7 +166,6 @@ async function latestNutritionTaskGroupId(sql: postgres.Sql, planId: string) {
     where plan_id = ${planId}::uuid
       and task_type in (
         'generate_supplement_guidance',
-        'generate_food_guidance',
         'nutrition_plan_chat_reply',
         'refine_nutrition_plan',
         'generate_nutrition_report'
@@ -399,7 +391,6 @@ export async function enqueueNutritionPlanTasks({
     `;
 
     return {
-      foodGuidanceTaskId: null,
       formulationTaskId
     };
   }
@@ -433,7 +424,6 @@ export async function enqueueNutritionPlanTasks({
   `;
 
   return {
-    foodGuidanceTaskId: null,
     formulationTaskId
   };
 }
@@ -1003,7 +993,6 @@ export async function enqueueRefinedNutritionPlanTasks({
   });
 
   return {
-    foodGuidanceTaskId: null,
     nutritionReportTaskId,
     supplementGuidanceTaskId
   };
@@ -1050,50 +1039,8 @@ async function enqueueExampleFormulationTask(
   return taskId;
 }
 
-async function enqueueExampleFoodGuidanceTask(
-  planId: string,
-  requestId: string,
-  taskGroupId?: string | null
-) {
-  const sql = getSql();
-
-  if (!sql) {
-    return null;
-  }
-
-  const taskId = await createWorkTask({
-    actorType: "ai",
-    businessValue: TASK_BUSINESS_VALUES.exampleFoodGuidance,
-    groupLabel: "Prepare Free nutrition plan email",
-    id: deterministicUuid(`mattanutra:task:example-food-guidance:${requestId}`),
-    idempotencyKey: `example-food-guidance:${requestId}`,
-    idempotencyScope: "successful",
-    idempotencyScopeKey: `free-example-food:${requestId}`,
-    payload: { businessValueClass: "free_example", requestId },
-    planId,
-    reasoningEffort: "low",
-    source: "free_example",
-    taskGroupId,
-    taskTitle: "Generate free food preview",
-    taskType: "generate_example_food_guidance"
-  });
-
-  if (taskId) {
-    await sql`
-      update public.assessment_example_requests set
-        status = 'formulation_queued',
-        food_guidance_status = 'queued',
-        updated_at = now()
-      where id = ${requestId}::uuid
-    `;
-  }
-
-  return taskId;
-}
-
 type ExamplePreviewTaskIds = {
   emailTaskId?: string | null;
-  foodGuidanceTaskId?: string | null;
   formulationTaskId?: string | null;
   waitingOnTaskId?: string | null;
 };
@@ -1102,7 +1049,6 @@ function primaryExampleTaskId(taskIds: ExamplePreviewTaskIds) {
   return (
     taskIds.emailTaskId ??
     taskIds.formulationTaskId ??
-    taskIds.foodGuidanceTaskId ??
     taskIds.waitingOnTaskId ??
     ""
   );
@@ -1125,7 +1071,6 @@ async function fullNutritionOutputsReady(sql: postgres.Sql, planId: string) {
   `;
 
   return {
-    foodGuidanceReady: true,
     formulationReady: rows[0]?.formulation_ready === true
   };
 }
@@ -1208,7 +1153,6 @@ async function enqueueExamplePreviewTasks(
   );
 
   return {
-    foodGuidanceTaskId: null,
     formulationTaskId
   };
 }
@@ -1395,7 +1339,6 @@ export async function requestExampleBrief({
           and tasks.payload ->> 'requestId' = assessment_example_requests.id::text
           and tasks.task_type in (
             'generate_example_supplement_guidance',
-            'generate_example_food_guidance',
             'send_example_email'
           )
           and tasks.status not in ('completed', 'failed', 'cancelled', 'skipped')

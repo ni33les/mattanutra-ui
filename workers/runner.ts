@@ -15,7 +15,6 @@ type WorkerMode =
   | "communications"
   | "content"
   | "email"
-  | "food"
   | "formulation"
   | "healthscore"
   | "hosting"
@@ -36,7 +35,6 @@ const WORKER_PROFILE_MODES: readonly WorkerProfileMode[] = [
   "communications",
   "content",
   "email",
-  "food",
   "formulation",
   "healthscore",
   "hosting",
@@ -122,7 +120,6 @@ function workerMode(value: string | undefined): WorkerMode {
   return value === "communications" ||
     value === "content" ||
     value === "email" ||
-    value === "food" ||
     value === "formulation" ||
     value === "healthscore" ||
     value === "hosting" ||
@@ -177,10 +174,6 @@ const WORKER_PROFILES: Record<WorkerProfileMode, WorkerAgentConfig> = {
     "send_example_email",
     "send_reassessment_email"
   ]),
-  food: agentProfile("foodGuidanceWorker", [
-    "generate_food_guidance",
-    "generate_example_food_guidance"
-  ]),
   formulation: agentProfile("formulationWorker", [
     "generate_supplement_guidance",
     "generate_example_supplement_guidance"
@@ -188,10 +181,7 @@ const WORKER_PROFILES: Record<WorkerProfileMode, WorkerAgentConfig> = {
   healthscore: agentProfile("healthScoreEngine", ["analyze_healthscore"]),
   hosting: agentProfile("scheduler", ["sync_digitalocean_billing"]),
   products: agentProfile("productMatcher", [
-    "discover_marketplace_products",
-    "generate_product_recommendations",
-    "parse_product_label",
-    "refresh_marketplace_product"
+    "generate_product_recommendations"
   ])
 };
 

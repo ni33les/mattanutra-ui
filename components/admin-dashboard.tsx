@@ -798,12 +798,6 @@ function agentDescription(row: AdminAgentRow, locale: Locale) {
       : "Builds supplement guidance from the HealthScore and client context.";
   }
 
-  if (row.name === "Food Guidance Engine") {
-    return thai
-      ? "สร้างคำแนะนำอาหารและช่องว่างที่อาหารควรช่วยเติม"
-      : "Builds food guidance and the food-based gap plan.";
-  }
-
   if (row.name === "HealthScore Engine") {
     return thai
       ? "วิเคราะห์คำตอบแบบประเมินและสร้างคำอธิบาย HealthScore"

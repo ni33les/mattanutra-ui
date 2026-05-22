@@ -218,7 +218,6 @@ export async function POST(request: Request) {
         locale: body.locale,
         planId: snapshot.planId,
         properties: {
-          foodGuidanceTaskId: taskIds.foodGuidanceTaskId,
           formulationTaskId: taskIds.formulationTaskId
         },
         ray: typeof bpm.ray === "string" ? bpm.ray : null,
