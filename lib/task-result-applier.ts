@@ -3,7 +3,7 @@ import { updateBlogPost, updateTestimonial } from "@/lib/blog";
 import { writeBpmEvent } from "@/lib/bpm";
 import { recordEmailCommunicationDelivery } from "@/lib/communications";
 import { getSql } from "@/lib/db";
-import { appendAssessmentEvent } from "@/lib/domain-history";
+import { appendAssessmentVersion } from "@/lib/domain-versions";
 import {
   getProductRecommendationCandidates
 } from "@/lib/admin-products";
@@ -111,7 +111,7 @@ async function updateAssessmentReadyIfNutritionReady(
   `;
   const ready = rows[0]?.formulation_ready === true;
 
-  await appendAssessmentEvent(sql, {
+  await appendAssessmentVersion(sql, {
     afterPayload: {
       completedAt: ready ? "coalesce_current_or_now" : "unchanged",
       errorMessage: null,
@@ -332,7 +332,7 @@ async function applyHealthScoreResult(
   `;
   const locale: Locale = isLocale(rows[0]?.locale) ? rows[0].locale : "en";
 
-  await appendAssessmentEvent(sql, {
+  await appendAssessmentVersion(sql, {
     actor: task.reservedByAgentId,
     afterPayload: {
       healthScore,
@@ -2102,7 +2102,7 @@ export async function applyTaskFailureResult({
     (task.taskType === "generate_supplement_guidance" ||
       task.taskType === "generate_food_guidance")
   ) {
-    await appendAssessmentEvent(sql, {
+    await appendAssessmentVersion(sql, {
       actor: task.reservedByAgentId,
       afterPayload: {
         errorMessage: retryWillBeScheduled ? null : errorMessage,

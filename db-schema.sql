@@ -18,6 +18,7 @@ drop table if exists
   public.assessment_example_requests,
   public.assessment_formulations,
   public.assessment_submissions,
+  public.assessment_versions,
   public.assessments,
   public.blog_posts,
   public.blog_testimonials,
@@ -38,6 +39,7 @@ drop table if exists
   public.formulations,
   public.goals,
   public.nutrition_reports,
+  public.nutrition_plan_versions,
   public.plan_chat_messages,
   public.plan_feedback,
   public.plan_guidance_adjustments,
@@ -78,6 +80,7 @@ cascade;
 
 drop function if exists public.mattanutra_supplement_safety_flags(text) cascade;
 drop function if exists public.prevent_domain_history_mutation() cascade;
+drop function if exists public.prevent_domain_version_mutation() cascade;
 drop function if exists public.prevent_task_dependency_cycle() cascade;
 drop function if exists public.prevent_task_events_mutation() cascade;
 
@@ -181,75 +184,97 @@ create index assessments_plan_idx
 create index assessments_answers_gin_idx
   on public.assessments using gin (answers jsonb_path_ops);
 
-create or replace function public.prevent_domain_history_mutation()
+create or replace function public.prevent_domain_version_mutation()
 returns trigger
 language plpgsql
 as $$
 begin
-  raise exception '% is append-only', tg_table_name;
+  raise exception '% is an append-only version table', tg_table_name;
 end;
 $$;
 
-create table public.assessment_events (
-  id uuid primary key default gen_random_uuid(),
+create table public.assessment_versions (
   plan_id uuid not null,
-  event_type text not null,
+  version integer not null,
+  action text not null,
   actor text not null default 'system',
-  change_reason text not null,
+  reason text not null,
   source text not null default 'application',
   task_id uuid null,
   request_id text null,
-  before_payload jsonb not null default '{}'::jsonb,
-  after_payload jsonb not null default '{}'::jsonb,
-  event_payload jsonb not null default '{}'::jsonb,
-  occurred_at timestamptz not null default now(),
-  created_at timestamptz not null default now()
+  snapshot jsonb not null default '{}'::jsonb,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  primary key (plan_id, version)
 );
 
-insert into public.assessment_events (
+insert into public.assessment_versions (
   plan_id,
-  event_type,
+  version,
+  action,
   actor,
-  change_reason,
+  reason,
   source,
-  before_payload,
-  after_payload,
-  event_payload,
-  occurred_at,
+  snapshot,
+  metadata,
   created_at
 )
 select
   assessments.plan_id,
+  1,
   'baseline',
   'system_backfill',
-  'append_only_baseline',
+  'versioned_projection_baseline',
   'schema_backfill',
-  '{}'::jsonb,
   to_jsonb(assessments),
   '{}'::jsonb,
-  coalesce(assessments.captured_at, now()),
   now()
 from public.assessments
 where not exists (
   select 1
-  from public.assessment_events existing
+  from public.assessment_versions existing
   where existing.plan_id = assessments.plan_id
-    and existing.event_type = 'baseline'
-    and existing.change_reason = 'append_only_baseline'
+    and existing.action = 'baseline'
+    and existing.reason = 'versioned_projection_baseline'
 );
 
-create index assessment_events_plan_idx
-  on public.assessment_events (plan_id, occurred_at asc, created_at asc);
+create index assessment_versions_latest_idx
+  on public.assessment_versions (plan_id, version desc, created_at desc);
 
-drop trigger if exists assessment_events_no_update_delete
-  on public.assessment_events;
+drop trigger if exists assessment_versions_no_update_delete
+  on public.assessment_versions;
 
-create trigger assessment_events_no_update_delete
-  before update or delete on public.assessment_events
-  for each row execute function public.prevent_domain_history_mutation();
+create trigger assessment_versions_no_update_delete
+  before update or delete on public.assessment_versions
+  for each row execute function public.prevent_domain_version_mutation();
 
-comment on table public.assessment_events is
-  'Append-only source-of-truth event stream for assessment answers, status, healthscore, and lifecycle projection changes.';
+comment on table public.assessment_versions is
+  'Append-only assessment source-of-truth versions. assessments is the current-state read model.';
+
+create table public.nutrition_plan_versions (
+  plan_id uuid not null,
+  version integer not null,
+  action text not null,
+  actor text not null default 'system',
+  reason text not null,
+  source text not null default 'application',
+  task_id uuid null,
+  request_id text null,
+  snapshot jsonb not null default '{}'::jsonb,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  primary key (plan_id, version)
+);
+
+create index nutrition_plan_versions_latest_idx
+  on public.nutrition_plan_versions (plan_id, version desc, created_at desc);
+
+drop trigger if exists nutrition_plan_versions_no_update_delete
+  on public.nutrition_plan_versions;
+
+create trigger nutrition_plan_versions_no_update_delete
+  before update or delete on public.nutrition_plan_versions
+  for each row execute function public.prevent_domain_version_mutation();
 
 create table public.ai_response_cache (
   cache_key text primary key,
@@ -436,6 +461,50 @@ create index formulations_latest_idx
 
 create index recommendations_latest_idx
   on public.recommendations (plan_id, version desc, generated_at desc);
+
+insert into public.nutrition_plan_versions (
+  plan_id,
+  version,
+  action,
+  actor,
+  reason,
+  source,
+  snapshot,
+  metadata,
+  created_at
+)
+select
+  assessments.plan_id,
+  1,
+  'baseline',
+  'system_backfill',
+  'versioned_projection_baseline',
+  'schema_backfill',
+  jsonb_build_object(
+    'selectedPlan', assessments.selected_plan,
+    'formulations', coalesce(formulation_rows.formulations, '[]'::jsonb),
+    'recommendations', coalesce(recommendation_rows.recommendations, '[]'::jsonb)
+  ),
+  '{}'::jsonb,
+  now()
+from public.assessments
+left join lateral (
+  select jsonb_agg(to_jsonb(formulations) order by formulations.version asc) as formulations
+  from public.formulations
+  where formulations.plan_id = assessments.plan_id
+) formulation_rows on true
+left join lateral (
+  select jsonb_agg(to_jsonb(recommendations) order by recommendations.version asc) as recommendations
+  from public.recommendations
+  where recommendations.plan_id = assessments.plan_id
+) recommendation_rows on true
+where not exists (
+  select 1
+  from public.nutrition_plan_versions existing
+  where existing.plan_id = assessments.plan_id
+    and existing.action = 'baseline'
+    and existing.reason = 'versioned_projection_baseline'
+);
 
 create table public.food_guidance (
   plan_id uuid not null references public.assessments(plan_id) on delete cascade,
@@ -3609,9 +3678,15 @@ create table public.supplement_versions (
   source text not null default 'application',
   before_payload jsonb not null default '{}'::jsonb,
   after_payload jsonb not null default '{}'::jsonb,
+  snapshot jsonb not null default '{}'::jsonb,
+  metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   primary key (supplement_id, version)
 );
+
+alter table public.supplement_versions
+  add column if not exists snapshot jsonb default '{}'::jsonb,
+  add column if not exists metadata jsonb default '{}'::jsonb;
 
 insert into public.supplement_versions (
   supplement_id,
@@ -3622,6 +3697,8 @@ insert into public.supplement_versions (
   source,
   before_payload,
   after_payload,
+  snapshot,
+  metadata,
   created_at
 )
 select
@@ -3629,7 +3706,7 @@ select
   1,
   'baseline',
   'system_backfill',
-  'append_only_baseline',
+  'versioned_projection_baseline',
   'schema_backfill',
   '{}'::jsonb,
   jsonb_build_object(
@@ -3637,6 +3714,12 @@ select
     'aliases', coalesce(alias_rows.aliases, '[]'::jsonb),
     'safetyLimits', coalesce(limit_rows.limits, '[]'::jsonb)
   ),
+  jsonb_build_object(
+    'supplement', to_jsonb(supplements),
+    'aliases', coalesce(alias_rows.aliases, '[]'::jsonb),
+    'safetyLimits', coalesce(limit_rows.limits, '[]'::jsonb)
+  ),
+  '{}'::jsonb,
   now()
 from public.supplements
 left join lateral (
@@ -3654,79 +3737,24 @@ where not exists (
   from public.supplement_versions existing
   where existing.supplement_id = supplements.id
     and existing.action = 'baseline'
-    and existing.change_reason = 'append_only_baseline'
+    and existing.change_reason = 'versioned_projection_baseline'
 );
 
 create index supplement_versions_latest_idx
   on public.supplement_versions (supplement_id, version desc);
+
+alter table public.supplement_versions
+  alter column snapshot set default '{}'::jsonb,
+  alter column snapshot set not null,
+  alter column metadata set default '{}'::jsonb,
+  alter column metadata set not null;
 
 drop trigger if exists supplement_versions_no_update_delete
   on public.supplement_versions;
 
 create trigger supplement_versions_no_update_delete
   before update or delete on public.supplement_versions
-  for each row execute function public.prevent_domain_history_mutation();
-
-create table public.supplement_alias_events (
-  id uuid primary key default gen_random_uuid(),
-  alias_id uuid null,
-  supplement_id uuid null,
-  normalized_alias text null,
-  action text not null,
-  actor text not null default 'system',
-  change_reason text not null,
-  source text not null default 'application',
-  before_payload jsonb not null default '{}'::jsonb,
-  after_payload jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
-);
-
-insert into public.supplement_alias_events (
-  alias_id,
-  supplement_id,
-  normalized_alias,
-  action,
-  actor,
-  change_reason,
-  source,
-  before_payload,
-  after_payload,
-  created_at
-)
-select
-  supplement_aliases.id,
-  supplement_aliases.supplement_id,
-  supplement_aliases.normalized_alias,
-  'baseline',
-  'system_backfill',
-  'append_only_baseline',
-  'schema_backfill',
-  '{}'::jsonb,
-  to_jsonb(supplement_aliases),
-  coalesce(supplement_aliases.created_at, now())
-from public.supplement_aliases
-where not exists (
-  select 1
-  from public.supplement_alias_events existing
-  where existing.alias_id = supplement_aliases.id
-    and existing.action = 'baseline'
-    and existing.change_reason = 'append_only_baseline'
-);
-
-create index supplement_alias_events_supplement_idx
-  on public.supplement_alias_events (supplement_id, created_at asc)
-  where supplement_id is not null;
-
-create index supplement_alias_events_alias_idx
-  on public.supplement_alias_events (normalized_alias, created_at asc)
-  where normalized_alias is not null;
-
-drop trigger if exists supplement_alias_events_no_update_delete
-  on public.supplement_alias_events;
-
-create trigger supplement_alias_events_no_update_delete
-  before update or delete on public.supplement_alias_events
-  for each row execute function public.prevent_domain_history_mutation();
+  for each row execute function public.prevent_domain_version_mutation();
 
 -- Marketplace product catalogue and product recommendation history.
 create table public.product_brands (
@@ -4061,69 +4089,15 @@ create index product_facts_nutrient_idx
   on public.product_facts (nutrient_id)
   where nutrient_id is not null;
 
-create table public.product_fact_versions (
-  product_id uuid not null,
-  version integer not null,
-  action text not null,
-  actor text not null default 'system',
-  change_reason text not null,
-  source text not null default 'application',
-  before_facts_snapshot jsonb not null default '[]'::jsonb,
-  after_facts_snapshot jsonb not null default '[]'::jsonb,
-  created_at timestamptz not null default now(),
-  primary key (product_id, version)
-);
-
-insert into public.product_fact_versions (
-  product_id,
-  version,
-  action,
-  actor,
-  change_reason,
-  source,
-  before_facts_snapshot,
-  after_facts_snapshot,
-  created_at
-)
-select
-  products.id,
-  1,
-  'baseline',
-  'system_backfill',
-  'append_only_baseline',
-  'schema_backfill',
-  '[]'::jsonb,
-  coalesce(fact_rows.facts, '[]'::jsonb),
-  now()
-from public.products
-left join lateral (
-  select jsonb_agg(to_jsonb(product_facts) order by product_facts.created_at asc) as facts
-  from public.product_facts
-  where product_facts.product_id = products.id
-) fact_rows on true
-where not exists (
-  select 1
-  from public.product_fact_versions existing
-  where existing.product_id = products.id
-    and existing.action = 'baseline'
-    and existing.change_reason = 'append_only_baseline'
-);
-
-create index product_fact_versions_latest_idx
-  on public.product_fact_versions (product_id, version desc);
-
-drop trigger if exists product_fact_versions_no_update_delete
-  on public.product_fact_versions;
-
-create trigger product_fact_versions_no_update_delete
-  before update or delete on public.product_fact_versions
-  for each row execute function public.prevent_domain_history_mutation();
-
 create table public.product_versions (
-  product_id uuid not null references public.products(id) on delete cascade,
+  product_id uuid not null,
   version integer not null,
   actor text null,
   change_note text null,
+  reason text null,
+  source text not null default 'application',
+  task_id uuid null,
+  request_id text null,
   title text not null,
   title_en text null,
   title_th text null,
@@ -4150,6 +4124,8 @@ create table public.product_versions (
   validation_checked_at timestamptz null,
   facts_snapshot jsonb not null default '[]'::jsonb,
   source_snapshot jsonb not null default '{}'::jsonb,
+  snapshot jsonb not null default '{}'::jsonb,
+  metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   primary key (product_id, version)
 );
@@ -4157,6 +4133,10 @@ create table public.product_versions (
 alter table public.product_versions
   add column if not exists actor text null,
   add column if not exists change_note text null,
+  add column if not exists reason text null,
+  add column if not exists source text default 'application',
+  add column if not exists task_id uuid null,
+  add column if not exists request_id text null,
   add column if not exists title text,
   add column if not exists title_en text null,
   add column if not exists title_th text null,
@@ -4183,6 +4163,8 @@ alter table public.product_versions
   add column if not exists validation_checked_at timestamptz null,
   add column if not exists facts_snapshot jsonb default '[]'::jsonb,
   add column if not exists source_snapshot jsonb default '{}'::jsonb,
+  add column if not exists snapshot jsonb default '{}'::jsonb,
+  add column if not exists metadata jsonb default '{}'::jsonb,
   add column if not exists created_at timestamptz default now();
 
 update public.product_versions
@@ -4224,6 +4206,9 @@ set
   validation_reasons = coalesce(validation_reasons, '{}'),
   facts_snapshot = coalesce(facts_snapshot, '[]'::jsonb),
   source_snapshot = coalesce(source_snapshot, '{}'::jsonb),
+  source = coalesce(nullif(source, ''), 'application'),
+  snapshot = coalesce(snapshot, '{}'::jsonb),
+  metadata = coalesce(metadata, '{}'::jsonb),
   created_at = coalesce(created_at, now())
 where title is null
   or product_url is null
@@ -4247,6 +4232,10 @@ where title is null
   or validation_reasons is null
   or facts_snapshot is null
   or source_snapshot is null
+  or source is null
+  or source = ''
+  or snapshot is null
+  or metadata is null
   or created_at is null;
 
 alter table public.product_versions
@@ -4275,11 +4264,107 @@ alter table public.product_versions
   alter column facts_snapshot set not null,
   alter column source_snapshot set default '{}'::jsonb,
   alter column source_snapshot set not null,
+  alter column source set default 'application',
+  alter column source set not null,
+  alter column snapshot set default '{}'::jsonb,
+  alter column snapshot set not null,
+  alter column metadata set default '{}'::jsonb,
+  alter column metadata set not null,
   alter column created_at set default now(),
   alter column created_at set not null;
 
 create index product_versions_latest_idx
   on public.product_versions (product_id, version desc);
+
+insert into public.product_versions (
+  product_id,
+  version,
+  actor,
+  change_note,
+  reason,
+  source,
+  title,
+  title_en,
+  title_th,
+  brand_name,
+  normalized_brand_name,
+  image_url,
+  product_url,
+  normalized_url,
+  description,
+  description_en,
+  description_th,
+  fda_approval_number,
+  product_kind,
+  product_audience,
+  status,
+  label_status,
+  availability_status,
+  affiliate_status,
+  price_amount,
+  currency,
+  validation_status,
+  validation_reasons,
+  validation_summary,
+  validation_checked_at,
+  facts_snapshot,
+  source_snapshot,
+  snapshot,
+  metadata,
+  created_at
+)
+select
+  products.id,
+  1,
+  'system_backfill',
+  'versioned_projection_baseline',
+  'versioned_projection_baseline',
+  'schema_backfill',
+  products.title,
+  products.title_en,
+  products.title_th,
+  products.brand_name,
+  products.normalized_brand_name,
+  products.image_url,
+  products.product_url,
+  products.normalized_url,
+  products.description,
+  products.description_en,
+  products.description_th,
+  products.fda_approval_number,
+  products.product_kind,
+  products.product_audience,
+  products.status,
+  products.label_status,
+  products.availability_status,
+  products.affiliate_status,
+  products.price_amount,
+  products.currency,
+  products.validation_status,
+  products.validation_reasons,
+  products.validation_summary,
+  products.validation_checked_at,
+  coalesce(fact_rows.facts, '[]'::jsonb),
+  products.source_snapshot,
+  jsonb_build_object(
+    'product', to_jsonb(products),
+    'facts', coalesce(fact_rows.facts, '[]'::jsonb)
+  ),
+  '{}'::jsonb,
+  now()
+from public.products
+left join lateral (
+  select jsonb_agg(to_jsonb(product_facts) order by product_facts.created_at asc) as facts
+  from public.product_facts
+  where product_facts.product_id = products.id
+) fact_rows on true
+where not exists (
+  select 1
+  from public.product_versions existing
+  where existing.product_id = products.id
+    and existing.version = 1
+    and existing.reason = 'versioned_projection_baseline'
+);
 
 create table public.product_offers (
   id uuid primary key default gen_random_uuid(),
@@ -4565,21 +4650,21 @@ drop trigger if exists product_versions_no_update_delete
 
 create trigger product_versions_no_update_delete
   before update or delete on public.product_versions
-  for each row execute function public.prevent_domain_history_mutation();
+  for each row execute function public.prevent_domain_version_mutation();
 
 drop trigger if exists product_recommendation_runs_no_update_delete
   on public.product_recommendation_runs;
 
 create trigger product_recommendation_runs_no_update_delete
   before update or delete on public.product_recommendation_runs
-  for each row execute function public.prevent_domain_history_mutation();
+  for each row execute function public.prevent_domain_version_mutation();
 
 drop trigger if exists product_recommendation_items_no_update_delete
   on public.product_recommendation_items;
 
 create trigger product_recommendation_items_no_update_delete
   before update or delete on public.product_recommendation_items
-  for each row execute function public.prevent_domain_history_mutation();
+  for each row execute function public.prevent_domain_version_mutation();
 
 create table public.product_admin_audit (
   id uuid primary key default gen_random_uuid(),
@@ -4789,6 +4874,8 @@ insert into public.supplement_versions (
   source,
   before_payload,
   after_payload,
+  snapshot,
+  metadata,
   created_at
 )
 select
@@ -4796,7 +4883,7 @@ select
   1,
   'baseline',
   'system_backfill',
-  'append_only_baseline',
+  'versioned_projection_baseline',
   'schema_backfill',
   '{}'::jsonb,
   jsonb_build_object(
@@ -4804,6 +4891,12 @@ select
     'aliases', coalesce(alias_rows.aliases, '[]'::jsonb),
     'safetyLimits', coalesce(limit_rows.limits, '[]'::jsonb)
   ),
+  jsonb_build_object(
+    'supplement', to_jsonb(supplements),
+    'aliases', coalesce(alias_rows.aliases, '[]'::jsonb),
+    'safetyLimits', coalesce(limit_rows.limits, '[]'::jsonb)
+  ),
+  '{}'::jsonb,
   now()
 from public.supplements
 left join lateral (
@@ -4821,39 +4914,7 @@ where not exists (
   from public.supplement_versions existing
   where existing.supplement_id = supplements.id
     and existing.action = 'baseline'
-    and existing.change_reason = 'append_only_baseline'
-);
-
-insert into public.supplement_alias_events (
-  alias_id,
-  supplement_id,
-  normalized_alias,
-  action,
-  actor,
-  change_reason,
-  source,
-  before_payload,
-  after_payload,
-  created_at
-)
-select
-  supplement_aliases.id,
-  supplement_aliases.supplement_id,
-  supplement_aliases.normalized_alias,
-  'baseline',
-  'system_backfill',
-  'append_only_baseline',
-  'schema_backfill',
-  '{}'::jsonb,
-  to_jsonb(supplement_aliases),
-  coalesce(supplement_aliases.created_at, now())
-from public.supplement_aliases
-where not exists (
-  select 1
-  from public.supplement_alias_events existing
-  where existing.alias_id = supplement_aliases.id
-    and existing.action = 'baseline'
-    and existing.change_reason = 'append_only_baseline'
+    and existing.change_reason = 'versioned_projection_baseline'
 );
 
 drop trigger if exists supplement_safety_limits_no_update_delete
@@ -4861,7 +4922,7 @@ drop trigger if exists supplement_safety_limits_no_update_delete
 
 create trigger supplement_safety_limits_no_update_delete
   before update or delete on public.supplement_safety_limits
-  for each row execute function public.prevent_domain_history_mutation();
+  for each row execute function public.prevent_domain_version_mutation();
 
 create table public.safety_reviews (
   id uuid primary key,
@@ -6487,12 +6548,12 @@ do $$
 begin
   if exists (select 1 from pg_roles where rolname = 'mn') then
     grant select, insert, update, delete
-      on public.assessment_events,
+      on public.assessment_versions,
+         public.nutrition_plan_versions,
          public.supplements,
          public.supplement_versions,
          public.supplement_safety_limits,
          public.supplement_aliases,
-         public.supplement_alias_events,
          public.supplement_admin_audit,
          public.nutrients,
          public.foods,
@@ -6504,7 +6565,6 @@ begin
          public.product_brands,
          public.products,
          public.product_facts,
-         public.product_fact_versions,
          public.product_versions,
          public.product_offers,
          public.product_import_runs,
@@ -6535,7 +6595,7 @@ begin
 
     grant execute
       on function public.mattanutra_supplement_safety_flags(text),
-                  public.prevent_domain_history_mutation(),
+                  public.prevent_domain_version_mutation(),
                   public.prevent_task_events_mutation()
       to mn;
   end if;

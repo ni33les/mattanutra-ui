@@ -5,7 +5,7 @@ import {
 } from "@/lib/assessment-store";
 import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
 import { getSql } from "@/lib/db";
-import { appendAssessmentEvent } from "@/lib/domain-history";
+import { appendAssessmentVersion } from "@/lib/domain-versions";
 import type {
   FoodGuidanceBlueprint,
   FormulationBlueprint,
@@ -411,7 +411,7 @@ async function buildFormulationWorkItem(task: TaskRecord) {
   ]);
 
   if (task.taskType === "generate_supplement_guidance") {
-    await appendAssessmentEvent(sql, {
+    await appendAssessmentVersion(sql, {
       actor: task.reservedByAgentId,
       afterPayload: {
         errorMessage: null,
@@ -465,7 +465,7 @@ async function buildFoodGuidanceWorkItem(task: TaskRecord) {
   const context = await loadPlanGenerationContext(sql, task.planId);
 
   if (task.taskType === "generate_food_guidance") {
-    await appendAssessmentEvent(sql, {
+    await appendAssessmentVersion(sql, {
       actor: task.reservedByAgentId,
       afterPayload: {
         errorMessage: null,

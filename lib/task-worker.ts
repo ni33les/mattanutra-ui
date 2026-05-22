@@ -7,7 +7,7 @@ import {
 } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
 import { getSql } from "@/lib/db";
-import { appendAssessmentEvent } from "@/lib/domain-history";
+import { appendAssessmentVersion } from "@/lib/domain-versions";
 import { validateLeadEmail } from "@/lib/email-validation";
 import { digitalOceanBillingSyncConfiguration } from "@/lib/finance-ledger";
 import { isLocale, type Locale } from "@/lib/i18n";
@@ -362,7 +362,7 @@ export async function enqueueNutritionPlanTasks({
     `;
     const formulationReady = formulationRows[0]?.exists === true;
 
-    await appendAssessmentEvent(sql, {
+    await appendAssessmentVersion(sql, {
       afterPayload: {
         completedAt: formulationReady ? "coalesce_current_or_now" : "unchanged",
         errorMessage: formulationReady
@@ -404,7 +404,7 @@ export async function enqueueNutritionPlanTasks({
     };
   }
 
-  await appendAssessmentEvent(sql, {
+  await appendAssessmentVersion(sql, {
     afterPayload: {
       errorMessage: null,
       planSelectedAt: "coalesce_current_or_now",

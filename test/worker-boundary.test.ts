@@ -73,7 +73,7 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /runSupervisedAgentLoop\(profileMode, config, slotIndex, concurrency\)/,
+      /runSupervisedAgentLoop\(\s*profileMode,\s*config,\s*slotIndex,\s*concurrency,/,
       "worker:all must supervise each real agent profile independently"
     );
     assert.match(
@@ -83,7 +83,7 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /WORKER_\$\{mode\.toUpperCase\(\)\}_CONCURRENCY/,
+      /WORKER_\$\{[a-zA-Z]+\.toUpperCase\(\)\}_CONCURRENCY/,
       "workers must allow profile-specific concurrency overrides"
     );
     assert.equal(

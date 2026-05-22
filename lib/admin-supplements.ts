@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { getSql } from "@/lib/db";
 import {
-  appendSupplementAliasEvent,
+  appendSupplementAliasVersion,
   appendSupplementVersion
-} from "@/lib/domain-history";
+} from "@/lib/domain-versions";
 import {
   normalizeSupplementSafetyFlags,
   type SupplementSafetyFlag
@@ -486,7 +486,7 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
     supplementId
   });
 
-  await appendSupplementAliasEvent(sql, {
+  await appendSupplementAliasVersion(sql, {
     action: "alias_added",
     actor: input.actor,
     afterPayload: {
@@ -630,7 +630,7 @@ export async function deleteAdminSupplementAlias(
     throw new Error("Supplement association not found");
   }
 
-  await appendSupplementAliasEvent(sql, {
+  await appendSupplementAliasVersion(sql, {
     action: "alias_deleted",
     actor: input.actor,
     afterPayload: { aliasId: input.aliasId },
@@ -724,7 +724,7 @@ export async function addAdminSupplementAlias(input: AddAdminSupplementAliasInpu
   const aliasId = before?.id ?? randomUUID();
   const action = before ? "alias_reassigned" : "alias_added";
 
-  await appendSupplementAliasEvent(sql, {
+  await appendSupplementAliasVersion(sql, {
     action,
     actor: input.actor,
     afterPayload: {

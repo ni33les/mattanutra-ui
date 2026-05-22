@@ -7,9 +7,9 @@ import type {
 } from "@/lib/admin-supplements";
 import { toJsonValue } from "@/lib/assessment-store";
 import {
-  appendSupplementAliasEvent,
+  appendSupplementAliasVersion,
   appendSupplementVersion
-} from "@/lib/domain-history";
+} from "@/lib/domain-versions";
 import {
   normalizeSupplementSafetyFlags,
   type SupplementSafetyFlag
@@ -990,7 +990,7 @@ export async function resolveAdminReviewTask(
       const beforeAlias = aliasRows[0] ?? null;
       const aliasId = beforeAlias?.id ?? randomUUID();
 
-      await appendSupplementAliasEvent(db, {
+      await appendSupplementAliasVersion(db, {
         action: beforeAlias ? "alias_reassigned" : "alias_added",
         actor: input.actor,
         afterPayload: {

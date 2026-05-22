@@ -28,6 +28,7 @@ import {
   type ProductRecommendationNeed
 } from "@/lib/product-recommendations";
 import { getSql } from "@/lib/db";
+import { appendAssessmentVersion } from "@/lib/domain-versions";
 
 export type StoredAssessmentStatus =
   | "captured"
@@ -952,43 +953,27 @@ export async function persistAssessmentSubmission({
     limit 1
   `;
 
-  await sql`
-    insert into public.assessment_events (
-      plan_id,
-      event_type,
-      actor,
-      change_reason,
-      source,
-      before_payload,
-      after_payload,
-      event_payload,
-      occurred_at,
-      created_at
-    )
-    values (
-      ${snapshot.planId}::uuid,
-      'assessment_submission_persisted',
-      'assessment_api',
-      'assessment_submission',
-      'assessment_store',
-      ${sql.json(toJsonValue(beforeRows[0]?.before_payload ?? {}))}::jsonb,
-      ${sql.json(toJsonValue({
-        answers: storedAnswers,
-        answerSummary: storedAnswerSummary,
-        healthScore: storedHealthScore,
-        locale: normalizedLocale,
-        queuePosition: snapshot.queuePosition,
-        selectedPlan,
-        status
-      }))}::jsonb,
-      ${sql.json(toJsonValue({
-        selectedPlan: storedPlan,
-        status
-      }))}::jsonb,
-      now(),
-      now()
-    )
-  `;
+  await appendAssessmentVersion(sql, {
+    actor: "assessment_api",
+    afterPayload: {
+      answers: storedAnswers,
+      answerSummary: storedAnswerSummary,
+      healthScore: storedHealthScore,
+      locale: normalizedLocale,
+      queuePosition: snapshot.queuePosition,
+      selectedPlan,
+      status
+    },
+    changeReason: "assessment_submission",
+    eventPayload: {
+      beforePayload: beforeRows[0]?.before_payload ?? {},
+      selectedPlan: storedPlan,
+      status
+    },
+    eventType: "assessment_submission_persisted",
+    planId: snapshot.planId,
+    source: "assessment_store"
+  });
 
   await sql`
     insert into assessments (
