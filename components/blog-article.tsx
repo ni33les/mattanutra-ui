@@ -110,11 +110,7 @@ function BlogAssessmentCta({
       <div className="relative mx-auto min-h-[26rem] w-full max-w-6xl overflow-hidden rounded-lg bg-[#F3F8FF] px-6 py-16 ring-1 ring-[#3A7BD5]/10 sm:px-10 lg:px-16">
         <div
           aria-hidden={true}
-          className="absolute inset-0 bg-cover bg-center opacity-28"
-          style={{
-            backgroundImage: 'url("/mainphoto.png")',
-            backgroundPosition: "center 42%"
-          }}
+          className="mn-blog-cta-background absolute inset-0 bg-cover bg-center opacity-28"
         />
         <div
           aria-hidden={true}
@@ -137,7 +133,7 @@ function BlogAssessmentCta({
               data-bpm-label={primaryLabel}
               data-bpm-target={href}
               data-bpm-type="funnel"
-              className="rounded-md bg-[#1FA77A] px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition hover:bg-[#188a65] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A]"
+              className="mn-primary-button"
             >
               {primaryLabel}
             </Link>
@@ -220,13 +216,7 @@ export function BlogArticle({
           aria-hidden="true"
           className="absolute -top-80 left-[max(6rem,33%)] -z-10 transform-gpu blur-3xl sm:left-1/2 md:top-20 lg:ml-20 xl:top-3 xl:ml-56"
         >
-          <div
-            style={{
-              clipPath:
-                "polygon(63.1% 29.6%, 100% 17.2%, 76.7% 3.1%, 48.4% 0.1%, 44.6% 4.8%, 54.5% 25.4%, 59.8% 49.1%, 55.3% 57.9%, 44.5% 57.3%, 27.8% 48%, 35.1% 81.6%, 0% 97.8%, 39.3% 100%, 35.3% 81.5%, 97.2% 52.8%, 63.1% 29.6%)"
-            }}
-            className="aspect-[801/1036] w-[50rem] bg-linear-to-tr from-[#DDF7EC] to-[#8BC6FF] opacity-30"
-          />
+          <div className="mn-blog-ambient-shape aspect-[801/1036] w-[50rem] bg-linear-to-tr from-[#DDF7EC] to-[#8BC6FF] opacity-30" />
         </div>
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-2xl lg:mx-0">
@@ -242,7 +232,7 @@ export function BlogArticle({
             <div className="relative space-y-10 lg:order-last lg:col-span-5">
               <svg
                 aria-hidden="true"
-                className="absolute -top-160 left-1 -z-10 h-256 w-702 -translate-x-1/2 mask-[radial-gradient(64rem_64rem_at_111.5rem_0%,white,transparent)] stroke-gray-900/10"
+                className="mn-blog-pattern"
               >
                 <defs>
                   <pattern
@@ -289,9 +279,7 @@ export function BlogArticle({
                         />
                       </>
                     ) : (
-                      <div className="relative mt-1 flex size-10 flex-none items-center justify-center overflow-hidden rounded-full bg-[#EAF5FF] text-xs font-semibold text-[#3A7BD5]">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_25%,#DDF7EC,transparent_45%),radial-gradient(circle_at_75%_75%,#CFE8FF,transparent_45%)]" />
-                        <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_0_42%,rgba(31,167,122,0.2)_43%_45%,transparent_46%)]" />
+                      <div className="mn-blog-avatar-fallback">
                         <span className="relative">
                           {initials(post.testimonial.authorName)}
                         </span>

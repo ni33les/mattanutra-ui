@@ -37,7 +37,7 @@ export function ServiceIssue({
         </p>
         <a
           href={href ?? `/${locale}`}
-          className="mt-8 inline-flex rounded-md bg-[var(--brand-blue)] px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition hover:bg-[var(--brand-blue-dark)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-turquoise)]"
+          className="mn-brand-button mt-8"
         >
           {copy.cta}
         </a>

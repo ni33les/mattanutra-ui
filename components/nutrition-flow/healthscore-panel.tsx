@@ -12,7 +12,6 @@ import { cx } from "@/components/nutrition-flow/ui";
 function getDomainTone(score: number) {
   if (score >= 80) {
     return {
-      bar: "bg-[#3A7BD5]",
       bg: "bg-[#EAF5FF]",
       ring: "ring-[#3A7BD5]/20",
       text: "text-[#2563EB]"
@@ -21,7 +20,6 @@ function getDomainTone(score: number) {
 
   if (score >= 50) {
     return {
-      bar: "bg-[#1FA77A]",
       bg: "bg-[#EFFBF5]",
       ring: "ring-[#1FA77A]/20",
       text: "text-[#126b4f]"
@@ -29,7 +27,6 @@ function getDomainTone(score: number) {
   }
 
   return {
-    bar: "bg-red-500",
     bg: "bg-red-50",
     ring: "ring-red-200",
     text: "text-red-600"
@@ -44,6 +41,8 @@ const healthScoreChartColors = [
   "#8B5CF6",
   "#06B6D4"
 ];
+
+const healthScoreDomainTones = ["blue", "green", "amber", "red", "purple", "cyan"] as const;
 
 function polarPoint(center: number, radius: number, angleDegrees: number) {
   const angleRadians = ((angleDegrees - 90) * Math.PI) / 180;
@@ -196,17 +195,14 @@ function DomainSnapshot({
       <div className="grid gap-3 sm:grid-cols-2">
         {result.domains.map((domain, index) => {
           const tone = getDomainTone(domain.score);
-          const accent =
-            healthScoreChartColors[index % healthScoreChartColors.length];
+          const domainTone =
+            healthScoreDomainTones[index % healthScoreDomainTones.length];
 
           return (
             <div
               key={domain.id}
-              className="min-w-0 rounded-xl border p-3"
-              style={{
-                backgroundColor: `${accent}14`,
-                borderColor: `${accent}33`
-              }}
+              className="mn-health-domain"
+              data-domain-tone={domainTone}
             >
               <div className="flex min-w-0 items-center justify-between gap-3 text-sm">
                 <span className="min-w-0 font-semibold text-[#20343A]">
@@ -216,12 +212,12 @@ function DomainSnapshot({
                   {domain.score}
                 </span>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/80">
-                <div
-                  className={cx("h-full rounded-full", tone.bar)}
-                  style={{ width: `${domain.score}%` }}
-                />
-              </div>
+              <progress
+                aria-label={`${domain.label} score`}
+                className="mn-progress mn-progress--soft mt-2"
+                max={100}
+                value={domain.score}
+              />
             </div>
           );
         })}
@@ -320,7 +316,7 @@ export function HealthScorePanel({
     <div className="mt-10 rounded-2xl bg-[#F7FAFD] p-4 ring-1 ring-[#3A7BD5]/10 sm:p-7">
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 lg:items-stretch">
         <div className="flex min-w-0 flex-col">
-          <div className="flex h-full min-h-[14rem] flex-col justify-between rounded-2xl bg-white p-5 text-center ring-1 ring-[#3A7BD5]/10 sm:min-h-0 sm:p-8">
+          <div className="mn-health-score-card">
             <p className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-[#20343A]">
               {labels.score}
             </p>
@@ -345,4 +341,3 @@ export function HealthScorePanel({
     </div>
   );
 }
-

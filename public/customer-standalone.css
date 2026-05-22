@@ -1,0 +1,45 @@
+.mn-standalone-page {
+  min-height: 100vh;
+  margin: 0;
+  background: #f3f8ff;
+  color: #20343a;
+  font-family: Arial, sans-serif;
+}
+
+.mn-standalone-main {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.mn-standalone-card {
+  max-width: 520px;
+  padding: 28px;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #d9e8f7;
+  border-radius: 16px;
+}
+
+.mn-standalone-brand {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #1fa77a;
+  text-transform: uppercase;
+}
+
+.mn-standalone-title {
+  margin: 14px 0 10px;
+  font-size: 28px;
+  line-height: 1.15;
+  color: #20343a;
+}
+
+.mn-standalone-body {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #5c6670;
+}

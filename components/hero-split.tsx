@@ -1,8 +1,6 @@
 import Image from "next/image";
 
 const heroImageUrl = "/final.png";
-const heroBottomLeftFade =
-  "radial-gradient(ellipse at bottom left, rgba(251, 253, 251, 0.98) 0%, rgba(238, 251, 250, 0.78) 16%, rgba(237, 246, 255, 0.34) 31%, rgba(251, 253, 251, 0) 48%)";
 
 type HeroSplitProps = Readonly<{
   cta: string;
@@ -72,7 +70,7 @@ export function HeroSplit({
               data-bpm-label={cta}
               data-bpm-target={ctaHref}
               data-bpm-type="funnel"
-              className="rounded-md bg-[var(--brand-blue)] px-4 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition hover:bg-[var(--brand-blue-dark)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-turquoise)]"
+              className="mn-brand-button"
             >
               {cta}
             </a>
@@ -100,8 +98,7 @@ export function HeroSplit({
           />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0"
-            style={{ background: heroBottomLeftFade }}
+            className="mn-hero-image-fade pointer-events-none absolute inset-0"
           />
           <div
             aria-hidden="true"

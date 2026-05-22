@@ -13,34 +13,21 @@ type ScaleOption = Option &
     tone: string;
   }>;
 
-const fitzpatrickSkinToneColors: Record<string, string> = {
-  I: "#f8dfc8",
-  II: "#eec29a",
-  III: "#d6a071",
-  IV: "#a66c45",
-  V: "#744222",
-  VI: "#3b2116"
-};
-
 export function cx(...classes: Array<string | false | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
 function pillClasses(selected: boolean) {
   return cx(
-    "rounded-md border px-4 py-2 text-sm font-semibold transition",
-    selected
-      ? "border-[#1FA77A] bg-[#1FA77A] text-white"
-      : "border-foreground/10 bg-white text-[#20343A] hover:border-[#1FA77A]/40 hover:bg-[#1FA77A]/5"
+    "mn-pill",
+    selected ? "mn-pill--selected" : "mn-pill--idle"
   );
 }
 
 export function cardOptionClasses(selected: boolean) {
   return cx(
-    "rounded-md border px-4 py-3 text-left text-sm font-semibold transition",
-    selected
-      ? "border-[#1FA77A] bg-[#1FA77A] text-white"
-      : "border-foreground/10 bg-white text-[#20343A] hover:border-[#1FA77A]/40 hover:bg-[#1FA77A]/5"
+    "mn-option-card",
+    selected ? "mn-option-card--selected" : "mn-option-card--idle"
   );
 }
 
@@ -81,7 +68,7 @@ export function ProcessingPanel({
 }: ProcessingPanelProps) {
   return (
     <section className="w-full">
-      <div className="rounded-lg bg-white p-5 ring-1 ring-foreground/10 sm:p-6">
+      <div className="mn-processing-card">
         <h1 className="text-xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-2xl">
           <HighlightedBrandText text={title} />
         </h1>
@@ -94,7 +81,7 @@ export function ProcessingPanel({
           <p className="text-sm font-medium text-red-600">{error}</p>
           <button
             type="button"
-            className="mt-3 rounded-md bg-[#1FA77A] px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-[#188a65]"
+            className="mn-primary-button mt-3"
             onClick={onRetry}
           >
             {retryLabel}
@@ -117,9 +104,7 @@ export function SectionProgress({
   return (
     <div
       className={cx(
-        framed
-          ? "rounded-lg border border-foreground/10 bg-white px-4 py-4 shadow-sm"
-          : "bg-background/95 px-1 py-2 backdrop-blur",
+        framed ? "mn-section-progress--framed" : "mn-section-progress",
         className
       )}
     >
@@ -135,12 +120,12 @@ export function SectionProgress({
           </span>
         </p>
       </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full border border-foreground/10 bg-background">
-        <div
-          className="h-full rounded-full bg-[#1FA77A] transition-all duration-500"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+      <progress
+        aria-label={label}
+        className="mn-progress mt-2"
+        max={100}
+        value={progress}
+      />
       <div className="mt-2 flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         <span>{marks[0]}</span>
         <span className="text-center">{marks[1]}</span>
@@ -164,27 +149,21 @@ export function SectionCard({
   title
 }: SectionCardProps) {
   return (
-    <section className="divide-y divide-foreground/10 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-foreground/10">
-      <div className="px-5 py-5 sm:px-6">
+    <section className="mn-section-card">
+      <div className="mn-section-card__header">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <p
               className={cx(
-                "flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em]",
-                done ? "text-[#1FA77A]" : "text-[#3A7BD5]"
+                "mn-section-card__kicker",
+                done ? "mn-section-card__kicker--done" : "mn-section-card__kicker--active"
               )}
             >
-              <span
-                className={cx(
-                  "size-1.5 rounded-full",
-                  done ? "bg-[#1FA77A]" : "bg-[#3A7BD5]"
-                )}
-              />
               {sectionLabel}
             </p>
-            <h2 className="mt-2 text-lg font-semibold text-[#20343A]">{title}</h2>
+            <h2 className="mn-section-card__title">{title}</h2>
             {description ? (
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+              <p className="mn-section-card__copy">
                 {description}
               </p>
             ) : null}
@@ -201,11 +180,11 @@ export function SectionCard({
           </div>
         </div>
       </div>
-      <div className="px-5 py-6 sm:p-6">
+      <div className="mn-section-card__body">
         <div className="space-y-7">{children}</div>
       </div>
       {footer ? (
-        <div className="bg-background/60 px-5 py-4 sm:px-6">
+        <div className="mn-section-card__footer">
           {footer}
         </div>
       ) : null}
@@ -235,17 +214,17 @@ export function Question({
   return (
     <div>
       {label ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-semibold text-[#20343A]">{label}</p>
+        <div className="mn-question__heading">
+          <p className="mn-question__label">{label}</p>
         </div>
       ) : null}
-      {hint ? <p className="mt-1 text-sm text-muted-foreground">{hint}</p> : null}
+      {hint ? <p className="mn-question__hint">{hint}</p> : null}
       {why ? (
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+        <p className="mn-question__why">
           {why}
         </p>
       ) : null}
-      <div className="mt-3">{children}</div>
+      <div className="mn-question__control">{children}</div>
     </div>
   );
 }
@@ -266,7 +245,7 @@ export function PillGroup({
   selected
 }: PillGroupProps) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="mn-pill-group">
       {options.map((option) => {
         const isSelected = Array.isArray(selected)
           ? selected.includes(option.value)
@@ -299,7 +278,7 @@ export function SkinToneGroup({ onSelect, options, selected }: SkinToneGroupProp
   const hasSelection = Boolean(selected);
 
   return (
-    <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+    <div className="mn-skin-grid">
       {options.map((option) => {
         const isSelected = selected === option.value;
 
@@ -309,23 +288,20 @@ export function SkinToneGroup({ onSelect, options, selected }: SkinToneGroupProp
             type="button"
             aria-label={option.label}
             className={cx(
-              "aspect-square rounded-md border-2 bg-white p-1 transition duration-150 focus:outline-none focus:ring-2 focus:ring-[#1FA77A]/25",
+              "mn-skin-button",
               isSelected
-                ? "border-[#1FA77A] shadow-sm ring-2 ring-[#1FA77A]/25"
+                ? "mn-skin-button--selected"
                 : cx(
-                    "border-foreground/10 hover:border-[#1FA77A]/40 hover:bg-[#1FA77A]/5 hover:opacity-100",
-                    hasSelection && "opacity-35 saturate-75"
+                    "mn-skin-button--idle",
+                    hasSelection && "mn-skin-button--muted"
                   )
             )}
             onClick={() => onSelect(option.value)}
           >
             <span
               aria-hidden={true}
-              className="block size-full rounded-[4px] border border-black/10"
-              style={{
-                backgroundColor:
-                  fitzpatrickSkinToneColors[option.value] ?? "#f8dfc8"
-              }}
+              className="mn-skin-swatch"
+              data-skin-tone={option.value}
             />
           </button>
         );
@@ -343,7 +319,7 @@ type OptionGridProps = Readonly<{
 
 export function OptionGrid({ max, onToggle, options, selected }: OptionGridProps) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="mn-option-grid">
       {options.map((option) => {
         const isSelected = selected.includes(option.value);
         const blocked = Boolean(max && selected.length >= max && !isSelected);
@@ -355,7 +331,7 @@ export function OptionGrid({ max, onToggle, options, selected }: OptionGridProps
             disabled={blocked}
             className={cx(
               cardOptionClasses(isSelected),
-              blocked && "cursor-not-allowed opacity-45"
+              blocked && "mn-option-card--blocked"
             )}
             onClick={() => onToggle(option.value)}
           >
@@ -375,7 +351,7 @@ type ScaleGroupProps = Readonly<{
 
 export function ScaleGroup({ onSelect, options, selected }: ScaleGroupProps) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="mn-scale-group">
       {options.map((option) => {
         const isSelected = selected === option.value;
 

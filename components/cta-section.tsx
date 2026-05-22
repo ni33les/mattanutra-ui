@@ -12,18 +12,12 @@ type CtaSectionProps = Readonly<{
   ctaHref: string;
 }>;
 
-const ctaBackgroundImage = "/cta-athletes.jpg";
-
 export function CtaSection({ content, ctaHref }: CtaSectionProps) {
   return (
     <section className="relative overflow-hidden bg-[var(--brand-soft-turquoise)]">
       <div
         aria-hidden={true}
-        className="absolute inset-0 bg-cover bg-center opacity-34"
-        style={{
-          backgroundImage: `url("${ctaBackgroundImage}")`,
-          backgroundPosition: "center 45%"
-        }}
+        className="mn-cta-background absolute inset-0 bg-cover bg-center opacity-34"
       />
       <div
         aria-hidden={true}
@@ -46,7 +40,7 @@ export function CtaSection({ content, ctaHref }: CtaSectionProps) {
             data-bpm-label={content.button}
             data-bpm-target={ctaHref}
             data-bpm-type="funnel"
-            className="inline-flex items-center gap-2 rounded-md bg-[var(--brand-blue)] px-5 py-3 text-[15px] font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition hover:bg-[var(--brand-blue-dark)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-turquoise)]"
+            className="mn-brand-button"
           >
             {content.button}
           </a>

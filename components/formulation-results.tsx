@@ -35,7 +35,6 @@ type FormulationResultsProps = Readonly<{
 
 type LoadState = "loading" | "ready" | "error";
 
-const formulationHeroBackgroundImage = "/formulation-couple.jpg";
 const MAX_PRODUCT_MATCHING_POLLS = 80;
 const PENDING_SECTION_POLL_INTERVAL_MS = 1_000;
 const PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS = 750;
@@ -702,11 +701,7 @@ export function FormulationResults({
       <div className="relative overflow-hidden rounded-lg bg-[#F3F8FF] p-6 ring-1 ring-[#3A7BD5]/10 sm:p-8 lg:p-10">
         <div
           aria-hidden={true}
-          className="absolute inset-0 bg-cover opacity-36"
-          style={{
-            backgroundImage: `url("${formulationHeroBackgroundImage}")`,
-            backgroundPosition: "left 52%"
-          }}
+          className="mn-formulation-hero-background absolute inset-0 bg-cover opacity-36"
         />
         <div
           aria-hidden={true}
@@ -1111,7 +1106,7 @@ function PreviewPaywallPanel({
           </p>
         </div>
         <a
-          className="inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188a65] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A]"
+          className="mn-green-button"
           href={unlockHref}
         >
           {labels.previewCta}
@@ -1655,13 +1650,12 @@ function FormulaPanel({
                         {productCoverage}%
                       </span>
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E5EEF7]">
-                      <div
-                        aria-hidden={true}
-                        className="h-full rounded-full bg-[#1FA77A] transition-[width] duration-500"
-                        style={{ width: `${productCoverage}%` }}
-                      />
-                    </div>
+                    <progress
+                      aria-label={labels.productCoverage}
+                      className="mn-progress mn-progress--soft mt-2"
+                      max={100}
+                      value={productCoverage}
+                    />
                   </div>
                   {benefitTags.length > 0 ? (
                     <div className="mt-3">
@@ -1789,7 +1783,7 @@ function LockedFormulaPreview({
           </p>
         </div>
         <a
-          className="inline-flex shrink-0 items-center justify-center rounded-md bg-[#1FA77A] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188a65] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A]"
+          className="mn-green-button mn-green-button--compact"
           href={unlockHref}
         >
           {labels.previewCta}

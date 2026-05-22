@@ -164,8 +164,8 @@ export function SiteFooter({
 }: Readonly<{ content: FooterContent; locale: Locale }>) {
   return (
     <footer className="border-t border-foreground/10 bg-background">
-      <div className="mx-auto grid min-h-28 w-full max-w-6xl grid-cols-1 items-center gap-7 px-4 py-7 sm:px-6 md:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.65fr)] md:gap-4 lg:px-8">
-        <div className="flex min-w-0 flex-col items-center gap-3 text-center text-[var(--brand-navy)] sm:flex-row sm:justify-center md:justify-start md:text-left">
+      <div className="mn-site-footer-main">
+        <div className="mn-site-footer-brand-row">
           <p className="max-w-full text-wrap text-[10px] font-semibold uppercase leading-5 tracking-[0.06em] sm:text-[11px] lg:text-xs">
             {content.recommended}
           </p>
@@ -193,11 +193,11 @@ export function SiteFooter({
           </div>
         </div>
       </div>
-      <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-5 border-t border-foreground/5 px-4 py-6 text-center text-xs text-muted-foreground sm:flex-row sm:px-6 sm:text-left lg:px-8">
+      <div className="mn-site-footer-bottom">
         <div className="flex flex-col items-center gap-3 sm:items-start">
           <nav
             aria-label="Legal"
-            className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground sm:justify-start sm:text-[11px]"
+            className="mn-site-footer-nav"
           >
             <Link
               href={`/${locale}/terms`}

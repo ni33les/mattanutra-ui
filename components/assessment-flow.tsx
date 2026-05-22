@@ -1092,10 +1092,6 @@ function healthScoreBpmFields(healthScore: HealthScoreResult | null | undefined)
   };
 }
 
-function textInputClasses() {
-  return "mt-2 block w-full rounded-md border border-foreground/10 bg-white px-3 py-2 text-sm text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15";
-}
-
 function PrecisionGauge({
   labels,
   progress
@@ -1110,12 +1106,12 @@ function PrecisionGauge({
           {progress}%
         </span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-foreground/10">
-        <div
-          className="h-full rounded-full bg-[#1FA77A] transition-all duration-500"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+      <progress
+        aria-label="Formula precision"
+        className="mn-progress mn-progress--thin"
+        max={100}
+        value={progress}
+      />
       <div className="mt-2 grid grid-cols-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         <span>{labels[0]}</span>
         <span className="text-center">{labels[1]}</span>
@@ -1638,7 +1634,7 @@ export function AssessmentFlow({
               </p>
               <select
                 value={answers.country}
-                className="mt-3 block w-full rounded-md border border-foreground/10 bg-white px-4 py-3 text-sm font-semibold text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
+                className="mn-text-input mt-3 px-4 py-3 font-semibold"
                 onChange={(event) => setSingle("country", event.target.value)}
               >
                 <option value="">{locale === "th" ? "เลือกประเทศ" : "Select country"}</option>
@@ -1867,7 +1863,7 @@ export function AssessmentFlow({
                   <PillGroup multi={true} options={copy.safety.medicationTypeOptions} selected={answers.medTypes} onToggle={(value) => toggleMulti("medTypes", value)} />
                   {selectedOther(answers.medTypes) ? (
                     <input
-                      className={textInputClasses()}
+                      className="mn-text-input"
                       placeholder={copy.safety.otherMedPlaceholder}
                       value={answers.otherMed}
                       onChange={(event) => setSingle("otherMed", event.target.value)}
@@ -1960,7 +1956,7 @@ export function AssessmentFlow({
               <Question infoLabel={ui.infoLabel} label={copy.precision.tracker}>
                 <PillGroup options={copy.precision.trackerOptions} selected={answers.tracker} onSelect={(value) => setSingle("tracker", value)} />
                 {answers.tracker === "other" ? (
-                  <input className={textInputClasses()} value={answers.otherTracker} onChange={(event) => setSingle("otherTracker", event.target.value)} />
+                  <input className="mn-text-input" value={answers.otherTracker} onChange={(event) => setSingle("otherTracker", event.target.value)} />
                 ) : null}
               </Question>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1968,7 +1964,7 @@ export function AssessmentFlow({
                   <label className="block">
                     <span className="text-sm font-semibold text-[#20343A]">{copy.precision.vo2}</span>
                     <input
-                      className={textInputClasses()}
+                      className="mn-text-input"
                       inputMode="decimal"
                       placeholder="e.g. 45 ml/kg/min"
                       value={answers.vo2}
@@ -1988,7 +1984,7 @@ export function AssessmentFlow({
                       <button
                         type="button"
                         disabled={vo2Estimate === null}
-                        className="inline-flex shrink-0 items-center justify-center rounded-md border border-[#1FA77A]/25 bg-[#1FA77A]/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#167558] transition hover:bg-[#1FA77A]/15 disabled:cursor-not-allowed disabled:opacity-45"
+                        className="mn-soft-action-button"
                         onClick={() => {
                           if (vo2Estimate !== null) {
                             setSingle("vo2", String(vo2Estimate));
@@ -2002,7 +1998,7 @@ export function AssessmentFlow({
                 </div>
                 <label className="block">
                   <span className="text-sm font-semibold text-[#20343A]">{copy.precision.hrv}</span>
-                  <input className={textInputClasses()} inputMode="decimal" value={answers.hrv} onChange={(event) => setSingle("hrv", event.target.value)} />
+                  <input className="mn-text-input" inputMode="decimal" value={answers.hrv} onChange={(event) => setSingle("hrv", event.target.value)} />
                 </label>
               </div>
               <Question infoLabel={ui.infoLabel} label={copy.precision.labs} hint={copy.precision.labsHint} why={copy.coach.labs}>
@@ -2012,13 +2008,13 @@ export function AssessmentFlow({
                       <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A]">{field.label}</span>
                       <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
                         <input
-                          className="min-w-0 rounded-md border border-foreground/10 px-3 py-2 text-sm outline-none focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
+                          className="mn-lab-input"
                           inputMode="decimal"
                           value={answers.labs[field.value] ?? ""}
                           onChange={(event) => updateLabValue(field.value, event.target.value)}
                         />
                         <select
-                          className="rounded-md border border-foreground/10 bg-white px-2 py-2 text-xs font-semibold text-[#20343A] outline-none focus:border-[#1FA77A]"
+                          className="mn-lab-unit"
                           value={answers.labUnits[field.value] ?? field.units[0]}
                           onChange={(event) => updateLabUnit(field.value, event.target.value)}
                         >
@@ -2255,7 +2251,7 @@ export function AssessmentFlow({
                       <button
                         type="button"
                         disabled={sectionIndex === 0}
-                        className="rounded-md border border-foreground/10 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-[#20343A] transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-40"
+                        className="mn-secondary-button"
                         onClick={goBack}
                       >
                         {ui.back}
@@ -2263,7 +2259,7 @@ export function AssessmentFlow({
                       {showDevShortcut ? (
                         <button
                           type="button"
-                          className="rounded-md border border-foreground/10 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition hover:bg-background hover:text-[#20343A]"
+                          className="mn-secondary-button mn-secondary-button--compact"
                           onClick={fillRandomDefaultsAndFinalStep}
                         >
                           Random defaults
@@ -2274,7 +2270,7 @@ export function AssessmentFlow({
                     <button
                       type="button"
                       disabled={primaryActionDisabled}
-                      className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-6 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition hover:bg-[#188a65] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[#1FA77A]"
+                      className="mn-assessment-continue-button"
                       onClick={goNext}
                     >
                       {isFinalStep ? copy.fixedAction.generate : ui.continue}
