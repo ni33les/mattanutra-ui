@@ -108,15 +108,31 @@ export function buildAssessmentSummary({
   const profileParts = [sex, height, weight].filter(Boolean);
   const goals = toTextArray(record.goals).map(humanize);
   const symptoms = toTextArray(record.symptoms);
-  const conditions = toTextArray(record.conditions);
   const medTypes = toTextArray(record.medTypes);
+  const supplementSensitivities = toTextArray(record.suppAllergies).filter(
+    (item) => item !== "none"
+  );
   const constraints = [
-    ...conditions.map(humanize),
     ...medTypes.map(humanize),
     ...(toText(record.meds) === "yes"
       ? [locale === "th" ? "ใช้ยาเป็นประจำ" : "Regular medication noted"]
       : []),
-    ...(toText(record.notes) ? [toText(record.notes)] : []),
+    ...(toText(record.kidney) && toText(record.kidney) !== "normal"
+      ? [locale === "th" ? "บริบทไต" : `Kidney: ${humanize(toText(record.kidney))}`]
+      : []),
+    ...(toText(record.liver) && toText(record.liver) !== "normal"
+      ? [locale === "th" ? "บริบทตับ" : `Liver: ${humanize(toText(record.liver))}`]
+      : []),
+    ...(toText(record.surgery) === "yes"
+      ? [locale === "th" ? "มีการผ่าตัดเร็ว ๆ นี้" : "Upcoming surgery noted"]
+      : []),
+    ...(toText(record.antibiotics) === "yes"
+      ? [locale === "th" ? "ใช้ยาปฏิชีวนะล่าสุด" : "Recent antibiotics noted"]
+      : []),
+    ...(supplementSensitivities.length > 0
+      ? supplementSensitivities.map(humanize)
+      : []),
+    ...(toText(record.avoidNote) ? [toText(record.avoidNote)] : []),
     ...(symptoms.length > 0 ? symptoms.map(humanize).slice(0, 3) : [])
   ];
 

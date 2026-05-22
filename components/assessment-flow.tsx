@@ -7,13 +7,11 @@ import {
   ArrowPathIcon,
   BeakerIcon,
   CheckIcon,
-  CheckCircleIcon,
   ShieldCheckIcon,
   SparklesIcon
 } from "@heroicons/react/20/solid";
 import { ChatChannelCards } from "@/components/chat-channel-cards";
 import { HighlightedBrandText } from "@/components/highlighted-brand-text";
-import { NutritionProgress } from "@/components/nutrition-progress";
 import {
   OptionGrid,
   PillGroup,
@@ -33,9 +31,7 @@ import {
 import { getBpmPayload, trackBpmEvent } from "@/lib/bpm-client";
 import { normalizeLeadEmail, validateLeadEmail } from "@/lib/email-validation";
 import type { BlogTestimonial } from "@/lib/blog";
-import type {
-  HealthScoreResult
-} from "@/lib/health-score";
+import type { HealthScoreResult } from "@/lib/health-score";
 import type { Locale } from "@/lib/i18n";
 import {
   nutritionHealthScorePath,
@@ -53,38 +49,123 @@ type ScaleOption = Option &
   }>;
 
 type LabField = Readonly<{
-  hint: string;
   label: string;
-  placeholder: string;
+  units: readonly string[];
   value: string;
 }>;
 
+type FoodFrequencyKey =
+  | "dairy"
+  | "eggs"
+  | "fish"
+  | "fruitveg"
+  | "legumes"
+  | "redmeat";
+
+type Answers = {
+  activity: string;
+  age: string;
+  alcohol: string;
+  allergies: string[];
+  antibiotics: string;
+  avoidNote: string;
+  budget: string;
+  caffeine: string;
+  country: string;
+  diet: string;
+  digCondition: string;
+  digestion: string;
+  disclosure: boolean;
+  energy: string;
+  family: string[];
+  flow: string;
+  foodFrequency: Record<FoodFrequencyKey, string>;
+  form: string;
+  goals: string[];
+  heightCm: string;
+  hrv: string;
+  kidney: string;
+  labs: Record<string, string>;
+  labUnits: Record<string, string>;
+  liver: string;
+  maxPills: string;
+  meds: string;
+  medTypes: string[];
+  menopause: string;
+  otherMed: string;
+  otherSupp: string;
+  otherTracker: string;
+  protein: string;
+  reassessmentEmail: string;
+  reproStatus: string;
+  sex: string;
+  skin: string;
+  sleepHrs: string;
+  smoking: string;
+  stress: string;
+  sun: string;
+  sunscreen: string;
+  surgery: string;
+  suppAllergies: string[];
+  supplements: string;
+  symptoms: string[];
+  tracker: string;
+  vo2: string;
+  weightKg: string;
+};
+
 type Copy = Readonly<{
   about: {
-    activity: string;
-    activityOptions: Option[];
     age: string;
     ageOptions: Option[];
-    build: string;
-    buildOptions: Option[];
     country: string;
     countryOptions: Option[];
+    femaleTitle: string;
+    flow: string;
+    flowOptions: Option[];
     height: string;
-    name: string;
+    menopause: string;
+    menopauseOptions: Option[];
+    reproStatus: string;
+    reproStatusOptions: Option[];
     sex: string;
     sexOptions: Option[];
     skin: string;
     skinOptions: Option[];
+    subtitle: string;
+    sun: string;
+    sunOptions: Option[];
+    sunscreen: string;
+    sunscreenOptions: Option[];
     title: string;
     weight: string;
   };
   badges: string[];
+  coach: Record<string, string>;
   common: {
+    optional: string;
     required: string;
   };
-  conditions: {
-    options: Option[];
-    prompt: string;
+  daily: {
+    activity: string;
+    activityOptions: Option[];
+    alcohol: string;
+    alcoholOptions: Option[];
+    caffeine: string;
+    caffeineOptions: Option[];
+    digCondition: string;
+    digConditionOptions: Option[];
+    digestion: string;
+    digestionOptions: Option[];
+    energy: string;
+    energyOptions: ScaleOption[];
+    sleepHrs: string;
+    sleepOptions: Option[];
+    smoking: string;
+    smokingOptions: Option[];
+    stress: string;
+    stressOptions: ScaleOption[];
+    subtitle: string;
     title: string;
   };
   fixedAction: {
@@ -92,10 +173,29 @@ type Copy = Readonly<{
     generate: string;
     remaining: (count: number) => string;
   };
+  food: {
+    allergies: string;
+    allergyOptions: Option[];
+    avoidNote: string;
+    avoidPlaceholder: string;
+    diet: string;
+    dietOptions: Option[];
+    disclosureBody: string;
+    disclosureTitle: string;
+    frequency: string;
+    frequencyOptions: Record<FoodFrequencyKey, Option[]>;
+    frequencyTitles: Record<FoodFrequencyKey, string>;
+    subtitle: string;
+    title: string;
+  };
   goals: {
-    hint: string;
-    options: Option[];
-    prompt: string;
+    goalHint: string;
+    goalOptions: Option[];
+    goals: string;
+    subtitle: string;
+    symptomHint: string;
+    symptomOptions: Option[];
+    symptoms: string;
     title: string;
   };
   hero: {
@@ -103,213 +203,176 @@ type Copy = Readonly<{
     time: string;
     title: string;
   };
-  lifestyle: {
-    alcohol: string;
-    alcoholOptions: Option[];
-    coffee: string;
-    coffeeOptions: Option[];
-    diet: string;
-    dietOptions: Option[];
-    foodAllergens: string;
-    foodAllergenOptions: Option[];
-    foodAvoidances: string;
-    foodAvoidancesPlaceholder: string;
-    foodSafetyBody: string;
-    foodSafetyCheckbox: string;
-    fish: string;
-    fishOptions: Option[];
-    lifestage: string;
-    lifestageOptions: Option[];
-    meds: string;
-    medsHint: string;
-    medType: string;
-    medTypeOptions: Option[];
-    medsOptions: Option[];
-    smoke: string;
-    smokeOptions: Option[];
-    supps: string;
-    suppsOptions: Option[];
-    sun: string;
-    sunOptions: Option[];
-    title: string;
-  };
   precision: {
-    family: string;
-    familyOptions: Option[];
-    gut: string;
-    gutOptions: Option[];
-    helper: string;
-    labs: string;
-    labFields: LabField[];
-    protein: string;
-    proteinOptions: Option[];
-    sleep: string;
-    sleepOptions: ScaleOption[];
-    stress: string;
-    stressOptions: ScaleOption[];
-    stressSource: string;
-    stressSourceOptions: Option[];
-    title: string;
-    vo2Known: string;
-    vo2KnownOptions: Option[];
-    vo2Max: string;
-    vo2Proxy: string;
-    vo2ProxyOptions: Option[];
-    wearable: string;
-    wearableOptions: Option[];
-  };
-  preferences: {
     budget: string;
     budgetOptions: Option[];
+    family: string;
+    familyOptions: Option[];
     form: string;
     formOptions: Option[];
-    pills: string;
-    pillsOptions: Option[];
+    hrv: string;
+    labs: string;
+    labsHint: string;
+    labFields: LabField[];
+    maxPills: string;
+    maxPillsOptions: Option[];
+    optionalBanner: string;
+    optionalBody: string;
+    protein: string;
+    proteinOptions: Option[];
+    subtitle: string;
     title: string;
+    tracker: string;
+    trackerOptions: Option[];
+    vo2: string;
   };
   progress: {
     complete: string;
+    label: string;
+    markEnd: string;
+    markMiddle: string;
+    markStart: string;
+    nearComplete: string;
+    optional: string;
+    partial: (progress: number) => string;
     start: string;
-    status: (done: number, total: number) => string;
   };
-  sleepBasics: {
-    average: string;
-    options: Option[];
+  safety: {
+    antibiotics: string;
+    antibioticsOptions: Option[];
+    kidney: string;
+    kidneyOptions: Option[];
+    liver: string;
+    liverOptions: Option[];
+    medications: string;
+    medicationHint: string;
+    medicationOptions: Option[];
+    medicationType: string;
+    medicationTypeOptions: Option[];
+    otherMedPlaceholder: string;
+    otherSuppPlaceholder: string;
+    suppAllergies: string;
+    suppAllergyOptions: Option[];
+    supplements: string;
+    supplementsOptions: Option[];
+    surgery: string;
+    surgeryOptions: Option[];
+    subtitle: string;
     title: string;
   };
-  symptoms: {
-    energy: string;
-    energyOptions: ScaleOption[];
-    great: Option;
-    hint: string;
-    options: Option[];
-    prompt: string;
-    title: string;
-  };
+  stagePhases: string[];
+  sectionNotes: string[];
+  stages: string[];
 }>;
 
-type Answers = {
-  activity: string;
-  alcohol: string;
-  age: string;
-  budget: string;
-  build: string;
-  coffee: string;
-  conditions: string[];
-  country: string;
-  diet: string;
-  energy: string;
-  family: string[];
-  fish: string;
-  feelGreat: boolean;
-  foodAllergens: string[];
-  foodAvoidances: string;
-  foodSafetyAcknowledged: boolean;
-  form: string;
-  goals: string[];
-  gut: string;
-  heightCm: string;
-  labs: Record<string, string>;
-  lifestage: string;
-  meds: string;
-  medTypes: string[];
-  name: string;
-  notes: string;
-  pills: string;
-  protein: string;
-  reassessmentEmail: string;
-  sex: string;
-  skin: string;
-  sleep: string;
-  sleepHours: string;
-  smoke: string;
-  stress: string;
-  stressSource: string;
-  sun: string;
-  supps: string;
-  symptoms: string[];
-  vo2Known: string;
-  vo2Max: string;
-  vo2Proxy: string;
-  wearable: string;
-  weightKg: string;
-};
+const foodFrequencyKeys: FoodFrequencyKey[] = [
+  "redmeat",
+  "dairy",
+  "fruitveg",
+  "eggs",
+  "legumes",
+  "fish"
+];
 
-const requiredGroups = [
-  "sex",
-  "age",
-  "heightCm",
-  "weightKg",
-  "skin",
-  "country",
-  "sun",
-  "activity",
-  "goals",
-  "symptoms",
-  "sleepHours",
-  "diet",
-  "foodSafetyAcknowledged",
-  "fish",
-  "smoke",
-  "alcohol",
-  "meds",
-  "budget",
-  "pills"
-] as const;
+const countryOptions: Option[] = [
+  { label: "Thailand", value: "TH" },
+  { label: "Singapore", value: "SG" },
+  { label: "Malaysia", value: "MY" },
+  { label: "Indonesia", value: "ID" },
+  { label: "Philippines", value: "PH" },
+  { label: "Vietnam", value: "VN" },
+  { label: "Myanmar", value: "MM" },
+  { label: "United States", value: "US" },
+  { label: "Australia", value: "AU" },
+  { label: "United Kingdom", value: "GB" },
+  { label: "Canada", value: "CA" },
+  { label: "Germany", value: "DE" },
+  { label: "France", value: "FR" },
+  { label: "Japan", value: "JP" },
+  { label: "South Korea", value: "KR" },
+  { label: "India", value: "IN" },
+  { label: "China", value: "CN" },
+  { label: "Other", value: "OTHER" }
+];
+
+const labFields: LabField[] = [
+  { label: "Vitamin D", value: "vitd", units: ["ng/mL", "nmol/L"] },
+  { label: "Vitamin B12", value: "b12", units: ["pg/mL", "pmol/L"] },
+  { label: "Ferritin", value: "ferritin", units: ["ng/mL", "ug/L"] },
+  { label: "HbA1c", value: "hba1c", units: ["%", "mmol/mol"] },
+  { label: "Omega-3 Index", value: "o3", units: ["%"] },
+  { label: "Homocysteine", value: "homo", units: ["umol/L", "mg/L"] }
+];
 
 const initialAnswers: Answers = {
   activity: "",
-  alcohol: "",
   age: "",
+  alcohol: "",
+  allergies: [],
+  antibiotics: "",
+  avoidNote: "",
   budget: "",
-  build: "",
-  coffee: "",
-  conditions: [],
-  country: "TH",
+  caffeine: "",
+  country: "",
   diet: "",
+  digCondition: "",
+  digestion: "",
+  disclosure: false,
   energy: "",
   family: [],
-  fish: "",
-  feelGreat: false,
-  foodAllergens: ["none"],
-  foodAvoidances: "",
-  foodSafetyAcknowledged: false,
+  flow: "",
+  foodFrequency: {
+    dairy: "",
+    eggs: "",
+    fish: "",
+    fruitveg: "",
+    legumes: "",
+    redmeat: ""
+  },
   form: "",
   goals: [],
-  gut: "",
-  heightCm: "170",
+  heightCm: "",
+  hrv: "",
+  kidney: "",
   labs: {},
-  lifestage: "",
+  labUnits: Object.fromEntries(
+    labFields.map((field) => [field.value, field.units[0]])
+  ),
+  liver: "",
+  maxPills: "",
   meds: "",
   medTypes: [],
-  name: "",
-  notes: "",
-  pills: "",
+  menopause: "",
+  otherMed: "",
+  otherSupp: "",
+  otherTracker: "",
   protein: "",
   reassessmentEmail: "",
+  reproStatus: "",
   sex: "",
   skin: "",
-  sleep: "",
-  sleepHours: "",
-  smoke: "",
+  sleepHrs: "",
+  smoking: "",
   stress: "",
-  stressSource: "",
   sun: "",
-  supps: "",
+  sunscreen: "",
+  surgery: "",
+  suppAllergies: [],
+  supplements: "",
   symptoms: [],
-  vo2Known: "",
-  vo2Max: "",
-  vo2Proxy: "",
-  wearable: "",
-  weightKg: "70"
+  tracker: "",
+  vo2: "",
+  weightKg: ""
 };
 
-function buildInitialAnswers(prefillAnswers?: unknown) {
-  if (
-    !prefillAnswers ||
-    typeof prefillAnswers !== "object" ||
-    Array.isArray(prefillAnswers)
-  ) {
+function cleanStringArray(value: unknown, fallback: string[] = []) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : fallback;
+}
+
+function buildInitialAnswers(prefillAnswers?: unknown): Answers {
+  if (!prefillAnswers || typeof prefillAnswers !== "object" || Array.isArray(prefillAnswers)) {
     return initialAnswers;
   }
 
@@ -318,29 +381,27 @@ function buildInitialAnswers(prefillAnswers?: unknown) {
   return {
     ...initialAnswers,
     ...prefill,
-    conditions: Array.isArray(prefill.conditions)
-      ? prefill.conditions
-      : initialAnswers.conditions,
-    family: Array.isArray(prefill.family)
-      ? prefill.family
-      : initialAnswers.family,
-    foodAllergens: Array.isArray(prefill.foodAllergens)
-      ? prefill.foodAllergens
-      : initialAnswers.foodAllergens,
-    goals: Array.isArray(prefill.goals)
-      ? prefill.goals
-      : initialAnswers.goals,
+    allergies: cleanStringArray(prefill.allergies, initialAnswers.allergies),
+    family: cleanStringArray(prefill.family, initialAnswers.family),
+    foodFrequency: {
+      ...initialAnswers.foodFrequency,
+      ...(prefill.foodFrequency && typeof prefill.foodFrequency === "object"
+        ? prefill.foodFrequency
+        : {})
+    },
+    goals: cleanStringArray(prefill.goals, initialAnswers.goals),
     labs:
-      prefill.labs && typeof prefill.labs === "object"
+      prefill.labs && typeof prefill.labs === "object" && !Array.isArray(prefill.labs)
         ? prefill.labs
         : initialAnswers.labs,
-    medTypes: Array.isArray(prefill.medTypes)
-      ? prefill.medTypes
-      : initialAnswers.medTypes,
-    symptoms: Array.isArray(prefill.symptoms)
-      ? prefill.symptoms
-      : initialAnswers.symptoms
-  } satisfies Answers;
+    labUnits:
+      prefill.labUnits && typeof prefill.labUnits === "object" && !Array.isArray(prefill.labUnits)
+        ? { ...initialAnswers.labUnits, ...prefill.labUnits }
+        : initialAnswers.labUnits,
+    medTypes: cleanStringArray(prefill.medTypes, initialAnswers.medTypes),
+    suppAllergies: cleanStringArray(prefill.suppAllergies, initialAnswers.suppAllergies),
+    symptoms: cleanStringArray(prefill.symptoms, initialAnswers.symptoms)
+  };
 }
 
 function randomItem<T>(items: readonly T[]) {
@@ -348,87 +409,69 @@ function randomItem<T>(items: readonly T[]) {
 }
 
 function randomSubset<T>(items: readonly T[], count: number) {
-  const shuffled = [...items].sort(() => Math.random() - 0.5);
-
-  return shuffled.slice(0, count);
+  return [...items].sort(() => Math.random() - 0.5).slice(0, count);
 }
 
 function buildRandomDevAnswers(): Answers {
   const sex = randomItem(["female", "male"] as const);
-  const meds = randomItem(["no", "yes"] as const);
-  const vo2Known = randomItem(["no", "yes"] as const);
-  const heightCm = String(Math.round(155 + Math.random() * 38));
-  const weightKg = String(Math.round(52 + Math.random() * 42));
 
   return {
-    activity: randomItem(["light", "moderate", "active", "athlete"]),
-    alcohol: randomItem(["none", "low", "moderate"]),
+    ...initialAnswers,
     age: randomItem(["26-35", "36-45", "46-55", "56-65"]),
-    budget: randomItem(["mid", "good", "high"]),
-    build: randomItem(["average", "muscular", "slim"]),
-    coffee: randomItem(["none", "1", "2-3"]),
-    conditions: randomItem([["none"], ["joints"], ["cholesterol"], ["mood"]]),
+    alcohol: randomItem(["none", "1-3", "4-7"]),
+    antibiotics: randomItem(["no", "yes"]),
+    activity: randomItem(["sitting", "light", "moderate", "active"]),
+    budget: randomItem(["1000-2500", "2500-5000", "5000+"]),
+    caffeine: randomItem(["1", "2-3", "4+"]),
     country: "TH",
     diet: randomItem(["balanced", "whole", "mediterranean", "plant"]),
-    energy: randomItem(["2", "3", "4", "5"]),
-    family: randomItem([["none"], ["heart"], ["diabetes"], ["bones"]]),
-    fish: randomItem(["rarely", "weekly", "2-3pw", "daily"]),
-    feelGreat: false,
-    form: randomItem(["capsules", "powder", "mixed"]),
-    foodAllergens: ["none"],
-    foodAvoidances: "",
-    foodSafetyAcknowledged: true,
-    goals: randomSubset(
-      ["energy", "sleep", "focus", "longevity", "fitness", "mood"],
-      3
-    ),
-    gut: randomItem(["great", "bloat", "constipation"]),
-    heightCm,
-    labs: {
-      b12: String(Math.round(380 + Math.random() * 360)),
-      ferritin: String(Math.round(45 + Math.random() * 90)),
-      hba1c: (5 + Math.random() * 0.8).toFixed(1),
-      hrv: String(Math.round(42 + Math.random() * 36)),
-      omega3: (4.5 + Math.random() * 3.5).toFixed(1),
-      vitaminD: String(Math.round(26 + Math.random() * 34))
+    digCondition: "none",
+    digestion: randomItem(["none", "bloating", "constipation"]),
+    disclosure: true,
+    energy: randomItem(["ok", "good", "excellent"]),
+    family: randomItem([["none"], ["heart"], ["diabetes"]]),
+    flow: sex === "female" ? randomItem(["none", "light", "moderate"]) : "",
+    foodFrequency: {
+      dairy: randomItem(["never", "1-2", "3+"]),
+      eggs: randomItem(["rare", "weekly", "most"]),
+      fish: randomItem(["rare", "once", "often"]),
+      fruitveg: randomItem(["1-2", "3+"]),
+      legumes: randomItem(["weekly", "most"]),
+      redmeat: randomItem(["never", "1-2", "3+"])
     },
-    lifestage:
-      sex === "female" ? randomItem(["regular", "peri", "post"]) : "",
-    meds,
-    medTypes:
-      meds === "yes"
-        ? randomSubset(["statin", "metformin", "bp", "antidepressant"], 1)
-        : [],
-    name: "",
-    notes: "Development shortcut generated this assessment.",
-    pills: randomItem(["4-6", "7-10", "unlimited"]),
-    protein: randomItem(["mid", "good", "high"]),
+    form: randomItem(["capsules", "powder", "mixed"]),
+    goals: randomSubset(["energy", "sleep", "focus", "longevity", "fitness", "mood"], 3),
+    heightCm: String(Math.round(155 + Math.random() * 38)),
+    hrv: String(Math.round(42 + Math.random() * 36)),
+    kidney: "normal",
+    labs: { b12: "520", ferritin: "80", hba1c: "5.3", o3: "6.2", vitd: "42" },
+    liver: "normal",
+    maxPills: randomItem(["4-6", "7-10", "nolimit"]),
+    meds: randomItem(["none", "yes"]),
+    medTypes: ["statin"],
+    menopause: sex === "female" ? randomItem(["pre", "peri", "post", "unsure"]) : "",
+    protein: randomItem(["1-1.5", "1.5-2", "2+"]),
     reassessmentEmail: "dev@example.dev",
+    reproStatus: sex === "female" ? randomItem(["none", "ttc"]) : "",
     sex,
     skin: randomItem(["II", "III", "IV", "V"]),
-    sleep: randomItem(["3", "4", "5"]),
-    sleepHours: randomItem(["6-7", "7-8", "8-9"]),
-    smoke: randomItem(["never", "exlong", "occasional"]),
-    stress: randomItem(["2", "3", "4"]),
-    stressSource: randomItem(["none", "work", "life", "health"]),
-    sun: randomItem(["low", "moderate", "high"]),
-    supps: randomItem(["none", "basic", "several"]),
-    symptoms: randomSubset(["fatigue", "brain", "sleep", "stress", "joints"], 2),
-    vo2Known,
-    vo2Max: vo2Known === "yes" ? String(Math.round(34 + Math.random() * 20)) : "",
-    vo2Proxy:
-      vo2Known === "no"
-        ? randomItem(["moderate", "sustained", "athlete"])
-        : "",
-    wearable: randomItem(["none", "apple", "garmin", "fitbit"]),
-    weightKg
+    sleepHrs: randomItem(["6-7", "7-8", "8-9"]),
+    smoking: randomItem(["never", "ex5+", "occasional"]),
+    stress: randomItem(["low", "moderate", "high"]),
+    sun: randomItem(["15-30", "30-60", "60+"]),
+    sunscreen: randomItem(["rarely", "sometimes", "daily"]),
+    surgery: randomItem(["no", "yes"]),
+    supplements: randomItem(["none", "basic", "d3omega", "targeted"]),
+    symptoms: randomSubset(["fatigue", "brainfog", "sleep", "stress", "joints"], 2),
+    tracker: randomItem(["none", "apple", "garmin", "fitbit"]),
+    vo2: String(Math.round(34 + Math.random() * 20)),
+    weightKg: String(Math.round(52 + Math.random() * 42))
   };
 }
-
 const en: Copy = {
   about: {
-    title: "About you",
-    name: "Name",
+    title: "First, the basics about you",
+    subtitle: "A few quick taps to start. This sets the baseline the rest of your formula is built on.",
     sex: "Sex",
     sexOptions: [
       { label: "Male", value: "male" },
@@ -455,252 +498,296 @@ const en: Copy = {
       { label: "Skin tone 6", value: "VI" }
     ],
     country: "Country",
-    countryOptions: [
-      { label: "Thailand", value: "TH" },
-      { label: "Singapore", value: "SG" },
-      { label: "Malaysia", value: "MY" },
-      { label: "Indonesia", value: "ID" },
-      { label: "Philippines", value: "PH" },
-      { label: "Vietnam", value: "VN" },
-      { label: "Myanmar", value: "MM" },
-      { label: "United States", value: "US" },
-      { label: "Australia", value: "AU" },
-      { label: "United Kingdom", value: "GB" },
-      { label: "Canada", value: "CA" },
-      { label: "Germany", value: "DE" },
-      { label: "France", value: "FR" },
-      { label: "Japan", value: "JP" },
-      { label: "South Korea", value: "KR" },
-      { label: "India", value: "IN" },
-      { label: "China", value: "CN" },
-      { label: "Other", value: "OTHER" }
+    countryOptions,
+    sun: "Sun exposure (min/day)",
+    sunOptions: [
+      { label: "Under 15", value: "u15" },
+      { label: "15-30", value: "15-30" },
+      { label: "30-60", value: "30-60" },
+      { label: "60+", value: "60+" }
+    ],
+    sunscreen: "Sunscreen use",
+    sunscreenOptions: [
+      { label: "Rarely", value: "rarely" },
+      { label: "Sometimes", value: "sometimes" },
+      { label: "Daily", value: "daily" }
+    ],
+    femaleTitle: "Female health context",
+    reproStatus: "Pregnancy / breastfeeding status",
+    reproStatusOptions: [
+      { label: "None", value: "none" },
+      { label: "Trying to conceive", value: "ttc" },
+      { label: "Pregnant", value: "pregnant" },
+      { label: "Breastfeeding", value: "breastfeeding" }
+    ],
+    menopause: "Menopause stage",
+    menopauseOptions: [
+      { label: "Pre-menopause", value: "pre" },
+      { label: "Perimenopause", value: "peri" },
+      { label: "Post-menopause", value: "post" },
+      { label: "Unsure", value: "unsure" }
+    ],
+    flow: "Menstrual flow",
+    flowOptions: [
+      { label: "No periods", value: "none" },
+      { label: "Light", value: "light" },
+      { label: "Moderate", value: "moderate" },
+      { label: "Heavy", value: "heavy" }
+    ]
+  },
+  badges: ["V3 assessment", "Safety context captured", "AI powered"],
+  coach: {
+    allergies: "Allergies and avoidance answers are passed through to formulation so the AI can explain relevant cautions.",
+    foodFrequency: "Food frequency improves micronutrient gap estimates without adding food matching back into the active product engine.",
+    goals: "Choose up to three. The formulation uses these as priorities rather than trying to optimise everything equally.",
+    labs: "Units matter. We keep the number and unit together before sending data to AI.",
+    medications: "This is not for diagnosis. It gives the AI and deterministic safety layer the context needed to add cautions.",
+    precision: "These optional fields move the last 20% of the precision meter.",
+    sex: "Sex and reproductive context affect dose caution, iron logic, and product audience filtering.",
+    sun: "Skin tone, sun, and sunscreen help estimate vitamin D context more honestly."
+  },
+  common: {
+    optional: "Optional",
+    required: "Required"
+  },
+  daily: {
+    title: "Your daily life",
+    subtitle: "This turns the formula from a generic stack into something that fits your routine.",
+    sleepHrs: "Sleep per night (hours)",
+    sleepOptions: [
+      { label: "Under 5", value: "u5" },
+      { label: "5-6", value: "5-6" },
+      { label: "6-7", value: "6-7" },
+      { label: "7-8", value: "7-8" },
+      { label: "8-9", value: "8-9" },
+      { label: "9+", value: "9+" }
+    ],
+    energy: "Energy level",
+    energyOptions: [
+      { label: "Drained", value: "drained", tone: "Low" },
+      { label: "Low", value: "low", tone: "Low" },
+      { label: "OK", value: "ok", tone: "Mid" },
+      { label: "Good", value: "good", tone: "High" },
+      { label: "Excellent", value: "excellent", tone: "High" }
     ],
     activity: "Activity level",
     activityOptions: [
-      { label: "Mostly sitting", value: "sedentary" },
+      { label: "Mostly sitting", value: "sitting" },
       { label: "Light", value: "light" },
       { label: "Moderate", value: "moderate" },
       { label: "Active", value: "active" },
       { label: "Athlete", value: "athlete" }
     ],
-    build: "My current build",
-    buildOptions: [
-      { label: "Slim", value: "slim" },
-      { label: "Average", value: "average" },
-      { label: "Overweight", value: "overweight" },
-      { label: "Muscular", value: "muscular" }
-    ]
-  },
-  badges: ["120+ ingredients", "Private and secure", "AI powered"],
-  common: {
-    required: "Required"
-  },
-  conditions: {
-    title: "Known health considerations",
-    prompt: "Anything we should account for? Select all that apply.",
-    options: [
+    stress: "Stress level",
+    stressOptions: [
+      { label: "Very low", value: "verylow", tone: "Low" },
+      { label: "Low", value: "low", tone: "Low" },
+      { label: "Moderate", value: "moderate", tone: "Mid" },
+      { label: "High", value: "high", tone: "High" },
+      { label: "Extreme", value: "extreme", tone: "High" }
+    ],
+    digestion: "Digestion",
+    digestionOptions: [
+      { label: "No issue", value: "none" },
+      { label: "Bloating", value: "bloating" },
+      { label: "Constipation", value: "constipation" },
+      { label: "Loose stools", value: "loose" }
+    ],
+    digCondition: "Digestive condition",
+    digConditionOptions: [
       { label: "None", value: "none" },
-      { label: "High blood pressure", value: "hbp" },
-      { label: "Blood sugar support", value: "blood-sugar" },
-      { label: "Thyroid support", value: "thyroid" },
-      { label: "Cholesterol support", value: "cholesterol" },
-      { label: "Joint support", value: "joints" },
-      { label: "Autoimmune considerations", value: "autoimmune" },
-      { label: "Digestive condition", value: "digestive" },
-      { label: "Bone density support", value: "bone" },
-      { label: "Mood support", value: "mood" }
+      { label: "IBS", value: "ibs" },
+      { label: "Celiac", value: "celiac" },
+      { label: "IBD", value: "ibd" },
+      { label: "Bariatric surgery", value: "bariatric" }
+    ],
+    smoking: "Smoking",
+    smokingOptions: [
+      { label: "Never", value: "never" },
+      { label: "Ex >5 years", value: "ex5+" },
+      { label: "Ex <5 years", value: "ex5" },
+      { label: "Occasional", value: "occasional" },
+      { label: "Daily", value: "daily" }
+    ],
+    alcohol: "Alcohol (drinks/week)",
+    alcoholOptions: [
+      { label: "None", value: "none" },
+      { label: "1-3", value: "1-3" },
+      { label: "4-7", value: "4-7" },
+      { label: "8+", value: "8+" }
+    ],
+    caffeine: "Caffeine (cups/day)",
+    caffeineOptions: [
+      { label: "None", value: "none" },
+      { label: "1", value: "1" },
+      { label: "2-3", value: "2-3" },
+      { label: "4+", value: "4+" }
     ]
   },
   fixedAction: {
-    complete: "All essentials answered - ready to generate.",
+    complete: "Ready to generate.",
     generate: "Generate my health score",
-    remaining: (count) =>
-      `${count} required question${count === 1 ? "" : "s"} remaining`
+    remaining: (count) => `${count} context point${count === 1 ? "" : "s"} not answered`
   },
-  goals: {
-    title: "Goals",
-    prompt: "Primary health goals",
-    hint: "Pick up to 3",
-    options: [
-      { label: "More energy", value: "energy" },
-      { label: "Better sleep", value: "sleep" },
-      { label: "Brain / focus", value: "focus" },
-      { label: "Longevity", value: "longevity" },
-      { label: "Immunity", value: "immune" },
-      { label: "Fitness / VO2", value: "fitness" },
-      { label: "Weight loss", value: "weight" },
-      { label: "Mood / calm", value: "mood" },
-      { label: "Heart health", value: "heart" },
-      { label: "Joints / bones", value: "joints" },
-      { label: "Skin / hair", value: "skin" },
-      { label: "Hormones", value: "hormones" }
-    ]
-  },
-  hero: {
-    title: "Your supplement formulation, personalised by AI",
-    description:
-      "Answer honestly. The more accurate you are, the more precise your formulation brief becomes.",
-    time: "About 4 minutes"
-  },
-  lifestyle: {
-    title: "Food, drinks, and habits",
+  food: {
+    title: "Food & nutrition",
+    subtitle: "Food context sharpens the supplement brief, even while product matching remains supplement-only.",
     diet: "Diet pattern",
     dietOptions: [
-      { label: "None", value: "none" },
-      { label: "Processed", value: "western" },
+      { label: "No pattern", value: "none" },
+      { label: "Processed", value: "processed" },
       { label: "Balanced", value: "balanced" },
       { label: "Whole foods", value: "whole" },
       { label: "Mediterranean", value: "mediterranean" },
       { label: "Plant-based", value: "plant" },
       { label: "Vegan", value: "vegan" },
-      { label: "Carnivore", value: "keto" }
+      { label: "Carnivore", value: "carnivore" }
     ],
-    foodAllergens: "Food allergies",
-    foodAllergenOptions: [
+    frequency: "How often do you eat...",
+    frequencyTitles: {
+      dairy: "Dairy (servings/day)",
+      eggs: "Eggs",
+      fish: "Fatty fish",
+      fruitveg: "Fruit & veg (servings/day)",
+      legumes: "Legumes / nuts",
+      redmeat: "Red meat (servings/week)"
+    },
+    frequencyOptions: {
+      dairy: [
+        { label: "Never", value: "never" },
+        { label: "1-2", value: "1-2" },
+        { label: "3+", value: "3+" }
+      ],
+      eggs: [
+        { label: "Rarely", value: "rare" },
+        { label: "Weekly", value: "weekly" },
+        { label: "Most days", value: "most" }
+      ],
+      fish: [
+        { label: "Never", value: "never" },
+        { label: "Rarely", value: "rare" },
+        { label: "Weekly", value: "once" },
+        { label: "Often", value: "often" }
+      ],
+      fruitveg: [
+        { label: "Not daily", value: "notdaily" },
+        { label: "1-2", value: "1-2" },
+        { label: "3+", value: "3+" }
+      ],
+      legumes: [
+        { label: "Rarely", value: "rare" },
+        { label: "Weekly", value: "weekly" },
+        { label: "Most days", value: "most" }
+      ],
+      redmeat: [
+        { label: "Never", value: "never" },
+        { label: "1-2", value: "1-2" },
+        { label: "3+", value: "3+" }
+      ]
+    },
+    allergies: "Food allergies",
+    allergyOptions: [
       { label: "None", value: "none" },
       { label: "Milk", value: "milk" },
       { label: "Eggs", value: "eggs" },
       { label: "Fish", value: "fish" },
       { label: "Shellfish", value: "shellfish" },
-      { label: "Tree nuts", value: "tree_nuts" },
+      { label: "Tree nuts", value: "treenuts" },
       { label: "Peanuts", value: "peanuts" },
       { label: "Wheat", value: "wheat" },
       { label: "Soy", value: "soy" },
       { label: "Sesame", value: "sesame" }
     ],
-    foodAvoidances: "Foods to avoid or dislike",
-    foodAvoidancesPlaceholder: "e.g. tofu, green tea, spicy fermented foods",
-    foodSafetyBody:
-      "MattaNutra food guidance is for general wellness support only and does not replace medical advice. Tell us about allergies, medical conditions, medications, and dietary restrictions before receiving recommendations.",
-    foodSafetyCheckbox:
-      "I confirm I have disclosed relevant allergies, medical conditions, medications, and dietary restrictions.",
-    fish: "Fatty fish / week",
-    fishOptions: [
-      { label: "Never", value: "never" },
-      { label: "Rarely", value: "rarely" },
-      { label: "Once", value: "weekly" },
-      { label: "Often", value: "2-3pw" },
-      { label: "Daily", value: "daily" }
+    avoidNote: "Foods to avoid or dislike",
+    avoidPlaceholder: "e.g. no pork, dislike strong fishy taste",
+    disclosureTitle: "I confirm I have disclosed relevant allergies, conditions, medications and dietary restrictions.",
+    disclosureBody: "MattaNutra guidance supports general wellness and does not replace medical advice."
+  },
+  goals: {
+    title: "Your goals & how you feel",
+    subtitle: "Your top priorities and current symptoms guide the order of the formulation.",
+    goals: "Primary health goals",
+    goalHint: "Pick up to 3",
+    goalOptions: [
+      { label: "Energy", value: "energy" },
+      { label: "Sleep", value: "sleep" },
+      { label: "Focus", value: "focus" },
+      { label: "Longevity", value: "longevity" },
+      { label: "Immunity", value: "immunity" },
+      { label: "Fitness", value: "fitness" },
+      { label: "Weight", value: "weight" },
+      { label: "Mood", value: "mood" },
+      { label: "Heart", value: "heart" },
+      { label: "Joints", value: "joints" },
+      { label: "Skin", value: "skin" },
+      { label: "Hormones", value: "hormones" }
     ],
-    sun: "Sun exposure (min)",
-    sunOptions: [
-      { label: "Under 15", value: "minimal" },
-      { label: "15-30", value: "low" },
-      { label: "30-60", value: "moderate" },
-      { label: "60+", value: "high" }
-    ],
-    smoke: "Smoking",
-    smokeOptions: [
-      { label: "Never", value: "never" },
-      { label: "Ex (>5 yrs)", value: "exlong" },
-      { label: "Ex (<5 yrs)", value: "exrecent" },
-      { label: "Occasional", value: "occasional" },
-      { label: "Daily", value: "daily" }
-    ],
-    alcohol: "Alcoholic drinks / week",
-    alcoholOptions: [
-      { label: "None", value: "none" },
-      { label: "1-3", value: "low" },
-      { label: "4-7", value: "moderate" },
-      { label: "8+", value: "high" }
-    ],
-    coffee: "Caffeine cups per day",
-    coffeeOptions: [
-      { label: "None", value: "none" },
-      { label: "1", value: "1" },
-      { label: "2-3", value: "2-3" },
-      { label: "4+", value: "4+" }
-    ],
-    meds: "Medications?",
-    medsHint:
-      "Used for safety checks only.",
-    medsOptions: [
-      { label: "None", value: "no" },
-      { label: "Yes", value: "yes" }
-    ],
-    medType: "Medication type(s)",
-    medTypeOptions: [
-      { label: "Statin", value: "statin" },
-      { label: "Metformin", value: "metformin" },
-      { label: "PPI / Omeprazole", value: "ppi" },
-      { label: "Contraceptive pill", value: "ocp" },
-      { label: "Antidepressant", value: "antidepressant" },
-      { label: "Blood thinner / aspirin", value: "blood-thinner" },
-      { label: "Thyroid medication", value: "thyroid" },
-      { label: "Blood pressure", value: "bp" },
-      { label: "Corticosteroid", value: "steroid" },
-      { label: "Other", value: "other" }
-    ],
-    supps: "Supplements?",
-    suppsOptions: [
-      { label: "None", value: "none" },
-      { label: "Basic multi", value: "basic" },
-      { label: "D3 / Omega-3", value: "several" },
-      { label: "Several targeted", value: "many" }
-    ],
-    lifestage: "My hormonal stage",
-    lifestageOptions: [
-      { label: "Regular cycle", value: "regular" },
-      { label: "Perimenopause", value: "peri" },
-      { label: "Post-menopause", value: "post" },
-      { label: "Pregnant / nursing", value: "pregnant" }
+    symptoms: "Current symptoms",
+    symptomHint: "Select all that apply. Choose Feeling great by itself if nothing stands out.",
+    symptomOptions: [
+      { label: "Fatigue", value: "fatigue" },
+      { label: "Brain fog", value: "brainfog" },
+      { label: "Mood", value: "mood" },
+      { label: "Joint pain", value: "joint" },
+      { label: "Digestion", value: "digestion" },
+      { label: "Poor sleep", value: "sleep" },
+      { label: "Stress", value: "stress" },
+      { label: "Skin", value: "skin" },
+      { label: "Hair loss", value: "hair" },
+      { label: "Low libido", value: "libido" },
+      { label: "Frequent colds", value: "colds" },
+      { label: "Feeling great", value: "great" }
     ]
   },
+  hero: {
+    title: "Your Right Amount Assessment",
+    description: "Answer honestly. Your formula precision climbs as we capture the context that matters.",
+    time: "About 4 minutes"
+  },
   precision: {
-    title: "Precision",
-    helper:
-      "Optional. Answer any or all. These details can sharpen your formulation brief.",
+    title: "Your preferences",
+    subtitle: "Set practical constraints first, then add optional precision if you have it.",
+    budget: "Monthly supplement budget (THB)",
+    budgetOptions: [
+      { label: "Under 1,000", value: "u1000" },
+      { label: "1,000-2,500", value: "1000-2500" },
+      { label: "2,500-5,000", value: "2500-5000" },
+      { label: "5,000+", value: "5000+" }
+    ],
+    maxPills: "Max pills/capsules (per day)",
+    maxPillsOptions: [
+      { label: "1-3", value: "1-3" },
+      { label: "4-6", value: "4-6" },
+      { label: "7-10", value: "7-10" },
+      { label: "No limit", value: "nolimit" }
+    ],
+    form: "Preferred form",
+    formOptions: [
+      { label: "Capsules", value: "capsules" },
+      { label: "Powder / shake", value: "powder" },
+      { label: "Gummies", value: "gummies" },
+      { label: "Mixed is fine", value: "mixed" }
+    ],
+    optionalBanner: "Optional precision tier",
+    optionalBody: "Add any details you know to move the final 20% of precision.",
+    protein: "Protein (g/kg/day)",
+    proteinOptions: [
+      { label: "Under 1", value: "u1" },
+      { label: "1-1.5", value: "1-1.5" },
+      { label: "1.5-2", value: "1.5-2" },
+      { label: "Over 2", value: "2+" }
+    ],
     family: "Family history",
     familyOptions: [
       { label: "Heart disease", value: "heart" },
-      { label: "Alzheimer's", value: "alzheimer" },
+      { label: "Alzheimer's", value: "alzheimers" },
       { label: "Diabetes", value: "diabetes" },
       { label: "Cancer", value: "cancer" },
-      { label: "Osteoporosis", value: "bones" },
+      { label: "Osteoporosis", value: "osteoporosis" },
       { label: "None", value: "none" }
     ],
-    protein: "Protein / day",
-    proteinOptions: [
-      { label: "Under 1g / kg", value: "low" },
-      { label: "1-1.5g / kg", value: "mid" },
-      { label: "1.5-2g / kg", value: "good" },
-      { label: "Over 2g / kg", value: "high" }
-    ],
-    sleep: "Wake refreshed?",
-    sleepOptions: [
-      { label: "Awful", value: "1", tone: "Low" },
-      { label: "Poor", value: "2", tone: "Low" },
-      { label: "OK", value: "3", tone: "Mid" },
-      { label: "Good", value: "4", tone: "High" },
-      { label: "Great", value: "5", tone: "High" }
-    ],
-    stress: "Stress level",
-    stressOptions: [
-      { label: "Very low", value: "1", tone: "Low" },
-      { label: "Low", value: "2", tone: "Low" },
-      { label: "Moderate", value: "3", tone: "Mid" },
-      { label: "High", value: "4", tone: "High" },
-      { label: "Extreme", value: "5", tone: "High" }
-    ],
-    stressSource: "Stress source",
-    stressSourceOptions: [
-      { label: "None", value: "none" },
-      { label: "Work", value: "work" },
-      { label: "Anxiety", value: "anxiety" },
-      { label: "Burnout", value: "burnout" },
-      { label: "Health", value: "health" },
-      { label: "Life events", value: "life" }
-    ],
-    gut: "Digestion",
-    gutOptions: [
-      { label: "No issues", value: "great" },
-      { label: "Bloating", value: "bloat" },
-      { label: "Constipation", value: "constipation" },
-      { label: "Loose stools", value: "loose" },
-      { label: "IBS / mixed", value: "ibs" }
-    ],
-    wearable: "Fitness tracker?",
-    wearableOptions: [
+    tracker: "Fitness tracker",
+    trackerOptions: [
       { label: "No wearable", value: "none" },
       { label: "Garmin", value: "garmin" },
       { label: "Oura", value: "oura" },
@@ -709,522 +796,356 @@ const en: Copy = {
       { label: "Fitbit", value: "fitbit" },
       { label: "Other", value: "other" }
     ],
-    vo2Known: "Know your VO2 max?",
-    vo2KnownOptions: [
-      { label: "No, estimate it", value: "no" },
-      { label: "Yes", value: "yes" }
-    ],
-    vo2Max: "VO2 max",
-    vo2Proxy: "Cardio fitness",
-    vo2ProxyOptions: [
-      { label: "Winded on stairs", value: "winded" },
-      { label: "Brisk walk is hard", value: "moderate" },
-      { label: "20-30 min moderate", value: "sustained" },
-      { label: "30+ min hard effort", value: "athlete" }
-    ],
-    labs: "My lab values, if I know them",
-    labFields: [
-      {
-        label: "Vitamin D",
-        value: "vitaminD",
-        placeholder: "",
-        hint: "ng/mL"
-      },
-      { label: "Vitamin B12", value: "b12", placeholder: "", hint: "pg/mL" },
-      { label: "Ferritin", value: "ferritin", placeholder: "", hint: "ng/mL" },
-      { label: "HbA1c", value: "hba1c", placeholder: "", hint: "%" },
-      {
-        label: "Omega-3 Index",
-        value: "omega3",
-        placeholder: "",
-        hint: "%"
-      },
-      {
-        label: "Homocysteine",
-        value: "homocysteine",
-        placeholder: "",
-        hint: "umol/L"
-      },
-      {
-        label: "Average HRV",
-        value: "hrv",
-        placeholder: "",
-        hint: "ms"
-      }
-    ]
-  },
-  preferences: {
-    title: "My preferences",
-    budget: "Monthly supplement budget",
-    budgetOptions: [
-      { label: "Under ฿1,000", value: "low" },
-      { label: "฿1,000-2,500", value: "mid" },
-      { label: "฿2,500-5,000", value: "good" },
-      { label: "฿5,000+", value: "high" }
-    ],
-    pills: "Max pills / capsules per day",
-    pillsOptions: [
-      { label: "1-3", value: "1-3" },
-      { label: "4-6", value: "4-6" },
-      { label: "7-10", value: "7-10" },
-      { label: "No limit", value: "unlimited" }
-    ],
-    form: "Preferred form",
-    formOptions: [
-      { label: "Capsules", value: "capsules" },
-      { label: "Powder / shake", value: "powder" },
-      { label: "Gummies", value: "gummies" },
-      { label: "Mixed is fine", value: "mixed" }
-    ]
+    vo2: "VO2 max",
+    hrv: "Average HRV",
+    labs: "Recent lab values",
+    labsHint: "Only if you have them. Units matter.",
+    labFields
   },
   progress: {
-    start: "Answer essentials to unlock your brief.",
-    complete: "All essentials complete",
-    status: (done, total) => `${done} of ${total} essentials answered`
+    start: "Every answer sharpens your personalised formula. Let's begin.",
+    complete: "Formula precision complete",
+    label: "Formula precision",
+    markEnd: "Precision",
+    markMiddle: "Essentials",
+    markStart: "Start",
+    nearComplete: "Essentials complete. The optional precision tier can take you to 100%.",
+    optional: "Optional precision",
+    partial: (progress) => `You're at ${progress}% - keep going to complete the essentials.`
   },
-  sleepBasics: {
-    title: "Sleep, energy, and activity",
-    average: "Sleep (hours)",
-    options: [
-      { label: "Under 5", value: "under-5" },
-      { label: "5-6", value: "5-6" },
-      { label: "6-7", value: "6-7" },
-      { label: "7-8", value: "7-8" },
-      { label: "8-9", value: "8-9" },
-      { label: "9+", value: "9-plus" }
-    ]
-  },
-  symptoms: {
-    title: "Symptoms",
-    prompt: "Current symptoms",
-    hint: "Select all that apply",
-    great: { label: "Feeling great", value: "great" },
-    options: [
-      { label: "Fatigue", value: "fatigue" },
-      { label: "Brain fog", value: "brain" },
-      { label: "Mood", value: "mood" },
-      { label: "Joint pain", value: "joints" },
-      { label: "Digestion", value: "digestion" },
-      { label: "Poor sleep", value: "sleep" },
-      { label: "Stress / anxiety", value: "stress" },
-      { label: "Skin", value: "skin" },
-      { label: "Hair loss", value: "hair" },
-      { label: "Low libido", value: "libido" },
-      { label: "Frequent colds", value: "cold" }
+  safety: {
+    title: "Medications & safety",
+    subtitle: "These answers are used for cautions and deterministic safety checks.",
+    medications: "Do you take any medications?",
+    medicationHint: "Used for cautions only.",
+    medicationOptions: [
+      { label: "None", value: "none" },
+      { label: "Yes", value: "yes" }
     ],
-    energy: "Energy level",
-    energyOptions: [
-      { label: "Drained", value: "1", tone: "Low" },
-      { label: "Low", value: "2", tone: "Low" },
-      { label: "OK", value: "3", tone: "Mid" },
-      { label: "Good", value: "4", tone: "High" },
-      { label: "Excellent", value: "5", tone: "High" }
+    medicationType: "Medication type(s)",
+    medicationTypeOptions: [
+      { label: "Statin", value: "statin" },
+      { label: "Metformin", value: "metformin" },
+      { label: "PPI / Omeprazole", value: "ppi" },
+      { label: "Diuretic", value: "diuretic" },
+      { label: "Contraceptive pill", value: "contraceptive" },
+      { label: "Antidepressant", value: "antidepressant" },
+      { label: "Blood thinner / aspirin", value: "bloodthinner" },
+      { label: "Thyroid medication", value: "thyroid" },
+      { label: "Blood pressure", value: "bp" },
+      { label: "Corticosteroid", value: "corticosteroid" },
+      { label: "Other", value: "other" }
+    ],
+    otherMedPlaceholder: "Please describe the medication and what it is for",
+    suppAllergies: "Supplement ingredient allergies or intolerances",
+    suppAllergyOptions: [
+      { label: "None known", value: "none" },
+      { label: "Iodine", value: "iodine" },
+      { label: "Iron", value: "iron" },
+      { label: "CoQ10", value: "coq10" },
+      { label: "B vitamins", value: "bvit" },
+      { label: "Soy-derived", value: "soyderived" },
+      { label: "Shellfish-derived", value: "shellfishderived" },
+      { label: "Other", value: "other" }
+    ],
+    otherSuppPlaceholder: "Please describe the ingredient you react to",
+    kidney: "Kidney function",
+    kidneyOptions: [
+      { label: "No known issue", value: "normal" },
+      { label: "Reduced function", value: "reduced" },
+      { label: "Kidney disease", value: "disease" }
+    ],
+    liver: "Liver condition",
+    liverOptions: [
+      { label: "No known issue", value: "normal" },
+      { label: "Liver condition", value: "condition" }
+    ],
+    surgery: "Surgery in the next 30 days?",
+    surgeryOptions: [
+      { label: "No", value: "no" },
+      { label: "Yes", value: "yes" }
+    ],
+    antibiotics: "Antibiotics in the last 3 months?",
+    antibioticsOptions: [
+      { label: "No", value: "no" },
+      { label: "Yes", value: "yes" }
+    ],
+    supplements: "Supplements you take now",
+    supplementsOptions: [
+      { label: "None", value: "none" },
+      { label: "Basic multi", value: "basic" },
+      { label: "D3 / Omega-3", value: "d3omega" },
+      { label: "Several targeted", value: "targeted" }
     ]
-  }
+  },
+  sectionNotes: [
+    "There are no right or wrong answers here, only true ones. The more honestly you answer, the more exactly your formula fits — and the safer it is alongside anything you already take.",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  stagePhases: ["Foundation", "Foundation", "Foundation", "Foundation", "Safety", "Personalise"],
+  stages: ["About you", "Goals", "Daily life", "Food", "Safety", "Precision"]
 };
 
 const th: Copy = {
   ...en,
   about: {
     ...en.about,
-    title: "เกี่ยวกับคุณ",
-    name: "ชื่อ",
+    title: "ข้อมูลพื้นฐานของคุณ",
+    subtitle: "เริ่มด้วยการแตะไม่กี่ครั้ง เพื่อวางพื้นฐานให้สูตรส่วนถัดไปแม่นยำขึ้น",
     sex: "เพศ",
     sexOptions: [
       { label: "ชาย", value: "male" },
       { label: "หญิง", value: "female" }
     ],
     age: "อายุ",
-    ageOptions: en.about.ageOptions,
     height: "ส่วนสูง",
     weight: "น้ำหนัก",
     skin: "สีผิว",
-    skinOptions: [
-      { label: "สีผิวระดับ 1", value: "I" },
-      { label: "สีผิวระดับ 2", value: "II" },
-      { label: "สีผิวระดับ 3", value: "III" },
-      { label: "สีผิวระดับ 4", value: "IV" },
-      { label: "สีผิวระดับ 5", value: "V" },
-      { label: "สีผิวระดับ 6", value: "VI" }
-    ],
     country: "ประเทศ",
-    countryOptions: [
-      { label: "ไทย", value: "TH" },
-      { label: "สิงคโปร์", value: "SG" },
-      { label: "มาเลเซีย", value: "MY" },
-      { label: "อินโดนีเซีย", value: "ID" },
-      { label: "ฟิลิปปินส์", value: "PH" },
-      { label: "เวียดนาม", value: "VN" },
-      { label: "เมียนมา", value: "MM" },
-      { label: "สหรัฐอเมริกา", value: "US" },
-      { label: "ออสเตรเลีย", value: "AU" },
-      { label: "สหราชอาณาจักร", value: "GB" },
-      { label: "แคนาดา", value: "CA" },
-      { label: "เยอรมนี", value: "DE" },
-      { label: "ฝรั่งเศส", value: "FR" },
-      { label: "ญี่ปุ่น", value: "JP" },
-      { label: "เกาหลีใต้", value: "KR" },
-      { label: "อินเดีย", value: "IN" },
-      { label: "จีน", value: "CN" },
-      { label: "อื่นๆ", value: "OTHER" }
-    ],
-    activity: "ระดับกิจกรรม",
-    activityOptions: [
-      { label: "นั่งเป็นส่วนใหญ่", value: "sedentary" },
-      { label: "เบา", value: "light" },
-      { label: "ปานกลาง", value: "moderate" },
-      { label: "แอคทีฟ", value: "active" },
-      { label: "นักกีฬา", value: "athlete" }
-    ],
-    build: "รูปร่างปัจจุบันของฉัน",
-    buildOptions: [
-      { label: "ผอม", value: "slim" },
-      { label: "ปกติ", value: "average" },
-      { label: "น้ำหนักเกิน", value: "overweight" },
-      { label: "มีกล้ามเนื้อ", value: "muscular" }
-    ]
+    sun: "การได้รับแดด",
+    sunscreen: "การใช้กันแดด",
+    femaleTitle: "บริบทสุขภาพผู้หญิง",
+    reproStatus: "สถานะตั้งครรภ์ / ให้นม",
+    menopause: "ช่วงวัยหมดประจำเดือน",
+    flow: "ปริมาณประจำเดือน"
   },
-  badges: ["ส่วนผสม 120+", "เป็นส่วนตัวและปลอดภัย", "ขับเคลื่อนด้วย AI"],
+  badges: ["แบบประเมิน V3", "เก็บบริบทข้อควรระวัง", "ขับเคลื่อนด้วย AI"],
+  coach: {
+    allergies: "ข้อมูลแพ้และหลีกเลี่ยงจะส่งต่อให้ AI เพื่ออธิบายข้อควรระวังที่เกี่ยวข้อง",
+    foodFrequency: "ความถี่อาหารช่วยประเมินช่องว่างสารอาหาร โดยไม่เปิด food matching ในระบบผลิตภัณฑ์ตอนนี้",
+    goals: "เลือกได้สูงสุด 3 ข้อ ระบบจะใช้เป็นลำดับความสำคัญ",
+    labs: "หน่วยสำคัญมาก เราเก็บตัวเลขพร้อมหน่วยก่อนส่งให้ AI",
+    medications: "ไม่ใช่การวินิจฉัย แต่ช่วยให้ AI และระบบตรวจความปลอดภัยเพิ่มข้อควรระวังได้",
+    precision: "ช่องเสริมเหล่านี้เพิ่มความแม่นยำ 20% สุดท้าย",
+    sex: "เพศและบริบทการตั้งครรภ์มีผลต่อข้อควรระวัง ธาตุเหล็ก และการกรองสินค้า",
+    sun: "สีผิว แดด และกันแดดช่วยประเมินบริบทวิตามินดีอย่างซื่อตรงขึ้น"
+  },
   common: {
+    optional: "ไม่บังคับ",
     required: "จำเป็น"
   },
-  conditions: {
-    title: "สิ่งที่ควรคำนึงด้านสุขภาพ",
-    prompt: "มีเรื่องใดที่ควรคำนึงถึงหรือไม่? เลือกได้ทุกข้อที่ตรงกับคุณ",
-    options: [
-      { label: "ไม่มี", value: "none" },
-      { label: "ความดันโลหิตสูง", value: "hbp" },
-      { label: "ดูแลระดับน้ำตาล", value: "blood-sugar" },
-      { label: "ดูแลไทรอยด์", value: "thyroid" },
-      { label: "ดูแลคอเลสเตอรอล", value: "cholesterol" },
-      { label: "ดูแลข้อต่อ", value: "joints" },
-      { label: "ข้อควรระวังภูมิคุ้มกัน", value: "autoimmune" },
-      { label: "ระบบย่อยอาหาร", value: "digestive" },
-      { label: "ดูแลความหนาแน่นกระดูก", value: "bone" },
-      { label: "ดูแลอารมณ์", value: "mood" }
-    ]
-  },
   fixedAction: {
-    complete: "ตอบคำถามสำคัญครบแล้ว พร้อมสร้างบรีฟ",
+    complete: "พร้อมสร้าง HealthScore",
     generate: "สร้าง HealthScore ของฉัน",
-    remaining: (count) => `เหลือคำถามจำเป็น ${count} ข้อ`
-  },
-  goals: {
-    title: "เป้าหมาย",
-    prompt: "เป้าหมายสุขภาพหลัก",
-    hint: "เลือกได้สูงสุด 3 ข้อ",
-    options: [
-      { label: "พลังงานมากขึ้น", value: "energy" },
-      { label: "นอนหลับดีขึ้น", value: "sleep" },
-      { label: "สมองและสมาธิ", value: "focus" },
-      { label: "อายุยืน", value: "longevity" },
-      { label: "สุขภาพภูมิคุ้มกัน", value: "immune" },
-      { label: "ฟิตเนสและ VO2", value: "fitness" },
-      { label: "ลดน้ำหนัก", value: "weight" },
-      { label: "อารมณ์และความสงบ", value: "mood" },
-      { label: "สุขภาพหัวใจ", value: "heart" },
-      { label: "ข้อต่อและกระดูก", value: "joints" },
-      { label: "ผิวและผม", value: "skin" },
-      { label: "สมดุลฮอร์โมน", value: "hormones" }
-    ]
+    remaining: (count) => `ยังไม่ได้ตอบข้อมูลบริบท ${count} ข้อ`
   },
   hero: {
-    title: "สูตรอาหารเสริมของคุณ ปรับให้เหมาะด้วย AI",
-    description:
-      "ตอบตามจริง ยิ่งข้อมูลแม่นยำ บรีฟสูตรอาหารเสริมของคุณก็ยิ่งเฉพาะเจาะจง",
+    title: "แบบประเมิน Right Amount ของคุณ",
+    description: "ตอบตามจริง ความแม่นยำของสูตรจะเพิ่มขึ้นเมื่อเราเก็บบริบทที่สำคัญครบขึ้น",
     time: "ประมาณ 4 นาที"
   },
-  lifestyle: {
-    ...en.lifestyle,
-    title: "อาหาร เครื่องดื่ม และพฤติกรรม",
-    diet: "รูปแบบอาหาร",
-    dietOptions: [
-      { label: "ไม่มี", value: "none" },
-      { label: "แปรรูป", value: "western" },
-      { label: "สมดุล", value: "balanced" },
-      { label: "อาหารธรรมชาติ", value: "whole" },
-      { label: "เมดิเตอร์เรเนียน", value: "mediterranean" },
-      { label: "เน้นพืช", value: "plant" },
-      { label: "วีแกน", value: "vegan" },
-      { label: "คาร์นิวอร์", value: "keto" }
-    ],
-    foodAllergens: "แพ้อาหาร",
-    foodAllergenOptions: [
-      { label: "ไม่มี", value: "none" },
-      { label: "นม", value: "milk" },
-      { label: "ไข่", value: "eggs" },
-      { label: "ปลา", value: "fish" },
-      { label: "หอยและกุ้งปู", value: "shellfish" },
-      { label: "ถั่วเปลือกแข็ง", value: "tree_nuts" },
-      { label: "ถั่วลิสง", value: "peanuts" },
-      { label: "ข้าวสาลี", value: "wheat" },
-      { label: "ถั่วเหลือง", value: "soy" },
-      { label: "งา", value: "sesame" }
-    ],
-    foodAvoidances: "อาหารที่ไม่ต้องการหรือไม่ชอบ",
-    foodAvoidancesPlaceholder: "เช่น เต้าหู้ ชาเขียว อาหารหมักรสจัด",
-    foodSafetyBody:
-      "คำแนะนำอาหารของ MattaNutra เป็นข้อมูลเพื่อสุขภาพทั่วไป ไม่ใช่คำแนะนำทางการแพทย์ กรุณาแจ้งการแพ้อาหาร โรค ยา และข้อจำกัดด้านอาหารก่อนรับคำแนะนำ",
-    foodSafetyCheckbox:
-      "ฉันยืนยันว่าได้แจ้งข้อมูลการแพ้อาหาร โรค ยา และข้อจำกัดด้านอาหารที่เกี่ยวข้องแล้ว",
-    fish: "ปลามัน / สัปดาห์",
-    fishOptions: [
-      { label: "ไม่เคย", value: "never" },
-      { label: "นานๆ ครั้ง", value: "rarely" },
-      { label: "1 ครั้ง", value: "weekly" },
-      { label: "บ่อย", value: "2-3pw" },
-      { label: "ทุกวัน", value: "daily" }
-    ],
-    sun: "แดด (นาที)",
-    sunOptions: [
-      { label: "น้อยกว่า 15", value: "minimal" },
-      { label: "15-30", value: "low" },
-      { label: "30-60", value: "moderate" },
-      { label: "60+", value: "high" }
-    ],
-    smoke: "การสูบบุหรี่",
-    smokeOptions: [
-      { label: "ไม่เคย", value: "never" },
-      { label: "เลิก >5 ปี", value: "exlong" },
-      { label: "เลิก <5 ปี", value: "exrecent" },
-      { label: "เป็นครั้งคราว", value: "occasional" },
-      { label: "ทุกวัน", value: "daily" }
-    ],
-    alcohol: "แอลกอฮอล์ / สัปดาห์",
-    alcoholOptions: [
-      { label: "ไม่ดื่ม", value: "none" },
-      { label: "1-3", value: "low" },
-      { label: "4-7", value: "moderate" },
-      { label: "8+", value: "high" }
-    ],
-    coffee: "คาเฟอีน แก้วต่อวัน",
-    coffeeOptions: [
-      { label: "ไม่มี", value: "none" },
-      { label: "1", value: "1" },
-      { label: "2-3", value: "2-3" },
-      { label: "4+", value: "4+" }
-    ],
-    meds: "ใช้ยา?",
-    medsHint: "ใช้เพื่อตรวจความปลอดภัยเท่านั้น",
-    medsOptions: [
-      { label: "ไม่มี", value: "no" },
-      { label: "ใช่", value: "yes" }
-    ],
-    medType: "ประเภทยา",
-    medTypeOptions: [
-      { label: "ยากลุ่มสแตติน", value: "statin" },
-      { label: "เมตฟอร์มิน", value: "metformin" },
-      { label: "PPI / โอเมพราโซล", value: "ppi" },
-      { label: "ยาคุมกำเนิด", value: "ocp" },
-      { label: "ยาต้านซึมเศร้า", value: "antidepressant" },
-      { label: "ยาละลายลิ่มเลือด / แอสไพริน", value: "blood-thinner" },
-      { label: "ยาไทรอยด์", value: "thyroid" },
-      { label: "ยาความดัน", value: "bp" },
-      { label: "คอร์ติโคสเตียรอยด์", value: "steroid" },
-      { label: "อื่นๆ", value: "other" }
-    ],
-    supps: "อาหารเสริม?",
-    suppsOptions: [
-      { label: "ไม่มี", value: "none" },
-      { label: "มัลตวิตามินพื้นฐาน", value: "basic" },
-      { label: "D3 / โอเมก้า-3", value: "several" },
-      { label: "อาหารเสริมเฉพาะหลายตัว", value: "many" }
-    ],
-    lifestage: "ช่วงฮอร์โมนของฉัน",
-    lifestageOptions: [
-      { label: "รอบเดือนปกติ", value: "regular" },
-      { label: "ก่อนวัยหมดประจำเดือน", value: "peri" },
-      { label: "หลังวัยหมดประจำเดือน", value: "post" },
-      { label: "ตั้งครรภ์ / ให้นม", value: "pregnant" }
-    ]
-  },
-  precision: {
-    ...en.precision,
-    title: "ความแม่นยำ",
-    helper: "ไม่บังคับ ตอบเท่าที่ทราบ รายละเอียดเหล่านี้ช่วยให้บรีฟแม่นขึ้น",
-    family: "ประวัติครอบครัว",
-    familyOptions: [
-      { label: "โรคหัวใจ", value: "heart" },
-      { label: "อัลไซเมอร์", value: "alzheimer" },
-      { label: "เบาหวาน", value: "diabetes" },
-      { label: "มะเร็ง", value: "cancer" },
-      { label: "กระดูกพรุน", value: "bones" },
-      { label: "ไม่มี", value: "none" }
-    ],
-    protein: "โปรตีน / วัน",
-    proteinOptions: [
-      { label: "ต่ำกว่า 1g / kg", value: "low" },
-      { label: "1-1.5g / kg", value: "mid" },
-      { label: "1.5-2g / kg", value: "good" },
-      { label: "มากกว่า 2g / kg", value: "high" }
-    ],
-    sleep: "ตื่นแล้วสดชื่น?",
-    sleepOptions: [
-      { label: "แย่มาก", value: "1", tone: "Low" },
-      { label: "ไม่ดี", value: "2", tone: "Low" },
-      { label: "พอใช้", value: "3", tone: "Mid" },
-      { label: "ดี", value: "4", tone: "High" },
-      { label: "ดีมาก", value: "5", tone: "High" }
-    ],
-    stress: "ระดับความเครียด",
-    stressOptions: [
-      { label: "ต่ำมาก", value: "1", tone: "Low" },
-      { label: "ต่ำ", value: "2", tone: "Low" },
-      { label: "ปานกลาง", value: "3", tone: "Mid" },
-      { label: "สูง", value: "4", tone: "High" },
-      { label: "รุนแรงมาก", value: "5", tone: "High" }
-    ],
-    stressSource: "แหล่งความเครียด",
-    stressSourceOptions: [
-      { label: "ไม่มี", value: "none" },
-      { label: "งาน", value: "work" },
-      { label: "กังวล", value: "anxiety" },
-      { label: "หมดไฟ", value: "burnout" },
-      { label: "สุขภาพ", value: "health" },
-      { label: "เหตุการณ์ชีวิต", value: "life" }
-    ],
-    gut: "การย่อยอาหาร",
-    gutOptions: [
-      { label: "ไม่มีปัญหา", value: "great" },
-      { label: "ท้องอืด", value: "bloat" },
-      { label: "ท้องผูก", value: "constipation" },
-      { label: "ถ่ายเหลว", value: "loose" },
-      { label: "IBS / สลับกัน", value: "ibs" }
-    ],
-    wearable: "ใช้อุปกรณ์ติดตามฟิตเนส?",
-    wearableOptions: [
-      { label: "ไม่ใช้", value: "none" },
-      { label: "Garmin", value: "garmin" },
-      { label: "Oura", value: "oura" },
-      { label: "WHOOP", value: "whoop" },
-      { label: "Apple Watch", value: "apple" },
-      { label: "Fitbit", value: "fitbit" },
-      { label: "อื่นๆ", value: "other" }
-    ],
-    vo2Known: "ทราบ VO2 max?",
-    vo2KnownOptions: [
-      { label: "ไม่ทราบ", value: "no" },
-      { label: "ทราบ", value: "yes" }
-    ],
-    vo2Max: "VO2 max",
-    vo2Proxy: "ความฟิตคาร์ดิโอ",
-    vo2ProxyOptions: [
-      { label: "ขึ้นบันไดแล้วเหนื่อย", value: "winded" },
-      { label: "เดินเร็วแล้วพูดยาก", value: "moderate" },
-      { label: "ปานกลาง 20-30 นาที", value: "sustained" },
-      { label: "หนัก 30+ นาที", value: "athlete" }
-    ],
-    labs: "ค่าตรวจเลือด หากทราบ",
-    labFields: [
-      { label: "วิตามินดี", value: "vitaminD", placeholder: "", hint: "ng/mL" },
-      { label: "วิตามินบี12", value: "b12", placeholder: "", hint: "pg/mL" },
-      { label: "เฟอร์ริติน", value: "ferritin", placeholder: "", hint: "ng/mL" },
-      { label: "HbA1c", value: "hba1c", placeholder: "", hint: "%" },
-      { label: "ดัชนีโอเมก้า-3", value: "omega3", placeholder: "", hint: "%" },
-      {
-        label: "โฮโมซิสเทอีน",
-        value: "homocysteine",
-        placeholder: "",
-        hint: "umol/L"
-      },
-      {
-        label: "ค่า HRV เฉลี่ย",
-        value: "hrv",
-        placeholder: "",
-        hint: "ms"
-      }
-    ]
-  },
-  preferences: {
-    ...en.preferences,
-    title: "ความต้องการของฉัน",
-    budget: "งบอาหารเสริมต่อเดือน",
-    budgetOptions: [
-      { label: "ต่ำกว่า ฿1,000", value: "low" },
-      { label: "฿1,000-2,500", value: "mid" },
-      { label: "฿2,500-5,000", value: "good" },
-      { label: "฿5,000+", value: "high" }
-    ],
-    pills: "จำนวนเม็ด / แคปซูลสูงสุดต่อวัน",
-    pillsOptions: [
-      { label: "1-3", value: "1-3" },
-      { label: "4-6", value: "4-6" },
-      { label: "7-10", value: "7-10" },
-      { label: "ไม่จำกัด", value: "unlimited" }
-    ],
-    form: "รูปแบบที่ต้องการ",
-    formOptions: [
-      { label: "แคปซูล", value: "capsules" },
-      { label: "ผง / เชค", value: "powder" },
-      { label: "กัมมี่", value: "gummies" },
-      { label: "ผสมได้", value: "mixed" }
-    ]
-  },
   progress: {
-    start: "ตอบคำถามสำคัญเพื่อปลดล็อกบรีฟ",
-    complete: "ตอบคำถามสำคัญครบแล้ว",
-    status: (done, total) => `ตอบแล้ว ${done} จาก ${total} ข้อสำคัญ`
+    start: "ทุกคำตอบช่วยให้สูตรเฉพาะตัวแม่นยำขึ้น เริ่มได้เลย",
+    complete: "ความแม่นยำของสูตรครบแล้ว",
+    label: "ความแม่นยำของสูตร",
+    markEnd: "ความแม่นยำ",
+    markMiddle: "ข้อมูลหลัก",
+    markStart: "เริ่มต้น",
+    nearComplete: "ข้อมูลหลักครบแล้ว ข้อมูลเสริมจะช่วยเพิ่มความแม่นยำถึง 100%",
+    optional: "ข้อมูลเสริม",
+    partial: (progress) => `ตอนนี้อยู่ที่ ${progress}% - ตอบต่อเพื่อเติมข้อมูลหลักให้ครบ`
   },
-  sleepBasics: {
-    title: "การนอนหลับ พลังงาน และกิจกรรม",
-    average: "การนอน (ชั่วโมง)",
-    options: [
-      { label: "น้อยกว่า 5", value: "under-5" },
-      { label: "5-6", value: "5-6" },
-      { label: "6-7", value: "6-7" },
-      { label: "7-8", value: "7-8" },
-      { label: "8-9", value: "8-9" },
-      { label: "9+", value: "9-plus" }
-    ]
-  },
-  symptoms: {
-    ...en.symptoms,
-    title: "อาการ",
-    prompt: "อาการปัจจุบัน",
-    hint: "เลือกได้ทุกข้อ",
-    great: { label: "รู้สึกดีมาก", value: "great" },
-    options: [
-      { label: "อ่อนเพลีย", value: "fatigue" },
-      { label: "สมองล้า", value: "brain" },
-      { label: "อารมณ์", value: "mood" },
-      { label: "ปวดข้อ", value: "joints" },
-      { label: "การย่อยอาหาร", value: "digestion" },
-      { label: "นอนไม่ดี", value: "sleep" },
-      { label: "เครียด / กังวล", value: "stress" },
-      { label: "ผิว", value: "skin" },
-      { label: "ผมร่วง", value: "hair" },
-      { label: "ความต้องการทางเพศต่ำ", value: "libido" },
-      { label: "ป่วยบ่อย", value: "cold" }
-    ],
-    energy: "ระดับพลังงาน",
-    energyOptions: [
-      { label: "หมดแรง", value: "1", tone: "Low" },
-      { label: "ต่ำ", value: "2", tone: "Low" },
-      { label: "พอใช้", value: "3", tone: "Mid" },
-      { label: "ดี", value: "4", tone: "High" },
-      { label: "ดีเยี่ยม", value: "5", tone: "High" }
-    ]
-  }
+  sectionNotes: [
+    "ไม่มีคำตอบที่ถูกหรือผิด มีเพียงคำตอบที่ตรงกับความจริง ยิ่งตอบตรงกับตัวคุณมากเท่าไร สูตรก็จะยิ่งพอดีและเหมาะกับสิ่งที่คุณใช้อยู่แล้วมากขึ้น",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  stagePhases: ["พื้นฐาน", "พื้นฐาน", "พื้นฐาน", "พื้นฐาน", "ความปลอดภัย", "เฉพาะตัว"],
+  stages: ["เกี่ยวกับคุณ", "เป้าหมาย", "ชีวิตประจำวัน", "อาหาร", "ความปลอดภัย", "ความแม่นยำ"]
 };
 
 const copies: Record<Locale, Copy> = { en, th };
-const heroBadgeIcons = [BeakerIcon, ShieldCheckIcon, SparklesIcon];
 const paywallFeatureIcons = [SparklesIcon, ShieldCheckIcon, ArrowPathIcon];
-const assessmentHeroImageUrl = "/final.png";
-const assessmentHeroFade =
-  "radial-gradient(ellipse at bottom left, rgba(243, 248, 255, 0.98) 0%, rgba(243, 248, 255, 0.76) 18%, rgba(243, 248, 255, 0.28) 34%, rgba(243, 248, 255, 0) 52%)";
-function countRequired(answers: Answers) {
-  return requiredGroups.reduce((count, group) => {
-    if (group === "goals") {
-      return count + (answers.goals.length > 0 ? 1 : 0);
-    }
+function hasText(value: string) {
+  return value.trim().length > 0;
+}
 
-    if (group === "symptoms") {
-      return count + (answers.symptoms.length > 0 || answers.feelGreat ? 1 : 0);
-    }
+function hasAny(values: readonly string[]) {
+  return values.length > 0;
+}
 
-    return count + (answers[group] ? 1 : 0);
-  }, 0);
+function selectedOther(values: readonly string[]) {
+  return values.includes("other");
+}
+
+function isPregnantOrBreastfeeding(answers: Answers) {
+  return answers.reproStatus === "pregnant" || answers.reproStatus === "breastfeeding";
+}
+
+function reachableEssentialChecks(answers: Answers) {
+  const checks: Array<{ answered: boolean; id: string }> = [
+    { id: "sex", answered: hasText(answers.sex) },
+    { id: "age", answered: hasText(answers.age) },
+    { id: "heightWeight", answered: hasText(answers.heightCm) && hasText(answers.weightKg) },
+    { id: "skin", answered: hasText(answers.skin) },
+    { id: "country", answered: hasText(answers.country) },
+    { id: "sun", answered: hasText(answers.sun) },
+    { id: "sunscreen", answered: hasText(answers.sunscreen) },
+    { id: "goals", answered: hasAny(answers.goals) },
+    { id: "symptoms", answered: hasAny(answers.symptoms) },
+    { id: "sleepHrs", answered: hasText(answers.sleepHrs) },
+    { id: "energy", answered: hasText(answers.energy) },
+    { id: "activity", answered: hasText(answers.activity) },
+    { id: "stress", answered: hasText(answers.stress) },
+    { id: "digestion", answered: hasText(answers.digestion) },
+    { id: "digCondition", answered: hasText(answers.digCondition) },
+    { id: "smoking", answered: hasText(answers.smoking) },
+    { id: "alcohol", answered: hasText(answers.alcohol) },
+    { id: "caffeine", answered: hasText(answers.caffeine) },
+    { id: "diet", answered: hasText(answers.diet) },
+    ...foodFrequencyKeys.map((key) => ({
+      id: `food-${key}`,
+      answered: hasText(answers.foodFrequency[key])
+    })),
+    { id: "allergies", answered: hasAny(answers.allergies) },
+    { id: "disclosure", answered: answers.disclosure },
+    { id: "meds", answered: hasText(answers.meds) },
+    { id: "suppAllergies", answered: hasAny(answers.suppAllergies) },
+    { id: "kidney", answered: hasText(answers.kidney) },
+    { id: "liver", answered: hasText(answers.liver) },
+    { id: "surgery", answered: hasText(answers.surgery) },
+    { id: "antibiotics", answered: hasText(answers.antibiotics) },
+    { id: "supplements", answered: hasText(answers.supplements) },
+    { id: "budget", answered: hasText(answers.budget) },
+    { id: "maxPills", answered: hasText(answers.maxPills) },
+    { id: "form", answered: hasText(answers.form) }
+  ];
+
+  if (answers.sex === "female") {
+    checks.push(
+      { id: "reproStatus", answered: hasText(answers.reproStatus) },
+      { id: "menopause", answered: hasText(answers.menopause) }
+    );
+
+    if (!isPregnantOrBreastfeeding(answers)) {
+      checks.push({ id: "flow", answered: hasText(answers.flow) });
+    }
+  }
+
+  if (answers.meds === "yes") {
+    checks.push({ id: "medTypes", answered: hasAny(answers.medTypes) });
+
+    if (selectedOther(answers.medTypes)) {
+      checks.push({ id: "otherMed", answered: hasText(answers.otherMed) });
+    }
+  }
+
+  if (selectedOther(answers.suppAllergies)) {
+    checks.push({ id: "otherSupp", answered: hasText(answers.otherSupp) });
+  }
+
+  return checks;
+}
+
+function optionalChecks(answers: Answers) {
+  return [
+    hasText(answers.protein),
+    hasAny(answers.family),
+    hasText(answers.tracker),
+    hasText(answers.vo2),
+    hasText(answers.hrv),
+    ...labFields.map((field) => hasText(answers.labs[field.value] ?? ""))
+  ];
+}
+
+function precisionProgress(answers: Answers) {
+  const essential = reachableEssentialChecks(answers);
+  const essentialDone = essential.filter((item) => item.answered).length;
+  const optional = optionalChecks(answers);
+  const optionalDone = optional.filter(Boolean).length;
+  const essentialPercent = essential.length > 0 ? (essentialDone / essential.length) * 80 : 0;
+  const optionalPercent = optional.length > 0 ? (optionalDone / optional.length) * 20 : 0;
+
+  return {
+    essentialDone,
+    essentialRemaining: essential.length - essentialDone,
+    essentialTotal: essential.length,
+    optionalDone,
+    optionalTotal: optional.length,
+    progress: Math.min(100, Math.round(essentialPercent + optionalPercent))
+  };
+}
+
+function precisionMeterHint(copy: Copy["progress"], progress: number) {
+  if (progress <= 0) {
+    return copy.start;
+  }
+
+  if (progress < 80) {
+    return copy.partial(progress);
+  }
+
+  if (progress < 100) {
+    return copy.nearComplete;
+  }
+
+  return copy.complete;
+}
+
+function aboutComplete(answers: Answers) {
+  const baseComplete = [answers.sex, answers.age, answers.heightCm, answers.weightKg, answers.skin, answers.country, answers.sun].every(hasText);
+
+  if (!baseComplete) {
+    return false;
+  }
+
+  if (answers.sex !== "female") {
+    return true;
+  }
+
+  return hasText(answers.reproStatus);
+}
+
+function goalsComplete(answers: Answers) {
+  return hasAny(answers.goals) && hasAny(answers.symptoms);
+}
+
+function dailyComplete(answers: Answers) {
+  return [answers.sleepHrs, answers.activity, answers.digCondition, answers.smoking, answers.alcohol].every(hasText);
+}
+
+function foodComplete(answers: Answers) {
+  return (
+    hasText(answers.diet) &&
+    foodFrequencyKeys.every((key) => hasText(answers.foodFrequency[key])) &&
+    hasAny(answers.allergies) &&
+    answers.disclosure
+  );
+}
+
+function safetyComplete(answers: Answers) {
+  if (![answers.meds, answers.kidney, answers.liver, answers.surgery, answers.antibiotics, answers.supplements].every(hasText)) {
+    return false;
+  }
+
+  if (!hasAny(answers.suppAllergies)) {
+    return false;
+  }
+
+  if (answers.meds === "yes" && !hasAny(answers.medTypes)) {
+    return false;
+  }
+
+  if (answers.meds === "yes" && selectedOther(answers.medTypes) && !hasText(answers.otherMed)) {
+    return false;
+  }
+
+  if (selectedOther(answers.suppAllergies) && !hasText(answers.otherSupp)) {
+    return false;
+  }
+
+  return true;
+}
+
+function precisionRequiredComplete(answers: Answers) {
+  return [answers.budget, answers.maxPills].every(hasText);
 }
 
 function formatHeightImperial(value: string) {
@@ -1272,9 +1193,9 @@ type AssessmentQuestion = Readonly<{
 }>;
 
 type AssessmentSection = Readonly<{
+  complete: boolean;
   description: string;
   id: string;
-  optional?: boolean;
   questions: AssessmentQuestion[];
   title: string;
 }>;
@@ -1300,15 +1221,9 @@ const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
 const HEALTH_SCORE_ANALYSIS_POLL_INTERVAL_MS = 1500;
 const HEALTH_SCORE_ANALYSIS_MAX_POLLS = 160;
 
-async function fetchWithTimeout(
-  input: RequestInfo | URL,
-  init: RequestInit = {}
-) {
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
   const controller = new AbortController();
-  const timeout = window.setTimeout(
-    () => controller.abort(),
-    ASSESSMENT_REQUEST_TIMEOUT_MS
-  );
+  const timeout = window.setTimeout(() => controller.abort(), ASSESSMENT_REQUEST_TIMEOUT_MS);
 
   try {
     return await fetch(input, {
@@ -1329,22 +1244,16 @@ function sleep(ms: number) {
 function getProcessingStepIndex(status: ProcessingStatus) {
   const failedIndex = status.steps.findIndex((step) => step.state === "failed");
 
-  if (failedIndex >= 0) {
-    return failedIndex;
-  }
+  if (failedIndex >= 0) return failedIndex;
 
   const activeIndex = status.steps.findIndex((step) => step.state === "active");
 
-  if (activeIndex >= 0) {
-    return activeIndex;
-  }
+  if (activeIndex >= 0) return activeIndex;
 
-  const completeIndex = status.steps.reduce(
-    (latest, step, index) => (step.state === "complete" ? index : latest),
-    -1
+  return Math.max(
+    0,
+    status.steps.reduce((latest, step, index) => (step.state === "complete" ? index : latest), -1)
   );
-
-  return Math.max(0, completeIndex);
 }
 
 function getInitialProcessingStepIndex(status: ProcessingStatus) {
@@ -1355,30 +1264,16 @@ function isStepComplete(status: ProcessingStatus, index: number) {
   return status.steps[index]?.state === "complete";
 }
 
-function getPacedProcessingStatus(
-  target: ProcessingStatus,
-  stepIndex: number,
-  terminal = false
-): ProcessingStatus {
+function getPacedProcessingStatus(target: ProcessingStatus, stepIndex: number, terminal = false): ProcessingStatus {
   return {
     ...target,
     status: terminal ? target.status : target.status === "failed" ? "failed" : "preparing",
     steps: target.steps.map((step, index) => {
-      if (index < stepIndex) {
-        return { ...step, state: "complete" as const };
-      }
-
+      if (index < stepIndex) return { ...step, state: "complete" as const };
       if (index === stepIndex) {
-        if (target.status === "failed" && step.state === "failed") {
-          return { ...step, state: "failed" as const };
-        }
-
-        return {
-          ...step,
-          state: terminal && step.state === "complete" ? "complete" : "active"
-        };
+        if (target.status === "failed" && step.state === "failed") return { ...step, state: "failed" as const };
+        return { ...step, state: terminal && step.state === "complete" ? "complete" : "active" };
       }
-
       return { ...step, state: "pending" as const };
     })
   };
@@ -1395,28 +1290,6 @@ function buildExampleProcessingStatus(planId: string): ProcessingStatus {
       { id: "scoreAnalysis", state: "complete" },
       { id: "payment", state: "complete" },
       { id: "formulation", state: "active" },
-      { id: "safety", state: "pending" },
-      { id: "results", state: "pending" }
-    ]
-  };
-}
-
-function buildReturningScoreGateStatus(
-  planId: string,
-  healthScore: HealthScoreResult
-): ProcessingStatus {
-  return {
-    healthScore,
-    planId,
-    queuePosition: 0,
-    status: "ready",
-    steps: [
-      { id: "assessment", state: "complete" },
-      { id: "score", state: "complete" },
-      { id: "scoreAnalysis", state: "complete" },
-      { id: "payment", state: "pending" },
-      { id: "formulation", state: "pending" },
-      { id: "safety", state: "pending" },
       { id: "results", state: "pending" }
     ]
   };
@@ -1433,28 +1306,39 @@ function buildExampleQueuedStatus(planId: string): ProcessingStatus {
       { id: "scoreAnalysis", state: "complete" },
       { id: "payment", state: "complete" },
       { id: "formulation", state: "complete" },
-      { id: "safety", state: "pending" },
+      { id: "results", state: "complete" }
+    ]
+  };
+}
+
+function buildReturningScoreGateStatus(planId: string, healthScore: HealthScoreResult): ProcessingStatus {
+  return {
+    healthScore,
+    planId,
+    queuePosition: 0,
+    status: "ready",
+    steps: [
+      { id: "assessment", state: "complete" },
+      { id: "score", state: "complete" },
+      { id: "scoreAnalysis", state: "complete" },
+      { id: "payment", state: "pending" },
+      { id: "formulation", state: "pending" },
       { id: "results", state: "pending" }
     ]
   };
 }
 
 function healthScoreBpmFields(healthScore: HealthScoreResult | null | undefined) {
-  const lowestDomain = healthScore?.domains
-    .slice()
-    .sort((a, b) => a.score - b.score)[0];
+  const lowestDomain = healthScore?.domains.slice().sort((a, b) => a.score - b.score)[0];
 
   return {
     healthScore: healthScore?.score,
     lowestDomain: lowestDomain?.id,
     metrics: {
-      domainScores: healthScore?.domains.reduce<Record<string, number>>(
-        (scores, domain) => {
-          scores[domain.id] = domain.score;
-          return scores;
-        },
-        {}
-      )
+      domainScores: healthScore?.domains.reduce<Record<string, number>>((scores, domain) => {
+        scores[domain.id] = domain.score;
+        return scores;
+      }, {})
     },
     scoreBand: healthScore?.band
   };
@@ -1481,172 +1365,21 @@ type PlanContent = Readonly<{
   title: string;
 }>;
 
-type QuestionWhyMap = Record<string, string>;
-
-const questionWhyEn: QuestionWhyMap = {
-  activity:
-    "Activity level changes recovery, protein, electrolyte, and performance support needs.",
-  age:
-    "Age changes baseline needs for bone, muscle, metabolic, and recovery support.",
-  alcohol:
-    "Alcohol intake can affect B-vitamin and magnesium needs, and shapes safety notes.",
-  budget:
-    "Budget keeps recommendations realistic and prevents an overbuilt stack.",
-  coffee: "Caffeine gives context for sleep, stress, and energy patterns.",
-  conditions:
-    "Known considerations help us avoid mismatched recommendations and flag extra caution.",
-  country:
-    "Country helps infer climate, latitude, marketplace, and product availability.",
-  diet:
-    "Diet pattern helps identify likely gaps and avoid recommending things you already get regularly.",
-  energy:
-    "Energy level helps cross-check goals against how you feel day to day.",
-  family:
-    "Family history adds useful risk context for long-term wellness priorities.",
-  fish: "Fatty fish intake is the simplest proxy for omega-3 intake.",
-  form: "Preferred format helps match products you are likely to stick with.",
-  goals:
-    "Goals set the priority order so the brief focuses on what matters most.",
-  gut: "Digestion affects comfort, nutrient absorption, and product tolerance.",
-  "height-weight":
-    "Body size helps estimate practical dose ranges and avoid generic recommendations.",
-  labs:
-    "Lab values make the brief more precise than symptom-based estimates alone.",
-  lifestage:
-    "Hormonal stage can change iron, bone, sleep, and symptom priorities.",
-  meds:
-    "Medications are essential for safety screening and avoiding interaction risks.",
-  name:
-    "This is only used to personalise the brief. It is completely okay to stay anonymous.",
-  pills: "Capsule limit helps keep the plan usable day to day.",
-  protein:
-    "Protein intake helps interpret activity, recovery, muscle, and satiety needs.",
-  review:
-    "This is your chance to add context that structured questions might miss.",
-  sex:
-    "Some nutrient ranges, hormonal considerations, and safety checks differ by biological sex.",
-  skin:
-    "Skin tone affects how much vitamin D your body may produce from sunlight.",
-  sleep:
-    "Sleep quality adds detail beyond hours, showing whether rest is actually restorative.",
-  "sleep-hours":
-    "Sleep duration is a major recovery signal and helps prioritize the brief.",
-  smoke:
-    "Smoking status changes antioxidant and vitamin C considerations.",
-  stress: "Stress level helps prioritize recovery and calm support.",
-  "stress-source":
-    "The source of stress helps separate lifestyle context from supplement support.",
-  sun:
-    "Sun exposure influences how strongly vitamin D support should be considered.",
-  supps:
-    "Current supplements help avoid duplicate products and unnecessary spend.",
-  symptoms:
-    "Symptoms help distinguish current friction points from longer-term goals.",
-  vo2:
-    "VO2 max is a useful proxy for cardiorespiratory fitness and long-term health capacity.",
-  wearable:
-    "Wearable data can sharpen recovery and activity interpretation."
-};
-
-const questionWhyTh: QuestionWhyMap = {
-  activity:
-    "กิจกรรมมีผลต่อการฟื้นตัว โปรตีน อิเล็กโทรไลต์ และการสนับสนุนสมรรถภาพ",
-  age:
-    "อายุมีผลต่อความต้องการด้านกระดูก กล้ามเนื้อ เมตาบอลิซึม และการฟื้นตัว",
-  alcohol:
-    "แอลกอฮอล์อาจเกี่ยวกับวิตามิน B แมกนีเซียม และหมายเหตุด้านความปลอดภัย",
-  budget: "งบประมาณทำให้คำแนะนำใช้งานจริง ไม่ใหญ่เกินจำเป็น",
-  coffee: "คาเฟอีนช่วยอธิบายรูปแบบการนอน ความเครียด และพลังงาน",
-  conditions:
-    "ข้อมูลสุขภาพช่วยหลีกเลี่ยงคำแนะนำที่ไม่เหมาะและเพิ่มข้อควรระวัง",
-  country:
-    "ประเทศช่วยประเมินภูมิอากาศ ละติจูด ตลาด และสินค้าที่หาได้",
-  diet:
-    "รูปแบบอาหารช่วยเห็นช่องว่างที่เป็นไปได้และหลีกเลี่ยงสิ่งที่คุณได้รับเพียงพอแล้ว",
-  energy:
-    "ระดับพลังงานช่วยเทียบเป้าหมายกับความรู้สึกจริงในแต่ละวัน",
-  family:
-    "ประวัติครอบครัวเพิ่มบริบทความเสี่ยงสำหรับเป้าหมายสุขภาพระยะยาว",
-  fish: "ปลามันเป็นตัวแทนง่ายๆ ของปริมาณโอเมก้า-3 จากอาหาร",
-  form:
-    "รูปแบบที่ชอบช่วยเลือกผลิตภัณฑ์ที่คุณมีแนวโน้มจะใช้ต่อเนื่อง",
-  goals: "เป้าหมายช่วยจัดลำดับความสำคัญของบรีฟ",
-  gut: "การย่อยมีผลต่อความสบาย การดูดซึม และความทนต่อผลิตภัณฑ์",
-  "height-weight":
-    "ขนาดร่างกายช่วยประเมินช่วงปริมาณให้เหมาะขึ้น ไม่ใช่คำแนะนำแบบทั่วไป",
-  labs:
-    "ค่าตรวจช่วยให้บรีฟแม่นกว่าการประเมินจากอาการอย่างเดียว",
-  lifestage:
-    "ช่วงฮอร์โมนอาจมีผลต่อธาตุเหล็ก กระดูก การนอน และอาการต่างๆ",
-  meds:
-    "ข้อมูลยาจำเป็นต่อการตรวจความปลอดภัยและลดความเสี่ยงจากปฏิกิริยาระหว่างกัน",
-  name:
-    "ใช้เพื่อให้บรีฟเป็นส่วนตัวขึ้นเท่านั้น คุณสามารถไม่ระบุตัวตนได้",
-  pills: "จำนวนเม็ดสูงสุดช่วยให้แผนทำตามได้จริงในชีวิตประจำวัน",
-  protein:
-    "โปรตีนช่วยตีความกิจกรรม การฟื้นตัว กล้ามเนื้อ และความอิ่ม",
-  review:
-    "ส่วนนี้ให้คุณเพิ่มบริบทที่คำถามแบบเลือกตอบอาจเก็บไม่ครบ",
-  sex:
-    "สารอาหารบางช่วง ฮอร์โมน และข้อควรระวังแตกต่างกันตามเพศชีวภาพ",
-  skin: "สีผิวมีผลต่อการสร้างวิตามินดีจากแสงแดด",
-  sleep:
-    "คุณภาพการนอนบอกได้ว่าเวลานอนนั้นฟื้นตัวจริงแค่ไหน",
-  "sleep-hours":
-    "เวลานอนเป็นสัญญาณสำคัญของการฟื้นตัวและการจัดลำดับคำแนะนำ",
-  smoke:
-    "การสูบบุหรี่มีผลต่อการพิจารณาสารต้านอนุมูลอิสระและวิตามิน C",
-  stress: "ความเครียดช่วยจัดลำดับการฟื้นตัวและการสนับสนุนความสงบ",
-  "stress-source":
-    "แหล่งความเครียดช่วยแยกบริบทชีวิตจากสิ่งที่อาหารเสริมช่วยได้",
-  sun: "แดดที่ได้รับมีผลต่อการพิจารณาวิตามินดี",
-  supps:
-    "อาหารเสริมที่ใช้อยู่ช่วยหลีกเลี่ยงการซ้ำซ้อนและค่าใช้จ่ายไม่จำเป็น",
-  symptoms:
-    "อาการปัจจุบันช่วยแยกสิ่งที่ควรดูแลก่อนจากเป้าหมายระยะยาว",
-  vo2:
-    "VO2 max เป็นตัวชี้วัดสมรรถภาพหัวใจและปอดที่มีประโยชน์",
-  wearable:
-    "ข้อมูลจากอุปกรณ์ช่วยเพิ่มความแม่นยำเรื่องการฟื้นตัวและกิจกรรม"
-};
-
-function getQuestionWhy(locale: Locale, id: string) {
-  return (locale === "th" ? questionWhyTh : questionWhyEn)[id];
-}
-
-function useCompactAssessment() {
-  const [isCompact, setIsCompact] = useState(false);
-
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 767px)");
-    const update = () => setIsCompact(query.matches);
-
-    update();
-    query.addEventListener("change", update);
-
-    return () => query.removeEventListener("change", update);
-  }, []);
-
-  return isCompact;
-}
-
 function getPlanContent(locale: Locale): PlanContent {
   if (locale === "th") {
     return {
       back: "กลับไปที่แบบประเมิน",
       badge: "แนะนำ",
       eyebrow: "เลือกแผนบรีฟ",
-      subtitle:
-        "เลือกความละเอียดของคำแนะนำ แล้วเราจะเปิดหน้าแผนให้คำแนะนำเติมเข้ามาเมื่อพร้อม",
+      subtitle: "เลือกความละเอียดของคำแนะนำ แล้วเราจะเปิดหน้าแผนให้คำแนะนำเติมเข้ามาเมื่อพร้อม",
       title: "เลือกความละเอียดของคำแนะนำ",
       tiers: [
         {
           cta: "ไปต่อ",
-          description:
-            "แผนอาหารและอาหารเสริมฉบับเต็ม พร้อมปรับขนาดและข้อควรระวังให้เข้ากับข้อมูลของคุณมากขึ้น",
+          description: "แผนอาหารเสริมฉบับเต็ม พร้อมปรับขนาดและข้อควรระวังให้เข้ากับข้อมูลของคุณมากขึ้น",
           featured: true,
           features: [
-            "คำแนะนำอาหารและอาหารเสริมแบบครบถ้วน",
+            "คำแนะนำอาหารเสริมแบบครบถ้วน",
             "ช่วงปริมาณที่ปรับตามร่างกาย",
             "รวมข้อมูลยา แล็บ และข้อควรระวัง",
             "ลำดับความสำคัญที่นำไปใช้ได้จริง",
@@ -1659,8 +1392,7 @@ function getPlanContent(locale: Locale): PlanContent {
         },
         {
           cta: "ไปต่อ",
-          description:
-            "การดูแลต่อเนื่องพร้อม AI เอเจนต์ที่ช่วยปรับคำแนะนำให้เข้ากับความต้องการรายวัน",
+          description: "การดูแลต่อเนื่องพร้อม AI เอเจนต์ที่ช่วยปรับคำแนะนำให้เข้ากับความต้องการรายวัน",
           features: [
             "ทุกอย่างในแผนความแม่นยำ",
             "AI เอเจนต์สำหรับความต้องการรายวัน",
@@ -1682,19 +1414,17 @@ function getPlanContent(locale: Locale): PlanContent {
     back: "Back to assessment",
     badge: "Recommended",
     eyebrow: "Choose your brief",
-    subtitle:
-      "Choose the level of guidance you want, then we will open your plan page while each section fills in.",
+    subtitle: "Choose the level of guidance you want, then we will open your plan page while each section fills in.",
     title: "Select the level of guidance",
     tiers: [
       {
         cta: "Go",
-        description:
-          "The full food and supplement guidance pack with more precise dosing logic and safety checks.",
+        description: "The full supplement guidance pack with more precise dosing logic and cautions.",
         featured: true,
         features: [
-          "Complete food and supplement guidance",
+          "Complete supplement guidance",
           "Body-size adjusted dose ranges",
-          "Medication and lab flags included",
+          "Medication and lab cautions included",
           "Practical priority order",
           "60-day reassessment prompt"
         ],
@@ -1705,8 +1435,7 @@ function getPlanContent(locale: Locale): PlanContent {
       },
       {
         cta: "Go",
-        description:
-          "Ongoing support with an AI agent that adapts the plan to day-to-day requirements.",
+        description: "Ongoing support with an AI agent that adapts the plan to day-to-day requirements.",
         features: [
           "Everything in Precision Plan",
           "AI agent for daily needs",
@@ -1723,6 +1452,82 @@ function getPlanContent(locale: Locale): PlanContent {
     ]
   };
 }
+function textInputClasses() {
+  return "mt-2 block w-full rounded-md border border-foreground/10 bg-white px-3 py-2 text-sm text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15";
+}
+
+function AssessmentStepper({
+  currentIndex,
+  onSelect,
+  phases,
+  sections,
+  stages
+}: Readonly<{
+  currentIndex: number;
+  onSelect: (index: number) => void;
+  phases: readonly string[];
+  sections: readonly AssessmentSection[];
+  stages: readonly string[];
+}>) {
+  return (
+    <nav aria-label="Assessment stages">
+      <ol className="grid grid-cols-3 gap-2 lg:grid-cols-6">
+        {sections.map((section, index) => {
+          const active = index === currentIndex;
+          const done = index < currentIndex || section.complete;
+
+          return (
+            <li key={section.id}>
+              <button
+                type="button"
+                aria-current={active ? "step" : undefined}
+                className={cx(
+                  "flex h-full w-full flex-col gap-1 rounded-lg border bg-white px-3 py-3 text-left shadow-sm transition",
+                  active
+                    ? "border-[#1FA77A] bg-[#1FA77A]/5 shadow-md"
+                    : done
+                      ? "border-[#1FA77A]/30 hover:border-[#1FA77A]/60"
+                      : "border-foreground/10 hover:border-[#3A7BD5]/35"
+                )}
+                onClick={() => onSelect(index)}
+              >
+                <span className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  <span
+                    className={cx(
+                      "flex size-5 items-center justify-center rounded-full text-[10px] font-bold",
+                      active
+                        ? "bg-[#1FA77A] text-white"
+                        : done
+                          ? "bg-[#20343A] text-white"
+                          : "bg-background text-muted-foreground"
+                    )}
+                  >
+                    {done && !active ? (
+                      <CheckIcon aria-hidden={true} className="size-3.5" />
+                    ) : (
+                      index + 1
+                    )}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {phases[index] ?? phases[0] ?? ""}
+                  </span>
+                </span>
+                <span
+                  className={cx(
+                    "hidden text-sm font-semibold tracking-normal sm:block",
+                    active || done ? "text-[#20343A]" : "text-muted-foreground"
+                  )}
+                >
+                  {stages[index] ?? section.title}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
 
 export function AssessmentFlow({
   exampleTestimonial,
@@ -1736,45 +1541,25 @@ export function AssessmentFlow({
   const copy = copies[locale];
   const router = useRouter();
   const showDevShortcut = process.env.NEXT_PUBLIC_SHOW_DEV_SHORTCUT !== "false";
-  const returningScoreStatus =
-    returningPlanId && returningHealthScore
-      ? buildReturningScoreGateStatus(returningPlanId, returningHealthScore)
-      : null;
-  const [answers, setAnswers] = useState<Answers>(() =>
-    buildInitialAnswers(prefillAnswers)
-  );
+  const returningScoreStatus = returningPlanId && returningHealthScore
+    ? buildReturningScoreGateStatus(returningPlanId, returningHealthScore)
+    : null;
+  const [answers, setAnswers] = useState<Answers>(() => buildInitialAnswers(prefillAnswers));
   const [sectionIndex, setSectionIndex] = useState(0);
-  const [questionIndex, setQuestionIndex] = useState(0);
-  const [processingStatus, setProcessingStatus] =
-    useState<ProcessingStatus | null>(null);
-  const [displayedProcessingStatus, setDisplayedProcessingStatus] =
-    useState<ProcessingStatus | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus | null>(null);
+  const [displayedProcessingStatus, setDisplayedProcessingStatus] = useState<ProcessingStatus | null>(null);
   const [processingError, setProcessingError] = useState("");
-  const [capturedStatus, setCapturedStatus] =
-    useState<ProcessingStatus | null>(returningScoreStatus);
+  const [capturedStatus, setCapturedStatus] = useState<ProcessingStatus | null>(returningScoreStatus);
   const [selectedPlan, setSelectedPlan] = useState("");
-  const [showPlans, setShowPlans] = useState(
-    Boolean(
-      returningScoreStatus &&
-        (!returningPlan || initialStage === "healthscore")
-    )
-  );
+  const [showPlans, setShowPlans] = useState(Boolean(returningScoreStatus && (!returningPlan || initialStage === "healthscore")));
   const [showExampleExit, setShowExampleExit] = useState(false);
-  const [processingMode, setProcessingMode] =
-    useState<"example" | "formulation" | "score">("formulation");
-  const [healthScore, setHealthScore] = useState<HealthScoreResult | null>(
-    returningHealthScore ?? null
-  );
+  const [processingMode, setProcessingMode] = useState<"example" | "formulation" | "score">("formulation");
+  const [healthScore, setHealthScore] = useState<HealthScoreResult | null>(returningHealthScore ?? null);
   const [exampleEmail, setExampleEmail] = useState("");
   const [exampleError, setExampleError] = useState("");
-  const [includeExampleReassessment, setIncludeExampleReassessment] =
-    useState(true);
+  const [includeExampleReassessment, setIncludeExampleReassessment] = useState(true);
   const [exampleLoading, setExampleLoading] = useState(false);
-  const [exampleRequest, setExampleRequest] = useState<{
-    email: string;
-    planId: string;
-    requestId: string;
-  } | null>(null);
+  const [exampleRequest, setExampleRequest] = useState<{ email: string; planId: string; requestId: string } | null>(null);
   const captureInFlight = useRef<Promise<ProcessingStatus | null> | null>(null);
   const displayedStepStartedAt = useRef(0);
   const pollFailureCount = useRef(0);
@@ -1782,7 +1567,10 @@ export function AssessmentFlow({
   const healthScoreViewedTracked = useRef(false);
   const planGateTracked = useRef(false);
   const exampleExitTracked = useRef(false);
-  const isCompact = useCompactAssessment();
+  const precision = precisionProgress(answers);
+  const hasReturningProAccess = returningPlan === "pro";
+  const reassessmentAlreadyOptedIn = validateLeadEmail(answers.reassessmentEmail).ok;
+  const precisionHint = precisionMeterHint(copy.progress, precision.progress);
 
   const clearProcessingStatus = useCallback(() => {
     displayedStepStartedAt.current = 0;
@@ -1790,39 +1578,23 @@ export function AssessmentFlow({
     setProcessingStatus(null);
   }, []);
 
-  const completed = countRequired(answers);
-  const requiredTotal = requiredGroups.length;
-  const progress = Math.round((completed / requiredTotal) * 100);
-  const canGenerate = completed === requiredTotal;
-  const hasReturningProAccess = returningPlan === "pro";
-  const reassessmentAlreadyOptedIn = validateLeadEmail(
-    answers.reassessmentEmail
-  ).ok;
-  const progressLabel = canGenerate
-    ? copy.progress.complete
-    : copy.progress.status(completed, requiredTotal);
-
   useEffect(() => {
-    if (assessmentStartedTracked.current || completed <= 0) {
-      return;
-    }
+    if (assessmentStartedTracked.current || precision.essentialDone <= 0) return;
 
     assessmentStartedTracked.current = true;
     trackBpmEvent("assessment_started", {
       eventType: "funnel",
       locale,
       properties: {
-        completedRequired: completed,
+        completedRequired: precision.essentialDone,
         returningPlan,
         returningPlanId: returningPlanId || undefined
       }
     });
-  }, [completed, locale, returningPlan, returningPlanId]);
+  }, [locale, precision.essentialDone, returningPlan, returningPlanId]);
 
   useEffect(() => {
-    if (!showPlans || planGateTracked.current) {
-      return;
-    }
+    if (!showPlans || planGateTracked.current) return;
 
     planGateTracked.current = true;
     trackBpmEvent("plan_gate_viewed", {
@@ -1837,9 +1609,7 @@ export function AssessmentFlow({
   }, [healthScore, locale, returningPlan, returningPlanId, showPlans]);
 
   useEffect(() => {
-    if (!showExampleExit || exampleExitTracked.current) {
-      return;
-    }
+    if (!showExampleExit || exampleExitTracked.current) return;
 
     exampleExitTracked.current = true;
     trackBpmEvent("free_example_exit_viewed", {
@@ -1849,285 +1619,177 @@ export function AssessmentFlow({
       planId: exampleRequest?.planId
     });
   }, [exampleRequest?.planId, exampleRequest?.requestId, locale, showExampleExit]);
-  const ui =
-    locale === "th"
-      ? {
-          back: "ย้อนกลับ",
-          close: "ปิด",
-          continue: "ต่อไป",
-          currentStep: "ขั้นตอนปัจจุบัน",
-          infoLabel: "ทำไมคำถามนี้สำคัญ",
-          optionalSection: "ความแม่นยำ",
-          requiredSection: "พื้นฐาน",
-          processingError: "ไม่สามารถเริ่มการประมวลผลได้ โปรดลองอีกครั้ง",
-          processingQueue: (count: number) =>
-            count > 0
-              ? `มี ${count} คนอยู่ในคิวก่อนคุณ`
-              : "กำลังเปิดหน้าปรับคำแนะนำของคุณ",
-          processingSteps: {
-            assessment: "แบบประเมิน",
-            score: "HealthScore",
-            scoreAnalysis: "กำลังวิเคราะห์ HealthScore",
-            payment: "สิทธิ์เข้าถึง",
-            formulation: "ปรับคำแนะนำ",
-            safety: "คำแนะนำกำลังแสดงในหน้านั้น",
-            results: "ส่งมอบแผน"
-          },
-          processingSubtitle:
-            "เราจะเปิดหน้าปรับคำแนะนำก่อน จากนั้นคุณค่อยส่งมอบแผนสุดท้ายเมื่อพร้อม",
-          processingTitle: "กำลังเตรียมคำแนะนำของคุณ",
-          scoreProcessingQueue: "กำลังเตรียมคะแนนสุขภาพของคุณ",
-          scoreProcessingSteps: {
-            assessment: "ทำแบบประเมินเสร็จแล้ว",
-            score: "กำลังเตรียม HealthScore",
-            scoreAnalysis: "กำลังวิเคราะห์ HealthScore",
-            payment: "เลือกแผน",
-            formulation: "หน้าแผนโภชนาการ",
-            safety: "ตรวจสอบความปลอดภัย",
-            results: "เสร็จสมบูรณ์"
-          },
-          scoreProcessingSubtitle:
-            "เรากำลังประเมินภาพรวมสุขภาพจากคำตอบของคุณก่อนแสดงตัวเลือกแผน",
-          scoreProcessingTitle: "กำลังเตรียม HealthScore ของคุณ",
-          scoreGate: {
-            emailButton: "ส่งแผนฟรี 3 ข้อ + HealthScore",
-            emailDescription:
-              "ใส่อีเมลของคุณ แล้วเราจะส่งแผนโภชนาการฟรี 3 ข้อที่ครอบคลุมพื้นฐานสำคัญ เพื่อช่วยเริ่มต้นเส้นทาง wellness ของคุณ",
-            emailDivider: "หรือรับแผนโภชนาการฟรี 3 ข้อทางอีเมล",
-            emailError: "กรุณาใส่อีเมลที่ถูกต้อง",
-            emailPlaceholder: "your@email.com",
-            emailTitle: "ยังไม่พร้อมปลดล็อก?",
-            planDescription:
-              "เลือกระดับคำแนะนำที่ต้องการ ก่อนที่เราจะเปิดแผนโภชนาการของคุณ",
-            planTitle: "ปลดล็อกแผนโภชนาการเฉพาะตัวของคุณ",
-            preparing: "กำลังเตรียม...",
-            proContinueCta: "ไปต่อ",
-            proContinueDescription:
-              "คุณมีสิทธิ์แผน Pro อยู่แล้ว เราจะเปิดแผนโภชนาการเวอร์ชันใหม่โดยไม่แสดงตัวเลือกชำระเงิน",
-            proContinueTitle: "แผน Pro พร้อมใช้งาน",
-            reassessmentDescription: "",
-            reassessmentTitle:
-              "รวมการประเมินซ้ำฟรีใน 60 วัน ยกเลิกได้ทุกเมื่อ",
-            title: "HealthScore ของคุณพร้อมแล้ว"
-          },
-          exampleExit: {
-            body:
-              "เรากำลังเตรียมแผนฉบับเต็มอยู่เบื้องหลัง และจะส่งตัวอย่างแผนโภชนาการ 3 ข้อแบบสั้นไปยังอีเมลของคุณ",
-            chatBody:
-              "เลือกช่องทางที่สะดวกเพื่อคุยต่อกับ AI advisor เฉพาะทาง WhatsApp สามารถเปิดพร้อม plan ได้ และ Telegram ทำได้เมื่อใช้ลิงก์ bot ส่วน LINE อาจต้องส่ง plan ที่แสดงอยู่ด้านล่าง หากยังไม่ได้ตั้งค่า LIFF deep link",
-            chatButton: "เปิดแชต",
-            chatPlanLabel: "แผน",
-            chatQrAlt: "QR code สำหรับเชื่อมต่อ MattaNutra AI advisor",
-            chatTitle:
-              "คุยกับ AI advisor ระหว่างรอตัวอย่างของคุณ",
-            emailPrefix: "เราจะส่งไปที่",
-            testimonialTitle: "ลูกค้าใช้ MattaNutra เพื่อเปลี่ยนข้อมูลสุขภาพให้เป็นขั้นตอนที่ทำได้จริง",
-            title: "ตัวอย่างของคุณกำลังถูกจัดเตรียม"
-          },
-          exampleProcessingQueue: "กำลังเตรียมอีเมลตัวอย่างของคุณ",
-          exampleProcessingSteps: {
-            assessment: "ทำแบบประเมินเสร็จแล้ว",
-            score: "กำลังเตรียม HealthScore",
-            scoreAnalysis: "กำลังวิเคราะห์ HealthScore",
-            payment: "กำลังประมวลผลการชำระเงิน",
-            formulation: "กำลังส่งคำขอตัวอย่าง",
-            safety: "กำลังตรวจสอบความปลอดภัย",
-            results: "เสร็จสมบูรณ์"
-          },
-          exampleProcessingSubtitle:
-            "เรากำลังเตรียมแผนฉบับเต็มก่อนคัดส่วนสำคัญเป็นตัวอย่างทางอีเมล",
-          exampleProcessingTitle: "กำลังเตรียมตัวอย่างของคุณ",
-          retry: "ลองอีกครั้ง",
-          statusLabels: {
-            active: "ตอนนี้",
-            complete: "เสร็จแล้ว",
-            failed: "ไม่สำเร็จ",
-            pending: "รอดำเนินการ"
-          },
-          section: (current: number, total: number) =>
-            `ส่วนที่ ${current} จาก ${total}`,
-          sectionHint: "ตอบคำถามในส่วนนี้เพื่อไปต่อ",
-          skipOptional: "ข้ามขั้นตอนเสริม",
-          step: (current: number, total: number) =>
-            `คำถามที่ ${current} จาก ${total}`,
-          validation: "ตอบคำถามจำเป็นเพื่อไปต่อ",
-          wellnessDisclaimer:
-            "แบบประเมินนี้เป็นข้อมูลเพื่อ wellness เท่านั้น ไม่ใช่การวินิจฉัย การรักษา หรือคำแนะนำให้หยุดยา"
-        }
-      : {
-          back: "Back",
-          close: "Close",
-          continue: "Continue",
-          currentStep: "Current step",
-          infoLabel: "Why this matters",
-          optionalSection: "Precision",
-          requiredSection: "Foundation",
-          processingError: "We could not start processing. Please try again.",
-          processingQueue: (count: number) =>
-            count > 0
-              ? `${count} ${count === 1 ? "person is" : "people are"} queued ahead of you`
-              : "Opening your refinement page",
-          processingSteps: {
-            assessment: "Assessment",
-            score: "HealthScore",
-            scoreAnalysis: "Analyzing HealthScore",
-            payment: "Access",
-            formulation: "Refine Guidance",
-            safety: "Guidance populates there",
-            results: "Deliver Plan"
-          },
-          processingSubtitle:
-            "We will open the refinement page first. When you are ready, deliver the final plan from there.",
-          processingTitle: "Preparing your guidance",
-          scoreProcessingQueue: "Preparing your HealthScore",
-          scoreProcessingSteps: {
-            assessment: "Assessment complete",
-            score: "Preparing your HealthScore",
-            scoreAnalysis: "Analyzing HealthScore",
-            payment: "Choose plan",
-            formulation: "Nutrition plan page",
-            safety: "Safety review",
-            results: "Complete"
-          },
-          scoreProcessingSubtitle:
-            "We are scoring your main wellness domains before showing the plan options.",
-          scoreProcessingTitle: "Preparing your HealthScore",
-          scoreGate: {
-            emailButton: "Send My Free 3-Point Plan + HealthScore",
-            emailDescription:
-              "Enter your email address and we'll send you a free 3-point nutrition plan covering the essentials to help you on your wellness journey.",
-            emailDivider: "or get a free 3-point nutrition plan by email",
-            emailError: "Enter a valid email address",
-            emailPlaceholder: "your@email.com",
-            emailTitle: "Not ready to unlock?",
-            planDescription:
-              "Choose the level of guidance you want before we open your nutrition plan.",
-            planTitle: "Unlock your bespoke nutrition plan",
-            preparing: "Preparing...",
-            proContinueCta: "Continue",
-            proContinueDescription:
-              "Your Pro access is active, so we can open a new nutrition plan version without showing payment options.",
-            proContinueTitle: "Pro plan active",
-            reassessmentDescription: "",
-            reassessmentTitle:
-              "Include a free 60-day reassessment. Cancel anytime.",
-            title: "Your HealthScore is ready"
-          },
-          exampleExit: {
-            body:
-              "We are preparing the full plan in the background and sending a focused 3-point nutrition example to your inbox.",
-            chatBody:
-              "Choose your preferred channel to continue with the specialist AI advisor. WhatsApp can open with your plan attached, and Telegram can do the same when it uses a bot link. LINE may need you to send the plan shown below unless a LIFF deep link is configured.",
-            chatButton: "Open chat",
-            chatPlanLabel: "Plan",
-            chatQrAlt: "QR code to connect with the MattaNutra AI advisor",
-            chatTitle: "Chat with the AI advisor while you wait",
-            emailPrefix: "We will send it to",
-            testimonialTitle:
-              "People use MattaNutra to turn wellness data into practical next steps",
-            title: "Your example is being prepared"
-          },
-          exampleProcessingQueue: "Preparing your email example",
-          exampleProcessingSteps: {
-            assessment: "Assessment complete",
-            score: "Preparing your HealthScore",
-            scoreAnalysis: "Analyzing HealthScore",
-            payment: "Processing Payment",
-            formulation: "Requesting example",
-            safety: "Safety review",
-            results: "Complete"
-          },
-          exampleProcessingSubtitle:
-            "We are preparing the full plan first, then selecting the key points for your email example.",
-          exampleProcessingTitle: "Preparing your example",
-          retry: "Try again",
-          statusLabels: {
-            active: "Now",
-            complete: "Complete",
-            failed: "Failed",
-            pending: "Pending"
-          },
-          section: (current: number, total: number) =>
-            `Section ${current} of ${total}`,
-          sectionHint: "Complete the required questions in this section to continue.",
-          skipOptional: "Skip optional",
-          step: (current: number, total: number) =>
-            `Question ${current} of ${total}`,
-          validation: "Answer the required questions to continue",
-          wellnessDisclaimer:
-            "This assessment provides wellness information only. It is not diagnosis, treatment, or advice to stop medication."
-        };
+
+  const ui = locale === "th"
+    ? {
+        back: "ย้อนกลับ",
+        continue: "ต่อไป",
+        infoLabel: "Note",
+        optionalSection: "ความแม่นยำ",
+        processingError: "ไม่สามารถเริ่มการประมวลผลได้ โปรดลองอีกครั้ง",
+        processingSubtitle: "เราจะเปิดหน้าปรับคำแนะนำก่อน จากนั้นคุณค่อยส่งมอบแผนสุดท้ายเมื่อพร้อม",
+        processingTitle: "กำลังเตรียมคำแนะนำของคุณ",
+        scoreProcessingSubtitle: "เรากำลังประเมินภาพรวมสุขภาพจากคำตอบของคุณก่อนแสดงตัวเลือกแผน",
+        scoreProcessingTitle: "กำลังเตรียม HealthScore ของคุณ",
+        scoreGate: {
+          emailButton: "ส่งแผนฟรี 3 ข้อ + HealthScore",
+          emailDescription: "ใส่อีเมลของคุณ แล้วเราจะส่งแผนโภชนาการฟรี 3 ข้อที่ครอบคลุมพื้นฐานสำคัญ",
+          emailDivider: "หรือรับแผนโภชนาการฟรี 3 ข้อทางอีเมล",
+          emailError: "กรุณาใส่อีเมลที่ถูกต้อง",
+          emailPlaceholder: "your@email.com",
+          emailTitle: "ยังไม่พร้อมปลดล็อก?",
+          planDescription: "เลือกระดับคำแนะนำที่ต้องการ ก่อนที่เราจะเปิดแผนโภชนาการของคุณ",
+          planTitle: "ปลดล็อกแผนโภชนาการเฉพาะตัวของคุณ",
+          preparing: "กำลังเตรียม...",
+          proContinueCta: "ไปต่อ",
+          proContinueDescription: "คุณมีสิทธิ์แผน Pro อยู่แล้ว เราจะเปิดแผนโภชนาการเวอร์ชันใหม่โดยไม่แสดงตัวเลือกชำระเงิน",
+          proContinueTitle: "แผน Pro พร้อมใช้งาน",
+          reassessmentDescription: "",
+          reassessmentTitle: "รวมการประเมินซ้ำฟรีใน 60 วัน ยกเลิกได้ทุกเมื่อ",
+          title: "HealthScore ของคุณพร้อมแล้ว"
+        },
+        exampleExit: {
+          body: "เรากำลังเตรียมแผนฉบับเต็มอยู่เบื้องหลัง และจะส่งตัวอย่างแผนโภชนาการ 3 ข้อแบบสั้นไปยังอีเมลของคุณ",
+          chatBody: "เลือกช่องทางที่สะดวกเพื่อคุยต่อกับ AI advisor",
+          chatButton: "เปิดแชต",
+          chatPlanLabel: "แผน",
+          chatQrAlt: "QR code สำหรับเชื่อมต่อ MattaNutra AI advisor",
+          chatTitle: "คุยกับ AI advisor ระหว่างรอตัวอย่างของคุณ",
+          emailPrefix: "เราจะส่งไปที่",
+          testimonialTitle: "ลูกค้าใช้ MattaNutra เพื่อเปลี่ยนข้อมูลสุขภาพให้เป็นขั้นตอนที่ทำได้จริง",
+          title: "ตัวอย่างของคุณกำลังถูกจัดเตรียม"
+        },
+        exampleProcessingSubtitle: "เรากำลังเตรียมแผนฉบับเต็มก่อนคัดส่วนสำคัญเป็นตัวอย่างทางอีเมล",
+        exampleProcessingTitle: "กำลังเตรียมตัวอย่างของคุณ",
+        retry: "ลองอีกครั้ง",
+        requiredSection: "บริบท",
+        section: (current: number, total: number) => `ขั้นตอน ${current} / ${total}`,
+        step: (current: number, total: number) => `คำถามที่ ${current} จาก ${total}`,
+        validation: "",
+        wellnessDisclaimer: "แบบประเมินนี้เป็นข้อมูลเพื่อ wellness เท่านั้น ไม่ใช่การวินิจฉัย การรักษา หรือคำแนะนำให้หยุดยา"
+      }
+    : {
+        back: "Back",
+        continue: "Continue",
+        infoLabel: "Note",
+        optionalSection: "Precision",
+        processingError: "We could not start processing. Please try again.",
+        processingSubtitle: "We will open the refinement page first. When you are ready, deliver the final plan from there.",
+        processingTitle: "Preparing your guidance",
+        scoreProcessingSubtitle: "We are scoring your main wellness domains before showing the plan options.",
+        scoreProcessingTitle: "Preparing your HealthScore",
+        scoreGate: {
+          emailButton: "Send My Free 3-Point Plan + HealthScore",
+          emailDescription: "Enter your email address and we'll send you a free 3-point nutrition plan covering the essentials.",
+          emailDivider: "or get a free 3-point nutrition plan by email",
+          emailError: "Enter a valid email address",
+          emailPlaceholder: "your@email.com",
+          emailTitle: "Not ready to unlock?",
+          planDescription: "Choose the level of guidance you want before we open your nutrition plan.",
+          planTitle: "Unlock your bespoke nutrition plan",
+          preparing: "Preparing...",
+          proContinueCta: "Continue",
+          proContinueDescription: "Your Pro access is active, so we can open a new nutrition plan version without showing payment options.",
+          proContinueTitle: "Pro plan active",
+          reassessmentDescription: "",
+          reassessmentTitle: "Include a free 60-day reassessment. Cancel anytime.",
+          title: "Your HealthScore is ready"
+        },
+        exampleExit: {
+          body: "We are preparing the full plan in the background and sending a focused 3-point nutrition example to your inbox.",
+          chatBody: "Choose your preferred channel to continue with the specialist AI advisor.",
+          chatButton: "Open chat",
+          chatPlanLabel: "Plan",
+          chatQrAlt: "QR code to connect with the MattaNutra AI advisor",
+          chatTitle: "Chat with the AI advisor while you wait",
+          emailPrefix: "We will send it to",
+          testimonialTitle: "People use MattaNutra to turn wellness data into practical next steps",
+          title: "Your example is being prepared"
+        },
+        exampleProcessingSubtitle: "We are preparing the full plan first, then selecting the key points for your email example.",
+        exampleProcessingTitle: "Preparing your example",
+        retry: "Try again",
+        requiredSection: "Context",
+        section: (current: number, total: number) => `Step ${current} / ${total}`,
+        step: (current: number, total: number) => `Question ${current} of ${total}`,
+        validation: "",
+        wellnessDisclaimer: "This assessment provides wellness information only. It is not diagnosis, treatment, or advice to stop medication."
+      };
 
   function setSingle(key: keyof Answers, value: string) {
     setAnswers((current) => ({
       ...current,
       [key]: value,
-      ...(key === "sex" && value !== "female" ? { lifestage: "" } : {}),
-      ...(key === "meds" && value !== "yes" ? { medTypes: [] } : {}),
-      ...(key === "vo2Known" && value === "yes" ? { vo2Proxy: "" } : {}),
-      ...(key === "vo2Known" && value !== "yes" ? { vo2Max: "" } : {})
+      ...(key === "sex" && value !== "female" ? { flow: "", menopause: "", reproStatus: "" } : {}),
+      ...(key === "reproStatus" && (value === "pregnant" || value === "breastfeeding") ? { flow: "" } : {}),
+      ...(key === "meds" && value !== "yes" ? { medTypes: [], otherMed: "" } : {}),
+      ...(key === "tracker" && value !== "other" ? { otherTracker: "" } : {})
     }));
   }
 
-  function toggleMulti(
-    key:
-      | "conditions"
-      | "family"
-      | "foodAllergens"
-      | "goals"
-      | "medTypes"
-      | "symptoms",
-    value: string,
-    max = 99
-  ) {
+  function toggleMulti(key: "allergies" | "family" | "goals" | "medTypes" | "suppAllergies" | "symptoms", value: string, max = 99) {
     setAnswers((current) => {
       const values = current[key];
       const selected = values.includes(value);
 
-      if (!selected && values.length >= max) {
-        return current;
-      }
+      if (!selected && values.length >= max) return current;
 
-      if (key === "conditions" || key === "family" || key === "foodAllergens") {
+      if (key === "allergies" || key === "family" || key === "suppAllergies") {
         if (value === "none") {
-          return {
-            ...current,
-            [key]: selected ? [] : ["none"]
-          };
+          return { ...current, [key]: selected ? [] : ["none"] };
         }
 
         return {
           ...current,
-          [key]: selected
-            ? values.filter((item) => item !== value)
-            : [...values.filter((item) => item !== "none"), value]
+          [key]: selected ? values.filter((item) => item !== value) : [...values.filter((item) => item !== "none"), value]
         };
+      }
+
+      if (key === "symptoms" && value === "great") {
+        return { ...current, symptoms: selected ? [] : ["great"] };
       }
 
       return {
         ...current,
-        [key]: selected
-          ? values.filter((item) => item !== value)
-          : [...values, value],
-        ...(key === "symptoms" ? { feelGreat: false } : {})
+        [key]: selected ? values.filter((item) => item !== value) : [...values.filter((item) => item !== "great"), value]
       };
     });
   }
 
-  function markFeelingGreat() {
+  function updateFoodFrequency(key: FoodFrequencyKey, value: string) {
     setAnswers((current) => ({
       ...current,
-      feelGreat: !current.feelGreat,
-      symptoms: []
+      foodFrequency: {
+        ...current.foodFrequency,
+        [key]: value
+      }
     }));
   }
 
-  const sections: AssessmentSection[] = [
+  function updateLabValue(key: string, value: string) {
+    setAnswers((current) => ({
+      ...current,
+      labs: {
+        ...current.labs,
+        [key]: value
+      }
+    }));
+  }
+
+  function updateLabUnit(key: string, value: string) {
+    setAnswers((current) => ({
+      ...current,
+      labUnits: {
+        ...current.labUnits,
+        [key]: value
+      }
+    }));
+  }
+
+  const rawSections: AssessmentSection[] = [
     {
-      description:
-        locale === "th"
-          ? "ข้อมูลพื้นฐานช่วยให้เราปรับแผนให้เหมาะกับร่างกายและไลฟ์สไตล์ของคุณ"
-          : "A few basics help us shape the plan around your body and lifestyle.",
+      complete: aboutComplete(answers),
+      description: copy.about.subtitle,
       id: "about",
       questions: [
         {
@@ -2139,9 +1801,9 @@ export function AssessmentFlow({
             />
           ),
           id: "sex",
-          isAnswered: Boolean(answers.sex),
+          isAnswered: hasText(answers.sex),
           label: copy.about.sex,
-          required: true
+          why: copy.coach.sex
         },
         {
           content: (
@@ -2152,9 +1814,8 @@ export function AssessmentFlow({
             />
           ),
           id: "age",
-          isAnswered: Boolean(answers.age),
-          label: copy.about.age,
-          required: true
+          isAnswered: hasText(answers.age),
+          label: copy.about.age
         },
         {
           content: (
@@ -2205,13 +1866,9 @@ export function AssessmentFlow({
               </label>
             </div>
           ),
-          id: "height-weight",
-          isAnswered: Boolean(answers.heightCm && answers.weightKg),
-          label:
-            locale === "th"
-              ? "ส่วนสูงและน้ำหนัก"
-              : "Height and weight",
-          required: true
+          id: "body-size",
+          isAnswered: hasText(answers.heightCm) && hasText(answers.weightKg),
+          label: locale === "th" ? "ส่วนสูงและน้ำหนัก" : "Height and weight"
         },
         {
           content: (
@@ -2222,591 +1879,473 @@ export function AssessmentFlow({
             />
           ),
           id: "skin",
-          isAnswered: Boolean(answers.skin),
-          label: copy.about.skin,
-          required: true
+          isAnswered: hasText(answers.skin),
+          label: copy.about.skin
         },
         {
           content: (
-            <select
-              value={answers.country}
-              className="block w-full rounded-md border border-foreground/10 bg-white px-4 py-3 text-sm font-semibold text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
-              onChange={(event) => setSingle("country", event.target.value)}
-            >
-              <option value="">
-                {locale === "th" ? "เลือกประเทศ" : "Select country"}
-              </option>
-              {copy.about.countryOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <div className="grid gap-5 md:grid-cols-[minmax(13rem,0.8fr)_minmax(0,1.2fr)] md:items-start">
+              <label className="block">
+                <span className="text-sm font-semibold text-[#20343A]">
+                  {copy.about.country}
+                </span>
+                <select
+                  value={answers.country}
+                  className="mt-3 block w-full rounded-md border border-foreground/10 bg-white px-4 py-3 text-sm font-semibold text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
+                  onChange={(event) => setSingle("country", event.target.value)}
+                >
+                  <option value="">{locale === "th" ? "เลือกประเทศ" : "Select country"}</option>
+                  {copy.about.countryOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <div>
+                <p className="text-sm font-semibold text-[#20343A]">
+                  {copy.about.sun}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {copy.coach.sun}
+                </p>
+                <div className="mt-3">
+                  <PillGroup
+                    options={copy.about.sunOptions}
+                    selected={answers.sun}
+                    onSelect={(value) => setSingle("sun", value)}
+                  />
+                </div>
+              </div>
+            </div>
           ),
-          id: "country",
-          isAnswered: Boolean(answers.country),
-          label: copy.about.country,
-          required: true
+          id: "country-sun",
+          isAnswered: hasText(answers.country) && hasText(answers.sun),
+          label: ""
         },
         {
           content: (
             <PillGroup
-              options={copy.lifestyle.sunOptions}
-              selected={answers.sun}
-              onSelect={(value) => setSingle("sun", value)}
+              options={copy.about.sunscreenOptions}
+              selected={answers.sunscreen}
+              onSelect={(value) => setSingle("sunscreen", value)}
             />
           ),
-          id: "sun",
-          isAnswered: Boolean(answers.sun),
-          label: copy.lifestyle.sun,
-          required: true
-        }
+          id: "sunscreen",
+          isAnswered: hasText(answers.sunscreen),
+          label: copy.about.sunscreen
+        },
+        ...(answers.sex === "female"
+          ? [
+              {
+                content: (
+                  <div className="space-y-5 rounded-lg border border-[#1FA77A]/15 bg-[#1FA77A]/5 p-4">
+                    <Question
+                      infoLabel={ui.infoLabel}
+                      label={copy.about.reproStatus}
+                      why={copy.coach.sex}
+                    >
+                      <PillGroup
+                        options={copy.about.reproStatusOptions}
+                        selected={answers.reproStatus}
+                        onSelect={(value) => setSingle("reproStatus", value)}
+                      />
+                    </Question>
+                    <Question
+                      infoLabel={ui.infoLabel}
+                      label={copy.about.menopause}
+                    >
+                      <PillGroup
+                        options={copy.about.menopauseOptions}
+                        selected={answers.menopause}
+                        onSelect={(value) => setSingle("menopause", value)}
+                      />
+                    </Question>
+                    {!isPregnantOrBreastfeeding(answers) ? (
+                      <Question
+                        infoLabel={ui.infoLabel}
+                        label={copy.about.flow}
+                      >
+                        <PillGroup
+                          options={copy.about.flowOptions}
+                          selected={answers.flow}
+                          onSelect={(value) => setSingle("flow", value)}
+                        />
+                      </Question>
+                    ) : null}
+                  </div>
+                ),
+                id: "female-context",
+                isAnswered:
+                  hasText(answers.reproStatus) &&
+                  hasText(answers.menopause) &&
+                  (isPregnantOrBreastfeeding(answers) || hasText(answers.flow)),
+                label: copy.about.femaleTitle
+              }
+            ]
+          : [])
       ],
       title: copy.about.title
     },
     {
-      description:
-        locale === "th"
-          ? "เลือกสิ่งที่สำคัญที่สุด เพื่อให้สูตรมีทิศทางชัดเจนตั้งแต่ต้น"
-          : "Choose what matters most so the formulation has a clear direction.",
+      complete: goalsComplete(answers),
+      description: copy.goals.subtitle,
       id: "goals",
       questions: [
         {
           content: (
             <OptionGrid
               max={3}
-              options={copy.goals.options}
+              options={copy.goals.goalOptions}
               selected={answers.goals}
               onToggle={(value) => toggleMulti("goals", value, 3)}
             />
           ),
-          hint: copy.goals.hint,
+          hint: copy.goals.goalHint,
           id: "goals",
-          isAnswered: answers.goals.length > 0,
-          label: copy.goals.prompt,
-          required: true
+          isAnswered: hasAny(answers.goals),
+          label: copy.goals.goals,
+          why: copy.coach.goals
+        },
+        {
+          content: (
+            <OptionGrid
+              options={copy.goals.symptomOptions}
+              selected={answers.symptoms}
+              onToggle={(value) => toggleMulti("symptoms", value)}
+            />
+          ),
+          hint: copy.goals.symptomHint,
+          id: "symptoms",
+          isAnswered: hasAny(answers.symptoms),
+          label: copy.goals.symptoms
         }
       ],
       title: copy.goals.title
     },
     {
-      description:
-        locale === "th"
-          ? "บอกเราว่าตอนนี้คุณรู้สึกอย่างไร เพื่อแยกสิ่งที่ควรสนับสนุนเป็นอันดับแรก"
-          : "Tell us how you feel right now so we can separate priorities from nice-to-haves.",
-      id: "symptoms",
+      complete: dailyComplete(answers),
+      description: copy.daily.subtitle,
+      id: "daily",
       questions: [
         {
-          content: (
-            <>
-              <OptionGrid
-                options={copy.symptoms.options}
-                selected={answers.symptoms}
-                onToggle={(value) => toggleMulti("symptoms", value)}
-              />
-              <div className="mt-3">
-                <button
-                  type="button"
-                  className={cardOptionClasses(answers.feelGreat)}
-                  onClick={markFeelingGreat}
-                >
-                  {copy.symptoms.great.label}
-                </button>
-              </div>
-            </>
-          ),
-          hint: copy.symptoms.hint,
-          id: "symptoms",
-          isAnswered: answers.symptoms.length > 0 || answers.feelGreat,
-          label: copy.symptoms.prompt,
-          required: true
-        }
-      ],
-      title: copy.symptoms.title
-    },
-    {
-      description:
-        locale === "th"
-          ? "เวลานอนเฉลี่ยเป็นพื้นฐานสำคัญก่อนเพิ่มรายละเอียดคุณภาพการนอนในขั้นตอนเสริม"
-          : "Average sleep duration gives us the baseline before optional sleep-quality detail.",
-      id: "sleep-basics",
-      questions: [
-        {
-          content: (
-            <PillGroup
-              options={copy.sleepBasics.options}
-              selected={answers.sleepHours}
-              onSelect={(value) => setSingle("sleepHours", value)}
-            />
-          ),
-          id: "sleep-hours",
-          isAnswered: Boolean(answers.sleepHours),
-          label: copy.sleepBasics.average,
-          required: true
+          content: <PillGroup options={copy.daily.sleepOptions} selected={answers.sleepHrs} onSelect={(value) => setSingle("sleepHrs", value)} />,
+          id: "sleepHrs",
+          isAnswered: hasText(answers.sleepHrs),
+          label: copy.daily.sleepHrs
         },
         {
-          content: (
-            <ScaleGroup
-              options={copy.symptoms.energyOptions}
-              selected={answers.energy}
-              onSelect={(value) => setSingle("energy", value)}
-            />
-          ),
+          content: <ScaleGroup options={copy.daily.energyOptions} selected={answers.energy} onSelect={(value) => setSingle("energy", value)} />,
           id: "energy",
-          isAnswered: Boolean(answers.energy),
-          label: copy.symptoms.energy
+          isAnswered: hasText(answers.energy),
+          label: copy.daily.energy
         },
         {
-          content: (
-            <PillGroup
-              options={copy.about.activityOptions}
-              selected={answers.activity}
-              onSelect={(value) => setSingle("activity", value)}
-            />
-          ),
+          content: <PillGroup options={copy.daily.activityOptions} selected={answers.activity} onSelect={(value) => setSingle("activity", value)} />,
           id: "activity",
-          isAnswered: Boolean(answers.activity),
-          label: copy.about.activity,
-          required: true
+          isAnswered: hasText(answers.activity),
+          label: copy.daily.activity
+        },
+        {
+          content: <ScaleGroup options={copy.daily.stressOptions} selected={answers.stress} onSelect={(value) => setSingle("stress", value)} />,
+          id: "stress",
+          isAnswered: hasText(answers.stress),
+          label: copy.daily.stress
+        },
+        {
+          content: <PillGroup options={copy.daily.digestionOptions} selected={answers.digestion} onSelect={(value) => setSingle("digestion", value)} />,
+          id: "digestion",
+          isAnswered: hasText(answers.digestion),
+          label: copy.daily.digestion
+        },
+        {
+          content: <PillGroup options={copy.daily.digConditionOptions} selected={answers.digCondition} onSelect={(value) => setSingle("digCondition", value)} />,
+          id: "digCondition",
+          isAnswered: hasText(answers.digCondition),
+          label: copy.daily.digCondition
+        },
+        {
+          content: <PillGroup options={copy.daily.smokingOptions} selected={answers.smoking} onSelect={(value) => setSingle("smoking", value)} />,
+          id: "smoking",
+          isAnswered: hasText(answers.smoking),
+          label: copy.daily.smoking
+        },
+        {
+          content: <PillGroup options={copy.daily.alcoholOptions} selected={answers.alcohol} onSelect={(value) => setSingle("alcohol", value)} />,
+          id: "alcohol",
+          isAnswered: hasText(answers.alcohol),
+          label: copy.daily.alcohol
+        },
+        {
+          content: <PillGroup options={copy.daily.caffeineOptions} selected={answers.caffeine} onSelect={(value) => setSingle("caffeine", value)} />,
+          id: "caffeine",
+          isAnswered: hasText(answers.caffeine),
+          label: copy.daily.caffeine
         }
       ],
-      title: copy.sleepBasics.title
+      title: copy.daily.title
     },
     {
-      description:
-        locale === "th"
-          ? "อาหาร เครื่องดื่ม และการสูบบุหรี่ช่วยให้เราปรับบรีฟให้เหมาะกับกิจวัตรจริง"
-          : "Food, beverages, and smoking context keep the brief grounded in real habits.",
-      id: "lifestyle",
+      complete: foodComplete(answers),
+      description: copy.food.subtitle,
+      id: "food",
       questions: [
         {
-          content: (
-            <PillGroup
-              options={copy.lifestyle.dietOptions}
-              selected={answers.diet}
-              onSelect={(value) => setSingle("diet", value)}
-            />
-          ),
+          content: <PillGroup options={copy.food.dietOptions} selected={answers.diet} onSelect={(value) => setSingle("diet", value)} />,
           id: "diet",
-          isAnswered: Boolean(answers.diet),
-          label: copy.lifestyle.diet,
-          required: true
+          isAnswered: hasText(answers.diet),
+          label: copy.food.diet
         },
         {
           content: (
             <div className="space-y-4">
-              <PillGroup
-                multi={true}
-                options={copy.lifestyle.foodAllergenOptions}
-                selected={answers.foodAllergens}
-                onToggle={(value) => toggleMulti("foodAllergens", value)}
-              />
-              <label className="block">
-                <span className="text-sm font-semibold text-[#20343A]">
-                  {copy.lifestyle.foodAvoidances}
-                </span>
-                <textarea
-                  className="mt-2 min-h-24 w-full rounded-lg border border-foreground/10 bg-white px-4 py-3 text-sm text-[#20343A] outline-none transition placeholder:text-muted-foreground/70 focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/20"
-                  placeholder={copy.lifestyle.foodAvoidancesPlaceholder}
-                  value={answers.foodAvoidances}
-                  onChange={(event) =>
-                    setSingle("foodAvoidances", event.target.value)
-                  }
-                />
-              </label>
-              <label className="flex gap-3 rounded-lg border border-[#1FA77A]/20 bg-[#1FA77A]/5 p-4 text-sm leading-6 text-muted-foreground">
-                <input
-                  checked={answers.foodSafetyAcknowledged}
-                  className="mt-1 size-4 rounded border-foreground/20 text-[#1FA77A] focus:ring-[#1FA77A]"
-                  type="checkbox"
-                  onChange={(event) =>
-                    setAnswers((current) => ({
-                      ...current,
-                      foodSafetyAcknowledged: event.target.checked
-                    }))
-                  }
-                />
-                <span>
-                  <span className="block font-medium text-[#20343A]">
-                    {copy.lifestyle.foodSafetyCheckbox}
-                  </span>
-                  <span className="mt-1 block">
-                    {copy.lifestyle.foodSafetyBody}
-                  </span>
-                </span>
-              </label>
-            </div>
-          ),
-          id: "food-safety",
-          isAnswered: answers.foodSafetyAcknowledged,
-          label: copy.lifestyle.foodAllergens,
-          required: true
-        },
-        {
-          content: (
-            <PillGroup
-              options={copy.lifestyle.fishOptions}
-              selected={answers.fish}
-              onSelect={(value) => setSingle("fish", value)}
-            />
-          ),
-          id: "fish",
-          isAnswered: Boolean(answers.fish),
-          label: copy.lifestyle.fish,
-          required: true
-        },
-        {
-          content: (
-            <PillGroup
-              options={copy.lifestyle.smokeOptions}
-              selected={answers.smoke}
-              onSelect={(value) => setSingle("smoke", value)}
-            />
-          ),
-          id: "smoke",
-          isAnswered: Boolean(answers.smoke),
-          label: copy.lifestyle.smoke,
-          required: true
-        },
-        {
-          content: (
-            <PillGroup
-              options={copy.lifestyle.alcoholOptions}
-              selected={answers.alcohol}
-              onSelect={(value) => setSingle("alcohol", value)}
-            />
-          ),
-          id: "alcohol",
-          isAnswered: Boolean(answers.alcohol),
-          label: copy.lifestyle.alcohol,
-          required: true
-        },
-        {
-          content: (
-            <PillGroup
-              options={copy.lifestyle.coffeeOptions}
-              selected={answers.coffee}
-              onSelect={(value) => setSingle("coffee", value)}
-            />
-          ),
-          id: "coffee",
-          isAnswered: Boolean(answers.coffee),
-          label: copy.lifestyle.coffee
-        }
-      ],
-      title: copy.lifestyle.title
-    },
-    {
-      description:
-        locale === "th"
-          ? "ยาและอาหารเสริมที่ใช้อยู่ช่วยให้เราตรวจทานความซ้ำซ้อนและข้อควรระวัง"
-          : "Medication and supplement context helps us check safety flags and avoid doubling up.",
-      id: "medications-supplements",
-      questions: [
-        {
-          content: (
-            <>
-              <PillGroup
-                options={copy.lifestyle.medsOptions}
-                selected={answers.meds}
-                onSelect={(value) => setSingle("meds", value)}
-              />
-              {answers.meds === "yes" ? (
-                <div className="mt-4 rounded-lg border border-[#1FA77A]/20 bg-[#1FA77A]/5 p-4">
-                  <p className="text-sm font-semibold text-[#20343A]">
-                    {copy.lifestyle.medType}
-                  </p>
-                  <div className="mt-3">
-                    <PillGroup
-                      multi={true}
-                      options={copy.lifestyle.medTypeOptions}
-                      selected={answers.medTypes}
-                      onToggle={(value) => toggleMulti("medTypes", value)}
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </>
-          ),
-          hint: copy.lifestyle.medsHint,
-          id: "meds",
-          isAnswered: Boolean(answers.meds),
-          label: copy.lifestyle.meds,
-          required: true
-        },
-        {
-          content: (
-            <PillGroup
-              options={copy.lifestyle.suppsOptions}
-              selected={answers.supps}
-              onSelect={(value) => setSingle("supps", value)}
-            />
-          ),
-          id: "supps",
-          isAnswered: Boolean(answers.supps),
-          label: copy.lifestyle.supps
-        },
-        ...(answers.sex === "female"
-          ? [
-              {
-                content: (
-                  <PillGroup
-                    options={copy.lifestyle.lifestageOptions}
-                    selected={answers.lifestage}
-                    onSelect={(value) => setSingle("lifestage", value)}
-                  />
-                ),
-                id: "lifestage",
-                isAnswered: Boolean(answers.lifestage),
-                label: copy.lifestyle.lifestage
-              }
-            ]
-          : [])
-      ],
-      title: locale === "th" ? "ยาและอาหารเสริม" : "Medications and supplements"
-    },
-    {
-      description:
-        locale === "th"
-          ? "กำหนดงบ รูปแบบ และความสะดวก เพื่อให้คำแนะนำเหมาะกับการใช้จริง"
-          : "Set budget, format, and convenience constraints so the plan can be practical.",
-      id: "preferences",
-      questions: [
-        {
-          content: (
-            <PillGroup
-              options={copy.preferences.budgetOptions}
-              selected={answers.budget}
-              onSelect={(value) => setSingle("budget", value)}
-            />
-          ),
-          id: "budget",
-          isAnswered: Boolean(answers.budget),
-          label: copy.preferences.budget,
-          required: true
-        },
-        {
-          content: (
-            <PillGroup
-              options={copy.preferences.pillsOptions}
-              selected={answers.pills}
-              onSelect={(value) => setSingle("pills", value)}
-            />
-          ),
-          id: "pills",
-          isAnswered: Boolean(answers.pills),
-          label: copy.preferences.pills,
-          required: true
-        },
-        {
-          content: (
-            <PillGroup
-              options={copy.preferences.formOptions}
-              selected={answers.form}
-              onSelect={(value) => setSingle("form", value)}
-            />
-          ),
-          id: "form",
-          isAnswered: Boolean(answers.form),
-          label: copy.preferences.form
-        }
-      ],
-      title: copy.preferences.title
-    },
-    {
-      description: copy.precision.helper,
-      id: "precision",
-      optional: true,
-      questions: [
-        {
-          content: (
-            <PillGroup
-              options={copy.precision.proteinOptions}
-              selected={answers.protein}
-              onSelect={(value) => setSingle("protein", value)}
-            />
-          ),
-          id: "protein",
-          isAnswered: Boolean(answers.protein),
-          label: copy.precision.protein
-        },
-        {
-          content: (
-            <ScaleGroup
-              options={copy.precision.sleepOptions}
-              selected={answers.sleep}
-              onSelect={(value) => setSingle("sleep", value)}
-            />
-          ),
-          id: "sleep",
-          isAnswered: Boolean(answers.sleep),
-          label: copy.precision.sleep
-        },
-        {
-          content: (
-            <ScaleGroup
-              options={copy.precision.stressOptions}
-              selected={answers.stress}
-              onSelect={(value) => setSingle("stress", value)}
-            />
-          ),
-          id: "stress",
-          isAnswered: Boolean(answers.stress),
-          label: copy.precision.stress
-        },
-        {
-          content: (
-            <PillGroup
-              options={copy.precision.stressSourceOptions}
-              selected={answers.stressSource}
-              onSelect={(value) => setSingle("stressSource", value)}
-            />
-          ),
-          id: "stress-source",
-          isAnswered: Boolean(answers.stressSource),
-          label: copy.precision.stressSource
-        },
-        {
-          content: (
-            <PillGroup
-              options={copy.precision.gutOptions}
-              selected={answers.gut}
-              onSelect={(value) => setSingle("gut", value)}
-            />
-          ),
-          id: "gut",
-          isAnswered: Boolean(answers.gut),
-          label: copy.precision.gut
-        },
-        {
-          content: (
-            <PillGroup
-              options={copy.precision.wearableOptions}
-              selected={answers.wearable}
-              onSelect={(value) => setSingle("wearable", value)}
-            />
-          ),
-          id: "wearable",
-          isAnswered: Boolean(answers.wearable),
-          label: copy.precision.wearable
-        },
-        {
-          content: (
-            <>
-              <PillGroup
-                options={copy.precision.vo2KnownOptions}
-                selected={answers.vo2Known}
-                onSelect={(value) => setSingle("vo2Known", value)}
-              />
-              {answers.vo2Known === "yes" ? (
-                <label className="mt-4 block max-w-xs">
-                  <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A]">
-                    {copy.precision.vo2Max}
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={answers.vo2Max}
-                    className="mt-2 block w-full rounded-md border border-foreground/10 bg-white px-3 py-2 text-sm text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
-                    onChange={(event) => setSingle("vo2Max", event.target.value)}
-                  />
-                </label>
-              ) : null}
-              {answers.vo2Known === "no" ? (
-                <div className="mt-4">
+              {foodFrequencyKeys.map((key) => (
+                <div key={key} className="rounded-lg border border-foreground/10 bg-white p-4">
                   <p className="mb-3 text-sm font-semibold text-[#20343A]">
-                    {copy.precision.vo2Proxy}
+                    {copy.food.frequencyTitles[key]}
                   </p>
                   <PillGroup
-                    options={copy.precision.vo2ProxyOptions}
-                    selected={answers.vo2Proxy}
-                    onSelect={(value) => setSingle("vo2Proxy", value)}
+                    options={copy.food.frequencyOptions[key]}
+                    selected={answers.foodFrequency[key]}
+                    onSelect={(value) => updateFoodFrequency(key, value)}
                   />
                 </div>
-              ) : null}
-            </>
-          ),
-          id: "vo2",
-          isAnswered:
-            Boolean(answers.vo2Known) &&
-            (answers.vo2Known === "yes"
-              ? Boolean(answers.vo2Max)
-              : answers.vo2Known === "no"
-                ? Boolean(answers.vo2Proxy)
-                : true),
-          label: copy.precision.vo2Known
-        }
-      ],
-      title: copy.precision.title
-    },
-    {
-      description:
-        locale === "th"
-          ? "เพิ่มบริบทด้านความปลอดภัยและค่าตรวจที่คุณมี ข้ามได้ทุกข้อถ้ายังไม่ทราบ"
-          : "Add safety context and any lab values you know. Skip anything you do not have.",
-      id: "health-context",
-      optional: true,
-      questions: [
-        {
-          content: (
-            <PillGroup
-              multi={true}
-              options={copy.conditions.options}
-              selected={answers.conditions}
-              onToggle={(value) => toggleMulti("conditions", value)}
-            />
-          ),
-          id: "conditions",
-          isAnswered: answers.conditions.length > 0,
-          label: copy.conditions.prompt
-        },
-        {
-          content: (
-            <OptionGrid
-              options={copy.precision.familyOptions}
-              selected={answers.family}
-              onToggle={(value) => toggleMulti("family", value, 8)}
-            />
-          ),
-          id: "family",
-          isAnswered: answers.family.length > 0,
-          label: copy.precision.family
-        },
-        {
-          content: (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {copy.precision.labFields.map((field) => (
-                <label key={field.value} className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A]">
-                    {field.label}
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={answers.labs[field.value] ?? ""}
-                    className="mt-2 block w-full rounded-md border border-foreground/10 bg-white px-3 py-2 text-sm text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
-                    onChange={(event) =>
-                      setAnswers((current) => ({
-                        ...current,
-                        labs: {
-                          ...current.labs,
-                          [field.value]: event.target.value
-                        }
-                      }))
-                    }
-                  />
-                </label>
               ))}
             </div>
           ),
-          id: "labs",
-          isAnswered: Object.values(answers.labs).some(Boolean),
-          label: copy.precision.labs
+          id: "foodFrequency",
+          isAnswered: foodFrequencyKeys.every((key) => hasText(answers.foodFrequency[key])),
+          label: copy.food.frequency,
+          why: copy.coach.foodFrequency
+        },
+        {
+          content: (
+            <div className="space-y-4">
+              <PillGroup multi={true} options={copy.food.allergyOptions} selected={answers.allergies} onToggle={(value) => toggleMulti("allergies", value)} />
+              <textarea
+                className={textInputClasses()}
+                placeholder={copy.food.avoidPlaceholder}
+                value={answers.avoidNote}
+                onChange={(event) => setSingle("avoidNote", event.target.value)}
+              />
+            </div>
+          ),
+          hint: copy.food.avoidNote,
+          id: "allergies",
+          isAnswered: hasAny(answers.allergies),
+          label: copy.food.allergies,
+          why: copy.coach.allergies
+        },
+        {
+          content: (
+            <label className="flex gap-3 rounded-lg border border-[#1FA77A]/20 bg-[#1FA77A]/5 p-4 text-sm leading-6 text-muted-foreground">
+              <input
+                checked={answers.disclosure}
+                className="mt-1 size-4 rounded border-foreground/20 text-[#1FA77A] focus:ring-[#1FA77A]"
+                type="checkbox"
+                onChange={(event) => setAnswers((current) => ({ ...current, disclosure: event.target.checked }))}
+              />
+              <span>
+                <span className="block font-medium text-[#20343A]">{copy.food.disclosureTitle}</span>
+                <span className="mt-1 block">{copy.food.disclosureBody}</span>
+              </span>
+            </label>
+          ),
+          id: "disclosure",
+          isAnswered: answers.disclosure,
+          label: copy.food.disclosureTitle
         }
       ],
-      title: copy.conditions.title
+      title: copy.food.title
+    },
+    {
+      complete: safetyComplete(answers),
+      description: copy.safety.subtitle,
+      id: "safety",
+      questions: [
+        {
+          content: (
+            <div className="space-y-4">
+              <PillGroup options={copy.safety.medicationOptions} selected={answers.meds} onSelect={(value) => setSingle("meds", value)} />
+              {answers.meds === "yes" ? (
+                <div className="rounded-lg border border-[#1FA77A]/15 bg-[#1FA77A]/5 p-4">
+                  <p className="mb-3 text-sm font-semibold text-[#20343A]">{copy.safety.medicationType}</p>
+                  <PillGroup multi={true} options={copy.safety.medicationTypeOptions} selected={answers.medTypes} onToggle={(value) => toggleMulti("medTypes", value)} />
+                  {selectedOther(answers.medTypes) ? (
+                    <input
+                      className={textInputClasses()}
+                      placeholder={copy.safety.otherMedPlaceholder}
+                      value={answers.otherMed}
+                      onChange={(event) => setSingle("otherMed", event.target.value)}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ),
+          hint: copy.safety.medicationHint,
+          id: "meds",
+          isAnswered: hasText(answers.meds) && (answers.meds !== "yes" || hasAny(answers.medTypes)),
+          label: copy.safety.medications,
+          why: copy.coach.medications
+        },
+        {
+          content: <PillGroup options={copy.safety.kidneyOptions} selected={answers.kidney} onSelect={(value) => setSingle("kidney", value)} />,
+          id: "kidney",
+          isAnswered: hasText(answers.kidney),
+          label: copy.safety.kidney
+        },
+        {
+          content: <PillGroup options={copy.safety.liverOptions} selected={answers.liver} onSelect={(value) => setSingle("liver", value)} />,
+          id: "liver",
+          isAnswered: hasText(answers.liver),
+          label: copy.safety.liver
+        },
+        {
+          content: <PillGroup options={copy.safety.surgeryOptions} selected={answers.surgery} onSelect={(value) => setSingle("surgery", value)} />,
+          id: "surgery",
+          isAnswered: hasText(answers.surgery),
+          label: copy.safety.surgery
+        },
+        {
+          content: <PillGroup options={copy.safety.antibioticsOptions} selected={answers.antibiotics} onSelect={(value) => setSingle("antibiotics", value)} />,
+          id: "antibiotics",
+          isAnswered: hasText(answers.antibiotics),
+          label: copy.safety.antibiotics
+        },
+        {
+          content: <PillGroup options={copy.safety.supplementsOptions} selected={answers.supplements} onSelect={(value) => setSingle("supplements", value)} />,
+          id: "supplements",
+          isAnswered: hasText(answers.supplements),
+          label: copy.safety.supplements
+        },
+        {
+          content: (
+            <div className="space-y-4">
+              <PillGroup multi={true} options={copy.safety.suppAllergyOptions} selected={answers.suppAllergies} onToggle={(value) => toggleMulti("suppAllergies", value)} />
+              {selectedOther(answers.suppAllergies) ? (
+                <input
+                  className={textInputClasses()}
+                  placeholder={copy.safety.otherSuppPlaceholder}
+                  value={answers.otherSupp}
+                  onChange={(event) => setSingle("otherSupp", event.target.value)}
+                />
+              ) : null}
+            </div>
+          ),
+          id: "suppAllergies",
+          isAnswered: hasAny(answers.suppAllergies) && (!selectedOther(answers.suppAllergies) || hasText(answers.otherSupp)),
+          label: copy.safety.suppAllergies
+        }
+      ],
+      title: copy.safety.title
+    },
+    {
+      complete: precisionRequiredComplete(answers),
+      description: copy.precision.subtitle,
+      id: "precision",
+      questions: [
+        {
+          content: <PillGroup options={copy.precision.budgetOptions} selected={answers.budget} onSelect={(value) => setSingle("budget", value)} />,
+          id: "budget",
+          isAnswered: hasText(answers.budget),
+          label: copy.precision.budget
+        },
+        {
+          content: <PillGroup options={copy.precision.maxPillsOptions} selected={answers.maxPills} onSelect={(value) => setSingle("maxPills", value)} />,
+          id: "maxPills",
+          isAnswered: hasText(answers.maxPills),
+          label: copy.precision.maxPills
+        },
+        {
+          content: <PillGroup options={copy.precision.formOptions} selected={answers.form} onSelect={(value) => setSingle("form", value)} />,
+          id: "form",
+          isAnswered: hasText(answers.form),
+          label: copy.precision.form
+        },
+        {
+          content: (
+            <div className="space-y-5 rounded-lg border border-[#3A7BD5]/15 bg-[#3A7BD5]/5 p-4">
+              <div>
+                <p className="text-sm font-semibold text-[#20343A]">{copy.precision.optionalBanner}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{copy.precision.optionalBody}</p>
+              </div>
+              <Question infoLabel={ui.infoLabel} label={copy.precision.protein} why={copy.coach.precision}>
+                <PillGroup options={copy.precision.proteinOptions} selected={answers.protein} onSelect={(value) => setSingle("protein", value)} />
+              </Question>
+              <Question infoLabel={ui.infoLabel} label={copy.precision.family}>
+                <OptionGrid options={copy.precision.familyOptions} selected={answers.family} onToggle={(value) => toggleMulti("family", value, 8)} />
+              </Question>
+              <Question infoLabel={ui.infoLabel} label={copy.precision.tracker}>
+                <PillGroup options={copy.precision.trackerOptions} selected={answers.tracker} onSelect={(value) => setSingle("tracker", value)} />
+                {answers.tracker === "other" ? (
+                  <input className={textInputClasses()} value={answers.otherTracker} onChange={(event) => setSingle("otherTracker", event.target.value)} />
+                ) : null}
+              </Question>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-sm font-semibold text-[#20343A]">{copy.precision.vo2}</span>
+                  <input className={textInputClasses()} inputMode="decimal" value={answers.vo2} onChange={(event) => setSingle("vo2", event.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-[#20343A]">{copy.precision.hrv}</span>
+                  <input className={textInputClasses()} inputMode="decimal" value={answers.hrv} onChange={(event) => setSingle("hrv", event.target.value)} />
+                </label>
+              </div>
+              <Question infoLabel={ui.infoLabel} label={copy.precision.labs} hint={copy.precision.labsHint} why={copy.coach.labs}>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {copy.precision.labFields.map((field) => (
+                    <label key={field.value} className="block rounded-lg border border-foreground/10 bg-white p-3">
+                      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A]">{field.label}</span>
+                      <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
+                        <input
+                          className="min-w-0 rounded-md border border-foreground/10 px-3 py-2 text-sm outline-none focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
+                          inputMode="decimal"
+                          value={answers.labs[field.value] ?? ""}
+                          onChange={(event) => updateLabValue(field.value, event.target.value)}
+                        />
+                        <select
+                          className="rounded-md border border-foreground/10 bg-white px-2 py-2 text-xs font-semibold text-[#20343A] outline-none focus:border-[#1FA77A]"
+                          value={answers.labUnits[field.value] ?? field.units[0]}
+                          onChange={(event) => updateLabUnit(field.value, event.target.value)}
+                        >
+                          {field.units.map((unit) => (
+                            <option key={unit} value={unit}>{unit}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </Question>
+              <label className="block">
+                <span className="text-sm font-semibold text-[#20343A]">{locale === "th" ? "อีเมลสำหรับประเมินซ้ำ" : "Reassessment email"}</span>
+                <input
+                  className={textInputClasses()}
+                  type="email"
+                  value={answers.reassessmentEmail}
+                  onChange={(event) => setSingle("reassessmentEmail", event.target.value)}
+                />
+              </label>
+            </div>
+          ),
+          id: "optional-precision",
+          isAnswered: optionalChecks(answers).some(Boolean),
+          label: copy.precision.optionalBanner,
+          why: copy.coach.precision
+        }
+      ],
+      title: copy.precision.title
     }
   ];
+
+  const sections: AssessmentSection[] = rawSections.map((section) => ({
+    ...section,
+    complete: section.questions.some((question) => question.isAnswered),
+    questions: section.questions.map((question) => ({
+      ...question,
+      required: false
+    }))
+  }));
+
 
   function fillRandomDefaultsAndFinalStep() {
     setAnswers(buildRandomDevAnswers());
@@ -2819,97 +2358,43 @@ export function AssessmentFlow({
     setExampleRequest(null);
     captureInFlight.current = null;
     setSectionIndex(sections.length - 1);
-    setQuestionIndex(0);
     window.scrollTo({ behavior: "smooth", top: 0 });
   }
 
   const currentSection = sections[Math.min(sectionIndex, sections.length - 1)];
-  const currentQuestionIndex = Math.min(
-    questionIndex,
-    currentSection.questions.length - 1
-  );
-  const currentQuestion = currentSection.questions[currentQuestionIndex];
-  const renderedQuestions = isCompact
-    ? [currentQuestion]
-    : currentSection.questions;
-  const requiredQuestions = isCompact
-    ? [currentQuestion]
-    : currentSection.questions;
-  const currentStepComplete =
-    currentSection.optional ||
-    requiredQuestions.every((question) => !question.required || question.isAnswered);
-  const isFinalSection = sectionIndex === sections.length - 1;
-  const isFinalStep =
-    isFinalSection &&
-    (!isCompact || currentQuestionIndex >= currentSection.questions.length - 1);
-  const canMoveForward = isFinalStep ? canGenerate : currentStepComplete;
-  const flowStepTotal = isCompact
-    ? sections.reduce((total, section) => total + section.questions.length, 0)
-    : sections.length;
-  const flowStepCurrent = isCompact
-    ? sections
-        .slice(0, sectionIndex)
-        .reduce((total, section) => total + section.questions.length, 0) +
-      currentQuestionIndex +
-      1
-    : sectionIndex + 1;
+  const renderedQuestions = currentSection.questions;
+  const isFinalStep = sectionIndex === sections.length - 1;
 
   function sectionIsComplete(section: AssessmentSection) {
-    if (section.optional) {
-      return section.questions.some((question) => question.isAnswered);
-    }
-
-    return section.questions.every(
-      (question) => !question.required || question.isAnswered
-    );
+    return section.questions.some((question) => question.isAnswered);
   }
 
   function goBack() {
     setProcessingError("");
     setExampleError("");
 
-    if (isCompact && currentQuestionIndex > 0) {
-      setQuestionIndex(currentQuestionIndex - 1);
-      return;
-    }
-
     if (sectionIndex > 0) {
-      const previousSection = sections[sectionIndex - 1];
       setSectionIndex(sectionIndex - 1);
-      setQuestionIndex(isCompact ? previousSection.questions.length - 1 : 0);
       return;
     }
 
     return;
   }
 
-  function goNext() {
-    if (!canMoveForward) {
-      return;
-    }
-
-    if (isCompact && currentQuestionIndex < currentSection.questions.length - 1) {
-      setQuestionIndex(currentQuestionIndex + 1);
-      return;
-    }
-
-    if (isFinalStep) {
-      void prepareHealthScoreGate(answers);
-      return;
-    }
-
-    setSectionIndex(Math.min(sectionIndex + 1, sections.length - 1));
-    setQuestionIndex(0);
+  function goToSection(index: number) {
+    setProcessingError("");
+    setExampleError("");
+    setSectionIndex(Math.min(Math.max(index, 0), sections.length - 1));
+    window.scrollTo({ behavior: "smooth", top: 0 });
   }
 
-  function skipOptionalSection() {
+  function goNext() {
     if (isFinalStep) {
       void prepareHealthScoreGate(answers);
       return;
     }
 
     setSectionIndex(Math.min(sectionIndex + 1, sections.length - 1));
-    setQuestionIndex(0);
   }
 
   function choosePlan(planId: string) {
@@ -3002,8 +2487,8 @@ export function AssessmentFlow({
       eventType: "funnel",
       locale,
       properties: {
-        completedRequired: completed,
-        requiredTotal
+        completedRequired: precision.essentialDone,
+        requiredTotal: precision.essentialTotal
       }
     });
 
@@ -3469,24 +2954,10 @@ export function AssessmentFlow({
 
   const visibleProcessingStatus =
     displayedProcessingStatus ?? processingStatus;
-  const progressStage =
-    visibleProcessingStatus && processingMode !== "score" && processingMode !== "example"
-      ? "refine"
-      : showPlans || showExampleExit
-        ? "refine"
-        : "quiz";
 
   return (
     <>
       <div className="mx-auto w-full max-w-6xl px-6 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-10 sm:px-8 sm:pb-16 lg:pt-14">
-        <NutritionProgress
-          className="mb-6"
-          current={progressStage}
-          locale={locale}
-          pending={Boolean(
-            visibleProcessingStatus && visibleProcessingStatus.status !== "failed"
-          )}
-        />
         {visibleProcessingStatus ? (
           <ProcessingPanel
             error={
@@ -3544,145 +3015,56 @@ export function AssessmentFlow({
           />
         ) : (
           <div className="space-y-6">
-            {sectionIndex === 0 ? (
-              <section className="relative overflow-hidden rounded-lg bg-[#3A7BD5]/5 p-6 ring-1 ring-[#3A7BD5]/10 sm:p-8 lg:p-10">
-                <Image
-                  src={assessmentHeroImageUrl}
-                  alt=""
-                  fill
-                  priority
-                  sizes="(min-width: 1024px) 896px, 100vw"
-                  className="object-cover object-center opacity-18"
-                />
-                <div
-                  aria-hidden={true}
-                  className="pointer-events-none absolute inset-0"
-                  style={{ background: assessmentHeroFade }}
-                />
-                <div
-                  aria-hidden={true}
-                  className="pointer-events-none absolute inset-0 bg-[#F3F8FF]/65"
-                />
-                <div className="relative">
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#3A7BD5]">
-                    {copy.hero.time}
-                  </p>
-                  <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-5xl">
-                    {copy.hero.title}
-                  </h1>
-                  <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-                    {copy.hero.description}
-                  </p>
-
-                  <div className="mt-6 grid gap-2 sm:grid-cols-3">
-                    {copy.badges.map((badge, index) => {
-                      const BadgeIcon =
-                        heroBadgeIcons[index] ?? CheckCircleIcon;
-
-                      return (
-                        <div
-                          key={badge}
-                          className="flex items-center gap-3 rounded-md border border-foreground/10 bg-background/90 px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A] shadow-sm backdrop-blur-sm sm:text-sm"
-                        >
-                          <BadgeIcon
-                            aria-hidden={true}
-                            className="size-4 flex-none text-[#3A7BD5]"
-                          />
-                          <span>{badge}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-5 max-w-2xl text-xs font-medium leading-5 text-muted-foreground">
-                    {ui.wellnessDisclaimer}
-                  </p>
-                  {showDevShortcut ? (
-                    <button
-                      type="button"
-                      className="mt-6 inline-flex items-center justify-center rounded-md border border-[#3A7BD5]/25 bg-white/85 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.1em] text-[#245f9f] shadow-sm backdrop-blur-sm transition hover:bg-white"
-                      onClick={fillRandomDefaultsAndFinalStep}
-                    >
-                      Dev: random defaults
-                    </button>
-                  ) : null}
-                </div>
-              </section>
-            ) : null}
+            <SectionProgress
+              className="sticky top-[4.5rem] z-40 mb-2"
+              hint={precisionHint}
+              label={copy.progress.label}
+              marks={[
+                copy.progress.markStart,
+                copy.progress.markMiddle,
+                copy.progress.markEnd
+              ]}
+              progress={precision.progress}
+            />
 
             <div>
-              <SectionCard
-                done={sectionIsComplete(currentSection)}
-                number={sectionIndex + 1}
-                sectionLabel={
-                  currentSection.optional
-                    ? ui.optionalSection
-                    : ui.requiredSection
-                }
-                stepLabel={
-                  isCompact
-                    ? ui.step(flowStepCurrent, flowStepTotal)
-                    : ui.section(sectionIndex + 1, sections.length)
-                }
-                title={currentSection.title}
-              >
-                {renderedQuestions.map((question) => (
-                  <Question
-                    key={question.id}
-                    hint={question.hint}
-                    infoLabel={ui.infoLabel}
-                    label={question.label}
-                    required={question.required}
-                    requiredLabel={copy.common.required}
-                    why={question.why ?? getQuestionWhy(locale, question.id)}
-                  >
-                    {question.content}
-                  </Question>
-                ))}
-              </SectionCard>
-
-              {!canMoveForward ? (
-                <p className="mt-3 text-sm font-medium text-muted-foreground">
-                  {ui.validation}
-                </p>
-              ) : null}
-              {processingError ? (
-                <p className="mt-3 text-sm font-medium text-red-600">
-                  {processingError}
-                </p>
-              ) : null}
-
-              <SectionProgress
-                className="mt-5"
-                framed={true}
-                progress={progress}
-                progressLabel={progressLabel}
+              <AssessmentStepper
+                currentIndex={sectionIndex}
+                onSelect={goToSection}
+                phases={copy.stagePhases}
+                sections={sections}
+                stages={copy.stages}
               />
+            </div>
 
-              <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <button
-                  type="button"
-                  disabled={sectionIndex === 0 && currentQuestionIndex === 0}
-                  className="rounded-md border border-foreground/10 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-[#20343A] transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-40"
-                  onClick={goBack}
-                >
-                  {ui.back}
-                </button>
-
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  {currentSection.optional && !isFinalStep ? (
+            <SectionCard
+              description={currentSection.description}
+              done={sectionIsComplete(currentSection)}
+              footer={
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
                     <button
                       type="button"
-                      className="rounded-md px-4 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground transition hover:text-[#20343A]"
-                      onClick={skipOptionalSection}
+                      disabled={sectionIndex === 0}
+                      className="rounded-md border border-foreground/10 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-[#20343A] transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={goBack}
                     >
-                      {ui.skipOptional}
+                      {ui.back}
                     </button>
-                  ) : null}
+                    {showDevShortcut ? (
+                      <button
+                        type="button"
+                        className="rounded-md border border-foreground/10 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition hover:bg-background hover:text-[#20343A]"
+                        onClick={fillRandomDefaultsAndFinalStep}
+                      >
+                        Random defaults
+                      </button>
+                    ) : null}
+                  </div>
 
                   <button
                     type="button"
-                    disabled={!canMoveForward}
-                    className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-6 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition enabled:hover:bg-[#188a65] disabled:cursor-not-allowed disabled:bg-foreground/15 disabled:text-muted-foreground"
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-6 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition hover:bg-[#188a65]"
                     onClick={goNext}
                   >
                     {isFinalStep ? copy.fixedAction.generate : ui.continue}
@@ -3691,8 +3073,30 @@ export function AssessmentFlow({
                     ) : null}
                   </button>
                 </div>
-              </div>
-            </div>
+              }
+              sectionLabel={copy.stagePhases[sectionIndex] ?? ""}
+              stepLabel={ui.section(sectionIndex + 1, sections.length)}
+              supportingNote={copy.sectionNotes[sectionIndex]}
+              title={currentSection.title}
+            >
+              {renderedQuestions.map((question) => (
+                <Question
+                  key={question.id}
+                  hint={question.hint}
+                  infoLabel={ui.infoLabel}
+                  label={question.label}
+                  why={question.why}
+                >
+                  {question.content}
+                </Question>
+              ))}
+            </SectionCard>
+
+            {processingError ? (
+              <p className="text-sm font-medium text-red-600">
+                {processingError}
+              </p>
+            ) : null}
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { HighlightedBrandText } from "@/components/highlighted-brand-text";
 
 type Option = Readonly<{
@@ -46,18 +46,22 @@ export function cardOptionClasses(selected: boolean) {
 
 type SectionCardProps = Readonly<{
   children: ReactNode;
+  description?: string;
   done: boolean;
-  number: number;
+  footer?: ReactNode;
   sectionLabel: string;
   stepLabel: string;
+  supportingNote?: string;
   title: string;
 }>;
 
 type SectionProgressProps = Readonly<{
   className?: string;
   framed?: boolean;
+  hint: string;
+  label: string;
+  marks: readonly [string, string, string];
   progress: number;
-  progressLabel: string;
 }>;
 
 type ProcessingPanelProps = Readonly<{
@@ -105,70 +109,107 @@ export function ProcessingPanel({
 export function SectionProgress({
   className,
   framed = false,
+  hint,
+  label,
+  marks,
   progress,
-  progressLabel
 }: SectionProgressProps) {
   return (
     <div
       className={cx(
         framed
-          ? "rounded-lg border border-foreground/10 bg-white px-4 py-3 shadow-sm"
-          : "px-1 py-1",
+          ? "rounded-lg border border-foreground/10 bg-white px-4 py-4 shadow-sm"
+          : "bg-background/95 px-1 py-4 backdrop-blur",
         className
       )}
     >
-      <div className="flex items-center justify-between gap-3">
-        <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          {progressLabel}
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <span className="size-1.5 rounded-full bg-[#1FA77A]" />
+          {label}
         </p>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#20343A]">
-          {progress}%
+        <p className="text-2xl font-semibold tracking-normal text-[#1FA77A]">
+          {progress}
+          <span className="ml-0.5 text-sm font-semibold text-muted-foreground">
+            %
+          </span>
         </p>
       </div>
-      <div className="mt-1.5 h-1 rounded-md bg-background">
+      <div className="mt-2 h-2 overflow-hidden rounded-full border border-foreground/10 bg-background">
         <div
-          className="h-full rounded-md bg-[#1FA77A] transition-all"
+          className="h-full rounded-full bg-[#1FA77A] transition-all duration-500"
           style={{ width: `${progress}%` }}
         />
       </div>
+      <div className="mt-2 flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        <span>{marks[0]}</span>
+        <span className="text-center">{marks[1]}</span>
+        <span className="text-right">{marks[2]}</span>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        {hint}
+      </p>
     </div>
   );
 }
 
 export function SectionCard({
   children,
+  description,
   done,
-  number,
+  footer,
   sectionLabel,
   stepLabel,
+  supportingNote,
   title
 }: SectionCardProps) {
   return (
-    <section className="rounded-lg bg-white p-5 ring-1 ring-foreground/10 sm:p-6">
-      <div className="mb-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div
+    <section className="divide-y divide-foreground/10 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-foreground/10">
+      <div className="px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p
               className={cx(
-                "flex size-8 items-center justify-center rounded-md text-sm font-semibold text-white",
-                done ? "bg-[#1FA77A]" : "bg-[#3A7BD5]"
+                "flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em]",
+                done ? "text-[#1FA77A]" : "text-[#3A7BD5]"
               )}
             >
-              {done ? "✓" : number}
-            </div>
-            <h2 className="text-lg font-semibold text-[#20343A]">{title}</h2>
-          </div>
-          <div className="text-left sm:text-right">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#3A7BD5]">
-              {stepLabel}
-            </p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <span
+                className={cx(
+                  "size-1.5 rounded-full",
+                  done ? "bg-[#1FA77A]" : "bg-[#3A7BD5]"
+                )}
+              />
               {sectionLabel}
             </p>
+            <h2 className="mt-2 text-lg font-semibold text-[#20343A]">{title}</h2>
+            {description ? (
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                {description}
+              </p>
+            ) : null}
+          </div>
+          <div className="max-w-xl text-left lg:max-w-sm lg:text-right">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              {stepLabel}
+            </p>
+            {supportingNote ? (
+              <p className="mt-2 border-l-2 border-[#1FA77A]/40 pl-3 text-sm leading-6 text-muted-foreground lg:border-l-0 lg:border-r-2 lg:pl-0 lg:pr-3">
+                <span aria-hidden={true} className="mr-1 text-[#1FA77A]">“</span>
+                {supportingNote}
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
-      <div className="space-y-6">{children}</div>
+      <div className="px-5 py-6 sm:p-6">
+        <div className="space-y-7">{children}</div>
+      </div>
+      {footer ? (
+        <div className="bg-background/60 px-5 py-4 sm:px-6">
+          {footer}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -186,70 +227,27 @@ type QuestionProps = Readonly<{
 export function Question({
   children,
   hint,
-  infoLabel,
+  infoLabel: _infoLabel,
   label,
-  required = false,
-  requiredLabel,
+  required: _required = false,
+  requiredLabel: _requiredLabel,
   why
 }: QuestionProps) {
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2">
-        {why ? (
-          <QuestionLabelPopover
-            infoLabel={infoLabel}
-            label={label}
-            text={why}
-          />
-        ) : (
+      {label ? (
+        <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold text-[#20343A]">{label}</p>
-        )}
-        {required ? (
-          <span className="rounded-full bg-[#1FA77A]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#1FA77A]">
-            {requiredLabel}
-          </span>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
       {hint ? <p className="mt-1 text-sm text-muted-foreground">{hint}</p> : null}
+      {why ? (
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          {why}
+        </p>
+      ) : null}
       <div className="mt-3">{children}</div>
     </div>
-  );
-}
-
-function QuestionLabelPopover({
-  infoLabel,
-  label,
-  text
-}: Readonly<{ infoLabel: string; label: string; text: string }>) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <span
-      className="relative inline-flex max-w-full"
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-    >
-      <button
-        type="button"
-        aria-expanded={isOpen}
-        aria-label={`${infoLabel}: ${label}`}
-        className="cursor-help rounded-sm text-left text-sm font-semibold text-[#20343A] underline decoration-foreground/20 decoration-dotted underline-offset-4 transition hover:text-[#245f9f] focus:outline-none focus:ring-2 focus:ring-[#3A7BD5]/25"
-        onBlur={() => setIsOpen(false)}
-        onClick={() => setIsOpen((current) => !current)}
-        onFocus={() => setIsOpen(true)}
-      >
-        {label}
-      </button>
-      <span
-        role="tooltip"
-        className={cx(
-          "absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-md bg-[#20343A] px-3 py-2 text-left text-xs font-medium normal-case leading-5 tracking-normal text-white shadow-lg sm:left-1/2 sm:-translate-x-1/2",
-          isOpen ? "block" : "hidden"
-        )}
-      >
-        {text}
-      </span>
-    </span>
   );
 }
 

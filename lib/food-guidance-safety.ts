@@ -109,11 +109,12 @@ function safetyIntake(answers: unknown) {
     ...stringArray(record.avoidedFoods),
     ...stringArray(record.foodAvoidances),
     ...splitFreeText(record.foodAvoidances),
+    ...splitFreeText(record.avoidNote),
     ...splitFreeText(record.dislikedFoods)
   ];
 
   return {
-    acknowledged: record.foodSafetyAcknowledged === true,
+    acknowledged: record.disclosure === true,
     allergens: allergenInputs.map(normalizeFoodName).filter(Boolean),
     avoidances: avoidances.map(normalizeFoodName).filter(Boolean),
     conditionFlags: deriveConditionFlags(record)

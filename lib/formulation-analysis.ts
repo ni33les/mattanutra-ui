@@ -4,6 +4,7 @@ import type { Locale } from "@/lib/i18n";
 import type {
   FoodGuidanceBlueprint,
   FormulationBlueprint,
+  FormulationCaution,
   FormulationIngredient,
   LocalizedText,
   MarketingPoint,
@@ -64,6 +65,11 @@ const VALID_STATUSES = new Set<FormulationStatus>([
   "covered",
   "review"
 ]);
+const VALID_CAUTION_SEVERITIES = new Set<FormulationCaution["severity"]>([
+  "caution",
+  "info",
+  "review"
+]);
 
 function getConfiguredValue(value: string | undefined) {
   return value?.trim() ?? "";
@@ -88,14 +94,88 @@ function getGrokConfig() {
   };
 }
 
+function compactStringArray(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+}
+
+function compactText(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function buildAssessmentSafetyContext(answers: unknown) {
+  const record = isRecord(answers) ? answers : {};
+  const labs = isRecord(record.labs) ? record.labs : {};
+  const labUnits = isRecord(record.labUnits) ? record.labUnits : {};
+
+  return {
+    allergies: compactStringArray(record, "allergies"),
+    antibiotics: compactText(record, "antibiotics"),
+    avoidNote: compactText(record, "avoidNote"),
+    budget: compactText(record, "budget"),
+    country: compactText(record, "country") ?? "TH",
+    digestiveCondition: compactText(record, "digCondition"),
+    familyHistory: compactStringArray(record, "family"),
+    foodRestrictions: {
+      allergies: compactStringArray(record, "allergies"),
+      avoidNote: compactText(record, "avoidNote"),
+      diet: compactText(record, "diet"),
+      frequency: isRecord(record.foodFrequency) ? record.foodFrequency : {}
+    },
+    formPreference: compactText(record, "form"),
+    kidney: compactText(record, "kidney"),
+    labs: Object.fromEntries(
+      Object.entries(labs)
+        .filter(([, value]) => typeof value === "string" && value.trim())
+        .map(([key, value]) => [
+          key,
+          {
+            unit: typeof labUnits[key] === "string" ? labUnits[key] : null,
+            value
+          }
+        ])
+    ),
+    liver: compactText(record, "liver"),
+    maxPills: compactText(record, "maxPills"),
+    medications: {
+      answer: compactText(record, "meds"),
+      classes: compactStringArray(record, "medTypes"),
+      other: compactText(record, "otherMed")
+    },
+    menopause: compactText(record, "menopause"),
+    pillCount: compactText(record, "maxPills"),
+    pregnancyBreastfeedingTryingToConceive: compactText(record, "reproStatus"),
+    proteinIntake: compactText(record, "protein"),
+    recentSurgery: compactText(record, "surgery"),
+    sex: compactText(record, "sex"),
+    supplementSensitivities: {
+      classes: compactStringArray(record, "suppAllergies"),
+      other: compactText(record, "otherSupp")
+    },
+    supplementsCurrentlyUsed: compactText(record, "supplements"),
+    trackerData: {
+      hrv: compactText(record, "hrv"),
+      tracker: compactText(record, "tracker"),
+      vo2: compactText(record, "vo2")
+    }
+  };
+}
+
 function systemPrompt(promptVersion: string) {
   return [
     `MattaNutra formulation analysis engine ${promptVersion}.`,
     "You are generating a wellness-oriented nutritional formulation brief.",
     "This is not medical advice, a prescription, a diagnosis, or a treatment plan.",
     "Use the completed assessment to produce a concise supplement breakdown.",
+    "Use the assessmentSafetyContext to include clear cautions where relevant.",
     "Prefer the supplied canonical supplement names exactly when they fit the assessment.",
     "Also produce concise, personalized marketing points that explain why the user's full MattaNutra plan is worth opening.",
+    "Use the user-facing term cautions only. Do not output warning-named fields.",
     "Do not include product recommendations, marketplace links, personal contact data, markdown, explanations outside JSON, or medical claims.",
     "The first character of your response must be { and the last character must be }.",
     "Every supplementBreakdown entry must be a JSON object, never a string.",
@@ -129,6 +209,7 @@ function userPrompt({
   return JSON.stringify(
     {
       assessment: answers,
+      assessmentSafetyContext: buildAssessmentSafetyContext(answers),
       currentPlanContext: {
         chatMessages: (chatMessages ?? []).map((message) => ({
           body: message.body,
@@ -165,10 +246,40 @@ function userPrompt({
               en: "one English sentence explaining the wellness benefit in plain language",
               th: "one Thai sentence explaining the wellness benefit in plain language"
             },
+            cautions: [
+              {
+                body: {
+                  en: "specific English caution tied to the assessment context",
+                  th: "specific Thai caution tied to the assessment context"
+                },
+                id: "stable kebab-case identifier",
+                relatedAnswerKeys: ["medTypes", "kidney"],
+                severity: "caution | info | review",
+                title: {
+                  en: "short English caution title",
+                  th: "short Thai caution title"
+                }
+              }
+            ],
             status: "covered | add | review",
             supplement: {
               en: "English supplement name",
               th: "Thai supplement name"
+            }
+          }
+        ],
+        cautions: [
+          {
+            body: {
+              en: "plan-level English caution tied to medication, pregnancy, kidney/liver, surgery, antibiotics, allergies, or uncertainty",
+              th: "plan-level Thai caution tied to medication, pregnancy, kidney/liver, surgery, antibiotics, allergies, or uncertainty"
+            },
+            id: "stable kebab-case identifier",
+            relatedAnswerKeys: ["meds", "reproStatus"],
+            severity: "caution | info | review",
+            title: {
+              en: "short English caution title",
+              th: "short Thai caution title"
             }
           }
         ],
@@ -187,13 +298,17 @@ function userPrompt({
         ]
       },
       instructions: [
-        "Return a JSON object with exactly two top-level keys: supplementBreakdown and marketingPoints.",
+        "Return a JSON object with exactly three top-level keys: supplementBreakdown, marketingPoints, and cautions.",
         "supplementBreakdown must contain 6 to 18 items.",
         "marketingPoints must contain 3 concise points that are specific to this assessment, the HealthScore, and the plan.",
         "Every marketingPoints array entry must be an object with id, title, and body.",
+        "cautions must be an array. Return an empty array only when the assessment context truly has no relevant cautions.",
+        "Every caution must be an object with id, severity, body, optional title, and optional relatedAnswerKeys.",
+        "Use cautions for medication, pregnancy, breastfeeding, trying-to-conceive, kidney, liver, surgery, antibiotics, allergy, supplement sensitivity, lab, or uncertainty context.",
+        "Do not use warning terminology or output warning-named keys. The user-facing term is caution.",
         "marketingPoints title and body must each be localized objects with exactly en and th string values.",
         "Marketing copy must be truthful, benefit-led, and calm. Do not invent discounts, urgency, guarantees, cures, diagnosis, treatment claims, or product availability.",
-        "Use marketingPoints to explain why the full bespoke plan is more useful than the free preview: for example prioritization, dose/safety checks, and food-plus-supplement fit.",
+        "Use marketingPoints to explain why the full bespoke plan is more useful than the free preview: for example prioritization, dose checks, cautions, and food-plus-supplement fit.",
         "When currentPlanContext.planFeedback is present, treat it as client-stated preferences and constraints for this new version.",
         "Use canonicalSupplementCatalogue as the preferred naming vocabulary. When a listed canonical supplement fits, set supplement.en exactly to its name.",
         "Use canonical aliases only to recognize equivalent ingredients; do not output aliases when a canonical name exists.",
@@ -210,7 +325,7 @@ function userPrompt({
         "Avoid capsule counts, serving sizes, proprietary-blend doses, vague ranges, or multiple units in dailyDose. If uncertain, use a conservative numeric dose and set status=review.",
         "Write the English fields for a consumer wellness audience, and the Thai fields as natural Thai, not transliterated English unless the ingredient name is normally used that way.",
         "Keep category and status as canonical English values for internal processing.",
-        "Use status=review for anything that should be checked before use because of medication, pregnancy, breastfeeding, condition, or uncertainty.",
+        "Use status=review for anything that should be checked before use because of medication, pregnancy, breastfeeding, condition, or uncertainty, and add a linked caution.",
         "Keep rationales benefit-focused, for example: Supports skin, joint, and active lifestyle goals.",
         "Return both English and Thai display copy regardless of the requested locale."
       ],
@@ -230,6 +345,7 @@ function retryPrompt(errors: string[]) {
     "Do not include markdown or prose.",
     "Every supplementBreakdown item must be a JSON object, not a string.",
     "marketingPoints must contain 3 localized objects with id, title, and body.",
+    "cautions must be an array of localized caution objects.",
     "Every item must include a unique integer effectivenessRank where 1 is highest impact.",
     "If a field is uncertain, set status to review and still return valid JSON.",
     "Validation errors:",
@@ -403,8 +519,68 @@ function textFromLocalizedCandidate(value: unknown) {
   return readText(value, "en") || readText(value, "th");
 }
 
+function readCautionsAt(
+  value: unknown,
+  path: string,
+  errors: string[]
+): FormulationCaution[] {
+  if (!Array.isArray(value)) {
+    errors.push(`${path} must be an array`);
+    return [];
+  }
+
+  const cautions: FormulationCaution[] = [];
+  const seenIds = new Set<string>();
+
+  value.forEach((item, index) => {
+    if (!isRecord(item)) {
+      errors.push(`${path}[${index}] must be an object`);
+      return;
+    }
+
+    const body = readLocalizedTextAt(item, "body", `${path}[${index}]`, errors);
+    const title = item.title
+      ? readLocalizedTextAt(item, "title", `${path}[${index}]`, errors)
+      : undefined;
+    const bodyText = textFromLocalizedCandidate(body);
+    const id =
+      readText(item, "id") || slugify(bodyText, `caution-${index + 1}`);
+    const rawSeverity = readText(item, "severity");
+    const severity = VALID_CAUTION_SEVERITIES.has(
+      rawSeverity as FormulationCaution["severity"]
+    )
+      ? rawSeverity as FormulationCaution["severity"]
+      : "caution";
+    const rawRelatedAnswerKeys = item.relatedAnswerKeys;
+    const relatedAnswerKeys = Array.isArray(rawRelatedAnswerKeys)
+      ? rawRelatedAnswerKeys.filter(
+          (key): key is string => typeof key === "string" && key.trim().length > 0
+        )
+      : undefined;
+
+    if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(id)) {
+      errors.push(`${path}[${index}].id must be stable kebab-case`);
+    } else if (seenIds.has(id)) {
+      errors.push(`${path}[${index}].id is duplicated`);
+    } else {
+      seenIds.add(id);
+    }
+
+    cautions.push({
+      body,
+      id,
+      ...(relatedAnswerKeys?.length ? { relatedAnswerKeys } : {}),
+      severity,
+      ...(title ? { title } : {})
+    });
+  });
+
+  return cautions;
+}
+
 function validateFormulation(value: unknown) {
   const errors: string[] = [];
+  const cautions: FormulationCaution[] = [];
   const marketingPoints: MarketingPoint[] = [];
   const supplementBreakdown: FormulationIngredient[] = [];
 
@@ -417,16 +593,17 @@ function validateFormulation(value: unknown) {
   }
 
   const unexpectedTopLevelKeys = Object.keys(response).filter(
-    (key) => key !== "supplementBreakdown" && key !== "marketingPoints"
+    (key) => key !== "supplementBreakdown" && key !== "marketingPoints" && key !== "cautions"
   );
 
   if (unexpectedTopLevelKeys.length > 0) {
     errors.push(
-      `Top-level response must only include supplementBreakdown and marketingPoints, found: ${unexpectedTopLevelKeys.join(", ")}`
+      `Top-level response must only include supplementBreakdown, marketingPoints, and cautions, found: ${unexpectedTopLevelKeys.join(", ")}`
     );
   }
 
   const rawItems = response.supplementBreakdown;
+  const rawCautions = response.cautions;
   const rawMarketingPoints = response.marketingPoints;
 
   if (!Array.isArray(rawItems)) {
@@ -443,6 +620,12 @@ function validateFormulation(value: unknown) {
     if (rawMarketingPoints.length > 4) {
       errors.push("marketingPoints must contain no more than 4 items");
     }
+  }
+
+  if (!Array.isArray(rawCautions)) {
+    errors.push("cautions must be an array");
+  } else {
+    cautions.push(...readCautionsAt(rawCautions, "cautions", errors));
   }
 
   if (rawItems.length < 1) {
@@ -482,6 +665,9 @@ function validateFormulation(value: unknown) {
       ? rawStatus
       : "review";
     const rationale = readLocalizedText(item, "rationale", index, errors);
+    const itemCautions = Array.isArray(item.cautions)
+      ? readCautionsAt(item.cautions, `supplementBreakdown[${index}].cautions`, errors)
+      : [];
 
     if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(id)) {
       errors.push(
@@ -507,6 +693,7 @@ function validateFormulation(value: unknown) {
 
     supplementBreakdown.push({
       category,
+      ...(itemCautions.length > 0 ? { cautions: itemCautions } : {}),
       dailyDose,
       effectivenessRank,
       id,
@@ -561,6 +748,7 @@ function validateFormulation(value: unknown) {
   return {
     errors,
     formulation: {
+      cautions,
       marketingPoints: marketingPoints.slice(0, 3),
       supplementBreakdown: [...supplementBreakdown].sort(
         (a, b) => a.effectivenessRank - b.effectivenessRank

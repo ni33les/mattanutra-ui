@@ -236,16 +236,29 @@ function productRecommendationClientContextFromPlan(
   guidanceAdjustments: readonly PlanGuidanceAdjustment[]
 ): ProductRecommendationClientContext {
   const record = payloadRecord(answers);
+  const cautions = [
+    ...stringArrayFromRecord(record, "suppAllergies"),
+    textFromRecord(record, "kidney"),
+    textFromRecord(record, "liver"),
+    textFromRecord(record, "surgery"),
+    textFromRecord(record, "antibiotics"),
+    textFromRecord(record, "digCondition")
+  ].filter((item): item is string => Boolean(item) && item !== "none" && item !== "normal" && item !== "no");
+  const lifestage = [
+    textFromRecord(record, "reproStatus"),
+    textFromRecord(record, "menopause"),
+    textFromRecord(record, "flow")
+  ].filter(Boolean).join("/");
 
   return {
     budgetPreference: textFromRecord(record, "budget"),
-    conditions: stringArrayFromRecord(record, "conditions"),
-    currentSupplements: textFromRecord(record, "supps"),
+    conditions: cautions,
+    currentSupplements: textFromRecord(record, "supplements"),
     guidanceAdjustmentCount: guidanceAdjustments.length,
-    lifestage: textFromRecord(record, "lifestage"),
+    lifestage: lifestage || null,
     medicationTypes: stringArrayFromRecord(record, "medTypes"),
     medications: textFromRecord(record, "meds"),
-    pillLimit: textFromRecord(record, "pills"),
+    pillLimit: textFromRecord(record, "maxPills"),
     planFeedbackTypes: [
       ...new Set(
         planFeedback

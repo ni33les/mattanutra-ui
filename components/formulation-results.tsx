@@ -15,6 +15,7 @@ import {
 import { NutritionProgress } from "@/components/nutrition-progress";
 import type {
   FoodGuidanceItem,
+  FormulationCaution,
   FormulationIngredient,
   FormulationResult,
   LocalizedText,
@@ -107,6 +108,7 @@ type CopyLabels = Record<
   | "benefits"
   | "constraints"
   | "context"
+  | "cautions"
   | "coveragePrefix"
   | "coverageSuffix"
   | "productCoverage"
@@ -205,6 +207,7 @@ export const formulationResultsCopy = {
       "Connect with our specialist AI supplement advisor for ongoing support and refinement.",
     constraints: "Constraints",
     context: "Assessment summary",
+    cautions: "Cautions",
     coveragePrefix: "Covers",
     coverageSuffix: "of the recommended supplements",
     productCoverage: "Product coverage",
@@ -280,7 +283,7 @@ export const formulationResultsCopy = {
     previewTitle: "Preview first, unlock when you're ready",
     profile: "Profile",
     region: "Region",
-    safety: "Safety notes",
+    safety: "Cautions",
     safetyCaptureAddress: "Contact detail",
     safetyCaptureBody:
       "Leave one contact channel and we will tell you when the human review is complete.",
@@ -322,6 +325,7 @@ export const formulationResultsCopy = {
       "เชื่อมต่อกับ AI advisor เฉพาะทางด้านอาหารเสริมเพื่อการดูแลและปรับแผนต่อเนื่อง",
     constraints: "ข้อจำกัด",
     context: "สรุปแบบประเมิน",
+    cautions: "ข้อควรระวัง",
     coveragePrefix: "ครอบคลุม",
     coverageSuffix: "ของรายการอาหารเสริมที่แนะนำ",
     productCoverage: "ความครอบคลุมจากผลิตภัณฑ์",
@@ -397,7 +401,7 @@ export const formulationResultsCopy = {
     previewTitle: "ดูตัวอย่างก่อน แล้วปลดล็อกเมื่อพร้อม",
     profile: "โปรไฟล์",
     region: "ภูมิภาค",
-    safety: "หมายเหตุด้านความปลอดภัย",
+    safety: "ข้อควรระวัง",
     safetyCaptureAddress: "รายละเอียดติดต่อ",
     safetyCaptureBody:
       "ฝากช่องทางติดต่อไว้หนึ่งช่องทาง แล้วเราจะแจ้งเมื่อทีมตรวจสอบเสร็จ",
@@ -866,6 +870,14 @@ export function FormulationResults({
         />
       ) : null}
 
+      {result.cautions?.length ? (
+        <CautionsPanel
+          cautions={result.cautions}
+          labels={labels}
+          locale={locale}
+        />
+      ) : null}
+
       <div className={`mt-8 grid gap-8 ${FOOD_GUIDANCE_VISIBLE ? "lg:grid-cols-2" : ""}`}>
         {FOOD_GUIDANCE_VISIBLE ? (
           <FoodGuidancePanel
@@ -947,6 +959,44 @@ export function FormulationResults({
 }
 
 type PanelLabels = (typeof formulationResultsCopy)["en"];
+
+function CautionsPanel({
+  cautions,
+  labels,
+  locale
+}: Readonly<{
+  cautions: FormulationCaution[];
+  labels: PanelLabels;
+  locale: Locale;
+}>) {
+  return (
+    <section className="mt-8 rounded-lg border border-amber-200 bg-amber-50/70 p-5 text-sm leading-6 text-amber-950 sm:p-6">
+      <div className="flex gap-3">
+        <ExclamationTriangleIcon
+          aria-hidden={true}
+          className="mt-0.5 size-5 flex-none text-amber-600"
+        />
+        <div>
+          <h2 className="font-semibold uppercase tracking-[0.12em]">
+            {labels.cautions}
+          </h2>
+          <ul className="mt-3 space-y-3">
+            {cautions.map((caution) => (
+              <li key={caution.id}>
+                {caution.title ? (
+                  <p className="font-semibold">
+                    {getLocalizedText(caution.title, locale)}
+                  </p>
+                ) : null}
+                <p>{getLocalizedText(caution.body, locale)}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function NutritionGuidancePreparingPanel({
   labels,
@@ -2084,6 +2134,25 @@ function FormulaPanel({
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     {rationale}
                   </p>
+                  {ingredient.cautions?.length ? (
+                    <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
+                      <p className="font-semibold uppercase tracking-[0.12em]">
+                        {labels.cautions}
+                      </p>
+                      <ul className="mt-1 space-y-1">
+                        {ingredient.cautions.map((caution) => (
+                          <li key={caution.id}>
+                            {caution.title ? (
+                              <span className="font-semibold">
+                                {getLocalizedText(caution.title, locale)}:{" "}
+                              </span>
+                            ) : null}
+                            {getLocalizedText(caution.body, locale)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                   <div className="mt-4 max-w-md">
                     <div className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                       <span>{labels.productCoverage}</span>

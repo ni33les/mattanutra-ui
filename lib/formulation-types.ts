@@ -18,9 +18,18 @@ export type LocalizedText =
       th: string;
     };
 
+export type FormulationCaution = {
+  body: LocalizedText;
+  id: string;
+  relatedAnswerKeys?: string[];
+  severity: "caution" | "info" | "review";
+  title?: LocalizedText;
+};
+
 export type FormulationIngredient = {
   benefitTags?: string[];
   category: string;
+  cautions?: FormulationCaution[];
   dailyDose: LocalizedText;
   effectivenessRank: number;
   id: string;
@@ -207,6 +216,7 @@ export type AssessmentSummary = {
 };
 
 export type FormulationBlueprint = {
+  cautions?: FormulationCaution[];
   marketingPoints?: MarketingPoint[];
   safetySummary?: {
     adjustedCount: number;

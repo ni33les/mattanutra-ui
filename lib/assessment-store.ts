@@ -14,6 +14,7 @@ import {
 } from "@/lib/formulation-preview";
 import {
   type FoodGuidanceItem,
+  type FormulationCaution,
   type FormulationIngredient,
   type FormulationResult,
   type MarketingPoint,
@@ -833,7 +834,7 @@ function buildAnswerSummary(answers: unknown) {
     country: scalarOrNull(record.country),
     goals: Array.isArray(record.goals) ? record.goals : [],
     medications: scalarOrNull(record.meds),
-    pills: scalarOrNull(record.pills),
+    maxPills: scalarOrNull(record.maxPills),
     sex: scalarOrNull(record.sex),
     symptoms: Array.isArray(record.symptoms) ? record.symptoms : []
   };
@@ -1586,6 +1587,7 @@ export async function getStoredFormulationResult(
   const marketingPoints = asArray<MarketingPoint>(
     storedFormulation.marketingPoints
   );
+  const cautions = asArray<FormulationCaution>(storedFormulation.cautions);
   const storedFoodGuidance = asArray<FoodGuidanceItem>(
     storedFoodGuidanceRecord.foodGuidance
   );
@@ -1846,6 +1848,7 @@ export async function getStoredFormulationResult(
     },
     ...(safetySummary ? { safetySummary } : {}),
     ...(foodSafetySummary ? { foodSafetySummary } : {}),
+    ...(cautions.length > 0 ? { cautions } : {}),
     ...(marketingPoints.length > 0 ? { marketingPoints } : {}),
     foodGuidance,
     supplementBreakdown

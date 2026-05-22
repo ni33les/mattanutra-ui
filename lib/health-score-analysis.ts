@@ -179,55 +179,49 @@ const answerLabels: Record<string, Record<string, string>> = {
     athlete: "athlete",
     light: "light activity",
     moderate: "moderate activity",
-    sedentary: "mostly sitting"
+    sitting: "mostly sitting"
   },
   alcohol: {
-    high: "8+ alcoholic drinks per week",
-    low: "1-3 alcoholic drinks per week",
-    moderate: "4-7 alcoholic drinks per week",
+    "1-3": "1-3 alcoholic drinks per week",
+    "4-7": "4-7 alcoholic drinks per week",
+    "8+": "8+ alcoholic drinks per week",
     none: "no alcohol"
   },
   budget: {
-    good: "฿2,500-5,000 monthly supplement budget",
-    high: "฿5,000+ monthly supplement budget",
-    low: "under ฿1,000 monthly supplement budget",
-    mid: "฿1,000-2,500 monthly supplement budget"
-  },
-  conditions: {
-    autoimmune: "autoimmune considerations",
-    bone: "bone density support",
-    "blood-sugar": "blood sugar support",
-    cholesterol: "cholesterol support",
-    digestive: "digestive condition",
-    hbp: "high blood pressure",
-    joints: "joint support",
-    mood: "mood support",
-    none: "no known health considerations",
-    thyroid: "thyroid support"
+    "1000-2500": "฿1,000-2,500 monthly supplement budget",
+    "2500-5000": "฿2,500-5,000 monthly supplement budget",
+    "5000+": "฿5,000+ monthly supplement budget",
+    u1000: "under ฿1,000 monthly supplement budget"
   },
   diet: {
     balanced: "balanced diet",
-    keto: "carnivore diet",
+    carnivore: "carnivore diet",
     mediterranean: "Mediterranean diet",
     none: "no defined diet pattern",
     plant: "plant-based diet",
+    processed: "processed diet",
     vegan: "vegan diet",
-    western: "processed diet",
     whole: "whole-food diet"
   },
-  energy: {
-    "1": "drained energy",
-    "2": "low energy",
-    "3": "OK energy",
-    "4": "good energy",
-    "5": "excellent energy"
+  digCondition: {
+    bariatric: "bariatric surgery",
+    celiac: "celiac disease",
+    ibd: "IBD",
+    ibs: "IBS",
+    none: "no digestive condition"
   },
-  fish: {
-    "2-3pw": "fatty fish often",
-    daily: "fatty fish daily",
-    never: "no fatty fish",
-    rarely: "fatty fish rarely",
-    weekly: "fatty fish once per week"
+  digestion: {
+    bloating: "bloating",
+    constipation: "constipation",
+    loose: "loose stools",
+    none: "no digestion issue"
+  },
+  energy: {
+    drained: "drained energy",
+    excellent: "excellent energy",
+    good: "good energy",
+    low: "low energy",
+    ok: "OK energy"
   },
   form: {
     capsules: "prefers capsules",
@@ -241,108 +235,113 @@ const answerLabels: Record<string, Record<string, string>> = {
     focus: "brain / focus",
     heart: "heart health",
     hormones: "hormones",
-    immune: "immunity",
-    joints: "joints / bones",
+    immunity: "immunity",
+    joints: "joints",
     longevity: "longevity",
     mood: "mood / calm",
-    skin: "skin / hair",
+    skin: "skin",
     sleep: "better sleep",
     weight: "weight loss"
   },
-  gut: {
-    bloat: "bloating",
-    constipation: "constipation",
-    great: "no digestion issues",
-    ibs: "IBS / mixed digestion",
-    loose: "loose stools"
+  kidney: {
+    disease: "kidney disease",
+    normal: "no known kidney issue",
+    reduced: "reduced kidney function"
+  },
+  liver: {
+    condition: "liver condition",
+    normal: "no known liver issue"
+  },
+  maxPills: {
+    "1-3": "1-3 pills per day limit",
+    "4-6": "4-6 pills per day limit",
+    "7-10": "7-10 pills per day limit",
+    nolimit: "no pill limit"
   },
   meds: {
-    no: "no medications reported",
+    none: "no medications reported",
     yes: "medications reported"
   },
   medTypes: {
     antidepressant: "antidepressant",
-    "blood-thinner": "blood thinner / aspirin",
+    bloodthinner: "blood thinner / aspirin",
     bp: "blood pressure medication",
+    contraceptive: "contraceptive pill",
+    corticosteroid: "corticosteroid",
+    diuretic: "diuretic",
     metformin: "metformin",
-    ocp: "contraceptive pill",
     other: "other medication",
     ppi: "PPI / omeprazole",
     statin: "statin",
-    steroid: "corticosteroid",
     thyroid: "thyroid medication"
   },
-  pills: {
-    "1-3": "1-3 pills per day limit",
-    "4-6": "4-6 pills per day limit",
-    "7-10": "7-10 pills per day limit",
-    unlimited: "no pill limit"
+  menopause: {
+    peri: "perimenopause",
+    post: "post-menopause",
+    pre: "pre-menopause",
+    unsure: "menopause stage unsure"
   },
   protein: {
-    good: "1.5-2g/kg protein per day",
-    high: "over 2g/kg protein per day",
-    low: "under 1g/kg protein per day",
-    mid: "1-1.5g/kg protein per day"
+    "1-1.5": "1-1.5g/kg protein per day",
+    "1.5-2": "1.5-2g/kg protein per day",
+    "2+": "over 2g/kg protein per day",
+    u1: "under 1g/kg protein per day"
   },
-  sleep: {
-    "1": "wakes feeling awful",
-    "2": "wakes feeling poor",
-    "3": "wakes feeling OK",
-    "4": "wakes feeling good",
-    "5": "wakes feeling great"
+  reproStatus: {
+    breastfeeding: "breastfeeding",
+    none: "not pregnant or breastfeeding",
+    pregnant: "pregnant",
+    ttc: "trying to conceive"
   },
-  smoke: {
+  smoking: {
     daily: "daily smoker",
-    exlong: "ex-smoker over 5 years",
-    exrecent: "recent ex-smoker",
+    ex5: "ex-smoker under 5 years",
+    "ex5+": "ex-smoker over 5 years",
     never: "never smoker",
     occasional: "occasional smoker"
   },
   stress: {
-    "1": "very low stress",
-    "2": "low stress",
-    "3": "moderate stress",
-    "4": "high stress",
-    "5": "extreme stress"
-  },
-  stressSource: {
-    anxiety: "stress source: anxiety",
-    burnout: "stress source: burnout",
-    health: "stress source: health",
-    life: "stress source: life events",
-    none: "no clear stress source",
-    work: "stress source: work"
+    extreme: "extreme stress",
+    high: "high stress",
+    low: "low stress",
+    moderate: "moderate stress",
+    verylow: "very low stress"
   },
   sun: {
-    high: "60+ minutes sun exposure",
-    low: "15-30 minutes sun exposure",
-    minimal: "under 15 minutes sun exposure",
-    moderate: "30-60 minutes sun exposure"
+    "15-30": "15-30 minutes sun exposure",
+    "30-60": "30-60 minutes sun exposure",
+    "60+": "60+ minutes sun exposure",
+    u15: "under 15 minutes sun exposure"
   },
-  supps: {
+  suppAllergies: {
+    bvit: "B vitamin sensitivity",
+    coq10: "CoQ10 sensitivity",
+    iodine: "iodine sensitivity",
+    iron: "iron sensitivity",
+    none: "no known supplement sensitivity",
+    other: "other supplement sensitivity",
+    shellfishderived: "shellfish-derived sensitivity",
+    soyderived: "soy-derived sensitivity"
+  },
+  supplements: {
     basic: "currently uses a basic multivitamin",
-    many: "currently uses several targeted supplements",
+    d3omega: "currently uses D3 / Omega-3",
     none: "not currently taking supplements",
-    several: "currently uses D3 / Omega-3"
+    targeted: "currently uses several targeted supplements"
   },
   symptoms: {
-    brain: "brain fog",
-    cold: "frequent colds",
+    brainfog: "brain fog",
+    colds: "frequent colds",
     digestion: "digestion symptoms",
     fatigue: "fatigue",
+    great: "feeling great",
     hair: "hair loss",
-    joints: "joint pain",
+    joint: "joint pain",
     libido: "low libido",
     mood: "mood symptoms",
     skin: "skin symptoms",
     sleep: "poor sleep",
     stress: "stress / anxiety"
-  },
-  vo2Proxy: {
-    athlete: "30+ minutes hard effort",
-    moderate: "brisk walk feels hard",
-    sustained: "20-30 minutes moderate cardio",
-    winded: "winded on stairs"
   }
 };
 
@@ -388,15 +387,21 @@ function buildPersonalizationSignals(
   const secondLowest = sortedDomains[1];
   const goals = answerListLabels("goals", answers.goals);
   const symptoms = answerListLabels("symptoms", answers.symptoms);
-  const conditions = answerListLabels("conditions", answers.conditions);
   const medTypes = answerListLabels("medTypes", answers.medTypes);
+  const supplementSensitivities = answerListLabels(
+    "suppAllergies",
+    answers.suppAllergies
+  );
   const labs = isRecord(answers.labs)
     ? Object.entries(answers.labs)
         .filter(([, value]) => typeof value === "string" && value.trim())
-        .map(([key, value]) => `${key}: ${value}`)
+        .map(([key, value]) => {
+          const labUnits = isRecord(answers.labUnits) ? answers.labUnits : {};
+          return `${key}: ${value}${typeof labUnits[key] === "string" ? ` ${labUnits[key]}` : ""}`;
+        })
     : [];
-  const sleepHours = textAnswer(answers, "sleepHours");
-  const vo2Max = textAnswer(answers, "vo2Max");
+  const sleepHours = textAnswer(answers, "sleepHrs");
+  const vo2Max = textAnswer(answers, "vo2");
   const signals = [
     `HealthScore: ${healthScore.score}/100 (${healthScore.band})`,
     lowest
@@ -407,36 +412,41 @@ function buildPersonalizationSignals(
       : "",
     goals.length ? `Primary goals: ${goals.join(", ")}` : "",
     symptoms.length ? `Current friction: ${symptoms.join(", ")}` : "",
-    conditions.length
-      ? `Known health considerations: ${conditions.join(", ")}`
-      : "",
+    signal("Health considerations", [
+      answerLabel("reproStatus", answers.reproStatus),
+      answerLabel("kidney", answers.kidney),
+      answerLabel("liver", answers.liver),
+      answerLabel("surgery", answers.surgery),
+      answerLabel("antibiotics", answers.antibiotics),
+      supplementSensitivities.length
+        ? `supplement sensitivities: ${supplementSensitivities.join(", ")}`
+        : ""
+    ]),
     signal("Practical constraints", [
       answerLabel("budget", answers.budget),
-      answerLabel("pills", answers.pills),
+      answerLabel("maxPills", answers.maxPills),
       answerLabel("form", answers.form)
     ]),
     signal("Sleep, energy, stress", [
       sleepHours ? `sleep duration ${sleepHours}` : "",
-      answerLabel("sleep", answers.sleep),
       answerLabel("energy", answers.energy),
-      answerLabel("stress", answers.stress),
-      answerLabel("stressSource", answers.stressSource)
+      answerLabel("stress", answers.stress)
     ]),
     signal("Lifestyle context", [
       answerLabel("diet", answers.diet),
-      answerLabel("fish", answers.fish),
       answerLabel("protein", answers.protein),
       answerLabel("alcohol", answers.alcohol),
-      answerLabel("sun", answers.sun)
+      answerLabel("sun", answers.sun),
+      answerLabel("smoking", answers.smoking)
     ]),
     signal("Movement context", [
       answerLabel("activity", answers.activity),
-      answerLabel("vo2Proxy", answers.vo2Proxy),
       vo2Max ? `VO2 max ${vo2Max}` : ""
     ]),
     signal("Safety context", [
       answerLabel("meds", answers.meds),
-      medTypes.length ? `medication types: ${medTypes.join(", ")}` : ""
+      medTypes.length ? `medication types: ${medTypes.join(", ")}` : "",
+      textAnswer(answers, "otherMed")
     ]),
     labs.length
       ? `Labs supplied: ${labs.slice(0, 6).join(", ")}`
@@ -468,41 +478,48 @@ function compactAssessmentForAdvice(answers: unknown) {
     activity: answers.activity,
     age: answers.age,
     alcohol: answers.alcohol,
+    allergies: answers.allergies,
+    antibiotics: answers.antibiotics,
+    avoidNote: answers.avoidNote,
     budget: answers.budget,
-    build: answers.build,
-    coffee: answers.coffee,
-    conditions: answers.conditions,
+    caffeine: answers.caffeine,
     country: answers.country,
     diet: answers.diet,
+    digCondition: answers.digCondition,
+    digestion: answers.digestion,
     energy: answers.energy,
     family: answers.family,
-    fish: answers.fish,
-    feelGreat: answers.feelGreat,
+    flow: answers.flow,
+    foodFrequency: answers.foodFrequency,
     form: answers.form,
     goals: answers.goals,
-    gut: answers.gut,
     heightCm: answers.heightCm,
+    hrv: answers.hrv,
+    kidney: answers.kidney,
     labs: answers.labs,
-    lifestage: answers.lifestage,
+    labUnits: answers.labUnits,
+    liver: answers.liver,
+    maxPills: answers.maxPills,
     meds: answers.meds,
     medTypes: answers.medTypes,
-    notes: answers.notes,
-    pills: answers.pills,
+    menopause: answers.menopause,
+    otherMed: answers.otherMed,
+    otherSupp: answers.otherSupp,
     protein: answers.protein,
+    reproStatus: answers.reproStatus,
     sex: answers.sex,
     skin: answers.skin,
-    sleep: answers.sleep,
-    sleepHours: answers.sleepHours,
-    smoke: answers.smoke,
+    sleepHrs: answers.sleepHrs,
+    smoking: answers.smoking,
     stress: answers.stress,
-    stressSource: answers.stressSource,
     sun: answers.sun,
-    supps: answers.supps,
+    sunscreen: answers.sunscreen,
+    suppAllergies: answers.suppAllergies,
+    supplements: answers.supplements,
+    surgery: answers.surgery,
     symptoms: answers.symptoms,
-    vo2Known: answers.vo2Known,
-    vo2Max: answers.vo2Max,
-    vo2Proxy: answers.vo2Proxy,
-    wearable: answers.wearable,
+    tracker: answers.tracker,
+    vo2: answers.vo2,
     weightKg: answers.weightKg
   };
 }

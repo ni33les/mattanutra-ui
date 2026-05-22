@@ -102,24 +102,24 @@ function ageYears(value: unknown) {
 function sleepHoursValue(value: unknown) {
   const direct = numberValue(value);
 
-  if (direct) {
+  if (direct !== null) {
     return direct;
   }
 
-  return optionScore(
-    value,
-    {
-      "4-5": 4.5,
-      "5-6": 5.5,
-      "6-7": 6.5,
-      "7-8": 7.5,
-      "8+": 8.5,
-      "8-9": 8.5,
-      "9-plus": 9.5,
-      "under-5": 4.5
-    },
-    7
-  );
+  const mapped = {
+    "4-5": 4.5,
+    "5-6": 5.5,
+    "6-7": 6.5,
+    "7-8": 7.5,
+    "8+": 8.5,
+    "8-9": 8.5,
+    "9+": 9.5,
+    "9-plus": 9.5,
+    u5: 4.5,
+    "under-5": 4.5
+  }[text(value)];
+
+  return mapped ?? null;
 }
 
 function sunValue(value: unknown) {
@@ -127,6 +127,22 @@ function sunValue(value: unknown) {
 
   if (sun === "minimal") {
     return "min";
+  }
+
+  if (sun === "u15") {
+    return "min";
+  }
+
+  if (sun === "15-30") {
+    return "low";
+  }
+
+  if (sun === "30-60") {
+    return "mod";
+  }
+
+  if (sun === "60+") {
+    return "high";
   }
 
   if (sun === "moderate") {
@@ -143,7 +159,61 @@ function dietValue(value: unknown) {
     return "med";
   }
 
+  if (diet === "processed") {
+    return "western";
+  }
+
+  if (diet === "carnivore") {
+    return "keto";
+  }
+
   return diet;
+}
+
+function labNumber(
+  labs: Record<string, unknown>,
+  labUnits: Record<string, unknown>,
+  ...keys: string[]
+) {
+  for (const key of keys) {
+    const raw = labs[key];
+    const value = isLabValueRecord(raw) ? raw.value : raw;
+    const parsed = numberValue(value);
+    const embeddedUnit = isLabValueRecord(raw) ? text(raw.unit) : "";
+    const unit = text(labUnits[key]) || embeddedUnit;
+
+    if (parsed !== null) {
+      return normalizeLabValue(key, parsed, unit);
+    }
+  }
+
+  return null;
+}
+
+function normalizeLabValue(key: string, value: number, unit: string) {
+  const normalizedUnit = unit.trim().toLowerCase();
+
+  if ((key === "vitd" || key === "vitaminD") && normalizedUnit === "nmol/l") {
+    return value / 2.5;
+  }
+
+  if (key === "b12" && normalizedUnit === "pmol/l") {
+    return value / 0.738;
+  }
+
+  if (key === "hba1c" && normalizedUnit === "mmol/mol") {
+    return (value + 46.7) / 28.7;
+  }
+
+  if ((key === "homo" || key === "homocysteine") && normalizedUnit === "mg/l") {
+    return value * 7.398;
+  }
+
+  return value;
+}
+
+function isLabValueRecord(value: unknown): value is { unit?: unknown; value?: unknown } {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function bmiPoints(answers: Record<string, unknown>) {
@@ -197,29 +267,135 @@ function vo2Thresholds(answers: Record<string, unknown>) {
 
 function labPoints(answers: Record<string, unknown>) {
   const labs = asRecord(answers.labs);
-  const vitaminD = numberValue(labs.vitaminD);
-  const hba1c = numberValue(labs.hba1c);
-  const omega3 = numberValue(labs.omega3);
-  const homocysteine = numberValue(labs.homocysteine);
+  const labUnits = asRecord(answers.labUnits);
+  const vitaminD = labNumber(labs, labUnits, "vitd", "vitaminD");
+  const b12 = labNumber(labs, labUnits, "b12");
+  const ferritin = labNumber(labs, labUnits, "ferritin");
+  const hba1c = labNumber(labs, labUnits, "hba1c");
+  const omega3 = labNumber(labs, labUnits, "o3", "omega3");
+  const homocysteine = labNumber(labs, labUnits, "homo", "homocysteine");
+  const male = text(answers.sex) === "male";
   let points = 0;
 
-  if (vitaminD) {
+  if (vitaminD !== null) {
     points += vitaminD >= 50 && vitaminD <= 80 ? 2 : vitaminD >= 30 ? 1 : 0;
   }
 
-  if (hba1c) {
+  if (b12 !== null) {
+    points += b12 >= 350 && b12 <= 900 ? 1 : b12 >= 250 ? 0.5 : 0;
+  }
+
+  if (ferritin !== null) {
+    const upper = male ? 300 : 150;
+    points += ferritin >= 40 && ferritin <= upper ? 2 : ferritin >= 20 ? 1 : 0;
+  }
+
+  if (hba1c !== null) {
     points += hba1c < 5.4 ? 2 : hba1c < 5.7 ? 1 : 0;
   }
 
-  if (omega3) {
+  if (omega3 !== null) {
     points += omega3 >= 8 ? 2 : omega3 >= 5 ? 1 : 0;
   }
 
-  if (homocysteine) {
+  if (homocysteine !== null) {
     points += homocysteine < 8 ? 1 : 0;
   }
 
   return points;
+}
+
+function sleepDurationPoints(value: unknown) {
+  const sleepHours = sleepHoursValue(value);
+
+  if (sleepHours === null) return 7;
+  if (sleepHours >= 7 && sleepHours <= 9) return 14;
+  if (sleepHours > 9) return 11;
+  if (sleepHours >= 6) return 10;
+  if (sleepHours >= 5) return 5;
+  return 2;
+}
+
+function energyForSleepPoints(value: unknown) {
+  return optionScore(
+    value,
+    { drained: 0, excellent: 4, good: 4, low: 1, ok: 2 },
+    2
+  );
+}
+
+function caffeineSleepPoints(value: unknown) {
+  return optionScore(
+    value,
+    { "1": 2, "2-3": 1, "4+": 0, none: 2 },
+    1
+  );
+}
+
+function foodFrequencyPoints(foodFrequency: Record<string, unknown>) {
+  const fruitVeg = optionScore(
+    foodFrequency.fruitveg,
+    { "1-2": 2, "3+": 3, notdaily: 0 },
+    1
+  );
+  const legumes = optionScore(
+    foodFrequency.legumes,
+    { most: 2, rare: 0, weekly: 1 },
+    1
+  );
+  const redMeat = optionScore(
+    foodFrequency.redmeat,
+    { "1-2": 1, "3+": 0, never: 1 },
+    0.5
+  );
+  const eggs = optionScore(
+    foodFrequency.eggs,
+    { most: 1, rare: 0, weekly: 0.5 },
+    0.5
+  );
+  const dairy = optionScore(
+    foodFrequency.dairy,
+    { "1-2": 1, "3+": 1, never: 0 },
+    0.5
+  );
+
+  return fruitVeg + legumes + redMeat + Math.min(1, eggs + dairy);
+}
+
+function digestionPoints(answers: Record<string, unknown>) {
+  const symptomPoints = optionScore(
+    answers.digestion,
+    { bloating: -1, constipation: -1, loose: -1, none: 1 },
+    0
+  );
+  const conditionPoints = optionScore(
+    answers.digCondition,
+    { bariatric: -1, celiac: -1, ibd: -1, ibs: -1, none: 1 },
+    0
+  );
+
+  return symptomPoints + conditionPoints;
+}
+
+function sunHabitPoints(answers: Record<string, unknown>) {
+  const sun = sunValue(answers.sun);
+  const sunscreen = text(answers.sunscreen);
+  const skin = text(answers.skin);
+  let points = optionScore(
+    sun,
+    { high: 1, low: 1, min: 0, mod: 2 },
+    1
+  );
+
+  if (sun === "high" && (sunscreen === "daily" || sunscreen === "sometimes")) {
+    points += 1;
+  }
+
+  if (sun === "high" && sunscreen === "rarely" && (skin === "I" || skin === "II")) {
+    points -= 1;
+  }
+
+  return clampRaw(points, 0, 2);
 }
 
 function domainLabels(locale: Locale) {
@@ -227,20 +403,20 @@ function domainLabels(locale: Locale) {
     return {
       activity: ["กิจกรรมและฟิตเนส", "สะท้อนการเคลื่อนไหว ความฟิต และพื้นฐานการฟื้นตัว"],
       biomarkers: ["ตัวชี้วัดร่างกาย", "รวม BMI และค่าแล็บที่คุณใส่ไว้"],
-      habits: ["พฤติกรรมสุขภาพ", "สะท้อนบุหรี่ แสงแดด อาการ และภาระต่อร่างกาย"],
-      nutrition: ["โภชนาการ", "สะท้อนรูปแบบอาหาร ปลา แอลกอฮอล์ และโปรตีน"],
-      sleep: ["การนอนและการฟื้นตัว", "สะท้อนชั่วโมงนอนและความสดชื่นหลังตื่น"],
-      stress: ["ความเครียดและสมดุล", "สะท้อนระดับความเครียด ระบบย่อย และ HRV ถ้ามี"]
+      habits: ["พฤติกรรมสุขภาพ", "สะท้อนบุหรี่ แสงแดด กันแดด อาการ และพลังงาน"],
+      nutrition: ["โภชนาการ", "สะท้อนรูปแบบอาหาร ความถี่อาหาร ปลา แอลกอฮอล์ และโปรตีน"],
+      sleep: ["การนอนและการฟื้นตัว", "สะท้อนชั่วโมงนอน พลังงาน และคาเฟอีน"],
+      stress: ["ความเครียดและสมดุล", "สะท้อนระดับความเครียด ระบบย่อย ภาวะทางเดินอาหาร และ HRV ถ้ามี"]
     } satisfies Record<DomainId, [string, string]>;
   }
 
   return {
     activity: ["Activity & fitness", "Reflects movement, cardio base, and recovery capacity."],
     biomarkers: ["Body markers", "Uses BMI plus any lab values you added."],
-    habits: ["Health habits", "Reflects smoking, sun exposure, symptoms, and body load."],
-    nutrition: ["Nutrition", "Reflects diet pattern, fish intake, alcohol, and protein."],
-    sleep: ["Sleep & recovery", "Reflects sleep duration and how refreshed you wake."],
-    stress: ["Stress & balance", "Reflects stress load, digestion, and HRV when available."]
+    habits: ["Health habits", "Reflects smoking, sun exposure, sunscreen use, symptoms, and energy."],
+    nutrition: ["Nutrition", "Reflects diet pattern, food frequency, fish intake, alcohol, and protein."],
+    sleep: ["Sleep & recovery", "Reflects sleep duration, energy, and caffeine load."],
+    stress: ["Stress & balance", "Reflects stress load, digestion, digestive conditions, and HRV when available."]
   } satisfies Record<DomainId, [string, string]>;
 }
 
@@ -299,30 +475,20 @@ export function computeHealthScore(
 ): HealthScoreResult {
   const answers = asRecord(answersInput);
   const labs = asRecord(answers.labs);
-  const sleepHours = sleepHoursValue(answers.sleepHours);
-  const sleepHoursPoints =
-    sleepHours >= 7 && sleepHours <= 9
-      ? 12
-      : sleepHours > 9
-        ? 9
-        : sleepHours >= 6
-          ? 8
-          : sleepHours >= 5
-            ? 4
-            : 1;
-  const sleepQualityPoints = optionScore(
-    answers.sleep,
-    { "1": 0, "2": 2, "3": 5, "4": 7, "5": 8 },
-    4
+  const foodFrequency = asRecord(answers.foodFrequency);
+  const sleepPoints = Math.min(
+    sleepDurationPoints(answers.sleepHrs) +
+      energyForSleepPoints(answers.energy) +
+      caffeineSleepPoints(answers.caffeine),
+    20
   );
-  const sleepPoints = Math.min(sleepHoursPoints + sleepQualityPoints, 20);
 
   const activityPoints = optionScore(
     answers.activity,
-    { active: 11, athlete: 14, light: 5, moderate: 8, sedentary: 2 },
+    { active: 11, athlete: 14, light: 5, moderate: 8, sedentary: 2, sitting: 2 },
     5
   );
-  const vo2Max = numberValue(answers.vo2Max) ?? 0;
+  const vo2Max = numberValue(answers.vo2) ?? 0;
   const vo2 = vo2Thresholds(answers);
   const vo2Points =
     vo2Max > 0
@@ -333,91 +499,98 @@ export function computeHealthScore(
           : vo2Max >= vo2.fair
             ? 2
             : 1
-      : optionScore(
-          answers.vo2Proxy,
-          { athlete: 6, moderate: 3, sustained: 5, winded: 1 },
-          2
-        );
+      : 2;
   const activityTotalPoints = Math.min(activityPoints + vo2Points, 20);
 
   const dietPoints = optionScore(
     dietValue(answers.diet),
     {
-      balanced: 6,
+      balanced: 5,
       fast: 0,
-      keto: 5,
-      med: 8,
-      plant: 7,
-      vegan: 6,
-      western: 2,
-      whole: 8
+      keto: 4,
+      med: 6,
+      none: 3,
+      plant: 5,
+      vegan: 5,
+      western: 1,
+      whole: 6
     },
-    4
+    3
   );
   const fishPoints = optionScore(
-    answers.fish,
-    { "2-3pw": 5, daily: 5, never: 0, rarely: 2, weekly: 4 },
+    answers.fish ?? foodFrequency.fish,
+    { "2-3pw": 4, daily: 4, never: 0, often: 4, once: 3, rare: 1, rarely: 1, weekly: 3 },
     2
   );
   const alcoholPoints = optionScore(
     answers.alcohol,
-    { high: 0, low: 2, moderate: 1, none: 3 },
+    { "1-3": 2, "4-7": 1, "8+": 0, high: 0, low: 2, moderate: 1, none: 2 },
     1
   );
   const proteinPoints = optionScore(
     answers.protein,
-    { good: 2, high: 2, low: 0, mid: 1 },
+    { "1-1.5": 1, "1.5-2": 2, "2+": 2, good: 2, high: 2, low: 0, mid: 1, u1: 0 },
     0
   );
   const nutritionPoints = Math.min(
-    dietPoints + fishPoints + alcoholPoints + proteinPoints,
-    18
+    dietPoints +
+      fishPoints +
+      foodFrequencyPoints(foodFrequency) +
+      alcoholPoints +
+      proteinPoints,
+    20
   );
 
   const stressPoints = optionScore(
     answers.stress,
-    { "1": 14, "2": 11, "3": 8, "4": 5, "5": 2 },
-    8
+    { "1": 12, "2": 10, "3": 7, "4": 4, "5": 1, extreme: 1, high: 4, low: 10, moderate: 7, verylow: 12 },
+    6
   );
-  const hrv = numberValue(labs.hrv);
-  const hrvPoints = hrv ? (hrv >= 70 ? 1 : hrv < 40 ? -1 : 0) : 0;
-  const gutPoints = optionScore(answers.gut, { great: 1, ibs: -1, loose: -1 }, 0);
-  const stressTotalPoints = clampRaw(stressPoints + hrvPoints + gutPoints, 0, 15);
+  const hrv = numberValue(answers.hrv) ?? numberValue(labs.hrv);
+  const hrvPoints = hrv ? (hrv >= 70 ? 2 : hrv >= 50 ? 1 : hrv < 40 ? -1 : 0) : 0;
+  const stressTotalPoints = clampRaw(
+    stressPoints + hrvPoints + digestionPoints(answers),
+    0,
+    15
+  );
 
-  const biomarkerPoints = Math.min(bmiPoints(answers) + labPoints(answers), 12);
+  const biomarkerPoints = Math.min(bmiPoints(answers) + labPoints(answers), 15);
   const smokingPoints = optionScore(
-    answers.smoke,
-    { daily: 0, exlong: 6, exrecent: 5, never: 7, occasional: 3 },
-    4
+    answers.smoking,
+    { daily: 0, "ex5+": 5, ex5: 4, exlong: 5, exrecent: 4, never: 5, occasional: 2 },
+    3
   );
-  const sunPoints = optionScore(
-    sunValue(answers.sun),
-    { high: 1, low: 1, min: 0, mod: 2 },
-    1
+  const energyPoints = optionScore(
+    answers.energy,
+    { drained: 0, excellent: 1, good: 1, low: 0, ok: 0.5 },
+    0.5
   );
-  const energyPoints = optionScore(answers.energy, { "1": -1, "5": 1 }, 0);
   const symptoms = arrayValue(answers.symptoms);
   const ageDeflation = ageYears(answers.age) >= 60 ? -1 : 0;
-  const symptomPoints = answers.feelGreat
-    ? 5
+  const symptomPoints = symptoms.includes("great")
+    ? 2
     : symptoms.length === 0
-      ? 4
+      ? 1
       : symptoms.length <= 2
-        ? 3
+        ? 1.5
         : symptoms.length <= 4
-          ? 2
-          : 1;
+          ? 1
+          : 0.5;
   const habitPoints = clampRaw(
-    smokingPoints + sunPoints + energyPoints + symptomPoints + ageDeflation,
+    smokingPoints +
+      sunHabitPoints(answers) +
+      energyPoints +
+      symptomPoints +
+      ageDeflation,
     0,
     10
   );
   const labelLookup = domainLabels(locale);
   const domainPoints: Record<DomainId, { max: number; points: number }> = {
     activity: { max: 20, points: activityTotalPoints },
-    biomarkers: { max: 12, points: biomarkerPoints },
+    biomarkers: { max: 15, points: biomarkerPoints },
     habits: { max: 10, points: habitPoints },
-    nutrition: { max: 18, points: nutritionPoints },
+    nutrition: { max: 20, points: nutritionPoints },
     sleep: { max: 20, points: sleepPoints },
     stress: { max: 15, points: stressTotalPoints }
   };
@@ -437,7 +610,11 @@ export function computeHealthScore(
     (sum, domain) => sum + domain.points,
     0
   );
-  const score = clamp((rawPoints / 95) * 100, 8, 96);
+  const maxPoints = Object.values(domainPoints).reduce(
+    (sum, domain) => sum + domain.max,
+    0
+  );
+  const score = clamp((rawPoints / maxPoints) * 100, 8, 96);
   const lowest = [...domains].sort((a, b) => a.score - b.score)[0];
 
   return {

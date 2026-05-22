@@ -32,15 +32,6 @@ function reassessmentEmailFromAnswers(answers: unknown) {
   return typeof value === "string" ? value : "";
 }
 
-function foodSafetyAcknowledged(answers: unknown) {
-  return (
-    Boolean(answers) &&
-    typeof answers === "object" &&
-    !Array.isArray(answers) &&
-    (answers as Record<string, unknown>).foodSafetyAcknowledged === true
-  );
-}
-
 function buildHealthScore(answers: unknown, locale: unknown) {
   const normalizedLocale = isLocale(locale) ? locale : "en";
 
@@ -151,18 +142,6 @@ export async function PATCH(
   if (intent === "process" && !isAssessmentPlan(body.plan)) {
     return NextResponse.json(
       { message: "Unsupported assessment plan" },
-      {
-        headers: {
-          "Cache-Control": "no-store"
-        },
-        status: 400
-      }
-    );
-  }
-
-  if (intent === "process" && !foodSafetyAcknowledged(body.answers)) {
-    return NextResponse.json(
-      { message: "Food safety acknowledgement is required" },
       {
         headers: {
           "Cache-Control": "no-store"
