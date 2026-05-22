@@ -455,7 +455,7 @@ const en: Copy = {
     ],
     country: "Country",
     countryOptions,
-    sun: "Sun exposure (min/day)",
+    sun: "Sun exposure ( Min / day )",
     sunOptions: [
       { label: "Under 15", value: "u15" },
       { label: "15-30", value: "15-30" },
@@ -594,12 +594,12 @@ const en: Copy = {
     ],
     frequency: "How often do you eat...",
     frequencyTitles: {
-      dairy: "Dairy (servings/day)",
+      dairy: "Dairy ( Servings / day )",
       eggs: "Eggs",
       fish: "Fatty fish",
-      fruitveg: "Fruit & veg (servings/day)",
+      fruitveg: "Fruit & veg ( Servings / day )",
       legumes: "Legumes / nuts",
-      redmeat: "Red meat (servings/week)"
+      redmeat: "Red meat ( Servings / week )"
     },
     frequencyOptions: {
       dairy: [
@@ -689,14 +689,14 @@ const en: Copy = {
   precision: {
     title: "Your preferences",
     subtitle: "Set practical constraints first, then add optional precision if you have it.",
-    budget: "Monthly supplement budget (THB)",
+    budget: "Monthly supplement budget ( THB )",
     budgetOptions: [
       { label: "Under 1,000", value: "u1000" },
       { label: "1,000-2,500", value: "1000-2500" },
       { label: "2,500-5,000", value: "2500-5000" },
       { label: "5,000+", value: "5000+" }
     ],
-    maxPills: "Max pills/capsules (per day)",
+    maxPills: "Max pills / capsules ( Per day )",
     maxPillsOptions: [
       { label: "1-3", value: "1-3" },
       { label: "4-6", value: "4-6" },
@@ -712,7 +712,7 @@ const en: Copy = {
     ],
     optionalBanner: "Optional precision tier",
     optionalBody: "Add any details you know to move the final 20% of precision.",
-    protein: "Protein (g/kg/day)",
+    protein: "Protein ( G / kg / day )",
     proteinOptions: [
       { label: "Under 1", value: "u1" },
       { label: "1-1.5", value: "1-1.5" },
@@ -813,14 +813,14 @@ const en: Copy = {
     ]
   },
   sectionNotes: [
-    "There are no right or wrong answers here, only true ones. The more honestly you answer, the more exactly your formula fits — and the safer it is alongside anything you already take.",
+    "The more we understand you, the better our recommendations become.",
     "",
     "",
     "",
     "",
     ""
   ],
-  stagePhases: ["Foundation", "Foundation", "Foundation", "Foundation", "Safety", "Personalise"],
+  stagePhases: ["It's all you", "Foundation", "Foundation", "Foundation", "Safety", "Personalise"],
   stages: ["About you", "Goals", "Daily life", "Food", "Safety", "Precision"]
 };
 
@@ -861,7 +861,7 @@ const th: Copy = {
     generate: "สร้าง HealthScore ของฉัน"
   },
   sectionNotes: [
-    "ไม่มีคำตอบที่ถูกหรือผิด มีเพียงคำตอบที่ตรงกับความจริง ยิ่งตอบตรงกับตัวคุณมากเท่าไร สูตรก็จะยิ่งพอดีและเหมาะกับสิ่งที่คุณใช้อยู่แล้วมากขึ้น",
+    "ไม่มีคำตอบที่ถูกหรือผิด มีเพียงคำตอบที่ตรงกับความจริง บริบทที่ซื่อตรงช่วยให้สูตรพอดีกับคุณมากขึ้น และปลอดภัยขึ้นเมื่อใช้ร่วมกับสิ่งที่คุณรับประทานอยู่แล้ว",
     "",
     "",
     "",
@@ -1029,6 +1029,8 @@ type AssessmentSection = Readonly<{
   title: string;
 }>;
 
+type SegmentIntroPhase = "done" | "leaving" | "showing";
+
 type ProcessingStepState = "active" | "complete" | "failed" | "pending";
 
 type ProcessingStatus = Readonly<{
@@ -1120,6 +1122,39 @@ function PrecisionGauge({
         <span className="text-right">{labels[2]}</span>
       </div>
     </div>
+  );
+}
+
+function SegmentIntro({
+  body,
+  phase,
+  title
+}: Readonly<{
+  body: string;
+  phase: SegmentIntroPhase;
+  title: string;
+}>) {
+  const leaving = phase === "leaving";
+
+  return (
+    <section
+      aria-label={`${title} introduction`}
+      className={cx(
+        "fixed inset-0 z-50 flex items-center justify-center bg-background px-6 py-16 text-center transition-all duration-700 ease-out sm:px-10",
+        leaving
+          ? "-translate-y-6 opacity-0"
+          : "translate-y-0 opacity-100"
+      )}
+    >
+      <div className="assessment-intro-rise mx-auto max-w-5xl">
+        <h2 className="font-serif text-6xl font-semibold uppercase tracking-[0.16em] text-[#20343A] text-balance sm:text-7xl lg:text-8xl">
+          {title}
+        </h2>
+        <p className="mx-auto mt-8 max-w-4xl text-2xl font-semibold uppercase leading-snug tracking-[0.08em] text-[#1FA77A] text-balance sm:text-4xl">
+          “{body}”
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -1275,6 +1310,9 @@ export function AssessmentFlow({
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus | null>(null);
   const [processingError, setProcessingError] = useState("");
   const [capturedStatus, setCapturedStatus] = useState<ProcessingStatus | null>(returningScoreStatus);
+  const [foundationIntroPhase, setFoundationIntroPhase] = useState<SegmentIntroPhase>(() =>
+    initialStage === "quiz" && !returningScoreStatus ? "showing" : "done"
+  );
   const [showHealthScore, setShowHealthScore] = useState(Boolean(returningScoreStatus || initialStage === "healthscore"));
   const [healthScore, setHealthScore] = useState<HealthScoreResult | null>(returningHealthScore ?? null);
   const captureInFlight = useRef<Promise<ProcessingStatus | null> | null>(null);
@@ -1318,6 +1356,38 @@ export function AssessmentFlow({
       ...healthScoreBpmFields(healthScore)
     });
   }, [capturedStatus?.planId, healthScore, locale, returningPlanId, showHealthScore]);
+
+  useEffect(() => {
+    if (
+      foundationIntroPhase !== "showing" ||
+      sectionIndex !== 0 ||
+      showHealthScore ||
+      processingStatus
+    ) {
+      return;
+    }
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setFoundationIntroPhase("done");
+      return;
+    }
+
+    const leaveTimer = window.setTimeout(() => setFoundationIntroPhase("leaving"), 3200);
+
+    return () => {
+      window.clearTimeout(leaveTimer);
+    };
+  }, [foundationIntroPhase, processingStatus, sectionIndex, showHealthScore]);
+
+  useEffect(() => {
+    if (foundationIntroPhase !== "leaving") {
+      return;
+    }
+
+    const doneTimer = window.setTimeout(() => setFoundationIntroPhase("done"), 650);
+
+    return () => window.clearTimeout(doneTimer);
+  }, [foundationIntroPhase]);
 
   const ui = locale === "th"
     ? {
@@ -1740,28 +1810,18 @@ export function AssessmentFlow({
           isAnswered: hasText(answers.diet),
           label: copy.food.diet
         },
-        {
+        ...foodFrequencyKeys.map((key) => ({
           content: (
-            <div className="space-y-4">
-              {foodFrequencyKeys.map((key) => (
-                <div key={key} className="rounded-lg border border-foreground/10 bg-white p-4">
-                  <p className="mb-3 text-sm font-semibold text-[#20343A]">
-                    {copy.food.frequencyTitles[key]}
-                  </p>
-                  <PillGroup
-                    options={copy.food.frequencyOptions[key]}
-                    selected={answers.foodFrequency[key]}
-                    onSelect={(value) => updateFoodFrequency(key, value)}
-                  />
-                </div>
-              ))}
-            </div>
+            <PillGroup
+              options={copy.food.frequencyOptions[key]}
+              selected={answers.foodFrequency[key]}
+              onSelect={(value) => updateFoodFrequency(key, value)}
+            />
           ),
-          id: "foodFrequency",
-          isAnswered: foodFrequencyKeys.every((key) => hasText(answers.foodFrequency[key])),
-          label: copy.food.frequency,
-          why: copy.coach.foodFrequency
-        },
+          id: `food-${key}`,
+          isAnswered: hasText(answers.foodFrequency[key]),
+          label: copy.food.frequencyTitles[key]
+        })),
         {
           content: (
             <PillGroup multi={true} options={copy.food.allergyOptions} selected={answers.allergies} onToggle={(value) => toggleMulti("allergies", value)} />
@@ -1996,6 +2056,7 @@ export function AssessmentFlow({
     clearProcessingStatus();
     setCapturedStatus(null);
     captureInFlight.current = null;
+    setFoundationIntroPhase("done");
     setSectionIndex(sections.length - 1);
     window.scrollTo({ behavior: "smooth", top: 0 });
   }
@@ -2003,8 +2064,11 @@ export function AssessmentFlow({
   const currentSection = sections[Math.min(sectionIndex, sections.length - 1)];
   const renderedQuestions = currentSection.questions;
   const isFinalStep = sectionIndex === sections.length - 1;
+  const foundationIntroActive = currentSection.id === "about" && foundationIntroPhase !== "done";
+  const questionsConcealed = currentSection.id === "about" && foundationIntroPhase === "showing";
   const disclosureRequiredForAction = ["food", "safety", "precision"].includes(currentSection.id);
-  const primaryActionDisabled = disclosureRequiredForAction && !answers.disclosure;
+  const primaryActionDisabled =
+    foundationIntroActive || (disclosureRequiredForAction && !answers.disclosure);
 
   function goBack() {
     setProcessingError("");
@@ -2019,6 +2083,9 @@ export function AssessmentFlow({
 
   function goToSection(index: number) {
     setProcessingError("");
+    if (index !== 0) {
+      setFoundationIntroPhase("done");
+    }
     setSectionIndex(Math.min(Math.max(index, 0), sections.length - 1));
     window.scrollTo({ behavior: "smooth", top: 0 });
   }
@@ -2153,14 +2220,20 @@ export function AssessmentFlow({
             subtitle={ui.scoreProcessingSubtitle}
             title={ui.scoreProcessingTitle}
           />
-        ) : showHealthScore ? (
-          <HealthScoreOnlyPanel
-            healthScore={healthScore}
-            locale={locale}
-            scoreContent={ui.scoreGate}
-          />
-        ) : (
-          <div className="space-y-6">
+	        ) : showHealthScore ? (
+	          <HealthScoreOnlyPanel
+	            healthScore={healthScore}
+	            locale={locale}
+	            scoreContent={ui.scoreGate}
+	          />
+	        ) : foundationIntroActive ? (
+	          <SegmentIntro
+	            body={copy.sectionNotes[0]}
+	            phase={foundationIntroPhase}
+	            title={copy.stagePhases[0] ?? "Foundation"}
+	          />
+	        ) : (
+	          <div className="space-y-6">
             <div className="py-3">
               <AssessmentStepper
                 currentIndex={sectionIndex}
@@ -2214,20 +2287,29 @@ export function AssessmentFlow({
               }
               sectionLabel={copy.stagePhases[sectionIndex] ?? ""}
               stepLabel={ui.section(sectionIndex + 1, sections.length)}
-              supportingNote={copy.sectionNotes[sectionIndex]}
+              supportingNote={sectionIndex === 0 ? undefined : copy.sectionNotes[sectionIndex]}
               title={currentSection.title}
             >
-              {renderedQuestions.map((question) => (
-                <Question
-                  key={question.id}
-                  hint={question.hint}
-                  infoLabel={ui.infoLabel}
-                  label={question.label}
-                  why={question.why}
-                >
-                  {question.content}
-                </Question>
-              ))}
+              <div
+                className={cx(
+                  "space-y-7 transition-all duration-700 ease-out",
+                  questionsConcealed
+                    ? "max-h-0 translate-y-4 overflow-hidden opacity-0"
+                    : "max-h-[240rem] translate-y-0 opacity-100"
+                )}
+              >
+                {renderedQuestions.map((question) => (
+                  <Question
+                    key={question.id}
+                    hint={question.hint}
+                    infoLabel={ui.infoLabel}
+                    label={question.label}
+                    why={question.why}
+                  >
+                    {question.content}
+                  </Question>
+                ))}
+              </div>
             </SectionCard>
 
             {processingError ? (

@@ -58,3 +58,25 @@ body {
     transform: scale(1.16);
   }
 }
+
+@keyframes assessment-intro-rise {
+  0% {
+    opacity: 0.8;
+    transform: translateY(8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.assessment-intro-rise {
+  animation: assessment-intro-rise 700ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assessment-intro-rise {
+    animation: none;
+  }
+}
