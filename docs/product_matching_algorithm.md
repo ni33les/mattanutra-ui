@@ -14,11 +14,10 @@ The active path is:
 - `lib/task-result-applier.ts` persists the recommendation run, items, diagnostics, and review tasks.
 - `lib/product-recommendations.ts` contains the matcher.
 
-The older matchers remain available:
+The active matcher surface is intentionally small:
 
 | Function | Role |
 | --- | --- |
-| `recommendProductStackLegacy` | old greedy baseline for rollback/regression comparison |
 | `recommendProductStackV2` | exact scoring over a deterministic shortlist |
 | `recommendProductStackFullBeam` | active customer matcher, beam search over the full eligible pool |
 | `recommendProductStack` | default export path, currently delegates to full beam |
@@ -447,9 +446,9 @@ The plan pages should show:
 - total plan coverage
 - remaining gaps
 
-## Legacy Greedy Matcher
+## Removed Greedy Matcher
 
-The legacy matcher selected products one at a time. It used marginal coverage and stopped once remaining candidates looked weak after the target count.
+The old greedy matcher selected products one at a time. It used marginal coverage and stopped once remaining candidates looked weak after the target count. It has been removed from the active codebase so there is one customer matcher path plus the deterministic shortlist comparator.
 
 That caused a known failure mode:
 
@@ -507,7 +506,6 @@ Questionable data belongs in product review. It should not enter customer recomm
 The test suite should continue to cover:
 
 - active default is `v2-full-beam`
-- legacy matcher remains callable
 - shortlist matcher remains callable
 - sex/audience filtering
 - affiliate as tie-break only

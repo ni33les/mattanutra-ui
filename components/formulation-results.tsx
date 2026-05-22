@@ -1656,10 +1656,10 @@ const productRecommendationCopy = {
       "Product matching has finished, but the current catalogue does not contain parsed, safe, available products that match this plan yet.",
     completeEmptyTitle: "Product matching complete",
     emptyBody:
-      "We are matching your final plan against available Thailand marketplace products. Your nutrition plan is ready; product matches update separately.",
+      "We are matching your final plan against available Thailand catalogue products. Your nutrition plan is ready; product matches update separately.",
     emptyTitle: "Product matching in progress",
     failedBody:
-      "Your nutrition plan is ready, but product matching needs attention before we can show marketplace options.",
+      "Your nutrition plan is ready, but product matching needs attention before we can show product options.",
     failedTitle: "Product matching needs review",
     matched: "Matched",
     needsReviewed: "client needs reviewed",
@@ -1685,7 +1685,7 @@ const productRecommendationCopy = {
       "เรากำลังจับคู่แผนสุดท้ายของคุณกับสินค้าที่มีในตลาดไทย แผนโภชนาการของคุณพร้อมแล้ว ส่วนสินค้าแนะนำจะอัปเดตแยกต่างหาก",
     emptyTitle: "กำลังจับคู่สินค้า",
     failedBody:
-      "แผนโภชนาการของคุณพร้อมแล้ว แต่การจับคู่สินค้าต้องตรวจสอบก่อนแสดงตัวเลือก marketplace",
+      "แผนโภชนาการของคุณพร้อมแล้ว แต่การจับคู่สินค้าต้องตรวจสอบก่อนแสดงตัวเลือกสินค้า",
     failedTitle: "ต้องตรวจสอบการจับคู่สินค้า",
     matched: "จับคู่แล้ว",
     needsReviewed: "ความต้องการที่ตรวจแล้ว",

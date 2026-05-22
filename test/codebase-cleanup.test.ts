@@ -29,6 +29,30 @@ const auditScript = readFileSync(
   new URL("../scripts/audit-codebase.ts", import.meta.url),
   "utf8"
 );
+const adminSafetyViews = readFileSync(
+  new URL("../components/admin/safety-views.tsx", import.meta.url),
+  "utf8"
+);
+const adminProductView = readFileSync(
+  new URL("../components/admin/product-view.tsx", import.meta.url),
+  "utf8"
+);
+const adminProductsService = readFileSync(
+  new URL("../lib/admin-products.ts", import.meta.url),
+  "utf8"
+);
+const adminReviewQueueView = readFileSync(
+  new URL("../components/admin/review-queue-view.tsx", import.meta.url),
+  "utf8"
+);
+const adminSupplementView = readFileSync(
+  new URL("../components/admin/supplement-view.tsx", import.meta.url),
+  "utf8"
+);
+
+function lineCount(value: string) {
+  return value.split(/\r?\n/).length;
+}
 
 describe("codebase cleanup guardrails", () => {
   it("defines the cleanup scripts promised by the assessment", () => {
@@ -110,5 +134,24 @@ describe("codebase cleanup guardrails", () => {
     assert.match(auditScript, /tableCounts/);
     assert.match(auditScript, /codeInventory/);
     assert.match(auditScript, /Direct SQL Write Hotspots/);
+  });
+
+  it("keeps admin safety views split by domain roots", () => {
+    assert.ok(
+      lineCount(adminSafetyViews) < 1000,
+      "safety-views should remain the food wrapper plus compatibility exports"
+    );
+    assert.match(adminProductView, /\bexport\s+function\s+AdminProductsView\b/);
+    assert.match(adminSupplementView, /\bexport\s+function\s+AdminSupplementsView\b/);
+    assert.match(adminReviewQueueView, /\bexport\s+function\s+AdminReviewQueueView\b/);
+    assert.doesNotMatch(adminSafetyViews, /\bfunction\s+ProductModal\b/);
+    assert.doesNotMatch(adminSafetyViews, /\bfunction\s+ProductImportReviewModal\b/);
+    assert.doesNotMatch(adminSafetyViews, /\bfunction\s+SupplementDetailsModal\b/);
+  });
+
+  it("keeps marketplace-era product import helpers out of the active product service", () => {
+    assert.doesNotMatch(adminProductsService, /\bimportDiscoveredMarketplaceProducts\b/);
+    assert.doesNotMatch(adminProductsService, /\bfactsFromMarketplaceSnapshot\b/);
+    assert.doesNotMatch(adminProductsService, /\bmarketplace_discovery\b/);
   });
 });

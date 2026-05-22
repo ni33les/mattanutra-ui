@@ -1,5 +1,4 @@
 import { getSql } from "@/lib/db";
-import type { ProductSnapshot } from "@/lib/product-adapters";
 import { toJsonValue } from "@/lib/assessment-store";
 import {
   comparableDoseAmount,
@@ -22,7 +21,6 @@ import {
   type ProductConfidence,
   type ProductKind,
   type ProductStatus,
-  type ProductRecommendationNeed,
   type ProductPlatform
 } from "@/lib/product-recommendations";
 import {
@@ -2639,72 +2637,6 @@ async function recordProductVersion(
   return version;
 }
 
-function titleContainsNeed(title: string, need: ProductRecommendationNeed) {
-  const normalizedTitle = normalizeProductFactKey(title);
-  const needKeys = productFactAliasKeys(need.displayName, need.aliasKeys);
-  const needTokens = [...new Set(
-    needKeys
-      .flatMap((key) => key.split("_"))
-      .filter((token) => token.length > 1 && token !== "and")
-  )];
-
-  if (
-    needKeys.some((key) =>
-      normalizedTitle.includes(key) || productKeysMatch(title, key)
-    )
-  ) {
-    return true;
-  }
-
-  return needTokens.length > 0 &&
-    needTokens.every((token) => normalizedTitle.includes(token));
-}
-
-function titleDose(title: string) {
-  const match = title.match(/(\d+(?:\.\d+)?)\s*(mcg|µg|ug|mg|g|iu)\b/i);
-
-  if (!match) {
-    return { amount: null, unit: null };
-  }
-
-  return {
-    amount: Number(match[1]),
-    unit:
-      match[2]
-        ?.toLowerCase()
-        .replace("µg", "mcg")
-        .replace("ug", "mcg") ?? null
-  };
-}
-
-async function supplementIdsForNeeds(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  needs: readonly ProductRecommendationNeed[]
-) {
-  const normalizedNames = [...new Set(
-    needs
-      .flatMap((need) => productFactAliasKeys(need.displayName, need.aliasKeys))
-      .filter(Boolean)
-  )];
-
-  if (normalizedNames.length < 1) {
-    return new Map<string, string>();
-  }
-
-  const rows = await sql<Array<{
-    id: string;
-    normalized_alias: string;
-  }>>`
-    select supplements.id::text, supplement_aliases.normalized_alias
-    from public.supplement_aliases
-    join public.supplements
-      on supplements.id = supplement_aliases.supplement_id
-    where supplement_aliases.normalized_alias = any(${normalizedNames}::text[])
-  `;
-
-  return new Map(rows.map((row) => [row.normalized_alias, row.id]));
-}
-
 async function supplementIdsForFacts(
   sql: NonNullable<ReturnType<typeof getSql>>,
   facts: readonly ProductImportFactInput[]
@@ -2829,29 +2761,6 @@ export async function validateProductImportForApproval(input: Readonly<{
     productUrl: input.productUrl,
     sourceUrl: input.sourceUrl
   });
-}
-
-function factsFromMarketplaceSnapshot(
-  snapshot: ProductSnapshot,
-  needs: readonly ProductRecommendationNeed[],
-  supplementIds: ReadonlyMap<string, string>
-) {
-  const dose = titleDose(snapshot.title);
-
-  return needs
-    .filter((need) => need.itemType !== "food")
-    .filter((need) => titleContainsNeed(snapshot.title, need))
-    .map((need) => ({
-      amount: dose.amount,
-      confidence: dose.amount ? "moderate" as const : "low" as const,
-      itemType: "supplement" as const,
-      name: need.displayName,
-      supplementId:
-        productFactAliasKeys(need.displayName, need.aliasKeys)
-          .map((alias) => supplementIds.get(alias))
-          .find((id): id is string => Boolean(id)) ?? null,
-      unit: dose.unit
-    }));
 }
 
 export async function createAdminProduct(input: CreateAdminProductInput) {
@@ -3062,13 +2971,17 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
   }
 
   if (input.replaceFacts || facts.length > 0) {
+    const factSource = input.source?.trim() || "admin";
+
     await replaceProductFacts(sql, {
-      ...(input.replaceFacts ? { deleteSources: ["marketplace_discovery", "admin"] } : {}),
+      ...(input.replaceFacts
+        ? { deleteSources: [...new Set([factSource, "admin"])] }
+        : {}),
       actor: input.actor,
       changeReason: "product_create_facts",
       facts,
       productId,
-      source: input.source === "marketplace_discovery" ? "marketplace_discovery" : "admin",
+      source: factSource,
       supplementMatchesByFactName
     });
   }
@@ -3168,62 +3081,6 @@ export async function deletePendingManufacturerImportProduct(productId: string) 
   }
 
   return Boolean(rows[0]);
-}
-
-export async function importDiscoveredMarketplaceProducts(input: Readonly<{
-  actor?: string | null;
-  needs: readonly ProductRecommendationNeed[];
-  products: readonly ProductSnapshot[];
-}>) {
-  const sql = getSql();
-
-  if (!sql || input.products.length < 1) {
-    return {
-      imported: 0,
-      withInferredFacts: 0
-    };
-  }
-
-  const supplementIds = await supplementIdsForNeeds(sql, input.needs);
-  let imported = 0;
-  let withInferredFacts = 0;
-
-  for (const snapshot of input.products) {
-    const facts = factsFromMarketplaceSnapshot(snapshot, input.needs, supplementIds);
-
-    try {
-      await createAdminProduct({
-        actor: input.actor ?? "product_matcher",
-        availabilityStatus: snapshot.availabilityStatus,
-        availableCountryCodes: [snapshot.region],
-        brandName: snapshot.brandName,
-        currency: snapshot.currency,
-        facts,
-        imageUrl: snapshot.imageUrl,
-        labelStatus: facts.length > 0 ? "parsed" : "missing",
-        manufacturerCountryCodes: [snapshot.region],
-        status: "pending_review",
-        externalProductId: snapshot.externalProductId,
-        platform: snapshot.platform,
-        priceAmount: snapshot.priceAmount ?? null,
-        productUrl: snapshot.productUrl,
-        region: snapshot.region,
-        replaceFacts: facts.length > 0,
-        source: "marketplace_discovery",
-        title: snapshot.title
-      });
-      imported += 1;
-      withInferredFacts += facts.length > 0 ? 1 : 0;
-    } catch (error) {
-      console.error("Unable to import discovered marketplace product", {
-        error: error instanceof Error ? error.message : "Unknown product import error",
-        productUrl: snapshot.productUrl,
-        title: snapshot.title
-      });
-    }
-  }
-
-  return { imported, withInferredFacts };
 }
 
 export async function stageProductImport(input: StageProductImportInput) {
