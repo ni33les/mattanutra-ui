@@ -43,29 +43,29 @@
     "@headlessui/react": "^2.2.10",
     "@heroicons/react": "^2.2.0",
     "@types/nodemailer": "^8.0.0",
-    "clsx": "latest",
-    "lucide-react": "latest",
-    "next": "latest",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.507.0",
+    "next": "^16.2.4",
     "nodemailer": "^8.0.7",
     "postgres": "^3.4.9",
-    "react": "latest",
-    "react-dom": "latest",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "tailwind-merge": "latest"
+    "tailwind-merge": "^3.2.0"
   },
   "overrides": {
     "postcss": "$postcss"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "latest",
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "eslint": "latest",
-    "eslint-config-next": "latest",
+    "@tailwindcss/postcss": "^4.2.4",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.4",
     "postcss": "8.5.12",
-    "tailwindcss": "latest",
-    "typescript": "latest"
+    "tailwindcss": "^4.2.4",
+    "typescript": "^6.0.3"
   }
 }

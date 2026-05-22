@@ -1,6 +1,8 @@
 # Tailwind Component Index
 
-Local Tailwind examples live under `tailwind-examples/`. Use the React examples first for this Next app, then HTML or Vue only as visual references.
+> **Note**: The vendored `tailwind-examples/` copy (19 MB) was removed in Sprint 1 to keep the repository lean. Use the official Tailwind UI examples, shadcn/ui, or the project's own component patterns as references instead.
+
+Local Tailwind examples previously lived under `tailwind-examples/`. Use the React examples first for this Next app, then HTML or Vue only as visual references.
 
 ## Inventory
 

@@ -111,7 +111,7 @@ export type ProductRecommendationNeedDiagnostic = Readonly<{
 export type ProductRecommendationAlgorithmVersion =
   | "v2-exact-shortlist"
   | "v2-full-beam";
-export type ProductStackPreference = "balanced" | "compact" | "max_coverage";
+export type ProductStackPreference = "balanced" | "compact";
 
 export type ProductRecommendationDiagnostics = Readonly<{
   algorithmVersion?: ProductRecommendationAlgorithmVersion;
@@ -224,15 +224,10 @@ type CoverageResult = Readonly<{
   percent: number;
 }>;
 
-const DEFAULT_TARGET_COUNT = 3;
 const DEFAULT_MAX_COUNT = 6;
-const EXPANDED_MAX_COUNT = 12;
-const MIN_USEFUL_MARGINAL_COVERAGE = 0.02;
-const STOP_AFTER_TARGET_MARGINAL_COVERAGE = 0.08;
 const TARGET_DOSE_SWEET_SPOT_MIN = 0.7;
 const TARGET_DOSE_SWEET_SPOT_MAX = 1.3;
 const TARGET_DOSE_SOFT_MAX = 1.5;
-const AFFILIATE_SIMILARITY_PERCENT = 3;
 const GENERIC_BASE_PRODUCT_QUERIES = [
   "multivitamin",
   "multivitamin mineral",
@@ -579,7 +574,6 @@ export function buildProductNeeds(input: Readonly<{
   const supplementNeeds =
     input.formulation?.supplementBreakdown
       ?.filter((item) => visibleSafetyStatus(item))
-      .filter((item) => item.status === "add" || item.status === "review")
       .map((item) => {
         const displayName = textValue(item.supplement);
         const normalizedName = normalizeProductFactKey(displayName);
@@ -732,79 +726,6 @@ function productFactAudienceMismatchReason(
   return mismatched ? factAudienceMismatchReason(mismatched, clientSex) : null;
 }
 
-function factNeedCoverage(fact: ProductCandidateFact, need: ProductRecommendationNeed) {
-  if (!matchesNeed(fact, need)) {
-    return 0;
-  }
-
-  const confidence = confidenceMultiplier(fact.confidence);
-  const factAmount = factComparableAmount(fact);
-
-  if (
-    factAmount !== null &&
-    need.targetComparableAmount !== null &&
-    need.targetComparableAmount > 0
-  ) {
-    const ratio = factAmount / need.targetComparableAmount;
-
-    if (ratio <= 0) {
-      return 0;
-    }
-
-    if (ratio < TARGET_DOSE_SWEET_SPOT_MIN) {
-      return ratio * 0.85 * confidence;
-    }
-
-    if (ratio <= TARGET_DOSE_SWEET_SPOT_MAX) {
-      return Math.min(1, ratio) * confidence;
-    }
-
-    if (ratio <= TARGET_DOSE_SOFT_MAX) {
-      return Math.max(0.75, 1 - (ratio - TARGET_DOSE_SWEET_SPOT_MAX) * 0.75) *
-        confidence;
-    }
-
-    return Math.max(0.25, 1 - (ratio - TARGET_DOSE_SOFT_MAX) * 0.5) *
-      confidence;
-  }
-
-  return 0.8 * confidence;
-}
-
-function productCoverage(
-  product: ProductCandidate,
-  needs: ProductRecommendationNeed[],
-  clientSex?: ProductClientSex | null
-) {
-  const coverageByNeed = new Map<string, number>();
-  const coveredNeeds: ProductRecommendationNeed[] = [];
-  const totalWeight = needs.reduce((total, need) => total + need.weight, 0);
-  const facts = product.facts.filter((fact) => factAllowedForClient(fact, clientSex));
-
-  for (const need of needs) {
-    const coverage = Math.max(
-      0,
-      ...facts.map((fact) => factNeedCoverage(fact, need))
-    );
-
-    if (coverage > 0) {
-      coverageByNeed.set(need.id, Math.min(1, coverage));
-      coveredNeeds.push(need);
-    }
-  }
-
-  const weightedCoverage = coveredNeeds.reduce(
-    (total, need) => total + need.weight * (coverageByNeed.get(need.id) ?? 0),
-    0
-  );
-
-  return {
-    coverageByNeed,
-    coveredNeeds,
-    percent: totalWeight > 0 ? (weightedCoverage / totalWeight) * 100 : 0
-  } satisfies CoverageResult;
-}
-
 function exclusionReason(product: ProductCandidate) {
   if (product.brandStatus === "ignored") {
     return "Brand is ignored";
@@ -856,117 +777,6 @@ function productAudienceMismatchReason(
   return audience === "female"
     ? "Product is for women only"
     : "Product is for men only";
-}
-
-function productPenalty(product: ProductCandidate, budgetAmount?: number | null) {
-  let penalty = 0;
-
-  if (product.labelStatus === "stale") {
-    penalty += 4;
-  }
-
-  if (budgetAmount && product.priceAmount && product.priceAmount > budgetAmount) {
-    penalty += Math.min(15, ((product.priceAmount - budgetAmount) / budgetAmount) * 10);
-  }
-
-  return penalty;
-}
-
-function extraIngredientPenalty(
-  product: ProductCandidate,
-  needs: ProductRecommendationNeed[]
-) {
-  const neededNames = new Set(
-    needs.flatMap((need) =>
-      [...matchKeyAliases(need.displayName || need.normalizedName, need.aliasKeys)]
-    )
-  );
-  const extras = product.facts.filter(
-    (fact) => ![...matchKeyAliases(fact.name || fact.normalizedName, fact.aliasKeys)]
-      .some((alias) => neededNames.has(alias))
-  );
-
-  if (extras.length < 1) {
-    return 0;
-  }
-
-  const lowConfidenceExtras = extras.filter((fact) => fact.confidence === "low");
-
-  return Math.min(8, extras.length * 0.2 + lowConfidenceExtras.length * 0.35);
-}
-
-function broadBaseBonus(
-  product: ProductCandidate,
-  coverage: CoverageResult,
-  selectedCount: number
-) {
-  if (selectedCount > 0) {
-    return 0;
-  }
-
-  const productKind = product.productKind ?? "supplement";
-  const broadFactCount = product.facts.length;
-
-  if (productKind === "multi" || broadFactCount >= 6) {
-    return Math.min(8, coverage.coveredNeeds.length * 1.2 + broadFactCount * 0.1);
-  }
-
-  return 0;
-}
-
-function affiliateTieScore(product: ProductCandidate) {
-  if (!product.activeAffiliateUrl) {
-    return 0;
-  }
-
-  const commissionRate = product.activeAffiliateCommissionRate ?? 0;
-  const priority = product.activeAffiliatePriority ?? 0;
-  const affiliateTypeBonus = product.activeAffiliateType === "affiliate" ? 10 : 1;
-
-  return affiliateTypeBonus + commissionRate * 100 + priority;
-}
-
-function productsAreNutritionallySimilar(
-  first: Readonly<{ marginal: number; score: number }>,
-  second: Readonly<{ marginal: number; score: number }>
-) {
-  return Math.abs(first.marginal - second.marginal) <= AFFILIATE_SIMILARITY_PERCENT &&
-    Math.abs(first.score - second.score) <= AFFILIATE_SIMILARITY_PERCENT;
-}
-
-function marginalCoveragePercent(
-  coverage: CoverageResult,
-  existingCoverage: Map<string, number>,
-  needs: ProductRecommendationNeed[]
-) {
-  const totalWeight = needs.reduce((total, need) => total + need.weight, 0);
-  const weightedMarginal = needs.reduce((total, need) => {
-    const current = existingCoverage.get(need.id) ?? 0;
-    const next = coverage.coverageByNeed.get(need.id) ?? 0;
-
-    return total + Math.max(0, next - current) * need.weight;
-  }, 0);
-
-  return totalWeight > 0 ? (weightedMarginal / totalWeight) * 100 : 0;
-}
-
-function applyCoverage(
-  target: Map<string, number>,
-  coverage: CoverageResult
-) {
-  for (const [needId, nextCoverage] of coverage.coverageByNeed.entries()) {
-    target.set(needId, Math.max(target.get(needId) ?? 0, nextCoverage));
-  }
-}
-
-function coversCurrentlyUnmatchedNeed(
-  coverage: CoverageResult,
-  existingCoverage: Map<string, number>
-) {
-  return [...coverage.coverageByNeed.entries()].some(
-    ([needId, nextCoverage]) =>
-      nextCoverage > 0 && (existingCoverage.get(needId) ?? 0) <= 0
-  );
 }
 
 function stackCoveragePercent(
@@ -1195,18 +1005,13 @@ export const PRODUCT_STACK_VARIANT_CONFIGS: readonly ProductStackVariantConfig[]
     maxProducts: 6,
     stackPreference: "balanced",
     targetProducts: 3
-  },
-  {
-    maxProducts: EXPANDED_MAX_COUNT,
-    stackPreference: "max_coverage",
-    targetProducts: 6
   }
 ];
 
 export function normalizeProductStackPreference(
   value: unknown
 ): ProductStackPreference {
-  return value === "compact" || value === "max_coverage" || value === "balanced"
+  return value === "compact" || value === "balanced"
     ? value
     : "balanced";
 }
@@ -2093,7 +1898,7 @@ function compareBalancedStackScores(first: V2StackScore, second: V2StackScore) {
   return compareStackScores(first, second);
 }
 
-function compareMaxCoverageStackScores(
+function compareCoverageStackScores(
   first: V2StackScore,
   second: V2StackScore
 ) {
@@ -2162,34 +1967,12 @@ function selectStackForPreference(
     return null;
   }
 
-  if (stackPreference === "max_coverage") {
-    const balancedStack = [...uniqueScores].sort(compareBalancedStackScores)[0] ?? null;
-    const maxCoverageStack =
-      [...uniqueScores].sort(compareMaxCoverageStackScores)[0] ?? null;
-
-    if (!balancedStack || !maxCoverageStack) {
-      return maxCoverageStack;
-    }
-
-    const maxCoverage = maxCoverageStack.supplementProductCoveragePercent;
-    const balancedKey = stackFingerprint(balancedStack);
-    const distinctCoverageTie = uniqueScores
-      .filter((score) =>
-        stackFingerprint(score) !== balancedKey &&
-        Math.abs(score.supplementProductCoveragePercent - maxCoverage) <=
-          V2_SCORE_EPSILON
-      )
-      .sort(compareMaxCoverageStackScores)[0];
-
-    return distinctCoverageTie ?? maxCoverageStack;
-  }
-
   if (stackPreference !== "compact") {
     return [...uniqueScores].sort(compareBalancedStackScores)[0] ?? null;
   }
 
   const bestCoverageStack =
-    [...uniqueScores].sort(compareMaxCoverageStackScores)[0] ?? uniqueScores[0]!;
+    [...uniqueScores].sort(compareCoverageStackScores)[0] ?? uniqueScores[0]!;
   const minimumCoverage =
     bestCoverageStack.supplementProductCoveragePercent *
     V2_COMPACT_MIN_COVERAGE_RATIO;
@@ -3257,7 +3040,7 @@ function recommendProductStackExact(
 ) {
   const stackPreference = normalizeProductStackPreference(input.stackPreference);
   const maxProducts = Math.min(
-    EXPANDED_MAX_COUNT,
+    DEFAULT_MAX_COUNT,
     Math.max(1, input.maxProducts ?? DEFAULT_MAX_COUNT)
   );
   const scoringNeeds = supplementProductNeeds(input.needs);

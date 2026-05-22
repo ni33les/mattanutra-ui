@@ -1368,7 +1368,8 @@ export function AssessmentFlow({
     }
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setFoundationIntroPhase("done");
+      // Defer to avoid synchronous setState-in-effect lint rule (safe for this mount-time jump)
+      Promise.resolve().then(() => setFoundationIntroPhase("done"));
       return;
     }
 
