@@ -3,7 +3,6 @@ import { AssessmentFlow } from "@/components/assessment-flow";
 import { ServiceIssue } from "@/components/service-issue";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
-import { getRandomPublishedTestimonial } from "@/lib/blog";
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
@@ -59,7 +58,6 @@ export default async function NutritionQuizPage({
   const prefill = returningPlanId
     ? await getStoredAssessmentPrefill(returningPlanId)
     : null;
-  const exampleTestimonial = await getRandomPublishedTestimonial(locale);
 
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
@@ -69,12 +67,10 @@ export default async function NutritionQuizPage({
         title={dictionary.hero.eyebrow}
       />
       <AssessmentFlow
-        exampleTestimonial={exampleTestimonial}
         initialStage="quiz"
         locale={locale}
         prefillAnswers={prefill?.answers ?? null}
         returningHealthScore={prefill?.healthScore ?? null}
-        returningPlan={prefill?.plan ?? null}
         returningPlanId={prefill?.planId ?? undefined}
       />
       <SiteFooter content={dictionary.footer} locale={locale} />

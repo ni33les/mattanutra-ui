@@ -132,7 +132,6 @@ export function buildAssessmentSummary({
     ...(supplementSensitivities.length > 0
       ? supplementSensitivities.map(humanize)
       : []),
-    ...(toText(record.avoidNote) ? [toText(record.avoidNote)] : []),
     ...(symptoms.length > 0 ? symptoms.map(humanize).slice(0, 3) : [])
   ];
 

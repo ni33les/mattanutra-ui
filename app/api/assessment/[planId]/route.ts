@@ -5,15 +5,11 @@ import {
 } from "@/lib/assessment-snapshot";
 import {
   getStoredAssessmentSnapshot,
-  getStoredHealthScoreAnalysisSnapshot,
   isUuid,
   persistAssessmentSubmission
 } from "@/lib/assessment-store";
 import { computeHealthScore } from "@/lib/health-score";
-import { writeSkippedPaymentSuccessEvent } from "@/lib/payment-bpm";
 import {
-  enqueueHealthScoreAnalysisTask,
-  enqueueNutritionPlanTasks,
   enqueueDueScheduledActions,
   scheduleReassessmentAction
 } from "@/lib/task-worker";
@@ -70,11 +66,7 @@ export async function GET(
   { params }: AssessmentStatusRouteProps
 ) {
   const { planId } = await params;
-  const url = new URL(request.url);
-  const scoreMode = url.searchParams.get("mode") === "score";
-  const snapshot = scoreMode
-    ? await getStoredHealthScoreAnalysisSnapshot(planId)
-    : await getStoredAssessmentSnapshot(planId);
+  const snapshot = await getStoredAssessmentSnapshot(planId);
 
   if (!snapshot) {
     return NextResponse.json(
@@ -86,10 +78,6 @@ export async function GET(
         status: 404
       }
     );
-  }
-
-  if (scoreMode && snapshot.status === "preparing") {
-    await enqueueHealthScoreAnalysisTask({ planId: snapshot.planId });
   }
 
   void enqueueDueScheduledActions();
@@ -166,7 +154,7 @@ export async function PATCH(
       plan: selectedPlan ?? existingSnapshot?.plan,
       planId,
       queuePosition: existingSnapshot?.queuePosition,
-      status: "queued"
+      status: "ready"
     });
 
     await persistAssessmentSubmission({
@@ -174,7 +162,7 @@ export async function PATCH(
       locale: body.locale,
       selectedPlan,
       snapshot,
-      status: intent === "capture" ? "captured" : "queued"
+      status: "captured"
     });
 
     await writeBpmEvent({
@@ -190,10 +178,6 @@ export async function PATCH(
       ray: typeof bpm.ray === "string" ? bpm.ray : null,
       selectedPlan,
       ...healthScoreBpmFields(snapshot)
-    });
-
-    await enqueueHealthScoreAnalysisTask({
-      planId: snapshot.planId
     });
 
     const reassessmentEmail = reassessmentEmailFromAnswers(body.answers);
@@ -218,11 +202,7 @@ export async function PATCH(
     }
 
     if (intent === "capture") {
-      const storedSnapshot = await getStoredHealthScoreAnalysisSnapshot(
-        snapshot.planId
-      );
-
-      return NextResponse.json(storedSnapshot ?? snapshot, {
+      return NextResponse.json(snapshot, {
         headers: {
           "Cache-Control": "no-store"
         }
@@ -240,41 +220,6 @@ export async function PATCH(
       eventType: "plan",
       locale: body.locale,
       planId: snapshot.planId,
-      ray: typeof bpm.ray === "string" ? bpm.ray : null,
-      selectedPlan,
-      ...healthScoreBpmFields(snapshot)
-    });
-
-    await writeSkippedPaymentSuccessEvent({
-      attribution: bpm.attribution,
-      locale: body.locale,
-      planId: snapshot.planId,
-      ray: typeof bpm.ray === "string" ? bpm.ray : null,
-      selectedPlan,
-      ...healthScoreBpmFields(snapshot)
-    });
-
-    const taskIds = await enqueueNutritionPlanTasks({
-      answers: body.answers,
-      locale: body.locale,
-      plan: selectedPlan,
-      planId: snapshot.planId
-    });
-
-    if (!taskIds) {
-      throw new Error("Unable to queue assessment processing");
-    }
-
-    await writeBpmEvent({
-      actorType: "system",
-      attribution: bpm.attribution,
-      eventName: "formulation_requested",
-      eventType: "formulation",
-      locale: body.locale,
-      planId: snapshot.planId,
-      properties: {
-        formulationTaskId: taskIds.formulationTaskId
-      },
       ray: typeof bpm.ray === "string" ? bpm.ray : null,
       selectedPlan,
       ...healthScoreBpmFields(snapshot)

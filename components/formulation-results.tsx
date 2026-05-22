@@ -1,15 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowPathIcon,
   BeakerIcon,
-  ChatBubbleLeftRightIcon,
   ExclamationTriangleIcon,
   HeartIcon,
   InformationCircleIcon,
-  PaperAirplaneIcon,
   SparklesIcon
 } from "@heroicons/react/20/solid";
 import { NutritionProgress } from "@/components/nutrition-progress";
@@ -19,7 +16,6 @@ import type {
   FormulationIngredient,
   FormulationResult,
   LocalizedText,
-  PlanChatMessage,
   ProductRecommendationOption,
   ProductStackPreference,
   RecommendedProduct
@@ -28,7 +24,6 @@ import { foodTagLabel } from "@/lib/food-tags";
 import type { Locale } from "@/lib/i18n";
 import {
   nutritionHealthScorePath,
-  nutritionPlanPath,
   nutritionRefinePath
 } from "@/lib/nutrition-paths";
 
@@ -41,7 +36,6 @@ type FormulationResultsProps = Readonly<{
 type LoadState = "loading" | "ready" | "error";
 
 const formulationHeroBackgroundImage = "/formulation-couple.jpg";
-const MAX_PLAN_CHAT_ROUNDS = 8;
 const MAX_PRODUCT_MATCHING_POLLS = 80;
 const PENDING_SECTION_POLL_INTERVAL_MS = 1_000;
 const PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS = 750;
@@ -145,21 +139,7 @@ type CopyLabels = Record<
   | "nutritionProgressReady"
   | "nutritionProgressSupplements"
   | "nutritionProgressTitle"
-  | "planChatAssistantName"
-  | "planChatBody"
-  | "planChatEmpty"
-  | "planChatEyebrow"
-  | "planChatError"
-  | "planChatPlaceholder"
-  | "planChatSend"
-  | "planChatSending"
-  | "planChatLimit"
-  | "planChatThinking"
-  | "planChatTitle"
-  | "planChatWaiting"
   | "dailyDose"
-  | "deliveryHandoffBody"
-  | "deliveryHandoffTitle"
   | "plan"
   | "previewBadge"
   | "previewBody"
@@ -253,25 +233,7 @@ export const formulationResultsCopy = {
     nutritionProgressReady: "Ready",
     nutritionProgressSupplements: "Supplement guidance",
     nutritionProgressTitle: "Preparing your guidance",
-    planChatAssistantName: "MattaNutra AI",
-    planChatBody:
-      "Tell us what you would like to remove, swap, simplify, or adjust. The final plan will use this conversation as context.",
-    planChatEmpty: "No refinement notes yet.",
-    planChatEyebrow: "Plan refinement",
-    planChatError: "We could not send that message. Please try again.",
-    planChatPlaceholder: "Anything you'd like to change?",
-    planChatSend: "Send",
-    planChatSending: "Sending",
-    planChatLimit:
-      "You have used the 8 refinement rounds for this plan. Press Deliver Nutrition Plan when you are ready.",
-    planChatThinking: "Thinking through your note...",
-    planChatTitle: "Anything you'd like to change?",
-    planChatWaiting:
-      "Chat will unlock when your supplement guidance is ready.",
     dailyDose: "Dose",
-    deliveryHandoffBody:
-      "We’re tailoring the final plan from your supplement guidance and refinement notes.",
-    deliveryHandoffTitle: "Delivering your nutrition plan",
     plan: "Plan",
     previewBadge: "Free preview",
     previewBody:
@@ -371,25 +333,7 @@ export const formulationResultsCopy = {
     nutritionProgressReady: "พร้อมแล้ว",
     nutritionProgressSupplements: "คำแนะนำอาหารเสริม",
     nutritionProgressTitle: "กำลังเตรียมคำแนะนำของคุณ",
-    planChatAssistantName: "MattaNutra AI",
-    planChatBody:
-      "บอกเราได้ว่าต้องการเอาอะไรออก เปลี่ยนอะไร ทำให้ง่ายขึ้น หรือปรับให้เข้ากับชีวิตประจำวันอย่างไร แผนสุดท้ายจะใช้บทสนทนานี้เป็นบริบท",
-    planChatEmpty: "ยังไม่มีโน้ตสำหรับปรับแผน",
-    planChatEyebrow: "ปรับแผน",
-    planChatError: "ไม่สามารถส่งข้อความได้ กรุณาลองอีกครั้ง",
-    planChatPlaceholder: "มีอะไรที่อยากเปลี่ยนไหม?",
-    planChatSend: "ส่ง",
-    planChatSending: "กำลังส่ง",
-    planChatLimit:
-      "คุณใช้ครบ 8 รอบสำหรับการปรับแผนนี้แล้ว กดส่งมอบแผนโภชนาการเมื่อพร้อม",
-    planChatThinking: "กำลังพิจารณาข้อความของคุณ...",
-    planChatTitle: "มีอะไรที่อยากเปลี่ยนไหม?",
-    planChatWaiting:
-      "แชตจะใช้งานได้เมื่อคำแนะนำอาหารเสริมพร้อมแล้ว",
     dailyDose: "ขนาด",
-    deliveryHandoffBody:
-      "เรากำลังออกแบบแผนสุดท้ายจากคำแนะนำอาหารเสริมและบันทึกการปรับแต่งของคุณ",
-    deliveryHandoffTitle: "กำลังส่งมอบแผนโภชนาการของคุณ",
     plan: "แผน",
     previewBadge: "ตัวอย่างฟรี",
     previewBody:
@@ -482,10 +426,6 @@ function planResultsHref(locale: Locale, planId: string) {
   return nutritionRefinePath(locale, planId);
 }
 
-function planDeliveryHref(locale: Locale, planId: string) {
-  return nutritionPlanPath(locale, planId);
-}
-
 function planPaywallHref(locale: Locale, planId: string) {
   return nutritionHealthScorePath(locale, planId);
 }
@@ -574,7 +514,6 @@ export function FormulationResults({
   locale,
   planId
 }: FormulationResultsProps) {
-  const router = useRouter();
   const labels = formulationResultsCopy[locale];
   const effectivePlanId = planId;
   const [loadState, setLoadState] = useState<LoadState>(
@@ -584,9 +523,6 @@ export function FormulationResults({
   const [result, setResult] = useState<FormulationResult | null>(initialResult);
   const [selectedProductStackPreference, setSelectedProductStackPreference] =
     useState<ProductStackPreference | null>(null);
-  const [deliveryHandoffPlanId, setDeliveryHandoffPlanId] = useState<
-    string | null
-  >(null);
   const productPollAttemptsRef = useRef(0);
 
   useEffect(() => {
@@ -673,21 +609,6 @@ export function FormulationResults({
     );
   }, [result]);
 
-  useEffect(() => {
-    if (
-      deliveryHandoffPlanId === effectivePlanId &&
-      result?.nutritionReport
-    ) {
-      router.push(planDeliveryHref(locale, effectivePlanId));
-    }
-  }, [
-    deliveryHandoffPlanId,
-    effectivePlanId,
-    locale,
-    result?.nutritionReport,
-    router
-  ]);
-
   if (loadState === "loading") {
     return (
       <NutritionGuidancePreparingPanel
@@ -760,15 +681,6 @@ export function FormulationResults({
   const productCoverageBySupplementId = supplementProductCoverageById(
     activeProductRecommendations
   );
-
-  if (deliveryHandoffPlanId === effectiveResultPlanId) {
-    return (
-      <NutritionPlanPreparingPanel
-        labels={labels}
-        locale={locale}
-      />
-    );
-  }
 
   if (nutritionPending) {
     return (
@@ -919,23 +831,6 @@ export function FormulationResults({
         />
       )}
 
-      {isPreview ? null : (
-        <PlanChatPanel
-          canFinalize={!nutritionPending}
-          labels={labels}
-          locale={locale}
-          onFinalizationQueued={() => {
-            setRefreshNonce((value) => value + 1);
-          }}
-          onPlanDeliveryStarted={() =>
-            setDeliveryHandoffPlanId(effectiveResultPlanId)
-          }
-          planId={effectiveResultPlanId}
-          report={result.nutritionReport ?? null}
-          reportStatus={sectionStatuses.report}
-        />
-      )}
-
       <div className="mt-8 rounded-lg bg-[#20343A] p-6 text-sm leading-6 text-white/75">
         <div className="flex gap-3">
           <InformationCircleIcon
@@ -1022,36 +917,6 @@ function NutritionGuidancePreparingPanel({
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
           {labels.nutritionProgressBody}
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function NutritionPlanPreparingPanel({
-  labels,
-  locale
-}: Readonly<{
-  labels: PanelLabels;
-  locale: Locale;
-}>) {
-  return (
-    <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
-      <NutritionProgress
-        className="mb-8"
-        current="plan"
-        locale={locale}
-        pending={true}
-      />
-      <div
-        aria-live="polite"
-        className="rounded-lg bg-white p-6 ring-1 ring-foreground/10 transition-colors sm:p-8"
-      >
-        <h1 className="max-w-2xl text-2xl font-semibold tracking-normal text-[#20343A] sm:text-3xl">
-          {labels.deliveryHandoffTitle}
-        </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-          {labels.deliveryHandoffBody}
         </p>
       </div>
     </section>
@@ -1251,376 +1116,6 @@ function PreviewPaywallPanel({
         >
           {labels.previewCta}
         </a>
-      </div>
-    </section>
-  );
-}
-
-function PlanChatPanel({
-  canFinalize,
-  labels,
-  locale,
-  onFinalizationQueued,
-  onPlanDeliveryStarted,
-  planId,
-  report,
-  reportStatus
-}: Readonly<{
-  canFinalize: boolean;
-  labels: PanelLabels;
-  locale: Locale;
-  onFinalizationQueued: () => void;
-  onPlanDeliveryStarted: () => void;
-  planId: string;
-  report: FormulationResult["nutritionReport"];
-  reportStatus?: "failed" | "pending" | "ready";
-}>) {
-  const router = useRouter();
-  const [messages, setMessages] = useState<PlanChatMessage[]>([]);
-  const [message, setMessage] = useState("");
-  const [loadState, setLoadState] = useState<"idle" | "loading" | "error">(
-    "loading"
-  );
-  const [sendState, setSendState] = useState<"idle" | "sending" | "error">(
-    "idle"
-  );
-  const [finalizeState, setFinalizeState] = useState<
-    "idle" | "queued" | "submitting" | "error"
-  >("idle");
-  const [awaitingReplyMessageId, setAwaitingReplyMessageId] = useState<
-    string | null
-  >(null);
-  const lastReadyMessageSignature = useRef("");
-  const onPlanUpdatedRef = useRef(onFinalizationQueued);
-  const onPlanDeliveryStartedRef = useRef(onPlanDeliveryStarted);
-  const [pollVersion, setPollVersion] = useState(0);
-  const pendingChat = messages.some((item) => item.status === "queued");
-  const userRoundCount = messages.filter((item) => item.role === "user").length;
-  const chatLimitReached = userRoundCount >= MAX_PLAN_CHAT_ROUNDS;
-  const waitingForSubmittedReply = Boolean(
-    awaitingReplyMessageId &&
-      !messages.some(
-        (item) =>
-          item.role === "assistant" &&
-          item.replyToMessageId === awaitingReplyMessageId &&
-          item.status === "ready"
-      )
-  );
-  const finalizing =
-    reportStatus === "pending" ||
-    (finalizeState === "queued" && reportStatus !== "failed");
-  const finalizeDisabled =
-    !canFinalize ||
-    pendingChat ||
-    finalizeState === "submitting" ||
-    finalizing;
-  const chatDisabled = !canFinalize || chatLimitReached || sendState === "sending";
-
-  useEffect(() => {
-    onPlanUpdatedRef.current = onFinalizationQueued;
-    onPlanDeliveryStartedRef.current = onPlanDeliveryStarted;
-  }, [onFinalizationQueued, onPlanDeliveryStarted]);
-
-  useEffect(() => {
-    if (canFinalize && !report) {
-      router.prefetch(planDeliveryHref(locale, planId));
-    }
-  }, [canFinalize, locale, planId, report, router]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let timer: number | undefined;
-
-    async function loadMessages() {
-      try {
-        const response = await fetch(
-          `/api/assessment/${encodeURIComponent(planId)}/chat`,
-          { cache: "no-store" }
-        );
-
-        if (!response.ok) {
-          throw new Error("Unable to load chat");
-        }
-
-        const payload = (await response.json()) as {
-          messages?: PlanChatMessage[];
-        };
-
-        if (cancelled) {
-          return;
-        }
-
-        const nextMessages = Array.isArray(payload.messages)
-          ? payload.messages
-          : [];
-
-        setMessages(nextMessages);
-        setLoadState("idle");
-
-        const hasQueuedMessages = nextMessages.some(
-          (item) => item.status === "queued"
-        );
-        const hasSubmittedReply = awaitingReplyMessageId
-          ? nextMessages.some(
-              (item) =>
-                item.role === "assistant" &&
-                item.replyToMessageId === awaitingReplyMessageId &&
-                item.status === "ready"
-            )
-          : true;
-        const readySignature = nextMessages
-          .filter((item) => item.status === "ready")
-          .map((item) => item.id)
-          .join("|");
-
-        if (
-          !hasQueuedMessages &&
-          readySignature &&
-          readySignature !== lastReadyMessageSignature.current
-        ) {
-          lastReadyMessageSignature.current = readySignature;
-          onPlanUpdatedRef.current();
-        }
-
-        if (awaitingReplyMessageId && hasSubmittedReply) {
-          setAwaitingReplyMessageId(null);
-        }
-
-        if (hasQueuedMessages || !hasSubmittedReply) {
-          timer = window.setTimeout(loadMessages, 1500);
-        }
-      } catch {
-        if (!cancelled) {
-          setLoadState("error");
-        }
-      }
-    }
-
-    loadMessages();
-
-    return () => {
-      cancelled = true;
-
-      if (timer) {
-        window.clearTimeout(timer);
-      }
-    };
-  }, [awaitingReplyMessageId, canFinalize, planId, pollVersion]);
-
-  async function handleSend(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const trimmed = message.trim();
-
-    if (!trimmed || chatDisabled) {
-      return;
-    }
-
-    setSendState("sending");
-
-    try {
-      const response = await fetch(
-        `/api/assessment/${encodeURIComponent(planId)}/chat`,
-        {
-          body: JSON.stringify({ message: trimmed }),
-          cache: "no-store",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          method: "POST"
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Unable to send chat message");
-      }
-
-      const payload = (await response.json()) as {
-        messageId?: string;
-        messages?: PlanChatMessage[];
-      };
-
-      setAwaitingReplyMessageId(
-        typeof payload.messageId === "string" ? payload.messageId : null
-      );
-      setMessages(Array.isArray(payload.messages) ? payload.messages : []);
-      setMessage("");
-      setSendState("idle");
-      setPollVersion((current) => current + 1);
-    } catch {
-      setSendState("error");
-    }
-  }
-
-  async function handleFinalize() {
-    if (finalizeDisabled) {
-      return;
-    }
-
-    const href = planDeliveryHref(locale, planId);
-
-    if (report) {
-      router.push(href);
-      return;
-    }
-
-    setFinalizeState("submitting");
-
-    try {
-      const response = await fetch(
-        `/api/assessment/${encodeURIComponent(planId)}/finalize`,
-        {
-          cache: "no-store",
-          method: "POST"
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Unable to finalize plan");
-      }
-
-      setFinalizeState("queued");
-      onPlanDeliveryStartedRef.current();
-      onFinalizationQueued();
-    } catch {
-      setFinalizeState("error");
-    }
-  }
-
-  return (
-    <section className="mt-10">
-      <div className="rounded-lg bg-white p-5 ring-1 ring-foreground/10 sm:p-6">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#2F67B8]">
-          <ChatBubbleLeftRightIcon aria-hidden={true} className="size-4" />
-          {labels.planChatEyebrow}
-        </div>
-        <h2 className="mt-3 max-w-2xl text-2xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-3xl">
-          {labels.planChatTitle}
-        </h2>
-
-        <div className="mt-5 space-y-3">
-          {loadState === "loading" ? (
-            <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
-              <ArrowPathIcon aria-hidden={true} className="size-4 animate-spin" />
-              {labels.nutritionProgressPending}
-            </div>
-          ) : messages.length < 1 ? (
-            <p className="p-3 text-sm text-muted-foreground">
-              {labels.planChatEmpty}
-            </p>
-          ) : (
-            messages.map((item) => {
-              const isAssistant = item.role === "assistant";
-
-              return (
-                <div className={isAssistant ? "flex justify-start" : "flex justify-end"} key={item.id}>
-                  <div
-                    className={
-                      isAssistant
-                        ? "inline-block w-fit max-w-[min(38rem,88%)] break-words rounded-2xl bg-[#F8FAFC] px-3.5 py-2.5 text-sm leading-6 text-[#20343A] ring-1 ring-foreground/10"
-                        : "inline-block w-fit max-w-[min(34rem,88%)] break-words rounded-2xl bg-[#3A7BD5] px-3.5 py-2.5 text-sm leading-6 text-white"
-                    }
-                  >
-                    {isAssistant ? (
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#2F67B8]">
-                        {labels.planChatAssistantName}
-                      </p>
-                    ) : null}
-                    <p className="whitespace-pre-line">{item.body}</p>
-                    {item.status === "queued" ? (
-                      <p className={isAssistant ? "mt-1 text-xs text-muted-foreground" : "mt-1 text-xs text-white/75"}>
-                        {labels.nutritionProgressPending}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })
-          )}
-          {pendingChat || waitingForSubmittedReply ? (
-            <div className="inline-flex w-fit max-w-[min(38rem,88%)] items-center gap-2 rounded-2xl bg-[#F8FAFC] px-3.5 py-2.5 text-sm text-muted-foreground ring-1 ring-foreground/10">
-              <ArrowPathIcon aria-hidden={true} className="size-4 animate-spin text-[#3A7BD5]" />
-              <span>
-                <span className="font-medium text-[#20343A]">
-                  {labels.planChatAssistantName}
-                </span>{" "}
-                {labels.planChatThinking}
-              </span>
-            </div>
-          ) : null}
-          {loadState === "error" ? (
-            <p className="p-3 text-sm font-medium text-red-700">
-              {labels.error}
-            </p>
-          ) : null}
-        </div>
-
-        <form className="mt-4 space-y-3" onSubmit={handleSend}>
-          <label className="sr-only" htmlFor="plan-chat-message">
-            {labels.planChatPlaceholder}
-          </label>
-          <input
-            className="block h-11 w-full rounded-md border border-foreground/10 bg-white px-3 text-sm text-[#20343A] outline-none transition placeholder:text-muted-foreground/60 focus:border-[#3A7BD5] focus:ring-2 focus:ring-[#3A7BD5]/15"
-            disabled={chatDisabled}
-            id="plan-chat-message"
-            maxLength={1200}
-            onChange={(event) => {
-              setMessage(event.target.value);
-              setSendState("idle");
-            }}
-            placeholder={labels.planChatPlaceholder}
-            value={message}
-          />
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <button
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#3A7BD5] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#2f67b4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3A7BD5] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!message.trim() || chatDisabled}
-              type="submit"
-            >
-              <PaperAirplaneIcon aria-hidden={true} className="size-4" />
-              {sendState === "sending" ? labels.planChatSending : labels.planChatSend}
-            </button>
-            <button
-              className="inline-flex h-11 items-center justify-center rounded-md bg-[#20343A] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#17282d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20343A] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={finalizeDisabled}
-              onClick={handleFinalize}
-              type="button"
-            >
-              {finalizeState === "submitting" || finalizing
-                ? labels.finalizingPlan
-                : labels.finalizePlan}
-            </button>
-          </div>
-        </form>
-        {!canFinalize ? (
-          <p className="mt-2 text-sm text-muted-foreground">
-            {labels.planChatWaiting}
-          </p>
-        ) : chatLimitReached ? (
-          <p className="mt-2 text-sm text-muted-foreground">
-            {labels.planChatLimit}
-          </p>
-        ) : null}
-        {sendState === "error" ? (
-          <p className="mt-2 text-sm font-medium text-red-700">
-            {labels.planChatError}
-          </p>
-        ) : null}
-        {finalizing ? (
-          <p className="mt-2 text-sm font-medium text-[#2F67B8]">
-            {labels.finalizingPlan}
-          </p>
-        ) : report ? (
-          <p className="mt-2 text-sm font-medium text-[#126B4F]">
-            {labels.finalizeReady}
-          </p>
-        ) : null}
-        {finalizeState === "error" || reportStatus === "failed" ? (
-          <p className="mt-2 text-sm font-medium text-red-700">
-            {labels.finalizeError}
-          </p>
-        ) : null}
-
       </div>
     </section>
   );

@@ -109,7 +109,6 @@ function safetyIntake(answers: unknown) {
     ...stringArray(record.avoidedFoods),
     ...stringArray(record.foodAvoidances),
     ...splitFreeText(record.foodAvoidances),
-    ...splitFreeText(record.avoidNote),
     ...splitFreeText(record.dislikedFoods)
   ];
 

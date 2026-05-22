@@ -119,7 +119,7 @@ export function SectionProgress({
       className={cx(
         framed
           ? "rounded-lg border border-foreground/10 bg-white px-4 py-4 shadow-sm"
-          : "bg-background/95 px-1 py-4 backdrop-blur",
+          : "bg-background/95 px-1 py-2 backdrop-blur",
         className
       )}
     >
@@ -146,7 +146,7 @@ export function SectionProgress({
         <span className="text-center">{marks[1]}</span>
         <span className="text-right">{marks[2]}</span>
       </div>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">
         {hint}
       </p>
     </div>

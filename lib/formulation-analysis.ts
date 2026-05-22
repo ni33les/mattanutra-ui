@@ -116,14 +116,12 @@ function buildAssessmentSafetyContext(answers: unknown) {
   return {
     allergies: compactStringArray(record, "allergies"),
     antibiotics: compactText(record, "antibiotics"),
-    avoidNote: compactText(record, "avoidNote"),
     budget: compactText(record, "budget"),
     country: compactText(record, "country") ?? "TH",
     digestiveCondition: compactText(record, "digCondition"),
     familyHistory: compactStringArray(record, "family"),
     foodRestrictions: {
       allergies: compactStringArray(record, "allergies"),
-      avoidNote: compactText(record, "avoidNote"),
       diet: compactText(record, "diet"),
       frequency: isRecord(record.foodFrequency) ? record.foodFrequency : {}
     },
@@ -154,8 +152,7 @@ function buildAssessmentSafetyContext(answers: unknown) {
     recentSurgery: compactText(record, "surgery"),
     sex: compactText(record, "sex"),
     supplementSensitivities: {
-      classes: compactStringArray(record, "suppAllergies"),
-      other: compactText(record, "otherSupp")
+      classes: compactStringArray(record, "suppAllergies")
     },
     supplementsCurrentlyUsed: compactText(record, "supplements"),
     trackerData: {

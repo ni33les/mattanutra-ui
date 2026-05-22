@@ -31,12 +31,9 @@ const MAX_POLLING_BACKOFF_MS = 30_000;
 const MAX_WORKER_PROFILE_CONCURRENCY = 8;
 const WORKER_PROFILE_STARTUP_STAGGER_MS = 350;
 const WORKER_PROFILE_MODES: readonly WorkerProfileMode[] = [
-  "advisor",
   "communications",
   "content",
   "email",
-  "formulation",
-  "healthscore",
   "hosting",
   "products"
 ];
@@ -161,24 +158,16 @@ function agentProfile(
 }
 
 const WORKER_PROFILES: Record<WorkerProfileMode, WorkerAgentConfig> = {
-  advisor: agentProfile("nutritionPlanAdvisor", [
-    "nutrition_plan_chat_reply",
-    "refine_nutrition_plan",
-    "generate_nutrition_report"
-  ]),
+  advisor: agentProfile("nutritionPlanAdvisor", []),
   communications: agentProfile("communicationsCoordinator", [
     "client_safety_followup"
   ]),
   content: agentProfile("contentPublisher", ["content_status_change"]),
   email: agentProfile("emailDispatcher", [
-    "send_example_email",
     "send_reassessment_email"
   ]),
-  formulation: agentProfile("formulationWorker", [
-    "generate_supplement_guidance",
-    "generate_example_supplement_guidance"
-  ]),
-  healthscore: agentProfile("healthScoreEngine", ["analyze_healthscore"]),
+  formulation: agentProfile("formulationWorker", []),
+  healthscore: agentProfile("healthScoreEngine", []),
   hosting: agentProfile("scheduler", ["sync_digitalocean_billing"]),
   products: agentProfile("productMatcher", [
     "generate_product_recommendations"

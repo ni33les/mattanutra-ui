@@ -6,15 +6,10 @@ import {
   type AssessmentPlan
 } from "@/lib/assessment-snapshot";
 import {
-  getStoredAssessmentSnapshot,
-  getStoredHealthScoreAnalysisSnapshot,
   persistAssessmentSubmission
 } from "@/lib/assessment-store";
 import { computeHealthScore } from "@/lib/health-score";
-import { writeSkippedPaymentSuccessEvent } from "@/lib/payment-bpm";
 import {
-  enqueueHealthScoreAnalysisTask,
-  enqueueNutritionPlanTasks,
   enqueueDueScheduledActions,
   scheduleReassessmentAction
 } from "@/lib/task-worker";
@@ -101,9 +96,9 @@ export async function POST(request: Request) {
   }
   const snapshot = createAssessmentSnapshot({
     healthScore: buildHealthScore(body.answers, body.locale),
-    plan: selectedPlan ?? DEFAULT_ASSESSMENT_PLAN
+    plan: selectedPlan ?? DEFAULT_ASSESSMENT_PLAN,
+    status: "ready"
   });
-  let responseSnapshot = snapshot;
 
   try {
     await persistAssessmentSubmission({
@@ -111,7 +106,7 @@ export async function POST(request: Request) {
       locale: body.locale,
       selectedPlan,
       snapshot,
-      status: intent === "capture" ? "captured" : snapshot.status
+      status: "captured"
     });
 
     await writeBpmEvent({
@@ -125,16 +120,6 @@ export async function POST(request: Request) {
       selectedPlan,
       ...healthScoreBpmFields(snapshot)
     });
-
-    await enqueueHealthScoreAnalysisTask({
-      planId: snapshot.planId
-    });
-
-    if (intent === "capture") {
-      responseSnapshot =
-        (await getStoredHealthScoreAnalysisSnapshot(snapshot.planId)) ??
-        responseSnapshot;
-    }
 
     const reassessmentEmail = reassessmentEmailFromAnswers(body.answers);
 
@@ -169,43 +154,6 @@ export async function POST(request: Request) {
         selectedPlan,
         ...healthScoreBpmFields(snapshot)
       });
-
-      await writeSkippedPaymentSuccessEvent({
-        attribution: bpm.attribution,
-        locale: body.locale,
-        planId: snapshot.planId,
-        ray: typeof bpm.ray === "string" ? bpm.ray : null,
-        selectedPlan,
-        ...healthScoreBpmFields(snapshot)
-      });
-
-      const taskIds = await enqueueNutritionPlanTasks({
-        answers: body.answers,
-        locale: body.locale,
-        plan: selectedPlan,
-        planId: snapshot.planId
-      });
-
-      if (!taskIds) {
-        throw new Error("Unable to queue assessment processing");
-      }
-
-      await writeBpmEvent({
-        actorType: "system",
-        attribution: bpm.attribution,
-        eventName: "formulation_requested",
-        eventType: "formulation",
-        locale: body.locale,
-        planId: snapshot.planId,
-        properties: {
-          formulationTaskId: taskIds.formulationTaskId
-        },
-        ray: typeof bpm.ray === "string" ? bpm.ray : null,
-        selectedPlan,
-        ...healthScoreBpmFields(snapshot)
-      });
-      responseSnapshot =
-        (await getStoredAssessmentSnapshot(snapshot.planId)) ?? snapshot;
     }
   } catch (error) {
     console.error("Unable to persist assessment submission", error);
@@ -233,7 +181,7 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json(responseSnapshot, {
+  return NextResponse.json(snapshot, {
     headers: {
       "Cache-Control": "no-store"
     }

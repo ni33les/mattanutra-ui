@@ -1,17 +1,11 @@
 "use client";
 
-import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowPathIcon,
   BeakerIcon,
-  CheckIcon,
-  ShieldCheckIcon,
-  SparklesIcon
+  CheckIcon
 } from "@heroicons/react/20/solid";
-import { ChatChannelCards } from "@/components/chat-channel-cards";
-import { HighlightedBrandText } from "@/components/highlighted-brand-text";
 import {
   OptionGrid,
   PillGroup,
@@ -19,24 +13,15 @@ import {
   Question,
   ScaleGroup,
   SectionCard,
-  SectionProgress,
   SkinToneGroup,
   cardOptionClasses,
   cx
 } from "@/components/nutrition-flow/ui";
-import {
-  HealthScorePanel,
-  localizeHealthScoreText
-} from "@/components/nutrition-flow/healthscore-panel";
+import { HealthScorePanel } from "@/components/nutrition-flow/healthscore-panel";
 import { getBpmPayload, trackBpmEvent } from "@/lib/bpm-client";
-import { normalizeLeadEmail, validateLeadEmail } from "@/lib/email-validation";
-import type { BlogTestimonial } from "@/lib/blog";
 import type { HealthScoreResult } from "@/lib/health-score";
 import type { Locale } from "@/lib/i18n";
-import {
-  nutritionHealthScorePath,
-  nutritionRefinePath
-} from "@/lib/nutrition-paths";
+import { nutritionHealthScorePath } from "@/lib/nutrition-paths";
 
 type Option = Readonly<{
   label: string;
@@ -68,7 +53,6 @@ type Answers = {
   alcohol: string;
   allergies: string[];
   antibiotics: string;
-  avoidNote: string;
   budget: string;
   caffeine: string;
   country: string;
@@ -93,7 +77,6 @@ type Answers = {
   medTypes: string[];
   menopause: string;
   otherMed: string;
-  otherSupp: string;
   otherTracker: string;
   protein: string;
   reassessmentEmail: string;
@@ -176,8 +159,6 @@ type Copy = Readonly<{
   food: {
     allergies: string;
     allergyOptions: Option[];
-    avoidNote: string;
-    avoidPlaceholder: string;
     diet: string;
     dietOptions: Option[];
     disclosureBody: string;
@@ -225,6 +206,10 @@ type Copy = Readonly<{
     tracker: string;
     trackerOptions: Option[];
     vo2: string;
+    vo2Estimate: string;
+    vo2EstimateButton: string;
+    vo2EstimateNeeds: string;
+    vo2EstimateReady: (value: number) => string;
   };
   progress: {
     complete: string;
@@ -250,7 +235,6 @@ type Copy = Readonly<{
     medicationType: string;
     medicationTypeOptions: Option[];
     otherMedPlaceholder: string;
-    otherSuppPlaceholder: string;
     suppAllergies: string;
     suppAllergyOptions: Option[];
     supplements: string;
@@ -310,10 +294,9 @@ const initialAnswers: Answers = {
   alcohol: "",
   allergies: [],
   antibiotics: "",
-  avoidNote: "",
   budget: "",
   caffeine: "",
-  country: "",
+  country: "TH",
   diet: "",
   digCondition: "",
   digestion: "",
@@ -344,7 +327,6 @@ const initialAnswers: Answers = {
   medTypes: [],
   menopause: "",
   otherMed: "",
-  otherSupp: "",
   otherTracker: "",
   protein: "",
   reassessmentEmail: "",
@@ -537,7 +519,7 @@ const en: Copy = {
   },
   badges: ["V3 assessment", "Safety context captured", "AI powered"],
   coach: {
-    allergies: "Allergies and avoidance answers are passed through to formulation so the AI can explain relevant cautions.",
+    allergies: "Food allergy context keeps the supplement brief practical without adding a free-text avoidance field.",
     foodFrequency: "Food frequency improves micronutrient gap estimates without adding food matching back into the active product engine.",
     goals: "Choose up to three. The formulation uses these as priorities rather than trying to optimise everything equally.",
     labs: "Units matter. We keep the number and unit together before sending data to AI.",
@@ -553,14 +535,14 @@ const en: Copy = {
   daily: {
     title: "Your daily life",
     subtitle: "This turns the formula from a generic stack into something that fits your routine.",
-    sleepHrs: "Sleep per night (hours)",
+    sleepHrs: "Sleep per night ( hours )",
     sleepOptions: [
       { label: "Under 5", value: "u5" },
       { label: "5-6", value: "5-6" },
       { label: "6-7", value: "6-7" },
       { label: "7-8", value: "7-8" },
       { label: "8-9", value: "8-9" },
-      { label: "9+", value: "9+" }
+      { label: "Over 9", value: "9+" }
     ],
     energy: "Energy level",
     energyOptions: [
@@ -609,14 +591,14 @@ const en: Copy = {
       { label: "Occasional", value: "occasional" },
       { label: "Daily", value: "daily" }
     ],
-    alcohol: "Alcohol (drinks/week)",
+    alcohol: "Alcohol ( Drinks / week )",
     alcoholOptions: [
       { label: "None", value: "none" },
       { label: "1-3", value: "1-3" },
       { label: "4-7", value: "4-7" },
       { label: "8+", value: "8+" }
     ],
-    caffeine: "Caffeine (cups/day)",
+    caffeine: "Caffeine ( Cups / day )",
     caffeineOptions: [
       { label: "None", value: "none" },
       { label: "1", value: "1" },
@@ -698,8 +680,6 @@ const en: Copy = {
       { label: "Soy", value: "soy" },
       { label: "Sesame", value: "sesame" }
     ],
-    avoidNote: "Foods to avoid or dislike",
-    avoidPlaceholder: "e.g. no pork, dislike strong fishy taste",
     disclosureTitle: "I confirm I have disclosed relevant allergies, conditions, medications and dietary restrictions.",
     disclosureBody: "MattaNutra guidance supports general wellness and does not replace medical advice."
   },
@@ -797,6 +777,10 @@ const en: Copy = {
       { label: "Other", value: "other" }
     ],
     vo2: "VO2 max",
+    vo2Estimate: "VO2 estimator",
+    vo2EstimateButton: "Use estimate",
+    vo2EstimateNeeds: "Answer sex, age, height, weight and activity to estimate VO2.",
+    vo2EstimateReady: (value) => `Estimated ${value} ml/kg/min from your current answers.`,
     hrv: "Average HRV",
     labs: "Recent lab values",
     labsHint: "Only if you have them. Units matter.",
@@ -848,7 +832,6 @@ const en: Copy = {
       { label: "Shellfish-derived", value: "shellfishderived" },
       { label: "Other", value: "other" }
     ],
-    otherSuppPlaceholder: "Please describe the ingredient you react to",
     kidney: "Kidney function",
     kidneyOptions: [
       { label: "No known issue", value: "normal" },
@@ -915,7 +898,7 @@ const th: Copy = {
   },
   badges: ["แบบประเมิน V3", "เก็บบริบทข้อควรระวัง", "ขับเคลื่อนด้วย AI"],
   coach: {
-    allergies: "ข้อมูลแพ้และหลีกเลี่ยงจะส่งต่อให้ AI เพื่ออธิบายข้อควรระวังที่เกี่ยวข้อง",
+    allergies: "ข้อมูลแพ้อาหารช่วยให้คำแนะนำด้านอาหารเสริมเหมาะสมขึ้น โดยไม่ต้องกรอกข้อความเพิ่มเติม",
     foodFrequency: "ความถี่อาหารช่วยประเมินช่องว่างสารอาหาร โดยไม่เปิด food matching ในระบบผลิตภัณฑ์ตอนนี้",
     goals: "เลือกได้สูงสุด 3 ข้อ ระบบจะใช้เป็นลำดับความสำคัญ",
     labs: "หน่วยสำคัญมาก เราเก็บตัวเลขพร้อมหน่วยก่อนส่งให้ AI",
@@ -962,7 +945,7 @@ const th: Copy = {
 };
 
 const copies: Record<Locale, Copy> = { en, th };
-const paywallFeatureIcons = [SparklesIcon, ShieldCheckIcon, ArrowPathIcon];
+
 function hasText(value: string) {
   return value.trim().length > 0;
 }
@@ -1037,10 +1020,6 @@ function reachableEssentialChecks(answers: Answers) {
     }
   }
 
-  if (selectedOther(answers.suppAllergies)) {
-    checks.push({ id: "otherSupp", answered: hasText(answers.otherSupp) });
-  }
-
   return checks;
 }
 
@@ -1071,22 +1050,6 @@ function precisionProgress(answers: Answers) {
     optionalTotal: optional.length,
     progress: Math.min(100, Math.round(essentialPercent + optionalPercent))
   };
-}
-
-function precisionMeterHint(copy: Copy["progress"], progress: number) {
-  if (progress <= 0) {
-    return copy.start;
-  }
-
-  if (progress < 80) {
-    return copy.partial(progress);
-  }
-
-  if (progress < 100) {
-    return copy.nearComplete;
-  }
-
-  return copy.complete;
 }
 
 function aboutComplete(answers: Answers) {
@@ -1137,10 +1100,6 @@ function safetyComplete(answers: Answers) {
     return false;
   }
 
-  if (selectedOther(answers.suppAllergies) && !hasText(answers.otherSupp)) {
-    return false;
-  }
-
   return true;
 }
 
@@ -1173,12 +1132,10 @@ function formatWeightImperial(value: string) {
 }
 
 type AssessmentFlowProps = Readonly<{
-  exampleTestimonial?: BlogTestimonial | null;
   initialStage?: "healthscore" | "quiz";
   locale: Locale;
   prefillAnswers?: unknown;
   returningHealthScore?: HealthScoreResult | null;
-  returningPlan?: "precision" | "pro" | null;
   returningPlanId?: string;
 }>;
 
@@ -1215,11 +1172,7 @@ type ProcessingStatus = Readonly<{
   >;
 }>;
 
-const PROCESSING_STEP_MIN_MS = 1000;
-const PROCESSING_COMPLETE_HOLD_MS = 1000;
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
-const HEALTH_SCORE_ANALYSIS_POLL_INTERVAL_MS = 1500;
-const HEALTH_SCORE_ANALYSIS_MAX_POLLS = 160;
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
   const controller = new AbortController();
@@ -1235,82 +1188,6 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
   }
 }
 
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
-function getProcessingStepIndex(status: ProcessingStatus) {
-  const failedIndex = status.steps.findIndex((step) => step.state === "failed");
-
-  if (failedIndex >= 0) return failedIndex;
-
-  const activeIndex = status.steps.findIndex((step) => step.state === "active");
-
-  if (activeIndex >= 0) return activeIndex;
-
-  return Math.max(
-    0,
-    status.steps.reduce((latest, step, index) => (step.state === "complete" ? index : latest), -1)
-  );
-}
-
-function getInitialProcessingStepIndex(status: ProcessingStatus) {
-  return getProcessingStepIndex(status);
-}
-
-function isStepComplete(status: ProcessingStatus, index: number) {
-  return status.steps[index]?.state === "complete";
-}
-
-function getPacedProcessingStatus(target: ProcessingStatus, stepIndex: number, terminal = false): ProcessingStatus {
-  return {
-    ...target,
-    status: terminal ? target.status : target.status === "failed" ? "failed" : "preparing",
-    steps: target.steps.map((step, index) => {
-      if (index < stepIndex) return { ...step, state: "complete" as const };
-      if (index === stepIndex) {
-        if (target.status === "failed" && step.state === "failed") return { ...step, state: "failed" as const };
-        return { ...step, state: terminal && step.state === "complete" ? "complete" : "active" };
-      }
-      return { ...step, state: "pending" as const };
-    })
-  };
-}
-
-function buildExampleProcessingStatus(planId: string): ProcessingStatus {
-  return {
-    planId,
-    queuePosition: 0,
-    status: "preparing",
-    steps: [
-      { id: "assessment", state: "complete" },
-      { id: "score", state: "complete" },
-      { id: "scoreAnalysis", state: "complete" },
-      { id: "payment", state: "complete" },
-      { id: "formulation", state: "active" },
-      { id: "results", state: "pending" }
-    ]
-  };
-}
-
-function buildExampleQueuedStatus(planId: string): ProcessingStatus {
-  return {
-    planId,
-    queuePosition: 0,
-    status: "ready",
-    steps: [
-      { id: "assessment", state: "complete" },
-      { id: "score", state: "complete" },
-      { id: "scoreAnalysis", state: "complete" },
-      { id: "payment", state: "complete" },
-      { id: "formulation", state: "complete" },
-      { id: "results", state: "complete" }
-    ]
-  };
-}
-
 function buildReturningScoreGateStatus(planId: string, healthScore: HealthScoreResult): ProcessingStatus {
   return {
     healthScore,
@@ -1320,10 +1197,7 @@ function buildReturningScoreGateStatus(planId: string, healthScore: HealthScoreR
     steps: [
       { id: "assessment", state: "complete" },
       { id: "score", state: "complete" },
-      { id: "scoreAnalysis", state: "complete" },
-      { id: "payment", state: "pending" },
-      { id: "formulation", state: "pending" },
-      { id: "results", state: "pending" }
+      { id: "results", state: "complete" }
     ]
   };
 }
@@ -1344,116 +1218,98 @@ function healthScoreBpmFields(healthScore: HealthScoreResult | null | undefined)
   };
 }
 
-type PlanTier = Readonly<{
-  cta: string;
-  description: string;
-  featured?: boolean;
-  features: string[];
-  id: string;
-  name: string;
-  price: string;
-  priceSuffix: string;
-  tierBadge?: string;
-}>;
+function textInputClasses() {
+  return "mt-2 block w-full rounded-md border border-foreground/10 bg-white px-3 py-2 text-sm text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15";
+}
 
-type PlanContent = Readonly<{
-  back: string;
-  badge: string;
-  eyebrow: string;
-  subtitle: string;
-  tiers: PlanTier[];
-  title: string;
-}>;
+function PrecisionGauge({
+  labels,
+  progress
+}: Readonly<{
+  labels: readonly [string, string, string];
+  progress: number;
+}>) {
+  return (
+    <div className="mt-5">
+      <div className="mb-2 flex justify-end">
+        <span className="text-xs font-semibold tabular-nums text-[#1FA77A]">
+          {progress}%
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-foreground/10">
+        <div
+          className="h-full rounded-full bg-[#1FA77A] transition-all duration-500"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <div className="mt-2 grid grid-cols-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        <span>{labels[0]}</span>
+        <span className="text-center">{labels[1]}</span>
+        <span className="text-right">{labels[2]}</span>
+      </div>
+    </div>
+  );
+}
 
-function getPlanContent(locale: Locale): PlanContent {
-  if (locale === "th") {
-    return {
-      back: "กลับไปที่แบบประเมิน",
-      badge: "แนะนำ",
-      eyebrow: "เลือกแผนบรีฟ",
-      subtitle: "เลือกความละเอียดของคำแนะนำ แล้วเราจะเปิดหน้าแผนให้คำแนะนำเติมเข้ามาเมื่อพร้อม",
-      title: "เลือกความละเอียดของคำแนะนำ",
-      tiers: [
-        {
-          cta: "ไปต่อ",
-          description: "แผนอาหารเสริมฉบับเต็ม พร้อมปรับขนาดและข้อควรระวังให้เข้ากับข้อมูลของคุณมากขึ้น",
-          featured: true,
-          features: [
-            "คำแนะนำอาหารเสริมแบบครบถ้วน",
-            "ช่วงปริมาณที่ปรับตามร่างกาย",
-            "รวมข้อมูลยา แล็บ และข้อควรระวัง",
-            "ลำดับความสำคัญที่นำไปใช้ได้จริง",
-            "พร้อมเช็คอินซ้ำใน 60 วัน"
-          ],
-          id: "precision",
-          name: "แผนความแม่นยำ",
-          price: "฿399",
-          priceSuffix: "ครั้งเดียว"
-        },
-        {
-          cta: "ไปต่อ",
-          description: "การดูแลต่อเนื่องพร้อม AI เอเจนต์ที่ช่วยปรับคำแนะนำให้เข้ากับความต้องการรายวัน",
-          features: [
-            "ทุกอย่างในแผนความแม่นยำ",
-            "AI เอเจนต์สำหรับความต้องการรายวัน",
-            "ปรับเวลาทานและกิจวัตร",
-            "รองรับการเดินทาง การฝึก และการนอน",
-            "ทบทวนลำดับความสำคัญเมื่อข้อมูลเปลี่ยน"
-          ],
-          id: "pro",
-          name: "โปร",
-          price: "฿1,490",
-          priceSuffix: "/เดือน",
-          tierBadge: "มี AI เอเจนต์"
-        }
-      ]
-    };
+function numericAnswer(value: string) {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function ageEstimate(value: string) {
+  const direct = numericAnswer(value);
+
+  if (direct !== null) {
+    return direct;
   }
 
   return {
-    back: "Back to assessment",
-    badge: "Recommended",
-    eyebrow: "Choose your brief",
-    subtitle: "Choose the level of guidance you want, then we will open your plan page while each section fills in.",
-    title: "Select the level of guidance",
-    tiers: [
-      {
-        cta: "Go",
-        description: "The full supplement guidance pack with more precise dosing logic and cautions.",
-        featured: true,
-        features: [
-          "Complete supplement guidance",
-          "Body-size adjusted dose ranges",
-          "Medication and lab cautions included",
-          "Practical priority order",
-          "60-day reassessment prompt"
-        ],
-        id: "precision",
-        name: "Precision Plan",
-        price: "฿399",
-        priceSuffix: "one time"
-      },
-      {
-        cta: "Go",
-        description: "Ongoing support with an AI agent that adapts the plan to day-to-day requirements.",
-        features: [
-          "Everything in Precision Plan",
-          "AI agent for daily needs",
-          "Routine and timing adjustments",
-          "Travel, training, and sleep adaptation",
-          "Priority review as your data changes"
-        ],
-        id: "pro",
-        name: "Pro Plan",
-        price: "฿1,490",
-        priceSuffix: "/month",
-        tierBadge: "AI agent included"
-      }
-    ]
-  };
+    "18-25": 22,
+    "26-35": 31,
+    "36-45": 41,
+    "46-55": 51,
+    "56-65": 61,
+    "66+": 66
+  }[value] ?? null;
 }
-function textInputClasses() {
-  return "mt-2 block w-full rounded-md border border-foreground/10 bg-white px-3 py-2 text-sm text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15";
+
+function estimateVo2Max(answers: Answers) {
+  const age = ageEstimate(answers.age);
+  const heightCm = numericAnswer(answers.heightCm);
+  const weightKg = numericAnswer(answers.weightKg);
+  const sexFactor = answers.sex === "male" ? 1 : answers.sex === "female" ? 0 : null;
+  const activityRating = {
+    active: 6,
+    athlete: 7,
+    light: 2,
+    moderate: 4,
+    sedentary: 0,
+    sitting: 0
+  }[answers.activity];
+
+  if (
+    age === null ||
+    heightCm === null ||
+    weightKg === null ||
+    sexFactor === null ||
+    activityRating === undefined ||
+    heightCm <= 0 ||
+    weightKg <= 0
+  ) {
+    return null;
+  }
+
+  const heightM = heightCm / 100;
+  const bmi = weightKg / (heightM * heightM);
+  const estimate =
+    56.363 +
+    1.921 * activityRating -
+    0.381 * age -
+    0.754 * bmi +
+    10.987 * sexFactor;
+
+  return Math.min(70, Math.max(18, Math.round(estimate)));
 }
 
 function AssessmentStepper({
@@ -1530,12 +1386,10 @@ function AssessmentStepper({
 }
 
 export function AssessmentFlow({
-  exampleTestimonial,
   initialStage = "quiz",
   locale,
   prefillAnswers,
   returningHealthScore,
-  returningPlan,
   returningPlanId
 }: AssessmentFlowProps) {
   const copy = copies[locale];
@@ -1547,36 +1401,22 @@ export function AssessmentFlow({
   const [answers, setAnswers] = useState<Answers>(() => buildInitialAnswers(prefillAnswers));
   const [sectionIndex, setSectionIndex] = useState(0);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus | null>(null);
-  const [displayedProcessingStatus, setDisplayedProcessingStatus] = useState<ProcessingStatus | null>(null);
   const [processingError, setProcessingError] = useState("");
   const [capturedStatus, setCapturedStatus] = useState<ProcessingStatus | null>(returningScoreStatus);
-  const [selectedPlan, setSelectedPlan] = useState("");
-  const [showPlans, setShowPlans] = useState(Boolean(returningScoreStatus && (!returningPlan || initialStage === "healthscore")));
-  const [showExampleExit, setShowExampleExit] = useState(false);
-  const [processingMode, setProcessingMode] = useState<"example" | "formulation" | "score">("formulation");
+  const [showHealthScore, setShowHealthScore] = useState(Boolean(returningScoreStatus || initialStage === "healthscore"));
   const [healthScore, setHealthScore] = useState<HealthScoreResult | null>(returningHealthScore ?? null);
-  const [exampleEmail, setExampleEmail] = useState("");
-  const [exampleError, setExampleError] = useState("");
-  const [includeExampleReassessment, setIncludeExampleReassessment] = useState(true);
-  const [exampleLoading, setExampleLoading] = useState(false);
-  const [exampleRequest, setExampleRequest] = useState<{ email: string; planId: string; requestId: string } | null>(null);
   const captureInFlight = useRef<Promise<ProcessingStatus | null> | null>(null);
-  const displayedStepStartedAt = useRef(0);
-  const pollFailureCount = useRef(0);
   const assessmentStartedTracked = useRef(false);
   const healthScoreViewedTracked = useRef(false);
-  const planGateTracked = useRef(false);
-  const exampleExitTracked = useRef(false);
   const precision = precisionProgress(answers);
-  const hasReturningProAccess = returningPlan === "pro";
-  const reassessmentAlreadyOptedIn = validateLeadEmail(answers.reassessmentEmail).ok;
-  const precisionHint = precisionMeterHint(copy.progress, precision.progress);
+  const vo2Estimate = estimateVo2Max(answers);
+  const gaugeLabels: [string, string, string] = locale === "th"
+    ? ["พื้นฐาน", "ข้อมูลหลัก", "ความแม่นยำ"]
+    : ["Basic", "Essentials", "Precision"];
 
-  const clearProcessingStatus = useCallback(() => {
-    displayedStepStartedAt.current = 0;
-    setDisplayedProcessingStatus(null);
+  function clearProcessingStatus() {
     setProcessingStatus(null);
-  }, []);
+  }
 
   useEffect(() => {
     if (assessmentStartedTracked.current || precision.essentialDone <= 0) return;
@@ -1587,38 +1427,25 @@ export function AssessmentFlow({
       locale,
       properties: {
         completedRequired: precision.essentialDone,
-        returningPlan,
         returningPlanId: returningPlanId || undefined
       }
     });
-  }, [locale, precision.essentialDone, returningPlan, returningPlanId]);
+  }, [locale, precision.essentialDone, returningPlanId]);
 
   useEffect(() => {
-    if (!showPlans || planGateTracked.current) return;
+    if (!showHealthScore || healthScoreViewedTracked.current) return;
 
-    planGateTracked.current = true;
-    trackBpmEvent("plan_gate_viewed", {
+    healthScoreViewedTracked.current = true;
+    trackBpmEvent("healthscore_viewed", {
       eventType: "funnel",
       locale,
+      planId: capturedStatus?.planId,
       properties: {
-        returningPlan,
         returningPlanId: returningPlanId || undefined
       },
       ...healthScoreBpmFields(healthScore)
     });
-  }, [healthScore, locale, returningPlan, returningPlanId, showPlans]);
-
-  useEffect(() => {
-    if (!showExampleExit || exampleExitTracked.current) return;
-
-    exampleExitTracked.current = true;
-    trackBpmEvent("free_example_exit_viewed", {
-      eventType: "email",
-      exampleRequestId: exampleRequest?.requestId,
-      locale,
-      planId: exampleRequest?.planId
-    });
-  }, [exampleRequest?.planId, exampleRequest?.requestId, locale, showExampleExit]);
+  }, [capturedStatus?.planId, healthScore, locale, returningPlanId, showHealthScore]);
 
   const ui = locale === "th"
     ? {
@@ -1627,40 +1454,12 @@ export function AssessmentFlow({
         infoLabel: "Note",
         optionalSection: "ความแม่นยำ",
         processingError: "ไม่สามารถเริ่มการประมวลผลได้ โปรดลองอีกครั้ง",
-        processingSubtitle: "เราจะเปิดหน้าปรับคำแนะนำก่อน จากนั้นคุณค่อยส่งมอบแผนสุดท้ายเมื่อพร้อม",
-        processingTitle: "กำลังเตรียมคำแนะนำของคุณ",
-        scoreProcessingSubtitle: "เรากำลังประเมินภาพรวมสุขภาพจากคำตอบของคุณก่อนแสดงตัวเลือกแผน",
+        scoreProcessingSubtitle: "เรากำลังประเมินภาพรวมสุขภาพจากคำตอบของคุณ",
         scoreProcessingTitle: "กำลังเตรียม HealthScore ของคุณ",
         scoreGate: {
-          emailButton: "ส่งแผนฟรี 3 ข้อ + HealthScore",
-          emailDescription: "ใส่อีเมลของคุณ แล้วเราจะส่งแผนโภชนาการฟรี 3 ข้อที่ครอบคลุมพื้นฐานสำคัญ",
-          emailDivider: "หรือรับแผนโภชนาการฟรี 3 ข้อทางอีเมล",
-          emailError: "กรุณาใส่อีเมลที่ถูกต้อง",
-          emailPlaceholder: "your@email.com",
-          emailTitle: "ยังไม่พร้อมปลดล็อก?",
-          planDescription: "เลือกระดับคำแนะนำที่ต้องการ ก่อนที่เราจะเปิดแผนโภชนาการของคุณ",
-          planTitle: "ปลดล็อกแผนโภชนาการเฉพาะตัวของคุณ",
-          preparing: "กำลังเตรียม...",
-          proContinueCta: "ไปต่อ",
-          proContinueDescription: "คุณมีสิทธิ์แผน Pro อยู่แล้ว เราจะเปิดแผนโภชนาการเวอร์ชันใหม่โดยไม่แสดงตัวเลือกชำระเงิน",
-          proContinueTitle: "แผน Pro พร้อมใช้งาน",
-          reassessmentDescription: "",
-          reassessmentTitle: "รวมการประเมินซ้ำฟรีใน 60 วัน ยกเลิกได้ทุกเมื่อ",
+          planDescription: "นี่คือคะแนน HealthScore จากคำตอบของคุณ",
           title: "HealthScore ของคุณพร้อมแล้ว"
         },
-        exampleExit: {
-          body: "เรากำลังเตรียมแผนฉบับเต็มอยู่เบื้องหลัง และจะส่งตัวอย่างแผนโภชนาการ 3 ข้อแบบสั้นไปยังอีเมลของคุณ",
-          chatBody: "เลือกช่องทางที่สะดวกเพื่อคุยต่อกับ AI advisor",
-          chatButton: "เปิดแชต",
-          chatPlanLabel: "แผน",
-          chatQrAlt: "QR code สำหรับเชื่อมต่อ MattaNutra AI advisor",
-          chatTitle: "คุยกับ AI advisor ระหว่างรอตัวอย่างของคุณ",
-          emailPrefix: "เราจะส่งไปที่",
-          testimonialTitle: "ลูกค้าใช้ MattaNutra เพื่อเปลี่ยนข้อมูลสุขภาพให้เป็นขั้นตอนที่ทำได้จริง",
-          title: "ตัวอย่างของคุณกำลังถูกจัดเตรียม"
-        },
-        exampleProcessingSubtitle: "เรากำลังเตรียมแผนฉบับเต็มก่อนคัดส่วนสำคัญเป็นตัวอย่างทางอีเมล",
-        exampleProcessingTitle: "กำลังเตรียมตัวอย่างของคุณ",
         retry: "ลองอีกครั้ง",
         requiredSection: "บริบท",
         section: (current: number, total: number) => `ขั้นตอน ${current} / ${total}`,
@@ -1674,40 +1473,12 @@ export function AssessmentFlow({
         infoLabel: "Note",
         optionalSection: "Precision",
         processingError: "We could not start processing. Please try again.",
-        processingSubtitle: "We will open the refinement page first. When you are ready, deliver the final plan from there.",
-        processingTitle: "Preparing your guidance",
-        scoreProcessingSubtitle: "We are scoring your main wellness domains before showing the plan options.",
+        scoreProcessingSubtitle: "We are scoring your main wellness domains from your answers.",
         scoreProcessingTitle: "Preparing your HealthScore",
         scoreGate: {
-          emailButton: "Send My Free 3-Point Plan + HealthScore",
-          emailDescription: "Enter your email address and we'll send you a free 3-point nutrition plan covering the essentials.",
-          emailDivider: "or get a free 3-point nutrition plan by email",
-          emailError: "Enter a valid email address",
-          emailPlaceholder: "your@email.com",
-          emailTitle: "Not ready to unlock?",
-          planDescription: "Choose the level of guidance you want before we open your nutrition plan.",
-          planTitle: "Unlock your bespoke nutrition plan",
-          preparing: "Preparing...",
-          proContinueCta: "Continue",
-          proContinueDescription: "Your Pro access is active, so we can open a new nutrition plan version without showing payment options.",
-          proContinueTitle: "Pro plan active",
-          reassessmentDescription: "",
-          reassessmentTitle: "Include a free 60-day reassessment. Cancel anytime.",
+          planDescription: "This is the deterministic HealthScore calculated from your answers.",
           title: "Your HealthScore is ready"
         },
-        exampleExit: {
-          body: "We are preparing the full plan in the background and sending a focused 3-point nutrition example to your inbox.",
-          chatBody: "Choose your preferred channel to continue with the specialist AI advisor.",
-          chatButton: "Open chat",
-          chatPlanLabel: "Plan",
-          chatQrAlt: "QR code to connect with the MattaNutra AI advisor",
-          chatTitle: "Chat with the AI advisor while you wait",
-          emailPrefix: "We will send it to",
-          testimonialTitle: "People use MattaNutra to turn wellness data into practical next steps",
-          title: "Your example is being prepared"
-        },
-        exampleProcessingSubtitle: "We are preparing the full plan first, then selecting the key points for your email example.",
-        exampleProcessingTitle: "Preparing your example",
         retry: "Try again",
         requiredSection: "Context",
         section: (current: number, total: number) => `Step ${current} / ${total}`,
@@ -1885,21 +1656,23 @@ export function AssessmentFlow({
         {
           content: (
             <div className="grid gap-5 md:grid-cols-[minmax(13rem,0.8fr)_minmax(0,1.2fr)] md:items-start">
-              <label className="block">
-                <span className="text-sm font-semibold text-[#20343A]">
-                  {copy.about.country}
-                </span>
-                <select
-                  value={answers.country}
-                  className="mt-3 block w-full rounded-md border border-foreground/10 bg-white px-4 py-3 text-sm font-semibold text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
-                  onChange={(event) => setSingle("country", event.target.value)}
-                >
-                  <option value="">{locale === "th" ? "เลือกประเทศ" : "Select country"}</option>
-                  {copy.about.countryOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </label>
+              <div>
+                <p className="text-sm font-semibold text-[#20343A]">
+                  {copy.about.sunscreen}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {locale === "th"
+                    ? "ช่วยปรับบริบทวิตามินดีและการได้รับแดด"
+                    : "Helps tune vitamin D and sun exposure context."}
+                </p>
+                <div className="mt-3">
+                  <PillGroup
+                    options={copy.about.sunscreenOptions}
+                    selected={answers.sunscreen}
+                    onSelect={(value) => setSingle("sunscreen", value)}
+                  />
+                </div>
+              </div>
               <div>
                 <p className="text-sm font-semibold text-[#20343A]">
                   {copy.about.sun}
@@ -1917,21 +1690,36 @@ export function AssessmentFlow({
               </div>
             </div>
           ),
-          id: "country-sun",
-          isAnswered: hasText(answers.country) && hasText(answers.sun),
+          id: "sunscreen-sun",
+          isAnswered: hasText(answers.sunscreen) && hasText(answers.sun),
           label: ""
         },
         {
           content: (
-            <PillGroup
-              options={copy.about.sunscreenOptions}
-              selected={answers.sunscreen}
-              onSelect={(value) => setSingle("sunscreen", value)}
-            />
+            <label className="block">
+              <span className="text-sm font-semibold text-[#20343A]">
+                {copy.about.country}
+              </span>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                {locale === "th"
+                  ? "ใช้เพื่อปรับบริบทพื้นที่และสินค้าที่พร้อมใช้งาน"
+                  : "Used for local context and product availability."}
+              </p>
+              <select
+                value={answers.country}
+                className="mt-3 block w-full rounded-md border border-foreground/10 bg-white px-4 py-3 text-sm font-semibold text-[#20343A] outline-none transition focus:border-[#1FA77A] focus:ring-2 focus:ring-[#1FA77A]/15"
+                onChange={(event) => setSingle("country", event.target.value)}
+              >
+                <option value="">{locale === "th" ? "เลือกประเทศ" : "Select country"}</option>
+                {copy.about.countryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
           ),
-          id: "sunscreen",
-          isAnswered: hasText(answers.sunscreen),
-          label: copy.about.sunscreen
+          id: "country",
+          isAnswered: hasText(answers.country),
+          label: ""
         },
         ...(answers.sex === "female"
           ? [
@@ -2118,17 +1906,8 @@ export function AssessmentFlow({
         },
         {
           content: (
-            <div className="space-y-4">
-              <PillGroup multi={true} options={copy.food.allergyOptions} selected={answers.allergies} onToggle={(value) => toggleMulti("allergies", value)} />
-              <textarea
-                className={textInputClasses()}
-                placeholder={copy.food.avoidPlaceholder}
-                value={answers.avoidNote}
-                onChange={(event) => setSingle("avoidNote", event.target.value)}
-              />
-            </div>
+            <PillGroup multi={true} options={copy.food.allergyOptions} selected={answers.allergies} onToggle={(value) => toggleMulti("allergies", value)} />
           ),
-          hint: copy.food.avoidNote,
           id: "allergies",
           isAnswered: hasAny(answers.allergies),
           label: copy.food.allergies,
@@ -2218,21 +1997,9 @@ export function AssessmentFlow({
           label: copy.safety.supplements
         },
         {
-          content: (
-            <div className="space-y-4">
-              <PillGroup multi={true} options={copy.safety.suppAllergyOptions} selected={answers.suppAllergies} onToggle={(value) => toggleMulti("suppAllergies", value)} />
-              {selectedOther(answers.suppAllergies) ? (
-                <input
-                  className={textInputClasses()}
-                  placeholder={copy.safety.otherSuppPlaceholder}
-                  value={answers.otherSupp}
-                  onChange={(event) => setSingle("otherSupp", event.target.value)}
-                />
-              ) : null}
-            </div>
-          ),
+          content: <PillGroup multi={true} options={copy.safety.suppAllergyOptions} selected={answers.suppAllergies} onToggle={(value) => toggleMulti("suppAllergies", value)} />,
           id: "suppAllergies",
-          isAnswered: hasAny(answers.suppAllergies) && (!selectedOther(answers.suppAllergies) || hasText(answers.otherSupp)),
+          isAnswered: hasAny(answers.suppAllergies),
           label: copy.safety.suppAllergies
         }
       ],
@@ -2281,10 +2048,42 @@ export function AssessmentFlow({
                 ) : null}
               </Question>
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-sm font-semibold text-[#20343A]">{copy.precision.vo2}</span>
-                  <input className={textInputClasses()} inputMode="decimal" value={answers.vo2} onChange={(event) => setSingle("vo2", event.target.value)} />
-                </label>
+                <div className="block">
+                  <label className="block">
+                    <span className="text-sm font-semibold text-[#20343A]">{copy.precision.vo2}</span>
+                    <input
+                      className={textInputClasses()}
+                      inputMode="decimal"
+                      placeholder="e.g. 45 ml/kg/min"
+                      value={answers.vo2}
+                      onChange={(event) => setSingle("vo2", event.target.value)}
+                    />
+                  </label>
+                  <div className="mt-3 rounded-lg border border-[#1FA77A]/15 bg-white p-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-[#20343A]">{copy.precision.vo2Estimate}</p>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                          {vo2Estimate === null
+                            ? copy.precision.vo2EstimateNeeds
+                            : copy.precision.vo2EstimateReady(vo2Estimate)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={vo2Estimate === null}
+                        className="inline-flex shrink-0 items-center justify-center rounded-md border border-[#1FA77A]/25 bg-[#1FA77A]/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#167558] transition hover:bg-[#1FA77A]/15 disabled:cursor-not-allowed disabled:opacity-45"
+                        onClick={() => {
+                          if (vo2Estimate !== null) {
+                            setSingle("vo2", String(vo2Estimate));
+                          }
+                        }}
+                      >
+                        {copy.precision.vo2EstimateButton}
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <label className="block">
                   <span className="text-sm font-semibold text-[#20343A]">{copy.precision.hrv}</span>
                   <input className={textInputClasses()} inputMode="decimal" value={answers.hrv} onChange={(event) => setSingle("hrv", event.target.value)} />
@@ -2350,12 +2149,9 @@ export function AssessmentFlow({
   function fillRandomDefaultsAndFinalStep() {
     setAnswers(buildRandomDevAnswers());
     setProcessingError("");
-    setExampleError("");
-    setShowPlans(false);
-    setShowExampleExit(false);
+    setShowHealthScore(false);
     clearProcessingStatus();
     setCapturedStatus(null);
-    setExampleRequest(null);
     captureInFlight.current = null;
     setSectionIndex(sections.length - 1);
     window.scrollTo({ behavior: "smooth", top: 0 });
@@ -2364,6 +2160,8 @@ export function AssessmentFlow({
   const currentSection = sections[Math.min(sectionIndex, sections.length - 1)];
   const renderedQuestions = currentSection.questions;
   const isFinalStep = sectionIndex === sections.length - 1;
+  const disclosureRequiredForAction = ["food", "safety", "precision"].includes(currentSection.id);
+  const primaryActionDisabled = disclosureRequiredForAction && !answers.disclosure;
 
   function sectionIsComplete(section: AssessmentSection) {
     return section.questions.some((question) => question.isAnswered);
@@ -2371,7 +2169,6 @@ export function AssessmentFlow({
 
   function goBack() {
     setProcessingError("");
-    setExampleError("");
 
     if (sectionIndex > 0) {
       setSectionIndex(sectionIndex - 1);
@@ -2383,12 +2180,15 @@ export function AssessmentFlow({
 
   function goToSection(index: number) {
     setProcessingError("");
-    setExampleError("");
     setSectionIndex(Math.min(Math.max(index, 0), sections.length - 1));
     window.scrollTo({ behavior: "smooth", top: 0 });
   }
 
   function goNext() {
+    if (primaryActionDisabled) {
+      return;
+    }
+
     if (isFinalStep) {
       void prepareHealthScoreGate(answers);
       return;
@@ -2397,91 +2197,18 @@ export function AssessmentFlow({
     setSectionIndex(Math.min(sectionIndex + 1, sections.length - 1));
   }
 
-  function choosePlan(planId: string) {
-    setSelectedPlan(planId);
-    setShowPlans(false);
-    setShowExampleExit(false);
-    setExampleRequest(null);
-    setProcessingMode("formulation");
-    trackBpmEvent("plan_selected_clicked", {
-      eventType: "plan",
-      locale,
-      properties: {
-        plan: planId
-      },
-      selectedPlan: planId,
-      ...healthScoreBpmFields(healthScore)
-    });
-    void startProcessing(planId);
-  }
-
-  function showProcessingStatus(status: ProcessingStatus) {
-    displayedStepStartedAt.current = Date.now();
-    setDisplayedProcessingStatus(
-      getPacedProcessingStatus(status, getInitialProcessingStepIndex(status))
-    );
-    setProcessingStatus(status);
-  }
-
-  const applyHealthScoreStatus = useCallback((status: ProcessingStatus) => {
-    if (!status.healthScore) {
-      return;
-    }
-
-    setHealthScore(status.healthScore);
-
-    if (status.status !== "ready" || healthScoreViewedTracked.current) {
-      return;
-    }
-
-    healthScoreViewedTracked.current = true;
-    trackBpmEvent("healthscore_viewed", {
-      eventType: "funnel",
-      locale,
-      planId: status.planId,
-      ...healthScoreBpmFields(status.healthScore)
-    });
-  }, [locale]);
-
   async function prepareHealthScoreGate(answerPayload = answers) {
     setProcessingError("");
-    setExampleError("");
-    setShowPlans(false);
-    setShowExampleExit(false);
-    setExampleRequest(null);
-    setProcessingMode("score");
-    healthScoreViewedTracked.current = false;
-    const scoreStatus: ProcessingStatus = {
+    setProcessingStatus({
       planId: "",
       queuePosition: 0,
       status: "preparing",
       steps: [
         { id: "assessment", state: "complete" },
         { id: "score", state: "active" },
-        { id: "scoreAnalysis", state: "pending" },
-        { id: "payment", state: "pending" },
-        { id: "formulation", state: "pending" },
-        { id: "safety", state: "pending" },
         { id: "results", state: "pending" }
       ]
-    };
-    const analysisStatus: ProcessingStatus = {
-      ...scoreStatus,
-      steps: [
-        { id: "assessment", state: "complete" },
-        { id: "score", state: "complete" },
-        { id: "scoreAnalysis", state: "active" },
-        { id: "payment", state: "pending" },
-        { id: "formulation", state: "pending" },
-        { id: "safety", state: "pending" },
-        { id: "results", state: "pending" }
-      ]
-    };
-    const analysisStepTimeout = window.setTimeout(() => {
-      setProcessingStatus(analysisStatus);
-    }, PROCESSING_STEP_MIN_MS);
-
-    showProcessingStatus(scoreStatus);
+    });
     window.scrollTo({ behavior: "smooth", top: 0 });
     trackBpmEvent("assessment_submitted", {
       eventType: "funnel",
@@ -2494,67 +2221,24 @@ export function AssessmentFlow({
 
     try {
       const captured = await captureAssessment(true, answerPayload);
-      window.clearTimeout(analysisStepTimeout);
 
       if (!captured?.planId) {
-        throw new Error("Unable to capture assessment before plan selection");
+        throw new Error("Unable to capture assessment");
       }
 
       if (!captured.healthScore) {
         throw new Error("Assessment capture did not return a HealthScore");
       }
 
-      applyHealthScoreStatus(captured);
+      setHealthScore(captured.healthScore);
       setCapturedStatus(captured);
-      setProcessingStatus(captured);
-
-      const readyScoreStatus = await waitForHealthScoreAnalysis(captured);
-
-      applyHealthScoreStatus(readyScoreStatus);
-      setCapturedStatus(readyScoreStatus);
-      setProcessingStatus(readyScoreStatus);
-      router.replace(nutritionHealthScorePath(locale, readyScoreStatus.planId));
-
+      setProcessingStatus(null);
+      setShowHealthScore(true);
+      router.replace(nutritionHealthScorePath(locale, captured.planId));
     } catch {
-      window.clearTimeout(analysisStepTimeout);
       clearProcessingStatus();
       setProcessingError(ui.processingError);
     }
-  }
-
-  async function waitForHealthScoreAnalysis(initialStatus: ProcessingStatus) {
-    let status = initialStatus;
-
-    for (let attempt = 0; attempt <= HEALTH_SCORE_ANALYSIS_MAX_POLLS; attempt += 1) {
-      if (status.status === "ready") {
-        return status;
-      }
-
-      if (status.status === "failed") {
-        throw new Error("HealthScore analysis failed");
-      }
-
-      if (attempt > 0) {
-        applyHealthScoreStatus(status);
-        setCapturedStatus(status);
-        setProcessingStatus(status);
-      }
-
-      await sleep(HEALTH_SCORE_ANALYSIS_POLL_INTERVAL_MS);
-
-      const response = await fetchWithTimeout(
-        `/api/assessment/${encodeURIComponent(status.planId)}?mode=score`,
-        { cache: "no-store" }
-      );
-
-      if (!response.ok) {
-        throw new Error("Unable to fetch HealthScore analysis status");
-      }
-
-      status = (await response.json()) as ProcessingStatus;
-    }
-
-    throw new Error("HealthScore analysis timed out");
   }
 
   async function captureAssessment(force = false, answerPayload = answers) {
@@ -2616,418 +2300,30 @@ export function AssessmentFlow({
     return captureInFlight.current;
   }
 
-  async function startProcessing(planId = selectedPlan || "precision") {
-    setProcessingError("");
-    pollFailureCount.current = 0;
-    setProcessingMode("formulation");
-    showProcessingStatus({
-      planId: "",
-      queuePosition: 0,
-      status: "queued",
-      steps: [
-        { id: "score", state: "complete" },
-        { id: "formulation", state: "active" },
-        { id: "results", state: "pending" }
-      ]
-    });
-
-    try {
-      const captured = captureInFlight.current
-        ? await captureInFlight.current
-        : capturedStatus ?? (await captureAssessment());
-      const response = captured?.planId
-        ? await fetchWithTimeout(
-            `/api/assessment/${encodeURIComponent(captured.planId)}`,
-            {
-              body: JSON.stringify({
-                answers,
-                bpm: getBpmPayload(),
-                locale,
-                plan: planId
-              }),
-              cache: "no-store",
-              headers: {
-                "content-type": "application/json"
-              },
-              method: "PATCH"
-            }
-          )
-        : await fetchWithTimeout("/api/assessment", {
-            body: JSON.stringify({
-              answers,
-              bpm: getBpmPayload(),
-              intent: "process",
-              locale,
-              plan: planId
-            }),
-            cache: "no-store",
-            headers: {
-              "content-type": "application/json"
-            },
-            method: "POST"
-          });
-
-      if (!response.ok) {
-        throw new Error("Unable to create assessment plan");
-      }
-
-      const status = (await response.json()) as ProcessingStatus;
-      setCapturedStatus(status);
-      setProcessingStatus(status);
-    } catch {
-      setProcessingError(ui.processingError);
-      clearProcessingStatus();
-    }
-  }
-
-  async function requestExampleBrief() {
-    const emailValidation = validateLeadEmail(exampleEmail);
-
-    if (!emailValidation.ok) {
-      setExampleError(ui.scoreGate.emailError);
-      return;
-    }
-
-    const email = normalizeLeadEmail(emailValidation.email);
-
-    setExampleLoading(true);
-    setExampleError("");
-    trackBpmEvent("free_email_requested_clicked", {
-      email,
-      eventType: "email",
-      locale,
-      planId: capturedStatus?.planId,
-      properties: {
-        includeReassessment:
-          includeExampleReassessment && !reassessmentAlreadyOptedIn
-      },
-      ...healthScoreBpmFields(healthScore)
-    });
-
-    try {
-      const captured = capturedStatus?.planId
-        ? capturedStatus
-        : await captureAssessment(true);
-
-      if (!captured?.planId) {
-        throw new Error("Unable to capture assessment before example request");
-      }
-
-      const response = await fetchWithTimeout(
-        `/api/assessment/${encodeURIComponent(captured.planId)}/example`,
-        {
-          body: JSON.stringify({
-            bpm: getBpmPayload(),
-            email,
-            includeReassessment:
-              includeExampleReassessment && !reassessmentAlreadyOptedIn,
-            locale
-          }),
-          cache: "no-store",
-          headers: {
-            "content-type": "application/json"
-          },
-          method: "POST"
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Unable to request example brief");
-      }
-
-      const result = (await response.json()) as {
-        planId?: string;
-        requestId?: string;
-      };
-      const planId = result.planId ?? captured.planId;
-      const requestId = result.requestId ?? "";
-
-      if (!requestId) {
-        throw new Error("Example request did not return a request id");
-      }
-
-      setExampleRequest({ email, planId, requestId });
-      setProcessingMode("example");
-      setShowPlans(false);
-      setShowExampleExit(false);
-      showProcessingStatus(buildExampleProcessingStatus(planId));
-      window.scrollTo({ behavior: "smooth", top: 0 });
-      setProcessingStatus(buildExampleQueuedStatus(planId));
-    } catch {
-      setExampleError(ui.processingError);
-    } finally {
-      setExampleLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!processingStatus) {
-      displayedStepStartedAt.current = 0;
-      return;
-    }
-
-    if (processingStatus.status === "failed") {
-      const timeout = window.setTimeout(() => {
-        displayedStepStartedAt.current = Date.now();
-        setDisplayedProcessingStatus(processingStatus);
-      }, 0);
-
-      return () => window.clearTimeout(timeout);
-    }
-
-    if (!displayedProcessingStatus) {
-      const timeout = window.setTimeout(() => {
-        displayedStepStartedAt.current = Date.now();
-        setDisplayedProcessingStatus(
-          getPacedProcessingStatus(
-            processingStatus,
-            getInitialProcessingStepIndex(processingStatus)
-          )
-        );
-      }, 0);
-
-      return () => window.clearTimeout(timeout);
-    }
-
-    const displayedStepIndex = getProcessingStepIndex(displayedProcessingStatus);
-    const targetStepIndex = getProcessingStepIndex(processingStatus);
-    const elapsed = Date.now() - displayedStepStartedAt.current;
-    const wait = Math.max(0, PROCESSING_STEP_MIN_MS - elapsed);
-
-    if (targetStepIndex > displayedStepIndex) {
-      const timeout = window.setTimeout(() => {
-        displayedStepStartedAt.current = Date.now();
-        setDisplayedProcessingStatus(
-          getPacedProcessingStatus(processingStatus, displayedStepIndex + 1)
-        );
-      }, wait);
-
-      return () => window.clearTimeout(timeout);
-    }
-
-    const targetStepComplete = isStepComplete(
-      processingStatus,
-      displayedStepIndex
-    );
-    const displayedStepComplete = isStepComplete(
-      displayedProcessingStatus,
-      displayedStepIndex
-    );
-    const targetReadyAtDisplayedStep =
-      processingStatus.status === "ready" &&
-      targetStepIndex === displayedStepIndex &&
-      targetStepComplete;
-
-    if (targetReadyAtDisplayedStep && !displayedStepComplete) {
-      const timeout = window.setTimeout(() => {
-        setDisplayedProcessingStatus(
-          getPacedProcessingStatus(processingStatus, displayedStepIndex, true)
-        );
-      }, wait);
-
-      return () => window.clearTimeout(timeout);
-    }
-  }, [displayedProcessingStatus, processingStatus]);
-
-  useEffect(() => {
-    if (!displayedProcessingStatus || displayedProcessingStatus.status !== "ready") {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      if (processingMode === "score") {
-        if (displayedProcessingStatus.planId) {
-          router.replace(
-            nutritionHealthScorePath(locale, displayedProcessingStatus.planId)
-          );
-        }
-        clearProcessingStatus();
-        setShowPlans(true);
-        return;
-      }
-
-      if (processingMode === "example") {
-        clearProcessingStatus();
-        setShowExampleExit(true);
-        return;
-      }
-
-      if (displayedProcessingStatus.planId) {
-        router.push(nutritionRefinePath(locale, displayedProcessingStatus.planId));
-      }
-    }, PROCESSING_COMPLETE_HOLD_MS);
-
-    return () => window.clearTimeout(timeout);
-  }, [
-    clearProcessingStatus,
-    displayedProcessingStatus,
-    locale,
-    processingMode,
-    router
-  ]);
-
-  useEffect(() => {
-    if (!processingStatus?.planId) {
-      return;
-    }
-
-    if (processingStatus.status === "ready") {
-      return;
-    }
-
-    if (processingStatus.status === "failed") {
-      return;
-    }
-
-    const planId = processingStatus.planId;
-    let cancelled = false;
-    let pollTimeout: number | undefined;
-
-    async function pollStatus() {
-      try {
-        if (processingMode === "example" && !exampleRequest?.requestId) {
-          return;
-        }
-
-        const url =
-          processingMode === "example"
-            ? `/api/assessment/${encodeURIComponent(planId)}/example?requestId=${encodeURIComponent(exampleRequest?.requestId ?? "")}`
-            : processingMode === "score"
-              ? `/api/assessment/${encodeURIComponent(planId)}?mode=score`
-              : `/api/assessment/${encodeURIComponent(planId)}`;
-        const response = await fetchWithTimeout(
-          url,
-          {
-            cache: "no-store"
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Unable to fetch assessment plan");
-        }
-
-        const status = (await response.json()) as ProcessingStatus;
-
-        if (!cancelled) {
-          pollFailureCount.current = 0;
-          setProcessingError(
-            status.status === "failed" ? ui.processingError : ""
-          );
-          if (processingMode === "score") {
-            applyHealthScoreStatus(status);
-            setCapturedStatus(status);
-          }
-          setProcessingStatus(status);
-        }
-      } catch {
-        if (!cancelled) {
-          pollFailureCount.current += 1;
-
-          if (pollFailureCount.current >= 3) {
-            setProcessingError(ui.processingError);
-          }
-        }
-      } finally {
-        if (!cancelled) {
-          pollTimeout = window.setTimeout(pollStatus, 1500);
-        }
-      }
-    }
-
-    pollTimeout = window.setTimeout(pollStatus, 0);
-
-    return () => {
-      cancelled = true;
-      if (pollTimeout !== undefined) {
-        window.clearTimeout(pollTimeout);
-      }
-    };
-  }, [
-    applyHealthScoreStatus,
-    exampleRequest?.requestId,
-    locale,
-    processingMode,
-    processingStatus?.planId,
-    processingStatus?.status,
-    ui.processingError
-  ]);
-
-  const visibleProcessingStatus =
-    displayedProcessingStatus ?? processingStatus;
-
   return (
     <>
       <div className="mx-auto w-full max-w-6xl px-6 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-10 sm:px-8 sm:pb-16 lg:pt-14">
-        {visibleProcessingStatus ? (
+        {processingStatus ? (
           <ProcessingPanel
             error={
-              visibleProcessingStatus.status === "failed"
+              processingStatus.status === "failed"
                 ? ui.processingError
                 : processingError
             }
-            onRetry={() =>
-              processingMode === "score"
-                ? void prepareHealthScoreGate()
-                : processingMode === "example"
-                  ? void requestExampleBrief()
-                  : void startProcessing()
-            }
+            onRetry={() => void prepareHealthScoreGate()}
             retryLabel={ui.retry}
-            subtitle={
-              processingMode === "score"
-                ? ui.scoreProcessingSubtitle
-                : processingMode === "example"
-                  ? ui.exampleProcessingSubtitle
-                  : ui.processingSubtitle
-            }
-            title={
-              processingMode === "score"
-                ? ui.scoreProcessingTitle
-                : processingMode === "example"
-                  ? ui.exampleProcessingTitle
-                  : ui.processingTitle
-            }
+            subtitle={ui.scoreProcessingSubtitle}
+            title={ui.scoreProcessingTitle}
           />
-        ) : showExampleExit ? (
-          <ExampleExitPanel
-            content={ui.exampleExit}
-            dbTestimonial={exampleTestimonial}
-            email={exampleRequest?.email ?? exampleEmail}
-            locale={locale}
-            planId={exampleRequest?.planId ?? capturedStatus?.planId ?? ""}
-          />
-        ) : showPlans ? (
-          <PlanSelectionPanel
-            content={getPlanContent(locale)}
-            email={exampleEmail}
-            emailError={exampleError}
-            exampleLoading={exampleLoading}
+        ) : showHealthScore ? (
+          <HealthScoreOnlyPanel
             healthScore={healthScore}
-            includeReassessment={includeExampleReassessment}
             locale={locale}
-            onEmailChange={setExampleEmail}
-            onIncludeReassessmentChange={setIncludeExampleReassessment}
-            onRequestExample={() => void requestExampleBrief()}
-            onSelect={choosePlan}
             scoreContent={ui.scoreGate}
-            proAccess={hasReturningProAccess}
-            reassessmentAlreadyOptedIn={reassessmentAlreadyOptedIn}
           />
         ) : (
           <div className="space-y-6">
-            <SectionProgress
-              className="sticky top-[4.5rem] z-40 mb-2"
-              hint={precisionHint}
-              label={copy.progress.label}
-              marks={[
-                copy.progress.markStart,
-                copy.progress.markMiddle,
-                copy.progress.markEnd
-              ]}
-              progress={precision.progress}
-            />
-
-            <div>
+            <div className="py-3">
               <AssessmentStepper
                 currentIndex={sectionIndex}
                 onSelect={goToSection}
@@ -3041,37 +2337,41 @@ export function AssessmentFlow({
               description={currentSection.description}
               done={sectionIsComplete(currentSection)}
               footer={
-                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
-                    <button
-                      type="button"
-                      disabled={sectionIndex === 0}
-                      className="rounded-md border border-foreground/10 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-[#20343A] transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-40"
-                      onClick={goBack}
-                    >
-                      {ui.back}
-                    </button>
-                    {showDevShortcut ? (
+                <div className="space-y-4">
+                  <PrecisionGauge labels={gaugeLabels} progress={precision.progress} />
+                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
                       <button
                         type="button"
-                        className="rounded-md border border-foreground/10 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition hover:bg-background hover:text-[#20343A]"
-                        onClick={fillRandomDefaultsAndFinalStep}
+                        disabled={sectionIndex === 0}
+                        className="rounded-md border border-foreground/10 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-[#20343A] transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={goBack}
                       >
-                        Random defaults
+                        {ui.back}
                       </button>
-                    ) : null}
-                  </div>
+                      {showDevShortcut ? (
+                        <button
+                          type="button"
+                          className="rounded-md border border-foreground/10 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition hover:bg-background hover:text-[#20343A]"
+                          onClick={fillRandomDefaultsAndFinalStep}
+                        >
+                          Random defaults
+                        </button>
+                      ) : null}
+                    </div>
 
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-6 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition hover:bg-[#188a65]"
-                    onClick={goNext}
-                  >
-                    {isFinalStep ? copy.fixedAction.generate : ui.continue}
-                    {isFinalStep ? (
-                      <BeakerIcon aria-hidden={true} className="size-5" />
-                    ) : null}
-                  </button>
+                    <button
+                      type="button"
+                      disabled={primaryActionDisabled}
+                      className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-6 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-white shadow-sm transition hover:bg-[#188a65] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[#1FA77A]"
+                      onClick={goNext}
+                    >
+                      {isFinalStep ? copy.fixedAction.generate : ui.continue}
+                      {isFinalStep ? (
+                        <BeakerIcon aria-hidden={true} className="size-5" />
+                      ) : null}
+                    </button>
+                  </div>
                 </div>
               }
               sectionLabel={copy.stagePhases[sectionIndex] ?? ""}
@@ -3104,667 +2404,32 @@ export function AssessmentFlow({
   );
 }
 
-type PlanSelectionPanelProps = Readonly<{
-  content: PlanContent;
-  email: string;
-  emailError: string;
-  exampleLoading: boolean;
+function HealthScoreOnlyPanel({
+  healthScore,
+  locale,
+  scoreContent
+}: Readonly<{
   healthScore: HealthScoreResult | null;
-  includeReassessment: boolean;
   locale: Locale;
-  onEmailChange: (value: string) => void;
-  onIncludeReassessmentChange: (value: boolean) => void;
-  onRequestExample: () => void;
-  onSelect: (planId: string) => void;
-  proAccess: boolean;
-  reassessmentAlreadyOptedIn: boolean;
   scoreContent: {
-    emailButton: string;
-    emailDescription: string;
-    emailDivider: string;
-    emailError: string;
-    emailPlaceholder: string;
-    emailTitle: string;
     planDescription: string;
-    planTitle: string;
-    preparing: string;
-    proContinueCta: string;
-    proContinueDescription: string;
-    proContinueTitle: string;
-    reassessmentDescription: string;
-    reassessmentTitle: string;
     title: string;
   };
-}>;
-
-function PlanSelectionPanel({
-  content,
-  email,
-  emailError,
-  exampleLoading,
-  healthScore,
-  includeReassessment,
-  locale,
-  onEmailChange,
-  onIncludeReassessmentChange,
-  onRequestExample,
-  onSelect,
-  proAccess,
-  reassessmentAlreadyOptedIn,
-  scoreContent
-}: PlanSelectionPanelProps) {
-  const personalizedEyebrow = localizeHealthScoreText(
-    healthScore?.advice?.paywallEyebrow,
-    locale
-  );
-  const personalizedTitle = localizeHealthScoreText(
-    healthScore?.advice?.paywallTitle,
-    locale
-  );
-  const personalizedDescription = localizeHealthScoreText(
-    healthScore?.advice?.paywallSubtitle,
-    locale
-  );
-  const lowestDomain = healthScore?.domains
-    .slice()
-    .sort((a, b) => a.score - b.score)[0];
-  const fallbackFeatures =
-    locale === "th"
-      ? [
-          {
-            description:
-              lowestDomain
-                ? `เริ่มจาก ${lowestDomain.label} (${lowestDomain.score}/100) เพื่อให้แผนเน้นจุดที่มีผลต่อ HealthScore มากที่สุด`
-                : "จัดลำดับคำแนะนำตามจุดที่คะแนนของคุณบอกว่าควรเริ่มก่อน",
-            name: lowestDomain ? `โฟกัส ${lowestDomain.label}` : "โฟกัสตามคะแนนของคุณ"
-          },
-          {
-            description:
-              healthScore
-                ? `ใช้คะแนน ${healthScore.score}/100 เพื่อจัดลำดับสิ่งที่คุ้มค่าก่อน ลดการซื้อแบบเดาสุ่ม`
-                : "ช่วยให้เห็นภาพว่าควรสนับสนุนร่างกายในปริมาณที่เหมาะสม ไม่ใช่เดาสุ่ม",
-            name: "แนวทางปริมาณที่เหมาะสม"
-          },
-          {
-            description:
-              "เปลี่ยนผลลัพธ์จากแบบประเมินให้เป็นขั้นตอนที่ทำตามได้จริง พร้อมจังหวะทบทวนเมื่อข้อมูลเปลี่ยน",
-            name: "เหมาะกับชีวิตประจำวัน"
-          }
-        ]
-      : [
-          {
-            description:
-              lowestDomain
-                ? `Starts with ${lowestDomain.label} (${lowestDomain.score}/100), so the plan focuses on the area most likely to move your HealthScore.`
-                : "Prioritises the areas your HealthScore suggests deserve attention first.",
-            name: lowestDomain ? `${lowestDomain.label} focus` : "Score-led priorities"
-          },
-          {
-            description:
-              healthScore
-                ? `Uses your ${healthScore.score}/100 score to prioritise fewer, better-targeted moves and reduce wasted supplement spend.`
-                : "Shows what your body may need in sensible amounts, without guesswork.",
-            name: "Right-amount guidance"
-          },
-          {
-            description:
-              "Turns the assessment into practical next steps you can fit into your routine, then refine as your data changes.",
-            name: "Built around your day"
-          }
-        ];
-  const personalizedFeatures =
-    healthScore?.advice?.paywallFeatures
-      ?.map((feature) => ({
-        description: localizeHealthScoreText(feature.description, locale),
-        name: localizeHealthScoreText(feature.name, locale)
-      }))
-      .filter((feature) => feature.description && feature.name)
-      .slice(0, 3) ?? [];
-  const paywallFeatures =
-    !proAccess && personalizedFeatures.length === 3
-      ? personalizedFeatures
-      : fallbackFeatures;
-  const planTitle = proAccess
-    ? scoreContent.proContinueTitle
-    : personalizedTitle || scoreContent.planTitle;
-  const planDescription = proAccess
-    ? scoreContent.proContinueDescription
-    : personalizedDescription || scoreContent.planDescription;
-  const heroEyebrow =
-    !proAccess && personalizedEyebrow ? personalizedEyebrow : content.eyebrow;
-  const heroSubtitle =
-    !proAccess && personalizedDescription
-      ? personalizedDescription
-      : content.subtitle;
-
+}>) {
   return (
-    <section className="relative isolate overflow-hidden rounded-lg bg-white px-6 py-16 ring-1 ring-foreground/10 sm:py-20 lg:px-8">
-      <div
-        aria-hidden={true}
-        className="absolute inset-x-0 -top-3 -z-10 transform-gpu overflow-hidden px-12 blur-3xl sm:px-36"
-      >
-        <div
-          className="mx-auto aspect-[1155/678] w-[72rem] bg-linear-to-tr from-[#EAF5FF] to-[#DDF7EC] opacity-70"
-          style={{
-            clipPath:
-              "polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)"
-          }}
-        />
-      </div>
-
+    <section className="rounded-lg bg-white px-6 py-10 ring-1 ring-foreground/10 sm:px-8">
       <div className="text-center">
-        <p className="text-base/7 font-semibold text-[#3A7BD5]">
-          {heroEyebrow}
-        </p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight text-balance text-gray-900 sm:text-6xl">
-          <HighlightedBrandText text={scoreContent.title} />
+        <h1 className="text-3xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-4xl">
+          {scoreContent.title}
         </h1>
+        <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
+          {scoreContent.planDescription}
+        </p>
       </div>
-      <p className="mx-auto mt-6 max-w-2xl text-center text-lg font-medium text-pretty text-gray-600 sm:text-xl/8">
-        {heroSubtitle}
-      </p>
 
       {healthScore ? (
         <HealthScorePanel locale={locale} result={healthScore} />
       ) : null}
-
-      <div className="mx-auto mt-10 max-w-2xl text-center">
-        <h2 className="text-xl font-semibold text-[#20343A]">
-          <HighlightedBrandText text={planTitle} />
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          {planDescription}
-        </p>
-      </div>
-
-      {!proAccess ? (
-        <div className="mt-12 rounded-3xl bg-white/80 px-6 py-8 ring-1 ring-[#3A7BD5]/10 sm:px-8">
-          <dl className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-3">
-            {paywallFeatures.map((feature, index) => {
-              const Icon = paywallFeatureIcons[index] ?? ArrowPathIcon;
-
-              return (
-                <div key={feature.name} className="flex flex-col">
-                  <dt className="flex items-center gap-x-3 text-base/7 font-semibold text-[#20343A]">
-                    <Icon
-                      aria-hidden={true}
-                      className="size-5 flex-none text-[#1FA77A]"
-                    />
-                    {feature.name}
-                  </dt>
-                  <dd className="mt-4 text-sm/6 text-gray-600">
-                    {feature.description}
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
-        </div>
-      ) : null}
-
-      {proAccess ? (
-        <div className="mt-14 rounded-3xl bg-[#20343A] p-8 text-center shadow-2xl ring-1 ring-gray-900/10 sm:p-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#8BC6FF]">
-            Pro
-          </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">
-            {scoreContent.proContinueTitle}
-          </h2>
-          <p className="mx-auto mt-4 max-w-md text-base/7 text-gray-300">
-            {scoreContent.proContinueDescription}
-          </p>
-          <button
-            type="button"
-            className="mt-8 rounded-md bg-[#1FA77A] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188a65] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A]"
-            onClick={() => onSelect("pro")}
-          >
-            {scoreContent.proContinueCta}
-          </button>
-        </div>
-      ) : (
-        <div className="mt-14 grid grid-cols-1 items-center gap-y-6 sm:mt-16 sm:gap-y-0 lg:grid-cols-2">
-          {content.tiers.map((tier, tierIndex) => (
-          <div
-            key={tier.id}
-            className={cx(
-              "rounded-3xl p-8 ring-1 ring-gray-900/10 sm:p-10",
-              tier.featured
-                ? "relative z-10 bg-[#20343A] shadow-2xl"
-                : "bg-white/70",
-              !tier.featured && tierIndex === 0
-                ? "rounded-t-3xl sm:rounded-b-none lg:rounded-bl-3xl lg:rounded-tr-none"
-                : undefined,
-              !tier.featured && tierIndex !== 0
-                ? "sm:rounded-t-none lg:rounded-bl-none lg:rounded-tr-3xl"
-                : undefined
-            )}
-          >
-            <div className="flex w-full flex-col">
-              <h2
-                id={tier.id}
-                className={cx(
-                  tier.featured ? "text-[#8BC6FF]" : "text-[#3A7BD5]",
-                  "text-base/7 font-semibold"
-                )}
-              >
-                {tier.name}
-              </h2>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {tier.featured ? (
-                  <p className="inline-flex rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-white">
-                    {content.badge}
-                  </p>
-                ) : null}
-                {tier.tierBadge ? (
-                  <p
-                    className={cx(
-                      "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold",
-                      tier.featured
-                        ? "bg-[#1FA77A]/20 text-[#DDF7EC]"
-                        : "bg-[#1FA77A]/10 text-[#126b4f]"
-                    )}
-                  >
-                    {tier.tierBadge}
-                  </p>
-                ) : null}
-              </div>
-              <p className="mt-4 flex items-baseline gap-x-2">
-                <span
-                  className={cx(
-                    tier.featured ? "text-white" : "text-gray-900",
-                    "text-5xl font-semibold tracking-tight"
-                  )}
-                >
-                  {tier.price}
-                </span>
-                {tier.priceSuffix ? (
-                  <span
-                    className={cx(
-                      tier.featured ? "text-gray-400" : "text-gray-500",
-                      "text-base"
-                    )}
-                  >
-                    {tier.priceSuffix}
-                  </span>
-                ) : null}
-              </p>
-              <p
-                className={cx(
-                  tier.featured ? "text-gray-300" : "text-gray-600",
-                  "mt-6 min-h-24 text-base/7"
-                )}
-              >
-                {tier.description}
-              </p>
-              <ul
-                role="list"
-                className={cx(
-                  tier.featured ? "text-gray-300" : "text-gray-600",
-                  "mt-8 space-y-3 text-sm/6 sm:mt-10"
-                )}
-              >
-                {tier.features.map((feature) => (
-                  <li key={feature} className="flex gap-x-3">
-                    <CheckIcon
-                      aria-hidden={true}
-                      className={cx(
-                        tier.featured ? "text-[#8BC6FF]" : "text-[#3A7BD5]",
-                        "h-6 w-5 flex-none"
-                      )}
-                    />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                aria-describedby={tier.id}
-                className={cx(
-                  tier.featured
-                    ? "bg-[#1FA77A] text-white shadow-sm hover:bg-[#188a65]"
-                    : "text-[#126b4f] inset-ring inset-ring-[#1FA77A]/25 hover:inset-ring-[#1FA77A]/40",
-                  "mt-8 block rounded-md px-3.5 py-2.5 text-center text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A] sm:mt-10"
-                )}
-                onClick={() => onSelect(tier.id)}
-              >
-                {tier.cta}
-              </button>
-            </div>
-          </div>
-          ))}
-        </div>
-      )}
-
-      <div className="mx-auto mt-14 max-w-2xl">
-        <div className="flex items-center gap-3 text-center text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          <span className="h-px flex-1 bg-gray-200" />
-          <span>{scoreContent.emailDivider}</span>
-          <span className="h-px flex-1 bg-gray-200" />
-        </div>
-      </div>
-
-      <FreePreviewEmailSection
-        content={scoreContent}
-        email={email}
-        emailError={emailError}
-        exampleLoading={exampleLoading}
-        includeReassessment={includeReassessment}
-        onEmailChange={onEmailChange}
-        onIncludeReassessmentChange={onIncludeReassessmentChange}
-        onRequestExample={onRequestExample}
-        reassessmentAlreadyOptedIn={reassessmentAlreadyOptedIn}
-      />
     </section>
-  );
-}
-
-function FreePreviewEmailSection({
-  content,
-  email,
-  emailError,
-  exampleLoading,
-  includeReassessment,
-  onEmailChange,
-  onIncludeReassessmentChange,
-  onRequestExample,
-  reassessmentAlreadyOptedIn
-}: Readonly<{
-  content: PlanSelectionPanelProps["scoreContent"];
-  email: string;
-  emailError: string;
-  exampleLoading: boolean;
-  includeReassessment: boolean;
-  onEmailChange: (value: string) => void;
-  onIncludeReassessmentChange: (value: boolean) => void;
-  onRequestExample: () => void;
-  reassessmentAlreadyOptedIn: boolean;
-}>) {
-  return (
-    <section className="mt-8 rounded-3xl bg-white py-12 ring-1 ring-gray-900/10 sm:py-14">
-      <div className="mx-auto grid grid-cols-1 gap-8 px-6 lg:grid-cols-12 lg:gap-8 lg:px-8">
-        <div className="lg:col-span-7">
-          <h2 className="max-w-xl text-3xl font-semibold tracking-tight text-balance text-[#20343A] sm:text-4xl">
-            {content.emailTitle}
-          </h2>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-gray-600">
-            {content.emailDescription}
-          </p>
-        </div>
-        <form
-          className="w-full max-w-md lg:col-span-5 lg:pt-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onRequestExample();
-          }}
-        >
-          <div className="flex flex-col gap-3">
-            <label htmlFor="free-preview-email" className="sr-only">
-              {content.emailPlaceholder}
-            </label>
-            <input
-              id="free-preview-email"
-              name="email"
-              type="email"
-              required={true}
-              value={email}
-              placeholder={content.emailPlaceholder}
-              autoComplete="email"
-              className="min-w-0 flex-auto rounded-md bg-white px-3.5 py-2.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 transition placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-[#1FA77A] sm:text-sm/6"
-              onChange={(event) => onEmailChange(event.target.value)}
-            />
-            <button
-              type="submit"
-              disabled={exampleLoading}
-              className="w-full rounded-md bg-[#1FA77A] px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-[#188a65] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1FA77A] disabled:cursor-wait disabled:opacity-70"
-            >
-              {exampleLoading ? content.preparing : content.emailButton}
-            </button>
-          </div>
-          {emailError ? (
-            <p className="mt-3 text-sm font-medium text-red-600">
-              {emailError}
-            </p>
-          ) : null}
-          {reassessmentAlreadyOptedIn ? null : (
-            <button
-              type="button"
-              aria-pressed={includeReassessment}
-              className="mt-4 flex w-full items-start gap-3 text-left text-sm/6 text-gray-900"
-              onClick={() => onIncludeReassessmentChange(!includeReassessment)}
-            >
-              <span
-                className={cx(
-                  "relative mt-0.5 inline-flex h-6 w-11 flex-none items-center rounded-full transition",
-                  includeReassessment ? "bg-[#1FA77A]" : "bg-gray-300"
-                )}
-              >
-                <span className="sr-only">{content.reassessmentTitle}</span>
-                <span
-                  className={cx(
-                    "inline-block h-5 w-5 rounded-full bg-white shadow-sm transition",
-                    includeReassessment ? "translate-x-5" : "translate-x-1"
-                  )}
-                />
-              </span>
-              <span>
-                <span className="font-semibold text-[#20343A]">
-                  {content.reassessmentTitle}
-                </span>{" "}
-                {content.reassessmentDescription ? (
-                  <span className="text-gray-600">
-                    {content.reassessmentDescription}
-                  </span>
-                ) : null}
-              </span>
-            </button>
-          )}
-        </form>
-      </div>
-    </section>
-  );
-}
-
-function getExampleTestimonial(locale: Locale) {
-  return locale === "th"
-    ? {
-        meta: "ออกกำลังกาย 4 วันต่อสัปดาห์",
-        name: "เมย์",
-        quote:
-          "ชอบที่ MattaNutra ผูกคำแนะนำกับการนอน อาหาร และการฟื้นตัวจริง ไม่ใช่แค่รายการอาหารเสริม ทำให้รู้ว่าควรเริ่มตรงไหนก่อน"
-      }
-    : {
-        meta: "Trains 4 days a week",
-        name: "May",
-        quote:
-          "MattaNutra connected the guidance to my sleep, food, and recovery, not just a supplement list. It made the next steps feel practical instead of generic."
-      };
-}
-
-function mapExampleTestimonial(
-  dbTestimonial: BlogTestimonial | null | undefined,
-  locale: Locale
-) {
-  if (!dbTestimonial) {
-    const fallback = getExampleTestimonial(locale);
-
-    return {
-      imageAlt: "",
-      imageUrl: "",
-      meta: fallback.meta,
-      name: fallback.name,
-      quote: fallback.quote
-    };
-  }
-
-  return {
-    imageAlt: dbTestimonial.authorImageAlt,
-    imageUrl: dbTestimonial.authorImageUrl,
-    meta: dbTestimonial.authorTitle || dbTestimonial.authorHandle,
-    name: dbTestimonial.authorName,
-    quote: dbTestimonial.quote
-  };
-}
-
-function assessmentResultsHref(locale: Locale, planId: string) {
-  return nutritionRefinePath(locale, planId);
-}
-
-function ExampleExitPanel({
-  content,
-  dbTestimonial,
-  email,
-  locale,
-  planId
-}: Readonly<{
-  content: {
-    body: string;
-    chatBody: string;
-    chatButton: string;
-    chatPlanLabel: string;
-    chatQrAlt: string;
-    chatTitle: string;
-    emailPrefix: string;
-    testimonialTitle: string;
-    title: string;
-  };
-  dbTestimonial?: BlogTestimonial | null;
-  email: string;
-  locale: Locale;
-  planId: string;
-}>) {
-  const testimonial = mapExampleTestimonial(dbTestimonial, locale);
-
-  return (
-    <div className="space-y-6">
-      <section className="overflow-hidden rounded-lg bg-white ring-1 ring-foreground/10">
-        <div className="grid gap-0 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="p-8 text-center sm:p-10 lg:text-left">
-            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[#1FA77A]/10 lg:mx-0">
-              <CheckIcon aria-hidden={true} className="size-7 text-[#1FA77A]" />
-            </div>
-            <h1 className="mt-6 text-3xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-4xl">
-              {content.title}
-            </h1>
-            <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">
-              {content.body}
-            </p>
-            {email ? (
-              <p className="mt-5 inline-flex max-w-full rounded-md bg-[#1FA77A]/10 px-3 py-2 text-sm font-semibold text-[#126b4f]">
-                <span className="truncate">
-                  {content.emailPrefix} {email}
-                </span>
-              </p>
-            ) : null}
-          </div>
-          <div className="relative min-h-72 bg-[#EAF5FF]">
-            <Image
-              alt=""
-              fill
-              sizes="(min-width: 1024px) 480px, 100vw"
-              src="/mainphoto.png"
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-linear-to-br from-[#EAF5FF]/15 via-transparent to-[#20343A]/20" />
-          </div>
-        </div>
-      </section>
-
-      <section className="isolate overflow-hidden rounded-lg bg-white px-6 ring-1 ring-foreground/10 lg:px-8">
-        <div className="relative mx-auto max-w-2xl py-16 sm:py-20 lg:max-w-4xl">
-          <div className="absolute left-1/2 top-0 -z-10 h-[32rem] w-[64rem] -translate-x-1/2 bg-[radial-gradient(50%_100%_at_top,#DDF7EC,white)] opacity-40 lg:left-36" />
-          <div className="absolute inset-y-0 right-1/2 -z-10 mr-12 w-[150vw] origin-bottom-left skew-x-[-30deg] bg-white shadow-xl shadow-[#3A7BD5]/10 ring-1 ring-[#EAF5FF] sm:mr-20 md:mr-0 lg:right-full lg:-mr-36 lg:origin-center" />
-          <figure className="grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-x-6 gap-y-8 sm:grid-cols-[5rem_minmax(0,1fr)] lg:grid-cols-[18rem_minmax(0,1fr)] lg:gap-x-10">
-            <div className="relative col-start-2 row-start-1 lg:row-start-2">
-              <svg
-                fill="none"
-                viewBox="0 0 162 128"
-                aria-hidden={true}
-                className="absolute -top-12 left-0 -z-10 h-32 stroke-[#20343A]/10"
-              >
-                <path
-                  d="M65.5697 118.507L65.8918 118.89C68.9503 116.314 71.367 113.253 73.1386 109.71C74.9162 106.155 75.8027 102.28 75.8027 98.0919C75.8027 94.237 75.16 90.6155 73.8708 87.2314C72.5851 83.8565 70.8137 80.9533 68.553 78.5292C66.4529 76.1079 63.9476 74.2482 61.0407 72.9536C58.2795 71.4949 55.276 70.767 52.0386 70.767C48.9935 70.767 46.4686 71.1668 44.4872 71.9924L44.4799 71.9955L44.4726 71.9988C42.7101 72.7999 41.1035 73.6831 39.6544 74.6492C38.2407 75.5916 36.8279 76.455 35.4159 77.2394L35.4047 77.2457L35.3938 77.2525C34.2318 77.9787 32.6713 78.3634 30.6736 78.3634C29.0405 78.3634 27.5131 77.2868 26.1274 74.8257C24.7483 72.2185 24.0519 69.2166 24.0519 65.8071C24.0519 60.0311 25.3782 54.4081 28.0373 48.9335C30.703 43.4454 34.3114 38.345 38.8667 33.6325C43.5812 28.761 49.0045 24.5159 55.1389 20.8979C60.1667 18.0071 65.4966 15.6179 71.1291 13.7305C73.8626 12.8145 75.8027 10.2968 75.8027 7.38572C75.8027 3.6497 72.6341 0.62247 68.8814 1.1527C61.1635 2.2432 53.7398 4.41426 46.6119 7.66522C37.5369 11.6459 29.5729 17.0612 22.7236 23.9105C16.0322 30.6019 10.618 38.4859 6.47981 47.558L6.47976 47.558L6.47682 47.5647C2.4901 56.6544 0.5 66.6148 0.5 77.4391C0.5 84.2996 1.61702 90.7679 3.85425 96.8404L3.8558 96.8445C6.08991 102.749 9.12394 108.02 12.959 112.654L12.959 112.654L12.9646 112.661C16.8027 117.138 21.2829 120.739 26.4034 123.459L26.4033 123.459L26.4144 123.465C31.5505 126.033 37.0873 127.316 43.0178 127.316C47.5035 127.316 51.6783 126.595 55.5376 125.148L55.5376 125.148L55.5477 125.144C59.5516 123.542 63.0052 121.456 65.9019 118.881L65.5697 118.507Z"
-                  id="example-testimonial-quote"
-                />
-                <use x={86} href="#example-testimonial-quote" />
-              </svg>
-              <p className="text-sm font-semibold leading-6 text-[#3A7BD5]">
-                <HighlightedBrandText text={content.testimonialTitle} />
-              </p>
-              <blockquote className="mt-5 text-xl/8 font-semibold text-[#20343A] sm:text-2xl/9">
-                <p>
-                  <HighlightedBrandText text={testimonial.quote} />
-                </p>
-              </blockquote>
-            </div>
-            <div className="col-start-1 row-start-1 w-16 sm:w-20 lg:row-span-4 lg:w-72">
-              {testimonial.imageUrl ? (
-                <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt={testimonial.imageAlt}
-                    src={testimonial.imageUrl}
-                    className="aspect-square rounded-xl bg-[#EAF5FF] object-cover lg:rounded-3xl"
-                  />
-                </>
-              ) : (
-                <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-[#EAF5FF] text-lg font-semibold text-[#3A7BD5] lg:rounded-3xl lg:text-5xl">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_24%,#DDF7EC,transparent_38%),radial-gradient(circle_at_78%_74%,#CFE8FF,transparent_44%)]" />
-                  <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_0_44%,rgba(31,167,122,0.18)_45%_47%,transparent_48%),linear-gradient(45deg,transparent_0_56%,rgba(58,123,213,0.12)_57%_59%,transparent_60%)]" />
-                  <span className="relative">
-                    {testimonial.name
-                      .split(/\s+/)
-                      .map((part) => part[0])
-                      .join("")
-                      .slice(0, 2)
-                      .toUpperCase()}
-                  </span>
-                </div>
-              )}
-            </div>
-            <figcaption className="col-start-2 row-start-2 text-base lg:row-start-3">
-              <div className="font-semibold text-[#20343A]">
-                {testimonial.name}
-              </div>
-              <div className="mt-1 text-muted-foreground">
-                {testimonial.meta}
-              </div>
-            </figcaption>
-          </figure>
-        </div>
-      </section>
-
-      <section className="rounded-lg bg-white p-6 ring-1 ring-foreground/10 sm:p-8">
-        <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-3xl">
-              {content.chatTitle}
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
-              {content.chatBody}
-            </p>
-          </div>
-          {planId ? (
-            <div className="flex max-w-full flex-wrap items-center gap-2 text-xs lg:justify-end">
-              <span className="font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                {content.chatPlanLabel}
-              </span>
-              <a
-                className="max-w-full truncate rounded-md bg-background px-2.5 py-1.5 font-mono text-[11px] font-medium text-[#3A7BD5] ring-1 ring-foreground/10 hover:text-[#2F67B8]"
-                href={assessmentResultsHref(locale, planId)}
-              >
-                {planId}
-              </a>
-            </div>
-          ) : null}
-        </div>
-
-        <ChatChannelCards
-          buttonLabel={content.chatButton}
-          className="mt-7"
-          planId={planId}
-          qrAlt={content.chatQrAlt}
-        />
-      </section>
-    </div>
   );
 }

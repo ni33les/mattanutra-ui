@@ -5,10 +5,6 @@ type StepState = "active" | "complete" | "failed" | "pending";
 type AssessmentStepId =
   | "assessment"
   | "score"
-  | "scoreAnalysis"
-  | "payment"
-  | "formulation"
-  | "safety"
   | "results";
 
 export type AssessmentPlan = "precision" | "pro";
@@ -58,11 +54,8 @@ export function buildAssessmentSteps(
   const hasFailed = status === "failed";
 
   return [
-    { id: "score", state: "complete" },
-    {
-      id: "formulation",
-      state: isReady ? "complete" : hasFailed ? "failed" : "active"
-    },
+    { id: "assessment", state: "complete" },
+    { id: "score", state: isReady ? "complete" : hasFailed ? "failed" : "active" },
     {
       id: "results",
       state: isReady ? "complete" : "pending"
@@ -73,21 +66,7 @@ export function buildAssessmentSteps(
 export function buildHealthScoreAnalysisSteps(
   status: AssessmentStatus
 ): AssessmentSnapshot["steps"] {
-  const isReady = status === "ready";
-  const hasFailed = status === "failed";
-
-  return [
-    { id: "assessment", state: "complete" },
-    { id: "score", state: "complete" },
-    {
-      id: "scoreAnalysis",
-      state: isReady ? "complete" : hasFailed ? "failed" : "active"
-    },
-    { id: "payment", state: "pending" },
-    { id: "formulation", state: "pending" },
-    { id: "safety", state: "pending" },
-    { id: "results", state: "pending" }
-  ] satisfies AssessmentSnapshot["steps"];
+  return buildAssessmentSteps(status);
 }
 
 export function createAssessmentSnapshot({

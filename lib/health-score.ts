@@ -66,6 +66,18 @@ function arrayValue(value: unknown) {
   return Array.isArray(value) ? value.map(String) : [];
 }
 
+function hasProvidedValue(value: unknown) {
+  if (typeof value === "string") {
+    return value.trim().length > 0;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+
+  return value !== null && value !== undefined;
+}
+
 function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, Math.round(value)));
 }
@@ -76,6 +88,19 @@ function clampRaw(value: number, min: number, max: number) {
 
 function optionScore(value: unknown, scores: Record<string, number>, fallback: number) {
   return scores[text(value)] ?? fallback;
+}
+
+function optionalOptionScore(
+  value: unknown,
+  scores: Record<string, number>,
+  fallback: number,
+  missingFallback: number
+) {
+  if (!hasProvidedValue(value)) {
+    return missingFallback;
+  }
+
+  return optionScore(value, scores, fallback);
 }
 
 function ageYears(value: unknown) {
@@ -277,30 +302,19 @@ function labPoints(answers: Record<string, unknown>) {
   const male = text(answers.sex) === "male";
   let points = 0;
 
-  if (vitaminD !== null) {
-    points += vitaminD >= 50 && vitaminD <= 80 ? 2 : vitaminD >= 30 ? 1 : 0;
-  }
-
-  if (b12 !== null) {
-    points += b12 >= 350 && b12 <= 900 ? 1 : b12 >= 250 ? 0.5 : 0;
-  }
+  points += vitaminD !== null ? (vitaminD >= 50 && vitaminD <= 80 ? 2 : vitaminD >= 30 ? 1 : 0) : 1.2;
+  points += b12 !== null ? (b12 >= 350 && b12 <= 900 ? 1 : b12 >= 250 ? 0.5 : 0) : 0.6;
 
   if (ferritin !== null) {
     const upper = male ? 300 : 150;
     points += ferritin >= 40 && ferritin <= upper ? 2 : ferritin >= 20 ? 1 : 0;
+  } else {
+    points += 1.2;
   }
 
-  if (hba1c !== null) {
-    points += hba1c < 5.4 ? 2 : hba1c < 5.7 ? 1 : 0;
-  }
-
-  if (omega3 !== null) {
-    points += omega3 >= 8 ? 2 : omega3 >= 5 ? 1 : 0;
-  }
-
-  if (homocysteine !== null) {
-    points += homocysteine < 8 ? 1 : 0;
-  }
+  points += hba1c !== null ? (hba1c < 5.4 ? 2 : hba1c < 5.7 ? 1 : 0) : 1.2;
+  points += omega3 !== null ? (omega3 >= 8 ? 2 : omega3 >= 5 ? 1 : 0) : 1.2;
+  points += homocysteine !== null ? (homocysteine < 8 ? 1 : 0) : 0.6;
 
   return points;
 }
@@ -308,7 +322,7 @@ function labPoints(answers: Record<string, unknown>) {
 function sleepDurationPoints(value: unknown) {
   const sleepHours = sleepHoursValue(value);
 
-  if (sleepHours === null) return 7;
+  if (sleepHours === null) return 9;
   if (sleepHours >= 7 && sleepHours <= 9) return 14;
   if (sleepHours > 9) return 11;
   if (sleepHours >= 6) return 10;
@@ -317,45 +331,52 @@ function sleepDurationPoints(value: unknown) {
 }
 
 function energyForSleepPoints(value: unknown) {
-  return optionScore(
+  return optionalOptionScore(
     value,
     { drained: 0, excellent: 4, good: 4, low: 1, ok: 2 },
+    2,
     2
   );
 }
 
 function caffeineSleepPoints(value: unknown) {
-  return optionScore(
+  return optionalOptionScore(
     value,
     { "1": 2, "2-3": 1, "4+": 0, none: 2 },
+    1,
     1
   );
 }
 
 function foodFrequencyPoints(foodFrequency: Record<string, unknown>) {
-  const fruitVeg = optionScore(
+  const fruitVeg = optionalOptionScore(
     foodFrequency.fruitveg,
     { "1-2": 2, "3+": 3, notdaily: 0 },
-    1
+    1,
+    2
   );
-  const legumes = optionScore(
+  const legumes = optionalOptionScore(
     foodFrequency.legumes,
     { most: 2, rare: 0, weekly: 1 },
+    1,
     1
   );
-  const redMeat = optionScore(
+  const redMeat = optionalOptionScore(
     foodFrequency.redmeat,
     { "1-2": 1, "3+": 0, never: 1 },
-    0.5
+    0.5,
+    1
   );
-  const eggs = optionScore(
+  const eggs = optionalOptionScore(
     foodFrequency.eggs,
     { most: 1, rare: 0, weekly: 0.5 },
+    0.5,
     0.5
   );
-  const dairy = optionScore(
+  const dairy = optionalOptionScore(
     foodFrequency.dairy,
     { "1-2": 1, "3+": 1, never: 0 },
+    0.5,
     0.5
   );
 
@@ -363,14 +384,16 @@ function foodFrequencyPoints(foodFrequency: Record<string, unknown>) {
 }
 
 function digestionPoints(answers: Record<string, unknown>) {
-  const symptomPoints = optionScore(
+  const symptomPoints = optionalOptionScore(
     answers.digestion,
     { bloating: -1, constipation: -1, loose: -1, none: 1 },
+    0,
     0
   );
-  const conditionPoints = optionScore(
+  const conditionPoints = optionalOptionScore(
     answers.digCondition,
     { bariatric: -1, celiac: -1, ibd: -1, ibs: -1, none: 1 },
+    0,
     0
   );
 
@@ -381,10 +404,11 @@ function sunHabitPoints(answers: Record<string, unknown>) {
   const sun = sunValue(answers.sun);
   const sunscreen = text(answers.sunscreen);
   const skin = text(answers.skin);
-  let points = optionScore(
+  let points = optionalOptionScore(
     sun,
     { high: 1, low: 1, min: 0, mod: 2 },
-    1
+    1,
+    1.2
   );
 
   if (sun === "high" && (sunscreen === "daily" || sunscreen === "sometimes")) {
@@ -483,10 +507,11 @@ export function computeHealthScore(
     20
   );
 
-  const activityPoints = optionScore(
+  const activityPoints = optionalOptionScore(
     answers.activity,
     { active: 11, athlete: 14, light: 5, moderate: 8, sedentary: 2, sitting: 2 },
-    5
+    5,
+    8
   );
   const vo2Max = numberValue(answers.vo2) ?? 0;
   const vo2 = vo2Thresholds(answers);
@@ -499,10 +524,10 @@ export function computeHealthScore(
           : vo2Max >= vo2.fair
             ? 2
             : 1
-      : 2;
+      : 4;
   const activityTotalPoints = Math.min(activityPoints + vo2Points, 20);
 
-  const dietPoints = optionScore(
+  const dietPoints = optionalOptionScore(
     dietValue(answers.diet),
     {
       balanced: 5,
@@ -515,22 +540,26 @@ export function computeHealthScore(
       western: 1,
       whole: 6
     },
-    3
+    3,
+    4
   );
-  const fishPoints = optionScore(
+  const fishPoints = optionalOptionScore(
     answers.fish ?? foodFrequency.fish,
     { "2-3pw": 4, daily: 4, never: 0, often: 4, once: 3, rare: 1, rarely: 1, weekly: 3 },
+    2,
     2
   );
-  const alcoholPoints = optionScore(
+  const alcoholPoints = optionalOptionScore(
     answers.alcohol,
     { "1-3": 2, "4-7": 1, "8+": 0, high: 0, low: 2, moderate: 1, none: 2 },
-    1
+    1,
+    1.5
   );
-  const proteinPoints = optionScore(
+  const proteinPoints = optionalOptionScore(
     answers.protein,
     { "1-1.5": 1, "1.5-2": 2, "2+": 2, good: 2, high: 2, low: 0, mid: 1, u1: 0 },
-    0
+    0,
+    1
   );
   const nutritionPoints = Math.min(
     dietPoints +
@@ -541,10 +570,11 @@ export function computeHealthScore(
     20
   );
 
-  const stressPoints = optionScore(
+  const stressPoints = optionalOptionScore(
     answers.stress,
     { "1": 12, "2": 10, "3": 7, "4": 4, "5": 1, extreme: 1, high: 4, low: 10, moderate: 7, verylow: 12 },
-    6
+    6,
+    9
   );
   const hrv = numberValue(answers.hrv) ?? numberValue(labs.hrv);
   const hrvPoints = hrv ? (hrv >= 70 ? 2 : hrv >= 50 ? 1 : hrv < 40 ? -1 : 0) : 0;
@@ -555,14 +585,16 @@ export function computeHealthScore(
   );
 
   const biomarkerPoints = Math.min(bmiPoints(answers) + labPoints(answers), 15);
-  const smokingPoints = optionScore(
+  const smokingPoints = optionalOptionScore(
     answers.smoking,
     { daily: 0, "ex5+": 5, ex5: 4, exlong: 5, exrecent: 4, never: 5, occasional: 2 },
+    3,
     3
   );
-  const energyPoints = optionScore(
+  const energyPoints = optionalOptionScore(
     answers.energy,
     { drained: 0, excellent: 1, good: 1, low: 0, ok: 0.5 },
+    0.5,
     0.5
   );
   const symptoms = arrayValue(answers.symptoms);

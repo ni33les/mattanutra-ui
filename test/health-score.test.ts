@@ -70,6 +70,23 @@ describe("HealthScore v3 deterministic scoring", () => {
     assert.equal(domainScore(ngMl, "biomarkers"), domainScore(nmolL, "biomarkers"));
   });
 
+  it("treats unanswered optional v3 fields as neutral unknowns", () => {
+    const sparse = computeHealthScore(
+      {
+        age: "36-45",
+        country: "TH",
+        sex: "male"
+      },
+      "en"
+    );
+
+    assert.ok(sparse.score >= 58);
+    assert.notEqual(sparse.band, "Needs Attention");
+    assert.ok(domainScore(sparse, "activity") >= 55);
+    assert.ok(domainScore(sparse, "biomarkers") >= 55);
+    assert.ok(domainScore(sparse, "nutrition") >= 55);
+  });
+
   it("scores the new v3 lifestyle fields across sleep, nutrition, stress, and habits", () => {
     const strong = computeHealthScore(
       {
