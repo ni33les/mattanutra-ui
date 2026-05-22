@@ -1047,6 +1047,8 @@ type ProcessingStatus = Readonly<{
 }>;
 
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
+const FOUNDATION_INTRO_DISPLAY_MS = 800;
+const FOUNDATION_INTRO_EXIT_MS = 200;
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
   const controller = new AbortController();
@@ -1136,7 +1138,7 @@ function SegmentIntro({
     <section
       aria-label={`${title} introduction`}
       className={cx(
-        "fixed inset-0 z-50 flex items-center justify-center bg-background px-6 py-16 text-center transition-all duration-700 ease-out sm:px-10",
+        "fixed inset-0 z-50 flex items-center justify-center bg-background px-6 py-16 text-center transition-all duration-200 ease-out sm:px-10",
         leaving
           ? "-translate-y-6 opacity-0"
           : "translate-y-0 opacity-100"
@@ -1297,7 +1299,9 @@ export function AssessmentFlow({
 }: AssessmentFlowProps) {
   const copy = copies[locale];
   const router = useRouter();
-  const showDevShortcut = process.env.NEXT_PUBLIC_SHOW_DEV_SHORTCUT === "true";
+  const showDevShortcut =
+    process.env.NODE_ENV !== "production" ||
+    process.env.NEXT_PUBLIC_SHOW_DEV_SHORTCUT === "true";
   const returningScoreStatus = returningPlanId && returningHealthScore
     ? buildReturningScoreGateStatus(returningPlanId, returningHealthScore)
     : null;
@@ -1368,7 +1372,10 @@ export function AssessmentFlow({
       return;
     }
 
-    const leaveTimer = window.setTimeout(() => setFoundationIntroPhase("leaving"), 3200);
+    const leaveTimer = window.setTimeout(
+      () => setFoundationIntroPhase("leaving"),
+      FOUNDATION_INTRO_DISPLAY_MS
+    );
 
     return () => {
       window.clearTimeout(leaveTimer);
@@ -1380,7 +1387,10 @@ export function AssessmentFlow({
       return;
     }
 
-    const doneTimer = window.setTimeout(() => setFoundationIntroPhase("done"), 650);
+    const doneTimer = window.setTimeout(
+      () => setFoundationIntroPhase("done"),
+      FOUNDATION_INTRO_EXIT_MS
+    );
 
     return () => window.clearTimeout(doneTimer);
   }, [foundationIntroPhase]);
@@ -2262,7 +2272,7 @@ export function AssessmentFlow({
                           className="mn-secondary-button mn-secondary-button--compact"
                           onClick={fillRandomDefaultsAndFinalStep}
                         >
-                          Random defaults
+                          Dev defaults
                         </button>
                       ) : null}
                     </div>
