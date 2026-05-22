@@ -1,6 +1,14 @@
 # MattaNutra Recommendations & Action Plan
 
-**Generated**: 2026-05-22  
+**Generated**: 2026-05-22 (updated after Sprint 1)
+
+**Sprint 1 Completed** (2026-05-22, commit f49e709 on `dev`):
+- 0 ESLint errors (fixed React hook violations + render mutation)
+- Dependencies pinned, 19 MB tailwind-examples bloat removed
+- OpenClaw `/messages` route stub added → admin-auth tests green
+- Large legacy dead-code prune in product-recommendations.ts
+- `docs/recommendations.md` created as living plan
+
 **Based on**: Project evaluation + `docs/codebase-cleanup-assessment.md` (2026-05-21) + `docs/todo.md` + static analysis (lint, tests, typecheck)
 
 ## Executive Summary

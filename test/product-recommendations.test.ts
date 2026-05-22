@@ -624,10 +624,10 @@ describe("product recommendation scoring v2 exact shortlist", () => {
       needs,
       stackPreference: "compact"
     });
-    const maxCoverage = recommendProductStackFullBeam({
+    const balanced = recommendProductStackFullBeam({
       candidates,
       needs,
-      stackPreference: "max_coverage"
+      stackPreference: "balanced"
     });
 
     assert.deepEqual(
@@ -635,10 +635,10 @@ describe("product recommendation scoring v2 exact shortlist", () => {
       ["near-complete-multi"]
     );
     assert.equal(compact.supplementProductCoveragePercent, 98);
-    assert.equal(maxCoverage.supplementProductCoveragePercent, 100);
-    assert.equal(maxCoverage.recommendations.length, 2);
+    assert.equal(balanced.supplementProductCoveragePercent, 100);
+    assert.equal(balanced.recommendations.length, 2);
     assert.equal(compact.diagnostics.stackPreference, "compact");
-    assert.equal(maxCoverage.diagnostics.stackPreference, "max_coverage");
+    assert.equal(balanced.diagnostics.stackPreference, "balanced");
   });
 
   it("lets compact mode trade some coverage for a smaller stack", () => {
@@ -667,10 +667,10 @@ describe("product recommendation scoring v2 exact shortlist", () => {
       needs,
       stackPreference: "compact"
     });
-    const maxCoverage = recommendProductStackFullBeam({
+    const balanced = recommendProductStackFullBeam({
       candidates,
       needs,
-      stackPreference: "max_coverage"
+      stackPreference: "balanced"
     });
 
     assert.deepEqual(
@@ -678,8 +678,8 @@ describe("product recommendation scoring v2 exact shortlist", () => {
       ["broad-multi"]
     );
     assert.equal(compact.supplementProductCoveragePercent, 67);
-    assert.equal(maxCoverage.supplementProductCoveragePercent, 100);
-    assert.equal(maxCoverage.recommendations.length, 3);
+    assert.equal(balanced.supplementProductCoveragePercent, 100);
+    assert.equal(balanced.recommendations.length, 3);
   });
 
   it("reports distinct alternative stack fingerprints", () => {

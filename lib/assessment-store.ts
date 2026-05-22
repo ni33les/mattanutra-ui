@@ -85,7 +85,7 @@ function asArray<T>(value: unknown): T[] {
 }
 
 function asProductStackPreference(value: unknown): ProductStackPreference | undefined {
-  return value === "compact" || value === "max_coverage" || value === "balanced"
+  return value === "compact" || value === "balanced"
     ? value
     : undefined;
 }
@@ -1472,7 +1472,7 @@ export async function getStoredFormulationResult(
           order by case latest_runs.stack_preference
             when 'compact' then 1
             when 'balanced' then 2
-            when 'max_coverage' then 3
+            when 'balanced' then 3
             else 4
           end
         ),

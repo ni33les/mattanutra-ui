@@ -40,6 +40,10 @@ import {
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import { createTask } from "@/lib/task-service";
 
+// Re-exports needed by the new module structure (temporary during stabilization)
+export { defaultProductCountryCode } from "@/lib/product-countries";
+export { isUuidValue } from "./admin-product-helpers"; // will move definition later if needed
+
 export type ProductAffiliateStatus = "active" | "flagged_stale" | "none";
 export type ProductLabelStatus = "failed" | "missing" | "parsed" | "stale";
 type ProductFactSupplementStatus = "active" | "blocked";
@@ -155,7 +159,7 @@ export type ProductImportRunRow = Readonly<{
   totalProducts: number;
 }>;
 
-type ProductDbRow = Readonly<{
+export type ProductDbRow = Readonly<{
   active_offer_id: string | null;
   active_offer_availability_status: ProductAvailabilityStatus | null;
   active_affiliate_commission_rate: string | number | null;
@@ -245,7 +249,7 @@ type ProductRecommendationDbRow = Readonly<{
   title_th: string | null;
 }>;
 
-type FactDbPayload = Readonly<{
+export type FactDbPayload = Readonly<{
   aliases?: string[] | null;
   amount?: number | string | null;
   confidence?: ProductConfidence | null;
@@ -1502,7 +1506,7 @@ function summaryFromRows(rows: AdminProductRow[]) {
   );
 }
 
-async function loadProductRows(productId?: string | null) {
+export async function loadProductRows(productId?: string | null) {
   const sql = getSql();
 
   if (!sql) {

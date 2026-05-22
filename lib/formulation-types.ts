@@ -177,7 +177,7 @@ export type NutritionReport = {
 };
 
 export type ProductRecommendationStatus = "failed" | "partial" | "pending" | "ready";
-export type ProductStackPreference = "balanced" | "compact" | "max_coverage";
+export type ProductStackPreference = "balanced" | "compact";
 
 export type ProductNeedCoverage = {
   bestRejectedProductId: string | null;
