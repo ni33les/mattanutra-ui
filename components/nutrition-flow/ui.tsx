@@ -194,8 +194,7 @@ export function SectionCard({
               {stepLabel}
             </p>
             {supportingNote ? (
-              <p className="mt-2 border-l-2 border-[#1FA77A]/40 pl-3 text-sm leading-6 text-muted-foreground lg:border-l-0 lg:border-r-2 lg:pl-0 lg:pr-3">
-                <span aria-hidden={true} className="mr-1 text-[#1FA77A]">“</span>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {supportingNote}
               </p>
             ) : null}

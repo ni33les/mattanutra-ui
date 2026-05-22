@@ -79,7 +79,6 @@ type Answers = {
   otherMed: string;
   otherTracker: string;
   protein: string;
-  reassessmentEmail: string;
   reproStatus: string;
   sex: string;
   skin: string;
@@ -123,12 +122,7 @@ type Copy = Readonly<{
     title: string;
     weight: string;
   };
-  badges: string[];
   coach: Record<string, string>;
-  common: {
-    optional: string;
-    required: string;
-  };
   daily: {
     activity: string;
     activityOptions: Option[];
@@ -152,9 +146,7 @@ type Copy = Readonly<{
     title: string;
   };
   fixedAction: {
-    complete: string;
     generate: string;
-    remaining: (count: number) => string;
   };
   food: {
     allergies: string;
@@ -177,11 +169,6 @@ type Copy = Readonly<{
     symptomHint: string;
     symptomOptions: Option[];
     symptoms: string;
-    title: string;
-  };
-  hero: {
-    description: string;
-    time: string;
     title: string;
   };
   precision: {
@@ -210,17 +197,6 @@ type Copy = Readonly<{
     vo2EstimateButton: string;
     vo2EstimateNeeds: string;
     vo2EstimateReady: (value: number) => string;
-  };
-  progress: {
-    complete: string;
-    label: string;
-    markEnd: string;
-    markMiddle: string;
-    markStart: string;
-    nearComplete: string;
-    optional: string;
-    partial: (progress: number) => string;
-    start: string;
   };
   safety: {
     antibiotics: string;
@@ -329,7 +305,6 @@ const initialAnswers: Answers = {
   otherMed: "",
   otherTracker: "",
   protein: "",
-  reassessmentEmail: "",
   reproStatus: "",
   sex: "",
   skin: "",
@@ -433,7 +408,6 @@ function buildRandomDevAnswers(): Answers {
     medTypes: ["statin"],
     menopause: sex === "female" ? randomItem(["pre", "peri", "post", "unsure"]) : "",
     protein: randomItem(["1-1.5", "1.5-2", "2+"]),
-    reassessmentEmail: "dev@example.dev",
     reproStatus: sex === "female" ? randomItem(["none", "ttc"]) : "",
     sex,
     skin: randomItem(["II", "III", "IV", "V"]),
@@ -517,7 +491,6 @@ const en: Copy = {
       { label: "Heavy", value: "heavy" }
     ]
   },
-  badges: ["V3 assessment", "Safety context captured", "AI powered"],
   coach: {
     allergies: "Food allergy context keeps the supplement brief practical without adding a free-text avoidance field.",
     foodFrequency: "Food frequency improves micronutrient gap estimates without adding food matching back into the active product engine.",
@@ -527,10 +500,6 @@ const en: Copy = {
     precision: "These optional fields move the last 20% of the precision meter.",
     sex: "Sex and reproductive context affect dose caution, iron logic, and product audience filtering.",
     sun: "Skin tone, sun, and sunscreen help estimate vitamin D context more honestly."
-  },
-  common: {
-    optional: "Optional",
-    required: "Required"
   },
   daily: {
     title: "Your daily life",
@@ -607,9 +576,7 @@ const en: Copy = {
     ]
   },
   fixedAction: {
-    complete: "Ready to generate.",
-    generate: "Generate my health score",
-    remaining: (count) => `${count} context point${count === 1 ? "" : "s"} not answered`
+    generate: "Generate my health score"
   },
   food: {
     title: "Food & nutrition",
@@ -719,11 +686,6 @@ const en: Copy = {
       { label: "Feeling great", value: "great" }
     ]
   },
-  hero: {
-    title: "Your Right Amount Assessment",
-    description: "Answer honestly. Your formula precision climbs as we capture the context that matters.",
-    time: "About 4 minutes"
-  },
   precision: {
     title: "Your preferences",
     subtitle: "Set practical constraints first, then add optional precision if you have it.",
@@ -785,17 +747,6 @@ const en: Copy = {
     labs: "Recent lab values",
     labsHint: "Only if you have them. Units matter.",
     labFields
-  },
-  progress: {
-    start: "Every answer sharpens your personalised formula. Let's begin.",
-    complete: "Formula precision complete",
-    label: "Formula precision",
-    markEnd: "Precision",
-    markMiddle: "Essentials",
-    markStart: "Start",
-    nearComplete: "Essentials complete. The optional precision tier can take you to 100%.",
-    optional: "Optional precision",
-    partial: (progress) => `You're at ${progress}% - keep going to complete the essentials.`
   },
   safety: {
     title: "Medications & safety",
@@ -896,7 +847,6 @@ const th: Copy = {
     menopause: "ช่วงวัยหมดประจำเดือน",
     flow: "ปริมาณประจำเดือน"
   },
-  badges: ["แบบประเมิน V3", "เก็บบริบทข้อควรระวัง", "ขับเคลื่อนด้วย AI"],
   coach: {
     allergies: "ข้อมูลแพ้อาหารช่วยให้คำแนะนำด้านอาหารเสริมเหมาะสมขึ้น โดยไม่ต้องกรอกข้อความเพิ่มเติม",
     foodFrequency: "ความถี่อาหารช่วยประเมินช่องว่างสารอาหาร โดยไม่เปิด food matching ในระบบผลิตภัณฑ์ตอนนี้",
@@ -907,30 +857,8 @@ const th: Copy = {
     sex: "เพศและบริบทการตั้งครรภ์มีผลต่อข้อควรระวัง ธาตุเหล็ก และการกรองสินค้า",
     sun: "สีผิว แดด และกันแดดช่วยประเมินบริบทวิตามินดีอย่างซื่อตรงขึ้น"
   },
-  common: {
-    optional: "ไม่บังคับ",
-    required: "จำเป็น"
-  },
   fixedAction: {
-    complete: "พร้อมสร้าง HealthScore",
-    generate: "สร้าง HealthScore ของฉัน",
-    remaining: (count) => `ยังไม่ได้ตอบข้อมูลบริบท ${count} ข้อ`
-  },
-  hero: {
-    title: "แบบประเมิน Right Amount ของคุณ",
-    description: "ตอบตามจริง ความแม่นยำของสูตรจะเพิ่มขึ้นเมื่อเราเก็บบริบทที่สำคัญครบขึ้น",
-    time: "ประมาณ 4 นาที"
-  },
-  progress: {
-    start: "ทุกคำตอบช่วยให้สูตรเฉพาะตัวแม่นยำขึ้น เริ่มได้เลย",
-    complete: "ความแม่นยำของสูตรครบแล้ว",
-    label: "ความแม่นยำของสูตร",
-    markEnd: "ความแม่นยำ",
-    markMiddle: "ข้อมูลหลัก",
-    markStart: "เริ่มต้น",
-    nearComplete: "ข้อมูลหลักครบแล้ว ข้อมูลเสริมจะช่วยเพิ่มความแม่นยำถึง 100%",
-    optional: "ข้อมูลเสริม",
-    partial: (progress) => `ตอนนี้อยู่ที่ ${progress}% - ตอบต่อเพื่อเติมข้อมูลหลักให้ครบ`
+    generate: "สร้าง HealthScore ของฉัน"
   },
   sectionNotes: [
     "ไม่มีคำตอบที่ถูกหรือผิด มีเพียงคำตอบที่ตรงกับความจริง ยิ่งตอบตรงกับตัวคุณมากเท่าไร สูตรก็จะยิ่งพอดีและเหมาะกับสิ่งที่คุณใช้อยู่แล้วมากขึ้น",
@@ -1052,61 +980,6 @@ function precisionProgress(answers: Answers) {
   };
 }
 
-function aboutComplete(answers: Answers) {
-  const baseComplete = [answers.sex, answers.age, answers.heightCm, answers.weightKg, answers.skin, answers.country, answers.sun].every(hasText);
-
-  if (!baseComplete) {
-    return false;
-  }
-
-  if (answers.sex !== "female") {
-    return true;
-  }
-
-  return hasText(answers.reproStatus);
-}
-
-function goalsComplete(answers: Answers) {
-  return hasAny(answers.goals) && hasAny(answers.symptoms);
-}
-
-function dailyComplete(answers: Answers) {
-  return [answers.sleepHrs, answers.activity, answers.digCondition, answers.smoking, answers.alcohol].every(hasText);
-}
-
-function foodComplete(answers: Answers) {
-  return (
-    hasText(answers.diet) &&
-    foodFrequencyKeys.every((key) => hasText(answers.foodFrequency[key])) &&
-    hasAny(answers.allergies) &&
-    answers.disclosure
-  );
-}
-
-function safetyComplete(answers: Answers) {
-  if (![answers.meds, answers.kidney, answers.liver, answers.surgery, answers.antibiotics, answers.supplements].every(hasText)) {
-    return false;
-  }
-
-  if (!hasAny(answers.suppAllergies)) {
-    return false;
-  }
-
-  if (answers.meds === "yes" && !hasAny(answers.medTypes)) {
-    return false;
-  }
-
-  if (answers.meds === "yes" && selectedOther(answers.medTypes) && !hasText(answers.otherMed)) {
-    return false;
-  }
-
-  return true;
-}
-
-function precisionRequiredComplete(answers: Answers) {
-  return [answers.budget, answers.maxPills].every(hasText);
-}
-
 function formatHeightImperial(value: string) {
   const cm = Number(value);
 
@@ -1145,7 +1018,6 @@ type AssessmentQuestion = Readonly<{
   id: string;
   isAnswered: boolean;
   label: string;
-  required?: boolean;
   why?: string;
 }>;
 
@@ -1394,7 +1266,7 @@ export function AssessmentFlow({
 }: AssessmentFlowProps) {
   const copy = copies[locale];
   const router = useRouter();
-  const showDevShortcut = process.env.NEXT_PUBLIC_SHOW_DEV_SHORTCUT !== "false";
+  const showDevShortcut = process.env.NEXT_PUBLIC_SHOW_DEV_SHORTCUT === "true";
   const returningScoreStatus = returningPlanId && returningHealthScore
     ? buildReturningScoreGateStatus(returningPlanId, returningHealthScore)
     : null;
@@ -1452,7 +1324,6 @@ export function AssessmentFlow({
         back: "ย้อนกลับ",
         continue: "ต่อไป",
         infoLabel: "Note",
-        optionalSection: "ความแม่นยำ",
         processingError: "ไม่สามารถเริ่มการประมวลผลได้ โปรดลองอีกครั้ง",
         scoreProcessingSubtitle: "เรากำลังประเมินภาพรวมสุขภาพจากคำตอบของคุณ",
         scoreProcessingTitle: "กำลังเตรียม HealthScore ของคุณ",
@@ -1461,17 +1332,12 @@ export function AssessmentFlow({
           title: "HealthScore ของคุณพร้อมแล้ว"
         },
         retry: "ลองอีกครั้ง",
-        requiredSection: "บริบท",
-        section: (current: number, total: number) => `ขั้นตอน ${current} / ${total}`,
-        step: (current: number, total: number) => `คำถามที่ ${current} จาก ${total}`,
-        validation: "",
-        wellnessDisclaimer: "แบบประเมินนี้เป็นข้อมูลเพื่อ wellness เท่านั้น ไม่ใช่การวินิจฉัย การรักษา หรือคำแนะนำให้หยุดยา"
+        section: (current: number, total: number) => `ขั้นตอน ${current} / ${total}`
       }
     : {
         back: "Back",
         continue: "Continue",
         infoLabel: "Note",
-        optionalSection: "Precision",
         processingError: "We could not start processing. Please try again.",
         scoreProcessingSubtitle: "We are scoring your main wellness domains from your answers.",
         scoreProcessingTitle: "Preparing your HealthScore",
@@ -1480,11 +1346,7 @@ export function AssessmentFlow({
           title: "Your HealthScore is ready"
         },
         retry: "Try again",
-        requiredSection: "Context",
-        section: (current: number, total: number) => `Step ${current} / ${total}`,
-        step: (current: number, total: number) => `Question ${current} of ${total}`,
-        validation: "",
-        wellnessDisclaimer: "This assessment provides wellness information only. It is not diagnosis, treatment, or advice to stop medication."
+        section: (current: number, total: number) => `Step ${current} / ${total}`
       };
 
   function setSingle(key: keyof Answers, value: string) {
@@ -1557,9 +1419,8 @@ export function AssessmentFlow({
     }));
   }
 
-  const rawSections: AssessmentSection[] = [
+  const rawSections: Array<Omit<AssessmentSection, "complete">> = [
     {
-      complete: aboutComplete(answers),
       description: copy.about.subtitle,
       id: "about",
       questions: [
@@ -1774,7 +1635,6 @@ export function AssessmentFlow({
       title: copy.about.title
     },
     {
-      complete: goalsComplete(answers),
       description: copy.goals.subtitle,
       id: "goals",
       questions: [
@@ -1810,7 +1670,6 @@ export function AssessmentFlow({
       title: copy.goals.title
     },
     {
-      complete: dailyComplete(answers),
       description: copy.daily.subtitle,
       id: "daily",
       questions: [
@@ -1872,7 +1731,6 @@ export function AssessmentFlow({
       title: copy.daily.title
     },
     {
-      complete: foodComplete(answers),
       description: copy.food.subtitle,
       id: "food",
       questions: [
@@ -1936,7 +1794,6 @@ export function AssessmentFlow({
       title: copy.food.title
     },
     {
-      complete: safetyComplete(answers),
       description: copy.safety.subtitle,
       id: "safety",
       questions: [
@@ -2006,7 +1863,6 @@ export function AssessmentFlow({
       title: copy.safety.title
     },
     {
-      complete: precisionRequiredComplete(answers),
       description: copy.precision.subtitle,
       id: "precision",
       questions: [
@@ -2115,15 +1971,6 @@ export function AssessmentFlow({
                   ))}
                 </div>
               </Question>
-              <label className="block">
-                <span className="text-sm font-semibold text-[#20343A]">{locale === "th" ? "อีเมลสำหรับประเมินซ้ำ" : "Reassessment email"}</span>
-                <input
-                  className={textInputClasses()}
-                  type="email"
-                  value={answers.reassessmentEmail}
-                  onChange={(event) => setSingle("reassessmentEmail", event.target.value)}
-                />
-              </label>
             </div>
           ),
           id: "optional-precision",
@@ -2138,11 +1985,7 @@ export function AssessmentFlow({
 
   const sections: AssessmentSection[] = rawSections.map((section) => ({
     ...section,
-    complete: section.questions.some((question) => question.isAnswered),
-    questions: section.questions.map((question) => ({
-      ...question,
-      required: false
-    }))
+    complete: section.questions.some((question) => question.isAnswered)
   }));
 
 
@@ -2162,10 +2005,6 @@ export function AssessmentFlow({
   const isFinalStep = sectionIndex === sections.length - 1;
   const disclosureRequiredForAction = ["food", "safety", "precision"].includes(currentSection.id);
   const primaryActionDisabled = disclosureRequiredForAction && !answers.disclosure;
-
-  function sectionIsComplete(section: AssessmentSection) {
-    return section.questions.some((question) => question.isAnswered);
-  }
 
   function goBack() {
     setProcessingError("");
@@ -2301,8 +2140,7 @@ export function AssessmentFlow({
   }
 
   return (
-    <>
-      <div className="mx-auto w-full max-w-6xl px-6 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-10 sm:px-8 sm:pb-16 lg:pt-14">
+    <main className="mx-auto w-full max-w-6xl px-6 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-10 sm:px-8 sm:pb-16 lg:pt-14">
         {processingStatus ? (
           <ProcessingPanel
             error={
@@ -2335,7 +2173,7 @@ export function AssessmentFlow({
 
             <SectionCard
               description={currentSection.description}
-              done={sectionIsComplete(currentSection)}
+              done={currentSection.complete}
               footer={
                 <div className="space-y-4">
                   <PrecisionGauge labels={gaugeLabels} progress={precision.progress} />
@@ -2399,8 +2237,7 @@ export function AssessmentFlow({
             ) : null}
           </div>
         )}
-      </div>
-    </>
+    </main>
   );
 }
 
