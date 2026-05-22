@@ -17,7 +17,7 @@ import {
   cardOptionClasses,
   cx
 } from "@/components/nutrition-flow/ui";
-import { HealthScorePanel } from "@/components/nutrition-flow/healthscore-panel";
+import { HealthScorePaymentPanel } from "@/components/nutrition-flow/healthscore-panel";
 import { getBpmPayload, trackBpmEvent } from "@/lib/bpm-client";
 import type { HealthScoreResult } from "@/lib/health-score";
 import type { Locale } from "@/lib/i18n";
@@ -2230,7 +2230,7 @@ export function AssessmentFlow({
 	          <HealthScoreOnlyPanel
 	            healthScore={healthScore}
 	            locale={locale}
-	            scoreContent={ui.scoreGate}
+	            planId={capturedStatus?.planId ?? returningPlanId ?? undefined}
 	          />
 	        ) : foundationIntroActive ? (
 	          <SegmentIntro
@@ -2332,29 +2332,19 @@ export function AssessmentFlow({
 function HealthScoreOnlyPanel({
   healthScore,
   locale,
-  scoreContent
+  planId
 }: Readonly<{
   healthScore: HealthScoreResult | null;
   locale: Locale;
-  scoreContent: {
-    planDescription: string;
-    title: string;
-  };
+  planId?: string;
 }>) {
-  return (
-    <section className="rounded-lg bg-[var(--mn-paper)] px-6 py-10 ring-1 ring-foreground/10 sm:px-8">
-      <div className="text-center">
-        <h1 className="text-3xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance sm:text-4xl">
-          {scoreContent.title}
-        </h1>
-        <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
-          {scoreContent.planDescription}
-        </p>
-      </div>
+  if (!healthScore) return null;
 
-      {healthScore ? (
-        <HealthScorePanel locale={locale} result={healthScore} />
-      ) : null}
-    </section>
+  return (
+    <HealthScorePaymentPanel
+      locale={locale}
+      planId={planId}
+      result={healthScore}
+    />
   );
 }

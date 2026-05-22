@@ -4,6 +4,7 @@ import {
   isAssessmentPlan
 } from "@/lib/assessment-snapshot";
 import {
+  getStoredAssessmentPrefill,
   getStoredAssessmentSnapshot,
   isUuid,
   persistAssessmentSubmission
@@ -11,6 +12,7 @@ import {
 import { computeHealthScore } from "@/lib/health-score";
 import {
   enqueueDueScheduledActions,
+  enqueueNutritionPlanTasks,
   scheduleReassessmentAction
 } from "@/lib/task-worker";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
@@ -141,6 +143,9 @@ export async function PATCH(
 
   try {
     const existingSnapshot = await getStoredAssessmentSnapshot(planId);
+    const existingPrefill = await getStoredAssessmentPrefill(planId);
+    const effectiveAnswers =
+      body.answers === undefined ? existingPrefill?.answers : body.answers;
     const selectedPlan =
       intent === "process" && isAssessmentPlan(body.plan)
         ? body.plan
@@ -148,7 +153,7 @@ export async function PATCH(
     const healthScore =
       intent === "process" && existingSnapshot?.healthScore
         ? existingSnapshot.healthScore
-        : buildHealthScore(body.answers, body.locale);
+        : buildHealthScore(effectiveAnswers, body.locale);
     const snapshot = createAssessmentSnapshot({
       healthScore,
       plan: selectedPlan ?? existingSnapshot?.plan,
@@ -158,7 +163,7 @@ export async function PATCH(
     });
 
     await persistAssessmentSubmission({
-      answers: body.answers,
+      answers: effectiveAnswers,
       locale: body.locale,
       selectedPlan,
       snapshot,
@@ -223,6 +228,13 @@ export async function PATCH(
       ray: typeof bpm.ray === "string" ? bpm.ray : null,
       selectedPlan,
       ...healthScoreBpmFields(snapshot)
+    });
+
+    await enqueueNutritionPlanTasks({
+      answers: effectiveAnswers,
+      locale: body.locale,
+      plan: selectedPlan,
+      planId: snapshot.planId
     });
 
     const storedSnapshot = await getStoredAssessmentSnapshot(snapshot.planId);

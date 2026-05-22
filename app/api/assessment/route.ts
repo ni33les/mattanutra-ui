@@ -6,11 +6,13 @@ import {
   type AssessmentPlan
 } from "@/lib/assessment-snapshot";
 import {
+  getStoredAssessmentSnapshot,
   persistAssessmentSubmission
 } from "@/lib/assessment-store";
 import { computeHealthScore } from "@/lib/health-score";
 import {
   enqueueDueScheduledActions,
+  enqueueNutritionPlanTasks,
   scheduleReassessmentAction
 } from "@/lib/task-worker";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
@@ -154,6 +156,13 @@ export async function POST(request: Request) {
         selectedPlan,
         ...healthScoreBpmFields(snapshot)
       });
+
+      await enqueueNutritionPlanTasks({
+        answers: body.answers,
+        locale: body.locale,
+        plan: selectedPlan,
+        planId: snapshot.planId
+      });
     }
   } catch (error) {
     console.error("Unable to persist assessment submission", error);
@@ -181,7 +190,9 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json(snapshot, {
+  const storedSnapshot = await getStoredAssessmentSnapshot(snapshot.planId);
+
+  return NextResponse.json(storedSnapshot ?? snapshot, {
     headers: {
       "Cache-Control": "no-store"
     }

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowPathIcon,
   BeakerIcon,
   ExclamationTriangleIcon,
   HeartIcon,
@@ -641,9 +640,6 @@ export function FormulationResults({
   const orderedIngredients = [...result.supplementBreakdown].sort(
     (first, second) => first.effectivenessRank - second.effectivenessRank
   );
-  const orderedFoods = [...(result.foodGuidance ?? [])].sort(
-    (first, second) => first.effectivenessRank - second.effectivenessRank
-  );
   const formattedDate = new Intl.DateTimeFormat(
     locale === "th" ? "th-TH" : "en-GB",
     {
@@ -652,10 +648,9 @@ export function FormulationResults({
     }
   ).format(new Date(result.generatedAt));
   const effectiveResultPlanId = result.planId || effectivePlanId;
-  const hasPendingSafetyReview = pendingReviewCount(result) > 0;
   const isPreview = result.access === "preview";
   const sectionStatuses = result.sectionStatuses ?? {
-    foods: orderedFoods.length > 0 ? "ready" : "pending",
+    foods: (result.foodGuidance ?? []).length > 0 ? "ready" : "pending",
     supplements: orderedIngredients.length > 0 ? "ready" : "pending"
   };
   const nutritionPending =
@@ -665,7 +660,6 @@ export function FormulationResults({
     0,
     Number(result.lockedSupplementCount ?? 0)
   );
-  const lockedFoodCount = Math.max(0, Number(result.lockedFoodCount ?? 0));
   const unlockHref = planPaywallHref(locale, effectiveResultPlanId);
   const productRecommendationOptions = productRecommendationOptionsForResult(result);
   const selectedProductRecommendationOption = selectProductRecommendationOption(
@@ -691,160 +685,26 @@ export function FormulationResults({
   }
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
-      <NutritionProgress
-        className="mb-8"
-        current="refine"
-        locale={locale}
-      />
-
-      <div className="mn-formulation-hero-card p-6 sm:p-8 lg:p-10">
-        <div
-          aria-hidden={true}
-          className="mn-formulation-hero-background absolute inset-0 bg-cover opacity-36"
-        />
-        <div
-          aria-hidden={true}
-          className="mn-formulation-hero-wash"
-        />
-        <div
-          aria-hidden={true}
-          className="mn-formulation-hero-bottom-wash"
-        />
-        <div className="relative grid gap-8 lg:grid-cols-[1fr_20rem] lg:items-center">
-          <div>
-            <SparklesIcon
-              aria-hidden={true}
-              className="size-12 text-[var(--mn-gold)]"
-            />
-            <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance sm:text-5xl">
-              {labels.heroTitle}
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-              {labels.heroSubtitle}
-            </p>
-          </div>
-
-          <div className="rounded-lg bg-background/90 p-5 shadow-sm ring-1 ring-foreground/10 backdrop-blur-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--mn-ink)]">
-              {labels.context}
-            </p>
-            <dl className="mt-4 space-y-4 text-sm">
-              <ContextItem
-                label={labels.plan}
-                value={result.assessmentSummary.plan}
-              />
-              <ContextItem
-                label={labels.profile}
-                value={result.assessmentSummary.profile}
-              />
-              <ContextItem
-                label={labels.region}
-                value={result.assessmentSummary.region}
-              />
-              <ContextChips
-                label={labels.goals}
-                values={result.assessmentSummary.goals}
-              />
-              <ContextChips
-                label={labels.constraints}
-                values={result.assessmentSummary.constraints}
-              />
-            </dl>
-          </div>
-        </div>
-
-        <div className="relative mt-8 border-t border-foreground/10 pt-5 text-xs font-normal leading-5 text-muted-foreground">
-          <p>
-            {labels.generated}: {formattedDate}
-          </p>
-          <p className="mt-1">
-            {labels.plan}:{" "}
-            <a
-              className="font-semibold text-[var(--mn-gold)] hover:text-[var(--mn-teal-deep)]"
-              href={planResultsHref(locale, effectiveResultPlanId)}
-            >
-              {effectiveResultPlanId}
-            </a>
-          </p>
-        </div>
-      </div>
-
-      {isPreview ? (
-        <PreviewPaywallPanel
-          labels={labels}
-          unlockHref={unlockHref}
-        />
-      ) : null}
-
-      {result.cautions?.length ? (
-        <CautionsPanel
-          cautions={result.cautions}
-          labels={labels}
-          locale={locale}
-        />
-      ) : null}
-
-      <div className={`mt-8 grid gap-8 ${FOOD_GUIDANCE_VISIBLE ? "lg:grid-cols-2" : ""}`}>
-        {FOOD_GUIDANCE_VISIBLE ? (
-          <FoodGuidancePanel
-            foods={orderedFoods}
-            hasPendingSafetyReview={hasPendingSafetyReview}
-            isPending={sectionStatuses.foods !== "ready"}
-            labels={labels}
-            lockedFoodCount={lockedFoodCount}
-            locale={locale}
-            unlockHref={unlockHref}
-          />
-        ) : null}
-
-        <FormulaPanel
-          hasPendingSafetyReview={hasPendingSafetyReview}
-          ingredients={orderedIngredients}
-          isPending={sectionStatuses.supplements !== "ready"}
-          labels={labels}
-          lockedSupplementCount={lockedSupplementCount}
-          locale={locale}
-          productCoverageBySupplementId={productCoverageBySupplementId}
-          unlockHref={unlockHref}
-        />
-      </div>
-
-      {isPreview ? null : (
-        <ProductRecommendationsPanel
-          locale={locale}
-          onRefreshRequested={() => setRefreshNonce((value) => value + 1)}
-          onStackPreferenceChange={setSelectedProductStackPreference}
-          planId={effectiveResultPlanId}
-          productRecommendationOptions={productRecommendationOptions}
-          productRecommendations={activeProductRecommendations}
-          recommendations={activeProductRecommendationItems}
-          selectedStackPreference={
-            selectedProductRecommendationOption?.id ??
-            selectedProductStackPreference
-          }
-        />
-      )}
-
-      <div className="mt-8 rounded-lg bg-[var(--mn-ink)] p-6 text-sm leading-6 text-white/75">
-        <div className="flex gap-3">
-          <InformationCircleIcon
-            aria-hidden={true}
-            className="mt-0.5 size-5 flex-none text-white"
-          />
-          <div>
-            <p className="font-semibold uppercase tracking-[0.12em] text-white">
-              {labels.safety}
-            </p>
-            <ul className="mt-3 space-y-2">
-              {labels.safetyNotes.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
+    <RevealResultsPage
+      activeProductRecommendations={activeProductRecommendations}
+      formattedDate={formattedDate}
+      ingredients={orderedIngredients}
+      isPreview={isPreview}
+      labels={labels}
+      locale={locale}
+      lockedSupplementCount={lockedSupplementCount}
+      onProductStackPreferenceChange={setSelectedProductStackPreference}
+      planId={effectiveResultPlanId}
+      productCoverageBySupplementId={productCoverageBySupplementId}
+      productRecommendationOptions={productRecommendationOptions}
+      products={activeProductRecommendationItems}
+      result={result}
+      selectedProductStackPreference={
+        selectedProductRecommendationOption?.id ??
+        selectedProductStackPreference
+      }
+      unlockHref={unlockHref}
+    />
   );
 }
 
@@ -913,6 +773,667 @@ function NutritionGuidancePreparingPanel({
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
           {labels.nutritionProgressBody}
         </p>
+      </div>
+    </section>
+  );
+}
+
+const revealCopy = {
+  en: {
+    evaluated: "evaluated",
+    formulaEyebrow: "Your formula",
+    formulaLead:
+      "These are the supplement priorities selected from your answers, cautions and product coverage.",
+    formulaTitle: "The exact stack selected for you.",
+    heroEyebrow: "Your Right Amount",
+    heroTitle: "Your Right Amount",
+    heroHeadline:
+      "Your plan has been distilled into the few things most likely to matter.",
+    heroMetaGenerated: "Generated",
+    heroMetaPlan: "Plan ID",
+    heroSub:
+      "We have turned your assessment into a practical formula and matched it to available products where the catalogue can support it.",
+    personalizationBody:
+      "Your result is shaped by your profile, goals, country, budget, preferences and cautions. These signals explain why this is not a generic supplement list.",
+    personalizationTitle: "We built this around your context.",
+    productsBody:
+      "Products are shown as the closest available stack from the approved catalogue. The goal is fewer bottles, clear coverage and no unnecessary overlap.",
+    productsEmpty:
+      "The formula is ready, but the product catalogue does not yet contain an approved stack for these needs.",
+    productsTitle: "From shelves to certainty.",
+    selected: "selected",
+    selectedProducts: "Selected products",
+    tableAmount: "Daily amount",
+    tableCoverage: "Product fit",
+    tableName: "Supplement",
+    tableReason: "Why it is here",
+    viewProduct: "View product",
+    cautionsTitle: "Cautions checked",
+    closingTitle: "The wisdom of knowing the right amount",
+    closingBody:
+      "Not from more, but from exactly enough. This formula is the practical version of that idea: the right priorities, in the right amounts, with product choices where the data is strong enough.",
+    print: "Print or save PDF",
+    save: "Open this plan",
+    reassess: "Reassess later",
+    wellnessOnly:
+      "Wellness information only. Share this plan with a physician or pharmacist if you use medication, are pregnant or breastfeeding, have a medical condition, or your situation changes."
+  },
+  th: {
+    evaluated: "รายการที่ประเมิน",
+    formulaEyebrow: "สูตรของคุณ",
+    formulaLead:
+      "นี่คือลำดับความสำคัญของอาหารเสริมที่เลือกจากคำตอบ ข้อควรระวัง และความครอบคลุมของผลิตภัณฑ์",
+    formulaTitle: "ชุดอาหารเสริมที่เลือกให้คุณ",
+    heroEyebrow: "Right Amount ของคุณ",
+    heroTitle: "Right Amount ของคุณ",
+    heroHeadline: "แผนของคุณถูกกลั่นให้เหลือสิ่งที่น่าจะสำคัญที่สุด",
+    heroMetaGenerated: "สร้างเมื่อ",
+    heroMetaPlan: "รหัสแผน",
+    heroSub:
+      "เราแปลงแบบประเมินของคุณเป็นสูตรที่ใช้งานได้จริง และจับคู่กับผลิตภัณฑ์ที่มีข้อมูลเพียงพอในแคตตาล็อก",
+    personalizationBody:
+      "ผลลัพธ์นี้ใช้โปรไฟล์ เป้าหมาย ประเทศ งบประมาณ ความชอบ และข้อควรระวังของคุณ จึงไม่ใช่รายการอาหารเสริมทั่วไป",
+    personalizationTitle: "เราสร้างแผนจากบริบทของคุณ",
+    productsBody:
+      "ผลิตภัณฑ์ที่แสดงคือชุดที่ใกล้ที่สุดจากแคตตาล็อกที่อนุมัติแล้ว เป้าหมายคือขวดน้อยลง ความครอบคลุมชัดเจน และไม่ซ้ำซ้อนเกินจำเป็น",
+    productsEmpty:
+      "สูตรพร้อมแล้ว แต่แคตตาล็อกยังไม่มีชุดผลิตภัณฑ์ที่อนุมัติสำหรับความต้องการนี้",
+    productsTitle: "จากชั้นวางสู่ความชัดเจน",
+    selected: "รายการที่เลือก",
+    selectedProducts: "ผลิตภัณฑ์ที่เลือก",
+    tableAmount: "ปริมาณต่อวัน",
+    tableCoverage: "ความพอดีของสินค้า",
+    tableName: "อาหารเสริม",
+    tableReason: "เหตุผลที่อยู่ในแผน",
+    viewProduct: "ดูสินค้า",
+    cautionsTitle: "ตรวจข้อควรระวังแล้ว",
+    closingTitle: "ปัญญาแห่งการรู้ปริมาณที่พอดี",
+    closingBody:
+      "ไม่ใช่จากการเพิ่มให้มากขึ้น แต่จากการเลือกให้พอดี สูตรนี้คือการนำแนวคิดนั้นมาใช้จริง: ลำดับที่ถูกต้อง ปริมาณที่เหมาะ และผลิตภัณฑ์ที่ข้อมูลแข็งแรงพอ",
+    print: "พิมพ์หรือบันทึก PDF",
+    save: "เปิดแผนนี้",
+    reassess: "ประเมินใหม่ภายหลัง",
+    wellnessOnly:
+      "ข้อมูลเพื่อสุขภาวะเท่านั้น โปรดแบ่งปันแผนนี้กับแพทย์หรือเภสัชกรหากคุณใช้ยา ตั้งครรภ์ ให้นมบุตร มีโรคประจำตัว หรือสถานการณ์เปลี่ยนแปลง"
+  }
+} satisfies Record<Locale, Record<string, string>>;
+
+function visibleFormulaIngredients(ingredients: FormulationIngredient[]) {
+  return ingredients.filter((ingredient) => ingredient.safety?.visibility !== "hidden");
+}
+
+function groupedFormulaIngredients(ingredients: FormulationIngredient[]) {
+  const groups = new Map<string, FormulationIngredient[]>();
+
+  for (const ingredient of ingredients) {
+    const key = ingredient.category || "Core";
+    groups.set(key, [...(groups.get(key) ?? []), ingredient]);
+  }
+
+  return [...groups.entries()];
+}
+
+function revealContextChips(result: FormulationResult) {
+  return [
+    { kind: "profile", value: result.assessmentSummary.profile },
+    { kind: "profile", value: result.assessmentSummary.region },
+    { kind: "profile", value: result.assessmentSummary.plan },
+    ...result.assessmentSummary.goals.map((value) => ({ kind: "goal", value })),
+    ...result.assessmentSummary.constraints.map((value) => ({
+      kind: "constraint",
+      value
+    }))
+  ].filter((chip) => chip.value);
+}
+
+function productCoveredNeedCount(products: RecommendedProduct[]) {
+  return new Set(products.flatMap((product) => product.covers)).size;
+}
+
+function selectedStackCoverage(
+  productRecommendations: FormulationResult["productRecommendations"] | undefined,
+  products: RecommendedProduct[]
+) {
+  return Math.max(
+    0,
+    Math.round(
+      productRecommendations?.stackCoveragePercent ??
+        Math.max(0, ...products.map((product) => product.stackCoveragePercent ?? 0))
+    )
+  );
+}
+
+function RevealResultsPage({
+  activeProductRecommendations,
+  formattedDate,
+  ingredients,
+  isPreview,
+  labels,
+  locale,
+  lockedSupplementCount,
+  onProductStackPreferenceChange,
+  planId,
+  productCoverageBySupplementId,
+  productRecommendationOptions,
+  products,
+  result,
+  selectedProductStackPreference,
+  unlockHref
+}: Readonly<{
+  activeProductRecommendations?: FormulationResult["productRecommendations"];
+  formattedDate: string;
+  ingredients: FormulationIngredient[];
+  isPreview: boolean;
+  labels: PanelLabels;
+  locale: Locale;
+  lockedSupplementCount: number;
+  onProductStackPreferenceChange: (preference: ProductStackPreference) => void;
+  planId: string;
+  productCoverageBySupplementId: ReadonlyMap<string, number>;
+  productRecommendationOptions: ProductRecommendationOption[];
+  products: RecommendedProduct[];
+  result: FormulationResult;
+  selectedProductStackPreference?: ProductStackPreference | null;
+  unlockHref: string;
+}>) {
+  const copy = revealCopy[locale];
+  const visibleIngredients = visibleFormulaIngredients(ingredients);
+  const selectedCount = visibleIngredients.length;
+  const evaluatedCount = Math.max(
+    selectedCount,
+    Number(result.totalSupplementCount ?? selectedCount)
+  );
+  const selectedCoverage = selectedStackCoverage(activeProductRecommendations, products);
+  const productNeedCount = productCoveredNeedCount(products);
+  const productOptions = productStackPreferenceOrder.flatMap((preference) => {
+    const option = productRecommendationOptions.find((item) => item.id === preference);
+
+    return option ? [option] : [];
+  });
+
+  return (
+    <section className="w-full">
+      <section className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-6xl flex-col items-center justify-center px-6 py-20 text-center sm:px-8">
+        <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.24em] text-[var(--mn-teal-deep)]">
+          {copy.heroEyebrow}
+        </p>
+        <p className="mt-8 font-serif text-2xl italic leading-8 text-[var(--mn-ink-soft)]">
+          {result.assessmentSummary.profile}
+        </p>
+        <h1 className="mt-3 max-w-4xl font-serif text-6xl font-medium leading-none tracking-normal text-[var(--mn-teal-deep)] text-balance sm:text-7xl lg:text-8xl">
+          {copy.heroTitle}
+        </h1>
+        <p className="mt-8 max-w-3xl font-serif text-3xl font-medium leading-tight text-[var(--mn-ink)] text-balance sm:text-4xl">
+          {copy.heroHeadline}
+        </p>
+        <p className="mt-6 max-w-2xl text-base leading-7 text-[var(--mn-ink-soft)]">
+          {copy.heroSub}
+        </p>
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-3 rounded-full bg-[var(--mn-paper)] px-5 py-3 text-xs text-[var(--mn-ash)] ring-1 ring-[var(--mn-line)]">
+          <span>{copy.heroMetaPlan}: {planId}</span>
+          <span aria-hidden={true} className="h-3 w-px bg-[var(--mn-line)]" />
+          <span>{copy.heroMetaGenerated}: {formattedDate}</span>
+        </div>
+      </section>
+
+      <section className="border-y border-[var(--mn-line)] py-16">
+        <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 sm:px-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
+          <div>
+            <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
+              01 · Personalisation
+            </p>
+            <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
+              {copy.personalizationTitle}
+            </h2>
+          </div>
+          <p className="text-base leading-8 text-[var(--mn-ink-soft)]">
+            {copy.personalizationBody}
+          </p>
+          <div className="lg:col-span-2">
+            <div className="flex flex-wrap gap-2">
+              {revealContextChips(result).map((chip) => (
+                <span
+                  className={`rounded-full px-4 py-2 text-sm font-semibold ring-1 ${
+                    chip.kind === "goal"
+                      ? "bg-white text-[var(--mn-teal-deep)] ring-[var(--mn-teal)]"
+                      : chip.kind === "constraint"
+                        ? "bg-[var(--mn-gold-tint)] text-[#6d5427] ring-transparent"
+                        : "bg-[var(--mn-mint)] text-[var(--mn-ink)] ring-transparent"
+                  }`}
+                  key={`${chip.kind}:${chip.value}`}
+                >
+                  {chip.value}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 text-center">
+        <div className="mx-auto max-w-5xl px-6 sm:px-8">
+          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
+            02 · Distilled
+          </p>
+          <h2 className="mx-auto mt-6 max-w-3xl font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
+            From broad possibility to a focused formula.
+          </h2>
+          <div className="mt-12 flex flex-col items-center justify-center gap-8 sm:flex-row sm:gap-14">
+            <div>
+              <div className="font-serif text-8xl font-light leading-none text-[var(--mn-ash-soft)] sm:text-9xl">
+                {evaluatedCount}
+              </div>
+              <p className="mn-mono-label mt-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-ash)]">
+                {copy.evaluated}
+              </p>
+            </div>
+            <div className="font-serif text-5xl italic text-[var(--mn-gold)]">
+              →
+            </div>
+            <div>
+              <div className="font-serif text-8xl font-light leading-none text-[var(--mn-teal-deep)] sm:text-9xl">
+                {selectedCount}
+              </div>
+              <p className="mn-mono-label mt-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-ink-soft)]">
+                {copy.selected}
+              </p>
+            </div>
+          </div>
+          <p className="mx-auto mt-8 max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]">
+            {selectedCount} selected recommendations, {lockedSupplementCount} held back or locked, and no food items included in the active product engine.
+          </p>
+        </div>
+      </section>
+
+      {isPreview ? (
+        <div className="mx-auto w-full max-w-6xl px-6 sm:px-8">
+          <PreviewPaywallPanel labels={labels} unlockHref={unlockHref} />
+        </div>
+      ) : null}
+
+      <RevealFormulaSection
+        copy={copy}
+        ingredients={visibleIngredients}
+        locale={locale}
+        productCoverageBySupplementId={productCoverageBySupplementId}
+      />
+
+      <RevealProductsSection
+        copy={copy}
+        locale={locale}
+        onProductStackPreferenceChange={onProductStackPreferenceChange}
+        planId={planId}
+        productNeedCount={productNeedCount}
+        productOptions={productOptions}
+        products={products}
+        selectedCoverage={selectedCoverage}
+        selectedProductStackPreference={selectedProductStackPreference}
+      />
+
+      <RevealClosingSection
+        copy={copy}
+        labels={labels}
+        locale={locale}
+        planId={planId}
+        result={result}
+      />
+    </section>
+  );
+}
+
+function RevealFormulaSection({
+  copy,
+  ingredients,
+  locale,
+  productCoverageBySupplementId
+}: Readonly<{
+  copy: typeof revealCopy.en;
+  ingredients: FormulationIngredient[];
+  locale: Locale;
+  productCoverageBySupplementId: ReadonlyMap<string, number>;
+}>) {
+  let rowNumber = 0;
+
+  return (
+    <section className="border-t border-[var(--mn-line)] py-20" id="formula">
+      <div className="mx-auto w-full max-w-6xl px-6 sm:px-8">
+        <div className="grid gap-8 lg:grid-cols-2 lg:items-end">
+          <div>
+            <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
+              03 · {copy.formulaEyebrow}
+            </p>
+            <h2 className="mt-4 font-serif text-5xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
+              {copy.formulaTitle}
+            </h2>
+          </div>
+          <p className="text-base leading-8 text-[var(--mn-ink-soft)]">
+            {copy.formulaLead}
+          </p>
+        </div>
+
+        <div className="mt-10 rounded-lg bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:p-8">
+          <div className="hidden grid-cols-[3rem_1.2fr_2fr_0.9fr_0.8fr] gap-5 border-b border-[var(--mn-line)] pb-4 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[var(--mn-ash)] lg:grid">
+            <div />
+            <div>{copy.tableName}</div>
+            <div>{copy.tableReason}</div>
+            <div>{copy.tableAmount}</div>
+            <div className="text-right">{copy.tableCoverage}</div>
+          </div>
+
+          {groupedFormulaIngredients(ingredients).map(([category, group]) => (
+            <div key={category}>
+              <div className="mt-6 flex items-center gap-3 border-b border-dashed border-[var(--mn-line)] pb-3 font-serif text-sm italic text-[var(--mn-gold)]">
+                <span className="size-1.5 rounded-full bg-[var(--mn-gold)]" />
+                {category}
+                <span className="ml-auto font-mono text-[0.65rem] not-italic uppercase tracking-[0.18em] text-[var(--mn-ash)]">
+                  {group.length} selected
+                </span>
+              </div>
+              {group.map((ingredient) => {
+                rowNumber += 1;
+                const supplement = getLocalizedText(ingredient.supplement, locale);
+                const rationale = getLocalizedText(ingredient.rationale, locale);
+                const dailyDose = getLocalizedText(ingredient.dailyDose, locale);
+                const coverage =
+                  productCoverageBySupplementId.get(ingredient.id) ?? 0;
+                const benefit = supplementBenefitTags(ingredient)[0];
+
+                return (
+                  <article
+                    className="grid gap-3 border-b border-[var(--mn-line)] py-5 last:border-b-0 lg:grid-cols-[3rem_1.2fr_2fr_0.9fr_0.8fr] lg:gap-5"
+                    key={ingredient.id}
+                  >
+                    <div className="font-serif text-2xl italic text-[var(--mn-gold)]">
+                      {String(rowNumber).padStart(2, "0")}
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-xl font-medium leading-tight text-[var(--mn-ink)]">
+                        {supplement}
+                      </h3>
+                      <p className="mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--mn-ash)]">
+                        {ingredient.category}
+                      </p>
+                    </div>
+                    <div className="text-sm leading-6 text-[var(--mn-ink-soft)]">
+                      {rationale}
+                      {benefit ? (
+                        <span className="mt-2 block w-max max-w-full rounded-full bg-[var(--mn-mint)] px-3 py-1 text-xs font-semibold text-[var(--mn-teal-deep)]">
+                          {foodTagLabel(benefit)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="font-mono text-sm font-semibold text-[var(--mn-ink)]">
+                      {dailyDose}
+                    </div>
+                    <div className="font-mono text-sm font-semibold text-[var(--mn-teal-deep)] lg:text-right">
+                      {coverage}%
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RevealProductsSection({
+  copy,
+  locale,
+  onProductStackPreferenceChange,
+  planId,
+  productNeedCount,
+  productOptions,
+  products,
+  selectedCoverage,
+  selectedProductStackPreference
+}: Readonly<{
+  copy: typeof revealCopy.en;
+  locale: Locale;
+  onProductStackPreferenceChange: (preference: ProductStackPreference) => void;
+  planId: string;
+  productNeedCount: number;
+  productOptions: ProductRecommendationOption[];
+  products: RecommendedProduct[];
+  selectedCoverage: number;
+  selectedProductStackPreference?: ProductStackPreference | null;
+}>) {
+  const labels = productRecommendationCopy[locale];
+
+  return (
+    <section className="border-t border-[var(--mn-line)] bg-[var(--mn-cream-deep)] py-20">
+      <div className="mx-auto w-full max-w-6xl px-6 sm:px-8">
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
+            04 · {copy.selectedProducts}
+          </p>
+          <h2 className="mt-4 font-serif text-5xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
+            {copy.productsTitle}
+          </h2>
+          <p className="mt-4 text-base leading-8 text-[var(--mn-ink-soft)]">
+            {copy.productsBody}
+          </p>
+        </div>
+
+        {productOptions.length > 1 ? (
+          <div className="mt-8 flex justify-center">
+            <div className="inline-flex flex-wrap justify-center gap-2 rounded-full bg-[var(--mn-paper)] p-1 ring-1 ring-[var(--mn-line)]">
+              {productOptions.map((option) => (
+                <button
+                  aria-pressed={option.id === selectedProductStackPreference}
+                  className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] ${
+                    option.id === selectedProductStackPreference
+                      ? "bg-[var(--mn-teal)] text-white"
+                      : "text-[var(--mn-ink-soft)] hover:bg-[var(--mn-mint)]"
+                  }`}
+                  key={option.id}
+                  onClick={() => onProductStackPreferenceChange(option.id)}
+                  type="button"
+                >
+                  {option.id === "max_coverage"
+                    ? labels.preferenceMaxCoverage
+                    : option.id === "compact"
+                      ? labels.preferenceCompact
+                      : labels.preferenceBalanced}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {products.length < 1 ? (
+          <div className="mt-10 rounded-lg bg-[var(--mn-paper)] p-8 text-center ring-1 ring-[var(--mn-line)]">
+            <p className="text-sm leading-6 text-[var(--mn-ink-soft)]">
+              {copy.productsEmpty}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            {products.map((product, index) => (
+              <article
+                className="flex flex-col overflow-hidden rounded-xl bg-[var(--mn-paper)] ring-1 ring-[var(--mn-line)] transition hover:-translate-y-1 hover:ring-[var(--mn-teal)]"
+                key={`${product.recommendationRunId ?? "product"}:${product.id}`}
+              >
+                <div className="relative flex h-56 items-center justify-center bg-white">
+                  <span className="absolute left-4 top-4 font-serif text-3xl italic text-[var(--mn-gold)]">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  {product.imageUrl ? (
+                    <img
+                      alt=""
+                      className="h-full w-full object-contain p-8"
+                      src={product.imageUrl}
+                    />
+                  ) : (
+                    <div className="grid size-32 place-items-center rounded-2xl bg-[var(--mn-mint)] font-serif text-4xl italic text-[var(--mn-teal-deep)]">
+                      MN
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-1 flex-col p-5">
+                  <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--mn-ash)]">
+                    {product.marketplace}
+                  </p>
+                  <h3 className="mt-2 min-h-12 font-serif text-xl font-medium leading-tight text-[var(--mn-ink)]">
+                    {product.name}
+                  </h3>
+                  <div className="mt-4 flex flex-wrap gap-1.5">
+                    {product.covers.slice(0, 4).map((cover) => (
+                      <span
+                        className="rounded-full bg-[var(--mn-mint)] px-2.5 py-1 text-xs font-semibold text-[var(--mn-teal-deep)]"
+                        key={cover}
+                      >
+                        {cover}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-4 flex-1 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                    {product.description}
+                  </p>
+                  <div className="mt-5 rounded-lg bg-[var(--mn-cream)] p-3 text-sm text-[var(--mn-ink-soft)] ring-1 ring-[var(--mn-line)]">
+                    <strong className="text-[var(--mn-ink)]">
+                      {product.servingMultiplier && product.servingMultiplier > 1
+                        ? `${product.servingMultiplier} servings`
+                        : "Recommended dose"}
+                    </strong>
+                    <br />
+                    {product.stackContributionPercent ?? product.productCoveragePercent ?? 0}% contribution
+                  </div>
+                  <a
+                    className="mt-4 inline-flex items-center justify-between rounded-full bg-[var(--mn-teal)] px-4 py-3 text-sm font-bold text-white hover:bg-[var(--mn-teal-deep)]"
+                    href={product.url}
+                    onClick={() => trackMarketplaceClick(planId, product)}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {copy.viewProduct}
+                    <span aria-hidden={true}>→</span>
+                  </a>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-8 grid gap-3 rounded-xl bg-[var(--mn-paper)] p-5 ring-1 ring-[var(--mn-line)] md:grid-cols-3">
+          <div>
+            <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
+              {products.length}
+            </p>
+            <p className="text-sm text-[var(--mn-ash)]">{copy.selectedProducts}</p>
+          </div>
+          <div>
+            <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
+              {productNeedCount}
+            </p>
+            <p className="text-sm text-[var(--mn-ash)]">Needs covered by products</p>
+          </div>
+          <div>
+            <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
+              {selectedCoverage}%
+            </p>
+            <p className="text-sm text-[var(--mn-ash)]">Stack coverage</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RevealClosingSection({
+  copy,
+  labels,
+  locale,
+  planId,
+  result
+}: Readonly<{
+  copy: typeof revealCopy.en;
+  labels: PanelLabels;
+  locale: Locale;
+  planId: string;
+  result: FormulationResult;
+}>) {
+  const cautions = [
+    ...(result.cautions ?? []).map((caution) => ({
+      body: getLocalizedText(caution.body, locale),
+      title: caution.title ? getLocalizedText(caution.title, locale) : ""
+    })),
+    ...result.supplementBreakdown.flatMap((ingredient) =>
+      (ingredient.cautions ?? []).map((caution) => ({
+        body: getLocalizedText(caution.body, locale),
+        title:
+          caution.title
+            ? getLocalizedText(caution.title, locale)
+            : getLocalizedText(ingredient.supplement, locale)
+      }))
+    )
+  ];
+
+  return (
+    <section className="border-t border-[var(--mn-line)] py-20">
+      <div className="mx-auto grid w-full max-w-5xl gap-8 px-6 sm:px-8">
+        <div className="rounded-xl bg-[var(--mn-paper)] p-6 ring-1 ring-[var(--mn-line)] sm:p-8">
+          <div className="flex gap-4">
+            <InformationCircleIcon
+              aria-hidden={true}
+              className="mt-1 size-6 shrink-0 text-[var(--mn-teal-deep)]"
+            />
+            <div>
+              <h2 className="font-serif text-3xl font-medium text-[var(--mn-ink)]">
+                {copy.cautionsTitle}
+              </h2>
+              <div className="mt-4 space-y-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                {cautions.length > 0 ? (
+                  cautions.map((caution, index) => (
+                    <div key={`${caution.title}:${index}`}>
+                      {caution.title ? (
+                        <p className="font-semibold text-[var(--mn-ink)]">
+                          {caution.title}
+                        </p>
+                      ) : null}
+                      <p>{caution.body}</p>
+                    </div>
+                  ))
+                ) : (
+                  labels.safetyNotes.map((note) => <p key={note}>{note}</p>)
+                )}
+                <p>{copy.wellnessOnly}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="text-center">
+          <p className="font-serif text-5xl font-medium italic text-[var(--mn-teal-deep)]">
+            Mattaññutā
+          </p>
+          <p className="mn-mono-label mt-2 text-xs uppercase tracking-[0.2em] text-[var(--mn-ash)]">
+            Pāli · knowing the right amount
+          </p>
+          <h2 className="mx-auto mt-8 max-w-3xl font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
+            {copy.closingTitle}
+          </h2>
+          <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-[var(--mn-ink-soft)]">
+            {copy.closingBody}
+          </p>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              className="mn-primary-button"
+              onClick={() => window.print()}
+              type="button"
+            >
+              {copy.print}
+            </button>
+            <a className="mn-secondary-button" href={planResultsHref(locale, planId)}>
+              {copy.save}
+            </a>
+            <a className="mn-secondary-button" href={`/${locale}/nutrition/quiz`}>
+              {copy.reassess}
+            </a>
+          </div>
+        </div>
       </div>
     </section>
   );
