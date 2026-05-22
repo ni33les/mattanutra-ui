@@ -36,7 +36,7 @@ export function ChatChannelCards({
                 width={32}
                 className="size-8"
               />
-              <h3 className="text-base font-semibold text-[#20343A]">
+              <h3 className="text-base font-semibold text-[var(--mn-ink)]">
                 {channel.name}
               </h3>
             </div>

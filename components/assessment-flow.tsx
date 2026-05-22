@@ -1102,7 +1102,7 @@ function PrecisionGauge({
   return (
     <div className="mt-5">
       <div className="mb-2 flex justify-end">
-        <span className="text-xs font-semibold tabular-nums text-[#1FA77A]">
+        <span className="text-xs font-semibold tabular-nums text-[var(--mn-teal)]">
           {progress}%
         </span>
       </div>
@@ -1143,10 +1143,10 @@ function SegmentIntro({
       )}
     >
       <div className="assessment-intro-rise mx-auto max-w-5xl">
-        <h2 className="font-serif text-6xl font-semibold uppercase tracking-[0.16em] text-[#20343A] text-balance sm:text-7xl lg:text-8xl">
+        <h2 className="mn-display-heading text-6xl font-semibold uppercase tracking-[0.16em] text-[var(--mn-ink)] text-balance sm:text-7xl lg:text-8xl">
           {title}
         </h2>
-        <p className="mx-auto mt-8 max-w-4xl text-2xl font-semibold uppercase leading-snug tracking-[0.08em] text-[#1FA77A] text-balance sm:text-4xl">
+        <p className="mx-auto mt-8 max-w-4xl text-2xl font-semibold uppercase leading-snug tracking-[0.08em] text-[var(--mn-teal)] text-balance sm:text-4xl">
           “{body}”
         </p>
       </div>
@@ -1241,12 +1241,12 @@ function AssessmentStepper({
                 type="button"
                 aria-current={active ? "step" : undefined}
                 className={cx(
-                  "flex h-full w-full flex-col gap-1 rounded-lg border bg-white px-3 py-3 text-left shadow-sm transition",
+                  "flex h-full w-full flex-col gap-1 rounded-lg border bg-[var(--mn-paper)] px-3 py-3 text-left shadow-sm transition",
                   active
-                    ? "border-[#1FA77A] bg-[#1FA77A]/5 shadow-md"
+                    ? "border-[var(--mn-teal)] bg-[color-mix(in_srgb,var(--mn-teal)_5%,transparent)] shadow-md"
                     : done
-                      ? "border-[#1FA77A]/30 hover:border-[#1FA77A]/60"
-                      : "border-foreground/10 hover:border-[#3A7BD5]/35"
+                      ? "border-[color-mix(in_srgb,var(--mn-teal)_30%,transparent)] hover:border-[color-mix(in_srgb,var(--mn-teal)_60%,transparent)]"
+                      : "border-foreground/10 hover:border-[color-mix(in_srgb,var(--mn-gold)_35%,transparent)]"
                 )}
                 onClick={() => onSelect(index)}
               >
@@ -1255,9 +1255,9 @@ function AssessmentStepper({
                     className={cx(
                       "flex size-5 items-center justify-center rounded-full text-[10px] font-bold",
                       active
-                        ? "bg-[#1FA77A] text-white"
+                        ? "bg-[var(--mn-teal)] text-white"
                         : done
-                          ? "bg-[#20343A] text-white"
+                          ? "bg-[var(--mn-ink)] text-white"
                           : "bg-background text-muted-foreground"
                     )}
                   >
@@ -1274,7 +1274,7 @@ function AssessmentStepper({
                 <span
                   className={cx(
                     "hidden text-sm font-semibold tracking-normal sm:block",
-                    active || done ? "text-[#20343A]" : "text-muted-foreground"
+                    active || done ? "text-[var(--mn-ink)]" : "text-muted-foreground"
                   )}
                 >
                   {stages[index] ?? section.title}
@@ -1519,9 +1519,9 @@ export function AssessmentFlow({
           content: (
             <div className="grid gap-5 sm:grid-cols-2">
               <label className="block">
-                <span className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A]">
+                <span className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--mn-ink)]">
                   <span>{copy.about.height}</span>
-                  <span className="rounded-md bg-[#3A7BD5]/10 px-2 py-1 text-[#3A7BD5]">
+                  <span className="rounded-md bg-[color-mix(in_srgb,var(--mn-gold)_10%,transparent)] px-2 py-1 text-[var(--mn-gold)]">
                     {answers.heightCm || "170"} cm
                   </span>
                 </span>
@@ -1531,19 +1531,19 @@ export function AssessmentFlow({
                   max={220}
                   step={1}
                   value={answers.heightCm || "170"}
-                  className="mt-3 block w-full accent-[#1FA77A]"
+                  className="mt-3 block w-full accent-[var(--mn-teal)]"
                   onChange={(event) => setSingle("heightCm", event.target.value)}
                 />
                 <span className="mt-2 flex justify-end">
-                  <span className="rounded-md bg-[#3A7BD5]/10 px-2 py-1 text-xs font-semibold text-[#3A7BD5]">
+                  <span className="rounded-md bg-[color-mix(in_srgb,var(--mn-gold)_10%,transparent)] px-2 py-1 text-xs font-semibold text-[var(--mn-gold)]">
                     {formatHeightImperial(answers.heightCm || "170")}
                   </span>
                 </span>
               </label>
               <label className="block">
-                <span className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A]">
+                <span className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--mn-ink)]">
                   <span>{copy.about.weight}</span>
-                  <span className="rounded-md bg-[#3A7BD5]/10 px-2 py-1 text-[#3A7BD5]">
+                  <span className="rounded-md bg-[color-mix(in_srgb,var(--mn-gold)_10%,transparent)] px-2 py-1 text-[var(--mn-gold)]">
                     {answers.weightKg || "70"} kg
                   </span>
                 </span>
@@ -1553,11 +1553,11 @@ export function AssessmentFlow({
                   max={180}
                   step={1}
                   value={answers.weightKg || "70"}
-                  className="mt-3 block w-full accent-[#1FA77A]"
+                  className="mt-3 block w-full accent-[var(--mn-teal)]"
                   onChange={(event) => setSingle("weightKg", event.target.value)}
                 />
                 <span className="mt-2 flex justify-end">
-                  <span className="rounded-md bg-[#3A7BD5]/10 px-2 py-1 text-xs font-semibold text-[#3A7BD5]">
+                  <span className="rounded-md bg-[color-mix(in_srgb,var(--mn-gold)_10%,transparent)] px-2 py-1 text-xs font-semibold text-[var(--mn-gold)]">
                     {formatWeightImperial(answers.weightKg || "70")}
                   </span>
                 </span>
@@ -1584,7 +1584,7 @@ export function AssessmentFlow({
           content: (
             <div className="grid gap-5 md:grid-cols-[minmax(13rem,0.8fr)_minmax(0,1.2fr)] md:items-start">
               <div>
-                <p className="text-sm font-semibold text-[#20343A]">
+                <p className="text-sm font-semibold text-[var(--mn-ink)]">
                   {copy.about.sunscreen}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -1601,7 +1601,7 @@ export function AssessmentFlow({
                 </div>
               </div>
               <div>
-                <p className="text-sm font-semibold text-[#20343A]">
+                <p className="text-sm font-semibold text-[var(--mn-ink)]">
                   {copy.about.sun}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -1624,7 +1624,7 @@ export function AssessmentFlow({
         {
           content: (
             <label className="block">
-              <span className="text-sm font-semibold text-[#20343A]">
+              <span className="text-sm font-semibold text-[var(--mn-ink)]">
                 {copy.about.country}
               </span>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -1652,7 +1652,7 @@ export function AssessmentFlow({
           ? [
               {
                 content: (
-                  <div className="space-y-5 rounded-lg border border-[#1FA77A]/15 bg-[#1FA77A]/5 p-4">
+                  <div className="space-y-5 rounded-lg border border-[color-mix(in_srgb,var(--mn-teal)_15%,transparent)] bg-[color-mix(in_srgb,var(--mn-teal)_5%,transparent)] p-4">
                     <Question
                       infoLabel={ui.infoLabel}
                       label={copy.about.reproStatus}
@@ -1829,15 +1829,15 @@ export function AssessmentFlow({
         },
         {
           content: (
-            <label className="flex gap-3 rounded-lg border border-[#1FA77A]/20 bg-[#1FA77A]/5 p-4 text-sm leading-6 text-muted-foreground">
+            <label className="mn-disclosure-card">
               <input
                 checked={answers.disclosure}
-                className="mt-1 size-4 rounded border-foreground/20 text-[#1FA77A] focus:ring-[#1FA77A]"
+                className="mt-1 size-4 rounded border-foreground/20 text-[var(--mn-teal)] focus:ring-[var(--mn-teal)]"
                 type="checkbox"
                 onChange={(event) => setAnswers((current) => ({ ...current, disclosure: event.target.checked }))}
               />
               <span>
-                <span className="block font-medium text-[#20343A]">{copy.food.disclosureTitle}</span>
+                <span className="block font-medium text-[var(--mn-ink)]">{copy.food.disclosureTitle}</span>
                 <span className="mt-1 block">{copy.food.disclosureBody}</span>
               </span>
             </label>
@@ -1858,8 +1858,8 @@ export function AssessmentFlow({
             <div className="space-y-4">
               <PillGroup options={copy.safety.medicationOptions} selected={answers.meds} onSelect={(value) => setSingle("meds", value)} />
               {answers.meds === "yes" ? (
-                <div className="rounded-lg border border-[#1FA77A]/15 bg-[#1FA77A]/5 p-4">
-                  <p className="mb-3 text-sm font-semibold text-[#20343A]">{copy.safety.medicationType}</p>
+                <div className="rounded-lg border border-[color-mix(in_srgb,var(--mn-teal)_15%,transparent)] bg-[color-mix(in_srgb,var(--mn-teal)_5%,transparent)] p-4">
+                  <p className="mb-3 text-sm font-semibold text-[var(--mn-ink)]">{copy.safety.medicationType}</p>
                   <PillGroup multi={true} options={copy.safety.medicationTypeOptions} selected={answers.medTypes} onToggle={(value) => toggleMulti("medTypes", value)} />
                   {selectedOther(answers.medTypes) ? (
                     <input
@@ -1942,9 +1942,9 @@ export function AssessmentFlow({
         },
         {
           content: (
-            <div className="space-y-5 rounded-lg border border-[#3A7BD5]/15 bg-[#3A7BD5]/5 p-4">
+            <div className="space-y-5 rounded-lg border border-[color-mix(in_srgb,var(--mn-gold)_15%,transparent)] bg-[color-mix(in_srgb,var(--mn-gold)_5%,transparent)] p-4">
               <div>
-                <p className="text-sm font-semibold text-[#20343A]">{copy.precision.optionalBanner}</p>
+                <p className="text-sm font-semibold text-[var(--mn-ink)]">{copy.precision.optionalBanner}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{copy.precision.optionalBody}</p>
               </div>
               <Question infoLabel={ui.infoLabel} label={copy.precision.protein} why={copy.coach.precision}>
@@ -1962,7 +1962,7 @@ export function AssessmentFlow({
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="block">
                   <label className="block">
-                    <span className="text-sm font-semibold text-[#20343A]">{copy.precision.vo2}</span>
+                    <span className="text-sm font-semibold text-[var(--mn-ink)]">{copy.precision.vo2}</span>
                     <input
                       className="mn-text-input"
                       inputMode="decimal"
@@ -1971,10 +1971,10 @@ export function AssessmentFlow({
                       onChange={(event) => setSingle("vo2", event.target.value)}
                     />
                   </label>
-                  <div className="mt-3 rounded-lg border border-[#1FA77A]/15 bg-white p-3">
+                  <div className="mt-3 rounded-lg border border-[color-mix(in_srgb,var(--mn-teal)_15%,transparent)] bg-[var(--mn-paper)] p-3">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-[#20343A]">{copy.precision.vo2Estimate}</p>
+                        <p className="text-sm font-semibold text-[var(--mn-ink)]">{copy.precision.vo2Estimate}</p>
                         <p className="mt-1 text-sm leading-6 text-muted-foreground">
                           {vo2Estimate === null
                             ? copy.precision.vo2EstimateNeeds
@@ -1997,15 +1997,15 @@ export function AssessmentFlow({
                   </div>
                 </div>
                 <label className="block">
-                  <span className="text-sm font-semibold text-[#20343A]">{copy.precision.hrv}</span>
+                  <span className="text-sm font-semibold text-[var(--mn-ink)]">{copy.precision.hrv}</span>
                   <input className="mn-text-input" inputMode="decimal" value={answers.hrv} onChange={(event) => setSingle("hrv", event.target.value)} />
                 </label>
               </div>
               <Question infoLabel={ui.infoLabel} label={copy.precision.labs} hint={copy.precision.labsHint} why={copy.coach.labs}>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {copy.precision.labFields.map((field) => (
-                    <label key={field.value} className="block rounded-lg border border-foreground/10 bg-white p-3">
-                      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#20343A]">{field.label}</span>
+                    <label key={field.value} className="block rounded-lg border border-foreground/10 bg-[var(--mn-paper)] p-3">
+                      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--mn-ink)]">{field.label}</span>
                       <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
                         <input
                           className="mn-lab-input"
@@ -2332,9 +2332,9 @@ function HealthScoreOnlyPanel({
   };
 }>) {
   return (
-    <section className="rounded-lg bg-white px-6 py-10 ring-1 ring-foreground/10 sm:px-8">
+    <section className="rounded-lg bg-[var(--mn-paper)] px-6 py-10 ring-1 ring-foreground/10 sm:px-8">
       <div className="text-center">
-        <h1 className="text-3xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-4xl">
+        <h1 className="text-3xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance sm:text-4xl">
           {scoreContent.title}
         </h1>
         <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-muted-foreground">

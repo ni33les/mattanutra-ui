@@ -38,7 +38,7 @@ export default async function Home({ params }: HomeProps) {
 
   if (!databaseReady) {
     return (
-      <main className="flex min-h-screen flex-col bg-background text-foreground">
+      <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
         <TitleBar
           currentLocale={locale}
           currentPath={`/${locale}`}
@@ -53,7 +53,7 @@ export default async function Home({ params }: HomeProps) {
   const blogPosts = await getPublishedBlogPosts(locale, 3);
 
   return (
-    <main className="flex min-h-screen flex-col bg-background text-foreground">
+    <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
       <TitleBar
         currentLocale={locale}
         currentPath={`/${locale}`}

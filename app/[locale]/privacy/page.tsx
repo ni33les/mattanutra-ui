@@ -41,7 +41,7 @@ export default async function PrivacyPage({ params }: PrivacyPageProps) {
   const content = getLegalContent(locale, "privacy");
 
   return (
-    <main className="flex min-h-screen flex-col bg-background text-foreground">
+    <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
       <TitleBar
         currentLocale={locale}
         currentPath={`/${locale}/privacy`}

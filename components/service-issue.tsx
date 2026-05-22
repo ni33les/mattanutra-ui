@@ -25,14 +25,14 @@ export function ServiceIssue({
 
   return (
     <section className="flex flex-1 items-center justify-center px-6 py-20 sm:px-8">
-      <div className="mx-auto w-full max-w-2xl rounded-lg bg-[var(--brand-soft-blue)] p-8 text-center ring-1 ring-[#44c3c7]/20 sm:p-12">
+      <div className="mx-auto w-full max-w-2xl rounded-[var(--mn-radius-lg)] bg-[var(--mn-paper)] p-8 text-center shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:p-12">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--brand-blue)]">
           {copy.eyebrow}
         </p>
         <h1 className="mt-4 text-4xl font-semibold tracking-normal text-[var(--brand-navy)] text-balance sm:text-5xl">
           {copy.title}
         </h1>
-        <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-[#17216f]/75">
+        <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-[color-mix(in_srgb,var(--mn-ink)_75%,transparent)]">
           {copy.body}
         </p>
         <a

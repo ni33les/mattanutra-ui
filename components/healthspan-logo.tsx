@@ -27,11 +27,11 @@ export function HealthspanLogo({
       />
 
       <span className="inline-grid leading-none">
-        <span className="flex items-baseline text-[20px] font-semibold tracking-[0.04em] sm:text-[22.5px]">
-          <span className="font-extrabold text-[var(--brand-blue)]">Matta</span>
-          <span className="text-[var(--brand-green)]">Nutra</span>
+        <span className="flex items-baseline font-[family:var(--mn-font-display)] text-[20px] font-semibold tracking-normal sm:text-[22.5px]">
+          <span className="text-[var(--mn-ink)]">Matta</span>
+          <span className="text-[var(--mn-teal)]">Nutra</span>
         </span>
-        <span className="mt-[4.5px] text-[10.5px] font-medium uppercase tracking-[0.18em] text-muted-foreground sm:text-[11.5px]">
+        <span className="mt-[4.5px] font-[family:var(--mn-font-mono)] text-[10.5px] font-medium uppercase tracking-[0.18em] text-muted-foreground sm:text-[11.5px]">
           know the right amount
         </span>
       </span>

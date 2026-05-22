@@ -1,4 +1,10 @@
 import type { Metadata } from "next";
+import {
+  DM_Sans,
+  Fraunces,
+  JetBrains_Mono,
+  Noto_Sans_Thai
+} from "next/font/google";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { BpmTracker } from "@/components/bpm-tracker";
@@ -13,6 +19,31 @@ type LocaleLayoutProps = Readonly<{
     locale: string;
   }>;
 }>;
+
+const bodyFont = DM_Sans({
+  subsets: ["latin"],
+  variable: "--mn-font-body",
+  display: "swap"
+});
+
+const displayFont = Fraunces({
+  subsets: ["latin"],
+  variable: "--mn-font-display",
+  display: "swap"
+});
+
+const monoFont = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--mn-font-mono",
+  display: "swap"
+});
+
+const thaiFont = Noto_Sans_Thai({
+  subsets: ["thai"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--mn-font-thai",
+  display: "swap"
+});
 
 export async function generateMetadata({
   params
@@ -43,7 +74,14 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale}>
-      <body>
+      <body
+        className={[
+          bodyFont.variable,
+          displayFont.variable,
+          monoFont.variable,
+          thaiFont.variable
+        ].join(" ")}
+      >
         <BpmTracker locale={locale} />
         {children}
       </body>

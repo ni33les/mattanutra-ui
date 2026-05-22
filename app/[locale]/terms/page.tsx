@@ -41,7 +41,7 @@ export default async function TermsPage({ params }: TermsPageProps) {
   const content = getLegalContent(locale, "terms");
 
   return (
-    <main className="flex min-h-screen flex-col bg-background text-foreground">
+    <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
       <TitleBar
         currentLocale={locale}
         currentPath={`/${locale}/terms`}

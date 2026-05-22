@@ -14,14 +14,14 @@ type CtaSectionProps = Readonly<{
 
 export function CtaSection({ content, ctaHref }: CtaSectionProps) {
   return (
-    <section className="relative overflow-hidden bg-[var(--brand-soft-turquoise)]">
+    <section className="relative overflow-hidden bg-[var(--mn-mint)]">
       <div
         aria-hidden={true}
         className="mn-cta-background absolute inset-0 bg-cover bg-center opacity-34"
       />
       <div
         aria-hidden={true}
-        className="absolute inset-0 bg-gradient-to-b from-[#eefbfa]/82 via-[#edf6ff]/64 to-[#effaf4]/86"
+        className="absolute inset-0 bg-gradient-to-b from-[color-mix(in_srgb,var(--mn-mint)_82%,transparent)] via-[color-mix(in_srgb,var(--mn-gold-tint)_64%,transparent)] to-[color-mix(in_srgb,var(--mn-cream)_86%,transparent)]"
       />
       <div className="relative mx-auto flex min-h-[28rem] max-w-7xl flex-col items-center justify-center px-6 py-24 text-center sm:py-32 lg:px-8">
         <h2 className="max-w-2xl text-4xl font-semibold tracking-normal text-balance text-[var(--brand-navy)] sm:text-5xl">

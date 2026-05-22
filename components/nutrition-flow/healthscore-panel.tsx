@@ -12,17 +12,17 @@ import { cx } from "@/components/nutrition-flow/ui";
 function getDomainTone(score: number) {
   if (score >= 80) {
     return {
-      bg: "bg-[#EAF5FF]",
-      ring: "ring-[#3A7BD5]/20",
-      text: "text-[#2563EB]"
+      bg: "bg-[var(--mn-mint)]",
+      ring: "ring-[color-mix(in_srgb,var(--mn-teal-deep)_20%,transparent)]",
+      text: "text-[var(--mn-teal-deep)]"
     };
   }
 
   if (score >= 50) {
     return {
-      bg: "bg-[#EFFBF5]",
-      ring: "ring-[#1FA77A]/20",
-      text: "text-[#126b4f]"
+      bg: "bg-[var(--mn-mint-deep)]",
+      ring: "ring-[color-mix(in_srgb,var(--mn-teal)_20%,transparent)]",
+      text: "text-[var(--mn-teal-deep)]"
     };
   }
 
@@ -34,12 +34,12 @@ function getDomainTone(score: number) {
 }
 
 const healthScoreChartColors = [
-  "#3A7BD5",
-  "#1FA77A",
-  "#F59E0B",
-  "#EF4444",
-  "#8B5CF6",
-  "#06B6D4"
+  "var(--mn-teal-deep)",
+  "var(--mn-teal)",
+  "var(--mn-gold)",
+  "var(--mn-error)",
+  "var(--mn-sand-deep)",
+  "var(--mn-teal-light)"
 ];
 
 const healthScoreDomainTones = ["blue", "green", "amber", "red", "purple", "cyan"] as const;
@@ -83,7 +83,7 @@ function HealthScoreRadar({
   const domainCount = Math.max(result.domains.length, 1);
 
   return (
-    <div className="flex h-full rounded-2xl bg-white p-2 ring-1 ring-[#3A7BD5]/10 sm:p-3">
+    <div className="flex h-full rounded-2xl bg-[var(--mn-paper)] p-2 ring-1 ring-[var(--mn-line)] sm:p-3">
       <div className="flex flex-1 items-center justify-center">
         <svg
           aria-label="Domain shape"
@@ -96,7 +96,7 @@ function HealthScoreRadar({
               key={level}
               fill="none"
               points={radarPolygonPoints(result.domains, center, radius, level)}
-              stroke="#B9D3EE"
+              stroke="var(--mn-line)"
               strokeWidth="1.4"
             />
           ))}
@@ -110,7 +110,7 @@ function HealthScoreRadar({
             return (
               <line
                 key={domain.id}
-                stroke="#B9D3EE"
+                stroke="var(--mn-line)"
                 strokeWidth="1.4"
                 x1={center}
                 x2={outer.x}
@@ -120,9 +120,9 @@ function HealthScoreRadar({
             );
           })}
           <polygon
-            fill="rgba(31, 167, 122, 0.22)"
+            fill="color-mix(in srgb, var(--mn-teal) 22%, transparent)"
             points={radarPolygonPoints(result.domains, center, radius)}
-            stroke="#1FA77A"
+            stroke="var(--mn-teal)"
             strokeLinejoin="round"
             strokeWidth="3"
           />
@@ -173,8 +173,8 @@ function HealthScoreVisuals({
 
   return (
     <div className="mt-5 sm:mt-6">
-      <div className="rounded-2xl bg-white p-4 ring-1 ring-[#3A7BD5]/10 sm:p-6">
-        <p className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-[#20343A]">
+      <div className="rounded-2xl bg-[var(--mn-paper)] p-4 ring-1 ring-[var(--mn-line)] sm:p-6">
+        <p className="text-center font-[family:var(--mn-font-mono)] text-xs font-semibold uppercase tracking-[0.12em] text-[var(--mn-ink)]">
           {labels.domains}
         </p>
         <div className="mt-4">
@@ -205,7 +205,7 @@ function DomainSnapshot({
               data-domain-tone={domainTone}
             >
               <div className="flex min-w-0 items-center justify-between gap-3 text-sm">
-                <span className="min-w-0 font-semibold text-[#20343A]">
+                <span className="min-w-0 font-semibold text-[var(--mn-ink)]">
                   {domain.label}
                 </span>
                 <span className={cx("font-semibold", tone.text)}>
@@ -276,7 +276,7 @@ function HealthScoreAdvice({
     `${fallbackFocus} ${fallbackHowToImprove}`;
 
   return (
-    <div className="mt-5 rounded-2xl bg-white p-5 ring-1 ring-[#3A7BD5]/10 sm:mt-6 sm:p-6">
+    <div className="mt-5 rounded-2xl bg-[var(--mn-paper)] p-5 ring-1 ring-[var(--mn-line)] sm:mt-6 sm:p-6">
       <div className="flex gap-4">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#FFF8E8]">
           <ExclamationTriangleIcon
@@ -313,22 +313,22 @@ export function HealthScorePanel({
         };
 
   return (
-    <div className="mt-10 rounded-2xl bg-[#F7FAFD] p-4 ring-1 ring-[#3A7BD5]/10 sm:p-7">
+    <div className="mt-10 rounded-2xl bg-[var(--mn-mint)] p-4 ring-1 ring-[var(--mn-line)] sm:p-7">
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 lg:items-stretch">
         <div className="flex min-w-0 flex-col">
           <div className="mn-health-score-card">
-            <p className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-[#20343A]">
+            <p className="text-center font-[family:var(--mn-font-mono)] text-xs font-semibold uppercase tracking-[0.12em] text-[var(--mn-ink)]">
               {labels.score}
             </p>
             <div className="flex items-end justify-center gap-3">
-              <span className="text-6xl font-semibold tracking-normal text-[#20343A] sm:text-8xl">
+              <span className="text-6xl font-semibold tracking-normal text-[var(--mn-ink)] sm:text-8xl">
                 {result.score}
               </span>
               <span className="pb-2 text-lg font-semibold text-muted-foreground sm:pb-3 sm:text-xl">
                 /100
               </span>
             </div>
-            <p className="inline-flex self-center rounded-full bg-[#1FA77A]/10 px-4 py-1.5 text-sm font-semibold text-[#126b4f]">
+            <p className="inline-flex self-center rounded-full bg-[color-mix(in_srgb,var(--mn-teal)_10%,transparent)] px-4 py-1.5 text-sm font-semibold text-[var(--mn-teal-deep)]">
               {result.band}
             </p>
           </div>

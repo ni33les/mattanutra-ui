@@ -82,11 +82,11 @@ export function NutritionProgress({
                   "mt-0.5 flex size-9 shrink-0 items-center justify-center sm:size-10",
                   active && pending ? "" : "rounded-full border-2",
                   complete
-                    ? "border-[#3A7BD5] bg-[#3A7BD5]"
+                    ? "border-[var(--mn-gold)] bg-[var(--mn-gold)]"
                     : active
                       ? active && pending
                         ? ""
-                        : "border-[#3A7BD5] bg-white"
+                        : "border-[var(--mn-gold)] bg-white"
                       : "border-gray-300 bg-white"
                 )}
               >
@@ -95,14 +95,14 @@ export function NutritionProgress({
                 ) : active && pending ? (
                   <ArrowPathIcon
                     aria-hidden={true}
-                    className="size-7 animate-spin text-[#3A7BD5] sm:size-8"
+                    className="size-7 animate-spin text-[var(--mn-gold)] sm:size-8"
                     strokeWidth={2.6}
                   />
                 ) : (
                   <span
                     className={cx(
                       "text-sm font-semibold",
-                      active ? "text-[#3A7BD5]" : "text-gray-500"
+                      active ? "text-[var(--mn-gold)]" : "text-gray-500"
                     )}
                   >
                     {String(stageIndex + 1).padStart(2, "0")}
@@ -113,7 +113,7 @@ export function NutritionProgress({
                 <span
                   className={cx(
                     "block text-base font-bold sm:text-lg",
-                    complete || active ? "text-[#20343A]" : "text-gray-500"
+                    complete || active ? "text-[var(--mn-ink)]" : "text-gray-500"
                   )}
                 >
                   {copy[stage].title}

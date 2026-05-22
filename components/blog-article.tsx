@@ -13,7 +13,7 @@ import type { BlogPost } from "@/lib/blog";
 const markdownComponents: Components = {
   a: ({ children, href }) => (
     <a
-      className="font-semibold text-[#126B4F] underline decoration-[#1FA77A]/30 underline-offset-4 transition hover:text-[#0F5A43] hover:decoration-[#1FA77A]"
+      className="mn-link-accent"
       href={href}
       rel={href?.startsWith("http") ? "noreferrer" : undefined}
       target={href?.startsWith("http") ? "_blank" : undefined}
@@ -22,7 +22,7 @@ const markdownComponents: Components = {
     </a>
   ),
   blockquote: ({ children }) => (
-    <blockquote className="mt-8 border-l-4 border-[#3A7BD5] pl-5 text-lg/8 font-medium text-gray-800">
+    <blockquote className="mt-8 border-l-4 border-[var(--mn-gold)] pl-5 text-lg/8 font-medium text-gray-800">
       {children}
     </blockquote>
   ),
@@ -107,23 +107,23 @@ function BlogAssessmentCta({
 }: BlogArticleCta) {
   return (
     <section className="bg-white px-6 pt-2 pb-24 sm:pb-32 lg:px-8">
-      <div className="relative mx-auto min-h-[26rem] w-full max-w-6xl overflow-hidden rounded-lg bg-[#F3F8FF] px-6 py-16 ring-1 ring-[#3A7BD5]/10 sm:px-10 lg:px-16">
+      <div className="mn-blog-cta-card mx-auto min-h-[26rem] w-full max-w-6xl px-6 py-16 sm:px-10 lg:px-16">
         <div
           aria-hidden={true}
           className="mn-blog-cta-background absolute inset-0 bg-cover bg-center opacity-28"
         />
         <div
           aria-hidden={true}
-          className="absolute inset-0 bg-gradient-to-r from-[#F3F8FF]/96 via-[#F3F8FF]/82 to-[#F3F8FF]/52"
+          className="mn-blog-cta-wash"
         />
         <div className="relative flex min-h-[18rem] max-w-3xl flex-col justify-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#3A7BD5]">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--mn-gold)]">
             {eyebrow}
           </p>
-          <h2 className="mt-4 text-4xl font-semibold tracking-normal text-balance text-[#20343A] sm:text-5xl">
+          <h2 className="mt-4 text-4xl font-semibold tracking-normal text-balance text-[var(--mn-ink)] sm:text-5xl">
             <HighlightedBrandText text={title} />
           </h2>
-          <p className="mt-6 max-w-2xl text-lg/8 text-pretty text-[#20343A]/78">
+          <p className="mt-6 max-w-2xl text-lg/8 text-pretty text-[color-mix(in_srgb,var(--mn-ink)_78%,transparent)]">
             <HighlightedBrandText text={body} />
           </p>
           <div className="mt-10 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-x-6">
@@ -143,7 +143,7 @@ function BlogAssessmentCta({
               data-bpm-label={secondaryLabel}
               data-bpm-target={secondaryHref}
               data-bpm-type="content"
-              className="text-sm/6 font-semibold text-gray-900 transition hover:text-[#3A7BD5]"
+              className="text-sm/6 font-semibold text-gray-900 transition hover:text-[var(--mn-gold)]"
             >
               {secondaryLabel} <span aria-hidden="true">→</span>
             </Link>
@@ -177,7 +177,7 @@ function StructuredBlogBody({ post }: Readonly<{ post: BlogPost }>) {
               <li key={point.title} className="flex gap-x-3">
                 <Icon
                   aria-hidden={true}
-                  className="mt-1 size-5 flex-none text-[#3A7BD5]"
+                  className="mt-1 size-5 flex-none text-[var(--mn-gold)]"
                 />
                 <span>
                   <strong className="font-semibold text-gray-900">
@@ -220,7 +220,7 @@ export function BlogArticle({
         </div>
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-2xl lg:mx-0">
-            <p className="text-base/7 font-semibold text-[#3A7BD5]">
+            <p className="text-base/7 font-semibold text-[var(--mn-gold)]">
               MattaNutra Journal
             </p>
             <h1 className="mt-2 text-4xl font-semibold tracking-tight text-pretty text-gray-900 sm:text-5xl">
@@ -263,7 +263,7 @@ export function BlogArticle({
                 </figure>
               ) : null}
               {post.testimonial ? (
-                <figure className="border-l border-[#3A7BD5] pl-8">
+                <figure className="border-l border-[var(--mn-gold)] pl-8">
                   <blockquote className="text-xl/8 font-semibold tracking-tight text-gray-900">
                     <p>&quot;{post.testimonial.quote}&quot;</p>
                   </blockquote>

@@ -698,26 +698,26 @@ export function FormulationResults({
         locale={locale}
       />
 
-      <div className="relative overflow-hidden rounded-lg bg-[#F3F8FF] p-6 ring-1 ring-[#3A7BD5]/10 sm:p-8 lg:p-10">
+      <div className="mn-formulation-hero-card p-6 sm:p-8 lg:p-10">
         <div
           aria-hidden={true}
           className="mn-formulation-hero-background absolute inset-0 bg-cover opacity-36"
         />
         <div
           aria-hidden={true}
-          className="absolute inset-0 bg-gradient-to-r from-[#F3F8FF]/92 via-[#F3F8FF]/76 to-[#F3F8FF]/50"
+          className="mn-formulation-hero-wash"
         />
         <div
           aria-hidden={true}
-          className="absolute inset-0 bg-gradient-to-b from-[#F3F8FF]/20 via-transparent to-[#F3F8FF]/72"
+          className="mn-formulation-hero-bottom-wash"
         />
         <div className="relative grid gap-8 lg:grid-cols-[1fr_20rem] lg:items-center">
           <div>
             <SparklesIcon
               aria-hidden={true}
-              className="size-12 text-[#3A7BD5]"
+              className="size-12 text-[var(--mn-gold)]"
             />
-            <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-5xl">
+            <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance sm:text-5xl">
               {labels.heroTitle}
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
@@ -726,7 +726,7 @@ export function FormulationResults({
           </div>
 
           <div className="rounded-lg bg-background/90 p-5 shadow-sm ring-1 ring-foreground/10 backdrop-blur-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#20343A]">
+            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--mn-ink)]">
               {labels.context}
             </p>
             <dl className="mt-4 space-y-4 text-sm">
@@ -761,7 +761,7 @@ export function FormulationResults({
           <p className="mt-1">
             {labels.plan}:{" "}
             <a
-              className="font-semibold text-[#3A7BD5] hover:text-[#2F67B8]"
+              className="font-semibold text-[var(--mn-gold)] hover:text-[var(--mn-teal-deep)]"
               href={planResultsHref(locale, effectiveResultPlanId)}
             >
               {effectiveResultPlanId}
@@ -826,7 +826,7 @@ export function FormulationResults({
         />
       )}
 
-      <div className="mt-8 rounded-lg bg-[#20343A] p-6 text-sm leading-6 text-white/75">
+      <div className="mt-8 rounded-lg bg-[var(--mn-ink)] p-6 text-sm leading-6 text-white/75">
         <div className="flex gap-3">
           <InformationCircleIcon
             aria-hidden={true}
@@ -907,7 +907,7 @@ function NutritionGuidancePreparingPanel({
         aria-live="polite"
         className="rounded-lg bg-white p-6 ring-1 ring-foreground/10 transition-colors sm:p-8"
       >
-        <h1 className="max-w-2xl text-2xl font-semibold tracking-normal text-[#20343A] sm:text-3xl">
+        <h1 className="max-w-2xl text-2xl font-semibold tracking-normal text-[var(--mn-ink)] sm:text-3xl">
           {labels.nutritionProgressTitle}
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -939,7 +939,7 @@ function FoodGuidancePanel({
     <section className="rounded-lg bg-white p-5 ring-1 ring-foreground/10 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold tracking-normal text-[#20343A]">
+          <h2 className="text-2xl font-semibold tracking-normal text-[var(--mn-ink)]">
             {labels.foods}
           </h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -948,7 +948,7 @@ function FoodGuidancePanel({
         </div>
         <SparklesIcon
           aria-hidden={true}
-          className="size-6 flex-none text-[#1FA77A]"
+          className="size-6 flex-none text-[var(--mn-teal)]"
         />
       </div>
 
@@ -959,9 +959,9 @@ function FoodGuidancePanel({
           <div className="rounded-lg border border-dashed border-foreground/15 bg-background/60 p-6 text-center">
             <SparklesIcon
               aria-hidden={true}
-              className="mx-auto size-7 text-[#1FA77A]"
+              className="mx-auto size-7 text-[var(--mn-teal)]"
             />
-            <h3 className="mt-4 text-base font-semibold text-[#20343A]">
+            <h3 className="mt-4 text-base font-semibold text-[var(--mn-ink)]">
               {hasPendingSafetyReview
                 ? labels.foodsEmptyTitle
                 : labels.formulaNoVisibleTitle}
@@ -997,7 +997,7 @@ function FoodGuidancePanel({
             >
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <h4 className="text-base font-semibold text-[#20343A]">
+                  <h4 className="text-base font-semibold text-[var(--mn-ink)]">
                     {food}
                   </h4>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -1011,7 +1011,7 @@ function FoodGuidancePanel({
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {tags.slice(0, 6).map((tag) => (
                           <span
-                            className="rounded-full bg-[#ECFDF5] px-2 py-0.5 text-xs font-semibold text-[#126B4F] ring-1 ring-[#A7F3D0]"
+                            className="rounded-full bg-[var(--mn-mint-deep)] px-2 py-0.5 text-xs font-semibold text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-teal-glow)]"
                             key={tag}
                           >
                             {foodTagLabel(tag)}
@@ -1026,7 +1026,7 @@ function FoodGuidancePanel({
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     {labels.foodServing}
                   </p>
-                  <p className="mt-1 text-sm font-medium text-[#20343A]">
+                  <p className="mt-1 text-sm font-medium text-[var(--mn-ink)]">
                     {serving}
                   </p>
                   <p className="mt-1 text-xs font-medium text-muted-foreground">
@@ -1056,7 +1056,7 @@ function ContextItem({ label, value }: Readonly<{ label: string; value: string }
       <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 font-medium text-[#20343A]">{value}</dd>
+      <dd className="mt-1 font-medium text-[var(--mn-ink)]">{value}</dd>
     </div>
   );
 }
@@ -1074,7 +1074,7 @@ function ContextChips({
         {values.map((value) => (
           <span
             key={value}
-            className="rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-[#20343A] ring-1 ring-foreground/10"
+            className="rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--mn-ink)] ring-1 ring-foreground/10"
           >
             {value}
           </span>
@@ -1092,13 +1092,13 @@ function PreviewPaywallPanel({
   unlockHref: string;
 }>) {
   return (
-    <section className="mt-8 overflow-hidden rounded-lg bg-white p-5 ring-1 ring-[#1FA77A]/20 sm:p-6">
+    <section className="mt-8 overflow-hidden rounded-lg bg-white p-5 ring-1 ring-[color-mix(in_srgb,var(--mn-teal)_20%,transparent)] sm:p-6">
       <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#126b4f]">
             {labels.previewBadge}
           </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-normal text-[#20343A] text-balance">
+          <h2 className="mt-2 text-2xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance">
             {labels.previewTitle}
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -1141,8 +1141,8 @@ export function FinalReportPanel({
   ];
 
   return (
-    <div className="mt-6 rounded-lg border border-[#3A7BD5]/15 bg-[#F3F8FF] p-5">
-      <h3 className="text-2xl font-semibold tracking-normal text-[#20343A] text-balance">
+    <div className="mt-6 rounded-lg border border-[color-mix(in_srgb,var(--mn-gold)_15%,transparent)] bg-[var(--mn-mint)] p-5">
+      <h3 className="text-2xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance">
         {getLocalizedText(report.title, locale)}
       </h3>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">
@@ -1155,13 +1155,13 @@ export function FinalReportPanel({
             className="rounded-lg bg-white p-4 ring-1 ring-foreground/10"
             key={section.title}
           >
-            <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#20343A]">
+            <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--mn-ink)]">
               {section.title}
             </h4>
             <div className="mt-3 space-y-3">
               {section.items.map((item) => (
                 <div key={item.id}>
-                  <p className="text-sm font-semibold text-[#20343A]">
+                  <p className="text-sm font-semibold text-[var(--mn-ink)]">
                     {getLocalizedText(item.title, locale)}
                   </p>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -1176,7 +1176,7 @@ export function FinalReportPanel({
 
       {report.safetyNotes.length > 0 ? (
         <div className="mt-4 rounded-lg bg-white p-4 ring-1 ring-foreground/10">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#20343A]">
+          <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--mn-ink)]">
             {labels.finalReportSafetyNotes}
           </h4>
           <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
@@ -1343,9 +1343,9 @@ export function ProductRecommendationsPanel({
               disabled={pending}
               className={`px-3 py-2 transition ${
                 selected
-                  ? "bg-[#1FA77A] text-white"
+                  ? "bg-[var(--mn-teal)] text-white"
                   : available
-                    ? "bg-white text-[#20343A] hover:bg-gray-50"
+                    ? "bg-white text-[var(--mn-ink)] hover:bg-gray-50"
                     : "bg-white text-gray-400 hover:bg-gray-50"
               } disabled:cursor-wait disabled:opacity-70`}
               key={preference}
@@ -1424,7 +1424,7 @@ export function ProductRecommendationsPanel({
     return (
       <section className="mt-6 rounded-lg border border-gray-200 bg-white p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <h3 className="text-xl font-semibold tracking-normal text-[#20343A]">
+          <h3 className="text-xl font-semibold tracking-normal text-[var(--mn-ink)]">
             {emptyTitle}
           </h3>
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1447,13 +1447,13 @@ export function ProductRecommendationsPanel({
         {productRecommendations ? (
           <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <div className="rounded-md bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
-              <span className="font-semibold text-[#20343A]">
+              <span className="font-semibold text-[var(--mn-ink)]">
                 {productRecommendations.matchedCount}
               </span>{" "}
               <span className="text-gray-500">{labels.matched}</span>
             </div>
             <div className="rounded-md bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
-              <span className="font-semibold text-[#20343A]">
+              <span className="font-semibold text-[var(--mn-ink)]">
                 {productRecommendations.needsCount}
               </span>{" "}
               <span className="text-gray-500">{labels.needsReviewed}</span>
@@ -1467,13 +1467,13 @@ export function ProductRecommendationsPanel({
   return (
     <section className="mt-6 rounded-lg border border-gray-200 bg-white p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h3 className="text-2xl font-semibold tracking-normal text-[#20343A]">
+        <h3 className="text-2xl font-semibold tracking-normal text-[var(--mn-ink)]">
           {labels.title}
         </h3>
         <div className="flex flex-wrap items-center justify-end gap-3">
           {preferenceControl}
           <p className="text-sm font-medium text-gray-500">
-            {labels.stack}: <span className="text-[#20343A]">{stackCoverage}%</span>
+            {labels.stack}: <span className="text-[var(--mn-ink)]">{stackCoverage}%</span>
           </p>
         </div>
       </div>
@@ -1497,7 +1497,7 @@ export function ProductRecommendationsPanel({
             )}
             <div className="flex flex-1 flex-col p-4">
               <div className="flex items-start justify-between gap-3">
-                <h4 className="text-base font-semibold text-[#20343A]">
+                <h4 className="text-base font-semibold text-[var(--mn-ink)]">
                   {product.name}
                 </h4>
                 <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
@@ -1513,13 +1513,13 @@ export function ProductRecommendationsPanel({
                 {product.description}
               </p>
               <div className="mt-4 flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-[#20343A]">
+                <p className="text-sm font-semibold text-[var(--mn-ink)]">
                   {product.price
                     ? `${product.price.amount} ${product.price.currency}`
                     : ""}
                 </p>
                 <a
-                  className="rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white hover:bg-[#168763]"
+                  className="rounded-md bg-[var(--mn-teal)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--mn-teal-deep)]"
                   href={product.url}
                   onClick={() => trackMarketplaceClick(planId, product)}
                   rel="noreferrer"
@@ -1559,7 +1559,7 @@ function FormulaPanel({
     <section className="rounded-lg bg-white p-5 ring-1 ring-foreground/10 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold tracking-normal text-[#20343A]">
+          <h2 className="text-2xl font-semibold tracking-normal text-[var(--mn-ink)]">
             {labels.formula}
           </h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -1568,7 +1568,7 @@ function FormulaPanel({
         </div>
         <BeakerIcon
           aria-hidden={true}
-          className="size-6 flex-none text-[#3A7BD5]"
+          className="size-6 flex-none text-[var(--mn-gold)]"
         />
       </div>
 
@@ -1579,9 +1579,9 @@ function FormulaPanel({
           <div className="rounded-lg border border-dashed border-foreground/15 bg-background/60 p-6 text-center">
             <BeakerIcon
               aria-hidden={true}
-              className="mx-auto size-7 text-[#3A7BD5]"
+              className="mx-auto size-7 text-[var(--mn-gold)]"
             />
-            <h3 className="mt-4 text-base font-semibold text-[#20343A]">
+            <h3 className="mt-4 text-base font-semibold text-[var(--mn-ink)]">
               {hasPendingSafetyReview
                 ? labels.formulaEmptyTitle
                 : labels.formulaNoVisibleTitle}
@@ -1618,7 +1618,7 @@ function FormulaPanel({
             >
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <h4 className="text-base font-semibold text-[#20343A]">
+                  <h4 className="text-base font-semibold text-[var(--mn-ink)]">
                     {supplement}
                   </h4>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -1646,7 +1646,7 @@ function FormulaPanel({
                   <div className="mt-4 max-w-md">
                     <div className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                       <span>{labels.productCoverage}</span>
-                      <span className="text-[#20343A]">
+                      <span className="text-[var(--mn-ink)]">
                         {productCoverage}%
                       </span>
                     </div>
@@ -1665,7 +1665,7 @@ function FormulaPanel({
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {benefitTags.map((tag) => (
                           <span
-                            className="rounded-full bg-[#EFF6FF] px-2 py-0.5 text-xs font-semibold text-[#2F67B8] ring-1 ring-[#BFDBFE]"
+                            className="rounded-full bg-[var(--mn-mint)] px-2 py-0.5 text-xs font-semibold text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]"
                             key={tag}
                           >
                             {foodTagLabel(tag)}
@@ -1680,7 +1680,7 @@ function FormulaPanel({
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     {labels.dailyDose}
                   </p>
-                  <p className="mt-1 text-sm font-medium text-[#20343A]">
+                  <p className="mt-1 text-sm font-medium text-[var(--mn-ink)]">
                     {dailyDose}
                   </p>
                 </div>
@@ -1709,8 +1709,8 @@ function SectionLoadingCards({
   const rows = Array.from({ length: 3 });
   const tint =
     accent === "green"
-      ? "bg-[#ECFDF5] ring-[#A7F3D0]"
-      : "bg-[#EFF6FF] ring-[#BFDBFE]";
+      ? "bg-[var(--mn-mint-deep)] ring-[var(--mn-teal-glow)]"
+      : "bg-[var(--mn-mint)] ring-[var(--mn-line)]";
 
   return (
     <>
@@ -1748,7 +1748,7 @@ function ReviewPlaceholderCard({
           <HeartIcon aria-hidden={true} className="size-5" />
         </span>
         <div className="min-w-0">
-          <h4 className="text-base font-semibold text-[#20343A]">
+          <h4 className="text-base font-semibold text-[var(--mn-ink)]">
             {title}
           </h4>
           <p className="mt-1 text-sm leading-6 text-amber-800">
@@ -1772,10 +1772,10 @@ function LockedFormulaPreview({
   const placeholderRows = Array.from({ length: Math.min(count, 3) });
 
   return (
-    <article className="rounded-lg border border-[#1FA77A]/20 bg-[#F3FBF7] p-4">
+    <article className="rounded-lg border border-[color-mix(in_srgb,var(--mn-teal)_20%,transparent)] bg-[var(--mn-mint-deep)] p-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <p className="text-base font-semibold text-[#20343A]">
+          <p className="text-base font-semibold text-[var(--mn-ink)]">
             {labels.previewLockedTitle}
           </p>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -1799,9 +1799,9 @@ function LockedFormulaPreview({
             key={index}
             className="rounded-lg border border-white/80 bg-white/80 p-4"
           >
-            <div className="h-4 w-40 rounded bg-[#20343A]/20" />
-            <div className="mt-3 h-3 w-full max-w-md rounded bg-[#20343A]/10" />
-            <div className="mt-2 h-3 w-3/4 rounded bg-[#20343A]/10" />
+            <div className="h-4 w-40 rounded bg-[color-mix(in_srgb,var(--mn-ink)_20%,transparent)]" />
+            <div className="mt-3 h-3 w-full max-w-md rounded bg-[color-mix(in_srgb,var(--mn-ink)_10%,transparent)]" />
+            <div className="mt-2 h-3 w-3/4 rounded bg-[color-mix(in_srgb,var(--mn-ink)_10%,transparent)]" />
           </div>
         ))}
       </div>

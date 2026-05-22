@@ -69,7 +69,7 @@ export function ProcessingPanel({
   return (
     <section className="w-full">
       <div className="mn-processing-card">
-        <h1 className="text-xl font-semibold tracking-normal text-[#20343A] text-balance sm:text-2xl">
+        <h1 className="text-xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance sm:text-2xl">
           <HighlightedBrandText text={title} />
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -109,11 +109,11 @@ export function SectionProgress({
       )}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          <span className="size-1.5 rounded-full bg-[#1FA77A]" />
+        <p className="flex items-center gap-2 font-[family:var(--mn-font-mono)] text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <span className="size-1.5 rounded-full bg-[var(--mn-teal)]" />
           {label}
         </p>
-        <p className="text-2xl font-semibold tracking-normal text-[#1FA77A]">
+        <p className="text-2xl font-semibold tracking-normal text-[var(--mn-teal)]">
           {progress}
           <span className="ml-0.5 text-sm font-semibold text-muted-foreground">
             %
