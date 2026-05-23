@@ -793,7 +793,7 @@ function jsonValue(value: unknown) {
   return JSON.parse(serialized ?? "{}");
 }
 
-function cacheKey({
+async function cacheKey({
   answers,
   healthScore,
   model,
@@ -960,7 +960,7 @@ export async function analyzeHealthScoreAdviceWithUsage({
   locale: Locale;
 }>): Promise<HealthScoreAdviceAnalysis> {
   const config = grokConfig();
-  const key = cacheKey({
+  const key = await cacheKey({
     answers,
     healthScore,
     model: config.model,

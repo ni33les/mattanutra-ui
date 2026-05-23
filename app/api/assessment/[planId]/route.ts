@@ -6,12 +6,14 @@ import {
 import {
   getStoredAssessmentPrefill,
   getStoredAssessmentSnapshot,
+  getStoredHealthScoreAnalysisSnapshot,
   isUuid,
   persistAssessmentSubmission
 } from "@/lib/assessment-store";
 import { computeHealthScore } from "@/lib/health-score";
 import {
   enqueueDueScheduledActions,
+  enqueueHealthScoreAnalysisTask,
   enqueueNutritionPlanTasks,
   scheduleReassessmentAction
 } from "@/lib/task-worker";
@@ -68,7 +70,16 @@ export async function GET(
   { params }: AssessmentStatusRouteProps
 ) {
   const { planId } = await params;
-  const snapshot = await getStoredAssessmentSnapshot(planId);
+  const url = new URL(request.url);
+  const healthScoreView = url.searchParams.get("view") === "healthscore";
+
+  if (healthScoreView) {
+    await enqueueHealthScoreAnalysisTask({ planId });
+  }
+
+  const snapshot = healthScoreView
+    ? await getStoredHealthScoreAnalysisSnapshot(planId)
+    : await getStoredAssessmentSnapshot(planId);
 
   if (!snapshot) {
     return NextResponse.json(
@@ -185,6 +196,8 @@ export async function PATCH(
       ...healthScoreBpmFields(snapshot)
     });
 
+    await enqueueHealthScoreAnalysisTask({ planId: snapshot.planId });
+
     const reassessmentEmail = reassessmentEmailFromAnswers(body.answers);
 
     if (reassessmentEmail) {
@@ -207,7 +220,11 @@ export async function PATCH(
     }
 
     if (intent === "capture") {
-      return NextResponse.json(snapshot, {
+      const healthScoreSnapshot =
+        await getStoredHealthScoreAnalysisSnapshot(snapshot.planId) ??
+        snapshot;
+
+      return NextResponse.json(healthScoreSnapshot, {
         headers: {
           "Cache-Control": "no-store"
         }

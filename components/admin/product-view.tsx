@@ -6,7 +6,7 @@ import type {
   AdminProductRow,
   AdminProductsData
 } from "@/lib/admin-products";
-import { productMatchesSearch } from "@/lib/admin-product-search";
+import { productMatchesSearch } from "@/lib/admin-product-search-client";
 import {
   defaultProductCountryCode,
   normalizeProductCountryCode,

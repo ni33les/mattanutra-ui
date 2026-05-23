@@ -11,28 +11,30 @@ export function HealthspanLogo({
   return (
     <div
       role="img"
-      aria-label="MattaNutra logo. know the right amount."
-      className={cn("inline-flex w-max items-center gap-[13.5px]", className)}
+      aria-label="MattaNutra logo. Knowing the Right Amount."
+      className={cn("inline-flex w-max items-center gap-3", className)}
       {...props}
     >
-      <Image
-        src="/favicon.svg"
-        alt=""
-        width={38}
-        height={38}
-        priority
-        unoptimized
-        className="h-[40px] w-[40px] shrink-0 sm:h-[44px] sm:w-[44px]"
-        aria-hidden="true"
-      />
+      <span className="mn-logo-mark-frame">
+        <Image
+          src="/v11/logo-mark.png"
+          alt=""
+          width={96}
+          height={150}
+          priority
+          unoptimized
+          className="mn-logo-mark-image"
+          aria-hidden="true"
+        />
+      </span>
 
       <span className="inline-grid leading-none">
-        <span className="flex items-baseline font-[family:var(--mn-font-display)] text-[20px] font-semibold tracking-normal sm:text-[22.5px]">
-          <span className="text-[var(--mn-ink)]">Matta</span>
+        <span className="flex items-baseline gap-1 font-[family:var(--mn-font-display)] text-[21px] font-semibold tracking-normal sm:text-[23px]">
+          <span className="text-[var(--mn-logo-ink,var(--mn-ink))]">Matta</span>
           <span className="text-[var(--mn-teal)]">Nutra</span>
         </span>
-        <span className="mt-[4.5px] font-[family:var(--mn-font-mono)] text-[10.5px] font-medium uppercase tracking-[0.18em] text-muted-foreground sm:text-[11.5px]">
-          know the right amount
+        <span className="mt-1 font-[family:var(--mn-font-mono)] text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--mn-logo-tagline,var(--muted-foreground))] sm:text-[10.5px]">
+          Knowing the Right Amount
         </span>
       </span>
     </div>

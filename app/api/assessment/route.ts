@@ -7,11 +7,13 @@ import {
 } from "@/lib/assessment-snapshot";
 import {
   getStoredAssessmentSnapshot,
+  getStoredHealthScoreAnalysisSnapshot,
   persistAssessmentSubmission
 } from "@/lib/assessment-store";
 import { computeHealthScore } from "@/lib/health-score";
 import {
   enqueueDueScheduledActions,
+  enqueueHealthScoreAnalysisTask,
   enqueueNutritionPlanTasks,
   scheduleReassessmentAction
 } from "@/lib/task-worker";
@@ -123,6 +125,8 @@ export async function POST(request: Request) {
       ...healthScoreBpmFields(snapshot)
     });
 
+    await enqueueHealthScoreAnalysisTask({ planId: snapshot.planId });
+
     const reassessmentEmail = reassessmentEmailFromAnswers(body.answers);
 
     if (reassessmentEmail) {
@@ -190,7 +194,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const storedSnapshot = await getStoredAssessmentSnapshot(snapshot.planId);
+  const storedSnapshot =
+    await getStoredHealthScoreAnalysisSnapshot(snapshot.planId) ??
+    await getStoredAssessmentSnapshot(snapshot.planId);
 
   return NextResponse.json(storedSnapshot ?? snapshot, {
     headers: {

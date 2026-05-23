@@ -105,7 +105,7 @@ export async function POST(
       network: textOrNull(body.network, 100),
       platform: textOrNull(body.platform, 100),
       priceAmount: numberOrNull(body.priceAmount),
-      priority: numberOrNull(body.priority),
+      priority: numberOrNull(body.priority) ?? undefined,
       productId: id,
       status:
         status === "flagged_stale" || status === "inactive"

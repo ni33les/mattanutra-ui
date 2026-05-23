@@ -781,7 +781,7 @@ function NutritionGuidancePreparingPanel({
 
 const revealCopy = {
   en: {
-    evaluated: "evaluated",
+    ingredientCount: "ingredients",
     formulaEyebrow: "Your formula",
     formulaLead:
       "These are the supplement priorities selected from your answers, cautions and product coverage.",
@@ -802,7 +802,7 @@ const revealCopy = {
     productsEmpty:
       "The formula is ready, but the product catalogue does not yet contain an approved stack for these needs.",
     productsTitle: "From shelves to certainty.",
-    selected: "selected",
+    supplementsRecommended: "supplements recommended",
     selectedProducts: "Selected products",
     tableAmount: "Daily amount",
     tableCoverage: "Product fit",
@@ -820,7 +820,7 @@ const revealCopy = {
       "Wellness information only. Share this plan with a physician or pharmacist if you use medication, are pregnant or breastfeeding, have a medical condition, or your situation changes."
   },
   th: {
-    evaluated: "รายการที่ประเมิน",
+    ingredientCount: "ส่วนผสม",
     formulaEyebrow: "สูตรของคุณ",
     formulaLead:
       "นี่คือลำดับความสำคัญของอาหารเสริมที่เลือกจากคำตอบ ข้อควรระวัง และความครอบคลุมของผลิตภัณฑ์",
@@ -840,7 +840,7 @@ const revealCopy = {
     productsEmpty:
       "สูตรพร้อมแล้ว แต่แคตตาล็อกยังไม่มีชุดผลิตภัณฑ์ที่อนุมัติสำหรับความต้องการนี้",
     productsTitle: "จากชั้นวางสู่ความชัดเจน",
-    selected: "รายการที่เลือก",
+    supplementsRecommended: "อาหารเสริมที่แนะนำ",
     selectedProducts: "ผลิตภัณฑ์ที่เลือก",
     tableAmount: "ปริมาณต่อวัน",
     tableCoverage: "ความพอดีของสินค้า",
@@ -939,10 +939,11 @@ function RevealResultsPage({
 }>) {
   const copy = revealCopy[locale];
   const visibleIngredients = visibleFormulaIngredients(ingredients);
-  const selectedCount = visibleIngredients.length;
-  const evaluatedCount = Math.max(
-    selectedCount,
-    Number(result.totalSupplementCount ?? selectedCount)
+  const recommendedSupplementCount = visibleIngredients.length;
+  const ingredientCount = Math.max(
+    recommendedSupplementCount + lockedSupplementCount,
+    Number(result.totalSupplementCount ?? recommendedSupplementCount),
+    recommendedSupplementCount
   );
   const selectedCoverage = selectedStackCoverage(activeProductRecommendations, products);
   const productNeedCount = productCoveredNeedCount(products);
@@ -1022,10 +1023,10 @@ function RevealResultsPage({
           <div className="mt-12 flex flex-col items-center justify-center gap-8 sm:flex-row sm:gap-14">
             <div>
               <div className="font-serif text-8xl font-light leading-none text-[var(--mn-ash-soft)] sm:text-9xl">
-                {evaluatedCount}
+                {ingredientCount}
               </div>
               <p className="mn-mono-label mt-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-ash)]">
-                {copy.evaluated}
+                {copy.ingredientCount}
               </p>
             </div>
             <div className="font-serif text-5xl italic text-[var(--mn-gold)]">
@@ -1033,15 +1034,15 @@ function RevealResultsPage({
             </div>
             <div>
               <div className="font-serif text-8xl font-light leading-none text-[var(--mn-teal-deep)] sm:text-9xl">
-                {selectedCount}
+                {recommendedSupplementCount}
               </div>
               <p className="mn-mono-label mt-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-ink-soft)]">
-                {copy.selected}
+                {copy.supplementsRecommended}
               </p>
             </div>
           </div>
           <p className="mx-auto mt-8 max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]">
-            {selectedCount} selected recommendations, {lockedSupplementCount} held back or locked, and no food items included in the active product engine.
+            {ingredientCount} ingredient priorities assessed, {recommendedSupplementCount} supplements recommended, {lockedSupplementCount} held back or locked, and no food items included in the active product engine.
           </p>
         </div>
       </section>

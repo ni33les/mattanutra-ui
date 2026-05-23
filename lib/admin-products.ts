@@ -46,10 +46,6 @@ const randomUUID = () => globalThis.crypto.randomUUID();
 export { defaultProductCountryCode } from "@/lib/product-countries";
 export { isUuidValue } from "./admin-product-helpers"; // will move definition later if needed
 export { createAdminProduct, updateAdminProduct } from "./admin-product-writes";
-
-export { upsertProductOffer, removeProductOffer } from "./admin-product-offers";
-
-export { updateProductBrandCountries } from "./admin-product-countries";
 import { summaryFromRows } from "./admin-product-read-model"; // transitional for duplicate getAdminProductsData during final cleanup
 import { cleanNullableText, normalizedUrl, productTitleLooksEnglish } from "./admin-product-helpers"; // for remaining functions in god during final cleanup
 import { loadAdminProductRow, loadAdminProductRowsForBrand } from "./admin-product-read-model"; // for remaining calls in god during final cleanup
@@ -2672,8 +2668,6 @@ export async function updateProductBrandCountries(input: Readonly<{
   };
 }
 
-export { updateAdminProduct } from "./admin-product-writes";
-
 // Transitional minimal implementations for names still imported by other modules during final cleanup.
 // These will be properly moved to their target modules (helpers/search) in the next tranche.
 
@@ -2867,16 +2861,74 @@ export type RemoveProductOfferInput = Readonly<{
 // This satisfies the task system callers during the final split. The real implementation should live in admin-product-search.ts.
 
 export async function getProductRecommendationCandidates(input: Readonly<{
+  countryCode?: string | null;
+  includeIneligible?: boolean;
   limit?: number;
   productId?: string | null;
 }>) {
   const rows = await loadProductRows(input.productId ?? null);
 
   if (!rows) {
-    return [] as any[];
+    return [] as ProductCandidate[];
   }
 
-  // Basic candidate list (full marginal coverage, penalty, etc. logic to be restored in search module)
-  return rows.map(rowFromDb).slice(0, input.limit ?? 100) as any[];
-}
+  const countryCode = input.countryCode
+    ? normalizeProductCountryCode(input.countryCode)
+    : null;
+  let candidates = rows.map((sourceRow) => {
+    const row = rowFromDb(sourceRow);
+    const activeOffer =
+      row.offers.find((offer) =>
+        offer.status === "active" &&
+        offer.availabilityStatus !== "out_of_stock" &&
+        offer.availabilityStatus !== "unavailable" &&
+        offer.linkType === "affiliate"
+      ) ??
+      row.offers.find((offer) =>
+        offer.status === "active" &&
+        offer.availabilityStatus !== "out_of_stock" &&
+        offer.availabilityStatus !== "unavailable"
+      ) ??
+      null;
 
+    return {
+      ...row,
+      activeOfferId: activeOffer?.id ?? null,
+      activeAffiliateUrl:
+        activeOffer?.linkType === "affiliate" ? activeOffer.url : null,
+      activeAffiliateCommissionRate:
+        activeOffer?.linkType === "affiliate"
+          ? activeOffer.commissionRate
+          : null,
+      activeAffiliatePriority: activeOffer?.priority ?? null,
+      activeAffiliateType: activeOffer?.linkType ?? null,
+      automatedSafetyPassed:
+        row.validation.status === "pass" &&
+        productSafetyPasses(row.facts, sourceRow.facts)
+    } satisfies ProductCandidate;
+  });
+
+  if (countryCode) {
+    candidates = candidates.filter((candidate) => {
+      const productCountries = candidate.availableCountryCodes ?? [];
+      const manufacturerCountries = candidate.manufacturerCountryCodes ?? [];
+
+      return (
+        productCountries.includes(countryCode) &&
+        (manufacturerCountries.length < 1 ||
+          manufacturerCountries.includes(countryCode))
+      );
+    });
+  }
+
+  if (!input.includeIneligible) {
+    candidates = candidates.filter((candidate) =>
+      candidate.status === "approved" &&
+      candidate.brandStatus === "approved" &&
+      candidate.validation?.status === "pass" &&
+      candidate.automatedSafetyPassed
+    );
+  }
+
+  return input.limit ? candidates.slice(0, input.limit) : candidates;
+}

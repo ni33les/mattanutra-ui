@@ -1029,8 +1029,6 @@ type AssessmentSection = Readonly<{
   title: string;
 }>;
 
-type SegmentIntroPhase = "done" | "leaving" | "showing";
-
 type ProcessingStepState = "active" | "complete" | "failed" | "pending";
 
 type ProcessingStatus = Readonly<{
@@ -1047,8 +1045,6 @@ type ProcessingStatus = Readonly<{
 }>;
 
 const ASSESSMENT_REQUEST_TIMEOUT_MS = 30_000;
-const FOUNDATION_INTRO_DISPLAY_MS = 800;
-const FOUNDATION_INTRO_EXIT_MS = 200;
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
   const controller = new AbortController();
@@ -1062,6 +1058,10 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
   } finally {
     window.clearTimeout(timeout);
   }
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function buildReturningScoreGateStatus(planId: string, healthScore: HealthScoreResult): ProcessingStatus {
@@ -1120,39 +1120,6 @@ function PrecisionGauge({
         <span className="text-right">{labels[2]}</span>
       </div>
     </div>
-  );
-}
-
-function SegmentIntro({
-  body,
-  phase,
-  title
-}: Readonly<{
-  body: string;
-  phase: SegmentIntroPhase;
-  title: string;
-}>) {
-  const leaving = phase === "leaving";
-
-  return (
-    <section
-      aria-label={`${title} introduction`}
-      className={cx(
-        "fixed inset-0 z-50 flex items-center justify-center bg-background px-6 py-16 text-center transition-all duration-200 ease-out sm:px-10",
-        leaving
-          ? "-translate-y-6 opacity-0"
-          : "translate-y-0 opacity-100"
-      )}
-    >
-      <div className="assessment-intro-rise mx-auto max-w-5xl">
-        <h2 className="mn-display-heading text-6xl font-semibold uppercase tracking-[0.16em] text-[var(--mn-ink)] text-balance sm:text-7xl lg:text-8xl">
-          {title}
-        </h2>
-        <p className="mx-auto mt-8 max-w-4xl text-2xl font-semibold uppercase leading-snug tracking-[0.08em] text-[var(--mn-teal)] text-balance sm:text-4xl">
-          “{body}”
-        </p>
-      </div>
-    </section>
   );
 }
 
@@ -1243,23 +1210,28 @@ function AssessmentStepper({
                 type="button"
                 aria-current={active ? "step" : undefined}
                 className={cx(
-                  "flex h-full w-full flex-col gap-1 rounded-lg border bg-[var(--mn-paper)] px-3 py-3 text-left shadow-sm transition",
+                  "flex h-full w-full flex-col gap-1 rounded-lg border px-3 py-3 text-left shadow-sm transition",
                   active
-                    ? "border-[var(--mn-teal)] bg-[color-mix(in_srgb,var(--mn-teal)_5%,transparent)] shadow-md"
+                    ? "border-[#3A7BD5] bg-[#3A7BD5] text-white shadow-md"
                     : done
-                      ? "border-[color-mix(in_srgb,var(--mn-teal)_30%,transparent)] hover:border-[color-mix(in_srgb,var(--mn-teal)_60%,transparent)]"
-                      : "border-foreground/10 hover:border-[color-mix(in_srgb,var(--mn-gold)_35%,transparent)]"
+                      ? "border-[var(--mn-teal)] bg-[var(--mn-teal)] text-white hover:border-[var(--mn-teal-deep)]"
+                      : "border-foreground/10 bg-[var(--mn-paper)] hover:border-[color-mix(in_srgb,var(--mn-gold)_35%,transparent)]"
                 )}
                 onClick={() => onSelect(index)}
               >
-                <span className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                <span
+                  className={cx(
+                    "flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]",
+                    active || done ? "text-white/80" : "text-muted-foreground"
+                  )}
+                >
                   <span
                     className={cx(
                       "flex size-5 items-center justify-center rounded-full text-[10px] font-bold",
                       active
-                        ? "bg-[var(--mn-teal)] text-white"
+                        ? "bg-white text-[#3A7BD5]"
                         : done
-                          ? "bg-[var(--mn-ink)] text-white"
+                          ? "bg-white text-[var(--mn-teal-deep)]"
                           : "bg-background text-muted-foreground"
                     )}
                   >
@@ -1276,7 +1248,7 @@ function AssessmentStepper({
                 <span
                   className={cx(
                     "hidden text-sm font-semibold tracking-normal sm:block",
-                    active || done ? "text-[var(--mn-ink)]" : "text-muted-foreground"
+                    active || done ? "text-white" : "text-muted-foreground"
                   )}
                 >
                   {stages[index] ?? section.title}
@@ -1310,9 +1282,6 @@ export function AssessmentFlow({
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus | null>(null);
   const [processingError, setProcessingError] = useState("");
   const [capturedStatus, setCapturedStatus] = useState<ProcessingStatus | null>(returningScoreStatus);
-  const [foundationIntroPhase, setFoundationIntroPhase] = useState<SegmentIntroPhase>(() =>
-    initialStage === "quiz" && !returningScoreStatus ? "showing" : "done"
-  );
   const [showHealthScore, setShowHealthScore] = useState(Boolean(returningScoreStatus || initialStage === "healthscore"));
   const [healthScore, setHealthScore] = useState<HealthScoreResult | null>(returningHealthScore ?? null);
   const captureInFlight = useRef<Promise<ProcessingStatus | null> | null>(null);
@@ -1356,45 +1325,6 @@ export function AssessmentFlow({
       ...healthScoreBpmFields(healthScore)
     });
   }, [capturedStatus?.planId, healthScore, locale, returningPlanId, showHealthScore]);
-
-  useEffect(() => {
-    if (
-      foundationIntroPhase !== "showing" ||
-      sectionIndex !== 0 ||
-      showHealthScore ||
-      processingStatus
-    ) {
-      return;
-    }
-
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      // Defer to avoid synchronous setState-in-effect lint rule (safe for this mount-time jump)
-      Promise.resolve().then(() => setFoundationIntroPhase("done"));
-      return;
-    }
-
-    const leaveTimer = window.setTimeout(
-      () => setFoundationIntroPhase("leaving"),
-      FOUNDATION_INTRO_DISPLAY_MS
-    );
-
-    return () => {
-      window.clearTimeout(leaveTimer);
-    };
-  }, [foundationIntroPhase, processingStatus, sectionIndex, showHealthScore]);
-
-  useEffect(() => {
-    if (foundationIntroPhase !== "leaving") {
-      return;
-    }
-
-    const doneTimer = window.setTimeout(
-      () => setFoundationIntroPhase("done"),
-      FOUNDATION_INTRO_EXIT_MS
-    );
-
-    return () => window.clearTimeout(doneTimer);
-  }, [foundationIntroPhase]);
 
   const ui = locale === "th"
     ? {
@@ -2063,7 +1993,6 @@ export function AssessmentFlow({
     clearProcessingStatus();
     setCapturedStatus(null);
     captureInFlight.current = null;
-    setFoundationIntroPhase("done");
     setSectionIndex(sections.length - 1);
     window.scrollTo({ behavior: "smooth", top: 0 });
   }
@@ -2071,11 +2000,9 @@ export function AssessmentFlow({
   const currentSection = sections[Math.min(sectionIndex, sections.length - 1)];
   const renderedQuestions = currentSection.questions;
   const isFinalStep = sectionIndex === sections.length - 1;
-  const foundationIntroActive = currentSection.id === "about" && foundationIntroPhase !== "done";
-  const questionsConcealed = currentSection.id === "about" && foundationIntroPhase === "showing";
   const disclosureRequiredForAction = ["food", "safety", "precision"].includes(currentSection.id);
   const primaryActionDisabled =
-    foundationIntroActive || (disclosureRequiredForAction && !answers.disclosure);
+    disclosureRequiredForAction && !answers.disclosure;
 
   function goBack() {
     setProcessingError("");
@@ -2090,9 +2017,6 @@ export function AssessmentFlow({
 
   function goToSection(index: number) {
     setProcessingError("");
-    if (index !== 0) {
-      setFoundationIntroPhase("done");
-    }
     setSectionIndex(Math.min(Math.max(index, 0), sections.length - 1));
     window.scrollTo({ behavior: "smooth", top: 0 });
   }
@@ -2108,6 +2032,7 @@ export function AssessmentFlow({
     }
 
     setSectionIndex(Math.min(sectionIndex + 1, sections.length - 1));
+    window.scrollTo({ behavior: "smooth", top: 0 });
   }
 
   async function prepareHealthScoreGate(answerPayload = answers) {
@@ -2139,19 +2064,56 @@ export function AssessmentFlow({
         throw new Error("Unable to capture assessment");
       }
 
-      if (!captured.healthScore) {
+      let readyStatus = captured;
+
+      if (readyStatus.status !== "ready") {
+        setProcessingStatus(readyStatus);
+        readyStatus = await waitForHealthScoreAnalysis(readyStatus.planId);
+      }
+
+      if (!readyStatus.healthScore) {
         throw new Error("Assessment capture did not return a HealthScore");
       }
 
-      setHealthScore(captured.healthScore);
-      setCapturedStatus(captured);
+      setHealthScore(readyStatus.healthScore);
+      setCapturedStatus(readyStatus);
       setProcessingStatus(null);
       setShowHealthScore(true);
-      router.replace(nutritionHealthScorePath(locale, captured.planId));
+      router.replace(nutritionHealthScorePath(locale, readyStatus.planId));
     } catch {
       clearProcessingStatus();
       setProcessingError(ui.processingError);
     }
+  }
+
+  async function waitForHealthScoreAnalysis(planId: string) {
+    let latestStatus: ProcessingStatus | null = null;
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const response = await fetchWithTimeout(
+        `/api/assessment/${encodeURIComponent(planId)}?view=healthscore`,
+        { cache: "no-store" }
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to load HealthScore analysis status");
+      }
+
+      latestStatus = (await response.json()) as ProcessingStatus;
+      setProcessingStatus(latestStatus);
+
+      if (latestStatus.status === "ready") {
+        return latestStatus;
+      }
+
+      if (latestStatus.status === "failed") {
+        throw new Error("HealthScore analysis failed");
+      }
+
+      await sleep(1500);
+    }
+
+    throw new Error("HealthScore analysis timed out");
   }
 
   async function captureAssessment(force = false, answerPayload = answers) {
@@ -2233,12 +2195,6 @@ export function AssessmentFlow({
 	            locale={locale}
 	            planId={capturedStatus?.planId ?? returningPlanId ?? undefined}
 	          />
-	        ) : foundationIntroActive ? (
-	          <SegmentIntro
-	            body={copy.sectionNotes[0]}
-	            phase={foundationIntroPhase}
-	            title={copy.stagePhases[0] ?? "Foundation"}
-	          />
 	        ) : (
 	          <div className="space-y-6">
             <div className="py-3">
@@ -2298,12 +2254,7 @@ export function AssessmentFlow({
               title={currentSection.title}
             >
               <div
-                className={cx(
-                  "space-y-7 transition-all duration-700 ease-out",
-                  questionsConcealed
-                    ? "max-h-0 translate-y-4 overflow-hidden opacity-0"
-                    : "max-h-[240rem] translate-y-0 opacity-100"
-                )}
+                className="space-y-7"
               >
                 {renderedQuestions.map((question) => (
                   <Question

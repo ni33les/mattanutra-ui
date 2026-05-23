@@ -365,7 +365,7 @@ const paymentCopy = {
     heroTitle(score: number) {
       return `Your HealthScore is ${score}.`;
     },
-    heroAccent: "And now we know so much more.",
+    heroAccent: "And now you know so much more.",
     heroBody:
       "We analysed your answers to prepare your Right Amount Plan. The next step turns your score pattern into specific supplement priorities, dose guidance and product direction.",
     heroPrimary: "Unlock my Right Amount Plan",
@@ -763,7 +763,11 @@ function HealthScorePaymentProgress({ locale }: Readonly<{ locale: Locale }>) {
           <div
             className={cx(
               "flex items-center gap-3 p-4 md:p-5",
-              active ? "bg-[var(--mn-mint)]" : ""
+              done
+                ? "bg-[var(--mn-teal)] text-white"
+                : active
+                  ? "bg-[#3A7BD5] text-white"
+                  : ""
             )}
             key={title}
           >
@@ -771,19 +775,29 @@ function HealthScorePaymentProgress({ locale }: Readonly<{ locale: Locale }>) {
               className={cx(
                 "grid size-9 shrink-0 place-items-center rounded-full border text-xs font-bold",
                 done
-                  ? "border-[var(--mn-teal)] bg-[var(--mn-teal)] text-white"
+                  ? "border-white bg-white text-[var(--mn-teal-deep)]"
                   : active
-                    ? "border-[var(--mn-teal)] bg-white text-[var(--mn-teal-deep)]"
+                    ? "border-white bg-white text-[#3A7BD5]"
                     : "border-[var(--mn-line)] bg-white text-[var(--mn-ash)]"
               )}
             >
               {done ? "✓" : `0${index + 1}`}
             </span>
             <span>
-              <strong className="block text-sm text-[var(--mn-ink)]">
+              <strong
+                className={cx(
+                  "block text-sm",
+                  done || active ? "text-white" : "text-[var(--mn-ink)]"
+                )}
+              >
                 {title}
               </strong>
-              <span className="block text-xs text-[var(--mn-ash)]">
+              <span
+                className={cx(
+                  "block text-xs",
+                  done || active ? "text-white/80" : "text-[var(--mn-ash)]"
+                )}
+              >
                 {body}
               </span>
             </span>
