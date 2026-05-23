@@ -1474,7 +1474,8 @@ export async function getStoredFormulationResult(
           order by case latest_runs.stack_preference
             when 'compact' then 1
             when 'balanced' then 2
-            else 3
+            when 'balanced' then 3
+            else 4
           end
         ),
         '[]'::jsonb

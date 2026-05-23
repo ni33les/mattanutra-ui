@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import {
   BeakerIcon,
   ExclamationTriangleIcon,
@@ -589,7 +589,6 @@ export function FormulationResults({
 
   useEffect(() => {
     if (!result) {
-      setSelectedProductStackPreference(null);
       return;
     }
 
@@ -600,11 +599,13 @@ export function FormulationResults({
       options[0]?.id ??
       null;
 
-    setSelectedProductStackPreference((current) =>
-      current && options.some((option) => option.id === current)
-        ? current
-        : defaultPreference
-    );
+    startTransition(() => {
+      setSelectedProductStackPreference((current) =>
+        current && options.some((option) => option.id === current)
+          ? current
+          : defaultPreference
+      );
+    });
   }, [result]);
 
   if (loadState === "loading") {
@@ -1092,7 +1093,14 @@ function RevealFormulaSection({
   locale: Locale;
   productCoverageBySupplementId: ReadonlyMap<string, number>;
 }>) {
-  let rowNumber = 0;
+  // Compute stable row numbers declaratively (avoids mutation during render)
+  const ingredientRowNumber = new Map<string, number>();
+  let n = 0;
+  for (const [, group] of groupedFormulaIngredients(ingredients)) {
+    for (const ing of group) {
+      ingredientRowNumber.set(ing.id, ++n);
+    }
+  }
 
   return (
     <section className="border-t border-[var(--mn-line)] py-20" id="formula">
@@ -1130,7 +1138,7 @@ function RevealFormulaSection({
                 </span>
               </div>
               {group.map((ingredient) => {
-                rowNumber += 1;
+                const rowNumber = ingredientRowNumber.get(ingredient.id) ?? 0;
                 const supplement = getLocalizedText(ingredient.supplement, locale);
                 const rationale = getLocalizedText(ingredient.rationale, locale);
                 const dailyDose = getLocalizedText(ingredient.dailyDose, locale);
