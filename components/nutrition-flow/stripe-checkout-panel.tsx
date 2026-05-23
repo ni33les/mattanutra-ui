@@ -7,6 +7,8 @@ import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { Locale } from "@/lib/i18n";
 import type { PaymentSourceSurface } from "@/lib/payment-paths";
 
+const MOCK_PAYMENT_COMPLETION_DELAY_MS = 1200;
+
 type StripeCheckoutPanelProps = Readonly<{
   locale: Locale;
   plan: AssessmentPlan;
@@ -128,6 +130,13 @@ export function StripeCheckoutPanel({
       setIsCompletingMock(false);
     }
   }, [labels.unable]);
+  const scheduleMockCheckoutCompletion = useCallback((id: string) => {
+    setIsCompletingMock(true);
+    setError("");
+    window.setTimeout(() => {
+      void completeMockCheckout(id);
+    }, MOCK_PAYMENT_COMPLETION_DELAY_MS);
+  }, [completeMockCheckout]);
   const options = useMemo(
     () => ({
       fetchClientSecret: async () => {
@@ -156,7 +165,7 @@ export function StripeCheckoutPanel({
             disabled={isCompletingMock}
             type="button"
             onClick={async () => {
-              await completeMockCheckout(paymentId);
+              scheduleMockCheckoutCompletion(paymentId);
             }}
           >
             {isCompletingMock ? labels.loading : labels.mockCta}
@@ -184,7 +193,7 @@ export function StripeCheckoutPanel({
               const session = await requestCheckoutSession();
 
               if (session.mock && session.paymentId) {
-                await completeMockCheckout(session.paymentId);
+                scheduleMockCheckoutCompletion(session.paymentId);
               }
             } catch (caught) {
               setError(caught instanceof Error ? caught.message : labels.configError);

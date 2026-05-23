@@ -11,7 +11,14 @@ export type AdminFinancialMetricId =
   | "transactions";
 
 export type AdminFinancialEntryType = "actual" | "nominal";
-export type AdminFinancialCategory = "ai" | "hosting" | "other";
+export type AdminFinancialCategory =
+  | "ai"
+  | "hosting"
+  | "other"
+  | "payment_fee"
+  | "payout"
+  | "refund"
+  | "revenue";
 
 export type AdminFinancialTransactionRow = Readonly<{
   amount: number;
@@ -239,6 +246,15 @@ function financeCategory(value: string | null | undefined): AdminFinancialCatego
 
   if (value === "hosting" || value === "infrastructure") {
     return "hosting";
+  }
+
+  if (
+    value === "payment_fee" ||
+    value === "payout" ||
+    value === "refund" ||
+    value === "revenue"
+  ) {
+    return value;
   }
 
   return "other";

@@ -111,7 +111,10 @@ const SUPPORTED_STRIPE_WEBHOOK_EVENTS = new Set([
   "checkout.session.async_payment_succeeded",
   "checkout.session.completed",
   "checkout.session.expired",
-  "payment_intent.payment_failed"
+  "payment_intent.payment_failed",
+  "payout.canceled",
+  "payout.failed",
+  "payout.paid"
 ]);
 
 export function normalizeStripeWebhookPayloadShape(
@@ -620,7 +623,55 @@ async function insertPayment(
     source: "stripe_payments"
   });
 
+  if (rows[0]) {
+    await recordStripePaymentNominalRevenue(sql, rows[0], {
+      accountingBasis: "payment_created",
+      mattanutraEnv: input.config.env,
+      sourceSurface: input.sourceSurface,
+      stripeMode: input.config.mode
+    });
+  }
+
   return rows[0];
+}
+
+function paymentCustomerLedgerAccount(payment: PaymentRow) {
+  return payment.plan_id
+    ? `plan:${payment.plan_id}:customer`
+    : `payment:${payment.id}:unbound-customer`;
+}
+
+async function recordStripePaymentNominalRevenue(
+  sql: Db,
+  payment: PaymentRow,
+  metadata: Record<string, unknown> = {}
+) {
+  return recordFinanceTransaction({
+    amount: payment.amount,
+    category: "revenue",
+    currency: payment.currency,
+    description: `Nominal Stripe ${payment.selected_plan} payment`,
+    entryType: "nominal",
+    from: paymentCustomerLedgerAccount(payment),
+    metadata: {
+      paymentId: payment.id,
+      paymentStatus: payment.status,
+      planId: payment.plan_id,
+      selectedPlan: payment.selected_plan,
+      sourceSurface: payment.source_surface,
+      stripeCheckoutSessionId: payment.stripe_checkout_session_id,
+      stripeCustomerId: payment.stripe_customer_id,
+      stripePaymentIntentId: payment.stripe_payment_intent_id,
+      ...metadata
+    },
+    provider: "stripe",
+    source: "stripe",
+    sourceRef: `stripe:payment:${payment.id}:nominal-revenue`,
+    sql,
+    to: "mattanutra:revenue",
+    toAccountId: FINANCE_ACCOUNT_IDS.mattanutraRevenue,
+    usdRate: thbUsdRate()
+  });
 }
 
 function stringId(value: unknown) {
@@ -672,34 +723,14 @@ async function recordStripePaymentAccounting(
   const paymentIntentId =
     (session ? stringId(session.payment_intent) : null) ??
     payment.stripe_payment_intent_id;
-  const from = payment.plan_id
-    ? `plan:${payment.plan_id}:customer`
-    : `customer:${customerId || payment.id}`;
 
   try {
-    await recordFinanceTransaction({
-      amount: amountMicros,
-      category: "revenue",
-      currency: payment.currency,
-      description: `Stripe ${payment.selected_plan} payment`,
-      entryType: "actual",
-      from,
-      metadata: {
-        accountingBasis: "cash_receipt",
-        paymentId: payment.id,
-        selectedPlan: payment.selected_plan,
-        sourceSurface: payment.source_surface,
-        stripeCheckoutSessionId: checkoutSessionId,
-        stripeCustomerId: customerId,
-        stripePaymentIntentId: paymentIntentId
-      },
-      provider: "stripe",
-      source: "stripe",
-      sourceRef: `stripe:checkout_session:${checkoutSessionId}:gross`,
-      sql,
-      to: "mattanutra:stripe-clearing",
-      toAccountId: FINANCE_ACCOUNT_IDS.stripeClearing,
-      usdRate: thbUsdRate()
+    await recordStripePaymentNominalRevenue(sql, payment, {
+      accountingBasis: "payment_confirmed",
+      amountMicros,
+      stripeCheckoutSessionId: checkoutSessionId,
+      stripeCustomerId: customerId,
+      stripePaymentIntentId: paymentIntentId
     });
 
     const intent = session ? paymentIntentFromSession(session) as unknown as {
@@ -785,6 +816,72 @@ async function recordStripePaymentAccounting(
       valueCurrency: payment.currency
     });
   }
+}
+
+async function recordStripePayoutAccounting(
+  sql: Db,
+  payout: Stripe.Payout,
+  input: Readonly<{
+    config: StripePaymentConfig;
+    request?: Request;
+    stripeEventId?: string | null;
+  }>
+) {
+  const amountMicros = amountMicrosFromStripeAmount(payout.amount);
+  const currency = payout.currency?.toUpperCase() || "THB";
+
+  if (!amountMicros || !/^[A-Z]{3}$/.test(currency)) {
+    throw new Error("Stripe payout amount or currency is invalid");
+  }
+
+  await recordFinanceTransaction({
+    amount: amountMicros,
+    category: "payout",
+    currency,
+    description: `Stripe payout ${payout.id}`,
+    entryType: "actual",
+    from: `stripe:payout:${payout.id}`,
+    fromAccountId: FINANCE_ACCOUNT_IDS.stripeClearing,
+    metadata: {
+      accountingBasis: "stripe_payout",
+      arrivalDate: payout.arrival_date ?? null,
+      balanceTransactionId: stringId(payout.balance_transaction),
+      mattanutraEnv: input.config.env,
+      stripeMode: input.config.mode,
+      stripePayoutId: payout.id,
+      stripePayoutStatus: payout.status
+    },
+    occurredAt: payout.arrival_date
+      ? new Date(payout.arrival_date * 1000)
+      : new Date(),
+    provider: "stripe",
+    source: "stripe",
+    sourceRef: `stripe:payout:${payout.id}:net`,
+    sql,
+    to: "mattanutra:bank",
+    toAccountId: FINANCE_ACCOUNT_IDS.mattanutraBank,
+    usdRate: thbUsdRate()
+  });
+
+  await writePaymentBpmEvent({
+    actorType: "system",
+    eventName: "payment_payout_recorded",
+    eventStatus: "payout_recorded",
+    properties: {
+      amountMicros,
+      currency,
+      mattanutraEnv: input.config.env,
+      stripeMode: input.config.mode,
+      stripePayoutId: payout.id,
+      stripePayoutStatus: payout.status
+    },
+    request: input.request,
+    severity: "low",
+    sql,
+    stripeEventId: input.stripeEventId,
+    valueAmount: amountMicros / AMOUNT_MICROS_PER_UNIT,
+    valueCurrency: currency
+  });
 }
 
 async function storeStripeEmail(
@@ -1184,6 +1281,9 @@ export async function markPaymentCancelled(input: Readonly<{
           reason: "visitor_cancelled_checkout",
           status: "cancelled"
         });
+  await recordStripePaymentNominalRevenue(sql, updated ?? payment, {
+    accountingBasis: "payment_cancelled"
+  });
 
   await writePaymentBpmEvent({
     actorType: "visitor",
@@ -1230,6 +1330,11 @@ export async function completeMockPayment(input: Readonly<{
     return null;
   }
 
+  const mockWebhook = await recordMockStripeWebhookLifecycle(sql, {
+    config,
+    payment,
+    request: input.request
+  });
   const paid =
     payment.status === "paid" || payment.status === "bound"
       ? payment
@@ -1299,6 +1404,18 @@ export async function completeMockPayment(input: Readonly<{
     valueCurrency: currentPayment.currency
   });
 
+  await markWebhookEventStatus(sql, {
+    paymentId: currentPayment.id,
+    sessionId: mockWebhook.sessionId,
+    status: "processed",
+    stripeEventId: mockWebhook.fatEventId
+  });
+  await recordMockStripePayoutLifecycle(sql, {
+    config,
+    payment: currentPayment,
+    request: input.request
+  });
+
   return {
     destination: paymentReturnDestination(
       currentPayment.locale,
@@ -1306,6 +1423,297 @@ export async function completeMockPayment(input: Readonly<{
     ),
     payment: mapPayment(currentPayment)
   };
+}
+
+async function recordMockStripeWebhookLifecycle(
+  sql: Db,
+  input: Readonly<{
+    config: StripePaymentConfig;
+    payment: PaymentRow;
+    request?: Request;
+  }>
+) {
+  const sessionId =
+    input.payment.stripe_checkout_session_id || `mock_cs_${input.payment.id}`;
+  const fatEventId = `mock_evt_${input.payment.id}_checkout_session_completed`;
+  const thinEventId = `mock_evt_${input.payment.id}_thin_checkout_session_completed`;
+  const basePayload = {
+    api_version: "mock",
+    created: Math.floor(Date.now() / 1000),
+    data: {
+      object: {
+        id: sessionId,
+        metadata: {
+          paymentId: input.payment.id
+        },
+        object: "checkout.session",
+        payment_status: "paid",
+        status: "complete"
+      }
+    },
+    livemode: false,
+    object: "event",
+    type: "checkout.session.completed"
+  };
+
+  const fatInserted = await insertMockStripeWebhookEvent(sql, {
+    eventType: "checkout.session.completed",
+    eventId: fatEventId,
+    payload: {
+      ...basePayload,
+      id: fatEventId
+    },
+    payloadShape: "fat",
+    payment: input.payment,
+    sessionId
+  });
+
+  if (fatInserted) {
+    await writePaymentBpmEvent({
+      actorType: "system",
+      eventName: "payment_webhook_received",
+      eventStatus: "received",
+      locale: input.payment.locale,
+      paymentId: input.payment.id,
+      planId: input.payment.plan_id,
+      properties: {
+        eventType: "checkout.session.completed",
+        mattanutraEnv: input.config.env,
+        mock: true,
+        payloadShape: "fat",
+        source: "local_dev"
+      },
+      request: input.request,
+      selectedPlan: input.payment.selected_plan,
+      severity: "low",
+      sql,
+      stripeEventId: fatEventId,
+      stripeSessionId: sessionId,
+      valueAmount: input.payment.amount / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: input.payment.currency
+    });
+  }
+
+  const thinInserted = await insertMockStripeWebhookEvent(sql, {
+    eventType: "checkout.session.completed",
+    eventId: thinEventId,
+    payload: {
+      ...basePayload,
+      id: thinEventId
+    },
+    payloadShape: "thin",
+    payment: input.payment,
+    sessionId
+  });
+
+  if (thinInserted) {
+    await markWebhookEventStatus(sql, {
+      paymentId: input.payment.id,
+      sessionId,
+      status: "ignored",
+      stripeEventId: thinEventId
+    });
+    await writePaymentBpmEvent({
+      actorType: "system",
+      eventName: "payment_webhook_ignored",
+      eventStatus: "ignored",
+      locale: input.payment.locale,
+      paymentId: input.payment.id,
+      planId: input.payment.plan_id,
+      properties: {
+        eventType: "checkout.session.completed",
+        mattanutraEnv: input.config.env,
+        mock: true,
+        payloadShape: "thin",
+        reason: "mock_thin_shadow_mode",
+        source: "local_dev"
+      },
+      request: input.request,
+      selectedPlan: input.payment.selected_plan,
+      severity: "low",
+      sql,
+      stripeEventId: thinEventId,
+      stripeSessionId: sessionId,
+      valueAmount: input.payment.amount / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: input.payment.currency
+    });
+  }
+
+  return {
+    fatEventId,
+    sessionId,
+    thinEventId
+  };
+}
+
+async function recordMockStripePayoutLifecycle(
+  sql: Db,
+  input: Readonly<{
+    config: StripePaymentConfig;
+    payment: PaymentRow;
+    request?: Request;
+  }>
+) {
+  const payoutId = `mock_po_${input.payment.id}`;
+  const fatEventId = `mock_evt_${input.payment.id}_payout_paid`;
+  const thinEventId = `mock_evt_${input.payment.id}_thin_payout_paid`;
+  const payoutPayload = {
+    api_version: "mock",
+    created: Math.floor(Date.now() / 1000),
+    data: {
+      object: {
+        amount: Math.round(
+          (input.payment.amount / AMOUNT_MICROS_PER_UNIT) *
+            STRIPE_MINOR_UNITS_PER_MAJOR
+        ),
+        arrival_date: Math.floor(Date.now() / 1000),
+        balance_transaction: `mock_txn_${input.payment.id}`,
+        currency: input.payment.currency.toLowerCase(),
+        id: payoutId,
+        object: "payout",
+        status: "paid"
+      }
+    },
+    livemode: false,
+    object: "event",
+    type: "payout.paid"
+  };
+  const fatInserted = await insertMockStripeWebhookEvent(sql, {
+    eventId: fatEventId,
+    eventType: "payout.paid",
+    payload: {
+      ...payoutPayload,
+      id: fatEventId
+    },
+    payloadShape: "fat",
+    payment: input.payment,
+    sessionId: input.payment.stripe_checkout_session_id ?? `mock_cs_${input.payment.id}`
+  });
+
+  if (fatInserted) {
+    await writePaymentBpmEvent({
+      actorType: "system",
+      eventName: "payment_webhook_received",
+      eventStatus: "received",
+      locale: input.payment.locale,
+      paymentId: input.payment.id,
+      planId: input.payment.plan_id,
+      properties: {
+        eventType: "payout.paid",
+        mattanutraEnv: input.config.env,
+        mock: true,
+        payloadShape: "fat",
+        source: "local_dev"
+      },
+      request: input.request,
+      selectedPlan: input.payment.selected_plan,
+      severity: "low",
+      sql,
+      stripeEventId: fatEventId,
+      valueAmount: input.payment.amount / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: input.payment.currency
+    });
+    await recordStripePayoutAccounting(
+      sql,
+      payoutPayload.data.object as unknown as Stripe.Payout,
+      {
+        config: input.config,
+        request: input.request,
+        stripeEventId: fatEventId
+      }
+    );
+    await markWebhookEventStatus(sql, {
+      paymentId: input.payment.id,
+      sessionId: input.payment.stripe_checkout_session_id,
+      status: "processed",
+      stripeEventId: fatEventId
+    });
+  }
+
+  const thinInserted = await insertMockStripeWebhookEvent(sql, {
+    eventId: thinEventId,
+    eventType: "payout.paid",
+    payload: {
+      ...payoutPayload,
+      id: thinEventId
+    },
+    payloadShape: "thin",
+    payment: input.payment,
+    sessionId: input.payment.stripe_checkout_session_id ?? `mock_cs_${input.payment.id}`
+  });
+
+  if (thinInserted) {
+    await markWebhookEventStatus(sql, {
+      paymentId: input.payment.id,
+      sessionId: input.payment.stripe_checkout_session_id,
+      status: "ignored",
+      stripeEventId: thinEventId
+    });
+    await writePaymentBpmEvent({
+      actorType: "system",
+      eventName: "payment_webhook_ignored",
+      eventStatus: "ignored",
+      locale: input.payment.locale,
+      paymentId: input.payment.id,
+      planId: input.payment.plan_id,
+      properties: {
+        eventType: "payout.paid",
+        mattanutraEnv: input.config.env,
+        mock: true,
+        payloadShape: "thin",
+        reason: "mock_thin_shadow_mode",
+        source: "local_dev"
+      },
+      request: input.request,
+      selectedPlan: input.payment.selected_plan,
+      severity: "low",
+      sql,
+      stripeEventId: thinEventId,
+      valueAmount: input.payment.amount / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: input.payment.currency
+    });
+  }
+}
+
+async function insertMockStripeWebhookEvent(
+  sql: Db,
+  input: Readonly<{
+    eventId: string;
+    eventType: string;
+    payload: Record<string, unknown>;
+    payloadShape: StripeWebhookPayloadShape;
+    payment: PaymentRow;
+    sessionId: string;
+  }>
+) {
+  const rows = await sql<Array<{ id: string }>>`
+    insert into public.stripe_webhook_events (
+      stripe_event_id,
+      payload_shape,
+      stripe_mode,
+      event_type,
+      payment_id,
+      stripe_checkout_session_id,
+      status,
+      payload,
+      received_at
+    )
+    values (
+      ${input.eventId},
+      ${input.payloadShape},
+      'mock',
+      ${input.eventType},
+      ${input.payment.id}::uuid,
+      ${input.sessionId},
+      'received',
+      ${sql.json(toJsonValue(input.payload))}::jsonb,
+      now()
+    )
+    on conflict (stripe_event_id) do nothing
+    returning id::text
+  `;
+
+  return Boolean(rows[0]);
 }
 
 export async function getPayment(paymentId: string) {
@@ -1732,6 +2140,9 @@ export async function bindPaidReservationToAssessment(input: Readonly<{
   });
   const nextPayment = bound ?? payment;
 
+  await recordStripePaymentNominalRevenue(sql, nextPayment, {
+    accountingBasis: "reservation_bound"
+  });
   await storeStripeEmail(sql, nextPayment, payment.customer_email);
   await startPaidAssessmentPlan({
     locale: input.locale,
@@ -1810,6 +2221,11 @@ export async function markStripePaymentFailure(input: Readonly<{
     paymentId: payment.id,
     reason: input.reason,
     status: input.eventStatus
+  });
+  await recordStripePaymentNominalRevenue(sql, updated ?? payment, {
+    accountingBasis: input.eventStatus === "expired" ? "payment_expired" : "payment_failed",
+    failureReason: input.reason,
+    stripeEventId: input.stripeEventId
   });
 
   await writePaymentBpmEvent({
@@ -2034,6 +2450,56 @@ export async function handleStripeWebhookPayload(input: Readonly<{
       await markWebhookEventStatus(sql, {
         paymentId: failed?.id ?? null,
         sessionId: failed?.stripeCheckoutSessionId ?? null,
+        status: "processed",
+        stripeEventId: event.id
+      });
+
+      return { duplicate: false, ok: true };
+    }
+
+    if (event.type === "payout.paid") {
+      const payout = event.data.object as Stripe.Payout;
+
+      await recordStripePayoutAccounting(sql, payout, {
+        config,
+        request: input.request,
+        stripeEventId: event.id
+      });
+
+      await markWebhookEventStatus(sql, {
+        sessionId: null,
+        status: "processed",
+        stripeEventId: event.id
+      });
+
+      return { duplicate: false, ok: true };
+    }
+
+    if (event.type === "payout.failed" || event.type === "payout.canceled") {
+      const payout = event.data.object as Stripe.Payout;
+
+      await writePaymentBpmEvent({
+        actorType: "system",
+        errorCode: event.type,
+        errorMessage: `Stripe payout ${payout.status || "failed"}`,
+        eventName: "payment_payout_failed",
+        eventStatus: "failed",
+        properties: {
+          eventType: event.type,
+          mattanutraEnv: config.env,
+          stripeMode: config.mode,
+          stripePayoutId: payout.id,
+          stripePayoutStatus: payout.status
+        },
+        request: input.request,
+        severity: "high",
+        sql,
+        stripeEventId: event.id
+      });
+
+      await markWebhookEventStatus(sql, {
+        errorMessage: `Stripe payout ${payout.status || "failed"}`,
+        sessionId: null,
         status: "processed",
         stripeEventId: event.id
       });

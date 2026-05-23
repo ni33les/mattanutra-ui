@@ -2580,6 +2580,13 @@ values
     'Stripe clearing account for customer payments before payout reconciliation.',
     now(),
     now()
+  ),
+  (
+    '66666666-6666-4666-8666-666666666666'::uuid,
+    'MattaNutra bank',
+    'MattaNutra bank or settlement account for Stripe payouts.',
+    now(),
+    now()
   )
 on conflict (id) do update set
   name = excluded.name,
@@ -2595,7 +2602,7 @@ comment on table public.finance_accounts is
 create table public.finance_transactions (
   id uuid primary key,
   occurred_at timestamptz not null default now(),
-  category text not null check (category in ('ai', 'hosting', 'other', 'payment_fee', 'refund', 'revenue')),
+  category text not null check (category in ('ai', 'hosting', 'other', 'payment_fee', 'payout', 'refund', 'revenue')),
   entry_type text not null default 'nominal' check (entry_type in ('nominal', 'actual')),
   source text not null,
   source_ref text null,
@@ -2627,9 +2634,9 @@ begin
       drop constraint finance_transactions_category_check;
   end if;
 
-  alter table public.finance_transactions
+    alter table public.finance_transactions
     add constraint finance_transactions_category_check
-    check (category in ('ai', 'hosting', 'other', 'payment_fee', 'refund', 'revenue'));
+    check (category in ('ai', 'hosting', 'other', 'payment_fee', 'payout', 'refund', 'revenue'));
 end $$;
 
 comment on table public.finance_transactions is

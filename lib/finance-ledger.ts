@@ -8,12 +8,14 @@ export type FinanceCategory =
   | "hosting"
   | "other"
   | "payment_fee"
+  | "payout"
   | "refund"
   | "revenue";
 export type FinanceEntryType = "actual" | "nominal";
 
 export const FINANCE_ACCOUNT_IDS = {
   digitalOcean: "22222222-2222-4222-8222-222222222222",
+  mattanutraBank: "66666666-6666-4666-8666-666666666666",
   mattanutraRevenue: "44444444-4444-4444-8444-444444444444",
   stripe: "33333333-3333-4333-8333-333333333333",
   stripeClearing: "55555555-5555-4555-8555-555555555555",
@@ -209,6 +211,7 @@ export async function recordFinanceTransaction(input: FinanceTransactionInput) {
     input.category === "ai" ||
     input.category === "hosting" ||
     input.category === "payment_fee" ||
+    input.category === "payout" ||
     input.category === "refund" ||
     input.category === "revenue" ||
     input.category === "other"

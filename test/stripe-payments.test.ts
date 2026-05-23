@@ -196,13 +196,25 @@ describe("Stripe payment schema and lifecycle", () => {
   });
 
   it("extends platform finance categories for payment accounting", () => {
-    for (const category of ["revenue", "payment_fee", "refund"]) {
+    for (const category of ["revenue", "payment_fee", "payout", "refund"]) {
       assert.match(schema, new RegExp(`'${category}'`, "i"));
     }
 
-    for (const account of ["Stripe", "MattaNutra revenue", "Stripe clearing"]) {
+    for (const account of [
+      "Stripe",
+      "MattaNutra revenue",
+      "Stripe clearing",
+      "MattaNutra bank"
+    ]) {
       assert.match(schema, new RegExp(account, "i"));
     }
+
+    assert.match(paymentService, /entryType:\s*"nominal"/);
+    assert.match(paymentService, /stripe:payment:\$\{payment\.id\}:nominal-revenue/);
+    assert.match(paymentService, /paymentCustomerLedgerAccount/);
+    assert.match(paymentService, /plan:\$\{payment\.plan_id\}:customer/);
+    assert.match(paymentService, /entryType:\s*"actual"/);
+    assert.match(paymentService, /stripe:payout:\$\{payout\.id\}:net/);
   });
 
   it("keeps required payment BPM lifecycle events in one service", () => {
@@ -226,7 +238,9 @@ describe("Stripe payment schema and lifecycle", () => {
       "payment_config_error",
       "payment_webhook_signature_failed",
       "payment_accounting_recorded",
-      "payment_accounting_failed"
+      "payment_accounting_failed",
+      "payment_payout_recorded",
+      "payment_payout_failed"
     ]) {
       assert.match(paymentService, new RegExp(eventName));
     }
@@ -251,7 +265,10 @@ describe("Stripe payment schema and lifecycle", () => {
       "checkout.session.async_payment_succeeded",
       "checkout.session.async_payment_failed",
       "checkout.session.expired",
-      "payment_intent.payment_failed"
+      "payment_intent.payment_failed",
+      "payout.paid",
+      "payout.failed",
+      "payout.canceled"
     ]) {
       assert.match(packageJson, new RegExp(eventName));
     }
