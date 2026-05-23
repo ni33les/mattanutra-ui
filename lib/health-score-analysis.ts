@@ -1,4 +1,8 @@
-import { createHash } from "crypto";
+// Dynamic import to avoid bundling Node 'crypto' into client bundles
+async function getCreateHash() {
+  const crypto = await import("crypto");
+  return crypto.createHash;
+}
 import type {
   HealthScoreAdvice,
   HealthScorePaywallFeature,
@@ -812,6 +816,7 @@ function cacheKey({
       reasoningEffort
     })
   );
+  const createHash = await getCreateHash();
   const digest = createHash("sha256").update(payload).digest("hex");
 
   return `${CACHE_TYPE}:${digest}`;

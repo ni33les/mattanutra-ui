@@ -40,6 +40,8 @@ import {
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import { createTask } from "@/lib/task-service";
 
+const randomUUID = () => globalThis.crypto.randomUUID();
+
 // Re-exports needed by the new module structure (temporary during stabilization)
 export { defaultProductCountryCode } from "@/lib/product-countries";
 export { isUuidValue } from "./admin-product-helpers"; // will move definition later if needed
@@ -620,7 +622,7 @@ function normalizeFact(fact: FactDbPayload): AdminProductFact {
     comparableAmount,
     confidence: fact.confidence ?? "moderate",
     foodId: fact.foodId ?? null,
-    id: fact.id ?? crypto.randomUUID(),
+    id: fact.id ?? randomUUID(),
     itemType: fact.itemType ?? "supplement",
     maxAmount: numberOrNull(fact.maxAmount),
     maxUnit: typeof fact.maxUnit === "string" ? fact.maxUnit : null,
@@ -856,7 +858,7 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
           : "unknown",
       commissionRate: numberOrNull(record.commissionRate),
       currency: typeof record.currency === "string" ? record.currency : "THB",
-      id: typeof record.id === "string" ? record.id : crypto.randomUUID(),
+      id: typeof record.id === "string" ? record.id : randomUUID(),
       linkType: record.linkType === "direct" ? "direct" : "affiliate",
       network: typeof record.network === "string" ? record.network : null,
       platform: typeof record.platform === "string" ? record.platform : null,

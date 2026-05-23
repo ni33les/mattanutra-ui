@@ -15,6 +15,8 @@ import {
   productAudienceFromText,
   aiCorrectionNotesFromSnapshot
 } from "./admin-product-helpers";
+const randomUUID = () => globalThis.crypto.randomUUID();
+
 import {
   normalizeProductFactName,
   normalizeProductFactKey,
@@ -59,7 +61,7 @@ export function normalizeFact(fact: FactDbPayload): AdminProductFact {
     comparableAmount,
     confidence: fact.confidence ?? "moderate",
     foodId: fact.foodId ?? null,
-    id: fact.id ?? crypto.randomUUID(),
+    id: fact.id ?? randomUUID(),
     itemType: fact.itemType ?? "supplement",
     maxAmount: numberOrNull(fact.maxAmount),
     maxUnit: typeof fact.maxUnit === "string" ? fact.maxUnit : null,
@@ -248,7 +250,7 @@ export function rowFromDb(row: ProductDbRow): AdminProductRow {
           : "unknown",
       commissionRate: numberOrNull(record.commissionRate),
       currency: typeof record.currency === "string" ? record.currency : "THB",
-      id: typeof record.id === "string" ? record.id : crypto.randomUUID(),
+      id: typeof record.id === "string" ? record.id : randomUUID(),
       linkType: record.linkType === "direct" ? "direct" : "affiliate",
       network: typeof record.network === "string" ? record.network : null,
       platform: typeof record.platform === "string" ? record.platform : null,

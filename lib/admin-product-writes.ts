@@ -45,7 +45,8 @@ import {
   normalizeDoseUnit,
   parseDoseLimit
 } from "@/lib/dose-conversion";
-import crypto from "crypto";
+// Use Web Crypto API (available in Node runtime for Next.js server code)
+const randomUUID = () => globalThis.crypto.randomUUID();
 
 import { preferredProductTitle } from "./admin-products"; // transitional
 import { supplementIdsForFacts } from "./admin-products"; // transitional
@@ -789,7 +790,7 @@ export async function increaseProductFactSafetyLimit(input: Readonly<{
       after_payload
     )
     values (
-      ${crypto.randomUUID()}::uuid,
+      ${randomUUID()}::uuid,
       ${fact.supplement_id}::uuid,
       'safety_limit_increased_from_product',
       ${input.actor ?? "admin_dashboard"},
