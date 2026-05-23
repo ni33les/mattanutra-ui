@@ -11,7 +11,6 @@
     "db:reset:dev": "node --env-file-if-exists=.env.local scripts/reset-dev-db.mjs --confirm-blitz",
     "db:reset:dev:clean": "node --env-file-if-exists=.env.local scripts/reset-dev-db-clean.mjs",
     "catalogue:snapshot": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/catalogue-snapshot.ts",
-    "catalogue:sql:export": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/export-catalogue-sql.ts",
     "catalogue:reload": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/catalogue-reload.ts",
     "audit:codebase": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/audit-codebase.ts",
     "lint": "eslint .",
