@@ -1,6 +1,7 @@
 import type {
   ProductAudience,
   ProductAvailabilityStatus,
+  ProductConfidence,
   ProductKind,
   ProductPlatform,
   ProductStatus
@@ -188,3 +189,117 @@ export function emptyAdminProductsData(): AdminProductsData {
     }
   };
 }
+
+// Internal DB row shapes (moved from god file as part of the split)
+export type ProductDbRow = Readonly<{
+  active_offer_id: string | null;
+  active_offer_availability_status: ProductAvailabilityStatus | null;
+  active_affiliate_commission_rate: string | number | null;
+  active_offer_currency: string | null;
+  active_affiliate_priority: string | number | null;
+  active_offer_price_amount: string | number | null;
+  active_affiliate_type: "affiliate" | "direct" | null;
+  active_affiliate_url: string | null;
+  offers: unknown;
+  affiliate_status: ProductAffiliateStatus;
+  availability_status: ProductAvailabilityStatus;
+  available_country_codes: string[] | null;
+  brand_id: string | null;
+  brand_name: string | null;
+  brand_status: ProductStatus | null;
+  category: string | null;
+  currency: string;
+  current_version: string | number | null;
+  description: string | null;
+  description_en: string | null;
+  description_th: string | null;
+  facts: unknown;
+  fda_approval_number: string | null;
+  history_average_product_coverage_percent: string | number | null;
+  history_average_stack_coverage_percent: string | number | null;
+  history_chosen_count: string | number | null;
+  history_last_recommended_at: Date | string | null;
+  id: string;
+  image_url: string | null;
+  import_duplicate_product_ids: string[] | null;
+  import_id: string | null;
+  import_review_task_id: string | null;
+  import_status: string | null;
+  label_status: ProductLabelStatus;
+  manufacturer_country_codes: string[] | null;
+  status: ProductStatus;
+  platform: ProductPlatform;
+  price_amount: string | number | null;
+  product_audience: ProductAudience | null;
+  product_kind: ProductKind;
+  product_data_expires_at: Date | string | null;
+  product_url: string;
+  validation_checked_at: Date | string | null;
+  validation_reasons: string[] | null;
+  validation_status: ValidationResult["status"] | null;
+  validation_summary: string | null;
+  region: string;
+  source_snapshot: unknown;
+  source_url: string | null;
+  title: string;
+  title_en: string | null;
+  title_th: string | null;
+  updated_at: Date | string;
+}>;
+
+export type ProductRecommendationDbRow = Readonly<{
+  active_offer_id: string | null;
+  active_offer_availability_status: ProductAvailabilityStatus | null;
+  active_affiliate_commission_rate: string | number | null;
+  active_offer_currency: string | null;
+  active_affiliate_priority: string | number | null;
+  active_offer_price_amount: string | number | null;
+  active_affiliate_type: "affiliate" | "direct" | null;
+  active_affiliate_url: string | null;
+  available_country_codes: string[] | null;
+  brand_name: string | null;
+  brand_status: ProductStatus | null;
+  currency: string;
+  description: string | null;
+  description_en: string | null;
+  description_th: string | null;
+  facts: unknown;
+  id: string;
+  image_url: string | null;
+  label_status: ProductLabelStatus;
+  manufacturer_country_codes: string[] | null;
+  status: ProductStatus;
+  platform: ProductPlatform;
+  product_audience: ProductAudience | null;
+  product_kind: ProductKind;
+  product_data_expires_at: Date | string | null;
+  product_url: string;
+  region: string;
+  source_url: string | null;
+  title: string;
+  title_en: string | null;
+  title_th: string | null;
+}>;
+
+export type FactDbPayload = Readonly<{
+  aliases?: string[] | null;
+  amount?: number | string | null;
+  confidence?: ProductConfidence | null;
+  foodId?: string | null;
+  id?: string;
+  itemType?: "food" | "nutrient" | "supplement";
+  maxAmount?: number | string | null;
+  maxUnit?: string | null;
+  name?: string;
+  normalizedName?: string;
+  nutrientId?: string | null;
+  servingLabel?: string | null;
+  source?: string | null;
+  sourceText?: string | null;
+  sourceUrl?: string | null;
+  supplementId?: string | null;
+  supplementAudience?: ProductAudience | null;
+  supplementStatus?: ProductFactSupplementStatus | null;
+  safetyFlags?: string[] | null;
+  unit?: string | null;
+}>;

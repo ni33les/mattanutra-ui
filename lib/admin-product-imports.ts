@@ -1,26 +1,24 @@
 import { getSql } from "@/lib/db";
 import { defaultProductCountryCode } from "@/lib/product-countries";
 import { toJsonValue } from "@/lib/assessment-store";
-import { createTask } from "@/lib/task-service";
-import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import {
   normalizeProductKey,
   normalizeProductFactName,
-  normalizeProductFactKey,
   productFactAliasKeys,
+  normalizeProductFactKey,
   productKeysMatch
 } from "@/lib/product-recommendations";
+import type { ProductConfidence } from "@/lib/product-recommendations";
+import type { ProductAudience } from "@/lib/product-recommendations";
 import { validateProduct } from "@/lib/product-validation";
-import { numberOrNull, isoOrNull, cleanNullableText, normalizedUrl, productTitleLooksEnglish } from "./admin-product-helpers";
+import { numberOrNull, isoOrNull, cleanNullableText, normalizedUrl } from "./admin-product-helpers";
 import { preferredProductTitle, clearProductRecommendationCandidateCache, createAdminProduct } from "./admin-products";
-import { productAudienceFromSnapshot } from "./admin-product-helpers";
-import { isUuidValue } from "./admin-product-helpers";
-
-// This module will eventually own all import run, staging, review, and approval logic.
-
+import { productAudienceFromSnapshot, isUuidValue } from "./admin-product-helpers";
+// Local copy of the fact input shape for this module's input types and helpers.
+// (Will be centralized in admin-product-types.ts in a later cleanup pass.)
 export type ProductImportFactInput = Readonly<{
   amount?: number | null;
-  confidence?: any;
+  confidence?: ProductConfidence;
   itemType?: "food" | "nutrient" | "supplement";
   name: string;
   servingLabel?: string | null;
@@ -29,6 +27,8 @@ export type ProductImportFactInput = Readonly<{
   supplementId?: string | null;
   unit?: string | null;
 }>;
+
+// This module will eventually own all import run, staging, review, and approval logic.
 
 export type StageProductImportInput = Readonly<{
   actor?: string | null;
@@ -41,7 +41,7 @@ export type StageProductImportInput = Readonly<{
   imageUrls?: readonly string[];
   importRunId?: string | null;
   parsedFacts?: readonly ProductImportFactInput[];
-  parseConfidence?: any;
+  parseConfidence?: ProductConfidence;
   productTitle: string;
   rawSnapshot?: Record<string, unknown> | null;
   source?: string | null;
@@ -79,7 +79,7 @@ export type ResolveProductImportReviewInput = Readonly<{
   manufacturerCountryCodes?: readonly string[];
   mergeProductId?: string | null;
   parsedFacts?: readonly ProductImportFactInput[];
-  productAudience?: any;
+  productAudience?: ProductAudience;
   productUrl?: string | null;
   reviewerNote?: string | null;
   returnRow?: boolean;

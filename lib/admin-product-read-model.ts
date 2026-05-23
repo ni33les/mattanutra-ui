@@ -1,10 +1,12 @@
+import { getSql } from "@/lib/db";
 import {
   emptyAdminProductsData,
   type AdminProductsData,
-  type AdminProductRow
+  type AdminProductRow,
+  type ProductDbRow
 } from "./admin-product-types";
 import { rowFromDb } from "./admin-product-mappers";
-import { loadProductRows, isUuidValue } from "./admin-products";
+import { isUuidValue, loadProductRows } from "./admin-products"; // transitional delegation until loadProductRows is fully moved here
 
 // Read model helpers and queries extracted as part of Sprint 2 refactor.
 

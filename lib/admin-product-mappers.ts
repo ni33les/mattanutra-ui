@@ -4,7 +4,7 @@ import type {
   AdminProductOffer,
   ProductValidationCacheStatus
 } from "./admin-product-types";
-import type { ProductDbRow, FactDbPayload } from "./admin-products";
+import type { ProductDbRow, FactDbPayload } from "./admin-product-types";
 import type { ValidationResult } from "@/lib/product-validation";
 import {
   numberOrNull,
