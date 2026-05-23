@@ -3,8 +3,8 @@ import type {
   AdminProductRow,
   AdminProductOffer,
   ProductValidationCacheStatus
-} from "./admin-product-types";
-import type { ProductDbRow, FactDbPayload } from "./admin-product-types";
+} from "./admin-product-types.ts";
+import type { ProductDbRow, FactDbPayload } from "./admin-product-types.ts";
 import type { ValidationResult } from "@/lib/product-validation";
 import {
   numberOrNull,
@@ -14,7 +14,7 @@ import {
   productAudienceFromUnknown,
   productAudienceFromText,
   aiCorrectionNotesFromSnapshot
-} from "./admin-product-helpers";
+} from "./admin-product-helpers.ts";
 const randomUUID = () => globalThis.crypto.randomUUID();
 
 import {

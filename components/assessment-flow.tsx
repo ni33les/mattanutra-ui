@@ -21,7 +21,10 @@ import { HealthScorePaymentPanel } from "@/components/nutrition-flow/healthscore
 import { getBpmPayload, trackBpmEvent } from "@/lib/bpm-client";
 import type { HealthScoreResult } from "@/lib/health-score";
 import type { Locale } from "@/lib/i18n";
-import { nutritionHealthScorePath } from "@/lib/nutrition-paths";
+import {
+  nutritionHealthScorePath,
+  nutritionRefinePath
+} from "@/lib/nutrition-paths";
 
 type Option = Readonly<{
   label: string;
@@ -1007,6 +1010,7 @@ function formatWeightImperial(value: string) {
 type AssessmentFlowProps = Readonly<{
   initialStage?: "healthscore" | "quiz";
   locale: Locale;
+  paymentId?: string;
   prefillAnswers?: unknown;
   returningHealthScore?: HealthScoreResult | null;
   returningPlanId?: string;
@@ -1265,6 +1269,7 @@ function AssessmentStepper({
 export function AssessmentFlow({
   initialStage = "quiz",
   locale,
+  paymentId,
   prefillAnswers,
   returningHealthScore,
   returningPlanId
@@ -2079,7 +2084,11 @@ export function AssessmentFlow({
       setCapturedStatus(readyStatus);
       setProcessingStatus(null);
       setShowHealthScore(true);
-      router.replace(nutritionHealthScorePath(locale, readyStatus.planId));
+      router.replace(
+        paymentId
+          ? nutritionRefinePath(locale, readyStatus.planId)
+          : nutritionHealthScorePath(locale, readyStatus.planId)
+      );
     } catch {
       clearProcessingStatus();
       setProcessingError(ui.processingError);
@@ -2135,7 +2144,8 @@ export function AssessmentFlow({
                   answers: answerPayload,
                   bpm: getBpmPayload(),
                   intent: "capture",
-                  locale
+                  locale,
+                  paymentId
                 }),
                 cache: "no-store",
                 headers: {
@@ -2149,7 +2159,8 @@ export function AssessmentFlow({
                 answers: answerPayload,
                 bpm: getBpmPayload(),
                 intent: "capture",
-                locale
+                locale,
+                paymentId
               }),
               cache: "no-store",
               headers: {

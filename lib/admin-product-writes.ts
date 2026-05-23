@@ -10,10 +10,10 @@
 
 import { getSql } from "@/lib/db";
 import { toJsonValue } from "@/lib/assessment-store";
-import { clearProductRecommendationCandidateCache } from "./admin-products"; // transitional
-import { loadAdminProductRow } from "./admin-product-read-model";
-import { rowFromDb } from "./admin-product-mappers";
-import { isUuidValue, cleanNullableText, numberOrNull } from "./admin-product-helpers";
+import { clearProductRecommendationCandidateCache } from "./admin-products.ts"; // transitional
+import { loadAdminProductRow } from "./admin-product-read-model.ts";
+import { rowFromDb } from "./admin-product-mappers.ts";
+import { isUuidValue, cleanNullableText, numberOrNull } from "./admin-product-helpers.ts";
 import type {
   AdminProductRow,
   CreateAdminProductInput,
@@ -21,9 +21,9 @@ import type {
   ProductImportFactInput,
   ProductDbRow,
   ProductLabelStatus
-} from "./admin-products"; // transitional for Input types until centralized in types.ts
+} from "./admin-products.ts"; // transitional for Input types until centralized in types.ts
 
-import { loadProductRows } from "./admin-products"; // transitional until loadProductRows is also extracted to read-model
+import { loadProductRows } from "./admin-products.ts"; // transitional until loadProductRows is also extracted to read-model
 
 import type { ProductStatus } from "@/lib/product-recommendations";
 import type { ValidationResult } from "@/lib/product-validation";
@@ -48,27 +48,27 @@ import {
 // Use Web Crypto API (available in Node runtime for Next.js server code)
 const randomUUID = () => globalThis.crypto.randomUUID();
 
-import { preferredProductTitle } from "./admin-products"; // transitional
-import { supplementIdsForFacts } from "./admin-products"; // transitional
+import { preferredProductTitle } from "./admin-products.ts"; // transitional
+import { supplementIdsForFacts } from "./admin-products.ts"; // transitional
 import {
   replaceBrandCountryCodes,
   ensureBrandCountryCodes
-} from "./admin-product-countries";
+} from "./admin-product-countries.ts";
 import {
   normalizeSubmittedProductCountryCodes,
   assertProductCountriesAllowedByBrand,
   normalizedUrl,
   productAudienceFromSnapshot
-} from "./admin-product-helpers";
+} from "./admin-product-helpers.ts";
 import {
   replaceProductCountryCodes,
   loadProductCountryCodes,
   loadBrandCountryCodes,
   reconcileProductsForBrandCountryCodes
-} from "./admin-product-countries";
-import type { ProductCountryCode } from "./admin-product-types";
-import { sameProductCountryCodes } from "./admin-product-helpers";
-import { normalizedFactsForStorage } from "./admin-products"; // transitional
+} from "./admin-product-countries.ts";
+import type { ProductCountryCode } from "./admin-product-types.ts";
+import { sameProductCountryCodes } from "./admin-product-helpers.ts";
+import { normalizedFactsForStorage } from "./admin-products.ts"; // transitional
 
 // ---------------------------------------------------------------------------
 // Internal write helpers (moved from the god file)

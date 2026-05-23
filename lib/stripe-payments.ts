@@ -1,0 +1,2093 @@
+import { randomUUID } from "node:crypto";
+import Stripe from "stripe";
+import {
+  isAssessmentPlan,
+  type AssessmentPlan
+} from "@/lib/assessment-snapshot";
+import { isUuid, toJsonValue } from "@/lib/assessment-store";
+import { writeBpmEvent } from "@/lib/bpm";
+import {
+  upsertCommunicationChannel
+} from "@/lib/communications";
+import { getSql } from "@/lib/db";
+import {
+  FINANCE_ACCOUNT_IDS,
+  recordFinanceTransaction
+} from "@/lib/finance-ledger";
+import { isLocale, type Locale } from "@/lib/i18n";
+import { nutritionQuizPath, nutritionRefinePath } from "@/lib/nutrition-paths";
+import { paymentReturnPath, type PaymentSourceSurface } from "@/lib/payment-paths";
+import { writePaymentBpmEvent } from "@/lib/payment-bpm";
+import { siteBaseUrl } from "@/lib/site-url";
+import { enqueueNutritionPlanTasks } from "@/lib/task-worker";
+import { validateLeadEmail } from "@/lib/email-validation";
+
+type Db = NonNullable<ReturnType<typeof getSql>>;
+
+export type PaymentStatus =
+  | "bound"
+  | "cancelled"
+  | "checkout_opened"
+  | "checkout_session_created"
+  | "created"
+  | "expired"
+  | "failed"
+  | "fulfillment_failed"
+  | "paid"
+  | "processing";
+
+type PaymentRow = Readonly<{
+  amount: number;
+  bound_at: Date | string | null;
+  created_at: Date | string;
+  currency: string;
+  customer_email: string | null;
+  customer_email_opted_in: boolean;
+  id: string;
+  locale: Locale;
+  metadata: Record<string, unknown>;
+  paid_at: Date | string | null;
+  plan_id: string | null;
+  selected_plan: AssessmentPlan;
+  source_surface: PaymentSourceSurface;
+  status: PaymentStatus;
+  stripe_checkout_session_id: string | null;
+  stripe_customer_id: string | null;
+  stripe_mode: PaymentProviderMode;
+  stripe_payment_intent_id: string | null;
+  stripe_price_id: string | null;
+  updated_at: Date | string;
+}>;
+
+type StripeMode = "live" | "test";
+type PaymentProviderMode = StripeMode | "mock";
+export type StripeWebhookPayloadShape = "fat" | "thin";
+
+type PaymentPlan = Readonly<{
+  amountMicros: number;
+  description: Record<Locale, string>;
+  name: Record<Locale, string>;
+  plan: AssessmentPlan;
+  priceEnvName: string;
+}>;
+
+type StripePaymentConfig = Readonly<{
+  env: "dev" | "prd" | "uat";
+  mode: PaymentProviderMode;
+  priceIds: Record<AssessmentPlan, string>;
+  publishableKey: string;
+  secretKey: string;
+  webhookSecrets: Record<StripeWebhookPayloadShape, string>;
+}>;
+
+type CheckoutSessionInput = Readonly<{
+  locale: Locale;
+  planId?: string | null;
+  request?: Request;
+  selectedPlan: AssessmentPlan;
+  sourceSurface: PaymentSourceSurface;
+}>;
+
+type PaymentStatePatch = Readonly<{
+  action: string;
+  actor?: string;
+  customerEmail?: string | null;
+  metadata?: Record<string, unknown>;
+  paymentId: string;
+  planId?: string | null;
+  reason: string;
+  status?: PaymentStatus;
+  stripeCheckoutSessionId?: string | null;
+  stripeCustomerId?: string | null;
+  stripePaymentIntentId?: string | null;
+  stripePriceId?: string | null;
+}>;
+
+const AMOUNT_MICROS_PER_UNIT = 1_000_000;
+const STRIPE_MINOR_UNITS_PER_MAJOR = 100;
+const THB_USD_RATE_FALLBACK = 0.027;
+const SUPPORTED_STRIPE_WEBHOOK_EVENTS = new Set([
+  "checkout.session.async_payment_failed",
+  "checkout.session.async_payment_succeeded",
+  "checkout.session.completed",
+  "checkout.session.expired",
+  "payment_intent.payment_failed"
+]);
+
+export function normalizeStripeWebhookPayloadShape(
+  value: unknown
+): StripeWebhookPayloadShape | null {
+  return value === "fat" || value === "thin" ? value : null;
+}
+
+const PAYMENT_PLANS: Record<AssessmentPlan, PaymentPlan> = {
+  precision: {
+    amountMicros: 690 * AMOUNT_MICROS_PER_UNIT,
+    description: {
+      en: "Your Right Amount Formula with supplement priorities, dose context, cautions, and product direction.",
+      th: "สูตร Right Amount พร้อมลำดับความสำคัญ ปริมาณ ข้อควรระวัง และแนวทางสินค้า"
+    },
+    name: {
+      en: "Right Amount Formula",
+      th: "สูตร Right Amount"
+    },
+    plan: "precision",
+    priceEnvName: "STRIPE_PRICE_PRECISION_THB"
+  },
+  pro: {
+    amountMicros: 1590 * AMOUNT_MICROS_PER_UNIT,
+    description: {
+      en: "The Right Amount Formula plus 90 days of wellness concierge guidance.",
+      th: "สูตร Right Amount พร้อมคำแนะนำ Wellness Concierge 90 วัน"
+    },
+    name: {
+      en: "90-Day Wellness Concierge",
+      th: "Wellness Concierge 90 วัน"
+    },
+    plan: "pro",
+    priceEnvName: "STRIPE_PRICE_PRO_THB"
+  }
+};
+
+let paymentSchemaReady: Promise<void> | null = null;
+let stripeClient: Stripe | null = null;
+let stripeClientKey = "";
+
+function jsonRecord(value: unknown) {
+  const json = toJsonValue(value);
+
+  return json && typeof json === "object" && !Array.isArray(json)
+    ? (json as Record<string, unknown>)
+    : {};
+}
+
+function normalizedMattanutraEnv() {
+  const raw =
+    process.env.MATTANUTRA_ENV?.trim().toLowerCase() ||
+    (process.env.NODE_ENV === "production" ? "prd" : "dev");
+
+  if (raw === "production" || raw === "prod") {
+    return "prd";
+  }
+
+  if (raw === "staging" || raw === "stage") {
+    return "uat";
+  }
+
+  if (raw === "development" || raw === "local") {
+    return "dev";
+  }
+
+  return raw === "uat" || raw === "prd" ? raw : "dev";
+}
+
+function stripeModeFromKey(key: string): StripeMode | null {
+  if (key.startsWith("sk_test_") || key.startsWith("pk_test_")) {
+    return "test";
+  }
+
+  if (key.startsWith("sk_live_") || key.startsWith("pk_live_")) {
+    return "live";
+  }
+
+  return null;
+}
+
+function requestedStripePaymentMode(
+  env: ReturnType<typeof normalizedMattanutraEnv>
+): PaymentProviderMode {
+  const requested = process.env.STRIPE_PAYMENT_MODE?.trim().toLowerCase();
+
+  if (requested === "mock" || requested === "test" || requested === "live") {
+    return requested;
+  }
+
+  return env === "dev" ? "mock" : env === "prd" ? "live" : "test";
+}
+
+export function stripePublishableKey() {
+  return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() ?? "";
+}
+
+export function paymentPlan(plan: AssessmentPlan) {
+  return PAYMENT_PLANS[plan];
+}
+
+export function normalizePaymentPlan(plan: unknown): AssessmentPlan | null {
+  return isAssessmentPlan(plan) ? plan : null;
+}
+
+export function normalizePaymentSourceSurface(
+  value: unknown
+): PaymentSourceSurface {
+  return value === "landing" ? "landing" : "healthscore";
+}
+
+export function stripePaymentConfig(): StripePaymentConfig {
+  const env = normalizedMattanutraEnv();
+  const expectedMode = requestedStripePaymentMode(env);
+  const secretKey = process.env.STRIPE_SECRET_KEY?.trim() ?? "";
+  const publishableKey = stripePublishableKey();
+  const webhookSecrets = {
+    fat: process.env.STRIPE_WEBHOOK_SECRET_FAT?.trim() ?? "",
+    thin: process.env.STRIPE_WEBHOOK_SECRET_THIN?.trim() ?? ""
+  };
+  const secretMode = stripeModeFromKey(secretKey);
+  const publishableMode = stripeModeFromKey(publishableKey);
+  const priceIds = {
+    precision: process.env.STRIPE_PRICE_PRECISION_THB?.trim() ?? "",
+    pro: process.env.STRIPE_PRICE_PRO_THB?.trim() ?? ""
+  };
+
+  if (env === "uat" && expectedMode !== "test") {
+    throw new Error("Stripe key mode mismatch for uat. Expected test keys.");
+  }
+
+  if (env !== "prd" && expectedMode === "live") {
+    throw new Error(`Stripe key mode mismatch for ${env}. Expected non-live payments.`);
+  }
+
+  if (env === "prd" && expectedMode !== "live") {
+    throw new Error("Stripe key mode mismatch for prd. Expected live keys.");
+  }
+
+  if (env !== "dev" && expectedMode === "mock") {
+    throw new Error("Stripe mock mode is only allowed in dev.");
+  }
+
+  if (expectedMode === "mock") {
+    return {
+      env,
+      mode: "mock",
+      priceIds: {
+        precision: priceIds.precision || "mock_price_precision_thb",
+        pro: priceIds.pro || "mock_price_pro_thb"
+      },
+      publishableKey,
+      secretKey,
+      webhookSecrets: {
+        fat: webhookSecrets.fat || "mock_whsec_fat",
+        thin: webhookSecrets.thin || "mock_whsec_thin"
+      }
+    };
+  }
+
+  const missing = [
+    !secretKey && "STRIPE_SECRET_KEY",
+    !publishableKey && "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+    !webhookSecrets.fat && "STRIPE_WEBHOOK_SECRET_FAT",
+    !webhookSecrets.thin && "STRIPE_WEBHOOK_SECRET_THIN",
+    !priceIds.precision && "STRIPE_PRICE_PRECISION_THB",
+    !priceIds.pro && "STRIPE_PRICE_PRO_THB"
+  ].filter(Boolean);
+
+  if (missing.length > 0) {
+    throw new Error(`Stripe configuration is missing: ${missing.join(", ")}`);
+  }
+
+  if (secretMode !== expectedMode || publishableMode !== expectedMode) {
+    throw new Error(
+      `Stripe key mode mismatch for ${env}. Expected ${expectedMode} keys.`
+    );
+  }
+
+  return {
+    env,
+    mode: expectedMode,
+    priceIds,
+    publishableKey,
+    secretKey,
+    webhookSecrets
+  };
+}
+
+function stripeClientForConfig(config: StripePaymentConfig) {
+  if (stripeClient && stripeClientKey === config.secretKey) {
+    return stripeClient;
+  }
+
+  stripeClientKey = config.secretKey;
+  stripeClient = new Stripe(config.secretKey);
+
+  return stripeClient;
+}
+
+function stripeLocale(locale: Locale) {
+  return locale === "th" ? "th" : "en";
+}
+
+function amountMicrosFromStripeAmount(amount: number | null | undefined) {
+  if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+    return null;
+  }
+
+  return Math.round((Number(amount) / STRIPE_MINOR_UNITS_PER_MAJOR) * AMOUNT_MICROS_PER_UNIT);
+}
+
+function thbUsdRate() {
+  const parsed = Number(process.env.FINANCE_THB_USD_RATE);
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : THB_USD_RATE_FALLBACK;
+}
+
+async function sqlOrThrow() {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database connection is not configured");
+  }
+
+  return sql;
+}
+
+async function assertPaymentSchema(sql: Db) {
+  paymentSchemaReady ??= (async () => {
+    const requiredColumns = {
+      payments: [
+        "id",
+        "plan_id",
+        "selected_plan",
+        "locale",
+        "source_surface",
+        "status",
+        "amount",
+        "currency",
+        "stripe_mode",
+        "stripe_checkout_session_id",
+        "stripe_payment_intent_id",
+        "stripe_customer_id",
+        "stripe_price_id",
+        "customer_email",
+        "customer_email_opted_in",
+        "metadata",
+        "created_at",
+        "updated_at",
+        "paid_at",
+        "bound_at"
+      ],
+      payment_versions: [
+        "payment_id",
+        "version",
+        "action",
+        "actor",
+        "reason",
+        "source",
+        "plan_id",
+        "snapshot",
+        "metadata",
+        "created_at"
+      ],
+      stripe_webhook_events: [
+        "id",
+        "stripe_event_id",
+        "payload_shape",
+        "stripe_mode",
+        "event_type",
+        "payment_id",
+        "stripe_checkout_session_id",
+        "status",
+        "payload",
+        "error_message",
+        "received_at",
+        "processed_at"
+      ]
+    } as const;
+    const rows = await sql<Array<{ column_name: string; table_name: string }>>`
+      select table_name, column_name
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = any(${Object.keys(requiredColumns)}::text[])
+    `;
+    const available = new Map<string, Set<string>>();
+
+    for (const row of rows) {
+      const columns = available.get(row.table_name) ?? new Set<string>();
+      columns.add(row.column_name);
+      available.set(row.table_name, columns);
+    }
+
+    const missing = Object.entries(requiredColumns).flatMap(([table, columns]) => {
+      const tableColumns = available.get(table) ?? new Set<string>();
+
+      return [...columns]
+        .filter((column) => !tableColumns.has(column))
+        .map((column) => `public.${table}.${column}`);
+    });
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Payment schema is incomplete. Apply db-schema.sql before using Stripe payments. Missing: ${missing.join(", ")}`
+      );
+    }
+  })().catch((error) => {
+    paymentSchemaReady = null;
+    throw error;
+  });
+
+  await paymentSchemaReady;
+}
+
+async function recordPaymentVersion(
+  sql: Db,
+  input: Readonly<{
+    action: string;
+    actor: string;
+    metadata?: Record<string, unknown>;
+    paymentId: string;
+    reason: string;
+    source: string;
+  }>
+) {
+  await sql`
+    insert into public.payment_versions (
+      payment_id,
+      version,
+      action,
+      actor,
+      reason,
+      source,
+      plan_id,
+      snapshot,
+      metadata,
+      created_at
+    )
+    select
+      payments.id,
+      coalesce((
+        select max(version)
+        from public.payment_versions
+        where payment_id = payments.id
+      ), 0) + 1,
+      ${input.action},
+      ${input.actor},
+      ${input.reason},
+      ${input.source},
+      payments.plan_id,
+      to_jsonb(payments.*),
+      ${sql.json(toJsonValue(input.metadata ?? {}))}::jsonb,
+      now()
+    from public.payments payments
+    where payments.id = ${input.paymentId}::uuid
+  `;
+}
+
+function mapPayment(row: PaymentRow) {
+  return {
+    amount: Number(row.amount),
+    boundAt: row.bound_at ? new Date(row.bound_at).toISOString() : null,
+    createdAt: new Date(row.created_at).toISOString(),
+    currency: row.currency,
+    customerEmail: row.customer_email,
+    customerEmailOptedIn: row.customer_email_opted_in,
+    id: row.id,
+    locale: row.locale,
+    metadata: row.metadata,
+    paidAt: row.paid_at ? new Date(row.paid_at).toISOString() : null,
+    planId: row.plan_id,
+    selectedPlan: row.selected_plan,
+    sourceSurface: row.source_surface,
+    status: row.status,
+    stripeCheckoutSessionId: row.stripe_checkout_session_id,
+    stripeCustomerId: row.stripe_customer_id,
+    stripeMode: row.stripe_mode,
+    stripePaymentIntentId: row.stripe_payment_intent_id,
+    stripePriceId: row.stripe_price_id,
+    updatedAt: new Date(row.updated_at).toISOString()
+  };
+}
+
+async function getPaymentRowById(sql: Db, paymentId: string) {
+  const rows = await sql<PaymentRow[]>`
+    select *
+    from public.payments
+    where id = ${paymentId}::uuid
+    limit 1
+  `;
+
+  return rows[0] ?? null;
+}
+
+async function getPaymentRowBySessionId(sql: Db, sessionId: string) {
+  const rows = await sql<PaymentRow[]>`
+    select *
+    from public.payments
+    where stripe_checkout_session_id = ${sessionId}
+    limit 1
+  `;
+
+  return rows[0] ?? null;
+}
+
+async function updatePaymentState(
+  sql: Db,
+  input: PaymentStatePatch
+) {
+  const metadata = input.metadata ?? {};
+  const rows = await sql<PaymentRow[]>`
+    update public.payments
+    set
+      plan_id = coalesce(${input.planId ?? null}::uuid, plan_id),
+      status = coalesce(${input.status ?? null}, status),
+      stripe_checkout_session_id = coalesce(${input.stripeCheckoutSessionId ?? null}, stripe_checkout_session_id),
+      stripe_payment_intent_id = coalesce(${input.stripePaymentIntentId ?? null}, stripe_payment_intent_id),
+      stripe_customer_id = coalesce(${input.stripeCustomerId ?? null}, stripe_customer_id),
+      stripe_price_id = coalesce(${input.stripePriceId ?? null}, stripe_price_id),
+      customer_email = coalesce(${input.customerEmail ?? null}, customer_email),
+      metadata = metadata || ${sql.json(toJsonValue(metadata))}::jsonb,
+      paid_at = case
+        when ${input.status ?? null} = 'paid' then coalesce(paid_at, now())
+        else paid_at
+      end,
+      bound_at = case
+        when ${input.status ?? null} = 'bound' then coalesce(bound_at, now())
+        else bound_at
+      end,
+      updated_at = now()
+    where id = ${input.paymentId}::uuid
+    returning *
+  `;
+  const payment = rows[0] ?? null;
+
+  if (payment) {
+    await recordPaymentVersion(sql, {
+      action: input.action,
+      actor: input.actor ?? "system",
+      metadata,
+      paymentId: input.paymentId,
+      reason: input.reason,
+      source: "stripe_payments"
+    });
+  }
+
+  return payment;
+}
+
+async function insertPayment(
+  sql: Db,
+  input: Readonly<{
+    config: StripePaymentConfig;
+    locale: Locale;
+    paymentId: string;
+    planId?: string | null;
+    selectedPlan: AssessmentPlan;
+    sourceSurface: PaymentSourceSurface;
+  }>
+) {
+  const plan = paymentPlan(input.selectedPlan);
+  const rows = await sql<PaymentRow[]>`
+    insert into public.payments (
+      id,
+      plan_id,
+      selected_plan,
+      locale,
+      source_surface,
+      status,
+      amount,
+      amount_unit,
+      currency,
+      stripe_mode,
+      metadata,
+      created_at,
+      updated_at
+    )
+    values (
+      ${input.paymentId}::uuid,
+      ${input.planId ?? null}::uuid,
+      ${input.selectedPlan}::public.assessment_plan,
+      ${input.locale},
+      ${input.sourceSurface},
+      'created',
+      ${plan.amountMicros},
+      'micros',
+      'THB',
+      ${input.config.mode},
+      ${sql.json(toJsonValue({ mattanutraEnv: input.config.env }))}::jsonb,
+      now(),
+      now()
+    )
+    returning *
+  `;
+
+  await recordPaymentVersion(sql, {
+    action: "payment_created",
+    actor: "visitor",
+    metadata: {
+      mattanutraEnv: input.config.env,
+      sourceSurface: input.sourceSurface
+    },
+    paymentId: input.paymentId,
+    reason: "checkout_requested",
+    source: "stripe_payments"
+  });
+
+  return rows[0];
+}
+
+function stringId(value: unknown) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value && typeof value === "object" && "id" in value) {
+    const id = (value as { id?: unknown }).id;
+
+    return typeof id === "string" ? id : null;
+  }
+
+  return null;
+}
+
+function sessionCustomerEmail(session: Stripe.Checkout.Session) {
+  return (
+    session.customer_details?.email ||
+    (typeof session.customer_email === "string" ? session.customer_email : "") ||
+    ""
+  );
+}
+
+function paymentIntentFromSession(session: Stripe.Checkout.Session) {
+  return typeof session.payment_intent === "object"
+    ? session.payment_intent
+    : null;
+}
+
+function priceIdFromSession(session: Stripe.Checkout.Session) {
+  const lineItems = session.line_items?.data ?? [];
+  const first = lineItems[0];
+  const price = first?.price;
+
+  return price && typeof price === "object" ? price.id : null;
+}
+
+async function recordStripePaymentAccounting(
+  sql: Db,
+  payment: PaymentRow,
+  session: Stripe.Checkout.Session | null
+) {
+  const amountMicros =
+    (session ? amountMicrosFromStripeAmount(session.amount_total) : null) ||
+    payment.amount;
+  const customerId = (session ? stringId(session.customer) : null) ?? payment.stripe_customer_id;
+  const checkoutSessionId = session?.id ?? payment.stripe_checkout_session_id ?? `mock:${payment.id}`;
+  const paymentIntentId =
+    (session ? stringId(session.payment_intent) : null) ??
+    payment.stripe_payment_intent_id;
+  const from = payment.plan_id
+    ? `plan:${payment.plan_id}:customer`
+    : `customer:${customerId || payment.id}`;
+
+  try {
+    await recordFinanceTransaction({
+      amount: amountMicros,
+      category: "revenue",
+      currency: payment.currency,
+      description: `Stripe ${payment.selected_plan} payment`,
+      entryType: "actual",
+      from,
+      metadata: {
+        accountingBasis: "cash_receipt",
+        paymentId: payment.id,
+        selectedPlan: payment.selected_plan,
+        sourceSurface: payment.source_surface,
+        stripeCheckoutSessionId: checkoutSessionId,
+        stripeCustomerId: customerId,
+        stripePaymentIntentId: paymentIntentId
+      },
+      provider: "stripe",
+      source: "stripe",
+      sourceRef: `stripe:checkout_session:${checkoutSessionId}:gross`,
+      sql,
+      to: "mattanutra:stripe-clearing",
+      toAccountId: FINANCE_ACCOUNT_IDS.stripeClearing,
+      usdRate: thbUsdRate()
+    });
+
+    const intent = session ? paymentIntentFromSession(session) as unknown as {
+      latest_charge?: {
+        balance_transaction?: {
+          fee?: number | null;
+          id?: string | null;
+        } | string | null;
+      } | string | null;
+    } | null : null;
+    const balanceTransaction =
+      intent?.latest_charge &&
+      typeof intent.latest_charge === "object" &&
+      intent.latest_charge.balance_transaction &&
+      typeof intent.latest_charge.balance_transaction === "object"
+        ? intent.latest_charge.balance_transaction
+        : null;
+    const feeMicros = amountMicrosFromStripeAmount(balanceTransaction?.fee);
+
+    if (balanceTransaction?.id && feeMicros) {
+      await recordFinanceTransaction({
+        amount: feeMicros,
+        category: "payment_fee",
+        currency: payment.currency,
+        description: `Stripe fee for ${payment.selected_plan} payment`,
+        entryType: "actual",
+        from: "mattanutra:stripe-clearing",
+        fromAccountId: FINANCE_ACCOUNT_IDS.stripeClearing,
+        metadata: {
+          accountingBasis: "cash_fee",
+          paymentId: payment.id,
+          selectedPlan: payment.selected_plan,
+          stripeBalanceTransactionId: balanceTransaction.id,
+          stripeCheckoutSessionId: checkoutSessionId
+        },
+        provider: "stripe",
+        source: "stripe",
+        sourceRef: `stripe:balance_transaction:${balanceTransaction.id}:fee`,
+        sql,
+        to: "stripe:fees",
+        toAccountId: FINANCE_ACCOUNT_IDS.stripe,
+        usdRate: thbUsdRate()
+      });
+    }
+
+    await writePaymentBpmEvent({
+      actorType: "system",
+      eventName: "payment_accounting_recorded",
+      eventStatus: "accounting_recorded",
+      locale: payment.locale,
+      paymentId: payment.id,
+      planId: payment.plan_id,
+      properties: {
+        amountMicros,
+        feeMicros,
+        sourceSurface: payment.source_surface
+      },
+      selectedPlan: payment.selected_plan,
+      sql,
+      stripeSessionId: checkoutSessionId,
+      valueAmount: amountMicros / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: payment.currency
+    });
+  } catch (error) {
+    await writePaymentBpmEvent({
+      actorType: "system",
+      errorCode: "stripe_accounting_failed",
+      errorMessage:
+        error instanceof Error ? error.message : "Unable to record Stripe accounting",
+      eventName: "payment_accounting_failed",
+      eventStatus: "accounting_failed",
+      locale: payment.locale,
+      paymentId: payment.id,
+      planId: payment.plan_id,
+      properties: {
+        sourceSurface: payment.source_surface
+      },
+      selectedPlan: payment.selected_plan,
+      severity: "high",
+      sql,
+      stripeSessionId: checkoutSessionId,
+      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: payment.currency
+    });
+  }
+}
+
+async function storeStripeEmail(
+  sql: Db,
+  payment: PaymentRow,
+  email: string | null | undefined
+) {
+  const validation = validateLeadEmail(email ?? "");
+
+  if (!validation.ok) {
+    return;
+  }
+
+  await updatePaymentState(sql, {
+    action: "customer_email_captured",
+    actor: "system",
+    customerEmail: validation.email,
+    metadata: {
+      customerEmailOptedIn: false,
+      emailSource: "stripe_checkout",
+      transactionalOnly: true
+    },
+    paymentId: payment.id,
+    reason: "stripe_customer_email"
+  });
+
+  if (!payment.plan_id) {
+    return;
+  }
+
+  await upsertCommunicationChannel({
+    actorType: "system",
+    address: validation.email,
+    channelType: "email",
+    displayName: "Email",
+    metadata: {
+      marketingOptIn: false,
+      paymentId: payment.id,
+      source: "stripe_checkout",
+      transactionalOnly: true
+    },
+    planId: payment.plan_id,
+    preferenceRank: 90,
+    status: "active"
+  });
+}
+
+async function startPaidAssessmentPlan(input: Readonly<{
+  locale: Locale;
+  paymentId: string;
+  planId: string;
+  selectedPlan: AssessmentPlan;
+  sql: Db;
+}>) {
+  const rows = await input.sql<Array<{ answers: unknown }>>`
+    select answers
+    from public.assessments
+    where plan_id = ${input.planId}::uuid
+    limit 1
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error("Assessment not found for paid plan");
+  }
+
+  await writeBpmEvent({
+    actorType: "visitor",
+    emittedBy: "stripe_payment_flow",
+    eventName: "plan_selected",
+    eventType: "plan",
+    locale: input.locale,
+    planId: input.planId,
+    properties: {
+      paymentId: input.paymentId,
+      paymentRequired: true
+    },
+    selectedPlan: input.selectedPlan,
+    sql: input.sql
+  });
+
+  await enqueueNutritionPlanTasks({
+    answers: row.answers,
+    locale: input.locale,
+    plan: input.selectedPlan,
+    planId: input.planId
+  });
+}
+
+function assertSessionMatchesPayment(
+  session: Stripe.Checkout.Session,
+  payment: PaymentRow,
+  config: StripePaymentConfig
+) {
+  const metadata = session.metadata ?? {};
+  const expectedPlan = payment.selected_plan;
+  const expectedPrice = config.priceIds[expectedPlan];
+  const plan = paymentPlan(expectedPlan);
+  const amountMicros = amountMicrosFromStripeAmount(session.amount_total);
+  const sessionPriceId = priceIdFromSession(session) ?? payment.stripe_price_id;
+
+  if (metadata.mattanutraEnv && metadata.mattanutraEnv !== config.env) {
+    throw new Error("Stripe session environment does not match this deployment");
+  }
+
+  if (metadata.selectedPlan && metadata.selectedPlan !== expectedPlan) {
+    throw new Error("Stripe session selected plan does not match payment");
+  }
+
+  if (session.currency?.toUpperCase() !== payment.currency) {
+    throw new Error("Stripe session currency does not match payment");
+  }
+
+  if (sessionPriceId && sessionPriceId !== expectedPrice) {
+    throw new Error("Stripe session price does not match configured plan price");
+  }
+
+  if (amountMicros && amountMicros !== plan.amountMicros) {
+    throw new Error("Stripe session amount does not match configured plan amount");
+  }
+}
+
+export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
+  const sql = await sqlOrThrow();
+  const paymentId = randomUUID();
+
+  await assertPaymentSchema(sql);
+
+  let config: StripePaymentConfig;
+
+  try {
+    config = stripePaymentConfig();
+  } catch (error) {
+    await writePaymentBpmEvent({
+      actorType: "system",
+      errorCode: "stripe_config_error",
+      errorMessage:
+        error instanceof Error ? error.message : "Stripe configuration is invalid",
+      eventName: "payment_config_error",
+      eventStatus: "config_error",
+      locale: input.locale,
+      paymentId,
+      request: input.request,
+      selectedPlan: input.selectedPlan,
+      severity: "critical",
+      valueAmount: paymentPlan(input.selectedPlan).amountMicros / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: "THB"
+    });
+    throw error;
+  }
+
+  if (input.planId && !isUuid(input.planId)) {
+    throw new Error("Assessment plan not found");
+  }
+
+  if (input.planId) {
+    const rows = await sql<Array<{ exists: boolean }>>`
+      select exists (
+        select 1
+        from public.assessments
+        where plan_id = ${input.planId}::uuid
+      ) as exists
+    `;
+
+    if (rows[0]?.exists !== true) {
+      throw new Error("Assessment plan not found");
+    }
+  }
+
+  const payment = await insertPayment(sql, {
+    config,
+    locale: input.locale,
+    paymentId,
+    planId: input.planId,
+    selectedPlan: input.selectedPlan,
+    sourceSurface: input.sourceSurface
+  });
+
+  await writePaymentBpmEvent({
+    actorType: "visitor",
+    eventName: "payment_checkout_requested",
+    eventStatus: "requested",
+    locale: input.locale,
+    paymentId,
+    planId: input.planId,
+    properties: {
+      mattanutraEnv: config.env,
+      sourceSurface: input.sourceSurface
+    },
+    request: input.request,
+    selectedPlan: input.selectedPlan,
+    sql,
+    valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+    valueCurrency: payment.currency
+  });
+
+  if (config.mode === "mock") {
+    const mockSessionId = `mock_cs_${paymentId}`;
+
+    await updatePaymentState(sql, {
+      action: "mock_checkout_session_created",
+      actor: "system",
+      metadata: {
+        mock: true,
+        stripeMode: config.mode
+      },
+      paymentId,
+      reason: "local_mock_checkout_session_created",
+      status: "checkout_session_created",
+      stripeCheckoutSessionId: mockSessionId,
+      stripePriceId: config.priceIds[input.selectedPlan]
+    });
+
+    await writePaymentBpmEvent({
+      actorType: "system",
+      eventName: "payment_checkout_session_created",
+      eventStatus: "checkout_session_created",
+      locale: input.locale,
+      paymentId,
+      planId: input.planId,
+      properties: {
+        mattanutraEnv: config.env,
+        mock: true,
+        sourceSurface: input.sourceSurface
+      },
+      selectedPlan: input.selectedPlan,
+      sql,
+      stripeSessionId: mockSessionId,
+      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: payment.currency
+    });
+
+    return {
+      clientSecret: null,
+      mock: true,
+      paymentId,
+      publishableKey: "",
+      returnUrl: paymentReturnDestination(input.locale, mapPayment(payment))
+    };
+  }
+
+  const stripe = stripeClientForConfig(config);
+  const plan = paymentPlan(input.selectedPlan);
+  const session = await stripe.checkout.sessions.create({
+    client_reference_id: paymentId,
+    line_items: [
+      {
+        price: config.priceIds[input.selectedPlan],
+        quantity: 1
+      }
+    ],
+    locale: stripeLocale(input.locale),
+    metadata: {
+      locale: input.locale,
+      mattanutraEnv: config.env,
+      paymentId,
+      planId: input.planId ?? "",
+      selectedPlan: input.selectedPlan,
+      sourceSurface: input.sourceSurface
+    },
+    mode: "payment",
+    payment_intent_data: {
+      metadata: {
+        locale: input.locale,
+        mattanutraEnv: config.env,
+        paymentId,
+        planId: input.planId ?? "",
+        selectedPlan: input.selectedPlan,
+        sourceSurface: input.sourceSurface
+      }
+    },
+    return_url: `${siteBaseUrl()}${paymentReturnPath(input.locale)}?session_id={CHECKOUT_SESSION_ID}`,
+    ui_mode: "embedded_page"
+  });
+
+  if (!session.client_secret) {
+    throw new Error("Stripe did not return an embedded Checkout client secret");
+  }
+
+  await updatePaymentState(sql, {
+    action: "checkout_session_created",
+    actor: "system",
+    metadata: {
+      productDescription: plan.description[input.locale],
+      productName: plan.name[input.locale],
+      stripeMode: config.mode
+    },
+    paymentId,
+    reason: "stripe_checkout_session_created",
+    status: "checkout_session_created",
+    stripeCheckoutSessionId: session.id,
+    stripePriceId: config.priceIds[input.selectedPlan]
+  });
+
+  await writePaymentBpmEvent({
+    actorType: "system",
+    eventName: "payment_checkout_session_created",
+    eventStatus: "checkout_session_created",
+    locale: input.locale,
+    paymentId,
+    planId: input.planId,
+    properties: {
+      mattanutraEnv: config.env,
+      sourceSurface: input.sourceSurface
+    },
+    selectedPlan: input.selectedPlan,
+    sql,
+    stripeSessionId: session.id,
+    valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+    valueCurrency: payment.currency
+  });
+
+  return {
+    clientSecret: session.client_secret,
+    paymentId,
+    publishableKey: config.publishableKey
+  };
+}
+
+export async function markPaymentCheckoutOpened(input: Readonly<{
+  paymentId: string;
+  request?: Request;
+}>) {
+  if (!isUuid(input.paymentId)) {
+    return null;
+  }
+
+  const sql = await sqlOrThrow();
+
+  await assertPaymentSchema(sql);
+
+  const payment = await getPaymentRowById(sql, input.paymentId);
+
+  if (!payment) {
+    return null;
+  }
+
+  if (payment.status === "checkout_session_created") {
+    await updatePaymentState(sql, {
+      action: "checkout_opened",
+      actor: "visitor",
+      paymentId: input.paymentId,
+      reason: "embedded_checkout_opened",
+      status: "checkout_opened"
+    });
+  }
+
+  await writePaymentBpmEvent({
+    actorType: "visitor",
+    eventName: "payment_checkout_opened",
+    eventStatus: "checkout_opened",
+    locale: payment.locale,
+    paymentId: payment.id,
+    planId: payment.plan_id,
+    properties: {
+      sourceSurface: payment.source_surface
+    },
+    request: input.request,
+    selectedPlan: payment.selected_plan,
+    sql,
+    stripeSessionId: payment.stripe_checkout_session_id,
+    valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+    valueCurrency: payment.currency
+  });
+
+  return mapPayment(payment);
+}
+
+export async function markPaymentCancelled(input: Readonly<{
+  paymentId: string;
+  request?: Request;
+}>) {
+  if (!isUuid(input.paymentId)) {
+    return null;
+  }
+
+  const sql = await sqlOrThrow();
+
+  await assertPaymentSchema(sql);
+
+  const payment = await getPaymentRowById(sql, input.paymentId);
+
+  if (!payment) {
+    return null;
+  }
+
+  const updated =
+    payment.status === "paid" || payment.status === "bound"
+      ? payment
+      : await updatePaymentState(sql, {
+          action: "payment_cancelled",
+          actor: "visitor",
+          metadata: {
+            source: "checkout_cancel_action"
+          },
+          paymentId: input.paymentId,
+          reason: "visitor_cancelled_checkout",
+          status: "cancelled"
+        });
+
+  await writePaymentBpmEvent({
+    actorType: "visitor",
+    eventName: "payment_cancelled",
+    eventStatus: "cancelled",
+    locale: payment.locale,
+    paymentId: payment.id,
+    planId: payment.plan_id,
+    properties: {
+      sourceSurface: payment.source_surface
+    },
+    request: input.request,
+    selectedPlan: payment.selected_plan,
+    sql,
+    stripeSessionId: payment.stripe_checkout_session_id,
+    valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+    valueCurrency: payment.currency
+  });
+
+  return mapPayment(updated);
+}
+
+export async function completeMockPayment(input: Readonly<{
+  paymentId: string;
+  request?: Request;
+}>) {
+  if (!isUuid(input.paymentId)) {
+    return null;
+  }
+
+  const sql = await sqlOrThrow();
+
+  await assertPaymentSchema(sql);
+
+  const config = stripePaymentConfig();
+
+  if (config.mode !== "mock") {
+    throw new Error("Mock payment completion is only available in dev mock mode");
+  }
+
+  const payment = await getPaymentRowById(sql, input.paymentId);
+
+  if (!payment || payment.stripe_mode !== "mock") {
+    return null;
+  }
+
+  const paid =
+    payment.status === "paid" || payment.status === "bound"
+      ? payment
+      : await updatePaymentState(sql, {
+          action: "mock_payment_paid",
+          actor: "system",
+          metadata: {
+            mock: true,
+            source: "local_dev"
+          },
+          paymentId: input.paymentId,
+          reason: "local_mock_payment_confirmed",
+          status: "paid",
+          stripeCustomerId: "mock_customer",
+          stripePaymentIntentId: `mock_pi_${input.paymentId}`
+        });
+  const currentPayment = paid ?? payment;
+
+  await recordStripePaymentAccounting(sql, currentPayment, null);
+
+  await writePaymentBpmEvent({
+    actorType: "system",
+    eventName: "payment_succeeded",
+    eventStatus: "paid",
+    locale: currentPayment.locale,
+    paymentId: currentPayment.id,
+    planId: currentPayment.plan_id,
+    properties: {
+      mock: true,
+      source: "local_dev",
+      sourceSurface: currentPayment.source_surface
+    },
+    request: input.request,
+    selectedPlan: currentPayment.selected_plan,
+    sql,
+    stripeSessionId: currentPayment.stripe_checkout_session_id,
+    valueAmount: currentPayment.amount / AMOUNT_MICROS_PER_UNIT,
+    valueCurrency: currentPayment.currency
+  });
+
+  if (currentPayment.plan_id) {
+    await startPaidAssessmentPlan({
+      locale: currentPayment.locale,
+      paymentId: currentPayment.id,
+      planId: currentPayment.plan_id,
+      selectedPlan: currentPayment.selected_plan,
+      sql
+    });
+  }
+
+  await writePaymentBpmEvent({
+    actorType: "system",
+    eventName: "payment_fulfillment_succeeded",
+    eventStatus: "paid",
+    locale: currentPayment.locale,
+    paymentId: currentPayment.id,
+    planId: currentPayment.plan_id,
+    properties: {
+      mock: true,
+      source: "local_dev",
+      sourceSurface: currentPayment.source_surface
+    },
+    selectedPlan: currentPayment.selected_plan,
+    sql,
+    stripeSessionId: currentPayment.stripe_checkout_session_id,
+    valueAmount: currentPayment.amount / AMOUNT_MICROS_PER_UNIT,
+    valueCurrency: currentPayment.currency
+  });
+
+  return {
+    destination: paymentReturnDestination(
+      currentPayment.locale,
+      mapPayment(currentPayment)
+    ),
+    payment: mapPayment(currentPayment)
+  };
+}
+
+export async function getPayment(paymentId: string) {
+  if (!isUuid(paymentId)) {
+    return null;
+  }
+
+  const sql = await sqlOrThrow();
+
+  await assertPaymentSchema(sql);
+
+  const payment = await getPaymentRowById(sql, paymentId);
+
+  return payment ? mapPayment(payment) : null;
+}
+
+export async function getLatestPlanPayment(planId: string) {
+  if (!isUuid(planId)) {
+    return null;
+  }
+
+  const sql = await sqlOrThrow();
+
+  await assertPaymentSchema(sql);
+
+  const rows = await sql<PaymentRow[]>`
+    select *
+    from public.payments
+    where plan_id = ${planId}::uuid
+    order by created_at desc
+    limit 1
+  `;
+
+  return rows[0] ? mapPayment(rows[0]) : null;
+}
+
+async function markWebhookEventStatus(
+  sql: Db,
+  input: Readonly<{
+    errorMessage?: string | null;
+    paymentId?: string | null;
+    sessionId?: string | null;
+    status: "failed" | "ignored" | "processed";
+    stripeEventId: string;
+  }>
+) {
+  await sql`
+    update public.stripe_webhook_events
+    set
+      payment_id = coalesce(${input.paymentId ?? null}::uuid, payment_id),
+      stripe_checkout_session_id = coalesce(${input.sessionId ?? null}, stripe_checkout_session_id),
+      status = ${input.status},
+      error_message = ${input.errorMessage ?? null},
+      processed_at = now()
+    where stripe_event_id = ${input.stripeEventId}
+  `;
+}
+
+export async function recordStripeWebhookEvent(
+  sql: Db,
+  input: Readonly<{
+    config: StripePaymentConfig;
+    event: Stripe.Event;
+    payloadShape: StripeWebhookPayloadShape;
+    sessionId?: string | null;
+  }>
+) {
+  const rows = await sql<Array<{ id: string }>>`
+    insert into public.stripe_webhook_events (
+      stripe_event_id,
+      payload_shape,
+      stripe_mode,
+      event_type,
+      stripe_checkout_session_id,
+      status,
+      payload,
+      received_at
+    )
+    values (
+      ${input.event.id},
+      ${input.payloadShape},
+      ${input.config.mode},
+      ${input.event.type},
+      ${input.sessionId ?? null},
+      'received',
+      ${sql.json(toJsonValue(input.event))}::jsonb,
+      now()
+    )
+    on conflict (stripe_event_id) do nothing
+    returning id::text
+  `;
+
+  return Boolean(rows[0]);
+}
+
+function sessionFromEvent(event: Stripe.Event) {
+  return event.data.object as Stripe.Checkout.Session;
+}
+
+export async function fulfillCheckoutSession(
+  sessionId: string,
+  input: Readonly<{
+    request?: Request;
+    source: "return_page" | "webhook";
+    stripeEventId?: string | null;
+  }>
+) {
+  const sql = await sqlOrThrow();
+
+  await assertPaymentSchema(sql);
+
+  const config = stripePaymentConfig();
+  const stripe = stripeClientForConfig(config);
+
+  await writePaymentBpmEvent({
+    actorType: "system",
+    eventName: "payment_fulfillment_started",
+    eventStatus: "fulfillment_started",
+    paymentId: null,
+    properties: {
+      source: input.source
+    },
+    request: input.request,
+    severity: "low",
+    sql,
+    stripeEventId: input.stripeEventId,
+    stripeSessionId: sessionId
+  });
+
+  const session = await stripe.checkout.sessions.retrieve(sessionId, {
+    expand: [
+      "line_items.data.price",
+      "payment_intent.latest_charge.balance_transaction"
+    ]
+  });
+  const payment =
+    (session.metadata?.paymentId && isUuid(session.metadata.paymentId)
+      ? await getPaymentRowById(sql, session.metadata.paymentId)
+      : null) ?? (await getPaymentRowBySessionId(sql, session.id));
+
+  if (!payment) {
+    throw new Error("Payment record not found for Stripe session");
+  }
+
+  try {
+    if (input.source === "return_page") {
+      await writePaymentBpmEvent({
+        actorType: "visitor",
+        eventName: "payment_checkout_returned",
+        eventStatus: "received",
+        locale: payment.locale,
+        paymentId: payment.id,
+        planId: payment.plan_id,
+        properties: {
+          sourceSurface: payment.source_surface
+        },
+        request: input.request,
+        selectedPlan: payment.selected_plan,
+        sql,
+        stripeEventId: input.stripeEventId,
+        stripeSessionId: session.id,
+        valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+        valueCurrency: payment.currency
+      });
+    }
+
+    assertSessionMatchesPayment(session, payment, config);
+
+    const customerId = stringId(session.customer);
+    const paymentIntentId = stringId(session.payment_intent);
+    const email = sessionCustomerEmail(session);
+
+    if (session.status === "expired") {
+      const expired = await updatePaymentState(sql, {
+        action: "checkout_expired",
+        actor: "stripe",
+        metadata: {
+          source: input.source
+        },
+        paymentId: payment.id,
+        reason: "stripe_checkout_expired",
+        status: "expired",
+        stripeCustomerId: customerId,
+        stripePaymentIntentId: paymentIntentId
+      });
+
+      await writePaymentBpmEvent({
+        actorType: "system",
+        eventName: "payment_expired",
+        eventStatus: "expired",
+        locale: payment.locale,
+        paymentId: payment.id,
+        planId: payment.plan_id,
+        properties: {
+          source: input.source,
+          sourceSurface: payment.source_surface
+        },
+        selectedPlan: payment.selected_plan,
+        sql,
+        stripeEventId: input.stripeEventId,
+        stripeSessionId: session.id,
+        valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+        valueCurrency: payment.currency
+      });
+
+      return {
+        payment: expired ? mapPayment(expired) : mapPayment(payment),
+        status: "expired" as const
+      };
+    }
+
+    if (session.payment_status !== "paid") {
+      const processing = await updatePaymentState(sql, {
+        action: "payment_processing",
+        actor: "stripe",
+        metadata: {
+          paymentStatus: session.payment_status,
+          source: input.source
+        },
+        paymentId: payment.id,
+        reason: "stripe_checkout_not_paid",
+        status: "processing",
+        stripeCustomerId: customerId,
+        stripePaymentIntentId: paymentIntentId
+      });
+
+      await writePaymentBpmEvent({
+        actorType: "system",
+        eventName: "payment_processing",
+        eventStatus: "processing",
+        locale: payment.locale,
+        paymentId: payment.id,
+        planId: payment.plan_id,
+        properties: {
+          paymentStatus: session.payment_status,
+          source: input.source,
+          sourceSurface: payment.source_surface
+        },
+        selectedPlan: payment.selected_plan,
+        sql,
+        stripeEventId: input.stripeEventId,
+        stripeSessionId: session.id,
+        valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+        valueCurrency: payment.currency
+      });
+
+      return {
+        payment: processing ? mapPayment(processing) : mapPayment(payment),
+        status: "processing" as const
+      };
+    }
+
+    const paid =
+      payment.status === "paid" || payment.status === "bound"
+        ? payment
+        : await updatePaymentState(sql, {
+            action: "payment_paid",
+            actor: "stripe",
+            customerEmail: email || null,
+            metadata: {
+              source: input.source,
+              stripePaymentStatus: session.payment_status
+            },
+            paymentId: payment.id,
+            reason: "stripe_payment_confirmed",
+            status: "paid",
+            stripeCustomerId: customerId,
+            stripePaymentIntentId: paymentIntentId
+          });
+    const currentPayment = paid ?? payment;
+
+    await storeStripeEmail(sql, currentPayment, email);
+    await recordStripePaymentAccounting(sql, currentPayment, session);
+
+    await writePaymentBpmEvent({
+      actorType: "system",
+      eventName: "payment_succeeded",
+      eventStatus: "paid",
+      locale: payment.locale,
+      paymentId: payment.id,
+      planId: payment.plan_id,
+      properties: {
+        source: input.source,
+        sourceSurface: payment.source_surface
+      },
+      selectedPlan: payment.selected_plan,
+      sql,
+      stripeEventId: input.stripeEventId,
+      stripeSessionId: session.id,
+      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: payment.currency
+    });
+
+    if (currentPayment.plan_id && currentPayment.status !== "bound") {
+      await startPaidAssessmentPlan({
+        locale: currentPayment.locale,
+        paymentId: currentPayment.id,
+        planId: currentPayment.plan_id,
+        selectedPlan: currentPayment.selected_plan,
+        sql
+      });
+    }
+
+    await writePaymentBpmEvent({
+      actorType: "system",
+      eventName: "payment_fulfillment_succeeded",
+      eventStatus: "paid",
+      locale: payment.locale,
+      paymentId: payment.id,
+      planId: payment.plan_id,
+      properties: {
+        source: input.source,
+        sourceSurface: payment.source_surface
+      },
+      selectedPlan: payment.selected_plan,
+      sql,
+      stripeEventId: input.stripeEventId,
+      stripeSessionId: session.id,
+      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: payment.currency
+    });
+
+    return {
+      payment: mapPayment(currentPayment),
+      status: currentPayment.plan_id ? "paid_with_plan" as const : "paid_reservation" as const
+    };
+  } catch (error) {
+    await updatePaymentState(sql, {
+      action: "fulfillment_failed",
+      actor: "system",
+      metadata: {
+        errorMessage:
+          error instanceof Error ? error.message : "Payment fulfillment failed",
+        source: input.source
+      },
+      paymentId: payment.id,
+      reason: "fulfillment_failed",
+      status: "fulfillment_failed"
+    });
+    await writePaymentBpmEvent({
+      actorType: "system",
+      errorCode: "payment_fulfillment_failed",
+      errorMessage:
+        error instanceof Error ? error.message : "Payment fulfillment failed",
+      eventName: "payment_fulfillment_failed",
+      eventStatus: "fulfillment_failed",
+      locale: payment.locale,
+      paymentId: payment.id,
+      planId: payment.plan_id,
+      properties: {
+        source: input.source,
+        sourceSurface: payment.source_surface
+      },
+      selectedPlan: payment.selected_plan,
+      severity: "high",
+      sql,
+      stripeEventId: input.stripeEventId,
+      stripeSessionId: session.id,
+      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: payment.currency
+    });
+    throw error;
+  }
+}
+
+export async function bindPaidReservationToAssessment(input: Readonly<{
+  locale: Locale;
+  paymentId?: string | null;
+  planId: string;
+}>) {
+  if (!input.paymentId || !isUuid(input.paymentId) || !isUuid(input.planId)) {
+    return null;
+  }
+
+  const sql = await sqlOrThrow();
+
+  await assertPaymentSchema(sql);
+
+  const payment = await getPaymentRowById(sql, input.paymentId);
+
+  if (!payment || payment.plan_id || payment.locale !== input.locale) {
+    await writePaymentBpmEvent({
+      actorType: "system",
+      errorCode: "payment_reservation_bind_failed",
+      errorMessage: "Paid reservation could not be bound to assessment",
+      eventName: "payment_reservation_bind_failed",
+      eventStatus: "failed",
+      locale: input.locale,
+      paymentId: input.paymentId,
+      planId: input.planId,
+      severity: "high",
+      sql
+    });
+    return null;
+  }
+
+  if (payment.status !== "paid") {
+    await writePaymentBpmEvent({
+      actorType: "system",
+      errorCode: "payment_reservation_not_paid",
+      errorMessage: "Payment reservation is not paid",
+      eventName: "payment_reservation_bind_failed",
+      eventStatus: "failed",
+      locale: input.locale,
+      paymentId: input.paymentId,
+      planId: input.planId,
+      selectedPlan: payment.selected_plan,
+      severity: "high",
+      sql
+    });
+    return null;
+  }
+
+  const bound = await updatePaymentState(sql, {
+    action: "payment_reservation_bound",
+    actor: "system",
+    metadata: {
+      source: "assessment_capture"
+    },
+    paymentId: input.paymentId,
+    planId: input.planId,
+    reason: "paid_reservation_bound_to_assessment",
+    status: "bound"
+  });
+  const nextPayment = bound ?? payment;
+
+  await storeStripeEmail(sql, nextPayment, payment.customer_email);
+  await startPaidAssessmentPlan({
+    locale: input.locale,
+    paymentId: input.paymentId,
+    planId: input.planId,
+    selectedPlan: payment.selected_plan,
+    sql
+  });
+
+  await writePaymentBpmEvent({
+    actorType: "system",
+    eventName: "payment_reservation_bound",
+    eventStatus: "bound",
+    locale: input.locale,
+    paymentId: input.paymentId,
+    planId: input.planId,
+    selectedPlan: payment.selected_plan,
+    sql,
+    stripeSessionId: payment.stripe_checkout_session_id,
+    valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+    valueCurrency: payment.currency
+  });
+
+  return mapPayment(nextPayment);
+}
+
+export async function markStripePaymentFailure(input: Readonly<{
+  eventName: "payment_expired" | "payment_failed";
+  eventStatus: "expired" | "failed";
+  reason: string;
+  session?: Stripe.Checkout.Session | null;
+  stripeEventId?: string | null;
+  stripePaymentIntentId?: string | null;
+}>) {
+  const sql = await sqlOrThrow();
+
+  await assertPaymentSchema(sql);
+
+  const sessionPaymentId = input.session?.metadata?.paymentId;
+  const sessionId = input.session?.id ?? null;
+  const rows = sessionPaymentId && isUuid(sessionPaymentId)
+    ? await sql<PaymentRow[]>`
+        select *
+        from public.payments
+        where id = ${sessionPaymentId}::uuid
+        limit 1
+      `
+    : input.stripePaymentIntentId
+      ? await sql<PaymentRow[]>`
+          select *
+          from public.payments
+          where stripe_payment_intent_id = ${input.stripePaymentIntentId}
+          order by created_at desc
+          limit 1
+        `
+      : sessionId
+        ? await sql<PaymentRow[]>`
+            select *
+            from public.payments
+            where stripe_checkout_session_id = ${sessionId}
+            limit 1
+          `
+        : [];
+  const payment = rows[0];
+
+  if (!payment) {
+    return null;
+  }
+
+  const updated = await updatePaymentState(sql, {
+    action: input.eventName,
+    actor: "stripe",
+    metadata: {
+      failureReason: input.reason
+    },
+    paymentId: payment.id,
+    reason: input.reason,
+    status: input.eventStatus
+  });
+
+  await writePaymentBpmEvent({
+    actorType: "system",
+    errorCode: input.eventName,
+    errorMessage: input.reason,
+    eventName: input.eventName,
+    eventStatus: input.eventStatus,
+    locale: payment.locale,
+    paymentId: payment.id,
+    planId: payment.plan_id,
+    selectedPlan: payment.selected_plan,
+    severity: input.eventStatus === "failed" ? "medium" : "low",
+    sql,
+    stripeEventId: input.stripeEventId,
+    stripeSessionId: sessionId,
+    valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+    valueCurrency: payment.currency
+  });
+
+  return updated ? mapPayment(updated) : mapPayment(payment);
+}
+
+export async function handleStripeWebhookPayload(input: Readonly<{
+  payload: string;
+  payloadShape: StripeWebhookPayloadShape;
+  request?: Request;
+  signature: string | null;
+}>) {
+  const sql = await sqlOrThrow();
+
+  await assertPaymentSchema(sql);
+
+  let config: StripePaymentConfig;
+
+  try {
+    config = stripePaymentConfig();
+  } catch (error) {
+    await writePaymentBpmEvent({
+      actorType: "system",
+      errorCode: "stripe_config_error",
+      errorMessage:
+        error instanceof Error ? error.message : "Stripe configuration is invalid",
+      eventName: "payment_config_error",
+      eventStatus: "config_error",
+      request: input.request,
+      severity: "critical",
+      sql
+    });
+    throw error;
+  }
+
+  if (!input.signature) {
+    await writePaymentBpmEvent({
+      actorType: "system",
+      errorCode: "stripe_webhook_signature_missing",
+      errorMessage: "Stripe webhook signature is missing",
+      eventName: "payment_webhook_signature_failed",
+      eventStatus: "failed",
+      request: input.request,
+      severity: "critical",
+      sql
+    });
+    throw new Error("Stripe webhook signature is missing");
+  }
+
+  const stripe = stripeClientForConfig(config);
+  let event: Stripe.Event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      input.payload,
+      input.signature,
+      config.webhookSecrets[input.payloadShape]
+    );
+  } catch (error) {
+    await writePaymentBpmEvent({
+      actorType: "system",
+      errorCode: "stripe_webhook_signature_failed",
+      errorMessage:
+        error instanceof Error ? error.message : "Stripe webhook signature failed",
+      eventName: "payment_webhook_signature_failed",
+      eventStatus: "failed",
+      request: input.request,
+      severity: "critical",
+      sql
+    });
+    throw error;
+  }
+
+  const session =
+    input.payloadShape === "fat" && event.type.startsWith("checkout.session.")
+      ? sessionFromEvent(event)
+      : null;
+  const isFresh = await recordStripeWebhookEvent(sql, {
+    config,
+    event,
+    payloadShape: input.payloadShape,
+    sessionId: session?.id ?? null
+  });
+
+  if (!isFresh) {
+    return { duplicate: true, ok: true };
+  }
+
+  await writePaymentBpmEvent({
+    actorType: "system",
+    eventName: "payment_webhook_received",
+    eventStatus: "received",
+    paymentId: session?.metadata?.paymentId ?? null,
+    properties: {
+      eventType: event.type,
+      mattanutraEnv: config.env,
+      payloadShape: input.payloadShape
+    },
+    request: input.request,
+    severity: "low",
+    sql,
+    stripeEventId: event.id,
+    stripeSessionId: session?.id ?? null
+  });
+
+  try {
+    if (input.payloadShape === "thin") {
+      await markWebhookEventStatus(sql, {
+        sessionId: null,
+        status: "ignored",
+        stripeEventId: event.id
+      });
+      await writePaymentBpmEvent({
+        actorType: "system",
+        eventName: "payment_webhook_ignored",
+        eventStatus: "ignored",
+        paymentId: null,
+        properties: {
+          eventType: event.type,
+          mattanutraEnv: config.env,
+          payloadShape: input.payloadShape,
+          reason: "thin_webhook_shadow_mode",
+          supportedEvents: [...SUPPORTED_STRIPE_WEBHOOK_EVENTS]
+        },
+        request: input.request,
+        severity: "low",
+        sql,
+        stripeEventId: event.id,
+        stripeSessionId: null
+      });
+
+      return { duplicate: false, ignored: true, ok: true, payloadShape: input.payloadShape };
+    }
+
+    if (
+      event.type === "checkout.session.completed" ||
+      event.type === "checkout.session.async_payment_succeeded"
+    ) {
+      const result = await fulfillCheckoutSession(sessionFromEvent(event).id, {
+        request: input.request,
+        source: "webhook",
+        stripeEventId: event.id
+      });
+
+      await markWebhookEventStatus(sql, {
+        paymentId: result.payment.id,
+        sessionId: result.payment.stripeCheckoutSessionId,
+        status: "processed",
+        stripeEventId: event.id
+      });
+
+      return { duplicate: false, ok: true };
+    }
+
+    if (event.type === "checkout.session.async_payment_failed") {
+      const failed = await markStripePaymentFailure({
+        eventName: "payment_failed",
+        eventStatus: "failed",
+        reason: "Stripe async payment failed",
+        session: sessionFromEvent(event),
+        stripeEventId: event.id
+      });
+
+      await markWebhookEventStatus(sql, {
+        paymentId: failed?.id ?? null,
+        sessionId: failed?.stripeCheckoutSessionId ?? session?.id ?? null,
+        status: "processed",
+        stripeEventId: event.id
+      });
+
+      return { duplicate: false, ok: true };
+    }
+
+    if (event.type === "checkout.session.expired") {
+      const expired = await markStripePaymentFailure({
+        eventName: "payment_expired",
+        eventStatus: "expired",
+        reason: "Stripe checkout session expired",
+        session: sessionFromEvent(event),
+        stripeEventId: event.id
+      });
+
+      await markWebhookEventStatus(sql, {
+        paymentId: expired?.id ?? null,
+        sessionId: expired?.stripeCheckoutSessionId ?? session?.id ?? null,
+        status: "processed",
+        stripeEventId: event.id
+      });
+
+      return { duplicate: false, ok: true };
+    }
+
+    if (event.type === "payment_intent.payment_failed") {
+      const intent = event.data.object as Stripe.PaymentIntent;
+      const failed = await markStripePaymentFailure({
+        eventName: "payment_failed",
+        eventStatus: "failed",
+        reason:
+          intent.last_payment_error?.message ||
+          "Stripe payment intent failed",
+        stripeEventId: event.id,
+        stripePaymentIntentId: intent.id
+      });
+
+      await markWebhookEventStatus(sql, {
+        paymentId: failed?.id ?? null,
+        sessionId: failed?.stripeCheckoutSessionId ?? null,
+        status: "processed",
+        stripeEventId: event.id
+      });
+
+      return { duplicate: false, ok: true };
+    }
+
+    await markWebhookEventStatus(sql, {
+      sessionId: session?.id ?? null,
+      status: "ignored",
+      stripeEventId: event.id
+    });
+    await writePaymentBpmEvent({
+      actorType: "system",
+      eventName: "payment_webhook_ignored",
+      eventStatus: "ignored",
+      paymentId: session?.metadata?.paymentId ?? null,
+      properties: {
+        eventType: event.type,
+        mattanutraEnv: config.env,
+        payloadShape: input.payloadShape,
+        supportedEvents: [...SUPPORTED_STRIPE_WEBHOOK_EVENTS]
+      },
+      request: input.request,
+      severity: "low",
+      sql,
+      stripeEventId: event.id,
+      stripeSessionId: session?.id ?? null
+    });
+
+    return { duplicate: false, ignored: true, ok: true };
+  } catch (error) {
+    await markWebhookEventStatus(sql, {
+      errorMessage:
+        error instanceof Error ? error.message : "Stripe webhook processing failed",
+      sessionId: session?.id ?? null,
+      status: "failed",
+      stripeEventId: event.id
+    });
+    throw error;
+  }
+}
+
+export function paymentReturnDestination(
+  locale: Locale,
+  payment: Awaited<ReturnType<typeof getPayment>> | null
+) {
+  if (!payment) {
+    return `/${locale}`;
+  }
+
+  if (payment.planId) {
+    return nutritionRefinePath(locale, payment.planId);
+  }
+
+  return nutritionQuizPath(locale, undefined, { payment: payment.id });
+}

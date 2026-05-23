@@ -13,6 +13,7 @@ type NutritionQuizPageProps = Readonly<{
     locale: string;
   }>;
   searchParams?: Promise<{
+    payment?: string;
     plan?: string;
   }>;
 }>;
@@ -38,6 +39,10 @@ export default async function NutritionQuizPage({
   const dictionary = getDictionary(locale);
   const returningPlanId =
     typeof query.plan === "string" && isUuid(query.plan) ? query.plan : "";
+  const paymentId =
+    typeof query.payment === "string" && isUuid(query.payment)
+      ? query.payment
+      : "";
   const currentPath = nutritionQuizPath(locale, returningPlanId);
   const databaseReady = await checkDatabaseConnection();
 
@@ -69,6 +74,7 @@ export default async function NutritionQuizPage({
       <AssessmentFlow
         initialStage="quiz"
         locale={locale}
+        paymentId={paymentId || undefined}
         prefillAnswers={prefill?.answers ?? null}
         returningHealthScore={prefill?.healthScore ?? null}
         returningPlanId={prefill?.planId ?? undefined}

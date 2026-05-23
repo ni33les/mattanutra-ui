@@ -3,11 +3,20 @@ import type postgres from "postgres";
 
 type FinanceDb = postgres.Sql | postgres.TransactionSql;
 
-export type FinanceCategory = "ai" | "hosting" | "other";
+export type FinanceCategory =
+  | "ai"
+  | "hosting"
+  | "other"
+  | "payment_fee"
+  | "refund"
+  | "revenue";
 export type FinanceEntryType = "actual" | "nominal";
 
 export const FINANCE_ACCOUNT_IDS = {
   digitalOcean: "22222222-2222-4222-8222-222222222222",
+  mattanutraRevenue: "44444444-4444-4444-8444-444444444444",
+  stripe: "33333333-3333-4333-8333-333333333333",
+  stripeClearing: "55555555-5555-4555-8555-555555555555",
   xai: "11111111-1111-4111-8111-111111111111"
 } as const;
 
@@ -199,6 +208,9 @@ export async function recordFinanceTransaction(input: FinanceTransactionInput) {
   const category: FinanceCategory =
     input.category === "ai" ||
     input.category === "hosting" ||
+    input.category === "payment_fee" ||
+    input.category === "refund" ||
+    input.category === "revenue" ||
     input.category === "other"
       ? input.category
       : "other";

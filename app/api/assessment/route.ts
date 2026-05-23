@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   createAssessmentSnapshot,
-  DEFAULT_ASSESSMENT_PLAN,
-  isAssessmentPlan,
-  type AssessmentPlan
+  DEFAULT_ASSESSMENT_PLAN
 } from "@/lib/assessment-snapshot";
 import {
   getStoredAssessmentSnapshot,
@@ -14,11 +12,11 @@ import { computeHealthScore } from "@/lib/health-score";
 import {
   enqueueDueScheduledActions,
   enqueueHealthScoreAnalysisTask,
-  enqueueNutritionPlanTasks,
   scheduleReassessmentAction
 } from "@/lib/task-worker";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
 import { isLocale } from "@/lib/i18n";
+import { bindPaidReservationToAssessment } from "@/lib/stripe-payments";
 
 export const runtime = "nodejs";
 
@@ -64,6 +62,7 @@ export async function POST(request: Request) {
     answers?: unknown;
     intent?: "capture" | "process";
     locale?: unknown;
+    paymentId?: unknown;
     plan?: unknown;
   } = {};
 
@@ -72,6 +71,7 @@ export async function POST(request: Request) {
       answers?: unknown;
       intent?: "capture" | "process";
       locale?: unknown;
+      paymentId?: unknown;
       plan?: unknown;
     };
   } catch {
@@ -80,27 +80,22 @@ export async function POST(request: Request) {
 
   const intent = body.intent === "process" ? "process" : "capture";
   const bpm = bpmContextFromBody(body);
-  let selectedPlan: AssessmentPlan | null = null;
 
   if (intent === "process") {
-    if (!isAssessmentPlan(body.plan)) {
-      return NextResponse.json(
-        { message: "Unsupported assessment plan" },
-        {
-          headers: {
-            "Cache-Control": "no-store"
-          },
-          status: 400
-        }
-      );
-    }
-
-    selectedPlan = body.plan;
-
+    return NextResponse.json(
+      { message: "Payment is required before plan processing" },
+      {
+        headers: {
+          "Cache-Control": "no-store"
+        },
+        status: 402
+      }
+    );
   }
+
   const snapshot = createAssessmentSnapshot({
     healthScore: buildHealthScore(body.answers, body.locale),
-    plan: selectedPlan ?? DEFAULT_ASSESSMENT_PLAN,
+    plan: DEFAULT_ASSESSMENT_PLAN,
     status: "ready"
   });
 
@@ -108,7 +103,7 @@ export async function POST(request: Request) {
     await persistAssessmentSubmission({
       answers: body.answers,
       locale: body.locale,
-      selectedPlan,
+      selectedPlan: null,
       snapshot,
       status: "captured"
     });
@@ -121,7 +116,6 @@ export async function POST(request: Request) {
       locale: body.locale,
       planId: snapshot.planId,
       ray: typeof bpm.ray === "string" ? bpm.ray : null,
-      selectedPlan,
       ...healthScoreBpmFields(snapshot)
     });
 
@@ -148,26 +142,26 @@ export async function POST(request: Request) {
       });
     }
 
-    if (intent === "process" && selectedPlan) {
-      await writeBpmEvent({
-        actorType: "visitor",
-        attribution: bpm.attribution,
-        eventName: "plan_selected",
-        eventType: "plan",
-        locale: body.locale,
-        planId: snapshot.planId,
-        ray: typeof bpm.ray === "string" ? bpm.ray : null,
-        selectedPlan,
-        ...healthScoreBpmFields(snapshot)
-      });
-
-      await enqueueNutritionPlanTasks({
-        answers: body.answers,
-        locale: body.locale,
-        plan: selectedPlan,
+    if (intent === "capture" && typeof body.paymentId === "string") {
+      const boundPayment = await bindPaidReservationToAssessment({
+        locale: isLocale(body.locale) ? body.locale : "en",
+        paymentId: body.paymentId,
         planId: snapshot.planId
       });
+
+      if (!boundPayment) {
+        return NextResponse.json(
+          { message: "Paid reservation could not be applied" },
+          {
+            headers: {
+              "Cache-Control": "no-store"
+            },
+            status: 402
+          }
+        );
+      }
     }
+
   } catch (error) {
     console.error("Unable to persist assessment submission", error);
     await writeBpmEvent({

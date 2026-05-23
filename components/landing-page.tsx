@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import type { BlogPostSummary } from "@/lib/blog";
 import type { Locale } from "@/lib/i18n";
+import { paymentCheckoutPath } from "@/lib/payment-paths";
 
 type LandingPageProps = Readonly<{
   assessmentPath: string;
@@ -1000,7 +1001,13 @@ export function LandingPage({
                   <strong>{plan.price}</strong>
                 </div>
                 <p className="mn-v11-price-term">{plan.term}</p>
-                <Link className="mn-brand-button w-full" href={assessmentPath}>
+                <Link
+                  className="mn-brand-button w-full"
+                  href={paymentCheckoutPath(locale, {
+                    plan: index === 0 ? "precision" : "pro",
+                    sourceSurface: "landing"
+                  })}
+                >
                   {plan.cta}
                   <ArrowRight aria-hidden className="size-4" />
                 </Link>

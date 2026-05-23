@@ -113,7 +113,7 @@ function safetyIntake(answers: unknown) {
   ];
 
   return {
-    acknowledged: record.disclosure === true,
+    acknowledged: record.disclosure === true || record.foodSafetyAcknowledged === true,
     allergens: allergenInputs.map(normalizeFoodName).filter(Boolean),
     avoidances: avoidances.map(normalizeFoodName).filter(Boolean),
     conditionFlags: deriveConditionFlags(record)

@@ -276,6 +276,108 @@ create trigger nutrition_plan_versions_no_update_delete
   before update or delete on public.nutrition_plan_versions
   for each row execute function public.prevent_domain_version_mutation();
 
+create table public.payments (
+  id uuid primary key,
+  plan_id uuid null references public.assessments(plan_id) on delete set null,
+  selected_plan public.assessment_plan not null,
+  locale text not null default 'en' check (locale in ('en', 'th')),
+  source_surface text not null default 'healthscore' check (source_surface in ('landing', 'healthscore')),
+  status text not null default 'created' check (
+    status in (
+      'created',
+      'checkout_session_created',
+      'checkout_opened',
+      'processing',
+      'paid',
+      'failed',
+      'cancelled',
+      'expired',
+      'fulfillment_failed',
+      'bound'
+    )
+  ),
+  amount bigint not null check (amount > 0),
+  amount_unit text not null default 'micros' check (amount_unit = 'micros'),
+  currency text not null default 'THB' check (currency ~ '^[A-Z]{3}$'),
+  stripe_mode text not null default 'test' check (stripe_mode in ('test', 'live', 'mock')),
+  stripe_checkout_session_id text null,
+  stripe_payment_intent_id text null,
+  stripe_customer_id text null,
+  stripe_price_id text null,
+  customer_email text null,
+  customer_email_opted_in boolean not null default false,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  paid_at timestamptz null,
+  bound_at timestamptz null
+);
+
+create unique index payments_stripe_checkout_session_idx
+  on public.payments (stripe_checkout_session_id)
+  where stripe_checkout_session_id is not null;
+
+create index payments_plan_idx
+  on public.payments (plan_id, created_at desc)
+  where plan_id is not null;
+
+create index payments_status_idx
+  on public.payments (status, created_at desc);
+
+create table public.payment_versions (
+  payment_id uuid not null references public.payments(id) on delete restrict,
+  version integer not null,
+  action text not null,
+  actor text not null default 'system',
+  reason text not null,
+  source text not null default 'application',
+  plan_id uuid null references public.assessments(plan_id) on delete set null,
+  snapshot jsonb not null default '{}'::jsonb,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  primary key (payment_id, version)
+);
+
+create index payment_versions_latest_idx
+  on public.payment_versions (payment_id, version desc, created_at desc);
+
+drop trigger if exists payment_versions_no_update_delete
+  on public.payment_versions;
+
+create trigger payment_versions_no_update_delete
+  before update or delete on public.payment_versions
+  for each row execute function public.prevent_domain_version_mutation();
+
+create table public.stripe_webhook_events (
+  id uuid primary key default gen_random_uuid(),
+  stripe_event_id text not null unique,
+  payload_shape text not null default 'fat' check (payload_shape in ('fat', 'thin')),
+  stripe_mode text not null check (stripe_mode in ('test', 'live', 'mock')),
+  event_type text not null,
+  payment_id uuid null references public.payments(id) on delete set null,
+  stripe_checkout_session_id text null,
+  status text not null default 'received' check (
+    status in ('received', 'processed', 'ignored', 'failed')
+  ),
+  payload jsonb not null default '{}'::jsonb,
+  error_message text null,
+  received_at timestamptz not null default now(),
+  processed_at timestamptz null
+);
+
+create index stripe_webhook_events_payment_idx
+  on public.stripe_webhook_events (payment_id, received_at desc)
+  where payment_id is not null;
+
+comment on table public.payments is
+  'Current payment projection. payment_versions is the append-only source-of-truth.';
+
+comment on table public.payment_versions is
+  'Append-only payment state versions.';
+
+comment on table public.stripe_webhook_events is
+  'Idempotency and diagnostics for Stripe webhook processing.';
+
 create table public.ai_response_cache (
   cache_key text primary key,
   cache_type text not null,
@@ -2457,6 +2559,27 @@ values
     'DigitalOcean hosting, app platform, database, storage, and network costs.',
     now(),
     now()
+  ),
+  (
+    '33333333-3333-4333-8333-333333333333'::uuid,
+    'Stripe',
+    'Stripe payment processing and settlement.',
+    now(),
+    now()
+  ),
+  (
+    '44444444-4444-4444-8444-444444444444'::uuid,
+    'MattaNutra revenue',
+    'MattaNutra customer payment revenue.',
+    now(),
+    now()
+  ),
+  (
+    '55555555-5555-4555-8555-555555555555'::uuid,
+    'Stripe clearing',
+    'Stripe clearing account for customer payments before payout reconciliation.',
+    now(),
+    now()
   )
 on conflict (id) do update set
   name = excluded.name,
@@ -2472,7 +2595,7 @@ comment on table public.finance_accounts is
 create table public.finance_transactions (
   id uuid primary key,
   occurred_at timestamptz not null default now(),
-  category text not null check (category in ('ai', 'hosting', 'other')),
+  category text not null check (category in ('ai', 'hosting', 'other', 'payment_fee', 'refund', 'revenue')),
   entry_type text not null default 'nominal' check (entry_type in ('nominal', 'actual')),
   source text not null,
   source_ref text null,
@@ -2491,6 +2614,23 @@ create table public.finance_transactions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+do $$
+begin
+  if exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.finance_transactions'::regclass
+      and conname = 'finance_transactions_category_check'
+  ) then
+    alter table public.finance_transactions
+      drop constraint finance_transactions_category_check;
+  end if;
+
+  alter table public.finance_transactions
+    add constraint finance_transactions_category_check
+    check (category in ('ai', 'hosting', 'other', 'payment_fee', 'refund', 'revenue'));
+end $$;
 
 comment on table public.finance_transactions is
   'Positive-value platform finance ledger. entry_type distinguishes nominal fine-grained costs from actual money-flow rows.';

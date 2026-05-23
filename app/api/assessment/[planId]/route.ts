@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  createAssessmentSnapshot,
-  isAssessmentPlan
-} from "@/lib/assessment-snapshot";
+import { createAssessmentSnapshot } from "@/lib/assessment-snapshot";
 import {
   getStoredAssessmentPrefill,
   getStoredAssessmentSnapshot,
@@ -14,11 +11,11 @@ import { computeHealthScore } from "@/lib/health-score";
 import {
   enqueueDueScheduledActions,
   enqueueHealthScoreAnalysisTask,
-  enqueueNutritionPlanTasks,
   scheduleReassessmentAction
 } from "@/lib/task-worker";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
 import { isLocale } from "@/lib/i18n";
+import { bindPaidReservationToAssessment } from "@/lib/stripe-payments";
 
 export const runtime = "nodejs";
 
@@ -111,6 +108,7 @@ export async function PATCH(
     answers?: unknown;
     intent?: "capture" | "process";
     locale?: unknown;
+    paymentId?: unknown;
     plan?: unknown;
   } = {};
 
@@ -119,6 +117,7 @@ export async function PATCH(
       answers?: unknown;
       intent?: "capture" | "process";
       locale?: unknown;
+      paymentId?: unknown;
       plan?: unknown;
     };
   } catch {
@@ -140,14 +139,14 @@ export async function PATCH(
   const intent = body.intent === "capture" ? "capture" : "process";
   const bpm = bpmContextFromBody(body);
 
-  if (intent === "process" && !isAssessmentPlan(body.plan)) {
+  if (intent === "process") {
     return NextResponse.json(
-      { message: "Unsupported assessment plan" },
+      { message: "Payment is required before plan processing" },
       {
         headers: {
           "Cache-Control": "no-store"
         },
-        status: 400
+        status: 402
       }
     );
   }
@@ -158,13 +157,8 @@ export async function PATCH(
     const effectiveAnswers =
       body.answers === undefined ? existingPrefill?.answers : body.answers;
     const selectedPlan =
-      intent === "process" && isAssessmentPlan(body.plan)
-        ? body.plan
-        : (existingSnapshot?.plan ?? null);
-    const healthScore =
-      intent === "process" && existingSnapshot?.healthScore
-        ? existingSnapshot.healthScore
-        : buildHealthScore(effectiveAnswers, body.locale);
+      existingSnapshot?.plan ?? null;
+    const healthScore = buildHealthScore(effectiveAnswers, body.locale);
     const snapshot = createAssessmentSnapshot({
       healthScore,
       plan: selectedPlan ?? existingSnapshot?.plan,
@@ -219,6 +213,26 @@ export async function PATCH(
       });
     }
 
+    if (typeof body.paymentId === "string") {
+      const boundPayment = await bindPaidReservationToAssessment({
+        locale: isLocale(body.locale) ? body.locale : "en",
+        paymentId: body.paymentId,
+        planId: snapshot.planId
+      });
+
+      if (!boundPayment) {
+        return NextResponse.json(
+          { message: "Paid reservation could not be applied" },
+          {
+            headers: {
+              "Cache-Control": "no-store"
+            },
+            status: 402
+          }
+        );
+      }
+    }
+
     if (intent === "capture") {
       const healthScoreSnapshot =
         await getStoredHealthScoreAnalysisSnapshot(snapshot.planId) ??
@@ -231,32 +245,7 @@ export async function PATCH(
       });
     }
 
-    if (!selectedPlan) {
-      throw new Error("Assessment plan selection is missing");
-    }
-
-    await writeBpmEvent({
-      actorType: "visitor",
-      attribution: bpm.attribution,
-      eventName: "plan_selected",
-      eventType: "plan",
-      locale: body.locale,
-      planId: snapshot.planId,
-      ray: typeof bpm.ray === "string" ? bpm.ray : null,
-      selectedPlan,
-      ...healthScoreBpmFields(snapshot)
-    });
-
-    await enqueueNutritionPlanTasks({
-      answers: effectiveAnswers,
-      locale: body.locale,
-      plan: selectedPlan,
-      planId: snapshot.planId
-    });
-
-    const storedSnapshot = await getStoredAssessmentSnapshot(snapshot.planId);
-
-    return NextResponse.json(storedSnapshot ?? snapshot, {
+    return NextResponse.json(snapshot, {
       headers: {
         "Cache-Control": "no-store"
       }

@@ -10,7 +10,7 @@ import {
   normalizeSubmittedProductCountryCodes,
   productCountryCodesFromDb,
   isUuidValue
-} from "./admin-product-helpers";
+} from "./admin-product-helpers.ts";
 
 // Admin-specific product/brand country management logic.
 // Extracted as part of Sprint 2 god-module split.

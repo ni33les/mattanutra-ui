@@ -25,6 +25,9 @@
     "scrape:levitamins-products": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/scrape-levitaminsasia-products.ts",
     "scrape:manufacturer-products": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/scrape-manufacturer-products.ts",
     "seed:campaigns": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/seed-campaign-bpm.mjs",
+    "stripe:webhook:dev": "npm run stripe:webhook:dev:fat",
+    "stripe:webhook:dev:fat": "stripe listen --forward-to localhost:3000/api/stripe/webhook/fat --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired,payment_intent.payment_failed",
+    "stripe:webhook:dev:thin": "stripe listen --forward-thin-to localhost:3000/api/stripe/webhook/thin --thin-events v1.checkout.session.completed,v1.checkout.session.async_payment_succeeded,v1.checkout.session.async_payment_failed,v1.checkout.session.expired,v1.payment_intent.payment_failed",
     "test": "node --test --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "worker:all": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts all",
@@ -42,6 +45,8 @@
     "@aws-sdk/client-s3": "^3.1045.0",
     "@headlessui/react": "^2.2.10",
     "@heroicons/react": "^2.2.0",
+    "@stripe/react-stripe-js": "^6.4.0",
+    "@stripe/stripe-js": "^9.6.0",
     "@types/nodemailer": "^8.0.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.507.0",
@@ -52,6 +57,7 @@
     "react-dom": "^19.2.5",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "stripe": "^22.1.1",
     "tailwind-merge": "^3.2.0"
   },
   "overrides": {

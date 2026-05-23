@@ -9,7 +9,6 @@ import {
   SparklesIcon
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type {
   HealthScoreDomain,
@@ -18,7 +17,7 @@ import type {
 } from "@/lib/health-score";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { Locale } from "@/lib/i18n";
-import { nutritionRefinePath } from "@/lib/nutrition-paths";
+import { paymentCheckoutPath } from "@/lib/payment-paths";
 import { cx } from "@/components/nutrition-flow/ui";
 
 function getDomainTone(score: number) {
@@ -992,14 +991,12 @@ export function HealthScorePaymentPanel({
   planId?: string;
   result: HealthScoreResult;
 }>) {
-  const router = useRouter();
   const labels = paymentCopy[locale];
   const [pendingPlan, setPendingPlan] = useState<AssessmentPlan | null>(null);
-  const [selectionError, setSelectionError] = useState("");
   const lowest = [...result.domains].sort((a, b) => a.score - b.score)[0];
   const signals = paywallSignals(result, locale);
   const focusItems = planFocusItems(lowest, locale);
-  const unlockHref = planId ? nutritionRefinePath(locale, planId) : "#pricing";
+  const unlockHref = "#pricing";
   const paywallTitle =
     localizeHealthScoreText(result.advice?.paywallTitle, locale) ||
     labels.signalsTitle;
@@ -1012,32 +1009,12 @@ export function HealthScorePaymentPanel({
       return;
     }
 
-    setSelectionError("");
     setPendingPlan(plan);
-
-    try {
-      const response = await fetch(`/api/assessment/${encodeURIComponent(planId)}`, {
-        body: JSON.stringify({
-          intent: "process",
-          locale,
-          plan
-        }),
-        cache: "no-store",
-        headers: {
-          "content-type": "application/json"
-        },
-        method: "PATCH"
-      });
-
-      if (!response.ok) {
-        throw new Error("Unable to start plan");
-      }
-
-      router.push(nutritionRefinePath(locale, planId));
-    } catch {
-      setPendingPlan(null);
-      setSelectionError(labels.selectionError);
-    }
+    window.location.href = paymentCheckoutPath(locale, {
+      plan,
+      planId,
+      sourceSurface: "healthscore"
+    });
   }
 
   return (
@@ -1245,11 +1222,6 @@ export function HealthScorePaymentPanel({
             />
           ))}
         </div>
-        {selectionError ? (
-          <p className="mt-4 text-center text-sm font-semibold text-[var(--mn-error)]">
-            {selectionError}
-          </p>
-        ) : null}
         {!planId ? (
           <p className="mt-4 text-center text-sm text-[var(--mn-ash)]">
             <Link className="font-semibold text-[var(--mn-teal-deep)]" href={unlockHref}>

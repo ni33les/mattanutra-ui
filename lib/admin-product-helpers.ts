@@ -2,7 +2,7 @@ import type { ProductAudience } from "@/lib/product-recommendations";
 import { defaultProductCountryCode, normalizeProductCountryCode, normalizeProductCountryCodes, type ProductCountryCode } from "@/lib/product-countries";
 import { productFactAliasKeys, normalizeProductFactKey, normalizeProductFactName, productFactLooksLikeConcentration } from "@/lib/product-recommendations";
 import { normalizeDoseUnit, comparableDoseAmount } from "@/lib/dose-conversion";
-import { isProductAudience } from "./admin-product-types";
+import { isProductAudience } from "./admin-product-types.ts";
 
 // Small pure helpers extracted from admin-products.ts as part of Sprint 2 refactor.
 

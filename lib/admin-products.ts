@@ -44,15 +44,15 @@ const randomUUID = () => globalThis.crypto.randomUUID();
 
 // Re-exports needed by the new module structure (temporary during stabilization)
 export { defaultProductCountryCode } from "@/lib/product-countries";
-export { isUuidValue } from "./admin-product-helpers"; // will move definition later if needed
-export { createAdminProduct, updateAdminProduct } from "./admin-product-writes";
-import { summaryFromRows } from "./admin-product-read-model"; // transitional for duplicate getAdminProductsData during final cleanup
-import { cleanNullableText, normalizedUrl, productTitleLooksEnglish } from "./admin-product-helpers"; // for remaining functions in god during final cleanup
-import { loadAdminProductRow, loadAdminProductRowsForBrand } from "./admin-product-read-model"; // for remaining calls in god during final cleanup
+export { isUuidValue } from "./admin-product-helpers.ts"; // will move definition later if needed
+export { createAdminProduct, updateAdminProduct } from "./admin-product-writes.ts";
+import { summaryFromRows } from "./admin-product-read-model.ts"; // transitional for duplicate getAdminProductsData during final cleanup
+import { cleanNullableText, normalizedUrl, productTitleLooksEnglish } from "./admin-product-helpers.ts"; // for remaining functions in god during final cleanup
+import { loadAdminProductRow, loadAdminProductRowsForBrand } from "./admin-product-read-model.ts"; // for remaining calls in god during final cleanup
 
 // Input types for the remaining import/write functions are still declared locally in this file
 // (will be centralized to admin-product-types.ts in the final cleanup tranche).
-import { createAdminProduct } from "./admin-product-writes"; // for internal calls in update/resolve etc. (re-export below makes it public via barrel)
+import { createAdminProduct } from "./admin-product-writes.ts"; // for internal calls in update/resolve etc. (re-export below makes it public via barrel)
 
 export type ProductAffiliateStatus = "active" | "flagged_stale" | "none";
 export type ProductLabelStatus = "failed" | "missing" | "parsed" | "stale";
@@ -1069,7 +1069,7 @@ export {
   repairProductValidationConsistency,
   runProductValidationCheck,
   increaseProductFactSafetyLimit
-} from "./admin-product-writes";
+} from "./admin-product-writes.ts";
 
 export async function loadProductRows(productId?: string | null) {
   const sql = getSql();
@@ -1294,7 +1294,7 @@ export async function loadProductRows(productId?: string | null) {
   `;
 }
 
-export { loadAdminProductRow, loadAdminProductRowsForBrand, getAdminProductsData } from "./admin-product-read-model";
+export { loadAdminProductRow, loadAdminProductRowsForBrand, getAdminProductsData } from "./admin-product-read-model.ts";
 
 export async function startProductImportRun(input: StartProductImportRunInput) {
   const sql = getSql();

@@ -4,9 +4,9 @@ import {
   type AdminProductsData,
   type AdminProductRow,
   type ProductDbRow
-} from "./admin-product-types";
-import { rowFromDb } from "./admin-product-mappers";
-import { isUuidValue, loadProductRows } from "./admin-products"; // transitional delegation until loadProductRows is fully moved here
+} from "./admin-product-types.ts";
+import { rowFromDb } from "./admin-product-mappers.ts";
+import { isUuidValue, loadProductRows } from "./admin-products.ts"; // transitional delegation until loadProductRows is fully moved here
 
 // Read model helpers and queries extracted as part of Sprint 2 refactor.
 

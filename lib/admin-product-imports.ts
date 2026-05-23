@@ -11,9 +11,9 @@ import {
 import type { ProductConfidence } from "@/lib/product-recommendations";
 import type { ProductAudience } from "@/lib/product-recommendations";
 import { validateProduct } from "@/lib/product-validation";
-import { numberOrNull, isoOrNull, cleanNullableText, normalizedUrl } from "./admin-product-helpers";
-import { preferredProductTitle, clearProductRecommendationCandidateCache, createAdminProduct } from "./admin-products";
-import { productAudienceFromSnapshot, isUuidValue } from "./admin-product-helpers";
+import { numberOrNull, isoOrNull, cleanNullableText, normalizedUrl } from "./admin-product-helpers.ts";
+import { preferredProductTitle, clearProductRecommendationCandidateCache, createAdminProduct } from "./admin-products.ts";
+import { productAudienceFromSnapshot, isUuidValue } from "./admin-product-helpers.ts";
 // Local copy of the fact input shape for this module's input types and helpers.
 // (Will be centralized in admin-product-types.ts in a later cleanup pass.)
 export type ProductImportFactInput = Readonly<{

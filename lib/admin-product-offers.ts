@@ -1,8 +1,8 @@
 import { getSql } from "@/lib/db";
 import { toJsonValue } from "@/lib/assessment-store";
-import { clearProductRecommendationCandidateCache } from "./admin-products";
-import { loadAdminProductRow } from "./admin-product-read-model";
-import { cleanNullableText, isUuidValue } from "./admin-product-helpers";
+import { clearProductRecommendationCandidateCache } from "./admin-products.ts";
+import { loadAdminProductRow } from "./admin-product-read-model.ts";
+import { cleanNullableText, isUuidValue } from "./admin-product-helpers.ts";
 
 // Offer (link) management for products.
 // Extracted as part of Sprint 2 split of admin-products.
