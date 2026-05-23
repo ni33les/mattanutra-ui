@@ -163,17 +163,27 @@ export function formatNumber(value: number, locale: Locale) {
 }
 
 export function formatMoneyNumber(value: number, locale: Locale) {
+  const absoluteValue = Math.abs(value);
+  const fractionDigits = absoluteValue >= 100 || value === 0
+    ? { maximumFractionDigits: 0, minimumFractionDigits: 0 }
+    : { maximumFractionDigits: 4, minimumFractionDigits: 2 };
+
   return new Intl.NumberFormat(formatLocale(locale), {
-    maximumFractionDigits: value >= 100 ? 0 : 4,
-    minimumFractionDigits: value === 0 ? 0 : 2
+    maximumFractionDigits: fractionDigits.maximumFractionDigits,
+    minimumFractionDigits: fractionDigits.minimumFractionDigits
   }).format(value);
 }
 
 export function formatMoney(value: number, currency: string, locale: Locale) {
+  const absoluteValue = Math.abs(value);
+  const fractionDigits = absoluteValue >= 100 || value === 0
+    ? { maximumFractionDigits: 0, minimumFractionDigits: 0 }
+    : { maximumFractionDigits: 4, minimumFractionDigits: 2 };
+
   return new Intl.NumberFormat(formatLocale(locale), {
     currency,
-    maximumFractionDigits: value >= 100 ? 0 : 4,
-    minimumFractionDigits: value === 0 ? 0 : 2,
+    maximumFractionDigits: fractionDigits.maximumFractionDigits,
+    minimumFractionDigits: fractionDigits.minimumFractionDigits,
     style: "currency"
   }).format(value);
 }
