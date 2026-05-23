@@ -89,7 +89,7 @@ export type ResolveProductImportReviewInput = Readonly<{
   titleTh?: string | null;
 }>;
 
-function normalizedFactsForStorage(
+export function normalizedFactsForStorage(
   facts: readonly ProductImportFactInput[] | undefined
 ) {
   return (facts ?? [])
@@ -242,7 +242,7 @@ export async function getProductImportRuns(input: Readonly<{
 
 
 
-async function supplementIdsForFacts(
+export async function supplementIdsForFacts(
   sql: NonNullable<ReturnType<typeof getSql>>,
   facts: readonly ProductImportFactInput[]
 ) {
@@ -573,6 +573,4 @@ export async function stageProductImport(input: StageProductImportInput) {
   return importId;
 }
 
-export {
-  resolveProductImportReview
-} from "./admin-products";
+// resolveProductImportReview is now re-exported from the barrel (admin-products.ts)

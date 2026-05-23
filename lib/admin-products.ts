@@ -43,7 +43,11 @@ import { createTask } from "@/lib/task-service";
 // Re-exports needed by the new module structure (temporary during stabilization)
 export { defaultProductCountryCode } from "@/lib/product-countries";
 export { isUuidValue } from "./admin-product-helpers"; // will move definition later if needed
-export { createAdminProduct } from "./admin-product-writes";
+export { createAdminProduct, updateAdminProduct } from "./admin-product-writes";
+
+export { upsertProductOffer, removeProductOffer } from "./admin-product-offers";
+
+export { updateProductBrandCountries } from "./admin-product-countries";
 import { summaryFromRows } from "./admin-product-read-model"; // transitional for duplicate getAdminProductsData during final cleanup
 import { cleanNullableText, normalizedUrl, productTitleLooksEnglish } from "./admin-product-helpers"; // for remaining functions in god during final cleanup
 import { loadAdminProductRow, loadAdminProductRowsForBrand } from "./admin-product-read-model"; // for remaining calls in god during final cleanup

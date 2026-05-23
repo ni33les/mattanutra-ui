@@ -159,6 +159,20 @@ export function productTitleLooksEnglish(value: string): boolean {
   return /[A-Za-z]/.test(text);
 }
 
+export function preferredProductTitle(input: Readonly<{
+  title: string;
+  titleEn?: string | null;
+}>) {
+  const title = input.title.trim();
+  const titleEn = cleanNullableText(input.titleEn, 500);
+
+  if (titleEn && !productTitleLooksEnglish(title)) {
+    return titleEn;
+  }
+
+  return title;
+}
+
 export function isUuidValue(value: string | null | undefined): value is string {
   return Boolean(
     value &&
