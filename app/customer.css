@@ -25,8 +25,8 @@
     --mn-radius-sm: 0.75rem;
     --mn-radius-md: 1.125rem;
     --mn-radius-lg: 1.375rem;
-    --mn-shadow-soft: 0 1px 2px rgb(10 37 64 / 0.06);
-    --mn-shadow-card: 0 1px 2px rgb(10 37 64 / 0.06);
+    --mn-shadow-soft: none;
+    --mn-shadow-card: none;
     --background: var(--mn-cream);
     --foreground: var(--mn-ink);
     --muted-foreground: var(--mn-ash);
@@ -41,8 +41,6 @@
     --brand-soft-green: var(--mn-mint-deep);
     position: relative;
     min-height: 100vh;
-    overflow-x: clip;
-    isolation: isolate;
     background: var(--mn-cream);
     color: var(--foreground);
     font-family:
@@ -275,7 +273,6 @@
     line-height: 1.25rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    box-shadow: 0 12px 28px color-mix(in srgb, var(--mn-teal-deep, #1f6e58) 24%, transparent);
     transition: background-color 150ms ease;
   }
 
@@ -417,8 +414,7 @@
 
   .mn-section-progress {
     padding: 0.5rem 0.25rem;
-    background: color-mix(in srgb, var(--mn-cream, #fbfdfb) 94%, transparent);
-    backdrop-filter: blur(12px);
+    background: var(--mn-cream, #fbfdfb);
   }
 
   .mn-section-progress--framed {
@@ -1015,12 +1011,8 @@
   }
 
   .mn-titlebar {
-    position: sticky;
-    top: 0;
-    z-index: 50;
     border-bottom: 1px solid var(--mn-line);
-    background: color-mix(in srgb, var(--mn-paper) 92%, transparent);
-    backdrop-filter: blur(18px);
+    background: var(--mn-paper);
   }
 
   .mn-availability-bar {
@@ -1077,14 +1069,15 @@
     border: 1px solid color-mix(in srgb, var(--mn-line) 82%, transparent);
     border-radius: 999px;
     background: var(--mn-paper);
-    box-shadow: 0 8px 20px rgb(10 37 64 / 0.06);
+    padding: 0.4rem;
   }
 
   .mn-titlebar .mn-logo-mark-image {
-    width: auto;
-    height: auto;
-    max-width: 1.75rem;
-    max-height: 2.25rem;
+    width: 2.05rem;
+    height: 2.05rem;
+    max-width: none;
+    max-height: none;
+    object-fit: contain;
   }
 
   @media (min-width: 640px) {
@@ -1116,7 +1109,7 @@
   }
 
   .mn-titlebar-link {
-    transition: color 150ms ease;
+    color: inherit;
   }
 
   .mn-titlebar-link:hover {
@@ -1143,9 +1136,6 @@
     letter-spacing: 0.08em;
     line-height: 1rem;
     text-transform: uppercase;
-    transition:
-      background-color 150ms ease,
-      color 150ms ease;
   }
 
   .mn-titlebar-cta:hover {
@@ -1315,7 +1305,6 @@
     border-radius: 2rem;
     background: var(--mn-paper);
     padding: 1.5rem;
-    box-shadow: 0 24px 60px rgb(10 37 64 / 0.10);
   }
 
   @media (min-width: 768px) {
@@ -1425,7 +1414,6 @@
     border-radius: 2rem;
     background: #0e2d4d;
     padding: 1rem;
-    box-shadow: 0 24px 60px rgb(0 0 0 / 0.28);
   }
 
   @media (min-width: 640px) {
@@ -1520,7 +1508,7 @@
   .mn-v11-band {
     border-block: 1px solid var(--mn-line);
     background: var(--mn-mint);
-    padding-block: 3rem;
+    padding-block: 4rem;
     text-align: center;
   }
 
@@ -1558,10 +1546,16 @@
 
   .mn-v11-band p {
     max-width: 45rem;
-    margin: 1rem auto 0;
+    margin: 1.5rem auto 0;
     color: var(--mn-ink-soft);
     font-size: 1.0625rem;
     line-height: 1.875rem;
+  }
+
+  @media (min-width: 768px) {
+    .mn-v11-band {
+      padding-block: 5rem;
+    }
   }
 
   .mn-v11-price-card {
@@ -1570,7 +1564,6 @@
     border-radius: 1.5rem;
     background: var(--mn-paper);
     padding: 1.5rem;
-    box-shadow: 0 18px 45px rgb(10 37 64 / 0.08);
   }
 
   @media (min-width: 640px) {
@@ -1581,7 +1574,7 @@
 
   .mn-v11-price-card--featured {
     border-color: color-mix(in srgb, var(--mn-teal) 42%, var(--mn-line));
-    background: linear-gradient(180deg, var(--mn-paper), var(--mn-mint));
+    background: var(--mn-mint);
   }
 
   .mn-v11-popular {
@@ -1684,18 +1677,26 @@
   .mn-v11-origin-stack {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
-    align-items: stretch;
+    gap: 1rem;
+    align-items: center;
     max-width: 42rem;
   }
 
-  .mn-v11-origin-stack img {
-    width: 100%;
+  .mn-v11-origin-orb {
+    display: grid;
+    width: clamp(7rem, 9vw, 9rem);
     height: clamp(7rem, 9vw, 9rem);
-    border: 1px solid var(--mn-line);
-    border-radius: var(--mn-radius-md);
-    object-fit: cover;
+    place-items: center;
+    justify-self: center;
+    border: 1px solid color-mix(in srgb, var(--mn-line) 92%, transparent);
+    border-radius: 999px;
     background: var(--mn-paper);
+  }
+
+  .mn-v11-origin-orb img {
+    width: 72%;
+    height: 72%;
+    object-fit: contain;
   }
 
   @media (min-width: 1024px) {
@@ -1707,12 +1708,7 @@
 
   .mn-v11-journal-section {
     border-block: 1px solid var(--mn-line);
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--mn-paper) 82%, white),
-        var(--mn-cream)
-      );
+    background: var(--mn-cream);
   }
 
   .mn-v11-journal-card {
@@ -1726,12 +1722,6 @@
     background: var(--mn-paper);
     padding: 1.75rem;
     color: var(--mn-ink);
-    box-shadow: 0 18px 45px rgb(10 37 64 / 0.07);
-    transition:
-      background-color 150ms ease,
-      border-color 150ms ease,
-      box-shadow 150ms ease,
-      transform 150ms ease;
   }
 
   .mn-v11-journal-card::before {
@@ -1745,8 +1735,6 @@
   .mn-v11-journal-card:hover {
     border-color: color-mix(in srgb, var(--mn-teal) 38%, var(--mn-line));
     background: color-mix(in srgb, var(--mn-paper) 88%, var(--mn-mint));
-    box-shadow: 0 22px 55px rgb(10 37 64 / 0.1);
-    transform: translateY(-2px);
   }
 
   .mn-v11-journal-date {

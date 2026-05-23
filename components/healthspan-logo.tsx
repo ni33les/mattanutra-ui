@@ -17,10 +17,10 @@ export function HealthspanLogo({
     >
       <span className="mn-logo-mark-frame">
         <Image
-          src="/v11/logo-mark.png"
+          src="/v11/brand-mark.png"
           alt=""
-          width={96}
-          height={150}
+          width={420}
+          height={465}
           priority
           unoptimized
           className="mn-logo-mark-image"

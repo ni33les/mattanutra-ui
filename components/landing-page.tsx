@@ -639,7 +639,7 @@ export function LandingPage({
         <div className="mn-v11-container grid items-center gap-12 lg:grid-cols-[1fr_0.92fr]">
           <div>
             <p className="mn-v11-eyebrow">{copy.hero.eyebrow}</p>
-            <h1 className="mt-6 max-w-4xl font-serif text-5xl font-medium leading-[0.98] text-[var(--mn-ink)] text-balance sm:text-6xl lg:text-7xl">
+            <h1 className="mt-6 max-w-4xl font-serif text-5xl font-medium leading-[0.98] text-[var(--mn-ink)] sm:text-6xl lg:text-7xl">
               {copy.hero.title} <span className="italic text-[var(--mn-teal-deep)]">{copy.hero.accent}</span>
             </h1>
             <p className="mt-7 max-w-2xl text-lg leading-8 text-[var(--mn-ink-soft)] sm:text-xl">
@@ -677,6 +677,7 @@ export function LandingPage({
               className="mx-auto h-auto w-full max-w-[24rem]"
               height={465}
               priority
+              sizes="(min-width: 1024px) 24rem, 80vw"
               src={assets.brandMark}
               width={420}
             />
@@ -696,7 +697,7 @@ export function LandingPage({
         <div className="mn-v11-container">
           <div className="max-w-3xl">
             <p className="mn-v11-eyebrow">{copy.problem.eyebrow}</p>
-            <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance sm:text-5xl">
+            <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] sm:text-5xl">
               {copy.problem.title}
             </h2>
             <p className="mt-5 text-lg leading-8 text-[var(--mn-ink-soft)]">
@@ -709,6 +710,8 @@ export function LandingPage({
                 alt="Woman in a supplement aisle, overwhelmed by choice"
                 className="h-full w-full object-cover"
                 height={666}
+                loading="eager"
+                sizes="(min-width: 1024px) 50vw, 100vw"
                 src={assets.problem}
                 width={1000}
               />
@@ -777,7 +780,7 @@ export function LandingPage({
           <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
             <div>
               <p className="mn-v11-eyebrow">{copy.tell.eyebrow}</p>
-              <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance sm:text-5xl">
+              <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] sm:text-5xl">
                 {copy.tell.title}
               </h2>
               <p className="mt-5 text-lg leading-8 text-[var(--mn-ink-soft)]">{copy.tell.intro}</p>
@@ -826,7 +829,7 @@ export function LandingPage({
         <div className="mn-v11-container grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
             <p className="mn-v11-eyebrow mn-v11-eyebrow--light">{copy.protocol.eyebrow}</p>
-            <h2 className="mt-4 font-serif text-5xl font-medium leading-tight text-white text-balance sm:text-6xl">
+            <h2 className="mt-4 font-serif text-5xl font-medium leading-tight text-white sm:text-6xl">
               {copy.protocol.title} <span className="italic text-[var(--mn-teal-glow)]">{copy.protocol.accent}</span>
             </h2>
             <p className="mt-6 text-lg leading-8 text-[var(--mn-teal-glow)]">{copy.protocol.intro}</p>
@@ -922,7 +925,7 @@ export function LandingPage({
         <div className="mn-v11-container grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
             <p className="mn-v11-eyebrow">{copy.food.eyebrow}</p>
-            <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance sm:text-5xl">
+            <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] sm:text-5xl">
               {copy.food.title}
             </h2>
             <p className="mt-6 text-lg leading-8 text-[var(--mn-ink-soft)]">{copy.food.intro}</p>
@@ -1059,6 +1062,8 @@ export function LandingPage({
                   alt={name}
                   className="h-56 w-full rounded-[var(--mn-radius-md)] object-cover"
                   height={543}
+                  loading="eager"
+                  sizes="(min-width: 768px) 50vw, 100vw"
                   src={assets.portraits[index]}
                   width={724}
                 />
@@ -1081,28 +1086,31 @@ export function LandingPage({
       </section>
 
       <section className="mn-v11-section" id="origin">
-        <div className="mn-v11-container grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-          <div>
+        <div className="mn-v11-container">
+          <div className="max-w-4xl">
             <p className="mn-v11-eyebrow">{copy.origin.eyebrow}</p>
-            <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance sm:text-5xl">
+            <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] sm:text-5xl">
               {copy.origin.title}
             </h2>
             <p className="mt-6 text-lg leading-8 text-[var(--mn-ink-soft)]">{copy.origin.body}</p>
             <p className="mt-5 text-lg leading-8 text-[var(--mn-ink-soft)]">{copy.origin.body2}</p>
           </div>
-          <div className="mn-v11-origin-stack">
+          <div className="mn-v11-origin-stack mt-10">
             {assets.origin.map((src) => (
-              <Image
-                alt=""
-                aria-hidden="true"
-                height={256}
-                key={src}
-                src={src}
-                width={280}
-              />
+              <span className="mn-v11-origin-orb" key={src}>
+                <Image
+                  alt=""
+                  aria-hidden="true"
+                  height={256}
+                  loading="eager"
+                  sizes="9rem"
+                  src={src}
+                  width={280}
+                />
+              </span>
             ))}
           </div>
-          <div className="mn-v11-card lg:col-span-2">
+          <div className="mn-v11-card mt-8">
             <h3 className="text-2xl font-semibold text-[var(--mn-ink)]">{copy.origin.founders}</h3>
             <p className="mt-4 text-sm leading-7 text-[var(--mn-ink-soft)]">{copy.origin.founderBody}</p>
             <p className="mt-6 font-serif text-2xl italic text-[var(--mn-gold)]">{copy.origin.signoff}</p>
