@@ -270,16 +270,13 @@ describe("external worker boundaries", () => {
 
     const schemaSource = await readFile("db-schema.sql", "utf8");
 
-    assert.match(
-      schemaSource,
-      /when 'generate_formulation' then 'generate_supplement_guidance'/,
-      "db-schema.sql should keep the compatibility rewrite for old paid supplement tasks"
-    );
-    assert.match(
-      schemaSource,
-      /when 'generate_example_formulation' then 'generate_example_supplement_guidance'/,
-      "db-schema.sql should keep the compatibility rewrite for old free supplement tasks"
-    );
+    for (const taskType of oldTaskTypes) {
+      assert.equal(
+        schemaSource.includes(taskType),
+        false,
+        `db-schema.sql should not keep legacy ${taskType} compatibility rewrites`
+      );
+    }
   });
 
   it("does not leave assessments queued when successful formulation work is reused", async () => {

@@ -8,6 +8,10 @@ import {
 import { paymentCheckoutPath } from "../lib/payment-paths.ts";
 
 const schema = readFileSync(new URL("../db-schema.sql", import.meta.url), "utf8");
+const platformSeed = readFileSync(
+  new URL("../db-rollout/db-data-10-platform-seed.sql", import.meta.url),
+  "utf8"
+);
 const paymentService = readFileSync(
   new URL("../lib/stripe-payments.ts", import.meta.url),
   "utf8"
@@ -190,9 +194,14 @@ describe("Stripe payment schema and lifecycle", () => {
     assert.match(schema, /create\s+table\s+public\.payment_versions\b/i);
     assert.match(schema, /payment_versions_no_update_delete/i);
     assert.match(schema, /create\s+table\s+public\.stripe_webhook_events\b/i);
-    assert.match(schema, /payload_shape\s+text\s+not\s+null\s+default\s+'fat'/i);
-    assert.match(schema, /stripe_mode[^;]+in\s+\('test',\s*'live',\s*'mock'\)/i);
-    assert.match(schema, /stripe_event_id\s+text\s+not\s+null\s+unique/i);
+    assert.match(
+      schema,
+      /payload_shape\s+text\s+default\s+'fat'::text\s+not\s+null/i
+    );
+    assert.match(schema, /stripe_webhook_events_stripe_mode_check/i);
+    assert.match(schema, /'test'::text,\s*'live'::text,\s*'mock'::text/i);
+    assert.match(schema, /stripe_event_id\s+text\s+not\s+null/i);
+    assert.match(schema, /stripe_webhook_events_stripe_event_id_key\s+unique/i);
   });
 
   it("extends platform finance categories for payment accounting", () => {
@@ -206,7 +215,7 @@ describe("Stripe payment schema and lifecycle", () => {
       "Stripe clearing",
       "MattaNutra bank"
     ]) {
-      assert.match(schema, new RegExp(account, "i"));
+      assert.match(platformSeed, new RegExp(account, "i"));
     }
 
     assert.match(paymentService, /entryType:\s*"nominal"/);
