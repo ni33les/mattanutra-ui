@@ -33,6 +33,12 @@ export async function POST(request: Request) {
   const planId = text(body.planId);
 
   if (!locale || !selectedPlan || (planId && !isUuid(planId))) {
+    console.warn("Invalid Stripe checkout session request", {
+      hasLocale: Boolean(locale),
+      hasPlan: Boolean(selectedPlan),
+      hasValidPlanId: !planId || isUuid(planId)
+    });
+
     return NextResponse.json(
       { message: "Invalid checkout request" },
       {
@@ -45,6 +51,13 @@ export async function POST(request: Request) {
   }
 
   try {
+    console.info("Stripe checkout session requested", {
+      hasPlanId: Boolean(planId),
+      locale,
+      selectedPlan,
+      sourceSurface: normalizePaymentSourceSurface(body.sourceSurface)
+    });
+
     const session = await createStripeCheckoutSession({
       locale,
       planId: planId || null,
