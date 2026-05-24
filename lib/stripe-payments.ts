@@ -155,6 +155,7 @@ const PAYMENT_PLANS: Record<AssessmentPlan, PaymentPlan> = {
 let paymentSchemaReady: Promise<void> | null = null;
 let stripeClient: Stripe | null = null;
 let stripeClientKey = "";
+type MattanutraEnv = "dev" | "prd" | "uat";
 
 function jsonRecord(value: unknown) {
   const json = toJsonValue(value);
@@ -164,10 +165,12 @@ function jsonRecord(value: unknown) {
     : {};
 }
 
-function normalizedMattanutraEnv() {
-  const raw =
-    process.env.MATTANUTRA_ENV?.trim().toLowerCase() ||
-    (process.env.NODE_ENV === "production" ? "prd" : "dev");
+function normalizeMattanutraEnvValue(value: string | null | undefined): MattanutraEnv | null {
+  const raw = value?.trim().toLowerCase();
+
+  if (!raw) {
+    return null;
+  }
 
   if (raw === "production" || raw === "prod") {
     return "prd";
@@ -181,7 +184,76 @@ function normalizedMattanutraEnv() {
     return "dev";
   }
 
-  return raw === "uat" || raw === "prd" ? raw : "dev";
+  return raw === "dev" || raw === "uat" || raw === "prd" ? raw : null;
+}
+
+function hostFromUrlOrHost(value: string | null | undefined) {
+  const first = value?.split(",")[0]?.trim();
+
+  if (!first) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(first.includes("://") ? first : `https://${first}`);
+
+    return parsed.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function inferMattanutraEnvFromHost(host: string | null): MattanutraEnv | null {
+  if (!host) {
+    return null;
+  }
+
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+    return "dev";
+  }
+
+  if (host === "mattanutra.com" || host === "www.mattanutra.com") {
+    return "prd";
+  }
+
+  if (/(^|[.-])uat($|[.-])/.test(host)) {
+    return "uat";
+  }
+
+  if (/(^|[.-])dev($|[.-])/.test(host)) {
+    return "dev";
+  }
+
+  return null;
+}
+
+function normalizedMattanutraEnv(request?: Request): MattanutraEnv {
+  const explicit = normalizeMattanutraEnvValue(process.env.MATTANUTRA_ENV);
+
+  if (explicit) {
+    return explicit;
+  }
+
+  const candidates = [
+    request?.headers.get("x-forwarded-host"),
+    request?.headers.get("host"),
+    request?.url,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.APP_BASE_URL,
+    process.env.MATTANUTRA_API_BASE_URL,
+    process.env.VERCEL_URL,
+    process.env.RENDER_EXTERNAL_URL
+  ];
+
+  for (const candidate of candidates) {
+    const inferred = inferMattanutraEnvFromHost(hostFromUrlOrHost(candidate));
+
+    if (inferred) {
+      return inferred;
+    }
+  }
+
+  return process.env.NODE_ENV === "production" ? "prd" : "dev";
 }
 
 function stripeModeFromKey(key: string): StripeMode | null {
@@ -197,7 +269,7 @@ function stripeModeFromKey(key: string): StripeMode | null {
 }
 
 function requestedStripePaymentMode(
-  env: ReturnType<typeof normalizedMattanutraEnv>
+  env: MattanutraEnv
 ): PaymentProviderMode {
   const requested = process.env.STRIPE_PAYMENT_MODE?.trim().toLowerCase();
 
@@ -226,8 +298,8 @@ export function normalizePaymentSourceSurface(
   return value === "landing" ? "landing" : "healthscore";
 }
 
-export function stripePaymentConfig(): StripePaymentConfig {
-  const env = normalizedMattanutraEnv();
+export function stripePaymentConfig(request?: Request): StripePaymentConfig {
+  const env = normalizedMattanutraEnv(request);
   const expectedMode = requestedStripePaymentMode(env);
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim() ?? "";
   const publishableKey = stripePublishableKey();
@@ -288,6 +360,26 @@ export function stripePaymentConfig(): StripePaymentConfig {
     throw new Error(`Stripe configuration is missing: ${missing.join(", ")}`);
   }
 
+  const invalidPriceConfig = Object.entries(priceIds)
+    .filter(([planKey, value]) => {
+      if (isStripePriceId(value)) {
+        return false;
+      }
+
+      const planAmount = paymentPlan(planKey as AssessmentPlan).amountMicros /
+        AMOUNT_MICROS_PER_UNIT;
+      const configuredAmount = Number(value);
+
+      return !Number.isFinite(configuredAmount) || configuredAmount !== planAmount;
+    })
+    .map(([planKey]) => PAYMENT_PLANS[planKey as AssessmentPlan].priceEnvName);
+
+  if (invalidPriceConfig.length > 0) {
+    throw new Error(
+      `Stripe price configuration must be a Stripe price_ ID or the configured THB amount. Invalid: ${invalidPriceConfig.join(", ")}`
+    );
+  }
+
   if (secretMode !== expectedMode || publishableMode !== expectedMode) {
     throw new Error(
       `Stripe key mode mismatch for ${env}. Expected ${expectedMode} keys.`
@@ -317,6 +409,44 @@ function stripeClientForConfig(config: StripePaymentConfig) {
 
 function stripeLocale(locale: Locale) {
   return locale === "th" ? "th" : "en";
+}
+
+function isStripePriceId(value: string) {
+  return value.startsWith("price_");
+}
+
+function stripeMinorAmountFromMicros(amountMicros: number) {
+  return Math.round(
+    (amountMicros / AMOUNT_MICROS_PER_UNIT) * STRIPE_MINOR_UNITS_PER_MAJOR
+  );
+}
+
+function stripeLineItemForPlan(
+  config: StripePaymentConfig,
+  selectedPlan: AssessmentPlan,
+  locale: Locale
+) {
+  const plan = paymentPlan(selectedPlan);
+  const configuredPrice = config.priceIds[selectedPlan];
+
+  if (isStripePriceId(configuredPrice)) {
+    return {
+      price: configuredPrice,
+      quantity: 1
+    };
+  }
+
+  return {
+    price_data: {
+      currency: "thb",
+      product_data: {
+        description: plan.description[locale],
+        name: plan.name[locale]
+      },
+      unit_amount: stripeMinorAmountFromMicros(plan.amountMicros)
+    },
+    quantity: 1
+  };
 }
 
 function amountMicrosFromStripeAmount(amount: number | null | undefined) {
@@ -995,7 +1125,7 @@ function assertSessionMatchesPayment(
     throw new Error("Stripe session currency does not match payment");
   }
 
-  if (sessionPriceId && sessionPriceId !== expectedPrice) {
+  if (sessionPriceId && isStripePriceId(expectedPrice) && sessionPriceId !== expectedPrice) {
     throw new Error("Stripe session price does not match configured plan price");
   }
 
@@ -1013,7 +1143,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
   let config: StripePaymentConfig;
 
   try {
-    config = stripePaymentConfig();
+    config = stripePaymentConfig(input.request);
   } catch (error) {
     await writePaymentBpmEvent({
       actorType: "system",
@@ -1127,12 +1257,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
   const plan = paymentPlan(input.selectedPlan);
   const session = await stripe.checkout.sessions.create({
     client_reference_id: paymentId,
-    line_items: [
-      {
-        price: config.priceIds[input.selectedPlan],
-        quantity: 1
-      }
-    ],
+    line_items: [stripeLineItemForPlan(config, input.selectedPlan, input.locale)],
     locale: stripeLocale(input.locale),
     metadata: {
       locale: input.locale,
@@ -1318,7 +1443,7 @@ export async function completeMockPayment(input: Readonly<{
 
   await assertPaymentSchema(sql);
 
-  const config = stripePaymentConfig();
+  const config = stripePaymentConfig(input.request);
 
   if (config.mode !== "mock") {
     throw new Error("Mock payment completion is only available in dev mock mode");
@@ -1825,7 +1950,7 @@ export async function fulfillCheckoutSession(
 
   await assertPaymentSchema(sql);
 
-  const config = stripePaymentConfig();
+  const config = stripePaymentConfig(input.request);
   const stripe = stripeClientForConfig(config);
 
   await writePaymentBpmEvent({
@@ -2262,7 +2387,7 @@ export async function handleStripeWebhookPayload(input: Readonly<{
   let config: StripePaymentConfig;
 
   try {
-    config = stripePaymentConfig();
+    config = stripePaymentConfig(input.request);
   } catch (error) {
     await writePaymentBpmEvent({
       actorType: "system",
