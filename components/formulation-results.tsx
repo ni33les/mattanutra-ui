@@ -782,6 +782,8 @@ function NutritionGuidancePreparingPanel({
 const revealCopy = {
   en: {
     ingredientCount: "ingredients",
+    catalogueProducts: "approved products",
+    catalogueSupplements: "supplements in catalogue",
     formulaEyebrow: "Your formula",
     formulaLead:
       "These are the supplement priorities selected from your answers, cautions and product coverage.",
@@ -803,6 +805,7 @@ const revealCopy = {
       "The formula is ready, but the product catalogue does not yet contain an approved stack for these needs.",
     productsTitle: "From shelves to certainty.",
     supplementsRecommended: "supplements recommended",
+    productsRecommended: "products recommended for you",
     selectedProducts: "Selected products",
     tableAmount: "Daily amount",
     tableCoverage: "Product fit",
@@ -821,6 +824,8 @@ const revealCopy = {
   },
   th: {
     ingredientCount: "ส่วนผสม",
+    catalogueProducts: "ผลิตภัณฑ์ที่อนุมัติแล้ว",
+    catalogueSupplements: "อาหารเสริมในแคตตาล็อก",
     formulaEyebrow: "สูตรของคุณ",
     formulaLead:
       "นี่คือลำดับความสำคัญของอาหารเสริมที่เลือกจากคำตอบ ข้อควรระวัง และความครอบคลุมของผลิตภัณฑ์",
@@ -841,6 +846,7 @@ const revealCopy = {
       "สูตรพร้อมแล้ว แต่แคตตาล็อกยังไม่มีชุดผลิตภัณฑ์ที่อนุมัติสำหรับความต้องการนี้",
     productsTitle: "จากชั้นวางสู่ความชัดเจน",
     supplementsRecommended: "อาหารเสริมที่แนะนำ",
+    productsRecommended: "ผลิตภัณฑ์ที่แนะนำสำหรับคุณ",
     selectedProducts: "ผลิตภัณฑ์ที่เลือก",
     tableAmount: "ปริมาณต่อวัน",
     tableCoverage: "ความพอดีของสินค้า",
@@ -889,6 +895,48 @@ function revealContextChips(result: FormulationResult) {
 
 function productCoveredNeedCount(products: RecommendedProduct[]) {
   return new Set(products.flatMap((product) => product.covers)).size;
+}
+
+function recommendedProductCount(products: RecommendedProduct[]) {
+  return new Set(products.map((product) => product.productId || product.id)).size;
+}
+
+function RevealDistillationCard({
+  fromCount,
+  fromLabel,
+  toCount,
+  toLabel
+}: Readonly<{
+  fromCount: number;
+  fromLabel: string;
+  toCount: number;
+  toLabel: string;
+}>) {
+  return (
+    <div className="rounded-[var(--mn-radius-xl)] border border-[var(--mn-line)] bg-[var(--mn-paper)] px-6 py-8 shadow-[var(--mn-shadow-soft)]">
+      <div className="flex flex-col items-center justify-center gap-8 sm:flex-row sm:gap-14">
+        <div>
+          <div className="font-serif text-7xl font-light leading-none text-[var(--mn-ash-soft)] sm:text-8xl">
+            {fromCount}
+          </div>
+          <p className="mn-mono-label mt-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-ash)]">
+            {fromLabel}
+          </p>
+        </div>
+        <div className="font-serif text-5xl italic text-[var(--mn-gold)]">
+          →
+        </div>
+        <div>
+          <div className="font-serif text-7xl font-light leading-none text-[var(--mn-teal-deep)] sm:text-8xl">
+            {toCount}
+          </div>
+          <p className="mn-mono-label mt-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-ink-soft)]">
+            {toLabel}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function selectedStackCoverage(
@@ -940,10 +988,15 @@ function RevealResultsPage({
   const copy = revealCopy[locale];
   const visibleIngredients = visibleFormulaIngredients(ingredients);
   const recommendedSupplementCount = visibleIngredients.length;
-  const ingredientCount = Math.max(
-    recommendedSupplementCount + lockedSupplementCount,
-    Number(result.totalSupplementCount ?? recommendedSupplementCount),
+  const catalogueSupplementCount = Math.max(
+    recommendedSupplementCount,
+    Number(result.catalogueSupplementCount ?? result.totalSupplementCount ?? 0),
     recommendedSupplementCount
+  );
+  const selectedProductCount = recommendedProductCount(products);
+  const catalogueProductCount = Math.max(
+    selectedProductCount,
+    Number(result.catalogueProductCount ?? 0)
   );
   const selectedCoverage = selectedStackCoverage(activeProductRecommendations, products);
   const productNeedCount = productCoveredNeedCount(products);
@@ -1020,29 +1073,22 @@ function RevealResultsPage({
           <h2 className="mx-auto mt-6 max-w-3xl font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
             From broad possibility to a focused formula.
           </h2>
-          <div className="mt-12 flex flex-col items-center justify-center gap-8 sm:flex-row sm:gap-14">
-            <div>
-              <div className="font-serif text-8xl font-light leading-none text-[var(--mn-ash-soft)] sm:text-9xl">
-                {ingredientCount}
-              </div>
-              <p className="mn-mono-label mt-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-ash)]">
-                {copy.ingredientCount}
-              </p>
-            </div>
-            <div className="font-serif text-5xl italic text-[var(--mn-gold)]">
-              →
-            </div>
-            <div>
-              <div className="font-serif text-8xl font-light leading-none text-[var(--mn-teal-deep)] sm:text-9xl">
-                {recommendedSupplementCount}
-              </div>
-              <p className="mn-mono-label mt-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-ink-soft)]">
-                {copy.supplementsRecommended}
-              </p>
-            </div>
+          <div className="mt-12 grid gap-5">
+            <RevealDistillationCard
+              fromCount={catalogueSupplementCount}
+              fromLabel={copy.catalogueSupplements}
+              toCount={recommendedSupplementCount}
+              toLabel={copy.supplementsRecommended}
+            />
+            <RevealDistillationCard
+              fromCount={catalogueProductCount}
+              fromLabel={copy.catalogueProducts}
+              toCount={selectedProductCount}
+              toLabel={copy.productsRecommended}
+            />
           </div>
           <p className="mx-auto mt-8 max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]">
-            {ingredientCount} ingredient priorities assessed, {recommendedSupplementCount} supplements recommended, {lockedSupplementCount} held back or locked, and no food items included in the active product engine.
+            {catalogueSupplementCount} catalogue supplements assessed, {recommendedSupplementCount} selected for your formula, {catalogueProductCount} approved products checked, and {selectedProductCount} recommended for you.
           </p>
         </div>
       </section>

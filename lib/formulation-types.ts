@@ -242,6 +242,8 @@ export type NutritionSectionStatus = "failed" | "pending" | "ready";
 export type FormulationResult = FormulationBlueprint & FoodGuidanceBlueprint & {
   access?: "full" | "preview";
   assessmentSummary: AssessmentSummary;
+  catalogueProductCount?: number;
+  catalogueSupplementCount?: number;
   generatedAt: string;
   lockedFoodCount?: number;
   lockedSupplementCount?: number;

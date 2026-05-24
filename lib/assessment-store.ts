@@ -1280,7 +1280,9 @@ export async function getStoredFormulationResult(
       product_recommendation_run.stack_preference as product_recommendation_stack_preference,
       product_recommendation_items_payload.recommendations as product_recommendation_items_payload,
       product_recommendation_options_payload.options as product_recommendation_options_payload,
-      product_recommendation_task.status as product_recommendation_task_status
+      product_recommendation_task.status as product_recommendation_task_status,
+      supplement_catalogue.active_supplement_count,
+      product_catalogue.approved_product_count
     from assessments
     left join lateral (
       select formulation, generated_at, model_version
@@ -1565,6 +1567,15 @@ export async function getStoredFormulationResult(
       order by created_at desc
       limit 1
     ) product_recommendation_task on true
+    left join lateral (
+      select count(*)::int as active_supplement_count
+      from public.supplements
+    ) supplement_catalogue on true
+    left join lateral (
+      select count(*)::int as approved_product_count
+      from public.products
+      where status = 'approved'
+    ) product_catalogue on true
     where assessments.plan_id = ${planId}::uuid
       ${assessmentAccessFilter}
     limit 1
@@ -1806,6 +1817,14 @@ export async function getStoredFormulationResult(
       locale,
       plan
     }),
+    catalogueProductCount: Math.max(
+      0,
+      Number(row.approved_product_count) || 0
+    ),
+    catalogueSupplementCount: Math.max(
+      0,
+      Number(row.active_supplement_count) || 0
+    ),
     generatedAt,
     planId,
     nutritionReport,
