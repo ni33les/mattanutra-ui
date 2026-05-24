@@ -25,16 +25,17 @@ const securityHeaders = [
       "base-uri 'self'",
       isDevelopment
         ? "connect-src 'self' ws: wss: http://localhost:* http://127.0.0.1:*"
-        : "connect-src 'self'",
+        : "connect-src 'self' https://api.stripe.com https://checkout.stripe.com https://r.stripe.com",
       "font-src 'self' data:",
       "form-action 'self'",
       "frame-ancestors 'none'",
+      "frame-src 'self' https://checkout.stripe.com https://hooks.stripe.com https://js.stripe.com",
       "img-src 'self' data: blob: https:",
       "manifest-src 'self'",
       "object-src 'none'",
       isDevelopment
         ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-        : "script-src 'self' 'unsafe-inline'",
+        : "script-src 'self' 'unsafe-inline' https://js.stripe.com",
       "style-src 'self' 'unsafe-inline'",
       "worker-src 'self' blob:",
       "upgrade-insecure-requests"
@@ -52,7 +53,7 @@ const securityHeaders = [
       "local-fonts=()",
       "magnetometer=()",
       "microphone=()",
-      "payment=()",
+      'payment=(self "https://checkout.stripe.com" "https://js.stripe.com")',
       "serial=()",
       "usb=()"
     ].join(", ")
