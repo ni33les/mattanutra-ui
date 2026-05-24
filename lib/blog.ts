@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import { getSql } from "@/lib/db";
-import { defaultLocale, isLocale, publicLocales, type Locale } from "@/lib/i18n";
+import {
+  defaultLocale,
+  isLocale,
+  localeHtmlLang,
+  publicLocales,
+  type Locale
+} from "@/lib/i18n";
 
 export type BlogStatus = "archived" | "draft" | "published" | "review";
 
@@ -102,11 +108,7 @@ type TestimonialRow = {
   status?: string | null;
 };
 
-const dateFormatter = new Intl.DateTimeFormat("en", {
-  day: "numeric",
-  month: "short",
-  year: "numeric"
-});
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
 function toLocale(value: unknown): Locale {
   return isLocale(value) ? value : defaultLocale;
 }
@@ -211,11 +213,20 @@ function isUuid(value: string) {
   );
 }
 
-function formatPublishedDate(value: Date | string | null) {
+function formatPublishedDate(value: Date | string | null, locale: Locale) {
   const date = value ? new Date(value) : new Date();
+  const formatter =
+    dateFormatters.get(locale) ??
+    new Intl.DateTimeFormat(localeHtmlLang(locale), {
+      day: "numeric",
+      month: "short",
+      year: "numeric"
+    });
+
+  dateFormatters.set(locale, formatter);
 
   return {
-    date: dateFormatter.format(date),
+    date: formatter.format(date),
     datetime: date.toISOString().slice(0, 10)
   };
 }
@@ -266,7 +277,7 @@ function mapTestimonial(row: TestimonialRow | BlogPostRow): BlogTestimonial | nu
 
 function mapPost(row: BlogPostRow, localeOverride?: Locale): BlogPost {
   const locale = localeOverride ?? toLocale(row.locale);
-  const published = formatPublishedDate(row.published_at);
+  const published = formatPublishedDate(row.published_at, locale);
   const body = row.body ?? {};
 
   return {

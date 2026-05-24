@@ -23,6 +23,25 @@ export const PLAN_CHAT_MAX_USER_ROUNDS = 8;
 export const PLAN_CHAT_LIMIT_ERROR_MESSAGE =
   "Plan chat interaction limit reached";
 
+const planConciergeCopy = {
+  en: {
+    pendingProfile: "Profile pending",
+    pendingRegion: "Thailand",
+    welcome:
+      "Hi, I’m MattaNutra AI. I’ll help tailor your food and supplement guidance.\n\nTell me what you’d like to remove, swap, simplify, or adjust.\n\nWhen you’re happy, press Deliver Nutrition Plan or tell me to go ahead."
+  },
+  th: {
+    pendingProfile: "กำลังเตรียมข้อมูล",
+    pendingRegion: "ไทย",
+    welcome:
+      "สวัสดีครับ ผมคือ MattaNutra AI ผมจะช่วยปรับคำแนะนำอาหารและอาหารเสริมให้เข้ากับคุณ\n\nบอกผมได้เลยว่าอยากเอาอะไรออก เปลี่ยนอะไร หรือทำให้ง่ายขึ้น\n\nเมื่อพร้อมแล้ว ให้กด Deliver Nutrition Plan หรือบอกผมว่าไปต่อได้เลย"
+  }
+} satisfies Record<Locale, {
+  pendingProfile: string;
+  pendingRegion: string;
+  welcome: string;
+}>;
+
 export type PlanChatChannel =
   | "email"
   | "gui"
@@ -87,11 +106,7 @@ function deterministicUuid(seed: string) {
 }
 
 export function planChatWelcomeBody(locale: Locale) {
-  if (locale === "th") {
-    return "สวัสดีครับ ผมคือ MattaNutra AI ผมจะช่วยปรับคำแนะนำอาหารและอาหารเสริมให้เข้ากับคุณ\n\nบอกผมได้เลยว่าอยากเอาอะไรออก เปลี่ยนอะไร หรือทำให้ง่ายขึ้น\n\nเมื่อพร้อมแล้ว ให้กด Deliver Nutrition Plan หรือบอกผมว่าไปต่อได้เลย";
-  }
-
-  return "Hi, I’m MattaNutra AI. I’ll help tailor your food and supplement guidance.\n\nTell me what you’d like to remove, swap, simplify, or adjust.\n\nWhen you’re happy, press Deliver Nutrition Plan or tell me to go ahead.";
+  return planConciergeCopy[locale].welcome;
 }
 
 async function paidPlanExists(sql: Db, planId: string) {
@@ -409,8 +424,8 @@ export async function loadOpenClawPlanContext(planId: string) {
         constraints: [],
         goals: [],
         plan: selectedPlan,
-        profile: locale === "th" ? "กำลังเตรียมข้อมูล" : "Profile pending",
-        region: locale === "th" ? "ไทย" : "Thailand"
+        profile: planConciergeCopy[locale].pendingProfile,
+        region: planConciergeCopy[locale].pendingRegion
       },
     chatMessages,
     feedback,

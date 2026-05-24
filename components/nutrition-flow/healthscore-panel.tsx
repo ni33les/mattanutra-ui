@@ -55,6 +55,49 @@ const healthScoreChartColors = [
 
 const healthScoreDomainTones = ["blue", "green", "amber", "red", "purple", "cyan"] as const;
 
+const healthScorePanelCopy = {
+  en: {
+    domains: "6-domain snapshot",
+    fallbackImprovement(headline: string) {
+      return `${headline} Use this as a practical starting point: protect the areas already working well, then focus first on this lowest-scoring domain.`;
+    },
+    lowestDomainAdvice(domain: HealthScoreDomain) {
+      return `Your ${domain.label} score (${domain.score}/100) has room to improve. ${domain.description} This is the clearest place to focus first.`;
+    },
+    planFocusItems(lowest: HealthScoreDomain) {
+      return [
+        ["Protect what is working", "Your stronger domains should not be made more complicated."],
+        ["Start where it matters", `${lowest.label} is the clearest area to prioritise first.`],
+        ["Know your right amount", "Your formula uses your goals, preferences and fit context together."]
+      ] as const;
+    },
+    score: "HealthScore"
+  },
+  th: {
+    domains: "ภาพรวม 6 ด้าน",
+    fallbackImprovement(headline: string) {
+      return `${headline} ใช้คะแนนนี้เป็นจุดเริ่มต้น โดยรักษาด้านที่ทำได้ดีไว้ และให้ความสำคัญกับพื้นที่คะแนนต่ำสุดก่อน`;
+    },
+    lowestDomainAdvice(domain: HealthScoreDomain) {
+      return `คะแนนด้าน ${domain.label} ของคุณ (${domain.score}/100) ยังมีพื้นที่ให้ปรับปรุง ${domain.description} จุดนี้เป็นพื้นที่ที่ชัดที่สุดในการเริ่มปรับแผนสุขภาพของคุณ`;
+    },
+    planFocusItems(lowest: HealthScoreDomain) {
+      return [
+        ["รักษาสิ่งที่ทำได้ดี", "ด้านที่คะแนนสูงอยู่แล้วไม่ควรถูกทำให้ซับซ้อนเกินไป"],
+        ["เริ่มจากจุดที่ชัดที่สุด", `${lowest.label} เป็นพื้นที่ที่ควรจัดลำดับก่อน`],
+        ["รู้ปริมาณที่เหมาะกับคุณ", "สูตรจะใช้เป้าหมาย ความชอบ และบริบทด้านความเหมาะสมร่วมกัน"]
+      ] as const;
+    },
+    score: "คะแนนสุขภาพ"
+  }
+} satisfies Record<Locale, {
+  domains: string;
+  fallbackImprovement(headline: string): string;
+  lowestDomainAdvice(domain: HealthScoreDomain): string;
+  planFocusItems(lowest: HealthScoreDomain): readonly (readonly [string, string])[];
+  score: string;
+}>;
+
 function polarPoint(center: number, radius: number, angleDegrees: number) {
   const angleRadians = ((angleDegrees - 90) * Math.PI) / 180;
 
@@ -173,14 +216,7 @@ function HealthScoreVisuals({
   locale: Locale;
   result: HealthScoreResult;
 }>) {
-  const labels =
-    locale === "th"
-      ? {
-          domains: "ภาพรวม 6 ด้าน"
-        }
-      : {
-          domains: "6-domain snapshot"
-        };
+  const labels = healthScorePanelCopy[locale];
 
   return (
     <div className="mt-5 sm:mt-6">
@@ -238,11 +274,7 @@ function DomainSnapshot({
 }
 
 function lowestDomainAdvice(domain: HealthScoreDomain, locale: Locale) {
-  if (locale === "th") {
-    return `คะแนนด้าน ${domain.label} ของคุณ (${domain.score}/100) ยังมีพื้นที่ให้ปรับปรุง ${domain.description} จุดนี้เป็นพื้นที่ที่ชัดที่สุดในการเริ่มปรับแผนสุขภาพของคุณ`;
-  }
-
-  return `Your ${domain.label} score (${domain.score}/100) has room to improve. ${domain.description} This is the clearest place to focus first.`;
+  return healthScorePanelCopy[locale].lowestDomainAdvice(domain);
 }
 
 export function localizeHealthScoreText(
@@ -261,9 +293,7 @@ function HealthScoreAdvice({
 }>) {
   const lowest = [...result.domains].sort((a, b) => a.score - b.score)[0];
   const fallbackImprovement =
-    (locale === "th"
-      ? `${result.headline} ใช้คะแนนนี้เป็นจุดเริ่มต้น โดยรักษาด้านที่ทำได้ดีไว้ และให้ความสำคัญกับพื้นที่คะแนนต่ำสุดก่อน`
-      : `${result.headline} Use this as a practical starting point: protect the areas already working well, then focus first on this lowest-scoring domain.`);
+    healthScorePanelCopy[locale].fallbackImprovement(result.headline);
   const storedFocus = localizeHealthScoreText(
     result.advice?.focusArea,
     locale
@@ -304,16 +334,7 @@ export function HealthScorePanel({
   locale: Locale;
   result: HealthScoreResult;
 }>) {
-  const labels =
-    locale === "th"
-      ? {
-          domains: "ภาพรวม 6 ด้าน",
-          score: "คะแนนสุขภาพ"
-        }
-      : {
-          domains: "6-domain snapshot",
-          score: "HealthScore"
-        };
+  const labels = healthScorePanelCopy[locale];
 
   return (
     <div className="mt-10 rounded-2xl bg-[var(--mn-mint)] p-4 ring-1 ring-[var(--mn-line)] sm:p-7">
@@ -352,6 +373,7 @@ const paymentCopy = {
       ["Personalise", "Your HealthScore is ready"],
       ["Reveal", "Unlock your plan"]
     ],
+    progressAria: "Assessment progress",
     heroEyebrow: "Your free assessment result",
     heroTitle(score: number) {
       return `Your HealthScore is ${score}.`;
@@ -415,6 +437,12 @@ const paymentCopy = {
     pricingBody:
       "Start with a one-time Right Amount Formula, or choose 90-Day Wellness Concierge if you want ongoing support as your routine changes.",
     preparing: "Preparing...",
+    scoreBands: {
+      clear: "Clear opportunity",
+      excellent: "Excellent start",
+      improve: "Ready to improve",
+      strong: "Strong foundation"
+    },
     selectionError:
       "We could not start your plan. Please try again.",
     plans: [
@@ -474,11 +502,12 @@ const paymentCopy = {
       ["ปรับให้เหมาะ", "HealthScore พร้อมแล้ว"],
       ["เปิดแผน", "ปลดล็อกแผนของคุณ"]
     ],
+    progressAria: "ความคืบหน้าของแบบประเมิน",
     heroEyebrow: "ผลประเมินฟรีของคุณ",
     heroTitle(score: number) {
       return `HealthScore ของคุณคือ ${score}`;
     },
-    heroAccent: "และตอนนี้เรารู้บริบทของคุณมากขึ้น",
+    heroAccent: "และตอนนี้คุณรู้มากขึ้นแล้ว",
     heroBody:
       "เราวิเคราะห์คำตอบของคุณเพื่อเตรียม Right Amount Plan ขั้นต่อไปจะแปลงรูปแบบคะแนนเป็นลำดับความสำคัญ ปริมาณ และทิศทางผลิตภัณฑ์ที่ชัดเจน",
     heroPrimary: "ปลดล็อก Right Amount Plan",
@@ -536,6 +565,12 @@ const paymentCopy = {
     pricingBody:
       "เริ่มด้วย Right Amount Formula แบบครั้งเดียว หรือเลือก Wellness Concierge 90 วัน หากต้องการการสนับสนุนต่อเนื่อง",
     preparing: "กำลังเตรียม...",
+    scoreBands: {
+      clear: "มีโอกาสปรับปรุงชัดเจน",
+      excellent: "จุดเริ่มต้นดีเยี่ยม",
+      improve: "พร้อมยกระดับ",
+      strong: "พื้นฐานแข็งแรง"
+    },
     selectionError: "ไม่สามารถเริ่มแผนได้ กรุณาลองอีกครั้ง",
     plans: [
       {
@@ -597,27 +632,17 @@ function clampScore(score: number) {
   return Math.max(0, Math.min(100, score));
 }
 
-function scoreBandTone(score: number) {
-  if (score >= 80) return "Excellent start";
-  if (score >= 65) return "Strong foundation";
-  if (score >= 50) return "Ready to improve";
-  return "Clear opportunity";
+function scoreBandTone(score: number, locale: Locale) {
+  const bands = paymentCopy[locale].scoreBands;
+
+  if (score >= 80) return bands.excellent;
+  if (score >= 65) return bands.strong;
+  if (score >= 50) return bands.improve;
+  return bands.clear;
 }
 
 function planFocusItems(lowest: HealthScoreDomain, locale: Locale) {
-  if (locale === "th") {
-    return [
-      ["รักษาสิ่งที่ทำได้ดี", "ด้านที่คะแนนสูงอยู่แล้วไม่ควรถูกทำให้ซับซ้อนเกินไป"],
-      ["เริ่มจากจุดที่ชัดที่สุด", `${lowest.label} เป็นพื้นที่ที่ควรจัดลำดับก่อน`],
-      ["รู้ปริมาณที่เหมาะกับคุณ", "สูตรจะใช้เป้าหมาย ความชอบ และบริบทด้านความเหมาะสมร่วมกัน"]
-    ] as const;
-  }
-
-  return [
-    ["Protect what is working", "Your stronger domains should not be made more complicated."],
-    ["Start where it matters", `${lowest.label} is the clearest area to prioritise first.`],
-    ["Know your right amount", "Your formula uses your goals, preferences and fit context together."]
-  ] as const;
+  return healthScorePanelCopy[locale].planFocusItems(lowest);
 }
 
 function paywallSignals(result: HealthScoreResult, locale: Locale) {
@@ -660,7 +685,7 @@ function ScoreSummaryCard({
             {labels.scoreLabel}
           </p>
           <strong className="mt-1 block text-[var(--mn-ink)]">
-            {scoreBandTone(score)}
+            {scoreBandTone(score, locale)}
           </strong>
         </div>
         <span className="rounded-full bg-[var(--mn-mint)] px-3 py-1 text-xs font-bold text-[var(--mn-teal-deep)]">
@@ -743,7 +768,7 @@ function HealthScorePaymentProgress({ locale }: Readonly<{ locale: Locale }>) {
 
   return (
     <div
-      aria-label="Assessment progress"
+      aria-label={labels.progressAria}
       className="grid overflow-hidden rounded-[var(--mn-radius-md)] bg-[var(--mn-paper)] ring-1 ring-[var(--mn-line)] md:grid-cols-3"
     >
       {labels.progress.map(([title, body], index) => {

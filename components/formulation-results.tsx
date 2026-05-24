@@ -21,6 +21,7 @@ import type {
 } from "@/lib/formulation-types";
 import { foodTagLabel } from "@/lib/food-tags";
 import {
+  localeHtmlLang,
   localizedTextSearchValue,
   resolveLocalizedText,
   type Locale
@@ -642,7 +643,7 @@ export function FormulationResults({
     (first, second) => first.effectivenessRank - second.effectivenessRank
   );
   const formattedDate = new Intl.DateTimeFormat(
-    locale === "th" ? "th-TH" : "en-GB",
+    localeHtmlLang(locale),
     {
       dateStyle: "medium",
       timeStyle: "short"
@@ -972,22 +973,36 @@ const contextChipLabels: Record<Locale, Record<string, string>> = {
   }
 };
 
+const marketplaceLabels: Record<Locale, Record<string, string>> = {
+  en: {
+    "Imported product": "Imported product",
+    "Lazada Thailand": "Lazada Thailand",
+    "Shopee Thailand": "Shopee Thailand"
+  },
+  th: {
+    "Imported product": "สินค้าในแคตตาล็อก",
+    "Lazada Thailand": "ลาซาด้า ประเทศไทย",
+    "Shopee Thailand": "ช้อปปี้ ประเทศไทย"
+  }
+};
+
+const revealJoiners = {
+  en: ", ",
+  th: " และ "
+} satisfies Record<Locale, string>;
+
 function localizedBenefitTagLabel(value: string, locale: Locale) {
-  return benefitTagLabels[locale][value] ?? foodTagLabel(value);
+  return benefitTagLabels[locale][value] ?? benefitTagLabels.en[value] ?? foodTagLabel(value);
 }
 
 function localizedCategoryLabel(value: string, locale: Locale) {
-  return formulaCategoryLabels[locale][value] ?? value;
+  return formulaCategoryLabels[locale][value] ?? formulaCategoryLabels.en[value] ?? value;
 }
 
 function localizedContextChip(value: string, locale: Locale) {
-  if (locale !== "th") {
-    return value;
-  }
-
   return value
     .split(" / ")
-    .map((part) => contextChipLabels.th[part] ?? part)
+    .map((part) => contextChipLabels[locale][part] ?? contextChipLabels.en[part] ?? part)
     .join(" / ");
 }
 
@@ -1003,10 +1018,14 @@ function localizedCoverLabel(
   locale: Locale,
   supplementLabelById: ReadonlyMap<string, string>
 ) {
+  const fallback = foodTagLabel(value.replaceAll("-", "_"));
+
   return (
     supplementLabelById.get(value) ??
     supplementLabelById.get(value.replace(/^supplement:/, "")) ??
-    (locale === "th" ? value.replaceAll("-", " ") : foodTagLabel(value))
+    formulaCategoryLabels[locale][value] ??
+    formulaCategoryLabels.en[value] ??
+    fallback
   );
 }
 
@@ -1014,20 +1033,7 @@ function localizedMarketplaceName(
   value: RecommendedProduct["marketplace"],
   locale: Locale
 ) {
-  if (locale !== "th") {
-    return value;
-  }
-
-  switch (value) {
-    case "Imported product":
-      return "สินค้าในแคตตาล็อก";
-    case "Lazada Thailand":
-      return "ลาซาด้า ประเทศไทย";
-    case "Shopee Thailand":
-      return "ช้อปปี้ ประเทศไทย";
-    default:
-      return value;
-  }
+  return marketplaceLabels[locale][value] ?? marketplaceLabels.en[value] ?? value;
 }
 
 function localizedProductDescription({
@@ -1044,7 +1050,7 @@ function localizedProductDescription({
   const percent = product.stackContributionPercent ?? product.productCoveragePercent ?? 0;
   const covers = product.covers
     .map((cover) => localizedCoverLabel(cover, locale, supplementLabelById))
-    .join(locale === "th" ? " และ " : ", ");
+    .join(revealJoiners[locale]);
 
   if (product.servingMultiplier && product.servingMultiplier > 1) {
     return formatTemplate(copy.productServingMatchTemplate, {

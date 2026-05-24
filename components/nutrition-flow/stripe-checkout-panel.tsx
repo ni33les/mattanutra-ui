@@ -21,8 +21,10 @@ type StripeCheckoutPanelProps = Readonly<{
 
 const copy = {
   en: {
+    cancel: "Cancel",
     configError:
       "Checkout is not configured yet. Please try again later or contact support.",
+    creatingSession: "Creating your payment session...",
     loading: "Loading secure checkout...",
     mockCta: "Simulate successful payment",
     mockIntro:
@@ -33,8 +35,10 @@ const copy = {
     unable: "We could not open checkout. Please try again."
   },
   th: {
+    cancel: "ยกเลิก",
     configError:
       "ยังไม่ได้ตั้งค่าการชำระเงิน โปรดลองอีกครั้งภายหลังหรือติดต่อทีมงาน",
+    creatingSession: "กำลังสร้างเซสชันการชำระเงิน...",
     loading: "กำลังโหลดหน้าชำระเงินที่ปลอดภัย...",
     mockCta: "จำลองการชำระเงินสำเร็จ",
     mockIntro:
@@ -376,7 +380,7 @@ export function StripeCheckoutPanel({
               });
             }}
           >
-            {locale === "th" ? "ยกเลิก" : "Cancel"}
+            {labels.cancel}
           </button>
         ) : null}
       </div>
@@ -400,9 +404,7 @@ export function StripeCheckoutPanel({
             </p>
             {isLoadingSession ? (
               <p className="mt-3 text-sm text-[var(--mn-ash)]">
-                {locale === "th"
-                  ? "กำลังสร้างเซสชันการชำระเงิน..."
-                  : "Creating your payment session..."}
+                {labels.creatingSession}
               </p>
             ) : null}
           </div>

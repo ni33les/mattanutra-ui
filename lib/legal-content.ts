@@ -451,9 +451,16 @@ const thPrivacy: LegalContent = {
 };
 
 export function getLegalContent(locale: Locale, doc: LegalDoc): LegalContent {
-  if (locale === "th") {
-    return doc === "terms" ? thTerms : thPrivacy;
-  }
+  const documents = {
+    en: {
+      privacy: enPrivacy,
+      terms: enTerms
+    },
+    th: {
+      privacy: thPrivacy,
+      terms: thTerms
+    }
+  } satisfies Record<Locale, Record<LegalDoc, LegalContent>>;
 
-  return doc === "terms" ? enTerms : enPrivacy;
+  return documents[locale][doc];
 }

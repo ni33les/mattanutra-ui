@@ -16,25 +16,29 @@ const titleBarCopy = {
     assessment: "Free Assessment",
     availability: "Now available in",
     countries: ["Thailand", "Singapore", "Malaysia", "Philippines"],
+    homeAria: (title: string) => `${title} home`,
     links: [
       ["#living-protocol", "Living Protocol"],
       ["#how-it-works", "How it works"],
       ["#promises", "Promises"],
       ["#pricing", "Pricing"],
       ["#journal", "Journal"]
-    ]
+    ],
+    navAria: "Primary"
   },
   th: {
     assessment: "เริ่มประเมินฟรี",
     availability: "พร้อมให้บริการใน",
     countries: ["ไทย", "สิงคโปร์", "มาเลเซีย", "ฟิลิปปินส์"],
+    homeAria: (title: string) => `${title} หน้าแรก`,
     links: [
       ["#living-protocol", "โปรโตคอลชีวิต"],
       ["#how-it-works", "วิธีทำงาน"],
       ["#promises", "คำมั่น"],
       ["#pricing", "ราคา"],
       ["#journal", "บทความ"]
-    ]
+    ],
+    navAria: "เมนูหลัก"
   }
 } as const;
 
@@ -83,15 +87,13 @@ export function TitleBar({
           data-bpm-label="MattaNutra"
           data-bpm-target={`/${currentLocale}`}
           data-bpm-type="traffic"
-          aria-label={
-            currentLocale === "th" ? `${title} หน้าแรก` : `${title} home`
-          }
+          aria-label={copy.homeAria(title)}
           className="flex min-w-0 items-center text-foreground transition hover:text-[var(--mn-teal-deep)]"
         >
           <HealthspanLogo className="shrink-0" locale={currentLocale} />
         </Link>
         <nav
-          aria-label={currentLocale === "th" ? "เมนูหลัก" : "Primary"}
+          aria-label={copy.navAria}
           className="mn-titlebar-nav"
         >
           {copy.links.map(([href, label]) => (

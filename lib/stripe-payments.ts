@@ -412,7 +412,12 @@ function stripeClientForConfig(config: StripePaymentConfig) {
 }
 
 function stripeLocale(locale: Locale) {
-  return locale === "th" ? "th" : "en";
+  const stripeLocales = {
+    en: "en",
+    th: "th"
+  } satisfies Record<Locale, "auto" | "en" | "th">;
+
+  return stripeLocales[locale] ?? "auto";
 }
 
 function isStripePriceId(value: string) {

@@ -23,14 +23,25 @@ function getLocalizedPath(currentPath: string, locale: Locale) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+const languageSwitcherCopy = {
+  en: {
+    aria: "Language"
+  },
+  th: {
+    aria: "ภาษา"
+  }
+} satisfies Record<Locale, { aria: string }>;
+
 export function LanguageSwitcher({
   currentLocale,
   currentPath,
   localizedPaths
 }: LanguageSwitcherProps) {
+  const copy = languageSwitcherCopy[currentLocale];
+
   return (
     <nav
-      aria-label="Language"
+      aria-label={copy.aria}
       className="flex items-center gap-1 rounded-full border border-[var(--mn-line)] bg-[var(--mn-cream)]/75 p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.55)]"
     >
       {publicLocales.map((locale) => {

@@ -79,6 +79,46 @@ const planLabels = {
   }
 } satisfies Record<Locale, Record<AssessmentPlan, string>>;
 
+const summaryCopy = {
+  en: {
+    fallbackGoals: "General wellness",
+    fallbackProfile: "Sex not shown / height not shown / weight not shown",
+    labelAntibiotics: "Recent antibiotics noted",
+    labelKidney(value: string) {
+      return `Kidney: ${humanize(value)}`;
+    },
+    labelLiver(value: string) {
+      return `Liver: ${humanize(value)}`;
+    },
+    labelMedication: "Regular medication noted",
+    labelSurgery: "Upcoming surgery noted",
+    reviewLabels: "Review labels for allergies and sensitivities"
+  },
+  th: {
+    fallbackGoals: "สุขภาพโดยรวม",
+    fallbackProfile: "ไม่ระบุเพศ / ไม่ระบุส่วนสูง / ไม่ระบุน้ำหนัก",
+    labelAntibiotics: "ใช้ยาปฏิชีวนะล่าสุด",
+    labelKidney() {
+      return "บริบทไต";
+    },
+    labelLiver() {
+      return "บริบทตับ";
+    },
+    labelMedication: "ใช้ยาเป็นประจำ",
+    labelSurgery: "มีการผ่าตัดเร็ว ๆ นี้",
+    reviewLabels: "ตรวจฉลากเพื่อดูสารก่อแพ้และความไวต่อส่วนผสม"
+  }
+} satisfies Record<Locale, {
+  fallbackGoals: string;
+  fallbackProfile: string;
+  labelAntibiotics: string;
+  labelKidney(value: string): string;
+  labelLiver(value: string): string;
+  labelMedication: string;
+  labelSurgery: string;
+  reviewLabels: string;
+}>;
+
 function toRecord(value: unknown) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     return value as Record<string, unknown>;
@@ -136,9 +176,7 @@ function formatWeight(value: unknown) {
 }
 
 function fallbackProfile(locale: Locale) {
-  return locale === "th"
-    ? "ไม่ระบุเพศ / ไม่ระบุส่วนสูง / ไม่ระบุน้ำหนัก"
-    : "Sex not shown / height not shown / weight not shown";
+  return summaryCopy[locale].fallbackProfile;
 }
 
 export function buildAssessmentSummary({
@@ -168,19 +206,19 @@ export function buildAssessmentSummary({
   const constraints = [
     ...medTypes.map((value) => localizedValueLabel(value, locale)),
     ...(toText(record.meds) === "yes"
-      ? [locale === "th" ? "ใช้ยาเป็นประจำ" : "Regular medication noted"]
+      ? [summaryCopy[locale].labelMedication]
       : []),
     ...(toText(record.kidney) && toText(record.kidney) !== "normal"
-      ? [locale === "th" ? "บริบทไต" : `Kidney: ${humanize(toText(record.kidney))}`]
+      ? [summaryCopy[locale].labelKidney(toText(record.kidney))]
       : []),
     ...(toText(record.liver) && toText(record.liver) !== "normal"
-      ? [locale === "th" ? "บริบทตับ" : `Liver: ${humanize(toText(record.liver))}`]
+      ? [summaryCopy[locale].labelLiver(toText(record.liver))]
       : []),
     ...(toText(record.surgery) === "yes"
-      ? [locale === "th" ? "มีการผ่าตัดเร็ว ๆ นี้" : "Upcoming surgery noted"]
+      ? [summaryCopy[locale].labelSurgery]
       : []),
     ...(toText(record.antibiotics) === "yes"
-      ? [locale === "th" ? "ใช้ยาปฏิชีวนะล่าสุด" : "Recent antibiotics noted"]
+      ? [summaryCopy[locale].labelAntibiotics]
       : []),
     ...(supplementSensitivities.length > 0
       ? supplementSensitivities.map(humanize)
@@ -194,15 +232,11 @@ export function buildAssessmentSummary({
     constraints:
       constraints.length > 0
         ? constraints
-        : [
-            locale === "th"
-              ? "ตรวจฉลากเพื่อดูสารก่อแพ้และความไวต่อส่วนผสม"
-              : "Review labels for allergies and sensitivities"
-          ],
+        : [summaryCopy[locale].reviewLabels],
     goals:
       goals.length > 0
         ? goals
-        : [locale === "th" ? "สุขภาพโดยรวม" : "General wellness"],
+        : [summaryCopy[locale].fallbackGoals],
     plan: planLabels[locale][plan],
     profile:
       profileParts.length > 0

@@ -167,7 +167,7 @@ const en = {
 
 type Dictionary = typeof en;
 
-const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionary } = {
+const dictionaries = {
   en,
   th: {
     meta: {
@@ -273,7 +273,7 @@ const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionary } = {
       trustedLine2: "บนเส้นทางสุขภาพของพวกเขา"
     }
   }
-};
+} satisfies Record<Locale, Dictionary>;
 
 export function isLocale(value: unknown): value is Locale {
   return typeof value === "string" && localeByCode.has(value);
@@ -308,7 +308,7 @@ export function localeDirection(locale: LocaleCode) {
 }
 
 export function getDictionary(locale: LocaleCode) {
-  return dictionaries[isLocale(locale) ? locale : defaultLocale] ?? dictionaries.en;
+  return dictionaries[isLocale(locale) ? locale : defaultLocale];
 }
 
 export type LocalizedTextMap = Record<LocaleCode, string>;

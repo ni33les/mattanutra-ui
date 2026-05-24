@@ -18,6 +18,7 @@ const stageOrder: NutritionProgressStage[] = ["quiz", "refine", "plan"];
 
 const labels = {
   en: {
+    aria: "Nutrition progress",
     plan: {
       description: "We become your best nutrition guide",
       title: "Deliver"
@@ -32,6 +33,7 @@ const labels = {
     }
   },
   th: {
+    aria: "ความคืบหน้าด้านโภชนาการ",
     plan: {
       description: "เราส่งมอบคู่มือโภชนาการที่เหมาะกับคุณ",
       title: "ส่งมอบแผน"
@@ -47,7 +49,7 @@ const labels = {
   }
 } satisfies Record<
   Locale,
-  Record<NutritionProgressStage, { description: string; title: string }>
+  { aria: string } & Record<NutritionProgressStage, { description: string; title: string }>
 >;
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -65,7 +67,7 @@ export function NutritionProgress({
   const copy = labels[locale];
 
   return (
-    <nav aria-label="Nutrition progress" className={className}>
+    <nav aria-label={copy.aria} className={className}>
       <ol
         role="list"
         className="divide-y divide-gray-300 rounded-md border border-gray-300 bg-white md:flex md:divide-y-0"

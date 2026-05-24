@@ -839,16 +839,74 @@ const th: Copy = {
       { label: "หญิง", value: "female" }
     ],
     age: "อายุ",
+    ageOptions: en.about.ageOptions,
     height: "ส่วนสูง",
     weight: "น้ำหนัก",
     skin: "สีผิว",
+    skinOptions: [
+      { label: "สีผิว 1", value: "I" },
+      { label: "สีผิว 2", value: "II" },
+      { label: "สีผิว 3", value: "III" },
+      { label: "สีผิว 4", value: "IV" },
+      { label: "สีผิว 5", value: "V" },
+      { label: "สีผิว 6", value: "VI" }
+    ],
     country: "ประเทศ",
-    sun: "การได้รับแดด",
+    countryOptions: [
+      { label: "ประเทศไทย", value: "TH" },
+      { label: "สิงคโปร์", value: "SG" },
+      { label: "มาเลเซีย", value: "MY" },
+      { label: "อินโดนีเซีย", value: "ID" },
+      { label: "ฟิลิปปินส์", value: "PH" },
+      { label: "เวียดนาม", value: "VN" },
+      { label: "เมียนมา", value: "MM" },
+      { label: "สหรัฐอเมริกา", value: "US" },
+      { label: "ออสเตรเลีย", value: "AU" },
+      { label: "สหราชอาณาจักร", value: "GB" },
+      { label: "แคนาดา", value: "CA" },
+      { label: "เยอรมนี", value: "DE" },
+      { label: "ฝรั่งเศส", value: "FR" },
+      { label: "ญี่ปุ่น", value: "JP" },
+      { label: "เกาหลีใต้", value: "KR" },
+      { label: "อินเดีย", value: "IN" },
+      { label: "จีน", value: "CN" },
+      { label: "อื่น ๆ", value: "OTHER" }
+    ],
+    sun: "การได้รับแดด ( นาที / วัน )",
+    sunOptions: [
+      { label: "น้อยกว่า 15", value: "u15" },
+      { label: "15-30", value: "15-30" },
+      { label: "30-60", value: "30-60" },
+      { label: "60+", value: "60+" }
+    ],
     sunscreen: "การใช้กันแดด",
+    sunscreenOptions: [
+      { label: "แทบไม่ใช้", value: "rarely" },
+      { label: "บางครั้ง", value: "sometimes" },
+      { label: "ทุกวัน", value: "daily" }
+    ],
     femaleTitle: "บริบทสุขภาพผู้หญิง",
     reproStatus: "สถานะตั้งครรภ์ / ให้นม",
+    reproStatusOptions: [
+      { label: "ไม่มี", value: "none" },
+      { label: "กำลังพยายามตั้งครรภ์", value: "ttc" },
+      { label: "ตั้งครรภ์", value: "pregnant" },
+      { label: "ให้นมบุตร", value: "breastfeeding" }
+    ],
     menopause: "ช่วงวัยหมดประจำเดือน",
-    flow: "ปริมาณประจำเดือน"
+    menopauseOptions: [
+      { label: "ก่อนวัยหมดประจำเดือน", value: "pre" },
+      { label: "วัยใกล้หมดประจำเดือน", value: "peri" },
+      { label: "หลังหมดประจำเดือน", value: "post" },
+      { label: "ไม่แน่ใจ", value: "unsure" }
+    ],
+    flow: "ปริมาณประจำเดือน",
+    flowOptions: [
+      { label: "ไม่มีประจำเดือน", value: "none" },
+      { label: "น้อย", value: "light" },
+      { label: "ปานกลาง", value: "moderate" },
+      { label: "มาก", value: "heavy" }
+    ]
   },
   coach: {
     allergies: "ข้อมูลแพ้อาหารช่วยให้คำแนะนำด้านอาหารเสริมเหมาะสมขึ้น โดยไม่ต้องกรอกข้อความเพิ่มเติม",
@@ -863,6 +921,321 @@ const th: Copy = {
   fixedAction: {
     generate: "สร้าง HealthScore ของฉัน"
   },
+  daily: {
+    title: "ชีวิตประจำวันของคุณ",
+    subtitle: "ข้อมูลส่วนนี้ช่วยให้สูตรไม่ใช่แค่ชุดทั่วไป แต่เข้ากับกิจวัตรของคุณจริง ๆ",
+    sleepHrs: "เวลานอนต่อคืน ( ชั่วโมง )",
+    sleepOptions: [
+      { label: "น้อยกว่า 5", value: "u5" },
+      { label: "5-6", value: "5-6" },
+      { label: "6-7", value: "6-7" },
+      { label: "7-8", value: "7-8" },
+      { label: "8-9", value: "8-9" },
+      { label: "มากกว่า 9", value: "9+" }
+    ],
+    energy: "ระดับพลังงาน",
+    energyOptions: [
+      { label: "หมดแรง", value: "drained", tone: "Low" },
+      { label: "ต่ำ", value: "low", tone: "Low" },
+      { label: "พอใช้", value: "ok", tone: "Mid" },
+      { label: "ดี", value: "good", tone: "High" },
+      { label: "ดีเยี่ยม", value: "excellent", tone: "High" }
+    ],
+    activity: "ระดับกิจกรรม",
+    activityOptions: [
+      { label: "นั่งเป็นส่วนใหญ่", value: "sitting" },
+      { label: "เบา", value: "light" },
+      { label: "ปานกลาง", value: "moderate" },
+      { label: "กระฉับกระเฉง", value: "active" },
+      { label: "นักกีฬา", value: "athlete" }
+    ],
+    stress: "ระดับความเครียด",
+    stressOptions: [
+      { label: "ต่ำมาก", value: "verylow", tone: "Low" },
+      { label: "ต่ำ", value: "low", tone: "Low" },
+      { label: "ปานกลาง", value: "moderate", tone: "Mid" },
+      { label: "สูง", value: "high", tone: "High" },
+      { label: "สูงมาก", value: "extreme", tone: "High" }
+    ],
+    digestion: "การย่อยอาหาร",
+    digestionOptions: [
+      { label: "ไม่มีปัญหา", value: "none" },
+      { label: "ท้องอืด", value: "bloating" },
+      { label: "ท้องผูก", value: "constipation" },
+      { label: "ถ่ายเหลว", value: "loose" }
+    ],
+    digCondition: "ภาวะระบบทางเดินอาหาร",
+    digConditionOptions: [
+      { label: "ไม่มี", value: "none" },
+      { label: "ลำไส้แปรปรวน (IBS)", value: "ibs" },
+      { label: "โรคเซลิแอค", value: "celiac" },
+      { label: "ลำไส้อักเสบ (IBD)", value: "ibd" },
+      { label: "เคยผ่าตัดลดน้ำหนัก", value: "bariatric" }
+    ],
+    smoking: "การสูบบุหรี่",
+    smokingOptions: [
+      { label: "ไม่เคย", value: "never" },
+      { label: "เลิกมาเกิน 5 ปี", value: "ex5+" },
+      { label: "เลิกไม่ถึง 5 ปี", value: "ex5" },
+      { label: "สูบเป็นบางครั้ง", value: "occasional" },
+      { label: "สูบทุกวัน", value: "daily" }
+    ],
+    alcohol: "แอลกอฮอล์ ( แก้ว / สัปดาห์ )",
+    alcoholOptions: [
+      { label: "ไม่ดื่ม", value: "none" },
+      { label: "1-3", value: "1-3" },
+      { label: "4-7", value: "4-7" },
+      { label: "8+", value: "8+" }
+    ],
+    caffeine: "คาเฟอีน ( แก้ว / วัน )",
+    caffeineOptions: [
+      { label: "ไม่ดื่ม", value: "none" },
+      { label: "1", value: "1" },
+      { label: "2-3", value: "2-3" },
+      { label: "4+", value: "4+" }
+    ]
+  },
+  food: {
+    title: "อาหารและโภชนาการ",
+    subtitle: "บริบทอาหารช่วยให้คำแนะนำอาหารเสริมแม่นขึ้น แม้การจับคู่ผลิตภัณฑ์จะยังเน้นอาหารเสริมเท่านั้น",
+    diet: "รูปแบบการกิน",
+    dietOptions: [
+      { label: "ไม่มีรูปแบบเฉพาะ", value: "none" },
+      { label: "อาหารแปรรูปค่อนข้างมาก", value: "processed" },
+      { label: "ค่อนข้างสมดุล", value: "balanced" },
+      { label: "อาหารไม่แปรรูปเป็นหลัก", value: "whole" },
+      { label: "เมดิเตอร์เรเนียน", value: "mediterranean" },
+      { label: "เน้นพืช", value: "plant" },
+      { label: "วีแกน", value: "vegan" },
+      { label: "คาร์นิวอร์", value: "carnivore" }
+    ],
+    frequency: "คุณกินบ่อยแค่ไหน...",
+    frequencyTitles: {
+      dairy: "ผลิตภัณฑ์นม ( หน่วยบริโภค / วัน )",
+      eggs: "ไข่",
+      fish: "ปลาที่มีไขมัน",
+      fruitveg: "ผักและผลไม้ ( หน่วยบริโภค / วัน )",
+      legumes: "ถั่ว / ถั่วเปลือกแข็ง",
+      redmeat: "เนื้อแดง ( หน่วยบริโภค / สัปดาห์ )"
+    },
+    frequencyOptions: {
+      dairy: [
+        { label: "ไม่เคย", value: "never" },
+        { label: "1-2", value: "1-2" },
+        { label: "3+", value: "3+" }
+      ],
+      eggs: [
+        { label: "นาน ๆ ครั้ง", value: "rare" },
+        { label: "ทุกสัปดาห์", value: "weekly" },
+        { label: "เกือบทุกวัน", value: "most" }
+      ],
+      fish: [
+        { label: "ไม่เคย", value: "never" },
+        { label: "นาน ๆ ครั้ง", value: "rare" },
+        { label: "ทุกสัปดาห์", value: "once" },
+        { label: "บ่อย", value: "often" }
+      ],
+      fruitveg: [
+        { label: "ไม่ทุกวัน", value: "notdaily" },
+        { label: "1-2", value: "1-2" },
+        { label: "3+", value: "3+" }
+      ],
+      legumes: [
+        { label: "นาน ๆ ครั้ง", value: "rare" },
+        { label: "ทุกสัปดาห์", value: "weekly" },
+        { label: "เกือบทุกวัน", value: "most" }
+      ],
+      redmeat: [
+        { label: "ไม่เคย", value: "never" },
+        { label: "1-2", value: "1-2" },
+        { label: "3+", value: "3+" }
+      ]
+    },
+    allergies: "แพ้อาหาร",
+    allergyOptions: [
+      { label: "ไม่มี", value: "none" },
+      { label: "นม", value: "milk" },
+      { label: "ไข่", value: "eggs" },
+      { label: "ปลา", value: "fish" },
+      { label: "หอยและอาหารทะเลเปลือกแข็ง", value: "shellfish" },
+      { label: "ถั่วเปลือกแข็ง", value: "treenuts" },
+      { label: "ถั่วลิสง", value: "peanuts" },
+      { label: "ข้าวสาลี", value: "wheat" },
+      { label: "ถั่วเหลือง", value: "soy" },
+      { label: "งา", value: "sesame" }
+    ],
+    disclosureTitle: "ฉันยืนยันว่าได้เปิดเผยข้อมูลแพ้ ภาวะสุขภาพ ยา และข้อจำกัดด้านอาหารที่เกี่ยวข้องแล้ว",
+    disclosureBody: "คำแนะนำของ MattaNutra สนับสนุนสุขภาวะทั่วไป และไม่แทนคำแนะนำทางการแพทย์"
+  },
+  goals: {
+    title: "เป้าหมายและอาการของคุณ",
+    subtitle: "เป้าหมายหลักและอาการปัจจุบันช่วยกำหนดลำดับความสำคัญของสูตร",
+    goals: "เป้าหมายสุขภาพหลัก",
+    goalHint: "เลือกได้สูงสุด 3 ข้อ",
+    goalOptions: [
+      { label: "พลังงาน", value: "energy" },
+      { label: "การนอน", value: "sleep" },
+      { label: "สมาธิ", value: "focus" },
+      { label: "อายุยืนอย่างมีคุณภาพ", value: "longevity" },
+      { label: "ภูมิคุ้มกัน", value: "immunity" },
+      { label: "ฟิตเนส", value: "fitness" },
+      { label: "น้ำหนัก", value: "weight" },
+      { label: "อารมณ์", value: "mood" },
+      { label: "หัวใจ", value: "heart" },
+      { label: "ข้อและกระดูก", value: "joints" },
+      { label: "ผิว", value: "skin" },
+      { label: "ฮอร์โมน", value: "hormones" }
+    ],
+    symptoms: "อาการปัจจุบัน",
+    symptomHint: "เลือกได้ทุกข้อที่ตรงกับคุณ หากไม่มีอาการเด่น ให้เลือก รู้สึกดี",
+    symptomOptions: [
+      { label: "อ่อนเพลีย", value: "fatigue" },
+      { label: "สมองล้า / คิดไม่ชัด", value: "brainfog" },
+      { label: "อารมณ์", value: "mood" },
+      { label: "ปวดข้อ", value: "joint" },
+      { label: "ระบบย่อย", value: "digestion" },
+      { label: "นอนหลับไม่ดี", value: "sleep" },
+      { label: "เครียด", value: "stress" },
+      { label: "ผิว", value: "skin" },
+      { label: "ผมร่วง", value: "hair" },
+      { label: "ความต้องการทางเพศต่ำ", value: "libido" },
+      { label: "เป็นหวัดบ่อย", value: "colds" },
+      { label: "รู้สึกดี", value: "great" }
+    ]
+  },
+  precision: {
+    title: "ความชอบของคุณ",
+    subtitle: "กำหนดข้อจำกัดที่ใช้งานจริงก่อน แล้วค่อยเพิ่มข้อมูลเสริมถ้าคุณมี",
+    budget: "งบอาหารเสริมต่อเดือน ( THB )",
+    budgetOptions: [
+      { label: "ต่ำกว่า 1,000", value: "u1000" },
+      { label: "1,000-2,500", value: "1000-2500" },
+      { label: "2,500-5,000", value: "2500-5000" },
+      { label: "5,000+", value: "5000+" }
+    ],
+    maxPills: "จำนวนเม็ด / แคปซูลสูงสุด ( ต่อวัน )",
+    maxPillsOptions: [
+      { label: "1-3", value: "1-3" },
+      { label: "4-6", value: "4-6" },
+      { label: "7-10", value: "7-10" },
+      { label: "ไม่จำกัด", value: "nolimit" }
+    ],
+    form: "รูปแบบที่ชอบ",
+    formOptions: [
+      { label: "แคปซูล", value: "capsules" },
+      { label: "ผง / เชค", value: "powder" },
+      { label: "กัมมี่", value: "gummies" },
+      { label: "แบบผสมได้", value: "mixed" }
+    ],
+    optionalBanner: "ระดับความแม่นยำเพิ่มเติม",
+    optionalBody: "เพิ่มรายละเอียดที่คุณรู้ เพื่อเติมความแม่นยำ 20% สุดท้าย",
+    protein: "โปรตีน ( กรัม / กก. / วัน )",
+    proteinOptions: [
+      { label: "ต่ำกว่า 1", value: "u1" },
+      { label: "1-1.5", value: "1-1.5" },
+      { label: "1.5-2", value: "1.5-2" },
+      { label: "มากกว่า 2", value: "2+" }
+    ],
+    family: "ประวัติครอบครัว",
+    familyOptions: [
+      { label: "โรคหัวใจ", value: "heart" },
+      { label: "อัลไซเมอร์", value: "alzheimers" },
+      { label: "เบาหวาน", value: "diabetes" },
+      { label: "มะเร็ง", value: "cancer" },
+      { label: "กระดูกพรุน", value: "osteoporosis" },
+      { label: "ไม่มี", value: "none" }
+    ],
+    tracker: "อุปกรณ์ติดตามสุขภาพ",
+    trackerOptions: [
+      { label: "ไม่มีอุปกรณ์", value: "none" },
+      { label: "Garmin", value: "garmin" },
+      { label: "Oura", value: "oura" },
+      { label: "WHOOP", value: "whoop" },
+      { label: "Apple Watch", value: "apple" },
+      { label: "Fitbit", value: "fitbit" },
+      { label: "อื่น ๆ", value: "other" }
+    ],
+    vo2: "VO2 max",
+    vo2Estimate: "ตัวช่วยประเมิน VO2",
+    vo2EstimateButton: "ใช้ค่าประเมิน",
+    vo2EstimateNeeds: "ตอบเพศ อายุ ส่วนสูง น้ำหนัก และกิจกรรม เพื่อประเมิน VO2",
+    vo2EstimateReady: (value) => `ประเมินได้ ${value} ml/kg/min จากคำตอบปัจจุบัน`,
+    hrv: "ค่า HRV เฉลี่ย",
+    labs: "ค่าแล็บล่าสุด",
+    labsHint: "กรอกเฉพาะเมื่อมี หน่วยมีความสำคัญ",
+    labFields: [
+      { label: "วิตามิน D", value: "vitd", units: ["ng/mL", "nmol/L"] },
+      { label: "วิตามิน B12", value: "b12", units: ["pg/mL", "pmol/L"] },
+      { label: "เฟอร์ริติน", value: "ferritin", units: ["ng/mL", "ug/L"] },
+      { label: "HbA1c", value: "hba1c", units: ["%", "mmol/mol"] },
+      { label: "ดัชนีโอเมก้า-3", value: "o3", units: ["%"] },
+      { label: "โฮโมซิสเทอีน", value: "homo", units: ["umol/L", "mg/L"] }
+    ]
+  },
+  safety: {
+    title: "ยาและข้อควรระวัง",
+    subtitle: "ข้อมูลนี้ใช้สร้างข้อควรระวังและช่วยระบบตรวจความเหมาะสมแบบกำหนดตายตัว",
+    medications: "คุณใช้ยาอยู่หรือไม่?",
+    medicationHint: "ใช้เพื่อสร้างข้อควรระวังเท่านั้น",
+    medicationOptions: [
+      { label: "ไม่ใช้", value: "none" },
+      { label: "ใช่", value: "yes" }
+    ],
+    medicationType: "ประเภทยา",
+    medicationTypeOptions: [
+      { label: "ยากลุ่มสแตติน", value: "statin" },
+      { label: "เมตฟอร์มิน", value: "metformin" },
+      { label: "ยา PPI / โอเมพราโซล", value: "ppi" },
+      { label: "ยาขับปัสสาวะ", value: "diuretic" },
+      { label: "ยาคุมกำเนิด", value: "contraceptive" },
+      { label: "ยาต้านซึมเศร้า", value: "antidepressant" },
+      { label: "ยาละลายลิ่มเลือด / แอสไพริน", value: "bloodthinner" },
+      { label: "ยาไทรอยด์", value: "thyroid" },
+      { label: "ยาความดัน", value: "bp" },
+      { label: "คอร์ติโคสเตียรอยด์", value: "corticosteroid" },
+      { label: "อื่น ๆ", value: "other" }
+    ],
+    otherMedPlaceholder: "โปรดระบุยาและใช้เพื่ออะไร",
+    suppAllergies: "แพ้หรือไม่ทนต่อส่วนผสมอาหารเสริม",
+    suppAllergyOptions: [
+      { label: "ไม่ทราบว่ามี", value: "none" },
+      { label: "ไอโอดีน", value: "iodine" },
+      { label: "ธาตุเหล็ก", value: "iron" },
+      { label: "CoQ10", value: "coq10" },
+      { label: "วิตามินบี", value: "bvit" },
+      { label: "มาจากถั่วเหลือง", value: "soyderived" },
+      { label: "มาจากหอย / อาหารทะเลเปลือกแข็ง", value: "shellfishderived" },
+      { label: "อื่น ๆ", value: "other" }
+    ],
+    kidney: "การทำงานของไต",
+    kidneyOptions: [
+      { label: "ไม่มีปัญหาที่ทราบ", value: "normal" },
+      { label: "การทำงานลดลง", value: "reduced" },
+      { label: "โรคไต", value: "disease" }
+    ],
+    liver: "ภาวะตับ",
+    liverOptions: [
+      { label: "ไม่มีปัญหาที่ทราบ", value: "normal" },
+      { label: "มีภาวะเกี่ยวกับตับ", value: "condition" }
+    ],
+    surgery: "มีผ่าตัดใน 30 วันข้างหน้าหรือไม่?",
+    surgeryOptions: [
+      { label: "ไม่มี", value: "no" },
+      { label: "มี", value: "yes" }
+    ],
+    antibiotics: "ใช้ยาปฏิชีวนะใน 3 เดือนที่ผ่านมาไหม?",
+    antibioticsOptions: [
+      { label: "ไม่", value: "no" },
+      { label: "ใช่", value: "yes" }
+    ],
+    supplements: "อาหารเสริมที่ใช้อยู่ตอนนี้",
+    supplementsOptions: [
+      { label: "ไม่มี", value: "none" },
+      { label: "มัลติวิตามินพื้นฐาน", value: "basic" },
+      { label: "วิตามิน D3 / โอเมก้า-3", value: "d3omega" },
+      { label: "หลายตัวแบบเจาะจง", value: "targeted" }
+    ]
+  },
   sectionNotes: [
     "ไม่มีคำตอบที่ถูกหรือผิด มีเพียงคำตอบที่ตรงกับความจริง บริบทที่ซื่อตรงช่วยให้สูตรพอดีกับคุณมากขึ้น และปลอดภัยขึ้นเมื่อใช้ร่วมกับสิ่งที่คุณรับประทานอยู่แล้ว",
     "",
@@ -876,6 +1249,79 @@ const th: Copy = {
 };
 
 const copies: Record<Locale, Copy> = { en, th };
+
+const gaugeLabelsByLocale = {
+  en: ["Basic", "Essentials", "Precision"],
+  th: ["พื้นฐาน", "ข้อมูลหลัก", "ความแม่นยำ"]
+} satisfies Record<Locale, readonly [string, string, string]>;
+
+const assessmentUiCopy = {
+  en: {
+    back: "Back",
+    continue: "Continue",
+    countryHint: "Used for local context and product availability.",
+    devDefaults: "Dev defaults",
+    formulaPrecision: "Formula precision",
+    heightWeight: "Height and weight",
+    infoLabel: "Note",
+    stagesAria: "Assessment stages",
+    processingError: "We could not start processing. Please try again.",
+    scoreProcessingSubtitle: "We are scoring your main wellness domains from your answers.",
+    scoreProcessingTitle: "Preparing your HealthScore",
+    scoreGate: {
+      planDescription: "This is the deterministic HealthScore calculated from your answers.",
+      title: "Your HealthScore is ready"
+    },
+    retry: "Try again",
+    section: (current: number, total: number) => `Step ${current} / ${total}`,
+    selectCountry: "Select country",
+    sunHint: "Helps tune vitamin D and sun exposure context.",
+    vo2Placeholder: "e.g. 45 ml/kg/min"
+  },
+  th: {
+    back: "ย้อนกลับ",
+    continue: "ต่อไป",
+    countryHint: "ใช้เพื่อปรับบริบทพื้นที่และสินค้าที่พร้อมใช้งาน",
+    devDefaults: "ค่าเริ่มต้นสำหรับพัฒนา",
+    formulaPrecision: "ความแม่นยำของสูตร",
+    heightWeight: "ส่วนสูงและน้ำหนัก",
+    infoLabel: "หมายเหตุ",
+    stagesAria: "ขั้นตอนแบบประเมิน",
+    processingError: "ไม่สามารถเริ่มการประมวลผลได้ โปรดลองอีกครั้ง",
+    scoreProcessingSubtitle: "เรากำลังประเมินภาพรวมสุขภาพจากคำตอบของคุณ",
+    scoreProcessingTitle: "กำลังเตรียม HealthScore ของคุณ",
+    scoreGate: {
+      planDescription: "นี่คือคะแนน HealthScore จากคำตอบของคุณ",
+      title: "HealthScore ของคุณพร้อมแล้ว"
+    },
+    retry: "ลองอีกครั้ง",
+    section: (current: number, total: number) => `ขั้นตอน ${current} / ${total}`,
+    selectCountry: "เลือกประเทศ",
+    sunHint: "ช่วยปรับบริบทวิตามินดีและการได้รับแดด",
+    vo2Placeholder: "เช่น 45 ml/kg/min"
+  }
+} satisfies Record<Locale, {
+  back: string;
+  continue: string;
+  countryHint: string;
+  devDefaults: string;
+  formulaPrecision: string;
+  heightWeight: string;
+  infoLabel: string;
+  processingError: string;
+  scoreProcessingSubtitle: string;
+  scoreProcessingTitle: string;
+  scoreGate: {
+    planDescription: string;
+    title: string;
+  };
+  retry: string;
+  section: (current: number, total: number) => string;
+  selectCountry: string;
+  stagesAria: string;
+  sunHint: string;
+  vo2Placeholder: string;
+}>;
 
 function hasText(value: string) {
   return value.trim().length > 0;
@@ -1099,9 +1545,11 @@ function healthScoreBpmFields(healthScore: HealthScoreResult | null | undefined)
 }
 
 function PrecisionGauge({
+  ariaLabel,
   labels,
   progress
 }: Readonly<{
+  ariaLabel: string;
   labels: readonly [string, string, string];
   progress: number;
 }>) {
@@ -1113,7 +1561,7 @@ function PrecisionGauge({
         </span>
       </div>
       <progress
-        aria-label="Formula precision"
+        aria-label={ariaLabel}
         className="mn-progress mn-progress--thin"
         max={100}
         value={progress}
@@ -1189,12 +1637,14 @@ function estimateVo2Max(answers: Answers) {
 }
 
 function AssessmentStepper({
+  ariaLabel,
   currentIndex,
   onSelect,
   phases,
   sections,
   stages
 }: Readonly<{
+  ariaLabel: string;
   currentIndex: number;
   onSelect: (index: number) => void;
   phases: readonly string[];
@@ -1202,7 +1652,7 @@ function AssessmentStepper({
   stages: readonly string[];
 }>) {
   return (
-    <nav aria-label="Assessment stages">
+    <nav aria-label={ariaLabel}>
       <ol className="grid grid-cols-3 gap-2 lg:grid-cols-6">
         {sections.map((section, index) => {
           const active = index === currentIndex;
@@ -1294,9 +1744,7 @@ export function AssessmentFlow({
   const healthScoreViewedTracked = useRef(false);
   const precision = precisionProgress(answers);
   const vo2Estimate = estimateVo2Max(answers);
-  const gaugeLabels: [string, string, string] = locale === "th"
-    ? ["พื้นฐาน", "ข้อมูลหลัก", "ความแม่นยำ"]
-    : ["Basic", "Essentials", "Precision"];
+  const gaugeLabels = gaugeLabelsByLocale[locale];
 
   function clearProcessingStatus() {
     setProcessingStatus(null);
@@ -1331,35 +1779,7 @@ export function AssessmentFlow({
     });
   }, [capturedStatus?.planId, healthScore, locale, returningPlanId, showHealthScore]);
 
-  const ui = locale === "th"
-    ? {
-        back: "ย้อนกลับ",
-        continue: "ต่อไป",
-        infoLabel: "Note",
-        processingError: "ไม่สามารถเริ่มการประมวลผลได้ โปรดลองอีกครั้ง",
-        scoreProcessingSubtitle: "เรากำลังประเมินภาพรวมสุขภาพจากคำตอบของคุณ",
-        scoreProcessingTitle: "กำลังเตรียม HealthScore ของคุณ",
-        scoreGate: {
-          planDescription: "นี่คือคะแนน HealthScore จากคำตอบของคุณ",
-          title: "HealthScore ของคุณพร้อมแล้ว"
-        },
-        retry: "ลองอีกครั้ง",
-        section: (current: number, total: number) => `ขั้นตอน ${current} / ${total}`
-      }
-    : {
-        back: "Back",
-        continue: "Continue",
-        infoLabel: "Note",
-        processingError: "We could not start processing. Please try again.",
-        scoreProcessingSubtitle: "We are scoring your main wellness domains from your answers.",
-        scoreProcessingTitle: "Preparing your HealthScore",
-        scoreGate: {
-          planDescription: "This is the deterministic HealthScore calculated from your answers.",
-          title: "Your HealthScore is ready"
-        },
-        retry: "Try again",
-        section: (current: number, total: number) => `Step ${current} / ${total}`
-      };
+  const ui = assessmentUiCopy[locale];
 
   function setSingle(key: keyof Answers, value: string) {
     setAnswers((current) => ({
@@ -1512,7 +1932,7 @@ export function AssessmentFlow({
           ),
           id: "body-size",
           isAnswered: hasText(answers.heightCm) && hasText(answers.weightKg),
-          label: locale === "th" ? "ส่วนสูงและน้ำหนัก" : "Height and weight"
+          label: ui.heightWeight
         },
         {
           content: (
@@ -1534,9 +1954,7 @@ export function AssessmentFlow({
                   {copy.about.sunscreen}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  {locale === "th"
-                    ? "ช่วยปรับบริบทวิตามินดีและการได้รับแดด"
-                    : "Helps tune vitamin D and sun exposure context."}
+                  {ui.sunHint}
                 </p>
                 <div className="mt-3">
                   <PillGroup
@@ -1574,16 +1992,14 @@ export function AssessmentFlow({
                 {copy.about.country}
               </span>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                {locale === "th"
-                  ? "ใช้เพื่อปรับบริบทพื้นที่และสินค้าที่พร้อมใช้งาน"
-                  : "Used for local context and product availability."}
+                {ui.countryHint}
               </p>
               <select
                 value={answers.country}
                 className="mn-text-input mt-3 px-4 py-3 font-semibold"
                 onChange={(event) => setSingle("country", event.target.value)}
               >
-                <option value="">{locale === "th" ? "เลือกประเทศ" : "Select country"}</option>
+                <option value="">{ui.selectCountry}</option>
                 {copy.about.countryOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
@@ -1912,7 +2328,7 @@ export function AssessmentFlow({
                     <input
                       className="mn-text-input"
                       inputMode="decimal"
-                      placeholder="e.g. 45 ml/kg/min"
+                      placeholder={ui.vo2Placeholder}
                       value={answers.vo2}
                       onChange={(event) => setSingle("vo2", event.target.value)}
                     />
@@ -2210,6 +2626,7 @@ export function AssessmentFlow({
 	          <div className="space-y-6">
             <div className="py-3">
               <AssessmentStepper
+                ariaLabel={ui.stagesAria}
                 currentIndex={sectionIndex}
                 onSelect={goToSection}
                 phases={copy.stagePhases}
@@ -2223,7 +2640,11 @@ export function AssessmentFlow({
               done={currentSection.complete}
               footer={
                 <div className="space-y-4">
-                  <PrecisionGauge labels={gaugeLabels} progress={precision.progress} />
+                  <PrecisionGauge
+                    ariaLabel={ui.formulaPrecision}
+                    labels={gaugeLabels}
+                    progress={precision.progress}
+                  />
                   <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
                       <button
@@ -2240,7 +2661,7 @@ export function AssessmentFlow({
                           className="mn-secondary-button mn-secondary-button--compact"
                           onClick={fillRandomDefaultsAndFinalStep}
                         >
-                          Dev defaults
+                          {ui.devDefaults}
                         </button>
                       ) : null}
                     </div>

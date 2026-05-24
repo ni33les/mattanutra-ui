@@ -43,6 +43,74 @@ export type HealthScoreResult = Readonly<{
 
 type DomainId = HealthScoreDomain["id"];
 
+const healthScoreCopy = {
+  en: {
+    bands: {
+      excellent: "Excellent",
+      fair: "Fair",
+      good: "Good",
+      needsAttention: "Needs Attention"
+    },
+    domainLabels: {
+      activity: ["Activity & fitness", "Reflects movement, cardio base, and recovery capacity."],
+      biomarkers: ["Body markers", "Uses BMI plus any lab values you added."],
+      habits: ["Health habits", "Reflects smoking, sun exposure, sunscreen use, symptoms, and energy."],
+      nutrition: ["Nutrition", "Reflects diet pattern, food frequency, fish intake, alcohol, and protein."],
+      sleep: ["Sleep & recovery", "Reflects sleep duration, energy, and caffeine load."],
+      stress: ["Stress & balance", "Reflects stress load, digestion, digestive conditions, and HRV when available."]
+    },
+    headline(score: number) {
+      if (score >= 80) return "You have a strong health foundation.";
+      if (score >= 65) return "You have a solid base with clear room to personalise.";
+      if (score >= 50) return "Several areas can be improved with the right focus.";
+      return "There is a clear opportunity to improve the fundamentals.";
+    },
+    moverImpact: "High impact",
+    moverLabel(domain: HealthScoreDomain) {
+      return `Improve ${domain.label.toLowerCase()}`;
+    },
+    summary(lowest: HealthScoreDomain) {
+      return `Your biggest opportunity is ${lowest.label.toLowerCase()}. This score helps us prioritise the formulation and preview recommendations around your actual gaps.`;
+    }
+  },
+  th: {
+    bands: {
+      excellent: "ดีเยี่ยม",
+      fair: "พอใช้",
+      good: "ดี",
+      needsAttention: "ควรใส่ใจ"
+    },
+    domainLabels: {
+      activity: ["กิจกรรมและฟิตเนส", "สะท้อนการเคลื่อนไหว ความฟิต และพื้นฐานการฟื้นตัว"],
+      biomarkers: ["ตัวชี้วัดร่างกาย", "รวม BMI และค่าแล็บที่คุณใส่ไว้"],
+      habits: ["พฤติกรรมสุขภาพ", "สะท้อนบุหรี่ แสงแดด กันแดด อาการ และพลังงาน"],
+      nutrition: ["โภชนาการ", "สะท้อนรูปแบบอาหาร ความถี่อาหาร ปลา แอลกอฮอล์ และโปรตีน"],
+      sleep: ["การนอนและการฟื้นตัว", "สะท้อนชั่วโมงนอน พลังงาน และคาเฟอีน"],
+      stress: ["ความเครียดและสมดุล", "สะท้อนระดับความเครียด ระบบย่อย ภาวะทางเดินอาหาร และ HRV ถ้ามี"]
+    },
+    headline(score: number) {
+      if (score >= 80) return "พื้นฐานสุขภาพของคุณแข็งแรง";
+      if (score >= 65) return "คุณมีพื้นฐานที่ดีและยังปรับให้เฉพาะตัวได้อีก";
+      if (score >= 50) return "มีหลายจุดที่สามารถยกระดับได้";
+      return "มีโอกาสปรับปรุงที่ชัดเจน";
+    },
+    moverImpact: "ผลกระทบสูง",
+    moverLabel(domain: HealthScoreDomain) {
+      return `ปรับปรุง ${domain.label}`;
+    },
+    summary(lowest: HealthScoreDomain) {
+      return `พื้นที่ที่ควรให้ความสำคัญที่สุดคือ ${lowest.label} คะแนนนี้ช่วยให้เราจัดลำดับสูตรและคำแนะนำตัวอย่างได้เหมาะกับคุณมากขึ้น`;
+    }
+  }
+} satisfies Record<Locale, {
+  bands: Record<"excellent" | "fair" | "good" | "needsAttention", string>;
+  domainLabels: Record<DomainId, [string, string]>;
+  headline(score: number): string;
+  moverImpact: string;
+  moverLabel(domain: HealthScoreDomain): string;
+  summary(lowest: HealthScoreDomain): string;
+}>;
+
 function asRecord(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -420,61 +488,24 @@ function sunHabitPoints(answers: Record<string, unknown>) {
 }
 
 function domainLabels(locale: Locale) {
-  if (locale === "th") {
-    return {
-      activity: ["กิจกรรมและฟิตเนส", "สะท้อนการเคลื่อนไหว ความฟิต และพื้นฐานการฟื้นตัว"],
-      biomarkers: ["ตัวชี้วัดร่างกาย", "รวม BMI และค่าแล็บที่คุณใส่ไว้"],
-      habits: ["พฤติกรรมสุขภาพ", "สะท้อนบุหรี่ แสงแดด กันแดด อาการ และพลังงาน"],
-      nutrition: ["โภชนาการ", "สะท้อนรูปแบบอาหาร ความถี่อาหาร ปลา แอลกอฮอล์ และโปรตีน"],
-      sleep: ["การนอนและการฟื้นตัว", "สะท้อนชั่วโมงนอน พลังงาน และคาเฟอีน"],
-      stress: ["ความเครียดและสมดุล", "สะท้อนระดับความเครียด ระบบย่อย ภาวะทางเดินอาหาร และ HRV ถ้ามี"]
-    } satisfies Record<DomainId, [string, string]>;
-  }
-
-  return {
-    activity: ["Activity & fitness", "Reflects movement, cardio base, and recovery capacity."],
-    biomarkers: ["Body markers", "Uses BMI plus any lab values you added."],
-    habits: ["Health habits", "Reflects smoking, sun exposure, sunscreen use, symptoms, and energy."],
-    nutrition: ["Nutrition", "Reflects diet pattern, food frequency, fish intake, alcohol, and protein."],
-    sleep: ["Sleep & recovery", "Reflects sleep duration, energy, and caffeine load."],
-    stress: ["Stress & balance", "Reflects stress load, digestion, digestive conditions, and HRV when available."]
-  } satisfies Record<DomainId, [string, string]>;
+  return healthScoreCopy[locale].domainLabels;
 }
 
 function bandForScore(score: number, locale: Locale) {
-  if (locale === "th") {
-    if (score >= 80) return "ดีเยี่ยม";
-    if (score >= 65) return "ดี";
-    if (score >= 50) return "พอใช้";
-    return "ควรใส่ใจ";
-  }
+  const bands = healthScoreCopy[locale].bands;
 
-  if (score >= 80) return "Excellent";
-  if (score >= 65) return "Good";
-  if (score >= 50) return "Fair";
-  return "Needs Attention";
+  if (score >= 80) return bands.excellent;
+  if (score >= 65) return bands.good;
+  if (score >= 50) return bands.fair;
+  return bands.needsAttention;
 }
 
 function headlineForScore(score: number, locale: Locale) {
-  if (locale === "th") {
-    if (score >= 80) return "พื้นฐานสุขภาพของคุณแข็งแรง";
-    if (score >= 65) return "คุณมีพื้นฐานที่ดีและยังปรับให้เฉพาะตัวได้อีก";
-    if (score >= 50) return "มีหลายจุดที่สามารถยกระดับได้";
-    return "มีโอกาสปรับปรุงที่ชัดเจน";
-  }
-
-  if (score >= 80) return "You have a strong health foundation.";
-  if (score >= 65) return "You have a solid base with clear room to personalise.";
-  if (score >= 50) return "Several areas can be improved with the right focus.";
-  return "There is a clear opportunity to improve the fundamentals.";
+  return healthScoreCopy[locale].headline(score);
 }
 
 function summaryForScore(lowest: HealthScoreDomain, locale: Locale) {
-  if (locale === "th") {
-    return `พื้นที่ที่ควรให้ความสำคัญที่สุดคือ ${lowest.label} คะแนนนี้ช่วยให้เราจัดลำดับสูตรและคำแนะนำตัวอย่างได้เหมาะกับคุณมากขึ้น`;
-  }
-
-  return `Your biggest opportunity is ${lowest.label.toLowerCase()}. This score helps us prioritise the formulation and preview recommendations around your actual gaps.`;
+  return healthScoreCopy[locale].summary(lowest);
 }
 
 function buildMovers(domains: HealthScoreDomain[], locale: Locale): HealthScoreMover[] {
@@ -482,11 +513,8 @@ function buildMovers(domains: HealthScoreDomain[], locale: Locale): HealthScoreM
     .sort((a, b) => a.score - b.score)
     .slice(0, 3)
     .map((domain) => ({
-      impact: locale === "th" ? "ผลกระทบสูง" : "High impact",
-      label:
-        locale === "th"
-          ? `ปรับปรุง ${domain.label}`
-          : `Improve ${domain.label.toLowerCase()}`
+      impact: healthScoreCopy[locale].moverImpact,
+      label: healthScoreCopy[locale].moverLabel(domain)
     }));
 }
 

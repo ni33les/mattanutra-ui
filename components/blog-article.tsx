@@ -9,6 +9,7 @@ import {
 import { HighlightedBrandText } from "@/components/highlighted-brand-text";
 import type { ComponentType } from "react";
 import type { BlogPost } from "@/lib/blog";
+import type { Locale } from "@/lib/i18n";
 
 const markdownComponents: Components = {
   a: ({ children, href }) => (
@@ -76,6 +77,15 @@ const pointIcons: ComponentType<{
   "aria-hidden": boolean;
   className: string;
 }>[] = [CloudArrowUpIcon, LockClosedIcon, ServerIcon];
+
+const blogArticleCopy = {
+  en: {
+    journal: "MattaNutra Journal"
+  },
+  th: {
+    journal: "บทความ MattaNutra"
+  }
+} satisfies Record<Locale, { journal: string }>;
 
 function initials(name: string) {
   return name
@@ -208,6 +218,7 @@ export function BlogArticle({
   post
 }: Readonly<{ cta: BlogArticleCta; post: BlogPost }>) {
   const markdown = post.contentMarkdown.trim();
+  const copy = blogArticleCopy[post.locale];
 
   return (
     <>
@@ -215,7 +226,7 @@ export function BlogArticle({
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-2xl lg:mx-0">
             <p className="mn-v11-eyebrow">
-              MattaNutra Journal
+              {copy.journal}
             </p>
             <h1 className="mt-3 font-serif text-4xl font-medium tracking-normal text-pretty text-[var(--mn-ink)] sm:text-5xl">
               {post.title}
