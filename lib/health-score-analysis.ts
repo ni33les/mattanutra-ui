@@ -9,7 +9,7 @@ import type {
   HealthScoreResult,
   LocalizedHealthScoreText
 } from "@/lib/health-score";
-import type { Locale } from "@/lib/i18n";
+import { defaultLocale, type Locale } from "@/lib/i18n";
 
 type XaiChatCompletion = {
   choices?: Array<{
@@ -87,6 +87,8 @@ function userPrompt({
   healthScore: HealthScoreResult;
   locale: Locale;
 }>) {
+  const requiredOutputLocales = [...new Set([defaultLocale, locale])];
+
   return JSON.stringify(
     {
       assessment: compactAssessmentForAdvice(answers),
@@ -152,7 +154,7 @@ function userPrompt({
       },
       instructions: [
         "Return exactly one top-level key: advice.",
-        "Every localized field must contain exactly en and th strings.",
+        `Every localized field must include these locale keys: ${requiredOutputLocales.join(", ")}.`,
         "paywallFeatures must contain exactly 3 items.",
         "Use the assessment, healthScore, and personalizationSignals. These are the user's actual results.",
         "Write the paywallTitle as a sales headline for this person, not a product label.",
@@ -167,9 +169,10 @@ function userPrompt({
         "Avoid vague phrases like 'based on your profile', 'tailored to you', or 'your unique needs' unless followed by the exact signal.",
         "Keep the copy concise: overview max 2 sentences, title under 70 English characters, subtitle under 160 English characters, feature names under 42 English characters, feature descriptions under 150 English characters.",
         "No supplement names, ingredient names, doses, products, prices, discounts, false urgency, fear, medical instructions, or disease claims.",
-        "Return both English and Thai."
+        "Return English plus the requested locale. Include other locale keys only when they are useful and complete."
       ],
       locale,
+      requiredOutputLocales,
       personalizationSignals: buildPersonalizationSignals(answers, healthScore)
     },
     null,
@@ -631,32 +634,25 @@ function readLocalizedTextValue(
   errors: string[]
 ): LocalizedHealthScoreText {
   if (!isRecord(value)) {
-    errors.push(`${path} must be an object with en and th strings`);
-    return { en: "", th: "" };
+    errors.push(`${path} must be an object with localized string values`);
+    return {};
   }
 
-  const unexpectedKeys = Object.keys(value).filter(
-    (localizedKey) => localizedKey !== "en" && localizedKey !== "th"
+  const entries = Object.fromEntries(
+    Object.entries(value)
+      .filter(([localizedKey, text]) =>
+        /^[a-z]{2}(?:-[A-Z0-9]{2,8})?$/.test(localizedKey) &&
+        typeof text === "string" &&
+        text.trim().length > 0
+      )
+      .map(([localizedKey, text]) => [localizedKey, String(text).trim()])
   );
 
-  if (unexpectedKeys.length > 0) {
-    errors.push(
-      `${path} must only include en and th, found: ${unexpectedKeys.join(", ")}`
-    );
+  if (Object.keys(entries).length < 1) {
+    errors.push(`${path} requires at least one localized string`);
   }
 
-  const en = readText(value, "en");
-  const th = readText(value, "th");
-
-  if (!en) {
-    errors.push(`${path}.en is required`);
-  }
-
-  if (!th) {
-    errors.push(`${path}.th is required`);
-  }
-
-  return { en, th };
+  return entries;
 }
 
 function readLocalizedText(

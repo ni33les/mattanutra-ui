@@ -1,12 +1,72 @@
-export const locales = ["en", "th"] as const;
-export type Locale = (typeof locales)[number];
+export type LocaleCode = string;
+export type LocaleDirection = "ltr" | "rtl";
+
+export type SiteLocale = Readonly<{
+  code: LocaleCode;
+  direction: LocaleDirection;
+  fallbackLocale: LocaleCode | null;
+  htmlLang: string;
+  isIndexable: boolean;
+  isPublic: boolean;
+  label: string;
+  nativeLabel: string;
+  sortOrder: number;
+}>;
+
+export const siteLocaleRegistry = [
+  {
+    code: "en",
+    direction: "ltr",
+    fallbackLocale: null,
+    htmlLang: "en",
+    isIndexable: true,
+    isPublic: true,
+    label: "EN",
+    nativeLabel: "English",
+    sortOrder: 10
+  },
+  {
+    code: "th",
+    direction: "ltr",
+    fallbackLocale: "en",
+    htmlLang: "th",
+    isIndexable: true,
+    isPublic: true,
+    label: "TH",
+    nativeLabel: "ไทย",
+    sortOrder: 20
+  }
+] as const satisfies readonly SiteLocale[];
+
+export type Locale = (typeof siteLocaleRegistry)[number]["code"];
 
 export const defaultLocale: Locale = "en";
 
-export const localeLabels: Record<Locale, string> = {
-  en: "EN",
-  th: "TH"
-};
+export const allLocales = siteLocaleRegistry
+  .slice()
+  .sort((first, second) => first.sortOrder - second.sortOrder)
+  .map((locale) => locale.code) as Locale[];
+
+export const publicLocales = siteLocaleRegistry
+  .filter((locale) => locale.isPublic)
+  .sort((first, second) => first.sortOrder - second.sortOrder)
+  .map((locale) => locale.code) as Locale[];
+
+export const indexableLocales = siteLocaleRegistry
+  .filter((locale) => locale.isPublic && locale.isIndexable)
+  .sort((first, second) => first.sortOrder - second.sortOrder)
+  .map((locale) => locale.code) as Locale[];
+
+// Existing pages import `locales`; keep that as the public route set.
+export const locales = publicLocales;
+
+const localeByCode = new Map<LocaleCode, SiteLocale>(
+  siteLocaleRegistry.map((locale) => [locale.code, locale])
+);
+
+export const localeLabels = Object.fromEntries(
+  siteLocaleRegistry.map((locale) => [locale.code, locale.label])
+) as Record<Locale, string>;
 
 const en = {
   meta: {
@@ -107,7 +167,7 @@ const en = {
 
 type Dictionary = typeof en;
 
-const dictionaries: Record<Locale, Dictionary> = {
+const dictionaries: Partial<Record<Locale, Dictionary>> & { en: Dictionary } = {
   en,
   th: {
     meta: {
@@ -216,9 +276,86 @@ const dictionaries: Record<Locale, Dictionary> = {
 };
 
 export function isLocale(value: unknown): value is Locale {
-  return locales.some((locale) => locale === value);
+  return typeof value === "string" && localeByCode.has(value);
 }
 
-export function getDictionary(locale: Locale) {
-  return dictionaries[locale];
+export function isPublicLocale(value: unknown): value is Locale {
+  return isLocale(value) && Boolean(localeByCode.get(value)?.isPublic);
+}
+
+export function isIndexableLocale(value: unknown): value is Locale {
+  return isLocale(value) && Boolean(localeByCode.get(value)?.isIndexable);
+}
+
+export function getLocaleConfig(locale: LocaleCode | null | undefined) {
+  return localeByCode.get(locale ?? "") ?? localeByCode.get(defaultLocale)!;
+}
+
+export function localeLabel(locale: LocaleCode) {
+  return getLocaleConfig(locale).label;
+}
+
+export function localeNativeLabel(locale: LocaleCode) {
+  return getLocaleConfig(locale).nativeLabel;
+}
+
+export function localeHtmlLang(locale: LocaleCode) {
+  return getLocaleConfig(locale).htmlLang;
+}
+
+export function localeDirection(locale: LocaleCode) {
+  return getLocaleConfig(locale).direction;
+}
+
+export function getDictionary(locale: LocaleCode) {
+  return dictionaries[isLocale(locale) ? locale : defaultLocale] ?? dictionaries.en;
+}
+
+export type LocalizedTextMap = Record<LocaleCode, string>;
+export type LocalizedTextValue = string | Partial<LocalizedTextMap> | null | undefined;
+
+export function resolveLocalizedText(
+  value: LocalizedTextValue,
+  locale: LocaleCode,
+  fallbackLocale: LocaleCode = defaultLocale
+) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+
+  const localeConfig = getLocaleConfig(locale);
+  const fallbackChain = [
+    locale,
+    localeConfig.fallbackLocale,
+    fallbackLocale,
+    defaultLocale,
+    "en",
+    "th"
+  ].filter((item): item is string => Boolean(item));
+
+  for (const key of [...new Set(fallbackChain)]) {
+    const text = value[key];
+
+    if (typeof text === "string" && text.trim()) {
+      return text;
+    }
+  }
+
+  return Object.values(value).find((text) => typeof text === "string" && text.trim()) ?? "";
+}
+
+export function localizedTextSearchValue(value: LocalizedTextValue) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+
+  return Object.values(value).filter(Boolean).join(" ");
 }

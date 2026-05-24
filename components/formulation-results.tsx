@@ -20,7 +20,11 @@ import type {
   RecommendedProduct
 } from "@/lib/formulation-types";
 import { foodTagLabel } from "@/lib/food-tags";
-import type { Locale } from "@/lib/i18n";
+import {
+  localizedTextSearchValue,
+  resolveLocalizedText,
+  type Locale
+} from "@/lib/i18n";
 import {
   nutritionHealthScorePath,
   nutritionRefinePath
@@ -376,15 +380,11 @@ export const formulationResultsCopy = {
 } satisfies Record<Locale, CopyLabels>;
 
 function getLocalizedText(value: LocalizedText, locale: Locale) {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  return value[locale] || value.en || value.th;
+  return resolveLocalizedText(value, locale);
 }
 
 function searchableLocalizedText(value: LocalizedText) {
-  return typeof value === "string" ? value : `${value.en} ${value.th}`;
+  return localizedTextSearchValue(value);
 }
 
 function supplementBenefitTags(ingredient: FormulationIngredient) {

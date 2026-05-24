@@ -1,4 +1,4 @@
-import type { Locale } from "@/lib/i18n";
+import type { Locale, LocaleCode } from "@/lib/i18n";
 
 export type HealthScoreDomain = Readonly<{
   description: string;
@@ -14,10 +14,7 @@ export type HealthScoreMover = Readonly<{
 
 export type LocalizedHealthScoreText =
   | string
-  | Readonly<{
-      en: string;
-      th: string;
-    }>;
+  | Readonly<Record<LocaleCode, string>>;
 
 export type HealthScorePaywallFeature = Readonly<{
   description: LocalizedHealthScoreText;

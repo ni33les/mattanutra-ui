@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import { getSql } from "@/lib/db";
-import { defaultLocale, isLocale, type Locale } from "@/lib/i18n";
+import { defaultLocale, isLocale, publicLocales, type Locale } from "@/lib/i18n";
 
 export type BlogStatus = "archived" | "draft" | "published" | "review";
 
@@ -389,7 +389,7 @@ export async function getPublishedBlogPostLocalePaths(
       from public.blog_posts
       where translation_group_id = ${translationGroupId}
         and status = 'published'
-        and locale in ('en', 'th')
+        and locale = any(${publicLocales}::text[])
     `;
 
     return rows.reduce<Partial<Record<Locale, string>>>((paths, row) => {

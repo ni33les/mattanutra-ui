@@ -10,7 +10,7 @@ import {
   type ParsedDose
 } from "@/lib/dose-conversion";
 import type { FormulationBlueprint, FormulationIngredient, LocalizedText } from "@/lib/formulation-types";
-import type { Locale } from "@/lib/i18n";
+import { resolveLocalizedText, type Locale } from "@/lib/i18n";
 import { productFactAliasKeys, productKeysMatch } from "@/lib/product-recommendations";
 import { createTask, type TaskServiceDb } from "@/lib/task-service";
 
@@ -61,7 +61,7 @@ type SupplementReviewWork = Readonly<{
 }>;
 
 function textFromLocalized(value: LocalizedText) {
-  return typeof value === "string" ? value : value.en || value.th || "";
+  return resolveLocalizedText(value, "en");
 }
 
 function localized(en: string, th = en): LocalizedText {

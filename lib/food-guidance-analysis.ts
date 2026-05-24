@@ -8,7 +8,7 @@ import type {
   PlanChatMessage,
   PlanFeedbackItem
 } from "@/lib/formulation-types";
-import type { Locale } from "@/lib/i18n";
+import { defaultLocale, type Locale } from "@/lib/i18n";
 
 type AnalysisAuditEvent = {
   eventType: string;
@@ -122,6 +122,15 @@ function userPrompt({
   | "previousFormulation"
   | "planId"
 >) {
+  const requiredOutputLocales = [...new Set([defaultLocale, locale])];
+  const localizedExample = (english: string, requestedLocale: string) =>
+    Object.fromEntries(
+      requiredOutputLocales.map((localeCode) => [
+        localeCode,
+        localeCode === defaultLocale ? english : requestedLocale
+      ])
+    );
+
   return JSON.stringify(
     {
       assessment: answers,
@@ -142,23 +151,23 @@ function userPrompt({
               "Seeds | Pulses | Teas | Fermented foods | Fish | Whole grains | Fruit and vegetables | Herbs and spices | Thai staples | Other",
             effectivenessRank:
               "integer starting at 1; 1 is the most effective/highest-impact suggestion for this person",
-            food: {
-              en: "English food or ingredient name",
-              th: "Thai food or ingredient name"
-            },
-            frequency: {
-              en: "short English frequency, e.g. 3-4 times/week",
-              th: "short Thai frequency"
-            },
+            food: localizedExample(
+              "English food or ingredient name",
+              "Requested-locale food or ingredient name"
+            ),
+            frequency: localizedExample(
+              "short English frequency, e.g. 3-4 times/week",
+              "short requested-locale frequency"
+            ),
             id: "stable kebab-case identifier",
-            rationale: {
-              en: "one English sentence explaining the wellness benefit in plain language",
-              th: "one Thai sentence explaining the wellness benefit in plain language"
-            },
-            serving: {
-              en: "short practical serving, e.g. 1 tbsp or 1 small bowl",
-              th: "short practical Thai serving"
-            },
+            rationale: localizedExample(
+              "one English sentence explaining the wellness benefit in plain language",
+              "one requested-locale sentence explaining the wellness benefit in plain language"
+            ),
+            serving: localizedExample(
+              "short practical serving, e.g. 1 tbsp or 1 small bowl",
+              "short practical requested-locale serving"
+            ),
             status: "covered | add | review"
           }
         ]
@@ -169,15 +178,16 @@ function userPrompt({
         "Every item must include id, category, food, serving, frequency, effectivenessRank, status, and rationale.",
         "Set effectivenessRank as a unique integer from 1 to the number of items, where 1 is the most effective/highest-impact food suggestion.",
         "Order foodGuidance by effectivenessRank ascending.",
-        "food, serving, frequency, and rationale must each be localized objects with exactly en and th string values.",
+        `food, serving, frequency, and rationale must each be localized objects including these locale keys: ${requiredOutputLocales.join(", ")}.`,
         "Keep category and status as canonical English values for internal processing.",
         "Use status=review for anything that should be checked before use because of medication, pregnancy, breastfeeding, condition, allergy uncertainty, or digestive sensitivity.",
-        "Return both English and Thai display copy regardless of the requested locale.",
+        "Return English plus the requested locale. Include other locale keys only when they are useful and complete.",
         "When currentPlanContext.planFeedback is present, treat it as client-stated food preferences, avoidances, cuisine preferences, and safety disclosures for this new version.",
         "Do not reintroduce foods the client asked to remove, avoid, or dislikes.",
         "Use previousFoodGuidance only as context; this response must be a fresh full version, not a patch."
       ],
       locale,
+      requiredOutputLocales,
       plan,
       planId
     },
@@ -308,40 +318,33 @@ function readLocalizedText(
 
   if (typeof value === "string" && value.trim()) {
     errors.push(
-      `foodGuidance[${index}].${key} must be an object with en and th strings, not a plain string`
+      `foodGuidance[${index}].${key} must be an object with localized string values, not a plain string`
     );
-    return { en: "", th: "" };
+    return {};
   }
 
   if (!isRecord(value)) {
     errors.push(
-      `foodGuidance[${index}].${key} must be an object with en and th strings`
+      `foodGuidance[${index}].${key} must be an object with localized string values`
     );
-    return { en: "", th: "" };
+    return {};
   }
 
-  const unexpectedKeys = Object.keys(value).filter(
-    (localizedKey) => localizedKey !== "en" && localizedKey !== "th"
+  const entries = Object.fromEntries(
+    Object.entries(value)
+      .filter(([localizedKey, text]) =>
+        /^[a-z]{2}(?:-[A-Z0-9]{2,8})?$/.test(localizedKey) &&
+        typeof text === "string" &&
+        text.trim().length > 0
+      )
+      .map(([localizedKey, text]) => [localizedKey, String(text).trim()])
   );
 
-  if (unexpectedKeys.length > 0) {
-    errors.push(
-      `foodGuidance[${index}].${key} must only include en and th, found: ${unexpectedKeys.join(", ")}`
-    );
+  if (Object.keys(entries).length < 1) {
+    errors.push(`foodGuidance[${index}].${key} requires at least one localized string`);
   }
 
-  const en = readText(value, "en");
-  const th = readText(value, "th");
-
-  if (!en) {
-    errors.push(`foodGuidance[${index}].${key}.en is required`);
-  }
-
-  if (!th) {
-    errors.push(`foodGuidance[${index}].${key}.th is required`);
-  }
-
-  return { en, th };
+  return entries;
 }
 
 function textFromLocalizedCandidate(value: unknown) {
@@ -349,7 +352,9 @@ function textFromLocalizedCandidate(value: unknown) {
     return "";
   }
 
-  return readText(value, "en") || readText(value, "th");
+  return readText(value, "en") || Object.values(value).find(
+    (item): item is string => typeof item === "string" && item.trim().length > 0
+  ) || "";
 }
 
 function validateFoodGuidance(value: unknown) {

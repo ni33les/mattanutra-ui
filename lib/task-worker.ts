@@ -59,6 +59,8 @@ const TASK_BUSINESS_VALUES = {
   reassessment: 200
 } as const;
 const SUCCESSFUL_TASK_REUSE_STATUSES = new Set(["completed", "skipped"]);
+export const PAYMENT_CHECKOUT_PREGENERATION_SOURCE =
+  "payment_checkout_pregeneration" as const;
 
 function businessValueForPlan(plan: AssessmentPlan) {
   return plan === "pro" ? TASK_BUSINESS_VALUES.pro : TASK_BUSINESS_VALUES.precision;
@@ -304,6 +306,110 @@ export async function enqueueNutritionPlanTasks({
     locale,
     plan
   });
+  const existingFormulationRows = await sql<Array<{ exists: boolean }>>`
+    select exists (
+      select 1
+      from public.formulations
+      where plan_id = ${planId}::uuid
+        and (
+          model_version is null
+          or model_version not like '%:example'
+        )
+    ) as exists
+  `;
+  const formulationAlreadyReady = existingFormulationRows[0]?.exists === true;
+
+  if (formulationAlreadyReady) {
+    const productRecommendationTaskId = await enqueueProductRecommendationsTask({
+      plan,
+      planId,
+      source: "paid_plan_adoption"
+    });
+
+    await appendAssessmentVersion(sql, {
+      afterPayload: {
+        completedAt: "coalesce_current_or_now",
+        errorMessage: null,
+        planSelectedAt: "coalesce_current_or_now",
+        queuePosition: 0,
+        selectedPlan: plan,
+        status: "ready"
+      },
+      changeReason: "plan_selected_existing_formulation_adopted",
+      eventPayload: {
+        formulationReady: true,
+        productRecommendationTaskId
+      },
+      eventType: "plan_selection_projection_update",
+      planId,
+      source: "task_worker"
+    });
+
+    await sql`
+      update public.assessments set
+        selected_plan = ${plan},
+        status = 'ready',
+        queue_position = 0,
+        error_message = null,
+        plan_selected_at = coalesce(plan_selected_at, now()),
+        completed_at = coalesce(completed_at, now()),
+        updated_at = now()
+      where plan_id = ${planId}::uuid
+    `;
+
+    return {
+      formulationTaskId: null,
+      productRecommendationTaskId
+    };
+  }
+
+  const activePregenerationRows = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.tasks
+    where plan_id = ${planId}::uuid
+      and task_type = 'generate_supplement_guidance'
+      and context ->> 'source' = ${PAYMENT_CHECKOUT_PREGENERATION_SOURCE}
+      and payload ->> 'plan' = ${plan}
+      and status not in ('completed', 'failed', 'cancelled', 'skipped')
+    order by created_at desc
+    limit 1
+  `;
+  const activePregenerationTaskId = activePregenerationRows[0]?.id ?? null;
+
+  if (activePregenerationTaskId) {
+    await appendAssessmentVersion(sql, {
+      afterPayload: {
+        errorMessage: null,
+        planSelectedAt: "coalesce_current_or_now",
+        queuePosition: "coalesce_current_or_1",
+        selectedPlan: plan,
+        status: "preparing"
+      },
+      changeReason: "plan_selected_active_pregeneration_adopted",
+      eventPayload: {
+        formulationTaskId: activePregenerationTaskId
+      },
+      eventType: "plan_selection_projection_update",
+      planId,
+      source: "task_worker"
+    });
+
+    await sql`
+      update public.assessments set
+        selected_plan = ${plan},
+        status = 'preparing',
+        queue_position = coalesce(queue_position, 1),
+        error_message = null,
+        plan_selected_at = coalesce(plan_selected_at, now()),
+        updated_at = now()
+      where plan_id = ${planId}::uuid
+    `;
+
+    return {
+      formulationTaskId: activePregenerationTaskId
+    };
+  }
+
   const taskGroupId = deterministicUuid(
     `mattanutra:task-group:nutrition-plan:${planId}:${inputHash}`
   );
@@ -353,6 +459,14 @@ export async function enqueueNutritionPlanTasks({
       ) as exists
     `;
     const formulationReady = formulationRows[0]?.exists === true;
+    const productRecommendationTaskId = formulationReady
+      ? await enqueueProductRecommendationsTask({
+          parentTaskId: formulationTaskId,
+          plan,
+          planId,
+          taskGroupId
+        })
+      : null;
 
     await appendAssessmentVersion(sql, {
       afterPayload: {
@@ -368,7 +482,8 @@ export async function enqueueNutritionPlanTasks({
       changeReason: "plan_selected_reused_tasks",
       eventPayload: {
         formulationReady,
-        formulationTaskId
+        formulationTaskId,
+        productRecommendationTaskId
       },
       eventType: "plan_selection_projection_update",
       planId,
@@ -391,7 +506,8 @@ export async function enqueueNutritionPlanTasks({
     `;
 
     return {
-      formulationTaskId
+      formulationTaskId,
+      productRecommendationTaskId
     };
   }
 
@@ -425,6 +541,76 @@ export async function enqueueNutritionPlanTasks({
 
   return {
     formulationTaskId
+  };
+}
+
+export async function enqueuePaymentCheckoutPregenerationTasks({
+  answers,
+  locale,
+  paymentId,
+  plan,
+  planId
+}: Readonly<{
+  answers?: unknown;
+  locale?: unknown;
+  paymentId: string;
+  plan: AssessmentPlan;
+  planId: string;
+}>) {
+  const sql = getSql();
+
+  if (!sql || !isUuid(planId) || !isUuid(paymentId)) {
+    return null;
+  }
+
+  const assessmentRows = await sql`
+    select plan_id
+    from public.assessments
+    where plan_id = ${planId}::uuid
+    limit 1
+  `;
+
+  if (!assessmentRows[0]) {
+    return null;
+  }
+
+  const inputHash = stableHash({
+    answers,
+    locale,
+    paymentId,
+    plan
+  });
+  const taskGroupId = deterministicUuid(
+    `mattanutra:task-group:checkout-pregeneration:${planId}:${paymentId}`
+  );
+  const formulationTaskId = await createWorkTask({
+    actorType: "ai",
+    businessValue: businessValueForPlan(plan),
+    groupLabel: "Prepare plan during checkout",
+    id: deterministicUuid(
+      `mattanutra:task:checkout-pregeneration:formulation:${planId}:${paymentId}:${inputHash}`
+    ),
+    idempotencyKey: `checkout-pregeneration:formulation:${planId}:${plan}:${paymentId}:${inputHash}`,
+    idempotencyScope: "successful",
+    idempotencyScopeKey: `checkout-pregeneration:formulation:${planId}:${plan}:${paymentId}`,
+    payload: {
+      answers,
+      locale,
+      paymentId,
+      plan,
+      pregeneration: true
+    },
+    planId,
+    reasoningEffort: "low",
+    source: PAYMENT_CHECKOUT_PREGENERATION_SOURCE,
+    taskGroupId,
+    taskTitle: "Pre-generate supplement plan",
+    taskType: "generate_supplement_guidance"
+  });
+
+  return {
+    formulationTaskId,
+    taskGroupId
   };
 }
 
@@ -751,13 +937,19 @@ export async function enqueueNutritionReportTask({
 export async function enqueueProductRecommendationsTask({
   forceNew,
   parentTaskId,
+  paymentId,
+  plan,
   planId,
+  source = "product_recommendations",
   stackPreference,
   taskGroupId
 }: Readonly<{
   forceNew?: boolean;
   parentTaskId?: string | null;
+  paymentId?: string | null;
+  plan?: AssessmentPlan | null;
   planId: string;
+  source?: string;
   stackPreference?: ProductStackPreference | null;
   taskGroupId?: string | null;
 }>) {
@@ -865,12 +1057,14 @@ export async function enqueueProductRecommendationsTask({
       matcherAlgorithmVersion,
       matcherImplementationVersion,
       parentTaskId,
+      paymentId,
+      plan,
       row,
       stackPreference: normalizedStackPreference
     },
     planId,
     reasoningEffort: "none",
-    source: "product_recommendations",
+    source,
     taskGroupId: groupId,
     taskTitle: "Match product catalogue",
     taskType: "generate_product_recommendations"

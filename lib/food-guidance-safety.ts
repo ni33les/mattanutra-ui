@@ -13,7 +13,7 @@ import type {
   FoodGuidanceSafetyAction,
   LocalizedText
 } from "@/lib/formulation-types";
-import type { Locale } from "@/lib/i18n";
+import { resolveLocalizedText, type Locale } from "@/lib/i18n";
 import { safetyReviewItemColumnsAvailable } from "@/lib/safety-review-schema";
 import { createTask, type TaskServiceDb } from "@/lib/task-service";
 
@@ -61,7 +61,7 @@ type MatchedFood = FoodRow & {
 type ReviewKind = "condition_review" | "review_required" | "unknown_food";
 
 function textFromLocalized(value: LocalizedText) {
-  return typeof value === "string" ? value : value.en || value.th || "";
+  return resolveLocalizedText(value, "en");
 }
 
 function localized(en: string, th = en): LocalizedText {

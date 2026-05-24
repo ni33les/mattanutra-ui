@@ -10,7 +10,7 @@ import type {
   HealthScoreResult,
   LocalizedHealthScoreText
 } from "@/lib/health-score";
-import type { Locale } from "@/lib/i18n";
+import { resolveLocalizedText, type Locale } from "@/lib/i18n";
 import { buildAssessmentResultsUrl, buildUnsubscribeUrl } from "@/lib/site-url";
 
 function escapeHtml(value: string) {
@@ -26,15 +26,7 @@ function localize(
   value: LocalizedHealthScoreText | LocalizedText | undefined,
   locale: Locale
 ) {
-  if (!value) {
-    return "";
-  }
-
-  if (typeof value === "string") {
-    return value;
-  }
-
-  return value[locale] || value.en || value.th || "";
+  return resolveLocalizedText(value, locale);
 }
 
 function effectivenessRank(

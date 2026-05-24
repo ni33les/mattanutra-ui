@@ -1,14 +1,15 @@
 import {
   localeLabels,
-  locales,
-  type Locale
+  publicLocales,
+  type Locale,
+  type LocaleCode
 } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type LanguageSwitcherProps = Readonly<{
   currentLocale: Locale;
   currentPath: string;
-  localizedPaths?: Partial<Record<Locale, string>>;
+  localizedPaths?: Partial<Record<LocaleCode, string>>;
 }>;
 
 function getLocalizedPath(currentPath: string, locale: Locale) {
@@ -32,7 +33,7 @@ export function LanguageSwitcher({
       aria-label="Language"
       className="flex items-center gap-1 rounded-full border border-[var(--mn-line)] bg-[var(--mn-cream)]/75 p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.55)]"
     >
-      {locales.map((locale) => {
+      {publicLocales.map((locale) => {
         const isActive = locale === currentLocale;
         const next = localizedPaths?.[locale] ?? getLocalizedPath(currentPath, locale);
         const label = localeLabels[locale];

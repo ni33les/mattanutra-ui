@@ -1,5 +1,7 @@
 import type {
   AdminProductFact,
+  AdminProductTranslation,
+  AdminProductTranslationStatus,
   AdminProductRow,
   AdminProductOffer,
   ProductValidationCacheStatus
@@ -25,6 +27,7 @@ import {
 } from "@/lib/product-recommendations";
 import { normalizeDoseUnit, comparableDoseAmount, parseDoseLimit, doseExceedsLimit } from "@/lib/dose-conversion";
 import { validateProduct, validationCacheMismatchReasons } from "@/lib/product-validation";
+import { defaultLocale, resolveLocalizedText } from "@/lib/i18n";
 
 // Pure mapping / transformation functions extracted as part of Sprint 2 god-module split.
 
@@ -228,10 +231,102 @@ export function persistedValidationForRow(row: ProductDbRow) {
   };
 }
 
+function translationStatus(value: unknown): AdminProductTranslationStatus {
+  return value === "complete" || value === "missing" ? value : "draft";
+}
+
+function normalizeTranslations(row: ProductDbRow) {
+  const translations: Record<string, AdminProductTranslation> = {};
+  const raw = row.translations && typeof row.translations === "object"
+    ? row.translations as Record<string, unknown>
+    : {};
+
+  for (const [locale, value] of Object.entries(raw)) {
+    const record = value && typeof value === "object"
+      ? value as Record<string, unknown>
+      : {};
+    const title = typeof record.title === "string" && record.title.trim()
+      ? record.title.trim()
+      : null;
+    const description =
+      typeof record.description === "string" && record.description.trim()
+        ? record.description.trim()
+        : null;
+
+    translations[locale] = {
+      description,
+      locale,
+      status: translationStatus(record.status),
+      title,
+      updatedAt: isoOrNull(
+        typeof record.updatedAt === "string" || record.updatedAt instanceof Date
+          ? record.updatedAt
+          : null
+      )
+    };
+  }
+
+  const legacyRows: Array<{
+    description: string | null;
+    locale: string;
+    title: string | null;
+  }> = [
+    {
+      description: row.description_en ?? row.description,
+      locale: "en",
+      title: row.title_en ?? row.title
+    },
+    {
+      description: row.description_th,
+      locale: "th",
+      title: row.title_th
+    }
+  ];
+
+  for (const legacy of legacyRows) {
+    if (translations[legacy.locale]) {
+      continue;
+    }
+
+    if (!legacy.title && !legacy.description) {
+      continue;
+    }
+
+    translations[legacy.locale] = {
+      description: legacy.description,
+      locale: legacy.locale,
+      status: legacy.title && legacy.description ? "complete" : "draft",
+      title: legacy.title,
+      updatedAt: isoOrNull(row.updated_at)
+    };
+  }
+
+  return translations;
+}
+
 export function rowFromDb(row: ProductDbRow): AdminProductRow {
   const facts = (arrayPayload(row.facts) as FactDbPayload[]).map(normalizeFact);
   const validation = validationForRow(row, facts, row.facts);
   const validationCache = validationCacheStatusForRow(row, validation);
+  const translations = normalizeTranslations(row);
+  const titleMap = Object.fromEntries(
+    Object.entries(translations).map(([locale, translation]) => [
+      locale,
+      translation.title ?? ""
+    ])
+  );
+  const descriptionMap = Object.fromEntries(
+    Object.entries(translations).map(([locale, translation]) => [
+      locale,
+      translation.description ?? ""
+    ])
+  );
+  const displayTitle =
+    resolveLocalizedText(titleMap, defaultLocale) || row.title;
+  const displayDescription =
+    resolveLocalizedText(descriptionMap, defaultLocale) ||
+    row.description ||
+    null;
   const effectiveListStatus =
     row.status === "approved" && validation.status !== "pass"
       ? "pending_review"
@@ -287,6 +382,8 @@ export function rowFromDb(row: ProductDbRow): AdminProductRow {
     description: row.description,
     descriptionEn: row.description_en,
     descriptionTh: row.description_th,
+    displayDescription,
+    displayTitle,
     facts,
     fdaApprovalNumber: row.fda_approval_number,
     id: row.id,
@@ -306,7 +403,11 @@ export function rowFromDb(row: ProductDbRow): AdminProductRow {
             row.title_th,
             row.description,
             row.description_en,
-            row.description_th
+            row.description_th,
+            ...Object.values(translations).flatMap((translation) => [
+              translation.title,
+              translation.description
+            ])
           ) ?? row.product_audience ?? "both",
     importReviewTaskId: row.import_review_task_id,
     importStatus: row.import_status,
@@ -341,6 +442,7 @@ export function rowFromDb(row: ProductDbRow): AdminProductRow {
     title: row.title,
     titleEn: row.title_en,
     titleTh: row.title_th,
+    translations,
     updatedAt: new Date(row.updated_at).toISOString()
   };
 }

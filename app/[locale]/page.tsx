@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { LandingPage } from "@/components/landing-page";
 import { SiteFooter } from "@/components/site-footer";
 import { ServiceIssue } from "@/components/service-issue";
@@ -7,6 +8,7 @@ import { getPublishedBlogPosts } from "@/lib/blog";
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
+import { localizedMetadata } from "@/lib/seo";
 
 type HomeProps = Readonly<{
   params: Promise<{
@@ -19,6 +21,21 @@ export function generateStaticParams() {
 }
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params
+}: HomeProps): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
+  const dictionary = getDictionary(locale);
+
+  return localizedMetadata({
+    description: dictionary.meta.description,
+    locale,
+    path: "/",
+    title: dictionary.meta.title
+  });
+}
 
 export default async function Home({ params }: HomeProps) {
   const { locale: rawLocale } = await params;

@@ -20,7 +20,7 @@ import {
   normalizeDoseUnit,
   parseDoseLimit
 } from "@/lib/dose-conversion";
-import type { Locale } from "@/lib/i18n";
+import { siteLocaleRegistry, type Locale } from "@/lib/i18n";
 import { productFactObservableIssueMessages } from "@/lib/product-validation";
 import { supplementDoseUnits } from "@/lib/supplement-dose-units";
 import type { AdminContent } from "@/components/admin/dashboard-content";
@@ -631,7 +631,8 @@ export function AdminProductsView({
           productUrl: row.productUrl,
           title: row.title,
           titleEn: row.titleEn,
-          titleTh: row.titleTh
+          titleTh: row.titleTh,
+          translations: row.translations
         }),
         headers: {
           "Content-Type": "application/json"
@@ -833,7 +834,8 @@ export function AdminProductsView({
             reviewerNote,
             title: row.title,
             titleEn: row.titleEn,
-            titleTh: row.titleTh
+            titleTh: row.titleTh,
+            translations: row.translations
           }),
           headers: {
             "Content-Type": "application/json"
@@ -1116,6 +1118,71 @@ function ProductModal({
     ? productCountryCodes
     : [manufacturerCountryCodes[0] ?? defaultProductCountryCode];
 
+  function translationFor(locale: string) {
+    return draft.translations?.[locale] ?? {
+      description:
+        locale === "en"
+          ? draft.descriptionEn ?? draft.description
+          : locale === "th"
+            ? draft.descriptionTh
+            : null,
+      locale,
+      status: "missing" as const,
+      title:
+        locale === "en"
+          ? draft.titleEn ?? draft.title
+          : locale === "th"
+            ? draft.titleTh
+            : null,
+      updatedAt: null
+    };
+  }
+
+  function updateTranslation(
+    locale: string,
+    patch: Readonly<{ description?: string | null; title?: string | null }>
+  ) {
+    const current = translationFor(locale);
+    const nextTranslation = {
+      ...current,
+      ...patch
+    };
+    const hasTitle = Boolean(nextTranslation.title?.trim());
+    const hasDescription = Boolean(nextTranslation.description?.trim());
+    const translations = {
+      ...(draft.translations ?? {}),
+      [locale]: {
+        ...nextTranslation,
+        description: nextTranslation.description?.trim() || null,
+        status: hasTitle && hasDescription
+          ? "complete" as const
+          : hasTitle || hasDescription
+            ? "draft" as const
+            : "missing" as const,
+        title: nextTranslation.title?.trim() || null
+      }
+    };
+    const nextDraft: AdminProductRow = {
+      ...draft,
+      translations,
+      ...(locale === "en"
+        ? {
+            description: translations.en?.description ?? draft.description,
+            descriptionEn: translations.en?.description ?? null,
+            titleEn: translations.en?.title ?? null
+          }
+        : {}),
+      ...(locale === "th"
+        ? {
+            descriptionTh: translations.th?.description ?? null,
+            titleTh: translations.th?.title ?? null
+          }
+        : {})
+    };
+
+    setDraft(nextDraft);
+  }
+
   function addManufacturerCountry(countryCode: string) {
     setDraft({
       ...draft,
@@ -1384,34 +1451,28 @@ function ProductModal({
               value={draft.brandName ?? ""}
             />
           </label>
-          <label className="text-sm font-medium text-gray-700">
-            Title EN
-            <input
-              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  titleEn: event.target.value.trim() || null
-                })
-              }
-              type="text"
-              value={draft.titleEn ?? ""}
-            />
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Title TH
-            <input
-              className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  titleTh: event.target.value.trim() || null
-                })
-              }
-              type="text"
-              value={draft.titleTh ?? ""}
-            />
-          </label>
+          {siteLocaleRegistry.map((siteLocale) => {
+            const translation = translationFor(siteLocale.code);
+
+            return (
+              <label
+                className="text-sm font-medium text-gray-700"
+                key={`${siteLocale.code}-title`}
+              >
+                Title {siteLocale.label}
+                <input
+                  className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                  onChange={(event) =>
+                    updateTranslation(siteLocale.code, {
+                      title: event.target.value
+                    })
+                  }
+                  type="text"
+                  value={translation.title ?? ""}
+                />
+              </label>
+            );
+          })}
           <label className="text-sm font-medium text-gray-700">
             Product URL
             <input
@@ -1495,35 +1556,30 @@ function ProductModal({
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium text-gray-700">
-            Description EN
-            <textarea
-              className="min-h-24 resize-y rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-              onChange={(event) => {
-                const value = event.target.value;
+          {siteLocaleRegistry.map((siteLocale) => {
+            const translation = translationFor(siteLocale.code);
 
-                setDraft({
-                  ...draft,
-                  description: value || null,
-                  descriptionEn: value || null
-                });
-              }}
-              value={draft.descriptionEn ?? draft.description ?? ""}
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-medium text-gray-700">
-            Description TH
-            <textarea
-              className="min-h-24 resize-y rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  descriptionTh: event.target.value || null
-                })
-              }
-              value={draft.descriptionTh ?? ""}
-            />
-          </label>
+            return (
+              <label
+                className="grid gap-2 text-sm font-medium text-gray-700"
+                key={`${siteLocale.code}-description`}
+              >
+                Description {siteLocale.label}
+                <textarea
+                  className="min-h-24 resize-y rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                  onChange={(event) =>
+                    updateTranslation(siteLocale.code, {
+                      description: event.target.value
+                    })
+                  }
+                  value={translation.description ?? ""}
+                />
+                <span className="text-xs font-normal text-gray-500">
+                  {siteLocale.nativeLabel} · {translation.status}
+                </span>
+              </label>
+            );
+          })}
         </div>
 
         <div className="mt-5">

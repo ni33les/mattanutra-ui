@@ -62,6 +62,40 @@ function countryCodesFromBody(value: unknown) {
     : [];
 }
 
+function translationsFromBody(value: unknown) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([locale, item]) => {
+        const record =
+          item && typeof item === "object" && !Array.isArray(item)
+            ? item as Record<string, unknown>
+            : {};
+        const status = record.status === "complete" ||
+          record.status === "missing"
+          ? record.status
+          : "draft";
+
+        return [
+          locale,
+          {
+            description: textOrNull(record.description, 4000),
+            status,
+            title: textOrNull(record.title, 500)
+          }
+        ] as const;
+      })
+      .filter(([locale]) => /^[a-z]{2}(?:-[A-Z0-9]{2,8})?$/.test(locale))
+  );
+}
+
 function parseProductKind(value: unknown): ProductKind | undefined {
   const normalized = normalizedKey(value);
 
@@ -205,7 +239,8 @@ export async function PATCH(
       productUrl,
       title,
       titleEn: body.titleEn === undefined ? undefined : textOrNull(body.titleEn, 500),
-      titleTh: body.titleTh === undefined ? undefined : textOrNull(body.titleTh, 500)
+      titleTh: body.titleTh === undefined ? undefined : textOrNull(body.titleTh, 500),
+      translations: translationsFromBody(body.translations)
     });
     const rows = body.manufacturerCountryCodes !== undefined && row.brandId
       ? await loadAdminProductRowsForBrand(row.brandId)

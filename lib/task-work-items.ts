@@ -45,6 +45,7 @@ import {
   buildReassessmentEmailSubject
 } from "@/lib/reassessment-email";
 import type { TaskRecord } from "@/lib/task-service";
+import { PAYMENT_CHECKOUT_PREGENERATION_SOURCE } from "@/lib/task-worker";
 
 const EMPTY_FOOD_GUIDANCE: FoodGuidanceBlueprint = {
   foodGuidance: []
@@ -386,6 +387,21 @@ async function buildHealthScoreWorkItem(task: TaskRecord) {
   } satisfies HealthScoreWorkItem;
 }
 
+function taskSource(task: TaskRecord) {
+  const payload = payloadRecord(task.payload);
+  const context = payloadRecord(task.context);
+
+  return payloadText(payload, "source") || payloadText(context, "source");
+}
+
+function taskPlanOverride(task: TaskRecord): AssessmentPlan | null {
+  const payloadPlan = payloadText(task.payload, "plan");
+
+  return payloadPlan === "pro" || payloadPlan === "precision"
+    ? payloadPlan
+    : null;
+}
+
 async function buildFormulationWorkItem(task: TaskRecord) {
   const sql = getSql();
 
@@ -393,11 +409,13 @@ async function buildFormulationWorkItem(task: TaskRecord) {
     throw new Error("Formulation work item is missing a plan");
   }
   const [context, canonicalSupplements] = await Promise.all([
-    loadPlanGenerationContext(sql, task.planId),
+    loadPlanGenerationContext(sql, task.planId, taskPlanOverride(task)),
     loadCanonicalSupplementOptions(sql)
   ]);
+  const isCheckoutPregeneration =
+    taskSource(task) === PAYMENT_CHECKOUT_PREGENERATION_SOURCE;
 
-  if (task.taskType === "generate_supplement_guidance") {
+  if (task.taskType === "generate_supplement_guidance" && !isCheckoutPregeneration) {
     await appendAssessmentVersion(sql, {
       actor: task.reservedByAgentId,
       afterPayload: {
@@ -620,7 +638,11 @@ function mapChatMessage(row: Record<string, unknown>) {
   } satisfies PlanChatMessage;
 }
 
-async function loadPlanGenerationContext(sql: NonNullable<ReturnType<typeof getSql>>, planId: string) {
+async function loadPlanGenerationContext(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  planId: string,
+  planOverride?: AssessmentPlan | null
+) {
   const rows = await sql`
     select
       assessments.answers,
@@ -712,7 +734,7 @@ async function loadPlanGenerationContext(sql: NonNullable<ReturnType<typeof getS
     formulation,
     guidanceAdjustments,
     locale: isLocale(row.locale) ? row.locale : "en",
-    plan: normalizeAssessmentPlan(row.selected_plan),
+    plan: planOverride ?? normalizeAssessmentPlan(row.selected_plan),
     planFeedback,
     planId
   };
@@ -798,7 +820,7 @@ async function buildNutritionAdvisorContext(task: TaskRecord) {
     throw new Error("Nutrition advisor work item is missing a plan");
   }
 
-  return loadPlanGenerationContext(sql, task.planId);
+  return loadPlanGenerationContext(sql, task.planId, taskPlanOverride(task));
 }
 
 async function buildNutritionPlanChatWorkItem(task: TaskRecord) {

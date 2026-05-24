@@ -14,6 +14,7 @@ import type {
   RecommendedProduct
 } from "@/lib/formulation-types";
 import type { ValidationResult } from "@/lib/product-validation";
+import { resolveLocalizedText } from "@/lib/i18n";
 
 export type ProductStatus =
   | "approved"
@@ -506,7 +507,7 @@ export function productKeysMatch(
 }
 
 function textValue(value: LocalizedText) {
-  return typeof value === "string" ? value : value.en || value.th;
+  return resolveLocalizedText(value, "en");
 }
 
 function safePercent(value: number) {

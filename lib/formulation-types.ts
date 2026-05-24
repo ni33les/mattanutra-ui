@@ -1,3 +1,5 @@
+import type { LocaleCode } from "@/lib/i18n";
+
 export type FormulationStatus = "covered" | "add" | "review";
 export type FormulationSafetyAction =
   | "dose_reduced"
@@ -11,12 +13,7 @@ export type FoodGuidanceSafetyAction =
   | "human_review"
   | "unknown_food";
 
-export type LocalizedText =
-  | string
-  | {
-      en: string;
-      th: string;
-    };
+export type LocalizedText = string | Record<LocaleCode, string>;
 
 export type FormulationCaution = {
   body: LocalizedText;

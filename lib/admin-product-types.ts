@@ -64,6 +64,16 @@ export type AdminProductOffer = Readonly<{
   url: string;
 }>;
 
+export type AdminProductTranslationStatus = "complete" | "draft" | "missing";
+
+export type AdminProductTranslation = Readonly<{
+  description: string | null;
+  locale: string;
+  status: AdminProductTranslationStatus;
+  title: string | null;
+  updatedAt: string | null;
+}>;
+
 export type AdminProductRow = Readonly<{
   affiliateStatus: ProductAffiliateStatus;
   aiCorrectionNotes: string | null;
@@ -77,6 +87,8 @@ export type AdminProductRow = Readonly<{
   description: string | null;
   descriptionEn: string | null;
   descriptionTh: string | null;
+  displayDescription: string | null;
+  displayTitle: string;
   facts: AdminProductFact[];
   fdaApprovalNumber: string | null;
   id: string;
@@ -114,6 +126,7 @@ export type AdminProductRow = Readonly<{
   title: string;
   titleEn: string | null;
   titleTh: string | null;
+  translations: Record<string, AdminProductTranslation>;
   updatedAt: string;
 }>;
 
@@ -244,6 +257,7 @@ export type ProductDbRow = Readonly<{
   title: string;
   title_en: string | null;
   title_th: string | null;
+  translations: unknown;
   updated_at: Date | string;
 }>;
 

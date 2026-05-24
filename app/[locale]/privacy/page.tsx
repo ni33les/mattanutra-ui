@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { getLegalContent } from "@/lib/legal-content";
+import { localizedMetadata } from "@/lib/seo";
 
 type PrivacyPageProps = Readonly<{
   params: Promise<{
@@ -23,10 +24,12 @@ export async function generateMetadata({
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
   const content = getLegalContent(locale, "privacy");
 
-  return {
-    title: `MattaNutra | ${content.title}`,
-    description: content.intro
-  };
+  return localizedMetadata({
+    description: content.intro,
+    locale,
+    path: "/privacy",
+    title: `MattaNutra | ${content.title}`
+  });
 }
 
 export default async function PrivacyPage({ params }: PrivacyPageProps) {

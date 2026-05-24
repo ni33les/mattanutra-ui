@@ -16,7 +16,7 @@ import type {
   LocalizedHealthScoreText
 } from "@/lib/health-score";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
-import type { Locale } from "@/lib/i18n";
+import { resolveLocalizedText, type Locale } from "@/lib/i18n";
 import { paymentCheckoutPath } from "@/lib/payment-paths";
 import { cx } from "@/components/nutrition-flow/ui";
 
@@ -249,15 +249,7 @@ export function localizeHealthScoreText(
   value: LocalizedHealthScoreText | undefined,
   locale: Locale
 ) {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (!value) {
-    return "";
-  }
-
-  return value[locale] || value.en || value.th || "";
+  return resolveLocalizedText(value, locale);
 }
 
 function HealthScoreAdvice({

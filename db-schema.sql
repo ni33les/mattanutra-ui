@@ -60,6 +60,7 @@ drop table if exists
   public.product_brand_countries,
   public.product_brands,
   public.product_countries,
+  public.product_import_translations,
   public.product_fact_versions,
   public.product_facts,
   public.product_import_runs,
@@ -67,11 +68,13 @@ drop table if exists
   public.product_offers,
   public.product_recommendation_items,
   public.product_recommendation_runs,
+  public.product_translations,
   public.product_versions,
   public.products,
   public.rays,
   public.recommendations,
   public.safety_reviews,
+  public.site_locales,
   public.stripe_webhook_events,
   public.supplement_admin_audit,
   public.supplement_alias_events,
@@ -335,6 +338,33 @@ CREATE TABLE public.ai_response_cache (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+--
+-- Name: site_locales; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.site_locales (
+    code text PRIMARY KEY,
+    label text NOT NULL,
+    native_label text NOT NULL,
+    html_lang text NOT NULL,
+    direction text DEFAULT 'ltr'::text NOT NULL,
+    fallback_locale text REFERENCES public.site_locales(code),
+    is_public boolean DEFAULT false NOT NULL,
+    is_indexable boolean DEFAULT false NOT NULL,
+    sort_order integer DEFAULT 100 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT site_locales_code_check CHECK ((code ~ '^[a-z]{2}(-[A-Z0-9]{2,8})?$'::text)),
+    CONSTRAINT site_locales_direction_check CHECK ((direction = ANY (ARRAY['ltr'::text, 'rtl'::text])))
+);
+
+
+--
+-- Name: TABLE site_locales; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.site_locales IS 'Publish-gated locale registry used for public routing, SEO, and scalable admin translation fields.';
+
 
 --
 -- Name: assessment_example_requests; Type: TABLE; Schema: public; Owner: -
@@ -344,7 +374,7 @@ CREATE TABLE public.assessment_example_requests (
     id uuid NOT NULL,
     plan_id uuid NOT NULL,
     email text NOT NULL,
-    locale text DEFAULT 'en'::text NOT NULL,
+    locale text DEFAULT 'en'::text NOT NULL REFERENCES public.site_locales(code),
     status text DEFAULT 'requested'::text NOT NULL,
     health_score jsonb DEFAULT '{}'::jsonb NOT NULL,
     formulation_status text DEFAULT 'not_started'::text NOT NULL,
@@ -355,7 +385,6 @@ CREATE TABLE public.assessment_example_requests (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT assessment_example_requests_food_guidance_status_check CHECK ((food_guidance_status = ANY (ARRAY['not_started'::text, 'queued'::text, 'ready'::text, 'failed'::text]))),
     CONSTRAINT assessment_example_requests_formulation_status_check CHECK ((formulation_status = ANY (ARRAY['not_started'::text, 'queued'::text, 'ready'::text, 'failed'::text]))),
-    CONSTRAINT assessment_example_requests_locale_check CHECK ((locale = ANY (ARRAY['en'::text, 'th'::text]))),
     CONSTRAINT assessment_example_requests_status_check CHECK ((status = ANY (ARRAY['requested'::text, 'formulation_queued'::text, 'formulation_ready'::text, 'email_queued'::text, 'email_rendered'::text, 'email_sent'::text, 'failed'::text])))
 );
 
@@ -392,7 +421,7 @@ COMMENT ON TABLE public.assessment_versions IS 'Append-only assessment source-of
 
 CREATE TABLE public.assessments (
     plan_id uuid NOT NULL,
-    locale text DEFAULT 'en'::text NOT NULL,
+    locale text DEFAULT 'en'::text NOT NULL REFERENCES public.site_locales(code),
     selected_plan public.assessment_plan,
     status public.assessment_status DEFAULT 'captured'::public.assessment_status NOT NULL,
     answers jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -404,8 +433,7 @@ CREATE TABLE public.assessments (
     plan_selected_at timestamp with time zone,
     processing_started_at timestamp with time zone,
     completed_at timestamp with time zone,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT assessments_locale_check CHECK ((locale = ANY (ARRAY['en'::text, 'th'::text])))
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -416,7 +444,7 @@ CREATE TABLE public.assessments (
 CREATE TABLE public.blog_posts (
     id uuid NOT NULL,
     translation_group_id uuid NOT NULL,
-    locale text DEFAULT 'en'::text NOT NULL,
+    locale text DEFAULT 'en'::text NOT NULL REFERENCES public.site_locales(code),
     slug text NOT NULL,
     status text DEFAULT 'draft'::text NOT NULL,
     title text NOT NULL,
@@ -440,7 +468,6 @@ CREATE TABLE public.blog_posts (
     published_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT blog_posts_locale_check CHECK ((locale = ANY (ARRAY['en'::text, 'th'::text]))),
     CONSTRAINT blog_posts_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'review'::text, 'published'::text, 'archived'::text])))
 );
 
@@ -461,7 +488,7 @@ CREATE TABLE public.bpm (
     severity text DEFAULT 'low'::text NOT NULL,
     actor_type text DEFAULT 'visitor'::text NOT NULL,
     emitted_by text,
-    locale text,
+    locale text REFERENCES public.site_locales(code),
     selected_plan public.assessment_plan,
     email_hash text,
     ip_hash text,
@@ -509,7 +536,6 @@ CREATE TABLE public.bpm (
     CONSTRAINT bpm_actor_type_check CHECK ((actor_type = ANY (ARRAY['visitor'::text, 'system'::text, 'worker'::text, 'admin'::text, 'openclaw'::text]))),
     CONSTRAINT bpm_event_type_check CHECK ((event_type = ANY (ARRAY['traffic'::text, 'content'::text, 'funnel'::text, 'plan'::text, 'payment'::text, 'email'::text, 'chat'::text, 'formulation'::text, 'reassessment'::text, 'affiliate'::text, 'safety'::text, 'error'::text, 'system'::text]))),
     CONSTRAINT bpm_health_score_check CHECK (((health_score IS NULL) OR ((health_score >= 0) AND (health_score <= 100)))),
-    CONSTRAINT bpm_locale_check CHECK (((locale IS NULL) OR (locale = ANY (ARRAY['en'::text, 'th'::text])))),
     CONSTRAINT bpm_severity_check CHECK ((severity = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text, 'critical'::text])))
 );
 
@@ -987,7 +1013,7 @@ CREATE TABLE public.payments (
     id uuid NOT NULL,
     plan_id uuid,
     selected_plan public.assessment_plan NOT NULL,
-    locale text DEFAULT 'en'::text NOT NULL,
+    locale text DEFAULT 'en'::text NOT NULL REFERENCES public.site_locales(code),
     source_surface text DEFAULT 'healthscore'::text NOT NULL,
     status text DEFAULT 'created'::text NOT NULL,
     amount bigint NOT NULL,
@@ -1008,7 +1034,6 @@ CREATE TABLE public.payments (
     CONSTRAINT payments_amount_check CHECK ((amount > 0)),
     CONSTRAINT payments_amount_unit_check CHECK ((amount_unit = 'micros'::text)),
     CONSTRAINT payments_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
-    CONSTRAINT payments_locale_check CHECK ((locale = ANY (ARRAY['en'::text, 'th'::text]))),
     CONSTRAINT payments_source_surface_check CHECK ((source_surface = ANY (ARRAY['landing'::text, 'healthscore'::text]))),
     CONSTRAINT payments_status_check CHECK ((status = ANY (ARRAY['created'::text, 'checkout_session_created'::text, 'checkout_opened'::text, 'processing'::text, 'paid'::text, 'failed'::text, 'cancelled'::text, 'expired'::text, 'fulfillment_failed'::text, 'bound'::text]))),
     CONSTRAINT payments_stripe_mode_check CHECK ((stripe_mode = ANY (ARRAY['test'::text, 'live'::text, 'mock'::text])))
@@ -1278,6 +1303,32 @@ CREATE TABLE public.product_imports (
 
 
 --
+-- Name: product_import_translations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_import_translations (
+    import_id uuid NOT NULL,
+    locale text NOT NULL REFERENCES public.site_locales(code),
+    title text,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    source text DEFAULT 'importer'::text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_import_translations_pkey PRIMARY KEY (import_id, locale),
+    CONSTRAINT product_import_translations_status_check CHECK ((status = ANY (ARRAY['complete'::text, 'draft'::text, 'missing'::text])))
+);
+
+
+--
+-- Name: TABLE product_import_translations; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.product_import_translations IS 'Locale-scalable translated copy projection for staged product import evidence.';
+
+
+--
 -- Name: product_offers; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1457,6 +1508,32 @@ CREATE TABLE public.products (
     CONSTRAINT products_status_check CHECK ((status = ANY (ARRAY['approved'::text, 'ignored'::text, 'pending_review'::text]))),
     CONSTRAINT products_validation_status_check CHECK ((validation_status = ANY (ARRAY['failed'::text, 'needs_review'::text, 'pass'::text])))
 );
+
+
+--
+-- Name: product_translations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_translations (
+    product_id uuid NOT NULL,
+    locale text NOT NULL REFERENCES public.site_locales(code),
+    title text,
+    description text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    source text DEFAULT 'admin'::text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_translations_pkey PRIMARY KEY (product_id, locale),
+    CONSTRAINT product_translations_status_check CHECK ((status = ANY (ARRAY['complete'::text, 'draft'::text, 'missing'::text])))
+);
+
+
+--
+-- Name: TABLE product_translations; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.product_translations IS 'Locale-scalable product title and description projection. Legacy title_en/title_th columns are compatibility fields.';
 
 
 --
@@ -1908,7 +1985,7 @@ COMMENT ON COLUMN public.tasks.reasoning_effort IS 'Declared reasoning level for
 
 CREATE TABLE public.testimonials (
     id uuid NOT NULL,
-    locale text DEFAULT 'en'::text NOT NULL,
+    locale text DEFAULT 'en'::text NOT NULL REFERENCES public.site_locales(code),
     status text DEFAULT 'published'::text NOT NULL,
     quote text NOT NULL,
     author_name text NOT NULL,
@@ -1921,7 +1998,6 @@ CREATE TABLE public.testimonials (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT testimonials_locale_check CHECK ((locale = ANY (ARRAY['en'::text, 'th'::text]))),
     CONSTRAINT testimonials_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'review'::text, 'published'::text, 'archived'::text])))
 );
 
@@ -3224,6 +3300,13 @@ CREATE INDEX product_imports_status_idx ON public.product_imports USING btree (s
 
 
 --
+-- Name: product_import_translations_locale_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX product_import_translations_locale_idx ON public.product_import_translations USING btree (locale, status);
+
+
+--
 -- Name: product_offers_priority_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3298,6 +3381,13 @@ CREATE UNIQUE INDEX products_platform_identifier_idx ON public.products USING bt
 --
 
 CREATE INDEX products_status_idx ON public.products USING btree (status, availability_status, label_status, updated_at DESC);
+
+
+--
+-- Name: product_translations_locale_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX product_translations_locale_idx ON public.product_translations USING btree (locale, status);
 
 
 --
@@ -4069,6 +4159,14 @@ ALTER TABLE ONLY public.product_imports
 
 
 --
+-- Name: product_import_translations product_import_translations_import_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_import_translations
+    ADD CONSTRAINT product_import_translations_import_id_fkey FOREIGN KEY (import_id) REFERENCES public.product_imports(id) ON DELETE CASCADE;
+
+
+--
 -- Name: product_offers product_offers_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4114,6 +4212,14 @@ ALTER TABLE ONLY public.product_recommendation_runs
 
 ALTER TABLE ONLY public.product_recommendation_runs
     ADD CONSTRAINT product_recommendation_runs_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.tasks(id) ON DELETE SET NULL;
+
+
+--
+-- Name: product_translations product_translations_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_translations
+    ADD CONSTRAINT product_translations_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
 
 
 --
@@ -4351,5 +4457,3 @@ ALTER TABLE ONLY public.worker_sessions
 --
 -- PostgreSQL database dump complete
 --
-
-

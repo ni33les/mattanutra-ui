@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { HealthspanLogo } from "@/components/healthspan-logo";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import type { Locale } from "@/lib/i18n";
+import type { Locale, LocaleCode } from "@/lib/i18n";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
 
 type TitleBarProps = Readonly<{
   currentLocale: Locale;
   currentPath?: string;
-  localizedPaths?: Partial<Record<Locale, string>>;
+  localizedPaths?: Partial<Record<LocaleCode, string>>;
   title: string;
 }>;
 

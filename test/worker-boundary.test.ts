@@ -317,6 +317,28 @@ describe("external worker boundaries", () => {
     );
   });
 
+  it("keeps checkout pre-generation hidden until paid selection is adopted", async () => {
+    const taskWorker = await readFile("lib/task-worker.ts", "utf8");
+    const workItems = await readFile("lib/task-work-items.ts", "utf8");
+    const applier = await readFile("lib/task-result-applier.ts", "utf8");
+
+    assert.match(
+      taskWorker,
+      /PAYMENT_CHECKOUT_PREGENERATION_SOURCE/,
+      "checkout pre-generation should use a distinct task source"
+    );
+    assert.match(
+      workItems,
+      /!isCheckoutPregeneration[\s\S]*assessment_status_projection_update/,
+      "checkout pre-generation formulation tasks must not mark unpaid assessments preparing"
+    );
+    assert.match(
+      applier,
+      /isCheckoutPregeneration[\s\S]*return;/,
+      "checkout pre-generation completion must leave customer visibility gated until payment adoption"
+    );
+  });
+
   it("keeps worker execution modules free of static platform imports", async () => {
     const workerExecutionFiles = [
       "lib/finance-ledger.ts",

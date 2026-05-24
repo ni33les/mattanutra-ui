@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { defaultLocale, isLocale } from "@/lib/i18n";
+import { defaultLocale, isPublicLocale } from "@/lib/i18n";
 
 const oneYear = 60 * 60 * 24 * 365;
 
@@ -27,7 +27,7 @@ function stripInternalSearchParams(path: string) {
 export function GET(request: NextRequest) {
   const url = request.nextUrl;
   const requestedLocale = url.searchParams.get("locale") || defaultLocale;
-  const locale = isLocale(requestedLocale) ? requestedLocale : defaultLocale;
+  const locale = isPublicLocale(requestedLocale) ? requestedLocale : defaultLocale;
   const requestedNextPath = url.searchParams.get("next");
   const safeNextPath =
     requestedNextPath?.startsWith("/") && !requestedNextPath.startsWith("//")

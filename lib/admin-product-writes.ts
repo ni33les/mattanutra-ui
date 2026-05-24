@@ -196,6 +196,132 @@ async function replaceProductFacts(
   `;
 }
 
+function normalizedTranslationEntries(input: Readonly<{
+  description?: string | null;
+  descriptionEn?: string | null;
+  descriptionTh?: string | null;
+  title?: string | null;
+  titleEn?: string | null;
+  titleTh?: string | null;
+  translations?: CreateAdminProductInput["translations"] | UpdateAdminProductInput["translations"];
+}>) {
+  const translations = new Map<string, {
+    description: string | null;
+    status: "complete" | "draft" | "missing";
+    title: string | null;
+  }>();
+
+  for (const [locale, value] of Object.entries(input.translations ?? {})) {
+    if (!/^[a-z]{2}(?:-[A-Z0-9]{2,8})?$/.test(locale)) {
+      continue;
+    }
+
+    const title = cleanNullableText(value.title, 500);
+    const description = cleanNullableText(value.description, 4000);
+    const status = value.status === "complete" || value.status === "missing"
+      ? value.status
+      : title && description
+        ? "complete"
+        : title || description
+          ? "draft"
+          : "missing";
+
+    translations.set(locale, {
+      description,
+      status,
+      title
+    });
+  }
+
+  const legacy: Array<[string, string | null | undefined, string | null | undefined]> = [
+    ["en", input.titleEn ?? input.title, input.descriptionEn ?? input.description],
+    ["th", input.titleTh, input.descriptionTh]
+  ];
+
+  for (const [locale, legacyTitle, legacyDescription] of legacy) {
+    if (translations.has(locale)) {
+      continue;
+    }
+
+    const title = cleanNullableText(legacyTitle, 500);
+    const description = cleanNullableText(legacyDescription, 4000);
+
+    if (!title && !description) {
+      continue;
+    }
+
+    translations.set(locale, {
+      description,
+      status: title && description ? "complete" : "draft",
+      title
+    });
+  }
+
+  return [...translations].map(([locale, value]) => ({
+    locale,
+    ...value
+  }));
+}
+
+async function replaceProductTranslations(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  productId: string,
+  input: Readonly<{
+    description?: string | null;
+    descriptionEn?: string | null;
+    descriptionTh?: string | null;
+    source?: string | null;
+    title?: string | null;
+    titleEn?: string | null;
+    titleTh?: string | null;
+    translations?: CreateAdminProductInput["translations"] | UpdateAdminProductInput["translations"];
+  }>
+) {
+  const translations = normalizedTranslationEntries(input);
+
+  if (translations.length < 1) {
+    return;
+  }
+
+  await sql`
+    with translation_rows as (
+      select *
+      from jsonb_to_recordset(${sql.json(toJsonValue(translations))}::jsonb) as translation(
+        locale text,
+        title text,
+        description text,
+        status text
+      )
+    )
+    insert into public.product_translations (
+      product_id,
+      locale,
+      title,
+      description,
+      status,
+      source,
+      updated_at,
+      created_at
+    )
+    select
+      ${productId}::uuid,
+      translation_rows.locale,
+      translation_rows.title,
+      translation_rows.description,
+      translation_rows.status,
+      ${input.source ?? "admin"},
+      now(),
+      now()
+    from translation_rows
+    on conflict (product_id, locale) do update set
+      title = coalesce(excluded.title, product_translations.title),
+      description = coalesce(excluded.description, product_translations.description),
+      status = excluded.status,
+      source = excluded.source,
+      updated_at = excluded.updated_at
+  `;
+}
+
 async function recordProductVersion(
   sql: NonNullable<ReturnType<typeof getSql>>,
   input: Readonly<{
@@ -286,11 +412,30 @@ async function recordProductVersion(
         next_product.source_snapshot,
         jsonb_build_object(
           'product', to_jsonb(next_product),
-          'facts', coalesce(fact_rows.facts, '[]'::jsonb)
+          'facts', coalesce(fact_rows.facts, '[]'::jsonb),
+          'translations', coalesce(translation_rows.translations, '{}'::jsonb)
         ),
         '{}'::jsonb,
         now()
       from next_product
+      left join lateral (
+        select coalesce(
+          jsonb_object_agg(
+            product_translations.locale,
+            jsonb_build_object(
+              'locale', product_translations.locale,
+              'title', product_translations.title,
+              'description', product_translations.description,
+              'status', product_translations.status,
+              'updatedAt', product_translations.updated_at
+            )
+            order by product_translations.locale
+          ),
+          '{}'::jsonb
+        ) as translations
+        from public.product_translations
+        where product_translations.product_id = next_product.id
+      ) translation_rows on true
       left join lateral (
         select coalesce(
           jsonb_agg(
@@ -891,7 +1036,8 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
     ...(titleEn ? { titleEn } : {}),
     ...(titleTh ? { titleTh } : {}),
     ...(descriptionEn ? { descriptionEn } : {}),
-    ...(descriptionTh ? { descriptionTh } : {})
+    ...(descriptionTh ? { descriptionTh } : {}),
+    ...(input.translations ? { translations: input.translations } : {})
   };
 
   if (!title || !productUrl) {
@@ -973,8 +1119,6 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       product_url,
       normalized_url,
       description,
-      title_en,
-      title_th,
       fda_approval_number,
       source_url,
       source_snapshot,
@@ -1003,8 +1147,6 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       ${productUrl},
       ${normalizedUrl(productUrl)},
       ${description},
-      ${titleEn},
-      ${titleTh},
       ${cleanNullableText(input.fdaApprovalNumber, 100)},
       ${cleanNullableText(input.sourceUrl) ?? productUrl},
       ${sql.json(toJsonValue(sourceSnapshot))}::jsonb,
@@ -1029,8 +1171,6 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       normalized_brand_name = excluded.normalized_brand_name,
       image_url = coalesce(excluded.image_url, products.image_url),
       description = coalesce(excluded.description, products.description),
-      title_en = coalesce(excluded.title_en, products.title_en),
-      title_th = coalesce(excluded.title_th, products.title_th),
       fda_approval_number = coalesce(excluded.fda_approval_number, products.fda_approval_number),
       source_url = coalesce(excluded.source_url, products.source_url),
       source_snapshot = products.source_snapshot || excluded.source_snapshot,
@@ -1052,27 +1192,17 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
 	  }
 
 	  await replaceProductCountryCodes(sql, productId, productCountryCodes);
-	
-	  if (descriptionEn || descriptionTh) {
-    try {
-      await sql`
-        update public.products
-        set
-          description_en = coalesce(${descriptionEn}, description_en),
-          description_th = coalesce(${descriptionTh}, description_th),
-          updated_at = now()
-        where id = ${productId}::uuid
-      `;
-    } catch (error) {
-      const code = error && typeof error === "object"
-        ? (error as { code?: string }).code
-        : null;
 
-      if (code !== "42703") {
-        throw error;
-      }
-    }
-  }
+  await replaceProductTranslations(sql, productId, {
+    description,
+    descriptionEn,
+    descriptionTh,
+    source: input.source ?? "admin",
+    title,
+    titleEn,
+    titleTh,
+    translations: input.translations
+  });
 
   if (input.replaceFacts || facts.length > 0) {
     const factSource = input.source?.trim() || "admin";
@@ -1213,7 +1343,8 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
     ...(input.titleEn !== undefined ? { titleEn } : {}),
     ...(input.titleTh !== undefined ? { titleTh } : {}),
     ...(input.descriptionEn !== undefined ? { descriptionEn } : {}),
-    ...(input.descriptionTh !== undefined ? { descriptionTh } : {})
+    ...(input.descriptionTh !== undefined ? { descriptionTh } : {}),
+    ...(input.translations !== undefined ? { translations: input.translations } : {})
   };
   let brandRows: Array<{ id: string }> = [];
 
@@ -1300,9 +1431,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	      effectiveBrandName
 	    );
 	  }
-	  const titleParam = title ?? null;
-  const titleEnParam = titleEn ?? null;
-  const titleThParam = titleTh ?? null;
+  const titleParam = title ?? null;
   const brandNameParam = brandName ?? null;
   const normalizedBrandNameParam = normalizedBrandName ?? null;
   const brandIdParam = brandId ?? null;
@@ -1319,14 +1448,6 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
       normalized_title = case
         when ${input.title === undefined} then normalized_title
         else ${normalizeProductKey(titleParam ?? "")}
-      end,
-      title_en = case
-        when ${input.titleEn === undefined} then title_en
-        else ${titleEnParam}
-      end,
-      title_th = case
-        when ${input.titleTh === undefined} then title_th
-        else ${titleThParam}
       end,
       brand_id = case
         when ${input.brandName === undefined} then brand_id
@@ -1390,6 +1511,27 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	    await replaceProductCountryCodes(sql, input.id, productCountryCodes);
 	  }
 
+  if (
+    input.translations !== undefined ||
+    input.titleEn !== undefined ||
+    input.titleTh !== undefined ||
+    input.descriptionEn !== undefined ||
+    input.descriptionTh !== undefined ||
+    input.title !== undefined ||
+    input.description !== undefined
+  ) {
+    await replaceProductTranslations(sql, input.id, {
+      description: input.description,
+      descriptionEn,
+      descriptionTh,
+      source: "admin",
+      title,
+      titleEn,
+      titleTh,
+      translations: input.translations
+    });
+  }
+
 	  if (manufacturerCountriesChanged && effectiveBrandId) {
 	    await reconcileProductsForBrandCountryCodes(
 	      sql,
@@ -1397,33 +1539,6 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	      manufacturerCountryCodes
 	    );
 	  }
-		
-	  if (input.descriptionEn !== undefined || input.descriptionTh !== undefined) {
-    try {
-      await sql`
-        update public.products
-        set
-          description_en = case
-            when ${input.descriptionEn === undefined} then description_en
-            else ${descriptionEn}
-          end,
-          description_th = case
-            when ${input.descriptionTh === undefined} then description_th
-            else ${descriptionTh}
-          end,
-          updated_at = now()
-        where id = ${input.id}::uuid
-      `;
-    } catch (error) {
-      const code = error && typeof error === "object"
-        ? (error as { code?: string }).code
-        : null;
-
-      if (code !== "42703") {
-        throw error;
-      }
-    }
-  }
 
   const validation = await refreshAndPersistProductValidation(sql, input.id);
 
@@ -1479,6 +1594,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
         title: input.title,
         titleEn: input.titleEn,
         titleTh: input.titleTh,
+        translations: input.translations,
         version
       })}::jsonb
     )

@@ -6,6 +6,33 @@
 
 begin;
 
+insert into public.site_locales (
+  code,
+  label,
+  native_label,
+  html_lang,
+  direction,
+  fallback_locale,
+  is_public,
+  is_indexable,
+  sort_order,
+  created_at,
+  updated_at
+)
+values
+  ('en', 'EN', 'English', 'en', 'ltr', null, true, true, 10, now(), now()),
+  ('th', 'TH', 'ไทย', 'th', 'ltr', 'en', true, true, 20, now(), now())
+on conflict (code) do update set
+  label = excluded.label,
+  native_label = excluded.native_label,
+  html_lang = excluded.html_lang,
+  direction = excluded.direction,
+  fallback_locale = excluded.fallback_locale,
+  is_public = excluded.is_public,
+  is_indexable = excluded.is_indexable,
+  sort_order = excluded.sort_order,
+  updated_at = now();
+
 insert into public.agents (
   id,
   name,

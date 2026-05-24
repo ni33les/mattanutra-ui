@@ -44,12 +44,14 @@ import type {
 } from "@/lib/formulation-types";
 import type { HealthScoreResult } from "@/lib/health-score";
 import { isLocale, type Locale } from "@/lib/i18n";
+import { recordPaymentPregenerationProgress } from "@/lib/stripe-payments";
 import {
   enqueueExampleEmailIfPreviewReady,
   enqueueExampleEmailsForReadyFullPlan,
   enqueueNutritionPlanRefinementTask,
   enqueueProductRecommendationsTask,
-  enqueueRefinedNutritionPlanTasks
+  enqueueRefinedNutritionPlanTasks,
+  PAYMENT_CHECKOUT_PREGENERATION_SOURCE
 } from "@/lib/task-worker";
 import {
   PRODUCT_STACK_VARIANT_CONFIGS,
@@ -148,17 +150,24 @@ async function refreshAssessmentReadyIfNutritionReady(planId: string) {
 
 async function queueProductRecommendationsForReadyPlan({
   planId,
+  paymentId,
+  plan,
   source,
   task
 }: Readonly<{
   planId: string;
+  paymentId?: string | null;
+  plan?: "precision" | "pro" | null;
   source: string;
   task: TaskRecord;
 }>) {
   try {
     return await enqueueProductRecommendationsTask({
       parentTaskId: task.id,
+      paymentId,
+      plan,
       planId,
+      source,
       taskGroupId: task.taskGroupId
     });
   } catch (error) {
@@ -412,7 +421,18 @@ async function applyPaidFormulationResult(
   }
 
   const locale: Locale = isLocale(row.locale) ? row.locale : "en";
-  const plan = textValue(row.selected_plan) || "precision";
+  const taskPayload = objectValue(task.payload);
+  const taskContext = objectValue(task.context);
+  const taskSource =
+    textValue(taskPayload.source) || textValue(taskContext.source);
+  const isCheckoutPregeneration =
+    taskSource === PAYMENT_CHECKOUT_PREGENERATION_SOURCE;
+  const payloadPlan = textValue(taskPayload.plan);
+  const plan =
+    payloadPlan === "pro" || payloadPlan === "precision"
+      ? payloadPlan
+      : textValue(row.selected_plan) || "precision";
+  const paymentId = payloadText(taskPayload, "paymentId");
   const analysis = analysisPayload(resultPayload);
   await eventually(afterCommit, async () => {
     await recordTaskXaiUsageCost({
@@ -444,10 +464,76 @@ async function applyPaidFormulationResult(
     modelVersion: modelVersion(analysis),
     planId
   });
+  if (isCheckoutPregeneration) {
+    const paidSelectionReady = Boolean(textValue(row.selected_plan));
+    const productRecommendationsQueued = Boolean(
+      await queueProductRecommendationsForReadyPlan({
+        paymentId,
+        plan: plan === "pro" ? "pro" : "precision",
+        planId,
+        source: PAYMENT_CHECKOUT_PREGENERATION_SOURCE,
+        task
+      })
+    );
+
+    if (paidSelectionReady) {
+      const nutritionReady = await updateAssessmentReadyIfNutritionReady(sql, planId);
+
+      await eventually(afterCommit, async () => {
+        await refreshPaidNutritionReadinessAfterCommit(task, planId, nutritionReady);
+      });
+    }
+
+    await eventually(afterCommit, async () => {
+      await recordPaymentPregenerationProgress({
+        metadata: {
+          formulationVersion: version,
+          paidSelectionReady,
+          productRecommendationsQueued
+        },
+        paymentId,
+        status: "formulation_ready",
+        taskId: task.id
+      });
+    });
+
+    await eventually(afterCommit, async () => {
+      await addWorkEvent(task, "payment_checkout_pregeneration_ready", "medium", {
+        paymentId,
+        paidSelectionReady,
+        productRecommendationsQueued,
+        source: PAYMENT_CHECKOUT_PREGENERATION_SOURCE,
+        version
+      });
+    });
+    await eventually(afterCommit, async () => {
+      await writeBpmEvent({
+        actorType: "worker",
+        eventName: "payment_pregeneration_formula_ready",
+        eventStatus: "pregeneration_ready",
+        eventType: "payment",
+        locale,
+        planId,
+        properties: {
+          paymentId,
+          paidSelectionReady,
+          productRecommendationsQueued,
+          source: PAYMENT_CHECKOUT_PREGENERATION_SOURCE,
+          taskId: task.id,
+          version
+        },
+        selectedPlan: plan === "pro" ? "pro" : "precision"
+      });
+    });
+
+    return;
+  }
+
   const nutritionReady = await updateAssessmentReadyIfNutritionReady(sql, planId);
   const productRecommendationsQueued = nutritionReady
     ? Boolean(
         await queueProductRecommendationsForReadyPlan({
+          plan: plan === "pro" ? "pro" : "precision",
           planId,
           source: "formulation_completion",
           task
@@ -1762,6 +1848,26 @@ async function applyProductRecommendationsResult(
     await queueUnknownProductReviewTasks(task, runId, result);
   });
 
+  if (
+    textValue(objectValue(task.payload).source) ===
+      PAYMENT_CHECKOUT_PREGENERATION_SOURCE ||
+    textValue(objectValue(task.context).source) ===
+      PAYMENT_CHECKOUT_PREGENERATION_SOURCE
+  ) {
+    await eventually(afterCommit, async () => {
+      await recordPaymentPregenerationProgress({
+        metadata: {
+          productRecommendationRunId: runId,
+          productRecommendationVariants: [...runIds.keys()],
+          recommendedProductCount: result.recommendations.length
+        },
+        paymentId: payloadText(task.payload, "paymentId"),
+        status: "completed",
+        taskId: task.id
+      });
+    });
+  }
+
   return {
     ...objectValue(resultPayload),
     recommendationRunId: runId
@@ -1860,14 +1966,65 @@ export async function applyTaskFailureResult({
   const task = providedTask ?? (await getTaskBundle({ taskId })).task;
   const requestId = payloadText(task.payload, "requestId");
   const cronId = payloadText(task.payload, "cronId");
+  const taskPayload = objectValue(task.payload);
+  const taskContext = objectValue(task.context);
+  const taskSource =
+    textValue(taskPayload.source) || textValue(taskContext.source);
+  const isCheckoutPregeneration =
+    taskSource === PAYMENT_CHECKOUT_PREGENERATION_SOURCE;
 
   if (!sql) {
     return resultPayload;
   }
 
+  let shouldUpdateAssessmentFailure = true;
+
   if (
     task.planId &&
-    task.taskType === "generate_supplement_guidance"
+    task.taskType === "generate_supplement_guidance" &&
+    isCheckoutPregeneration
+  ) {
+    const rows = await sql<Array<{
+      locale: string | null;
+      selected_plan: string | null;
+    }>>`
+      select locale, selected_plan::text
+      from public.assessments
+      where plan_id = ${task.planId}::uuid
+      limit 1
+    `;
+    const row = rows[0];
+
+    shouldUpdateAssessmentFailure = Boolean(textValue(row?.selected_plan));
+
+    if (!shouldUpdateAssessmentFailure) {
+      await writeBpmEvent({
+        actorType: "worker",
+        errorMessage,
+        eventName: "payment_pregeneration_failed",
+        eventStatus: retryWillBeScheduled
+          ? "pregeneration_retry_scheduled"
+          : "pregeneration_failed",
+        eventType: "error",
+        locale: isLocale(row?.locale) ? row.locale : "en",
+        planId: task.planId,
+        properties: {
+          paymentId: payloadText(taskPayload, "paymentId"),
+          retryWillBeScheduled,
+          source: PAYMENT_CHECKOUT_PREGENERATION_SOURCE,
+          taskId: task.id
+        },
+        severity: retryWillBeScheduled ? "medium" : "high",
+        selectedPlan:
+          payloadText(taskPayload, "plan") === "pro" ? "pro" : "precision"
+      });
+    }
+  }
+
+  if (
+    task.planId &&
+    task.taskType === "generate_supplement_guidance" &&
+    shouldUpdateAssessmentFailure
   ) {
     await appendAssessmentVersion(sql, {
       actor: task.reservedByAgentId,

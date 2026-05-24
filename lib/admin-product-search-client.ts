@@ -28,6 +28,14 @@ function productSearchIndex(row: AdminProductRow) {
     row.title,
     row.titleEn,
     row.titleTh,
+    row.displayTitle,
+    row.displayDescription,
+    ...Object.values(row.translations ?? {}).flatMap((translation) => [
+      translation.locale,
+      translation.status,
+      translation.title,
+      translation.description
+    ]),
     row.brandName,
     row.category,
     row.fdaApprovalNumber,

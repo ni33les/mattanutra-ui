@@ -9,7 +9,13 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { BpmTracker } from "@/components/bpm-tracker";
 import "../globals.css";
-import { getDictionary, isLocale } from "@/lib/i18n";
+import {
+  defaultLocale,
+  getDictionary,
+  isLocale,
+  localeDirection,
+  localeHtmlLang
+} from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +55,7 @@ export async function generateMetadata({
   params
 }: Pick<LocaleLayoutProps, "params">): Promise<Metadata> {
   const { locale } = await params;
-  const dictionary = getDictionary(isLocale(locale) ? locale : "en");
+  const dictionary = getDictionary(isLocale(locale) ? locale : defaultLocale);
 
   return {
     title: dictionary.meta.title,
@@ -73,7 +79,7 @@ export default async function LocaleLayout({
   }
 
   return (
-    <html lang={locale}>
+    <html dir={localeDirection(locale)} lang={localeHtmlLang(locale)}>
       <body
         className={[
           bodyFont.variable,

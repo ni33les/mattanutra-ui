@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { SVGProps } from "react";
 import { HealthspanLogo } from "@/components/healthspan-logo";
-import type { Locale } from "@/lib/i18n";
+import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 
 const socialLinks = [
   {
@@ -194,8 +194,14 @@ export function SiteFooter({
         <div>
           <span>{copy.copyright}</span>
           <span className="mn-site-footer-languages">
-            <Link href="/api/locale?locale=en&next=%2Fen">EN</Link>
-            <Link href="/api/locale?locale=th&next=%2Fth">TH</Link>
+            {publicLocales.map((language) => (
+              <Link
+                href={`/api/locale?locale=${language}&next=%2F${language}`}
+                key={language}
+              >
+                {localeLabels[language]}
+              </Link>
+            ))}
           </span>
         </div>
       </div>

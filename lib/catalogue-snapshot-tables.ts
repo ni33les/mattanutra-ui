@@ -6,6 +6,11 @@ export type CatalogueSnapshotTable = Readonly<{
 
 export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
   {
+    description: "Publish-gated locale registry used by localized catalogue copy.",
+    name: "site_locales",
+    requiredForReload: true
+  },
+  {
     description: "Canonical supplement projection rows.",
     name: "supplements",
     requiredForReload: true
@@ -51,6 +56,11 @@ export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
     requiredForReload: true
   },
   {
+    description: "Locale-scalable product title and description rows.",
+    name: "product_translations",
+    requiredForReload: true
+  },
+  {
     description: "Canonical matchable product facts.",
     name: "product_facts",
     requiredForReload: true
@@ -76,6 +86,11 @@ export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
     requiredForReload: true
   },
   {
+    description: "Locale-scalable import title and description rows.",
+    name: "product_import_translations",
+    requiredForReload: true
+  },
+  {
     description: "Product admin decision/audit records.",
     name: "product_admin_audit",
     requiredForReload: false
@@ -83,6 +98,7 @@ export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
 ] as const;
 
 export const CATALOGUE_RELOAD_ORDER = [
+  "site_locales",
   "supplements",
   "supplement_aliases",
   "supplement_safety_limits",
@@ -92,22 +108,26 @@ export const CATALOGUE_RELOAD_ORDER = [
   "product_brand_countries",
   "products",
   "product_countries",
+  "product_translations",
   "product_facts",
   "product_versions",
   "product_offers",
   "product_import_runs",
   "product_imports",
+  "product_import_translations",
   "product_admin_audit"
 ] as const;
 
 export const CATALOGUE_TRUNCATE_ORDER = [
   "product_admin_audit",
+  "product_import_translations",
   "product_imports",
   "product_import_runs",
   "product_offers",
   "product_versions",
   "product_facts",
   "product_countries",
+  "product_translations",
   "products",
   "product_brand_countries",
   "product_brands",
@@ -115,7 +135,8 @@ export const CATALOGUE_TRUNCATE_ORDER = [
   "supplement_versions",
   "supplement_safety_limits",
   "supplement_aliases",
-  "supplements"
+  "supplements",
+  "site_locales"
 ] as const;
 
 export function catalogueSnapshotTableNames() {

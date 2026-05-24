@@ -84,6 +84,16 @@ export type AdminProductOffer = Readonly<{
   url: string;
 }>;
 
+export type AdminProductTranslationStatus = "complete" | "draft" | "missing";
+
+export type AdminProductTranslation = Readonly<{
+  description: string | null;
+  locale: string;
+  status: AdminProductTranslationStatus;
+  title: string | null;
+  updatedAt: string | null;
+}>;
+
 export type AdminProductRow = Readonly<{
   affiliateStatus: ProductAffiliateStatus;
   aiCorrectionNotes: string | null;
@@ -97,6 +107,8 @@ export type AdminProductRow = Readonly<{
   description: string | null;
   descriptionEn: string | null;
   descriptionTh: string | null;
+  displayDescription: string | null;
+  displayTitle: string;
   facts: AdminProductFact[];
   fdaApprovalNumber: string | null;
   id: string;
@@ -134,6 +146,7 @@ export type AdminProductRow = Readonly<{
   title: string;
   titleEn: string | null;
   titleTh: string | null;
+  translations: Record<string, AdminProductTranslation>;
   updatedAt: string;
 }>;
 
@@ -222,6 +235,7 @@ export type ProductDbRow = Readonly<{
   title: string;
   title_en: string | null;
   title_th: string | null;
+  translations: unknown;
   updated_at: Date | string;
 }>;
 
@@ -745,6 +759,62 @@ function aiCorrectionNotesFromSnapshot(value: unknown) {
   return typeof notes === "string" && notes.trim() ? notes.trim() : null;
 }
 
+function adminProductTranslationsFromRow(row: ProductDbRow) {
+  const raw = recordFromUnknown(row.translations);
+  const translations: Record<string, AdminProductTranslation> = {};
+
+  for (const [locale, value] of Object.entries(raw)) {
+    const record = recordFromUnknown(value);
+    const title = typeof record.title === "string" && record.title.trim()
+      ? record.title.trim()
+      : null;
+    const description =
+      typeof record.description === "string" && record.description.trim()
+        ? record.description.trim()
+        : null;
+
+    translations[locale] = {
+      description,
+      locale,
+      status:
+        record.status === "complete" || record.status === "missing"
+          ? record.status
+          : "draft",
+      title,
+      updatedAt: isoOrNull(row.updated_at)
+    };
+  }
+
+  const legacyRows = [
+    {
+      description: row.description_en ?? row.description,
+      locale: "en",
+      title: row.title_en ?? row.title
+    },
+    {
+      description: row.description_th,
+      locale: "th",
+      title: row.title_th
+    }
+  ];
+
+  for (const legacy of legacyRows) {
+    if (translations[legacy.locale] || (!legacy.title && !legacy.description)) {
+      continue;
+    }
+
+    translations[legacy.locale] = {
+      description: legacy.description,
+      locale: legacy.locale,
+      status: legacy.title && legacy.description ? "complete" : "draft",
+      title: legacy.title,
+      updatedAt: isoOrNull(row.updated_at)
+    };
+  }
+
+  return translations;
+}
+
 function validationLabel(validation: ValidationResult) {
   if (validation.reasons.includes("missing_image")) {
     return "Missing Image";
@@ -836,6 +906,10 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
   const facts = (arrayPayload(row.facts) as FactDbPayload[]).map(normalizeFact);
   const validation = validationForRow(row, facts, row.facts);
   const validationCache = validationCacheStatusForRow(row, validation);
+  const translations = adminProductTranslationsFromRow(row);
+  const displayTitle = translations.en?.title ?? row.title_en ?? row.title;
+  const displayDescription =
+    translations.en?.description ?? row.description_en ?? row.description ?? null;
   const effectiveListStatus =
     row.status === "approved" && validation.status !== "pass"
       ? "pending_review"
@@ -891,6 +965,8 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
     description: row.description,
     descriptionEn: row.description_en,
     descriptionTh: row.description_th,
+    displayDescription,
+    displayTitle,
     facts,
     fdaApprovalNumber: row.fda_approval_number,
     id: row.id,
@@ -910,7 +986,11 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
             row.title_th,
             row.description,
             row.description_en,
-            row.description_th
+            row.description_th,
+            ...Object.values(translations).flatMap((translation) => [
+              translation.title,
+              translation.description
+            ])
           ) ?? row.product_audience ?? "both",
 	    importReviewTaskId: row.import_review_task_id,
 	    importStatus: row.import_status,
@@ -945,6 +1025,7 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
     title: row.title,
     titleEn: row.title_en,
     titleTh: row.title_th,
+    translations,
     updatedAt: new Date(row.updated_at).toISOString()
   };
 }
@@ -1132,6 +1213,7 @@ export async function loadProductRows(productId?: string | null) {
       active_offer.admin_priority as active_affiliate_priority,
       coalesce(fact_rows.facts, '[]'::jsonb) as facts,
       coalesce(offer_rows.offers, '[]'::jsonb) as offers,
+      coalesce(product_translation_rows.translations, '{}'::jsonb) as translations,
       coalesce(history.chosen_count, 0) as history_chosen_count,
       history.last_recommended_at as history_last_recommended_at,
       history.average_product_coverage_percent,
@@ -1182,6 +1264,24 @@ export async function loadProductRows(productId?: string | null) {
         product_offers.updated_at desc
       limit 1
     ) active_offer on true
+    left join lateral (
+      select coalesce(
+        jsonb_object_agg(
+          product_translations.locale,
+          jsonb_build_object(
+            'locale', product_translations.locale,
+            'title', product_translations.title,
+            'description', product_translations.description,
+            'status', product_translations.status,
+            'updatedAt', product_translations.updated_at
+          )
+          order by product_translations.locale
+        ),
+        '{}'::jsonb
+      ) as translations
+      from public.product_translations
+      where product_translations.product_id = products.id
+    ) product_translation_rows on true
     left join lateral (
       select coalesce(
         jsonb_agg(
@@ -2723,6 +2823,12 @@ export type ProductImportFactInput = Readonly<{
   unit?: string | null;
 }>;
 
+export type ProductTranslationInput = Readonly<{
+  description?: string | null;
+  status?: AdminProductTranslationStatus;
+  title?: string | null;
+}>;
+
 export type StageProductImportInput = Readonly<{
   actor?: string | null;
   brandName: string;
@@ -2741,6 +2847,7 @@ export type StageProductImportInput = Readonly<{
   sourceUrl: string;
   titleEn?: string | null;
   titleTh?: string | null;
+  translations?: Record<string, ProductTranslationInput>;
 }>;
 
 export type ResolveProductImportReviewInput = Readonly<{
@@ -2764,6 +2871,7 @@ export type ResolveProductImportReviewInput = Readonly<{
   title?: string | null;
   titleEn?: string | null;
   titleTh?: string | null;
+  translations?: Record<string, ProductTranslationInput>;
 }>;
 
 
@@ -2800,6 +2908,7 @@ export type CreateAdminProductInput = Readonly<{
   title: string;
   titleEn?: string | null;
   titleTh?: string | null;
+  translations?: Record<string, ProductTranslationInput>;
 }>;
 
 export type UpdateAdminProductInput = Readonly<{
@@ -2829,6 +2938,7 @@ export type UpdateAdminProductInput = Readonly<{
   title?: string | null;
   titleEn?: string | null;
   titleTh?: string | null;
+  translations?: Record<string, ProductTranslationInput>;
 }>;
 
 

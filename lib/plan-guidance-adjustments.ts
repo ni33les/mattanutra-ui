@@ -7,6 +7,7 @@ import type {
   LocalizedText,
   PlanGuidanceAdjustment
 } from "@/lib/formulation-types";
+import { localizedTextSearchValue, resolveLocalizedText } from "@/lib/i18n";
 
 type Db = postgres.Sql | postgres.TransactionSql;
 
@@ -29,19 +30,11 @@ export function normalizedGuidanceText(value: unknown) {
 }
 
 function localizedText(value: LocalizedText | undefined) {
-  if (!value) {
-    return "";
-  }
-
-  return typeof value === "string" ? value : `${value.en} ${value.th}`;
+  return localizedTextSearchValue(value);
 }
 
 function localizedDisplay(value: LocalizedText | undefined) {
-  if (!value) {
-    return "";
-  }
-
-  return typeof value === "string" ? value : value.en || value.th;
+  return resolveLocalizedText(value, "en");
 }
 
 function itemSearchText(item: FormulationIngredient | FoodGuidanceItem) {

@@ -10,6 +10,7 @@ import {
 } from "@/lib/blog";
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
+import { localizedMetadata } from "@/lib/seo";
 
 type BlogArticlePageProps = Readonly<{
   params: Promise<{
@@ -74,10 +75,17 @@ export async function generateMetadata({
     return {};
   }
 
-  return {
+  const translationPaths = await getPublishedBlogPostLocalePaths(
+    page.post.translationGroupId
+  );
+
+  return localizedMetadata({
     description: page.post.seoDescription,
-    title: `MattaNutra | ${page.post.seoTitle}`
-  };
+    locale: page.locale,
+    path: `/blog/${page.post.slug}`,
+    title: `MattaNutra | ${page.post.seoTitle}`,
+    translatedPaths: translationPaths
+  });
 }
 
 export default async function BlogArticlePage({
@@ -117,10 +125,7 @@ export default async function BlogArticlePage({
   const translationPaths = await getPublishedBlogPostLocalePaths(
     post.translationGroupId
   );
-  const localizedPaths = {
-    en: translationPaths.en ?? "/en",
-    th: translationPaths.th ?? "/th"
-  };
+  const localizedPaths = translationPaths;
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">

@@ -1,6 +1,6 @@
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
-import type { Locale } from "@/lib/i18n";
+import { defaultLocale, type Locale } from "@/lib/i18n";
 import type {
   FoodGuidanceBlueprint,
   FormulationBlueprint,
@@ -203,6 +203,8 @@ function userPrompt({
   | "previousFormulation"
   | "planId"
 >) {
+  const requiredOutputLocales = [...new Set([defaultLocale, locale])];
+
   return JSON.stringify(
     {
       assessment: answers,
@@ -303,7 +305,7 @@ function userPrompt({
         "Every caution must be an object with id, severity, body, optional title, and optional relatedAnswerKeys.",
         "Use cautions for medication, pregnancy, breastfeeding, trying-to-conceive, kidney, liver, surgery, antibiotics, allergy, supplement sensitivity, lab, or uncertainty context.",
         "Do not use warning terminology or output warning-named keys. The user-facing term is caution.",
-        "marketingPoints title and body must each be localized objects with exactly en and th string values.",
+        `marketingPoints title and body must each be localized objects including these locale keys: ${requiredOutputLocales.join(", ")}.`,
         "Marketing copy must be truthful, benefit-led, and calm. Do not invent discounts, urgency, guarantees, cures, diagnosis, treatment claims, or product availability.",
         "Use marketingPoints to explain why the full bespoke plan is more useful than the free preview: for example prioritization, dose checks, cautions, and food-plus-supplement fit.",
         "When currentPlanContext.planFeedback is present, treat it as client-stated preferences and constraints for this new version.",
@@ -317,16 +319,17 @@ function userPrompt({
         "Every item must include id, category, supplement, dailyDose, effectivenessRank, status, and rationale.",
         "Set effectivenessRank as a unique integer from 1 to the number of items, where 1 is the most effective/highest-impact supplement suggestion for this person's assessment.",
         "Order supplementBreakdown by effectivenessRank ascending.",
-        "supplement, dailyDose, and rationale must each be localized objects with exactly en and th string values.",
+        `supplement, dailyDose, and rationale must each be localized objects including these locale keys: ${requiredOutputLocales.join(", ")}.`,
         "Keep dailyDose machine-readable: start with one numeric amount and one unit, using mg/day, mcg/day, g/day, or IU/day whenever possible.",
         "Avoid capsule counts, serving sizes, proprietary-blend doses, vague ranges, or multiple units in dailyDose. If uncertain, use a conservative numeric dose and set status=review.",
         "Write the English fields for a consumer wellness audience, and the Thai fields as natural Thai, not transliterated English unless the ingredient name is normally used that way.",
         "Keep category and status as canonical English values for internal processing.",
         "Use status=review for anything that should be checked before use because of medication, pregnancy, breastfeeding, condition, or uncertainty, and add a linked caution.",
         "Keep rationales benefit-focused, for example: Supports skin, joint, and active lifestyle goals.",
-        "Return both English and Thai display copy regardless of the requested locale."
+        "Return English plus the requested locale. Include other locale keys only when they are useful and complete."
       ],
       locale,
+      requiredOutputLocales,
       plan,
       planId
     },
@@ -459,40 +462,33 @@ function readLocalizedTextAt(
 
   if (typeof value === "string" && value.trim()) {
     errors.push(
-      `${path}.${key} must be an object with en and th strings, not a plain string`
+      `${path}.${key} must be an object with localized string values, not a plain string`
     );
-    return { en: "", th: "" };
+    return {};
   }
 
   if (!isRecord(value)) {
     errors.push(
-      `${path}.${key} must be an object with en and th strings`
+      `${path}.${key} must be an object with localized string values`
     );
-    return { en: "", th: "" };
+    return {};
   }
 
-  const unexpectedKeys = Object.keys(value).filter(
-    (localizedKey) => localizedKey !== "en" && localizedKey !== "th"
+  const entries = Object.fromEntries(
+    Object.entries(value)
+      .filter(([localizedKey, text]) =>
+        /^[a-z]{2}(?:-[A-Z0-9]{2,8})?$/.test(localizedKey) &&
+        typeof text === "string" &&
+        text.trim().length > 0
+      )
+      .map(([localizedKey, text]) => [localizedKey, String(text).trim()])
   );
 
-  if (unexpectedKeys.length > 0) {
-    errors.push(
-      `${path}.${key} must only include en and th, found: ${unexpectedKeys.join(", ")}`
-    );
+  if (Object.keys(entries).length < 1) {
+    errors.push(`${path}.${key} requires at least one localized string`);
   }
 
-  const en = readText(value, "en");
-  const th = readText(value, "th");
-
-  if (!en) {
-    errors.push(`${path}.${key}.en is required`);
-  }
-
-  if (!th) {
-    errors.push(`${path}.${key}.th is required`);
-  }
-
-  return { en, th };
+  return entries;
 }
 
 function readLocalizedText(
@@ -513,7 +509,9 @@ function textFromLocalizedCandidate(value: unknown) {
     return "";
   }
 
-  return readText(value, "en") || readText(value, "th");
+  return readText(value, "en") || Object.values(value).find(
+    (item): item is string => typeof item === "string" && item.trim().length > 0
+  ) || "";
 }
 
 function readCautionsAt(

@@ -222,6 +222,8 @@ describe("Stripe payment schema and lifecycle", () => {
       "payment_checkout_requested",
       "payment_checkout_session_created",
       "payment_checkout_opened",
+      "payment_pregeneration_started",
+      "payment_pregeneration_failed",
       "payment_checkout_returned",
       "payment_webhook_received",
       "payment_webhook_ignored",

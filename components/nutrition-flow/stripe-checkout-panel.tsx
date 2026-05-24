@@ -129,15 +129,15 @@ export function StripeCheckoutPanel({
 
     setPaymentId(body.paymentId);
 
-    if (body.mock) {
-      setIsMockCheckout(true);
-      return body;
-    }
-
     void fetch(`/api/payments/${encodeURIComponent(body.paymentId)}`, {
       cache: "no-store",
       method: "POST"
     });
+
+    if (body.mock) {
+      setIsMockCheckout(true);
+      return body;
+    }
 
     return body;
   }, [labels.unable, locale, plan, planId, sourceSurface]);

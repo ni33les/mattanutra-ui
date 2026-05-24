@@ -37,6 +37,16 @@ describe("dose conversion", () => {
     assert.equal(doseExceedsLimit(dose, limit, "vitamin_d3"), true);
   });
 
+  it("compares high-strength vitamin D mass doses against the mcg safety ceiling", () => {
+    const dose = parseDose("1 mg/day", "vitamin_d3");
+    const limit = parseDoseLimit(100, "mcg/day");
+
+    assert.ok(dose);
+    assert.ok(limit);
+    assert.equal(doseExceedsLimit(dose, limit, "vitamin_d3"), true);
+    assert.equal(doseAmountInLimitUnit(dose, limit, "vitamin_d3"), 1000);
+  });
+
   it("compares vitamin E IU against alpha-tocopherol mg limits", () => {
     const dose = parseDose("250 IU/day", "vitamin_e");
     const limit = parseDoseLimit(1000, "mg alpha-tocopherol/day");
