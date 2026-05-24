@@ -10,8 +10,9 @@ type FormulationRouteProps = Readonly<{
   }>;
 }>;
 
-export async function GET(_request: Request, { params }: FormulationRouteProps) {
+export async function GET(request: Request, { params }: FormulationRouteProps) {
   const { planId } = await params;
+  const locale = new URL(request.url).searchParams.get("locale");
   const snapshot = await getStoredAssessmentSnapshot(planId);
 
   if (!snapshot) {
@@ -19,6 +20,7 @@ export async function GET(_request: Request, { params }: FormulationRouteProps) 
   }
 
   const storedResult = await getStoredFormulationResult(planId, {
+    locale,
     mode: "full"
   });
 
@@ -38,6 +40,7 @@ export async function GET(_request: Request, { params }: FormulationRouteProps) 
   }
 
   const previewResult = await getStoredFormulationResult(planId, {
+    locale,
     mode: "preview"
   });
 

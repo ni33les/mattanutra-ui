@@ -29,7 +29,7 @@ const titleBarCopy = {
     availability: "พร้อมให้บริการใน",
     countries: ["ไทย", "สิงคโปร์", "มาเลเซีย", "ฟิลิปปินส์"],
     links: [
-      ["#living-protocol", "Living Protocol"],
+      ["#living-protocol", "โปรโตคอลชีวิต"],
       ["#how-it-works", "วิธีทำงาน"],
       ["#promises", "คำมั่น"],
       ["#pricing", "ราคา"],
@@ -88,9 +88,12 @@ export function TitleBar({
           }
           className="flex min-w-0 items-center text-foreground transition hover:text-[var(--mn-teal-deep)]"
         >
-          <HealthspanLogo className="shrink-0" />
+          <HealthspanLogo className="shrink-0" locale={currentLocale} />
         </Link>
-        <nav aria-label="Primary" className="mn-titlebar-nav">
+        <nav
+          aria-label={currentLocale === "th" ? "เมนูหลัก" : "Primary"}
+          className="mn-titlebar-nav"
+        >
           {copy.links.map(([href, label]) => (
             <Link
               href={homeAnchor(currentLocale, href)}

@@ -784,6 +784,12 @@ const revealCopy = {
     ingredientCount: "ingredients",
     catalogueProducts: "approved products",
     catalogueSupplements: "supplements in catalogue",
+    compactCoverageLabel: "Stack coverage",
+    contributionLabel: "contribution",
+    distilledEyebrow: "Distilled",
+    distilledSummaryTemplate:
+      "{supplementTotal} catalogue supplements assessed, {supplementSelected} selected for your formula, {productTotal} approved products checked, and {productSelected} recommended for you.",
+    distilledTitle: "From broad possibility to a focused formula.",
     formulaEyebrow: "Your formula",
     formulaLead:
       "These are the supplement priorities selected from your answers, cautions and product coverage.",
@@ -798,6 +804,7 @@ const revealCopy = {
       "We have turned your assessment into a practical formula and matched it to available products where the catalogue can support it.",
     personalizationBody:
       "Your result is shaped by your profile, goals, country, budget, preferences and cautions. These signals explain why this is not a generic supplement list.",
+    personalizationEyebrow: "Personalisation",
     personalizationTitle: "We built this around your context.",
     productsBody:
       "Products are shown as the closest available stack from the approved catalogue. The goal is fewer bottles, clear coverage and no unnecessary overlap.",
@@ -806,7 +813,15 @@ const revealCopy = {
     productsTitle: "From shelves to certainty.",
     supplementsRecommended: "supplements recommended",
     productsRecommended: "products recommended for you",
+    productDoseRecommended: "Recommended dose",
+    productServingUnit: "servings",
+    productSingleServingUnit: "serving",
+    productMatchTemplate:
+      "Matches {covers} and contributes {percent}% to this stack.",
+    productServingMatchTemplate:
+      "Use {servings} {servingUnit}. Matches {covers} and contributes {percent}% to this stack.",
     selectedProducts: "Selected products",
+    selectedSuffix: "selected",
     tableAmount: "Daily amount",
     tableCoverage: "Product fit",
     tableName: "Supplement",
@@ -816,6 +831,7 @@ const revealCopy = {
     closingTitle: "The wisdom of knowing the right amount",
     closingBody:
       "Not from more, but from exactly enough. This formula is the practical version of that idea: the right priorities, in the right amounts, with product choices where the data is strong enough.",
+    etymologyLine: "Pāli · knowing the right amount",
     print: "Print or save PDF",
     save: "Open this plan",
     reassess: "Reassess later",
@@ -826,6 +842,12 @@ const revealCopy = {
     ingredientCount: "ส่วนผสม",
     catalogueProducts: "ผลิตภัณฑ์ที่อนุมัติแล้ว",
     catalogueSupplements: "อาหารเสริมในแคตตาล็อก",
+    compactCoverageLabel: "ความครอบคลุมของชุดสินค้า",
+    contributionLabel: "เพิ่มความครอบคลุม",
+    distilledEyebrow: "กลั่นให้ชัด",
+    distilledSummaryTemplate:
+      "ประเมินอาหารเสริมในแคตตาล็อก {supplementTotal} รายการ เลือก {supplementSelected} รายการสำหรับสูตรของคุณ ตรวจผลิตภัณฑ์ที่อนุมัติแล้ว {productTotal} รายการ และแนะนำ {productSelected} รายการสำหรับคุณ",
+    distilledTitle: "จากตัวเลือกมากมาย สู่สูตรที่โฟกัสเฉพาะคุณ",
     formulaEyebrow: "สูตรของคุณ",
     formulaLead:
       "นี่คือลำดับความสำคัญของอาหารเสริมที่เลือกจากคำตอบ ข้อควรระวัง และความครอบคลุมของผลิตภัณฑ์",
@@ -839,6 +861,7 @@ const revealCopy = {
       "เราแปลงแบบประเมินของคุณเป็นสูตรที่ใช้งานได้จริง และจับคู่กับผลิตภัณฑ์ที่มีข้อมูลเพียงพอในแคตตาล็อก",
     personalizationBody:
       "ผลลัพธ์นี้ใช้โปรไฟล์ เป้าหมาย ประเทศ งบประมาณ ความชอบ และข้อควรระวังของคุณ จึงไม่ใช่รายการอาหารเสริมทั่วไป",
+    personalizationEyebrow: "เฉพาะบุคคล",
     personalizationTitle: "เราสร้างแผนจากบริบทของคุณ",
     productsBody:
       "ผลิตภัณฑ์ที่แสดงคือชุดที่ใกล้ที่สุดจากแคตตาล็อกที่อนุมัติแล้ว เป้าหมายคือขวดน้อยลง ความครอบคลุมชัดเจน และไม่ซ้ำซ้อนเกินจำเป็น",
@@ -847,7 +870,15 @@ const revealCopy = {
     productsTitle: "จากชั้นวางสู่ความชัดเจน",
     supplementsRecommended: "อาหารเสริมที่แนะนำ",
     productsRecommended: "ผลิตภัณฑ์ที่แนะนำสำหรับคุณ",
+    productDoseRecommended: "ขนาดที่แนะนำ",
+    productServingUnit: "หน่วยบริโภค",
+    productSingleServingUnit: "หน่วยบริโภค",
+    productMatchTemplate:
+      "ครอบคลุม {covers} และเพิ่มความครอบคลุมให้ชุดนี้ {percent}%",
+    productServingMatchTemplate:
+      "ใช้ {servings} {servingUnit} ครอบคลุม {covers} และเพิ่มความครอบคลุมให้ชุดนี้ {percent}%",
     selectedProducts: "ผลิตภัณฑ์ที่เลือก",
+    selectedSuffix: "รายการที่เลือก",
     tableAmount: "ปริมาณต่อวัน",
     tableCoverage: "ความพอดีของสินค้า",
     tableName: "อาหารเสริม",
@@ -857,6 +888,7 @@ const revealCopy = {
     closingTitle: "ปัญญาแห่งการรู้ปริมาณที่พอดี",
     closingBody:
       "ไม่ใช่จากการเพิ่มให้มากขึ้น แต่จากการเลือกให้พอดี สูตรนี้คือการนำแนวคิดนั้นมาใช้จริง: ลำดับที่ถูกต้อง ปริมาณที่เหมาะ และผลิตภัณฑ์ที่ข้อมูลแข็งแรงพอ",
+    etymologyLine: "บาลี · การรู้ปริมาณที่พอดี",
     print: "พิมพ์หรือบันทึก PDF",
     save: "เปิดแผนนี้",
     reassess: "ประเมินใหม่ภายหลัง",
@@ -864,6 +896,170 @@ const revealCopy = {
       "ข้อมูลเพื่อสุขภาวะเท่านั้น โปรดแบ่งปันแผนนี้กับแพทย์หรือเภสัชกรหากคุณใช้ยา ตั้งครรภ์ ให้นมบุตร มีโรคประจำตัว หรือสถานการณ์เปลี่ยนแปลง"
   }
 } satisfies Record<Locale, Record<string, string>>;
+
+const benefitTagLabels: Record<Locale, Record<string, string>> = {
+  en: {
+    anti_inflammatory: "Anti inflammatory",
+    bone_health: "Bone health",
+    cognitive_support: "Cognitive support",
+    energy_support: "Energy support",
+    gut_health: "Gut health",
+    heart_health: "Heart health",
+    hormone_support: "Hormone support",
+    immune_support: "Immune support",
+    recovery_support: "Recovery support",
+    skin_health: "Skin health",
+    sleep_support: "Sleep support",
+    stress_support: "Stress support"
+  },
+  th: {
+    anti_inflammatory: "ช่วยลดการอักเสบ",
+    bone_health: "บำรุงกระดูก",
+    cognitive_support: "สนับสนุนสมองและสมาธิ",
+    energy_support: "สนับสนุนพลังงาน",
+    gut_health: "ดูแลลำไส้",
+    heart_health: "ดูแลหัวใจ",
+    hormone_support: "สนับสนุนสมดุลฮอร์โมน",
+    immune_support: "สนับสนุนภูมิคุ้มกัน",
+    recovery_support: "ช่วยฟื้นตัว",
+    skin_health: "ดูแลผิว",
+    sleep_support: "สนับสนุนการนอน",
+    stress_support: "ช่วยรับมือความเครียด"
+  }
+};
+
+const formulaCategoryLabels: Record<Locale, Record<string, string>> = {
+  en: {
+    "Advanced Gut Health": "Advanced gut health",
+    "Fatty Acids": "Fatty acids",
+    Herbals: "Herbals",
+    Longevity: "Longevity",
+    Minerals: "Minerals",
+    Vitamins: "Vitamins"
+  },
+  th: {
+    "Advanced Gut Health": "สุขภาพลำไส้ขั้นสูง",
+    "Fatty Acids": "กรดไขมัน",
+    Herbals: "สมุนไพร",
+    Longevity: "การดูแลระยะยาว",
+    Minerals: "แร่ธาตุ",
+    Vitamins: "วิตามิน"
+  }
+};
+
+const contextChipLabels: Record<Locale, Record<string, string>> = {
+  en: {
+    Energy: "Energy",
+    Fatigue: "Fatigue",
+    Female: "Female",
+    Fitness: "Fitness",
+    Focus: "Focus",
+    Precision: "Precision",
+    Sleep: "Sleep",
+    Statin: "Statin",
+    Thailand: "Thailand"
+  },
+  th: {
+    Energy: "พลังงาน",
+    Fatigue: "อ่อนเพลีย",
+    Female: "หญิง",
+    Fitness: "ฟิตเนส",
+    Focus: "สมาธิ",
+    Precision: "ความแม่นยำ",
+    Sleep: "การนอน",
+    Statin: "สแตติน",
+    Thailand: "ประเทศไทย"
+  }
+};
+
+function localizedBenefitTagLabel(value: string, locale: Locale) {
+  return benefitTagLabels[locale][value] ?? foodTagLabel(value);
+}
+
+function localizedCategoryLabel(value: string, locale: Locale) {
+  return formulaCategoryLabels[locale][value] ?? value;
+}
+
+function localizedContextChip(value: string, locale: Locale) {
+  if (locale !== "th") {
+    return value;
+  }
+
+  return value
+    .split(" / ")
+    .map((part) => contextChipLabels.th[part] ?? part)
+    .join(" / ");
+}
+
+function formatTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce(
+    (text, [key, value]) => text.replaceAll(`{${key}}`, String(value)),
+    template
+  );
+}
+
+function localizedCoverLabel(
+  value: string,
+  locale: Locale,
+  supplementLabelById: ReadonlyMap<string, string>
+) {
+  return (
+    supplementLabelById.get(value) ??
+    supplementLabelById.get(value.replace(/^supplement:/, "")) ??
+    (locale === "th" ? value.replaceAll("-", " ") : foodTagLabel(value))
+  );
+}
+
+function localizedMarketplaceName(
+  value: RecommendedProduct["marketplace"],
+  locale: Locale
+) {
+  if (locale !== "th") {
+    return value;
+  }
+
+  switch (value) {
+    case "Imported product":
+      return "สินค้าในแคตตาล็อก";
+    case "Lazada Thailand":
+      return "ลาซาด้า ประเทศไทย";
+    case "Shopee Thailand":
+      return "ช้อปปี้ ประเทศไทย";
+    default:
+      return value;
+  }
+}
+
+function localizedProductDescription({
+  copy,
+  locale,
+  product,
+  supplementLabelById
+}: Readonly<{
+  copy: typeof revealCopy.en;
+  locale: Locale;
+  product: RecommendedProduct;
+  supplementLabelById: ReadonlyMap<string, string>;
+}>) {
+  const percent = product.stackContributionPercent ?? product.productCoveragePercent ?? 0;
+  const covers = product.covers
+    .map((cover) => localizedCoverLabel(cover, locale, supplementLabelById))
+    .join(locale === "th" ? " และ " : ", ");
+
+  if (product.servingMultiplier && product.servingMultiplier > 1) {
+    return formatTemplate(copy.productServingMatchTemplate, {
+      covers,
+      percent,
+      servings: product.servingMultiplier,
+      servingUnit:
+        product.servingMultiplier === 1
+          ? copy.productSingleServingUnit
+          : copy.productServingUnit
+    });
+  }
+
+  return formatTemplate(copy.productMatchTemplate, { covers, percent });
+}
 
 function visibleFormulaIngredients(ingredients: FormulationIngredient[]) {
   return ingredients.filter((ingredient) => ingredient.safety?.visibility !== "hidden");
@@ -988,6 +1184,12 @@ function RevealResultsPage({
   const copy = revealCopy[locale];
   const visibleIngredients = visibleFormulaIngredients(ingredients);
   const recommendedSupplementCount = visibleIngredients.length;
+  const supplementLabelById = new Map(
+    visibleIngredients.map((ingredient) => [
+      ingredient.id,
+      getLocalizedText(ingredient.supplement, locale)
+    ])
+  );
   const catalogueSupplementCount = Math.max(
     recommendedSupplementCount,
     Number(result.catalogueSupplementCount ?? result.totalSupplementCount ?? 0),
@@ -1013,7 +1215,7 @@ function RevealResultsPage({
           {copy.heroEyebrow}
         </p>
         <p className="mt-8 font-serif text-2xl italic leading-8 text-[var(--mn-ink-soft)]">
-          {result.assessmentSummary.profile}
+          {localizedContextChip(result.assessmentSummary.profile, locale)}
         </p>
         <h1 className="mt-3 max-w-4xl font-serif text-6xl font-medium leading-none tracking-normal text-[var(--mn-teal-deep)] text-balance sm:text-7xl lg:text-8xl">
           {copy.heroTitle}
@@ -1035,7 +1237,7 @@ function RevealResultsPage({
         <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 sm:px-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
           <div>
             <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
-              01 · Personalisation
+              01 · {copy.personalizationEyebrow}
             </p>
             <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
               {copy.personalizationTitle}
@@ -1057,7 +1259,7 @@ function RevealResultsPage({
                   }`}
                   key={`${chip.kind}:${chip.value}`}
                 >
-                  {chip.value}
+                  {localizedContextChip(chip.value, locale)}
                 </span>
               ))}
             </div>
@@ -1068,10 +1270,10 @@ function RevealResultsPage({
       <section className="py-20 text-center">
         <div className="mx-auto max-w-5xl px-6 sm:px-8">
           <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
-            02 · Distilled
+            02 · {copy.distilledEyebrow}
           </p>
           <h2 className="mx-auto mt-6 max-w-3xl font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
-            From broad possibility to a focused formula.
+            {copy.distilledTitle}
           </h2>
           <div className="mt-12 grid gap-5">
             <RevealDistillationCard
@@ -1088,7 +1290,12 @@ function RevealResultsPage({
             />
           </div>
           <p className="mx-auto mt-8 max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]">
-            {catalogueSupplementCount} catalogue supplements assessed, {recommendedSupplementCount} selected for your formula, {catalogueProductCount} approved products checked, and {selectedProductCount} recommended for you.
+            {formatTemplate(copy.distilledSummaryTemplate, {
+              productSelected: selectedProductCount,
+              productTotal: catalogueProductCount,
+              supplementSelected: recommendedSupplementCount,
+              supplementTotal: catalogueSupplementCount
+            })}
           </p>
         </div>
       </section>
@@ -1116,6 +1323,7 @@ function RevealResultsPage({
         products={products}
         selectedCoverage={selectedCoverage}
         selectedProductStackPreference={selectedProductStackPreference}
+        supplementLabelById={supplementLabelById}
       />
 
       <RevealClosingSection
@@ -1179,9 +1387,9 @@ function RevealFormulaSection({
             <div key={category}>
               <div className="mt-6 flex items-center gap-3 border-b border-dashed border-[var(--mn-line)] pb-3 font-serif text-sm italic text-[var(--mn-gold)]">
                 <span className="size-1.5 rounded-full bg-[var(--mn-gold)]" />
-                {category}
+                {localizedCategoryLabel(category, locale)}
                 <span className="ml-auto font-mono text-[0.65rem] not-italic uppercase tracking-[0.18em] text-[var(--mn-ash)]">
-                  {group.length} selected
+                  {group.length} {copy.selectedSuffix}
                 </span>
               </div>
               {group.map((ingredient) => {
@@ -1206,14 +1414,14 @@ function RevealFormulaSection({
                         {supplement}
                       </h3>
                       <p className="mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--mn-ash)]">
-                        {ingredient.category}
+                        {localizedCategoryLabel(ingredient.category, locale)}
                       </p>
                     </div>
                     <div className="text-sm leading-6 text-[var(--mn-ink-soft)]">
                       {rationale}
                       {benefit ? (
                         <span className="mt-2 block w-max max-w-full rounded-full bg-[var(--mn-mint)] px-3 py-1 text-xs font-semibold text-[var(--mn-teal-deep)]">
-                          {foodTagLabel(benefit)}
+                          {localizedBenefitTagLabel(benefit, locale)}
                         </span>
                       ) : null}
                     </div>
@@ -1243,7 +1451,8 @@ function RevealProductsSection({
   productOptions,
   products,
   selectedCoverage,
-  selectedProductStackPreference
+  selectedProductStackPreference,
+  supplementLabelById
 }: Readonly<{
   copy: typeof revealCopy.en;
   locale: Locale;
@@ -1254,6 +1463,7 @@ function RevealProductsSection({
   products: RecommendedProduct[];
   selectedCoverage: number;
   selectedProductStackPreference?: ProductStackPreference | null;
+  supplementLabelById: ReadonlyMap<string, string>;
 }>) {
   const labels = productRecommendationCopy[locale];
 
@@ -1327,7 +1537,7 @@ function RevealProductsSection({
                 </div>
                 <div className="flex flex-1 flex-col p-5">
                   <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--mn-ash)]">
-                    {product.marketplace}
+                    {localizedMarketplaceName(product.marketplace, locale)}
                   </p>
                   <h3 className="mt-2 min-h-12 font-serif text-xl font-medium leading-tight text-[var(--mn-ink)]">
                     {product.name}
@@ -1338,21 +1548,26 @@ function RevealProductsSection({
                         className="rounded-full bg-[var(--mn-mint)] px-2.5 py-1 text-xs font-semibold text-[var(--mn-teal-deep)]"
                         key={cover}
                       >
-                        {cover}
+                        {localizedCoverLabel(cover, locale, supplementLabelById)}
                       </span>
                     ))}
                   </div>
                   <p className="mt-4 flex-1 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                    {product.description}
+                    {localizedProductDescription({
+                      copy,
+                      locale,
+                      product,
+                      supplementLabelById
+                    })}
                   </p>
                   <div className="mt-5 rounded-lg bg-[var(--mn-cream)] p-3 text-sm text-[var(--mn-ink-soft)] ring-1 ring-[var(--mn-line)]">
                     <strong className="text-[var(--mn-ink)]">
                       {product.servingMultiplier && product.servingMultiplier > 1
-                        ? `${product.servingMultiplier} servings`
-                        : "Recommended dose"}
+                        ? `${product.servingMultiplier} ${copy.productServingUnit}`
+                        : copy.productDoseRecommended}
                     </strong>
                     <br />
-                    {product.stackContributionPercent ?? product.productCoveragePercent ?? 0}% contribution
+                    {product.stackContributionPercent ?? product.productCoveragePercent ?? 0}% {copy.contributionLabel}
                   </div>
                   <a
                     className="mt-4 inline-flex items-center justify-between rounded-full bg-[var(--mn-teal)] px-4 py-3 text-sm font-bold text-white hover:bg-[var(--mn-teal-deep)]"
@@ -1381,13 +1596,13 @@ function RevealProductsSection({
             <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
               {productNeedCount}
             </p>
-            <p className="text-sm text-[var(--mn-ash)]">Needs covered by products</p>
+            <p className="text-sm text-[var(--mn-ash)]">{labels.needsCovered}</p>
           </div>
           <div>
             <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
               {selectedCoverage}%
             </p>
-            <p className="text-sm text-[var(--mn-ash)]">Stack coverage</p>
+            <p className="text-sm text-[var(--mn-ash)]">{copy.compactCoverageLabel}</p>
           </div>
         </div>
       </div>
@@ -1463,7 +1678,7 @@ function RevealClosingSection({
             Mattaññutā
           </p>
           <p className="mn-mono-label mt-2 text-xs uppercase tracking-[0.2em] text-[var(--mn-ash)]">
-            Pāli · knowing the right amount
+            {copy.etymologyLine}
           </p>
           <h2 className="mx-auto mt-8 max-w-3xl font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
             {copy.closingTitle}
@@ -1588,7 +1803,7 @@ function FoodGuidancePanel({
                             className="rounded-full bg-[var(--mn-mint-deep)] px-2 py-0.5 text-xs font-semibold text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-teal-glow)]"
                             key={tag}
                           >
-                            {foodTagLabel(tag)}
+                            {localizedBenefitTagLabel(tag, locale)}
                           </span>
                         ))}
                       </div>
@@ -1776,6 +1991,7 @@ const productRecommendationCopy = {
       "Your nutrition plan is ready, but product matching needs attention before we can show product options.",
     failedTitle: "Product matching needs review",
     matched: "Matched",
+    needsCovered: "Needs covered by products",
     needsReviewed: "client needs reviewed",
     needs: "Adds",
     ofYourNeeds: "to product coverage",
@@ -1784,6 +2000,8 @@ const productRecommendationCopy = {
     preferenceBalanced: "Balanced",
     preferenceBalancedHint: "Up to 6 products, balancing coverage, simplicity, dose and cost",
     preferenceUpdating: "Switching product stack...",
+    recommendedDose: "Recommended dose",
+    servingInstruction: "Take {count} daily servings of this product.",
     stack: "Stack coverage",
     title: "Recommended products",
     unmatchedTitle: "Unmet supplement needs",
@@ -1800,6 +2018,7 @@ const productRecommendationCopy = {
       "แผนโภชนาการของคุณพร้อมแล้ว แต่การจับคู่สินค้าต้องตรวจสอบก่อนแสดงตัวเลือกสินค้า",
     failedTitle: "ต้องตรวจสอบการจับคู่สินค้า",
     matched: "จับคู่แล้ว",
+    needsCovered: "ความต้องการที่ผลิตภัณฑ์ครอบคลุม",
     needsReviewed: "ความต้องการที่ตรวจแล้ว",
     needs: "เพิ่ม",
     ofYourNeeds: "ให้ความครอบคลุมของสินค้า",
@@ -1808,6 +2027,8 @@ const productRecommendationCopy = {
     preferenceBalanced: "สมดุล",
     preferenceBalancedHint: "สูงสุด 6 รายการ โดยสมดุลระหว่างความครอบคลุม ความง่าย ปริมาณ และราคา",
     preferenceUpdating: "กำลังเปลี่ยนชุดสินค้า...",
+    recommendedDose: "ขนาดที่แนะนำ",
+    servingInstruction: "รับประทานผลิตภัณฑ์นี้ {count} หน่วยบริโภคต่อวัน",
     stack: "ความครอบคลุมของชุดสินค้า",
     title: "สินค้าแนะนำ",
     unmatchedTitle: "ความต้องการอาหารเสริมที่ยังไม่ครอบคลุม",
@@ -2079,6 +2300,16 @@ export function ProductRecommendationsPanel({
               <p className="mt-3 flex-1 text-sm leading-6 text-muted-foreground">
                 {product.description}
               </p>
+              {product.servingMultiplier && product.servingMultiplier > 1 ? (
+                <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900 ring-1 ring-amber-100">
+                  <span className="font-semibold">
+                    {labels.recommendedDose}:{" "}
+                  </span>
+                  {formatTemplate(labels.servingInstruction, {
+                    count: product.servingMultiplier
+                  })}
+                </div>
+              ) : null}
               <div className="mt-4 flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-[var(--mn-ink)]">
                   {product.price
@@ -2235,7 +2466,7 @@ function FormulaPanel({
                             className="rounded-full bg-[var(--mn-mint)] px-2 py-0.5 text-xs font-semibold text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]"
                             key={tag}
                           >
-                            {foodTagLabel(tag)}
+                            {localizedBenefitTagLabel(tag, locale)}
                           </span>
                         ))}
                       </div>

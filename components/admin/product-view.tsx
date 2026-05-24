@@ -382,6 +382,83 @@ function removeProductCountryCode(
   );
 }
 
+function productTranslationStatusClass(
+  status: AdminProductRow["translations"][string]["status"]
+) {
+  if (status === "complete") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  if (status === "draft") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+
+  return "border-gray-200 bg-gray-50 text-gray-500";
+}
+
+function productTranslationStatusLabel(
+  status: AdminProductRow["translations"][string]["status"]
+) {
+  if (status === "complete") {
+    return "Complete";
+  }
+
+  if (status === "draft") {
+    return "Draft";
+  }
+
+  return "Missing";
+}
+
+function productLocaleMeta(locale: string) {
+  const registeredLocale = siteLocaleRegistry.find((item) => item.code === locale);
+
+  return registeredLocale ?? {
+    code: locale,
+    direction: "ltr" as const,
+    fallbackLocale: "en",
+    htmlLang: locale,
+    isIndexable: false,
+    isPublic: false,
+    label: locale.toUpperCase(),
+    nativeLabel: locale,
+    sortOrder: 999
+  };
+}
+
+function productTranslationLocales(row: AdminProductRow) {
+  const registeredCodes = new Set<string>(
+    siteLocaleRegistry.map((item) => item.code)
+  );
+  const extraLocales = Object.keys(row.translations ?? {})
+    .filter((code) => !registeredCodes.has(code))
+    .map(productLocaleMeta);
+
+  return [...siteLocaleRegistry, ...extraLocales].sort(
+    (first, second) => first.sortOrder - second.sortOrder
+  );
+}
+
+function productTranslationFor(row: AdminProductRow, locale: string) {
+  return row.translations?.[locale] ?? {
+    description:
+      locale === "en"
+        ? row.descriptionEn ?? row.description
+        : locale === "th"
+          ? row.descriptionTh
+          : null,
+    locale,
+    status: "missing" as const,
+    title:
+      locale === "en"
+        ? row.titleEn ?? row.title
+        : locale === "th"
+          ? row.titleTh
+          : null,
+    updatedAt: null
+  };
+}
+
 function ProductCountryManager({
   allowedCountryCodes,
   countryCodes,
@@ -971,8 +1048,13 @@ export function AdminProductsView({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-base font-semibold text-gray-900">
-                      {row.title}
+                      {row.displayTitle}
                     </h3>
+                    {row.title !== row.displayTitle ? (
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        Source title: {row.title}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-sm text-gray-500">
                       {[
                         row.brandName,
@@ -998,6 +1080,27 @@ export function AdminProductsView({
                   >
                     {productBusinessStateLabel(productBusinessState(row))}
                   </span>
+                </div>
+                <div
+                  aria-label="Translation status"
+                  className="mt-3 flex flex-wrap gap-1.5"
+                >
+                  {productTranslationLocales(row).map((siteLocale) => {
+                    const translation = productTranslationFor(row, siteLocale.code);
+
+                    return (
+                      <span
+                        className={classNames(
+                          "rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
+                          productTranslationStatusClass(translation.status)
+                        )}
+                        key={siteLocale.code}
+                        title={`${siteLocale.nativeLabel}: ${productTranslationStatusLabel(translation.status)}`}
+                      >
+                        {siteLocale.label} {productTranslationStatusLabel(translation.status)}
+                      </span>
+                    );
+                  })}
                 </div>
                 {row.facts.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -1088,6 +1191,9 @@ function ProductModal({
   const [newOfferUrl, setNewOfferUrl] = useState("");
   const [newOfferCommissionRate, setNewOfferCommissionRate] = useState("");
   const [offerBusy, setOfferBusy] = useState(false);
+  const [selectedTranslationLocale, setSelectedTranslationLocale] = useState<string>(
+    siteLocaleRegistry[0]?.code ?? "en"
+  );
   const [mergeProductId, setMergeProductId] = useState(
     draft.productImportDuplicateProductIds.find((id) => id !== draft.id) ?? ""
   );
@@ -1117,25 +1223,17 @@ function ProductModal({
   const safeProductCountryCodes = productCountryCodes.length > 0
     ? productCountryCodes
     : [manufacturerCountryCodes[0] ?? defaultProductCountryCode];
+  const translationLocales = productTranslationLocales(draft);
+  const activeTranslationLocale = translationLocales.some(
+    (siteLocale) => siteLocale.code === selectedTranslationLocale
+  )
+    ? selectedTranslationLocale
+    : translationLocales[0]?.code ?? "en";
+  const activeTranslationMeta = productLocaleMeta(activeTranslationLocale);
+  const activeTranslation = productTranslationFor(draft, activeTranslationLocale);
 
   function translationFor(locale: string) {
-    return draft.translations?.[locale] ?? {
-      description:
-        locale === "en"
-          ? draft.descriptionEn ?? draft.description
-          : locale === "th"
-            ? draft.descriptionTh
-            : null,
-      locale,
-      status: "missing" as const,
-      title:
-        locale === "en"
-          ? draft.titleEn ?? draft.title
-          : locale === "th"
-            ? draft.titleTh
-            : null,
-      updatedAt: null
-    };
+    return productTranslationFor(draft, locale);
   }
 
   function updateTranslation(
@@ -1451,28 +1549,6 @@ function ProductModal({
               value={draft.brandName ?? ""}
             />
           </label>
-          {siteLocaleRegistry.map((siteLocale) => {
-            const translation = translationFor(siteLocale.code);
-
-            return (
-              <label
-                className="text-sm font-medium text-gray-700"
-                key={`${siteLocale.code}-title`}
-              >
-                Title {siteLocale.label}
-                <input
-                  className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-                  onChange={(event) =>
-                    updateTranslation(siteLocale.code, {
-                      title: event.target.value
-                    })
-                  }
-                  type="text"
-                  value={translation.title ?? ""}
-                />
-              </label>
-            );
-          })}
           <label className="text-sm font-medium text-gray-700">
             Product URL
             <input
@@ -1555,31 +1631,79 @@ function ProductModal({
           </label>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          {siteLocaleRegistry.map((siteLocale) => {
-            const translation = translationFor(siteLocale.code);
+        <div className="mt-5 rounded-xl border border-gray-100 bg-gray-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Translations
+              </h3>
+            </div>
+            <span
+              className={classNames(
+                "rounded-full border px-2.5 py-1 text-xs font-semibold",
+                productTranslationStatusClass(activeTranslation.status)
+              )}
+            >
+              {activeTranslationMeta.label} {productTranslationStatusLabel(activeTranslation.status)}
+            </span>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {translationLocales.map((siteLocale) => {
+              const translation = translationFor(siteLocale.code);
+              const selected = siteLocale.code === activeTranslationLocale;
 
-            return (
-              <label
-                className="grid gap-2 text-sm font-medium text-gray-700"
-                key={`${siteLocale.code}-description`}
-              >
-                Description {siteLocale.label}
-                <textarea
-                  className="min-h-24 resize-y rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-                  onChange={(event) =>
-                    updateTranslation(siteLocale.code, {
-                      description: event.target.value
-                    })
-                  }
-                  value={translation.description ?? ""}
-                />
-                <span className="text-xs font-normal text-gray-500">
-                  {siteLocale.nativeLabel} · {translation.status}
-                </span>
-              </label>
-            );
-          })}
+              return (
+                <button
+                  className={classNames(
+                    "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                    selected
+                      ? "border-[#1FA77A] bg-emerald-50 text-[#126B4F]"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-emerald-200 hover:text-[#126B4F]"
+                  )}
+                  key={siteLocale.code}
+                  onClick={() => setSelectedTranslationLocale(siteLocale.code)}
+                  type="button"
+                >
+                  {siteLocale.label}
+                  <span
+                    className={classNames(
+                      "ml-2 rounded-full border px-1.5 py-0.5 text-[10px] uppercase",
+                      productTranslationStatusClass(translation.status)
+                    )}
+                  >
+                    {productTranslationStatusLabel(translation.status)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-4 grid gap-4">
+            <label className="text-sm font-medium text-gray-700">
+              Title · {activeTranslationMeta.nativeLabel}
+              <input
+                className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                onChange={(event) =>
+                  updateTranslation(activeTranslationLocale, {
+                    title: event.target.value
+                  })
+                }
+                type="text"
+                value={activeTranslation.title ?? ""}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-gray-700">
+              Description · {activeTranslationMeta.nativeLabel}
+              <textarea
+                className="min-h-28 resize-y rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                onChange={(event) =>
+                  updateTranslation(activeTranslationLocale, {
+                    description: event.target.value
+                  })
+                }
+                value={activeTranslation.description ?? ""}
+              />
+            </label>
+          </div>
         </div>
 
         <div className="mt-5">

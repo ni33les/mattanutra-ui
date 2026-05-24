@@ -25,6 +25,11 @@ import {
   type RecommendedProduct
 } from "@/lib/formulation-types";
 import {
+  defaultLocale,
+  isLocale,
+  type Locale
+} from "@/lib/i18n";
+import {
   buildProductNeeds,
   type ProductRecommendationNeed
 } from "@/lib/product-recommendations";
@@ -54,8 +59,8 @@ export function isUuid(value: string) {
   );
 }
 
-function normalizeLocale(locale: unknown) {
-  return locale === "th" ? "th" : "en";
+function normalizeLocale(locale: unknown): Locale {
+  return isLocale(locale) ? locale : defaultLocale;
 }
 
 function toJsonRecord(value: unknown) {
@@ -1222,6 +1227,7 @@ export async function getStoredAssessmentPrefill(planId: string) {
 export async function getStoredFormulationResult(
   planId: string,
   options: Readonly<{
+    locale?: string | null;
     mode?: "full" | "preview";
   }> = {}
 ) {
@@ -1232,6 +1238,7 @@ export async function getStoredFormulationResult(
   }
 
   const mode = options.mode ?? "full";
+  const resultLocale = normalizeLocale(options.locale);
   const exampleModelPattern = "%:example";
   const formulationModeFilter =
     mode === "preview"
@@ -1382,7 +1389,17 @@ export async function getStoredFormulationResult(
                 else 'Imported product'
               end,
             'name',
-              products.title,
+              coalesce(
+                nullif(btrim(product_translation_locale.title), ''),
+                case
+                  when ${resultLocale} = 'th'
+                    then nullif(btrim(products.title_th), '')
+                  else null
+                end,
+                nullif(btrim(product_translation_default.title), ''),
+                nullif(btrim(products.title_en), ''),
+                products.title
+              ),
             'price',
               case
                 when product_recommendation_items.price_amount is not null
@@ -1405,6 +1422,21 @@ export async function getStoredFormulationResult(
               product_recommendation_items.rank,
             'recommendationRunId',
               product_recommendation_items.run_id::text,
+            'servingMultiplier',
+              greatest(
+                1,
+                coalesce(product_recommendation_items.serving_multiplier, 1),
+                coalesce(
+                  nullif(
+                    substring(
+                      coalesce(product_recommendation_items.why, '')
+                      from '^Use ([0-9]+) servings'
+                    ),
+                    ''
+                  )::integer,
+                  1
+                )
+              ),
             'stackContributionPercent',
               product_recommendation_items.stack_contribution_percent,
             'stackCoveragePercent',
@@ -1425,6 +1457,12 @@ export async function getStoredFormulationResult(
       from product_recommendation_items
       join products
         on products.id = product_recommendation_items.product_id
+      left join product_translations product_translation_locale
+        on product_translation_locale.product_id = products.id
+        and product_translation_locale.locale = ${resultLocale}
+      left join product_translations product_translation_default
+        on product_translation_default.product_id = products.id
+        and product_translation_default.locale = ${defaultLocale}
       where product_recommendation_run.id is not null
         and product_recommendation_items.run_id = product_recommendation_run.id
     ) product_recommendation_items_payload on true
@@ -1513,7 +1551,17 @@ export async function getStoredFormulationResult(
                   else 'Imported product'
                 end,
               'name',
-                products.title,
+                coalesce(
+                  nullif(btrim(product_translation_locale.title), ''),
+                  case
+                    when ${resultLocale} = 'th'
+                      then nullif(btrim(products.title_th), '')
+                    else null
+                  end,
+                  nullif(btrim(product_translation_default.title), ''),
+                  nullif(btrim(products.title_en), ''),
+                  products.title
+                ),
               'price',
                 case
                   when product_recommendation_items.price_amount is not null
@@ -1536,6 +1584,21 @@ export async function getStoredFormulationResult(
                 product_recommendation_items.rank,
               'recommendationRunId',
                 product_recommendation_items.run_id::text,
+              'servingMultiplier',
+                greatest(
+                  1,
+                  coalesce(product_recommendation_items.serving_multiplier, 1),
+                  coalesce(
+                    nullif(
+                      substring(
+                        coalesce(product_recommendation_items.why, '')
+                        from '^Use ([0-9]+) servings'
+                      ),
+                      ''
+                    )::integer,
+                    1
+                  )
+                ),
               'stackContributionPercent',
                 product_recommendation_items.stack_contribution_percent,
               'stackCoveragePercent',
@@ -1556,6 +1619,12 @@ export async function getStoredFormulationResult(
         from product_recommendation_items
         join products
           on products.id = product_recommendation_items.product_id
+        left join product_translations product_translation_locale
+          on product_translation_locale.product_id = products.id
+          and product_translation_locale.locale = ${resultLocale}
+        left join product_translations product_translation_default
+          on product_translation_default.product_id = products.id
+          and product_translation_default.locale = ${defaultLocale}
         where product_recommendation_items.run_id = latest_runs.id
       ) option_items on true
     ) product_recommendation_options_payload on true

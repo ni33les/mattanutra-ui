@@ -2249,6 +2249,10 @@ function isSkippedProduct(product: ScrapedManufacturerProduct) {
   return Boolean(importSkipReason(product));
 }
 
+function hasThaiText(value: string | null | undefined) {
+  return Boolean(value && /[ก-๙]/.test(value));
+}
+
 function hasBilingualDisplay(product: ScrapedManufacturerProduct) {
   return Boolean(
     product.titleEn?.trim() &&
@@ -2259,7 +2263,21 @@ function hasBilingualDisplay(product: ScrapedManufacturerProduct) {
 }
 
 function qualityDisplayBlockers(product: ScrapedManufacturerProduct) {
-  return hasBilingualDisplay(product) ? [] : ["missing_bilingual_copy"];
+  const blockers: string[] = [];
+
+  if (!hasBilingualDisplay(product)) {
+    blockers.push("missing_bilingual_copy");
+  }
+
+  if (product.titleTh?.trim() && !hasThaiText(product.titleTh)) {
+    blockers.push("thai_title_not_localized");
+  }
+
+  if (product.descriptionTh?.trim() && !hasThaiText(product.descriptionTh)) {
+    blockers.push("thai_description_not_localized");
+  }
+
+  return blockers;
 }
 
 function productAudienceFromRawSnapshot(snapshot: Record<string, unknown>) {
@@ -2282,7 +2300,8 @@ function hasSuccessfulAiCopyTranslation(product: ScrapedManufacturerProduct) {
   return Boolean(
     translation &&
     typeof translation === "object" &&
-    "translatedAt" in translation
+    "translatedAt" in translation &&
+    qualityDisplayBlockers(product).length === 0
   );
 }
 
@@ -2791,26 +2810,30 @@ async function enrichQualityProduct(
   const evidenceHash = qualityEvidenceHash(product);
 
   if (hasCurrentQualityEnrichment(product)) {
-    console.log(`[quality] reused ${index}/${total} ${product.productTitle}`);
-    const enrichment = qualityEnrichment(product);
+    if (qualityDisplayBlockers(product).length === 0) {
+      console.log(`[quality] reused ${index}/${total} ${product.productTitle}`);
+      const enrichment = qualityEnrichment(product);
 
-    return {
-      product: enrichment?.evidenceHash === evidenceHash
-        ? product
-        : {
-          ...product,
-          rawSnapshot: {
-            ...product.rawSnapshot,
-            qualityEnrichment: {
-              ...enrichment,
-              evidenceHash
+      return {
+        product: enrichment?.evidenceHash === evidenceHash
+          ? product
+          : {
+            ...product,
+            rawSnapshot: {
+              ...product.rawSnapshot,
+              qualityEnrichment: {
+                ...enrichment,
+                evidenceHash
+              }
             }
-          }
-      },
-      failed: false,
-      reused: true,
-      skipped: false
-    };
+          },
+        failed: false,
+        reused: true,
+        skipped: false
+      };
+    }
+
+    console.log(`[quality] refresh copy ${index}/${total} ${product.productTitle}`);
   }
 
   console.log(`[quality] enrich ${index}/${total} ${product.productTitle}`);
@@ -3098,6 +3121,10 @@ function applyQualityCache(
     const evidenceHash = qualityEvidenceHash(product);
 
     if (cachedEnrichment.evidenceHash !== evidenceHash) {
+      return product;
+    }
+
+    if (qualityDisplayBlockers(cached).length > 0) {
       return product;
     }
 

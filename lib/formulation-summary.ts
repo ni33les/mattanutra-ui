@@ -2,25 +2,70 @@ import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { Locale } from "@/lib/i18n";
 import type { AssessmentSummary } from "@/lib/formulation-types";
 
-const countryLabels: Record<string, string> = {
-  AU: "Australia",
-  CA: "Canada",
-  CN: "China",
-  DE: "Germany",
-  FR: "France",
-  GB: "United Kingdom",
-  ID: "Indonesia",
-  IN: "India",
-  JP: "Japan",
-  KR: "South Korea",
-  MM: "Myanmar",
-  MY: "Malaysia",
-  OTHER: "Other",
-  PH: "Philippines",
-  SG: "Singapore",
-  TH: "Thailand",
-  US: "United States",
-  VN: "Vietnam"
+const countryLabels: Record<Locale, Record<string, string>> = {
+  en: {
+    AU: "Australia",
+    CA: "Canada",
+    CN: "China",
+    DE: "Germany",
+    FR: "France",
+    GB: "United Kingdom",
+    ID: "Indonesia",
+    IN: "India",
+    JP: "Japan",
+    KR: "South Korea",
+    MM: "Myanmar",
+    MY: "Malaysia",
+    OTHER: "Other",
+    PH: "Philippines",
+    SG: "Singapore",
+    TH: "Thailand",
+    US: "United States",
+    VN: "Vietnam"
+  },
+  th: {
+    AU: "ออสเตรเลีย",
+    CA: "แคนาดา",
+    CN: "จีน",
+    DE: "เยอรมนี",
+    FR: "ฝรั่งเศส",
+    GB: "สหราชอาณาจักร",
+    ID: "อินโดนีเซีย",
+    IN: "อินเดีย",
+    JP: "ญี่ปุ่น",
+    KR: "เกาหลีใต้",
+    MM: "เมียนมา",
+    MY: "มาเลเซีย",
+    OTHER: "อื่น ๆ",
+    PH: "ฟิลิปปินส์",
+    SG: "สิงคโปร์",
+    TH: "ประเทศไทย",
+    US: "สหรัฐอเมริกา",
+    VN: "เวียดนาม"
+  }
+};
+
+const answerLabels: Record<Locale, Record<string, string>> = {
+  en: {
+    energy: "Energy",
+    fatigue: "Fatigue",
+    female: "Female",
+    fitness: "Fitness",
+    focus: "Focus",
+    male: "Male",
+    sleep: "Sleep",
+    statin: "Statin"
+  },
+  th: {
+    energy: "พลังงาน",
+    fatigue: "อ่อนเพลีย",
+    female: "หญิง",
+    fitness: "ฟิตเนส",
+    focus: "สมาธิ",
+    male: "ชาย",
+    sleep: "การนอน",
+    statin: "สแตติน"
+  }
 };
 
 const planLabels = {
@@ -64,6 +109,12 @@ function valueLabel(value: unknown) {
   return text ? humanize(text) : "";
 }
 
+function localizedValueLabel(value: unknown, locale: Locale) {
+  const text = toText(value);
+
+  return text ? answerLabels[locale][text] ?? humanize(text) : "";
+}
+
 function formatHeight(value: unknown) {
   const cm = Number(value);
 
@@ -101,19 +152,21 @@ export function buildAssessmentSummary({
 }>): AssessmentSummary {
   const record = toRecord(answers);
   const country = toText(record.country) || "TH";
-  const region = countryLabels[country] ?? valueLabel(country) ?? "Thailand";
-  const sex = valueLabel(record.sex);
+  const region = countryLabels[locale][country] ?? valueLabel(country) ?? "Thailand";
+  const sex = localizedValueLabel(record.sex, locale);
   const height = formatHeight(record.heightCm);
   const weight = formatWeight(record.weightKg);
   const profileParts = [sex, height, weight].filter(Boolean);
-  const goals = toTextArray(record.goals).map(humanize);
+  const goals = toTextArray(record.goals).map((value) =>
+    localizedValueLabel(value, locale)
+  );
   const symptoms = toTextArray(record.symptoms);
   const medTypes = toTextArray(record.medTypes);
   const supplementSensitivities = toTextArray(record.suppAllergies).filter(
     (item) => item !== "none"
   );
   const constraints = [
-    ...medTypes.map(humanize),
+    ...medTypes.map((value) => localizedValueLabel(value, locale)),
     ...(toText(record.meds) === "yes"
       ? [locale === "th" ? "ใช้ยาเป็นประจำ" : "Regular medication noted"]
       : []),
@@ -132,7 +185,9 @@ export function buildAssessmentSummary({
     ...(supplementSensitivities.length > 0
       ? supplementSensitivities.map(humanize)
       : []),
-    ...(symptoms.length > 0 ? symptoms.map(humanize).slice(0, 3) : [])
+    ...(symptoms.length > 0
+      ? symptoms.map((value) => localizedValueLabel(value, locale)).slice(0, 3)
+      : [])
   ];
 
   return {

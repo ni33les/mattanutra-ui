@@ -99,6 +99,9 @@ alter table public.product_versions
   alter column metadata set default '{}'::jsonb,
   alter column metadata set not null;
 
+alter table public.product_recommendation_items
+  add column if not exists serving_multiplier integer default 1 not null;
+
 insert into public.assessment_versions (
   plan_id,
   version,

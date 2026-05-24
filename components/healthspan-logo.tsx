@@ -1,17 +1,34 @@
 import type { HTMLAttributes } from "react";
 import Image from "next/image";
+import type { Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-type HealthspanLogoProps = HTMLAttributes<HTMLDivElement>;
+type HealthspanLogoProps = HTMLAttributes<HTMLDivElement> & Readonly<{
+  locale?: Locale;
+}>;
+
+const logoCopy = {
+  en: {
+    aria: "MattaNutra logo. Knowing the Right Amount.",
+    tagline: "Knowing the Right Amount"
+  },
+  th: {
+    aria: "โลโก้ MattaNutra รู้ปริมาณที่พอดี",
+    tagline: "รู้ปริมาณที่พอดี"
+  }
+} satisfies Record<Locale, { aria: string; tagline: string }>;
 
 export function HealthspanLogo({
   className,
+  locale = "en",
   ...props
 }: HealthspanLogoProps) {
+  const copy = logoCopy[locale];
+
   return (
     <div
       role="img"
-      aria-label="MattaNutra logo. Knowing the Right Amount."
+      aria-label={copy.aria}
       className={cn("inline-flex w-max items-center gap-3", className)}
       {...props}
     >
@@ -34,7 +51,7 @@ export function HealthspanLogo({
           <span className="text-[var(--mn-teal)]">Nutra</span>
         </span>
         <span className="mt-1 font-[family:var(--mn-font-mono)] text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--mn-logo-tagline,var(--muted-foreground))] sm:text-[10.5px]">
-          Knowing the Right Amount
+          {copy.tagline}
         </span>
       </span>
     </div>

@@ -1369,6 +1369,7 @@ CREATE TABLE public.product_recommendation_items (
     score numeric DEFAULT 0 NOT NULL,
     product_coverage_percent numeric DEFAULT 0 NOT NULL,
     stack_contribution_percent numeric DEFAULT 0 NOT NULL,
+    serving_multiplier integer DEFAULT 1 NOT NULL,
     covered_needs jsonb DEFAULT '[]'::jsonb NOT NULL,
     why text,
     offer_id uuid,

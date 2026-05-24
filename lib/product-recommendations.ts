@@ -949,7 +949,7 @@ type V2SafetyContext = Readonly<{
   bloodThinner: boolean;
   hasConditionContext: boolean;
   hasMedicationContext: boolean;
-  pregnant: boolean;
+  reproductiveCaution: boolean;
 }>;
 
 const V2_ALGORITHM_VERSION = "v2-exact-shortlist" as const;
@@ -981,6 +981,7 @@ const SAFETY_FLAG_PREGNANCY_CAUTION = 1;
 const SAFETY_FLAG_MEDICATION_INTERACTION = 2;
 const SAFETY_FLAG_BLEEDING_RISK = 4;
 const SAFETY_FLAG_CONDITION_CAUTION = 8;
+const SAFETY_FLAG_HORMONE_CAUTION = 16;
 const V2_BASE_WEIGHTS: V2Weights = {
   confidence: 0.05,
   cost: 0.1,
@@ -1094,10 +1095,16 @@ function normalizedV2Weights(
   const conditions = contextArray(context?.conditions).filter((item) => item !== "none");
   const hasMedicationContext =
     context?.medications === "yes" || medicationTypes.length > 0;
+  const lifestage = context?.lifestage?.toLowerCase() ?? "";
+  const hasReproductiveCaution =
+    lifestage.includes("pregnant") ||
+    lifestage.includes("breastfeeding") ||
+    lifestage.includes("ttc") ||
+    lifestage.includes("trying");
   const hasSafetyContext =
     hasMedicationContext ||
     conditions.length > 0 ||
-    context?.lifestage === "pregnant" ||
+    hasReproductiveCaution ||
     feedbackTypes.has("safety_disclosure");
 
   if (context?.budgetPreference === "low") {
@@ -1635,6 +1642,9 @@ function productSafetyMask(entry: V2ProductEntry) {
         case "condition_caution":
           mask |= SAFETY_FLAG_CONDITION_CAUTION;
           break;
+        case "hormone_caution":
+          mask |= SAFETY_FLAG_HORMONE_CAUTION;
+          break;
         default:
           break;
       }
@@ -1649,13 +1659,35 @@ function safetyContextFromClientContext(
 ): V2SafetyContext {
   const medicationTypes = new Set(contextArray(context?.medicationTypes));
   const conditions = contextArray(context?.conditions).filter((item) => item !== "none");
+  const lifestage = context?.lifestage?.toLowerCase() ?? "";
 
   return {
     bloodThinner: medicationTypes.has("blood-thinner"),
     hasConditionContext: conditions.length > 0,
     hasMedicationContext: context?.medications === "yes" || medicationTypes.size > 0,
-    pregnant: context?.lifestage === "pregnant"
+    reproductiveCaution:
+      lifestage.includes("pregnant") ||
+      lifestage.includes("breastfeeding") ||
+      lifestage.includes("ttc") ||
+      lifestage.includes("trying")
   };
+}
+
+function safetyContextBlockReasonForMask(
+  safetyMask: number,
+  context: V2SafetyContext
+) {
+  if (
+    context.reproductiveCaution &&
+    (
+      safetyMask & SAFETY_FLAG_PREGNANCY_CAUTION ||
+      safetyMask & SAFETY_FLAG_HORMONE_CAUTION
+    )
+  ) {
+    return "Blocked by pregnancy, breastfeeding, or trying-to-conceive safety context";
+  }
+
+  return null;
 }
 
 function safetyContextPenaltyForMask(
@@ -1664,7 +1696,13 @@ function safetyContextPenaltyForMask(
 ) {
   let penalty = 0;
 
-  if (context.pregnant && safetyMask & SAFETY_FLAG_PREGNANCY_CAUTION) {
+  if (
+    context.reproductiveCaution &&
+    (
+      safetyMask & SAFETY_FLAG_PREGNANCY_CAUTION ||
+      safetyMask & SAFETY_FLAG_HORMONE_CAUTION
+    )
+  ) {
     penalty += 1;
   }
 
@@ -3049,6 +3087,7 @@ function recommendProductStackExact(
   const bestRejectedByNeed = new Map<string, ProductRecommendationExclusion>();
   const bestRejectedCoverageByNeed = new Map<string, number>();
   const { deltas, weights } = normalizedV2Weights(input.clientContext);
+  const safetyContext = safetyContextFromClientContext(input.clientContext);
   const entries = input.candidates
     .flatMap((product) => {
       const baseEntry = productCoverageV2(product, scoringNeeds, input.clientSex);
@@ -3078,16 +3117,34 @@ function recommendProductStackExact(
         return [];
       }
 
+      const blockedSafetyReasons = new Set<string>();
       const productEntries = productServingMultipliers(product)
         .map((servingMultiplier) =>
           productCoverageV2(product, scoringNeeds, input.clientSex, servingMultiplier)
         )
-        .filter((entry) => entry.coverage.percent > 0);
+        .filter((entry) => {
+          if (entry.coverage.percent <= 0) {
+            return false;
+          }
+
+          const safetyReason = safetyContextBlockReasonForMask(
+            productSafetyMask(entry),
+            safetyContext
+          );
+
+          if (safetyReason) {
+            blockedSafetyReasons.add(safetyReason);
+            return false;
+          }
+
+          return true;
+        });
 
       if (productEntries.length <= 0) {
         exclusions.push({
           productId: product.id,
           reason:
+            [...blockedSafetyReasons][0] ??
             productFactAudienceMismatchReason(
               product,
               scoringNeeds,

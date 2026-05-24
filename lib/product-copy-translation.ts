@@ -227,6 +227,10 @@ async function callGrok(input: Readonly<{
               "Use the manufacturer's source page as authority. Product data may be in Thai, English, or mixed language.",
               "If the source explicitly contains an English product name, use that exact product name except for whitespace and HTML entity cleanup.",
               "If the source explicitly contains a Thai product name, use that exact Thai product name except for whitespace cleanup.",
+              "If no explicit Thai product name exists, create a natural Thai display title by translating or transliterating the English product title.",
+              "Never return null for titleTh when an English product title exists.",
+              "For Thai titles, use common Thai brand spellings where applicable: Blackmores = แบลคมอร์ส, DHC = ดีเอชซี, Vistra = วิสทร้า, Swisse = สวิสส์, Mega We Care = เมก้า วี แคร์.",
+              "Preserve meaningful Latin abbreviations and dose markers in titles when Thai readers expect them, such as CoQ10, D3, B12, IU, mg, DHA, EPA, ALA, Plus, and +.",
               "For descriptionEn, write a concise neutral catalogue description in English from source evidence only; if the evidence is Thai-only, translate or lightly summarize that Thai evidence into English.",
               "For descriptionTh, write the equivalent concise Thai catalogue description when Thai source evidence exists; if the evidence is English-only, translate or lightly summarize that English evidence into Thai.",
               "A faithful translation of source evidence is allowed and is not considered invention.",
@@ -246,7 +250,7 @@ async function callGrok(input: Readonly<{
                   descriptionTh: "neutral Thai display description or null",
                   notes: "short admin-facing notes",
                   titleEn: "English product title or null",
-                  titleTh: "Thai product title or null"
+                  titleTh: "Thai product title"
                 },
                 product: {
                   brandName: input.product.brandName,

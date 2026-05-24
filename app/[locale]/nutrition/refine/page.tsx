@@ -58,6 +58,7 @@ export default async function NutritionRefinePage({
   }
 
   const initialResult = await getStoredFormulationResult(planId, {
+    locale,
     mode: "full"
   });
 
