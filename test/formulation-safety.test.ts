@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { applyFormulationSafety } from "../lib/formulation-safety.ts";
+import {
+  applyFormulationSafety,
+  formulationSafetyContextReview
+} from "../lib/formulation-safety.ts";
 import type { FormulationBlueprint } from "../lib/formulation-types.ts";
 
 function fakeSafetySql(supplementRows: unknown[]) {
@@ -22,6 +25,20 @@ function fakeSafetySql(supplementRows: unknown[]) {
 }
 
 describe("formulation safety policy", () => {
+  it("flags ashwagandha for review in trying-to-conceive context", () => {
+    const review = formulationSafetyContextReview({
+      answers: {
+        reproStatus: "ttc",
+        sex: "female"
+      },
+      safetyFlags: ["hormone_caution"]
+    });
+
+    assert.equal(review?.ruleCode, "client_reproductive_context");
+    assert.equal(review?.reviewType, "pregnancy_breastfeeding");
+    assert.match(review?.reason ?? "", /trying-to-conceive/i);
+  });
+
   it("does not let AI review status override a whitelisted in-limit supplement", async () => {
     const formulation: FormulationBlueprint = {
       supplementBreakdown: [

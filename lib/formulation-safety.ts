@@ -25,6 +25,7 @@ type SafetyAudit = (event: {
 type SafetyInput = Readonly<{
   afterCommit?: SafetyAfterCommit;
   audit?: SafetyAudit;
+  answers?: unknown;
   formulation: FormulationBlueprint;
   locale: Locale;
   plan: AssessmentPlan;
@@ -52,9 +53,17 @@ type MatchedSupplement = SupplementRow & {
 };
 
 type ReviewKind =
+  | "client_context_safety"
   | "dose_reduced"
   | "dose_unverified"
   | "unknown_supplement";
+
+type ContextSafetyReview = Readonly<{
+  reason: string;
+  reviewType: "condition_stop" | "contraindication" | "medication_interaction" | "pregnancy_breastfeeding";
+  ruleCode: string;
+  severity: "high" | "medium";
+}>;
 
 type SupplementReviewWork = Readonly<{
   taskId: string;
@@ -68,6 +77,10 @@ function localized(en: string, th = en): LocalizedText {
   return { en, th };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 function normalizeName(value: string) {
   return value
     .toLowerCase()
@@ -75,6 +88,145 @@ function normalizeName(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+}
+
+function textFromRecord(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+
+  return typeof value === "string" && value.trim() ? value.trim().toLowerCase() : "";
+}
+
+function stringArrayFromRecord(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+
+  return Array.isArray(value)
+    ? value
+        .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+        .map((item) => item.trim().toLowerCase())
+    : [];
+}
+
+function activeContextValue(value: string | null | undefined) {
+  return Boolean(value && value !== "none" && value !== "normal" && value !== "no");
+}
+
+function reviewTypeForKind(kind: ReviewKind, contextReview?: ContextSafetyReview) {
+  if (contextReview) {
+    return contextReview.reviewType;
+  }
+
+  if (kind === "client_context_safety") {
+    return "contraindication";
+  }
+
+  if (kind === "dose_unverified") {
+    return "dose_limit";
+  }
+
+  return "ingredient_safety";
+}
+
+export function formulationSafetyContextReview(input: Readonly<{
+  answers?: unknown;
+  safetyFlags?: readonly string[] | null;
+}>): ContextSafetyReview | null {
+  const flags = new Set((input.safetyFlags ?? []).map((flag) => flag.toLowerCase()));
+  const answers = isRecord(input.answers) ? input.answers : {};
+  const reproductiveContext = [
+    textFromRecord(answers, "reproStatus"),
+    textFromRecord(answers, "menopause"),
+    textFromRecord(answers, "flow")
+  ].join(" ");
+  const hasReproductiveCaution =
+    reproductiveContext.includes("pregnan") ||
+    reproductiveContext.includes("breastfeed") ||
+    reproductiveContext.includes("ttc") ||
+    reproductiveContext.includes("trying");
+  const medicationTypes = stringArrayFromRecord(answers, "medTypes");
+  const hasMedicationContext =
+    textFromRecord(answers, "meds") === "yes" ||
+    medicationTypes.length > 0;
+  const bloodThinner = medicationTypes.includes("blood-thinner");
+  const kidney = textFromRecord(answers, "kidney");
+  const liver = textFromRecord(answers, "liver");
+  const surgery = textFromRecord(answers, "surgery");
+  const antibiotics = textFromRecord(answers, "antibiotics");
+  const digestiveCondition = textFromRecord(answers, "digCondition");
+
+  if (
+    hasReproductiveCaution &&
+    (flags.has("pregnancy_caution") || flags.has("hormone_caution"))
+  ) {
+    return {
+      reason:
+        "This supplement needs review because the assessment indicates pregnancy, breastfeeding, or trying-to-conceive context.",
+      reviewType: "pregnancy_breastfeeding",
+      ruleCode: "client_reproductive_context",
+      severity: "high"
+    };
+  }
+
+  if (
+    bloodThinner &&
+    (flags.has("bleeding_risk") || flags.has("medication_interaction"))
+  ) {
+    return {
+      reason:
+        "This supplement needs review because the assessment includes blood-thinner medication context.",
+      reviewType: "medication_interaction",
+      ruleCode: "client_medication_context",
+      severity: "high"
+    };
+  }
+
+  if (hasMedicationContext && flags.has("medication_interaction")) {
+    return {
+      reason:
+        "This supplement needs review because the assessment includes medication use.",
+      reviewType: "medication_interaction",
+      ruleCode: "client_medication_context",
+      severity: "medium"
+    };
+  }
+
+  if (activeContextValue(kidney) && flags.has("kidney_caution")) {
+    return {
+      reason:
+        "This supplement needs review because the assessment includes kidney context.",
+      reviewType: "condition_stop",
+      ruleCode: "client_condition_context",
+      severity: "medium"
+    };
+  }
+
+  if (activeContextValue(liver) && flags.has("liver_caution")) {
+    return {
+      reason:
+        "This supplement needs review because the assessment includes liver context.",
+      reviewType: "condition_stop",
+      ruleCode: "client_condition_context",
+      severity: "medium"
+    };
+  }
+
+  if (
+    (
+      activeContextValue(surgery) ||
+      activeContextValue(antibiotics) ||
+      activeContextValue(digestiveCondition)
+    ) &&
+    flags.has("condition_caution")
+  ) {
+    return {
+      reason:
+        "This supplement needs review because the assessment includes condition or procedure context.",
+      reviewType: "condition_stop",
+      ruleCode: "client_condition_context",
+      severity: "medium"
+    };
+  }
+
+  return null;
 }
 
 function numberOrNull(value: number | string | null) {
@@ -110,6 +262,10 @@ function reviewTaskType(kind: ReviewKind) {
 function reviewTaskBusinessValue(kind: ReviewKind) {
   if (kind === "dose_unverified") {
     return 500;
+  }
+
+  if (kind === "client_context_safety") {
+    return 550;
   }
 
   if (kind === "unknown_supplement") {
@@ -504,7 +660,8 @@ async function hideForReview(
   reason: string,
   severity: "critical" | "high" | "low" | "medium",
   dose: ParsedDose | null,
-  limit: ParsedDose | null
+  limit: ParsedDose | null,
+  contextReview?: ContextSafetyReview
 ) {
   const supplementName = match?.name ?? textFromLocalized(ingredient.supplement);
   const normalizedSupplementName = match?.normalized_name ?? normalizeName(supplementName);
@@ -537,19 +694,20 @@ async function hideForReview(
       reviewTaskId: reviewWork.taskId,
       safetyFlags: match?.safety_flags ?? [],
       safetyNotes: match?.safety_notes,
+      ...(contextReview
+        ? {
+            contextRuleCode: contextReview.ruleCode,
+            contextReviewType: contextReview.reviewType
+          }
+        : {}),
       taskId: reviewWork.taskId
     },
     dose,
     flagReason: reason,
     limit,
     planId: input.planId,
-    reviewType:
-      kind === "unknown_supplement"
-        ? "ingredient_safety"
-        : kind === "dose_unverified"
-          ? "dose_limit"
-          : "ingredient_safety",
-    ruleCode: kind,
+    reviewType: reviewTypeForKind(kind, contextReview),
+    ruleCode: contextReview?.ruleCode ?? kind,
     severity,
     supplementName,
     taskId: reviewWork.taskId
@@ -731,6 +889,31 @@ export async function applyFormulationSafety(
         ingredient,
         match,
         "Supplement is blocked in the MattaNutra supplement catalogue."
+      );
+      continue;
+    }
+
+    const contextReview = formulationSafetyContextReview({
+      answers: input.answers,
+      safetyFlags: match.safety_flags
+    });
+
+    if (contextReview) {
+      summary.hiddenCount += 1;
+      summary.reviewCount += 1;
+      supplementBreakdown.push(
+        await hideForReview(
+          sql,
+          input,
+          ingredient,
+          match,
+          "client_context_safety",
+          contextReview.reason,
+          contextReview.severity,
+          dose,
+          limit,
+          contextReview
+        )
       );
       continue;
     }

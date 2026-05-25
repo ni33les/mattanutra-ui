@@ -792,6 +792,8 @@ async function loadCanonicalSupplementOptions(
     max_unit: string | null;
     name: string;
     normalized_name: string;
+    safety_flags: string[] | null;
+    safety_notes: string | null;
   }>>`
     select
       supplements.id::text,
@@ -801,6 +803,8 @@ async function loadCanonicalSupplementOptions(
       supplements.list_status,
       safety.max_amount,
       safety.max_unit,
+      safety.safety_flags,
+      safety.safety_notes,
       coalesce(
         array_agg(distinct supplement_aliases.alias)
           filter (
@@ -813,7 +817,7 @@ async function loadCanonicalSupplementOptions(
     left join public.supplement_aliases
       on supplement_aliases.supplement_id = supplements.id
     left join lateral (
-      select max_amount, max_unit
+      select max_amount, max_unit, safety_flags, safety_notes
       from public.supplement_safety_limits
       where supplement_safety_limits.supplement_id = supplements.id
       order by version desc, updated_at desc
@@ -828,7 +832,9 @@ async function loadCanonicalSupplementOptions(
       supplements.category,
       supplements.list_status,
       safety.max_amount,
-      safety.max_unit
+      safety.max_unit,
+      safety.safety_flags,
+      safety.safety_notes
     order by
       case supplements.list_status
         when 'active' then 0
@@ -849,7 +855,9 @@ async function loadCanonicalSupplementOptions(
         : Number(row.max_amount),
     maxUnit: row.max_unit,
     name: row.name,
-    normalizedName: row.normalized_name
+    normalizedName: row.normalized_name,
+    safetyFlags: row.safety_flags ?? [],
+    safetyNotes: row.safety_notes
   }));
 }
 

@@ -470,6 +470,7 @@ async function applyPaidFormulationResult(
       eventually(afterCommit, async () =>
         addWorkEvent(task, eventType, level ?? "low", payload)
       ),
+    answers: row.answers,
     formulation: analysis.formulation,
     locale,
     plan: plan === "pro" ? "pro" : "precision",
@@ -745,7 +746,7 @@ async function applyExampleFormulationResult(
   }
 
   const rows = await sql`
-    select assessments.locale, assessments.selected_plan::text
+    select assessments.answers, assessments.locale, assessments.selected_plan::text
     from public.assessments
     join public.assessment_example_requests
       on assessment_example_requests.plan_id = assessments.plan_id
@@ -780,6 +781,7 @@ async function applyExampleFormulationResult(
       eventually(afterCommit, async () =>
         addWorkEvent(task, eventType, level ?? "low", { ...payload, requestId })
       ),
+    answers: row.answers,
     formulation: analysis.formulation,
     locale,
     plan,

@@ -227,6 +227,8 @@ function userPrompt({
             ? `${supplement.maxAmount} ${supplement.maxUnit}/day`
             : null,
         name: supplement.name,
+        safetyFlags: supplement.safetyFlags,
+        safetyNotes: supplement.safetyNotes,
         status: supplement.listStatus
       })),
       contract: {
@@ -310,6 +312,8 @@ function userPrompt({
         "Use marketingPoints to explain why the full bespoke plan is more useful than the free preview: for example prioritization, dose checks, cautions, and food-plus-supplement fit.",
         "When currentPlanContext.planFeedback is present, treat it as client-stated preferences and constraints for this new version.",
         "Use canonicalSupplementCatalogue as the preferred naming vocabulary. When a listed canonical supplement fits, set supplement.en exactly to its name.",
+        "Use canonicalSupplementCatalogue safetyFlags and safetyNotes before recommending a supplement. pregnancy_caution or hormone_caution conflicts with pregnancy, breastfeeding, and trying-to-conceive context; medication_interaction or bleeding_risk conflicts with disclosed medication context; kidney_caution, liver_caution, and condition_caution conflict with the matching assessment context.",
+        "Do not set status=add when a supplement safety flag conflicts with assessmentSafetyContext. Prefer a safer alternative or set status=review with a specific linked caution.",
         "Use canonical aliases only to recognize equivalent ingredients; do not output aliases when a canonical name exists.",
         "If a useful supplement is not in canonicalSupplementCatalogue, use a plain English ingredient name and set status=review so it can be checked.",
         "Do not output manufacturer product names, brand names, raw material concentrations, or label-strength text such as 100000 IU/g as supplement names.",

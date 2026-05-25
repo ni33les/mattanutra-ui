@@ -7,4 +7,6 @@ export type CanonicalSupplementOption = Readonly<{
   maxUnit: string | null;
   name: string;
   normalizedName: string;
+  safetyFlags: string[];
+  safetyNotes: string | null;
 }>;
