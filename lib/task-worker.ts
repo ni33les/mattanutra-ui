@@ -242,8 +242,10 @@ export async function enqueueDigitalOceanBillingSyncTask(date = new Date()) {
 }
 
 export async function enqueueHealthScoreAnalysisTask({
+  taskGroupId,
   planId
 }: Readonly<{
+  taskGroupId?: string | null;
   planId: string;
 }>) {
   const sql = getSql();
@@ -274,7 +276,7 @@ export async function enqueueHealthScoreAnalysisTask({
   return createWorkTask({
     actorType: "ai",
     businessValue: TASK_BUSINESS_VALUES.healthScoreAnalysis,
-    groupLabel: "Analyze HealthScore",
+    groupLabel: taskGroupId ? "Pre-generate nutrition guidance" : "Generate HealthScore",
     id: deterministicUuid(`mattanutra:task:healthscore:${planId}:${inputHash}`),
     idempotencyKey: `healthscore-analysis:${planId}:${inputHash}`,
     idempotencyScope: "successful",
@@ -283,7 +285,8 @@ export async function enqueueHealthScoreAnalysisTask({
     planId,
     reasoningEffort: "none",
     source: "assessment",
-    taskTitle: "Analyze HealthScore",
+    taskGroupId,
+    taskTitle: "Generate HealthScore",
     taskType: "analyze_healthscore"
   });
 }
@@ -428,6 +431,10 @@ export async function enqueueAssessmentPregenerationTasks({
     plan,
     pregeneration: true
   };
+  const healthScoreTaskId = await enqueueHealthScoreAnalysisTask({
+    planId,
+    taskGroupId
+  });
   const foodGuidanceTaskId = await createWorkTask({
     actorType: "ai",
     businessValue: TASK_BUSINESS_VALUES.foodGuidance,
@@ -464,10 +471,20 @@ export async function enqueueAssessmentPregenerationTasks({
     taskTitle: "Generate supplement plan",
     taskType: "generate_supplement_guidance"
   });
+  const productRecommendationTaskId = await enqueueProductRecommendationsTask({
+    dependsOnTaskId: formulationTaskId,
+    parentTaskId: formulationTaskId,
+    plan,
+    planId,
+    source: ASSESSMENT_PREGENERATION_SOURCE,
+    taskGroupId
+  });
 
   return {
     foodGuidanceTaskId,
     formulationTaskId,
+    healthScoreTaskId,
+    productRecommendationTaskId,
     taskGroupId
   };
 }
@@ -1133,6 +1150,7 @@ export async function enqueueNutritionReportTask({
 }
 
 export async function enqueueProductRecommendationsTask({
+  dependsOnTaskId,
   forceNew,
   parentTaskId,
   paymentId,
@@ -1142,6 +1160,7 @@ export async function enqueueProductRecommendationsTask({
   stackPreference,
   taskGroupId
 }: Readonly<{
+  dependsOnTaskId?: string | null;
   forceNew?: boolean;
   parentTaskId?: string | null;
   paymentId?: string | null;
@@ -1155,6 +1174,34 @@ export async function enqueueProductRecommendationsTask({
 
   if (!sql || !isUuid(planId)) {
     return null;
+  }
+
+  const matcherAlgorithmVersion =
+    ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION;
+  const matcherImplementationVersion =
+    ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION;
+  const normalizedStackPreference =
+    normalizeProductStackPreference(stackPreference);
+  const dependencyTaskId =
+    dependsOnTaskId && isUuid(dependsOnTaskId) ? dependsOnTaskId : null;
+
+  if (!forceNew) {
+    const activeRows = await sql<Array<{ id: string }>>`
+      select id::text
+      from public.tasks
+      where plan_id = ${planId}::uuid
+        and task_type = 'generate_product_recommendations'
+        and payload ->> 'matcherAlgorithmVersion' = ${matcherAlgorithmVersion}
+        and payload ->> 'matcherImplementationVersion' = ${matcherImplementationVersion}
+        and payload ->> 'stackPreference' = ${normalizedStackPreference}
+        and status not in ('completed', 'failed', 'cancelled', 'skipped')
+      order by business_value desc, scheduled_for asc, created_at asc
+      limit 1
+    `;
+
+    if (activeRows[0]?.id) {
+      return activeRows[0].id;
+    }
   }
 
   const rows = await sql<Array<{
@@ -1211,18 +1258,13 @@ export async function enqueueProductRecommendationsTask({
 
   if (
     !row ||
-    row.formulation_version < 1
+    (row.formulation_version < 1 && !dependencyTaskId)
   ) {
     return null;
   }
 
-  const matcherAlgorithmVersion =
-    ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION;
-  const matcherImplementationVersion =
-    ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION;
-  const normalizedStackPreference =
-    normalizeProductStackPreference(stackPreference);
   const inputHash = stableHash({
+    dependencyTaskId: row.formulation_version < 1 ? dependencyTaskId : null,
     matcherAlgorithmVersion,
     matcherImplementationVersion,
     normalizedStackPreference,
@@ -1237,6 +1279,9 @@ export async function enqueueProductRecommendationsTask({
   return createWorkTask({
     actorType: "deterministic",
     businessValue: TASK_BUSINESS_VALUES.productRecommendations,
+    dependencies: dependencyTaskId
+      ? [{ taskId: dependencyTaskId, type: "successful" }]
+      : undefined,
     groupLabel: "Match products",
     id: forcedRunKey
       ? crypto.randomUUID()
@@ -1252,10 +1297,12 @@ export async function enqueueProductRecommendationsTask({
       : `product-recommendations:${planId}:${inputHash}`,
     payload: {
       inputHash,
+      dependsOnTaskId: dependencyTaskId,
       matcherAlgorithmVersion,
       matcherImplementationVersion,
       parentTaskId,
       paymentId,
+      pendingFormulation: row.formulation_version < 1,
       plan,
       row,
       stackPreference: normalizedStackPreference

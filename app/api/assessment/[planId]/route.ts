@@ -190,7 +190,6 @@ export async function PATCH(
       ...healthScoreBpmFields(snapshot)
     });
 
-    await enqueueHealthScoreAnalysisTask({ planId: snapshot.planId });
     await enqueueAssessmentPregenerationTasks({
       answers: effectiveAnswers,
       locale: body.locale,

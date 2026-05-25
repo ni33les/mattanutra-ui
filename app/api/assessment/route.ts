@@ -12,7 +12,6 @@ import { computeHealthScore } from "@/lib/health-score";
 import {
   enqueueAssessmentPregenerationTasks,
   enqueueDueScheduledActions,
-  enqueueHealthScoreAnalysisTask,
   scheduleReassessmentAction
 } from "@/lib/task-worker";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
@@ -120,7 +119,6 @@ export async function POST(request: Request) {
       ...healthScoreBpmFields(snapshot)
     });
 
-    await enqueueHealthScoreAnalysisTask({ planId: snapshot.planId });
     await enqueueAssessmentPregenerationTasks({
       answers: body.answers,
       locale: body.locale,

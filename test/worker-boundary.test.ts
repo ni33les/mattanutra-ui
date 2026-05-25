@@ -243,8 +243,18 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       taskWorkerSource,
-      /enqueueAssessmentPregenerationTasks[\s\S]*generate_food_guidance[\s\S]*generate_supplement_guidance/,
-      "assessment capture should pre-generate food and supplement guidance in the active worker chain"
+      /enqueueAssessmentPregenerationTasks[\s\S]*enqueueHealthScoreAnalysisTask[\s\S]*generate_food_guidance[\s\S]*generate_supplement_guidance[\s\S]*enqueueProductRecommendationsTask/,
+      "assessment capture should create the healthscore, food, supplement, and product-matching task graph"
+    );
+    assert.match(
+      taskWorkerSource,
+      /dependsOnTaskId: formulationTaskId[\s\S]*parentTaskId: formulationTaskId/,
+      "assessment product matching must be queued immediately but depend on supplement generation"
+    );
+    assert.match(
+      taskWorkerSource,
+      /dependencies: dependencyTaskId[\s\S]*type: "successful"/,
+      "pending product matching must use task dependencies so reservation stays blocked until supplement success"
     );
   });
 
