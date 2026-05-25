@@ -39,6 +39,37 @@ describe("formulation safety policy", () => {
     assert.match(review?.reason ?? "", /trying-to-conceive/i);
   });
 
+  it("does not hard-review broad caution flags without matching active risk", () => {
+    assert.equal(
+      formulationSafetyContextReview({
+        answers: {
+          antibiotics: "yes",
+          digCondition: "none",
+          kidney: "normal",
+          liver: "normal",
+          meds: "none",
+          medTypes: ["statin"],
+          surgery: "yes"
+        },
+        safetyFlags: ["condition_caution", "kidney_caution", "medication_interaction"]
+      }),
+      null
+    );
+  });
+
+  it("flags blood-thinner interaction context using assessment option values", () => {
+    const review = formulationSafetyContextReview({
+      answers: {
+        meds: "yes",
+        medTypes: ["bloodthinner"]
+      },
+      safetyFlags: ["medication_interaction"]
+    });
+
+    assert.equal(review?.ruleCode, "client_medication_context");
+    assert.equal(review?.reviewType, "medication_interaction");
+  });
+
   it("does not let AI review status override a whitelisted in-limit supplement", async () => {
     const formulation: FormulationBlueprint = {
       supplementBreakdown: [

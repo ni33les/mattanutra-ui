@@ -98,6 +98,25 @@ function splitFreeText(value: unknown) {
     : [];
 }
 
+function textValue(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function activeContextValue(value: unknown) {
+  const normalized = textValue(value);
+
+  return Boolean(
+    normalized &&
+      normalized !== "none" &&
+      normalized !== "normal" &&
+      normalized !== "no"
+  );
+}
+
+function hasAnyToken(values: readonly string[], tokens: readonly string[]) {
+  return values.some((value) => tokens.includes(normalizeFoodName(value)));
+}
+
 function safetyIntake(answers: unknown) {
   const record = objectValue(answers);
   const allergenInputs = [
@@ -120,24 +139,88 @@ function safetyIntake(answers: unknown) {
   };
 }
 
-function deriveConditionFlags(record: Record<string, unknown>) {
-  const haystack = JSON.stringify(record).toLowerCase();
+export function deriveConditionFlags(record: Record<string, unknown>) {
   const flags = new Set<string>();
-  const addIf = (flag: string, patterns: readonly string[]) => {
-    if (patterns.some((pattern) => haystack.includes(pattern))) {
-      flags.add(flag);
-    }
-  };
+  const medicationAnswer = textValue(record.meds);
+  const medicationTypes =
+    medicationAnswer === "yes" ? stringArray(record.medTypes).map(normalizeFoodName) : [];
+  const otherMedication =
+    medicationAnswer === "yes" ? textValue(record.otherMed) : "";
+  const conditionTokens = [
+    ...stringArray(record.conditions),
+    ...stringArray(record.medicalConditions),
+    ...splitFreeText(record.conditionNotes)
+  ].map(normalizeFoodName);
+  const symptomText = [
+    ...stringArray(record.symptoms),
+    ...splitFreeText(record.symptomNotes)
+  ].join(" ").toLowerCase();
+  const reproductiveContext = [
+    textValue(record.reproStatus),
+    textValue(record.menopause),
+    textValue(record.flow)
+  ].join(" ");
 
-  addIf("blood_sugar", ["diabetes", "prediabetes", "blood sugar", "glucose", "hypogly"]);
-  addIf("kidney", ["kidney", "renal", "egfr", "creatinine"]);
-  addIf("sodium_heart", ["blood pressure", "hypertension", "heart", "cardiac", "sodium"]);
-  addIf("pregnancy", ["pregnan", "breastfeed", "conceiv"]);
-  addIf("restrictive_eating", ["eating disorder", "restrict", "binge", "food anxiety"]);
-  addIf("medication_interaction", ["warfarin", "statin", "ace inhibitor", "arb", "grapefruit", "medication", "medicine"]);
-  addIf("digestive", ["ibs", "ibd", "celiac", "reflux", "gallbladder", "pancreatitis", "digestive"]);
-  addIf("age_sensitive", ["teen", "child", "minor", "older adult", "elder"]);
-  addIf("red_flag", ["unexplained weight loss", "fainting", "chest pain", "blood in stool", "persistent vomiting", "severe abdominal"]);
+  if (
+    hasAnyToken(conditionTokens, ["diabetes", "prediabetes", "blood_sugar"]) ||
+    Number.parseFloat(textValue(objectValue(record.labs).hba1c)) >= 6.5
+  ) {
+    flags.add("blood_sugar");
+  }
+
+  if (activeContextValue(record.kidney)) {
+    flags.add("kidney");
+  }
+
+  if (
+    hasAnyToken(conditionTokens, ["hypertension", "heart", "cardiac"]) ||
+    hasAnyToken(medicationTypes, ["bp"])
+  ) {
+    flags.add("sodium_heart");
+  }
+
+  if (
+    reproductiveContext.includes("pregnan") ||
+    reproductiveContext.includes("breastfeed")
+  ) {
+    flags.add("pregnancy");
+  }
+
+  if (hasAnyToken(conditionTokens, ["eating_disorder", "restrictive_eating"])) {
+    flags.add("restrictive_eating");
+  }
+
+  if (
+    hasAnyToken(medicationTypes, ["bloodthinner", "blood_thinner", "warfarin", "anticoagulant"]) ||
+    otherMedication.includes("warfarin") ||
+    otherMedication.includes("anticoagulant")
+  ) {
+    flags.add("medication_interaction");
+  }
+
+  if (
+    activeContextValue(record.digCondition) ||
+    hasAnyToken(conditionTokens, ["ibs", "ibd", "celiac", "reflux", "gallbladder", "pancreatitis"])
+  ) {
+    flags.add("digestive");
+  }
+
+  if (hasAnyToken(conditionTokens, ["teen", "child", "minor", "older_adult", "elder"])) {
+    flags.add("age_sensitive");
+  }
+
+  if (
+    [
+      "unexplained weight loss",
+      "fainting",
+      "chest pain",
+      "blood in stool",
+      "persistent vomiting",
+      "severe abdominal"
+    ].some((pattern) => symptomText.includes(pattern))
+  ) {
+    flags.add("red_flag");
+  }
 
   return [...flags];
 }

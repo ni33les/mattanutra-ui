@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { applyFoodGuidanceSafety } from "../lib/food-guidance-safety.ts";
+import {
+  applyFoodGuidanceSafety,
+  deriveConditionFlags
+} from "../lib/food-guidance-safety.ts";
 import type { FoodGuidanceBlueprint } from "../lib/formulation-types.ts";
 
 function fakeFoodSafetySql(foodRows: unknown[]) {
@@ -22,6 +25,38 @@ function fakeFoodSafetySql(foodRows: unknown[]) {
 }
 
 describe("food guidance safety policy", () => {
+  it("does not infer conditions from inactive or stale answer fields", () => {
+    assert.deepEqual(
+      deriveConditionFlags({
+        antibiotics: "yes",
+        digCondition: "none",
+        family: ["diabetes"],
+        kidney: "normal",
+        labs: {
+          hba1c: "5.3"
+        },
+        meds: "none",
+        medTypes: ["statin"],
+        reproStatus: "ttc",
+        surgery: "yes"
+      }),
+      []
+    );
+  });
+
+  it("derives food interaction flags from explicit active risks", () => {
+    assert.deepEqual(
+      deriveConditionFlags({
+        digCondition: "ibs",
+        kidney: "reduced",
+        meds: "yes",
+        medTypes: ["bloodthinner"],
+        reproStatus: "pregnant"
+      }).sort(),
+      ["digestive", "kidney", "medication_interaction", "pregnancy"].sort()
+    );
+  });
+
   it("removes disclosed allergens and avoided foods before storage", async () => {
     const guidance: FoodGuidanceBlueprint = {
       foodGuidance: [

@@ -142,16 +142,16 @@ export function formulationSafetyContextReview(input: Readonly<{
     reproductiveContext.includes("breastfeed") ||
     reproductiveContext.includes("ttc") ||
     reproductiveContext.includes("trying");
-  const medicationTypes = stringArrayFromRecord(answers, "medTypes");
-  const hasMedicationContext =
-    textFromRecord(answers, "meds") === "yes" ||
-    medicationTypes.length > 0;
-  const bloodThinner = medicationTypes.includes("blood-thinner");
+  const medicationAnswer = textFromRecord(answers, "meds");
+  const medicationTypes =
+    medicationAnswer === "yes" ? stringArrayFromRecord(answers, "medTypes") : [];
+  const bloodThinner =
+    medicationTypes.includes("blood-thinner") ||
+    medicationTypes.includes("bloodthinner") ||
+    medicationTypes.includes("anticoagulant") ||
+    medicationTypes.includes("warfarin");
   const kidney = textFromRecord(answers, "kidney");
   const liver = textFromRecord(answers, "liver");
-  const surgery = textFromRecord(answers, "surgery");
-  const antibiotics = textFromRecord(answers, "antibiotics");
-  const digestiveCondition = textFromRecord(answers, "digCondition");
 
   if (
     hasReproductiveCaution &&
@@ -179,16 +179,6 @@ export function formulationSafetyContextReview(input: Readonly<{
     };
   }
 
-  if (hasMedicationContext && flags.has("medication_interaction")) {
-    return {
-      reason:
-        "This supplement needs review because the assessment includes medication use.",
-      reviewType: "medication_interaction",
-      ruleCode: "client_medication_context",
-      severity: "medium"
-    };
-  }
-
   if (activeContextValue(kidney) && flags.has("kidney_caution")) {
     return {
       reason:
@@ -203,23 +193,6 @@ export function formulationSafetyContextReview(input: Readonly<{
     return {
       reason:
         "This supplement needs review because the assessment includes liver context.",
-      reviewType: "condition_stop",
-      ruleCode: "client_condition_context",
-      severity: "medium"
-    };
-  }
-
-  if (
-    (
-      activeContextValue(surgery) ||
-      activeContextValue(antibiotics) ||
-      activeContextValue(digestiveCondition)
-    ) &&
-    flags.has("condition_caution")
-  ) {
-    return {
-      reason:
-        "This supplement needs review because the assessment includes condition or procedure context.",
       reviewType: "condition_stop",
       ruleCode: "client_condition_context",
       severity: "medium"
