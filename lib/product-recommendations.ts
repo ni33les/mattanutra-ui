@@ -884,12 +884,12 @@ function whyProductMatches(
 
   if (names.length < 1) {
     return contribution > 0
-      ? `${prefix}; adds ${contribution}% to this stack.`
+      ? `${prefix}; accounts for ${contribution}% of the selected stack.`
       : `${prefix}; fills an otherwise uncovered need.`;
   }
 
   return contribution > 0
-    ? `${prefix} for ${names.join(", ")}; adds ${contribution}% to this stack.`
+    ? `${prefix} for ${names.join(", ")}; accounts for ${contribution}% of the selected stack.`
     : `${prefix} for ${names.join(", ")}; fills an otherwise uncovered need.`;
 }
 
@@ -1577,6 +1577,10 @@ function productServingMultiplierAllowed(
 ) {
   if (servingMultiplier <= 1) {
     return true;
+  }
+
+  if (!product.facts.some((fact) => fact.servingLabel?.trim())) {
+    return false;
   }
 
   for (const fact of product.facts) {

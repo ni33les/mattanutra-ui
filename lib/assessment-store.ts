@@ -296,6 +296,14 @@ function weightedContributionPercent(
   return Math.min(100, Math.max(0, Math.round((coveredWeight / totalWeight) * 100)));
 }
 
+function boundedPercentOrNull(value: unknown) {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed)
+    ? Math.min(100, Math.max(0, Math.round(parsed)))
+    : null;
+}
+
 function recommendationMatchesNeed(
   recommendation: RecommendedProduct,
   need: ProductRecommendationNeed
@@ -310,7 +318,7 @@ function recommendationMatchesNeed(
   );
 }
 
-function reconcileProductRecommendationCoverage(input: Readonly<{
+export function reconcileProductRecommendationCoverage(input: Readonly<{
   foodGuidance: readonly FoodGuidanceItem[];
   rawNeedCoverage: readonly ProductNeedCoverage[];
   recommendations: readonly RecommendedProduct[];
@@ -336,20 +344,26 @@ function reconcileProductRecommendationCoverage(input: Readonly<{
       const matchedNeeds = productNeeds.filter((need) =>
         recommendationMatchesNeed(recommendation, need)
       );
-      const contributionPercent = weightedContributionPercent(
+      const fallbackContributionPercent = weightedContributionPercent(
         matchedNeeds,
         productNeeds,
         coverageLookup
       );
-      const displayPercent =
-        contributionPercent > 0
-          ? contributionPercent
-          : Math.min(100, Math.max(0, Math.round(recommendation.productCoveragePercent ?? 0)));
+      const stackContributionPercent =
+        boundedPercentOrNull(recommendation.stackContributionPercent) ??
+        (
+          fallbackContributionPercent > 0
+            ? fallbackContributionPercent
+            : boundedPercentOrNull(recommendation.productCoveragePercent) ?? 0
+        );
+      const productCoveragePercent =
+        boundedPercentOrNull(recommendation.productCoveragePercent) ??
+        stackContributionPercent;
 
       return {
         ...recommendation,
-        productCoveragePercent: displayPercent,
-        stackContributionPercent: displayPercent,
+        productCoveragePercent,
+        stackContributionPercent,
         stackCoveragePercent
       } satisfies RecommendedProduct;
     }),

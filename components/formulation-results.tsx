@@ -786,7 +786,7 @@ const revealCopy = {
     catalogueProducts: "approved products",
     catalogueSupplements: "supplements in catalogue",
     compactCoverageLabel: "Stack coverage",
-    contributionLabel: "contribution",
+    contributionLabel: "of selected stack",
     distilledEyebrow: "Distilled",
     distilledSummaryTemplate:
       "{supplementTotal} catalogue supplements assessed, {supplementSelected} selected for your formula, {productTotal} approved products checked, and {productSelected} recommended for you.",
@@ -818,9 +818,9 @@ const revealCopy = {
     productServingUnit: "servings",
     productSingleServingUnit: "serving",
     productMatchTemplate:
-      "Matches {covers} and contributes {percent}% to this stack.",
+      "Matches {covers} and accounts for {percent}% of the selected stack.",
     productServingMatchTemplate:
-      "Use {servings} {servingUnit}. Matches {covers} and contributes {percent}% to this stack.",
+      "Use {servings} {servingUnit}. Matches {covers} and accounts for {percent}% of the selected stack.",
     selectedProducts: "Selected products",
     selectedSuffix: "selected",
     tableAmount: "Daily amount",
@@ -844,7 +844,7 @@ const revealCopy = {
     catalogueProducts: "ผลิตภัณฑ์ที่อนุมัติแล้ว",
     catalogueSupplements: "อาหารเสริมในแคตตาล็อก",
     compactCoverageLabel: "ความครอบคลุมของชุดสินค้า",
-    contributionLabel: "เพิ่มความครอบคลุม",
+    contributionLabel: "ของชุดที่เลือก",
     distilledEyebrow: "กลั่นให้ชัด",
     distilledSummaryTemplate:
       "ประเมินอาหารเสริมในแคตตาล็อก {supplementTotal} รายการ เลือก {supplementSelected} รายการสำหรับสูตรของคุณ ตรวจผลิตภัณฑ์ที่อนุมัติแล้ว {productTotal} รายการ และแนะนำ {productSelected} รายการสำหรับคุณ",
@@ -875,9 +875,9 @@ const revealCopy = {
     productServingUnit: "หน่วยบริโภค",
     productSingleServingUnit: "หน่วยบริโภค",
     productMatchTemplate:
-      "ครอบคลุม {covers} และเพิ่มความครอบคลุมให้ชุดนี้ {percent}%",
+      "ครอบคลุม {covers} และคิดเป็น {percent}% ของชุดที่เลือก",
     productServingMatchTemplate:
-      "ใช้ {servings} {servingUnit} ครอบคลุม {covers} และเพิ่มความครอบคลุมให้ชุดนี้ {percent}%",
+      "ใช้ {servings} {servingUnit} ครอบคลุม {covers} และคิดเป็น {percent}% ของชุดที่เลือก",
     selectedProducts: "ผลิตภัณฑ์ที่เลือก",
     selectedSuffix: "รายการที่เลือก",
     tableAmount: "ปริมาณต่อวัน",
@@ -2007,8 +2007,8 @@ const productRecommendationCopy = {
     matched: "Matched",
     needsCovered: "Needs covered by products",
     needsReviewed: "client needs reviewed",
-    needs: "Adds",
-    ofYourNeeds: "to product coverage",
+    needs: "Accounts for",
+    ofYourNeeds: "of selected stack",
     preferenceCompact: "Compact",
     preferenceCompactHint: "Up to 3 products",
     preferenceBalanced: "Balanced",
@@ -2034,8 +2034,8 @@ const productRecommendationCopy = {
     matched: "จับคู่แล้ว",
     needsCovered: "ความต้องการที่ผลิตภัณฑ์ครอบคลุม",
     needsReviewed: "ความต้องการที่ตรวจแล้ว",
-    needs: "เพิ่ม",
-    ofYourNeeds: "ให้ความครอบคลุมของสินค้า",
+    needs: "คิดเป็น",
+    ofYourNeeds: "ของชุดที่เลือก",
     preferenceCompact: "ชุดเล็ก",
     preferenceCompactHint: "สูงสุด 3 รายการ",
     preferenceBalanced: "สมดุล",

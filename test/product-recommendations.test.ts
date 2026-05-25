@@ -46,6 +46,7 @@ function product(input: Readonly<{
   name: string;
   status?: ProductCandidate["status"];
   priceAmount?: number | null;
+  servingLabel?: string | null;
 }>): ProductCandidate {
   return {
     activeOfferId: input.affiliate ? `${input.id}-affiliate` : null,
@@ -65,6 +66,7 @@ function product(input: Readonly<{
         maxUnit: input.maxUnit ?? "mg",
         name: input.name,
         normalizedName: input.name.toLowerCase().replace(/\s+/g, "_"),
+        servingLabel: input.servingLabel ?? null,
         supplementAudience: input.factAudience ?? "both",
         unit: "mg"
       }
@@ -611,7 +613,8 @@ describe("product recommendation scoring v2 exact shortlist", () => {
           amount: 0.25,
           id: "low-dose-magnesium",
           maxAmount: 5000,
-          name: "Magnesium"
+          name: "Magnesium",
+          servingLabel: "1 capsule"
         })
       ],
       needs: [need("magnesium", "Magnesium", 5)]
@@ -623,6 +626,25 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.match(result.recommendations[0]?.why ?? "", /Use 3 servings/i);
   });
 
+  it("does not multiply a label dose when serving metadata is missing", () => {
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        product({
+          amount: 0.25,
+          id: "low-dose-no-serving",
+          maxAmount: 5000,
+          name: "Magnesium"
+        })
+      ],
+      needs: [need("magnesium", "Magnesium", 5)]
+    });
+
+    assert.equal(result.recommendations[0]?.product.id, "low-dose-no-serving");
+    assert.equal(result.recommendations[0]?.servingMultiplier, 1);
+    assert.equal(result.recommendations[0]?.productCoveragePercent, 25);
+    assert.doesNotMatch(result.recommendations[0]?.why ?? "", /Use 2|Use 3/i);
+  });
+
   it("prefers safe multiple servings over stacking separate products for the same need", () => {
     const result = recommendProductStackFullBeam({
       candidates: [
@@ -631,14 +653,16 @@ describe("product recommendation scoring v2 exact shortlist", () => {
           id: "single-low-dose",
           maxAmount: 5000,
           maxUnit: "mg/day",
-          name: "Magnesium"
+          name: "Magnesium",
+          servingLabel: "1 capsule"
         }),
         product({
           amount: 0.5,
           id: "second-low-dose",
           maxAmount: 5000,
           maxUnit: "mg/day",
-          name: "Magnesium"
+          name: "Magnesium",
+          servingLabel: "1 capsule"
         })
       ],
       needs: [need("magnesium", "Magnesium", 5)]
@@ -813,7 +837,8 @@ describe("product recommendation scoring v2 exact shortlist", () => {
       amount: 0.25,
       id: "combo",
       maxAmount: 5000,
-      name: "Magnesium"
+      name: "Magnesium",
+      servingLabel: "1 capsule"
     });
     const result = recommendProductStackFullBeam({
       candidates: [
