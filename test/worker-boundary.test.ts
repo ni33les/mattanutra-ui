@@ -83,8 +83,13 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /WORKER_PROFILE_MODES[\s\S]*"advisor"[\s\S]*"formulation"[\s\S]*"healthscore"[\s\S]*"products"/,
+      /WORKER_PROFILE_MODES[\s\S]*"advisor"[\s\S]*"food"[\s\S]*"formulation"[\s\S]*"healthscore"[\s\S]*"products"/,
       "worker:all must include every active customer task profile"
+    );
+    assert.match(
+      source,
+      /food:\s*agentProfile\("foodGuidanceWorker",\s*\[[\s\S]*"generate_food_guidance"[\s\S]*\]\)/,
+      "food workers must explicitly claim food guidance tasks"
     );
     assert.match(
       source,
@@ -183,7 +188,7 @@ describe("external worker boundaries", () => {
 
     assert.match(
       source,
-      /INTERACTIVE_TASK_TYPES[\s\S]*analyze_healthscore[\s\S]*generate_supplement_guidance/,
+      /INTERACTIVE_TASK_TYPES[\s\S]*analyze_healthscore[\s\S]*generate_food_guidance[\s\S]*generate_supplement_guidance/,
       "blocking UI task types must be on the interactive reserve path"
     );
     assert.match(
@@ -236,10 +241,10 @@ describe("external worker boundaries", () => {
       /exampleFormulation: 150/,
       "free example formulation must remain a low-value background task"
     );
-    assert.equal(
-      /exampleFoodGuidance|generate_example_food_guidance|generate_food_guidance/.test(taskWorkerSource),
-      false,
-      "food guidance tasks must stay out of the active customer worker chain"
+    assert.match(
+      taskWorkerSource,
+      /enqueueAssessmentPregenerationTasks[\s\S]*generate_food_guidance[\s\S]*generate_supplement_guidance/,
+      "assessment capture should pre-generate food and supplement guidance in the active worker chain"
     );
   });
 
@@ -279,18 +284,18 @@ describe("external worker boundaries", () => {
     }
   });
 
-  it("does not leave assessments queued when successful formulation work is reused", async () => {
+  it("adopts matching pregenerated nutrition outputs without leaving paid plans queued", async () => {
     const source = await readFile("lib/task-worker.ts", "utf8");
 
     assert.match(
       source,
-      /SUCCESSFUL_TASK_REUSE_STATUSES/,
-      "formulation enqueueing must explicitly handle reused successful tasks"
+      /nutritionOutputReadiness\([\s\S]*sql,[\s\S]*planId,[\s\S]*reusableInputHashes[\s\S]*\)/,
+      "paid nutrition enqueueing must explicitly check reusable pregenerated outputs"
     );
     assert.match(
       source,
-      /status = \$\{formulationReady \? "ready" : "failed"\}::public\.assessment_status/,
-      "reused successful supplement plan work must resolve the assessment instead of leaving it queued"
+      /const status = nutritionReady \? "ready" : "queued"/,
+      "reused food and supplement outputs must resolve the paid assessment instead of leaving it queued"
     );
   });
 
@@ -326,13 +331,13 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       workItems,
-      /!isCheckoutPregeneration[\s\S]*assessment_status_projection_update/,
-      "checkout pre-generation formulation tasks must not mark unpaid assessments preparing"
+      /!isBackgroundPregeneration[\s\S]*assessment_status_projection_update/,
+      "background pre-generation formulation tasks must not mark unpaid assessments preparing"
     );
     assert.match(
       applier,
-      /isCheckoutPregeneration[\s\S]*return;/,
-      "checkout pre-generation completion must leave customer visibility gated until payment adoption"
+      /isBackgroundPregeneration[\s\S]*return;/,
+      "background pre-generation completion must leave customer visibility gated until payment adoption"
     );
   });
 

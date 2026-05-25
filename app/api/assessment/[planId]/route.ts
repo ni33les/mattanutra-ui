@@ -9,6 +9,7 @@ import {
 } from "@/lib/assessment-store";
 import { computeHealthScore } from "@/lib/health-score";
 import {
+  enqueueAssessmentPregenerationTasks,
   enqueueDueScheduledActions,
   enqueueHealthScoreAnalysisTask,
   scheduleReassessmentAction
@@ -156,8 +157,7 @@ export async function PATCH(
     const existingPrefill = await getStoredAssessmentPrefill(planId);
     const effectiveAnswers =
       body.answers === undefined ? existingPrefill?.answers : body.answers;
-    const selectedPlan =
-      existingSnapshot?.plan ?? null;
+    const selectedPlan = existingPrefill?.plan ?? null;
     const healthScore = buildHealthScore(effectiveAnswers, body.locale);
     const snapshot = createAssessmentSnapshot({
       healthScore,
@@ -191,6 +191,11 @@ export async function PATCH(
     });
 
     await enqueueHealthScoreAnalysisTask({ planId: snapshot.planId });
+    await enqueueAssessmentPregenerationTasks({
+      answers: effectiveAnswers,
+      locale: body.locale,
+      planId: snapshot.planId
+    });
 
     const reassessmentEmail = reassessmentEmailFromAnswers(body.answers);
 

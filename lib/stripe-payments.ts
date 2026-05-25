@@ -1131,6 +1131,7 @@ async function startPaidAssessmentPlan(input: Readonly<{
   await enqueueNutritionPlanTasks({
     answers: row.answers,
     locale: input.locale,
+    paymentId: input.paymentId,
     plan: input.selectedPlan,
     planId: input.planId
   });

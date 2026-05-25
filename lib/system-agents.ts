@@ -9,6 +9,7 @@ export const AGENT_CAPABILITIES = {
   communicationRoute: "communication_route",
   doseNormalization: "dose_normalization",
   emailSend: "email_send",
+  foodGuidanceGeneration: "food_guidance_generation",
   foodGuidanceReview: "food_guidance_review",
   foodReview: "food_review",
   formulationGeneration: "formulation_generation",
@@ -42,6 +43,7 @@ export type SystemAgentKey =
   | "communicationsCoordinator"
   | "contentPublisher"
   | "emailDispatcher"
+  | "foodGuidanceWorker"
   | "formulationWorker"
   | "healthScoreEngine"
   | "humanReviewer"
@@ -116,6 +118,20 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
     model: null,
     name: "Email Dispatcher",
     type: "deterministic"
+  },
+  foodGuidanceWorker: {
+    capabilities: [
+      AGENT_CAPABILITIES.foodGuidanceGeneration,
+      AGENT_CAPABILITIES.foodGuidanceReview
+    ],
+    id: "b339a970-830a-4a4a-bf36-d31c8f1b0b70",
+    metadata: {
+      seeded: true,
+      usesModel: true
+    },
+    model: "grok:food-guidance",
+    name: "Food Guidance Worker",
+    type: "ai"
   },
   formulationWorker: {
     capabilities: [
@@ -231,6 +247,7 @@ export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
   analyze_healthscore: "healthScoreEngine",
   client_safety_followup: "communicationsCoordinator",
   generate_example_supplement_guidance: "formulationWorker",
+  generate_food_guidance: "foodGuidanceWorker",
   generate_supplement_guidance: "formulationWorker",
   generate_nutrition_report: "nutritionPlanAdvisor",
   generate_product_recommendations: "productMatcher",
@@ -257,6 +274,7 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
     generate_example_supplement_guidance: [
       AGENT_CAPABILITIES.freeExampleFormulation
     ],
+    generate_food_guidance: [AGENT_CAPABILITIES.foodGuidanceGeneration],
     generate_supplement_guidance: [AGENT_CAPABILITIES.formulationGeneration],
     generate_nutrition_report: [
       AGENT_CAPABILITIES.nutritionReportGeneration

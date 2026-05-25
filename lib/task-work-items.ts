@@ -45,7 +45,7 @@ import {
   buildReassessmentEmailSubject
 } from "@/lib/reassessment-email";
 import type { TaskRecord } from "@/lib/task-service";
-import { PAYMENT_CHECKOUT_PREGENERATION_SOURCE } from "@/lib/task-worker";
+import { isPregenerationSource } from "@/lib/task-worker";
 
 const EMPTY_FOOD_GUIDANCE: FoodGuidanceBlueprint = {
   foodGuidance: []
@@ -73,6 +73,19 @@ export type FormulationWorkItem = Readonly<{
   requestId?: string;
   taskId: string;
   taskType: "generate_example_supplement_guidance" | "generate_supplement_guidance";
+}>;
+
+export type FoodGuidanceWorkItem = Readonly<{
+  answers: unknown;
+  chatMessages: PlanChatMessage[];
+  locale: Locale;
+  plan: AssessmentPlan;
+  planFeedback: PlanFeedbackItem[];
+  planId: string;
+  previousFoodGuidance: FoodGuidanceBlueprint | null;
+  previousFormulation: FormulationBlueprint | null;
+  taskId: string;
+  taskType: "generate_food_guidance";
 }>;
 
 export type ExampleEmailWorkItem = Readonly<{
@@ -183,6 +196,7 @@ export type TaskWorkItem =
   | ContentStatusChangeWorkItem
   | DigitalOceanBillingSyncWorkItem
   | ExampleEmailWorkItem
+  | FoodGuidanceWorkItem
   | FormulationWorkItem
   | HealthScoreWorkItem
   | NutritionPlanChatWorkItem
@@ -412,10 +426,9 @@ async function buildFormulationWorkItem(task: TaskRecord) {
     loadPlanGenerationContext(sql, task.planId, taskPlanOverride(task)),
     loadCanonicalSupplementOptions(sql)
   ]);
-  const isCheckoutPregeneration =
-    taskSource(task) === PAYMENT_CHECKOUT_PREGENERATION_SOURCE;
+  const isBackgroundPregeneration = isPregenerationSource(taskSource(task));
 
-  if (task.taskType === "generate_supplement_guidance" && !isCheckoutPregeneration) {
+  if (task.taskType === "generate_supplement_guidance" && !isBackgroundPregeneration) {
     await appendAssessmentVersion(sql, {
       actor: task.reservedByAgentId,
       afterPayload: {
@@ -459,6 +472,33 @@ async function buildFormulationWorkItem(task: TaskRecord) {
       | "generate_example_supplement_guidance"
       | "generate_supplement_guidance"
   } satisfies FormulationWorkItem;
+}
+
+async function buildFoodGuidanceWorkItem(task: TaskRecord) {
+  const sql = getSql();
+
+  if (!sql || !task.planId) {
+    throw new Error("Food guidance work item is missing a plan");
+  }
+
+  const context = await loadPlanGenerationContext(
+    sql,
+    task.planId,
+    taskPlanOverride(task)
+  );
+
+  return {
+    answers: context.answers,
+    chatMessages: context.chatMessages,
+    locale: context.locale,
+    plan: context.plan,
+    planFeedback: context.planFeedback,
+    planId: task.planId,
+    previousFoodGuidance: context.foodGuidance,
+    previousFormulation: context.formulation,
+    taskId: task.id,
+    taskType: "generate_food_guidance"
+  } satisfies FoodGuidanceWorkItem;
 }
 
 async function buildExampleEmailWorkItem(task: TaskRecord) {
@@ -867,9 +907,13 @@ async function buildNutritionReportWorkItem(task: TaskRecord) {
     throw new Error("Nutrition report requires supplement guidance");
   }
 
+  if (!context.foodGuidance) {
+    throw new Error("Nutrition report requires food guidance");
+  }
+
   return {
     ...context,
-    foodGuidance: context.foodGuidance ?? EMPTY_FOOD_GUIDANCE,
+    foodGuidance: context.foodGuidance,
     formulation: context.formulation,
     taskId: task.id,
     taskType: "generate_nutrition_report"
@@ -988,6 +1032,10 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
     task.taskType === "generate_example_supplement_guidance"
   ) {
     return buildFormulationWorkItem(task);
+  }
+
+  if (task.taskType === "generate_food_guidance") {
+    return buildFoodGuidanceWorkItem(task);
   }
 
   if (task.taskType === "send_example_email") {

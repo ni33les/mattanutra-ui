@@ -1088,6 +1088,7 @@ export async function getStoredAssessmentSnapshot(planId: string) {
         from public.tasks
         where status = 'queued'
           and task_type in (
+            'generate_food_guidance',
             'generate_supplement_guidance',
             'generate_example_supplement_guidance'
           )
@@ -1845,7 +1846,7 @@ export async function getStoredFormulationResult(
         : new Date(row.assessment_updated_at)
   ).toISOString();
   const supplementsReady = Boolean(row.formulation);
-  const foodsReady = true;
+  const foodsReady = Boolean(row.food_guidance);
   const reportTaskStatus =
     typeof row.report_task_status === "string" ? row.report_task_status : "";
   const refinementTaskStatus =

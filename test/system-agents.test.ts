@@ -20,6 +20,7 @@ describe("system agents", () => {
         "Communications Coordinator",
         "Content Publisher",
         "Email Dispatcher",
+        "Food Guidance Worker",
         "HealthScore Engine",
         "Human Reviewer",
         "Nutrition Plan Advisor",
@@ -37,6 +38,7 @@ describe("system agents", () => {
       "client_safety_followup",
       "content_status_change",
       "generate_example_supplement_guidance",
+      "generate_food_guidance",
       "generate_nutrition_report",
       "generate_product_recommendations",
       "generate_supplement_guidance",
@@ -57,10 +59,9 @@ describe("system agents", () => {
     }
   });
 
-  it("keeps food guidance and marketplace-era refresh tasks out of the active roster", () => {
+  it("keeps inactive marketplace-era refresh tasks out of the active roster", () => {
     for (const inactiveTaskType of [
       "generate_example_food_guidance",
-      "generate_food_guidance",
       "discover_products",
       "parse_product_label",
       "refresh_marketplace_product"

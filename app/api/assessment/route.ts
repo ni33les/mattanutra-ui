@@ -10,6 +10,7 @@ import {
 } from "@/lib/assessment-store";
 import { computeHealthScore } from "@/lib/health-score";
 import {
+  enqueueAssessmentPregenerationTasks,
   enqueueDueScheduledActions,
   enqueueHealthScoreAnalysisTask,
   scheduleReassessmentAction
@@ -120,6 +121,11 @@ export async function POST(request: Request) {
     });
 
     await enqueueHealthScoreAnalysisTask({ planId: snapshot.planId });
+    await enqueueAssessmentPregenerationTasks({
+      answers: body.answers,
+      locale: body.locale,
+      planId: snapshot.planId
+    });
 
     const reassessmentEmail = reassessmentEmailFromAnswers(body.answers);
 
