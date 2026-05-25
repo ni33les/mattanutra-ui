@@ -33,7 +33,7 @@ type IuConversionRule = Readonly<{
 
 const IU_CONVERSION_RULES: readonly IuConversionRule[] = [
   {
-    aliases: ["vitamin_d", "vitamin_d3", "cholecalciferol"],
+    aliases: ["vitamin_d", "vitamin_d3", "d3", "cholecalciferol"],
     iuToUnitFactor: 1 / 40,
     unit: "mcg"
   },

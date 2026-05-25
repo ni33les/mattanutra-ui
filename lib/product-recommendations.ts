@@ -279,7 +279,7 @@ const MATCH_ALIAS_GROUPS: readonly (readonly string[])[] = [
   ["vitamin_b9", "folate", "folic_acid", "methylfolate", "l_5_mthf"],
   ["vitamin_b12", "b12", "cobalamin", "cyanocobalamin", "methylcobalamin"],
   ["vitamin_c", "ascorbic_acid", "calcium_ascorbate", "sodium_ascorbate"],
-  ["vitamin_d", "vitamin_d3", "cholecalciferol"],
+  ["vitamin_d", "vitamin_d3", "d3", "cholecalciferol"],
   ["vitamin_e", "tocopherol", "alpha_tocopherol", "tocopheryl_acetate", "tocopheryl_succinate"],
   ["vitamin_k", "vitamin_k1", "phytonadione", "phylloquinone"],
   ["vitamin_k2", "menaquinone", "mk_7", "mk7"],
@@ -655,7 +655,25 @@ function factComparableAmount(fact: ProductCandidateFact) {
 
   const dose = doseFromAmount(positiveNumber(fact.amount), fact.unit);
 
-  return dose ? comparableDoseAmount(dose, normalizeProductFactKey(fact.name)) : null;
+  if (!dose) {
+    return null;
+  }
+
+  const keys = [
+    normalizeProductFactKey(fact.name),
+    normalizeProductFactKey(fact.normalizedName),
+    ...productFactAliasKeys(fact.name || fact.normalizedName, fact.aliasKeys)
+  ];
+
+  for (const key of [...new Set(keys)].filter(Boolean)) {
+    const comparableAmount = comparableDoseAmount(dose, key);
+
+    if (comparableAmount !== null) {
+      return comparableAmount;
+    }
+  }
+
+  return null;
 }
 
 function confidenceMultiplier(confidence: ProductConfidence) {
@@ -894,9 +912,16 @@ type V2NeedMetrics = Readonly<{
   rawRatio: number | null;
 }>;
 
+type V2DoseContribution = Readonly<{
+  comparableAmount: number;
+  key: string;
+  limitComparableAmount: number | null;
+}>;
+
 type V2ProductEntry = Readonly<{
   confidence: number;
   coverage: CoverageResult;
+  doseContributions: V2DoseContribution[];
   extrasCount: number;
   metricsByNeed: Map<string, V2NeedMetrics>;
   product: ProductCandidate;
@@ -926,6 +951,8 @@ type V2BeamState = Readonly<{
   confidenceCoverageSums: number[];
   coverageProductCounts: number[];
   coverageSums: number[];
+  doseLimitMins: Record<string, number>;
+  doseSums: Record<string, number>;
   entries: V2ProductEntry[];
   extrasCount: number;
   indices: number[];
@@ -966,6 +993,7 @@ const V2_TOP_BROAD_SHORTLIST = 8;
 const V2_TOP_AFFILIATE_SHORTLIST = 8;
 const V2_MAX_SERVING_MULTIPLIER = 3;
 const V2_SCORE_EPSILON = 0.000001;
+const V2_STACK_DOSE_LIMIT_SLACK_MULTIPLIER = 1;
 const V2_DIVERSITY_SCORE_EPSILON = 0.005;
 const V2_MATERIAL_COVERAGE_DELTA_PERCENT = 3;
 const V2_BALANCED_MATERIAL_COVERAGE_DELTA_PERCENT = 15;
@@ -1280,6 +1308,98 @@ function comparableLimitAmountForName(
     : null;
 }
 
+function productFactStackDoseKeys(fact: ProductCandidateFact) {
+  const aliases = [
+    ...productFactAliasKeys(fact.name || fact.normalizedName, fact.aliasKeys),
+    ...productFactAliasKeys(fact.normalizedName || fact.name, fact.aliasKeys)
+  ];
+
+  return [...new Set(aliases.filter(Boolean))];
+}
+
+function productStackDoseContributions(
+  facts: readonly ProductCandidateFact[],
+  servingMultiplier: number
+) {
+  const contributionsByKey = new Map<
+    string,
+    { comparableAmount: number; limitComparableAmount: number | null }
+  >();
+
+  for (const fact of facts) {
+    const comparableAmount = factComparableAmount(fact);
+
+    if (comparableAmount === null) {
+      continue;
+    }
+
+    for (const key of productFactStackDoseKeys(fact)) {
+      const limitComparableAmount = comparableLimitAmountForName(fact, key);
+      const current = contributionsByKey.get(key);
+      let nextLimitComparableAmount = current?.limitComparableAmount ?? null;
+
+      if (limitComparableAmount !== null) {
+        nextLimitComparableAmount =
+          nextLimitComparableAmount === null
+            ? limitComparableAmount
+            : Math.min(nextLimitComparableAmount, limitComparableAmount);
+      }
+
+      contributionsByKey.set(key, {
+        comparableAmount:
+          (current?.comparableAmount ?? 0) +
+          comparableAmount * Math.max(1, servingMultiplier),
+        limitComparableAmount: nextLimitComparableAmount
+      });
+    }
+  }
+
+  return [...contributionsByKey.entries()].map(([key, contribution]) => ({
+    key,
+    ...contribution
+  }));
+}
+
+function mergeStackDoseContributions(
+  previousSums: Readonly<Record<string, number>>,
+  previousLimits: Readonly<Record<string, number>>,
+  contributions: readonly V2DoseContribution[]
+) {
+  const doseSums = { ...previousSums };
+  const doseLimitMins = { ...previousLimits };
+  const touchedKeys = new Set<string>();
+
+  for (const contribution of contributions) {
+    touchedKeys.add(contribution.key);
+    doseSums[contribution.key] =
+      (doseSums[contribution.key] ?? 0) + contribution.comparableAmount;
+
+    if (contribution.limitComparableAmount !== null) {
+      doseLimitMins[contribution.key] =
+        doseLimitMins[contribution.key] === undefined
+          ? contribution.limitComparableAmount
+          : Math.min(
+              doseLimitMins[contribution.key]!,
+              contribution.limitComparableAmount
+            );
+    }
+  }
+
+  for (const key of touchedKeys) {
+    const limit = doseLimitMins[key];
+
+    if (
+      limit !== undefined &&
+      (doseSums[key] ?? 0) >
+        limit * V2_STACK_DOSE_LIMIT_SLACK_MULTIPLIER + V2_SCORE_EPSILON
+    ) {
+      return null;
+    }
+  }
+
+  return { doseLimitMins, doseSums };
+}
+
 function factNeedMetric(
   fact: ProductCandidateFact,
   need: ProductRecommendationNeed,
@@ -1443,6 +1563,7 @@ function productCoverageV2(
       coveredNeeds,
       percent: totalWeight > 0 ? (weightedCoverage / totalWeight) * 100 : 0
     },
+    doseContributions: productStackDoseContributions(facts, servingMultiplier),
     extrasCount,
     metricsByNeed,
     product,
@@ -1460,10 +1581,15 @@ function productServingMultiplierAllowed(
 
   for (const fact of product.facts) {
     const comparableAmount = factComparableAmount(fact);
-    const limitComparableAmount = comparableLimitAmountForName(
-      fact,
-      fact.normalizedName || normalizeProductFactKey(fact.name)
-    );
+    const limitComparableAmounts = productFactStackDoseKeys(fact)
+      .map((key) => comparableLimitAmountForName(fact, key))
+      .filter(
+        (value): value is number =>
+          typeof value === "number" && Number.isFinite(value) && value > 0
+      );
+    const limitComparableAmount = limitComparableAmounts.length > 0
+      ? Math.min(...limitComparableAmounts)
+      : null;
 
     if (comparableAmount !== null && limitComparableAmount === null) {
       return false;
@@ -2397,6 +2523,16 @@ function beamSearchStackScores(
     const limitMins = previous
       ? [...previous.limitMins]
       : scoringNeeds.map((): number | null => null);
+    const nextDoseState = mergeStackDoseContributions(
+      previous?.doseSums ?? {},
+      previous?.doseLimitMins ?? {},
+      entry.doseContributions
+    );
+
+    if (!nextDoseState) {
+      return null;
+    }
+
     let extrasCount = previous?.extrasCount ?? 0;
     let priceCount = previous?.priceCount ?? 0;
     let priceSum = previous?.priceSum ?? 0;
@@ -2566,6 +2702,8 @@ function beamSearchStackScores(
       confidenceCoverageSums,
       coverageProductCounts,
       coverageSums,
+      doseLimitMins: nextDoseState.doseLimitMins,
+      doseSums: nextDoseState.doseSums,
       entries: selectedEntries,
       extrasCount,
       indices: nextIndices,
@@ -2662,7 +2800,13 @@ function enumerateStackScores(
   let priceSum = 0;
   let safetyMask = 0;
   let servingCount = 0;
+  let doseLimitMins: Record<string, number> = {};
+  let doseSums: Record<string, number> = {};
   const previousSafetyMasks: number[] = [];
+  const previousDoseStates: Array<{
+    doseLimitMins: Record<string, number>;
+    doseSums: Record<string, number>;
+  }> = [];
   let evaluatedStackCount = 0;
   const keepScore = (score: V2StackScore) => {
     evaluatedStackCount += 1;
@@ -2825,10 +2969,19 @@ function enumerateStackScores(
       )
     };
   };
-  const pushEntry = (entryIndex: number) => {
+  const pushEntry = (
+    entryIndex: number,
+    nextDoseState: {
+      doseLimitMins: Record<string, number>;
+      doseSums: Record<string, number>;
+    }
+  ) => {
     const entry = entries[entryIndex]!;
 
     stack.push(entry);
+    previousDoseStates.push({ doseLimitMins, doseSums });
+    doseLimitMins = nextDoseState.doseLimitMins;
+    doseSums = nextDoseState.doseSums;
     extrasCount += entry.extrasCount;
     servingCount += entry.servingMultiplier;
 
@@ -2867,6 +3020,9 @@ function enumerateStackScores(
     const entry = entries[entryIndex]!;
 
     stack.pop();
+    const previousDoseState = previousDoseStates.pop();
+    doseLimitMins = previousDoseState?.doseLimitMins ?? {};
+    doseSums = previousDoseState?.doseSums ?? {};
     extrasCount -= entry.extrasCount;
     servingCount -= entry.servingMultiplier;
 
@@ -2958,7 +3114,17 @@ function enumerateStackScores(
         continue;
       }
 
-      pushEntry(index);
+      const nextDoseState = mergeStackDoseContributions(
+        doseSums,
+        doseLimitMins,
+        entries[index]!.doseContributions
+      );
+
+      if (!nextDoseState) {
+        continue;
+      }
+
+      pushEntry(index, nextDoseState);
       visit(index + 1);
       popEntry(index);
     }

@@ -844,6 +844,85 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(result.recommendations[0]?.productCoveragePercent, 50);
   });
 
+  it("enforces supplement max dose across all product servings in the stack", () => {
+    const d3Fact = () => ({
+      amount: 3000,
+      comparableAmount: null,
+      confidence: "high" as const,
+      itemType: "supplement" as const,
+      maxAmount: 4000,
+      maxUnit: "IU/day",
+      name: "D3",
+      normalizedName: "d3",
+      supplementAudience: "both" as const,
+      unit: "IU"
+    });
+    const magnesiumBase = product({
+      amount: 1,
+      id: "magnesium-with-d3",
+      name: "Magnesium"
+    });
+    const zincBase = product({
+      amount: 1,
+      id: "zinc-with-d3",
+      name: "Zinc",
+      priceAmount: 1
+    });
+    const magnesiumWithD3: ProductCandidate = {
+      ...magnesiumBase,
+      facts: [magnesiumBase.facts[0]!, d3Fact()],
+      productKind: "multi"
+    };
+    const zincWithD3: ProductCandidate = {
+      ...zincBase,
+      facts: [zincBase.facts[0]!, d3Fact()],
+      productKind: "multi"
+    };
+    const zincOnly = product({
+      amount: 1,
+      id: "zinc-only",
+      name: "Zinc",
+      priceAmount: 1000
+    });
+    const needs = [
+      need("magnesium", "Magnesium", 5),
+      need("zinc", "Zinc", 5)
+    ];
+    const recommenders = [
+      { name: "full-beam", recommend: recommendProductStackFullBeam },
+      { name: "shortlist", recommend: recommendProductStackV2 }
+    ];
+
+    for (const { name, recommend } of recommenders) {
+      const result = recommend({
+        candidates: [magnesiumWithD3, zincWithD3, zincOnly],
+        maxProducts: 2,
+        needs
+      });
+      const recommendedIds = new Set(
+        result.recommendations.map((item) => item.product.id)
+      );
+      const totalD3 = result.recommendations.reduce(
+        (total, item) =>
+          total +
+          item.product.facts.reduce(
+            (factTotal, fact) =>
+              productKeysMatch(fact.name, "Vitamin D3", fact.aliasKeys)
+                ? factTotal + (fact.amount ?? 0) * item.servingMultiplier
+                : factTotal,
+            0
+          ),
+        0
+      );
+
+      assert.equal(recommendedIds.has("magnesium-with-d3"), true, name);
+      assert.equal(recommendedIds.has("zinc-with-d3"), false, name);
+      assert.equal(recommendedIds.has("zinc-only"), true, name);
+      assert.equal(totalD3 <= 4000, true, name);
+      assert.equal(result.supplementProductCoveragePercent, 100, name);
+    }
+  });
+
   it("does not stack duplicate pack variants of the same product", () => {
     const singlePack = {
       ...product({
