@@ -30,6 +30,28 @@ describe("product validation", () => {
     assert.equal(validation.matchableFactCount, 1);
   });
 
+  it("requires review when the source URL identity conflicts with the product facts", () => {
+    const validation = validateProduct({
+      facts: [
+        {
+          amount: 1000,
+          itemType: "supplement",
+          name: "Omega-3",
+          sourceText: "Each soft capsule contains fish oil 1 g",
+          supplementId,
+          unit: "mg"
+        }
+      ],
+      imageUrl: "https://example.com/fish-oil.jpg",
+      labelStatus: "parsed",
+      productUrl: "https://example.com/products/lecithin",
+      title: "Swisse Odourless Fish Oil 1000 mg"
+    });
+
+    assert.equal(validation.status, "needs_review");
+    assert.equal(validation.reasons.includes("source_conflict"), true);
+  });
+
   it("rejects concentration rows as matchable doses", () => {
     const validation = validateProduct({
       facts: [

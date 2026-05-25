@@ -984,7 +984,7 @@ const V2_FULL_BEAM_ALGORITHM_VERSION = "v2-full-beam" as const;
 export const ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION =
   V2_FULL_BEAM_ALGORITHM_VERSION;
 export const ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION =
-  "stack-preference-2";
+  "stack-preference-3";
 const V2_FULL_BEAM_WIDTH = 32;
 const V2_SHORTLIST_LIMIT = 32;
 const V2_PER_NEED_SHORTLIST = 4;
@@ -996,6 +996,9 @@ const V2_SCORE_EPSILON = 0.000001;
 const V2_STACK_DOSE_LIMIT_SLACK_MULTIPLIER = 1;
 const V2_DIVERSITY_SCORE_EPSILON = 0.005;
 const V2_MATERIAL_COVERAGE_DELTA_PERCENT = 3;
+const V2_MIN_MARGINAL_PRODUCT_CONTRIBUTION_PERCENT =
+  V2_MATERIAL_COVERAGE_DELTA_PERCENT;
+const V2_TINY_PARTIAL_PRODUCT_COVERAGE_CEILING = 0.2;
 const V2_BALANCED_MATERIAL_COVERAGE_DELTA_PERCENT = 15;
 const V2_COMPACT_MIN_COVERAGE_RATIO = 0.65;
 const V2_COMPACT_CRITICAL_WEIGHT_FLOOR = 9;
@@ -1944,6 +1947,42 @@ function stackCoverageForNeeds(
   return stackContributionMaps(entries, needs).achievedCoverage;
 }
 
+function marginalCoverageContributionPercent(
+  metrics: readonly (V2NeedMetrics | null)[],
+  currentCoverageSums: readonly number[],
+  needs: readonly ProductRecommendationNeed[]
+) {
+  const totalWeight = normalizedNeedWeightTotal(needs);
+
+  if (totalWeight <= 0) {
+    return 0;
+  }
+
+  const weightedGain = needs.reduce((total, need, needIndex) => {
+    const metric = metrics[needIndex];
+
+    if (!metric || metric.coverage <= V2_SCORE_EPSILON) {
+      return total;
+    }
+
+    const currentCoverage = clamp01(currentCoverageSums[needIndex] ?? 0);
+    const nextCoverage = clamp01(currentCoverage + metric.coverage);
+
+    return total + Math.max(0, nextCoverage - currentCoverage) * need.weight;
+  }, 0);
+
+  return (weightedGain / totalWeight) * 100;
+}
+
+function hasOnlyTinyPartialCoverage(metrics: readonly (V2NeedMetrics | null)[]) {
+  return metrics.every(
+    (metric) =>
+      !metric ||
+      metric.coverage <= V2_SCORE_EPSILON ||
+      metric.coverage < V2_TINY_PARTIAL_PRODUCT_COVERAGE_CEILING
+  );
+}
+
 function stackFingerprint(stack: V2StackScore) {
   return stack.entries
     .map((entry) => `${entry.product.id}:${entry.servingMultiplier}`)
@@ -2486,6 +2525,17 @@ function beamSearchStackScores(
           (metricsMatrix[entryIndex]![needIndex]?.coverage ?? 0) >=
             TARGET_DOSE_SWEET_SPOT_MIN
         )
+      ) {
+        return null;
+      }
+
+      if (
+        hasOnlyTinyPartialCoverage(metricsMatrix[entryIndex]!) &&
+        marginalCoverageContributionPercent(
+          metricsMatrix[entryIndex]!,
+          previous.coverageSums,
+          scoringNeeds
+        ) < V2_MIN_MARGINAL_PRODUCT_CONTRIBUTION_PERCENT
       ) {
         return null;
       }
@@ -3118,6 +3168,18 @@ function enumerateStackScores(
         continue;
       }
 
+      if (
+        stack.length > 0 &&
+        hasOnlyTinyPartialCoverage(metricsMatrix[index]!) &&
+        marginalCoverageContributionPercent(
+          metricsMatrix[index]!,
+          coverageSums,
+          scoringNeeds
+        ) < V2_MIN_MARGINAL_PRODUCT_CONTRIBUTION_PERCENT
+      ) {
+        continue;
+      }
+
       const nextDoseState = mergeStackDoseContributions(
         doseSums,
         doseLimitMins,
@@ -3169,6 +3231,230 @@ function contributionPercentForProduct(
   }
 
   return (weightedContribution / totalWeight) * 100;
+}
+
+function scoreV2StackEntries(
+  entries: readonly V2ProductEntry[],
+  input: ProductRecommendationInput,
+  scoringNeeds: readonly ProductRecommendationNeed[],
+  allNeeds: readonly ProductRecommendationNeed[],
+  weights: V2Weights
+): V2StackScore | null {
+  const {
+    achievedCoverage,
+    comparableByNeed,
+    limitsByNeed,
+    rawRatioByNeed
+  } = stackContributionMaps(entries, scoringNeeds);
+  const totalWeight = normalizedNeedWeightTotal(scoringNeeds);
+  const safetyContext = safetyContextFromClientContext(input.clientContext);
+  const budgetAmount = budgetAmountFromContext(input);
+  let coverageNumerator = 0;
+  let doseNumerator = 0;
+  let doseDenominator = 0;
+  let confidenceNumerator = 0;
+  let confidenceDenominator = 0;
+  let duplicateNeedProductNumerator = 0;
+  let extrasCount = 0;
+  let matchedNeedCount = 0;
+  let matchedNeedWeight = 0;
+  let overageNumerator = 0;
+  let overlapNumerator = 0;
+  let priceCount = 0;
+  let priceSum = 0;
+  let safetyMask = 0;
+  let servingCount = 0;
+
+  for (const entry of entries) {
+    extrasCount += entry.extrasCount;
+    safetyMask |= productSafetyMask(entry);
+    servingCount += entry.servingMultiplier;
+
+    if (typeof entry.product.priceAmount === "number" && entry.product.priceAmount > 0) {
+      priceCount += 1;
+      priceSum += entry.product.priceAmount;
+    }
+  }
+
+  for (const need of scoringNeeds) {
+    const coverageSum = entries.reduce(
+      (total, entry) => total + (entry.metricsByNeed.get(need.id)?.coverage ?? 0),
+      0
+    );
+    const achieved = achievedCoverage.get(need.id) ?? 0;
+    const comparableSeen = comparableByNeed.has(need.id);
+    const comparableAmount = comparableByNeed.get(need.id) ?? 0;
+    const rawRatio = rawRatioByNeed.get(need.id) ?? null;
+    const limit = limitsByNeed.get(need.id) ?? null;
+
+    if (limit && comparableSeen && comparableAmount > limit) {
+      return null;
+    }
+
+    coverageNumerator += achieved * need.weight;
+
+    if (achieved > 0) {
+      const confidenceCoverageSum = entries.reduce((total, entry) => {
+        const metric = entry.metricsByNeed.get(need.id) ?? null;
+
+        return metric
+          ? total + metric.coverage * metric.confidence
+          : total;
+      }, 0);
+      const confidence = coverageSum > 0
+        ? confidenceCoverageSum / coverageSum
+        : 0;
+
+      matchedNeedCount += 1;
+      matchedNeedWeight += need.weight;
+      doseNumerator += need.weight * achieved * doseBandScore(rawRatio);
+      doseDenominator += need.weight * achieved;
+      confidenceNumerator += need.weight * achieved * confidence;
+      confidenceDenominator += need.weight * achieved;
+    }
+
+    overlapNumerator += Math.max(0, coverageSum - achieved) * need.weight;
+
+    if (rawRatio !== null && rawRatio > TARGET_DOSE_SOFT_MAX) {
+      overageNumerator += Math.min(1, rawRatio - TARGET_DOSE_SOFT_MAX) * need.weight;
+    }
+
+    const coverageProductCount = entries.reduce((count, entry) => {
+      const metric = entry.metricsByNeed.get(need.id) ?? null;
+
+      return metric && metric.coverage > V2_SCORE_EPSILON ? count + 1 : count;
+    }, 0);
+
+    if (coverageProductCount > 1) {
+      duplicateNeedProductNumerator += (coverageProductCount - 1) * need.weight;
+    }
+  }
+
+  const coverage = totalWeight > 0 ? coverageNumerator / totalWeight : 0;
+  const dosePrecision = doseDenominator > 0 ? doseNumerator / doseDenominator : 0;
+  const confidence = confidenceDenominator > 0
+    ? confidenceNumerator / confidenceDenominator
+    : 0;
+  const extraServings = Math.max(0, servingCount - entries.length);
+  const simplicity = clamp01(
+    1 -
+      0.12 * Math.max(0, entries.length - 3) -
+      V2_EXTRA_SERVING_SIMPLICITY_PENALTY * extraServings
+  );
+  const price = priceCount > 0 ? priceSum : null;
+  const affordability =
+    budgetAmount && price
+      ? clamp01(1 - Math.max(0, price - budgetAmount) / budgetAmount)
+      : 0.5;
+  const costEfficiency = clamp01(coverage * 0.7 + affordability * 0.3);
+  const extras = usefulExtrasScore(extrasCount);
+  const overlapPenalty = totalWeight > 0 ? overlapNumerator / totalWeight : 0;
+  const overagePenalty = totalWeight > 0 ? overageNumerator / totalWeight : 0;
+  const extraFactPenalty = excessiveExtrasPenalty(extrasCount);
+  const duplicateNeedProductPenalty = totalWeight > 0
+    ? duplicateNeedProductNumerator / totalWeight
+    : 0;
+  const safetyContextPenalty = safetyContextPenaltyForMask(
+    safetyMask,
+    safetyContext
+  );
+  const penalty = clamp01(
+    0.3 * overlapPenalty +
+    V2_DUPLICATE_NEED_PRODUCT_PENALTY_WEIGHT * duplicateNeedProductPenalty +
+    0.4 * overagePenalty +
+    V2_EXCESSIVE_EXTRAS_PENALTY_WEIGHT * extraFactPenalty +
+    safetyContextPenalty
+  );
+  const componentScores = {
+    confidence: roundScore(confidence),
+    cost: roundScore(costEfficiency),
+    coverage: roundScore(coverage),
+    dose: roundScore(dosePrecision),
+    duplicateNeedProductPenalty: roundScore(duplicateNeedProductPenalty),
+    extraFactPenalty: roundScore(extraFactPenalty),
+    extras: roundScore(extras),
+    overagePenalty: roundScore(overagePenalty),
+    penalty: roundScore(penalty),
+    safetyContextPenalty: roundScore(safetyContextPenalty),
+    simplicity: roundScore(simplicity)
+  };
+  const score =
+    weights.coverage * coverage +
+    weights.dose * dosePrecision +
+    weights.simplicity * simplicity +
+    weights.cost * costEfficiency +
+    weights.extras * extras +
+    weights.confidence * confidence -
+    penalty;
+  const productNeeds = supplementProductNeeds(allNeeds);
+
+  return {
+    achievedCoverage,
+    comparableByNeed,
+    componentScores,
+    entries: [...entries],
+    matchedNeedCount,
+    matchedNeedWeight,
+    overagePenalty,
+    rawRatioByNeed,
+    safetyContextPenalty,
+    score,
+    servingCount,
+    supplementProductCoveragePercent: safePercent(
+      stackCoveragePercent(achievedCoverage, productNeeds)
+    ),
+    totalPlanCoveragePercent: safePercent(
+      stackCoveragePercent(achievedCoverage, allNeeds)
+    )
+  };
+}
+
+function pruneLowContributionStackEntries(
+  stack: V2StackScore,
+  input: ProductRecommendationInput,
+  scoringNeeds: readonly ProductRecommendationNeed[],
+  allNeeds: readonly ProductRecommendationNeed[],
+  weights: V2Weights
+) {
+  let entries = [...stack.entries];
+
+  while (entries.length > 1) {
+    const lowContributionEntry = entries
+      .map((entry) => ({
+        contribution: contributionPercentForProduct(entry, entries, scoringNeeds),
+        entry
+      }))
+      .filter(
+        ({ contribution, entry }) =>
+          contribution + V2_SCORE_EPSILON <
+            V2_MIN_MARGINAL_PRODUCT_CONTRIBUTION_PERCENT &&
+          hasOnlyTinyPartialCoverage(
+            scoringNeeds.map((need) => entry.metricsByNeed.get(need.id) ?? null)
+          )
+      )
+      .sort(
+        (first, second) =>
+          first.contribution - second.contribution ||
+          first.entry.coverage.percent - second.entry.coverage.percent ||
+          first.entry.product.title.localeCompare(second.entry.product.title) ||
+          first.entry.product.id.localeCompare(second.entry.product.id)
+      )[0];
+
+    if (!lowContributionEntry) {
+      break;
+    }
+
+    entries = entries.filter((entry) => entry !== lowContributionEntry.entry);
+  }
+
+  if (entries.length === stack.entries.length) {
+    return stack;
+  }
+
+  return (
+    scoreV2StackEntries(entries, input, scoringNeeds, allNeeds, weights) ??
+    stack
+  );
 }
 
 function recommendationsFromV2Stack(
@@ -3362,7 +3648,17 @@ function recommendProductStackExact(
         weights,
         maxProducts
       );
-  const stackScores = stackSearch.scores;
+  const stackScores = uniqueStackScores(
+    stackSearch.scores.map((stack) =>
+      pruneLowContributionStackEntries(
+        stack,
+        input,
+        scoringNeeds,
+        scoringNeeds,
+        weights
+      )
+    )
+  );
   const bestStack = selectStackForPreference(
     stackScores,
     scoringNeeds,

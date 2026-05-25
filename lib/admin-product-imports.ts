@@ -291,6 +291,8 @@ export async function validateProductImportForApproval(input: Readonly<{
   labelStatus?: string | null;
   productUrl?: string | null;
   sourceUrl?: string | null;
+  title?: string | null;
+  titleEn?: string | null;
 }>) {
   const sql = getSql();
 
@@ -364,7 +366,8 @@ export async function validateProductImportForApproval(input: Readonly<{
     imageUrl: input.imageUrl,
     labelStatus: input.labelStatus,
     productUrl: input.productUrl,
-    sourceUrl: input.sourceUrl
+    sourceUrl: input.sourceUrl,
+    title: input.titleEn ?? input.title
   });
 }
 

@@ -867,7 +867,10 @@ function validationCacheStatusForRow(
 }
 
 function validationForRow(
-  row: Pick<ProductDbRow, "image_url" | "label_status" | "product_url" | "source_url">,
+  row: Pick<
+    ProductDbRow,
+    "image_url" | "label_status" | "product_url" | "source_url" | "title" | "title_en"
+  >,
   facts: readonly AdminProductFact[],
   rawFacts: unknown
 ) {
@@ -898,7 +901,8 @@ function validationForRow(
     imageUrl: row.image_url,
     labelStatus: row.label_status,
     productUrl: row.product_url,
-    sourceUrl: row.source_url
+    sourceUrl: row.source_url,
+    title: row.title_en ?? row.title
   });
 }
 
@@ -1858,6 +1862,8 @@ export async function validateProductImportForApproval(input: Readonly<{
   labelStatus?: string | null;
   productUrl?: string | null;
   sourceUrl?: string | null;
+  title?: string | null;
+  titleEn?: string | null;
 }>) {
   const sql = getSql();
 
@@ -1931,7 +1937,8 @@ export async function validateProductImportForApproval(input: Readonly<{
     imageUrl: input.imageUrl,
     labelStatus: input.labelStatus,
     productUrl: input.productUrl,
-    sourceUrl: input.sourceUrl
+    sourceUrl: input.sourceUrl,
+    title: input.titleEn ?? input.title
   });
 }
 

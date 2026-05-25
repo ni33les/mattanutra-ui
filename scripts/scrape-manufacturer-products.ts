@@ -2434,7 +2434,9 @@ async function canAutoApproveProduct(product: ScrapedManufacturerProduct) {
     imageUrl: product.imageUrls[0] ?? null,
     labelStatus: product.parsedFacts.length > 0 ? "parsed" : "missing",
     productUrl: product.sourceUrl,
-    sourceUrl: product.sourceUrl
+    sourceUrl: product.sourceUrl,
+    title: product.productTitle,
+    titleEn: product.titleEn
   });
 
   return validation.status === "pass" &&
@@ -2997,7 +2999,9 @@ async function validateProductsForQualityImport(
       imageUrl: product.imageUrls[0] ?? null,
       labelStatus: product.parsedFacts.length > 0 ? "parsed" : "missing",
       productUrl: product.sourceUrl,
-      sourceUrl: product.sourceUrl
+      sourceUrl: product.sourceUrl,
+      title: product.productTitle,
+      titleEn: product.titleEn
     });
     const displayBlockers = qualityDisplayBlockers(product);
     const reasons = [...new Set([...validation.reasons, ...displayBlockers])];

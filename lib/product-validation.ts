@@ -45,6 +45,7 @@ export type ValidationInput = Readonly<{
   labelStatus?: string | null;
   productUrl?: string | null;
   sourceUrl?: string | null;
+  title?: string | null;
 }>;
 
 export type ValidationResult = Readonly<{
@@ -86,6 +87,24 @@ const SOURCE_FORM_TOKENS = new Set([
   "sulfate",
   "sulphate"
 ]);
+const SOURCE_IDENTITY_ALIAS_GROUPS: readonly (readonly string[])[] = [
+  ["ashwagandha", "ashwaganda", "withania_somnifera"],
+  ["coq10", "coenzyme_q10", "ubiquinone", "ubiquinol"],
+  ["creatine"],
+  ["curcumin", "curacumin", "turmeric"],
+  ["lecithin"],
+  ["magnesium"],
+  ["omega_3", "fish_oil", "fish"],
+  ["probiotics", "probiotic"],
+  ["theanine"],
+  ["vitamin_b12", "b12"],
+  ["vitamin_c"],
+  ["vitamin_d", "vitamin_d3", "d3"],
+  ["zinc"]
+];
+const SOURCE_IDENTITY_ALIASES = SOURCE_IDENTITY_ALIAS_GROUPS.map((group) =>
+  group.map((value) => normalizeProductFactKey(value)).filter(Boolean)
+);
 
 function numberOrNull(value: unknown) {
   if (value === null || value === undefined || value === "") {
@@ -111,6 +130,74 @@ function hasDose(fact: ValidationFact) {
 
 function factName(fact: ValidationFact) {
   return String(fact.name ?? fact.normalizedName ?? "");
+}
+
+function textContainsIdentityAlias(text: string, alias: string) {
+  return text === alias || text.startsWith(`${alias}_`) ||
+    text.endsWith(`_${alias}`) || text.includes(`_${alias}_`);
+}
+
+function identityGroupIndexes(value: string | null | undefined) {
+  const normalized = normalizeProductFactKey(String(value ?? ""));
+
+  if (!normalized) {
+    return new Set<number>();
+  }
+
+  const matches = new Set<number>();
+
+  for (const [index, aliases] of SOURCE_IDENTITY_ALIASES.entries()) {
+    if (aliases.some((alias) => textContainsIdentityAlias(normalized, alias))) {
+      matches.add(index);
+    }
+  }
+
+  return matches;
+}
+
+function productUrlIdentityText(input: ValidationInput) {
+  const rawUrl = input.productUrl || input.sourceUrl;
+
+  if (!rawUrl) {
+    return "";
+  }
+
+  try {
+    const url = new URL(rawUrl);
+    const parts = url.pathname.split("/").filter(Boolean);
+
+    return parts.at(-1) ?? "";
+  } catch {
+    const parts = rawUrl.split(/[/?#]/)[0]?.split("/").filter(Boolean) ?? [];
+
+    return parts.at(-1) ?? rawUrl;
+  }
+}
+
+function productSourceIdentityConflicts(input: ValidationInput) {
+  const sourceGroups = identityGroupIndexes(productUrlIdentityText(input));
+
+  if (sourceGroups.size < 1) {
+    return false;
+  }
+
+  const productIdentityText = [
+    input.title,
+    ...input.facts.flatMap((fact) => [
+      fact.name,
+      fact.normalizedName,
+      fact.sourceText
+    ])
+  ].filter((value): value is string => hasUsableText(value));
+  const productGroups = new Set<number>();
+
+  for (const value of productIdentityText) {
+    for (const group of identityGroupIndexes(value)) {
+      productGroups.add(group);
+    }
+  }
+
+  return [...sourceGroups].some((group) => !productGroups.has(group));
 }
 
 export function productFactLooksDirtyForMatching(fact: ValidationFact) {
@@ -366,6 +453,10 @@ export function validateProduct(input: ValidationInput): ValidationResult {
 
   if (facts.some(unsafeDose)) {
     reasons.add("unsafe_dose");
+  }
+
+  if (productSourceIdentityConflicts(input)) {
+    reasons.add("source_conflict");
   }
 
   if (
