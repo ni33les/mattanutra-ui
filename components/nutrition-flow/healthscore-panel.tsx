@@ -11,7 +11,7 @@ import {
   SparklesIcon
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type {
   HealthScoreGapCard,
@@ -1223,16 +1223,14 @@ function HealthScoreExperience({
   result: HealthScoreResult;
   showPricing: boolean;
 }>) {
-  const stableResult = useMemo(() => result, [result]);
-
   return (
     <section className="space-y-14">
-      <HealthScoreHero locale={locale} result={stableResult} />
-      <GapCards locale={locale} result={stableResult} />
-      <PillarBars locale={locale} result={stableResult} />
-      <FindingsSection locale={locale} result={stableResult} />
-      <SubtractionBeat locale={locale} result={stableResult} />
-      <MethodCards locale={locale} result={stableResult} />
+      <HealthScoreHero locale={locale} result={result} />
+      <GapCards locale={locale} result={result} />
+      <PillarBars locale={locale} result={result} />
+      <FindingsSection locale={locale} result={result} />
+      <SubtractionBeat locale={locale} result={result} />
+      <MethodCards locale={locale} result={result} />
       {showPricing ? <PricingSection locale={locale} planId={planId} /> : null}
     </section>
   );

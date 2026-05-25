@@ -14,7 +14,6 @@ import {
   ScaleGroup,
   SectionCard,
   SkinToneGroup,
-  cardOptionClasses,
   cx
 } from "@/components/nutrition-flow/ui";
 import { HealthScorePaymentPanel } from "@/components/nutrition-flow/healthscore-panel";

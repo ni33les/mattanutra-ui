@@ -2,16 +2,11 @@
 
 import { startTransition, useEffect, useRef, useState } from "react";
 import {
-  BeakerIcon,
   ExclamationTriangleIcon,
-  HeartIcon,
-  InformationCircleIcon,
-  SparklesIcon
+  InformationCircleIcon
 } from "@heroicons/react/20/solid";
 import { NutritionProgress } from "@/components/nutrition-progress";
 import type {
-  FoodGuidanceItem,
-  FormulationCaution,
   FormulationIngredient,
   FormulationResult,
   LocalizedText,
@@ -408,19 +403,6 @@ function supplementBenefitTags(ingredient: FormulationIngredient) {
   return [...new Set([...explicitTags, ...derivedTags])].slice(0, 4);
 }
 
-function pendingReviewCount(result: FormulationResult) {
-  const summary = result.safetySummary;
-  const foodSummary = result.foodSafetySummary;
-
-  return (
-    Math.max(0, Number(summary?.reviewCount ?? summary?.hiddenCount ?? 0)) +
-    Math.max(
-      0,
-      Number(foodSummary?.reviewCount ?? foodSummary?.hiddenCount ?? 0)
-    )
-  );
-}
-
 function planResultsHref(locale: Locale, planId: string) {
   return nutritionRefinePath(locale, planId);
 }
@@ -518,7 +500,6 @@ export function FormulationResults({
   const [loadState, setLoadState] = useState<LoadState>(
     initialResult ? "ready" : "loading"
   );
-  const [refreshNonce, setRefreshNonce] = useState(0);
   const [result, setResult] = useState<FormulationResult | null>(initialResult);
   const [selectedProductStackPreference, setSelectedProductStackPreference] =
     useState<ProductStackPreference | null>(null);
@@ -586,7 +567,7 @@ export function FormulationResults({
         window.clearTimeout(retryTimer);
       }
     };
-  }, [effectivePlanId, locale, refreshNonce]);
+  }, [effectivePlanId, locale]);
 
   useEffect(() => {
     if (!result) {
@@ -658,10 +639,6 @@ export function FormulationResults({
   const nutritionPending =
     (FOOD_GUIDANCE_VISIBLE && sectionStatuses.foods !== "ready") ||
     sectionStatuses.supplements !== "ready";
-  const lockedSupplementCount = Math.max(
-    0,
-    Number(result.lockedSupplementCount ?? 0)
-  );
   const unlockHref = planPaywallHref(locale, effectiveResultPlanId);
   const productRecommendationOptions = productRecommendationOptionsForResult(result);
   const selectedProductRecommendationOption = selectProductRecommendationOption(
@@ -694,7 +671,6 @@ export function FormulationResults({
       isPreview={isPreview}
       labels={labels}
       locale={locale}
-      lockedSupplementCount={lockedSupplementCount}
       onProductStackPreferenceChange={setSelectedProductStackPreference}
       planId={effectiveResultPlanId}
       productCoverageBySupplementId={productCoverageBySupplementId}
@@ -711,44 +687,6 @@ export function FormulationResults({
 }
 
 type PanelLabels = (typeof formulationResultsCopy)["en"];
-
-function CautionsPanel({
-  cautions,
-  labels,
-  locale
-}: Readonly<{
-  cautions: FormulationCaution[];
-  labels: PanelLabels;
-  locale: Locale;
-}>) {
-  return (
-    <section className="mt-8 rounded-lg border border-amber-200 bg-amber-50/70 p-5 text-sm leading-6 text-amber-950 sm:p-6">
-      <div className="flex gap-3">
-        <ExclamationTriangleIcon
-          aria-hidden={true}
-          className="mt-0.5 size-5 flex-none text-amber-600"
-        />
-        <div>
-          <h2 className="font-semibold uppercase tracking-[0.12em]">
-            {labels.cautions}
-          </h2>
-          <ul className="mt-3 space-y-3">
-            {cautions.map((caution) => (
-              <li key={caution.id}>
-                {caution.title ? (
-                  <p className="font-semibold">
-                    {getLocalizedText(caution.title, locale)}
-                  </p>
-                ) : null}
-                <p>{getLocalizedText(caution.body, locale)}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function NutritionGuidancePreparingPanel({
   labels,
@@ -1161,7 +1099,6 @@ function RevealResultsPage({
   isPreview,
   labels,
   locale,
-  lockedSupplementCount,
   onProductStackPreferenceChange,
   planId,
   productCoverageBySupplementId,
@@ -1177,7 +1114,6 @@ function RevealResultsPage({
   isPreview: boolean;
   labels: PanelLabels;
   locale: Locale;
-  lockedSupplementCount: number;
   onProductStackPreferenceChange: (preference: ProductStackPreference) => void;
   planId: string;
   productCoverageBySupplementId: ReadonlyMap<string, number>;
@@ -1721,172 +1657,6 @@ function RevealClosingSection({
   );
 }
 
-function FoodGuidancePanel({
-  foods,
-  hasPendingSafetyReview,
-  isPending,
-  labels,
-  lockedFoodCount,
-  locale,
-  unlockHref
-}: Readonly<{
-  foods: FoodGuidanceItem[];
-  hasPendingSafetyReview: boolean;
-  isPending: boolean;
-  labels: PanelLabels;
-  lockedFoodCount: number;
-  locale: Locale;
-  unlockHref: string;
-}>) {
-  return (
-    <section className="rounded-lg bg-white p-5 ring-1 ring-foreground/10 sm:p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-normal text-[var(--mn-ink)]">
-            {labels.foods}
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {labels.foodsHint}
-          </p>
-        </div>
-        <SparklesIcon
-          aria-hidden={true}
-          className="size-6 flex-none text-[var(--mn-teal)]"
-        />
-      </div>
-
-      <div className="mt-6 space-y-3">
-        {foods.length < 1 && isPending ? (
-          <SectionLoadingCards accent="green" />
-        ) : foods.length < 1 ? (
-          <div className="rounded-lg border border-dashed border-foreground/15 bg-background/60 p-6 text-center">
-            <SparklesIcon
-              aria-hidden={true}
-              className="mx-auto size-7 text-[var(--mn-teal)]"
-            />
-            <h3 className="mt-4 text-base font-semibold text-[var(--mn-ink)]">
-              {hasPendingSafetyReview
-                ? labels.foodsEmptyTitle
-                : labels.formulaNoVisibleTitle}
-            </h3>
-            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-              {hasPendingSafetyReview
-                ? labels.foodsEmptyBody
-                : labels.formulaNoVisibleBody}
-            </p>
-          </div>
-        ) : foods.map((item) => {
-          const food = getLocalizedText(item.food, locale);
-          const underReview = item.safety?.visibility === "hidden";
-          const rationale = getLocalizedText(item.rationale, locale);
-          const serving = getLocalizedText(item.serving, locale);
-          const frequency = getLocalizedText(item.frequency, locale);
-          const tags = [...(item.benefitTags ?? []), ...(item.nutrientTags ?? [])];
-
-          if (underReview) {
-            return (
-              <ReviewPlaceholderCard
-                key={item.id}
-                message={labels.foodUnderReview}
-                title={food}
-              />
-            );
-          }
-
-          return (
-            <article
-              key={item.id}
-              className="rounded-lg border border-foreground/10 bg-white p-4"
-            >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <h4 className="text-base font-semibold text-[var(--mn-ink)]">
-                    {food}
-                  </h4>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    {rationale}
-                  </p>
-                  {tags.length > 0 ? (
-                    <div className="mt-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                        {labels.benefits}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {tags.slice(0, 6).map((tag) => (
-                          <span
-                            className="rounded-full bg-[var(--mn-mint-deep)] px-2 py-0.5 text-xs font-semibold text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-teal-glow)]"
-                            key={tag}
-                          >
-                            {localizedBenefitTagLabel(tag, locale)}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="shrink-0 sm:w-44">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    {labels.foodServing}
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[var(--mn-ink)]">
-                    {serving}
-                  </p>
-                  <p className="mt-1 text-xs font-medium text-muted-foreground">
-                    {frequency}
-                  </p>
-                </div>
-              </div>
-            </article>
-          );
-        })}
-
-        {lockedFoodCount > 0 ? (
-          <LockedFormulaPreview
-            count={lockedFoodCount}
-            labels={labels}
-            unlockHref={unlockHref}
-          />
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function ContextItem({ label, value }: Readonly<{ label: string; value: string }>) {
-  return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </dt>
-      <dd className="mt-1 font-medium text-[var(--mn-ink)]">{value}</dd>
-    </div>
-  );
-}
-
-function ContextChips({
-  label,
-  values
-}: Readonly<{ label: string; values: string[] }>) {
-  return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </dt>
-      <dd className="mt-2 flex flex-wrap gap-2">
-        {values.map((value) => (
-          <span
-            key={value}
-            className="rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--mn-ink)] ring-1 ring-foreground/10"
-          >
-            {value}
-          </span>
-        ))}
-      </dd>
-    </div>
-  );
-}
-
 function PreviewPaywallPanel({
   labels,
   unlockHref
@@ -2345,278 +2115,5 @@ export function ProductRecommendationsPanel({
         ))}
       </div>
     </section>
-  );
-}
-
-function FormulaPanel({
-  hasPendingSafetyReview,
-  ingredients,
-  isPending,
-  labels,
-  lockedSupplementCount,
-  locale,
-  productCoverageBySupplementId,
-  unlockHref
-}: Readonly<{
-  hasPendingSafetyReview: boolean;
-  ingredients: FormulationIngredient[];
-  isPending: boolean;
-  labels: PanelLabels;
-  lockedSupplementCount: number;
-  locale: Locale;
-  productCoverageBySupplementId: ReadonlyMap<string, number>;
-  unlockHref: string;
-}>) {
-  return (
-    <section className="rounded-lg bg-white p-5 ring-1 ring-foreground/10 sm:p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-normal text-[var(--mn-ink)]">
-            {labels.formula}
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {labels.formulaHint}
-          </p>
-        </div>
-        <BeakerIcon
-          aria-hidden={true}
-          className="size-6 flex-none text-[var(--mn-gold)]"
-        />
-      </div>
-
-      <div className="mt-6 space-y-3">
-        {ingredients.length < 1 && isPending ? (
-          <SectionLoadingCards accent="blue" />
-        ) : ingredients.length < 1 ? (
-          <div className="rounded-lg border border-dashed border-foreground/15 bg-background/60 p-6 text-center">
-            <BeakerIcon
-              aria-hidden={true}
-              className="mx-auto size-7 text-[var(--mn-gold)]"
-            />
-            <h3 className="mt-4 text-base font-semibold text-[var(--mn-ink)]">
-              {hasPendingSafetyReview
-                ? labels.formulaEmptyTitle
-                : labels.formulaNoVisibleTitle}
-            </h3>
-            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-              {hasPendingSafetyReview
-                ? labels.formulaEmptyBody
-                : labels.formulaNoVisibleBody}
-            </p>
-          </div>
-        ) : ingredients.map((ingredient) => {
-          const supplement = getLocalizedText(ingredient.supplement, locale);
-          const underReview = ingredient.safety?.visibility === "hidden";
-          const rationale = getLocalizedText(ingredient.rationale, locale);
-          const dailyDose = getLocalizedText(ingredient.dailyDose, locale);
-          const benefitTags = supplementBenefitTags(ingredient);
-          const productCoverage =
-            productCoverageBySupplementId.get(ingredient.id) ?? 0;
-
-          if (underReview) {
-            return (
-              <ReviewPlaceholderCard
-                key={ingredient.id}
-                message={labels.supplementUnderReview}
-                title={supplement}
-              />
-            );
-          }
-
-          return (
-            <article
-              key={ingredient.id}
-              className="rounded-lg border border-foreground/10 bg-white p-4"
-            >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <h4 className="text-base font-semibold text-[var(--mn-ink)]">
-                    {supplement}
-                  </h4>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    {rationale}
-                  </p>
-                  {ingredient.cautions?.length ? (
-                    <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
-                      <p className="font-semibold uppercase tracking-[0.12em]">
-                        {labels.cautions}
-                      </p>
-                      <ul className="mt-1 space-y-1">
-                        {ingredient.cautions.map((caution) => (
-                          <li key={caution.id}>
-                            {caution.title ? (
-                              <span className="font-semibold">
-                                {getLocalizedText(caution.title, locale)}:{" "}
-                              </span>
-                            ) : null}
-                            {getLocalizedText(caution.body, locale)}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  <div className="mt-4 max-w-md">
-                    <div className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      <span>{labels.productCoverage}</span>
-                      <span className="text-[var(--mn-ink)]">
-                        {productCoverage}%
-                      </span>
-                    </div>
-                    <progress
-                      aria-label={labels.productCoverage}
-                      className="mn-progress mn-progress--soft mt-2"
-                      max={100}
-                      value={productCoverage}
-                    />
-                  </div>
-                  {benefitTags.length > 0 ? (
-                    <div className="mt-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                        {labels.benefits}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {benefitTags.map((tag) => (
-                          <span
-                            className="rounded-full bg-[var(--mn-mint)] px-2 py-0.5 text-xs font-semibold text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]"
-                            key={tag}
-                          >
-                            {localizedBenefitTagLabel(tag, locale)}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="shrink-0 sm:w-44">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    {labels.dailyDose}
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[var(--mn-ink)]">
-                    {dailyDose}
-                  </p>
-                </div>
-              </div>
-            </article>
-          );
-        })}
-
-        {lockedSupplementCount > 0 ? (
-          <LockedFormulaPreview
-            count={lockedSupplementCount}
-            labels={labels}
-            unlockHref={unlockHref}
-          />
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function SectionLoadingCards({
-  accent
-}: Readonly<{
-  accent: "blue" | "green";
-}>) {
-  const rows = Array.from({ length: 3 });
-  const tint =
-    accent === "green"
-      ? "bg-[var(--mn-mint-deep)] ring-[var(--mn-teal-glow)]"
-      : "bg-[var(--mn-mint)] ring-[var(--mn-line)]";
-
-  return (
-    <>
-      {rows.map((_, index) => (
-        <article
-          className="rounded-lg border border-foreground/10 bg-white p-4"
-          key={index}
-        >
-          <div className="animate-pulse">
-            <div className={`h-4 w-32 rounded-md ring-1 ${tint}`} />
-            <div className="mt-3 h-3 w-full rounded-md bg-foreground/10" />
-            <div className="mt-2 h-3 w-4/5 rounded-md bg-foreground/10" />
-            <div className="mt-4 flex gap-2">
-              <div className={`h-5 w-20 rounded-full ring-1 ${tint}`} />
-              <div className={`h-5 w-24 rounded-full ring-1 ${tint}`} />
-            </div>
-          </div>
-        </article>
-      ))}
-    </>
-  );
-}
-
-function ReviewPlaceholderCard({
-  message,
-  title
-}: Readonly<{
-  message: string;
-  title: string;
-}>) {
-  return (
-    <article className="rounded-lg border border-amber-200 bg-amber-50/70 p-4">
-      <div className="flex gap-3">
-        <span className="flex size-9 flex-none items-center justify-center rounded-full bg-white text-amber-600 ring-1 ring-amber-200">
-          <HeartIcon aria-hidden={true} className="size-5" />
-        </span>
-        <div className="min-w-0">
-          <h4 className="text-base font-semibold text-[var(--mn-ink)]">
-            {title}
-          </h4>
-          <p className="mt-1 text-sm leading-6 text-amber-800">
-            {message}
-          </p>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function LockedFormulaPreview({
-  count,
-  labels,
-  unlockHref
-}: Readonly<{
-  count: number;
-  labels: PanelLabels;
-  unlockHref: string;
-}>) {
-  const placeholderRows = Array.from({ length: Math.min(count, 3) });
-
-  return (
-    <article className="rounded-lg border border-[color-mix(in_srgb,var(--mn-teal)_20%,transparent)] bg-[var(--mn-mint-deep)] p-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-semibold text-[var(--mn-ink)]">
-            {labels.previewLockedTitle}
-          </p>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            {labels.previewLockedBody}
-          </p>
-        </div>
-        <a
-          className="mn-green-button mn-green-button--compact"
-          href={unlockHref}
-        >
-          {labels.previewCta}
-        </a>
-      </div>
-
-      <div
-        aria-hidden={true}
-        className="mt-4 space-y-3 opacity-75 blur-[2px]"
-      >
-        {placeholderRows.map((_, index) => (
-          <div
-            key={index}
-            className="rounded-lg border border-white/80 bg-white/80 p-4"
-          >
-            <div className="h-4 w-40 rounded bg-[color-mix(in_srgb,var(--mn-ink)_20%,transparent)]" />
-            <div className="mt-3 h-3 w-full max-w-md rounded bg-[color-mix(in_srgb,var(--mn-ink)_10%,transparent)]" />
-            <div className="mt-2 h-3 w-3/4 rounded bg-[color-mix(in_srgb,var(--mn-ink)_10%,transparent)]" />
-          </div>
-        ))}
-      </div>
-    </article>
   );
 }

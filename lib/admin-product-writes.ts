@@ -29,17 +29,13 @@ import type { ProductStatus } from "@/lib/product-recommendations";
 import type { ValidationResult } from "@/lib/product-validation";
 import {
   normalizeProductKey,
-  normalizeProductFactName,
   normalizeProductFactKey
 } from "@/lib/product-recommendations";
-import { validateProduct, validationCacheMismatchReasons, productFactObservableIssueMessages } from "@/lib/product-validation";
+import { validationCacheMismatchReasons, productFactObservableIssueMessages } from "@/lib/product-validation";
 import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
 import { normalizeSupplementSafetyFlags } from "@/lib/supplement-safety-flags";
-import { defaultProductCountryCode, normalizeProductCountryCode, normalizeProductCountryCodes } from "@/lib/product-countries";
-import { createTask } from "@/lib/task-service";
-import { AGENT_CAPABILITIES } from "@/lib/system-agents";
+import { defaultProductCountryCode, normalizeProductCountryCodes } from "@/lib/product-countries";
 import {
-  comparableDoseAmount,
   doseAmountInLimitUnit,
   doseExceedsLimit,
   normalizeDoseUnit,

@@ -161,14 +161,6 @@ let stripeClient: Stripe | null = null;
 let stripeClientKey = "";
 type MattanutraEnv = "dev" | "prd" | "uat";
 
-function jsonRecord(value: unknown) {
-  const json = toJsonValue(value);
-
-  return json && typeof json === "object" && !Array.isArray(json)
-    ? (json as Record<string, unknown>)
-    : {};
-}
-
 function normalizeMattanutraEnvValue(value: string | null | undefined): MattanutraEnv | null {
   const raw = value?.trim().toLowerCase();
 

@@ -2,13 +2,11 @@ import { getSql } from "@/lib/db";
 import { toJsonValue } from "@/lib/assessment-store";
 import {
   defaultProductCountryCode,
-  normalizeProductCountryCode,
   normalizeProductCountryCodes,
   type ProductCountryCode
 } from "@/lib/product-countries";
 import {
   normalizeSubmittedProductCountryCodes,
-  productCountryCodesFromDb,
   isUuidValue
 } from "./admin-product-helpers.ts";
 

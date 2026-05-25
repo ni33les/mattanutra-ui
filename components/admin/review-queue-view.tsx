@@ -34,14 +34,11 @@ import {
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
 import {
-  safetyMetric,
-  supplementStatusClass,
-  supplementStatusLabel
+  safetyMetric
 } from "@/components/admin/safety-view-helpers";
 import {
   SupplementDetailsModal,
-  SupplementListMeta,
-  formatSupplementDose
+  SupplementListMeta
 } from "@/components/admin/supplement-view";
 
 function reviewKindLabel(labels: AdminContent, row: AdminReviewTaskRow) {

@@ -3,8 +3,6 @@ import { toJsonValue } from "@/lib/assessment-store";
 
 type Db = postgres.Sql | postgres.TransactionSql;
 
-type JsonPayload = Record<string, unknown> | readonly unknown[];
-
 function jsonPayload(value: unknown) {
   return toJsonValue(value ?? {});
 }

@@ -1,5 +1,5 @@
 import type { AdminProductRow } from "@/lib/admin-products";
-import { getAdminProductsData, loadProductRows } from "@/lib/admin-products"; // transitional - will use read-model directly later
+import { getAdminProductsData } from "@/lib/admin-products"; // transitional - will use read-model directly later
 import { productSafetyPasses } from "@/lib/admin-product-mappers";
 import type { ProductCandidate } from "@/lib/product-recommendations";
 

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { ChevronDownIcon as ChevronDownSolidIcon } from "@heroicons/react/20/solid";
 import type {
   AdminFoodRow,
   AdminFoodsData,
@@ -17,16 +16,11 @@ import {
 } from "@/lib/food-tags";
 import type { Locale } from "@/lib/i18n";
 import {
-  foodReviewSuggestionTimeoutMs,
-  type AdminContent
-} from "@/components/admin/dashboard-content";
-import {
   BusinessStatsGrid,
   businessMetricColors,
   classNames,
   foodConfidences,
   foodListStatuses,
-  formatLocale,
   readableToken,
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";

@@ -1,9 +1,7 @@
-import { getSql } from "@/lib/db";
 import {
   emptyAdminProductsData,
   type AdminProductsData,
-  type AdminProductRow,
-  type ProductDbRow
+  type AdminProductRow
 } from "./admin-product-types.ts";
 import { rowFromDb } from "./admin-product-mappers.ts";
 import { isUuidValue, loadProductRows } from "./admin-products.ts"; // transitional delegation until loadProductRows is fully moved here

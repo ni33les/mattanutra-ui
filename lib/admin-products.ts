@@ -2,7 +2,6 @@ import { getSql } from "@/lib/db";
 import { toJsonValue } from "@/lib/assessment-store";
 import {
   comparableDoseAmount,
-  doseAmountInLimitUnit,
   doseExceedsLimit,
   normalizeDoseUnit,
   parseDoseLimit
@@ -24,13 +23,10 @@ import {
   type ProductPlatform
 } from "@/lib/product-recommendations";
 import {
-  productFactObservableIssueMessages,
   validateProduct,
   validationCacheMismatchReasons,
   type ValidationResult
 } from "@/lib/product-validation";
-import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
-import { normalizeSupplementSafetyFlags } from "@/lib/supplement-safety-flags";
 import {
   defaultProductCountryCode,
   normalizeProductCountryCode,
@@ -46,7 +42,6 @@ const randomUUID = () => globalThis.crypto.randomUUID();
 export { defaultProductCountryCode } from "@/lib/product-countries";
 export { isUuidValue } from "./admin-product-helpers.ts"; // will move definition later if needed
 export { createAdminProduct, updateAdminProduct } from "./admin-product-writes.ts";
-import { summaryFromRows } from "./admin-product-read-model.ts"; // transitional for duplicate getAdminProductsData during final cleanup
 import { cleanNullableText, normalizedUrl, productTitleLooksEnglish } from "./admin-product-helpers.ts"; // for remaining functions in god during final cleanup
 import { loadAdminProductRow, loadAdminProductRowsForBrand } from "./admin-product-read-model.ts"; // for remaining calls in god during final cleanup
 
@@ -239,39 +234,6 @@ export type ProductDbRow = Readonly<{
   updated_at: Date | string;
 }>;
 
-type ProductRecommendationDbRow = Readonly<{
-  active_offer_id: string | null;
-  active_offer_availability_status: ProductAvailabilityStatus | null;
-  active_affiliate_commission_rate: string | number | null;
-  active_offer_currency: string | null;
-  active_affiliate_priority: string | number | null;
-  active_offer_price_amount: string | number | null;
-  active_affiliate_type: "affiliate" | "direct" | null;
-  active_affiliate_url: string | null;
-  available_country_codes: string[] | null;
-  brand_name: string | null;
-  brand_status: ProductStatus | null;
-  currency: string;
-  description: string | null;
-  description_en: string | null;
-  description_th: string | null;
-  facts: unknown;
-  id: string;
-  image_url: string | null;
-  label_status: ProductLabelStatus;
-  manufacturer_country_codes: string[] | null;
-  status: ProductStatus;
-  platform: ProductPlatform;
-  product_audience: ProductAudience | null;
-  product_kind: ProductKind;
-  product_data_expires_at: Date | string | null;
-  product_url: string;
-  region: string;
-  source_url: string | null;
-  title: string;
-  title_en: string | null;
-  title_th: string | null;
-}>;
 
 export type FactDbPayload = Readonly<{
   aliases?: string[] | null;
@@ -427,24 +389,6 @@ async function loadBrandCountryCodes(
   );
 }
 
-async function loadProductCountryCodes(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  productId: string,
-  fallback: readonly string[] = [defaultProductCountryCode]
-): Promise<ProductCountryCode[]> {
-  const rows = await sql<Array<{ country_code: string }>>`
-    select country_code
-    from public.product_countries
-    where product_id = ${productId}::uuid
-    order by country_code asc
-  `;
-
-  return normalizeProductCountryCodes(
-    rows.map((row) => row.country_code),
-    fallback
-  );
-}
-
 async function ensureBrandCountryCodes(
   sql: NonNullable<ReturnType<typeof getSql>>,
   brandId: string | null | undefined,
@@ -497,53 +441,6 @@ async function replaceBrandCountryCodes(
   return codes;
 }
 
-async function replaceProductCountryCodes(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  productId: string,
-  countryCodes: readonly string[]
-): Promise<ProductCountryCode[]> {
-  const codes = normalizeSubmittedProductCountryCodes(
-    countryCodes,
-    "Product countries"
-  );
-
-  await sql`
-    delete from public.product_countries
-    where product_id = ${productId}::uuid
-      and country_code <> all(${codes}::text[])
-  `;
-
-  await sql`
-    insert into public.product_countries (
-      product_id,
-      country_code,
-      created_at,
-      updated_at
-    )
-    select
-      ${productId}::uuid,
-      country_code,
-      now(),
-      now()
-    from unnest(${codes}::text[]) as input(country_code)
-    on conflict (product_id, country_code) do update set
-      updated_at = excluded.updated_at
-  `;
-
-  return codes;
-}
-
-function sameProductCountryCodes(
-  left: readonly ProductCountryCode[],
-  right: readonly ProductCountryCode[]
-) {
-  const normalizedLeft = normalizeProductCountryCodes(left).sort();
-  const normalizedRight = normalizeProductCountryCodes(right).sort();
-
-  return normalizedLeft.length === normalizedRight.length &&
-    normalizedLeft.every((countryCode, index) => countryCode === normalizedRight[index]);
-}
-
 async function reconcileProductsForBrandCountryCodes(
   sql: NonNullable<ReturnType<typeof getSql>>,
   brandId: string,
@@ -582,21 +479,6 @@ async function reconcileProductsForBrandCountryCodes(
   `;
 
   return codes;
-}
-
-function assertProductCountriesAllowedByBrand(
-  productCountryCodes: readonly string[],
-  brandCountryCodes: readonly string[],
-  brandName?: string | null
-) {
-  const brandCountries = new Set(brandCountryCodes);
-  const disallowed = productCountryCodes.filter((code) => !brandCountries.has(code));
-
-  if (disallowed.length > 0) {
-    throw new Error(
-      `Product countries must be enabled on manufacturer${brandName ? ` ${brandName}` : ""}: ${disallowed.join(", ")}`
-    );
-  }
 }
 
 function normalizeFact(fact: FactDbPayload): AdminProductFact {
@@ -695,10 +577,6 @@ function productSafetyPasses(facts: readonly AdminProductFact[], rawFacts: unkno
   }
 
   return true;
-}
-
-function roundedDoseAmount(value: number) {
-  return Math.ceil(value * 1_000_000) / 1_000_000;
 }
 
 function recordFromUnknown(value: unknown) {
@@ -1032,120 +910,6 @@ function rowFromDb(row: ProductDbRow): AdminProductRow {
     translations,
     updatedAt: new Date(row.updated_at).toISOString()
   };
-}
-
-async function refreshAndPersistProductValidation(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  productId: string
-) {
-  const rows = await loadProductRows(productId);
-  const sourceRow = rows?.[0];
-
-  if (!sourceRow) {
-    throw new Error("Product not found for validation check");
-  }
-
-  const row = rowFromDb(sourceRow);
-  const validation = row.validation;
-  const safeListStatus =
-    row.status === "approved" && validation.status !== "pass"
-      ? "pending_review"
-      : row.status;
-  const safeLabelStatus =
-    validation.status === "pass" && row.facts.length > 0
-      ? "parsed"
-      : validation.reasons.includes("no_dosed_facts")
-      ? row.facts.length > 0
-        ? "failed"
-        : "missing"
-      : row.labelStatus;
-  const validationPayload = toJsonValue(validation);
-
-  await sql`
-    update public.products
-    set
-      status = ${safeListStatus},
-      label_status = ${safeLabelStatus},
-      source_snapshot = source_snapshot || jsonb_build_object(
-        'validation',
-        ${sql.json(validationPayload)}::jsonb
-      ),
-      updated_at = now()
-    where id = ${productId}::uuid
-  `;
-
-  try {
-    await sql`
-      update public.products
-      set
-        validation_status = ${validation.status},
-        validation_reasons = ${validation.reasons}::text[],
-        validation_summary = ${validation.summary},
-        validation_checked_at = ${validation.checkedAt}::timestamptz,
-        updated_at = now()
-      where id = ${productId}::uuid
-    `;
-  } catch (error) {
-    const code = error && typeof error === "object"
-      ? (error as { code?: string }).code
-      : null;
-
-    if (code !== "42703") {
-      throw error;
-    }
-  }
-
-  return {
-    labelStatus: safeLabelStatus,
-    status: safeListStatus,
-    validation
-  };
-}
-
-async function productIdsUsingSupplement(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  supplementId: string
-) {
-  if (!isUuidValue(supplementId)) {
-    return [];
-  }
-
-  const rows = await sql<Array<{ product_id: string }>>`
-    select distinct product_facts.product_id::text
-    from public.product_facts
-    where product_facts.supplement_id = ${supplementId}::uuid
-    order by product_facts.product_id::text
-  `;
-
-  return rows.map((row) => row.product_id);
-}
-
-async function refreshAndPersistProductValidations(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  productIds: readonly string[]
-) {
-  const uniqueProductIds = [...new Set(productIds.filter(isUuidValue))];
-  const refreshed: Array<{
-    labelStatus: ProductLabelStatus;
-    productId: string;
-    status: ProductStatus;
-    validation: ValidationResult;
-  }> = [];
-
-  for (const productId of uniqueProductIds) {
-    const result = await refreshAndPersistProductValidation(sql, productId);
-
-    refreshed.push({
-      productId,
-      ...result
-    });
-  }
-
-  if (refreshed.length > 0) {
-    clearProductRecommendationCandidateCache();
-  }
-
-  return refreshed;
 }
 
 export {
@@ -1556,7 +1320,7 @@ export function normalizedFactsForStorage(
     .filter((fact): fact is NonNullable<typeof fact> => Boolean(fact));
 }
 
-async function replaceProductFacts(
+export async function replaceProductFacts(
   sql: NonNullable<ReturnType<typeof getSql>>,
   input: Readonly<{
     actor?: string | null;
@@ -1678,7 +1442,7 @@ async function replaceProductFacts(
   `;
 }
 
-async function recordProductVersion(
+export async function recordProductVersion(
   sql: NonNullable<ReturnType<typeof getSql>>,
   input: Readonly<{
     actor?: string | null;

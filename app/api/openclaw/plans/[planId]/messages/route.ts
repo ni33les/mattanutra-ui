@@ -1,7 +1,6 @@
 import {
   openClawJson,
-  requireOpenClawRequest,
-  taskApiError
+  requireOpenClawRequest
 } from "@/lib/openclaw-api";
 
 export const runtime = "nodejs";

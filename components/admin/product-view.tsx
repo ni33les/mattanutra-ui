@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PlusIcon, SparklesIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { SparklesIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import type {
   AdminProductRow,
   AdminProductsData
@@ -23,13 +23,10 @@ import {
 import { siteLocaleRegistry, type Locale } from "@/lib/i18n";
 import { productFactObservableIssueMessages } from "@/lib/product-validation";
 import { supplementDoseUnits } from "@/lib/supplement-dose-units";
-import type { AdminContent } from "@/components/admin/dashboard-content";
 import {
   BusinessStatsGrid,
   businessMetricColors,
   classNames,
-  formatGeneratedAt,
-  formatLocale,
   readableToken,
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";

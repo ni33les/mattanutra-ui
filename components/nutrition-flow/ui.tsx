@@ -205,10 +205,7 @@ type QuestionProps = Readonly<{
 export function Question({
   children,
   hint,
-  infoLabel: _infoLabel,
   label,
-  required: _required = false,
-  requiredLabel: _requiredLabel,
   why
 }: QuestionProps) {
   return (
