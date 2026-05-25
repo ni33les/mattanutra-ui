@@ -199,7 +199,6 @@ export function StripeCheckoutPanel({
 
   useEffect(() => {
     if (!hasValidStripePublishableKey) {
-      setStripeReady(false);
       return;
     }
 
@@ -210,7 +209,6 @@ export function StripeCheckoutPanel({
       }
     }, STRIPE_LOAD_TIMEOUT_MS);
 
-    setStripeReady(false);
     stripePromise
       .then((stripe) => {
         if (cancelled) {
@@ -250,38 +248,44 @@ export function StripeCheckoutPanel({
     }
 
     let cancelled = false;
+    const sessionTimer = window.setTimeout(() => {
+      if (cancelled) {
+        return;
+      }
 
-    setIsLoadingSession(true);
-    void requestCheckoutSession()
-      .then((session) => {
-        if (cancelled) {
-          return;
-        }
+      setIsLoadingSession(true);
+      void requestCheckoutSession()
+        .then((session) => {
+          if (cancelled) {
+            return;
+          }
 
-        if (session.mock && session.paymentId) {
-          scheduleMockCheckoutCompletion(session.paymentId);
-          return;
-        }
+          if (session.mock && session.paymentId) {
+            scheduleMockCheckoutCompletion(session.paymentId);
+            return;
+          }
 
-        if (!session.clientSecret) {
-          throw new Error(labels.unable);
-        }
+          if (!session.clientSecret) {
+            throw new Error(labels.unable);
+          }
 
-        setClientSecret(session.clientSecret);
-      })
-      .catch((caught) => {
-        if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : labels.unable);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoadingSession(false);
-        }
-      });
+          setClientSecret(session.clientSecret);
+        })
+        .catch((caught) => {
+          if (!cancelled) {
+            setError(caught instanceof Error ? caught.message : labels.unable);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsLoadingSession(false);
+          }
+        });
+    }, 0);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(sessionTimer);
     };
   }, [
     checkoutAttempt,

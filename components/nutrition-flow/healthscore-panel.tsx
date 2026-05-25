@@ -1,463 +1,119 @@
 "use client";
 
-import { ExclamationTriangleIcon } from "@heroicons/react/20/solid";
 import {
+  AdjustmentsHorizontalIcon,
   ArrowRightIcon,
+  BeakerIcon,
   CheckCircleIcon,
+  ClipboardDocumentCheckIcon,
   LockClosedIcon,
   ShieldCheckIcon,
   SparklesIcon
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type {
-  HealthScoreDomain,
+  HealthScoreGapCard,
+  HealthScoreMethodCard,
+  HealthScorePageAiCard,
   HealthScoreResult,
   LocalizedHealthScoreText
 } from "@/lib/health-score";
-import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import { resolveLocalizedText, type Locale } from "@/lib/i18n";
 import { paymentCheckoutPath } from "@/lib/payment-paths";
 import { cx } from "@/components/nutrition-flow/ui";
 
-function getDomainTone(score: number) {
-  if (score >= 80) {
-    return {
-      bg: "bg-[var(--mn-mint)]",
-      ring: "ring-[color-mix(in_srgb,var(--mn-teal-deep)_20%,transparent)]",
-      text: "text-[var(--mn-teal-deep)]"
-    };
-  }
-
-  if (score >= 50) {
-    return {
-      bg: "bg-[var(--mn-mint-deep)]",
-      ring: "ring-[color-mix(in_srgb,var(--mn-teal)_20%,transparent)]",
-      text: "text-[var(--mn-teal-deep)]"
-    };
-  }
-
-  return {
-    bg: "bg-red-50",
-    ring: "ring-red-200",
-    text: "text-red-600"
-  };
-}
-
-const healthScoreChartColors = [
-  "var(--mn-teal-deep)",
-  "var(--mn-teal)",
-  "var(--mn-gold)",
-  "var(--mn-error)",
-  "var(--mn-sand-deep)",
-  "var(--mn-teal-light)"
-];
-
-const healthScoreDomainTones = ["blue", "green", "amber", "red", "purple", "cyan"] as const;
-
-const healthScorePanelCopy = {
+const pageCopy = {
   en: {
-    domains: "6-domain snapshot",
-    fallbackImprovement(headline: string) {
-      return `${headline} Use this as a practical starting point: protect the areas already working well, then focus first on this lowest-scoring domain.`;
-    },
-    lowestDomainAdvice(domain: HealthScoreDomain) {
-      return `Your ${domain.label} score (${domain.score}/100) has room to improve. ${domain.description} This is the clearest place to focus first.`;
-    },
-    planFocusItems(lowest: HealthScoreDomain) {
-      return [
-        ["Protect what is working", "Your stronger domains should not be made more complicated."],
-        ["Start where it matters", `${lowest.label} is the clearest area to prioritise first.`],
-        ["Know your right amount", "Your formula uses your goals, preferences and fit context together."]
-      ] as const;
-    },
-    score: "HealthScore"
-  },
-  th: {
-    domains: "ภาพรวม 6 ด้าน",
-    fallbackImprovement(headline: string) {
-      return `${headline} ใช้คะแนนนี้เป็นจุดเริ่มต้น โดยรักษาด้านที่ทำได้ดีไว้ และให้ความสำคัญกับพื้นที่คะแนนต่ำสุดก่อน`;
-    },
-    lowestDomainAdvice(domain: HealthScoreDomain) {
-      return `คะแนนด้าน ${domain.label} ของคุณ (${domain.score}/100) ยังมีพื้นที่ให้ปรับปรุง ${domain.description} จุดนี้เป็นพื้นที่ที่ชัดที่สุดในการเริ่มปรับแผนสุขภาพของคุณ`;
-    },
-    planFocusItems(lowest: HealthScoreDomain) {
-      return [
-        ["รักษาสิ่งที่ทำได้ดี", "ด้านที่คะแนนสูงอยู่แล้วไม่ควรถูกทำให้ซับซ้อนเกินไป"],
-        ["เริ่มจากจุดที่ชัดที่สุด", `${lowest.label} เป็นพื้นที่ที่ควรจัดลำดับก่อน`],
-        ["รู้ปริมาณที่เหมาะกับคุณ", "สูตรจะใช้เป้าหมาย ความชอบ และบริบทด้านความเหมาะสมร่วมกัน"]
-      ] as const;
-    },
-    score: "คะแนนสุขภาพ"
-  }
-} satisfies Record<Locale, {
-  domains: string;
-  fallbackImprovement(headline: string): string;
-  lowestDomainAdvice(domain: HealthScoreDomain): string;
-  planFocusItems(lowest: HealthScoreDomain): readonly (readonly [string, string])[];
-  score: string;
-}>;
-
-function polarPoint(center: number, radius: number, angleDegrees: number) {
-  const angleRadians = ((angleDegrees - 90) * Math.PI) / 180;
-
-  return {
-    x: center + radius * Math.cos(angleRadians),
-    y: center + radius * Math.sin(angleRadians)
-  };
-}
-
-function radarPolygonPoints(
-  domains: HealthScoreResult["domains"],
-  center: number,
-  radius: number,
-  scale = 1
-) {
-  return domains
-    .map((domain, index) => {
-      const point = polarPoint(
-        center,
-        radius * scale * (domain.score / 100),
-        (360 / domains.length) * index
-      );
-
-      return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
-    })
-    .join(" ");
-}
-
-function HealthScoreRadar({
-  result
-}: Readonly<{
-  result: HealthScoreResult;
-}>) {
-  const size = 260;
-  const center = size / 2;
-  const radius = 88;
-  const domainCount = Math.max(result.domains.length, 1);
-
-  return (
-    <div className="flex h-full rounded-2xl bg-[var(--mn-paper)] p-2 ring-1 ring-[var(--mn-line)] sm:p-3">
-      <div className="flex flex-1 items-center justify-center">
-        <svg
-          aria-label="Domain shape"
-          className="h-[14rem] w-full max-w-[40rem] sm:h-[17.5rem] lg:h-[16.75rem]"
-          role="img"
-          viewBox={`0 0 ${size} ${size}`}
-        >
-          {[0.25, 0.5, 0.75, 1].map((level) => (
-            <polygon
-              key={level}
-              fill="none"
-              points={radarPolygonPoints(result.domains, center, radius, level)}
-              stroke="var(--mn-line)"
-              strokeWidth="1.4"
-            />
-          ))}
-          {result.domains.map((domain, index) => {
-            const outer = polarPoint(
-              center,
-              radius,
-              (360 / domainCount) * index
-            );
-
-            return (
-              <line
-                key={domain.id}
-                stroke="var(--mn-line)"
-                strokeWidth="1.4"
-                x1={center}
-                x2={outer.x}
-                y1={center}
-                y2={outer.y}
-              />
-            );
-          })}
-          <polygon
-            fill="color-mix(in srgb, var(--mn-teal) 22%, transparent)"
-            points={radarPolygonPoints(result.domains, center, radius)}
-            stroke="var(--mn-teal)"
-            strokeLinejoin="round"
-            strokeWidth="3"
-          />
-          {result.domains.map((domain, index) => {
-            const point = polarPoint(
-              center,
-              radius * (domain.score / 100),
-              (360 / domainCount) * index
-            );
-
-            return (
-              <circle
-                key={domain.id}
-                cx={point.x}
-                cy={point.y}
-                fill={
-                  healthScoreChartColors[
-                    index % healthScoreChartColors.length
-                  ]
-                }
-                r="4.5"
-                stroke="#ffffff"
-                strokeWidth="2"
-              />
-            );
-          })}
-        </svg>
-      </div>
-    </div>
-  );
-}
-
-function HealthScoreVisuals({
-  locale,
-  result
-}: Readonly<{
-  locale: Locale;
-  result: HealthScoreResult;
-}>) {
-  const labels = healthScorePanelCopy[locale];
-
-  return (
-    <div className="mt-5 sm:mt-6">
-      <div className="rounded-2xl bg-[var(--mn-paper)] p-4 ring-1 ring-[var(--mn-line)] sm:p-6">
-        <p className="text-center font-[family:var(--mn-font-mono)] text-xs font-semibold uppercase tracking-[0.12em] text-[var(--mn-ink)]">
-          {labels.domains}
-        </p>
-        <div className="mt-4">
-          <DomainSnapshot result={result} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DomainSnapshot({
-  result
-}: Readonly<{
-  result: HealthScoreResult;
-}>) {
-  return (
-    <div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {result.domains.map((domain, index) => {
-          const tone = getDomainTone(domain.score);
-          const domainTone =
-            healthScoreDomainTones[index % healthScoreDomainTones.length];
-
-          return (
-            <div
-              key={domain.id}
-              className="mn-health-domain"
-              data-domain-tone={domainTone}
-            >
-              <div className="flex min-w-0 items-center justify-between gap-3 text-sm">
-                <span className="min-w-0 font-semibold text-[var(--mn-ink)]">
-                  {domain.label}
-                </span>
-                <span className={cx("font-semibold", tone.text)}>
-                  {domain.score}
-                </span>
-              </div>
-              <progress
-                aria-label={`${domain.label} score`}
-                className="mn-progress mn-progress--soft mt-2"
-                max={100}
-                value={domain.score}
-              />
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function lowestDomainAdvice(domain: HealthScoreDomain, locale: Locale) {
-  return healthScorePanelCopy[locale].lowestDomainAdvice(domain);
-}
-
-export function localizeHealthScoreText(
-  value: LocalizedHealthScoreText | undefined,
-  locale: Locale
-) {
-  return resolveLocalizedText(value, locale);
-}
-
-function HealthScoreAdvice({
-  locale,
-  result
-}: Readonly<{
-  locale: Locale;
-  result: HealthScoreResult;
-}>) {
-  const lowest = [...result.domains].sort((a, b) => a.score - b.score)[0];
-  const fallbackImprovement =
-    healthScorePanelCopy[locale].fallbackImprovement(result.headline);
-  const storedFocus = localizeHealthScoreText(
-    result.advice?.focusArea,
-    locale
-  );
-  const storedImprovement = localizeHealthScoreText(
-    result.advice?.howToImprove,
-    locale
-  );
-  const fallbackFocus = storedFocus || lowestDomainAdvice(lowest, locale);
-  const fallbackHowToImprove = storedImprovement || fallbackImprovement;
-  const overview =
-    localizeHealthScoreText(result.advice?.overview, locale) ||
-    `${fallbackFocus} ${fallbackHowToImprove}`;
-
-  return (
-    <div className="mt-5 rounded-2xl bg-[var(--mn-paper)] p-5 ring-1 ring-[var(--mn-line)] sm:mt-6 sm:p-6">
-      <div className="flex gap-4">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#FFF8E8]">
-          <ExclamationTriangleIcon
-            aria-hidden={true}
-            className="size-5 text-[#D97706]"
-          />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm leading-6 text-muted-foreground">
-            {overview}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function HealthScorePanel({
-  locale,
-  result
-}: Readonly<{
-  locale: Locale;
-  result: HealthScoreResult;
-}>) {
-  const labels = healthScorePanelCopy[locale];
-
-  return (
-    <div className="mt-10 rounded-2xl bg-[var(--mn-mint)] p-4 ring-1 ring-[var(--mn-line)] sm:p-7">
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 lg:items-stretch">
-        <div className="flex min-w-0 flex-col">
-          <div className="mn-health-score-card">
-            <p className="text-center font-[family:var(--mn-font-mono)] text-xs font-semibold uppercase tracking-[0.12em] text-[var(--mn-ink)]">
-              {labels.score}
-            </p>
-            <div className="flex items-end justify-center gap-3">
-              <span className="text-6xl font-semibold tracking-normal text-[var(--mn-ink)] sm:text-8xl">
-                {result.score}
-              </span>
-              <span className="pb-2 text-lg font-semibold text-muted-foreground sm:pb-3 sm:text-xl">
-                /100
-              </span>
-            </div>
-            <p className="inline-flex self-center rounded-full bg-[color-mix(in_srgb,var(--mn-teal)_10%,transparent)] px-4 py-1.5 text-sm font-semibold text-[var(--mn-teal-deep)]">
-              {result.band}
-            </p>
-          </div>
-        </div>
-
-        <HealthScoreRadar result={result} />
-      </div>
-      <HealthScoreVisuals locale={locale} result={result} />
-      <HealthScoreAdvice locale={locale} result={result} />
-    </div>
-  );
-}
-
-const paymentCopy = {
-  en: {
+    bodyClass: "leading-7",
     progress: [
-      ["Discover", "We understand you"],
-      ["Personalise", "Your HealthScore is ready"],
+      ["Discover", "Assessment complete"],
+      ["Score", "Your HealthScore is ready"],
       ["Reveal", "Unlock your plan"]
     ],
-    progressAria: "Assessment progress",
     heroEyebrow: "Your free assessment result",
     heroTitle(score: number) {
       return `Your HealthScore is ${score}.`;
     },
-    heroAccent: "And now you know so much more.",
-    heroBody:
-      "We analysed your answers to prepare your Right Amount Plan. The next step turns your score pattern into specific supplement priorities, dose guidance and product direction.",
-    heroPrimary: "Unlock my Right Amount Plan",
-    heroSecondary: "What my plan includes",
+    heroCta: "Unlock my Right Amount Plan",
+    heroSecondary: "See what shaped it",
     scoreLabel: "HealthScore",
-    keyFinding: "Key finding",
-    keyFindingBody:
-      "The goal is not more supplements. It is a more precise plan built around what your score says is most likely to move.",
-    opportunityEyebrow: "Clearest opportunity",
-    opportunityTitle: "Where your plan begins",
-    opportunityBody:
-      "MattaNutra does not assume everyone needs the same stack. Your paid plan starts with the area most likely to improve your overall score, while protecting what is already working.",
-    signalsEyebrow: "Assessment revealed",
-    signalsTitle: "Three personalised signals from your answers.",
-    signalsBody:
-      "These are the reasons your paid plan should not look like a generic multivitamin recommendation.",
-    fallbackSignals: [
-      [
-        "Focus the lowest-scoring domain first",
-        "Your plan starts where your HealthScore shows the clearest opportunity."
-      ],
-      [
-        "Choose precision over more pills",
-        "The aim is to reduce wasted supplement spend and avoid a long generic stack."
-      ],
-      [
-        "Make the plan specific",
-        "Your formula should reflect your answers, goals, country, budget and safety context."
-      ]
+    scoreOutOf: "/100",
+    percentile: "Percentile",
+    median: "Reference median",
+    spectrumStart: "Needs attention",
+    spectrumMid: "Median",
+    spectrumEnd: "Excellent",
+    defaultBandLine:
+      "Your score is built from five weighted pillars, safety flags, symptoms, goals, and any verified lab or wearable data you supplied.",
+    gapEyebrow: "Assessment revealed",
+    gapTitle: "Three things a generic vitamin quiz would have walked straight past.",
+    gapBody:
+      "These are the specific signals in your answers that shape your formula, laid out in full, nothing held back.",
+    fallbackGaps: [
+      {
+        body: "Your lowest pillar shows where the first practical change should start.",
+        headline: "The clearest gap is not hidden",
+        tag: "Signal",
+        value: "01"
+      },
+      {
+        body: "Your goals change which nutrients or products earn space in the plan.",
+        headline: "Your goals change the order",
+        tag: "Signal",
+        value: "02"
+      },
+      {
+        body: "Medication, diet pattern, country, and routine context stay visible before anything is suggested.",
+        headline: "Safety context stays in the room",
+        tag: "Signal",
+        value: "03"
+      }
     ],
-    includesEyebrow: "What your plan will include",
-    includesTitle:
-      "Your Right Amount Plan turns the score into exact next steps.",
-    includesBody:
-      "The free HealthScore shows the pattern. The paid plan gives the formula, dose, safety checks and purchase direction.",
-    includes: [
-      [
-        "Your personalised formula",
-        "Specific supplement priorities selected for your score, goals and questionnaire answers."
-      ],
-      [
-        "Dose and timing guidance",
-        "Clear instructions for how much to take, when to take it and how to use it consistently."
-      ],
-      [
-        "Safety and fit checks",
-        "Medication, lab, pregnancy, allergy and preference context stays visible before recommendations are made."
-      ],
-      [
-        "Trusted product direction",
-        "Product options and alternatives that reduce pharmacy-aisle confusion."
-      ]
+    pillarsEyebrow: "Five-pillar model",
+    pillarsTitle: "A fixed scoring model across five domains, not a guess.",
+    whatCaught: "What we caught",
+    fallbackFindingTitle: "Your HealthScore has a clear starting point",
+    fallbackFindingBody:
+      "The lowest pillar and safety context decide what the plan should prioritise first.",
+    subtractionEyebrow: "The subtraction beat",
+    subtractionTitle: "Your right amount is what remains after the unsuitable options are removed.",
+    evaluatedFallback: "evaluated",
+    setAsideFallback: "set aside",
+    chosenFallback: "right for your score",
+    methodEyebrow: "Method",
+    methodTitle:
+      "A fixed scoring model across five domains, not a guess and not an average of strangers.",
+    fallbackMethodCards: [
+      {
+        body: "The score is computed before AI writes a single line of copy.",
+        title: "Score first"
+      },
+      {
+        body: "Only the strongest assessment signals are shown on the page.",
+        title: "Signals selected by code"
+      },
+      {
+        body: "AI can phrase the page, but it cannot change your score, flags, counts, or findings.",
+        title: "Copy locked to facts"
+      }
     ],
+    trustLine:
+      "Locked facts render immediately. If AI copy is unavailable, deterministic fallback copy keeps the page usable.",
     pricingEyebrow: "Choose your level of guidance",
     pricingTitle: "Unlock the plan that matches your next step.",
     pricingBody:
       "Start with a one-time Right Amount Formula, or choose 90-Day Wellness Concierge if you want ongoing support as your routine changes.",
     preparing: "Preparing...",
-    scoreBands: {
-      clear: "Clear opportunity",
-      excellent: "Excellent start",
-      improve: "Ready to improve",
-      strong: "Strong foundation"
-    },
-    selectionError:
-      "We could not start your plan. Please try again.",
+    selectionError: "We could not start your plan. Please try again.",
     plans: [
       {
         badge: "Limited time offer",
-        eyebrow: "One-time plan",
-        name: "Right Amount Formula",
-        description:
-          "Your personalised supplement formula with precise dosing, timing and product guidance.",
-        was: "THB 990",
-        save: "Save 30%",
-        price: "690",
-        term: "one-time",
-        fine: "One-time payment · Lifetime access to this plan",
         cta: "Unlock my formula",
+        description:
+          "Your personalised supplement formula with precise dosing, timing, safety checks, and product direction.",
+        eyebrow: "One-time plan",
         features: [
           "Personalised supplement formula",
           "Body-size adjusted dose ranges",
@@ -466,22 +122,22 @@ const paymentCopy = {
           "Recommended product sources and alternatives",
           "60-day reassessment prompt"
         ],
+        fine: "One-time payment · Lifetime access to this plan",
         guarantee: "Clarity Guarantee",
         guaranteeBody:
-          "If your plan does not feel clear and useful, we will make it right or refund you within 7 days."
+          "If your plan does not feel clear and useful, we will make it right or refund you within 7 days.",
+        name: "Right Amount Formula",
+        price: "690",
+        save: "Save 30%",
+        term: "one-time",
+        was: "THB 990"
       },
       {
         badge: "Most adaptive",
-        eyebrow: "90-day support",
-        name: "90-Day Wellness Concierge",
-        description:
-          "Ongoing support that adapts your plan to your daily life.",
-        was: "THB 1,890",
-        save: "Save 16%",
-        price: "1,590",
-        term: "for 90 days",
-        fine: "Full access for 90 days · Cancel anytime",
         cta: "Start wellness concierge",
+        description:
+          "Ongoing support that adapts your formula, foods, and daily routine over 90 days.",
+        eyebrow: "90-day support",
         features: [
           "Includes the Right Amount Formula",
           "Daily guidance on foods and routines",
@@ -490,101 +146,107 @@ const paymentCopy = {
           "Weekly progress summaries",
           "Priority review as your data changes"
         ],
+        fine: "Full access for 90 days · Cancel anytime",
         guarantee: "7-Day Satisfaction Guarantee",
         guaranteeBody:
-          "Try the concierge support risk-free. Cancel within 7 days for a full refund."
+          "Try the concierge support risk-free. Cancel within 7 days for a full refund.",
+        name: "90-Day Wellness Concierge",
+        price: "1,590",
+        save: "Save 16%",
+        term: "for 90 days",
+        was: "THB 1,890"
       }
     ]
   },
   th: {
+    bodyClass: "leading-8 [word-break:keep-all]",
     progress: [
-      ["ค้นพบ", "เราเข้าใจข้อมูลของคุณ"],
-      ["ปรับให้เหมาะ", "คะแนนสุขภาพพร้อมแล้ว"],
+      ["ค้นพบ", "แบบประเมินเสร็จแล้ว"],
+      ["ให้คะแนน", "คะแนนสุขภาพพร้อมแล้ว"],
       ["เปิดแผน", "ปลดล็อกแผนของคุณ"]
     ],
-    progressAria: "ความคืบหน้าของแบบประเมิน",
     heroEyebrow: "ผลประเมินฟรีของคุณ",
     heroTitle(score: number) {
       return `คะแนนสุขภาพของคุณคือ ${score}`;
     },
-    heroAccent: "และตอนนี้คุณรู้มากขึ้นแล้ว",
-    heroBody:
-      "เราวิเคราะห์คำตอบของคุณเพื่อเตรียมแผนปริมาณที่พอดี ขั้นต่อไปจะแปลงรูปแบบคะแนนเป็นลำดับความสำคัญ ปริมาณ และทิศทางผลิตภัณฑ์ที่ชัดเจน",
-    heroPrimary: "ปลดล็อกแผนปริมาณที่พอดี",
-    heroSecondary: "แผนนี้มีอะไรบ้าง",
+    heroCta: "ปลดล็อกแผนปริมาณที่พอดี",
+    heroSecondary: "ดูสิ่งที่ใช้คำนวณ",
     scoreLabel: "คะแนนสุขภาพ",
-    keyFinding: "สิ่งที่พบ",
-    keyFindingBody:
-      "เป้าหมายไม่ใช่การเพิ่มอาหารเสริมให้มากขึ้น แต่คือการเลือกแผนที่แม่นยำขึ้นจากสิ่งที่คะแนนของคุณบอก",
-    opportunityEyebrow: "โอกาสที่ชัดที่สุด",
-    opportunityTitle: "จุดเริ่มต้นของแผน",
-    opportunityBody:
-      "MattaNutra ไม่ได้ถือว่าทุกคนต้องใช้ชุดเดียวกัน แผนแบบชำระเงินจะเริ่มจากด้านที่มีโอกาสช่วยคะแนนรวมมากที่สุด พร้อมรักษาสิ่งที่คุณทำได้ดีอยู่แล้ว",
-    signalsEyebrow: "สิ่งที่แบบประเมินบอก",
-    signalsTitle: "สามสัญญาณส่วนตัวจากคำตอบของคุณ",
-    signalsBody:
-      "นี่คือเหตุผลที่แผนของคุณไม่ควรเป็นคำแนะนำวิตามินรวมแบบทั่วไป",
-    fallbackSignals: [
-      [
-        "เริ่มจากด้านที่คะแนนต่ำสุด",
-        "แผนจะเริ่มจากจุดที่คะแนนสุขภาพแสดงโอกาสชัดที่สุด"
-      ],
-      [
-        "เลือกความแม่นยำมากกว่าจำนวนเม็ด",
-        "เป้าหมายคือเลี่ยงการซื้ออาหารเสริมที่ไม่จำเป็น"
-      ],
-      [
-        "ทำให้แผนเฉพาะกับคุณ",
-        "สูตรควรสะท้อนคำตอบ เป้าหมาย ประเทศ งบประมาณ และบริบทด้านความเหมาะสมของคุณ"
-      ]
+    scoreOutOf: "/100",
+    percentile: "เปอร์เซ็นไทล์",
+    median: "ค่ากลางอ้างอิง",
+    spectrumStart: "ควรใส่ใจ",
+    spectrumMid: "ค่ากลาง",
+    spectrumEnd: "ดีเยี่ยม",
+    defaultBandLine:
+      "คะแนนนี้คำนวณจากเสาหลักห้าด้าน ธงความเหมาะสม อาการ เป้าหมาย และข้อมูลแล็บหรืออุปกรณ์ที่คุณให้มา",
+    gapEyebrow: "สิ่งที่แบบประเมินพบ",
+    gapTitle: "สามเรื่องที่แบบทดสอบวิตามินทั่วไปมักมองข้าม",
+    gapBody:
+      "นี่คือสัญญาณเฉพาะจากคำตอบของคุณที่มีผลต่อสูตร โดยแสดงอย่างชัดเจน",
+    fallbackGaps: [
+      {
+        body: "เสาหลักที่ต่ำที่สุดบอกว่าควรเริ่มปรับจากจุดไหนก่อน",
+        headline: "ช่องว่างที่ชัดที่สุดไม่ได้ถูกซ่อนไว้",
+        tag: "สัญญาณ",
+        value: "01"
+      },
+      {
+        body: "เป้าหมายของคุณเปลี่ยนลำดับของสารอาหารหรือผลิตภัณฑ์ที่ควรอยู่ในแผน",
+        headline: "เป้าหมายของคุณเปลี่ยนลำดับ",
+        tag: "สัญญาณ",
+        value: "02"
+      },
+      {
+        body: "บริบทยา รูปแบบอาหาร ประเทศ และกิจวัตรยังถูกนำมาพิจารณาก่อนแนะนำสิ่งใด",
+        headline: "บริบทความเหมาะสมยังอยู่ในภาพ",
+        tag: "สัญญาณ",
+        value: "03"
+      }
     ],
-    includesEyebrow: "สิ่งที่อยู่ในแผน",
-    includesTitle: "แผนปริมาณที่พอดีแปลงคะแนนเป็นขั้นตอนที่ชัดเจน",
-    includesBody:
-      "คะแนนสุขภาพฟรีแสดงรูปแบบ ส่วนแผนแบบชำระเงินจะให้สูตร ปริมาณ การตรวจสอบความเหมาะสม และทิศทางการซื้อ",
-    includes: [
-      [
-        "สูตรส่วนตัวของคุณ",
-        "ลำดับความสำคัญของอาหารเสริมที่เลือกจากคะแนน เป้าหมาย และคำตอบของคุณ"
-      ],
-      [
-        "ปริมาณและเวลาใช้",
-        "คำแนะนำว่าควรใช้เท่าไร เมื่อไร และใช้อย่างไรให้สม่ำเสมอ"
-      ],
-      [
-        "ตรวจสอบความเหมาะสม",
-        "บริบทยา ผลแล็บ การตั้งครรภ์ ภูมิแพ้ และความชอบยังถูกนำมาพิจารณาก่อนแนะนำ"
-      ],
-      [
-        "ทิศทางผลิตภัณฑ์ที่เชื่อถือได้",
-        "ตัวเลือกผลิตภัณฑ์และทางเลือกที่ช่วยลดความสับสนเวลาเลือกซื้อ"
-      ]
+    pillarsEyebrow: "โมเดลห้าเสาหลัก",
+    pillarsTitle: "โมเดลคะแนนคงที่ห้าด้าน ไม่ใช่การเดา",
+    whatCaught: "สิ่งที่เราจับได้",
+    fallbackFindingTitle: "คะแนนสุขภาพของคุณมีจุดเริ่มต้นที่ชัดเจน",
+    fallbackFindingBody:
+      "เสาหลักที่ต่ำที่สุดและบริบทความเหมาะสมเป็นตัวกำหนดว่าแผนควรเริ่มจากอะไร",
+    subtractionEyebrow: "จังหวะการคัดออก",
+    subtractionTitle: "ปริมาณที่พอดีคือสิ่งที่เหลือหลังตัดตัวเลือกที่ไม่เหมาะออก",
+    evaluatedFallback: "ประเมิน",
+    setAsideFallback: "ตัดออก",
+    chosenFallback: "เหมาะกับคะแนนของคุณ",
+    methodEyebrow: "วิธีคำนวณ",
+    methodTitle:
+      "โมเดลคะแนนคงที่ห้าด้าน ไม่ใช่การเดา และไม่ใช่ค่าเฉลี่ยของคนอื่น",
+    fallbackMethodCards: [
+      {
+        body: "คะแนนถูกคำนวณก่อนที่ AI จะเขียนข้อความบนหน้า",
+        title: "คำนวณคะแนนก่อน"
+      },
+      {
+        body: "หน้าจะแสดงเฉพาะสัญญาณจากแบบประเมินที่สำคัญที่สุด",
+        title: "เลือกสัญญาณด้วยโค้ด"
+      },
+      {
+        body: "AI เขียนภาษาได้ แต่เปลี่ยนคะแนน ธง จำนวน หรือสิ่งที่พบไม่ได้",
+        title: "ข้อความถูกล็อกกับข้อเท็จจริง"
+      }
     ],
+    trustLine:
+      "ข้อเท็จจริงที่ล็อกไว้จะแสดงทันที หาก AI ยังไม่พร้อม ระบบจะใช้ข้อความสำรองที่กำหนดไว้",
     pricingEyebrow: "เลือกระดับคำแนะนำ",
     pricingTitle: "ปลดล็อกแผนที่เหมาะกับขั้นต่อไปของคุณ",
     pricingBody:
       "เริ่มด้วยสูตรปริมาณที่พอดีแบบครั้งเดียว หรือเลือกผู้ช่วยดูแลสุขภาพ 90 วัน หากต้องการการสนับสนุนต่อเนื่อง",
     preparing: "กำลังเตรียม...",
-    scoreBands: {
-      clear: "มีโอกาสปรับปรุงชัดเจน",
-      excellent: "จุดเริ่มต้นดีเยี่ยม",
-      improve: "พร้อมยกระดับ",
-      strong: "พื้นฐานแข็งแรง"
-    },
     selectionError: "ไม่สามารถเริ่มแผนได้ กรุณาลองอีกครั้ง",
     plans: [
       {
         badge: "ข้อเสนอพิเศษ",
-        eyebrow: "แผนครั้งเดียว",
-        name: "สูตรปริมาณที่พอดี",
-        description:
-          "สูตรอาหารเสริมส่วนตัว พร้อมปริมาณ เวลาใช้ และทิศทางผลิตภัณฑ์",
-        was: "THB 990",
-        save: "ประหยัด 30%",
-        price: "690",
-        term: "ครั้งเดียว",
-        fine: "ชำระครั้งเดียว · เข้าถึงแผนนี้ได้ตลอด",
         cta: "ปลดล็อกสูตรของฉัน",
+        description:
+          "สูตรอาหารเสริมส่วนตัว พร้อมปริมาณ เวลาใช้ การตรวจสอบความเหมาะสม และทิศทางผลิตภัณฑ์",
+        eyebrow: "แผนครั้งเดียว",
         features: [
           "สูตรอาหารเสริมส่วนตัว",
           "ช่วงปริมาณที่ปรับตามร่างกาย",
@@ -593,21 +255,22 @@ const paymentCopy = {
           "แหล่งผลิตภัณฑ์และทางเลือก",
           "แจ้งเตือนประเมินซ้ำใน 60 วัน"
         ],
+        fine: "ชำระครั้งเดียว · เข้าถึงแผนนี้ได้ตลอด",
         guarantee: "รับประกันความชัดเจน",
         guaranteeBody:
-          "หากแผนไม่ชัดเจนหรือไม่มีประโยชน์ เราจะปรับให้หรือคืนเงินภายใน 7 วัน"
+          "หากแผนไม่ชัดเจนหรือไม่มีประโยชน์ เราจะปรับให้หรือคืนเงินภายใน 7 วัน",
+        name: "สูตรปริมาณที่พอดี",
+        price: "690",
+        save: "ประหยัด 30%",
+        term: "ครั้งเดียว",
+        was: "THB 990"
       },
       {
         badge: "ปรับตัวได้ดีที่สุด",
-        eyebrow: "ดูแล 90 วัน",
-        name: "ผู้ช่วยดูแลสุขภาพ 90 วัน",
-        description: "การสนับสนุนต่อเนื่องที่ปรับตามชีวิตประจำวันของคุณ",
-        was: "THB 1,890",
-        save: "ประหยัด 16%",
-        price: "1,590",
-        term: "90 วัน",
-        fine: "เข้าถึงเต็มรูปแบบ 90 วัน · ยกเลิกได้",
         cta: "เริ่มผู้ช่วยดูแลสุขภาพ",
+        description:
+          "การสนับสนุนต่อเนื่องที่ปรับสูตร อาหาร และกิจวัตรประจำวันตลอด 90 วัน",
+        eyebrow: "ดูแล 90 วัน",
         features: [
           "รวมสูตรปริมาณที่พอดี",
           "คำแนะนำอาหารและกิจวัตรรายวัน",
@@ -616,202 +279,235 @@ const paymentCopy = {
           "สรุปความคืบหน้ารายสัปดาห์",
           "ทบทวนเมื่อข้อมูลเปลี่ยน"
         ],
+        fine: "เข้าถึงเต็มรูปแบบ 90 วัน · ยกเลิกได้",
         guarantee: "รับประกัน 7 วัน",
         guaranteeBody:
-          "ลองใช้แบบไม่มีความเสี่ยง ยกเลิกภายใน 7 วันเพื่อรับเงินคืนเต็มจำนวน"
+          "ลองใช้แบบไม่มีความเสี่ยง ยกเลิกภายใน 7 วันเพื่อรับเงินคืนเต็มจำนวน",
+        name: "ผู้ช่วยดูแลสุขภาพ 90 วัน",
+        price: "1,590",
+        save: "ประหยัด 16%",
+        term: "90 วัน",
+        was: "THB 1,890"
       }
     ]
   }
 } as const;
 
-function scoreCircumference(radius: number) {
-  return 2 * Math.PI * radius;
+type PricePlan = (typeof pageCopy.en.plans)[number] | (typeof pageCopy.th.plans)[number];
+
+function clamp(value: number, min = 0, max = 100) {
+  return Math.max(min, Math.min(max, value));
 }
 
-function clampScore(score: number) {
-  return Math.max(0, Math.min(100, score));
+function scorePosition(score: number) {
+  return clamp(((score - 30) / 62) * 100);
 }
 
-function scoreBandTone(score: number, locale: Locale) {
-  const bands = paymentCopy[locale].scoreBands;
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(() =>
+    typeof window === "undefined"
+      ? false
+      : window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
 
-  if (score >= 80) return bands.excellent;
-  if (score >= 65) return bands.strong;
-  if (score >= 50) return bands.improve;
-  return bands.clear;
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const listener = (event: MediaQueryListEvent) => setReduced(event.matches);
+
+    query.addEventListener("change", listener);
+
+    return () => query.removeEventListener("change", listener);
+  }, []);
+
+  return reduced;
 }
 
-function planFocusItems(lowest: HealthScoreDomain, locale: Locale) {
-  return healthScorePanelCopy[locale].planFocusItems(lowest);
-}
-
-function paywallSignals(result: HealthScoreResult, locale: Locale) {
-  const stored = result.advice?.paywallFeatures
-    ?.map((feature) => [
-      localizeHealthScoreText(feature.name, locale),
-      localizeHealthScoreText(feature.description, locale)
-    ] as const)
-    .filter(([name, body]) => name && body)
-    .slice(0, 3);
-
-  if (stored?.length === 3) {
-    return stored;
-  }
-
-  return paymentCopy[locale].fallbackSignals;
-}
-
-function ScoreSummaryCard({
-  locale,
-  result
+function CountUpNumber({
+  className,
+  value
 }: Readonly<{
-  locale: Locale;
-  result: HealthScoreResult;
+  className?: string;
+  value: number;
 }>) {
-  const labels = paymentCopy[locale];
-  const radius = 102;
-  const circumference = scoreCircumference(radius);
-  const score = clampScore(result.score);
-  const offset = circumference * (1 - score / 100);
+  const reducedMotion = useReducedMotion();
+  const [display, setDisplay] = useState(0);
 
+  useEffect(() => {
+    if (reducedMotion) {
+      return undefined;
+    }
+
+    let frame = 0;
+    const startedAt = performance.now();
+    const duration = 900;
+
+    function tick(now: number) {
+      const progress = clamp((now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+
+      setDisplay(Math.round(value * eased));
+
+      if (progress < 1) {
+        frame = requestAnimationFrame(tick);
+      }
+    }
+
+    frame = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(frame);
+  }, [reducedMotion, value]);
+
+  return <span className={className}>{reducedMotion ? value : display}</span>;
+}
+
+function localize(
+  value: LocalizedHealthScoreText | undefined,
+  locale: Locale,
+  fallback = ""
+) {
+  return resolveLocalizedText(value, locale) || fallback;
+}
+
+export function localizeHealthScoreText(
+  value: LocalizedHealthScoreText | undefined,
+  locale: Locale
+) {
+  return localize(value, locale);
+}
+
+function aiCardHeadline(
+  card: HealthScorePageAiCard | undefined,
+  locale: Locale,
+  fallback: string
+) {
+  return localize(card?.headline ?? card?.title, locale, fallback);
+}
+
+function aiCardBody(
+  card: HealthScorePageAiCard | undefined,
+  locale: Locale,
+  fallback: string
+) {
+  return localize(card?.body, locale, fallback);
+}
+
+function lowestDomain(result: HealthScoreResult) {
+  return [...result.domains].sort((left, right) => left.score - right.score)[0];
+}
+
+function normalizedPillars(result: HealthScoreResult) {
   return (
-    <aside
-      aria-label={labels.scoreLabel}
-      className="rounded-[2rem] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:p-8"
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-ash)]">
-            {labels.scoreLabel}
-          </p>
-          <strong className="mt-1 block text-[var(--mn-ink)]">
-            {scoreBandTone(score, locale)}
-          </strong>
-        </div>
-        <span className="rounded-full bg-[var(--mn-mint)] px-3 py-1 text-xs font-bold text-[var(--mn-teal-deep)]">
-          {result.band}
-        </span>
-      </div>
-
-      <div className="mx-auto mt-6 grid size-64 max-w-full place-items-center">
-        <svg
-          aria-hidden={true}
-          className="col-start-1 row-start-1 size-64 -rotate-90"
-          viewBox="0 0 240 240"
-        >
-          <defs>
-            <linearGradient id="healthscore-payment-gradient" x1="0" x2="1">
-              <stop offset="0" stopColor="var(--mn-gold-soft)" />
-              <stop offset="0.54" stopColor="var(--mn-teal-light)" />
-              <stop offset="1" stopColor="var(--mn-teal)" />
-            </linearGradient>
-          </defs>
-          <circle
-            cx="120"
-            cy="120"
-            fill="none"
-            r={radius}
-            stroke="var(--mn-cream-deep)"
-            strokeWidth="14"
-          />
-          <circle
-            cx="120"
-            cy="120"
-            fill="none"
-            r={radius}
-            stroke="url(#healthscore-payment-gradient)"
-            strokeDasharray={circumference.toFixed(2)}
-            strokeDashoffset={offset.toFixed(2)}
-            strokeLinecap="round"
-            strokeWidth="14"
-          />
-        </svg>
-        <div className="col-start-1 row-start-1 text-center">
-          <div className="font-serif text-7xl font-medium leading-none tracking-normal text-[var(--mn-ink)]">
-            {result.score}
-          </div>
-          <div className="mn-mono-label mt-1 text-xs font-bold uppercase tracking-[0.1em] text-[var(--mn-ash)]">
-            /100
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 space-y-3">
-        {result.domains.map((domain) => (
-          <div
-            className="grid grid-cols-[minmax(7.5rem,0.85fr)_1fr_2rem] items-center gap-3 text-xs font-bold text-[var(--mn-ink-soft)]"
-            key={domain.id}
-          >
-            <span>{domain.label}</span>
-            <progress
-              aria-label={`${domain.label} score`}
-              className="mn-progress mn-progress--soft"
-              max={100}
-              value={domain.score}
-            />
-            <span className="mn-mono-label text-right text-[0.7rem] text-[var(--mn-ink)]">
-              {domain.score}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-6 rounded-[var(--mn-radius-md)] bg-[var(--mn-gold-tint)] p-4 text-sm leading-6 text-[#6d5427]">
-        <strong>{labels.keyFinding}:</strong> {labels.keyFindingBody}
-      </div>
-    </aside>
+    result.pageContent?.locked.pillars ??
+    result.domains.map((domain) => ({
+      goalLinked: false,
+      id: domain.id,
+      label: domain.label,
+      tag: null,
+      value: domain.score
+    }))
   );
 }
 
-function HealthScorePaymentProgress({ locale }: Readonly<{ locale: Locale }>) {
-  const labels = paymentCopy[locale];
+function fallbackGapCards(
+  result: HealthScoreResult,
+  locale: Locale
+): HealthScoreGapCard[] {
+  const lowest = lowestDomain(result);
+  const cards: HealthScoreGapCard[] = pageCopy[locale].fallbackGaps.map((card) => ({
+    ...card
+  }));
+
+  if (lowest) {
+    cards[0] = {
+      body: lowest.description || cards[0].body,
+      headline: lowest.label,
+      tag: cards[0].tag,
+      value: `${lowest.score}`
+    };
+  }
+
+  return cards;
+}
+
+function gapCards(result: HealthScoreResult, locale: Locale) {
+  const seeds = result.pageContent?.copySeeds.gapTrio ?? fallbackGapCards(result, locale);
+
+  return seeds.slice(0, 3);
+}
+
+function methodCards(
+  result: HealthScoreResult,
+  locale: Locale
+): HealthScoreMethodCard[] {
+  return (
+    result.pageContent?.copySeeds.methodCards ??
+    pageCopy[locale].fallbackMethodCards
+  ).slice(0, 3);
+}
+
+function findings(result: HealthScoreResult, locale: Locale) {
+  const seedFindings = result.pageContent?.copySeeds.findings;
+
+  if (seedFindings && seedFindings.length > 0) {
+    return seedFindings.slice(0, 3);
+  }
+
+  const lowest = lowestDomain(result);
+
+  return [
+    {
+      body: lowest?.description ?? pageCopy[locale].fallbackFindingBody,
+      code: lowest?.id ?? "LOWEST_PILLAR",
+      headline: lowest?.label ?? pageCopy[locale].fallbackFindingTitle,
+      icon: "spark"
+    }
+  ];
+}
+
+function HealthScoreProgress({
+  locale
+}: Readonly<{
+  locale: Locale;
+}>) {
+  const copy = pageCopy[locale];
 
   return (
     <div
-      aria-label={labels.progressAria}
-      className="grid overflow-hidden rounded-[var(--mn-radius-md)] bg-[var(--mn-paper)] ring-1 ring-[var(--mn-line)] md:grid-cols-3"
+      aria-label="HealthScore assessment progress"
+      className="grid overflow-hidden rounded-lg bg-white ring-1 ring-[var(--mn-line)] md:grid-cols-3"
     >
-      {labels.progress.map(([title, body], index) => {
-        const done = index === 0;
+      {copy.progress.map(([title, body], index) => {
+        const complete = index === 0;
         const active = index === 1;
 
         return (
           <div
             className={cx(
               "flex items-center gap-3 p-4 md:p-5",
-              done
+              complete
                 ? "bg-[var(--mn-teal)] text-white"
                 : active
-                  ? "bg-[#3A7BD5] text-white"
-                  : ""
+                  ? "bg-[var(--mn-ink)] text-white"
+                  : "bg-white text-[var(--mn-ink)]"
             )}
             key={title}
           >
             <span
               className={cx(
                 "grid size-9 shrink-0 place-items-center rounded-full border text-xs font-bold",
-                done
+                complete || active
                   ? "border-white bg-white text-[var(--mn-teal-deep)]"
-                  : active
-                    ? "border-white bg-white text-[#3A7BD5]"
-                    : "border-[var(--mn-line)] bg-white text-[var(--mn-ash)]"
+                  : "border-[var(--mn-line)] bg-[var(--mn-paper)] text-[var(--mn-ash)]"
               )}
             >
-              {done ? "✓" : `0${index + 1}`}
+              {complete ? "OK" : `0${index + 1}`}
             </span>
-            <span>
-              <strong
-                className={cx(
-                  "block text-sm",
-                  done || active ? "text-white" : "text-[var(--mn-ink)]"
-                )}
-              >
-                {title}
-              </strong>
+            <span className="min-w-0">
+              <strong className="block text-sm">{title}</strong>
               <span
                 className={cx(
                   "block text-xs",
-                  done || active ? "text-white/80" : "text-[var(--mn-ash)]"
+                  complete || active ? "text-white/75" : "text-[var(--mn-ash)]"
                 )}
               >
                 {body}
@@ -821,6 +517,499 @@ function HealthScorePaymentProgress({ locale }: Readonly<{ locale: Locale }>) {
         );
       })}
     </div>
+  );
+}
+
+function ScoreSpectrum({
+  locale,
+  result
+}: Readonly<{
+  locale: Locale;
+  result: HealthScoreResult;
+}>) {
+  const copy = pageCopy[locale];
+  const score = result.pageContent?.locked.score ?? result.score;
+  const median = result.pageContent?.locked.median ?? 64;
+  const marker = scorePosition(score);
+  const medianMarker = scorePosition(median);
+
+  return (
+    <div className="mt-8">
+      <div className="relative h-4 rounded-full bg-[linear-gradient(90deg,#E46A4E_0%,#E7B85D_36%,#5FAE9F_72%,#1B6F68_100%)] shadow-inner">
+        <span
+          aria-hidden={true}
+          className="absolute top-1/2 h-8 w-px -translate-y-1/2 bg-white/70"
+          style={{ left: `${medianMarker}%` }}
+        />
+        <span
+          aria-label={`${copy.scoreLabel} ${score}`}
+          className="absolute top-1/2 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-[0.65rem] font-bold text-[var(--mn-teal-deep)] shadow-[0_8px_28px_rgba(18,82,76,0.22)] ring-4 ring-white/55 motion-safe:transition-[left] motion-safe:duration-700"
+          style={{ left: `${marker}%` }}
+        >
+          {score}
+        </span>
+      </div>
+      <div className="mt-3 flex justify-between gap-3 text-[0.7rem] font-semibold uppercase tracking-normal text-[var(--mn-ash)]">
+        <span>{copy.spectrumStart}</span>
+        <span>{copy.spectrumMid} {median}</span>
+        <span>{copy.spectrumEnd}</span>
+      </div>
+    </div>
+  );
+}
+
+function HealthScoreHero({
+  locale,
+  result
+}: Readonly<{
+  locale: Locale;
+  result: HealthScoreResult;
+}>) {
+  const copy = pageCopy[locale];
+  const page = result.pageContent;
+  const score = page?.locked.score ?? result.score;
+  const ai = page?.aiCopy;
+  const heroTitle = localize(ai?.heroTitle, locale, copy.heroTitle(score));
+  const heroBody = localize(ai?.heroBody, locale, page?.copySeeds.heroBody ?? result.summary);
+  const bandLine = localize(
+    ai?.bandLine,
+    locale,
+    page?.copySeeds.bandLine ?? copy.defaultBandLine
+  );
+  const percentile = page?.locked.percentile ?? null;
+
+  return (
+    <header className="space-y-8">
+      <HealthScoreProgress locale={locale} />
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.78fr)] lg:items-center">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-normal text-[var(--mn-teal-deep)]">
+            {copy.heroEyebrow}
+          </p>
+          <h1
+            className={cx(
+              "mt-5 max-w-5xl font-serif text-5xl font-medium leading-[1.04] tracking-normal text-[var(--mn-ink)] sm:text-6xl lg:text-7xl",
+              locale === "en" ? "text-balance" : "break-words"
+            )}
+          >
+            {heroTitle}
+          </h1>
+          <p
+            className={cx(
+              "mt-6 max-w-3xl text-lg text-[var(--mn-ink-soft)]",
+              copy.bodyClass
+            )}
+          >
+            {heroBody}
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link className="mn-primary-button" href="#pricing">
+              {copy.heroCta}
+              <ArrowRightIcon aria-hidden={true} className="size-4" />
+            </Link>
+            <Link className="mn-secondary-button" href="#signals">
+              {copy.heroSecondary}
+            </Link>
+          </div>
+        </div>
+
+        <aside className="rounded-lg bg-white p-6 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-normal text-[var(--mn-ash)]">
+                {copy.scoreLabel}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-[var(--mn-teal-deep)]">
+                {result.band}
+              </p>
+            </div>
+            {percentile !== null ? (
+              <span className="rounded-full bg-[var(--mn-mint)] px-3 py-1 text-xs font-bold text-[var(--mn-teal-deep)]">
+                {copy.percentile}: {percentile}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-8 flex items-end justify-center gap-3">
+            <CountUpNumber
+              className="font-serif text-8xl font-medium leading-none tracking-normal text-[var(--mn-ink)]"
+              value={score}
+            />
+            <span className="pb-3 text-lg font-semibold text-[var(--mn-ash)]">
+              {copy.scoreOutOf}
+            </span>
+          </div>
+
+          <ScoreSpectrum locale={locale} result={result} />
+
+          <p
+            className={cx(
+              "mt-6 rounded-lg bg-[var(--mn-gold-tint)] p-4 text-sm text-[#6d5427]",
+              copy.bodyClass
+            )}
+          >
+            {bandLine}
+          </p>
+        </aside>
+      </div>
+    </header>
+  );
+}
+
+function GapCards({
+  locale,
+  result
+}: Readonly<{
+  locale: Locale;
+  result: HealthScoreResult;
+}>) {
+  const copy = pageCopy[locale];
+  const page = result.pageContent;
+  const ai = page?.aiCopy;
+  const title = localize(ai?.paywallTitle, locale, copy.gapTitle);
+  const body = localize(ai?.paywallSubtitle, locale, copy.gapBody);
+  const cards = gapCards(result, locale);
+
+  return (
+    <section className="pt-2" id="signals">
+      <div className="grid gap-5 lg:grid-cols-[0.84fr_1.16fr] lg:items-end">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-normal text-[var(--mn-teal-deep)]">
+            {copy.gapEyebrow}
+          </p>
+          <h2 className="mt-3 font-serif text-4xl font-medium leading-tight tracking-normal text-[var(--mn-ink)]">
+            {title}
+          </h2>
+        </div>
+        <p className={cx("text-lg text-[var(--mn-ink-soft)]", copy.bodyClass)}>
+          {body}
+        </p>
+      </div>
+      <div className="mt-8 grid gap-4 md:grid-cols-3">
+        {cards.map((card, index) => {
+          const aiCard = ai?.gapTrio?.[index];
+
+          return (
+            <article
+              className="rounded-lg bg-white p-6 ring-1 ring-[var(--mn-line)] motion-safe:transition motion-safe:duration-300 motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-[var(--mn-shadow-card)]"
+              key={`${card.tag}-${card.value}-${index}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-bold uppercase tracking-normal text-[var(--mn-teal-deep)]">
+                  {card.tag}
+                </span>
+                <span className="font-serif text-4xl font-medium leading-none text-[var(--mn-gold)]">
+                  {card.value}
+                </span>
+              </div>
+              <h3 className="mt-5 text-xl font-semibold leading-snug text-[var(--mn-ink)]">
+                {aiCardHeadline(aiCard, locale, card.headline)}
+              </h3>
+              <p className={cx("mt-3 text-sm text-[var(--mn-ink-soft)]", copy.bodyClass)}>
+                {aiCardBody(aiCard, locale, card.body)}
+              </p>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function PillarBars({
+  locale,
+  result
+}: Readonly<{
+  locale: Locale;
+  result: HealthScoreResult;
+}>) {
+  const copy = pageCopy[locale];
+  const [mounted, setMounted] = useState(false);
+  const pillars = normalizedPillars(result);
+  const page = result.pageContent;
+  const relativity = page?.copySeeds.relativity;
+  const ai = page?.aiCopy;
+  const headline = localize(
+    ai?.relativityHeadline,
+    locale,
+    relativity?.headline ?? copy.pillarsTitle
+  );
+  const sub = localize(ai?.relativitySub, locale, relativity?.sub ?? result.summary);
+  const highestLeverage = page?.copySeeds.highestLeverage;
+  const strengthNote = page?.copySeeds.strengthNote;
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setMounted(true));
+
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  return (
+    <section className="rounded-lg bg-[var(--mn-paper)] p-5 ring-1 ring-[var(--mn-line)] sm:p-7">
+      <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-normal text-[var(--mn-teal-deep)]">
+            {copy.pillarsEyebrow}
+          </p>
+          <h2 className="mt-3 font-serif text-4xl font-medium leading-tight tracking-normal text-[var(--mn-ink)]">
+            {headline}
+          </h2>
+          <p className={cx("mt-4 text-base text-[var(--mn-ink-soft)]", copy.bodyClass)}>
+            {sub}
+          </p>
+          {highestLeverage ? (
+            <div className="mt-6 rounded-lg bg-white p-5 ring-1 ring-[var(--mn-line)]">
+              <p className="text-xs font-bold uppercase tracking-normal text-[var(--mn-gold)]">
+                {highestLeverage.pillar}
+              </p>
+              <p className={cx("mt-2 text-sm text-[var(--mn-ink-soft)]", copy.bodyClass)}>
+                {highestLeverage.text}
+              </p>
+            </div>
+          ) : null}
+          {strengthNote ? (
+            <p className={cx("mt-4 text-sm text-[var(--mn-ink-soft)]", copy.bodyClass)}>
+              {strengthNote}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-4">
+          {pillars.map((pillar) => (
+            <div className="rounded-lg bg-white p-4 ring-1 ring-[var(--mn-line)]" key={pillar.id}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h3 className="font-semibold leading-snug text-[var(--mn-ink)]">
+                    {pillar.label}
+                  </h3>
+                  {pillar.tag ? (
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-normal text-[var(--mn-teal-deep)]">
+                      {pillar.tag}
+                    </p>
+                  ) : null}
+                </div>
+                <span className="font-serif text-3xl font-medium leading-none text-[var(--mn-ink)]">
+                  {pillar.value}
+                </span>
+              </div>
+              <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-[var(--mn-cream-deep)]">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(90deg,var(--mn-gold)_0%,var(--mn-teal)_100%)] motion-safe:transition-[width] motion-safe:duration-700 motion-reduce:transition-none"
+                  style={{ width: mounted ? `${clamp(pillar.value)}%` : 0 }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FindingIcon({
+  index
+}: Readonly<{
+  index: number;
+}>) {
+  const className = "size-5";
+
+  if (index === 1) {
+    return <ShieldCheckIcon aria-hidden={true} className={className} />;
+  }
+
+  if (index === 2) {
+    return <ClipboardDocumentCheckIcon aria-hidden={true} className={className} />;
+  }
+
+  return <SparklesIcon aria-hidden={true} className={className} />;
+}
+
+function FindingsSection({
+  locale,
+  result
+}: Readonly<{
+  locale: Locale;
+  result: HealthScoreResult;
+}>) {
+  const copy = pageCopy[locale];
+  const page = result.pageContent;
+  const ai = page?.aiCopy;
+  const items = findings(result, locale);
+
+  return (
+    <section>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-normal text-[var(--mn-teal-deep)]">
+            {page?.copySeeds.findingsMode === "strengths" ? copy.pillarsEyebrow : copy.whatCaught}
+          </p>
+          <h2 className="mt-3 font-serif text-4xl font-medium leading-tight tracking-normal text-[var(--mn-ink)]">
+            {copy.whatCaught}
+          </h2>
+        </div>
+      </div>
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        {items.map((item, index) => {
+          const aiCard = ai?.findings?.[index];
+
+          return (
+            <article
+              className="rounded-lg bg-white p-6 ring-1 ring-[var(--mn-line)]"
+              key={`${item.code}-${index}`}
+            >
+              <div className="grid size-11 place-items-center rounded-lg bg-[var(--mn-mint)] text-[var(--mn-teal-deep)]">
+                <FindingIcon index={index} />
+              </div>
+              <h3 className="mt-5 text-xl font-semibold leading-snug text-[var(--mn-ink)]">
+                {aiCardHeadline(aiCard, locale, item.headline)}
+              </h3>
+              <p className={cx("mt-3 text-sm text-[var(--mn-ink-soft)]", copy.bodyClass)}>
+                {aiCardBody(aiCard, locale, item.body)}
+              </p>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SubtractionBeat({
+  locale,
+  result
+}: Readonly<{
+  locale: Locale;
+  result: HealthScoreResult;
+}>) {
+  const copy = pageCopy[locale];
+  const page = result.pageContent;
+  const ai = page?.aiCopy;
+  const subtraction = page?.locked.subtraction ?? {
+    chosen: 8,
+    evaluated: 120,
+    mode: "nutrients" as const,
+    setAside: 112
+  };
+  const seed = page?.copySeeds.subtraction;
+  const body = localize(ai?.subtractionBody, locale, seed?.body ?? copy.subtractionTitle);
+  const labels = [
+    seed?.labelEvaluated ?? copy.evaluatedFallback,
+    seed?.labelSetAside ?? copy.setAsideFallback,
+    seed?.labelChosen ?? copy.chosenFallback
+  ];
+  const numbers = [subtraction.evaluated, subtraction.setAside, subtraction.chosen];
+
+  return (
+    <section className="rounded-lg bg-[var(--mn-ink)] p-6 text-white sm:p-8">
+      <div className="mx-auto max-w-4xl text-center">
+        <p className="text-xs font-bold uppercase tracking-normal text-[var(--mn-gold-soft)]">
+          {copy.subtractionEyebrow}
+        </p>
+        <h2 className="mt-3 font-serif text-4xl font-medium leading-tight tracking-normal">
+          {copy.subtractionTitle}
+        </h2>
+        <div className="mt-8 grid gap-4 md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-center">
+          {numbers.map((number, index) => (
+            <div className="contents" key={`${labels[index]}-${number}`}>
+              <div className="rounded-lg bg-white/8 p-5 ring-1 ring-white/12">
+                <CountUpNumber
+                  className="font-serif text-6xl font-medium leading-none tracking-normal text-white"
+                  value={number}
+                />
+                <p className="mt-2 text-sm font-semibold uppercase tracking-normal text-white/65">
+                  {labels[index]}
+                </p>
+              </div>
+              {index < 2 ? (
+                <ArrowRightIcon
+                  aria-hidden={true}
+                  className="mx-auto hidden size-6 text-[var(--mn-gold-soft)] md:block"
+                />
+              ) : null}
+            </div>
+          ))}
+        </div>
+        <p className={cx("mx-auto mt-8 max-w-3xl text-base text-white/75", copy.bodyClass)}>
+          {body}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function MethodCards({
+  locale,
+  result
+}: Readonly<{
+  locale: Locale;
+  result: HealthScoreResult;
+}>) {
+  const copy = pageCopy[locale];
+  const page = result.pageContent;
+  const ai = page?.aiCopy;
+  const headline = localize(
+    ai?.methodHeadline,
+    locale,
+    page?.copySeeds.methodHeadline ?? copy.methodTitle
+  );
+  const cards = methodCards(result, locale);
+  const icons = [BeakerIcon, AdjustmentsHorizontalIcon, LockClosedIcon];
+
+  return (
+    <section className="rounded-lg bg-[var(--mn-sand-soft)] px-5 py-10 ring-1 ring-[var(--mn-sand-deep)] sm:px-8">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-xs font-bold uppercase tracking-normal text-[var(--mn-teal-deep)]">
+          {copy.methodEyebrow}
+        </p>
+        <h2 className="mt-3 font-serif text-4xl font-medium leading-tight tracking-normal text-[var(--mn-ink)]">
+          {headline}
+        </h2>
+      </div>
+      <div className="mt-8 grid gap-4 md:grid-cols-3">
+        {cards.map((card, index) => {
+          const Icon = icons[index] ?? BeakerIcon;
+          const aiCard = ai?.methodCards?.[index];
+
+          return (
+            <article
+              className={cx(
+                "rounded-lg p-6 ring-1",
+                index === 0
+                  ? "bg-[var(--mn-ink)] text-white ring-white/10"
+                  : "bg-white text-[var(--mn-ink)] ring-[var(--mn-line)]"
+              )}
+              key={`${card.title}-${index}`}
+            >
+              <div
+                className={cx(
+                  "grid size-11 place-items-center rounded-lg",
+                  index === 0
+                    ? "bg-white/10 text-[var(--mn-gold-soft)]"
+                    : "bg-[var(--mn-mint)] text-[var(--mn-teal-deep)]"
+                )}
+              >
+                <Icon aria-hidden={true} className="size-5" />
+              </div>
+              <h3 className="mt-5 text-xl font-semibold leading-snug">
+                {aiCardHeadline(aiCard, locale, card.title)}
+              </h3>
+              <p
+                className={cx(
+                  "mt-3 text-sm",
+                  copy.bodyClass,
+                  index === 0 ? "text-white/75" : "text-[var(--mn-ink-soft)]"
+                )}
+              >
+                {aiCardBody(aiCard, locale, card.body)}
+              </p>
+            </article>
+          );
+        })}
+      </div>
+      <p className={cx("mx-auto mt-6 max-w-3xl text-center text-sm text-[var(--mn-ink-soft)]", copy.bodyClass)}>
+        {copy.trustLine}
+      </p>
+    </section>
   );
 }
 
@@ -837,20 +1026,20 @@ function PriceCard({
   isPending?: boolean;
   onSelect: () => void;
   pendingLabel: string;
-  plan: (typeof paymentCopy.en.plans)[number] | (typeof paymentCopy.th.plans)[number];
+  plan: PricePlan;
 }>) {
   return (
     <article
       className={cx(
-        "relative flex flex-col rounded-[1.75rem] p-6 ring-1 sm:p-8",
+        "relative flex flex-col rounded-lg p-6 ring-1 sm:p-8",
         featured
           ? "bg-[var(--mn-ink)] text-white ring-[color-mix(in_srgb,var(--mn-teal-light)_60%,transparent)]"
-          : "bg-[var(--mn-paper)] text-[var(--mn-ink)] ring-[var(--mn-line)]"
+          : "bg-white text-[var(--mn-ink)] ring-[var(--mn-line)]"
       )}
     >
       <span
         className={cx(
-          "absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full px-4 py-2 text-center text-[0.65rem] font-bold uppercase tracking-[0.16em]",
+          "absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full px-4 py-2 text-center text-[0.65rem] font-bold uppercase tracking-normal",
           featured
             ? "bg-[var(--mn-gold)] text-white"
             : "bg-[var(--mn-gold-tint)] text-[var(--mn-gold)]"
@@ -860,13 +1049,13 @@ function PriceCard({
       </span>
       <p
         className={cx(
-          "mn-mono-label mt-4 text-xs font-bold uppercase tracking-[0.16em]",
+          "mt-4 text-xs font-bold uppercase tracking-normal",
           featured ? "text-[var(--mn-teal-light)]" : "text-[var(--mn-teal-deep)]"
         )}
       >
         {plan.eyebrow}
       </p>
-      <h3 className="mt-3 font-serif text-3xl font-medium leading-tight">
+      <h3 className="mt-3 font-serif text-3xl font-medium leading-tight tracking-normal">
         {plan.name}
       </h3>
       <p
@@ -883,55 +1072,30 @@ function PriceCard({
           featured ? "border-white/15" : "border-[var(--mn-line)]"
         )}
       >
-        <p
-          className={cx(
-            "text-sm",
-            featured ? "text-white/55" : "text-[var(--mn-ash)]"
-          )}
-        >
+        <p className={cx("text-sm", featured ? "text-white/55" : "text-[var(--mn-ash)]")}>
           <s>{plan.was}</s>{" "}
-          <span
-            className={cx(
-              "font-bold uppercase",
-              featured ? "text-[var(--mn-gold-soft)]" : "text-[var(--mn-gold)]"
-            )}
-          >
+          <span className={cx("font-bold uppercase", featured ? "text-[var(--mn-gold-soft)]" : "text-[var(--mn-gold)]")}>
             {plan.save}
           </span>
         </p>
         <p className="mt-2 flex flex-wrap items-end gap-2">
-          <span
-            className={cx(
-              "pb-2 text-sm font-bold",
-              featured ? "text-[var(--mn-teal-light)]" : "text-[var(--mn-teal-deep)]"
-            )}
-          >
+          <span className={cx("pb-2 text-sm font-bold", featured ? "text-[var(--mn-teal-light)]" : "text-[var(--mn-teal-deep)]")}>
             THB
           </span>
           <strong className="font-serif text-6xl font-medium leading-none tracking-normal">
             {plan.price}
           </strong>
-          <span
-            className={cx(
-              "mn-mono-label pb-2 text-xs font-bold uppercase tracking-[0.12em]",
-              featured ? "text-[var(--mn-teal-light)]" : "text-[var(--mn-teal-deep)]"
-            )}
-          >
+          <span className={cx("pb-2 text-xs font-bold uppercase tracking-normal", featured ? "text-[var(--mn-teal-light)]" : "text-[var(--mn-teal-deep)]")}>
             {plan.term}
           </span>
         </p>
-        <p
-          className={cx(
-            "mt-2 text-xs",
-            featured ? "text-white/55" : "text-[var(--mn-ash)]"
-          )}
-        >
+        <p className={cx("mt-2 text-xs", featured ? "text-white/55" : "text-[var(--mn-ash)]")}>
           {plan.fine}
         </p>
       </div>
       <button
         className={cx(
-          "inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-bold uppercase tracking-[0.08em]",
+          "inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-bold uppercase tracking-normal",
           featured
             ? "bg-white text-[var(--mn-teal-deep)] hover:bg-[var(--mn-cream)]"
             : "bg-[var(--mn-teal)] text-white hover:bg-[var(--mn-teal-deep)]",
@@ -942,9 +1106,7 @@ function PriceCard({
         type="button"
       >
         {isPending ? pendingLabel : plan.cta}
-        {isPending ? null : (
-          <ArrowRightIcon aria-hidden={true} className="size-4" />
-        )}
+        {isPending ? null : <ArrowRightIcon aria-hidden={true} className="size-4" />}
       </button>
       <ul className="mt-6 space-y-3">
         {plan.features.map((feature) => (
@@ -968,7 +1130,7 @@ function PriceCard({
       </ul>
       <div
         className={cx(
-          "mt-auto grid grid-cols-[2.5rem_1fr] gap-3 rounded-[var(--mn-radius-md)] p-4 text-sm leading-6",
+          "mt-auto grid grid-cols-[2.5rem_1fr] gap-3 rounded-lg p-4 text-sm leading-6",
           featured
             ? "bg-white/8 text-white/75 ring-1 ring-white/15"
             : "bg-[var(--mn-gold-tint)] text-[#6d5427]"
@@ -984,12 +1146,7 @@ function PriceCard({
           )}
         />
         <div>
-          <strong
-            className={cx(
-              "block",
-              featured ? "text-white" : "text-[var(--mn-ink)]"
-            )}
-          >
+          <strong className={cx("block", featured ? "text-white" : "text-[var(--mn-ink)]")}>
             {plan.guarantee}
           </strong>
           <p>{plan.guaranteeBody}</p>
@@ -999,27 +1156,15 @@ function PriceCard({
   );
 }
 
-export function HealthScorePaymentPanel({
+function PricingSection({
   locale,
-  planId,
-  result
+  planId
 }: Readonly<{
   locale: Locale;
   planId?: string;
-  result: HealthScoreResult;
 }>) {
-  const labels = paymentCopy[locale];
+  const copy = pageCopy[locale];
   const [pendingPlan, setPendingPlan] = useState<AssessmentPlan | null>(null);
-  const lowest = [...result.domains].sort((a, b) => a.score - b.score)[0];
-  const signals = paywallSignals(result, locale);
-  const focusItems = planFocusItems(lowest, locale);
-  const unlockHref = "#pricing";
-  const paywallTitle =
-    localizeHealthScoreText(result.advice?.paywallTitle, locale) ||
-    labels.signalsTitle;
-  const paywallSubtitle =
-    localizeHealthScoreText(result.advice?.paywallSubtitle, locale) ||
-    labels.signalsBody;
 
   async function startPlan(plan: AssessmentPlan) {
     if (!planId || pendingPlan) {
@@ -1035,218 +1180,97 @@ export function HealthScorePaymentPanel({
   }
 
   return (
-    <section className="space-y-16">
-      <header className="space-y-10">
-        <HealthScorePaymentProgress locale={locale} />
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.82fr)] lg:items-center">
-          <div>
-            <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
-              {labels.heroEyebrow}
-            </p>
-            <h1 className="mt-5 font-serif text-5xl font-medium leading-[1.04] tracking-normal text-[var(--mn-ink)] text-balance sm:text-6xl lg:text-7xl">
-              {labels.heroTitle(result.score)}{" "}
-              <span className="italic text-[var(--mn-teal-deep)]">
-                {labels.heroAccent}
-              </span>
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-[var(--mn-ink-soft)]">
-              {labels.heroBody}
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link className="mn-primary-button" href="#pricing">
-                {labels.heroPrimary}
-                <ArrowRightIcon aria-hidden={true} className="size-4" />
-              </Link>
-              <Link className="mn-secondary-button" href="#includes">
-                {labels.heroSecondary}
-              </Link>
-            </div>
-          </div>
-          <ScoreSummaryCard locale={locale} result={result} />
-        </div>
-      </header>
-
-      <section className="rounded-[2rem] bg-[var(--mn-paper)] p-5 ring-1 ring-[var(--mn-line)] sm:p-6 lg:grid lg:grid-cols-[0.9fr_1.1fr] lg:gap-6">
-        <div className="rounded-[1.5rem] bg-[var(--mn-ink)] p-7 text-white">
-          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-gold-soft)]">
-            {labels.opportunityEyebrow}
-          </p>
-          <div className="mt-8 font-serif text-7xl font-medium leading-none tracking-normal">
-            {lowest.score}
-            <span className="text-2xl text-white/55">/100</span>
-          </div>
-          <h2 className="mt-6 text-3xl font-medium">{lowest.label}</h2>
-          <p className="mt-3 text-sm leading-6 text-white/70">
-            {lowest.description}
-          </p>
-        </div>
-        <div className="p-2 pt-7 lg:p-7">
-          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]">
-            {labels.opportunityTitle}
-          </p>
-          <h2 className="mt-3 font-serif text-3xl font-medium leading-tight text-[var(--mn-ink)] sm:text-4xl">
-            {paywallTitle}
-          </h2>
-          <p className="mt-4 text-base leading-7 text-[var(--mn-ink-soft)]">
-            {paywallSubtitle}
-          </p>
-          <div className="mt-6 grid gap-3">
-            {focusItems.map(([title, body]) => (
-              <div
-                className="flex gap-3 rounded-[var(--mn-radius-md)] bg-[var(--mn-mint)] p-4 text-sm leading-6 text-[var(--mn-ink-soft)]"
-                key={title}
-              >
-                <CheckCircleIcon
-                  aria-hidden={true}
-                  className="mt-0.5 size-5 shrink-0 text-[var(--mn-teal)]"
-                />
-                <span>
-                  <strong className="text-[var(--mn-teal-deep)]">
-                    {title}
-                  </strong>{" "}
-                  {body}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <div className="grid gap-5 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
-          <div>
-            <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]">
-              {labels.signalsEyebrow}
-            </p>
-            <h2 className="mt-3 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)]">
-              {labels.signalsTitle}
-            </h2>
-          </div>
-          <p className="text-lg leading-8 text-[var(--mn-ink-soft)]">
-            {labels.signalsBody}
-          </p>
-        </div>
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {signals.map(([title, body], index) => (
-            <article
-              className="rounded-[1.5rem] bg-[var(--mn-paper)] p-6 ring-1 ring-[var(--mn-line)]"
-              key={title}
-            >
-              <div
-                className={cx(
-                  "grid size-12 place-items-center rounded-[var(--mn-radius-md)]",
-                  index === 1
-                    ? "bg-[var(--mn-gold-tint)] text-[var(--mn-gold)]"
-                    : "bg-[var(--mn-mint)] text-[var(--mn-teal-deep)]"
-                )}
-              >
-                <SparklesIcon aria-hidden={true} className="size-5" />
-              </div>
-              <h3 className="mt-5 text-xl font-semibold leading-snug text-[var(--mn-ink)]">
-                {title}
-              </h3>
-              <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                {body}
-              </p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section
-        className="rounded-[2rem] bg-[var(--mn-sand-soft)] px-5 py-10 ring-1 ring-[var(--mn-sand-deep)] sm:px-8"
-        id="includes"
-      >
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]">
-            {labels.includesEyebrow}
-          </p>
-          <h2 className="mt-3 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)]">
-            {labels.includesTitle}
-          </h2>
-          <p className="mt-4 text-lg leading-8 text-[var(--mn-ink-soft)]">
-            {labels.includesBody}
-          </p>
-        </div>
-        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {labels.includes.map(([title, body], index) => (
-            <article
-              className={cx(
-                "rounded-[1.5rem] p-6 ring-1",
-                index === 0
-                  ? "bg-[var(--mn-ink)] text-white ring-white/10"
-                  : "bg-[var(--mn-paper)] text-[var(--mn-ink)] ring-[var(--mn-line)]"
-              )}
-              key={title}
-            >
-              <div
-                className={cx(
-                  "grid size-11 place-items-center rounded-[var(--mn-radius-md)]",
-                  index === 0
-                    ? "bg-white/10 text-[var(--mn-gold-soft)]"
-                    : "bg-[var(--mn-mint)] text-[var(--mn-teal-deep)]"
-                )}
-              >
-                {index === 2 ? (
-                  <ShieldCheckIcon aria-hidden={true} className="size-5" />
-                ) : index === 3 ? (
-                  <LockClosedIcon aria-hidden={true} className="size-5" />
-                ) : (
-                  <SparklesIcon aria-hidden={true} className="size-5" />
-                )}
-              </div>
-              <h3 className="mt-5 text-xl font-semibold leading-snug">
-                {title}
-              </h3>
-              <p
-                className={cx(
-                  "mt-3 text-sm leading-6",
-                  index === 0 ? "text-white/75" : "text-[var(--mn-ink-soft)]"
-                )}
-              >
-                {body}
-              </p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="pricing">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]">
-            {labels.pricingEyebrow}
-          </p>
-          <h2 className="mt-3 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)]">
-            {labels.pricingTitle}
-          </h2>
-          <p className="mt-4 text-lg leading-8 text-[var(--mn-ink-soft)]">
-            {labels.pricingBody}
-          </p>
-        </div>
-        <div className="mt-10 grid gap-8 lg:grid-cols-2">
-          {labels.plans.map((plan, index) => (
-            <PriceCard
-              disabled={!planId || Boolean(pendingPlan)}
-              featured={index === 1}
-              isPending={
-                (index === 0 && pendingPlan === "precision") ||
-                (index === 1 && pendingPlan === "pro")
-              }
-              key={plan.name}
-              onSelect={() => void startPlan(index === 0 ? "precision" : "pro")}
-              pendingLabel={labels.preparing}
-              plan={plan}
-            />
-          ))}
-        </div>
-        {!planId ? (
-          <p className="mt-4 text-center text-sm text-[var(--mn-ash)]">
-            <Link className="font-semibold text-[var(--mn-teal-deep)]" href={unlockHref}>
-              {labels.heroPrimary}
-            </Link>
-          </p>
-        ) : null}
-      </section>
+    <section id="pricing">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-xs font-bold uppercase tracking-normal text-[var(--mn-teal-deep)]">
+          {copy.pricingEyebrow}
+        </p>
+        <h2 className="mt-3 font-serif text-4xl font-medium leading-tight tracking-normal text-[var(--mn-ink)]">
+          {copy.pricingTitle}
+        </h2>
+        <p className={cx("mt-4 text-lg text-[var(--mn-ink-soft)]", copy.bodyClass)}>
+          {copy.pricingBody}
+        </p>
+      </div>
+      <div className="mt-10 grid gap-8 lg:grid-cols-2">
+        {copy.plans.map((plan, index) => (
+          <PriceCard
+            disabled={!planId || Boolean(pendingPlan)}
+            featured={index === 1}
+            isPending={
+              (index === 0 && pendingPlan === "precision") ||
+              (index === 1 && pendingPlan === "pro")
+            }
+            key={plan.name}
+            onSelect={() => void startPlan(index === 0 ? "precision" : "pro")}
+            pendingLabel={copy.preparing}
+            plan={plan}
+          />
+        ))}
+      </div>
     </section>
+  );
+}
+
+function HealthScoreExperience({
+  locale,
+  planId,
+  result,
+  showPricing
+}: Readonly<{
+  locale: Locale;
+  planId?: string;
+  result: HealthScoreResult;
+  showPricing: boolean;
+}>) {
+  const stableResult = useMemo(() => result, [result]);
+
+  return (
+    <section className="space-y-14">
+      <HealthScoreHero locale={locale} result={stableResult} />
+      <GapCards locale={locale} result={stableResult} />
+      <PillarBars locale={locale} result={stableResult} />
+      <FindingsSection locale={locale} result={stableResult} />
+      <SubtractionBeat locale={locale} result={stableResult} />
+      <MethodCards locale={locale} result={stableResult} />
+      {showPricing ? <PricingSection locale={locale} planId={planId} /> : null}
+    </section>
+  );
+}
+
+export function HealthScorePanel({
+  locale,
+  result
+}: Readonly<{
+  locale: Locale;
+  result: HealthScoreResult;
+}>) {
+  return (
+    <div className="mt-10">
+      <HealthScoreExperience
+        locale={locale}
+        result={result}
+        showPricing={false}
+      />
+    </div>
+  );
+}
+
+export function HealthScorePaymentPanel({
+  locale,
+  planId,
+  result
+}: Readonly<{
+  locale: Locale;
+  planId?: string;
+  result: HealthScoreResult;
+}>) {
+  return (
+    <HealthScoreExperience
+      locale={locale}
+      planId={planId}
+      result={result}
+      showPricing={true}
+    />
   );
 }

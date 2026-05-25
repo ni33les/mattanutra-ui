@@ -242,9 +242,13 @@ export async function enqueueDigitalOceanBillingSyncTask(date = new Date()) {
 }
 
 export async function enqueueHealthScoreAnalysisTask({
+  force = false,
+  source = "assessment",
   taskGroupId,
   planId
 }: Readonly<{
+  force?: boolean;
+  source?: string;
   taskGroupId?: string | null;
   planId: string;
 }>) {
@@ -265,7 +269,7 @@ export async function enqueueHealthScoreAnalysisTask({
     return null;
   }
 
-  if (hasHealthScoreAdvice(rows[0].health_score)) {
+  if (!force && hasHealthScoreAdvice(rows[0].health_score)) {
     return null;
   }
 
@@ -281,10 +285,13 @@ export async function enqueueHealthScoreAnalysisTask({
     idempotencyKey: `healthscore-analysis:${planId}:${inputHash}`,
     idempotencyScope: "successful",
     idempotencyScopeKey: `healthscore:${planId}`,
-    payload: {},
+    payload: {
+      copyRefresh: force,
+      inputHash
+    },
     planId,
     reasoningEffort: "none",
-    source: "assessment",
+    source,
     taskGroupId,
     taskTitle: "Generate HealthScore",
     taskType: "analyze_healthscore"

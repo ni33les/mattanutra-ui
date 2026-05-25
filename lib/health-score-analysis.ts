@@ -1,17 +1,19 @@
-// Dynamic import to avoid bundling Node 'crypto' into client bundles
 async function getCreateHash() {
   const crypto = await import("crypto");
   return crypto.createHash;
 }
+
 import type {
   HealthScoreAdvice,
+  HealthScorePageAiCopy,
   HealthScorePaywallFeature,
   HealthScoreResult,
   LocalizedHealthScoreText
 } from "@/lib/health-score";
+import { HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS } from "@/lib/health-score";
 import { defaultLocale, type Locale } from "@/lib/i18n";
 
-type XaiChatCompletion = {
+type OpenAiChatCompletion = {
   choices?: Array<{
     message?: {
       content?: string | null;
@@ -24,6 +26,7 @@ type XaiChatCompletion = {
 
 export type HealthScoreAdviceAnalysis = Readonly<{
   advice: HealthScoreAdvice;
+  aiCopy?: HealthScorePageAiCopy;
   cachedOrExisting: boolean;
   model: string;
   promptVersion: string;
@@ -32,11 +35,16 @@ export type HealthScoreAdviceAnalysis = Readonly<{
   usage?: unknown;
 }>;
 
-const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
-const DEFAULT_GROK_MODEL = "grok-4.3";
-const DEFAULT_HEALTHSCORE_REASONING_EFFORT = "none";
-const DEFAULT_PROMPT_VERSION = "v5";
-const CACHE_TYPE = "healthscore_advice";
+type ValidatedHealthScoreAiResponse = Readonly<{
+  advice: HealthScoreAdvice;
+  pageCopy: HealthScorePageAiCopy;
+}>;
+
+const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+const DEFAULT_HEALTHSCORE_COPY_MODEL = "gpt-5.5";
+const DEFAULT_HEALTHSCORE_REASONING_EFFORT = "low";
+const DEFAULT_PROMPT_VERSION = "v6-page-content";
+const CACHE_TYPE = "healthscore_page_copy";
 const CACHE_TTL_DAYS = 7;
 const MAX_ATTEMPTS = 2;
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -49,16 +57,19 @@ function configured(value: string | undefined) {
   return value?.trim() ?? "";
 }
 
-function grokConfig() {
-  const apiKey = configured(process.env.XAI_API_KEY);
+function openAiConfig() {
+  const apiKey = configured(process.env.OPENAI_API_KEY);
 
   if (!apiKey) {
-    throw new Error("XAI_API_KEY is not configured");
+    throw new Error("OPENAI_API_KEY is not configured");
   }
 
   return {
     apiKey,
-    model: configured(process.env.GROK_MODEL) || DEFAULT_GROK_MODEL,
+    model:
+      configured(process.env.HEALTHSCORE_COPY_MODEL) ||
+      configured(process.env.OPENAI_MODEL) ||
+      DEFAULT_HEALTHSCORE_COPY_MODEL,
     promptVersion: DEFAULT_PROMPT_VERSION,
     reasoningEffort:
       configured(process.env.HEALTHSCORE_REASONING_EFFORT) ||
@@ -68,14 +79,18 @@ function grokConfig() {
 
 function systemPrompt(promptVersion: string) {
   return [
-    `You are MattaNutra's HealthScore sales copy engine ${promptVersion}.`,
-    "The user has just completed an assessment and seen their HealthScore.",
-    "Your task is to convert this specific person into a paid customer by showing that MattaNutra understands their results and can turn them into a practical nutrition plan.",
-    "Write like a calm premium wellness advisor: specific, useful, commercial, and trustworthy.",
-    "Never sound generic. If the copy could fit most users, it is wrong.",
-    "Do not recommend supplements, doses, products, brands, marketplace searches, treatments, or disease claims.",
+    `You are MattaNutra's HealthScore page copy engine ${promptVersion}.`,
+    "The deterministic engine has already selected the score, pillars, findings, counts, and evidence.",
+    "Your job is to polish copy only inside the provided slots. Never change numbers, flags, card counts, product counts, score bands, or what each card is about.",
+    "Write like a calm premium wellness advisor: specific, useful, commercially clear, and trustworthy.",
+    "Never sound generic. If a sentence could fit most customers, it is wrong.",
+    "Do not recommend supplements, doses, products, treatments, diagnosis, disease claims, lab testing, or medication changes.",
     "Return JSON only. The first character must be { and the last character must be }."
   ].join("\n");
+}
+
+function requiredLocales(locale: Locale) {
+  return [...new Set([defaultLocale, locale])];
 }
 
 function userPrompt({
@@ -87,93 +102,61 @@ function userPrompt({
   healthScore: HealthScoreResult;
   locale: Locale;
 }>) {
-  const requiredOutputLocales = [...new Set([defaultLocale, locale])];
+  const pageContent = healthScore.pageContent;
+  const locales = requiredLocales(locale);
 
   return JSON.stringify(
     {
       assessment: compactAssessmentForAdvice(answers),
       contract: {
         advice: {
-          overview: {
-            en: "One short English paragraph combining the main focus area from the lowest-scoring HealthScore domain with practical wellness next steps. No supplement advice.",
-            th: "One short Thai paragraph combining the main focus area from the lowest-scoring HealthScore domain with practical wellness next steps. No supplement advice."
-          },
-          paywallEyebrow: {
-            en: "Short English eyebrow adapted from: Choose your brief.",
-            th: "Short Thai eyebrow adapted from: Choose your brief."
-          },
-          paywallFeatures: [
-            {
-              description: {
-                en: "One English sentence anchored to a concrete signal from personalizationSignals.",
-                th: "One Thai sentence anchored to a concrete signal from personalizationSignals."
-              },
-              name: {
-                en: "Short English feature name anchored to the user's actual situation",
-                th: "Short Thai feature name anchored to the user's actual situation"
-              }
-            },
-            {
-              description: {
-                en: "One English sentence anchored to a different concrete signal from personalizationSignals.",
-                th: "One Thai sentence anchored to a different concrete signal from personalizationSignals."
-              },
-              name: {
-                en: "Short English feature name anchored to a different user signal",
-                th: "Short Thai feature name anchored to a different user signal"
-              }
-            },
-            {
-              description: {
-                en: "One English sentence anchored to a third concrete signal from personalizationSignals.",
-                th: "One Thai sentence anchored to a third concrete signal from personalizationSignals."
-              },
-              name: {
-                en: "Short English feature name anchored to a third user signal",
-                th: "Short Thai feature name anchored to a third user signal"
-              }
-            }
-          ],
-          paywallSubtitle: {
-            en: "One English sentence adapted from: Choose the level of guidance you want before we prepare your formulation.",
-            th: "One Thai sentence adapted from: Choose the level of guidance you want before we prepare your formulation."
-          },
-          paywallTitle: {
-            en: "Short English paywall heading adapted to this person's needs",
-            th: "Short Thai paywall heading adapted to this person's needs"
-          }
+          overview: "Localized short paragraph for the top HealthScore pattern.",
+          paywallEyebrow: "Localized short eyebrow.",
+          paywallFeatures: "Exactly 3 localized feature cards.",
+          paywallSubtitle: "Localized reason to unlock the plan now.",
+          paywallTitle: "Localized sales headline for this person."
+        },
+        pageCopy: {
+          bandLine: "Localized version of copySeeds.bandLine.",
+          gapTrio: "Exactly the same number/order as copySeeds.gapTrio.",
+          heroBody: "Localized supporting hero paragraph.",
+          heroTitle: "Localized goal mirror.",
+          findings: "Exactly the same number/order as copySeeds.findings.",
+          methodCards: "Exactly 3 localized method cards.",
+          methodHeadline: "Localized method section headline.",
+          overview: "Localized summary paragraph.",
+          paywallFeatures: "Exactly 3 localized feature cards.",
+          paywallSubtitle: "Localized paywall subtitle.",
+          paywallTitle: "Localized paywall heading.",
+          relativityHeadline: "Localized copySeeds.relativity.headline.",
+          relativitySub: "Localized copySeeds.relativity.sub.",
+          subtractionBody: "Localized copySeeds.subtraction.body."
         }
       },
+      deterministicContent: pageContent
+        ? {
+            copySeeds: pageContent.copySeeds,
+            locked: pageContent.locked,
+            meta: pageContent.meta
+          }
+        : null,
       healthScore: compactHealthScoreForAdvice(healthScore),
-      salesContext: {
-        goal: "Increase paid Precision or Pro plan conversion on the HealthScore paywall.",
-        screen:
-          "The user has seen their HealthScore and must decide whether to unlock a bespoke nutrition plan.",
-        userMindset:
-          "They may be curious but skeptical. They need to feel the paid plan is specific to their result, avoids wasted supplements, and gives a clearer next step."
-      },
       instructions: [
-        "Return exactly one top-level key: advice.",
-        `Every localized field must include these locale keys: ${requiredOutputLocales.join(", ")}.`,
-        "paywallFeatures must contain exactly 3 items.",
-        "Use the assessment, healthScore, and personalizationSignals. These are the user's actual results.",
-        "Write the paywallTitle as a sales headline for this person, not a product label.",
-        "Write the paywallSubtitle as the reason to pay now: what becomes clearer after unlocking the plan.",
-        "Each feature card must be anchored to a different concrete result from personalizationSignals.",
-        "Each feature card must name the user's result or constraint directly, for example their lowest domain, stated goal, symptom, budget, pill limit, missing labs, supplied labs, stress source, sleep pattern, medication caution, diet pattern, or activity context.",
-        "Each feature card must answer one sales objection: where to start, how to avoid wasted spend, how it fits daily life, whether constraints are handled, or how progress becomes measurable.",
-        "If budget is low or mid, sell prioritisation and avoiding waste.",
-        "If labs are missing, sell reassessment or future lab precision. If labs are present, sell use of that extra precision.",
-        "If medications or health considerations are present, sell safety-aware filtering without giving medical advice.",
-        "Use no generic feature names like 'Personalised guidance', 'Right-amount guidance', 'Built around your day', or 'Score-led priorities' unless they include a concrete user result.",
-        "Avoid vague phrases like 'based on your profile', 'tailored to you', or 'your unique needs' unless followed by the exact signal.",
-        "Keep the copy concise: overview max 2 sentences, title under 70 English characters, subtitle under 160 English characters, feature names under 42 English characters, feature descriptions under 150 English characters.",
-        "No supplement names, ingredient names, doses, products, prices, discounts, false urgency, fear, medical instructions, or disease claims.",
-        "Return English plus the requested locale. Include other locale keys only when they are useful and complete."
+        "Return exactly two top-level keys: advice and pageCopy.",
+        `Every localized field must include these locale keys: ${locales.join(", ")}.`,
+        "Use the deterministicContent.copySeeds as source material, but make the copy warmer and more specific.",
+        "Do not introduce any new finding, new score reason, new safety issue, new supplement, new product, or new measurement.",
+        "For gapTrio and findings, keep the same array length, order, and purpose as the deterministic seeds.",
+        "For methodCards, return exactly 3 cards and preserve the same purpose: goals, routine, safety.",
+        "For paywallFeatures, return exactly 3 cards and anchor each to a different deterministic signal.",
+        "Keep copy concise enough for responsive cards: heroTitle under 120 English characters, card headlines under 70 English characters, card bodies under 190 English characters.",
+        "No HTML tags. No markdown. No medical advice. No diagnosis. No bloodwork/lab-test/get-tested language.",
+        "Do not mention that any value is locked, capped, or unmeasured.",
+        "Do not alter or restate numbers unless they appear in deterministicContent.locked or copySeeds."
       ],
       locale,
-      requiredOutputLocales,
-      personalizationSignals: buildPersonalizationSignals(answers, healthScore)
+      personalizationSignals: buildPersonalizationSignals(answers, healthScore),
+      requiredOutputLocales: locales
     },
     null,
     2
@@ -195,10 +178,10 @@ const answerLabels: Record<string, Record<string, string>> = {
     none: "no alcohol"
   },
   budget: {
-    "1000-2500": "฿1,000-2,500 monthly supplement budget",
-    "2500-5000": "฿2,500-5,000 monthly supplement budget",
-    "5000+": "฿5,000+ monthly supplement budget",
-    u1000: "under ฿1,000 monthly supplement budget"
+    "1000-2500": "THB 1,000-2,500 monthly supplement budget",
+    "2500-5000": "THB 2,500-5,000 monthly supplement budget",
+    "5000+": "THB 5,000+ monthly supplement budget",
+    u1000: "under THB 1,000 monthly supplement budget"
   },
   diet: {
     balanced: "balanced diet",
@@ -209,13 +192,6 @@ const answerLabels: Record<string, Record<string, string>> = {
     processed: "processed diet",
     vegan: "vegan diet",
     whole: "whole-food diet"
-  },
-  digCondition: {
-    bariatric: "bariatric surgery",
-    celiac: "celiac disease",
-    ibd: "IBD",
-    ibs: "IBS",
-    none: "no digestive condition"
   },
   digestion: {
     bloating: "bloating",
@@ -238,7 +214,7 @@ const answerLabels: Record<string, Record<string, string>> = {
   },
   goals: {
     energy: "more energy",
-    fitness: "fitness / VO2",
+    fitness: "fitness",
     focus: "brain / focus",
     heart: "heart health",
     hormones: "hormones",
@@ -265,28 +241,13 @@ const answerLabels: Record<string, Record<string, string>> = {
     "7-10": "7-10 pills per day limit",
     nolimit: "no pill limit"
   },
-  meds: {
-    none: "no medications reported",
-    yes: "medications reported"
-  },
   medTypes: {
-    antidepressant: "antidepressant",
     bloodthinner: "blood thinner / aspirin",
-    bp: "blood pressure medication",
-    contraceptive: "contraceptive pill",
-    corticosteroid: "corticosteroid",
     diuretic: "diuretic",
     metformin: "metformin",
-    other: "other medication",
     ppi: "PPI / omeprazole",
     statin: "statin",
     thyroid: "thyroid medication"
-  },
-  menopause: {
-    peri: "perimenopause",
-    post: "post-menopause",
-    pre: "pre-menopause",
-    unsure: "menopause stage unsure"
   },
   protein: {
     "1-1.5": "1-1.5g/kg protein per day",
@@ -320,16 +281,6 @@ const answerLabels: Record<string, Record<string, string>> = {
     "60+": "60+ minutes sun exposure",
     u15: "under 15 minutes sun exposure"
   },
-  suppAllergies: {
-    bvit: "B vitamin sensitivity",
-    coq10: "CoQ10 sensitivity",
-    iodine: "iodine sensitivity",
-    iron: "iron sensitivity",
-    none: "no known supplement sensitivity",
-    other: "other supplement sensitivity",
-    shellfishderived: "shellfish-derived sensitivity",
-    soyderived: "soy-derived sensitivity"
-  },
   supplements: {
     basic: "currently uses a basic multivitamin",
     d3omega: "currently uses D3 / Omega-3",
@@ -351,6 +302,10 @@ const answerLabels: Record<string, Record<string, string>> = {
     stress: "stress / anxiety"
   }
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
 function textAnswer(record: Record<string, unknown>, key: string) {
   const value = record[key];
@@ -395,10 +350,6 @@ function buildPersonalizationSignals(
   const goals = answerListLabels("goals", answers.goals);
   const symptoms = answerListLabels("symptoms", answers.symptoms);
   const medTypes = answerListLabels("medTypes", answers.medTypes);
-  const supplementSensitivities = answerListLabels(
-    "suppAllergies",
-    answers.suppAllergies
-  );
   const labs = isRecord(answers.labs)
     ? Object.entries(answers.labs)
         .filter(([, value]) => typeof value === "string" && value.trim())
@@ -407,35 +358,20 @@ function buildPersonalizationSignals(
           return `${key}: ${value}${typeof labUnits[key] === "string" ? ` ${labUnits[key]}` : ""}`;
         })
     : [];
-  const sleepHours = textAnswer(answers, "sleepHrs");
-  const vo2Max = textAnswer(answers, "vo2");
-  const signals = [
+  const foodFrequency = isRecord(answers.foodFrequency)
+    ? answers.foodFrequency
+    : {};
+
+  return [
     `HealthScore: ${healthScore.score}/100 (${healthScore.band})`,
-    lowest
-      ? `Lowest domain: ${lowest.label} (${lowest.score}/100)`
-      : "",
-    secondLowest
-      ? `Second-lowest domain: ${secondLowest.label} (${secondLowest.score}/100)`
-      : "",
+    healthScore.version ? `Score version: ${healthScore.version}` : "",
+    lowest ? `Lowest pillar: ${lowest.label} (${lowest.score}/100)` : "",
+    secondLowest ? `Second-lowest pillar: ${secondLowest.label} (${secondLowest.score}/100)` : "",
     goals.length ? `Primary goals: ${goals.join(", ")}` : "",
     symptoms.length ? `Current friction: ${symptoms.join(", ")}` : "",
-    signal("Health considerations", [
-      answerLabel("reproStatus", answers.reproStatus),
-      answerLabel("kidney", answers.kidney),
-      answerLabel("liver", answers.liver),
-      answerLabel("surgery", answers.surgery),
-      answerLabel("antibiotics", answers.antibiotics),
-      supplementSensitivities.length
-        ? `supplement sensitivities: ${supplementSensitivities.join(", ")}`
-        : ""
-    ]),
-    signal("Practical constraints", [
-      answerLabel("budget", answers.budget),
-      answerLabel("maxPills", answers.maxPills),
-      answerLabel("form", answers.form)
-    ]),
+    healthScore.flagCodes?.length ? `Safety/content flags: ${healthScore.flagCodes.join(", ")}` : "",
     signal("Sleep, energy, stress", [
-      sleepHours ? `sleep duration ${sleepHours}` : "",
+      textAnswer(answers, "sleepHrs") ? `sleep duration ${textAnswer(answers, "sleepHrs")}` : "",
       answerLabel("energy", answers.energy),
       answerLabel("stress", answers.stress)
     ]),
@@ -444,23 +380,26 @@ function buildPersonalizationSignals(
       answerLabel("protein", answers.protein),
       answerLabel("alcohol", answers.alcohol),
       answerLabel("sun", answers.sun),
-      answerLabel("smoking", answers.smoking)
+      answerLabel("smoking", answers.smoking),
+      answerLabel("fish", foodFrequency.fish)
     ]),
     signal("Movement context", [
       answerLabel("activity", answers.activity),
-      vo2Max ? `VO2 max ${vo2Max}` : ""
+      textAnswer(answers, "vo2") ? `VO2 max ${textAnswer(answers, "vo2")}` : ""
     ]),
     signal("Safety context", [
-      answerLabel("meds", answers.meds),
-      medTypes.length ? `medication types: ${medTypes.join(", ")}` : "",
-      textAnswer(answers, "otherMed")
+      answerLabel("reproStatus", answers.reproStatus),
+      answerLabel("kidney", answers.kidney),
+      answerLabel("liver", answers.liver),
+      medTypes.length ? `medication types: ${medTypes.join(", ")}` : ""
     ]),
-    labs.length
-      ? `Labs supplied: ${labs.slice(0, 6).join(", ")}`
-      : "No lab values supplied"
-  ];
-
-  return signals.filter(Boolean).slice(0, 12);
+    signal("Practical constraints", [
+      answerLabel("budget", answers.budget),
+      answerLabel("maxPills", answers.maxPills),
+      answerLabel("form", answers.form)
+    ]),
+    labs.length ? `Measurements supplied: ${labs.slice(0, 6).join(", ")}` : ""
+  ].filter(Boolean).slice(0, 14);
 }
 
 function compactHealthScoreForAdvice(healthScore: HealthScoreResult) {
@@ -471,8 +410,11 @@ function compactHealthScoreForAdvice(healthScore: HealthScoreResult) {
       label: domain.label,
       score: domain.score
     })),
+    flagCodes: healthScore.flagCodes ?? [],
+    locked: healthScore.pageContent?.locked,
     movers: healthScore.movers,
-    score: healthScore.score
+    score: healthScore.score,
+    version: healthScore.version
   };
 }
 
@@ -485,21 +427,15 @@ function compactAssessmentForAdvice(answers: unknown) {
     activity: answers.activity,
     age: answers.age,
     alcohol: answers.alcohol,
-    allergies: answers.allergies,
-    antibiotics: answers.antibiotics,
     budget: answers.budget,
     caffeine: answers.caffeine,
     country: answers.country,
     diet: answers.diet,
-    digCondition: answers.digCondition,
     digestion: answers.digestion,
     energy: answers.energy,
-    family: answers.family,
-    flow: answers.flow,
     foodFrequency: answers.foodFrequency,
     form: answers.form,
     goals: answers.goals,
-    heightCm: answers.heightCm,
     hrv: answers.hrv,
     kidney: answers.kidney,
     labs: answers.labs,
@@ -508,24 +444,17 @@ function compactAssessmentForAdvice(answers: unknown) {
     maxPills: answers.maxPills,
     meds: answers.meds,
     medTypes: answers.medTypes,
-    menopause: answers.menopause,
-    otherMed: answers.otherMed,
     protein: answers.protein,
     reproStatus: answers.reproStatus,
     sex: answers.sex,
-    skin: answers.skin,
     sleepHrs: answers.sleepHrs,
     smoking: answers.smoking,
     stress: answers.stress,
     sun: answers.sun,
     sunscreen: answers.sunscreen,
-    suppAllergies: answers.suppAllergies,
     supplements: answers.supplements,
-    surgery: answers.surgery,
     symptoms: answers.symptoms,
-    tracker: answers.tracker,
-    vo2: answers.vo2,
-    weightKg: answers.weightKg
+    vo2: answers.vo2
   };
 }
 
@@ -539,7 +468,7 @@ function retryPrompt(errors: string[]) {
   ].join("\n");
 }
 
-async function callGrok({
+async function callOpenAi({
   apiKey,
   messages,
   model,
@@ -554,14 +483,13 @@ async function callGrok({
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
+    const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
       body: JSON.stringify({
         messages,
         model,
         ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
         response_format: { type: "json_object" },
-        stream: false,
-        temperature: 0.2
+        stream: false
       }),
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -574,15 +502,15 @@ async function callGrok({
     if (!response.ok) {
       const body = await response.text();
       throw new Error(
-        `xAI HealthScore request failed with ${response.status}: ${body.slice(0, 500)}`
+        `OpenAI HealthScore request failed with ${response.status}: ${body.slice(0, 500)}`
       );
     }
 
-    return (await response.json()) as XaiChatCompletion;
+    return (await response.json()) as OpenAiChatCompletion;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error(
-        `xAI HealthScore request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)} seconds`
+        `OpenAI HealthScore request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)} seconds`
       );
     }
 
@@ -619,37 +547,35 @@ function parseJsonObject(content: string | null | undefined) {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function readText(record: Record<string, unknown>, key: string) {
-  const value = record[key];
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function readLocalizedTextValue(
   value: unknown,
   path: string,
-  errors: string[]
+  errors: string[],
+  locales: readonly string[]
 ): LocalizedHealthScoreText {
   if (!isRecord(value)) {
     errors.push(`${path} must be an object with localized string values`);
     return {};
   }
 
-  const entries = Object.fromEntries(
-    Object.entries(value)
-      .filter(([localizedKey, text]) =>
-        /^[a-z]{2}(?:-[A-Z0-9]{2,8})?$/.test(localizedKey) &&
-        typeof text === "string" &&
-        text.trim().length > 0
-      )
-      .map(([localizedKey, text]) => [localizedKey, String(text).trim()])
+  const unexpectedKeys = Object.keys(value).filter(
+    (key) => !/^[a-z]{2}(?:-[A-Z0-9]{2,8})?$/.test(key)
   );
 
-  if (Object.keys(entries).length < 1) {
-    errors.push(`${path} requires at least one localized string`);
+  if (unexpectedKeys.length > 0) {
+    errors.push(`${path} has invalid locale keys: ${unexpectedKeys.join(", ")}`);
+  }
+
+  const entries = Object.fromEntries(
+    Object.entries(value)
+      .filter(([, item]) => typeof item === "string" && item.trim().length > 0)
+      .map(([key, item]) => [key, String(item).trim()])
+  );
+
+  for (const locale of locales) {
+    if (!entries[locale]) {
+      errors.push(`${path}.${locale} is required`);
+    }
   }
 
   return entries;
@@ -658,32 +584,92 @@ function readLocalizedTextValue(
 function readLocalizedText(
   record: Record<string, unknown>,
   key: string,
-  errors: string[]
+  path: string,
+  errors: string[],
+  locales: readonly string[]
 ) {
-  return readLocalizedTextValue(record[key], `advice.${key}`, errors);
+  return readLocalizedTextValue(record[key], `${path}.${key}`, errors, locales);
 }
 
-function readPaywallFeatures(
-  record: Record<string, unknown>,
-  key: string,
-  errors: string[]
-) {
-  const value = record[key];
+function readLocalizedCards({
+  errors,
+  expectedLength,
+  key,
+  locales,
+  parent,
+  titleKey = "headline"
+}: Readonly<{
+  errors: string[];
+  expectedLength: number;
+  key: string;
+  locales: readonly string[];
+  parent: Record<string, unknown>;
+  titleKey?: "headline" | "title";
+}>) {
+  const value = parent[key];
 
   if (!Array.isArray(value)) {
-    errors.push(`advice.${key} must be an array`);
+    errors.push(`pageCopy.${key} must be an array`);
     return [];
   }
 
-  if (value.length !== 3) {
-    errors.push(`advice.${key} must contain exactly 3 items`);
+  if (value.length !== expectedLength) {
+    errors.push(`pageCopy.${key} must contain exactly ${expectedLength} items`);
   }
 
   return value.map((item, index) => {
     if (!isRecord(item)) {
-      errors.push(
-        `advice.${key}[${index}] must be an object with name and description`
-      );
+      errors.push(`pageCopy.${key}[${index}] must be an object`);
+      return {
+        body: { en: "", th: "" },
+        [titleKey]: { en: "", th: "" }
+      };
+    }
+
+    const allowed = new Set([titleKey, "body"]);
+    const unexpected = Object.keys(item).filter((itemKey) => !allowed.has(itemKey));
+
+    if (unexpected.length > 0) {
+      errors.push(`pageCopy.${key}[${index}] has unexpected keys: ${unexpected.join(", ")}`);
+    }
+
+    return {
+      body: readLocalizedTextValue(
+        item.body,
+        `pageCopy.${key}[${index}].body`,
+        errors,
+        locales
+      ),
+      [titleKey]: readLocalizedTextValue(
+        item[titleKey],
+        `pageCopy.${key}[${index}].${titleKey}`,
+        errors,
+        locales
+      )
+    };
+  });
+}
+
+function readPaywallFeatures(
+  record: Record<string, unknown>,
+  path: string,
+  errors: string[],
+  locales: readonly string[]
+) {
+  const value = record.paywallFeatures;
+
+  if (!Array.isArray(value)) {
+    errors.push(`${path}.paywallFeatures must be an array`);
+    return [];
+  }
+
+  if (value.length !== 3) {
+    errors.push(`${path}.paywallFeatures must contain exactly 3 items`);
+  }
+
+  return value.map((item, index) => {
+    if (!isRecord(item)) {
+      errors.push(`${path}.paywallFeatures[${index}] must be an object`);
 
       return {
         description: { en: "", th: "" },
@@ -697,47 +683,95 @@ function readPaywallFeatures(
 
     if (unexpectedKeys.length > 0) {
       errors.push(
-        `advice.${key}[${index}] must only include name and description, found: ${unexpectedKeys.join(", ")}`
+        `${path}.paywallFeatures[${index}] must only include name and description, found: ${unexpectedKeys.join(", ")}`
       );
     }
 
     return {
       description: readLocalizedTextValue(
         item.description,
-        `advice.${key}[${index}].description`,
-        errors
+        `${path}.paywallFeatures[${index}].description`,
+        errors,
+        locales
       ),
       name: readLocalizedTextValue(
         item.name,
-        `advice.${key}[${index}].name`,
-        errors
+        `${path}.paywallFeatures[${index}].name`,
+        errors,
+        locales
       )
-    };
-  }) satisfies HealthScorePaywallFeature[];
+    } satisfies HealthScorePaywallFeature;
+  });
 }
 
-function validateAdvice(value: unknown) {
+function walkStrings(value: unknown, visit: (item: string) => void) {
+  if (typeof value === "string") {
+    visit(value);
+  } else if (Array.isArray(value)) {
+    for (const item of value) walkStrings(item, visit);
+  } else if (isRecord(value)) {
+    for (const item of Object.values(value)) walkStrings(item, visit);
+  }
+}
+
+function validateNoForbiddenCopy(value: unknown, errors: string[]) {
+  walkStrings(value, (item) => {
+    const lower = item.toLowerCase();
+    const found = HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS.find((bad) =>
+      lower.includes(bad)
+    );
+
+    if (found) {
+      errors.push(`copy contains forbidden term: ${found}`);
+    }
+
+    if (/<\/?[a-z][\s\S]*>/i.test(item)) {
+      errors.push("copy must not include HTML tags");
+    }
+  });
+}
+
+export function validateHealthScoreAiResponse({
+  healthScore,
+  locale,
+  value
+}: Readonly<{
+  healthScore: HealthScoreResult;
+  locale: Locale;
+  value: unknown;
+}>):
+  | Readonly<{ errors: string[]; response?: never }>
+  | Readonly<{ errors: []; response: ValidatedHealthScoreAiResponse }> {
   const errors: string[] = [];
+  const locales = requiredLocales(locale);
+  const pageContent = healthScore.pageContent;
 
   if (!isRecord(value)) {
     return { errors: ["Top-level response must be a JSON object"] };
   }
 
   const unexpectedTopLevelKeys = Object.keys(value).filter(
-    (key) => key !== "advice"
+    (key) => key !== "advice" && key !== "pageCopy"
   );
 
   if (unexpectedTopLevelKeys.length > 0) {
     errors.push(
-      `Top-level response must only include advice, found: ${unexpectedTopLevelKeys.join(", ")}`
+      `Top-level response must only include advice and pageCopy, found: ${unexpectedTopLevelKeys.join(", ")}`
     );
   }
 
   if (!isRecord(value.advice)) {
-    return { errors: [...errors, "advice must be an object"] };
+    errors.push("advice must be an object");
   }
 
-  const unexpectedAdviceKeys = Object.keys(value.advice).filter(
+  if (!isRecord(value.pageCopy)) {
+    errors.push("pageCopy must be an object");
+  }
+
+  const adviceRecord = isRecord(value.advice) ? value.advice : {};
+  const pageCopyRecord = isRecord(value.pageCopy) ? value.pageCopy : {};
+
+  const unexpectedAdviceKeys = Object.keys(adviceRecord).filter(
     (key) =>
       key !== "overview" &&
       key !== "paywallEyebrow" &&
@@ -747,24 +781,86 @@ function validateAdvice(value: unknown) {
   );
 
   if (unexpectedAdviceKeys.length > 0) {
-    errors.push(
-      `advice includes unexpected keys: ${unexpectedAdviceKeys.join(", ")}`
-    );
+    errors.push(`advice includes unexpected keys: ${unexpectedAdviceKeys.join(", ")}`);
+  }
+
+  const unexpectedPageKeys = Object.keys(pageCopyRecord).filter(
+    (key) =>
+      key !== "bandLine" &&
+      key !== "gapTrio" &&
+      key !== "heroBody" &&
+      key !== "heroTitle" &&
+      key !== "findings" &&
+      key !== "methodCards" &&
+      key !== "methodHeadline" &&
+      key !== "overview" &&
+      key !== "paywallFeatures" &&
+      key !== "paywallSubtitle" &&
+      key !== "paywallTitle" &&
+      key !== "relativityHeadline" &&
+      key !== "relativitySub" &&
+      key !== "subtractionBody"
+  );
+
+  if (unexpectedPageKeys.length > 0) {
+    errors.push(`pageCopy includes unexpected keys: ${unexpectedPageKeys.join(", ")}`);
   }
 
   const advice = {
-    overview: readLocalizedText(value.advice, "overview", errors),
-    paywallEyebrow: readLocalizedText(value.advice, "paywallEyebrow", errors),
-    paywallFeatures: readPaywallFeatures(
-      value.advice,
-      "paywallFeatures",
-      errors
-    ),
-    paywallSubtitle: readLocalizedText(value.advice, "paywallSubtitle", errors),
-    paywallTitle: readLocalizedText(value.advice, "paywallTitle", errors)
+    overview: readLocalizedText(adviceRecord, "overview", "advice", errors, locales),
+    paywallEyebrow: readLocalizedText(adviceRecord, "paywallEyebrow", "advice", errors, locales),
+    paywallFeatures: readPaywallFeatures(adviceRecord, "advice", errors, locales),
+    paywallSubtitle: readLocalizedText(adviceRecord, "paywallSubtitle", "advice", errors, locales),
+    paywallTitle: readLocalizedText(adviceRecord, "paywallTitle", "advice", errors, locales)
   } satisfies HealthScoreAdvice;
 
-  return errors.length > 0 ? { errors } : { advice, errors };
+  const pageCopy = {
+    bandLine: readLocalizedText(pageCopyRecord, "bandLine", "pageCopy", errors, locales),
+    gapTrio: readLocalizedCards({
+      errors,
+      expectedLength: pageContent?.copySeeds.gapTrio.length ?? 3,
+      key: "gapTrio",
+      locales,
+      parent: pageCopyRecord
+    }),
+    heroBody: readLocalizedText(pageCopyRecord, "heroBody", "pageCopy", errors, locales),
+    heroTitle: readLocalizedText(pageCopyRecord, "heroTitle", "pageCopy", errors, locales),
+    findings: readLocalizedCards({
+      errors,
+      expectedLength: pageContent?.copySeeds.findings.length ?? 3,
+      key: "findings",
+      locales,
+      parent: pageCopyRecord
+    }),
+    methodCards: readLocalizedCards({
+      errors,
+      expectedLength: 3,
+      key: "methodCards",
+      locales,
+      parent: pageCopyRecord,
+      titleKey: "title"
+    }),
+    methodHeadline: readLocalizedText(pageCopyRecord, "methodHeadline", "pageCopy", errors, locales),
+    overview: readLocalizedText(pageCopyRecord, "overview", "pageCopy", errors, locales),
+    paywallFeatures: readPaywallFeatures(pageCopyRecord, "pageCopy", errors, locales),
+    paywallSubtitle: readLocalizedText(pageCopyRecord, "paywallSubtitle", "pageCopy", errors, locales),
+    paywallTitle: readLocalizedText(pageCopyRecord, "paywallTitle", "pageCopy", errors, locales),
+    relativityHeadline: readLocalizedText(pageCopyRecord, "relativityHeadline", "pageCopy", errors, locales),
+    relativitySub: readLocalizedText(pageCopyRecord, "relativitySub", "pageCopy", errors, locales),
+    subtractionBody: readLocalizedText(pageCopyRecord, "subtractionBody", "pageCopy", errors, locales)
+  } satisfies HealthScorePageAiCopy;
+
+  validateNoForbiddenCopy({ advice, pageCopy }, errors);
+
+  return errors.length > 0
+    ? { errors }
+    : {
+        errors: [],
+        response: {
+          advice,
+          pageCopy
+        }
+      };
 }
 
 function stableJson(value: unknown): unknown {
@@ -776,6 +872,7 @@ function stableJson(value: unknown): unknown {
     return Object.fromEntries(
       Object.keys(value)
         .sort()
+        .filter((key) => key !== "aiCopy" && key !== "advice")
         .map((key) => [key, stableJson(value[key])])
     );
   }
@@ -807,6 +904,7 @@ async function cacheKey({
       assessment: compactAssessmentForAdvice(answers),
       cacheType: CACHE_TYPE,
       healthScore: compactHealthScoreForAdvice(healthScore),
+      pageContent: healthScore.pageContent,
       model,
       promptVersion,
       reasoningEffort
@@ -850,7 +948,7 @@ async function ensureCacheSchema() {
 
     if (missing.length > 0) {
       throw new Error(
-        `HealthScore cache schema is incomplete. Apply db-schema.sql before using the advice cache. Missing: ${missing.join(", ")}`
+        `HealthScore cache schema is incomplete. Apply db-schema.sql before using the copy cache. Missing: ${missing.join(", ")}`
       );
     }
   })().catch((error) => {
@@ -863,7 +961,11 @@ async function ensureCacheSchema() {
   return sql;
 }
 
-async function readCachedAdvice(key: string) {
+async function readCachedAnalysis(
+  key: string,
+  healthScore: HealthScoreResult,
+  locale: Locale
+) {
   try {
     const sql = await ensureCacheSchema();
 
@@ -885,25 +987,29 @@ async function readCachedAdvice(key: string) {
       return null;
     }
 
-    const validation = validateAdvice(cached);
+    const validation = validateHealthScoreAiResponse({
+      healthScore,
+      locale,
+      value: cached
+    });
 
-    return validation.advice ?? null;
+    return validation.response ?? null;
   } catch (error) {
-    console.warn("Unable to read HealthScore advice cache", error);
+    console.warn("Unable to read HealthScore copy cache", error);
     return null;
   }
 }
 
-async function writeCachedAdvice({
-  advice,
+async function writeCachedAnalysis({
   key,
   model,
-  promptVersion
+  promptVersion,
+  response
 }: Readonly<{
-  advice: HealthScoreAdvice;
   key: string;
   model: string;
   promptVersion: string;
+  response: ValidatedHealthScoreAiResponse;
 }>) {
   try {
     const sql = await ensureCacheSchema();
@@ -926,7 +1032,7 @@ async function writeCachedAdvice({
         ${CACHE_TYPE},
         ${model},
         ${promptVersion},
-        ${sql.json(jsonValue({ advice }))},
+        ${sql.json(jsonValue(response))},
         now() + make_interval(days => ${CACHE_TTL_DAYS})
       )
       on conflict (cache_key) do update set
@@ -940,7 +1046,7 @@ async function writeCachedAdvice({
         and expires_at < now()
     `;
   } catch (error) {
-    console.warn("Unable to write HealthScore advice cache", error);
+    console.warn("Unable to write HealthScore copy cache", error);
   }
 }
 
@@ -955,7 +1061,7 @@ export async function analyzeHealthScoreAdviceWithUsage({
   healthScore: HealthScoreResult;
   locale: Locale;
 }>): Promise<HealthScoreAdviceAnalysis> {
-  const config = grokConfig();
+  const config = openAiConfig();
   const key = await cacheKey({
     answers,
     healthScore,
@@ -963,11 +1069,14 @@ export async function analyzeHealthScoreAdviceWithUsage({
     promptVersion: config.promptVersion,
     reasoningEffort: config.reasoningEffort
   });
-  const cachedAdvice = cache ? await readCachedAdvice(key) : null;
+  const cached = cache
+    ? await readCachedAnalysis(key, healthScore, locale)
+    : null;
 
-  if (cachedAdvice) {
+  if (cached) {
     return {
-      advice: cachedAdvice,
+      advice: cached.advice,
+      aiCopy: cached.pageCopy,
       cachedOrExisting: true,
       model: config.model,
       promptVersion: config.promptVersion,
@@ -986,26 +1095,31 @@ export async function analyzeHealthScoreAdviceWithUsage({
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
-      const completion = await callGrok({
+      const completion = await callOpenAi({
         apiKey: config.apiKey,
         messages,
         model: config.model,
         reasoningEffort: config.reasoningEffort
       });
       const content = completion.choices?.[0]?.message?.content;
-      const validation = validateAdvice(parseJsonObject(content));
+      const validation = validateHealthScoreAiResponse({
+        healthScore,
+        locale,
+        value: parseJsonObject(content)
+      });
 
-      if (validation.advice) {
+      if (validation.response) {
         if (cache) {
-          await writeCachedAdvice({
-            advice: validation.advice,
+          await writeCachedAnalysis({
             key,
             model: config.model,
-            promptVersion: config.promptVersion
+            promptVersion: config.promptVersion,
+            response: validation.response
           });
         }
         return {
-          advice: validation.advice,
+          advice: validation.response.advice,
+          aiCopy: validation.response.pageCopy,
           cachedOrExisting: false,
           model: completion.model ?? config.model,
           promptVersion: config.promptVersion,
@@ -1022,14 +1136,14 @@ export async function analyzeHealthScoreAdviceWithUsage({
       lastErrors = [
         error instanceof Error
           ? error.message
-          : "Unknown HealthScore analysis error"
+          : "Unknown HealthScore copy error"
       ];
       messages.push({ content: retryPrompt(lastErrors), role: "user" });
     }
   }
 
   throw new Error(
-    `HealthScore analysis failed after ${MAX_ATTEMPTS} attempts: ${lastErrors.join("; ")}`
+    `HealthScore copy generation failed after ${MAX_ATTEMPTS} attempts: ${lastErrors.join("; ")}`
   );
 }
 

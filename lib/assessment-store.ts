@@ -76,12 +76,16 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 export function hasHealthScoreAdvice(value: unknown) {
-  const advice = asRecord(asRecord(value).advice);
+  const healthScore = asRecord(value);
+  const advice = asRecord(healthScore.advice);
   const overview = advice.overview;
+  const pageContent = asRecord(healthScore.pageContent);
+  const aiCopy = asRecord(pageContent.aiCopy);
 
   return (
     Boolean(overview && typeof overview === "object") ||
-    Array.isArray(advice.paywallFeatures)
+    Array.isArray(advice.paywallFeatures) ||
+    Object.keys(aiCopy).length > 0
   );
 }
 

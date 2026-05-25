@@ -1,6 +1,34 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { computeHealthScore } from "../lib/health-score.ts";
+import {
+  HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS,
+  applyHealthScoreProductSubtraction,
+  computeHealthScore
+} from "../lib/health-score.ts";
+
+function profileOne() {
+  return {
+    activity: "light",
+    age: "36-45",
+    country: "Singapore",
+    diet: "balanced",
+    digestion: "bloating",
+    energy: "low",
+    foodFrequency: {
+      fish: "rare"
+    },
+    goals: ["energy", "heart", "fitness"],
+    medTypes: ["statin"],
+    meds: "yes",
+    sex: "male",
+    sleepHrs: "6-7",
+    stress: "high",
+    sun: "15-30",
+    sunscreen: "daily",
+    supplements: "basic",
+    symptoms: ["fatigue", "digestion", "sleep"]
+  };
+}
 
 function domainScore(
   result: ReturnType<typeof computeHealthScore>,
@@ -13,144 +41,136 @@ function domainScore(
   return domain.score;
 }
 
-const bodyContext = {
-  age: "36-45",
-  heightCm: "175",
-  sex: "male",
-  weightKg: "72"
-};
+function walkStrings(value: unknown, visit: (text: string) => void) {
+  if (typeof value === "string") {
+    visit(value);
+    return;
+  }
 
-describe("HealthScore v3 deterministic scoring", () => {
-  it("uses v3 sleep fields and ignores the removed legacy sleep-quality key", () => {
-    const lowLegacySleep = computeHealthScore(
-      {
-        ...bodyContext,
-        caffeine: "1",
-        energy: "good",
-        sleep: "1",
-        sleepHrs: "7-8"
-      },
-      "en"
-    );
-    const highLegacySleep = computeHealthScore(
-      {
-        ...bodyContext,
-        caffeine: "1",
-        energy: "good",
-        sleep: "5",
-        sleepHrs: "7-8"
-      },
-      "en"
-    );
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      walkStrings(item, visit);
+    }
+    return;
+  }
 
-    assert.equal(
-      domainScore(lowLegacySleep, "sleep"),
-      domainScore(highLegacySleep, "sleep")
-    );
+  if (value && typeof value === "object") {
+    for (const item of Object.values(value)) {
+      walkStrings(item, visit);
+    }
+  }
+}
+
+describe("HealthScore v4 deterministic scoring", () => {
+  it("matches the reference Profile 1 scoring and locked content", () => {
+    const result = computeHealthScore(profileOne(), "en");
+
+    assert.equal(result.version, "healthscore:v4");
+    assert.equal(result.score, 47);
+    assert.equal(result.band, "Building foundation");
+    assert.equal(result.pageContent?.locked.percentile, 4);
+    assert.deepEqual(result.flagCodes, ["STATIN_COQ10", "VITD_ROUTINE"]);
+    assert.equal(domainScore(result, "habits"), 90);
+    assert.equal(domainScore(result, "sleep"), 67);
+    assert.equal(domainScore(result, "nutrition"), 67);
+    assert.equal(domainScore(result, "activity"), 43);
+    assert.equal(domainScore(result, "stress"), 38);
   });
 
-  it("normalizes v3 lab units before scoring biomarkers", () => {
-    const ngMl = computeHealthScore(
-      {
-        ...bodyContext,
-        labs: { vitd: "40" },
-        labUnits: { vitd: "ng/mL" }
-      },
-      "en"
-    );
-    const nmolL = computeHealthScore(
-      {
-        ...bodyContext,
-        labs: { vitd: "100" },
-        labUnits: { vitd: "nmol/L" }
-      },
-      "en"
-    );
+  it("keeps tier-1 findings first and caps the visible findings at three", () => {
+    const result = computeHealthScore(profileOne(), "en");
+    const findings = result.pageContent?.copySeeds.findings ?? [];
 
-    assert.equal(domainScore(ngMl, "biomarkers"), domainScore(nmolL, "biomarkers"));
+    assert.ok(findings.length > 0);
+    assert.ok(findings.length <= 3);
+    assert.equal(findings[0].code, "STATIN_COQ10");
+    assert.ok(findings.some((finding) => finding.code === "VITD_ROUTINE"));
   });
 
-  it("treats unanswered optional v3 fields as neutral unknowns", () => {
-    const sparse = computeHealthScore(
+  it("uses gap-framed relativity below median", () => {
+    const result = computeHealthScore(profileOne(), "en");
+    const relativity = result.pageContent?.copySeeds.relativity;
+
+    assert.equal(relativity?.mode, "gap");
+    assert.equal(relativity?.gap, 13);
+    assert.equal(relativity?.spectrumMedian, 60);
+    assert.equal(relativity?.spectrumYou, 47);
+  });
+
+  it("normalizes nested answer fields and lab units", () => {
+    const nestedNgMl = computeHealthScore(
       {
         age: "36-45",
         country: "TH",
+        foodFrequency: {
+          fish: "often",
+          fruitveg: "3+"
+        },
+        labs: { vitd: "40" },
+        labUnits: { vitd: "ng/mL" },
+        sex: "male"
+      },
+      "en"
+    );
+    const flatNmolL = computeHealthScore(
+      {
+        age: "36-45",
+        country: "Thailand",
+        f_fish: "often",
+        f_fruitveg: "3+",
+        lab_vitd: "100",
+        labUnits: { vitd: "nmol/L" },
         sex: "male"
       },
       "en"
     );
 
-    assert.ok(sparse.score >= 58);
-    assert.notEqual(sparse.band, "Needs Attention");
-    assert.ok(domainScore(sparse, "activity") >= 55);
-    assert.ok(domainScore(sparse, "biomarkers") >= 55);
-    assert.ok(domainScore(sparse, "nutrition") >= 55);
+    assert.equal(nestedNgMl.verification, flatNmolL.verification);
+    assert.equal(domainScore(nestedNgMl, "nutrition"), domainScore(flatNmolL, "nutrition"));
   });
 
-  it("scores the new v3 lifestyle fields across sleep, nutrition, stress, and habits", () => {
-    const strong = computeHealthScore(
-      {
-        ...bodyContext,
-        activity: "active",
-        alcohol: "none",
-        caffeine: "1",
-        diet: "whole",
-        digCondition: "none",
-        digestion: "none",
-        energy: "good",
-        foodFrequency: {
-          dairy: "1-2",
-          eggs: "weekly",
-          fish: "often",
-          fruitveg: "3+",
-          legumes: "most",
-          redmeat: "1-2"
-        },
-        protein: "1.5-2",
-        skin: "III",
-        sleepHrs: "7-8",
-        smoking: "never",
-        stress: "low",
-        sun: "30-60",
-        sunscreen: "daily",
-        symptoms: ["great"]
-      },
-      "en"
-    );
-    const weak = computeHealthScore(
-      {
-        ...bodyContext,
-        activity: "sitting",
-        alcohol: "8+",
-        caffeine: "4+",
-        diet: "processed",
-        digCondition: "ibs",
-        digestion: "loose",
-        energy: "drained",
-        foodFrequency: {
-          dairy: "never",
-          eggs: "rare",
-          fish: "never",
-          fruitveg: "notdaily",
-          legumes: "rare",
-          redmeat: "3+"
-        },
-        protein: "u1",
-        skin: "I",
-        sleepHrs: "u5",
-        smoking: "daily",
-        stress: "extreme",
-        sun: "60+",
-        sunscreen: "rarely",
-        symptoms: ["fatigue", "brainfog", "sleep", "stress", "joints"]
-      },
-      "en"
-    );
+  it("orders the five pillars by score for page rendering", () => {
+    const result = computeHealthScore(profileOne(), "en");
+    const pillarLabels = result.pageContent?.locked.pillars.map((pillar) => pillar.label);
 
-    assert.ok(domainScore(strong, "sleep") > domainScore(weak, "sleep"));
-    assert.ok(domainScore(strong, "nutrition") > domainScore(weak, "nutrition"));
-    assert.ok(domainScore(strong, "stress") > domainScore(weak, "stress"));
-    assert.ok(domainScore(strong, "habits") > domainScore(weak, "habits"));
-    assert.ok(strong.score > weak.score + 25);
+    assert.deepEqual(pillarLabels, [
+      "Health Habits",
+      "Sleep & Recovery",
+      "Nutrition & Diet",
+      "Activity & Fitness",
+      "Stress & Balance"
+    ]);
+  });
+
+  it("keeps deterministic fallback copy clear of forbidden substrings", () => {
+    const result = computeHealthScore(profileOne(), "en");
+    const hits: string[] = [];
+
+    walkStrings(result.pageContent?.copySeeds, (text) => {
+      const lower = text.toLowerCase();
+
+      for (const forbidden of HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS) {
+        if (lower.includes(forbidden)) {
+          hits.push(forbidden);
+        }
+      }
+    });
+
+    assert.deepEqual(hits, []);
+  });
+
+  it("switches subtraction to product mode without changing locked score facts", () => {
+    const result = computeHealthScore(profileOne(), "en");
+    const productReady = applyHealthScoreProductSubtraction(result, {
+      productsChosen: 4,
+      productsEvaluated: 37
+    });
+
+    assert.equal(productReady.score, 47);
+    assert.equal(productReady.pageContent?.locked.subtraction.mode, "products");
+    assert.equal(productReady.pageContent?.locked.subtraction.evaluated, 37);
+    assert.equal(productReady.pageContent?.locked.subtraction.setAside, 33);
+    assert.equal(productReady.pageContent?.locked.subtraction.chosen, 4);
+    assert.equal(productReady.pageContent?.aiCopy, undefined);
   });
 });

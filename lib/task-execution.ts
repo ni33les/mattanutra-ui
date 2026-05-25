@@ -22,12 +22,15 @@ function analysisErrorMessage(error: unknown) {
     : "Unknown HealthScore analysis error";
 }
 
-function hasHealthScoreAdvice(value: unknown): value is HealthScoreResult {
+function hasHealthScoreAdvice(value: unknown) {
+  const record =
+    value !== null && typeof value === "object"
+      ? (value as HealthScoreResult)
+      : null;
+
   return (
-    value !== null &&
-    typeof value === "object" &&
-    "advice" in value &&
-    Boolean((value as HealthScoreResult).advice)
+    Boolean(record?.advice) ||
+    Boolean(record?.pageContent?.aiCopy)
   );
 }
 
@@ -63,16 +66,25 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
 
       return {
         cachedOrExisting: false,
-        healthScore: Object.assign({}, workItem.healthScore, {
-          advice: analysis.advice
-        }) satisfies HealthScoreResult,
+        healthScore: {
+          ...workItem.healthScore,
+          advice: analysis.advice,
+          ...(workItem.healthScore.pageContent
+            ? {
+                pageContent: {
+                  ...workItem.healthScore.pageContent,
+                  aiCopy: analysis.aiCopy
+                }
+              }
+            : {})
+        } satisfies HealthScoreResult,
         xaiUsage: {
           metadata: {
             promptVersion: analysis.promptVersion,
             taskId: workItem.taskId
           },
           model: analysis.model,
-          purpose: "healthscore_advice",
+          purpose: "healthscore_page_copy",
           reasoningEffort: analysis.reasoningEffort,
           responseId: analysis.responseId,
           usage: analysis.usage

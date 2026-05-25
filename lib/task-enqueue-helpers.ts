@@ -71,8 +71,16 @@ export function stableHash(value: unknown) {
 export function healthScoreInputForIdempotency(healthScore: unknown) {
   const record = payloadRecord(healthScore);
   const input = { ...record };
+  const pageContent = payloadRecord(input.pageContent);
 
   delete input.advice;
+
+  if (Object.keys(pageContent).length > 0) {
+    const deterministicPageContent = { ...pageContent };
+
+    delete deterministicPageContent.aiCopy;
+    input.pageContent = deterministicPageContent;
+  }
+
   return input;
 }
-
