@@ -844,6 +844,32 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(result.recommendations[0]?.productCoveragePercent, 50);
   });
 
+  it("reports safety-blocked products as the reason an unmet need has no coverage", () => {
+    const ashwagandha: ProductCandidate = {
+      ...product({ amount: 1, id: "ashwagandha", name: "Ashwagandha" }),
+      facts: [
+        {
+          ...product({ amount: 1, id: "ashwagandha", name: "Ashwagandha" }).facts[0]!,
+          safetyFlags: ["pregnancy_caution"]
+        }
+      ]
+    };
+    const result = recommendProductStackFullBeam({
+      candidates: [ashwagandha],
+      clientContext: { lifestage: "ttc" },
+      needs: [need("ashwagandha", "Ashwagandha", 5)]
+    });
+    const unmatched = result.diagnostics.unmatchedNeeds[0];
+
+    assert.equal(result.recommendations.length, 0);
+    assert.equal(unmatched?.id, "ashwagandha");
+    assert.equal(unmatched?.bestRejectedProductId, "ashwagandha");
+    assert.match(
+      unmatched?.bestRejectedReason ?? "",
+      /pregnancy, breastfeeding, or trying-to-conceive/i
+    );
+  });
+
   it("enforces supplement max dose across all product servings in the stack", () => {
     const d3Fact = () => ({
       amount: 3000,

@@ -3254,6 +3254,20 @@ function recommendProductStackExact(
   const bestRejectedCoverageByNeed = new Map<string, number>();
   const { deltas, weights } = normalizedV2Weights(input.clientContext);
   const safetyContext = safetyContextFromClientContext(input.clientContext);
+  const recordBestRejectedNeeds = (
+    entry: V2ProductEntry,
+    exclusion: ProductRecommendationExclusion
+  ) => {
+    for (const need of entry.coverage.coveredNeeds) {
+      const current = bestRejectedCoverageByNeed.get(need.id) ?? 0;
+      const next = entry.coverage.coverageByNeed.get(need.id) ?? 0;
+
+      if (next > current) {
+        bestRejectedCoverageByNeed.set(need.id, next);
+        bestRejectedByNeed.set(need.id, exclusion);
+      }
+    }
+  };
   const entries = input.candidates
     .flatMap((product) => {
       const baseEntry = productCoverageV2(product, scoringNeeds, input.clientSex);
@@ -3269,16 +3283,7 @@ function recommendProductStackExact(
         };
 
         exclusions.push(exclusion);
-
-        for (const need of baseEntry.coverage.coveredNeeds) {
-          const current = bestRejectedCoverageByNeed.get(need.id) ?? 0;
-          const next = baseEntry.coverage.coverageByNeed.get(need.id) ?? 0;
-
-          if (next > current) {
-            bestRejectedCoverageByNeed.set(need.id, next);
-            bestRejectedByNeed.set(need.id, exclusion);
-          }
-        }
+        recordBestRejectedNeeds(baseEntry, exclusion);
 
         return [];
       }
@@ -3307,7 +3312,7 @@ function recommendProductStackExact(
         });
 
       if (productEntries.length <= 0) {
-        exclusions.push({
+        const exclusion = {
           productId: product.id,
           reason:
             [...blockedSafetyReasons][0] ??
@@ -3317,7 +3322,14 @@ function recommendProductStackExact(
               input.clientSex
             ) ?? "Product does not cover current client needs",
           title: product.title
-        });
+        };
+
+        exclusions.push(exclusion);
+
+        if (exclusion.reason !== "Product does not cover current client needs") {
+          recordBestRejectedNeeds(baseEntry, exclusion);
+        }
+
         return [];
       }
 

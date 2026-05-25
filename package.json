@@ -20,6 +20,7 @@
     "import:vistra-products": "node scripts/import-vistra-products.mjs",
     "import:dhc-products": "node scripts/import-dhc-products.mjs",
     "products:validation-consistency": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/check-product-validation-consistency.ts",
+    "coverage:explain": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/explain-product-coverage.ts",
     "locales:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-locale-schema.ts",
     "payments:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-payment-schema.ts",
     "versions:core:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-core-versioned-model-schema.ts",
