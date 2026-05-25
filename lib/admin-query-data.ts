@@ -157,6 +157,7 @@ export type AdminContentInventoryRow = Readonly<{
   summary: string | null;
   title: string;
   translationGroupId: string | null;
+  translationLocales: string[];
   updatedAt: string;
   workflowStatus: AdminContentWorkflowStatus;
 }>;
@@ -775,12 +776,14 @@ async function getContentInventory(params: QueryParams) {
         status: string;
         title: string;
         translation_group_id: string;
+        translation_locales: string[] | null;
         updated_at: Date | string;
       }>
     >`
       select
         id::text,
         translation_group_id::text,
+        coalesce(translation_group.locales, array[blog_posts.locale]::text[]) as translation_locales,
         locale,
         status,
         slug,
@@ -799,6 +802,15 @@ async function getContentInventory(params: QueryParams) {
         created_at,
         updated_at
       from public.blog_posts
+      left join lateral (
+        select array_agg(sibling_locales.locale order by sibling_locales.locale) as locales
+        from (
+          select distinct sibling.locale
+          from public.blog_posts sibling
+          where sibling.translation_group_id = blog_posts.translation_group_id
+            and sibling.locale is not null
+        ) sibling_locales
+      ) translation_group on true
       left join lateral (
         select
           count(*)::int as page_views,
@@ -924,6 +936,9 @@ async function getContentInventory(params: QueryParams) {
       summary: row.excerpt,
       title: row.title,
       translationGroupId: row.translation_group_id,
+      translationLocales:
+        row.translation_locales?.filter((value): value is string => Boolean(value)) ??
+        [row.locale],
       updatedAt: new Date(row.updated_at).toISOString(),
       workflowStatus: workflowStatus("blog_post", row.id, row.status)
     })),
@@ -949,6 +964,7 @@ async function getContentInventory(params: QueryParams) {
       summary: row.quote,
       title: row.author_name || "Testimonial",
       translationGroupId: null,
+      translationLocales: [row.locale],
       updatedAt: new Date(row.updated_at).toISOString(),
       workflowStatus: workflowStatus("testimonial", row.id, row.status)
     }))

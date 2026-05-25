@@ -166,6 +166,7 @@ function blogRow(
     summary: post.excerpt || null,
     title: post.title,
     translationGroupId: post.translationGroupId,
+    translationLocales: [post.locale],
     updatedAt: timestamp,
     workflowStatus: workflowStatus(status)
   };
@@ -198,6 +199,7 @@ function testimonialRow(
     summary: testimonial.quote || null,
     title: testimonial.authorName || "Testimonial",
     translationGroupId: null,
+    translationLocales: [locale],
     updatedAt: timestamp,
     workflowStatus: workflowStatus(status)
   };

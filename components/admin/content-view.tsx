@@ -110,6 +110,49 @@ function contentTypeLabel(type: AdminContentInventoryRow["contentType"]) {
   return type === "blog_post" ? "Blog post" : "Testimonial";
 }
 
+function formatLocalePillLabel(locale: string) {
+  return locale.trim().toUpperCase();
+}
+
+function contentTranslationLocales(row: AdminContentInventoryRow) {
+  return Array.from(
+    new Set([row.locale, ...(row.translationLocales ?? [])].filter(Boolean))
+  ).sort((left, right) => {
+    if (left === row.locale) {
+      return -1;
+    }
+
+    if (right === row.locale) {
+      return 1;
+    }
+
+    return left.localeCompare(right);
+  });
+}
+
+function mergeTranslationLocales(
+  row: AdminContentInventoryRow,
+  existing?: AdminContentInventoryRow
+) {
+  return Array.from(
+    new Set([
+      row.locale,
+      ...(row.translationLocales ?? []),
+      ...(existing?.translationLocales ?? [])
+    ].filter(Boolean))
+  ).sort((left, right) => {
+    if (left === row.locale) {
+      return -1;
+    }
+
+    if (right === row.locale) {
+      return 1;
+    }
+
+    return left.localeCompare(right);
+  });
+}
+
 function localDateTimeInputValue(date: Date) {
   const offsetMs = date.getTimezoneOffset() * 60_000;
 
@@ -421,20 +464,27 @@ export function AdminContentView({
   }
 
   function saveContentRow(row: AdminContentInventoryRow) {
+    const existingRow = rows.find((item) => item.id === row.id);
+    const normalizedRow = {
+      ...row,
+      translationLocales: mergeTranslationLocales(row, existingRow)
+    };
     const rowInServerData = data.rows.some((item) => item.id === row.id);
 
     setCreatedRows((current) => {
       if (current.some((item) => item.id === row.id)) {
-        return current.map((item) => (item.id === row.id ? row : item));
+        return current.map((item) =>
+          item.id === row.id ? normalizedRow : item
+        );
       }
 
-      return rowInServerData ? current : [row, ...current];
+      return rowInServerData ? current : [normalizedRow, ...current];
     });
     setRowOverrides((current) => ({
       ...current,
       [row.id]: {
         ...(current[row.id] ?? {}),
-        ...row
+        ...normalizedRow
       }
     }));
     setEditorState(null);
@@ -630,9 +680,19 @@ function ContentCard({
                 <span className="inline-flex rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
                   {contentTypeLabel(row.contentType)}
                 </span>
-                <span className="inline-flex rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                  {row.locale.toUpperCase()}
-                </span>
+                {contentTranslationLocales(row).map((translationLocale) => (
+                  <span
+                    className={classNames(
+                      "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
+                      translationLocale === row.locale
+                        ? "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]"
+                        : "bg-gray-50 text-gray-700 ring-gray-200"
+                    )}
+                    key={translationLocale}
+                  >
+                    {formatLocalePillLabel(translationLocale)}
+                  </span>
+                ))}
               </div>
             </div>
             <div className="flex shrink-0 items-start gap-3 text-left sm:text-right">
@@ -959,8 +1019,8 @@ function ContentEditorModal({
           </div>
 
           <div className="space-y-5 px-5 py-5">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_9rem]">
-              <Field>
+            <div className="max-w-40">
+              <Field className="min-w-0">
                 <Label className={labelClass}>
                   {labels.contentPages.locale}
                 </Label>
