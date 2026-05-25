@@ -4,7 +4,10 @@ import { LandingPage } from "@/components/landing-page";
 import { SiteFooter } from "@/components/site-footer";
 import { ServiceIssue } from "@/components/service-issue";
 import { TitleBar } from "@/components/title-bar";
-import { getPublishedBlogPosts } from "@/lib/blog";
+import {
+  getPublishedBlogPosts,
+  getRandomPublishedTestimonials
+} from "@/lib/blog";
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
@@ -63,7 +66,10 @@ export default async function Home({ params }: HomeProps) {
     );
   }
 
-  const blogPosts = await getPublishedBlogPosts(locale, 3);
+  const [blogPosts, testimonials] = await Promise.all([
+    getPublishedBlogPosts(locale, 3),
+    getRandomPublishedTestimonials(locale, 4)
+  ]);
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
@@ -76,6 +82,7 @@ export default async function Home({ params }: HomeProps) {
         assessmentPath={assessmentPath}
         blogPosts={blogPosts}
         locale={locale}
+        testimonials={testimonials}
       />
       <SiteFooter content={dictionary.footer} locale={locale} />
     </main>

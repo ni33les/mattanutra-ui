@@ -39,7 +39,7 @@ const labels = {
       title: "ส่งมอบแผน"
     },
     quiz: {
-      description: "เราเข้าใจ HealthScore ของคุณ",
+      description: "เราเข้าใจคะแนนสุขภาพของคุณ",
       title: "ค้นพบ"
     },
     refine: {

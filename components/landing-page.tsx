@@ -18,7 +18,7 @@ import {
   Utensils,
   XCircle
 } from "lucide-react";
-import type { BlogPostSummary } from "@/lib/blog";
+import type { BlogPostSummary, BlogTestimonial } from "@/lib/blog";
 import type { Locale } from "@/lib/i18n";
 import { paymentCheckoutPath } from "@/lib/payment-paths";
 
@@ -26,6 +26,7 @@ type LandingPageProps = Readonly<{
   assessmentPath: string;
   blogPosts: BlogPostSummary[];
   locale: Locale;
+  testimonials: BlogTestimonial[];
 }>;
 
 const assets = {
@@ -36,12 +37,6 @@ const assets = {
     "/v11/origin-stage-03.png",
     "/v11/origin-stage-04.png",
     "/v11/origin-stage-05.png"
-  ],
-  portraits: [
-    "/v11/portrait-daniel.jpg",
-    "/v11/portrait-01.jpg",
-    "/v11/portrait-02.jpg",
-    "/v11/portrait-03.jpg"
   ],
   problem: "/v11/supplement-aisle.jpg"
 } as const;
@@ -253,13 +248,7 @@ const content = {
       title: "Real people, real starting points.",
       intro:
         "Different lifestyles. Same goal: better health, more clarity, and a routine that feels possible.",
-      cta: "Start Your Personalized Wellness Quiz",
-      stories: [
-        ["Daniel L.", "40, Bangkok", "Project Manager", "I turned 40 and realised I kept saying I wanted to make changes, but I didn't know where to start. I had a drawer full of random vitamins and no real plan. MattaNutra gave me a clear first step, without making the whole process feel overwhelming."],
-        ["Mei Lin T.", "45, Singapore", "Operations Lead", "Between work, travel, and caring for my family, my health routine became whatever I could remember to do that day. MattaNutra helped me turn a messy supplement shelf into a simple plan that fits real life in Singapore."],
-        ["Wanida P. (วนิดา)", "43, Khon Kaen", "Shop Owner", "My doctor told me my blood pressure was creeping up and I needed to make changes. I spent hours researching supplements online and ended up more confused than when I started. MattaNutra cut through all the noise and built me something that actually fits my life."],
-        ["Malee S. (มาลี)", "41, Phuket", "Nurse Aide", "I work in a clinic, so everyone assumes I know exactly what supplements to take. The honest truth was the more I read, the less sure I felt. MattaNutra finally gave me a clear, sensible plan I could trust — for myself this time, not just my patients."]
-      ]
+      cta: "Start Your Personalized Wellness Quiz"
     },
     origin: {
       eyebrow: "Our origin",
@@ -280,6 +269,60 @@ const content = {
       accent: "Upgrade when ready.",
       intro:
         "Take the free questionnaire to get a starting plan. Upgrade only when you want deeper precision or ongoing AI support.",
+      offer: "Limited Time Offer",
+      plans: [
+        {
+          badge: "One-time plan",
+          name: "Right Amount Formula",
+          desc: "Your personalised supplement formula with precise dosing, timing, and product guidance.",
+          originalPrice: "THB 990",
+          saving: "SAVE 30%",
+          currency: "THB",
+          price: "690",
+          termLabel: "One-time",
+          term: "One-time payment · Lifetime access",
+          cta: "Get the Right Amount Formula",
+          plan: "precision",
+          features: [
+            "Personalised supplement formula",
+            "Body-size adjusted dose ranges",
+            "Timing and usage instructions",
+            "Medication and lab safety flags",
+            "Recommended products and alternatives",
+            "60-day reassessment prompt"
+          ],
+          guaranteeTitle: "Clarity Guarantee",
+          guarantee:
+            "If your plan doesn’t feel clear and useful, we’ll make it right or refund you within 7 days."
+        },
+        {
+          badge: "90-Day AI support",
+          popular: "Most Popular",
+          name: "Living Protocol",
+          desc: "Keep your right amount right as life changes — with food guidance and ongoing adjustments.",
+          originalPrice: "THB 1,890",
+          saving: "SAVE 16%",
+          currency: "THB",
+          price: "1,590",
+          termLabel: "For 90 days",
+          term: "One payment · 90 days of support · Renew anytime",
+          cta: "Start Living Protocol",
+          plan: "pro",
+          highlight: "Includes Right Amount Formula Plan.",
+          plusLabel: "PLUS",
+          features: [
+            "Which foods give you what you need",
+            "Sleep, energy and habits guidance",
+            "Learn which everyday foods give you what you need",
+            "Supplement timing & adherence support",
+            "Weekly progress summaries",
+            "Priority review as your data changes"
+          ],
+          guaranteeTitle: "7-Day Satisfaction Guarantee",
+          guarantee:
+            "Give Living Protocol a real try. If anything’s not right, tell us — we’ll fix it, or refund you in full within 7 days. No fuss."
+        }
+      ],
       trust: [
         ["Secure & Private", "Your data is encrypted and never shared."],
         ["Science-Backed", "Personalised recommendations based on trusted evidence."],
@@ -290,7 +333,7 @@ const content = {
     journal: {
       eyebrow: "From the journal",
       tag: "Journal",
-      title: "Understanding the right amount.",
+      title: "Understanding the right amount",
       intro:
         "Short, useful articles on personalised nutrition, smarter supplement choices, and healthier routines.",
       readMore: "Read article",
@@ -324,6 +367,10 @@ const content = {
       primary: "Start the Wellness Quiz",
       secondary: "How it works",
       quote: "Mattaññutā — knowing the right amount."
+    },
+    disclaimer: {
+      body:
+        "MattaNutra supports your supplement and everyday-nutrition decisions — it doesn’t replace medical care or personalised dietary therapy. Food guidance is general nutrition education, and all adjustments are organised around your goals, routine and current stack, and flagged against your medications and labs for safety."
     }
   },
   th: {
@@ -428,7 +475,7 @@ const content = {
       ]
     },
     protocolBand: {
-      title: "สูตร Right Amount คือฐานของคุณ.",
+      title: "สูตรปริมาณที่พอดีคือฐานของคุณ.",
       accent: "โปรโตคอลชีวิตช่วยให้ฐานนั้นเข้ากับชีวิตจริง.",
       body:
         "การเดินทาง ความเครียด การนอนไม่ดี และกิจวัตรที่เปลี่ยน ล้วนเปลี่ยนสิ่งที่ร่างกายต้องการ ฐานหลักไม่ต้องเปลี่ยน แต่รายละเอียดเล็ก ๆ รอบ ๆ ฐานนั้นควรปรับได้"
@@ -483,11 +530,11 @@ const content = {
       plans: [
         {
           badge: "สูตรครั้งเดียว",
-          name: "สูตร Right Amount",
+          name: "สูตรปริมาณที่พอดี",
           desc: "เลิกเดาหน้าชั้นวางอาหารเสริม แผนเฉพาะบุคคลพร้อมปริมาณ เวลาใช้ และคำแนะนำผลิตภัณฑ์",
           price: "690",
           term: "จ่ายครั้งเดียว · เข้าถึงได้ตลอด",
-          cta: "รับสูตร Right Amount",
+          cta: "รับสูตรปริมาณที่พอดี",
           best: "คนที่ต้องการจุดเริ่มต้นที่ชัดเจนและมั่นใจ",
           features: ["สูตรเฉพาะบุคคล", "ช่วงโดสตามร่างกาย", "คำแนะนำเวลาใช้", "ข้อควรระวังเรื่องยาและแล็บ", "ผลิตภัณฑ์และทางเลือก", "เตือนทบทวน 60 วัน"]
         },
@@ -495,12 +542,12 @@ const content = {
           badge: "พรีเมียม · สนับสนุน 90 วัน",
           popular: "นิยมที่สุด",
           name: "โปรโตคอลชีวิต",
-          desc: "คงความพอดีให้เหมาะกับชีวิตที่เปลี่ยน รวมทุกอย่างในสูตร Right Amount พร้อมการปรับต่อเนื่องเมื่อการนอน ความเครียด การเดินทาง การฝึก หรืออาหารเปลี่ยน",
+          desc: "คงความพอดีให้เหมาะกับชีวิตที่เปลี่ยน รวมทุกอย่างในสูตรปริมาณที่พอดี พร้อมการปรับต่อเนื่องเมื่อการนอน ความเครียด การเดินทาง การฝึก หรืออาหารเปลี่ยน",
           price: "1,590",
           term: "จ่ายครั้งเดียว · สนับสนุน 90 วัน · ต่ออายุได้",
           cta: "เริ่มโปรโตคอลชีวิต",
           best: "คนที่อยากให้แผนตามทันชีวิตประจำวันจริง",
-          features: ["รวมสูตร Right Amount", "เรียนรู้อาหารประจำวันที่ให้สิ่งที่คุณต้องการ", "ปรับเวลาและปริมาณเมื่อชีวิตเปลี่ยน", "ทุกการเปลี่ยนตรวจกับยาและแล็บ", "จำรูปแบบของคุณใน 90 วัน", "แค่ส่งข้อความเมื่อมีอะไรเปลี่ยน", "ทำต่อได้แม้เดินทาง เครียด หรือนอนสะดุด"]
+          features: ["รวมสูตรปริมาณที่พอดี", "เรียนรู้อาหารประจำวันที่ให้สิ่งที่คุณต้องการ", "ปรับเวลาและปริมาณเมื่อชีวิตเปลี่ยน", "ทุกการเปลี่ยนตรวจกับยาและแล็บ", "จำรูปแบบของคุณใน 90 วัน", "แค่ส่งข้อความเมื่อมีอะไรเปลี่ยน", "ทำต่อได้แม้เดินทาง เครียด หรือนอนสะดุด"]
         }
       ],
       guarantee:
@@ -510,13 +557,7 @@ const content = {
       eyebrow: "คนจริง เรื่องจริง",
       title: "คนต่างชีวิต จุดเริ่มต้นต่างกัน.",
       intro: "เป้าหมายเดียวกันคือสุขภาพที่ดีขึ้น ความชัดเจนมากขึ้น และกิจวัตรที่ทำได้จริง",
-      cta: "เริ่มแบบประเมินสุขภาพ",
-      stories: [
-        ["Daniel L.", "40, กรุงเทพฯ", "ผู้จัดการโครงการ", "พออายุ 40 ผมรู้ตัวว่าพูดตลอดว่าอยากเปลี่ยน แต่ไม่รู้จะเริ่มตรงไหน ลิ้นชักเต็มไปด้วยวิตามินแบบสุ่ม ๆ MattaNutra ให้ก้าวแรกที่ชัดเจนโดยไม่ทำให้รู้สึกหนักเกินไป"],
-        ["Mei Lin T.", "45, สิงคโปร์", "หัวหน้าฝ่ายปฏิบัติการ", "ระหว่างงาน การเดินทาง และดูแลครอบครัว กิจวัตรสุขภาพของฉันกลายเป็นอะไรที่นึกออกวันนั้น MattaNutra ช่วยเปลี่ยนชั้นอาหารเสริมที่ยุ่งให้เป็นแผนเรียบง่ายที่เข้ากับชีวิตจริง"],
-        ["Wanida P. (วนิดา)", "43, ขอนแก่น", "เจ้าของร้าน", "คุณหมอบอกว่าความดันเริ่มสูงและต้องปรับบางอย่าง ฉันค้นเรื่องอาหารเสริมอยู่นานจนสับสนกว่าเดิม MattaNutra ช่วยตัดเสียงรบกวนและสร้างแผนที่เข้ากับชีวิตฉัน"],
-        ["Malee S. (มาลี)", "41, ภูเก็ต", "ผู้ช่วยพยาบาล", "ฉันทำงานในคลินิก ทุกคนเลยคิดว่าฉันรู้ว่าควรกินอะไร แต่ยิ่งอ่านก็ยิ่งไม่แน่ใจ MattaNutra ให้แผนที่ชัด สมเหตุผล และไว้ใจได้สำหรับตัวฉันเอง"]
-      ]
+      cta: "เริ่มแบบประเมินสุขภาพ"
     },
     origin: {
       eyebrow: "จุดเริ่มต้น",
@@ -536,6 +577,60 @@ const content = {
       accent: "อัปเกรดเมื่อพร้อม.",
       intro:
         "ทำแบบประเมินฟรีเพื่อรับแผนตั้งต้น แล้วอัปเกรดเมื่อคุณต้องการความแม่นยำหรือการสนับสนุนต่อเนื่องมากขึ้น",
+      offer: "ข้อเสนอช่วงเปิดตัว",
+      plans: [
+        {
+          badge: "แผนครั้งเดียว",
+          name: "สูตรปริมาณที่พอดี",
+          desc: "สูตรอาหารเสริมเฉพาะบุคคล พร้อมปริมาณ เวลาใช้ และคำแนะนำผลิตภัณฑ์ที่ชัดเจน",
+          originalPrice: "THB 990",
+          saving: "ประหยัด 30%",
+          currency: "THB",
+          price: "690",
+          termLabel: "จ่ายครั้งเดียว",
+          term: "จ่ายครั้งเดียว · เข้าถึงได้ตลอด",
+          cta: "รับสูตรปริมาณที่พอดี",
+          plan: "precision",
+          features: [
+            "สูตรอาหารเสริมเฉพาะบุคคล",
+            "ช่วงโดสที่ปรับตามขนาดร่างกาย",
+            "คำแนะนำเวลาและวิธีใช้",
+            "ข้อควรระวังเรื่องยาและข้อมูลแล็บ",
+            "ผลิตภัณฑ์แนะนำและทางเลือก",
+            "เตือนทบทวนใน 60 วัน"
+          ],
+          guaranteeTitle: "รับประกันความชัดเจน",
+          guarantee:
+            "ถ้าแผนยังไม่ชัดเจนหรือใช้ประโยชน์ไม่ได้ เราจะปรับให้หรือคืนเงินภายใน 7 วัน"
+        },
+        {
+          badge: "AI สนับสนุน 90 วัน",
+          popular: "นิยมที่สุด",
+          name: "โปรโตคอลชีวิต",
+          desc: "รักษาปริมาณที่พอดีให้เหมาะกับชีวิตที่เปลี่ยน พร้อมคำแนะนำอาหารและการปรับต่อเนื่อง",
+          originalPrice: "THB 1,890",
+          saving: "ประหยัด 16%",
+          currency: "THB",
+          price: "1,590",
+          termLabel: "สำหรับ 90 วัน",
+          term: "จ่ายครั้งเดียว · สนับสนุน 90 วัน · ต่ออายุได้",
+          cta: "เริ่มโปรโตคอลชีวิต",
+          plan: "pro",
+          highlight: "รวมแผนสูตรปริมาณที่พอดี",
+          plusLabel: "เพิ่มเติม",
+          features: [
+            "รู้ว่าอาหารอะไรให้สิ่งที่คุณต้องการ",
+            "คำแนะนำเรื่องการนอน พลังงาน และนิสัยประจำวัน",
+            "เรียนรู้อาหารประจำวันที่ให้สิ่งที่ร่างกายต้องการ",
+            "ช่วยจัดเวลาใช้อาหารเสริมและทำให้ทำต่อได้",
+            "สรุปความคืบหน้ารายสัปดาห์",
+            "ทบทวนก่อนเมื่อข้อมูลของคุณเปลี่ยน"
+          ],
+          guaranteeTitle: "รับประกันความพึงพอใจ 7 วัน",
+          guarantee:
+            "ลองโปรโตคอลชีวิตอย่างจริงจัง หากมีอะไรไม่ตรง เราจะแก้ไขหรือคืนเงินเต็มจำนวนภายใน 7 วัน"
+        }
+      ],
       trust: [
         ["ปลอดภัยและเป็นส่วนตัว", "ข้อมูลถูกเข้ารหัสและไม่แบ่งปัน"],
         ["อิงหลักฐาน", "คำแนะนำเฉพาะบุคคลจากหลักฐานที่เชื่อถือได้"],
@@ -546,13 +641,13 @@ const content = {
     journal: {
       eyebrow: "จากบทความ",
       tag: "บทความ",
-      title: "อ่านเรื่องการรู้ปริมาณที่พอดี",
+      title: "เข้าใจปริมาณที่พอดี",
       intro: "บทความสั้น ๆ เรื่องโภชนาการเฉพาะบุคคล การเลือกอาหารเสริมที่ฉลาดขึ้น และกิจวัตรสุขภาพ",
       readMore: "อ่านบทความ",
       fallback: [
         ["หลัง 50", "10 พ.ค. 2026", "อะไรเปลี่ยนหลังวัย 50: พลังงาน การนอน และการฟื้นตัว", "พื้นฐานหลายอย่างเปลี่ยน ทั้งโครงสร้างการนอน หน้าต่างการฟื้นตัว และปัจจัยที่ส่งผลจริง"],
         ["งบประมาณ", "9 พ.ค. 2026", "เลือกอาหารเสริมอย่างไรไม่ให้เสียเงินฟรี", "กรอบสั้น ๆ เพื่อแยกสิ่งสำคัญจากสิ่งที่มีก็ดี และหลีกเลี่ยงการจ่ายเกินที่พบบ่อย"],
-        ["วิธีคิด", "8 พ.ค. 2026", "ทำไม HealthScore ดีกว่ารายการอาหารเสริมทั่วไป", "แผนที่มีประโยชน์เริ่มจากการเข้าใจว่าอะไรเป็นตัวถ่วง ไม่ใช่เพิ่มอีกขวดเข้าชั้น"]
+        ["วิธีคิด", "8 พ.ค. 2026", "ทำไมคะแนนสุขภาพดีกว่ารายการอาหารเสริมทั่วไป", "แผนที่มีประโยชน์เริ่มจากการเข้าใจว่าอะไรเป็นตัวถ่วง ไม่ใช่เพิ่มอีกขวดเข้าชั้น"]
       ]
     },
     faq: {
@@ -578,6 +673,10 @@ const content = {
       primary: "เริ่มแบบประเมินสุขภาพ",
       secondary: "ดูวิธีทำงาน",
       quote: "Mattaññutā — การรู้ปริมาณที่พอดี"
+    },
+    disclaimer: {
+      body:
+        "MattaNutra ช่วยสนับสนุนการตัดสินใจเรื่องอาหารเสริมและโภชนาการในชีวิตประจำวัน แต่ไม่แทนที่การดูแลทางการแพทย์หรือโภชนบำบัดเฉพาะบุคคล คำแนะนำด้านอาหารเป็นข้อมูลเพื่อการเรียนรู้ทั่วไป และการปรับทั้งหมดจะอิงเป้าหมาย กิจวัตร ชุดอาหารเสริมปัจจุบัน และตรวจเทียบกับยาและข้อมูลแล็บของคุณเพื่อความเหมาะสม"
     }
   }
 } as const;
@@ -624,7 +723,8 @@ function CheckItem({ children }: Readonly<{ children: string }>) {
 export function LandingPage({
   assessmentPath,
   blogPosts,
-  locale
+  locale,
+  testimonials
 }: LandingPageProps) {
   const copy = content[locale];
   const journalCards =
@@ -1039,68 +1139,62 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="mn-v11-section">
+      <section className="border-y border-[var(--mn-line)] bg-[var(--mn-paper)] py-8">
         <div className="mn-v11-container">
-          <SectionIntro
-            accent={copy.pricing.accent}
-            body={copy.pricing.intro}
-            eyebrow={copy.pricing.eyebrow}
-            title={copy.pricing.title}
-          />
-          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {[Lock, BadgeCheck, RefreshCw, ShieldCheck].map((Icon, index) => {
-              const [title, body] = copy.pricing.trust[index];
-              return (
-                <article className="mn-v11-card text-center" key={title}>
-                  <span className="mn-v11-icon mx-auto">
-                    <Icon aria-hidden className="size-5" />
-                  </span>
-                  <h3 className="mt-4 text-lg font-semibold text-[var(--mn-ink)]">{title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--mn-ash)]">{body}</p>
-                </article>
-              );
-            })}
-          </div>
+          <p className="mx-auto max-w-4xl text-center text-sm leading-7 text-[var(--mn-ash)]">
+            {copy.disclaimer.body}
+          </p>
         </div>
       </section>
 
-      <section className="mn-v11-section mn-v11-results" id="results-v11">
-        <div className="mn-v11-container">
-          <SectionIntro
-            body={copy.results.intro}
-            eyebrow={copy.results.eyebrow}
-            light
-            title={copy.results.title}
-          />
-          <div className="mt-12 grid gap-5 md:grid-cols-2">
-            {copy.results.stories.map(([name, meta, role, quote], index) => (
-              <article className="mn-v11-story" key={name}>
-                <Image
-                  alt={name}
-                  className="h-56 w-full rounded-[var(--mn-radius-md)] object-cover"
-                  height={543}
-                  loading="eager"
-                  sizes="(min-width: 768px) 50vw, 100vw"
-                  src={assets.portraits[index]}
-                  width={724}
-                />
-                <p className="mt-6 text-lg leading-8 text-white">“{quote}”</p>
-                <div className="mt-6 border-t border-white/15 pt-5">
-                  <h3>{name}</h3>
-                  <p>{meta}</p>
-                  <p>{role}</p>
-                </div>
-              </article>
-            ))}
+      {testimonials.length > 0 ? (
+        <section className="mn-v11-section mn-v11-results" id="results-v11">
+          <div className="mn-v11-container">
+            <SectionIntro
+              body={copy.results.intro}
+              eyebrow={copy.results.eyebrow}
+              light
+              title={copy.results.title}
+            />
+            <div className="mt-12 grid gap-5 md:grid-cols-2">
+              {testimonials.map((testimonial) => (
+                <article className="mn-v11-story" key={testimonial.id}>
+                  {testimonial.authorImageUrl ? (
+                    <Image
+                      alt={testimonial.authorImageAlt || testimonial.authorName}
+                      className="h-56 w-full rounded-[var(--mn-radius-md)] object-cover"
+                      height={543}
+                      loading="eager"
+                      sizes="(min-width: 768px) 50vw, 100vw"
+                      src={testimonial.authorImageUrl}
+                      width={724}
+                    />
+                  ) : (
+                    <div className="grid h-56 w-full place-items-center rounded-[var(--mn-radius-md)] bg-[var(--mn-ink-soft)] text-5xl font-semibold text-white">
+                      {testimonial.authorName.slice(0, 1)}
+                    </div>
+                  )}
+                  <p className="mt-6 text-lg leading-8 text-white">
+                    “{testimonial.quote}”
+                  </p>
+                  <div className="mt-6 border-t border-white/15 pt-5">
+                    <h3>{testimonial.authorName}</h3>
+                    {testimonial.authorTitle ? (
+                      <p>{testimonial.authorTitle}</p>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="mt-10 text-center">
+              <Link className="mn-brand-button" href={assessmentPath}>
+                {copy.results.cta}
+                <ArrowRight aria-hidden className="size-4" />
+              </Link>
+            </div>
           </div>
-          <div className="mt-10 text-center">
-            <Link className="mn-brand-button" href={assessmentPath}>
-              {copy.results.cta}
-              <ArrowRight aria-hidden className="size-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="mn-v11-section" id="origin">
         <div className="mn-v11-container">
@@ -1131,6 +1225,95 @@ export function LandingPage({
             <h3 className="text-2xl font-semibold text-[var(--mn-ink)]">{copy.origin.founders}</h3>
             <p className="mt-4 text-sm leading-7 text-[var(--mn-ink-soft)]">{copy.origin.founderBody}</p>
             <p className="mt-6 font-serif text-2xl italic text-[var(--mn-gold)]">{copy.origin.signoff}</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="mn-v11-section bg-[var(--mn-paper)]" id="pricing">
+        <div className="mn-v11-container">
+          <SectionIntro
+            accent={copy.pricing.accent}
+            body={copy.pricing.intro}
+            eyebrow={copy.pricing.eyebrow}
+            title={copy.pricing.title}
+          />
+          <div className="mt-12 grid gap-5 lg:grid-cols-2">
+            {copy.pricing.plans.map((plan, index) => (
+              <article
+                className={index === 1 ? "mn-v11-price-card mn-v11-price-card--featured" : "mn-v11-price-card"}
+                key={plan.name}
+              >
+                {"popular" in plan ? <span className="mn-v11-popular">{plan.popular}</span> : null}
+                {index === 0 ? (
+                  <span className="mb-4 inline-flex rounded-full bg-[var(--mn-gold-tint)] px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-[var(--mn-gold)]">
+                    {copy.pricing.offer}
+                  </span>
+                ) : null}
+                <p className="mn-v11-eyebrow">{plan.badge}</p>
+                <h3>{plan.name}</h3>
+                <p className="mn-v11-price-desc">{plan.desc}</p>
+                <div className="mt-6 flex flex-wrap items-end gap-3">
+                  <span className="text-sm font-semibold text-[var(--mn-ash)] line-through">
+                    {plan.originalPrice}
+                  </span>
+                  <span className="rounded-full bg-[var(--mn-mint)] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--mn-teal-deep)]">
+                    {plan.saving}
+                  </span>
+                </div>
+                <div className="mn-v11-price">
+                  <span>{plan.currency}</span>
+                  <strong>{plan.price}</strong>
+                </div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-gold)]">
+                  {plan.termLabel}
+                </p>
+                <p className="mn-v11-price-term">{plan.term}</p>
+                <Link
+                  className="mn-brand-button w-full"
+                  href={paymentCheckoutPath(locale, {
+                    plan: plan.plan,
+                    sourceSurface: "landing"
+                  })}
+                >
+                  {plan.cta}
+                  <ArrowRight aria-hidden className="size-4" />
+                </Link>
+                {"highlight" in plan ? (
+                  <p className="mt-7 rounded-[var(--mn-radius-md)] border border-[var(--mn-gold-soft)] bg-[var(--mn-gold-tint)] p-4 text-sm font-semibold leading-6 text-[var(--mn-ink)]">
+                    ✓ {plan.highlight}
+                  </p>
+                ) : null}
+                {"plusLabel" in plan ? (
+                  <p className="mt-6 text-xs font-bold uppercase tracking-[0.22em] text-[var(--mn-gold)]">
+                    {plan.plusLabel}
+                  </p>
+                ) : null}
+                <ul className="mt-7 space-y-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                  {plan.features.map((feature) => (
+                    <CheckItem key={feature}>{feature}</CheckItem>
+                  ))}
+                </ul>
+                <p className="mt-7 rounded-[var(--mn-radius-md)] bg-[var(--mn-cream)] p-4 text-sm leading-6 text-[var(--mn-ash)]">
+                  <strong className="text-[var(--mn-ink)]">{plan.guaranteeTitle}</strong>
+                  <br />
+                  {plan.guarantee}
+                </p>
+              </article>
+            ))}
+          </div>
+          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[Lock, BadgeCheck, RefreshCw, ShieldCheck].map((Icon, index) => {
+              const [title, body] = copy.pricing.trust[index];
+              return (
+                <article className="mn-v11-card text-center" key={title}>
+                  <span className="mn-v11-icon mx-auto">
+                    <Icon aria-hidden className="size-5" />
+                  </span>
+                  <h3 className="mt-4 text-lg font-semibold text-[var(--mn-ink)]">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--mn-ash)]">{body}</p>
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>

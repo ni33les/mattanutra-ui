@@ -919,7 +919,7 @@ const th: Copy = {
     sun: "สีผิว แดด และกันแดดช่วยประเมินบริบทวิตามินดีอย่างซื่อตรงขึ้น"
   },
   fixedAction: {
-    generate: "สร้าง HealthScore ของฉัน"
+    generate: "สร้างคะแนนสุขภาพของฉัน"
   },
   daily: {
     title: "ชีวิตประจำวันของคุณ",
@@ -1289,10 +1289,10 @@ const assessmentUiCopy = {
     stagesAria: "ขั้นตอนแบบประเมิน",
     processingError: "ไม่สามารถเริ่มการประมวลผลได้ โปรดลองอีกครั้ง",
     scoreProcessingSubtitle: "เรากำลังประเมินภาพรวมสุขภาพจากคำตอบของคุณ",
-    scoreProcessingTitle: "กำลังเตรียม HealthScore ของคุณ",
+    scoreProcessingTitle: "กำลังเตรียมคะแนนสุขภาพของคุณ",
     scoreGate: {
-      planDescription: "นี่คือคะแนน HealthScore จากคำตอบของคุณ",
-      title: "HealthScore ของคุณพร้อมแล้ว"
+      planDescription: "นี่คือคะแนนสุขภาพจากคำตอบของคุณ",
+      title: "คะแนนสุขภาพของคุณพร้อมแล้ว"
     },
     retry: "ลองอีกครั้ง",
     section: (current: number, total: number) => `ขั้นตอน ${current} / ${total}`,

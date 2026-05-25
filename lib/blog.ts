@@ -231,6 +231,55 @@ function formatPublishedDate(value: Date | string | null, locale: Locale) {
   };
 }
 
+function localizeThaiPublishedText(value: string, locale: Locale) {
+  if (locale !== "th" || !value) {
+    return value;
+  }
+
+  return value
+    .replace(/\bRight Amount Formula\b/g, "สูตรปริมาณที่พอดี")
+    .replace(/\bRight Amount\b/g, "ปริมาณที่พอดี")
+    .replace(/\bHealthScore\b/g, "คะแนนสุขภาพ")
+    .replace(/\bWellness Quiz\b/g, "แบบประเมินสุขภาพ")
+    .replace(/\bwellness\b/g, "สุขภาวะ")
+    .replace(/ทำไม\s+คะแนนสุขภาพ\s+ถึง/g, "ทำไมคะแนนสุขภาพจึง")
+    .replace(/คะแนนสุขภาพ\s+ช่วย/g, "คะแนนสุขภาพช่วย")
+    .replace(/คะแนนสุขภาพ\s+ทำ/g, "คะแนนสุขภาพทำ")
+    .replace(/ประสบการณ์\s+คะแนนสุขภาพ\s+ที่ดี/g, "ประสบการณ์คะแนนสุขภาพที่ดี");
+}
+
+function localizeThaiPublishedBody(
+  body: BlogArticleBody,
+  locale: Locale
+): BlogArticleBody {
+  if (locale !== "th") {
+    return body;
+  }
+
+  return {
+    closing:
+      body.closing === undefined
+        ? undefined
+        : localizeThaiPublishedText(body.closing, locale),
+    intro:
+      body.intro === undefined
+        ? undefined
+        : localizeThaiPublishedText(body.intro, locale),
+    points: body.points?.map((point) => ({
+      body: localizeThaiPublishedText(point.body, locale),
+      title: localizeThaiPublishedText(point.title, locale)
+    })),
+    sectionBody:
+      body.sectionBody === undefined
+        ? undefined
+        : localizeThaiPublishedText(body.sectionBody, locale),
+    sectionTitle:
+      body.sectionTitle === undefined
+        ? undefined
+        : localizeThaiPublishedText(body.sectionTitle, locale)
+  };
+}
+
 function hrefForPost(locale: Locale, slug: string) {
   return `/${locale}/blog/${slug}`;
 }
@@ -278,26 +327,29 @@ function mapTestimonial(row: TestimonialRow | BlogPostRow): BlogTestimonial | nu
 function mapPost(row: BlogPostRow, localeOverride?: Locale): BlogPost {
   const locale = localeOverride ?? toLocale(row.locale);
   const published = formatPublishedDate(row.published_at, locale);
-  const body = row.body ?? {};
+  const body = localizeThaiPublishedBody(row.body ?? {}, locale);
 
   return {
     body,
-    contentMarkdown: row.content_markdown ?? "",
+    contentMarkdown: localizeThaiPublishedText(row.content_markdown ?? "", locale),
     date: published.date,
     datetime: published.datetime,
-    excerpt: row.excerpt ?? "",
+    excerpt: localizeThaiPublishedText(row.excerpt ?? "", locale),
     href: hrefForPost(locale, row.slug),
     id: row.id,
     imageAlt: row.image_alt ?? "",
     imageUrl: row.image_url ?? "",
     locale,
-    seoDescription: row.seo_description ?? row.excerpt ?? "",
-    seoTitle: row.seo_title ?? row.title,
+    seoDescription: localizeThaiPublishedText(
+      row.seo_description ?? row.excerpt ?? "",
+      locale
+    ),
+    seoTitle: localizeThaiPublishedText(row.seo_title ?? row.title, locale),
     slug: row.slug,
-    subtitle: row.subtitle ?? row.excerpt ?? "",
+    subtitle: localizeThaiPublishedText(row.subtitle ?? row.excerpt ?? "", locale),
     tags: row.tags ?? [],
     testimonial: mapTestimonial(row),
-    title: row.title,
+    title: localizeThaiPublishedText(row.title, locale),
     translationGroupId: row.translation_group_id
   };
 }
@@ -877,6 +929,67 @@ export async function getRandomPublishedTestimonial(locale: Locale) {
   } catch (error) {
     console.error("Unable to load testimonial", error);
     return null;
+  }
+}
+
+export async function getRandomPublishedTestimonials(locale: Locale, limit = 4) {
+  const sql = getSql();
+
+  if (!sql) {
+    return [];
+  }
+
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 12);
+
+  try {
+    for (const homepageOnly of [true, false]) {
+      const homepagePredicate = homepageOnly
+        ? sql`and (source_agent = 'homepage_v11_seed' or metadata->>'homepage' = 'true')`
+        : sql``;
+      const rows =
+        locale === defaultLocale
+          ? await sql<TestimonialRow[]>`
+              select *
+              from public.testimonials
+              where status = 'published'
+                and locale = ${locale}
+                ${homepagePredicate}
+              order by random()
+              limit ${safeLimit}
+            `
+          : await sql<TestimonialRow[]>`
+              select *
+              from (
+                select *, 0 as locale_priority
+                from public.testimonials
+                where status = 'published'
+                  and locale = ${locale}
+                  ${homepagePredicate}
+                union all
+                select *, 1 as locale_priority
+                from public.testimonials
+                where status = 'published'
+                  and locale = ${defaultLocale}
+                  ${homepagePredicate}
+              ) testimonials_for_homepage
+              order by locale_priority asc, random()
+              limit ${safeLimit}
+            `;
+      const testimonials = rows
+        .map((row) => mapTestimonial(row))
+        .filter((testimonial): testimonial is BlogTestimonial =>
+          Boolean(testimonial)
+        );
+
+      if (testimonials.length > 0 || !homepageOnly) {
+        return testimonials;
+      }
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Unable to load homepage testimonials", error);
+    return [];
   }
 }
 

@@ -132,11 +132,11 @@ const PAYMENT_PLANS: Record<AssessmentPlan, PaymentPlan> = {
     amountMicros: 690 * AMOUNT_MICROS_PER_UNIT,
     description: {
       en: "Your Right Amount Formula with supplement priorities, dose context, cautions, and product direction.",
-      th: "สูตร Right Amount พร้อมลำดับความสำคัญ ปริมาณ ข้อควรระวัง และแนวทางสินค้า"
+      th: "สูตรปริมาณที่พอดี พร้อมลำดับความสำคัญ ปริมาณ ข้อควรระวัง และแนวทางสินค้า"
     },
     name: {
       en: "Right Amount Formula",
-      th: "สูตร Right Amount"
+      th: "สูตรปริมาณที่พอดี"
     },
     plan: "precision",
     priceEnvName: "STRIPE_PRICE_PRECISION_THB"
@@ -145,11 +145,11 @@ const PAYMENT_PLANS: Record<AssessmentPlan, PaymentPlan> = {
     amountMicros: 1590 * AMOUNT_MICROS_PER_UNIT,
     description: {
       en: "The Right Amount Formula plus 90 days of wellness concierge guidance.",
-      th: "สูตร Right Amount พร้อมคำแนะนำ Wellness Concierge 90 วัน"
+      th: "สูตรปริมาณที่พอดี พร้อมคำแนะนำจากผู้ช่วยดูแลสุขภาพ 90 วัน"
     },
     name: {
       en: "90-Day Wellness Concierge",
-      th: "Wellness Concierge 90 วัน"
+      th: "ผู้ช่วยดูแลสุขภาพ 90 วัน"
     },
     plan: "pro",
     priceEnvName: "STRIPE_PRICE_PRO_THB"

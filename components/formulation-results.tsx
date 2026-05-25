@@ -281,13 +281,13 @@ export const formulationResultsCopy = {
   th: {
     benefits: "ประโยชน์",
     connectChatBody:
-      "เลือกแอปแชตที่คุณสะดวก เพื่อรับการดูแลต่อเนื่องที่ปรับตามอาหาร กิจวัตร การเดินทาง การฝึก และชีวิตประจำวัน ส่งแผนของคุณแล้ว advisor จะคุยต่อจากคำแนะนำนี้ได้",
+      "เลือกแอปแชตที่คุณสะดวก เพื่อรับการดูแลต่อเนื่องที่ปรับตามอาหาร กิจวัตร การเดินทาง การฝึก และชีวิตประจำวัน ส่งแผนของคุณแล้วผู้ช่วยจะคุยต่อจากคำแนะนำนี้ได้",
     connectChatButton: "เปิดแชต",
     connectChatEyebrow: "คุยต่อในแชต",
     connectChatPlanId: "แผน",
-    connectChatQrAlt: "QR code สำหรับเชื่อมต่อ MattaNutra AI advisor",
+    connectChatQrAlt: "คิวอาร์โค้ดสำหรับเชื่อมต่อผู้ช่วย AI ของ MattaNutra",
     connectChatTitle:
-      "เชื่อมต่อกับ AI advisor เฉพาะทางด้านอาหารเสริมเพื่อการดูแลและปรับแผนต่อเนื่อง",
+      "เชื่อมต่อกับผู้ช่วย AI เฉพาะทางด้านอาหารเสริมเพื่อการดูแลและปรับแผนต่อเนื่อง",
     constraints: "ข้อจำกัด",
     context: "สรุปแบบประเมิน",
     cautions: "ข้อควรระวัง",
@@ -311,7 +311,7 @@ export const formulationResultsCopy = {
       "คำแนะนำอาหารทั้งหมดต้องผ่านการตรวจสอบด้านความปลอดภัยก่อนแสดง ทีมรีวิวได้รับรายการแล้ว",
     foodsEmptyTitle: "กำลังตรวจสอบอาหาร",
     foodsHint:
-      "อาหารและวัตถุดิบที่นำไปใช้กับมื้ออาหาร กิจวัตร และบทสนทนากับ concierge ต่อไปได้",
+      "อาหารและวัตถุดิบที่นำไปใช้กับมื้ออาหาร กิจวัตร และบทสนทนากับผู้ช่วยดูแลต่อไปได้",
     foodServing: "ปริมาณ",
     finalizeError: "ไม่สามารถส่งมอบแผนโภชนาการได้ กรุณาลองอีกครั้ง",
     finalizePlan: "ส่งมอบแผนโภชนาการ",
@@ -360,7 +360,7 @@ export const formulationResultsCopy = {
     safetyCaptureSuccess:
       "บันทึกแล้ว เราจะใช้ช่องทางนี้เพื่อแจ้งผลการตรวจสอบ",
     safetyCaptureTitle: "ต้องการให้เราติดต่อกลับไหม",
-    safetyChannelEmail: "Email",
+    safetyChannelEmail: "อีเมล",
     safetyChannelLine: "LINE",
     safetyChannelTelegram: "Telegram",
     safetyChannelWhatsapp: "WhatsApp",
@@ -853,8 +853,8 @@ const revealCopy = {
     formulaLead:
       "นี่คือลำดับความสำคัญของอาหารเสริมที่เลือกจากคำตอบ ข้อควรระวัง และความครอบคลุมของผลิตภัณฑ์",
     formulaTitle: "ชุดอาหารเสริมที่เลือกให้คุณ",
-    heroEyebrow: "Right Amount ของคุณ",
-    heroTitle: "Right Amount ของคุณ",
+    heroEyebrow: "ปริมาณที่พอดีของคุณ",
+    heroTitle: "ปริมาณที่พอดีของคุณ",
     heroHeadline: "แผนของคุณถูกกลั่นให้เหลือสิ่งที่น่าจะสำคัญที่สุด",
     heroMetaGenerated: "สร้างเมื่อ",
     heroMetaPlan: "รหัสแผน",
@@ -1480,7 +1480,11 @@ function RevealProductsSection({
           <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
             04 · {copy.selectedProducts}
           </p>
-          <h2 className="mt-4 font-serif text-5xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
+          <h2
+            className={`mt-4 font-serif text-5xl font-medium text-[var(--mn-ink)] text-balance ${
+              locale === "th" ? "leading-[1.35]" : "leading-tight"
+            }`}
+          >
             {copy.productsTitle}
           </h2>
           <p className="mt-4 text-base leading-8 text-[var(--mn-ink-soft)]">
@@ -1545,7 +1549,11 @@ function RevealProductsSection({
                   <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--mn-ash)]">
                     {localizedMarketplaceName(product.marketplace, locale)}
                   </p>
-                  <h3 className="mt-2 min-h-12 font-serif text-xl font-medium leading-tight text-[var(--mn-ink)]">
+                  <h3
+                    className={`mt-2 min-h-12 font-serif text-xl font-medium text-[var(--mn-ink)] ${
+                      locale === "th" ? "leading-8" : "leading-tight"
+                    }`}
+                  >
                     {product.name}
                   </h3>
                   <div className="mt-4 flex flex-wrap gap-1.5">
@@ -2291,7 +2299,7 @@ export function ProductRecommendationsPanel({
             )}
             <div className="flex flex-1 flex-col p-4">
               <div className="flex items-start justify-between gap-3">
-                <h4 className="text-base font-semibold text-[var(--mn-ink)]">
+                <h4 className="text-base font-semibold leading-7 text-[var(--mn-ink)]">
                   {product.name}
                 </h4>
                 <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">

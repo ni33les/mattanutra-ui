@@ -1047,7 +1047,7 @@ export function AdminProductsView({
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-base font-semibold text-gray-900">
+                    <h3 className="text-base font-semibold leading-6 text-gray-900">
                       {row.displayTitle}
                     </h3>
                     {row.title !== row.displayTitle ? (
@@ -1414,7 +1414,7 @@ function ProductModal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-xl font-semibold text-gray-900">{draft.title}</h2>
+              <h2 className="text-xl font-semibold leading-8 text-gray-900">{draft.title}</h2>
               <span
                 className={classNames(
                   "rounded-full border px-2.5 py-1 text-xs font-medium",
@@ -1655,24 +1655,18 @@ function ProductModal({
               return (
                 <button
                   className={classNames(
-                    "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                    "rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide transition",
+                    productTranslationStatusClass(translation.status),
                     selected
-                      ? "border-[#1FA77A] bg-emerald-50 text-[#126B4F]"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-emerald-200 hover:text-[#126B4F]"
+                      ? "ring-2 ring-[#1FA77A] ring-offset-1"
+                      : "hover:border-emerald-200 hover:text-[#126B4F]"
                   )}
                   key={siteLocale.code}
                   onClick={() => setSelectedTranslationLocale(siteLocale.code)}
+                  title={`${siteLocale.nativeLabel}: ${productTranslationStatusLabel(translation.status)}`}
                   type="button"
                 >
-                  {siteLocale.label}
-                  <span
-                    className={classNames(
-                      "ml-2 rounded-full border px-1.5 py-0.5 text-[10px] uppercase",
-                      productTranslationStatusClass(translation.status)
-                    )}
-                  >
-                    {productTranslationStatusLabel(translation.status)}
-                  </span>
+                  {siteLocale.label} {productTranslationStatusLabel(translation.status)}
                 </button>
               );
             })}
