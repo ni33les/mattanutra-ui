@@ -873,7 +873,7 @@ export async function applyFormulationSafety(
           ingredient,
           null,
           "unknown_supplement",
-        "This supplement is not yet in the MattaNutra supplement catalogue.",
+          "This supplement is not yet in the MattaNutra supplement catalogue.",
           "medium",
           dose,
           null
