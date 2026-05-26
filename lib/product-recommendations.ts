@@ -1000,6 +1000,7 @@ const V2_MIN_MARGINAL_PRODUCT_CONTRIBUTION_PERCENT =
   V2_MATERIAL_COVERAGE_DELTA_PERCENT;
 const V2_TINY_PARTIAL_PRODUCT_COVERAGE_CEILING = 0.2;
 const V2_BALANCED_MATERIAL_COVERAGE_DELTA_PERCENT = 15;
+const V2_MULTISERVING_REQUIRED_COVERAGE_GAIN_PERCENT = 15;
 const V2_COMPACT_MIN_COVERAGE_RATIO = 0.65;
 const V2_COMPACT_CRITICAL_WEIGHT_FLOOR = 9;
 const V2_COMPACT_CRITICAL_NEED_LOSS_TOLERANCE = 0.35;
@@ -1627,6 +1628,13 @@ function compareProductEntries(
 ) {
   const coverageDelta = second.coverage.percent - first.coverage.percent;
 
+  if (
+    first.servingMultiplier !== second.servingMultiplier &&
+    Math.abs(coverageDelta) < V2_MULTISERVING_REQUIRED_COVERAGE_GAIN_PERCENT
+  ) {
+    return first.servingMultiplier - second.servingMultiplier;
+  }
+
   if (Math.abs(coverageDelta) > V2_SCORE_EPSILON) {
     return coverageDelta;
   }
@@ -2093,6 +2101,13 @@ function compareBalancedStackScores(first: V2StackScore, second: V2StackScore) {
     return matchedCountDelta;
   }
 
+  // Inside the same balanced coverage band, prefer fewer extra servings.
+  const extraServingDelta = extraServingCount(first) - extraServingCount(second);
+
+  if (extraServingDelta !== 0) {
+    return extraServingDelta;
+  }
+
   const scoreDelta = second.score - first.score;
 
   if (Math.abs(scoreDelta) > V2_DIVERSITY_SCORE_EPSILON) {
@@ -2118,6 +2133,10 @@ function compareCoverageStackScores(
   }
 
   return compareStackScores(first, second);
+}
+
+function extraServingCount(score: V2StackScore) {
+  return Math.max(0, score.servingCount - score.entries.length);
 }
 
 function preservesCriticalNeedsForCompactMode(

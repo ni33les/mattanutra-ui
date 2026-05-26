@@ -673,6 +673,56 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(result.recommendations[0]?.stackContributionPercent, 100);
   });
 
+  it("prefers one serving over three when coverage is materially similar", () => {
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        product({
+          amount: 0.92,
+          id: "simple-magnesium",
+          name: "Magnesium"
+        }),
+        product({
+          amount: 0.33,
+          id: "three-serving-magnesium",
+          maxAmount: 5000,
+          maxUnit: "mg/day",
+          name: "Magnesium",
+          servingLabel: "1 capsule"
+        })
+      ],
+      needs: [need("magnesium", "Magnesium", 5)]
+    });
+
+    assert.equal(result.recommendations[0]?.product.id, "simple-magnesium");
+    assert.equal(result.recommendations[0]?.servingMultiplier, 1);
+    assert.equal(result.recommendations[0]?.productCoveragePercent, 92);
+  });
+
+  it("allows three servings when they unlock a material coverage gain", () => {
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        product({
+          amount: 0.8,
+          id: "simple-magnesium",
+          name: "Magnesium"
+        }),
+        product({
+          amount: 0.32,
+          id: "three-serving-magnesium",
+          maxAmount: 5000,
+          maxUnit: "mg/day",
+          name: "Magnesium",
+          servingLabel: "1 capsule"
+        })
+      ],
+      needs: [need("magnesium", "Magnesium", 5)]
+    });
+
+    assert.equal(result.recommendations[0]?.product.id, "three-serving-magnesium");
+    assert.equal(result.recommendations[0]?.servingMultiplier, 3);
+    assert.equal(result.recommendations[0]?.productCoveragePercent, 96);
+  });
+
   it("supports compact and balanced stack preferences", () => {
     const multi: ProductCandidate = {
       ...product({ amount: 0.98, id: "near-complete-multi", name: "Vitamin D" }),
