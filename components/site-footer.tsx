@@ -162,7 +162,7 @@ export function SiteFooter({
     <footer className="mn-site-footer">
       <div className="mn-site-footer-grid">
         <div className="mn-site-footer-brand">
-          <HealthspanLogo locale={locale} />
+          <HealthspanLogo locale={locale} variant="v14" />
           <p>{copy.body}</p>
           <div className="mn-site-footer-social">
             {socialLinks.map((item) => (

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Menu } from "lucide-react";
 import { HealthspanLogo } from "@/components/healthspan-logo";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import type { Locale, LocaleCode } from "@/lib/i18n";
@@ -24,6 +25,7 @@ const titleBarCopy = {
       ["#pricing", "Pricing"],
       ["#journal", "Journal"]
     ],
+    menu: "Open menu",
     navAria: "Primary"
   },
   th: {
@@ -38,6 +40,7 @@ const titleBarCopy = {
       ["#pricing", "ราคา"],
       ["#journal", "บทความ"]
     ],
+    menu: "เปิดเมนู",
     navAria: "เมนูหลัก"
   }
 } as const;
@@ -90,7 +93,7 @@ export function TitleBar({
           aria-label={copy.homeAria(title)}
           className="flex min-w-0 items-center text-foreground transition hover:text-[var(--mn-teal-deep)]"
         >
-          <HealthspanLogo className="shrink-0" locale={currentLocale} />
+          <HealthspanLogo className="shrink-0" locale={currentLocale} variant="v14" />
         </Link>
         <nav
           aria-label={copy.navAria}
@@ -117,6 +120,34 @@ export function TitleBar({
               {copy.assessment}
             </Link>
           ) : null}
+          <details className="mn-titlebar-mobile-menu">
+            <summary aria-label={copy.menu}>
+              <Menu aria-hidden className="size-5" />
+            </summary>
+            <div className="mn-titlebar-mobile-panel">
+              {copy.links.map(([href, label]) => (
+                <Link
+                  href={homeAnchor(currentLocale, href)}
+                  key={href}
+                  className="mn-titlebar-mobile-link"
+                >
+                  {label}
+                </Link>
+              ))}
+              <div className="mn-titlebar-mobile-actions">
+                {showAssessmentCta ? (
+                  <Link className="mn-titlebar-mobile-cta" href={assessmentPath}>
+                    {copy.assessment}
+                  </Link>
+                ) : null}
+                <LanguageSwitcher
+                  currentLocale={currentLocale}
+                  currentPath={currentPath}
+                  localizedPaths={localizedPaths}
+                />
+              </div>
+            </div>
+          </details>
         </div>
       </div>
     </header>

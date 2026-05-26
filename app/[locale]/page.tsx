@@ -12,6 +12,7 @@ import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import { localizedMetadata } from "@/lib/seo";
+import { siteBaseUrl } from "@/lib/site-url";
 
 type HomeProps = Readonly<{
   params: Promise<{
@@ -70,6 +71,32 @@ export default async function Home({ params }: HomeProps) {
     getPublishedBlogPosts(locale, 3),
     getRandomPublishedTestimonials(locale, 4)
   ]);
+  const baseUrl = siteBaseUrl();
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@id": `${baseUrl}/#organization`,
+        "@type": "Organization",
+        name: "MattaNutra",
+        url: baseUrl
+      },
+      {
+        "@id": `${baseUrl}/${locale}#website`,
+        "@type": "WebSite",
+        inLanguage: locale,
+        name: "MattaNutra",
+        potentialAction: {
+          "@type": "ReadAction",
+          target: `${baseUrl}${assessmentPath}`
+        },
+        publisher: {
+          "@id": `${baseUrl}/#organization`
+        },
+        url: `${baseUrl}/${locale}`
+      }
+    ]
+  };
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
@@ -77,6 +104,12 @@ export default async function Home({ params }: HomeProps) {
         currentLocale={locale}
         currentPath={`/${locale}`}
         title={dictionary.hero.eyebrow}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c")
+        }}
       />
       <LandingPage
         assessmentPath={assessmentPath}

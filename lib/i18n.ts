@@ -70,9 +70,9 @@ export const localeLabels = Object.fromEntries(
 
 const en = {
   meta: {
-    title: "MattaNutra",
+    title: "MattaNutra | Stop guessing. Start knowing.",
     description:
-      "Personalized supplement recommendations tailored to your body, lifestyle, and goals."
+      "AI-powered supplement and wellness plans for your body, goals, lifestyle, and changing routine."
   },
   hero: {
     eyebrow: "MattaNutra",
@@ -171,9 +171,9 @@ const dictionaries = {
   en,
   th: {
     meta: {
-      title: "MattaNutra",
+      title: "MattaNutra | เลิกเดา เริ่มรู้",
       description:
-        "คำแนะนำอาหารเสริมเฉพาะบุคคลที่ปรับให้เข้ากับร่างกาย ไลฟ์สไตล์ และเป้าหมายของคุณ"
+        "แผนอาหารเสริมและสุขภาพด้วย AI ที่ออกแบบให้เข้ากับร่างกาย เป้าหมาย ไลฟ์สไตล์ และชีวิตที่เปลี่ยนไปของคุณ"
     },
     hero: {
       eyebrow: "MattaNutra",

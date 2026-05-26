@@ -1,23 +1,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
-  Activity,
   ArrowRight,
   BadgeCheck,
   CheckCircle2,
-  CircleDollarSign,
-  HeartPulse,
+  Clock,
+  Heart,
   Leaf,
   Lock,
-  Pill,
   RefreshCw,
+  Search,
   ShieldCheck,
-  ShoppingBag,
-  Sparkles,
-  Target,
-  Utensils,
-  XCircle
+  UserRound
 } from "lucide-react";
+import { LandingReveal } from "@/components/landing-reveal";
 import type { BlogPostSummary, BlogTestimonial } from "@/lib/blog";
 import type { Locale } from "@/lib/i18n";
 import { paymentCheckoutPath } from "@/lib/payment-paths";
@@ -30,21 +26,27 @@ type LandingPageProps = Readonly<{
 }>;
 
 const assets = {
-  brandMark: "/v11/brand-mark.png",
+  heroFigure: "/v14/hero-figure.png",
   origin: [
-    "/v11/origin-stage-01.png",
-    "/v11/origin-stage-02.png",
-    "/v11/origin-stage-03.png",
-    "/v11/origin-stage-04.png",
-    "/v11/origin-stage-05.png"
+    "/v14/origin-stage-1.png",
+    "/v14/origin-stage-2.png",
+    "/v14/origin-stage-3.png",
+    "/v14/origin-stage-4.png",
+    "/v14/origin-stage-5.png"
   ],
-  problem: "/v11/supplement-aisle.jpg"
+  problem: "/v14/problem-shopper.jpg",
+  testimonials: [
+    "/v14/testimonial-daniel.jpg",
+    "/v14/testimonial-meilin.jpg",
+    "/v14/testimonial-wanida.jpg",
+    "/v14/testimonial-malee.jpg"
+  ]
 } as const;
 
 const content = {
   en: {
     hero: {
-      eyebrow: "Ancient Wisdom · Modern Science",
+      eyebrow: "Ancient wisdom · Modern science",
       title: "Stop guessing.",
       accent: "Start knowing.",
       intro:
@@ -52,73 +54,71 @@ const content = {
       paliTitle: "Mattaññutā",
       pali:
         "Pāli for the wisdom of knowing the right amount — that wellbeing comes not from more, but from exactly enough.",
-      primary: "Start the 2-minute quiz",
+      primary: "Start designing your Right Amount",
       secondary: "How it works",
-      checks: ["No credit card required", "120+ ingredients evaluated", "Safety checks included"],
-      ingredientPills: ["Magnesium", "Vitamin D3", "Omega-3", "Ashwagandha", "Zinc", "Creatine"]
+      microcopy:
+        "Start with a free Health Score that shows where you stand. Your personalised Right Amount Formula is ready when you are.",
+      checks: [
+        "No credit card required",
+        "120+ ingredients evaluated",
+        "Safety checks included"
+      ],
+      ingredientPills: ["Magnesium", "Vitamin D3", "Omega-3", "Ashwagandha", "Zinc"]
     },
     problem: {
-      eyebrow: "The problem we solve",
-      title: "From supplement confusion to a clear daily plan.",
-      intro:
-        "Thousands of products, conflicting claims, and almost no personalisation. MattaNutra gives you a place to start — and a reason to trust it.",
-      question: "Sound familiar?",
-      issueTitle: "Too many choices. Not enough guidance.",
-      issues: [
-        "Thousands of products with overlapping claims",
-        "Money wasted on supplements that may not fit your needs",
-        "Generic plans that ignore medications, sleep, diet, and goals"
-      ],
-      answer: "MattaNutra gives you a starting point.",
-      solutions: [
-        "A focused questionnaire that takes a few minutes",
-        "AI-guided supplement priorities and safety flags",
-        "Product guidance designed for Southeast Asian shoppers"
-      ]
+      eyebrow: "The problem",
+      title: "Too many bottles.",
+      accent: "Too little certainty.",
+      body:
+        "Walk into any pharmacy and the wall of supplements is overwhelming. Hundreds of options, conflicting advice, and no clear answer to the only question that matters: what does my body actually need?",
+      body2:
+        "Most people end up guessing — buying too much of what they don't need, missing what they do, and quietly wondering if any of it is working.",
+      imageAlt: "Shopper overwhelmed by supplement choices"
     },
     promises: {
       eyebrow: "What you can expect",
       title: "Four promises.",
       accent: "One simple plan.",
-      intro:
-        "The four things every MattaNutra plan is designed to give you — no matter your age, goals, or starting point.",
+      intro: "What every MattaNutra plan is designed to deliver.",
       cards: [
-        ["Clarity", "from confusion", "Replace the supplement aisle overwhelm with a clear, ranked list of what your body actually needs first."],
-        ["Guidance", "you can trust", "Recommendations grounded in published research and reviewed for safety against your medications and conditions."],
-        ["Personalized", "just for you", "Built around your body size, sun exposure, diet, sleep, training load, budget, and what you actually care about."],
-        ["Confidence", "in every choice", "Shop on Lazada — or any local pharmacy — knowing exactly what to look for, and what to skip."]
+        ["Clarity", "from confusion"],
+        ["Guidance", "you can trust"],
+        ["Personalised", "just for you"],
+        ["Confidence", "in every choice"]
       ]
-    },
-    tell: {
-      eyebrow: "A 2-minute conversation",
-      title: "Tell MattaNutra about your...",
-      intro:
-        "A short, focused questionnaire — no jargon, no fluff. Just the inputs we genuinely need to build a plan that actually fits.",
-      privacy: "Your answers stay private. Your plan stays yours.",
-      down: "and we'll do the rest",
-      inputs: [
-        "Goals & health priorities",
-        "Lifestyle & activity",
-        "Current medications",
-        "Budget & constraints",
-        "What you care about"
-      ],
-      output: "Your personalised plan."
     },
     how: {
       eyebrow: "How it works",
-      title: "A few minutes today.",
-      accent: "A clearer plan tomorrow.",
-      intro: "From questionnaire to recommendations, in four steps you can trust.",
+      title: "The right amount of questions.",
+      accent: "Nothing more, nothing missed.",
+      intro:
+        "From a short, focused questionnaire to recommendations you can trust — in four steps.",
       steps: [
-        ["Answer", "~ 2 min", "Complete a focused questionnaire covering goals, habits, diet, sleep, medications and budget."],
-        ["Analyze", "120+ ingredients", "Your answers are mapped to supplement priorities, dosage ranges and safety considerations."],
-        ["Match", "SE Asia ready", "Receive product guidance so you're not guessing in-store or on Lazada."],
-        ["Refine", "60-day prompts", "Optional check-ins update your plan as goals, symptoms and lifestyle change over time."]
+        [
+          "Answer",
+          "Short but detailed",
+          "A few focused questions about your goals, health priorities, lifestyle, medications, budget, and what you genuinely care about. No jargon, no fluff."
+        ],
+        [
+          "Analyse",
+          "120+ ingredients",
+          "Your answers are mapped to supplement priorities, dosage ranges and safety considerations."
+        ],
+        [
+          "Match",
+          "SE Asia ready",
+          "Receive product guidance so you're not guessing in-store or on Lazada."
+        ],
+        [
+          "Refine",
+          "60-day prompts",
+          "Optional check-ins update your plan as goals, symptoms and lifestyle change over time."
+        ]
       ]
     },
     protocol: {
       active: "Living Protocol active",
+      channel: "Line / WhatsApp",
       eyebrow: "Living Protocol · 90-day support",
       title: "Life changes constantly.",
       accent: "Your protocol can keep up.",
@@ -132,84 +132,185 @@ const content = {
         "Less second-guessing when life shifts"
       ],
       chat: [
-        ["MattaNutra", "Anything different this week — sleep, stress, travel or routine?"],
-        ["You", "I’m travelling to Tokyo tomorrow. Probably going to sleep badly this week."],
-        ["MattaNutra", "Got it — six days in Tokyo with some sleep disruption. I’ve made three small adjustments and kept everything else steady."]
-      ],
-      updates: [
-        "Take magnesium a little earlier — 7:30pm local instead of 9:30pm",
-        "Add electrolytes on your flight and each morning while you’re away",
-        "Everything else stays exactly the same"
+        "Anything different this week — sleep, stress, travel or routine?",
+        "I'm travelling to Tokyo tomorrow. Probably going to sleep badly this week.",
+        "Got it — six days in Tokyo with some sleep disruption. I've made three small adjustments and kept everything else steady. Here's your plan for the trip."
       ],
       updateLabel: "Updated protocol",
       tripTitle: "Your Tokyo trip — 3 small changes",
+      updates: [
+        "Take magnesium a little earlier — 7:30pm local instead of 9:30pm",
+        "Add electrolytes on your flight and each morning while you're away",
+        "Everything else stays exactly the same"
+      ],
+      basedOn: "Based on: 6-day trip · sleep disruption likely · meetings-heavy · more walking",
+      reasoningLabel: "See the reasoning",
       reasoning: [
         "Magnesium earlier — helps move your wind-down forward as you adjust to the timezone.",
-        "Electrolytes added — supports hydration through the flight and your higher walking load.",
-        "Adaptogen held steady — sleep has been unsettled, so the dose stays stable."
-      ]
+        "Electrolytes added — supports hydration through the flight and your higher walking load in the city.",
+        "Adaptogen held steady — your stress is rising, but your sleep has been unsettled lately, so we're holding the dose rather than stacking changes."
+      ],
+      foodNudge:
+        "One more thing — your last check showed your magnesium sitting a little low. I've got it in your plan, but you can top it up naturally too:",
+      foodTags: ["pumpkin seeds", "spinach", "black beans"],
+      vitaminQuestion: "Oh nice, didn't know that. What about my vitamin C — should I add a supplement?",
+      vitaminAnswer:
+        "Honestly? You probably don't need to. With the fruit and veg already in your week, you're comfortably covered. I'd save that one — food's doing the job."
     },
     protocolBand: {
       title: "Your Right Amount Formula is the foundation.",
       accent: "Your Living Protocol keeps it aligned with real life.",
       body:
-        "Travel, stress, poor sleep and changing routines all shift what your body needs. Your foundation doesn’t change — but the small adjustments around it do."
+        "Travel, stress, poor sleep and changing routines all shift what your body needs. Your foundation doesn't change — but the small adjustments around it do."
     },
-    protocolHow: {
-      eyebrow: "How it works",
+    practice: {
+      eyebrow: "Living Protocol in practice",
       title: "Three steps.",
       accent: "No apps to learn.",
       intro:
         "Living Protocol fits into the messaging you already use. You tell it what changed; it does the rest.",
       steps: [
-        ["Tell MattaNutra what changed", "A quick message through Line or WhatsApp is all it takes — no forms, no tracking, no apps to learn.", ["Sleeping badly this week.", "Travelling for work tomorrow.", "Started training harder lately."]],
-        ["Your protocol adapts around you", "Working from your current stack, goals and safety flags, MattaNutra turns that update into a few precise adjustments — timing, dosage, or a temporary addition — and points you to everyday foods that support what your body needs.", ["Move magnesium slightly earlier this week.", "Pumpkin seeds are a great natural source of magnesium.", "Hold your adaptogen steady until sleep settles."]],
-        ["Stay consistent without overthinking it", "You don’t have to research, second-guess, or restart from scratch every time life gets busy. You just get a few simple things to do — and the confidence they’re right for you.", ["No need to rethink your routine every time life shifts.", "Small adjustments keep your plan realistic.", "Your right amount stays right."]]
+        [
+          "Tell MattaNutra what changed",
+          "A quick message through Line or WhatsApp is all it takes — no forms, no tracking, no apps to learn.",
+          ["Sleeping badly this week.", "Travelling for work tomorrow.", "Started training harder lately."]
+        ],
+        [
+          "Your protocol adapts around you",
+          "Working from your current stack, goals and safety flags, MattaNutra turns that update into a few precise adjustments — timing, dosage, or a temporary addition — and points you to everyday foods that support what your body needs.",
+          [
+            "Move magnesium slightly earlier this week.",
+            "Pumpkin seeds are a great natural source of magnesium.",
+            "Hold your adaptogen steady until sleep settles."
+          ]
+        ],
+        [
+          "Stay consistent without overthinking it",
+          "You don't have to research, second-guess, or restart from scratch every time life gets busy. You just get a few simple things to do — and the confidence they're right for you.",
+          [
+            "No need to rethink your routine every time life shifts.",
+            "Small adjustments keep your plan realistic.",
+            "Your right amount stays right."
+          ]
+        ]
       ]
     },
     food: {
       eyebrow: "Food & supplements, together",
-      title: "The best source is sometimes on your plate.",
+      title: "The best source is sometimes",
+      accent: "on your plate.",
       intro:
-        "Supplements fill the gaps — but food fills them first. When Living Protocol spots something your body needs, it doesn’t just reach for a capsule. It tells you which everyday foods are naturally rich in it, so you can choose: top up at dinner, or top up from the bottle.",
+        "Supplements fill the gaps — but food fills them first. When Living Protocol spots something your body needs, it doesn't just reach for a capsule. It tells you which everyday foods are naturally rich in it, so you can choose: top up at dinner, or top up from the bottle. Either way, you're finally knowing, not guessing.",
       cards: [
         ["Low on magnesium?", "Pumpkin seeds, spinach and black beans are some of the richest natural sources.", ["pumpkin seeds", "spinach", "black beans"]],
         ["Need more chromium?", "It turns up in unexpected places — grape juice, broccoli and whole grains.", ["grape juice", "broccoli", "whole grains"]],
-        ["Already covered?", "If your meals are doing the job, Living Protocol will tell you to skip the supplement — and save your money.", ["food’s got it"]]
+        ["Already covered?", "If your meals are doing the job, Living Protocol will tell you to skip the supplement — and save your money.", ["food's got it"]]
       ],
       note:
         "No food diary. No calorie counting. Just a quick answer when you want one, and a nudge toward the right plate when it helps."
     },
     difference: {
-      eyebrow: "Why it’s different",
+      eyebrow: "Why it's different",
       title: "More than an answer.",
       accent: "A protocol that knows you.",
-      body:
-        "Anyone can look up whether travel affects magnesium. The hard part is knowing how it affects your plan — your stack, your medications, the weeks you’ve just had — and what to actually do about it. That’s the part Living Protocol handles for you.",
-      bullets: [
-        "It already knows everything you take, so there’s nothing to re-explain each time something changes.",
-        "Every adjustment it suggests is checked against your medications and lab flags.",
-        "Over 90 days it comes to recognise your patterns, so its advice reflects the trend behind this week.",
-        "You never have to know the right question to ask — you simply say what’s going on."
-      ],
-      closing:
-        "You don’t need to become your own pharmacist. You just tell MattaNutra what’s changed, and it keeps your protocol right."
+      paragraphs: [
+        "Anyone can look up whether travel affects magnesium. The hard part is knowing how it affects your plan — your stack, your medications, the weeks you've just had — and what to actually do about it. That's the part Living Protocol handles for you.",
+        "It already knows everything you take, so there's nothing to re-explain each time something changes. Every adjustment it suggests is checked against your medications and lab flags — the kind of safety net that only works when the guidance is built around you. Over 90 days it comes to recognise your patterns, so its advice reflects not just this week but the trend behind it.",
+        "You don't need to become your own pharmacist. You just tell MattaNutra what's changed, and it keeps your protocol right."
+      ]
     },
-    planChoice: {
-      eyebrow: "Choose your level of guidance",
-      title: "Start with the formula.",
-      accent: "Add the living layer.",
-      bestPrefix: "Best for: ",
+    bridge: {
+      title: "Ready to design your Right Amount?",
+      body:
+        "Start with a few focused questions and your free Health Score. Your personalised plan — and the option to add Living Protocol — is one step away.",
+      cta: "Start designing your Right Amount",
+      note: "See full plans and pricing below."
+    },
+    results: {
+      eyebrow: "Real people. Real stories.",
+      title: "Real people, real starting points.",
       intro:
-        "Begin with a clear, personalised supplement formula — or choose ongoing support that helps your routine adapt through real-life changes.",
+        "Different lifestyles. Same goal: better health, more clarity, and a routine that feels possible.",
+      cta: "Start designing your Right Amount",
+      join:
+        "Join thousands of people who are making smarter, more confident choices for their health.",
+      fallback: [
+        {
+          id: "daniel",
+          image: assets.testimonials[0],
+          name: "Daniel L.",
+          place: "40, Bangkok",
+          role: "Project Manager",
+          quote:
+            "I turned 40 and realised I kept saying I wanted to make changes, but I didn't know where to start. I had a drawer full of random vitamins and no real plan. MattaNutra gave me a clear first step, without making the whole process feel overwhelming."
+        },
+        {
+          id: "meilin",
+          image: assets.testimonials[1],
+          name: "Mei Lin T.",
+          place: "45, Singapore",
+          role: "Operations Lead",
+          quote:
+            "Between work, travel, and caring for my family, my health routine became whatever I could remember to do that day. MattaNutra helped me turn a messy supplement shelf into a simple plan that fits real life in Singapore."
+        },
+        {
+          id: "wanida",
+          image: assets.testimonials[2],
+          name: "Wanida P. (วนิดา)",
+          place: "43, Khon Kaen",
+          role: "Shop Owner",
+          quote:
+            "My doctor told me my blood pressure was creeping up and I needed to make changes. I spent hours researching supplements online and ended up more confused than when I started. MattaNutra cut through all the noise and built me something that actually fits my life."
+        },
+        {
+          id: "malee",
+          image: assets.testimonials[3],
+          name: "Malee S. (มาลี)",
+          place: "41, Phuket",
+          role: "Nurse Aide",
+          quote:
+            "I work in a clinic, so everyone assumes I know exactly what supplements to take. The honest truth was the more I read, the less sure I felt. MattaNutra finally gave me a clear, sensible plan I could trust — for myself this time, not just my patients."
+        }
+      ]
+    },
+    origin: {
+      eyebrow: "Our origin",
+      title: "Designed in Chiang Mai,",
+      accent: "where the right amount is a way of life.",
+      body:
+        "MattaNutra began in northern Thailand, where traditions of moderation — eating just enough, resting at the right hour, working with the body's own rhythms — have been quietly refined over centuries.",
+      body2:
+        "We built MattaNutra to translate that quiet wisdom into something modern, measurable, and personal: a plan that learns your body, adjusts when life shifts, and never asks you to become someone you're not.",
+      buildAlt: "The MattaNutra logo, built in five stages from outline to finished mark",
+      founders: "Founded by physicians, scientists, and innovative AI thinkers.",
+      founderParagraphs: [
+        "What goes into your body should be designed by people who understand what's actually in it.",
+        "MattaNutra was founded by an international group with an unusually broad foundation across medicine, science, technology, economics and the rewarding work of building things that last.",
+        "Between us, more than a hundred years of professional practice — in medicine, in science, in technology, and in building things that last."
+      ],
+      signoff: "From Chiang Mai, with care.",
+      tagline: "Ancient wisdom · Modern science"
+    },
+    pricing: {
+      eyebrow: "Simple pricing",
+      title: "Start free.",
+      accent: "Upgrade when ready.",
+      intro:
+        "Take the free questionnaire to get a starting plan. Upgrade only when you want deeper precision or ongoing AI support.",
+      offer: "Limited time offer",
       plans: [
         {
-          badge: "One-time formula",
-          name: "The Right Amount Formula",
-          desc: "Stop guessing in the supplement aisle. A personalised formula with precise dosing, timing and product guidance, built around your body.",
+          badge: "One-time plan",
+          name: "Right Amount Formula",
+          desc: "Your personalised supplement formula with precise dosing, timing, and product guidance.",
+          originalPrice: "THB 990",
+          saving: "Save 30%",
+          currency: "THB",
           price: "690",
+          termLabel: "One-time",
           term: "One-time payment · Lifetime access",
           cta: "Get the Right Amount Formula",
+          plan: "precision" as const,
           best: "People who want a clear, confident starting point — the right amount, made for them.",
           features: [
             "Personalised supplement formula",
@@ -218,16 +319,25 @@ const content = {
             "Medication and lab safety flags",
             "Recommended products and alternatives",
             "60-day reassessment prompt"
-          ]
+          ],
+          guaranteeTitle: "Clarity Guarantee.",
+          guarantee:
+            "If your plan doesn't feel clear and useful, we'll make it right or refund you within 7 days."
         },
         {
           badge: "Premium · 90-day support",
           popular: "Most popular",
           name: "Living Protocol",
-          desc: "Keep your right amount right as life changes. Everything in the Right Amount Formula, plus ongoing adjustments whenever sleep, stress, travel, training or diet shifts.",
+          desc:
+            "Keep your right amount right as life changes. Everything in the Right Amount Formula, plus ongoing adjustments whenever your sleep, stress, travel, training or diet shifts.",
+          originalPrice: "THB 1,890",
+          saving: "Save 16%",
+          currency: "THB",
           price: "1,590",
+          termLabel: "For 90 days",
           term: "One payment · 90 days of support · Renew anytime",
           cta: "Start Living Protocol",
+          plan: "pro" as const,
           best: "People who want their plan to keep up with the reality of everyday life.",
           features: [
             "Includes your full Right Amount Formula",
@@ -237,140 +347,52 @@ const content = {
             "Remembers your patterns over 90 days",
             "Just message when something changes — no apps, no tracking",
             "Stay consistent through travel, stress and disrupted sleep"
-          ]
-        }
-      ],
-      guarantee:
-        "7-Day Satisfaction Guarantee. Give Living Protocol a real try. If anything’s not right, tell us — we’ll fix it, or refund you in full within 7 days."
-    },
-    results: {
-      eyebrow: "REAL PEOPLE. REAL STORIES.",
-      title: "Real people, real starting points.",
-      intro:
-        "Different lifestyles. Same goal: better health, more clarity, and a routine that feels possible.",
-      cta: "Start Your Personalized Wellness Quiz"
-    },
-    origin: {
-      eyebrow: "Our origin",
-      title: "Designed in Chiang Mai, where the right amount is a way of life.",
-      body:
-        "MattaNutra began in northern Thailand, where traditions of moderation — eating just enough, resting at the right hour, working with the body’s own rhythms — have been quietly refined over centuries.",
-      body2:
-        "We built MattaNutra to translate that quiet wisdom into something modern, measurable, and personal: a plan that learns your body, adjusts when life shifts, and never asks you to become someone you’re not.",
-      founders:
-        "Founded by physicians, scientists, and innovative AI thinkers.",
-      founderBody:
-        "What goes into your body should be designed by people who understand what’s actually in it. MattaNutra was founded by an international group with an unusually broad foundation across medicine, science, technology, economics and the rewarding work of building things that last.",
-      signoff: "From Chiang Mai, with care."
-    },
-    pricing: {
-      eyebrow: "Simple pricing",
-      title: "Start free.",
-      accent: "Upgrade when ready.",
-      intro:
-        "Take the free questionnaire to get a starting plan. Upgrade only when you want deeper precision or ongoing AI support.",
-      offer: "Limited Time Offer",
-      plans: [
-        {
-          badge: "One-time plan",
-          name: "Right Amount Formula",
-          desc: "Your personalised supplement formula with precise dosing, timing, and product guidance.",
-          originalPrice: "THB 990",
-          saving: "SAVE 30%",
-          currency: "THB",
-          price: "690",
-          termLabel: "One-time",
-          term: "One-time payment · Lifetime access",
-          cta: "Get the Right Amount Formula",
-          plan: "precision",
-          features: [
-            "Personalised supplement formula",
-            "Body-size adjusted dose ranges",
-            "Timing and usage instructions",
-            "Medication and lab safety flags",
-            "Recommended products and alternatives",
-            "60-day reassessment prompt"
           ],
-          guaranteeTitle: "Clarity Guarantee",
+          guaranteeTitle: "7-Day Satisfaction Guarantee.",
           guarantee:
-            "If your plan doesn’t feel clear and useful, we’ll make it right or refund you within 7 days."
-        },
-        {
-          badge: "90-Day AI support",
-          popular: "Most Popular",
-          name: "Living Protocol",
-          desc: "Keep your right amount right as life changes — with food guidance and ongoing adjustments.",
-          originalPrice: "THB 1,890",
-          saving: "SAVE 16%",
-          currency: "THB",
-          price: "1,590",
-          termLabel: "For 90 days",
-          term: "One payment · 90 days of support · Renew anytime",
-          cta: "Start Living Protocol",
-          plan: "pro",
-          highlight: "Includes Right Amount Formula Plan.",
-          plusLabel: "PLUS",
-          features: [
-            "Which foods give you what you need",
-            "Sleep, energy and habits guidance",
-            "Learn which everyday foods give you what you need",
-            "Supplement timing & adherence support",
-            "Weekly progress summaries",
-            "Priority review as your data changes"
-          ],
-          guaranteeTitle: "7-Day Satisfaction Guarantee",
-          guarantee:
-            "Give Living Protocol a real try. If anything’s not right, tell us — we’ll fix it, or refund you in full within 7 days. No fuss."
+            "Give Living Protocol a real try. If anything's not right, tell us — we'll fix it, or refund you in full within 7 days. No fuss."
         }
       ],
       trust: [
-        ["Secure & Private", "Your data is encrypted and never shared."],
-        ["Science-Backed", "Personalised recommendations based on trusted evidence."],
-        ["Adapt & Improve", "Plans evolve as your body and goals change."],
-        ["AI + Human Oversight", "AI-powered guidance with human-reviewed safeguards."]
+        ["Secure & private", "Your data is encrypted and never shared."],
+        ["Science-backed", "Personalised recommendations based on trusted evidence."],
+        ["Adapt & improve", "Plans evolve as your body and goals change."],
+        ["AI + human oversight", "AI-powered guidance with human-reviewed safeguards."]
       ]
     },
     journal: {
-      eyebrow: "From the journal",
+      eyebrow: "From the Journal",
+      title: "Learn the",
+      accent: "right amount.",
+      browse: "Browse all articles",
       tag: "Journal",
-      title: "Understanding the right amount",
-      intro:
-        "Short, useful articles on personalised nutrition, smarter supplement choices, and healthier routines.",
       readMore: "Read article",
       fallback: [
-        ["After 50", "May 10, 2026", "What changes after 50: energy, sleep and recovery", "The baselines shift after 50 — sleep architecture, recovery windows, and which inputs actually move the needle."],
-        ["Budget", "May 9, 2026", "How to choose supplements without wasting money", "A short framework for separating priorities from nice-to-haves — and avoiding the most common overspends."],
-        ["Method", "May 8, 2026", "Why a HealthScore beats a generic supplement list", "A useful plan starts by understanding what is actually holding you back — not by adding another bottle to the shelf."]
+        ["Foundations", "Why \"more\" is rarely the answer with supplements", "The science of sufficiency — and why your body often needs less than the label suggests."],
+        ["Nutrition", "Eight everyday foods richer in magnesium than you'd think", "Before you reach for a capsule, check your plate — these staples do a lot of quiet work."],
+        ["Living well", "How travel quietly changes what your body needs", "Timezones, sleep and hydration all shift the maths — here's how to adjust without overthinking."]
       ]
     },
     faq: {
-      eyebrow: "Frequently asked",
-      title: "Honest answers",
-      accent: "before you start.",
-      intro:
-        "The questions we hear most often from people considering MattaNutra. If we miss yours, the LINE channel is the fastest way to ask.",
+      eyebrow: "Questions",
+      title: "Good questions,",
+      accent: "honest answers.",
       items: [
-        ["How does the AI actually decide what to recommend?", "Your answers — goals, body size, lifestyle, medications, diet, sleep, sun exposure, budget — are mapped to structured formulation logic covering 120+ ingredients."],
-        ["Is my data private?", "Yes. Your assessment is yours. We don’t sell answers, we don’t share with advertisers, and you can request deletion at any time."],
-        ["I’m on medication — is this safe for me?", "MattaNutra screens for common medication-supplement considerations and flags them in your plan. It is wellness guidance, not medical advice."],
-        ["How is this different from a multivitamin?", "A multivitamin gives everyone the same fixed blend. MattaNutra starts from your inputs and produces a ranked, dosed plan."],
-        ["Where do the recommended products come from?", "We point to products available on platforms Southeast Asian shoppers actually use, selected to match your formulation."],
-        ["Is the free assessment really free?", "Yes. The questionnaire is free and no credit card is required. You can choose whether to upgrade after you complete it."],
-        ["Why the Pāli name?", "Mattaññutā means knowing the right amount. The name is our promise: we’ll help you find your right amount, not sell you more of what you don’t need."]
+        ["Is my data private?", "Yes. Your assessment is yours. We don't sell answers, we don't share with advertisers, and you can request deletion at any time. Living Protocol conversations are stored only to maintain continuity in your plan."],
+        ["I'm on medication — is this safe for me?", "MattaNutra screens for the most common medication-supplement considerations and flags them in your plan. It is wellness guidance, not medical advice. If you are taking prescription medication, pregnant, nursing, or managing a medical condition, please consult a qualified healthcare professional before beginning any supplement programme."],
+        ["Where do the recommended products come from?", "We point to products available on platforms Southeast Asian shoppers actually use, selected to match your formulation. The goal is to help you buy with confidence in the marketplaces you already trust."],
+        ["Is the free assessment really free?", "Yes. The questionnaire and your Health Score are free, and no credit card is required. After you complete it, you'll see where you stand and a starting direction. The full personalised Right Amount Formula and optional Living Protocol support are available if you choose to go further."],
+        ["Why the Pāli name?", "Mattaññutā means knowing the right amount. It comes from a tradition of practical wisdom about moderation and balance — the idea that flourishing comes not from more, but from exactly enough."]
       ]
     },
     final: {
       title: "Stop guessing.",
       accent: "Start knowing.",
       body:
-        "Take the 2-minute Wellness Quiz and receive your personalised starting plan — built around your body, your goals, and your day.",
-      primary: "Start the Wellness Quiz",
+        "Answer a few focused questions, get your free Health Score, and receive your personalised starting plan — built around your body, your goals, and your day.",
+      primary: "Start designing your Right Amount",
       secondary: "How it works",
       quote: "Mattaññutā — knowing the right amount."
-    },
-    disclaimer: {
-      body:
-        "MattaNutra supports your supplement and everyday-nutrition decisions — it doesn’t replace medical care or personalised dietary therapy. Food guidance is general nutrition education, and all adjustments are organised around your goals, routine and current stack, and flagged against your medications and labs for safety."
     }
   },
   th: {
@@ -383,96 +405,87 @@ const content = {
       paliTitle: "Mattaññutā",
       pali:
         "ภาษาบาลีที่หมายถึงปัญญาในการรู้ปริมาณที่พอดี สุขภาพที่ดีไม่ได้มาจากการเพิ่มให้มากขึ้น แต่มาจากความพอดีอย่างแม่นยำ",
-      primary: "เริ่มแบบประเมิน 2 นาที",
+      primary: "ออกแบบปริมาณที่พอดีของคุณ",
       secondary: "ดูวิธีทำงาน",
+      microcopy:
+        "เริ่มจาก Health Score ฟรีเพื่อดูว่าคุณอยู่ตรงไหน สูตรปริมาณที่พอดีเฉพาะบุคคลพร้อมเมื่อคุณต้องการ",
       checks: ["ไม่ต้องใช้บัตรเครดิต", "ประเมินส่วนผสมกว่า 120 รายการ", "มีการตรวจความเหมาะสม"],
-      ingredientPills: ["แมกนีเซียม", "วิตามิน D3", "โอเมก้า-3", "อัชวกันธา", "สังกะสี", "ครีเอทีน"]
+      ingredientPills: ["แมกนีเซียม", "วิตามิน D3", "โอเมก้า-3", "อัชวกันธา", "สังกะสี"]
     },
     problem: {
-      eyebrow: "ปัญหาที่เราแก้",
-      title: "จากความสับสนเรื่องอาหารเสริม สู่แผนประจำวันที่ชัดเจน",
-      intro:
-        "ผลิตภัณฑ์มากมาย คำกล่าวอ้างที่ขัดกัน และแทบไม่มีความเฉพาะบุคคล MattaNutra ให้จุดเริ่มต้นที่ชัดเจนและมีเหตุผลให้เชื่อมั่น",
-      question: "คุ้นไหม?",
-      issueTitle: "ตัวเลือกเยอะเกินไป คำแนะนำกลับไม่พอ",
-      issues: [
-        "ผลิตภัณฑ์จำนวนมากพร้อมคำกล่าวอ้างที่ซ้อนกัน",
-        "เสียเงินกับอาหารเสริมที่อาจไม่เหมาะกับคุณ",
-        "แผนทั่วไปที่ไม่ดูยา การนอน อาหาร และเป้าหมาย"
-      ],
-      answer: "MattaNutra ให้จุดเริ่มต้นที่ชัดเจน",
-      solutions: [
-        "แบบประเมินสั้น ๆ ที่ใช้เวลาไม่กี่นาที",
-        "AI ช่วยจัดลำดับอาหารเสริมและข้อควรระวัง",
-        "คำแนะนำผลิตภัณฑ์สำหรับผู้ซื้อในเอเชียตะวันออกเฉียงใต้"
-      ]
+      eyebrow: "ปัญหา",
+      title: "ขวดเยอะเกินไป.",
+      accent: "ความมั่นใจกลับน้อยเกิน.",
+      body:
+        "เดินเข้าร้านขายยาแล้วเจออาหารเสริมเต็มชั้น ตัวเลือกมากมาย คำแนะนำขัดกัน และไม่มีคำตอบชัดเจนต่อคำถามเดียวที่สำคัญ: ร่างกายของฉันต้องการอะไรจริง ๆ",
+      body2:
+        "หลายคนจึงต้องเดา ซื้อสิ่งที่อาจไม่จำเป็น พลาดสิ่งที่ควรได้ และยังไม่แน่ใจว่าสิ่งที่กินอยู่ช่วยจริงหรือไม่",
+      imageAlt: "ผู้ซื้อที่สับสนกับตัวเลือกอาหารเสริมจำนวนมาก"
     },
     promises: {
       eyebrow: "สิ่งที่คุณคาดหวังได้",
       title: "สี่คำมั่น.",
       accent: "หนึ่งแผนที่เรียบง่าย.",
-      intro:
-        "สี่สิ่งที่ทุกแผนของ MattaNutra ถูกออกแบบมาเพื่อให้คุณ ไม่ว่าคุณจะอายุเท่าไร มีเป้าหมายอะไร หรือเริ่มจากจุดไหน",
+      intro: "สิ่งที่ทุกแผน MattaNutra ถูกออกแบบมาเพื่อส่งมอบ",
       cards: [
-        ["ชัดเจน", "จากความสับสน", "เปลี่ยนความล้นหลามของชั้นวางอาหารเสริมให้เป็นรายการที่จัดลำดับอย่างชัดเจน"],
-        ["มีหลักยึด", "ที่เชื่อถือได้", "คำแนะนำอิงงานวิจัยและตรวจความเหมาะสมกับยาและเงื่อนไขสุขภาพของคุณ"],
-        ["เฉพาะคุณ", "ไม่ใช่สูตรเดียวกันทุกคน", "คำนึงถึงร่างกาย แสงแดด อาหาร การนอน การฝึก งบประมาณ และสิ่งที่คุณให้ความสำคัญ"],
-        ["มั่นใจ", "ในการเลือกทุกครั้ง", "ซื้อบน Lazada หรือร้านขายยาใกล้บ้านโดยรู้ว่าควรมองหาอะไรและควรข้ามอะไร"]
+        ["ชัดเจน", "จากความสับสน"],
+        ["มีหลักยึด", "ที่เชื่อถือได้"],
+        ["เฉพาะคุณ", "ไม่ใช่สูตรเดียวกันทุกคน"],
+        ["มั่นใจ", "ในการเลือกทุกครั้ง"]
       ]
-    },
-    tell: {
-      eyebrow: "บทสนทนา 2 นาที",
-      title: "บอก MattaNutra เกี่ยวกับคุณ...",
-      intro:
-        "แบบประเมินสั้น กระชับ ไม่มีศัพท์ยาก มีเฉพาะข้อมูลที่จำเป็นต่อแผนที่เข้ากับชีวิตจริง",
-      privacy: "คำตอบเป็นของคุณ แผนก็เป็นของคุณ",
-      down: "แล้วเราจะจัดการต่อให้",
-      inputs: ["เป้าหมายและลำดับสุขภาพ", "ไลฟ์สไตล์และกิจกรรม", "ยาที่ใช้อยู่", "งบและข้อจำกัด", "สิ่งที่คุณแคร์"],
-      output: "แผนส่วนตัวของคุณ"
     },
     how: {
       eyebrow: "วิธีทำงาน",
-      title: "ไม่กี่นาทีวันนี้.",
-      accent: "แผนที่ชัดขึ้นพรุ่งนี้.",
-      intro: "จากแบบประเมินสู่คำแนะนำในสี่ขั้นตอนที่เข้าใจได้",
+      title: "คำถามในปริมาณที่พอดี.",
+      accent: "ไม่มากเกิน ไม่ตกหล่น.",
+      intro: "จากแบบประเมินสั้น ๆ สู่คำแนะนำที่เข้าใจได้ในสี่ขั้นตอน",
       steps: [
-        ["ตอบ", "~ 2 นาที", "ตอบคำถามเรื่องเป้าหมาย นิสัย อาหาร การนอน ยา และงบ"],
-        ["วิเคราะห์", "120+ ส่วนผสม", "คำตอบถูกแปลงเป็นลำดับความสำคัญ ช่วงโดส และข้อควรระวัง"],
+        ["ตอบ", "สั้นแต่ครบ", "ตอบคำถามที่จำเป็นเกี่ยวกับเป้าหมาย สุขภาพ ไลฟ์สไตล์ ยาที่ใช้อยู่ งบประมาณ และสิ่งที่คุณให้ความสำคัญ"],
+        ["วิเคราะห์", "120+ ส่วนผสม", "คำตอบถูกจับคู่กับลำดับความสำคัญ ช่วงปริมาณ และข้อควรระวัง"],
         ["จับคู่", "พร้อมใช้ในเอเชีย", "รับคำแนะนำผลิตภัณฑ์เพื่อไม่ต้องเดาในร้านหรือบน Lazada"],
         ["ปรับ", "เตือนทบทวน 60 วัน", "เช็กอินเพิ่มเติมเพื่อปรับแผนเมื่อเป้าหมาย อาการ และไลฟ์สไตล์เปลี่ยน"]
       ]
     },
     protocol: {
       active: "โปรโตคอลชีวิตกำลังทำงาน",
-      eyebrow: "โปรโตคอลชีวิต · การสนับสนุน 90 วัน",
+      channel: "LINE / WhatsApp",
+      eyebrow: "โปรโตคอลชีวิต · สนับสนุน 90 วัน",
       title: "ชีวิตเปลี่ยนตลอด.",
       accent: "โปรโตคอลของคุณก็ตามทันได้.",
       intro:
-        "การนอน ความเครียด การเดินทาง และกิจวัตรที่เปลี่ยน ล้วนเปลี่ยนสิ่งที่ร่างกายต้องการ โปรโตคอลชีวิตช่วยให้แผนอาหารเสริมและอาหารประจำวันสอดคล้องกับชีวิตจริง",
+        "การนอน ความเครียด การเดินทาง และกิจวัตรที่เปลี่ยน ล้วนเปลี่ยนสิ่งที่ร่างกายต้องการ โปรโตคอลชีวิตช่วยให้แผนอาหารเสริมและอาหารประจำวันที่อยู่เบื้องหลังสอดคล้องกับชีวิตจริง",
       primary: "ดูโปรโตคอลชีวิต",
       secondary: "ดูวิธีทำงาน",
       ticks: [
-        "ออกแบบโดยทีมแพทย์และตรวจความเหมาะสมกับยาและข้อมูลแล็บ",
+        "ออกแบบโดยทีมแพทย์ และตรวจเทียบกับยาและข้อมูลแล็บ",
         "ปรับตามการเดินทาง ความเครียด และการนอนไม่ดี",
         "ลดการเดาเมื่อชีวิตเปลี่ยน"
       ],
       chat: [
-        ["MattaNutra", "สัปดาห์นี้มีอะไรเปลี่ยนไหม เช่น การนอน ความเครียด การเดินทาง หรือกิจวัตร?"],
-        ["คุณ", "พรุ่งนี้เดินทางไปโตเกียว น่าจะนอนไม่ค่อยดีทั้งสัปดาห์"],
-        ["MattaNutra", "รับทราบ เดินทาง 6 วันและอาจนอนแย่ลง ฉันปรับเล็กน้อย 3 จุด และคงส่วนที่เหลือไว้เหมือนเดิม"]
+        "สัปดาห์นี้มีอะไรเปลี่ยนไหม เช่น การนอน ความเครียด การเดินทาง หรือกิจวัตร?",
+        "พรุ่งนี้เดินทางไปโตเกียว น่าจะนอนไม่ค่อยดีทั้งสัปดาห์",
+        "รับทราบ เดินทาง 6 วันและอาจนอนแย่ลง ฉันปรับเล็กน้อย 3 จุด และคงส่วนที่เหลือไว้เหมือนเดิม"
       ],
+      updateLabel: "แผนอัปเดต",
+      tripTitle: "ทริปโตเกียวของคุณ — 3 จุดเล็ก ๆ",
       updates: [
         "ทานแมกนีเซียมเร็วขึ้นเล็กน้อย เป็น 19:30 น. ตามเวลาท้องถิ่น",
         "เพิ่มอิเล็กโทรไลต์ระหว่างเที่ยวบินและทุกเช้าระหว่างเดินทาง",
         "อย่างอื่นคงไว้เหมือนเดิม"
       ],
-      updateLabel: "แผนอัปเดต",
-      tripTitle: "ทริปโตเกียวของคุณ — 3 จุดเล็ก ๆ",
+      basedOn: "อิงจาก: เดินทาง 6 วัน · อาจนอนสะดุด · มีประชุมมาก · เดินมากขึ้น",
+      reasoningLabel: "ดูเหตุผล",
       reasoning: [
-        "แมกนีเซียมเร็วขึ้น ช่วยเลื่อนจังหวะผ่อนคลายให้เข้ากับเขตเวลา",
-        "อิเล็กโทรไลต์ช่วยเรื่องน้ำในร่างกายจากเที่ยวบินและการเดินมากขึ้น",
-        "คงกลุ่มสมุนไพรช่วยปรับสมดุลไว้ เพราะการนอนยังไม่นิ่ง จึงไม่ควรเปลี่ยนหลายอย่างพร้อมกัน"
-      ]
+        "แมกนีเซียมเร็วขึ้น — ช่วยเลื่อนจังหวะผ่อนคลายให้เข้ากับเขตเวลา",
+        "เพิ่มอิเล็กโทรไลต์ — ช่วยเรื่องน้ำในร่างกายจากเที่ยวบินและการเดินมากขึ้น",
+        "คงกลุ่มสมุนไพรช่วยปรับสมดุลไว้ — เพราะการนอนยังไม่นิ่ง จึงไม่ควรเปลี่ยนหลายอย่างพร้อมกัน"
+      ],
+      foodNudge:
+        "อีกอย่างหนึ่ง ผลเช็กล่าสุดบอกว่าแมกนีเซียมของคุณค่อนข้างต่ำ แผนมีอยู่แล้ว แต่เติมจากอาหารได้ด้วย:",
+      foodTags: ["เมล็ดฟักทอง", "ผักโขม", "ถั่วดำ"],
+      vitaminQuestion: "ดีเลย ไม่เคยรู้ แล้ววิตามิน C ต้องเพิ่มอาหารเสริมไหม?",
+      vitaminAnswer:
+        "ตามจริงน่าจะไม่จำเป็น ผลไม้และผักในสัปดาห์ของคุณครอบคลุมดีแล้ว ข้ามตัวนี้ได้ อาหารทำหน้าที่อยู่"
     },
     protocolBand: {
       title: "สูตรปริมาณที่พอดีคือฐานของคุณ.",
@@ -480,12 +493,11 @@ const content = {
       body:
         "การเดินทาง ความเครียด การนอนไม่ดี และกิจวัตรที่เปลี่ยน ล้วนเปลี่ยนสิ่งที่ร่างกายต้องการ ฐานหลักไม่ต้องเปลี่ยน แต่รายละเอียดเล็ก ๆ รอบ ๆ ฐานนั้นควรปรับได้"
     },
-    protocolHow: {
-      eyebrow: "วิธีทำงาน",
+    practice: {
+      eyebrow: "โปรโตคอลชีวิตในชีวิตจริง",
       title: "สามขั้นตอน.",
       accent: "ไม่ต้องเรียนรู้แอปใหม่.",
-      intro:
-        "โปรโตคอลชีวิตอยู่ในช่องทางข้อความที่คุณใช้อยู่แล้ว คุณบอกว่าอะไรเปลี่ยน แล้วระบบช่วยจัดการต่อ",
+      intro: "โปรโตคอลชีวิตอยู่ในช่องทางข้อความที่คุณใช้อยู่แล้ว คุณบอกว่าอะไรเปลี่ยน แล้วระบบช่วยจัดการต่อ",
       steps: [
         ["บอก MattaNutra ว่าอะไรเปลี่ยน", "ส่งข้อความสั้น ๆ ผ่าน LINE หรือ WhatsApp ก็พอ ไม่ต้องกรอกฟอร์มหรือเรียนรู้แอปใหม่", ["ช่วงนี้นอนไม่ดี", "พรุ่งนี้เดินทางไปทำงาน", "ช่วงนี้ซ้อมหนักขึ้น"]],
         ["โปรโตคอลปรับรอบตัวคุณ", "จากชุดที่ใช้อยู่ เป้าหมาย และข้อควรระวัง MattaNutra แปลงข้อมูลนั้นเป็นการปรับที่ชัดเจน เช่น เวลา ปริมาณ หรืออาหารที่ช่วยสนับสนุน", ["เลื่อนแมกนีเซียมให้เร็วขึ้นเล็กน้อย", "เมล็ดฟักทองเป็นแหล่งแมกนีเซียมที่ดี", "คงกลุ่มสมุนไพรช่วยปรับสมดุลไว้จนกว่าการนอนจะนิ่ง"]],
@@ -494,9 +506,10 @@ const content = {
     },
     food: {
       eyebrow: "อาหารและอาหารเสริมไปด้วยกัน",
-      title: "บางครั้งแหล่งที่ดีที่สุดอยู่บนจานของคุณ",
+      title: "บางครั้งแหล่งที่ดีที่สุดอยู่",
+      accent: "บนจานของคุณ",
       intro:
-        "อาหารเสริมเติมช่องว่าง แต่อาหารควรมาก่อน เมื่อโปรโตคอลชีวิตเห็นสิ่งที่ร่างกายต้องการ ระบบไม่ได้มองหาแคปซูลทันที แต่บอกอาหารประจำวันที่มีสารนั้นตามธรรมชาติ",
+        "อาหารเสริมเติมช่องว่าง แต่อาหารควรมาก่อน เมื่อโปรโตคอลชีวิตเห็นสิ่งที่ร่างกายต้องการ ระบบไม่ได้มองหาแคปซูลทันที แต่บอกอาหารประจำวันที่มีสารนั้นตามธรรมชาติ เพื่อให้คุณเลือกได้ว่าจะเติมจากมื้ออาหารหรือจากขวด",
       cards: [
         ["แมกนีเซียมต่ำ?", "เมล็ดฟักทอง ผักโขม และถั่วดำเป็นแหล่งธรรมชาติที่เข้มข้น", ["เมล็ดฟักทอง", "ผักโขม", "ถั่วดำ"]],
         ["ต้องการโครเมียมเพิ่ม?", "พบได้ในอาหารที่หลายคนไม่คาดคิด เช่น น้ำองุ่น บรอกโคลี และธัญพืชเต็มเมล็ด", ["น้ำองุ่น", "บรอกโคลี", "ธัญพืชเต็มเมล็ด"]],
@@ -509,67 +522,81 @@ const content = {
       eyebrow: "สิ่งที่ต่าง",
       title: "มากกว่าคำตอบ.",
       accent: "คือโปรโตคอลที่รู้จักคุณ.",
-      body:
+      paragraphs: [
         "ใครก็ค้นได้ว่าการเดินทางส่งผลต่อแมกนีเซียมหรือไม่ แต่ส่วนที่ยากคือมันส่งผลต่อแผนของคุณอย่างไร ทั้งชุดที่คุณใช้อยู่ ยาของคุณ และสัปดาห์ที่ผ่านมา",
-      bullets: [
-        "ระบบรู้สิ่งที่คุณใช้อยู่แล้ว จึงไม่ต้องอธิบายใหม่ทุกครั้ง",
-        "ทุกการปรับตรวจเทียบกับยาและข้อมูลแล็บของคุณ",
-        "ตลอด 90 วัน ระบบเริ่มเห็นรูปแบบของคุณ ไม่ใช่แค่สัปดาห์นี้",
-        "คุณไม่ต้องรู้คำถามที่ถูกต้อง แค่บอกว่าเกิดอะไรขึ้น"
-      ],
-      closing:
+        "ระบบรู้สิ่งที่คุณใช้อยู่แล้ว จึงไม่ต้องอธิบายใหม่ทุกครั้ง ทุกการปรับตรวจเทียบกับยาและข้อมูลแล็บของคุณ และตลอด 90 วัน ระบบเริ่มเห็นรูปแบบของคุณ ไม่ใช่แค่สัปดาห์นี้",
         "คุณไม่ต้องเป็นเภสัชกรของตัวเอง แค่บอก MattaNutra ว่าอะไรเปลี่ยน แล้วระบบช่วยรักษาแผนให้พอดี"
+      ]
     },
-    planChoice: {
-      eyebrow: "เลือกระดับคำแนะนำ",
-      title: "เริ่มจากสูตรหลัก.",
-      accent: "แล้วเพิ่มชั้นที่ปรับตามชีวิต.",
-      bestPrefix: "เหมาะสำหรับ: ",
-      intro:
-        "เริ่มด้วยสูตรอาหารเสริมเฉพาะบุคคลที่ชัดเจน หรือเลือกการสนับสนุนต่อเนื่องที่ช่วยให้กิจวัตรปรับตามชีวิตจริง",
-      plans: [
-        {
-          badge: "สูตรครั้งเดียว",
-          name: "สูตรปริมาณที่พอดี",
-          desc: "เลิกเดาหน้าชั้นวางอาหารเสริม แผนเฉพาะบุคคลพร้อมปริมาณ เวลาใช้ และคำแนะนำผลิตภัณฑ์",
-          price: "690",
-          term: "จ่ายครั้งเดียว · เข้าถึงได้ตลอด",
-          cta: "รับสูตรปริมาณที่พอดี",
-          best: "คนที่ต้องการจุดเริ่มต้นที่ชัดเจนและมั่นใจ",
-          features: ["สูตรเฉพาะบุคคล", "ช่วงโดสตามร่างกาย", "คำแนะนำเวลาใช้", "ข้อควรระวังเรื่องยาและแล็บ", "ผลิตภัณฑ์และทางเลือก", "เตือนทบทวน 60 วัน"]
-        },
-        {
-          badge: "พรีเมียม · สนับสนุน 90 วัน",
-          popular: "นิยมที่สุด",
-          name: "โปรโตคอลชีวิต",
-          desc: "คงความพอดีให้เหมาะกับชีวิตที่เปลี่ยน รวมทุกอย่างในสูตรปริมาณที่พอดี พร้อมการปรับต่อเนื่องเมื่อการนอน ความเครียด การเดินทาง การฝึก หรืออาหารเปลี่ยน",
-          price: "1,590",
-          term: "จ่ายครั้งเดียว · สนับสนุน 90 วัน · ต่ออายุได้",
-          cta: "เริ่มโปรโตคอลชีวิต",
-          best: "คนที่อยากให้แผนตามทันชีวิตประจำวันจริง",
-          features: ["รวมสูตรปริมาณที่พอดี", "เรียนรู้อาหารประจำวันที่ให้สิ่งที่คุณต้องการ", "ปรับเวลาและปริมาณเมื่อชีวิตเปลี่ยน", "ทุกการเปลี่ยนตรวจกับยาและแล็บ", "จำรูปแบบของคุณใน 90 วัน", "แค่ส่งข้อความเมื่อมีอะไรเปลี่ยน", "ทำต่อได้แม้เดินทาง เครียด หรือนอนสะดุด"]
-        }
-      ],
-      guarantee:
-        "รับประกันความพึงพอใจ 7 วัน ลองโปรโตคอลชีวิตอย่างจริงจัง หากมีอะไรไม่ตรง เราจะแก้ไขหรือคืนเงินเต็มจำนวนภายใน 7 วัน"
+    bridge: {
+      title: "พร้อมออกแบบปริมาณที่พอดีของคุณไหม?",
+      body:
+        "เริ่มด้วยคำถามที่จำเป็นไม่กี่ข้อและ Health Score ฟรี แผนเฉพาะบุคคลของคุณ รวมถึงตัวเลือกโปรโตคอลชีวิต อยู่ห่างออกไปอีกขั้นเดียว",
+      cta: "ออกแบบปริมาณที่พอดีของคุณ",
+      note: "ดูแผนและราคาทั้งหมดด้านล่าง"
     },
     results: {
       eyebrow: "คนจริง เรื่องจริง",
       title: "คนต่างชีวิต จุดเริ่มต้นต่างกัน.",
       intro: "เป้าหมายเดียวกันคือสุขภาพที่ดีขึ้น ความชัดเจนมากขึ้น และกิจวัตรที่ทำได้จริง",
-      cta: "เริ่มแบบประเมินสุขภาพ"
+      cta: "ออกแบบปริมาณที่พอดีของคุณ",
+      join: "ร่วมกับผู้คนที่กำลังเลือกดูแลสุขภาพอย่างมั่นใจและฉลาดขึ้น",
+      fallback: [
+        {
+          id: "daniel",
+          image: assets.testimonials[0],
+          name: "Daniel L.",
+          place: "40, Bangkok",
+          role: "Project Manager",
+          quote:
+            "ฉันอายุ 40 แล้วรู้ว่าพูดอยู่นานว่าอยากเปลี่ยนแปลง แต่ไม่รู้จะเริ่มจากตรงไหน MattaNutra ให้ก้าวแรกที่ชัดเจนโดยไม่ทำให้รู้สึกหนักเกินไป"
+        },
+        {
+          id: "meilin",
+          image: assets.testimonials[1],
+          name: "Mei Lin T.",
+          place: "45, Singapore",
+          role: "Operations Lead",
+          quote:
+            "งาน การเดินทาง และครอบครัวทำให้กิจวัตรสุขภาพกลายเป็นสิ่งที่จำได้วันนั้น MattaNutra ช่วยเปลี่ยนชั้นอาหารเสริมที่ยุ่งเหยิงให้เป็นแผนง่าย ๆ ที่เข้ากับชีวิตจริง"
+        },
+        {
+          id: "wanida",
+          image: assets.testimonials[2],
+          name: "Wanida P. (วนิดา)",
+          place: "43, Khon Kaen",
+          role: "Shop Owner",
+          quote:
+            "หมอบอกว่าความดันเริ่มสูงและต้องปรับบางอย่าง ฉันค้นข้อมูลออนไลน์หลายชั่วโมงแล้วยิ่งสับสน MattaNutra ช่วยตัดเสียงรบกวนและสร้างสิ่งที่เข้ากับชีวิตจริง"
+        },
+        {
+          id: "malee",
+          image: assets.testimonials[3],
+          name: "Malee S. (มาลี)",
+          place: "41, Phuket",
+          role: "Nurse Aide",
+          quote:
+            "ทำงานในคลินิกทุกคนเลยคิดว่าฉันรู้ว่าจะกินอะไร แต่จริง ๆ ยิ่งอ่านยิ่งไม่มั่นใจ MattaNutra ให้แผนที่ชัดและสมเหตุสมผลสำหรับตัวฉันเอง"
+        }
+      ]
     },
     origin: {
       eyebrow: "จุดเริ่มต้น",
-      title: "ออกแบบในเชียงใหม่ ที่ซึ่งความพอดีเป็นวิถีชีวิต",
+      title: "ออกแบบในเชียงใหม่,",
+      accent: "ที่ซึ่งความพอดีเป็นวิถีชีวิต",
       body:
         "MattaNutra เริ่มต้นในภาคเหนือของไทย ที่ประเพณีเรื่องความพอดี การกินแต่พอเหมาะ การพักในเวลาที่ควร และการทำงานกับจังหวะของร่างกาย ถูกสั่งสมอย่างเงียบ ๆ มาหลายศตวรรษ",
       body2:
         "เราสร้าง MattaNutra เพื่อแปลภูมิปัญญานั้นให้ทันสมัย วัดได้ และเป็นส่วนตัว แผนที่เรียนรู้ร่างกายคุณ ปรับเมื่อชีวิตเปลี่ยน และไม่บังคับให้คุณกลายเป็นคนอื่น",
+      buildAlt: "โลโก้ MattaNutra ที่สร้างขึ้นเป็นห้าขั้นตอน",
       founders: "ก่อตั้งโดยแพทย์ นักวิทยาศาสตร์ และนักคิดด้าน AI",
-      founderBody:
-        "สิ่งที่เข้าสู่ร่างกายควรถูกออกแบบโดยคนที่เข้าใจว่าข้างในนั้นเกิดอะไรขึ้น ทีมของเรามีพื้นฐานหลากหลายทั้งแพทยศาสตร์ วิทยาศาสตร์ เทคโนโลยี เศรษฐศาสตร์ และการสร้างสิ่งที่อยู่ได้นาน",
-      signoff: "จากเชียงใหม่ ด้วยความใส่ใจ"
+      founderParagraphs: [
+        "สิ่งที่เข้าสู่ร่างกายควรถูกออกแบบโดยคนที่เข้าใจว่าข้างในนั้นเกิดอะไรขึ้น",
+        "ทีมของเรามีพื้นฐานหลากหลายทั้งแพทยศาสตร์ วิทยาศาสตร์ เทคโนโลยี เศรษฐศาสตร์ และการสร้างสิ่งที่อยู่ได้นาน",
+        "รวมกันแล้วมีประสบการณ์มากกว่าร้อยปีในงานแพทย์ วิทยาศาสตร์ เทคโนโลยี และการสร้างสิ่งที่ใช้งานได้จริง"
+      ],
+      signoff: "จากเชียงใหม่ ด้วยความใส่ใจ",
+      tagline: "ภูมิปัญญาเดิม · วิทยาศาสตร์สมัยใหม่"
     },
     pricing: {
       eyebrow: "ราคาที่เรียบง่าย",
@@ -590,7 +617,8 @@ const content = {
           termLabel: "จ่ายครั้งเดียว",
           term: "จ่ายครั้งเดียว · เข้าถึงได้ตลอด",
           cta: "รับสูตรปริมาณที่พอดี",
-          plan: "precision",
+          plan: "precision" as const,
+          best: "คนที่ต้องการจุดเริ่มต้นที่ชัดเจนและมั่นใจ",
           features: [
             "สูตรอาหารเสริมเฉพาะบุคคล",
             "ช่วงโดสที่ปรับตามขนาดร่างกาย",
@@ -599,15 +627,16 @@ const content = {
             "ผลิตภัณฑ์แนะนำและทางเลือก",
             "เตือนทบทวนใน 60 วัน"
           ],
-          guaranteeTitle: "รับประกันความชัดเจน",
+          guaranteeTitle: "รับประกันความชัดเจน.",
           guarantee:
             "ถ้าแผนยังไม่ชัดเจนหรือใช้ประโยชน์ไม่ได้ เราจะปรับให้หรือคืนเงินภายใน 7 วัน"
         },
         {
-          badge: "AI สนับสนุน 90 วัน",
+          badge: "พรีเมียม · สนับสนุน 90 วัน",
           popular: "นิยมที่สุด",
           name: "โปรโตคอลชีวิต",
-          desc: "รักษาปริมาณที่พอดีให้เหมาะกับชีวิตที่เปลี่ยน พร้อมคำแนะนำอาหารและการปรับต่อเนื่อง",
+          desc:
+            "รักษาปริมาณที่พอดีให้เหมาะกับชีวิตที่เปลี่ยน รวมทุกอย่างในสูตรปริมาณที่พอดี พร้อมการปรับต่อเนื่อง",
           originalPrice: "THB 1,890",
           saving: "ประหยัด 16%",
           currency: "THB",
@@ -615,18 +644,18 @@ const content = {
           termLabel: "สำหรับ 90 วัน",
           term: "จ่ายครั้งเดียว · สนับสนุน 90 วัน · ต่ออายุได้",
           cta: "เริ่มโปรโตคอลชีวิต",
-          plan: "pro",
-          highlight: "รวมแผนสูตรปริมาณที่พอดี",
-          plusLabel: "เพิ่มเติม",
+          plan: "pro" as const,
+          best: "คนที่อยากให้แผนตามทันชีวิตประจำวันจริง",
           features: [
-            "รู้ว่าอาหารอะไรให้สิ่งที่คุณต้องการ",
-            "คำแนะนำเรื่องการนอน พลังงาน และนิสัยประจำวัน",
-            "เรียนรู้อาหารประจำวันที่ให้สิ่งที่ร่างกายต้องการ",
-            "ช่วยจัดเวลาใช้อาหารเสริมและทำให้ทำต่อได้",
-            "สรุปความคืบหน้ารายสัปดาห์",
-            "ทบทวนก่อนเมื่อข้อมูลของคุณเปลี่ยน"
+            "รวมสูตรปริมาณที่พอดี",
+            "เรียนรู้อาหารประจำวันที่ให้สิ่งที่คุณต้องการ",
+            "ปรับเวลาและปริมาณเมื่อชีวิตเปลี่ยน",
+            "ทุกการเปลี่ยนตรวจกับยาและแล็บ",
+            "จำรูปแบบของคุณใน 90 วัน",
+            "แค่ส่งข้อความเมื่อมีอะไรเปลี่ยน ไม่ต้องเรียนรู้แอปใหม่",
+            "ทำต่อได้แม้เดินทาง เครียด หรือนอนสะดุด"
           ],
-          guaranteeTitle: "รับประกันความพึงพอใจ 7 วัน",
+          guaranteeTitle: "รับประกันความพึงพอใจ 7 วัน.",
           guarantee:
             "ลองโปรโตคอลชีวิตอย่างจริงจัง หากมีอะไรไม่ตรง เราจะแก้ไขหรือคืนเงินเต็มจำนวนภายใน 7 วัน"
         }
@@ -640,28 +669,26 @@ const content = {
     },
     journal: {
       eyebrow: "จากบทความ",
+      title: "เรียนรู้",
+      accent: "ปริมาณที่พอดี",
+      browse: "ดูบทความทั้งหมด",
       tag: "บทความ",
-      title: "เข้าใจปริมาณที่พอดี",
-      intro: "บทความสั้น ๆ เรื่องโภชนาการเฉพาะบุคคล การเลือกอาหารเสริมที่ฉลาดขึ้น และกิจวัตรสุขภาพ",
       readMore: "อ่านบทความ",
       fallback: [
-        ["หลัง 50", "10 พ.ค. 2026", "อะไรเปลี่ยนหลังวัย 50: พลังงาน การนอน และการฟื้นตัว", "พื้นฐานหลายอย่างเปลี่ยน ทั้งโครงสร้างการนอน หน้าต่างการฟื้นตัว และปัจจัยที่ส่งผลจริง"],
-        ["งบประมาณ", "9 พ.ค. 2026", "เลือกอาหารเสริมอย่างไรไม่ให้เสียเงินฟรี", "กรอบสั้น ๆ เพื่อแยกสิ่งสำคัญจากสิ่งที่มีก็ดี และหลีกเลี่ยงการจ่ายเกินที่พบบ่อย"],
-        ["วิธีคิด", "8 พ.ค. 2026", "ทำไมคะแนนสุขภาพดีกว่ารายการอาหารเสริมทั่วไป", "แผนที่มีประโยชน์เริ่มจากการเข้าใจว่าอะไรเป็นตัวถ่วง ไม่ใช่เพิ่มอีกขวดเข้าชั้น"]
+        ["พื้นฐาน", "ทำไมอาหารเสริมไม่ใช่ยิ่งมากยิ่งดี", "แนวคิดเรื่องความพอเพียง และเหตุผลที่ร่างกายมักต้องการน้อยกว่าที่ฉลากชวนให้เชื่อ"],
+        ["โภชนาการ", "อาหารประจำวันแปดอย่างที่มีแมกนีเซียมมากกว่าที่คิด", "ก่อนหยิบแคปซูล ลองดูในจานของคุณ อาหารพื้นฐานบางอย่างช่วยได้มาก"],
+        ["อยู่ให้ดี", "การเดินทางเปลี่ยนสิ่งที่ร่างกายต้องการอย่างไร", "เขตเวลา การนอน และน้ำในร่างกายเปลี่ยนสมการได้ โดยไม่ต้องคิดให้ซับซ้อน"]
       ]
     },
     faq: {
-      eyebrow: "คำถามที่พบบ่อย",
-      title: "คำตอบตรงไปตรงมา",
-      accent: "ก่อนเริ่ม",
-      intro: "คำถามที่เราได้ยินบ่อยจากคนที่กำลังพิจารณา MattaNutra หากไม่มีคำถามของคุณ LINE คือช่องทางที่เร็วที่สุด",
+      eyebrow: "คำถาม",
+      title: "คำถามดี ๆ,",
+      accent: "คำตอบตรงไปตรงมา",
       items: [
-        ["AI ตัดสินใจอย่างไร?", "คำตอบของคุณ เช่น เป้าหมาย ขนาดร่างกาย ไลฟ์สไตล์ ยา อาหาร การนอน แสงแดด และงบ ถูกจับคู่กับตรรกะการสร้างสูตรที่มีโครงสร้างกว่า 120 ส่วนผสม"],
-        ["ข้อมูลเป็นส่วนตัวไหม?", "ใช่ แบบประเมินเป็นของคุณ เราไม่ขายคำตอบ ไม่แบ่งปันกับผู้ลงโฆษณา และคุณสามารถขอลบข้อมูลได้"],
-        ["ถ้ากินยาอยู่ ปลอดภัยไหม?", "MattaNutra คัดกรองข้อควรระวังที่พบบ่อยระหว่างยาและอาหารเสริม แต่เป็นคำแนะนำเพื่อสุขภาพ ไม่ใช่คำแนะนำทางการแพทย์"],
-        ["ต่างจากมัลติวิตามินอย่างไร?", "มัลติวิตามินให้สูตรเดียวกับทุกคน MattaNutra เริ่มจากข้อมูลของคุณและสร้างแผนที่จัดลำดับและมีช่วงโดส"],
+        ["ข้อมูลเป็นส่วนตัวไหม?", "ใช่ แบบประเมินเป็นของคุณ เราไม่ขายคำตอบ ไม่แบ่งปันกับผู้ลงโฆษณา และคุณสามารถขอลบข้อมูลได้ การสนทนาในโปรโตคอลชีวิตถูกเก็บเพื่อให้แผนต่อเนื่องเท่านั้น"],
+        ["ถ้ากินยาอยู่ ปลอดภัยไหม?", "MattaNutra คัดกรองข้อควรระวังที่พบบ่อยระหว่างยาและอาหารเสริม และแสดงเป็นธงในแผน แต่เป็นคำแนะนำเพื่อสุขภาพ ไม่ใช่คำแนะนำทางการแพทย์"],
         ["ผลิตภัณฑ์แนะนำมาจากไหน?", "เราแนะนำผลิตภัณฑ์ที่มีในแพลตฟอร์มที่ผู้ซื้อเอเชียตะวันออกเฉียงใต้ใช้จริง และเลือกให้เข้ากับสูตรของคุณ"],
-        ["แบบประเมินฟรีจริงไหม?", "ฟรีจริงและไม่ต้องใช้บัตรเครดิต หลังทำเสร็จคุณเลือกได้ว่าจะอัปเกรดหรือไม่"],
+        ["แบบประเมินฟรีจริงไหม?", "ฟรีจริง แบบประเมินและ Health Score ไม่ต้องใช้บัตรเครดิต หลังทำเสร็จคุณเลือกได้ว่าจะไปต่อด้วยสูตรเฉพาะบุคคลหรือโปรโตคอลชีวิตหรือไม่"],
         ["ทำไมใช้ชื่อภาษาบาลี?", "Mattaññutā หมายถึงการรู้ปริมาณที่พอดี ชื่อนี้คือคำมั่นว่าเราจะช่วยหาความพอดีของคุณ ไม่ใช่ขายให้มากขึ้น"]
       ]
     },
@@ -669,14 +696,10 @@ const content = {
       title: "เลิกเดา.",
       accent: "เริ่มรู้.",
       body:
-        "ทำแบบประเมินสุขภาพ 2 นาทีเพื่อรับแผนตั้งต้นเฉพาะบุคคลที่สร้างจากร่างกาย เป้าหมาย และวันจริงของคุณ",
-      primary: "เริ่มแบบประเมินสุขภาพ",
+        "ตอบคำถามที่จำเป็นไม่กี่ข้อ รับ Health Score ฟรี และได้แผนตั้งต้นเฉพาะบุคคลที่สร้างจากร่างกาย เป้าหมาย และวันจริงของคุณ",
+      primary: "ออกแบบปริมาณที่พอดีของคุณ",
       secondary: "ดูวิธีทำงาน",
       quote: "Mattaññutā — การรู้ปริมาณที่พอดี"
-    },
-    disclaimer: {
-      body:
-        "MattaNutra ช่วยสนับสนุนการตัดสินใจเรื่องอาหารเสริมและโภชนาการในชีวิตประจำวัน แต่ไม่แทนที่การดูแลทางการแพทย์หรือโภชนบำบัดเฉพาะบุคคล คำแนะนำด้านอาหารเป็นข้อมูลเพื่อการเรียนรู้ทั่วไป และการปรับทั้งหมดจะอิงเป้าหมาย กิจวัตร ชุดอาหารเสริมปัจจุบัน และตรวจเทียบกับยาและข้อมูลแล็บของคุณเพื่อความเหมาะสม"
     }
   }
 } as const;
@@ -695,15 +718,15 @@ function SectionIntro({
   title: string;
 }>) {
   return (
-    <div className="mx-auto max-w-3xl text-center">
-      <p className={light ? "mn-v11-eyebrow mn-v11-eyebrow--light" : "mn-v11-eyebrow"}>
+    <div className="mx-auto max-w-3xl text-center" data-reveal>
+      <p className={light ? "mn-v14-eyebrow mn-v14-eyebrow--light" : "mn-v14-eyebrow"}>
         {eyebrow}
       </p>
-      <h2 className={light ? "mn-v11-heading mn-v11-heading--light" : "mn-v11-heading"}>
+      <h2 className={light ? "mn-v14-heading mn-v14-heading--light" : "mn-v14-heading"}>
         {title} {accent ? <span>{accent}</span> : null}
       </h2>
       {body ? (
-        <p className={light ? "mn-v11-section-copy mn-v11-section-copy--light" : "mn-v11-section-copy"}>
+        <p className={light ? "mn-v14-section-copy mn-v14-section-copy--light" : "mn-v14-section-copy"}>
           {body}
         </p>
       ) : null}
@@ -711,12 +734,78 @@ function SectionIntro({
   );
 }
 
-function CheckItem({ children }: Readonly<{ children: string }>) {
+function CheckItem({
+  children,
+  light = false
+}: Readonly<{ children: string; light?: boolean }>) {
   return (
-    <li className="flex gap-3">
-      <CheckCircle2 aria-hidden className="mt-0.5 size-5 shrink-0 text-[var(--mn-teal)]" />
+    <li className={light ? "mn-v14-check mn-v14-check--light" : "mn-v14-check"}>
+      <CheckCircle2 aria-hidden className="mt-0.5 size-5 shrink-0" />
       <span>{children}</span>
     </li>
+  );
+}
+
+function PricingCard({
+  featured = false,
+  locale,
+  plan
+}: Readonly<{
+  featured?: boolean;
+  locale: Locale;
+  plan: (typeof content.en.pricing.plans)[number] | (typeof content.th.pricing.plans)[number];
+}>) {
+  return (
+    <article
+      className={featured ? "mn-v14-price-card mn-v14-price-card--featured" : "mn-v14-price-card"}
+      data-reveal
+    >
+      {"popular" in plan ? <span className="mn-v14-popular">{plan.popular}</span> : null}
+      <p className={featured ? "mn-v14-eyebrow mn-v14-eyebrow--light" : "mn-v14-eyebrow"}>
+        {plan.badge}
+      </p>
+      <h3>{plan.name}</h3>
+      <p className="mn-v14-price-desc">{plan.desc}</p>
+      <div className="mt-6 flex flex-wrap items-center gap-2.5">
+        <span className={featured ? "text-[var(--mn-ash-soft)] line-through" : "text-[var(--mn-ash-soft)] line-through"}>
+          {plan.originalPrice}
+        </span>
+        <span className={featured ? "mn-v14-save-badge mn-v14-save-badge--dark" : "mn-v14-save-badge"}>
+          {plan.saving}
+        </span>
+      </div>
+      <div className="mn-v14-price">
+        <span>{plan.currency}</span>
+        <strong>{plan.price}</strong>
+        <em>{plan.termLabel}</em>
+      </div>
+      <p className="mn-v14-price-term">{plan.term}</p>
+      <Link
+        className={featured ? "mn-v14-button mn-v14-button--bright w-full" : "mn-v14-button mn-v14-button--outline w-full"}
+        href={paymentCheckoutPath(locale, {
+          plan: plan.plan,
+          sourceSurface: "landing"
+        })}
+      >
+        {plan.cta}
+      </Link>
+      <ul className="mt-7 grid gap-3">
+        {plan.features.map((feature, index) => (
+          <CheckItem key={feature} light={featured && index > 0}>
+            {feature}
+          </CheckItem>
+        ))}
+      </ul>
+      <p className={featured ? "mn-v14-best mn-v14-best--dark" : "mn-v14-best"}>
+        <strong>Best for:</strong> {plan.best}
+      </p>
+      <p className={featured ? "mn-v14-guarantee mn-v14-guarantee--dark" : "mn-v14-guarantee"}>
+        <ShieldCheck aria-hidden className="mt-0.5 size-5 shrink-0" />
+        <span>
+          <strong>{plan.guaranteeTitle}</strong> {plan.guarantee}
+        </span>
+      </p>
+    </article>
   );
 }
 
@@ -727,158 +816,153 @@ export function LandingPage({
   testimonials
 }: LandingPageProps) {
   const copy = content[locale];
+  const testimonialCards =
+    testimonials.length > 0
+      ? testimonials.map((testimonial) => ({
+          id: testimonial.id,
+          image: testimonial.authorImageUrl,
+          name: testimonial.authorName,
+          place: testimonial.authorTitle,
+          quote: testimonial.quote,
+          role: testimonial.authorHandle,
+          imageAlt: testimonial.authorImageAlt || testimonial.authorName
+        }))
+      : copy.results.fallback.map((testimonial) => ({
+          ...testimonial,
+          imageAlt: testimonial.name
+        }));
   const journalCards =
     blogPosts.length > 0
       ? blogPosts.map((post) => ({
           body: post.excerpt,
-          date: post.date,
           href: post.href,
           tag: copy.journal.tag,
           title: post.title
         }))
-      : copy.journal.fallback.map(([tag, date, title, body]) => ({
+      : copy.journal.fallback.map(([tag, title, body]) => ({
           body,
-          date,
           href: "#journal",
           tag,
           title
         }));
+  const browseHref = blogPosts[0]?.href ?? "#journal";
 
   return (
     <div className="flex-1">
-      <section className="mn-v11-hero">
-        <div className="mn-v11-container grid items-center gap-12 lg:grid-cols-[1fr_0.92fr]">
+      <LandingReveal />
+
+      <section className="mn-v14-hero">
+        <div className="mn-v14-glow mn-v14-glow--hero-a" />
+        <div className="mn-v14-glow mn-v14-glow--hero-b" />
+        <div className="mn-v14-container relative z-[1] grid items-center gap-14 py-20 lg:grid-cols-[1.02fr_0.98fr] lg:py-24">
           <div>
-            <p className="mn-v11-eyebrow">{copy.hero.eyebrow}</p>
-            <h1 className="mt-6 max-w-4xl font-serif text-5xl font-medium leading-[0.98] text-[var(--mn-ink)] sm:text-6xl lg:text-7xl">
-              {copy.hero.title} <span className="italic text-[var(--mn-teal-deep)]">{copy.hero.accent}</span>
+            <p className="mn-v14-eyebrow" data-reveal>{copy.hero.eyebrow}</p>
+            <h1 className="mt-6 max-w-4xl font-[family:var(--mn-font-display)] text-5xl font-medium leading-[1.02] text-[var(--mn-ink)] sm:text-6xl lg:text-7xl" data-reveal>
+              {copy.hero.title}
+              <br />
+              <span className="italic text-[var(--mn-teal-deep)]">{copy.hero.accent}</span>
             </h1>
-            <p className="mt-7 max-w-2xl text-lg leading-8 text-[var(--mn-ink-soft)] sm:text-xl">
+            <p className="mt-7 max-w-xl text-lg leading-8 text-[var(--mn-ink-soft)] sm:text-xl" data-reveal>
               {copy.hero.intro}
             </p>
-            <div className="mt-8 max-w-xl border-l-2 border-[var(--mn-gold)] pl-5">
-              <p className="font-serif text-2xl italic text-[var(--mn-gold)]">
+            <div className="mt-8 max-w-xl border-l-2 border-[var(--mn-gold-soft)] pl-5" data-reveal>
+              <p className="font-[family:var(--mn-font-display)] text-2xl italic text-[var(--mn-gold)]">
                 {copy.hero.paliTitle}
               </p>
-              <p className="mt-2 text-sm leading-6 text-[var(--mn-ash)]">
+              <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
                 {copy.hero.pali}
               </p>
             </div>
-            <div className="mt-9 flex flex-wrap gap-3">
-              <Link className="mn-brand-button" href={assessmentPath}>
+            <div className="mt-9 flex flex-wrap gap-3" data-reveal>
+              <Link className="mn-v14-button" href={assessmentPath}>
                 {copy.hero.primary}
                 <ArrowRight aria-hidden className="size-4" />
               </Link>
-              <Link className="mn-secondary-button" href="#how-it-works">
+              <Link className="mn-v14-button mn-v14-button--outline" href="#how-it-works">
                 {copy.hero.secondary}
               </Link>
             </div>
-            <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-[var(--mn-ink-soft)]">
+            <p className="mt-4 max-w-lg text-sm leading-6 text-[var(--mn-ink-soft)]" data-reveal>
+              {copy.hero.microcopy}
+            </p>
+            <ul className="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-sm text-[var(--mn-ash)]" data-reveal>
               {copy.hero.checks.map((item) => (
-                <li className="flex items-center gap-2" key={item}>
+                <li className="inline-flex items-center gap-2" key={item}>
                   <CheckCircle2 aria-hidden className="size-4 text-[var(--mn-teal)]" />
                   {item}
                 </li>
               ))}
             </ul>
           </div>
-          <div className="mn-v11-hero-visual">
+          <div className="mn-v14-hero-scatter" data-reveal>
+            <span className="mn-v14-hero-orb" />
+            <span className="mn-v14-hero-orb-inner" />
             <Image
-              alt="MattaNutra brand mark"
-              className="mx-auto h-auto w-full max-w-[24rem]"
+              alt="MattaNutra emblem"
+              className="mn-v14-hero-figure"
               height={465}
               priority
-              sizes="(min-width: 1024px) 24rem, 80vw"
-              src={assets.brandMark}
+              sizes="(min-width: 768px) 230px, 140px"
+              src={assets.heroFigure}
               width={420}
             />
-            <div className="mn-v11-ingredient-cloud">
-              {copy.hero.ingredientPills.map((item) => (
-                <span key={item}>
-                  {item}
-                  <strong>?</strong>
-                </span>
-              ))}
-            </div>
+            {copy.hero.ingredientPills.map((pill, index) => (
+              <span className="mn-v14-float-pill" data-pill-index={index} key={pill}>
+                {pill}
+                <span>?</span>
+              </span>
+            ))}
           </div>
         </div>
       </section>
 
-      <section className="mn-v11-section bg-[var(--mn-paper)]">
-        <div className="mn-v11-container">
-          <div className="max-w-3xl">
-            <p className="mn-v11-eyebrow">{copy.problem.eyebrow}</p>
-            <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] sm:text-5xl">
+      <section className="border-b border-[var(--mn-line)] bg-[var(--mn-paper)]">
+        <div className="mn-v14-container grid items-center gap-12 py-20 lg:grid-cols-2 lg:py-24">
+          <div className="relative" data-reveal>
+            <span className="absolute -inset-3 -z-10 rounded-[28px] bg-linear-to-br from-[var(--mn-mint)] to-[var(--mn-sand-soft)]" />
+            <Image
+              alt={copy.problem.imageAlt}
+              className="aspect-[4/3] w-full rounded-[22px] object-cover shadow-[0_20px_60px_-38px_rgba(10,37,64,0.45)]"
+              height={666}
+              priority
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              src={assets.problem}
+              width={1000}
+            />
+          </div>
+          <div data-reveal>
+            <p className="mn-v14-eyebrow">{copy.problem.eyebrow}</p>
+            <h2 className="mn-v14-heading mt-4 text-left">
               {copy.problem.title}
+              <br />
+              <span>{copy.problem.accent}</span>
             </h2>
-            <p className="mt-5 text-lg leading-8 text-[var(--mn-ink-soft)]">
-              {copy.problem.intro}
-            </p>
-          </div>
-          <div className="mt-10 grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch">
-            <div className="overflow-hidden rounded-[var(--mn-radius-lg)] border border-[var(--mn-line)] bg-[var(--mn-cream)] lg:min-h-[28rem]">
-              <Image
-                alt="Woman in a supplement aisle, overwhelmed by choice"
-                className="h-full w-full object-cover"
-                height={666}
-                loading="eager"
-                sizes="(min-width: 1024px) 50vw, 100vw"
-                src={assets.problem}
-                width={1000}
-              />
-            </div>
-            <div className="grid gap-5 lg:h-full lg:grid-rows-2">
-              <div className="mn-v11-card">
-                <p className="mn-v11-eyebrow">{copy.problem.question}</p>
-                <h3 className="mt-3 text-2xl font-semibold text-[var(--mn-ink)]">
-                  {copy.problem.issueTitle}
-                </h3>
-                <ul className="mt-5 space-y-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                  {copy.problem.issues.map((item) => (
-                    <li className="flex gap-3" key={item}>
-                      <XCircle aria-hidden className="mt-0.5 size-5 shrink-0 text-[var(--mn-error)]" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="mn-v11-card mn-v11-card--mint">
-                <h3 className="text-2xl font-semibold text-[var(--mn-ink)]">
-                  {copy.problem.answer}
-                </h3>
-                <ul className="mt-5 space-y-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                  {copy.problem.solutions.map((item) => (
-                    <CheckItem key={item}>{item}</CheckItem>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            <p className="mt-6 text-lg leading-8 text-[var(--mn-ink-soft)]">{copy.problem.body}</p>
+            <p className="mt-4 text-lg leading-8 text-[var(--mn-ink-soft)]">{copy.problem.body2}</p>
           </div>
         </div>
       </section>
 
-      <section className="mn-v11-section" id="promises">
-        <div className="mn-v11-container">
+      <section className="mn-v14-section" id="promises">
+        <div className="mn-v14-container">
           <SectionIntro
             accent={copy.promises.accent}
             body={copy.promises.intro}
             eyebrow={copy.promises.eyebrow}
             title={copy.promises.title}
           />
-          <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {[Target, ShieldCheck, Sparkles, ShoppingBag].map((Icon, index) => {
-              const [title, subtitle, body] = copy.promises.cards[index];
+          <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {[Search, Leaf, UserRound, Heart].map((Icon, index) => {
+              const [title, subtitle] = copy.promises.cards[index];
               return (
-                <article className="mn-v11-card" key={title}>
-                  <div className="flex items-center justify-between">
-                    <span className="mn-v11-number">{String(index + 1).padStart(2, "0")}</span>
-                    <span className="mn-v11-icon">
-                      <Icon aria-hidden className="size-5" />
-                    </span>
-                  </div>
-                  <h3 className="mt-7 text-2xl font-semibold text-[var(--mn-ink)]">{title}</h3>
-                  <p className="mt-1 font-serif text-xl italic text-[var(--mn-gold)]">{subtitle}</p>
-                  <p className="mt-4 text-sm leading-6 text-[var(--mn-ink-soft)]">{body}</p>
+                <article className="text-center" data-reveal key={title}>
+                  <span className="mx-auto grid size-12 place-items-center rounded-full bg-[var(--mn-mint)] text-[var(--mn-teal-deep)]">
+                    <Icon aria-hidden className="size-6" />
+                  </span>
+                  <h3 className="mt-4 font-[family:var(--mn-font-display)] text-2xl font-medium text-[var(--mn-ink)]">
+                    {title}
+                  </h3>
+                  <p className="mt-1 text-sm text-[var(--mn-ash)]">{subtitle}</p>
                 </article>
               );
             })}
@@ -886,46 +970,17 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="mn-v11-section bg-[var(--mn-paper)]">
-        <div className="mn-v11-container">
-          <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
-            <div>
-              <p className="mn-v11-eyebrow">{copy.tell.eyebrow}</p>
-              <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] sm:text-5xl">
-                {copy.tell.title}
-              </h2>
-              <p className="mt-5 text-lg leading-8 text-[var(--mn-ink-soft)]">{copy.tell.intro}</p>
-              <p className="mt-5 text-sm font-semibold text-[var(--mn-teal-deep)]">{copy.tell.privacy}</p>
-              <p className="mt-8 font-serif text-2xl italic text-[var(--mn-gold)]">↓ {copy.tell.down}</p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[Target, Activity, Pill, CircleDollarSign, HeartPulse].map((Icon, index) => (
-                <div className="mn-v11-card" key={copy.tell.inputs[index]}>
-                  <span className="mn-v11-number">{String(index + 1).padStart(2, "0")}</span>
-                  <Icon aria-hidden className="mt-6 size-8 text-[var(--mn-teal-deep)]" />
-                  <h3 className="mt-4 text-lg font-semibold text-[var(--mn-ink)]">{copy.tell.inputs[index]}</h3>
-                </div>
-              ))}
-              <div className="mn-v11-card mn-v11-card--dark sm:col-span-2">
-                <p className="font-serif text-3xl font-medium text-white">{copy.tell.output}</p>
-                <ArrowRight aria-hidden className="mt-6 size-8 text-[var(--mn-teal-glow)]" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mn-v11-section" id="how-it-works">
-        <div className="mn-v11-container">
+      <section className="mn-v14-section border-y border-[var(--mn-line)] bg-[var(--mn-paper)]" id="how-it-works">
+        <div className="mn-v14-container">
           <SectionIntro
             accent={copy.how.accent}
             body={copy.how.intro}
             eyebrow={copy.how.eyebrow}
             title={copy.how.title}
           />
-          <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {copy.how.steps.map(([title, label, body], index) => (
-              <article className="mn-v11-step" key={title}>
+              <article className="mn-v14-step-card" data-reveal key={title}>
                 <span>{index + 1}</span>
                 <h3>{title}</h3>
                 <p>{body}</p>
@@ -936,381 +991,303 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="mn-v11-section mn-v11-protocol" id="living-protocol">
-        <div className="mn-v11-container grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-          <div>
-            <p className="mn-v11-eyebrow mn-v11-eyebrow--light">{copy.protocol.eyebrow}</p>
-            <h2 className="mt-4 font-serif text-5xl font-medium leading-tight text-white sm:text-6xl">
-              {copy.protocol.title} <span className="italic text-[var(--mn-teal-glow)]">{copy.protocol.accent}</span>
-            </h2>
-            <p className="mt-6 text-lg leading-8 text-[var(--mn-teal-glow)]">{copy.protocol.intro}</p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link className="mn-brand-button" href="#plans">
-                {copy.protocol.primary}
-                <ArrowRight aria-hidden className="size-4" />
-              </Link>
-              <Link className="mn-secondary-button" href="#how">
-                {copy.protocol.secondary}
-              </Link>
-            </div>
-            <ul className="mt-8 space-y-3 text-sm leading-6 text-[var(--mn-teal-glow)]">
-              {copy.protocol.ticks.map((item) => (
-                <li className="flex gap-3" key={item}>
-                  <BadgeCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-[var(--mn-gold-soft)]" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="mn-v11-phone">
-            <div className="mn-v11-phone-header">
-              <span>M</span>
-              <div>
-                <strong>MattaNutra</strong>
-                <small>{copy.protocol.active}</small>
+      <section id="living-protocol">
+        <div className="relative overflow-hidden border-b border-[var(--mn-line)] bg-[var(--mn-cream)]">
+          <div className="mn-v14-glow mn-v14-glow--protocol" />
+          <div className="mn-v14-container relative z-[1] grid items-center gap-14 py-20 lg:grid-cols-2 lg:py-24">
+            <div data-reveal>
+              <p className="mn-v14-badge">{copy.protocol.eyebrow}</p>
+              <h2 className="mn-v14-heading mt-5 text-left">
+                {copy.protocol.title}
+                <br />
+                <span>{copy.protocol.accent}</span>
+              </h2>
+              <p className="mt-6 max-w-xl text-lg leading-8 text-[var(--mn-ink-soft)]">
+                {copy.protocol.intro}
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link className="mn-v14-button" href="#pricing">
+                  {copy.protocol.primary}
+                  <ArrowRight aria-hidden className="size-4" />
+                </Link>
+                <Link className="mn-v14-button mn-v14-button--outline" href="#lp-practice">
+                  {copy.protocol.secondary}
+                </Link>
               </div>
-            </div>
-            <div className="space-y-3">
-              {copy.protocol.chat.map(([sender, message], index) => (
-                <div className={index === 1 ? "mn-v11-chat mn-v11-chat--user" : "mn-v11-chat"} key={`${sender}-${message}`}>
-                  <strong>{sender}</strong>
-                  <p>{message}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mn-v11-update-card">
-              <p className="mn-v11-eyebrow">{copy.protocol.updateLabel}</p>
-              <h3>{copy.protocol.tripTitle}</h3>
-              <ul>
-                {copy.protocol.updates.map((item) => (
+              <ul className="mt-9 grid gap-3 text-[var(--mn-ink-soft)]">
+                {copy.protocol.ticks.map((item) => (
                   <CheckItem key={item}>{item}</CheckItem>
                 ))}
               </ul>
             </div>
-            <div className="mn-v11-reasoning">
-              {copy.protocol.reasoning.map((item) => (
-                <p key={item}>{item}</p>
+            <div className="mn-v14-phone" data-reveal>
+              <div className="mn-v14-phone-header">
+                <span>M</span>
+                <div>
+                  <strong>MattaNutra</strong>
+                  <small>{copy.protocol.active}</small>
+                </div>
+                <em>{copy.protocol.channel}</em>
+              </div>
+              <div className="grid gap-3 bg-[var(--mn-cream)] p-4">
+                <p className="mn-v14-chat">{copy.protocol.chat[0]}</p>
+                <p className="mn-v14-chat mn-v14-chat--user">{copy.protocol.chat[1]}</p>
+                <p className="mn-v14-chat">{copy.protocol.chat[2]}</p>
+                <div className="mn-v14-protocol-card">
+                  <div>
+                    <p>{copy.protocol.updateLabel}</p>
+                    <h3>{copy.protocol.tripTitle}</h3>
+                  </div>
+                  <ul>
+                    {copy.protocol.updates.map((item, index) => (
+                      <li key={item}>
+                        <span>{index === 2 ? "—" : "✓"}</span>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mn-v14-based-on">{copy.protocol.basedOn}</p>
+                  <details className="mn-v14-reasoning">
+                    <summary>{copy.protocol.reasoningLabel}</summary>
+                    <div>
+                      {copy.protocol.reasoning.map((item) => (
+                        <p key={item}>{item}</p>
+                      ))}
+                    </div>
+                  </details>
+                </div>
+                <p className="mn-v14-chat">
+                  {copy.protocol.foodNudge}
+                  <span className="mt-2 flex flex-wrap gap-1.5">
+                    {copy.protocol.foodTags.map((tag) => (
+                      <span className="mn-v14-food-tag" key={tag}>{tag}</span>
+                    ))}
+                  </span>
+                </p>
+                <p className="mn-v14-chat mn-v14-chat--user">{copy.protocol.vitaminQuestion}</p>
+                <p className="mn-v14-chat">{copy.protocol.vitaminAnswer}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mn-v14-band">
+          <div className="mn-v14-container" data-reveal>
+            <h2>
+              {copy.protocolBand.title}
+              <br />
+              <span>{copy.protocolBand.accent}</span>
+            </h2>
+            <p>{copy.protocolBand.body}</p>
+          </div>
+        </div>
+
+        <div className="mn-v14-section" id="lp-practice">
+          <div className="mn-v14-container">
+            <SectionIntro
+              accent={copy.practice.accent}
+              body={copy.practice.intro}
+              eyebrow={copy.practice.eyebrow}
+              title={copy.practice.title}
+            />
+            <div className="mt-12 grid gap-7 md:grid-cols-3">
+              {copy.practice.steps.map(([title, body, examples], index) => (
+                <article className="mn-v14-practice-card" data-reveal key={title}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                  <div>
+                    {examples.map((example) => (
+                      <em key={example}>“{example}”</em>
+                    ))}
+                  </div>
+                </article>
               ))}
             </div>
           </div>
         </div>
-      </section>
 
-      <section className="mn-v11-band">
-        <div className="mn-v11-container">
-          <h2>
-            {copy.protocolBand.title} <span>{copy.protocolBand.accent}</span>
-          </h2>
-          <p>{copy.protocolBand.body}</p>
-        </div>
-      </section>
-
-      <section className="mn-v11-section" id="how">
-        <div className="mn-v11-container">
-          <SectionIntro
-            accent={copy.protocolHow.accent}
-            body={copy.protocolHow.intro}
-            eyebrow={copy.protocolHow.eyebrow}
-            title={copy.protocolHow.title}
-          />
-          <div className="mt-12 grid gap-4 lg:grid-cols-3">
-            {copy.protocolHow.steps.map(([title, body, examples], index) => (
-              <article className="mn-v11-card" key={title}>
-                <span className="mn-v11-number">{String(index + 1).padStart(2, "0")}</span>
-                <h3 className="mt-6 text-2xl font-semibold text-[var(--mn-ink)]">{title}</h3>
-                <p className="mt-4 text-sm leading-6 text-[var(--mn-ink-soft)]">{body}</p>
-                <div className="mt-6 flex flex-wrap gap-2">
-                  {examples.map((item) => (
-                    <span className="mn-v11-mini-pill" key={item}>
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="mn-v11-section bg-[var(--mn-paper)]">
-        <div className="mn-v11-container grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-          <div>
-            <p className="mn-v11-eyebrow">{copy.food.eyebrow}</p>
-            <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] sm:text-5xl">
-              {copy.food.title}
-            </h2>
-            <p className="mt-6 text-lg leading-8 text-[var(--mn-ink-soft)]">{copy.food.intro}</p>
-            <p className="mt-6 rounded-[var(--mn-radius-md)] border border-[var(--mn-line)] bg-[var(--mn-cream)] p-5 text-sm leading-6 text-[var(--mn-ash)]">
+        <div className="mn-v14-section border-y border-[var(--mn-sand-deep)] bg-[var(--mn-sand-soft)]">
+          <div className="mn-v14-container">
+            <SectionIntro
+              accent={copy.food.accent}
+              body={copy.food.intro}
+              eyebrow={copy.food.eyebrow}
+              title={copy.food.title}
+            />
+            <div className="mt-12 grid gap-6 md:grid-cols-3">
+              {copy.food.cards.map(([title, body, tags], index) => (
+                <article className={index === 2 ? "mn-v14-food-card mn-v14-food-card--mint" : "mn-v14-food-card"} data-reveal key={title}>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                  <div>
+                    {tags.map((tag) => (
+                      <span key={tag}>{tag}</span>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+            <p className="mx-auto mt-12 max-w-2xl text-center font-[family:var(--mn-font-display)] text-xl italic leading-8 text-[var(--mn-ink-soft)]" data-reveal>
               {copy.food.note}
             </p>
           </div>
-          <div className="grid gap-4">
-            {[Leaf, Utensils, CircleDollarSign].map((Icon, index) => {
-              const [title, body, foods] = copy.food.cards[index];
-              return (
-                <article className="mn-v11-card" key={title}>
-                  <div className="flex items-start gap-4">
-                    <span className="mn-v11-icon">
-                      <Icon aria-hidden className="size-5" />
-                    </span>
-                    <div>
-                      <h3 className="text-xl font-semibold text-[var(--mn-ink)]">{title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">{body}</p>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {foods.map((food) => (
-                          <span className="mn-v11-mini-pill" key={food}>{food}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
         </div>
-      </section>
 
-      <section className="mn-v11-section">
-        <div className="mn-v11-container grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
-          <SectionIntro
-            accent={copy.difference.accent}
-            body={copy.difference.body}
-            eyebrow={copy.difference.eyebrow}
-            title={copy.difference.title}
-          />
-          <div className="mn-v11-card mn-v11-card--mint">
-            <ul className="space-y-4 text-sm leading-6 text-[var(--mn-ink-soft)]">
-              {copy.difference.bullets.map((item) => (
-                <CheckItem key={item}>{item}</CheckItem>
-              ))}
-            </ul>
-            <p className="mt-6 border-t border-[var(--mn-line)] pt-6 font-serif text-2xl italic leading-8 text-[var(--mn-teal-deep)]">
-              {copy.difference.closing}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="mn-v11-section bg-[var(--mn-paper)]" id="plans">
-        <div className="mn-v11-container">
-          <SectionIntro
-            accent={copy.planChoice.accent}
-            body={copy.planChoice.intro}
-            eyebrow={copy.planChoice.eyebrow}
-            title={copy.planChoice.title}
-          />
-          <div className="mt-12 grid gap-5 lg:grid-cols-2">
-            {copy.planChoice.plans.map((plan, index) => (
-              <article className={index === 1 ? "mn-v11-price-card mn-v11-price-card--featured" : "mn-v11-price-card"} key={plan.name}>
-                {"popular" in plan ? <span className="mn-v11-popular">{plan.popular}</span> : null}
-                <p className="mn-v11-eyebrow">{plan.badge}</p>
-                <h3>{plan.name}</h3>
-                <p className="mn-v11-price-desc">{plan.desc}</p>
-                <div className="mn-v11-price">
-                  <span>THB</span>
-                  <strong>{plan.price}</strong>
-                </div>
-                <p className="mn-v11-price-term">{plan.term}</p>
-                <Link
-                  className="mn-brand-button w-full"
-                  href={paymentCheckoutPath(locale, {
-                    plan: index === 0 ? "precision" : "pro",
-                    sourceSurface: "landing"
-                  })}
-                >
-                  {plan.cta}
-                  <ArrowRight aria-hidden className="size-4" />
-                </Link>
-                <ul className="mt-7 space-y-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                  {plan.features.map((feature) => (
-                    <CheckItem key={feature}>{feature}</CheckItem>
-                  ))}
-                </ul>
-                <p className="mt-7 rounded-[var(--mn-radius-md)] bg-[var(--mn-cream)] p-4 text-sm leading-6 text-[var(--mn-ash)]">
-                  <strong className="text-[var(--mn-ink)]">{copy.planChoice.bestPrefix}</strong>
-                  {plan.best}
-                </p>
-              </article>
+        <div className="mn-v14-difference">
+          <div className="mx-auto max-w-3xl px-7" data-reveal>
+            <p className="mn-v14-badge mn-v14-badge--dark">{copy.difference.eyebrow}</p>
+            <h2>
+              {copy.difference.title}
+              <br />
+              <span>{copy.difference.accent}</span>
+            </h2>
+            {copy.difference.paragraphs.map((paragraph, index) => (
+              <p className={index === 2 ? "mn-v14-difference-signoff" : undefined} key={paragraph}>
+                {paragraph}
+              </p>
             ))}
           </div>
-          <p className="mx-auto mt-6 max-w-3xl rounded-[var(--mn-radius-md)] border border-[var(--mn-gold-soft)] bg-[var(--mn-gold-tint)] p-5 text-center text-sm font-semibold leading-6 text-[var(--mn-ink)]">
-            {copy.planChoice.guarantee}
-          </p>
+        </div>
+
+        <div className="mn-v14-bridge">
+          <div className="mx-auto max-w-3xl px-7 text-center" data-reveal>
+            <h2>{copy.bridge.title}</h2>
+            <p>{copy.bridge.body}</p>
+            <Link className="mn-v14-button mt-7" href={assessmentPath}>
+              {copy.bridge.cta}
+              <ArrowRight aria-hidden className="size-4" />
+            </Link>
+            <small>{copy.bridge.note}</small>
+          </div>
         </div>
       </section>
 
-      <section className="border-y border-[var(--mn-line)] bg-[var(--mn-paper)] py-8">
-        <div className="mn-v11-container">
-          <p className="mx-auto max-w-4xl text-center text-sm leading-7 text-[var(--mn-ash)]">
-            {copy.disclaimer.body}
-          </p>
-        </div>
-      </section>
-
-      {testimonials.length > 0 ? (
-        <section className="mn-v11-section mn-v11-results" id="results-v11">
-          <div className="mn-v11-container">
-            <SectionIntro
-              body={copy.results.intro}
-              eyebrow={copy.results.eyebrow}
-              light
-              title={copy.results.title}
-            />
-            <div className="mt-12 grid gap-5 md:grid-cols-2">
-              {testimonials.map((testimonial) => (
-                <article className="mn-v11-story" key={testimonial.id}>
-                  {testimonial.authorImageUrl ? (
+      <section className="mn-v14-section" id="testimonials">
+        <div className="mn-v14-container">
+          <SectionIntro
+            body={copy.results.intro}
+            eyebrow={copy.results.eyebrow}
+            title={copy.results.title}
+          />
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {testimonialCards.map((testimonial) => (
+              <article className="mn-v14-testimonial-card" data-reveal key={testimonial.id}>
+                <div className="relative">
+                  {testimonial.image ? (
                     <Image
-                      alt={testimonial.authorImageAlt || testimonial.authorName}
-                      className="h-56 w-full rounded-[var(--mn-radius-md)] object-cover"
+                      alt={testimonial.imageAlt}
+                      className="aspect-[4/3] w-full rounded-[14px] object-cover"
                       height={543}
-                      loading="eager"
-                      sizes="(min-width: 768px) 50vw, 100vw"
-                      src={testimonial.authorImageUrl}
+                      sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+                      src={testimonial.image}
                       width={724}
                     />
                   ) : (
-                    <div className="grid h-56 w-full place-items-center rounded-[var(--mn-radius-md)] bg-[var(--mn-ink-soft)] text-5xl font-semibold text-white">
-                      {testimonial.authorName.slice(0, 1)}
+                    <div className="grid aspect-[4/3] w-full place-items-center rounded-[14px] bg-[var(--mn-mint)] text-4xl font-semibold text-[var(--mn-teal-deep)]">
+                      {testimonial.name.slice(0, 1)}
                     </div>
                   )}
-                  <p className="mt-6 text-lg leading-8 text-white">
-                    “{testimonial.quote}”
-                  </p>
-                  <div className="mt-6 border-t border-white/15 pt-5">
-                    <h3>{testimonial.authorName}</h3>
-                    {testimonial.authorTitle ? (
-                      <p>{testimonial.authorTitle}</p>
-                    ) : null}
-                  </div>
-                </article>
-              ))}
-            </div>
-            <div className="mt-10 text-center">
-              <Link className="mn-brand-button" href={assessmentPath}>
-                {copy.results.cta}
-                <ArrowRight aria-hidden className="size-4" />
-              </Link>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      <section className="mn-v11-section" id="origin">
-        <div className="mn-v11-container">
-          <div className="max-w-4xl">
-            <p className="mn-v11-eyebrow">{copy.origin.eyebrow}</p>
-            <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] sm:text-5xl">
-              {copy.origin.title}
-            </h2>
-            <p className="mt-6 text-lg leading-8 text-[var(--mn-ink-soft)]">{copy.origin.body}</p>
-            <p className="mt-5 text-lg leading-8 text-[var(--mn-ink-soft)]">{copy.origin.body2}</p>
-          </div>
-          <div className="mn-v11-origin-stack mt-10">
-            {assets.origin.map((src) => (
-              <span className="mn-v11-origin-orb" key={src}>
-                <Image
-                  alt=""
-                  aria-hidden="true"
-                  height={256}
-                  loading="eager"
-                  sizes="9rem"
-                  src={src}
-                  width={280}
-                />
-              </span>
+                  <span>”</span>
+                </div>
+                <p>{testimonial.quote}</p>
+                <div className="mt-auto border-t border-[var(--mn-line)] pt-4">
+                  <strong>{testimonial.name}</strong>
+                  <small>{testimonial.place}</small>
+                  {testimonial.role ? <em>{testimonial.role}</em> : null}
+                </div>
+              </article>
             ))}
           </div>
-          <div className="mn-v11-card mt-8">
-            <h3 className="text-2xl font-semibold text-[var(--mn-ink)]">{copy.origin.founders}</h3>
-            <p className="mt-4 text-sm leading-7 text-[var(--mn-ink-soft)]">{copy.origin.founderBody}</p>
-            <p className="mt-6 font-serif text-2xl italic text-[var(--mn-gold)]">{copy.origin.signoff}</p>
+          <div className="mt-12 text-center" data-reveal>
+            <p className="mb-6 inline-flex max-w-3xl items-center justify-center gap-2 text-[var(--mn-ink-soft)]">
+              <Leaf aria-hidden className="size-5 text-[var(--mn-teal)]" />
+              {copy.results.join}
+            </p>
+            <br />
+            <Link className="mn-v14-button" href={assessmentPath}>
+              {copy.results.cta}
+              <ArrowRight aria-hidden className="size-4" />
+            </Link>
           </div>
         </div>
       </section>
 
-      <section className="mn-v11-section bg-[var(--mn-paper)]" id="pricing">
-        <div className="mn-v11-container">
+      <section className="mn-v14-origin" id="origin">
+        <div className="mn-v14-glow mn-v14-glow--origin-a" />
+        <div className="mn-v14-glow mn-v14-glow--origin-b" />
+        <div className="relative z-[1] mx-auto max-w-5xl px-7">
+          <div className="max-w-3xl" data-reveal>
+            <p className="mn-v14-eyebrow">{copy.origin.eyebrow}</p>
+            <h2 className="mn-v14-heading mt-4 text-left">
+              {copy.origin.title}
+              <br />
+              <span>{copy.origin.accent}</span>
+            </h2>
+            <p className="mt-6 text-lg leading-8 text-[var(--mn-ink-soft)]">{copy.origin.body}</p>
+            <p className="mt-4 text-lg leading-8 text-[var(--mn-ink-soft)]">{copy.origin.body2}</p>
+          </div>
+          <div className="mn-v14-origin-build" role="img" aria-label={copy.origin.buildAlt} data-reveal>
+            {assets.origin.map((src, index) => (
+              <span className="contents" key={src}>
+                <Image
+                  alt=""
+                  aria-hidden="true"
+                  className="w-[110px] flex-none object-contain md:w-[100px]"
+                  height={256}
+                  loading="eager"
+                  sizes="110px"
+                  src={src}
+                  width={280}
+                />
+                {index < assets.origin.length - 1 ? <i aria-hidden /> : null}
+              </span>
+            ))}
+          </div>
+          <div className="max-w-3xl" data-reveal>
+            <h3 className="font-[family:var(--mn-font-display)] text-2xl font-medium text-[var(--mn-ink)]">
+              {copy.origin.founders}
+            </h3>
+            {copy.origin.founderParagraphs.map((paragraph) => (
+              <p className="mt-4 text-lg leading-8 text-[var(--mn-ink-soft)]" key={paragraph}>
+                {paragraph}
+              </p>
+            ))}
+          </div>
+          <div className="mt-12 flex max-w-3xl items-center gap-3.5 border-t border-[var(--mn-sand-deep)] pt-7" data-reveal>
+            <span className="grid size-10 shrink-0 place-items-center rounded-full border border-[var(--mn-gold-soft)] bg-[var(--mn-paper)] text-[var(--mn-gold)]">
+              <Clock aria-hidden className="size-5" />
+            </span>
+            <span className="grid leading-tight">
+              <span className="font-[family:var(--mn-font-display)] text-lg italic text-[var(--mn-ink-soft)]">
+                {copy.origin.signoff}
+              </span>
+              <span className="mt-1 text-xs font-semibold text-[var(--mn-ash)]">{copy.origin.tagline}</span>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section className="mn-v14-section" id="pricing">
+        <div className="mn-v14-container">
           <SectionIntro
             accent={copy.pricing.accent}
             body={copy.pricing.intro}
             eyebrow={copy.pricing.eyebrow}
             title={copy.pricing.title}
           />
-          <div className="mt-12 grid gap-5 lg:grid-cols-2">
-            {copy.pricing.plans.map((plan, index) => (
-              <article
-                className={index === 1 ? "mn-v11-price-card mn-v11-price-card--featured" : "mn-v11-price-card"}
-                key={plan.name}
-              >
-                {"popular" in plan ? <span className="mn-v11-popular">{plan.popular}</span> : null}
-                {index === 0 ? (
-                  <span className="mb-4 inline-flex rounded-full bg-[var(--mn-gold-tint)] px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-[var(--mn-gold)]">
-                    {copy.pricing.offer}
-                  </span>
-                ) : null}
-                <p className="mn-v11-eyebrow">{plan.badge}</p>
-                <h3>{plan.name}</h3>
-                <p className="mn-v11-price-desc">{plan.desc}</p>
-                <div className="mt-6 flex flex-wrap items-end gap-3">
-                  <span className="text-sm font-semibold text-[var(--mn-ash)] line-through">
-                    {plan.originalPrice}
-                  </span>
-                  <span className="rounded-full bg-[var(--mn-mint)] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--mn-teal-deep)]">
-                    {plan.saving}
-                  </span>
-                </div>
-                <div className="mn-v11-price">
-                  <span>{plan.currency}</span>
-                  <strong>{plan.price}</strong>
-                </div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-gold)]">
-                  {plan.termLabel}
-                </p>
-                <p className="mn-v11-price-term">{plan.term}</p>
-                <Link
-                  className="mn-brand-button w-full"
-                  href={paymentCheckoutPath(locale, {
-                    plan: plan.plan,
-                    sourceSurface: "landing"
-                  })}
-                >
-                  {plan.cta}
-                  <ArrowRight aria-hidden className="size-4" />
-                </Link>
-                {"highlight" in plan ? (
-                  <p className="mt-7 rounded-[var(--mn-radius-md)] border border-[var(--mn-gold-soft)] bg-[var(--mn-gold-tint)] p-4 text-sm font-semibold leading-6 text-[var(--mn-ink)]">
-                    ✓ {plan.highlight}
-                  </p>
-                ) : null}
-                {"plusLabel" in plan ? (
-                  <p className="mt-6 text-xs font-bold uppercase tracking-[0.22em] text-[var(--mn-gold)]">
-                    {plan.plusLabel}
-                  </p>
-                ) : null}
-                <ul className="mt-7 space-y-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                  {plan.features.map((feature) => (
-                    <CheckItem key={feature}>{feature}</CheckItem>
-                  ))}
-                </ul>
-                <p className="mt-7 rounded-[var(--mn-radius-md)] bg-[var(--mn-cream)] p-4 text-sm leading-6 text-[var(--mn-ash)]">
-                  <strong className="text-[var(--mn-ink)]">{plan.guaranteeTitle}</strong>
-                  <br />
-                  {plan.guarantee}
-                </p>
-              </article>
-            ))}
+          <div className="mx-auto mt-12 grid max-w-5xl items-start gap-8 lg:grid-cols-[1fr_1.08fr]">
+            <PricingCard locale={locale} plan={copy.pricing.plans[0]} />
+            <PricingCard featured locale={locale} plan={copy.pricing.plans[1]} />
           </div>
           <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {[Lock, BadgeCheck, RefreshCw, ShieldCheck].map((Icon, index) => {
               const [title, body] = copy.pricing.trust[index];
               return (
-                <article className="mn-v11-card text-center" key={title}>
-                  <span className="mn-v11-icon mx-auto">
-                    <Icon aria-hidden className="size-5" />
-                  </span>
-                  <h3 className="mt-4 text-lg font-semibold text-[var(--mn-ink)]">{title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--mn-ash)]">{body}</p>
+                <article className="mn-v14-trust-card" data-reveal key={title}>
+                  <Icon aria-hidden className="mx-auto size-5 text-[var(--mn-teal-deep)]" />
+                  <h3>{title}</h3>
+                  <p>{body}</p>
                 </article>
               );
             })}
@@ -1318,70 +1295,81 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="mn-v11-section mn-v11-journal-section" id="journal">
-        <div className="mn-v11-container">
-          <SectionIntro
-            body={copy.journal.intro}
-            eyebrow={copy.journal.eyebrow}
-            title={copy.journal.title}
-          />
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {journalCards.map((post) => (
-              <Link className="mn-v11-journal-card" href={post.href} key={post.title}>
-                <p className="mn-v11-eyebrow">{post.tag}</p>
-                <p className="mn-v11-journal-date">{post.date}</p>
-                <h3>{post.title}</h3>
-                <p>{post.body}</p>
-                <span>
-                  {copy.journal.readMore}
-                  <ArrowRight aria-hidden className="size-4" />
-                </span>
+      <section className="mn-v14-section border-y border-[var(--mn-line)] bg-[var(--mn-paper)]" id="journal">
+        <div className="mn-v14-container">
+          <div className="mb-12 flex flex-wrap items-end justify-between gap-6" data-reveal>
+            <div>
+              <p className="mn-v14-eyebrow">{copy.journal.eyebrow}</p>
+              <h2 className="mn-v14-heading mt-3 text-left">
+                {copy.journal.title} <span>{copy.journal.accent}</span>
+              </h2>
+            </div>
+            <Link className="inline-flex items-center gap-2 font-semibold text-[var(--mn-teal-deep)] hover:text-[var(--mn-ink)]" href={browseHref}>
+              {copy.journal.browse}
+              <ArrowRight aria-hidden className="size-4" />
+            </Link>
+          </div>
+          <div className="grid gap-7 md:grid-cols-3">
+            {journalCards.map((post, index) => (
+              <Link className="mn-v14-journal-card group" data-reveal href={post.href} key={post.title}>
+                <span data-journal-tone={index % 3} />
+                <div>
+                  <p>{post.tag}</p>
+                  <h3>{post.title}</h3>
+                  <p>{post.body}</p>
+                  <strong>
+                    {copy.journal.readMore}
+                    <ArrowRight aria-hidden className="size-4" />
+                  </strong>
+                </div>
               </Link>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="mn-v11-section" id="faq">
-        <div className="mn-v11-container">
+      <section className="mn-v14-section" id="faq">
+        <div className="mx-auto max-w-5xl px-7">
           <SectionIntro
             accent={copy.faq.accent}
-            body={copy.faq.intro}
             eyebrow={copy.faq.eyebrow}
             title={copy.faq.title}
           />
-          <div className="mx-auto mt-12 max-w-4xl divide-y divide-[var(--mn-line)] rounded-[var(--mn-radius-lg)] border border-[var(--mn-line)] bg-[var(--mn-paper)]">
+          <div className="mt-12 grid gap-3.5">
             {copy.faq.items.map(([question, answer]) => (
-              <details className="group p-6" key={question}>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left text-lg font-semibold text-[var(--mn-ink)]">
+              <details className="mn-v14-faq-item" data-reveal key={question}>
+                <summary>
                   {question}
-                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--mn-mint)] text-[var(--mn-teal-deep)] transition group-open:rotate-45">
-                    +
-                  </span>
+                  <span>+</span>
                 </summary>
-                <p className="mt-4 text-sm leading-7 text-[var(--mn-ink-soft)]">{answer}</p>
+                <p>{answer}</p>
               </details>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="mn-v11-final-cta" id="assessment">
-        <div className="mn-v11-container text-center">
+      <section className="mn-v14-final-cta" id="assessment">
+        <div className="mn-v14-glow mn-v14-glow--final" />
+        <div className="relative z-[1] mx-auto max-w-4xl px-7 text-center" data-reveal>
           <h2>
-            {copy.final.title} <span>{copy.final.accent}</span>
+            {copy.final.title}
+            <br />
+            <span>{copy.final.accent}</span>
           </h2>
           <p>{copy.final.body}</p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link className="mn-brand-button" href={assessmentPath}>
+          <div className="mt-9 flex flex-wrap justify-center gap-3">
+            <Link className="mn-v14-button mn-v14-button--cream" href={assessmentPath}>
               {copy.final.primary}
               <ArrowRight aria-hidden className="size-4" />
             </Link>
-            <Link className="mn-secondary-button" href="#how-it-works">
+            <Link className="mn-v14-button mn-v14-button--ghost" href="#how-it-works">
               {copy.final.secondary}
             </Link>
           </div>
-          <p className="mt-8 font-serif text-2xl italic text-[var(--mn-gold)]">{copy.final.quote}</p>
+          <p className="mt-8 font-[family:var(--mn-font-display)] text-lg text-[var(--mn-gold-soft)]">
+            {copy.final.quote}
+          </p>
         </div>
       </section>
     </div>

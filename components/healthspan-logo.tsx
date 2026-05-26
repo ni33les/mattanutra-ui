@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 type HealthspanLogoProps = HTMLAttributes<HTMLDivElement> & Readonly<{
   locale?: Locale;
+  variant?: "default" | "v14";
 }>;
 
 const logoCopy = {
@@ -21,9 +22,11 @@ const logoCopy = {
 export function HealthspanLogo({
   className,
   locale = "en",
+  variant = "default",
   ...props
 }: HealthspanLogoProps) {
   const copy = logoCopy[locale];
+  const isV14 = variant === "v14";
 
   return (
     <div
@@ -32,12 +35,12 @@ export function HealthspanLogo({
       className={cn("inline-flex w-max items-center gap-3", className)}
       {...props}
     >
-      <span className="mn-logo-mark-frame">
+      <span className={cn("mn-logo-mark-frame", isV14 && "mn-logo-mark-frame--v14")}>
         <Image
-          src="/v11/brand-mark.png"
+          src={isV14 ? "/v14/logo.png" : "/v11/brand-mark.png"}
           alt=""
-          width={420}
-          height={465}
+          width={isV14 ? 96 : 420}
+          height={isV14 ? 150 : 465}
           priority
           unoptimized
           className="mn-logo-mark-image"
