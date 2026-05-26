@@ -9,6 +9,10 @@ import {
 const packageJson = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8")
 ) as { scripts?: Record<string, string> };
+const nextConfigSource = readFileSync(
+  new URL("../next.config.ts", import.meta.url),
+  "utf8"
+);
 const assessment = readFileSync(
   new URL("../docs/codebase-cleanup-assessment.md", import.meta.url),
   "utf8"
@@ -205,5 +209,11 @@ describe("codebase cleanup guardrails", () => {
     assert.doesNotMatch(customerCss, /(^|\n)\s*\.mn-reveal-ready \[data-reveal\]/);
     assert.doesNotMatch(customerCss, /(^|\n)\s*\.mn-titlebar\b/);
     assert.doesNotMatch(customerCss, /(^|\n)\s*\.mn-site-footer\b/);
+  });
+
+  it("keeps local admin dev origins hydrated", () => {
+    assert.match(nextConfigSource, /allowedDevOrigins/);
+    assert.match(nextConfigSource, /["']localhost["']/);
+    assert.match(nextConfigSource, /["']127\.0\.0\.1["']/);
   });
 });
