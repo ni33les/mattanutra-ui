@@ -677,7 +677,7 @@
     filter: saturate(0.75);
   }
 
-  .mn-site-footer-main {
+  .mn-customer-shell .mn-site-footer-main {
     display: grid;
     align-items: center;
     width: 100%;
@@ -690,25 +690,25 @@
   }
 
   @media (min-width: 640px) {
-    .mn-site-footer-main {
+    .mn-customer-shell .mn-site-footer-main {
       padding-inline: 1.5rem;
     }
   }
 
   @media (min-width: 768px) {
-    .mn-site-footer-main {
+    .mn-customer-shell .mn-site-footer-main {
       grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.65fr);
       gap: 1rem;
     }
   }
 
   @media (min-width: 1024px) {
-    .mn-site-footer-main {
+    .mn-customer-shell .mn-site-footer-main {
       padding-inline: 2rem;
     }
   }
 
-  .mn-site-footer-brand-row {
+  .mn-customer-shell .mn-site-footer-brand-row {
     display: flex;
     min-width: 0;
     flex-direction: column;
@@ -719,20 +719,20 @@
   }
 
   @media (min-width: 640px) {
-    .mn-site-footer-brand-row {
+    .mn-customer-shell .mn-site-footer-brand-row {
       flex-direction: row;
       justify-content: center;
     }
   }
 
   @media (min-width: 768px) {
-    .mn-site-footer-brand-row {
+    .mn-customer-shell .mn-site-footer-brand-row {
       justify-content: flex-start;
       text-align: left;
     }
   }
 
-  .mn-site-footer-bottom {
+  .mn-customer-shell .mn-site-footer-bottom {
     display: flex;
     width: 100%;
     max-width: 72rem;
@@ -750,7 +750,7 @@
   }
 
   @media (min-width: 640px) {
-    .mn-site-footer-bottom {
+    .mn-customer-shell .mn-site-footer-bottom {
       flex-direction: row;
       padding-inline: 1.5rem;
       text-align: left;
@@ -758,12 +758,12 @@
   }
 
   @media (min-width: 1024px) {
-    .mn-site-footer-bottom {
+    .mn-customer-shell .mn-site-footer-bottom {
       padding-inline: 2rem;
     }
   }
 
-  .mn-site-footer-nav {
+  .mn-customer-shell .mn-site-footer-nav {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -778,7 +778,7 @@
   }
 
   @media (min-width: 640px) {
-    .mn-site-footer-nav {
+    .mn-customer-shell .mn-site-footer-nav {
       justify-content: flex-start;
       font-size: 0.6875rem;
     }
@@ -1010,12 +1010,12 @@
     line-height: 1.5rem;
   }
 
-  .mn-titlebar {
+  .mn-customer-shell .mn-titlebar {
     border-bottom: 1px solid var(--mn-line);
     background: var(--mn-paper);
   }
 
-  .mn-availability-bar {
+  .mn-customer-shell .mn-availability-bar {
     display: flex;
     min-height: 2.5rem;
     align-items: center;
@@ -1033,14 +1033,14 @@
     text-transform: uppercase;
   }
 
-  .mn-availability-pills {
+  .mn-customer-shell .mn-availability-pills {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 0.375rem;
   }
 
-  .mn-availability-pill {
+  .mn-customer-shell .mn-availability-pill {
     border: 1px solid color-mix(in srgb, var(--mn-teal) 24%, transparent);
     border-radius: 999px;
     background: var(--mn-paper);
@@ -1051,7 +1051,7 @@
     letter-spacing: 0.1em;
   }
 
-  .mn-titlebar-main {
+  .mn-customer-shell .mn-titlebar-main {
     display: flex;
     width: 100%;
     max-width: 82.5rem;
@@ -1063,7 +1063,7 @@
     padding: 0.75rem 1rem;
   }
 
-  .mn-titlebar .mn-logo-mark-frame {
+  .mn-customer-shell .mn-titlebar .mn-logo-mark-frame {
     width: 3rem;
     height: 3rem;
     border: 1px solid color-mix(in srgb, var(--mn-line) 82%, transparent);
@@ -1072,7 +1072,7 @@
     padding: 0.4rem;
   }
 
-  .mn-titlebar .mn-logo-mark-image {
+  .mn-customer-shell .mn-titlebar .mn-logo-mark-image {
     width: 2.05rem;
     height: 2.05rem;
     max-width: none;
@@ -1081,18 +1081,18 @@
   }
 
   @media (min-width: 640px) {
-    .mn-titlebar-main {
+    .mn-customer-shell .mn-titlebar-main {
       padding-inline: 1.5rem;
     }
   }
 
   @media (min-width: 1024px) {
-    .mn-titlebar-main {
+    .mn-customer-shell .mn-titlebar-main {
       padding-inline: 2rem;
     }
   }
 
-  .mn-titlebar-nav {
+  .mn-customer-shell .mn-titlebar-nav {
     display: none;
     align-items: center;
     gap: 1.25rem;
@@ -1103,27 +1103,27 @@
   }
 
   @media (min-width: 1024px) {
-    .mn-titlebar-nav {
+    .mn-customer-shell .mn-titlebar-nav {
       display: flex;
     }
   }
 
-  .mn-titlebar-link {
+  .mn-customer-shell .mn-titlebar-link {
     color: inherit;
   }
 
-  .mn-titlebar-link:hover {
+  .mn-customer-shell .mn-titlebar-link:hover {
     color: var(--mn-teal-deep);
   }
 
-  .mn-titlebar-actions {
+  .mn-customer-shell .mn-titlebar-actions {
     display: flex;
     flex-shrink: 0;
     align-items: center;
     gap: 0.625rem;
   }
 
-  .mn-titlebar-cta {
+  .mn-customer-shell .mn-titlebar-cta {
     display: none;
     align-items: center;
     justify-content: center;
@@ -1138,12 +1138,12 @@
     text-transform: uppercase;
   }
 
-  .mn-titlebar-cta:hover {
+  .mn-customer-shell .mn-titlebar-cta:hover {
     background: var(--mn-teal-deep);
   }
 
   @media (min-width: 640px) {
-    .mn-titlebar-cta {
+    .mn-customer-shell .mn-titlebar-cta {
       display: inline-flex;
     }
   }
@@ -1825,13 +1825,13 @@
     line-height: 2rem;
   }
 
-  .mn-site-footer {
+  .mn-customer-shell .mn-site-footer {
     border-top: 1px solid var(--mn-line);
     background: var(--mn-ink);
     color: color-mix(in srgb, white 78%, transparent);
   }
 
-  .mn-site-footer-grid {
+  .mn-customer-shell .mn-site-footer-grid {
     display: grid;
     width: 100%;
     max-width: 82.5rem;
@@ -1841,25 +1841,25 @@
   }
 
   @media (min-width: 640px) {
-    .mn-site-footer-grid {
+    .mn-customer-shell .mn-site-footer-grid {
       padding-inline: 1.5rem;
     }
   }
 
   @media (min-width: 900px) {
-    .mn-site-footer-grid {
+    .mn-customer-shell .mn-site-footer-grid {
       grid-template-columns: minmax(0, 1.35fr) repeat(3, minmax(0, 0.55fr));
       padding-inline: 2rem;
     }
   }
 
-  .mn-site-footer-brand {
+  .mn-customer-shell .mn-site-footer-brand {
     max-width: 24rem;
     --mn-logo-ink: white;
     --mn-logo-tagline: color-mix(in srgb, white 58%, transparent);
   }
 
-  .mn-site-footer-brand .mn-logo-mark-frame {
+  .mn-customer-shell .mn-site-footer-brand .mn-logo-mark-frame {
     width: 3.25rem;
     height: 3.25rem;
     border-radius: 999px;
@@ -1867,25 +1867,25 @@
     box-shadow: 0 0 0 1px color-mix(in srgb, white 22%, transparent);
   }
 
-  .mn-site-footer-brand .mn-logo-mark-image {
+  .mn-customer-shell .mn-site-footer-brand .mn-logo-mark-image {
     max-width: 2rem;
     max-height: 2.5rem;
   }
 
-  .mn-site-footer-brand p {
+  .mn-customer-shell .mn-site-footer-brand p {
     margin-top: 1.25rem;
     font-size: 0.95rem;
     line-height: 1.75rem;
   }
 
-  .mn-site-footer-social {
+  .mn-customer-shell .mn-site-footer-social {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
     margin-top: 1.5rem;
   }
 
-  .mn-site-footer-social a {
+  .mn-customer-shell .mn-site-footer-social a {
     display: grid;
     width: 2.5rem;
     height: 2.5rem;
@@ -1898,18 +1898,18 @@
       color 150ms ease;
   }
 
-  .mn-site-footer-social a:hover {
+  .mn-customer-shell .mn-site-footer-social a:hover {
     background: color-mix(in srgb, white 8%, transparent);
     color: var(--mn-teal-glow);
   }
 
-  .mn-site-footer-column {
+  .mn-customer-shell .mn-site-footer-column {
     display: grid;
     align-content: start;
     gap: 0.75rem;
   }
 
-  .mn-site-footer-column h2 {
+  .mn-customer-shell .mn-site-footer-column h2 {
     color: white;
     font-family: var(--mn-font-mono), ui-monospace, monospace;
     font-size: 0.75rem;
@@ -1918,17 +1918,17 @@
     text-transform: uppercase;
   }
 
-  .mn-site-footer-column a {
+  .mn-customer-shell .mn-site-footer-column a {
     color: color-mix(in srgb, white 72%, transparent);
     font-size: 0.9rem;
     transition: color 150ms ease;
   }
 
-  .mn-site-footer-column a:hover {
+  .mn-customer-shell .mn-site-footer-column a:hover {
     color: var(--mn-teal-glow);
   }
 
-  .mn-site-footer-fineprint {
+  .mn-customer-shell .mn-site-footer-fineprint {
     width: 100%;
     max-width: 82.5rem;
     margin-inline: auto;
@@ -1940,18 +1940,18 @@
   }
 
   @media (min-width: 640px) {
-    .mn-site-footer-fineprint {
+    .mn-customer-shell .mn-site-footer-fineprint {
       padding-inline: 1.5rem;
     }
   }
 
   @media (min-width: 1024px) {
-    .mn-site-footer-fineprint {
+    .mn-customer-shell .mn-site-footer-fineprint {
       padding-inline: 2rem;
     }
   }
 
-  .mn-site-footer-fineprint > div {
+  .mn-customer-shell .mn-site-footer-fineprint > div {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
@@ -1959,7 +1959,7 @@
     margin-top: 1rem;
   }
 
-  .mn-site-footer-languages {
+  .mn-customer-shell .mn-site-footer-languages {
     display: inline-flex;
     gap: 0.75rem;
     color: white;
@@ -1968,12 +1968,12 @@
     letter-spacing: 0.12em;
   }
 
-  .mn-reveal-ready [data-reveal] {
+  .mn-customer-shell.mn-reveal-ready [data-reveal] {
     opacity: 0;
     transform: translateY(18px);
   }
 
-  .mn-reveal-ready [data-reveal].mn-reveal-in {
+  .mn-customer-shell.mn-reveal-ready [data-reveal].mn-reveal-in {
     animation: mn-reveal-fade-up 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
 
@@ -3273,7 +3273,7 @@
     object-fit: contain;
   }
 
-  .mn-titlebar {
+  .mn-customer-shell .mn-titlebar {
     position: sticky;
     top: 0;
     z-index: 50;
@@ -3281,12 +3281,12 @@
     backdrop-filter: blur(14px);
   }
 
-  .mn-titlebar-main {
+  .mn-customer-shell .mn-titlebar-main {
     position: relative;
     min-height: 4.75rem;
   }
 
-  .mn-titlebar .mn-logo-mark-frame {
+  .mn-customer-shell .mn-titlebar .mn-logo-mark-frame {
     width: 2.25rem;
     height: 2.25rem;
     border: 0;
@@ -3294,18 +3294,18 @@
     padding: 0;
   }
 
-  .mn-titlebar .mn-logo-mark-image {
+  .mn-customer-shell .mn-titlebar .mn-logo-mark-image {
     width: 2.25rem;
     height: 2.25rem;
   }
 
-  .mn-titlebar-nav {
+  .mn-customer-shell .mn-titlebar-nav {
     gap: 2rem;
     font-size: 0.95rem;
     font-weight: 500;
   }
 
-  .mn-titlebar-cta {
+  .mn-customer-shell .mn-titlebar-cta {
     background: var(--mn-teal-deep);
     padding: 0.75rem 1.25rem;
     font-size: 0.875rem;
@@ -3313,17 +3313,17 @@
     text-transform: none;
   }
 
-  .mn-titlebar-mobile-menu {
+  .mn-customer-shell .mn-titlebar-mobile-menu {
     display: block;
   }
 
   @media (min-width: 1024px) {
-    .mn-titlebar-mobile-menu {
+    .mn-customer-shell .mn-titlebar-mobile-menu {
       display: none;
     }
   }
 
-  .mn-titlebar-mobile-menu summary {
+  .mn-customer-shell .mn-titlebar-mobile-menu summary {
     display: inline-flex;
     width: 2.5rem;
     height: 2.5rem;
@@ -3339,16 +3339,16 @@
       color 150ms ease;
   }
 
-  .mn-titlebar-mobile-menu summary::-webkit-details-marker {
+  .mn-customer-shell .mn-titlebar-mobile-menu summary::-webkit-details-marker {
     display: none;
   }
 
-  .mn-titlebar-mobile-menu summary:hover {
+  .mn-customer-shell .mn-titlebar-mobile-menu summary:hover {
     background: var(--mn-paper);
     color: var(--mn-teal-deep);
   }
 
-  .mn-titlebar-mobile-panel {
+  .mn-customer-shell .mn-titlebar-mobile-panel {
     position: absolute;
     top: calc(100% + 0.75rem);
     right: 1rem;
@@ -3362,25 +3362,25 @@
     backdrop-filter: blur(14px);
   }
 
-  .mn-titlebar-mobile-link {
+  .mn-customer-shell .mn-titlebar-mobile-link {
     border-bottom: 1px solid color-mix(in srgb, var(--mn-line) 70%, transparent);
     padding: 0.9rem 1rem;
     color: var(--mn-ink-soft);
     font-size: 1rem;
   }
 
-  .mn-titlebar-mobile-link:hover {
+  .mn-customer-shell .mn-titlebar-mobile-link:hover {
     color: var(--mn-teal-deep);
   }
 
-  .mn-titlebar-mobile-actions {
+  .mn-customer-shell .mn-titlebar-mobile-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
     padding: 1rem;
   }
 
-  .mn-titlebar-mobile-cta {
+  .mn-customer-shell .mn-titlebar-mobile-cta {
     display: inline-flex;
     flex: 1 1 12rem;
     align-items: center;
@@ -3429,8 +3429,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .mn-reveal-ready [data-reveal],
-    .mn-reveal-ready [data-reveal].mn-reveal-in {
+    .mn-customer-shell.mn-reveal-ready [data-reveal],
+    .mn-customer-shell.mn-reveal-ready [data-reveal].mn-reveal-in {
       opacity: 1;
       transform: none;
       animation: none;

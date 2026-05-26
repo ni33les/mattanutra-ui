@@ -7,12 +7,6 @@ import {
   type ReactNode
 } from "react";
 import {
-  Dialog,
-  DialogBackdrop,
-  DialogPanel,
-  DialogTitle
-} from "@headlessui/react";
-import {
   Bars3Icon,
   XMarkIcon
 } from "@heroicons/react/24/outline";
@@ -115,6 +109,7 @@ import {
   AdminSupplementsView,
   SupplementListMeta
 } from "@/components/admin/safety-views";
+import { AdminDrawer, AdminModal } from "@/components/admin/ui";
 
 
 
@@ -1212,19 +1207,7 @@ function VisibilityTaskDetailsModal({
   const runtimeWarning = taskRuntimeWarning(row, snapshotAt);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <button
-        aria-label={labels.supplements.close}
-        className="fixed inset-0 cursor-default bg-gray-900/40"
-        onClick={onClose}
-        type="button"
-      />
-      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
-        <section
-          aria-modal={true}
-          className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-900/10"
-          role="dialog"
-        >
+    <AdminModal onClose={onClose} panelClassName="max-w-3xl">
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -1423,9 +1406,7 @@ function VisibilityTaskDetailsModal({
               ) : null}
             </div>
           </div>
-        </section>
-      </div>
-    </div>
+    </AdminModal>
   );
 }
 
@@ -1914,7 +1895,7 @@ function AdminFinancialsView({
           </h2>
         </div>
         {data.rows.length > 0 ? (
-          <div className="overflow-x-auto px-5">
+          <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead>
                 <tr>
@@ -2039,16 +2020,12 @@ function FinancialTransactionDetailModal({
   row: AdminFinancialTransactionRow;
 }>) {
   return (
-    <Dialog className="relative z-50" onClose={onClose} open={true}>
-      <DialogBackdrop className="fixed inset-0 bg-gray-900/40" />
-      <div className="fixed inset-0 overflow-y-auto">
-        <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
-          <DialogPanel className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-900/10">
+    <AdminModal onClose={onClose} panelClassName="max-w-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
               <div className="min-w-0">
-                <DialogTitle className="text-base font-semibold text-gray-900">
+                <h2 className="text-base font-semibold text-gray-900">
                   {row.description}
-                </DialogTitle>
+                </h2>
                 <p className="mt-1 break-all text-xs text-gray-400">
                   {row.sourceRef ?? row.source}
                 </p>
@@ -2131,10 +2108,7 @@ function FinancialTransactionDetailModal({
                 }
               />
             </dl>
-          </DialogPanel>
-        </div>
-      </div>
-    </Dialog>
+    </AdminModal>
   );
 }
 
@@ -2355,33 +2329,25 @@ export function AdminDashboard({
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#20343A]">
       {sidebarOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <AdminDrawer onClose={() => setSidebarOpen(false)}>
+          <SidebarContent
+            accessToken={accessToken}
+            filters={filters}
+            labels={labels}
+            locale={locale}
+            onNavigate={() => setSidebarOpen(false)}
+            range={data.range}
+            view={view}
+          />
           <button
             type="button"
-            aria-label={labels.closeSidebar}
-            className="absolute inset-0 bg-gray-900/70"
             onClick={() => setSidebarOpen(false)}
-          />
-          <aside className="relative flex h-full w-full max-w-xs">
-            <SidebarContent
-              accessToken={accessToken}
-              filters={filters}
-              labels={labels}
-              locale={locale}
-              onNavigate={() => setSidebarOpen(false)}
-              range={data.range}
-              view={view}
-            />
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(false)}
-              className="absolute left-full top-5 ml-4 rounded-md p-2 text-white"
-            >
-              <span className="sr-only">{labels.closeSidebar}</span>
-              <XMarkIcon aria-hidden={true} className="size-6" />
-            </button>
-          </aside>
-        </div>
+            className="absolute left-full top-5 ml-4 rounded-md p-2 text-white"
+          >
+            <span className="sr-only">{labels.closeSidebar}</span>
+            <XMarkIcon aria-hidden={true} className="size-6" />
+          </button>
+        </AdminDrawer>
       ) : null}
 
       <aside className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">

@@ -34,6 +34,7 @@ import {
   supplementListStatuses,
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
+import { AdminModal } from "@/components/admin/ui";
 import {
   formatSupplementSafetyFlags,
   listStatusSummary,
@@ -513,20 +514,11 @@ function CreateSupplementModal({
     "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]";
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <button
-        aria-label={labels.supplements.close}
-        className="fixed inset-0 cursor-default bg-gray-900/40"
-        disabled={saving}
-        onClick={onClose}
-        type="button"
-      />
-      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
-        <section
-          aria-modal={true}
-          className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-900/10"
-          role="dialog"
-        >
+    <AdminModal
+      closeDisabled={saving}
+      onClose={onClose}
+      panelClassName="max-w-lg"
+    >
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
@@ -608,9 +600,7 @@ function CreateSupplementModal({
               </button>
             </div>
           </form>
-        </section>
-      </div>
-    </div>
+    </AdminModal>
   );
 }
 
@@ -821,19 +811,7 @@ export function SupplementDetailsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <button
-        aria-label={labels.supplements.close}
-        className="fixed inset-0 cursor-default bg-gray-900/40"
-        onClick={onClose}
-        type="button"
-      />
-      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
-        <section
-          aria-modal={true}
-          className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-900/10"
-          role="dialog"
-        >
+    <AdminModal onClose={onClose} panelClassName="max-w-3xl">
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
@@ -1171,9 +1149,7 @@ export function SupplementDetailsModal({
               </button>
             </div>
           </div>
-        </section>
-      </div>
-    </div>
+    </AdminModal>
   );
 }
 

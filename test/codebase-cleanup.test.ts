@@ -33,6 +33,18 @@ const adminSafetyViews = readFileSync(
   new URL("../components/admin/safety-views.tsx", import.meta.url),
   "utf8"
 );
+const adminDashboardView = readFileSync(
+  new URL("../components/admin-dashboard.tsx", import.meta.url),
+  "utf8"
+);
+const adminContentView = readFileSync(
+  new URL("../components/admin/content-view.tsx", import.meta.url),
+  "utf8"
+);
+const adminUi = readFileSync(
+  new URL("../components/admin/ui.tsx", import.meta.url),
+  "utf8"
+);
 const adminProductView = readFileSync(
   new URL("../components/admin/product-view.tsx", import.meta.url),
   "utf8"
@@ -45,8 +57,20 @@ const adminReviewQueueView = readFileSync(
   new URL("../components/admin/review-queue-view.tsx", import.meta.url),
   "utf8"
 );
+const adminMarketingLeadsView = readFileSync(
+  new URL("../components/admin/marketing-leads.tsx", import.meta.url),
+  "utf8"
+);
 const adminSupplementView = readFileSync(
   new URL("../components/admin/supplement-view.tsx", import.meta.url),
+  "utf8"
+);
+const customerCss = readFileSync(
+  new URL("../app/customer.css", import.meta.url),
+  "utf8"
+);
+const globalsCss = readFileSync(
+  new URL("../app/globals.css", import.meta.url),
   "utf8"
 );
 
@@ -153,5 +177,33 @@ describe("codebase cleanup guardrails", () => {
     assert.doesNotMatch(adminProductsService, /\bimportDiscoveredMarketplaceProducts\b/);
     assert.doesNotMatch(adminProductsService, /\bfactsFromMarketplaceSnapshot\b/);
     assert.doesNotMatch(adminProductsService, /\bmarketplace_discovery\b/);
+  });
+
+  it("keeps admin overlays behind shared primitives", () => {
+    assert.match(adminUi, /\bexport function AdminModal\b/);
+    assert.match(adminUi, /\bexport function AdminDrawer\b/);
+    assert.match(adminUi, /DialogBackdrop/);
+
+    for (const [name, source] of [
+      ["admin dashboard", adminDashboardView],
+      ["admin content", adminContentView],
+      ["admin product", adminProductView],
+      ["admin review queue", adminReviewQueueView],
+      ["admin safety", adminSafetyViews],
+      ["admin marketing leads", adminMarketingLeadsView],
+      ["admin supplements", adminSupplementView]
+    ] as const) {
+      assert.doesNotMatch(source, /DialogBackdrop|DialogPanel|DialogTitle/, name);
+      assert.doesNotMatch(source, /fixed inset-0 z-50/, name);
+      assert.doesNotMatch(source, /aria-modal=\{true\}|role="dialog"/, name);
+    }
+  });
+
+  it("keeps customer motion and chrome CSS away from admin routes", () => {
+    assert.doesNotMatch(globalsCss, /customer\.css/);
+    assert.match(customerCss, /\.mn-customer-shell\.mn-reveal-ready \[data-reveal\]/);
+    assert.doesNotMatch(customerCss, /(^|\n)\s*\.mn-reveal-ready \[data-reveal\]/);
+    assert.doesNotMatch(customerCss, /(^|\n)\s*\.mn-titlebar\b/);
+    assert.doesNotMatch(customerCss, /(^|\n)\s*\.mn-site-footer\b/);
   });
 });

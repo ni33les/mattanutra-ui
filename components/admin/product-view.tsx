@@ -31,6 +31,7 @@ import {
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
 import { safetyMetric } from "@/components/admin/safety-view-helpers";
+import { AdminModal } from "@/components/admin/ui";
 
 const productKinds = ["supplement", "multi", "food", "other"] as const;
 const productAudiences = ["both", "female", "male"] as const;
@@ -1406,8 +1407,10 @@ function ProductModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-950/40 px-4 py-8">
-      <div className="mx-auto max-w-3xl rounded-2xl bg-white p-6 shadow-xl ring-1 ring-gray-200">
+    <AdminModal
+      onClose={onClose}
+      panelClassName="max-w-3xl p-6 ring-gray-200"
+    >
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-3">
@@ -2152,7 +2155,6 @@ function ProductModal({
             </span>
           </div>
         </div>
-      </div>
-    </div>
+    </AdminModal>
   );
 }

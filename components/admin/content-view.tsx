@@ -2,10 +2,6 @@
 
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import {
-  Dialog,
-  DialogBackdrop,
-  DialogPanel,
-  DialogTitle,
   Field,
   Input,
   Label,
@@ -39,6 +35,7 @@ import {
   formatNumber,
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
+import { AdminModal } from "@/components/admin/ui";
 
 function contentWorkflowStatusLabel(
   labels: AdminContent,
@@ -986,24 +983,13 @@ function ContentEditorModal({
   }
 
   return (
-    <Dialog className="relative z-50" onClose={onClose} open>
-      <DialogBackdrop
-        className="fixed inset-0 bg-gray-500/75 transition-opacity data-closed:opacity-0 data-enter:duration-300 data-enter:ease-out data-leave:duration-200 data-leave:ease-in"
-        transition
-      />
-
-      <div className="fixed inset-0 z-50 w-screen overflow-y-auto">
-        <div className="flex min-h-full items-end justify-center p-4 text-left sm:items-center sm:p-0">
-          <DialogPanel
-            className="relative w-full transform overflow-hidden rounded-lg bg-white shadow-xl transition-all data-closed:translate-y-4 data-closed:opacity-0 data-enter:duration-300 data-enter:ease-out data-leave:duration-200 data-leave:ease-in sm:my-8 sm:max-w-2xl data-closed:sm:translate-y-0 data-closed:sm:scale-95"
-            transition
-          >
+    <AdminModal onClose={onClose} panelClassName="max-w-2xl">
         <form onSubmit={submitEditor}>
           <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
             <div className="min-w-0">
-              <DialogTitle className="text-base font-semibold text-gray-900">
+              <h2 className="text-base font-semibold text-gray-900">
                 {modalTitle}
-              </DialogTitle>
+              </h2>
               <p className="mt-1 text-xs font-medium text-gray-500">
                 {editing ? labels.contentPages.edit : labels.contentPages.draft}
               </p>
@@ -1224,9 +1210,6 @@ function ContentEditorModal({
             </button>
           </div>
         </form>
-          </DialogPanel>
-        </div>
-      </div>
-    </Dialog>
+    </AdminModal>
   );
 }

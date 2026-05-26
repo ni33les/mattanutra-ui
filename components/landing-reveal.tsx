@@ -4,8 +4,13 @@ import { useEffect } from "react";
 
 export function LandingReveal() {
   useEffect(() => {
-    const root = document.documentElement;
-    const items = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
+    const root = document.querySelector<HTMLElement>(".mn-customer-shell");
+
+    if (!root) {
+      return;
+    }
+
+    const items = Array.from(root.querySelectorAll<HTMLElement>("[data-reveal]"));
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     if (prefersReducedMotion || items.length === 0 || !("IntersectionObserver" in window)) {

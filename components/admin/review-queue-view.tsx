@@ -40,6 +40,7 @@ import {
   SupplementDetailsModal,
   SupplementListMeta
 } from "@/components/admin/supplement-view";
+import { AdminModal } from "@/components/admin/ui";
 
 function reviewKindLabel(labels: AdminContent, row: AdminReviewTaskRow) {
   if (row.reviewKind === "dose_reduced") {
@@ -490,19 +491,7 @@ function PlanSafetyReviewModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <button
-        aria-label={labels.supplements.close}
-        className="fixed inset-0 cursor-default bg-gray-900/40"
-        onClick={onClose}
-        type="button"
-      />
-      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
-        <section
-          aria-modal={true}
-          className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-900/10"
-          role="dialog"
-        >
+    <AdminModal onClose={onClose} panelClassName="max-w-3xl">
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
@@ -728,9 +717,7 @@ function PlanSafetyReviewModal({
               </button>
             </div>
           </div>
-        </section>
-      </div>
-    </div>
+    </AdminModal>
   );
 }
 
@@ -825,19 +812,7 @@ function ProductImportReviewModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <button
-        aria-label={labels.supplements.close}
-        className="fixed inset-0 cursor-default bg-gray-900/40"
-        onClick={onClose}
-        type="button"
-      />
-      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
-        <section
-          aria-modal={true}
-          className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-900/10"
-          role="dialog"
-        >
+    <AdminModal onClose={onClose} panelClassName="max-w-3xl">
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
             <div className="min-w-0">
               <h2 className="text-xl font-semibold text-gray-900">
@@ -1115,9 +1090,7 @@ function ProductImportReviewModal({
               </span>
             </div>
           </div>
-        </section>
-      </div>
-    </div>
+    </AdminModal>
   );
 }
 

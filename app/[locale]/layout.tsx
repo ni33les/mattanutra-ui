@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { BpmTracker } from "@/components/bpm-tracker";
 import "../globals.css";
+import "../customer.css";
 import {
   defaultLocale,
   getDictionary,
