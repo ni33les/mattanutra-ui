@@ -29,7 +29,7 @@ export function ServiceIssue({
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--brand-blue)]">
           {copy.eyebrow}
         </p>
-        <h1 className="mt-4 text-4xl font-semibold tracking-normal text-[var(--brand-navy)] text-balance sm:text-5xl">
+        <h1 className="mn-hero-title mt-4 text-4xl font-semibold tracking-normal text-[var(--brand-navy)] text-balance sm:text-5xl">
           {copy.title}
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-[color-mix(in_srgb,var(--mn-ink)_75%,transparent)]">

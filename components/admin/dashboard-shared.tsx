@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { HealthspanLogo } from "@/components/healthspan-logo";
 import { adminDashboardFilterEntries, type AdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import type { AdminTaskVisibilityRow } from "@/lib/admin-execution";
-import { nutritionRefinePath } from "@/lib/nutrition-paths";
+import { nutritionRevealPath } from "@/lib/nutrition-paths";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import type { AdminConversionTargetId, AdminFlowData, AdminFlowNodeId } from "@/lib/admin-flow-data";
 import type { FoodConfidence, FoodListStatus } from "@/lib/admin-foods";
@@ -353,6 +353,16 @@ export function SidebarContent({
             onNavigate={onNavigate}
             range={range}
             title={labels.governanceTitle}
+            view={view}
+          />
+          <SidebarNavList
+            accessToken={accessToken}
+            filters={filters}
+            items={labels.insights}
+            locale={locale}
+            onNavigate={onNavigate}
+            range={range}
+            title={labels.insightsTitle}
             view={view}
           />
           <SidebarNavList
@@ -772,8 +782,8 @@ export function compactId(value: string) {
   return value.length > 12 ? `${value.slice(0, 8)}…${value.slice(-4)}` : value;
 }
 
-function planResultsHref(locale: Locale, planId: string) {
-  return nutritionRefinePath(locale, planId);
+function planRevealHref(locale: Locale, planId: string) {
+  return nutritionRevealPath(locale, planId);
 }
 
 export function PlanIdLink({
@@ -799,7 +809,7 @@ export function PlanIdLink({
         "font-semibold text-[#3A7BD5] hover:text-[#2F67B8]",
         className
       )}
-      href={planResultsHref(locale, planId)}
+      href={planRevealHref(locale, planId)}
       onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
       onKeyDown={
         stopPropagation ? (event) => event.stopPropagation() : undefined

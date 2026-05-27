@@ -6,6 +6,7 @@ import {
 import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
 import { getSql } from "@/lib/db";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
+import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
 import type {
   FoodGuidanceBlueprint,
   FormulationBlueprint,
@@ -143,9 +144,11 @@ export type DigitalOceanBillingSyncWorkItem = Readonly<{
 export type NutritionPlanChatWorkItem = Readonly<{
   answers: unknown;
   chatMessages: PlanChatMessage[];
+  firstName?: string | null;
   foodGuidance: FoodGuidanceBlueprint | null;
   formulation: FormulationBlueprint | null;
   guidanceAdjustments: PlanGuidanceAdjustment[];
+  healthScore?: HealthScoreResult | null;
   locale: Locale;
   messageId: string;
   plan: AssessmentPlan;
@@ -159,9 +162,11 @@ export type NutritionPlanChatWorkItem = Readonly<{
 export type NutritionReportWorkItem = Readonly<{
   answers: unknown;
   chatMessages: PlanChatMessage[];
+  firstName?: string | null;
   foodGuidance: FoodGuidanceBlueprint;
   formulation: FormulationBlueprint;
   guidanceAdjustments: PlanGuidanceAdjustment[];
+  healthScore?: HealthScoreResult | null;
   locale: Locale;
   plan: AssessmentPlan;
   planFeedback: PlanFeedbackItem[];
@@ -686,6 +691,8 @@ async function loadPlanGenerationContext(
   const rows = await sql`
     select
       assessments.answers,
+      assessments.first_name,
+      assessments.health_score,
       assessments.locale,
       assessments.selected_plan::text,
       formulations.formulation,
@@ -770,9 +777,17 @@ async function loadPlanGenerationContext(
   return {
     answers: row.answers,
     chatMessages: chatRows.map(mapChatMessage),
+    firstName:
+      typeof row.first_name === "string" && row.first_name.trim()
+        ? row.first_name.trim()
+        : firstNameFromAssessmentAnswers(row.answers),
     foodGuidance,
     formulation,
     guidanceAdjustments,
+    healthScore:
+      row.health_score && typeof row.health_score === "object"
+        ? (row.health_score as HealthScoreResult)
+        : null,
     locale: isLocale(row.locale) ? row.locale : "en",
     plan: planOverride ?? normalizeAssessmentPlan(row.selected_plan),
     planFeedback,

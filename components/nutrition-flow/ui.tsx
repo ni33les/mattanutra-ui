@@ -69,7 +69,7 @@ export function ProcessingPanel({
   return (
     <section className="w-full">
       <div className="mn-processing-card">
-        <h1 className="text-xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance sm:text-2xl">
+        <h1 className="mn-hero-title text-xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance sm:text-2xl">
           <HighlightedBrandText text={title} />
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">

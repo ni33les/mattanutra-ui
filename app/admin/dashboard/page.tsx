@@ -16,6 +16,9 @@ import { getAdminFinancialsData } from "@/lib/admin-financials";
 import { getAdminFoodsData } from "@/lib/admin-foods";
 import { getAdminProductsData } from "@/lib/admin-products";
 import {
+  getAdminRecommendationInsightsData
+} from "@/lib/admin-recommendation-insights";
+import {
   getAdminCampaignsData,
   getAdminContentData,
   getAdminLeadsData
@@ -53,8 +56,10 @@ export default async function AdminDashboardPage({
     rawView === "flow" ||
     rawView === "glance" ||
     rawView === "leads" ||
+    rawView === "product-insights" ||
     rawView === "products" ||
     rawView === "reviews" ||
+    rawView === "supplement-insights" ||
     rawView === "supplements" ||
     rawView === "testimonials" ||
     rawView === "visibility"
@@ -80,6 +85,7 @@ export default async function AdminDashboardPage({
     flowData,
     leadsData,
     productsData,
+    recommendationInsightsData,
     reviewQueueData,
     supplementsData,
     visibilityData
@@ -94,9 +100,10 @@ export default async function AdminDashboardPage({
     getAdminFoodsData(),
     getAdminFlowData(range, filters),
     getAdminLeadsData(range, filters),
-    getAdminProductsData(),
+    getAdminProductsData(range),
+    getAdminRecommendationInsightsData(range),
     getAdminReviewQueueData(),
-    getAdminSupplementsData(),
+    getAdminSupplementsData(range),
     getAdminTaskVisibilityData(range, selectedTaskId)
   ]);
 
@@ -116,6 +123,7 @@ export default async function AdminDashboardPage({
       leadsData={leadsData}
       locale="en"
       productsData={productsData}
+      recommendationInsightsData={recommendationInsightsData}
       reviewQueueData={reviewQueueData}
       selectedReviewTaskId={selectedReviewTaskId}
       selectedTaskId={selectedTaskId}

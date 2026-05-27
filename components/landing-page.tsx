@@ -857,12 +857,12 @@ export function LandingPage({
         <div className="mn-v14-container relative z-[1] grid items-center gap-14 py-20 lg:grid-cols-[1.02fr_0.98fr] lg:py-24">
           <div>
             <p className="mn-v14-eyebrow" data-reveal>{copy.hero.eyebrow}</p>
-            <h1 className="mt-6 max-w-4xl font-[family:var(--mn-font-display)] text-5xl font-medium leading-[1.02] text-[var(--mn-ink)] sm:text-6xl lg:text-7xl" data-reveal>
+            <h1 className="mn-hero-title mt-6 max-w-4xl font-[family:var(--mn-font-display)] text-5xl font-medium leading-[1.02] text-[var(--mn-ink)] sm:text-6xl lg:text-7xl" data-reveal>
               {copy.hero.title}
               <br />
               <span className="italic text-[var(--mn-teal-deep)]">{copy.hero.accent}</span>
             </h1>
-            <p className="mt-7 max-w-xl text-lg leading-8 text-[var(--mn-ink-soft)] sm:text-xl" data-reveal>
+            <p className="mn-hero-subtitle mt-7 max-w-xl text-lg leading-8 text-[var(--mn-ink-soft)] sm:text-xl" data-reveal>
               {copy.hero.intro}
             </p>
             <div className="mt-8 max-w-xl border-l-2 border-[var(--mn-gold-soft)] pl-5" data-reveal>

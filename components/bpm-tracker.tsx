@@ -19,7 +19,7 @@ function pageEventForPath(pathname: string) {
 
   if (
     /^\/(en|th)\/assessment\/results/.test(pathname) ||
-    /^\/(en|th)\/nutrition\/refine/.test(pathname)
+    /^\/(en|th)\/nutrition\/reveal/.test(pathname)
   ) {
     return { eventName: "formulation_page_viewed", eventType: "formulation" };
   }

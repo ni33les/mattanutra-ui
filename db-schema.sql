@@ -66,6 +66,7 @@ drop table if exists
   public.product_import_runs,
   public.product_imports,
   public.product_offers,
+  public.product_recommendation_decisions,
   public.product_recommendation_items,
   public.product_recommendation_runs,
   public.product_translations,
@@ -79,6 +80,7 @@ drop table if exists
   public.supplement_admin_audit,
   public.supplement_alias_events,
   public.supplement_aliases,
+  public.supplement_recommendation_selections,
   public.supplement_safety_limits,
   public.supplement_versions,
   public.supplements,
@@ -426,6 +428,7 @@ CREATE TABLE public.assessments (
     status public.assessment_status DEFAULT 'captured'::public.assessment_status NOT NULL,
     answers jsonb DEFAULT '{}'::jsonb NOT NULL,
     answer_summary jsonb DEFAULT '{}'::jsonb NOT NULL,
+    first_name text,
     health_score jsonb DEFAULT '{}'::jsonb NOT NULL,
     queue_position integer,
     error_message text,
@@ -1383,6 +1386,39 @@ CREATE TABLE public.product_recommendation_items (
 
 
 --
+-- Name: product_recommendation_decisions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_recommendation_decisions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    run_id uuid NOT NULL,
+    plan_id uuid,
+    task_id uuid,
+    product_id uuid NOT NULL,
+    product_title text NOT NULL,
+    outcome text NOT NULL,
+    dedupe_key text NOT NULL,
+    rank integer,
+    score numeric,
+    product_coverage_percent numeric,
+    stack_contribution_percent numeric,
+    serving_multiplier integer DEFAULT 1 NOT NULL,
+    covered_needs jsonb DEFAULT '[]'::jsonb NOT NULL,
+    reason text,
+    offer_id uuid,
+    url_used text,
+    price_amount numeric,
+    currency text DEFAULT 'THB'::text NOT NULL,
+    unknown_at_recommendation boolean DEFAULT false NOT NULL,
+    is_current boolean DEFAULT false NOT NULL,
+    generated_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_recommendation_decisions_outcome_check CHECK ((outcome = ANY (ARRAY['chosen'::text, 'near_miss'::text, 'rejected'::text]))),
+    CONSTRAINT product_recommendation_decisions_serving_multiplier_check CHECK ((serving_multiplier >= 1))
+);
+
+
+--
 -- Name: product_recommendation_runs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1716,6 +1752,38 @@ CREATE TABLE public.supplement_safety_limits (
     CONSTRAINT supplement_safety_limits_confidence_check CHECK ((confidence = ANY (ARRAY['high'::text, 'moderate'::text, 'low'::text]))),
     CONSTRAINT supplement_safety_limits_safety_flags_check CHECK ((safety_flags <@ ARRAY['allergy_caution'::text, 'bleeding_risk'::text, 'condition_caution'::text, 'contamination_risk'::text, 'exclude_automated_use'::text, 'general_caution'::text, 'hormone_caution'::text, 'kidney_caution'::text, 'liver_caution'::text, 'medication_interaction'::text, 'pregnancy_caution'::text, 'regulatory_risk'::text, 'stimulant'::text, 'upper_dose_risk'::text])),
     CONSTRAINT supplement_safety_limits_version_check CHECK ((version > 0))
+);
+
+
+--
+-- Name: supplement_recommendation_selections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.supplement_recommendation_selections (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    plan_id uuid NOT NULL,
+    formulation_version integer NOT NULL,
+    task_id uuid,
+    model_version text,
+    item_id text NOT NULL,
+    supplement_id uuid,
+    supplement_name jsonb DEFAULT '{}'::jsonb NOT NULL,
+    supplement_name_text text NOT NULL,
+    category text NOT NULL,
+    status text NOT NULL,
+    effectiveness_rank integer NOT NULL,
+    daily_dose jsonb DEFAULT '{}'::jsonb NOT NULL,
+    daily_dose_text text NOT NULL,
+    dose_amount numeric,
+    dose_unit text,
+    dose_parse_status text DEFAULT 'unparsed'::text NOT NULL,
+    safety_action text,
+    safety_visibility text,
+    is_current boolean DEFAULT false NOT NULL,
+    generated_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT supplement_recommendation_selections_dose_parse_status_check CHECK ((dose_parse_status = ANY (ARRAY['parsed'::text, 'unparsed'::text]))),
+    CONSTRAINT supplement_recommendation_selections_status_check CHECK ((status = ANY (ARRAY['covered'::text, 'add'::text, 'review'::text])))
 );
 
 
@@ -2451,6 +2519,22 @@ ALTER TABLE ONLY public.product_recommendation_items
 
 
 --
+-- Name: product_recommendation_decisions product_recommendation_decisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recommendation_decisions
+    ADD CONSTRAINT product_recommendation_decisions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: product_recommendation_decisions product_recommendation_decisions_run_id_dedupe_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recommendation_decisions
+    ADD CONSTRAINT product_recommendation_decisions_run_id_dedupe_key_key UNIQUE (run_id, dedupe_key);
+
+
+--
 -- Name: product_recommendation_runs product_recommendation_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2552,6 +2636,22 @@ ALTER TABLE ONLY public.supplement_safety_limits
 
 ALTER TABLE ONLY public.supplement_safety_limits
     ADD CONSTRAINT supplement_safety_limits_supplement_id_version_key UNIQUE (supplement_id, version);
+
+
+--
+-- Name: supplement_recommendation_selections supplement_recommendation_selections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.supplement_recommendation_selections
+    ADD CONSTRAINT supplement_recommendation_selections_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: supplement_recommendation_selections supplement_recommendation_selections_plan_version_item_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.supplement_recommendation_selections
+    ADD CONSTRAINT supplement_recommendation_selections_plan_version_item_key UNIQUE (plan_id, formulation_version, item_id);
 
 
 --
@@ -3336,6 +3436,27 @@ CREATE INDEX product_recommendation_items_product_idx ON public.product_recommen
 
 
 --
+-- Name: product_recommendation_decisions_current_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX product_recommendation_decisions_current_idx ON public.product_recommendation_decisions USING btree (is_current, outcome, generated_at DESC);
+
+
+--
+-- Name: product_recommendation_decisions_product_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX product_recommendation_decisions_product_idx ON public.product_recommendation_decisions USING btree (product_id, outcome, generated_at DESC);
+
+
+--
+-- Name: product_recommendation_decisions_run_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX product_recommendation_decisions_run_idx ON public.product_recommendation_decisions USING btree (run_id, outcome);
+
+
+--
 -- Name: product_recommendation_runs_plan_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3494,6 +3615,27 @@ CREATE INDEX supplement_admin_audit_supplement_idx ON public.supplement_admin_au
 --
 
 CREATE INDEX supplement_aliases_supplement_idx ON public.supplement_aliases USING btree (supplement_id, alias);
+
+
+--
+-- Name: supplement_recommendation_selections_current_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX supplement_recommendation_selections_current_idx ON public.supplement_recommendation_selections USING btree (is_current, status, generated_at DESC);
+
+
+--
+-- Name: supplement_recommendation_selections_plan_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX supplement_recommendation_selections_plan_idx ON public.supplement_recommendation_selections USING btree (plan_id, formulation_version DESC);
+
+
+--
+-- Name: supplement_recommendation_selections_supplement_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX supplement_recommendation_selections_supplement_idx ON public.supplement_recommendation_selections USING btree (supplement_id, generated_at DESC) WHERE (supplement_id IS NOT NULL);
 
 
 --
@@ -4200,6 +4342,46 @@ ALTER TABLE ONLY public.product_recommendation_items
 
 
 --
+-- Name: product_recommendation_decisions product_recommendation_decisions_offer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recommendation_decisions
+    ADD CONSTRAINT product_recommendation_decisions_offer_id_fkey FOREIGN KEY (offer_id) REFERENCES public.product_offers(id) ON DELETE SET NULL;
+
+
+--
+-- Name: product_recommendation_decisions product_recommendation_decisions_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recommendation_decisions
+    ADD CONSTRAINT product_recommendation_decisions_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.assessments(plan_id) ON DELETE SET NULL;
+
+
+--
+-- Name: product_recommendation_decisions product_recommendation_decisions_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recommendation_decisions
+    ADD CONSTRAINT product_recommendation_decisions_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: product_recommendation_decisions product_recommendation_decisions_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recommendation_decisions
+    ADD CONSTRAINT product_recommendation_decisions_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.product_recommendation_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_recommendation_decisions product_recommendation_decisions_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recommendation_decisions
+    ADD CONSTRAINT product_recommendation_decisions_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.tasks(id) ON DELETE SET NULL;
+
+
+--
 -- Name: product_recommendation_runs product_recommendation_runs_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4285,6 +4467,30 @@ ALTER TABLE ONLY public.supplement_admin_audit
 
 ALTER TABLE ONLY public.supplement_aliases
     ADD CONSTRAINT supplement_aliases_supplement_id_fkey FOREIGN KEY (supplement_id) REFERENCES public.supplements(id) ON DELETE CASCADE;
+
+
+--
+-- Name: supplement_recommendation_selections supplement_recommendation_selections_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.supplement_recommendation_selections
+    ADD CONSTRAINT supplement_recommendation_selections_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.assessments(plan_id) ON DELETE CASCADE;
+
+
+--
+-- Name: supplement_recommendation_selections supplement_recommendation_selections_supplement_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.supplement_recommendation_selections
+    ADD CONSTRAINT supplement_recommendation_selections_supplement_id_fkey FOREIGN KEY (supplement_id) REFERENCES public.supplements(id) ON DELETE SET NULL;
+
+
+--
+-- Name: supplement_recommendation_selections supplement_recommendation_selections_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.supplement_recommendation_selections
+    ADD CONSTRAINT supplement_recommendation_selections_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.tasks(id) ON DELETE SET NULL;
 
 
 --

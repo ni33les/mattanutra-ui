@@ -50,12 +50,12 @@ export function HeroSplit({
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--brand-blue)]">
             {eyebrow}
           </p>
-          <h1 className="mt-6 text-5xl font-semibold leading-[1.02] tracking-normal text-[var(--brand-navy)] text-balance sm:text-6xl lg:text-7xl">
+          <h1 className="mn-hero-title mt-6 text-5xl font-semibold leading-[1.02] tracking-normal text-[var(--brand-navy)] text-balance sm:text-6xl lg:text-7xl">
             {renderAccentText(headline, headlineAccent, "text-[var(--brand-green)]")}{" "}
             <span className="text-[var(--brand-navy)]">{headlineMuted}</span>
           </h1>
           {subheadline ? (
-            <p className="mt-8 max-w-xl text-lg font-medium leading-8 text-muted-foreground sm:text-xl">
+            <p className="mn-hero-subtitle mt-8 max-w-xl text-lg font-medium leading-8 text-muted-foreground sm:text-xl">
               {renderAccentText(
                 subheadline,
                 subheadlineAccent,

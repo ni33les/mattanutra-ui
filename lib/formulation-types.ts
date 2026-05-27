@@ -166,12 +166,38 @@ export type NutritionReport = {
   generatedAt?: string;
   nextSteps: NutritionReportSection[];
   planId?: string;
+  revealPageCopy?: RevealPageCopy;
   safetyNotes: LocalizedText[];
   summary: LocalizedText;
   synergies: NutritionReportSection[];
   title: LocalizedText;
   version?: number;
 };
+
+export const revealPageCopySlots = [
+  "heroTitle",
+  "heroHeadline",
+  "heroSub",
+  "breadcrumbsTitle",
+  "breadcrumbsBody",
+  "distillNarrative",
+  "distillFoot",
+  "formulaTitle",
+  "formulaLead",
+  "productsTitle",
+  "productsLead",
+  "safetyHeadline",
+  "safetyBody",
+  "closingTitle",
+  "closingBody"
+] as const;
+
+export type RevealPageCopySlot = (typeof revealPageCopySlots)[number];
+
+export type RevealPageCopy = Readonly<Record<
+  RevealPageCopySlot,
+  Readonly<Record<"en" | "th", string>>
+>>;
 
 export type ProductRecommendationStatus = "failed" | "partial" | "pending" | "ready";
 export type ProductStackPreference = "balanced" | "compact";
@@ -241,6 +267,7 @@ export type FormulationResult = FormulationBlueprint & FoodGuidanceBlueprint & {
   assessmentSummary: AssessmentSummary;
   catalogueProductCount?: number;
   catalogueSupplementCount?: number;
+  firstName?: string | null;
   generatedAt: string;
   lockedFoodCount?: number;
   lockedSupplementCount?: number;

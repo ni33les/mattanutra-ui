@@ -15,7 +15,7 @@ import {
   recordFinanceTransaction
 } from "@/lib/finance-ledger";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { nutritionQuizPath, nutritionRefinePath } from "@/lib/nutrition-paths";
+import { nutritionQuizPath, nutritionRevealPath } from "@/lib/nutrition-paths";
 import { paymentReturnPath, type PaymentSourceSurface } from "@/lib/payment-paths";
 import { writePaymentBpmEvent } from "@/lib/payment-bpm";
 import { siteBaseUrl } from "@/lib/site-url";
@@ -2908,7 +2908,7 @@ export function paymentReturnDestination(
   }
 
   if (payment.planId) {
-    return nutritionRefinePath(locale, payment.planId);
+    return nutritionRevealPath(locale, payment.planId);
   }
 
   return nutritionQuizPath(locale, undefined, { payment: payment.id });

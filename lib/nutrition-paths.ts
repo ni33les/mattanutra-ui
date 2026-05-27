@@ -31,6 +31,6 @@ export function nutritionHealthScorePath(locale: Locale, planId?: string) {
   return withQuery(`/${locale}/nutrition/healthscore`, { plan: planId });
 }
 
-export function nutritionRefinePath(locale: Locale, planId?: string) {
-  return withQuery(`/${locale}/nutrition/refine`, { plan: planId });
+export function nutritionRevealPath(locale: Locale, planId?: string) {
+  return withQuery(`/${locale}/nutrition/reveal`, { plan: planId });
 }

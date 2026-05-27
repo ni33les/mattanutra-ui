@@ -29,6 +29,10 @@ import {
   getAdminProductsData
 } from "@/lib/admin-products";
 import {
+  emptyAdminRecommendationInsightsData,
+  getAdminRecommendationInsightsData
+} from "@/lib/admin-recommendation-insights";
+import {
   emptyCampaignsData,
   emptyContentData,
   emptyLeadsData,
@@ -100,8 +104,10 @@ export default async function LocalizedAdminDashboardPage({
     rawView === "flow" ||
     rawView === "glance" ||
     rawView === "leads" ||
+    rawView === "product-insights" ||
     rawView === "products" ||
     rawView === "reviews" ||
+    rawView === "supplement-insights" ||
     rawView === "supplements" ||
     rawView === "testimonials" ||
     rawView === "visibility"
@@ -126,6 +132,7 @@ export default async function LocalizedAdminDashboardPage({
   let flowData = emptyFlow(range);
   let leadsData = emptyLeadsData();
   let productsData = emptyAdminProductsData();
+  let recommendationInsightsData = emptyAdminRecommendationInsightsData(range);
   let reviewQueueData = emptyAdminReviewQueueData();
   let supplementsData = emptyAdminSupplementsData();
   let visibilityData = emptyVisibilityData();
@@ -159,13 +166,17 @@ export default async function LocalizedAdminDashboardPage({
   } else if (view === "leads") {
     leadsData = await getAdminLeadsData(range, filters);
   } else if (view === "products") {
-    productsData = await getAdminProductsData();
+    productsData = await getAdminProductsData(range);
+  } else if (view === "product-insights" || view === "supplement-insights") {
+    recommendationInsightsData = await getAdminRecommendationInsightsData(range);
+    productsData = await getAdminProductsData(range);
+    supplementsData = await getAdminSupplementsData(range);
   } else if (view === "reviews") {
     reviewQueueData = await getAdminReviewQueueData();
-    productsData = await getAdminProductsData();
-    supplementsData = await getAdminSupplementsData();
+    productsData = await getAdminProductsData(range);
+    supplementsData = await getAdminSupplementsData(range);
   } else if (view === "supplements") {
-    supplementsData = await getAdminSupplementsData();
+    supplementsData = await getAdminSupplementsData(range);
   } else if (view === "visibility") {
     visibilityData = await getAdminTaskVisibilityData(range, selectedTaskId);
   }
@@ -186,6 +197,7 @@ export default async function LocalizedAdminDashboardPage({
       leadsData={leadsData}
       locale={locale}
       productsData={productsData}
+      recommendationInsightsData={recommendationInsightsData}
       reviewQueueData={reviewQueueData}
       selectedReviewTaskId={selectedReviewTaskId}
       selectedTaskId={selectedTaskId}

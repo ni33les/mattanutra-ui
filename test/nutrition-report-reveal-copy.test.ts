@@ -1,0 +1,102 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { revealPageCopySlots } from "../lib/formulation-types.ts";
+import { validateRevealPageCopy } from "../lib/nutrition-plan-advisor-analysis.ts";
+
+function validRevealPageCopy() {
+  return Object.fromEntries(
+    revealPageCopySlots.map((slot) => [
+      slot,
+      {
+        en: `Personalised ${slot} copy for the reveal page.`,
+        th: `ข้อความภาษาไทยสำหรับ ${slot}`
+      }
+    ])
+  );
+}
+
+describe("nutrition report reveal page copy validator", () => {
+  it("accepts complete English and Thai reveal page copy", () => {
+    const validation = validateRevealPageCopy(validRevealPageCopy());
+
+    assert.deepEqual(validation.errors, []);
+    assert.ok(validation.copy);
+    assert.equal(validation.copy.heroTitle.en, "Personalised heroTitle copy for the reveal page.");
+  });
+
+  it("rejects missing required locales", () => {
+    const copy = validRevealPageCopy() as Record<string, unknown>;
+
+    copy.heroSub = { en: "English only reveal copy." };
+
+    const validation = validateRevealPageCopy(copy);
+
+    assert.ok(validation.errors.some((error) => error.includes("heroSub.th")));
+  });
+
+  it("rejects extra fields", () => {
+    const validation = validateRevealPageCopy({
+      ...validRevealPageCopy(),
+      lockedCount: { en: "Do not add facts.", th: "ไม่เพิ่มข้อเท็จจริง" }
+    });
+
+    assert.ok(
+      validation.errors.some((error) =>
+        error.includes("unexpected fields: lockedCount")
+      )
+    );
+  });
+
+  it("rejects wrong field shapes", () => {
+    const copy = validRevealPageCopy() as Record<string, unknown>;
+
+    copy.formulaLead = "Not localized";
+
+    const validation = validateRevealPageCopy(copy);
+
+    assert.ok(
+      validation.errors.some((error) =>
+        error.includes("formulaLead must be a localized object")
+      )
+    );
+  });
+
+  it("rejects banned medical wording", () => {
+    const copy = validRevealPageCopy() as Record<string, unknown>;
+
+    copy.safetyBody = {
+      en: "This plan will treat your condition.",
+      th: "ข้อความภาษาไทย"
+    };
+
+    const validation = validateRevealPageCopy(copy);
+
+    assert.ok(validation.errors.some((error) => error.includes("forbidden term")));
+  });
+
+  it("rejects HTML or markdown", () => {
+    const copy = validRevealPageCopy() as Record<string, unknown>;
+
+    copy.closingBody = {
+      en: "<strong>Styled reveal copy</strong>",
+      th: "ข้อความภาษาไทย"
+    };
+
+    const validation = validateRevealPageCopy(copy);
+
+    assert.ok(validation.errors.some((error) => error.includes("HTML or markdown")));
+  });
+
+  it("rejects invented numeric claims", () => {
+    const copy = validRevealPageCopy() as Record<string, unknown>;
+
+    copy.productsLead = {
+      en: "This covers 5 product needs.",
+      th: "ข้อความภาษาไทย"
+    };
+
+    const validation = validateRevealPageCopy(copy);
+
+    assert.ok(validation.errors.some((error) => error.includes("numeric claims")));
+  });
+});

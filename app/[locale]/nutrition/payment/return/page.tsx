@@ -168,7 +168,7 @@ export default async function PaymentReturnPage({
           >
             <Icon aria-hidden className="size-8" />
           </div>
-          <h1 className="mt-6 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)]">
+          <h1 className="mn-hero-title mt-6 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)]">
             {labels.title}
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-[var(--mn-ink-soft)]">

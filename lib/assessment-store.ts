@@ -35,6 +35,10 @@ import {
 } from "@/lib/product-recommendations";
 import { getSql } from "@/lib/db";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
+import {
+  firstNameFromAssessmentAnswers,
+  normalizeAssessmentFirstName
+} from "@/lib/assessment-first-name";
 
 export type StoredAssessmentStatus =
   | "captured"
@@ -850,16 +854,28 @@ function scalarOrNull(value: unknown) {
 
 function buildAnswerSummary(answers: unknown) {
   const record = toJsonRecord(answers);
+  const firstName = firstNameFromAssessmentAnswers(record);
 
   return {
     age: scalarOrNull(record.age),
     budget: scalarOrNull(record.budget),
     country: scalarOrNull(record.country),
+    firstName,
     goals: Array.isArray(record.goals) ? record.goals : [],
     medications: scalarOrNull(record.meds),
     maxPills: scalarOrNull(record.maxPills),
     sex: scalarOrNull(record.sex),
     symptoms: Array.isArray(record.symptoms) ? record.symptoms : []
+  };
+}
+
+function buildStoredAssessmentAnswers(answers: unknown) {
+  const record = toJsonRecord(answers);
+  const firstName = firstNameFromAssessmentAnswers(record);
+
+  return {
+    ...record,
+    firstName: firstName ?? ""
   };
 }
 
@@ -890,6 +906,7 @@ export async function ensureAssessmentSchema() {
       "status",
       "answers",
       "answer_summary",
+      "first_name",
       "health_score",
       "queue_position",
       "error_message",
@@ -967,8 +984,10 @@ export async function persistAssessmentSubmission({
   await ensureAssessmentSchema();
   const normalizedLocale = normalizeLocale(locale);
   const storedPlan = toStoredPlan(selectedPlan);
-  const storedAnswers = toJsonValue(answers);
-  const storedAnswerSummary = toJsonValue(buildAnswerSummary(answers));
+  const storedAnswersRecord = buildStoredAssessmentAnswers(answers);
+  const firstName = normalizeAssessmentFirstName(storedAnswersRecord.firstName);
+  const storedAnswers = toJsonValue(storedAnswersRecord);
+  const storedAnswerSummary = toJsonValue(buildAnswerSummary(storedAnswersRecord));
   const storedHealthScore = toJsonValue(snapshot.healthScore);
   const beforeRows = await sql<Array<{ before_payload: unknown }>>`
     select to_jsonb(assessments.*) as before_payload
@@ -982,6 +1001,7 @@ export async function persistAssessmentSubmission({
     afterPayload: {
       answers: storedAnswers,
       answerSummary: storedAnswerSummary,
+      firstName,
       healthScore: storedHealthScore,
       locale: normalizedLocale,
       queuePosition: snapshot.queuePosition,
@@ -1007,6 +1027,7 @@ export async function persistAssessmentSubmission({
       status,
       answers,
       answer_summary,
+      first_name,
       health_score,
       queue_position,
       plan_selected_at,
@@ -1021,6 +1042,7 @@ export async function persistAssessmentSubmission({
       ${status},
       ${sql.json(storedAnswers)},
       ${sql.json(storedAnswerSummary)},
+      ${firstName},
       ${sql.json(storedHealthScore)},
       ${snapshot.queuePosition},
       ${selectedPlan ? sql`now()` : null},
@@ -1036,6 +1058,7 @@ export async function persistAssessmentSubmission({
       status = excluded.status,
       answers = excluded.answers,
       answer_summary = excluded.answer_summary,
+      first_name = excluded.first_name,
       health_score = excluded.health_score,
       queue_position = excluded.queue_position,
       error_message = case
@@ -1281,6 +1304,7 @@ export async function getStoredFormulationResult(
   const rows = await sql`
     select
       assessments.answers,
+      assessments.first_name,
       assessments.locale,
       assessments.selected_plan::text,
       assessments.updated_at as assessment_updated_at,
@@ -1679,6 +1703,9 @@ export async function getStoredFormulationResult(
   }
 
   const locale = normalizeLocale(row.locale);
+  const firstName =
+    normalizeAssessmentFirstName(row.first_name) ??
+    firstNameFromAssessmentAnswers(row.answers);
   const plan = fromStoredPlan(row.selected_plan);
   const storedFormulation = asRecord(row.formulation);
   const storedFoodGuidanceRecord = asRecord(row.food_guidance);
@@ -1914,6 +1941,7 @@ export async function getStoredFormulationResult(
       Number(row.active_supplement_count) || 0
     ),
     generatedAt,
+    ...(firstName ? { firstName } : {}),
     planId,
     nutritionReport,
     ...(productRecommendationStatus

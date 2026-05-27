@@ -5,6 +5,8 @@ import {
   ExclamationTriangleIcon,
   InformationCircleIcon
 } from "@heroicons/react/20/solid";
+import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
+import { LandingReveal } from "@/components/landing-reveal";
 import { NutritionProgress } from "@/components/nutrition-progress";
 import type {
   FormulationIngredient,
@@ -14,6 +16,7 @@ import type {
   ProductStackPreference,
   RecommendedProduct
 } from "@/lib/formulation-types";
+import type { RevealPageCopySlot } from "@/lib/formulation-types";
 import { foodTagLabel } from "@/lib/food-tags";
 import {
   localeHtmlLang,
@@ -23,7 +26,7 @@ import {
 } from "@/lib/i18n";
 import {
   nutritionHealthScorePath,
-  nutritionRefinePath
+  nutritionRevealPath
 } from "@/lib/nutrition-paths";
 
 type FormulationResultsProps = Readonly<{
@@ -221,11 +224,11 @@ export const formulationResultsCopy = {
     generated: "Generated",
     goals: "Goals",
     heroSubtitle:
-      "Review the supplements, tell us what to change, then refine the plan around your preferences.",
-    heroTitle: "Let's refine your nutrition guidance",
+      "Review the formula, product matches, and safety notes selected from your assessment.",
+    heroTitle: "Your nutrition reveal is ready",
     loading: "Loading your formulation",
     nutritionProgressBody:
-      "We’re preparing your supplement guidance. The refinement tools will appear here as soon as everything is ready.",
+      "We’re preparing your supplement guidance. Your reveal page will appear here as soon as everything is ready.",
     nutritionProgressFoods: "Food guidance",
     nutritionProgressPending: "Preparing",
     nutritionProgressReady: "Ready",
@@ -321,11 +324,11 @@ export const formulationResultsCopy = {
     generated: "สร้างเมื่อ",
     goals: "เป้าหมาย",
     heroSubtitle:
-      "ตรวจคำแนะนำอาหารเสริม บอกเราว่าต้องการเปลี่ยนอะไร แล้วปรับแผนให้เข้ากับคุณ",
-    heroTitle: "มาปรับคำแนะนำโภชนาการของคุณกัน",
+      "ตรวจสูตร ผลิตภัณฑ์ที่จับคู่ และหมายเหตุด้านความปลอดภัยจากแบบประเมินของคุณ",
+    heroTitle: "ผลลัพธ์โภชนาการของคุณพร้อมแล้ว",
     loading: "กำลังโหลดสูตรของคุณ",
     nutritionProgressBody:
-      "เรากำลังเตรียมคำแนะนำอาหารเสริม เครื่องมือปรับแผนจะแสดงที่นี่เมื่อทุกอย่างพร้อม",
+      "เรากำลังเตรียมคำแนะนำอาหารเสริม หน้าแสดงผลลัพธ์จะแสดงที่นี่เมื่อทุกอย่างพร้อม",
     nutritionProgressFoods: "คำแนะนำอาหาร",
     nutritionProgressPending: "กำลังเตรียม",
     nutritionProgressReady: "พร้อมแล้ว",
@@ -403,8 +406,8 @@ function supplementBenefitTags(ingredient: FormulationIngredient) {
   return [...new Set([...explicitTags, ...derivedTags])].slice(0, 4);
 }
 
-function planResultsHref(locale: Locale, planId: string) {
-  return nutritionRefinePath(locale, planId);
+function planRevealHref(locale: Locale, planId: string) {
+  return nutritionRevealPath(locale, planId);
 }
 
 function planPaywallHref(locale: Locale, planId: string) {
@@ -604,7 +607,7 @@ export function FormulationResults({
       <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
         <NutritionProgress
           className="mb-8"
-          current="refine"
+          current="reveal"
           locale={locale}
         />
         <div className="rounded-lg bg-white p-6 text-center ring-1 ring-foreground/10 sm:p-8">
@@ -699,7 +702,7 @@ function NutritionGuidancePreparingPanel({
     <section className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:py-14">
       <NutritionProgress
         className="mb-8"
-        current="refine"
+        current="reveal"
         locale={locale}
         pending={true}
       />
@@ -707,7 +710,7 @@ function NutritionGuidancePreparingPanel({
         aria-live="polite"
         className="rounded-lg bg-white p-6 ring-1 ring-foreground/10 transition-colors sm:p-8"
       >
-        <h1 className="max-w-2xl text-2xl font-semibold tracking-normal text-[var(--mn-ink)] sm:text-3xl">
+        <h1 className="mn-hero-title max-w-2xl text-2xl font-semibold tracking-normal text-[var(--mn-ink)] sm:text-3xl">
           {labels.nutritionProgressTitle}
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -733,7 +736,14 @@ const revealCopy = {
     formulaLead:
       "These are the supplement priorities selected from your answers, cautions and product coverage.",
     formulaTitle: "The exact stack selected for you.",
+    formulaMetaEvaluated: "evaluated",
+    formulaMetaSelected: "selected",
+    formulaMetaNoPadding: "no padding",
+    formulaMetaTier: "Formula",
+    formulaMetaNrv: "Dose guidance",
+    formulaSignedPrefix: "Composed",
     heroEyebrow: "Your Right Amount",
+    heroFor: "For",
     heroTitle: "Your Right Amount",
     heroHeadline:
       "Your plan has been distilled into the few things most likely to matter.",
@@ -747,12 +757,15 @@ const revealCopy = {
     personalizationTitle: "We built this around your context.",
     productsBody:
       "Products are shown as the closest available stack from the approved catalogue. The goal is fewer bottles, clear coverage and no unnecessary overlap.",
+    productsLead:
+      "Products are shown as the closest available stack from the approved catalogue. The goal is fewer bottles, clear coverage and no unnecessary overlap.",
     productsEmpty:
       "The formula is ready, but the product catalogue does not yet contain an approved stack for these needs.",
     productsTitle: "From shelves to certainty.",
     supplementsRecommended: "supplements recommended",
     productsRecommended: "products recommended for you",
     productDoseRecommended: "Recommended dose",
+    productVerified: "Matched",
     productServingUnit: "servings",
     productSingleServingUnit: "serving",
     productMatchTemplate:
@@ -761,12 +774,18 @@ const revealCopy = {
       "Use {servings} {servingUnit}. Matches {covers} and accounts for {percent}% of the selected stack.",
     selectedProducts: "Selected products",
     selectedSuffix: "selected",
+    begin: "Begin",
     tableAmount: "Daily amount",
     tableCoverage: "Product fit",
     tableName: "Supplement",
     tableReason: "Why it is here",
     viewProduct: "View product",
     cautionsTitle: "Cautions checked",
+    coverageHeadlineTemplate: "All {supplementCount} priorities covered.",
+    coverageSub:
+      "Every product is checked against your formula, serving burden, and catalogue data before it appears here.",
+    bottles: "Bottles",
+    prioritiesCovered: "Priorities covered",
     closingTitle: "The wisdom of knowing the right amount",
     closingBody:
       "Not from more, but from exactly enough. This formula is the practical version of that idea: the right priorities, in the right amounts, with product choices where the data is strong enough.",
@@ -791,7 +810,14 @@ const revealCopy = {
     formulaLead:
       "นี่คือลำดับความสำคัญของอาหารเสริมที่เลือกจากคำตอบ ข้อควรระวัง และความครอบคลุมของผลิตภัณฑ์",
     formulaTitle: "ชุดอาหารเสริมที่เลือกให้คุณ",
+    formulaMetaEvaluated: "ประเมิน",
+    formulaMetaSelected: "เลือก",
+    formulaMetaNoPadding: "ไม่เติมเกินจำเป็น",
+    formulaMetaTier: "สูตร",
+    formulaMetaNrv: "แนวทางปริมาณ",
+    formulaSignedPrefix: "จัดทำ",
     heroEyebrow: "ปริมาณที่พอดีของคุณ",
+    heroFor: "สำหรับ",
     heroTitle: "ปริมาณที่พอดีของคุณ",
     heroHeadline: "แผนของคุณถูกกลั่นให้เหลือสิ่งที่น่าจะสำคัญที่สุด",
     heroMetaGenerated: "สร้างเมื่อ",
@@ -804,12 +830,15 @@ const revealCopy = {
     personalizationTitle: "เราสร้างแผนจากบริบทของคุณ",
     productsBody:
       "ผลิตภัณฑ์ที่แสดงคือชุดที่ใกล้ที่สุดจากแคตตาล็อกที่อนุมัติแล้ว เป้าหมายคือขวดน้อยลง ความครอบคลุมชัดเจน และไม่ซ้ำซ้อนเกินจำเป็น",
+    productsLead:
+      "ผลิตภัณฑ์ที่แสดงคือชุดที่ใกล้ที่สุดจากแคตตาล็อกที่อนุมัติแล้ว เป้าหมายคือขวดน้อยลง ความครอบคลุมชัดเจน และไม่ซ้ำซ้อนเกินจำเป็น",
     productsEmpty:
       "สูตรพร้อมแล้ว แต่แคตตาล็อกยังไม่มีชุดผลิตภัณฑ์ที่อนุมัติสำหรับความต้องการนี้",
     productsTitle: "จากชั้นวางสู่ความชัดเจน",
     supplementsRecommended: "อาหารเสริมที่แนะนำ",
     productsRecommended: "ผลิตภัณฑ์ที่แนะนำสำหรับคุณ",
     productDoseRecommended: "ขนาดที่แนะนำ",
+    productVerified: "จับคู่แล้ว",
     productServingUnit: "หน่วยบริโภค",
     productSingleServingUnit: "หน่วยบริโภค",
     productMatchTemplate:
@@ -818,12 +847,18 @@ const revealCopy = {
       "ใช้ {servings} {servingUnit} ครอบคลุม {covers} และคิดเป็น {percent}% ของชุดที่เลือก",
     selectedProducts: "ผลิตภัณฑ์ที่เลือก",
     selectedSuffix: "รายการที่เลือก",
+    begin: "เริ่ม",
     tableAmount: "ปริมาณต่อวัน",
     tableCoverage: "ความพอดีของสินค้า",
     tableName: "อาหารเสริม",
     tableReason: "เหตุผลที่อยู่ในแผน",
     viewProduct: "ดูสินค้า",
     cautionsTitle: "ตรวจข้อควรระวังแล้ว",
+    coverageHeadlineTemplate: "ครอบคลุมลำดับสำคัญ {supplementCount} รายการ",
+    coverageSub:
+      "ผลิตภัณฑ์ทุกตัวถูกเทียบกับสูตร ภาระการรับประทาน และข้อมูลแคตตาล็อกก่อนแสดงบนหน้านี้",
+    bottles: "ขวด",
+    prioritiesCovered: "รายการที่ครอบคลุม",
     closingTitle: "ปัญญาแห่งการรู้ปริมาณที่พอดี",
     closingBody:
       "ไม่ใช่จากการเพิ่มให้มากขึ้น แต่จากการเลือกให้พอดี สูตรนี้คือการนำแนวคิดนั้นมาใช้จริง: ลำดับที่ถูกต้อง ปริมาณที่เหมาะ และผลิตภัณฑ์ที่ข้อมูลแข็งแรงพอ",
@@ -893,9 +928,14 @@ const contextChipLabels: Record<Locale, Record<string, string>> = {
     Female: "Female",
     Fitness: "Fitness",
     Focus: "Focus",
+    Male: "Male",
+    Mood: "Mood",
     Precision: "Precision",
+    "Regular medication noted": "Regular medication noted",
     Sleep: "Sleep",
     Statin: "Statin",
+    Stress: "Stress",
+    "Upcoming surgery noted": "Upcoming surgery noted",
     Thailand: "Thailand"
   },
   th: {
@@ -904,9 +944,14 @@ const contextChipLabels: Record<Locale, Record<string, string>> = {
     Female: "หญิง",
     Fitness: "ฟิตเนส",
     Focus: "สมาธิ",
+    Male: "ชาย",
+    Mood: "อารมณ์",
     Precision: "ความแม่นยำ",
+    "Regular medication noted": "มีการใช้ยาเป็นประจำ",
     Sleep: "การนอน",
     Statin: "สแตติน",
+    Stress: "ความเครียด",
+    "Upcoming surgery noted": "มีแผนผ่าตัด",
     Thailand: "ประเทศไทย"
   }
 };
@@ -928,6 +973,140 @@ const revealJoiners = {
   en: ", ",
   th: " และ "
 } satisfies Record<Locale, string>;
+
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(() =>
+    typeof window === "undefined"
+      ? false
+      : window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const listener = (event: MediaQueryListEvent) => setReduced(event.matches);
+
+    query.addEventListener("change", listener);
+
+    return () => query.removeEventListener("change", listener);
+  }, []);
+
+  return reduced;
+}
+
+function useInViewOnce<T extends HTMLElement>() {
+  const reducedMotion = useReducedMotion();
+  const ref = useRef<T | null>(null);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      return undefined;
+    }
+
+    const element = ref.current;
+
+    if (!element || typeof IntersectionObserver === "undefined") {
+      return undefined;
+    }
+
+    const prepareFrame = window.requestAnimationFrame(() => setVisible(false));
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          window.cancelAnimationFrame(prepareFrame);
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -12% 0px", threshold: 0.12 }
+    );
+
+    observer.observe(element);
+
+    const fallback = window.setTimeout(() => setVisible(true), 1800);
+
+    return () => {
+      window.cancelAnimationFrame(prepareFrame);
+      window.clearTimeout(fallback);
+      observer.disconnect();
+    };
+  }, [reducedMotion]);
+
+  return { ref, visible: visible || reducedMotion } as const;
+}
+
+function CountUpNumber({
+  active,
+  className,
+  duration = 1000,
+  value
+}: Readonly<{
+  active: boolean;
+  className?: string;
+  duration?: number;
+  value: number;
+}>) {
+  const reducedMotion = useReducedMotion();
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    if (reducedMotion || !active) {
+      return undefined;
+    }
+
+    let frame = 0;
+    const startedAt = performance.now();
+
+    function tick(now: number) {
+      const progress = Math.min(1, Math.max(0, (now - startedAt) / duration));
+      const eased = 1 - Math.pow(1 - progress, 3);
+
+      setDisplay(Math.round(value * eased));
+
+      if (progress < 1) {
+        frame = requestAnimationFrame(tick);
+      }
+    }
+
+    frame = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(frame);
+  }, [active, duration, reducedMotion, value]);
+
+  return <span className={className}>{reducedMotion || !active ? value : display}</span>;
+}
+
+const thaiScriptPattern = /[\u0E00-\u0E7F]/;
+
+function localizedPlanText(value: unknown, locale: Locale, fallback: string) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    const text = typeof record[locale] === "string" ? record[locale].trim() : "";
+
+    if (text) {
+      return text;
+    }
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const text = value.trim();
+
+    if (locale === "th" ? thaiScriptPattern.test(text) : !thaiScriptPattern.test(text)) {
+      return text;
+    }
+  }
+
+  return fallback;
+}
+
+function revealSlotCopy(
+  result: FormulationResult,
+  slot: RevealPageCopySlot,
+  locale: Locale,
+  fallback: string
+) {
+  return localizedPlanText(result.nutritionReport?.revealPageCopy?.[slot], locale, fallback);
+}
 
 function localizedBenefitTagLabel(value: string, locale: Locale) {
   return benefitTagLabels[locale][value] ?? benefitTagLabels.en[value] ?? foodTagLabel(value);
@@ -1045,32 +1224,43 @@ function RevealDistillationCard({
   fromCount,
   fromLabel,
   toCount,
-  toLabel
+  toLabel,
+  variant = "card"
 }: Readonly<{
   fromCount: number;
   fromLabel: string;
   toCount: number;
   toLabel: string;
+  variant?: "card" | "plain";
 }>) {
+  const { ref, visible } = useInViewOnce<HTMLDivElement>();
+
   return (
-    <div className="rounded-[var(--mn-radius-xl)] border border-[var(--mn-line)] bg-[var(--mn-paper)] px-6 py-8 shadow-[var(--mn-shadow-soft)]">
+    <div
+      className={
+        variant === "card"
+          ? "rounded-[var(--mn-radius-xl)] border border-[var(--mn-line)] bg-[var(--mn-paper)] px-6 py-8 shadow-[var(--mn-shadow-soft)]"
+          : ""
+      }
+      ref={ref}
+    >
       <div className="flex flex-col items-center justify-center gap-8 sm:flex-row sm:gap-14">
         <div>
           <div className="font-serif text-7xl font-light leading-none text-[var(--mn-ash-soft)] sm:text-8xl">
-            {fromCount}
+            <CountUpNumber active={visible} duration={1100} value={fromCount} />
           </div>
-          <p className="mn-mono-label mt-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-ash)]">
+          <p className="mn-mono-label mt-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-ash)] max-sm:leading-[1.35]">
             {fromLabel}
           </p>
         </div>
-        <div className="font-serif text-5xl italic text-[var(--mn-gold)]">
+        <div className="font-serif text-5xl italic text-[var(--mn-gold)] max-sm:rotate-90">
           →
         </div>
         <div>
           <div className="font-serif text-7xl font-light leading-none text-[var(--mn-teal-deep)] sm:text-8xl">
-            {toCount}
+            <CountUpNumber active={visible} duration={1400} value={toCount} />
           </div>
-          <p className="mn-mono-label mt-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-ink-soft)]">
+          <p className="mn-mono-label mt-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-ink-soft)] max-sm:leading-[1.35]">
             {toLabel}
           </p>
         </div>
@@ -1149,46 +1339,178 @@ function RevealResultsPage({
 
     return option ? [option] : [];
   });
+  const displayFirstName =
+    typeof result.firstName === "string" && result.firstName.trim()
+      ? result.firstName.trim()
+      : "";
+  const heroTitle = revealSlotCopy(result, "heroTitle", locale, copy.heroTitle);
+  const heroHeadline = revealSlotCopy(
+    result,
+    "heroHeadline",
+    locale,
+    copy.heroHeadline
+  );
+  const heroSub = revealSlotCopy(result, "heroSub", locale, copy.heroSub);
+  const breadcrumbsTitle = revealSlotCopy(
+    result,
+    "breadcrumbsTitle",
+    locale,
+    copy.personalizationTitle
+  );
+  const breadcrumbsBody = revealSlotCopy(
+    result,
+    "breadcrumbsBody",
+    locale,
+    copy.personalizationBody
+  );
+  const distillNarrative = revealSlotCopy(
+    result,
+    "distillNarrative",
+    locale,
+    copy.distilledTitle
+  );
+  const distillFoot = revealSlotCopy(
+    result,
+    "distillFoot",
+    locale,
+    formatTemplate(copy.distilledSummaryTemplate, {
+      productSelected: selectedProductCount,
+      productTotal: catalogueProductCount,
+      supplementSelected: recommendedSupplementCount,
+      supplementTotal: catalogueSupplementCount
+    })
+  );
+  const profileLine = [
+    result.assessmentSummary.profile,
+    result.assessmentSummary.region
+  ]
+    .filter(Boolean)
+    .map((value) => localizedContextChip(value, locale))
+    .join(", ");
+  const heroMeta = [
+    { label: copy.heroMetaPlan, value: planId },
+    { label: copy.heroMetaGenerated, value: formattedDate }
+  ];
 
   return (
-    <section className="w-full">
-      <section className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-6xl flex-col items-center justify-center px-6 py-20 text-center sm:px-8">
-        <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.24em] text-[var(--mn-teal-deep)]">
-          {copy.heroEyebrow}
-        </p>
-        <p className="mt-8 font-serif text-2xl italic leading-8 text-[var(--mn-ink-soft)]">
-          {localizedContextChip(result.assessmentSummary.profile, locale)}
-        </p>
-        <h1 className="mt-3 max-w-4xl font-serif text-6xl font-medium leading-none tracking-normal text-[var(--mn-teal-deep)] text-balance sm:text-7xl lg:text-8xl">
-          {copy.heroTitle}
-        </h1>
-        <p className="mt-8 max-w-3xl font-serif text-3xl font-medium leading-tight text-[var(--mn-ink)] text-balance sm:text-4xl">
-          {copy.heroHeadline}
-        </p>
-        <p className="mt-6 max-w-2xl text-base leading-7 text-[var(--mn-ink-soft)]">
-          {copy.heroSub}
-        </p>
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-3 rounded-full bg-[var(--mn-paper)] px-5 py-3 text-xs text-[var(--mn-ash)] ring-1 ring-[var(--mn-line)]">
-          <span>{copy.heroMetaPlan}: {planId}</span>
-          <span aria-hidden={true} className="h-3 w-px bg-[var(--mn-line)]" />
-          <span>{copy.heroMetaGenerated}: {formattedDate}</span>
+    <section className="w-full overflow-hidden">
+      <LandingReveal />
+
+      <section className="relative isolate flex min-h-[calc(100svh-5rem)] w-full items-center justify-center overflow-hidden px-6 py-24 text-center sm:px-8 lg:py-28">
+        <div
+          aria-hidden={true}
+          className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_50%_38%,rgba(31,119,93,0.12),transparent_32rem),linear-gradient(180deg,var(--mn-cream),var(--mn-paper)_58%,var(--mn-cream-deep))]"
+        />
+        <div
+          aria-hidden={true}
+          className="absolute left-1/2 top-[18%] -z-10 size-64 -translate-x-1/2 rounded-full bg-[color-mix(in_srgb,var(--mn-gold)_26%,transparent)] blur-2xl [animation:mn-hero-breathe_7s_ease-in-out_infinite] motion-reduce:animate-none sm:size-80"
+        />
+        <span
+          aria-hidden={true}
+          className="absolute left-[9%] top-[24%] hidden h-16 w-8 -rotate-12 rounded-full rounded-br-sm bg-[color-mix(in_srgb,var(--mn-teal)_16%,transparent)] [animation:mn-float-drift_8s_ease-in-out_infinite] motion-reduce:animate-none md:block"
+        />
+        <span
+          aria-hidden={true}
+          className="absolute right-[12%] top-[32%] hidden h-20 w-9 rotate-12 rounded-full rounded-bl-sm bg-[color-mix(in_srgb,var(--mn-gold)_22%,transparent)] [animation:mn-float-drift_9s_ease-in-out_infinite] motion-reduce:animate-none lg:block"
+        />
+
+        <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center" data-reveal>
+          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.24em] text-[var(--mn-teal-deep)]">
+            {copy.heroEyebrow}
+          </p>
+          {displayFirstName ? (
+            <>
+              <p className="mt-5 max-w-2xl font-serif text-2xl italic leading-9 text-[var(--mn-ink)]">
+                {heroTitle}
+              </p>
+              <p className="mt-8 font-serif text-2xl italic leading-8 text-[var(--mn-ink-soft)]">
+                {copy.heroFor}
+              </p>
+              <h1
+                className={`mn-hero-title mt-2 max-w-5xl break-words font-serif text-6xl font-medium leading-[1.05] tracking-normal text-[var(--mn-teal-deep)] sm:text-7xl lg:text-8xl ${
+                  locale === "th" ? "leading-[1.22]" : ""
+                }`}
+              >
+                {displayFirstName}
+                <span className="text-[var(--mn-gold)]">.</span>
+              </h1>
+            </>
+          ) : (
+            <h1
+              className={`mn-hero-title mt-8 max-w-5xl break-words font-serif text-6xl font-medium leading-[1.05] tracking-normal text-[var(--mn-teal-deep)] sm:text-7xl lg:text-8xl ${
+                locale === "th" ? "leading-[1.22]" : "text-balance"
+              }`}
+            >
+              {heroTitle}
+            </h1>
+          )}
+          {profileLine ? (
+            <p className="mt-5 font-serif text-xl italic leading-8 text-[var(--mn-ink-soft)] sm:text-2xl">
+              {profileLine}
+            </p>
+          ) : null}
+          <p
+            className={`mn-hero-subtitle mt-8 max-w-3xl font-serif text-3xl font-medium text-[var(--mn-ink)] sm:text-4xl ${
+              locale === "th"
+                ? "break-words leading-[1.45] [overflow-wrap:anywhere]"
+                : "leading-tight text-balance"
+            }`}
+          >
+            {heroHeadline}
+          </p>
+          <p
+            className={`mt-6 max-w-2xl text-base text-[var(--mn-ink-soft)] ${
+              locale === "th" ? "leading-8" : "leading-7"
+            }`}
+          >
+            {heroSub}
+          </p>
+          <div className="mt-10 flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--mn-paper)_82%,white)] px-4 py-3 text-xs text-[var(--mn-ash)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:gap-3 sm:px-5">
+            {heroMeta.map((item, index) => (
+              <span className="inline-flex min-w-0 items-center gap-1.5" key={item.label}>
+                {index > 0 ? (
+                  <span
+                    aria-hidden={true}
+                    className="mr-1 hidden h-3 w-px bg-[var(--mn-line)] sm:inline-block"
+                  />
+                ) : null}
+                <span className="shrink-0 font-semibold text-[var(--mn-ink-soft)]">
+                  {item.label}:
+                </span>
+                <span className="min-w-0 truncate">{item.value}</span>
+              </span>
+            ))}
+          </div>
+          <a
+            className="mn-mono-label mt-12 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]"
+            href="#formula"
+          >
+            {copy.begin}
+            <span aria-hidden={true}>↓</span>
+          </a>
         </div>
       </section>
 
       <section className="border-y border-[var(--mn-line)] py-16">
         <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 sm:px-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
-          <div>
+          <div data-reveal>
             <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
               01 · {copy.personalizationEyebrow}
             </p>
-            <h2 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
-              {copy.personalizationTitle}
+            <h2
+              className={`mt-4 font-serif text-4xl font-medium text-[var(--mn-ink)] ${
+                locale === "th"
+                  ? "leading-[1.45] break-words [overflow-wrap:anywhere]"
+                  : "leading-tight text-balance"
+              }`}
+            >
+              {breadcrumbsTitle}
             </h2>
           </div>
-          <p className="text-base leading-8 text-[var(--mn-ink-soft)]">
-            {copy.personalizationBody}
+          <p className="text-base leading-8 text-[var(--mn-ink-soft)]" data-reveal>
+            {breadcrumbsBody}
           </p>
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2" data-reveal>
             <div className="flex flex-wrap gap-2">
               {revealContextChips(result).map((chip) => (
                 <span
@@ -1211,33 +1533,29 @@ function RevealResultsPage({
 
       <section className="py-20 text-center">
         <div className="mx-auto max-w-5xl px-6 sm:px-8">
-          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
+          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]" data-reveal>
             02 · {copy.distilledEyebrow}
           </p>
-          <h2 className="mx-auto mt-6 max-w-3xl font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
-            {copy.distilledTitle}
+          <h2
+            className={`mx-auto mt-6 max-w-3xl font-serif text-4xl font-medium text-[var(--mn-ink)] ${
+              locale === "th"
+                ? "leading-[1.45] break-words [overflow-wrap:anywhere]"
+                : "leading-tight text-balance"
+            }`}
+            data-reveal
+          >
+            {distillNarrative}
           </h2>
-          <div className="mt-12 grid gap-5">
+          <div className="mt-12 grid gap-5" data-reveal>
             <RevealDistillationCard
               fromCount={catalogueSupplementCount}
               fromLabel={copy.catalogueSupplements}
               toCount={recommendedSupplementCount}
               toLabel={copy.supplementsRecommended}
             />
-            <RevealDistillationCard
-              fromCount={catalogueProductCount}
-              fromLabel={copy.catalogueProducts}
-              toCount={selectedProductCount}
-              toLabel={copy.productsRecommended}
-            />
           </div>
-          <p className="mx-auto mt-8 max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]">
-            {formatTemplate(copy.distilledSummaryTemplate, {
-              productSelected: selectedProductCount,
-              productTotal: catalogueProductCount,
-              supplementSelected: recommendedSupplementCount,
-              supplementTotal: catalogueSupplementCount
-            })}
+          <p className="mx-auto mt-8 max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]" data-reveal>
+            {distillFoot}
           </p>
         </div>
       </section>
@@ -1249,10 +1567,15 @@ function RevealResultsPage({
       ) : null}
 
       <RevealFormulaSection
+        catalogueProductCount={catalogueProductCount}
+        catalogueSupplementCount={catalogueSupplementCount}
         copy={copy}
+        formattedDate={formattedDate}
         ingredients={visibleIngredients}
         locale={locale}
         productCoverageBySupplementId={productCoverageBySupplementId}
+        result={result}
+        selectedProductCount={selectedProductCount}
       />
 
       <RevealProductsSection
@@ -1263,6 +1586,7 @@ function RevealResultsPage({
         productNeedCount={productNeedCount}
         productOptions={productOptions}
         products={products}
+        result={result}
         selectedCoverage={selectedCoverage}
         selectedProductStackPreference={selectedProductStackPreference}
         supplementLabelById={supplementLabelById}
@@ -1280,15 +1604,25 @@ function RevealResultsPage({
 }
 
 function RevealFormulaSection({
+  catalogueProductCount,
+  catalogueSupplementCount,
   copy,
+  formattedDate,
   ingredients,
   locale,
-  productCoverageBySupplementId
+  productCoverageBySupplementId,
+  result,
+  selectedProductCount
 }: Readonly<{
+  catalogueProductCount: number;
+  catalogueSupplementCount: number;
   copy: typeof revealCopy.en;
+  formattedDate: string;
   ingredients: FormulationIngredient[];
   locale: Locale;
   productCoverageBySupplementId: ReadonlyMap<string, number>;
+  result: FormulationResult;
+  selectedProductCount: number;
 }>) {
   // Compute stable row numbers declaratively (avoids mutation during render)
   const ingredientRowNumber = new Map<string, number>();
@@ -1298,26 +1632,67 @@ function RevealFormulaSection({
       ingredientRowNumber.set(ing.id, ++n);
     }
   }
+  const formulaTitle = revealSlotCopy(result, "formulaTitle", locale, copy.formulaTitle);
+  const formulaLead = revealSlotCopy(result, "formulaLead", locale, copy.formulaLead);
 
   return (
     <section className="border-t border-[var(--mn-line)] py-20" id="formula">
       <div className="mx-auto w-full max-w-6xl px-6 sm:px-8">
-        <div className="grid gap-8 lg:grid-cols-2 lg:items-end">
+        <div className="grid gap-8 lg:grid-cols-2 lg:items-end" data-reveal>
           <div>
             <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
               03 · {copy.formulaEyebrow}
             </p>
-            <h2 className="mt-4 font-serif text-5xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
-              {copy.formulaTitle}
+            <h2
+              className={`mt-4 font-serif text-5xl font-medium text-[var(--mn-ink)] ${
+                locale === "th"
+                  ? "leading-[1.4] break-words [overflow-wrap:anywhere]"
+                : "leading-tight text-balance"
+              }`}
+            >
+              {formulaTitle}
             </h2>
           </div>
           <p className="text-base leading-8 text-[var(--mn-ink-soft)]">
-            {copy.formulaLead}
+            {formulaLead}
           </p>
         </div>
 
-        <div className="mt-10 rounded-lg bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:p-8">
-          <div className="hidden grid-cols-[3rem_1.2fr_2fr_0.9fr_0.8fr] gap-5 border-b border-[var(--mn-line)] pb-4 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[var(--mn-ash)] lg:grid">
+        <div className="mt-10 rounded-lg bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:p-8" data-reveal>
+          <div className="grid gap-3 border-b border-[var(--mn-line)] pb-5 text-sm sm:grid-cols-3">
+            <div>
+              <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)]">
+                {copy.formulaMetaTier}
+              </p>
+              <p className="mt-1 font-serif text-2xl font-medium text-[var(--mn-ink)]">
+                {ingredients.length} {copy.formulaMetaSelected}
+              </p>
+            </div>
+            <div>
+              <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)]">
+                {copy.formulaMetaNrv}
+              </p>
+              <p className="mt-1 font-serif text-2xl font-medium text-[var(--mn-ink)]">
+                {copy.formulaMetaNoPadding}
+              </p>
+            </div>
+            <div>
+              <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)]">
+                {copy.formulaSignedPrefix}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                {formattedDate}
+              </p>
+            </div>
+          </div>
+
+          <div
+            className={`hidden grid-cols-[3rem_1.2fr_2fr_0.9fr_0.8fr] gap-5 border-b border-[var(--mn-line)] py-4 text-[0.65rem] font-semibold text-[var(--mn-ash)] lg:grid ${
+              locale === "th"
+                ? "tracking-normal"
+                : "uppercase tracking-[0.18em]"
+            }`}
+          >
             <div />
             <div>{copy.tableName}</div>
             <div>{copy.tableReason}</div>
@@ -1346,6 +1721,7 @@ function RevealFormulaSection({
                 return (
                   <article
                     className="grid gap-3 border-b border-[var(--mn-line)] py-5 last:border-b-0 lg:grid-cols-[3rem_1.2fr_2fr_0.9fr_0.8fr] lg:gap-5"
+                    data-reveal
                     key={ingredient.id}
                   >
                     <div className="font-serif text-2xl italic text-[var(--mn-gold)]">
@@ -1379,6 +1755,19 @@ function RevealFormulaSection({
             </div>
           ))}
         </div>
+
+        <div className="mt-10">
+          <RevealDistillationCard
+            fromCount={catalogueProductCount}
+            fromLabel={copy.catalogueProducts}
+            toCount={selectedProductCount}
+            toLabel={copy.productsRecommended}
+          />
+          <p className="mx-auto mt-5 max-w-2xl text-center text-sm leading-7 text-[var(--mn-ink-soft)]">
+            {catalogueSupplementCount} {copy.catalogueSupplements} · {ingredients.length}{" "}
+            {copy.supplementsRecommended} · {copy.formulaMetaNoPadding}
+          </p>
+        </div>
       </div>
     </section>
   );
@@ -1392,6 +1781,7 @@ function RevealProductsSection({
   productNeedCount,
   productOptions,
   products,
+  result,
   selectedCoverage,
   selectedProductStackPreference,
   supplementLabelById
@@ -1403,33 +1793,41 @@ function RevealProductsSection({
   productNeedCount: number;
   productOptions: ProductRecommendationOption[];
   products: RecommendedProduct[];
+  result: FormulationResult;
   selectedCoverage: number;
   selectedProductStackPreference?: ProductStackPreference | null;
   supplementLabelById: ReadonlyMap<string, string>;
 }>) {
   const labels = productRecommendationCopy[locale];
+  const productsTitle = revealSlotCopy(result, "productsTitle", locale, copy.productsTitle);
+  const productsLead = revealSlotCopy(result, "productsLead", locale, copy.productsLead);
+  const coverageHeadline = formatTemplate(copy.coverageHeadlineTemplate, {
+    supplementCount: productNeedCount || products.length
+  });
 
   return (
     <section className="border-t border-[var(--mn-line)] bg-[var(--mn-cream-deep)] py-20">
       <div className="mx-auto w-full max-w-6xl px-6 sm:px-8">
-        <div className="mx-auto max-w-3xl text-center">
+        <div className="mx-auto max-w-3xl text-center" data-reveal>
           <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
             04 · {copy.selectedProducts}
           </p>
           <h2
-            className={`mt-4 font-serif text-5xl font-medium text-[var(--mn-ink)] text-balance ${
-              locale === "th" ? "leading-[1.35]" : "leading-tight"
+            className={`mt-4 font-serif text-5xl font-medium text-[var(--mn-ink)] ${
+              locale === "th"
+                ? "leading-[1.4] break-words [overflow-wrap:anywhere]"
+                : "leading-tight text-balance"
             }`}
           >
-            {copy.productsTitle}
+            {productsTitle}
           </h2>
           <p className="mt-4 text-base leading-8 text-[var(--mn-ink-soft)]">
-            {copy.productsBody}
+            {productsLead}
           </p>
         </div>
 
         {productOptions.length > 1 ? (
-          <div className="mt-8 flex justify-center">
+          <div className="mt-8 flex justify-center" data-reveal>
             <div className="inline-flex flex-wrap justify-center gap-2 rounded-full bg-[var(--mn-paper)] p-1 ring-1 ring-[var(--mn-line)]">
               {productOptions.map((option) => (
                 <button
@@ -1462,21 +1860,29 @@ function RevealProductsSection({
           <div className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
             {products.map((product, index) => (
               <article
-                className="flex flex-col overflow-hidden rounded-xl bg-[var(--mn-paper)] ring-1 ring-[var(--mn-line)] transition hover:-translate-y-1 hover:ring-[var(--mn-teal)]"
+                className="group flex flex-col overflow-hidden rounded-[1.25rem] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] transition hover:-translate-y-1 hover:ring-[var(--mn-teal)] motion-reduce:transition-none"
+                data-reveal
                 key={`${product.recommendationRunId ?? "product"}:${product.id}`}
               >
-                <div className="relative flex h-56 items-center justify-center bg-white">
-                  <span className="absolute left-4 top-4 font-serif text-3xl italic text-[var(--mn-gold)]">
+                <div className="relative flex h-60 items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#fff,var(--mn-mint))]">
+                  <span className="absolute left-4 top-4 z-10 font-serif text-3xl italic text-[var(--mn-gold)]">
                     {String(index + 1).padStart(2, "0")}
                   </span>
+                  <span className="absolute right-4 top-4 z-10 rounded-full bg-white/85 px-3 py-1 text-[0.65rem] font-bold text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]">
+                    {copy.productVerified}
+                  </span>
+                  <div
+                    aria-hidden={true}
+                    className="absolute bottom-5 h-5 w-28 rounded-full bg-[color-mix(in_srgb,var(--mn-ink)_14%,transparent)] blur-md transition group-hover:scale-110 motion-reduce:transition-none"
+                  />
                   {product.imageUrl ? (
                     <img
                       alt=""
-                      className="h-full w-full object-contain p-8"
+                      className="relative z-[1] h-full w-full object-contain p-8 transition duration-500 group-hover:-translate-y-1 group-hover:scale-[1.03] motion-reduce:transition-none"
                       src={product.imageUrl}
                     />
                   ) : (
-                    <div className="grid size-32 place-items-center rounded-2xl bg-[var(--mn-mint)] font-serif text-4xl italic text-[var(--mn-teal-deep)]">
+                    <div className="relative z-[1] grid size-32 place-items-center rounded-[1.5rem] bg-white font-serif text-4xl italic text-[var(--mn-teal-deep)] shadow-sm ring-1 ring-[var(--mn-line)]">
                       MN
                     </div>
                   )}
@@ -1535,24 +1941,44 @@ function RevealProductsSection({
           </div>
         )}
 
-        <div className="mt-8 grid gap-3 rounded-xl bg-[var(--mn-paper)] p-5 ring-1 ring-[var(--mn-line)] md:grid-cols-3">
+        <div className="mt-8 rounded-xl bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]" data-reveal>
+          <div className="grid gap-5 md:grid-cols-[1fr_1.2fr] md:items-center">
+            <div>
+              <h3 className="font-serif text-3xl font-medium leading-tight text-[var(--mn-ink)]">
+                {coverageHeadline}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                {copy.coverageSub}
+              </p>
+            </div>
+            <div>
+              <div className="h-3 overflow-hidden rounded-full bg-[var(--mn-line)]">
+                <div
+                  className="h-full rounded-full bg-[var(--mn-teal)] transition-[width] duration-1000 motion-reduce:transition-none"
+                  style={{ width: `${Math.min(100, Math.max(0, selectedCoverage))}%` }}
+                />
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-3 text-center">
           <div>
             <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
-              {products.length}
+              <CountUpNumber active={true} duration={900} value={products.length} />
             </p>
             <p className="text-sm text-[var(--mn-ash)]">{copy.selectedProducts}</p>
           </div>
           <div>
             <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
-              {productNeedCount}
+              <CountUpNumber active={true} duration={1000} value={productNeedCount} />
             </p>
             <p className="text-sm text-[var(--mn-ash)]">{labels.needsCovered}</p>
           </div>
           <div>
             <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
-              {selectedCoverage}%
+              <CountUpNumber active={true} duration={1100} value={selectedCoverage} />%
             </p>
             <p className="text-sm text-[var(--mn-ash)]">{copy.compactCoverageLabel}</p>
+          </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1588,11 +2014,35 @@ function RevealClosingSection({
       }))
     )
   ];
+  const safetyHeadline = revealSlotCopy(
+    result,
+    "safetyHeadline",
+    locale,
+    copy.cautionsTitle
+  );
+  const safetyBody = revealSlotCopy(
+    result,
+    "safetyBody",
+    locale,
+    copy.wellnessOnly
+  );
+  const closingTitle = revealSlotCopy(
+    result,
+    "closingTitle",
+    locale,
+    copy.closingTitle
+  );
+  const closingBody = revealSlotCopy(
+    result,
+    "closingBody",
+    locale,
+    copy.closingBody
+  );
 
   return (
     <section className="border-t border-[var(--mn-line)] py-20">
       <div className="mx-auto grid w-full max-w-5xl gap-8 px-6 sm:px-8">
-        <div className="rounded-xl bg-[var(--mn-paper)] p-6 ring-1 ring-[var(--mn-line)] sm:p-8">
+        <div className="rounded-xl bg-[var(--mn-paper)] p-6 ring-1 ring-[var(--mn-line)] sm:p-8" data-reveal>
           <div className="flex gap-4">
             <InformationCircleIcon
               aria-hidden={true}
@@ -1600,8 +2050,11 @@ function RevealClosingSection({
             />
             <div>
               <h2 className="font-serif text-3xl font-medium text-[var(--mn-ink)]">
-                {copy.cautionsTitle}
+                {safetyHeadline}
               </h2>
+              <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                {safetyBody}
+              </p>
               <div className="mt-4 space-y-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
                 {cautions.length > 0 ? (
                   cautions.map((caution, index) => (
@@ -1623,28 +2076,35 @@ function RevealClosingSection({
           </div>
         </div>
 
-        <div className="text-center">
+        <div className="text-center" data-reveal>
           <p className="font-serif text-5xl font-medium italic text-[var(--mn-teal-deep)]">
             Mattaññutā
           </p>
           <p className="mn-mono-label mt-2 text-xs uppercase tracking-[0.2em] text-[var(--mn-ash)]">
             {copy.etymologyLine}
           </p>
-          <h2 className="mx-auto mt-8 max-w-3xl font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] text-balance">
-            {copy.closingTitle}
+          <h2
+            className={`mx-auto mt-8 max-w-3xl font-serif text-4xl font-medium text-[var(--mn-ink)] ${
+              locale === "th"
+                ? "leading-[1.45] break-words [overflow-wrap:anywhere]"
+                : "leading-tight text-balance"
+              }`}
+          >
+            {closingTitle}
           </h2>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-[var(--mn-ink-soft)]">
-            {copy.closingBody}
+            {closingBody}
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <button
-              className="mn-primary-button"
+              className="mn-primary-button inline-flex items-center justify-center gap-2"
               onClick={() => window.print()}
               type="button"
             >
+              <ArrowDownTrayIcon aria-hidden={true} className="size-4" />
               {copy.print}
             </button>
-            <a className="mn-secondary-button" href={planResultsHref(locale, planId)}>
+            <a className="mn-secondary-button" href={planRevealHref(locale, planId)}>
               {copy.save}
             </a>
             <a className="mn-secondary-button" href={`/${locale}/nutrition/quiz`}>

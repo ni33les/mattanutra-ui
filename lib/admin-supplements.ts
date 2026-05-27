@@ -9,6 +9,11 @@ import {
   type SupplementSafetyFlag
 } from "@/lib/supplement-safety-flags";
 import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
+import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
+import {
+  getSupplementSelectionStatsBySupplement,
+  type AdminSupplementSelectionStats
+} from "@/lib/admin-recommendation-insights";
 export type { SupplementSafetyFlag } from "@/lib/supplement-safety-flags";
 
 export type SupplementListStatus =
@@ -35,6 +40,7 @@ export type AdminSupplementRow = Readonly<{
   primaryUseCase: string | null;
   safetyFlags: SupplementSafetyFlag[];
   safetyNotes: string | null;
+  selectionStats?: AdminSupplementSelectionStats;
   sourceStatus: "core" | "recommended_add";
   updatedAt: string;
 }>;
@@ -164,7 +170,10 @@ function normalizeAlias(value: string) {
     .replace(/^_+|_+$/g, "");
 }
 
-function rowFromDb(row: SupplementDbRow): AdminSupplementRow {
+function rowFromDb(
+  row: SupplementDbRow,
+  selectionStats?: AdminSupplementSelectionStats
+): AdminSupplementRow {
   return {
     aliases: aliasesFromDb(row.aliases),
     category: row.category,
@@ -178,6 +187,7 @@ function rowFromDb(row: SupplementDbRow): AdminSupplementRow {
     primaryUseCase: row.primary_use_case,
     safetyFlags: normalizeSupplementSafetyFlags(row.safety_flags),
     safetyNotes: row.safety_notes,
+    ...(selectionStats ? { selectionStats } : {}),
     sourceStatus: row.source_status,
     updatedAt: new Date(row.updated_at).toISOString()
   };
@@ -216,7 +226,9 @@ export function isSupplementConfidence(
   return typeof value === "string" && confidences.has(value as SupplementConfidence);
 }
 
-export async function getAdminSupplementsData(): Promise<AdminSupplementsData> {
+export async function getAdminSupplementsData(
+  range: AdminDashboardRange = "all"
+): Promise<AdminSupplementsData> {
   const sql = getSql();
 
   if (!sql) {
@@ -267,7 +279,10 @@ export async function getAdminSupplementsData(): Promise<AdminSupplementsData> {
       order by supplements.category asc, supplements.name asc
       limit 1000
     `;
-    const mappedRows = rows.map(rowFromDb);
+    const selectionStats = await getSupplementSelectionStatsBySupplement(range);
+    const mappedRows = rows.map((row) =>
+      rowFromDb(row, selectionStats.get(row.id))
+    );
 
     return {
       categories: [...new Set(mappedRows.map((row) => row.category))].sort(),

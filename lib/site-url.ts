@@ -1,7 +1,7 @@
 import type { Locale } from "@/lib/i18n";
 import {
   nutritionQuizPath,
-  nutritionRefinePath
+  nutritionRevealPath
 } from "@/lib/nutrition-paths";
 
 export function siteBaseUrl() {
@@ -13,7 +13,7 @@ export function siteBaseUrl() {
 }
 
 export function buildAssessmentResultsUrl(locale: Locale, planId: string) {
-  return `${siteBaseUrl()}${nutritionRefinePath(locale, planId)}`;
+  return `${siteBaseUrl()}${nutritionRevealPath(locale, planId)}`;
 }
 
 export function buildReassessmentUrl(locale: Locale, planId: string) {

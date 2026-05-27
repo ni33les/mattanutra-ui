@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { isUuid } from "@/lib/assessment-store";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { nutritionRefinePath } from "@/lib/nutrition-paths";
+import { nutritionRevealPath } from "@/lib/nutrition-paths";
 
 type AssessmentResultsRedirectPageProps = Readonly<{
   params: Promise<{
@@ -30,5 +30,5 @@ export default async function AssessmentResultsRedirectPage({
     notFound();
   }
 
-  redirect(nutritionRefinePath(locale, planId));
+  redirect(nutritionRevealPath(locale, planId));
 }

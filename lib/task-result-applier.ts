@@ -72,6 +72,10 @@ import {
   type ProductRecommendationResult,
   type ProductStackPreference
 } from "@/lib/product-recommendations";
+import {
+  projectProductRecommendationDecisions,
+  projectSupplementRecommendationSelections
+} from "@/lib/recommendation-selection-projections";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import {
   addTaskEvent,
@@ -487,6 +491,12 @@ async function applyPaidFormulationResult(
     includeEmptyRecommendations: true,
     modelVersion: modelVersion(analysis),
     planId
+  });
+  await projectSupplementRecommendationSelections(sql, {
+    formulation: safeFormulation,
+    formulationVersion: version,
+    modelVersion: modelVersion(analysis),
+    task
   });
   if (isBackgroundPregeneration) {
     const paidSelectionReady = Boolean(textValue(row.selected_plan));
@@ -1844,6 +1854,12 @@ async function insertProductRecommendationResult({
       on conflict (run_id, product_id) do nothing
     `;
   }
+
+  await projectProductRecommendationDecisions(sql, {
+    result,
+    runId,
+    task
+  });
 
   return runId;
 }

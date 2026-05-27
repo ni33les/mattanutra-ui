@@ -54,6 +54,9 @@ import type {
   AdminProductsData
 } from "@/lib/admin-products";
 import type {
+  AdminRecommendationInsightsData
+} from "@/lib/admin-recommendation-insights";
+import type {
   AdminCampaignsData,
   AdminContentInventoryData,
   AdminLeadsData
@@ -109,6 +112,7 @@ import {
   AdminSupplementsView,
   SupplementListMeta
 } from "@/components/admin/safety-views";
+import { AdminRecommendationInsightsView } from "@/components/admin/recommendation-insights-view";
 import { AdminDrawer, AdminModal } from "@/components/admin/ui";
 
 
@@ -2139,6 +2143,7 @@ function adminViewDatabaseAvailable({
   flowData,
   leadsData,
   productsData,
+  recommendationInsightsData,
   reviewQueueData,
   supplementsData,
   visibilityData,
@@ -2155,6 +2160,7 @@ function adminViewDatabaseAvailable({
   flowData: AdminFlowData;
   leadsData: AdminLeadsData;
   productsData: AdminProductsData;
+  recommendationInsightsData: AdminRecommendationInsightsData;
   reviewQueueData: AdminReviewQueueData;
   supplementsData: AdminSupplementsData;
   visibilityData: AdminTaskVisibilityData;
@@ -2210,6 +2216,10 @@ function adminViewDatabaseAvailable({
     return productsData.databaseAvailable;
   }
 
+  if (view === "product-insights" || view === "supplement-insights") {
+    return recommendationInsightsData.databaseAvailable;
+  }
+
   if (view === "reviews") {
     return reviewQueueData.databaseAvailable;
   }
@@ -2240,6 +2250,7 @@ export function AdminDashboard({
   leadsData,
   locale,
   productsData,
+  recommendationInsightsData,
   reviewQueueData,
   selectedReviewTaskId,
   selectedTaskId,
@@ -2261,6 +2272,7 @@ export function AdminDashboard({
   leadsData: AdminLeadsData;
   locale: Locale;
   productsData: AdminProductsData;
+  recommendationInsightsData: AdminRecommendationInsightsData;
   reviewQueueData: AdminReviewQueueData;
   selectedReviewTaskId?: string | null;
   selectedTaskId?: string | null;
@@ -2320,6 +2332,7 @@ export function AdminDashboard({
     flowData,
     leadsData,
     productsData,
+    recommendationInsightsData,
     reviewQueueData,
     supplementsData,
     visibilityData: liveVisibilityData,
@@ -2408,6 +2421,8 @@ export function AdminDashboard({
           view === "flow" ||
           view === "glance" ||
           view === "leads" ||
+          view === "product-insights" ||
+          view === "supplement-insights" ||
           view === "visibility") ? (
             <>
               <div className="mt-6 flex flex-wrap items-center gap-4">
@@ -2537,6 +2552,12 @@ export function AdminDashboard({
               accessToken={accessToken}
               data={productsData}
               locale={locale}
+            />
+          ) : view === "product-insights" || view === "supplement-insights" ? (
+            <AdminRecommendationInsightsView
+              data={recommendationInsightsData}
+              locale={locale}
+              mode={view === "product-insights" ? "products" : "supplements"}
             />
           ) : view === "supplements" ? (
             <AdminSupplementsView

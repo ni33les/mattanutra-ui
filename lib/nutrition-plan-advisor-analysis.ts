@@ -5,17 +5,23 @@ import type {
   NutritionReport,
   PlanGuidanceAdjustment,
   PlanFeedbackItem,
-  PlanChatMessage
+  PlanChatMessage,
+  RevealPageCopy
 } from "@/lib/formulation-types";
+import { revealPageCopySlots } from "@/lib/formulation-types";
+import type { HealthScoreResult } from "@/lib/health-score";
+import { HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS } from "@/lib/health-score";
 import { normalizePlanFeedbackItems } from "@/lib/plan-feedback";
 import type { Locale } from "@/lib/i18n";
 
 type AdvisorInput = Readonly<{
   answers: unknown;
   chatMessages: PlanChatMessage[];
+  firstName?: string | null;
   foodGuidance?: FoodGuidanceBlueprint | null;
   formulation?: FormulationBlueprint | null;
   guidanceAdjustments?: PlanGuidanceAdjustment[];
+  healthScore?: HealthScoreResult | null;
   locale: Locale;
   plan: AssessmentPlan;
   planFeedback?: PlanFeedbackItem[];
@@ -134,9 +140,18 @@ function contextPayload(input: AdvisorInput) {
       createdAt: message.createdAt,
       role: message.role
     })),
+    firstName: input.firstName ?? null,
     foodGuidance: input.foodGuidance,
     formulation: input.formulation,
     guidanceAdjustments: input.guidanceAdjustments ?? [],
+    healthScore: input.healthScore
+      ? {
+          copySeeds: input.healthScore.pageContent?.copySeeds ?? null,
+          flagCodes: input.healthScore.flagCodes ?? [],
+          pageLocked: input.healthScore.pageContent?.locked ?? null,
+          score: input.healthScore.score
+        }
+      : null,
     locale: input.locale,
     plan: input.plan,
     planFeedback: input.planFeedback ?? [],
@@ -294,6 +309,119 @@ function localizedText(value: unknown) {
   return "";
 }
 
+const revealCopyForbiddenTerms = [
+  ...HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS,
+  "diagnose",
+  "diagnosis",
+  "treat",
+  "treatment",
+  "cure",
+  "prescribe",
+  "prescription",
+  "reverse disease",
+  "prevent disease",
+  "fda",
+  "thai fda"
+] as const;
+
+function hasHtmlOrMarkdown(value: string) {
+  return /<[^>]+>/.test(value) || /[`#*_>\[\]]/.test(value);
+}
+
+function hasNumericClaim(value: string) {
+  return /[0-9๐-๙]/.test(value);
+}
+
+function hasForbiddenRevealCopy(value: string) {
+  const lower = value.toLowerCase();
+
+  return revealCopyForbiddenTerms.find((term) => lower.includes(term));
+}
+
+export function validateRevealPageCopy(value: unknown): {
+  copy?: RevealPageCopy;
+  errors: string[];
+} {
+  const errors: string[] = [];
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      errors: ["revealPageCopy must be an object"]
+    };
+  }
+
+  const record = value as Record<string, unknown>;
+  const allowed = new Set<string>(revealPageCopySlots);
+  const extraKeys = Object.keys(record).filter((key) => !allowed.has(key));
+
+  if (extraKeys.length > 0) {
+    errors.push(`revealPageCopy has unexpected fields: ${extraKeys.join(", ")}`);
+  }
+
+  const copy: Partial<Record<keyof RevealPageCopy, { en: string; th: string }>> = {};
+
+  for (const slot of revealPageCopySlots) {
+    const localized = record[slot];
+
+    if (!localized || typeof localized !== "object" || Array.isArray(localized)) {
+      errors.push(`revealPageCopy.${slot} must be a localized object`);
+      continue;
+    }
+
+    const localizedRecord = localized as Record<string, unknown>;
+    const localeKeys = Object.keys(localizedRecord);
+    const extraLocaleKeys = localeKeys.filter((key) => key !== "en" && key !== "th");
+
+    if (extraLocaleKeys.length > 0) {
+      errors.push(
+        `revealPageCopy.${slot} has unsupported locales: ${extraLocaleKeys.join(", ")}`
+      );
+    }
+
+    const en = typeof localizedRecord.en === "string" ? localizedRecord.en.trim() : "";
+    const th = typeof localizedRecord.th === "string" ? localizedRecord.th.trim() : "";
+
+    if (!en) {
+      errors.push(`revealPageCopy.${slot}.en is required`);
+    }
+
+    if (!th) {
+      errors.push(`revealPageCopy.${slot}.th is required`);
+    }
+
+    for (const [locale, text] of [
+      ["en", en],
+      ["th", th]
+    ] as const) {
+      if (!text) {
+        continue;
+      }
+
+      const forbidden = hasForbiddenRevealCopy(text);
+
+      if (forbidden) {
+        errors.push(`revealPageCopy.${slot}.${locale} contains forbidden term: ${forbidden}`);
+      }
+
+      if (hasHtmlOrMarkdown(text)) {
+        errors.push(`revealPageCopy.${slot}.${locale} must not contain HTML or markdown`);
+      }
+
+      if (hasNumericClaim(text)) {
+        errors.push(`revealPageCopy.${slot}.${locale} must not introduce numeric claims`);
+      }
+    }
+
+    if (en && th) {
+      copy[slot] = { en, th };
+    }
+  }
+
+  return errors.length > 0
+    ? { errors }
+    : { copy: copy as RevealPageCopy, errors: [] };
+}
+
 function reportSections(value: unknown) {
   if (!Array.isArray(value)) {
     return [];
@@ -337,6 +465,10 @@ function normalizeReport(value: unknown): NutritionReport {
   const safetyNotes = Array.isArray(record.safetyNotes)
     ? record.safetyNotes.map(localizedText).filter(Boolean)
     : [];
+  const revealPageCopyResult =
+    record.revealPageCopy === undefined
+      ? null
+      : validateRevealPageCopy(record.revealPageCopy);
 
   if (!summary || !title) {
     throw new Error("Nutrition report is missing title or summary");
@@ -346,9 +478,14 @@ function normalizeReport(value: unknown): NutritionReport {
     throw new Error("Nutrition report is missing required sections");
   }
 
+  if (revealPageCopyResult?.errors.length) {
+    throw new Error(`Nutrition report revealPageCopy is invalid: ${revealPageCopyResult.errors.join("; ")}`);
+  }
+
   return {
     dailyFocus,
     nextSteps,
+    ...(revealPageCopyResult?.copy ? { revealPageCopy: revealPageCopyResult.copy } : {}),
     safetyNotes,
     summary,
     synergies,
@@ -388,6 +525,15 @@ export async function analyzeNutritionReportWithGrok(input: AdvisorInput) {
                     th: "short conservative safety note"
                   }
                 ],
+                revealPageCopy: Object.fromEntries(
+                  revealPageCopySlots.map((slot) => [
+                    slot,
+                    {
+                      en: "short personalized copy without numbers or medical claims",
+                      th: "short personalized Thai copy without numbers or medical claims"
+                    }
+                  ])
+                ),
                 summary: {
                   en: "one concise summary paragraph",
                   th: "one concise summary paragraph"
@@ -411,6 +557,11 @@ export async function analyzeNutritionReportWithGrok(input: AdvisorInput) {
               "synergies must contain 2 to 4 food-plus-supplement combinations or routines.",
               "nextSteps must contain 2 to 4 customer actions.",
               "safetyNotes must contain 2 to 5 conservative notes.",
+              "revealPageCopy is required and must contain every listed reveal page slot.",
+              "Every revealPageCopy slot must include English and Thai.",
+              "revealPageCopy is copy-only. Do not include scores, counts, doses, product names, product links, FDA status, diagnoses, treatments, cures, prescriptions, HTML, markdown, or numeric claims.",
+              "Use firstName only as optional display context; if it is missing, write copy that still reads naturally without a name.",
+              "Use healthScore copySeeds, assessment goals, symptoms, safety flags, formulation rows, food guidance, and plan feedback only to phrase the page narrative. Do not alter locked facts.",
               "Every display field must include English and Thai."
             ]
           },

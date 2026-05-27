@@ -228,10 +228,10 @@ export function BlogArticle({
             <p className="mn-v11-eyebrow">
               {copy.journal}
             </p>
-            <h1 className="mt-3 font-serif text-4xl font-medium tracking-normal text-pretty text-[var(--mn-ink)] sm:text-5xl">
+            <h1 className="mn-hero-title mt-3 font-serif text-4xl font-medium tracking-normal text-pretty text-[var(--mn-ink)] sm:text-5xl">
               {post.title}
             </h1>
-            <p className="mt-6 text-xl/8 text-[var(--mn-ink-soft)]">{post.subtitle}</p>
+            <p className="mn-hero-subtitle mt-6 text-xl/8 text-[var(--mn-ink-soft)]">{post.subtitle}</p>
           </div>
           <div className="mx-auto mt-14 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-10 lg:mx-0 lg:max-w-none lg:grid-cols-12">
             <div className="relative space-y-10 lg:order-last lg:col-span-5">

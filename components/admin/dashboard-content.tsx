@@ -32,8 +32,10 @@ export type AdminDashboardView =
   | "flow"
   | "glance"
   | "leads"
+  | "product-insights"
   | "products"
   | "reviews"
+  | "supplement-insights"
   | "supplements"
   | "testimonials"
   | "visibility";
@@ -311,6 +313,8 @@ export type AdminContent = Readonly<{
   executionTitle: string;
   governance: AdminNavItem[];
   governanceTitle: string;
+  insights: AdminNavItem[];
+  insightsTitle: string;
   marketing: AdminNavItem[];
   marketingTitle: string;
   openSidebar: string;
@@ -714,6 +718,11 @@ export const content = {
       { icon: BeakerIcon, name: "Supplements", view: "supplements" }
     ],
     governanceTitle: "Safety",
+    insights: [
+      { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" },
+      { icon: ShoppingBagIcon, name: "Products", view: "product-insights" }
+    ],
+    insightsTitle: "Insights",
     openSidebar: "Open sidebar",
     execution: [
       { icon: ExclamationTriangleIcon, name: "Reviews", view: "reviews" },
@@ -734,8 +743,10 @@ export const content = {
       flow: "Conversions",
       glance: "Dashboard",
       leads: "Leads",
+      "product-insights": "Product Insights",
       products: "Products",
       reviews: "Reviews",
+      "supplement-insights": "Supplement Insights",
       supplements: "Supplements",
       testimonials: "Testimonials",
       visibility: "Tasks"
@@ -1149,6 +1160,11 @@ export const content = {
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplements" }
     ],
     governanceTitle: "ความปลอดภัย",
+    insights: [
+      { icon: BeakerIcon, name: "อาหารเสริม", view: "supplement-insights" },
+      { icon: ShoppingBagIcon, name: "สินค้า", view: "product-insights" }
+    ],
+    insightsTitle: "Insights",
     openSidebar: "เปิดแถบเมนู",
     execution: [
       { icon: ExclamationTriangleIcon, name: "รีวิว", view: "reviews" },
@@ -1169,8 +1185,10 @@ export const content = {
       flow: "Conversions",
       glance: "Dashboard",
       leads: "ลีด",
+      "product-insights": "ข้อมูลสินค้า",
       products: "สินค้า",
       reviews: "รีวิว",
+      "supplement-insights": "ข้อมูลอาหารเสริม",
       supplements: "อาหารเสริม",
       testimonials: "คำรับรอง",
       visibility: "Tasks"

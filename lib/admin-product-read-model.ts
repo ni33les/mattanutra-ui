@@ -5,6 +5,8 @@ import {
 } from "./admin-product-types.ts";
 import { rowFromDb } from "./admin-product-mappers.ts";
 import { isUuidValue, loadProductRows } from "./admin-products.ts"; // transitional delegation until loadProductRows is fully moved here
+import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
+import { getProductDecisionStatsByProduct } from "@/lib/admin-recommendation-insights";
 
 // Read model helpers and queries extracted as part of Sprint 2 refactor.
 
@@ -67,11 +69,13 @@ export async function loadAdminProductRowsForBrand(brandId: string) {
   const rows = await loadProductRows();
 
   return rows
-    ? rows.map(rowFromDb).filter((row) => row.brandId === brandId)
+    ? rows.map((row) => rowFromDb(row)).filter((row) => row.brandId === brandId)
     : [];
 }
 
-export async function getAdminProductsData(): Promise<AdminProductsData> {
+export async function getAdminProductsData(
+  range: AdminDashboardRange = "all"
+): Promise<AdminProductsData> {
   try {
     const rows = await loadProductRows();
 
@@ -79,7 +83,10 @@ export async function getAdminProductsData(): Promise<AdminProductsData> {
       return emptyAdminProductsData();
     }
 
-    const mappedRows = rows.map(rowFromDb);
+    const decisionStats = await getProductDecisionStatsByProduct(range);
+    const mappedRows = rows.map((row) =>
+      rowFromDb(row, decisionStats.get(row.id))
+    );
 
     return {
       databaseAvailable: true,

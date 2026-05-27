@@ -144,8 +144,11 @@ export function AdminSupplementsView({
       }
 
       const payload = (await response.json()) as { row?: AdminSupplementRow };
+      const nextRow = payload.row
+        ? { ...payload.row, selectionStats: row.selectionStats }
+        : row;
 
-      syncRow(payload.row ?? row);
+      syncRow(nextRow);
       return true;
     } catch {
       setErrorId(row.id);
@@ -178,7 +181,7 @@ export function AdminSupplementsView({
       const payload = (await response.json()) as { row?: AdminSupplementRow };
 
       if (payload.row) {
-        syncRow(payload.row);
+        syncRow({ ...payload.row, selectionStats: row.selectionStats });
       }
     } catch {
       setErrorId(row.id);
@@ -210,7 +213,7 @@ export function AdminSupplementsView({
       const payload = (await response.json()) as { row?: AdminSupplementRow };
 
       if (payload.row) {
-        syncRow(payload.row);
+        syncRow({ ...payload.row, selectionStats: row.selectionStats });
       }
 
       return true;
@@ -421,6 +424,11 @@ export function AdminSupplementsView({
                   value={formatSupplementSafetyFlags(labels, row.safetyFlags)}
                 />
               </div>
+              {row.selectionStats?.chosenPlanCount ? (
+                <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                  {supplementSelectionSummary(row, locale)}
+                </p>
+              ) : null}
             </button>
           ))}
         </div>
@@ -617,6 +625,28 @@ export function formatSupplementDose(row: AdminSupplementRow, locale: Locale) {
         }).format(row.maxAmount);
 
   return row.maxUnit ? [amount, row.maxUnit].filter(Boolean).join(" ") : amount;
+}
+
+function supplementSelectionSummary(row: AdminSupplementRow, locale: Locale) {
+  const stats = row.selectionStats;
+
+  if (!stats) {
+    return "";
+  }
+
+  const formatter = new Intl.NumberFormat(formatLocale(locale));
+  const topDose = stats.topDoses[0]?.label;
+  const chosen = formatter.format(stats.chosenPlanCount);
+
+  if (locale === "th") {
+    return topDose
+      ? `ถูกเลือกใน ${chosen} แผน · ขนาดที่พบบ่อย ${topDose}`
+      : `ถูกเลือกใน ${chosen} แผน`;
+  }
+
+  return topDose
+    ? `Chosen in ${chosen} plans · top dose ${topDose}`
+    : `Chosen in ${chosen} plans`;
 }
 
 export function SupplementListMeta({
@@ -853,6 +883,50 @@ export function SupplementDetailsModal({
                 value={formatSupplementSafetyFlags(labels, draft.safetyFlags)}
               />
             </div>
+
+            {draft.selectionStats ? (
+              <div className="rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                  {locale === "th" ? "การเลือกโดย AI" : "AI selections"}
+                </p>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <SupplementListMeta
+                    label={locale === "th" ? "แผนที่เลือก" : "Chosen plans"}
+                    value={new Intl.NumberFormat(formatLocale(locale)).format(
+                      draft.selectionStats.chosenPlanCount
+                    )}
+                  />
+                  <SupplementListMeta
+                    label={locale === "th" ? "ซ่อนเพื่อความปลอดภัย" : "Safety hidden"}
+                    value={new Intl.NumberFormat(formatLocale(locale)).format(
+                      draft.selectionStats.safetyHiddenCount
+                    )}
+                  />
+                  <SupplementListMeta
+                    label={locale === "th" ? "ล่าสุด" : "Last chosen"}
+                    value={
+                      draft.selectionStats.lastSelectedAt
+                        ? new Intl.DateTimeFormat(formatLocale(locale), {
+                            dateStyle: "medium"
+                          }).format(new Date(draft.selectionStats.lastSelectedAt))
+                        : ""
+                    }
+                  />
+                </div>
+                {draft.selectionStats.topDoses.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {draft.selectionStats.topDoses.map((dose) => (
+                      <span
+                        className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100"
+                        key={dose.label}
+                      >
+                        {dose.label} · {dose.count}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             {draft.primaryUseCase ? (
               <div className="rounded-xl bg-gray-50 p-4 text-sm leading-6 text-gray-700 ring-1 ring-gray-100">

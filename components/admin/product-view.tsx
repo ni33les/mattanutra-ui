@@ -87,6 +87,21 @@ function productBusinessStateForMetric(
   return "";
 }
 
+function ProductInsightStat({
+  label,
+  value
+}: Readonly<{
+  label: string;
+  value: number;
+}>) {
+  return (
+    <div className="rounded-lg bg-white px-3 py-2 ring-1 ring-gray-200">
+      <p className="text-xs font-medium text-gray-500">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-gray-900">{value}</p>
+    </div>
+  );
+}
+
 function productStatusLabel(status: string) {
   if (status === "approved") {
     return "Approved";
@@ -159,6 +174,23 @@ function productBusinessStateClass(state: ProductBusinessState) {
   }
 
   return "border-amber-200 bg-amber-50 text-amber-700";
+}
+
+function productDecisionSummary(row: AdminProductRow, locale: Locale) {
+  const formatter = new Intl.NumberFormat(locale === "th" ? "th-TH" : "en");
+  const chosen =
+    row.decisionStats?.chosenPlanCount ?? row.recommendationHistory.chosenCount;
+  const nearMisses = row.decisionStats?.nearMissCount ?? 0;
+
+  if (locale === "th") {
+    return nearMisses > 0
+      ? `ถูกเลือก ${formatter.format(chosen)} ครั้ง · เกือบถูกเลือก ${formatter.format(nearMisses)}`
+      : `ถูกเลือก ${formatter.format(chosen)} ครั้ง`;
+  }
+
+  return nearMisses > 0
+    ? `Chosen ${formatter.format(chosen)} times · ${formatter.format(nearMisses)} near misses`
+    : `Chosen ${formatter.format(chosen)} times`;
 }
 
 function productMatchesMetricFilter(
@@ -725,10 +757,17 @@ export function AdminProductsView({
         row?: AdminProductRow;
         rows?: AdminProductRow[];
       };
-      const savedRow = payload.row ?? row;
+      const savedRow = payload.row
+        ? { ...payload.row, decisionStats: row.decisionStats }
+        : row;
       const updatedRows = new Map(
         (payload.rows && payload.rows.length > 0 ? payload.rows : [savedRow])
-          .map((item) => [item.id, item])
+          .map((item) => [
+            item.id,
+            item.id === row.id
+              ? { ...item, decisionStats: row.decisionStats }
+              : item
+          ])
       );
 
       setRows((currentRows) =>
@@ -1116,9 +1155,10 @@ export function AdminProductsView({
                   <p className="mt-3 text-sm text-amber-700">No parsed label facts yet.</p>
                 )}
                 <p className="mt-3 text-sm text-gray-500">
-                  Chosen {row.recommendationHistory.chosenCount} times
-                  {row.recommendationHistory.averageProductCoveragePercent
-                    ? ` · avg ${Math.round(row.recommendationHistory.averageProductCoveragePercent)}% client fit`
+                  {productDecisionSummary(row, locale)}
+                  {(row.decisionStats?.averageProductCoveragePercent ??
+                    row.recommendationHistory.averageProductCoveragePercent)
+                    ? ` · avg ${Math.round(row.decisionStats?.averageProductCoveragePercent ?? row.recommendationHistory.averageProductCoveragePercent ?? 0)}% client fit`
                     : ""}
                 </p>
               </div>
@@ -1133,6 +1173,7 @@ export function AdminProductsView({
           draft={draft}
           error={errorId === draft.id}
           errorMessage={errorId === draft.id ? errorMessage : null}
+          locale={locale}
           onImportDecision={decideProductImportFromProduct}
           onCorrectFacts={correctProductFacts}
           onIncreaseSafetyLimit={increaseProductSafetyLimit}
@@ -1156,6 +1197,7 @@ function ProductModal({
   draft,
   error,
   errorMessage,
+  locale,
   onImportDecision,
   onCorrectFacts,
   onIncreaseSafetyLimit,
@@ -1169,6 +1211,7 @@ function ProductModal({
   draft: AdminProductRow;
   error: boolean;
   errorMessage: string | null;
+  locale: Locale;
   onImportDecision: (
     row: AdminProductRow,
     action: "approve_product" | "ignore_import" | "merge_product",
@@ -1368,7 +1411,7 @@ function ProductModal({
       const payload = (await response.json()) as { row?: AdminProductRow };
 
       if (payload.row) {
-        setDraft(payload.row);
+        setDraft({ ...payload.row, decisionStats: draft.decisionStats });
         setNewOfferUrl("");
         setNewOfferCommissionRate("");
       }
@@ -1399,7 +1442,7 @@ function ProductModal({
       const payload = (await response.json()) as { row?: AdminProductRow };
 
       if (payload.row) {
-        setDraft(payload.row);
+        setDraft({ ...payload.row, decisionStats: draft.decisionStats });
       }
     } finally {
       setOfferBusy(false);
@@ -1450,6 +1493,43 @@ function ProductModal({
         </div>
 
         <div className="mt-5 grid gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">
+          {draft.decisionStats ? (
+            <div>
+              <p className="font-semibold text-gray-900">
+                {locale === "th" ? "ข้อมูลการเลือกสินค้า" : "Recommendation decisions"}
+              </p>
+              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <ProductInsightStat
+                  label={locale === "th" ? "ถูกเลือก" : "Chosen"}
+                  value={draft.decisionStats.chosenPlanCount}
+                />
+                <ProductInsightStat
+                  label={locale === "th" ? "เกือบถูกเลือก" : "Near misses"}
+                  value={draft.decisionStats.nearMissCount}
+                />
+                <ProductInsightStat
+                  label={locale === "th" ? "ไม่ผ่าน" : "Rejected"}
+                  value={draft.decisionStats.rejectedCount}
+                />
+              </div>
+              {draft.decisionStats.topServingMultipliers.length > 0 ||
+              draft.decisionStats.topRejectionReasons.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[
+                    ...draft.decisionStats.topServingMultipliers,
+                    ...draft.decisionStats.topRejectionReasons
+                  ].map((item) => (
+                    <span
+                      className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700"
+                      key={`${item.label}:${item.count}`}
+                    >
+                      {item.label} · {item.count}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {draft.validationCacheStatus === "stale" ? (
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-800">

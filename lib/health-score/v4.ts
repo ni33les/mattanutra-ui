@@ -70,14 +70,19 @@ export type HealthScorePageAiCopy = Readonly<{
   heroBody?: LocalizedHealthScoreText;
   heroTitle?: LocalizedHealthScoreText;
   findings?: HealthScorePageAiCard[];
+  findingsHeadline?: LocalizedHealthScoreText;
+  findingsSub?: LocalizedHealthScoreText;
+  highestLeverageBody?: LocalizedHealthScoreText;
   methodCards?: HealthScorePageAiCard[];
   methodHeadline?: LocalizedHealthScoreText;
   overview?: LocalizedHealthScoreText;
   paywallFeatures?: HealthScorePaywallFeature[];
   paywallSubtitle?: LocalizedHealthScoreText;
   paywallTitle?: LocalizedHealthScoreText;
+  pillarHeadline?: LocalizedHealthScoreText;
   relativityHeadline?: LocalizedHealthScoreText;
   relativitySub?: LocalizedHealthScoreText;
+  strengthNote?: LocalizedHealthScoreText;
   subtractionBody?: LocalizedHealthScoreText;
 }>;
 
@@ -103,7 +108,9 @@ export type HealthScorePageContent = Readonly<{
   copySeeds: Readonly<{
     bandLine: string;
     findings: HealthScoreFinding[];
+    findingsHeadline: string;
     findingsMode: "caught" | "strengths";
+    findingsSub: string;
     gapTrio: HealthScoreGapCard[];
     goalMirror: string;
     heroBody: string;
@@ -114,6 +121,7 @@ export type HealthScorePageContent = Readonly<{
     }>;
     methodCards: HealthScoreMethodCard[];
     methodHeadline: string;
+    pillarHeadline: string;
     relativity: Readonly<{
       gap?: number;
       headline: string;
@@ -1473,8 +1481,8 @@ function highestLeverage(
   return {
     pillar: hero.label,
     text: locale === "th"
-      ? `<b>จุดที่ให้แรงส่งสูงที่สุด:</b> ${hero.label} อยู่ที่ ${hero.value}% และเชื่อมกับเป้าหมายของคุณโดยตรง เมื่อเสาหลักนี้ขยับ ${goalList} จะขยับไปด้วย`
-      : `<b>Your highest-leverage move:</b> ${hero.label} sits at ${hero.value}% and every one of your goals routes through it. Lift this one pillar and ${goalList} all move together. That is not a coincidence in your results; it is the shape of your answers.`,
+      ? `จุดที่ให้แรงส่งสูงที่สุด: ${hero.label} อยู่ที่ ${hero.value}% และเชื่อมกับเป้าหมายของคุณโดยตรง เมื่อเสาหลักนี้ขยับ ${goalList} จะขยับไปด้วย`
+      : `Your highest-leverage move: ${hero.label} sits at ${hero.value}% and every one of your goals routes through it. Lift this one pillar and ${goalList} all move together. That is not a coincidence in your results; it is the shape of your answers.`,
     value: hero.value
   };
 }
@@ -1750,7 +1758,21 @@ function buildPageContent({
     copySeeds: {
       bandLine: bandLine(engine.final, engine.band, locale),
       findings: selectedFindings,
+      findingsHeadline: findings.length > 0
+        ? locale === "th"
+          ? `${selectedFindings.length} เรื่องที่แบบทดสอบวิตามินทั่วไปมักมองข้าม`
+          : `${selectedFindings.length} things a generic vitamin quiz would have missed.`
+        : locale === "th"
+          ? "สิ่งที่คุณทำได้ดีอยู่แล้วก็เป็นส่วนหนึ่งของแผน"
+          : "What you are already doing well matters too.",
       findingsMode: findings.length > 0 ? "caught" : "strengths",
+      findingsSub: findings.length > 0
+        ? locale === "th"
+          ? "แสดงอย่างชัดเจนจากสัญญาณจริงในคำตอบของคุณ"
+          : "Laid out from the specific signals in your answers, nothing held back."
+        : locale === "th"
+          ? "แผนจะรักษาจุดแข็งเหล่านี้ไว้ พร้อมจัดลำดับสิ่งที่ควรปรับ"
+          : "The plan keeps these strengths intact while it prioritizes the few things worth changing.",
       gapTrio: buildGapTrio(pillarsWithNames, answers, locale),
       goalMirror:
         answers.goals.length > 0
@@ -1768,6 +1790,9 @@ function buildPageContent({
       methodHeadline: locale === "th"
         ? "โมเดลคะแนนคงที่ห้าด้าน ไม่ใช่การเดา และไม่ใช่ค่าเฉลี่ยของคนอื่น"
         : "A fixed scoring model across five domains, not a guess and not an average of strangers.",
+      pillarHeadline: locale === "th"
+        ? `เสาหลักที่เชื่อมกับเป้าหมายบอกว่า ${engine.final >= median ? "สิ่งที่เหลือคือการปรับให้คมขึ้น" : "ควรเริ่มจากจุดไหนก่อน"}`
+        : `Your goal-linked pillars show ${engine.final >= median ? "where refinement still matters" : "where the plan should start"}.`,
       relativity: relative,
       strengthNote: strengthNote(pillarsWithNames, locale),
       subtraction: {

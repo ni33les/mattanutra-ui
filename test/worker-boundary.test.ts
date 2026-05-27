@@ -194,7 +194,7 @@ describe("external worker boundaries", () => {
     assert.match(
       source,
       /INTERACTIVE_TASK_TYPES[\s\S]*generate_product_recommendations/,
-      "product matching must be on the interactive reserve path because the refine page waits for it"
+      "product matching must be on the interactive reserve path because the reveal page waits for it"
     );
     assert.match(
       source,

@@ -27,6 +27,7 @@ import {
   validationCacheMismatchReasons,
   type ValidationResult
 } from "@/lib/product-validation";
+import type { AdminProductDecisionStats } from "@/lib/admin-recommendation-insights";
 import {
   defaultProductCountryCode,
   normalizeProductCountryCode,
@@ -130,6 +131,7 @@ export type AdminProductRow = Readonly<{
     chosenCount: number;
     lastRecommendedAt: string | null;
   };
+  decisionStats?: AdminProductDecisionStats;
   offers: AdminProductOffer[];
   region: string;
   sourceEvidence: {

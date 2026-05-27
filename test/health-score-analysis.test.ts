@@ -60,18 +60,23 @@ function validResponse() {
     },
     pageCopy: {
       bandLine: text,
+      findingsHeadline: text,
+      findingsSub: text,
       findings: localizedCards(3),
       gapTrio: localizedCards(3),
       heroBody: text,
       heroTitle: text,
+      highestLeverageBody: text,
       methodCards: localizedCards(3, "title"),
       methodHeadline: text,
       overview: text,
       paywallFeatures: paywallFeatures(),
       paywallSubtitle: text,
       paywallTitle: text,
+      pillarHeadline: text,
       relativityHeadline: text,
       relativitySub: text,
+      strengthNote: text,
       subtractionBody: text
     }
   };
@@ -110,6 +115,20 @@ describe("HealthScore AI copy validator", () => {
     const validation = validate(response);
 
     assert.ok(validation.errors.some((error) => error.includes("heroTitle.th")));
+  });
+
+  it("requires both English and Thai even when the current locale is English", () => {
+    const response = mutableResponse();
+
+    response.pageCopy.heroBody = { en: "English only" };
+
+    const validation = validateHealthScoreAiResponse({
+      healthScore: computeHealthScore(profileOne(), "en"),
+      locale: "en",
+      value: response
+    });
+
+    assert.ok(validation.errors.some((error) => error.includes("heroBody.th")));
   });
 
   it("rejects extra top-level fields that try to alter locked facts", () => {

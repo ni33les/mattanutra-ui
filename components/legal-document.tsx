@@ -11,7 +11,7 @@ export function LegalDocument({ content }: LegalDocumentProps) {
         <p className="font-[family:var(--mn-font-mono)] text-sm font-semibold uppercase tracking-[0.16em] text-[var(--mn-gold)]">
           {content.eyebrow}
         </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance sm:text-5xl">
+        <h1 className="mn-hero-title mt-3 text-4xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance sm:text-5xl">
           {content.title}
         </h1>
         <p className="mt-4 text-sm font-medium text-muted-foreground">

@@ -7,6 +7,7 @@ import type {
   ProductValidationCacheStatus
 } from "./admin-product-types.ts";
 import type { ProductDbRow, FactDbPayload } from "./admin-product-types.ts";
+import type { AdminProductDecisionStats } from "@/lib/admin-recommendation-insights";
 import type { ValidationResult } from "@/lib/product-validation";
 import {
   numberOrNull,
@@ -308,7 +309,10 @@ function normalizeTranslations(row: ProductDbRow) {
   return translations;
 }
 
-export function rowFromDb(row: ProductDbRow): AdminProductRow {
+export function rowFromDb(
+  row: ProductDbRow,
+  decisionStats?: AdminProductDecisionStats
+): AdminProductRow {
   const facts = (arrayPayload(row.facts) as FactDbPayload[]).map(normalizeFact);
   const validation = validationForRow(row, facts, row.facts);
   const validationCache = validationCacheStatusForRow(row, validation);
@@ -436,6 +440,7 @@ export function rowFromDb(row: ProductDbRow): AdminProductRow {
       chosenCount: Math.max(0, Math.round(numberOrNull(row.history_chosen_count) ?? 0)),
       lastRecommendedAt: isoOrNull(row.history_last_recommended_at)
     },
+    ...(decisionStats ? { decisionStats } : {}),
     region: row.region,
     sourceEvidence: {
       importId: row.import_id,

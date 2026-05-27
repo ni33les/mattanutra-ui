@@ -4,7 +4,7 @@ import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import type { Locale } from "@/lib/i18n";
 
-type NutritionProgressStage = "plan" | "quiz" | "refine";
+type NutritionProgressStage = "plan" | "quiz" | "reveal";
 
 type NutritionProgressProps = Readonly<{
   className?: string;
@@ -14,7 +14,7 @@ type NutritionProgressProps = Readonly<{
   pending?: boolean;
 }>;
 
-const stageOrder: NutritionProgressStage[] = ["quiz", "refine", "plan"];
+const stageOrder: NutritionProgressStage[] = ["quiz", "reveal", "plan"];
 
 const labels = {
   en: {
@@ -27,9 +27,9 @@ const labels = {
       description: "We understand you",
       title: "Discover"
     },
-    refine: {
-      description: "We adapt the plan for you",
-      title: "Personalize"
+    reveal: {
+      description: "We reveal your formula",
+      title: "Reveal"
     }
   },
   th: {
@@ -42,9 +42,9 @@ const labels = {
       description: "เราเข้าใจคะแนนสุขภาพของคุณ",
       title: "ค้นพบ"
     },
-    refine: {
-      description: "เราปรับแผนให้เหมาะกับคุณ",
-      title: "ปรับเฉพาะคุณ"
+    reveal: {
+      description: "เราแสดงสูตรของคุณ",
+      title: "เปิดเผยแผน"
     }
   }
 } satisfies Record<

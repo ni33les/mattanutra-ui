@@ -198,9 +198,11 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
     const analysis = await analyzeNutritionPlanChatWithGrok({
       answers: workItem.answers,
       chatMessages: workItem.chatMessages,
+      firstName: workItem.firstName,
       foodGuidance: workItem.foodGuidance,
       formulation: workItem.formulation,
       guidanceAdjustments: workItem.guidanceAdjustments,
+      healthScore: workItem.healthScore,
       locale: workItem.locale,
       plan: workItem.plan,
       planFeedback: workItem.planFeedback,
@@ -216,9 +218,11 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
     const analysis = await analyzeNutritionReportWithGrok({
       answers: workItem.answers,
       chatMessages: workItem.chatMessages,
+      firstName: workItem.firstName,
       foodGuidance: workItem.foodGuidance,
       formulation: workItem.formulation,
       guidanceAdjustments: workItem.guidanceAdjustments,
+      healthScore: workItem.healthScore,
       locale: workItem.locale,
       plan: workItem.plan,
       planFeedback: workItem.planFeedback,

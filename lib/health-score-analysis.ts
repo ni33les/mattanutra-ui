@@ -87,7 +87,7 @@ function systemPrompt(promptVersion: string) {
 }
 
 function requiredLocales(locale: Locale) {
-  return [...new Set([defaultLocale, locale])];
+  return [...new Set([defaultLocale, "th", locale])];
 }
 
 function userPrompt({
@@ -117,16 +117,21 @@ function userPrompt({
           bandLine: "Localized version of copySeeds.bandLine.",
           gapTrio: "Exactly the same number/order as copySeeds.gapTrio.",
           heroBody: "Localized supporting hero paragraph.",
-          heroTitle: "Localized goal mirror.",
+          heroTitle: "Localized goal mirror matching the prototype: 'You came here for...' adapted to this person's goals.",
           findings: "Exactly the same number/order as copySeeds.findings.",
+          findingsHeadline: "Localized headline for the 'What we caught' section.",
+          findingsSub: "Localized supporting line for the 'What we caught' section.",
+          highestLeverageBody: "Localized body for copySeeds.highestLeverage when present; otherwise a short goal-linked pillar observation.",
           methodCards: "Exactly 3 localized method cards.",
           methodHeadline: "Localized method section headline.",
           overview: "Localized summary paragraph.",
           paywallFeatures: "Exactly 3 localized feature cards.",
           paywallSubtitle: "Localized paywall subtitle.",
           paywallTitle: "Localized paywall heading.",
+          pillarHeadline: "Localized headline for the pillar section, anchored to goal-linked pillars.",
           relativityHeadline: "Localized copySeeds.relativity.headline.",
           relativitySub: "Localized copySeeds.relativity.sub.",
+          strengthNote: "Localized note about the strongest pillar or already-mastered area.",
           subtractionBody: "Localized copySeeds.subtraction.body."
         }
       },
@@ -142,10 +147,12 @@ function userPrompt({
         "Return exactly two top-level keys: advice and pageCopy.",
         `Every localized field must include these locale keys: ${locales.join(", ")}.`,
         "Use the deterministicContent.copySeeds as source material, but make the copy warmer and more specific.",
+        "Match the attached HealthScore prototype slots: hero goal mirror, score meaning, gap cards, pillar leverage, what-we-caught, subtraction beat, method cards, and paywall framing.",
         "Do not introduce any new finding, new score reason, new safety issue, new supplement, new product, or new measurement.",
         "For gapTrio and findings, keep the same array length, order, and purpose as the deterministic seeds.",
-        "For methodCards, return exactly 3 cards and preserve the same purpose: goals, routine, safety.",
+        "For methodCards, return exactly 3 cards and preserve the same purpose: goals direction, data/routine precision, and diet/safety focus.",
         "For paywallFeatures, return exactly 3 cards and anchor each to a different deterministic signal.",
+        "Use personalizationSignals to mention only signals the user actually supplied: goals, diet, activity, sleep, labs or wearables, symptoms, safety flags, lowest pillars, goal-linked pillars, findings, and subtraction mode.",
         "Keep copy concise enough for responsive cards: heroTitle under 120 English characters, card headlines under 70 English characters, card bodies under 190 English characters.",
         "No HTML tags. No markdown. No medical advice. No diagnosis. No bloodwork/lab-test/get-tested language.",
         "Do not mention that any value is locked, capped, or unmeasured.",

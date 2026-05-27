@@ -9,6 +9,7 @@ import type {
 import type { ValidationResult } from "@/lib/product-validation";
 import type { ProductCandidateFact } from "@/lib/product-recommendations";
 import type { ProductCountryCode } from "@/lib/product-countries";
+import type { AdminProductDecisionStats } from "@/lib/admin-recommendation-insights";
 
 export type { ProductCountryCode } from "@/lib/product-countries";
 
@@ -115,6 +116,7 @@ export type AdminProductRow = Readonly<{
     chosenCount: number;
     lastRecommendedAt: string | null;
   };
+  decisionStats?: AdminProductDecisionStats;
   offers: AdminProductOffer[];
   region: string;
   sourceEvidence: {

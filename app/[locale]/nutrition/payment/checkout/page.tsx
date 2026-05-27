@@ -109,7 +109,7 @@ export default async function PaymentCheckoutPage({
             <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]">
               {labels.eyebrow}
             </p>
-            <h1 className="mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] sm:text-5xl">
+            <h1 className="mn-hero-title mt-4 font-serif text-4xl font-medium leading-tight text-[var(--mn-ink)] sm:text-5xl">
               {labels.title}
             </h1>
             <p className="mt-4 text-base leading-7 text-[var(--mn-ink-soft)]">

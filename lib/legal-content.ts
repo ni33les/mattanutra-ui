@@ -138,16 +138,16 @@ const enPrivacy: LegalContent = {
       title: "1. Who we are",
       paragraphs: [
         "MattaNutra provides wellness information and supplement formulation support from Thailand. We are not a medical provider and we do not maintain medical records.",
-        "The assessment is designed to be anonymous. You can use it without giving us your name, home address, phone number, or direct contact details. If you request a free email example or contact support, you may choose to provide an email address or chat handle for that limited purpose.",
+        "The assessment can be used without giving us your home address, phone number, or direct contact details. You may choose to provide a first name so the experience can address you more naturally. If you request a free email example or contact support, you may also choose to provide an email address or chat handle for that limited purpose.",
         "Where Thailand's Personal Data Protection Act B.E. 2562 (2019), as amended, applies, MattaNutra acts as a personal data controller for the personal data we collect and decide how to use."
       ]
     },
     {
       title: "2. Information we collect",
       bullets: [
-        "We do not ask for or intentionally collect your name, home address, phone number, or other direct contact details through the assessment. The formulation brief is linked to a plan ID rather than your identity.",
-        "Email address if you choose to request a free example by email. This is optional and is not required to complete the anonymous assessment.",
-        "Assessment answers, such as age range, biological sex, height, weight, skin tone, country, goals, symptoms, sleep, activity, diet, sun exposure, alcohol, caffeine, medication categories, supplement use, budget, preferences, and optional notes.",
+        "Optional first name if you choose to provide it. It is used for in-product personalization and stored with your assessment plan ID.",
+        "Email address if you choose to request a free example by email. This is optional and is not required to complete the assessment.",
+        "Assessment answers, such as age range, sex, height, weight, skin tone, country, goals, symptoms, sleep, activity, diet, sun exposure, alcohol, caffeine, medication categories, supplement use, budget, preferences, and optional notes.",
         "Optional precision information, such as family history, stress, gut health, wearable data, VO2 max estimates, HRV, and lab values you choose to enter.",
         "Plan and transaction information, such as selected plan, plan ID, status, and payment status. Payment card or banking details are handled by payment providers and are not intended to be stored by us.",
         "Support and chat information, such as messages, chat app identifiers, and your plan ID if you connect with our AI support through LINE, WhatsApp, Telegram, or similar services.",
@@ -181,7 +181,7 @@ const enPrivacy: LegalContent = {
       title: "6. How we share information",
       paragraphs: [
         "We do not sell your personal information. We may share information with service providers that help us host the site, process assessments, provide AI functionality, process payments, manage chat support, analyze usage, send communications, and secure the service.",
-        "Although the MattaNutra assessment is designed to be anonymous, payment providers, chat apps, marketplaces, and technical systems may process their own account identifiers, transaction identifiers, IP addresses, device details, or chat handles under their own terms and privacy policies. We may also disclose information if required by law, to protect rights and safety, or as part of a business transfer."
+        "Although the MattaNutra assessment is linked primarily to a plan ID, payment providers, chat apps, marketplaces, and technical systems may process their own account identifiers, transaction identifiers, IP addresses, device details, or chat handles under their own terms and privacy policies. We may also disclose information if required by law, to protect rights and safety, or as part of a business transfer."
       ]
     },
     {
@@ -353,16 +353,16 @@ const thPrivacy: LegalContent = {
       title: "1. เราคือใคร",
       paragraphs: [
         "MattaNutra ให้ข้อมูลด้านสุขภาวะและสนับสนุนการสร้างสูตรอาหารเสริมจากประเทศไทย เราไม่ใช่ผู้ให้บริการทางการแพทย์ และเราไม่ได้จัดเก็บเวชระเบียน",
-        "แบบประเมินถูกออกแบบให้ใช้งานแบบไม่ระบุตัวตน คุณสามารถใช้งานได้โดยไม่ต้องให้ชื่อ ที่อยู่บ้าน หมายเลขโทรศัพท์ หรือข้อมูลติดต่อโดยตรง หากคุณขอตัวอย่างฟรีทางอีเมลหรือติดต่อฝ่ายสนับสนุน คุณอาจเลือกให้อีเมลหรือชื่อบัญชีแชทเพื่อวัตถุประสงค์นั้นเท่านั้น",
+        "คุณสามารถใช้งานแบบประเมินได้โดยไม่ต้องให้ที่อยู่บ้าน หมายเลขโทรศัพท์ หรือข้อมูลติดต่อโดยตรง คุณอาจเลือกให้ชื่อเพื่อให้ประสบการณ์ในระบบเป็นส่วนตัวขึ้น หากคุณขอตัวอย่างฟรีทางอีเมลหรือติดต่อฝ่ายสนับสนุน คุณอาจเลือกให้อีเมลหรือชื่อบัญชีแชทเพื่อวัตถุประสงค์นั้นเท่านั้น",
         "ในกรณีที่พระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 และที่แก้ไขเพิ่มเติม (PDPA) ของประเทศไทยมีผลใช้บังคับ MattaNutra มีสถานะเป็นผู้ควบคุมข้อมูลส่วนบุคคลสำหรับข้อมูลส่วนบุคคลที่เราเก็บรวบรวมและกำหนดวัตถุประสงค์การใช้"
       ]
     },
     {
       title: "2. ข้อมูลที่เราเก็บรวบรวม",
       bullets: [
-        "เราไม่ขอและไม่ได้ตั้งใจเก็บชื่อ ที่อยู่บ้าน หมายเลขโทรศัพท์ หรือข้อมูลติดต่อโดยตรงอื่นๆ ผ่านแบบประเมิน บรีฟสูตรจะเชื่อมกับรหัสแผนแทนตัวตนของคุณ",
-        "อีเมล หากคุณเลือกขอตัวอย่างฟรีทางอีเมล ข้อมูลนี้เป็นทางเลือกและไม่จำเป็นสำหรับการทำแบบประเมินแบบไม่ระบุตัวตน",
-        "คำตอบในแบบประเมิน เช่น ช่วงอายุ เพศทางชีววิทยา ส่วนสูง น้ำหนัก สีผิว ประเทศ เป้าหมาย อาการ การนอน กิจกรรม อาหาร แสงแดด แอลกอฮอล์ คาเฟอีน ประเภทยา การใช้อาหารเสริม งบประมาณ ความต้องการ และบันทึกเพิ่มเติมที่คุณเลือกกรอก",
+        "ชื่อที่คุณเลือกให้ ข้อมูลนี้ไม่บังคับ ใช้เพื่อปรับประสบการณ์ในระบบ และจัดเก็บร่วมกับรหัสแผนของแบบประเมิน",
+        "อีเมล หากคุณเลือกขอตัวอย่างฟรีทางอีเมล ข้อมูลนี้เป็นทางเลือกและไม่จำเป็นสำหรับการทำแบบประเมิน",
+        "คำตอบในแบบประเมิน เช่น ช่วงอายุ เพศ ส่วนสูง น้ำหนัก สีผิว ประเทศ เป้าหมาย อาการ การนอน กิจกรรม อาหาร แสงแดด แอลกอฮอล์ คาเฟอีน ประเภทยา การใช้อาหารเสริม งบประมาณ ความต้องการ และบันทึกเพิ่มเติมที่คุณเลือกกรอก",
         "ข้อมูลเพิ่มความแม่นยำที่ไม่บังคับ เช่น ประวัติครอบครัว ความเครียด สุขภาพลำไส้ ข้อมูลจากอุปกรณ์สวมใส่ ค่า VO2 max ค่า HRV และค่าแล็บที่คุณเลือกกรอก",
         "ข้อมูลแผนและธุรกรรม เช่น แผนที่เลือก รหัสแผน สถานะ และสถานะการชำระเงิน ข้อมูลบัตรหรือบัญชีธนาคารจะจัดการโดยผู้ให้บริการชำระเงิน และเราไม่ได้ตั้งใจจัดเก็บข้อมูลเหล่านั้น",
         "ข้อมูลสนับสนุนและแชท เช่น ข้อความ ตัวระบุบัญชีแอปแชท และรหัสแผน หากคุณเชื่อมต่อกับการสนับสนุนด้วย AI ผ่าน LINE, WhatsApp, Telegram หรือบริการคล้ายกัน",
@@ -396,7 +396,7 @@ const thPrivacy: LegalContent = {
       title: "6. การเปิดเผยข้อมูล",
       paragraphs: [
         "เราไม่ขายข้อมูลส่วนบุคคลของคุณ เราอาจเปิดเผยข้อมูลให้ผู้ให้บริการที่ช่วยเราโฮสต์เว็บไซต์ ประมวลผลแบบประเมิน ให้ฟังก์ชัน AI ประมวลผลการชำระเงิน จัดการแชทสนับสนุน วิเคราะห์การใช้งาน ส่งการสื่อสาร และรักษาความปลอดภัยของบริการ",
-        "แม้แบบประเมินของ MattaNutra จะถูกออกแบบให้ใช้งานแบบไม่ระบุตัวตน ผู้ให้บริการชำระเงิน แอปแชท ตลาดออนไลน์ และระบบทางเทคนิคอาจประมวลผลตัวระบุบัญชี ตัวระบุธุรกรรม ที่อยู่ IP รายละเอียดอุปกรณ์ หรือชื่อบัญชีแชทของตนเองตามเงื่อนไขและนโยบายความเป็นส่วนตัวของบริการนั้นๆ เราอาจเปิดเผยข้อมูลหากกฎหมายกำหนด เพื่อปกป้องสิทธิและความปลอดภัย หรือเป็นส่วนหนึ่งของการโอนธุรกิจ"
+        "แม้แบบประเมินของ MattaNutra จะเชื่อมกับรหัสแผนเป็นหลัก ผู้ให้บริการชำระเงิน แอปแชท ตลาดออนไลน์ และระบบทางเทคนิคอาจประมวลผลตัวระบุบัญชี ตัวระบุธุรกรรม ที่อยู่ IP รายละเอียดอุปกรณ์ หรือชื่อบัญชีแชทของตนเองตามเงื่อนไขและนโยบายความเป็นส่วนตัวของบริการนั้นๆ เราอาจเปิดเผยข้อมูลหากกฎหมายกำหนด เพื่อปกป้องสิทธิและความปลอดภัย หรือเป็นส่วนหนึ่งของการโอนธุรกิจ"
       ]
     },
     {

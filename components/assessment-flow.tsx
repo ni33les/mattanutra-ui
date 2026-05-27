@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BeakerIcon,
-  CheckIcon
+  CheckIcon,
+  ShieldCheckIcon
 } from "@heroicons/react/20/solid";
 import {
   OptionGrid,
@@ -17,12 +18,16 @@ import {
   cx
 } from "@/components/nutrition-flow/ui";
 import { HealthScorePaymentPanel } from "@/components/nutrition-flow/healthscore-panel";
+import {
+  ASSESSMENT_FIRST_NAME_MAX_LENGTH,
+  normalizeAssessmentFirstName
+} from "@/lib/assessment-first-name";
 import { getBpmPayload, trackBpmEvent } from "@/lib/bpm-client";
 import type { HealthScoreResult } from "@/lib/health-score";
 import type { Locale } from "@/lib/i18n";
 import {
   nutritionHealthScorePath,
-  nutritionRefinePath
+  nutritionRevealPath
 } from "@/lib/nutrition-paths";
 
 type Option = Readonly<{
@@ -64,6 +69,7 @@ type Answers = {
   disclosure: boolean;
   energy: string;
   family: string[];
+  firstName: string;
   flow: string;
   foodFrequency: Record<FoodFrequencyKey, string>;
   form: string;
@@ -105,8 +111,12 @@ type Copy = Readonly<{
     country: string;
     countryOptions: Option[];
     femaleTitle: string;
+    firstName: string;
+    firstNameHint: string;
+    firstNameOptional: string;
     flow: string;
     flowOptions: Option[];
+    honestyBody: string;
     height: string;
     menopause: string;
     menopauseOptions: Option[];
@@ -122,6 +132,10 @@ type Copy = Readonly<{
     sunscreen: string;
     sunscreenOptions: Option[];
     title: string;
+    trustItems: readonly Readonly<{
+      body: string;
+      title: string;
+    }>[];
     weight: string;
   };
   coach: Record<string, string>;
@@ -281,6 +295,7 @@ const initialAnswers: Answers = {
   disclosure: false,
   energy: "",
   family: [],
+  firstName: "",
   flow: "",
   foodFrequency: {
     dairy: "",
@@ -330,6 +345,10 @@ function cleanStringArray(value: unknown, fallback: string[] = []) {
     : fallback;
 }
 
+function clampFirstNameInput(value: string) {
+  return Array.from(value).slice(0, ASSESSMENT_FIRST_NAME_MAX_LENGTH).join("");
+}
+
 function buildInitialAnswers(prefillAnswers?: unknown): Answers {
   if (!prefillAnswers || typeof prefillAnswers !== "object" || Array.isArray(prefillAnswers)) {
     return initialAnswers;
@@ -342,6 +361,10 @@ function buildInitialAnswers(prefillAnswers?: unknown): Answers {
     ...prefill,
     allergies: cleanStringArray(prefill.allergies, initialAnswers.allergies),
     family: cleanStringArray(prefill.family, initialAnswers.family),
+    firstName:
+      typeof prefill.firstName === "string"
+        ? clampFirstNameInput(prefill.firstName)
+        : initialAnswers.firstName,
     foodFrequency: {
       ...initialAnswers.foodFrequency,
       ...(prefill.foodFrequency && typeof prefill.foodFrequency === "object"
@@ -389,6 +412,7 @@ function buildRandomDevAnswers(): Answers {
     disclosure: true,
     energy: randomItem(["ok", "good", "excellent"]),
     family: randomItem([["none"], ["heart"], ["diabetes"]]),
+    firstName: randomItem(["Alex", "Maya", "Niran"]),
     flow: sex === "female" ? randomItem(["none", "light", "moderate"]) : "",
     foodFrequency: {
       dairy: randomItem(["never", "1-2", "3+"]),
@@ -430,6 +454,11 @@ const en: Copy = {
   about: {
     title: "First, the basics about you",
     subtitle: "A few quick taps to start. This sets the baseline the rest of your formula is built on.",
+    firstName: "First name",
+    firstNameHint: "So we can personalise your Right Amount.",
+    firstNameOptional: "Optional",
+    honestyBody:
+      "There are no right or wrong answers here, only true ones. The more honestly you answer, the more exactly your formula fits, and the safer it is alongside anything you already take.",
     sex: "Sex",
     sexOptions: [
       { label: "Male", value: "male" },
@@ -491,6 +520,20 @@ const en: Copy = {
       { label: "Light", value: "light" },
       { label: "Moderate", value: "moderate" },
       { label: "Heavy", value: "heavy" }
+    ],
+    trustItems: [
+      {
+        body: "Every formula is screened against your medicines, labs, and Thai FDA registration.",
+        title: "Reviewed for safety"
+      },
+      {
+        body: "Your answers stay tied to your plan. We do not sell them or share them with advertisers.",
+        title: "Private by default"
+      },
+      {
+        body: "Guidance to support your goals, always shareable with your doctor.",
+        title: "Wellness, not diagnosis"
+      }
     ]
   },
   coach: {
@@ -832,6 +875,11 @@ const th: Copy = {
     ...en.about,
     title: "ข้อมูลพื้นฐานของคุณ",
     subtitle: "เริ่มด้วยการแตะไม่กี่ครั้ง เพื่อวางพื้นฐานให้สูตรส่วนถัดไปแม่นยำขึ้น",
+    firstName: "ชื่อเล่นหรือชื่อจริง",
+    firstNameHint: "ใช้เพื่อปรับข้อความในแผนของคุณเท่านั้น",
+    firstNameOptional: "ไม่บังคับ",
+    honestyBody:
+      "ไม่มีคำตอบที่ถูกหรือผิด มีแค่คำตอบที่ตรงกับคุณ ยิ่งตอบตามจริง สูตรก็ยิ่งเหมาะกับชีวิตจริงและปลอดภัยขึ้นเมื่อใช้ร่วมกับสิ่งที่คุณทานอยู่",
     sex: "เพศ",
     sexOptions: [
       { label: "ชาย", value: "male" },
@@ -905,6 +953,20 @@ const th: Copy = {
       { label: "น้อย", value: "light" },
       { label: "ปานกลาง", value: "moderate" },
       { label: "มาก", value: "heavy" }
+    ],
+    trustItems: [
+      {
+        body: "สูตรถูกตรวจร่วมกับยา แล็บ และบริบททะเบียน อย. ไทย",
+        title: "ตรวจเพื่อความปลอดภัย"
+      },
+      {
+        body: "คำตอบผูกกับแผนของคุณ เราไม่ขายหรือส่งให้ผู้ลงโฆษณา",
+        title: "เป็นส่วนตัวตั้งแต่ต้น"
+      },
+      {
+        body: "คำแนะนำเพื่อสนับสนุนเป้าหมายสุขภาวะ และนำไปคุยกับแพทย์ได้",
+        title: "สุขภาวะ ไม่ใช่การวินิจฉัย"
+      }
     ]
   },
   coach: {
@@ -1263,6 +1325,12 @@ const assessmentUiCopy = {
     formulaPrecision: "Formula precision",
     heightWeight: "Height and weight",
     infoLabel: "Note",
+    nameGreeting: (name: string) => `Nice to meet you, ${name}.`,
+    precisionHint: (progress: number, remaining: number) =>
+      remaining > 0
+        ? `${progress}% complete. ${remaining} essential signal${remaining === 1 ? "" : "s"} left before the precision layer.`
+        : `${progress}% complete. Essentials are ready; optional precision data can refine the formula further.`,
+    precisionMarks: ["Start", "Essentials -> 80%", "Precision -> 100%"],
     stagesAria: "Assessment stages",
     processingError: "We could not start processing. Please try again.",
     scoreProcessingSubtitle: "We are scoring your main wellness domains from your answers.",
@@ -1285,6 +1353,12 @@ const assessmentUiCopy = {
     formulaPrecision: "ความแม่นยำของสูตร",
     heightWeight: "ส่วนสูงและน้ำหนัก",
     infoLabel: "หมายเหตุ",
+    nameGreeting: (name: string) => `ยินดีที่ได้รู้จัก ${name}`,
+    precisionHint: (progress: number, remaining: number) =>
+      remaining > 0
+        ? `เสร็จแล้ว ${progress}% ยังเหลือข้อมูลหลัก ${remaining} ข้อก่อนเข้าสู่ชั้นความแม่นยำ`
+        : `เสร็จแล้ว ${progress}% ข้อมูลหลักพร้อมแล้ว ข้อมูลเสริมช่วยปรับสูตรให้ละเอียดขึ้น`,
+    precisionMarks: ["เริ่มต้น", "ข้อมูลหลัก -> 80%", "ความแม่นยำ -> 100%"],
     stagesAria: "ขั้นตอนแบบประเมิน",
     processingError: "ไม่สามารถเริ่มการประมวลผลได้ โปรดลองอีกครั้ง",
     scoreProcessingSubtitle: "เรากำลังประเมินภาพรวมสุขภาพจากคำตอบของคุณ",
@@ -1307,6 +1381,9 @@ const assessmentUiCopy = {
   formulaPrecision: string;
   heightWeight: string;
   infoLabel: string;
+  nameGreeting: (name: string) => string;
+  precisionHint: (progress: number, remaining: number) => string;
+  precisionMarks: readonly [string, string, string];
   processingError: string;
   scoreProcessingSubtitle: string;
   scoreProcessingTitle: string;
@@ -1574,6 +1651,86 @@ function PrecisionGauge({
   );
 }
 
+type AssessmentUiLabels = (typeof assessmentUiCopy)[Locale];
+
+function QuestionnairePrecisionMeter({
+  precision,
+  ui
+}: Readonly<{
+  precision: ReturnType<typeof precisionProgress>;
+  ui: AssessmentUiLabels;
+}>) {
+  return (
+    <aside className="mn-questionnaire-meter" aria-label={ui.formulaPrecision}>
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="mn-questionnaire-meter__label">{ui.formulaPrecision}</p>
+          <p className="mn-questionnaire-meter__hint">
+            {ui.precisionHint(precision.progress, precision.essentialRemaining)}
+          </p>
+        </div>
+        <p className="mn-questionnaire-meter__value">
+          {precision.progress}
+          <span>%</span>
+        </p>
+      </div>
+      <progress
+        aria-label={ui.formulaPrecision}
+        className="mn-progress mn-progress--soft mt-4"
+        max={100}
+        value={precision.progress}
+      />
+      <div className="mn-questionnaire-meter__marks">
+        <span>{ui.precisionMarks[0]}</span>
+        <span>{ui.precisionMarks[1]}</span>
+        <span>{ui.precisionMarks[2]}</span>
+      </div>
+    </aside>
+  );
+}
+
+function AssessmentIntroNote({
+  body,
+  firstName,
+  greeting
+}: Readonly<{
+  body: string;
+  firstName: string | null;
+  greeting: string;
+}>) {
+  return (
+    <div className="mn-assessment-honesty">
+      <div aria-hidden={true} className="mn-assessment-honesty__mark">&quot;</div>
+      <div className="min-w-0">
+        {firstName ? (
+          <p className="mn-assessment-honesty__greeting">{greeting}</p>
+        ) : null}
+        <p>{body}</p>
+      </div>
+    </div>
+  );
+}
+
+function AssessmentTrustStrip({
+  items
+}: Readonly<{
+  items: Copy["about"]["trustItems"];
+}>) {
+  return (
+    <div className="mn-assessment-trust-strip">
+      {items.map((item) => (
+        <div key={item.title} className="mn-assessment-trust-item">
+          <ShieldCheckIcon aria-hidden={true} className="size-5 shrink-0" />
+          <div className="min-w-0">
+            <p className="mn-assessment-trust-item__title">{item.title}</p>
+            <p className="mn-assessment-trust-item__body">{item.body}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function numericAnswer(value: string) {
   const parsed = Number(value);
 
@@ -1663,29 +1820,29 @@ function AssessmentStepper({
                 type="button"
                 aria-current={active ? "step" : undefined}
                 className={cx(
-                  "flex h-full w-full flex-col gap-1 rounded-lg border px-3 py-3 text-left shadow-sm transition",
+                  "flex h-full w-full flex-col gap-1 rounded-[0.85rem] border px-3 py-3 text-left shadow-sm transition",
                   active
-                    ? "border-[#3A7BD5] bg-[#3A7BD5] text-white shadow-md"
+                    ? "border-[var(--mn-teal)] bg-[linear-gradient(180deg,#fff,var(--mn-mint))] text-[var(--mn-ink)] shadow-[0_14px_34px_-26px_rgba(45,143,114,0.6)]"
                     : done
-                      ? "border-[var(--mn-teal)] bg-[var(--mn-teal)] text-white hover:border-[var(--mn-teal-deep)]"
-                      : "border-foreground/10 bg-[var(--mn-paper)] hover:border-[color-mix(in_srgb,var(--mn-gold)_35%,transparent)]"
+                      ? "border-[var(--mn-teal-deep)] bg-[var(--mn-mint)] text-[var(--mn-ink)] hover:border-[var(--mn-teal)]"
+                      : "border-[var(--mn-line)] bg-[var(--mn-paper)] hover:border-[color-mix(in_srgb,var(--mn-gold)_45%,transparent)]"
                 )}
                 onClick={() => onSelect(index)}
               >
                 <span
                   className={cx(
                     "flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]",
-                    active || done ? "text-white/80" : "text-muted-foreground"
+                    active || done ? "text-[var(--mn-teal-deep)]" : "text-muted-foreground"
                   )}
                 >
                   <span
                     className={cx(
                       "flex size-5 items-center justify-center rounded-full text-[10px] font-bold",
                       active
-                        ? "bg-white text-[#3A7BD5]"
+                        ? "bg-[var(--mn-teal)] text-white"
                         : done
-                          ? "bg-white text-[var(--mn-teal-deep)]"
-                          : "bg-background text-muted-foreground"
+                          ? "bg-[var(--mn-teal-deep)] text-white"
+                          : "bg-[var(--mn-cream-deep)] text-muted-foreground"
                     )}
                   >
                     {done && !active ? (
@@ -1701,7 +1858,7 @@ function AssessmentStepper({
                 <span
                   className={cx(
                     "hidden text-sm font-semibold tracking-normal sm:block",
-                    active || done ? "text-white" : "text-muted-foreground"
+                    active || done ? "text-[var(--mn-ink)]" : "text-muted-foreground"
                   )}
                 >
                   {stages[index] ?? section.title}
@@ -1742,6 +1899,7 @@ export function AssessmentFlow({
   const assessmentStartedTracked = useRef(false);
   const healthScoreViewedTracked = useRef(false);
   const precision = precisionProgress(answers);
+  const displayFirstName = normalizeAssessmentFirstName(answers.firstName);
   const vo2Estimate = estimateVo2Max(answers);
   const gaugeLabels = gaugeLabelsByLocale[locale];
 
@@ -1781,13 +1939,15 @@ export function AssessmentFlow({
   const ui = assessmentUiCopy[locale];
 
   function setSingle(key: keyof Answers, value: string) {
+    const nextValue = key === "firstName" ? clampFirstNameInput(value) : value;
+
     setAnswers((current) => ({
       ...current,
-      [key]: value,
-      ...(key === "sex" && value !== "female" ? { flow: "", menopause: "", reproStatus: "" } : {}),
-      ...(key === "reproStatus" && (value === "pregnant" || value === "breastfeeding") ? { flow: "" } : {}),
-      ...(key === "meds" && value !== "yes" ? { medTypes: [], otherMed: "" } : {}),
-      ...(key === "tracker" && value !== "other" ? { otherTracker: "" } : {})
+      [key]: nextValue,
+      ...(key === "sex" && nextValue !== "female" ? { flow: "", menopause: "", reproStatus: "" } : {}),
+      ...(key === "reproStatus" && (nextValue === "pregnant" || nextValue === "breastfeeding") ? { flow: "" } : {}),
+      ...(key === "meds" && nextValue !== "yes" ? { medTypes: [], otherMed: "" } : {}),
+      ...(key === "tracker" && nextValue !== "other" ? { otherTracker: "" } : {})
     }));
   }
 
@@ -1855,6 +2015,29 @@ export function AssessmentFlow({
       description: copy.about.subtitle,
       id: "about",
       questions: [
+        {
+          content: (
+            <label className="block">
+              <span className="mn-question__heading">
+                <span className="mn-question__label">{copy.about.firstName}</span>
+                <span className="mn-optional-badge">{copy.about.firstNameOptional}</span>
+              </span>
+              <span className="mn-question__hint">{copy.about.firstNameHint}</span>
+              <input
+                autoComplete="given-name"
+                className="mn-text-input"
+                maxLength={ASSESSMENT_FIRST_NAME_MAX_LENGTH}
+                placeholder={copy.about.firstName}
+                type="text"
+                value={answers.firstName}
+                onChange={(event) => setSingle("firstName", event.target.value)}
+              />
+            </label>
+          ),
+          id: "firstName",
+          isAnswered: normalizeAssessmentFirstName(answers.firstName) !== null,
+          label: ""
+        },
         {
           content: (
             <PillGroup
@@ -2501,7 +2684,7 @@ export function AssessmentFlow({
       setShowHealthScore(true);
       router.replace(
         paymentId
-          ? nutritionRefinePath(locale, readyStatus.planId)
+          ? nutritionRevealPath(locale, readyStatus.planId)
           : nutritionHealthScorePath(locale, readyStatus.planId)
       );
     } catch {
@@ -2617,12 +2800,14 @@ export function AssessmentFlow({
           />
 	        ) : showHealthScore ? (
 	          <HealthScoreOnlyPanel
+	            firstName={displayFirstName}
 	            healthScore={healthScore}
 	            locale={locale}
 	            planId={capturedStatus?.planId ?? returningPlanId ?? undefined}
 	          />
 	        ) : (
 	          <div className="space-y-6">
+            <QuestionnairePrecisionMeter precision={precision} ui={ui} />
             <div className="py-3">
               <AssessmentStepper
                 ariaLabel={ui.stagesAria}
@@ -2687,6 +2872,13 @@ export function AssessmentFlow({
               <div
                 className="space-y-7"
               >
+                {sectionIndex === 0 ? (
+                  <AssessmentIntroNote
+                    body={copy.about.honestyBody}
+                    firstName={displayFirstName}
+                    greeting={displayFirstName ? ui.nameGreeting(displayFirstName) : ""}
+                  />
+                ) : null}
                 {renderedQuestions.map((question) => (
                   <Question
                     key={question.id}
@@ -2698,6 +2890,9 @@ export function AssessmentFlow({
                     {question.content}
                   </Question>
                 ))}
+                {sectionIndex === 0 ? (
+                  <AssessmentTrustStrip items={copy.about.trustItems} />
+                ) : null}
               </div>
             </SectionCard>
 
@@ -2713,10 +2908,12 @@ export function AssessmentFlow({
 }
 
 function HealthScoreOnlyPanel({
+  firstName,
   healthScore,
   locale,
   planId
 }: Readonly<{
+  firstName?: string | null;
   healthScore: HealthScoreResult | null;
   locale: Locale;
   planId?: string;
@@ -2725,6 +2922,7 @@ function HealthScoreOnlyPanel({
 
   return (
     <HealthScorePaymentPanel
+      firstName={firstName ?? undefined}
       locale={locale}
       planId={planId}
       result={healthScore}

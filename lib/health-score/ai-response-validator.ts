@@ -6,7 +6,7 @@ import type {
   LocalizedHealthScoreText
 } from "@/lib/health-score";
 import { HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS } from "@/lib/health-score";
-import { defaultLocale, type Locale } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 
 export type ValidatedHealthScoreAiResponse = Readonly<{
   advice: HealthScoreAdvice;
@@ -18,7 +18,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function requiredLocales(locale: Locale) {
-  return [...new Set([defaultLocale, locale])];
+  return [...new Set(["en", "th", locale])];
 }
 
 function readLocalizedTextValue(
@@ -265,14 +265,19 @@ export function validateHealthScoreAiResponse({
       key !== "heroBody" &&
       key !== "heroTitle" &&
       key !== "findings" &&
+      key !== "findingsHeadline" &&
+      key !== "findingsSub" &&
+      key !== "highestLeverageBody" &&
       key !== "methodCards" &&
       key !== "methodHeadline" &&
       key !== "overview" &&
       key !== "paywallFeatures" &&
       key !== "paywallSubtitle" &&
       key !== "paywallTitle" &&
+      key !== "pillarHeadline" &&
       key !== "relativityHeadline" &&
       key !== "relativitySub" &&
+      key !== "strengthNote" &&
       key !== "subtractionBody"
   );
 
@@ -299,6 +304,9 @@ export function validateHealthScoreAiResponse({
     }),
     heroBody: readLocalizedText(pageCopyRecord, "heroBody", "pageCopy", errors, locales),
     heroTitle: readLocalizedText(pageCopyRecord, "heroTitle", "pageCopy", errors, locales),
+    findingsHeadline: readLocalizedText(pageCopyRecord, "findingsHeadline", "pageCopy", errors, locales),
+    findingsSub: readLocalizedText(pageCopyRecord, "findingsSub", "pageCopy", errors, locales),
+    highestLeverageBody: readLocalizedText(pageCopyRecord, "highestLeverageBody", "pageCopy", errors, locales),
     findings: readLocalizedCards({
       errors,
       expectedLength: pageContent?.copySeeds.findings.length ?? 3,
@@ -319,8 +327,10 @@ export function validateHealthScoreAiResponse({
     paywallFeatures: readPaywallFeatures(pageCopyRecord, "pageCopy", errors, locales),
     paywallSubtitle: readLocalizedText(pageCopyRecord, "paywallSubtitle", "pageCopy", errors, locales),
     paywallTitle: readLocalizedText(pageCopyRecord, "paywallTitle", "pageCopy", errors, locales),
+    pillarHeadline: readLocalizedText(pageCopyRecord, "pillarHeadline", "pageCopy", errors, locales),
     relativityHeadline: readLocalizedText(pageCopyRecord, "relativityHeadline", "pageCopy", errors, locales),
     relativitySub: readLocalizedText(pageCopyRecord, "relativitySub", "pageCopy", errors, locales),
+    strengthNote: readLocalizedText(pageCopyRecord, "strengthNote", "pageCopy", errors, locales),
     subtractionBody: readLocalizedText(pageCopyRecord, "subtractionBody", "pageCopy", errors, locales)
   } satisfies HealthScorePageAiCopy;
 
