@@ -192,12 +192,17 @@ export const revealPageCopySlots = [
   "closingBody"
 ] as const;
 
+export const revealPageCopyVersion = "reveal:v3-template" as const;
+
 export type RevealPageCopySlot = (typeof revealPageCopySlots)[number];
 
-export type RevealPageCopy = Readonly<Record<
-  RevealPageCopySlot,
-  Readonly<Record<"en" | "th", string>>
->>;
+export type RevealPageCopy = Readonly<{
+  version?: typeof revealPageCopyVersion;
+}> &
+  Readonly<Record<
+    RevealPageCopySlot,
+    Readonly<Record<"en" | "th", string>>
+  >>;
 
 export type ProductRecommendationStatus = "failed" | "partial" | "pending" | "ready";
 export type ProductStackPreference = "balanced" | "compact";

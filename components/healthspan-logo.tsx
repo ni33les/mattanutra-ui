@@ -37,10 +37,10 @@ export function HealthspanLogo({
     >
       <span className={cn("mn-logo-mark-frame", isV14 && "mn-logo-mark-frame--v14")}>
         <Image
-          src={isV14 ? "/v14/logo.png" : "/v11/brand-mark.png"}
+          src="/v11/brand-mark.png"
           alt=""
-          width={isV14 ? 96 : 420}
-          height={isV14 ? 150 : 465}
+          width={420}
+          height={465}
           priority
           unoptimized
           className="mn-logo-mark-image"
@@ -49,11 +49,11 @@ export function HealthspanLogo({
       </span>
 
       <span className="inline-grid leading-none">
-        <span className="flex items-baseline gap-1 font-[family:var(--mn-font-display)] text-[21px] font-semibold tracking-normal sm:text-[23px]">
+        <span className="mn-logo-wordmark flex items-baseline gap-1 text-[22px] font-medium tracking-normal sm:text-[23px]">
           <span className="text-[var(--mn-logo-ink,var(--mn-ink))]">Matta</span>
           <span className="text-[var(--mn-teal)]">Nutra</span>
         </span>
-        <span className="mt-1 font-[family:var(--mn-font-mono)] text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--mn-logo-tagline,var(--muted-foreground))] sm:text-[10.5px]">
+        <span className="mn-logo-tagline mt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--mn-logo-tagline,var(--muted-foreground))] sm:text-[10.5px]">
           {copy.tagline}
         </span>
       </span>

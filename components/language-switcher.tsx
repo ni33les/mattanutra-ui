@@ -42,7 +42,7 @@ export function LanguageSwitcher({
   return (
     <nav
       aria-label={copy.aria}
-      className="flex items-center gap-1 rounded-full border border-[var(--mn-line)] bg-[var(--mn-cream)]/75 p-1 shadow-[inset_0_1px_0_rgb(255_255_255/0.55)]"
+      className="flex items-center overflow-hidden rounded-full border border-[var(--mn-line)] bg-transparent text-[13px]"
     >
       {publicLocales.map((locale) => {
         const isActive = locale === currentLocale;
@@ -55,10 +55,10 @@ export function LanguageSwitcher({
             href={`/api/locale?locale=${locale}&next=${encodeURIComponent(next)}`}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "rounded-full px-2.5 py-1.5 font-[family:var(--mn-font-mono)] text-xs font-semibold uppercase tracking-[0.08em] transition",
+              "px-3 py-1.5 font-[family:var(--mn-font-body)] text-xs font-semibold uppercase tracking-normal transition",
               isActive
                 ? "bg-[var(--mn-ink)] text-[var(--mn-paper)] shadow-sm"
-                : "text-muted-foreground hover:bg-[var(--mn-mint)] hover:text-[var(--mn-teal-deep)]"
+                : "text-[var(--mn-ash)] hover:bg-[var(--mn-paper)] hover:text-[var(--mn-teal-deep)]"
             )}
           >
             {label}

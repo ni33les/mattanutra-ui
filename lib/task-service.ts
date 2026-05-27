@@ -101,6 +101,7 @@ const globalTaskService = globalThis as typeof globalThis & {
 const TASK_FINALIZATION_LEASE_SECONDS = 300;
 const EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT = 50;
 const EXPIRED_RESERVATION_SWEEP_BATCH_LIMIT_MAX = 100;
+const DEPENDENCY_BOOTSTRAP_DELAY_MS = 60_000;
 
 type Db = TaskServiceDb;
 type ActiveReservationRow = {
@@ -827,6 +828,16 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
     optionalText(input.groupLabel) ??
     inheritedGroupLabel ??
     cleanText(input.title, "Untitled task");
+  const dependencies = input.dependencies ?? [];
+  const hasDependencyInputs = dependencies.some((dependency) =>
+    Boolean(uuidOrNull(dependency.taskId))
+  );
+  const intendedScheduledFor = input.scheduledFor
+    ? new Date(input.scheduledFor)
+    : new Date();
+  const initialScheduledFor = hasDependencyInputs
+    ? new Date(Date.now() + DEPENDENCY_BOOTSTRAP_DELAY_MS)
+    : intendedScheduledFor;
 
   if (idempotencyKey) {
     const existing = await sql<TaskRow[]>`
@@ -849,7 +860,11 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
     `;
 
     if (existing[0]) {
-      return { created: false, task: mapTask(existing[0]) };
+      const task = mapTask(existing[0]);
+
+      await ensureTaskDependencies(sql, task.id, dependencies);
+
+      return { created: false, task };
     }
   }
 
@@ -907,7 +922,7 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
       '{}'::jsonb,
       ${idempotencyKey},
       ${idempotencyScopeKey},
-      ${input.scheduledFor ? new Date(input.scheduledFor) : new Date()},
+      ${initialScheduledFor},
       0,
       ${positiveInteger(input.maxAttempts, 3)},
       ${retryOfTaskId}::uuid,
@@ -951,15 +966,29 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
     throw new Error("Unable to create or locate task");
   }
 
-  const task = mapTask(taskRow);
+  let task = mapTask(taskRow);
 
   if (!inserted[0]) {
-    await ensureTaskDependencies(sql, task.id, input.dependencies ?? []);
+    await ensureTaskDependencies(sql, task.id, dependencies);
 
     return { created: false, task };
   }
 
-  await ensureTaskDependencies(sql, task.id, input.dependencies ?? []);
+  await ensureTaskDependencies(sql, task.id, dependencies);
+
+  if (hasDependencyInputs) {
+    const updatedRows = await sql<TaskRow[]>`
+      update public.tasks
+      set scheduled_for = ${intendedScheduledFor}
+      where id = ${task.id}::uuid
+        and status = 'queued'
+      returning *
+    `;
+
+    if (updatedRows[0]) {
+      task = mapTask(updatedRows[0]);
+    }
+  }
 
   await insertTaskEvent(sql, {
     agentId: input.createdByAgentId,

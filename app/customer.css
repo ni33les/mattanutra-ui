@@ -25,8 +25,8 @@
     --mn-radius-sm: 0.75rem;
     --mn-radius-md: 1.125rem;
     --mn-radius-lg: 1.375rem;
-    --mn-shadow-soft: none;
-    --mn-shadow-card: none;
+    --mn-shadow-soft: 0 18px 40px -20px rgba(10, 37, 64, 0.18);
+    --mn-shadow-card: 0 40px 80px -44px rgba(10, 37, 64, 0.26);
     --background: var(--mn-cream);
     --foreground: var(--mn-ink);
     --muted-foreground: var(--mn-ash);
@@ -68,7 +68,7 @@
     font-family:
       var(--mn-font-display),
       var(--mn-font-body),
-      serif;
+      serif !important;
     letter-spacing: 0;
   }
 
@@ -82,23 +82,59 @@
       var(--mn-font-body),
       ui-sans-serif,
       system-ui,
-      sans-serif;
+      sans-serif !important;
+    font-style: normal !important;
+    line-height: 1.35;
   }
 
   .mn-customer-shell code,
   .mn-customer-shell kbd,
-  .mn-customer-shell .mn-mono-label {
+  .mn-customer-shell .mn-mono-label,
+  .mn-customer-shell .font-mono {
     font-family:
       var(--mn-font-mono),
       ui-monospace,
       SFMono-Regular,
       Menlo,
-      monospace;
+      monospace !important;
+  }
+
+  .mn-customer-shell .mn-logo-wordmark {
+    font-family:
+      var(--mn-font-display),
+      Georgia,
+      serif !important;
+  }
+
+  .mn-customer-shell .mn-logo-tagline {
+    font-family:
+      var(--mn-font-mono),
+      ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      monospace !important;
+  }
+
+  :lang(th) .mn-customer-shell .mn-logo-wordmark,
+  :lang(th) .mn-customer-shell .mn-logo-tagline {
+    font-family:
+      var(--mn-font-thai),
+      var(--mn-font-body),
+      ui-sans-serif,
+      system-ui,
+      sans-serif !important;
+  }
+
+  :lang(th) .mn-customer-shell .mn-mono-label,
+  :lang(th) .mn-customer-shell [class*="tracking-"] {
+    letter-spacing: 0.02em !important;
+    text-transform: none !important;
   }
 
   .mn-logo-mark-frame {
     display: inline-grid;
     flex-shrink: 0;
+    overflow: visible;
     place-items: center;
   }
 
@@ -1208,10 +1244,10 @@
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    border-bottom: 1px solid color-mix(in srgb, var(--mn-line) 80%, transparent);
-    background: var(--mn-mint);
+    border-bottom: 1px solid color-mix(in srgb, white 10%, transparent);
+    background: var(--mn-ink);
     padding: 0.5rem 1rem;
-    color: var(--mn-ink-soft);
+    color: var(--mn-teal-glow);
     font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -1228,11 +1264,11 @@
   }
 
   .mn-customer-shell .mn-availability-pill {
-    border: 1px solid color-mix(in srgb, var(--mn-teal) 24%, transparent);
+    border: 1px solid color-mix(in srgb, white 10%, transparent);
     border-radius: 999px;
-    background: var(--mn-paper);
+    background: color-mix(in srgb, white 7%, transparent);
     padding: 0.1875rem 0.625rem;
-    color: var(--mn-teal-deep);
+    color: color-mix(in srgb, white 80%, transparent);
     font-family: var(--mn-font-mono), ui-monospace, monospace;
     font-size: 0.625rem;
     letter-spacing: 0.1em;
@@ -1255,13 +1291,13 @@
     height: 3rem;
     border: 1px solid color-mix(in srgb, var(--mn-line) 82%, transparent);
     border-radius: 999px;
-    background: var(--mn-paper);
-    padding: 0.4rem;
+    background: transparent;
+    padding: 0;
   }
 
   .mn-customer-shell .mn-titlebar .mn-logo-mark-image {
-    width: 2.05rem;
-    height: 2.05rem;
+    width: auto;
+    height: 2.55rem;
     max-width: none;
     max-height: none;
     object-fit: contain;
@@ -3450,13 +3486,14 @@
   }
 
   .mn-logo-mark-frame--v14 {
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    overflow: visible;
   }
 
   .mn-logo-mark-frame--v14 .mn-logo-mark-image {
-    width: 2.25rem;
-    height: 2.25rem;
+    width: auto;
+    height: 2.75rem;
     object-fit: contain;
   }
 
@@ -3464,7 +3501,7 @@
     position: sticky;
     top: 0;
     z-index: 50;
-    background: color-mix(in srgb, var(--mn-cream) 86%, transparent);
+    background: color-mix(in srgb, var(--mn-cream) 88%, transparent);
     backdrop-filter: blur(14px);
   }
 
@@ -3474,16 +3511,17 @@
   }
 
   .mn-customer-shell .mn-titlebar .mn-logo-mark-frame {
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 2.75rem;
+    height: 2.75rem;
     border: 0;
     background: transparent;
     padding: 0;
+    overflow: visible;
   }
 
   .mn-customer-shell .mn-titlebar .mn-logo-mark-image {
-    width: 2.25rem;
-    height: 2.25rem;
+    width: auto;
+    height: 2.75rem;
   }
 
   .mn-customer-shell .mn-titlebar-nav {

@@ -6,9 +6,13 @@ import type {
   PlanGuidanceAdjustment,
   PlanFeedbackItem,
   PlanChatMessage,
-  RevealPageCopy
+  RevealPageCopy,
+  RevealPageCopySlot
 } from "@/lib/formulation-types";
-import { revealPageCopySlots } from "@/lib/formulation-types";
+import {
+  revealPageCopySlots,
+  revealPageCopyVersion
+} from "@/lib/formulation-types";
 import type { HealthScoreResult } from "@/lib/health-score";
 import { HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS } from "@/lib/health-score";
 import { normalizePlanFeedbackItems } from "@/lib/plan-feedback";
@@ -45,6 +49,39 @@ const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
 const DEFAULT_GROK_MODEL = "grok-4.3";
 const DEFAULT_PROMPT_VERSION = "v1";
 const REQUEST_TIMEOUT_MS = 360_000;
+
+const revealPageSlotGuide: Record<string, string> = {
+  breadcrumbsBody:
+    "Assessment breadcrumb body: stay close to the prototype idea that the formula folds together body context, goals, location, preferences, and constraints.",
+  breadcrumbsTitle:
+    "Legacy slot. The UI renders the locked prototype heading; keep this semantically identical if included.",
+  closingBody:
+    "Closing paragraph about right amount: not more, exactly enough, with the formula as the practical embodiment. No new facts.",
+  closingTitle:
+    "Legacy slot. The UI renders the locked prototype heading; keep this semantically identical if included.",
+  distillFoot:
+    "Short paragraph explaining that selected items earned their place against goals, cautions, and available catalogue evidence.",
+  distillNarrative:
+    "Legacy slot. The UI renders locked count language; keep this semantically identical if included.",
+  formulaLead:
+    "Formula table body: doses are sized to the user's profile, goals, and disclosed safety context. Do not mention exact doses or counts.",
+  formulaTitle:
+    "Legacy slot. The UI renders the locked formula heading; keep this semantically identical if included.",
+  heroHeadline:
+    "Legacy slot. The UI renders the locked prototype hero headline; keep this semantically identical if included.",
+  heroSub:
+    "Legacy slot. The UI renders the locked hero body with deterministic counts; keep this semantically identical if included.",
+  heroTitle:
+    "Legacy slot. The UI renders the locked name/no-name hero title; keep this semantically identical if included.",
+  productsLead:
+    "Product matching body: searched approved Thai catalogue or market data for products that fit the formula, dosing, and serving burden. Do not mention exact product names or counts.",
+  productsTitle:
+    "Legacy slot. The UI renders the locked product heading; keep this semantically identical if included.",
+  safetyBody:
+    "Conservative safety paragraph. Mention disclosed cautions only generically and never claim contraindications are absent.",
+  safetyHeadline:
+    "Legacy slot. The UI renders the locked safety headline from deterministic safety context; keep this semantically identical if included."
+};
 
 function configured(value: string | undefined) {
   return value?.trim() ?? "";
@@ -351,14 +388,26 @@ export function validateRevealPageCopy(value: unknown): {
   }
 
   const record = value as Record<string, unknown>;
-  const allowed = new Set<string>(revealPageCopySlots);
+  const allowed = new Set<string>([...revealPageCopySlots, "version"]);
   const extraKeys = Object.keys(record).filter((key) => !allowed.has(key));
+  const version =
+    typeof record.version === "string" ? record.version.trim() : undefined;
 
   if (extraKeys.length > 0) {
     errors.push(`revealPageCopy has unexpected fields: ${extraKeys.join(", ")}`);
   }
 
-  const copy: Partial<Record<keyof RevealPageCopy, { en: string; th: string }>> = {};
+  if (version && version !== revealPageCopyVersion) {
+    errors.push(`revealPageCopy.version must be ${revealPageCopyVersion}`);
+  }
+
+  const copy: Partial<Record<RevealPageCopySlot, { en: string; th: string }>> & {
+    version?: typeof revealPageCopyVersion;
+  } = {};
+
+  if (version === revealPageCopyVersion) {
+    copy.version = revealPageCopyVersion;
+  }
 
   for (const slot of revealPageCopySlots) {
     const localized = record[slot];
@@ -525,15 +574,18 @@ export async function analyzeNutritionReportWithGrok(input: AdvisorInput) {
                     th: "short conservative safety note"
                   }
                 ],
-                revealPageCopy: Object.fromEntries(
-                  revealPageCopySlots.map((slot) => [
-                    slot,
-                    {
-                      en: "short personalized copy without numbers or medical claims",
-                      th: "short personalized Thai copy without numbers or medical claims"
-                    }
-                  ])
-                ),
+                revealPageCopy: {
+                  version: revealPageCopyVersion,
+                  ...Object.fromEntries(
+                    revealPageCopySlots.map((slot) => [
+                      slot,
+                      {
+                        en: "short personalized copy without numbers or medical claims",
+                        th: "short personalized Thai copy without numbers or medical claims"
+                      }
+                    ])
+                  )
+                },
                 summary: {
                   en: "one concise summary paragraph",
                   th: "one concise summary paragraph"
@@ -549,7 +601,8 @@ export async function analyzeNutritionReportWithGrok(input: AdvisorInput) {
                   en: "Final nutrition plan",
                   th: "Final nutrition plan"
                 }
-              }
+              },
+              revealPageSlotGuide
             },
             instructions: [
               "Return a JSON object with exactly one top-level key: report.",
@@ -557,11 +610,13 @@ export async function analyzeNutritionReportWithGrok(input: AdvisorInput) {
               "synergies must contain 2 to 4 food-plus-supplement combinations or routines.",
               "nextSteps must contain 2 to 4 customer actions.",
               "safetyNotes must contain 2 to 5 conservative notes.",
-              "revealPageCopy is required and must contain every listed reveal page slot.",
+              `revealPageCopy is required, must set version to ${revealPageCopyVersion}, and must contain every listed reveal page slot.`,
               "Every revealPageCopy slot must include English and Thai.",
               "revealPageCopy is copy-only. Do not include scores, counts, doses, product names, product links, FDA status, diagnoses, treatments, cures, prescriptions, HTML, markdown, or numeric claims.",
               "Use firstName only as optional display context; if it is missing, write copy that still reads naturally without a name.",
               "Use healthScore copySeeds, assessment goals, symptoms, safety flags, formulation rows, food guidance, and plan feedback only to phrase the page narrative. Do not alter locked facts.",
+              "English revealPageCopy must stay faithful to the reveal prototype voice and must not rewrite locked template headings or labels.",
+              "Thai revealPageCopy must be natural Thai, not word-for-word English; avoid cramped uppercase-style phrasing and keep sentences easy to wrap on mobile.",
               "Every display field must include English and Thai."
             ]
           },

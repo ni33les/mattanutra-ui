@@ -212,6 +212,16 @@ describe("external worker boundaries", () => {
       "task creation should notify waiting workers without constant DB polling"
     );
     assert.match(
+      serviceSource,
+      /initialScheduledFor[\s\S]*hasDependencyInputs[\s\S]*DEPENDENCY_BOOTSTRAP_DELAY_MS/,
+      "dependent tasks must not be reservable before dependency rows have been inserted"
+    );
+    assert.match(
+      serviceSource,
+      /ensureTaskDependencies\(sql, task\.id, dependencies\)[\s\S]*set scheduled_for = \$\{intendedScheduledFor\}/,
+      "dependent tasks should restore their intended schedule only after dependency rows exist"
+    );
+    assert.match(
       visibilityEventsSource,
       /waitForSnapshotSignal: waitForTaskQueueChange/,
       "admin task visibility should refresh when the queue changes, not wait for the fallback snapshot interval"

@@ -18,6 +18,18 @@ const titleBar = readFileSync(
   new URL("../components/title-bar.tsx", import.meta.url),
   "utf8"
 );
+const localeLayout = readFileSync(
+  new URL("../app/[locale]/layout.tsx", import.meta.url),
+  "utf8"
+);
+const customerCss = readFileSync(
+  new URL("../app/customer.css", import.meta.url),
+  "utf8"
+);
+const globalsCss = readFileSync(
+  new URL("../app/globals.css", import.meta.url),
+  "utf8"
+);
 const formulationTypes = readFileSync(
   new URL("../lib/formulation-types.ts", import.meta.url),
   "utf8"
@@ -137,9 +149,22 @@ describe("plan reveal V3 migration", () => {
     assert.match(formulationResults, /data-reveal/);
     assert.match(formulationResults, /CountUpNumber/);
     assert.match(formulationResults, /RevealDistillationCard/);
-    assert.match(formulationResults, /revealSlotCopy\(result,\s*"heroTitle",\s*locale,\s*copy\.heroTitle\)/);
-    assert.match(formulationResults, /revealSlotCopy\(result,\s*"formulaTitle",\s*locale,\s*copy\.formulaTitle\)/);
-    assert.match(formulationResults, /localizedPlanText\(result\.nutritionReport\?\.revealPageCopy/);
+    assert.match(formulationResults, /Your Right Amount Has Arrived/);
+    assert.match(formulationResults, /A formula built around your body, your goals/);
+    assert.match(formulationResults, /Everything you told us, folded into one plan/);
+    assert.match(formulationResults, /We evaluated \{supplementTotalText\} ingredients/);
+    assert.match(formulationResults, /\{supplementSelectedText\} nutrients\. Exactly enough\./);
+    assert.match(formulationResults, /\{productSelectedText\} bottles\. All \{supplementSelectedTextLower\} nutrients\./);
+    assert.match(formulationResults, /\{productSelectedText\} bottles\. \{coveredText\} of \{supplementSelectedTextLower\} nutrients\./);
+    assert.doesNotMatch(formulationResults, /copy\.heroMetaPlan/);
+    assert.doesNotMatch(formulationResults, /copy\.heroMetaGenerated/);
+    assert.match(formulationResults, /localizedPlanText\(revealPageCopy\[slot\]/);
+  });
+
+  it("gates stale reveal AI copy behind the current template version", () => {
+    assert.match(formulationTypes, /revealPageCopyVersion = "reveal:v3-template"/);
+    assert.match(formulationResults, /revealPageCopy\?\.version !== revealPageCopyVersion/);
+    assert.match(nutritionAdvisor, /must set version to \$\{revealPageCopyVersion\}/);
   });
 
   it("keeps real product catalogue behavior and stack switching in the reveal design", () => {
@@ -148,6 +173,16 @@ describe("plan reveal V3 migration", () => {
     assert.match(formulationResults, /selectedProductStackPreference/);
     assert.match(formulationResults, /onProductStackPreferenceChange\(option\.id\)/);
     assert.match(formulationResults, /productRecommendations/);
+  });
+
+  it("uses V14 public fonts and colour tokens as the site-wide public system", () => {
+    assert.match(localeLayout, /DM_Sans/);
+    assert.doesNotMatch(localeLayout, /Manrope/);
+    assert.match(globalsCss, /--foreground: #0a2540/);
+    assert.match(globalsCss, /var\(--mn-font-body, "DM Sans"\)/);
+    assert.match(customerCss, /--mn-ink: #0a2540/);
+    assert.match(customerCss, /--mn-teal: #2d8f72/);
+    assert.match(customerCss, /--mn-paper: #fefcf7/);
   });
 
   it("keeps old reports without revealPageCopy readable", () => {

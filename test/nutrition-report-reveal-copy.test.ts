@@ -1,18 +1,24 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { revealPageCopySlots } from "../lib/formulation-types.ts";
+import {
+  revealPageCopySlots,
+  revealPageCopyVersion
+} from "../lib/formulation-types.ts";
 import { validateRevealPageCopy } from "../lib/nutrition-plan-advisor-analysis.ts";
 
 function validRevealPageCopy() {
-  return Object.fromEntries(
-    revealPageCopySlots.map((slot) => [
-      slot,
-      {
-        en: `Personalised ${slot} copy for the reveal page.`,
-        th: `ข้อความภาษาไทยสำหรับ ${slot}`
-      }
-    ])
-  );
+  return {
+    version: revealPageCopyVersion,
+    ...Object.fromEntries(
+      revealPageCopySlots.map((slot) => [
+        slot,
+        {
+          en: `Personalised ${slot} copy for the reveal page.`,
+          th: `ข้อความภาษาไทยสำหรับ ${slot}`
+        }
+      ])
+    )
+  };
 }
 
 describe("nutrition report reveal page copy validator", () => {
@@ -21,7 +27,29 @@ describe("nutrition report reveal page copy validator", () => {
 
     assert.deepEqual(validation.errors, []);
     assert.ok(validation.copy);
+    assert.equal(validation.copy.version, revealPageCopyVersion);
     assert.equal(validation.copy.heroTitle.en, "Personalised heroTitle copy for the reveal page.");
+  });
+
+  it("accepts legacy unversioned copy for stored report compatibility", () => {
+    const copy = validRevealPageCopy() as Record<string, unknown>;
+
+    delete copy.version;
+
+    const validation = validateRevealPageCopy(copy);
+
+    assert.deepEqual(validation.errors, []);
+    assert.ok(validation.copy);
+    assert.equal(validation.copy.version, undefined);
+  });
+
+  it("rejects an unsupported reveal page copy version", () => {
+    const validation = validateRevealPageCopy({
+      ...validRevealPageCopy(),
+      version: "old-template"
+    });
+
+    assert.ok(validation.errors.some((error) => error.includes("version")));
   });
 
   it("rejects missing required locales", () => {

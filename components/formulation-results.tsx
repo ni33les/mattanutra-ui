@@ -17,6 +17,7 @@ import type {
   RecommendedProduct
 } from "@/lib/formulation-types";
 import type { RevealPageCopySlot } from "@/lib/formulation-types";
+import { revealPageCopyVersion } from "@/lib/formulation-types";
 import { foodTagLabel } from "@/lib/food-tags";
 import {
   localeHtmlLang,
@@ -725,44 +726,55 @@ const revealCopy = {
   en: {
     ingredientCount: "ingredients",
     catalogueProducts: "approved products",
-    catalogueSupplements: "supplements in catalogue",
-    compactCoverageLabel: "Stack coverage",
+    catalogueSupplements: "Ingredients evaluated",
+    compactCoverageLabel: "Catalogue fit",
     contributionLabel: "of selected stack",
-    distilledEyebrow: "Distilled",
-    distilledSummaryTemplate:
-      "{supplementTotal} catalogue supplements assessed, {supplementSelected} selected for your formula, {productTotal} approved products checked, and {productSelected} recommended for you.",
-    distilledTitle: "From broad possibility to a focused formula.",
+    distilledEyebrow: "The distillation",
+    distilledSummaryTemplate: "{supplementTotal} ingredients evaluated. {supplementSelected} selected for you.",
+    distilledFoot:
+      "Each one screened against your disclosed cautions, your goals, and the catalogue evidence. Nothing in your formula was added because it sells well. Each was added because it earned its place for you.",
+    distilledTitle:
+      "We evaluated the catalogue. Only what earned a place stayed.",
+    distilledTitleTemplate:
+      "We evaluated {supplementTotalText} ingredients. {supplementSelectedText} earned a place in your formula.",
     formulaEyebrow: "Your formula",
     formulaLead:
-      "These are the supplement priorities selected from your answers, cautions and product coverage.",
-    formulaTitle: "The exact stack selected for you.",
-    formulaMetaEvaluated: "evaluated",
+      "Every dose below is sized to your body, your goals, and the safety context you shared. Product fit shows how closely the selected stack covers each nutrient.",
+    formulaTitle: "Exactly enough.",
+    formulaTitleTemplate: "{supplementSelectedText} nutrients. Exactly enough.",
+    formulaMetaEvaluated: "Precision tier",
     formulaMetaSelected: "selected",
     formulaMetaNoPadding: "no padding",
-    formulaMetaTier: "Formula",
-    formulaMetaNrv: "Dose guidance",
+    formulaMetaTier: "FORMULA · PRECISION TIER",
+    formulaMetaNrv: "PRODUCT FIT · SELECTED STACK",
+    formulaMetaFocus: "Focus",
     formulaSignedPrefix: "Composed",
-    heroEyebrow: "Your Right Amount",
+    heroEyebrow: "Your Right Amount Has Arrived",
     heroFor: "For",
-    heroTitle: "Your Right Amount",
+    heroTitle: "Your formula has arrived",
     heroHeadline:
-      "Your plan has been distilled into the few things most likely to matter.",
+      "A formula built around your body, your goals, and the way you actually live.",
     heroMetaGenerated: "Generated",
     heroMetaPlan: "Plan ID",
     heroSub:
-      "We have turned your assessment into a practical formula and matched it to available products where the catalogue can support it.",
+      "No guesswork. No pharmacy aisle confusion. {supplementSelectedText} nutrients, chosen with intention, paired with the exact products to buy.",
     personalizationBody:
-      "Your result is shaped by your profile, goals, country, budget, preferences and cautions. These signals explain why this is not a generic supplement list.",
-    personalizationEyebrow: "Personalisation",
-    personalizationTitle: "We built this around your context.",
+      "Your formula begins with who you are. Body, location, the goals that actually matter to you, and the constraints we honour without compromise.",
+    personalizationEyebrow: "Built from your assessment",
+    personalizationTitle: "Everything you told us, folded into one plan.",
     productsBody:
-      "Products are shown as the closest available stack from the approved catalogue. The goal is fewer bottles, clear coverage and no unnecessary overlap.",
+      "Products are shown as the closest available stack from the approved catalogue. The goal is fewer bottles, clear coverage, and no unnecessary overlap.",
     productsLead:
-      "Products are shown as the closest available stack from the approved catalogue. The goal is fewer bottles, clear coverage and no unnecessary overlap.",
+      "We searched the Thai market for products that meet your formula as closely as the catalogue allows: verified dosing, clean enough labels, and direct marketplace links where available.",
     productsEmpty:
       "The formula is ready, but the product catalogue does not yet contain an approved stack for these needs.",
+    productsEyebrow: "From shelves to certainty",
     productsTitle: "From shelves to certainty.",
-    supplementsRecommended: "supplements recommended",
+    productsAllTitleTemplate:
+      "{productSelectedText} bottles. All {supplementSelectedTextLower} nutrients.",
+    productsPartialTitleTemplate:
+      "{productSelectedText} bottles. {coveredText} of {supplementSelectedTextLower} nutrients.",
+    supplementsRecommended: "Selected for you",
     productsRecommended: "products recommended for you",
     productDoseRecommended: "Recommended dose",
     productVerified: "Matched",
@@ -772,70 +784,84 @@ const revealCopy = {
       "Matches {covers} and accounts for {percent}% of the selected stack.",
     productServingMatchTemplate:
       "Use {servings} {servingUnit}. Matches {covers} and accounts for {percent}% of the selected stack.",
-    selectedProducts: "Selected products",
+    selectedProducts: "Bottles",
     selectedSuffix: "selected",
     begin: "Begin",
     tableAmount: "Daily amount",
     tableCoverage: "Product fit",
-    tableName: "Supplement",
-    tableReason: "Why it is here",
+    tableName: "Nutrient",
+    tableReason: "Why this, for you",
     viewProduct: "View product",
-    cautionsTitle: "Cautions checked",
-    coverageHeadlineTemplate: "All {supplementCount} priorities covered.",
+    cautionsTitle: "Safety check complete.",
+    statinCautionsTitle: "Statin-aware safety check complete.",
+    coverageHeadlineTemplate: "All {supplementCount} nutrients delivered.",
+    coveragePartialHeadlineTemplate:
+      "Products cover {coveredText} of {supplementSelectedText} nutrients.",
     coverageSub:
       "Every product is checked against your formula, serving burden, and catalogue data before it appears here.",
     bottles: "Bottles",
-    prioritiesCovered: "Priorities covered",
+    prioritiesCovered: "Nutrients covered",
     closingTitle: "The wisdom of knowing the right amount",
     closingBody:
-      "Not from more, but from exactly enough. This formula is the practical version of that idea: the right priorities, in the right amounts, with product choices where the data is strong enough.",
-    etymologyLine: "Pāli · knowing the right amount",
-    print: "Print or save PDF",
-    save: "Open this plan",
-    reassess: "Reassess later",
+      "Your formula is the embodiment of this idea. The right nutrients. The right amounts. The right products where the data is strong enough. Now your body has what it needs to do the rest.",
+    etymologyLine: "Mattaññutā · Pāli",
+    print: "Download formula PDF",
+    save: "Save to my plan",
+    reassess: "Schedule 60-day re-assessment",
     wellnessOnly:
       "Wellness information only. Share this plan with a physician or pharmacist if you use medication, are pregnant or breastfeeding, have a medical condition, or your situation changes."
   },
   th: {
     ingredientCount: "ส่วนผสม",
     catalogueProducts: "ผลิตภัณฑ์ที่อนุมัติแล้ว",
-    catalogueSupplements: "อาหารเสริมในแคตตาล็อก",
-    compactCoverageLabel: "ความครอบคลุมของชุดสินค้า",
+    catalogueSupplements: "ส่วนผสมที่ประเมิน",
+    compactCoverageLabel: "ความพอดีกับแคตตาล็อก",
     contributionLabel: "ของชุดที่เลือก",
-    distilledEyebrow: "กลั่นให้ชัด",
+    distilledEyebrow: "การคัดให้เหลือสิ่งจำเป็น",
     distilledSummaryTemplate:
-      "ประเมินอาหารเสริมในแคตตาล็อก {supplementTotal} รายการ เลือก {supplementSelected} รายการสำหรับสูตรของคุณ ตรวจผลิตภัณฑ์ที่อนุมัติแล้ว {productTotal} รายการ และแนะนำ {productSelected} รายการสำหรับคุณ",
-    distilledTitle: "จากตัวเลือกมากมาย สู่สูตรที่โฟกัสเฉพาะคุณ",
+      "ประเมินส่วนผสม {supplementTotal} รายการ และเลือก {supplementSelected} รายการสำหรับคุณ",
+    distilledFoot:
+      "แต่ละรายการถูกคัดจากข้อควรระวังที่คุณแจ้ง เป้าหมายของคุณ และข้อมูลในแคตตาล็อก ไม่มีรายการใดถูกใส่เข้ามาเพราะขายดี แต่เพราะสมควรอยู่ในสูตรของคุณ",
+    distilledTitle: "เราประเมินทั้งแคตตาล็อก และเก็บไว้เฉพาะสิ่งที่เหมาะกับคุณจริง ๆ",
+    distilledTitleTemplate:
+      "เราประเมินส่วนผสม {supplementTotalText} รายการ และมี {supplementSelectedText} รายการที่ได้อยู่ในสูตรของคุณ",
     formulaEyebrow: "สูตรของคุณ",
     formulaLead:
-      "นี่คือลำดับความสำคัญของอาหารเสริมที่เลือกจากคำตอบ ข้อควรระวัง และความครอบคลุมของผลิตภัณฑ์",
-    formulaTitle: "ชุดอาหารเสริมที่เลือกให้คุณ",
-    formulaMetaEvaluated: "ประเมิน",
+      "ปริมาณด้านล่างปรับตามร่างกาย เป้าหมาย และบริบทความปลอดภัยที่คุณให้ไว้ ความพอดีของสินค้าแสดงว่าชุดที่เลือกครอบคลุมสารอาหารแต่ละรายการได้แค่ไหน",
+    formulaTitle: "พอดี ไม่มากเกินจำเป็น",
+    formulaTitleTemplate: "{supplementSelectedText} สารอาหาร ในปริมาณที่พอดี",
+    formulaMetaEvaluated: "ระดับความแม่นยำ",
     formulaMetaSelected: "เลือก",
     formulaMetaNoPadding: "ไม่เติมเกินจำเป็น",
-    formulaMetaTier: "สูตร",
-    formulaMetaNrv: "แนวทางปริมาณ",
+    formulaMetaTier: "สูตร · ระดับความแม่นยำ",
+    formulaMetaNrv: "ความพอดีของสินค้า · ชุดที่เลือก",
+    formulaMetaFocus: "เป้าหมาย",
     formulaSignedPrefix: "จัดทำ",
-    heroEyebrow: "ปริมาณที่พอดีของคุณ",
+    heroEyebrow: "ปริมาณที่พอดีของคุณพร้อมแล้ว",
     heroFor: "สำหรับ",
-    heroTitle: "ปริมาณที่พอดีของคุณ",
-    heroHeadline: "แผนของคุณถูกกลั่นให้เหลือสิ่งที่น่าจะสำคัญที่สุด",
+    heroTitle: "สูตรของคุณพร้อมแล้ว",
+    heroHeadline: "สูตรที่สร้างจากร่างกาย เป้าหมาย และวิถีชีวิตจริงของคุณ",
     heroMetaGenerated: "สร้างเมื่อ",
     heroMetaPlan: "รหัสแผน",
     heroSub:
-      "เราแปลงแบบประเมินของคุณเป็นสูตรที่ใช้งานได้จริง และจับคู่กับผลิตภัณฑ์ที่มีข้อมูลเพียงพอในแคตตาล็อก",
+      "ไม่ใช่การเดา ไม่ใช่การหยิบจากชั้นวางแบบสุ่ม สารอาหาร {supplementSelectedText} รายการถูกเลือกอย่างตั้งใจ แล้วจับคู่กับผลิตภัณฑ์ที่ซื้อได้จริงเมื่อข้อมูลรองรับ",
     personalizationBody:
-      "ผลลัพธ์นี้ใช้โปรไฟล์ เป้าหมาย ประเทศ งบประมาณ ความชอบ และข้อควรระวังของคุณ จึงไม่ใช่รายการอาหารเสริมทั่วไป",
-    personalizationEyebrow: "เฉพาะบุคคล",
-    personalizationTitle: "เราสร้างแผนจากบริบทของคุณ",
+      "สูตรนี้เริ่มจากตัวคุณ ทั้งข้อมูลร่างกาย ที่อยู่ เป้าหมายที่สำคัญจริง และข้อจำกัดที่ต้องเคารพอย่างจริงจัง",
+    personalizationEyebrow: "สร้างจากแบบประเมินของคุณ",
+    personalizationTitle: "ทุกอย่างที่คุณบอกเรา ถูกพับรวมเป็นแผนเดียว",
     productsBody:
       "ผลิตภัณฑ์ที่แสดงคือชุดที่ใกล้ที่สุดจากแคตตาล็อกที่อนุมัติแล้ว เป้าหมายคือขวดน้อยลง ความครอบคลุมชัดเจน และไม่ซ้ำซ้อนเกินจำเป็น",
     productsLead:
-      "ผลิตภัณฑ์ที่แสดงคือชุดที่ใกล้ที่สุดจากแคตตาล็อกที่อนุมัติแล้ว เป้าหมายคือขวดน้อยลง ความครอบคลุมชัดเจน และไม่ซ้ำซ้อนเกินจำเป็น",
+      "เราค้นหาผลิตภัณฑ์ในตลาดไทยที่ตรงกับสูตรของคุณมากที่สุดเท่าที่แคตตาล็อกรองรับ โดยดูปริมาณที่ตรวจได้ ฉลากที่ชัดเจน และลิงก์ซื้อเมื่อมีข้อมูลเพียงพอ",
     productsEmpty:
       "สูตรพร้อมแล้ว แต่แคตตาล็อกยังไม่มีชุดผลิตภัณฑ์ที่อนุมัติสำหรับความต้องการนี้",
+    productsEyebrow: "จากชั้นวางสู่ความชัดเจน",
     productsTitle: "จากชั้นวางสู่ความชัดเจน",
-    supplementsRecommended: "อาหารเสริมที่แนะนำ",
+    productsAllTitleTemplate:
+      "{productSelectedText} ขวด ครอบคลุมสารอาหารครบ {supplementSelectedText} รายการ",
+    productsPartialTitleTemplate:
+      "{productSelectedText} ขวด ครอบคลุมสารอาหาร {coveredText} จาก {supplementSelectedText} รายการ",
+    supplementsRecommended: "เลือกสำหรับคุณ",
     productsRecommended: "ผลิตภัณฑ์ที่แนะนำสำหรับคุณ",
     productDoseRecommended: "ขนาดที่แนะนำ",
     productVerified: "จับคู่แล้ว",
@@ -845,27 +871,30 @@ const revealCopy = {
       "ครอบคลุม {covers} และคิดเป็น {percent}% ของชุดที่เลือก",
     productServingMatchTemplate:
       "ใช้ {servings} {servingUnit} ครอบคลุม {covers} และคิดเป็น {percent}% ของชุดที่เลือก",
-    selectedProducts: "ผลิตภัณฑ์ที่เลือก",
+    selectedProducts: "ขวด",
     selectedSuffix: "รายการที่เลือก",
     begin: "เริ่ม",
     tableAmount: "ปริมาณต่อวัน",
     tableCoverage: "ความพอดีของสินค้า",
-    tableName: "อาหารเสริม",
-    tableReason: "เหตุผลที่อยู่ในแผน",
+    tableName: "สารอาหาร",
+    tableReason: "เหตุผลที่เหมาะกับคุณ",
     viewProduct: "ดูสินค้า",
-    cautionsTitle: "ตรวจข้อควรระวังแล้ว",
-    coverageHeadlineTemplate: "ครอบคลุมลำดับสำคัญ {supplementCount} รายการ",
+    cautionsTitle: "ตรวจความปลอดภัยแล้ว",
+    statinCautionsTitle: "ตรวจความปลอดภัยโดยคำนึงถึงสแตตินแล้ว",
+    coverageHeadlineTemplate: "ส่งมอบสารอาหารครบ {supplementCount} รายการ",
+    coveragePartialHeadlineTemplate:
+      "ผลิตภัณฑ์ครอบคลุมสารอาหาร {coveredText} จาก {supplementSelectedText} รายการ",
     coverageSub:
       "ผลิตภัณฑ์ทุกตัวถูกเทียบกับสูตร ภาระการรับประทาน และข้อมูลแคตตาล็อกก่อนแสดงบนหน้านี้",
     bottles: "ขวด",
-    prioritiesCovered: "รายการที่ครอบคลุม",
+    prioritiesCovered: "สารอาหารที่ครอบคลุม",
     closingTitle: "ปัญญาแห่งการรู้ปริมาณที่พอดี",
     closingBody:
-      "ไม่ใช่จากการเพิ่มให้มากขึ้น แต่จากการเลือกให้พอดี สูตรนี้คือการนำแนวคิดนั้นมาใช้จริง: ลำดับที่ถูกต้อง ปริมาณที่เหมาะ และผลิตภัณฑ์ที่ข้อมูลแข็งแรงพอ",
-    etymologyLine: "บาลี · การรู้ปริมาณที่พอดี",
-    print: "พิมพ์หรือบันทึก PDF",
-    save: "เปิดแผนนี้",
-    reassess: "ประเมินใหม่ภายหลัง",
+      "สูตรนี้คือการนำแนวคิดนั้นมาใช้จริง: สารอาหารที่เหมาะ ปริมาณที่เหมาะ และผลิตภัณฑ์ที่ข้อมูลแข็งแรงพอ เพื่อให้ร่างกายได้สิ่งที่ต้องใช้ต่อจากนี้",
+    etymologyLine: "มัตตัญญุตา · บาลี",
+    print: "ดาวน์โหลดสูตรเป็น PDF",
+    save: "บันทึกแผนของฉัน",
+    reassess: "นัดประเมินอีกครั้งใน 60 วัน",
     wellnessOnly:
       "ข้อมูลเพื่อสุขภาวะเท่านั้น โปรดแบ่งปันแผนนี้กับแพทย์หรือเภสัชกรหากคุณใช้ยา ตั้งครรภ์ ให้นมบุตร มีโรคประจำตัว หรือสถานการณ์เปลี่ยนแปลง"
   }
@@ -1077,6 +1106,43 @@ function CountUpNumber({
 }
 
 const thaiScriptPattern = /[\u0E00-\u0E7F]/;
+const englishCountWords = new Map<number, string>([
+  [0, "no"],
+  [1, "one"],
+  [2, "two"],
+  [3, "three"],
+  [4, "four"],
+  [5, "five"],
+  [6, "six"],
+  [7, "seven"],
+  [8, "eight"],
+  [9, "nine"],
+  [10, "ten"],
+  [11, "eleven"],
+  [12, "twelve"],
+  [13, "thirteen"],
+  [14, "fourteen"],
+  [15, "fifteen"],
+  [16, "sixteen"],
+  [17, "seventeen"],
+  [18, "eighteen"],
+  [19, "nineteen"],
+  [20, "twenty"]
+]);
+
+function capitalizeText(value: string) {
+  return value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value;
+}
+
+function localizedCountText(value: number, locale: Locale, capitalize = false) {
+  if (locale === "th") {
+    return String(value);
+  }
+
+  const word = englishCountWords.get(value) ?? String(value);
+
+  return capitalize ? capitalizeText(word) : word;
+}
 
 function localizedPlanText(value: unknown, locale: Locale, fallback: string) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -1105,7 +1171,13 @@ function revealSlotCopy(
   locale: Locale,
   fallback: string
 ) {
-  return localizedPlanText(result.nutritionReport?.revealPageCopy?.[slot], locale, fallback);
+  const revealPageCopy = result.nutritionReport?.revealPageCopy;
+
+  if (revealPageCopy?.version !== revealPageCopyVersion) {
+    return fallback;
+  }
+
+  return localizedPlanText(revealPageCopy[slot], locale, fallback);
 }
 
 function localizedBenefitTagLabel(value: string, locale: Locale) {
@@ -1212,12 +1284,22 @@ function revealContextChips(result: FormulationResult) {
   ].filter((chip) => chip.value);
 }
 
-function productCoveredNeedCount(products: RecommendedProduct[]) {
-  return new Set(products.flatMap((product) => product.covers)).size;
+function revealHeroMetaItems(result: FormulationResult, locale: Locale) {
+  const profileParts = result.assessmentSummary.profile
+    .split("/")
+    .map((part) => part.trim())
+    .filter(
+      (part) =>
+        part &&
+        !/not shown|ไม่ระบุ/i.test(part)
+    );
+  const values = [...profileParts, result.assessmentSummary.region].filter(Boolean);
+
+  return values.map((value) => (locale === "en" ? value.toUpperCase() : value));
 }
 
-function recommendedProductCount(products: RecommendedProduct[]) {
-  return new Set(products.map((product) => product.productId || product.id)).size;
+function productCoveredNeedCount(products: RecommendedProduct[]) {
+  return new Set(products.flatMap((product) => product.covers)).size;
 }
 
 function RevealDistillationCard({
@@ -1327,11 +1409,6 @@ function RevealResultsPage({
     Number(result.catalogueSupplementCount ?? result.totalSupplementCount ?? 0),
     recommendedSupplementCount
   );
-  const selectedProductCount = recommendedProductCount(products);
-  const catalogueProductCount = Math.max(
-    selectedProductCount,
-    Number(result.catalogueProductCount ?? 0)
-  );
   const selectedCoverage = selectedStackCoverage(activeProductRecommendations, products);
   const productNeedCount = productCoveredNeedCount(products);
   const productOptions = productStackPreferenceOrder.flatMap((preference) => {
@@ -1343,54 +1420,35 @@ function RevealResultsPage({
     typeof result.firstName === "string" && result.firstName.trim()
       ? result.firstName.trim()
       : "";
-  const heroTitle = revealSlotCopy(result, "heroTitle", locale, copy.heroTitle);
-  const heroHeadline = revealSlotCopy(
-    result,
-    "heroHeadline",
+  const supplementSelectedText = localizedCountText(
+    recommendedSupplementCount,
     locale,
-    copy.heroHeadline
+    true
   );
-  const heroSub = revealSlotCopy(result, "heroSub", locale, copy.heroSub);
-  const breadcrumbsTitle = revealSlotCopy(
-    result,
-    "breadcrumbsTitle",
-    locale,
-    copy.personalizationTitle
-  );
+  const heroSub =
+    locale === "en"
+      ? `No guesswork. No pharmacy aisle confusion. ${supplementSelectedText} ${
+          recommendedSupplementCount === 1 ? "nutrient" : "nutrients"
+        }, chosen with intention, paired with the exact products to buy.`
+      : formatTemplate(copy.heroSub, { supplementSelectedText });
+  const breadcrumbsTitle = copy.personalizationTitle;
   const breadcrumbsBody = revealSlotCopy(
     result,
     "breadcrumbsBody",
     locale,
     copy.personalizationBody
   );
-  const distillNarrative = revealSlotCopy(
-    result,
-    "distillNarrative",
-    locale,
-    copy.distilledTitle
-  );
+  const distillNarrative = formatTemplate(copy.distilledTitleTemplate, {
+    supplementSelectedText,
+    supplementTotalText: localizedCountText(catalogueSupplementCount, locale)
+  });
   const distillFoot = revealSlotCopy(
     result,
     "distillFoot",
     locale,
-    formatTemplate(copy.distilledSummaryTemplate, {
-      productSelected: selectedProductCount,
-      productTotal: catalogueProductCount,
-      supplementSelected: recommendedSupplementCount,
-      supplementTotal: catalogueSupplementCount
-    })
+    copy.distilledFoot
   );
-  const profileLine = [
-    result.assessmentSummary.profile,
-    result.assessmentSummary.region
-  ]
-    .filter(Boolean)
-    .map((value) => localizedContextChip(value, locale))
-    .join(", ");
-  const heroMeta = [
-    { label: copy.heroMetaPlan, value: planId },
-    { label: copy.heroMetaGenerated, value: formattedDate }
-  ];
+  const heroMeta = revealHeroMetaItems(result, locale);
 
   return (
     <section className="w-full overflow-hidden">
@@ -1399,35 +1457,24 @@ function RevealResultsPage({
       <section className="relative isolate flex min-h-[calc(100svh-5rem)] w-full items-center justify-center overflow-hidden px-6 py-24 text-center sm:px-8 lg:py-28">
         <div
           aria-hidden={true}
-          className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_50%_38%,rgba(31,119,93,0.12),transparent_32rem),linear-gradient(180deg,var(--mn-cream),var(--mn-paper)_58%,var(--mn-cream-deep))]"
+          className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_50%_48%,rgba(220,232,224,0.58)_0%,rgba(220,232,224,0.26)_34%,transparent_68%),var(--mn-cream)]"
         />
         <div
           aria-hidden={true}
-          className="absolute left-1/2 top-[18%] -z-10 size-64 -translate-x-1/2 rounded-full bg-[color-mix(in_srgb,var(--mn-gold)_26%,transparent)] blur-2xl [animation:mn-hero-breathe_7s_ease-in-out_infinite] motion-reduce:animate-none sm:size-80"
-        />
-        <span
-          aria-hidden={true}
-          className="absolute left-[9%] top-[24%] hidden h-16 w-8 -rotate-12 rounded-full rounded-br-sm bg-[color-mix(in_srgb,var(--mn-teal)_16%,transparent)] [animation:mn-float-drift_8s_ease-in-out_infinite] motion-reduce:animate-none md:block"
-        />
-        <span
-          aria-hidden={true}
-          className="absolute right-[12%] top-[32%] hidden h-20 w-9 rotate-12 rounded-full rounded-bl-sm bg-[color-mix(in_srgb,var(--mn-gold)_22%,transparent)] [animation:mn-float-drift_9s_ease-in-out_infinite] motion-reduce:animate-none lg:block"
+          className="absolute left-1/2 top-1/2 -z-10 size-[min(46rem,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(220,232,224,0.48)_0%,rgba(220,232,224,0.22)_38%,transparent_70%)] [animation:mn-hero-breathe_18s_ease-in-out_infinite_alternate] motion-reduce:animate-none"
         />
 
         <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center" data-reveal>
-          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.24em] text-[var(--mn-teal-deep)]">
+          <p className="mn-mono-label text-xs font-medium uppercase tracking-[0.24em] text-[var(--mn-teal)]">
             {copy.heroEyebrow}
           </p>
           {displayFirstName ? (
             <>
-              <p className="mt-5 max-w-2xl font-serif text-2xl italic leading-9 text-[var(--mn-ink)]">
-                {heroTitle}
-              </p>
-              <p className="mt-8 font-serif text-2xl italic leading-8 text-[var(--mn-ink-soft)]">
+              <p className="mt-9 font-serif text-2xl italic leading-8 text-[var(--mn-ink-soft)] sm:text-[1.75rem]">
                 {copy.heroFor}
               </p>
               <h1
-                className={`mn-hero-title mt-2 max-w-5xl break-words font-serif text-6xl font-medium leading-[1.05] tracking-normal text-[var(--mn-teal-deep)] sm:text-7xl lg:text-8xl ${
+                className={`mn-hero-title mt-3 max-w-5xl break-words font-serif text-6xl font-normal italic leading-[0.98] tracking-normal text-[var(--mn-teal-deep)] sm:text-8xl lg:text-[8.25rem] ${
                   locale === "th" ? "leading-[1.22]" : ""
                 }`}
               >
@@ -1437,26 +1484,29 @@ function RevealResultsPage({
             </>
           ) : (
             <h1
-              className={`mn-hero-title mt-8 max-w-5xl break-words font-serif text-6xl font-medium leading-[1.05] tracking-normal text-[var(--mn-teal-deep)] sm:text-7xl lg:text-8xl ${
+              className={`mn-hero-title mt-10 max-w-4xl break-words font-serif text-5xl font-normal italic leading-[1.02] tracking-normal text-[var(--mn-teal-deep)] sm:text-7xl lg:text-8xl ${
                 locale === "th" ? "leading-[1.22]" : "text-balance"
               }`}
             >
-              {heroTitle}
+              {copy.heroTitle}
             </h1>
           )}
-          {profileLine ? (
-            <p className="mt-5 font-serif text-xl italic leading-8 text-[var(--mn-ink-soft)] sm:text-2xl">
-              {profileLine}
-            </p>
-          ) : null}
           <p
-            className={`mn-hero-subtitle mt-8 max-w-3xl font-serif text-3xl font-medium text-[var(--mn-ink)] sm:text-4xl ${
+            className={`mn-hero-subtitle mt-8 max-w-3xl font-serif text-3xl font-normal text-[var(--mn-ink)] sm:text-[2.75rem] ${
               locale === "th"
                 ? "break-words leading-[1.45] [overflow-wrap:anywhere]"
-                : "leading-tight text-balance"
+                : "leading-[1.18] text-balance"
             }`}
           >
-            {heroHeadline}
+            {locale === "en" ? (
+              <>
+                A formula built around <em>your body, your goals,</em>
+                <br className="hidden sm:block" />
+                {" "}and the way you actually live.
+              </>
+            ) : (
+              copy.heroHeadline
+            )}
           </p>
           <p
             className={`mt-6 max-w-2xl text-base text-[var(--mn-ink-soft)] ${
@@ -1465,28 +1515,25 @@ function RevealResultsPage({
           >
             {heroSub}
           </p>
-          <div className="mt-10 flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--mn-paper)_82%,white)] px-4 py-3 text-xs text-[var(--mn-ash)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:gap-3 sm:px-5">
+          <div className="mt-12 flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full bg-[var(--mn-paper)]/65 px-4 py-3 font-[family:var(--mn-font-mono)] text-[0.68rem] tracking-[0.04em] text-[var(--mn-ink-soft)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] backdrop-blur-sm sm:gap-3 sm:px-5">
             {heroMeta.map((item, index) => (
-              <span className="inline-flex min-w-0 items-center gap-1.5" key={item.label}>
+              <span className="inline-flex min-w-0 items-center gap-1.5" key={`${item}:${index}`}>
                 {index > 0 ? (
                   <span
                     aria-hidden={true}
                     className="mr-1 hidden h-3 w-px bg-[var(--mn-line)] sm:inline-block"
                   />
                 ) : null}
-                <span className="shrink-0 font-semibold text-[var(--mn-ink-soft)]">
-                  {item.label}:
-                </span>
-                <span className="min-w-0 truncate">{item.value}</span>
+                <span className="min-w-0 truncate">{item}</span>
               </span>
             ))}
           </div>
           <a
-            className="mn-mono-label mt-12 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]"
+            className="mn-mono-label mt-12 inline-flex flex-col items-center gap-3 text-[0.65rem] font-medium uppercase tracking-[0.24em] text-[var(--mn-ash)]"
             href="#formula"
           >
             {copy.begin}
-            <span aria-hidden={true}>↓</span>
+            <span aria-hidden={true} className="h-9 w-px bg-[var(--mn-ash)]" />
           </a>
         </div>
       </section>
@@ -1504,7 +1551,13 @@ function RevealResultsPage({
                   : "leading-tight text-balance"
               }`}
             >
-              {breadcrumbsTitle}
+              {locale === "en" ? (
+                <>
+                  Everything you told us, <em>folded into one plan</em>.
+                </>
+              ) : (
+                breadcrumbsTitle
+              )}
             </h2>
           </div>
           <p className="text-base leading-8 text-[var(--mn-ink-soft)]" data-reveal>
@@ -1544,7 +1597,18 @@ function RevealResultsPage({
             }`}
             data-reveal
           >
-            {distillNarrative}
+            {locale === "en" ? (
+              <>
+                We evaluated{" "}
+                <em>{localizedCountText(catalogueSupplementCount, locale)}</em>{" "}
+                ingredients.
+                <br />
+                {" "}
+                {localizedCountText(recommendedSupplementCount, locale, true)} earned a place in your formula.
+              </>
+            ) : (
+              distillNarrative
+            )}
           </h2>
           <div className="mt-12 grid gap-5" data-reveal>
             <RevealDistillationCard
@@ -1567,7 +1631,6 @@ function RevealResultsPage({
       ) : null}
 
       <RevealFormulaSection
-        catalogueProductCount={catalogueProductCount}
         catalogueSupplementCount={catalogueSupplementCount}
         copy={copy}
         formattedDate={formattedDate}
@@ -1575,7 +1638,6 @@ function RevealResultsPage({
         locale={locale}
         productCoverageBySupplementId={productCoverageBySupplementId}
         result={result}
-        selectedProductCount={selectedProductCount}
       />
 
       <RevealProductsSection
@@ -1604,17 +1666,14 @@ function RevealResultsPage({
 }
 
 function RevealFormulaSection({
-  catalogueProductCount,
   catalogueSupplementCount,
   copy,
   formattedDate,
   ingredients,
   locale,
   productCoverageBySupplementId,
-  result,
-  selectedProductCount
+  result
 }: Readonly<{
-  catalogueProductCount: number;
   catalogueSupplementCount: number;
   copy: typeof revealCopy.en;
   formattedDate: string;
@@ -1622,7 +1681,6 @@ function RevealFormulaSection({
   locale: Locale;
   productCoverageBySupplementId: ReadonlyMap<string, number>;
   result: FormulationResult;
-  selectedProductCount: number;
 }>) {
   // Compute stable row numbers declaratively (avoids mutation during render)
   const ingredientRowNumber = new Map<string, number>();
@@ -1632,8 +1690,25 @@ function RevealFormulaSection({
       ingredientRowNumber.set(ing.id, ++n);
     }
   }
-  const formulaTitle = revealSlotCopy(result, "formulaTitle", locale, copy.formulaTitle);
+  const supplementSelectedText = localizedCountText(ingredients.length, locale, true);
   const formulaLead = revealSlotCopy(result, "formulaLead", locale, copy.formulaLead);
+  const formulaTitle = formatTemplate(copy.formulaTitleTemplate, {
+    supplementSelectedText
+  });
+  const nutrientNoun = ingredients.length === 1 ? "nutrient" : "nutrients";
+  const formulaFocus =
+    result.assessmentSummary.goals.length > 0
+      ? result.assessmentSummary.goals
+          .map((goal) => localizedContextChip(goal, locale))
+          .join(revealJoiners[locale])
+      : result.assessmentSummary.plan;
+  const signedFor = result.firstName?.trim()
+    ? locale === "en"
+      ? `${copy.formulaSignedPrefix} for ${result.firstName.trim()}, ${formattedDate}.`
+      : `${copy.formulaSignedPrefix}สำหรับ ${result.firstName.trim()}, ${formattedDate}`
+    : locale === "en"
+      ? `${copy.formulaSignedPrefix}, ${formattedDate}.`
+      : `${copy.formulaSignedPrefix}เมื่อ ${formattedDate}`;
 
   return (
     <section className="border-t border-[var(--mn-line)] py-20" id="formula">
@@ -1650,7 +1725,13 @@ function RevealFormulaSection({
                 : "leading-tight text-balance"
               }`}
             >
-              {formulaTitle}
+              {locale === "en" ? (
+                <>
+                  {supplementSelectedText} {nutrientNoun}. <em>Exactly enough.</em>
+                </>
+              ) : (
+                formulaTitle
+              )}
             </h2>
           </div>
           <p className="text-base leading-8 text-[var(--mn-ink-soft)]">
@@ -1659,31 +1740,16 @@ function RevealFormulaSection({
         </div>
 
         <div className="mt-10 rounded-lg bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:p-8" data-reveal>
-          <div className="grid gap-3 border-b border-[var(--mn-line)] pb-5 text-sm sm:grid-cols-3">
-            <div>
-              <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)]">
-                {copy.formulaMetaTier}
-              </p>
-              <p className="mt-1 font-serif text-2xl font-medium text-[var(--mn-ink)]">
-                {ingredients.length} {copy.formulaMetaSelected}
-              </p>
-            </div>
-            <div>
-              <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)]">
-                {copy.formulaMetaNrv}
-              </p>
-              <p className="mt-1 font-serif text-2xl font-medium text-[var(--mn-ink)]">
-                {copy.formulaMetaNoPadding}
-              </p>
-            </div>
-            <div>
-              <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)]">
-                {copy.formulaSignedPrefix}
-              </p>
-              <p className="mt-1 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                {formattedDate}
-              </p>
-            </div>
+          <div className="grid gap-3 border-b border-[var(--mn-line)] pb-5 text-sm sm:grid-cols-3 sm:items-center">
+            <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)]">
+              {copy.formulaMetaTier}
+            </p>
+            <p className="font-serif text-lg font-medium text-[var(--mn-teal-deep)] sm:text-center">
+              {copy.formulaMetaFocus}: {formulaFocus}
+            </p>
+            <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)] sm:text-right">
+              {copy.formulaMetaNrv}
+            </p>
           </div>
 
           <div
@@ -1754,19 +1820,17 @@ function RevealFormulaSection({
               })}
             </div>
           ))}
-        </div>
 
-        <div className="mt-10">
-          <RevealDistillationCard
-            fromCount={catalogueProductCount}
-            fromLabel={copy.catalogueProducts}
-            toCount={selectedProductCount}
-            toLabel={copy.productsRecommended}
-          />
-          <p className="mx-auto mt-5 max-w-2xl text-center text-sm leading-7 text-[var(--mn-ink-soft)]">
-            {catalogueSupplementCount} {copy.catalogueSupplements} · {ingredients.length}{" "}
-            {copy.supplementsRecommended} · {copy.formulaMetaNoPadding}
-          </p>
+          <div className="mt-6 flex flex-col gap-2 border-t border-[var(--mn-line)] pt-5 font-[family:var(--mn-font-mono)] text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[var(--mn-ash)] sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              {locale === "en"
+                ? `${catalogueSupplementCount} EVALUATED · ${ingredients.length} SELECTED · 0 PADDING`
+                : `${catalogueSupplementCount} ${copy.catalogueSupplements} · ${ingredients.length} ${copy.formulaMetaSelected} · 0 ${copy.formulaMetaNoPadding}`}
+            </div>
+            <div className="normal-case tracking-normal text-[var(--mn-ink-soft)]">
+              {signedFor}
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1799,18 +1863,47 @@ function RevealProductsSection({
   supplementLabelById: ReadonlyMap<string, string>;
 }>) {
   const labels = productRecommendationCopy[locale];
-  const productsTitle = revealSlotCopy(result, "productsTitle", locale, copy.productsTitle);
+  const supplementSelectedCount = result.supplementBreakdown.filter(
+    (ingredient) => ingredient.safety?.visibility !== "hidden"
+  ).length;
+  const productSelectedText = localizedCountText(products.length, locale, true);
+  const supplementSelectedText = localizedCountText(supplementSelectedCount, locale, true);
+  const bottleNoun = products.length === 1 ? "bottle" : "bottles";
+  const nutrientNoun = supplementSelectedCount === 1 ? "nutrient" : "nutrients";
+  const coveredProductNeedCount = Math.min(
+    Math.max(0, productNeedCount),
+    Math.max(0, supplementSelectedCount)
+  );
+  const hasFullProductCoverage =
+    supplementSelectedCount > 0 && coveredProductNeedCount >= supplementSelectedCount;
+  const fallbackProductsTitle = formatTemplate(
+    hasFullProductCoverage
+      ? copy.productsAllTitleTemplate
+      : copy.productsPartialTitleTemplate,
+    {
+      coveredText: localizedCountText(coveredProductNeedCount, locale, true),
+      productSelectedText,
+      supplementSelectedText,
+      supplementSelectedTextLower: localizedCountText(supplementSelectedCount, locale)
+    }
+  );
+  const productsTitle = fallbackProductsTitle;
   const productsLead = revealSlotCopy(result, "productsLead", locale, copy.productsLead);
-  const coverageHeadline = formatTemplate(copy.coverageHeadlineTemplate, {
-    supplementCount: productNeedCount || products.length
-  });
+  const coverageHeadline = hasFullProductCoverage
+    ? formatTemplate(copy.coverageHeadlineTemplate, {
+        supplementCount: supplementSelectedCount
+      })
+    : formatTemplate(copy.coveragePartialHeadlineTemplate, {
+        coveredText: localizedCountText(coveredProductNeedCount, locale),
+        supplementSelectedText: localizedCountText(supplementSelectedCount, locale)
+      });
 
   return (
     <section className="border-t border-[var(--mn-line)] bg-[var(--mn-cream-deep)] py-20">
       <div className="mx-auto w-full max-w-6xl px-6 sm:px-8">
         <div className="mx-auto max-w-3xl text-center" data-reveal>
           <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
-            04 · {copy.selectedProducts}
+            04 · {copy.productsEyebrow}
           </p>
           <h2
             className={`mt-4 font-serif text-5xl font-medium text-[var(--mn-ink)] ${
@@ -1819,7 +1912,21 @@ function RevealProductsSection({
                 : "leading-tight text-balance"
             }`}
           >
-            {productsTitle}
+            {locale === "en" ? (
+              <>
+                {productSelectedText} {bottleNoun}.{" "}
+                <em>
+                  {hasFullProductCoverage
+                    ? `All ${localizedCountText(supplementSelectedCount, locale)} ${nutrientNoun}.`
+                    : `${localizedCountText(coveredProductNeedCount, locale, true)} of ${localizedCountText(
+                        supplementSelectedCount,
+                        locale
+                      )} ${nutrientNoun}.`}
+                </em>
+              </>
+            ) : (
+              productsTitle
+            )}
           </h2>
           <p className="mt-4 text-base leading-8 text-[var(--mn-ink-soft)]">
             {productsLead}
@@ -1968,8 +2075,9 @@ function RevealProductsSection({
           <div>
             <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
               <CountUpNumber active={true} duration={1000} value={productNeedCount} />
+              /{Math.max(productNeedCount, supplementSelectedCount)}
             </p>
-            <p className="text-sm text-[var(--mn-ash)]">{labels.needsCovered}</p>
+            <p className="text-sm text-[var(--mn-ash)]">{copy.prioritiesCovered}</p>
           </div>
           <div>
             <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
@@ -2014,24 +2122,19 @@ function RevealClosingSection({
       }))
     )
   ];
-  const safetyHeadline = revealSlotCopy(
-    result,
-    "safetyHeadline",
-    locale,
-    copy.cautionsTitle
+  const hasStatinContext = result.assessmentSummary.constraints.some((constraint) =>
+    /statin|สแตติน/i.test(constraint)
   );
+  const safetyHeadline = hasStatinContext
+    ? copy.statinCautionsTitle
+    : copy.cautionsTitle;
   const safetyBody = revealSlotCopy(
     result,
     "safetyBody",
     locale,
     copy.wellnessOnly
   );
-  const closingTitle = revealSlotCopy(
-    result,
-    "closingTitle",
-    locale,
-    copy.closingTitle
-  );
+  const closingTitle = copy.closingTitle;
   const closingBody = revealSlotCopy(
     result,
     "closingBody",
@@ -2040,27 +2143,30 @@ function RevealClosingSection({
   );
 
   return (
-    <section className="border-t border-[var(--mn-line)] py-20">
+    <section className="relative overflow-hidden border-t border-[var(--mn-line)] bg-[var(--mn-teal-deep)] py-24 text-[#f5f0e2]">
+      <div
+        aria-hidden={true}
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(184,149,74,0.12)_0%,transparent_48%),radial-gradient(circle_at_80%_80%,rgba(220,232,224,0.07)_0%,transparent_56%)]"
+      />
       <div className="mx-auto grid w-full max-w-5xl gap-8 px-6 sm:px-8">
-        <div className="rounded-xl bg-[var(--mn-paper)] p-6 ring-1 ring-[var(--mn-line)] sm:p-8" data-reveal>
+        <div className="relative rounded-[10px] bg-white/[0.06] p-6 ring-1 ring-[#f5f0e2]/15 sm:p-8" data-reveal>
           <div className="flex gap-4">
-            <InformationCircleIcon
-              aria-hidden={true}
-              className="mt-1 size-6 shrink-0 text-[var(--mn-teal-deep)]"
-            />
+            <span className="mt-1 grid size-11 shrink-0 place-items-center rounded-full bg-[var(--mn-gold-soft)] text-[var(--mn-teal-deep)]">
+              <InformationCircleIcon aria-hidden={true} className="size-6" />
+            </span>
             <div>
-              <h2 className="font-serif text-3xl font-medium text-[var(--mn-ink)]">
+              <h2 className="font-serif text-2xl font-normal italic text-[var(--mn-gold-soft)]">
                 {safetyHeadline}
               </h2>
-              <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
+              <p className="mt-3 text-sm leading-7 text-[#f5f0e2]/85">
                 {safetyBody}
               </p>
-              <div className="mt-4 space-y-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
+              <div className="mt-4 space-y-3 text-sm leading-7 text-[#f5f0e2]/80">
                 {cautions.length > 0 ? (
                   cautions.map((caution, index) => (
                     <div key={`${caution.title}:${index}`}>
                       {caution.title ? (
-                        <p className="font-semibold text-[var(--mn-ink)]">
+                        <p className="font-semibold text-[#f5f0e2]">
                           {caution.title}
                         </p>
                       ) : null}
@@ -2076,38 +2182,51 @@ function RevealClosingSection({
           </div>
         </div>
 
-        <div className="text-center" data-reveal>
-          <p className="font-serif text-5xl font-medium italic text-[var(--mn-teal-deep)]">
-            Mattaññutā
+        <div className="relative text-center" data-reveal>
+          <p className="font-serif text-5xl font-light italic leading-none text-[var(--mn-gold-soft)] sm:text-7xl">
+            मत्तञ्ञुतā
           </p>
-          <p className="mn-mono-label mt-2 text-xs uppercase tracking-[0.2em] text-[var(--mn-ash)]">
+          <p className="mn-mono-label mt-4 text-xs uppercase tracking-[0.24em] text-[#f5f0e2]/55">
             {copy.etymologyLine}
           </p>
           <h2
-            className={`mx-auto mt-8 max-w-3xl font-serif text-4xl font-medium text-[var(--mn-ink)] ${
+            className={`mx-auto mt-8 max-w-3xl font-serif text-4xl font-normal text-[#f5f0e2] ${
               locale === "th"
                 ? "leading-[1.45] break-words [overflow-wrap:anywhere]"
                 : "leading-tight text-balance"
               }`}
           >
-            {closingTitle}
+            {locale === "en" ? (
+              <>
+                <em>{closingTitle}</em> — not from more, but from{" "}
+                <em>exactly enough.</em>
+              </>
+            ) : (
+              closingTitle
+            )}
           </h2>
-          <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-[var(--mn-ink-soft)]">
+          <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-[#f5f0e2]/75">
             {closingBody}
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <button
-              className="mn-primary-button inline-flex items-center justify-center gap-2"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--mn-gold-soft)] px-7 py-4 text-sm font-semibold text-[var(--mn-teal-deep)] transition hover:bg-[#f2ddaa] motion-reduce:transition-none"
               onClick={() => window.print()}
               type="button"
             >
               <ArrowDownTrayIcon aria-hidden={true} className="size-4" />
               {copy.print}
             </button>
-            <a className="mn-secondary-button" href={planRevealHref(locale, planId)}>
+            <a
+              className="inline-flex items-center justify-center rounded-full border border-[#f5f0e2]/30 px-7 py-4 text-sm font-semibold text-[#f5f0e2] transition hover:border-[var(--mn-gold-soft)] hover:text-[var(--mn-gold-soft)] motion-reduce:transition-none"
+              href={planRevealHref(locale, planId)}
+            >
               {copy.save}
             </a>
-            <a className="mn-secondary-button" href={`/${locale}/nutrition/quiz`}>
+            <a
+              className="inline-flex items-center justify-center rounded-full border border-[#f5f0e2]/30 px-7 py-4 text-sm font-semibold text-[#f5f0e2] transition hover:border-[var(--mn-gold-soft)] hover:text-[var(--mn-gold-soft)] motion-reduce:transition-none"
+              href={`/${locale}/nutrition/quiz`}
+            >
               {copy.reassess}
             </a>
           </div>
