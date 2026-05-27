@@ -1,4 +1,5 @@
 import { validateLeadEmail } from "@/lib/email-validation";
+import { analyzeFoodGapSupportWithGrok } from "@/lib/food-gap-support";
 import { analyzeFoodGuidanceWithGrok } from "@/lib/food-guidance-analysis";
 import { analyzeFormulationWithGrok } from "@/lib/formulation-analysis";
 import { fetchDigitalOceanInvoicePreview } from "@/lib/finance-ledger";
@@ -132,6 +133,25 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
       planId: workItem.planId,
       previousFoodGuidance: workItem.previousFoodGuidance,
       previousFormulation: workItem.previousFormulation,
+      taskId: workItem.taskId
+    });
+
+    return { analysis };
+  }
+
+  if (workItem.taskType === "generate_food_gap_guidance") {
+    const analysis = await analyzeFoodGapSupportWithGrok({
+      answers: workItem.answers,
+      audit: async () => undefined,
+      chatMessages: workItem.chatMessages,
+      locale: workItem.locale,
+      managedFoods: workItem.managedFoods,
+      plan: workItem.plan,
+      planFeedback: workItem.planFeedback,
+      planId: workItem.planId,
+      previousFoodGuidance: workItem.previousFoodGuidance,
+      previousFormulation: workItem.previousFormulation,
+      productVariants: workItem.productVariants,
       taskId: workItem.taskId
     });
 

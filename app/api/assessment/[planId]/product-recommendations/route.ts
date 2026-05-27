@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
 import { normalizeProductStackPreference } from "@/lib/product-recommendations";
-import { enqueueProductRecommendationsTask } from "@/lib/task-worker";
+import {
+  enqueueFoodGapSupportTask,
+  enqueueProductRecommendationsTask
+} from "@/lib/task-worker";
 
 type ProductRecommendationsRouteProps = Readonly<{
   params: Promise<{
@@ -52,6 +55,14 @@ export async function POST(
       { status: 409 }
     );
   }
+
+  await enqueueFoodGapSupportTask({
+    dependsOnTaskId: taskId,
+    forceNew: true,
+    parentTaskId: taskId,
+    planId,
+    source: "product_recommendations_request"
+  });
 
   return NextResponse.json({
     stackPreference,

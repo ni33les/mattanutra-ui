@@ -47,9 +47,12 @@ export type FoodGuidanceItem = {
   benefitTags?: string[];
   category: string;
   effectivenessRank: number;
+  foodId?: string;
   food: LocalizedText;
   frequency: LocalizedText;
   id: string;
+  imagePath?: string;
+  imageAlt?: LocalizedText;
   nutrientFacts?: {
     amountPer100g: number;
     amountPerServing: number;
@@ -72,6 +75,34 @@ export type FoodGuidanceItem = {
   };
   serving: LocalizedText;
   status: FormulationStatus;
+};
+
+export type FoodGapSupportItem = {
+  category: Record<"en" | "th", string>;
+  food: Record<"en" | "th", string>;
+  foodId: string;
+  frequency: Record<"en" | "th", string>;
+  gapNeedIds: string[];
+  imageAlt: Record<"en" | "th", string>;
+  imagePath: string;
+  position: number;
+  rationale: Record<"en" | "th", string>;
+  serving: Record<"en" | "th", string>;
+};
+
+export type FoodGapSupportVariant = {
+  body: Record<"en" | "th", string>;
+  headline: Record<"en" | "th", string>;
+  items: FoodGapSupportItem[];
+};
+
+export type FoodGapSupport = {
+  generatedAt?: string;
+  version: "food-gap:v1";
+  variants: {
+    balanced: FoodGapSupportVariant;
+    compact: FoodGapSupportVariant;
+  };
 };
 
 export type RecommendedProduct = {
@@ -257,6 +288,7 @@ export type FormulationBlueprint = {
 
 export type FoodGuidanceBlueprint = {
   foodGuidance: FoodGuidanceItem[];
+  foodGapSupport?: FoodGapSupport;
   foodSafetySummary?: {
     adjustedCount: number;
     hiddenCount: number;

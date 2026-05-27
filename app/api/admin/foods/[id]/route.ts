@@ -4,6 +4,7 @@ import {
   isFoodConfidence,
   isFoodListStatus,
   updateAdminFood,
+  type AdminFoodTranslation,
   type FoodConfidence,
   type FoodListStatus
 } from "@/lib/admin-foods";
@@ -53,6 +54,38 @@ function parseConfidence(value: unknown): FoodConfidence | null {
   return isFoodConfidence(normalized) ? normalized : null;
 }
 
+function recordValue(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function parseTranslations(value: unknown) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const translations: Record<string, AdminFoodTranslation> = {};
+
+  for (const [locale, rawTranslation] of Object.entries(recordValue(value))) {
+    const translation = recordValue(rawTranslation);
+    const status = String(translation.status ?? "missing");
+
+    translations[locale] = {
+      category: textOrNull(translation.category),
+      imageAlt: textOrNull(translation.imageAlt),
+      name: textOrNull(translation.name),
+      primaryUseCase: textOrNull(translation.primaryUseCase),
+      status:
+        status === "complete" || status === "draft" || status === "missing"
+          ? status
+          : "missing"
+    };
+  }
+
+  return translations;
+}
+
 export async function PATCH(
   request: Request,
   { params }: AdminFoodRouteProps
@@ -100,6 +133,7 @@ export async function PATCH(
         : normalizeFoodServingSize(body.defaultServing);
   const nutrientProfile = normalizeFoodNutrientProfileInput(body.nutrientProfile);
   const nutrientTags = parseFoodNutrientTagInput(body.nutrientTags);
+  const translations = parseTranslations(body.translations);
 
   if (
     !listStatus ||
@@ -129,10 +163,14 @@ export async function PATCH(
       confidence,
       defaultServing,
       id,
+      imagePath: body.imagePath === undefined ? undefined : textOrNull(body.imagePath),
+      imageSource:
+        body.imageSource === undefined ? undefined : textOrNull(body.imageSource),
       listStatus,
       nutrientProfile,
       nutrientTags,
-      safetyNotes: textOrNull(body.safetyNotes)
+      safetyNotes: textOrNull(body.safetyNotes),
+      translations
     });
 
     return NextResponse.json(

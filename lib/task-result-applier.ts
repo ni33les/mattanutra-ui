@@ -44,6 +44,7 @@ import {
   savePlanFeedback
 } from "@/lib/plan-feedback";
 import type {
+  FoodGapSupport,
   FoodGuidanceBlueprint,
   FormulationBlueprint
 } from "@/lib/formulation-types";
@@ -56,6 +57,7 @@ import { recordPaymentPregenerationProgress } from "@/lib/stripe-payments";
 import {
   enqueueExampleEmailIfPreviewReady,
   enqueueExampleEmailsForReadyFullPlan,
+  enqueueFoodGapSupportTask,
   enqueueHealthScoreAnalysisTask,
   enqueueNutritionPlanRefinementTask,
   enqueueProductRecommendationsTask,
@@ -188,7 +190,7 @@ async function queueProductRecommendationsForReadyPlan({
   task: TaskRecord;
 }>) {
   try {
-    return await enqueueProductRecommendationsTask({
+    const productRecommendationTaskId = await enqueueProductRecommendationsTask({
       parentTaskId: task.id,
       paymentId,
       plan,
@@ -196,6 +198,18 @@ async function queueProductRecommendationsForReadyPlan({
       source,
       taskGroupId: task.taskGroupId
     });
+
+    if (productRecommendationTaskId) {
+      await enqueueFoodGapSupportTask({
+        dependsOnTaskId: productRecommendationTaskId,
+        parentTaskId: productRecommendationTaskId,
+        planId,
+        source,
+        taskGroupId: task.taskGroupId
+      });
+    }
+
+    return productRecommendationTaskId;
   } catch (error) {
     console.error("Unable to queue product recommendations", error);
     await addWorkEvent(task, "product_recommendations_queue_failed", "medium", {
@@ -738,6 +752,100 @@ async function applyFoodGuidanceResult(
         reasoningEffort: analysis.reasoningEffort,
         responseId: analysis.responseId,
         source: taskSource,
+        taskId: task.id,
+        version
+      }
+    });
+  });
+}
+
+async function applyFoodGapSupportResult(
+  task: TaskRecord,
+  resultPayload: unknown,
+  sqlOverride?: TaskServiceDb,
+  afterCommit?: AfterCommitScheduler
+) {
+  const sql = sqlOverride ?? getSql();
+  const planId = task.planId;
+
+  if (!sql || !planId) {
+    throw new Error("Food gap support completion result is missing a plan");
+  }
+
+  const analysis = objectValue(objectValue(resultPayload).analysis);
+  const foodGapSupport = objectValue(analysis.foodGapSupport) as FoodGapSupport;
+
+  if (
+    foodGapSupport.version !== "food-gap:v1" ||
+    !objectValue(foodGapSupport.variants).balanced ||
+    !objectValue(foodGapSupport.variants).compact
+  ) {
+    throw new Error("Task completion result is missing food gap support");
+  }
+
+  const rows = await sql<Array<{
+    guidance: FoodGuidanceBlueprint | null;
+    locale: unknown;
+  }>>`
+    select food_guidance.guidance, assessments.locale
+    from public.assessments
+    left join lateral (
+      select guidance
+      from public.food_guidance
+      where food_guidance.plan_id = assessments.plan_id
+        and (
+          model_version is null
+          or model_version not like '%:example'
+        )
+      order by version desc, generated_at desc
+      limit 1
+    ) food_guidance on true
+    where assessments.plan_id = ${planId}::uuid
+    limit 1
+  `;
+  const previousFoodGuidance = rows[0]?.guidance ?? { foodGuidance: [] };
+  const nextFoodGuidance = {
+    ...previousFoodGuidance,
+    foodGapSupport
+  } satisfies FoodGuidanceBlueprint;
+  const version = await insertFoodGuidanceVersion(sql, {
+    foodGuidance: nextFoodGuidance,
+    modelVersion: modelVersion(analysis, ":food-gap"),
+    planId
+  });
+  const locale: Locale = isLocale(rows[0]?.locale) ? rows[0].locale : "en";
+
+  await eventually(afterCommit, async () => {
+    await recordTaskXaiUsageCost({
+      analysis,
+      metadata: {
+        planId
+      },
+      purpose: "food_gap_support_analysis",
+      task
+    });
+  });
+
+  await eventually(afterCommit, async () => {
+    await addWorkEvent(task, "food_gap_support_written", "medium", {
+      fallbackUsed: analysis.fallbackUsed === true,
+      model: analysis.model,
+      promptVersion: analysis.promptVersion,
+      reasoningEffort: analysis.reasoningEffort,
+      responseId: analysis.responseId,
+      version
+    });
+    await writeBpmEvent({
+      actorType: "worker",
+      eventName: "food_gap_support_ready",
+      eventType: "formulation",
+      locale,
+      planId,
+      properties: {
+        fallbackUsed: analysis.fallbackUsed === true,
+        model: analysis.model,
+        promptVersion: analysis.promptVersion,
+        reasoningEffort: analysis.reasoningEffort,
         taskId: task.id,
         version
       }
@@ -2098,6 +2206,15 @@ async function applyProductRecommendationsResult(
   });
 
   await eventually(afterCommit, async () => {
+    await enqueueFoodGapSupportTask({
+      parentTaskId: task.id,
+      planId: task.planId as string,
+      source: "product_recommendations_ready",
+      taskGroupId: task.taskGroupId
+    });
+  });
+
+  await eventually(afterCommit, async () => {
     await writeBpmEvent({
       actorType: "worker",
       eventName: "product_recommendations_ready",
@@ -2181,6 +2298,11 @@ export async function applyTaskCompletionResult({
 
   if (task.taskType === "generate_food_guidance") {
     await applyFoodGuidanceResult(task, resultPayload, sql, afterCommit);
+    return resultPayload;
+  }
+
+  if (task.taskType === "generate_food_gap_guidance") {
+    await applyFoodGapSupportResult(task, resultPayload, sql, afterCommit);
     return resultPayload;
   }
 

@@ -88,8 +88,8 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /food:\s*agentProfile\("foodGuidanceWorker",\s*\[[\s\S]*"generate_food_guidance"[\s\S]*\]\)/,
-      "food workers must explicitly claim food guidance tasks"
+      /food:\s*agentProfile\("foodGuidanceWorker",\s*\[[\s\S]*"generate_food_gap_guidance"[\s\S]*"generate_food_guidance"[\s\S]*\]\)/,
+      "food workers must explicitly claim food guidance and food gap tasks"
     );
     assert.match(
       source,
@@ -188,7 +188,7 @@ describe("external worker boundaries", () => {
 
     assert.match(
       source,
-      /INTERACTIVE_TASK_TYPES[\s\S]*analyze_healthscore[\s\S]*generate_food_guidance[\s\S]*generate_supplement_guidance/,
+      /INTERACTIVE_TASK_TYPES[\s\S]*analyze_healthscore[\s\S]*generate_food_gap_guidance[\s\S]*generate_food_guidance[\s\S]*generate_supplement_guidance/,
       "blocking UI task types must be on the interactive reserve path"
     );
     assert.match(
@@ -258,6 +258,31 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       taskWorkerSource,
+      /enqueueAssessmentPregenerationTasks[\s\S]*enqueueFoodGapSupportTask\(\{[\s\S]*dependsOnTaskId: productRecommendationTaskId/,
+      "assessment capture should queue food-gap support early behind product matching"
+    );
+    assert.match(
+      taskWorkerSource,
+      /enqueueAssessmentPregenerationTasks[\s\S]*enqueueNutritionReportTask\(\{[\s\S]*dependsOnTaskIds: \[foodGuidanceTaskId, formulationTaskId\]/,
+      "assessment capture should queue final report copy early behind food and supplement generation"
+    );
+    assert.match(
+      taskWorkerSource,
+      /enqueueNutritionPlanTasks[\s\S]*enqueueProductRecommendationsTask\(\{[\s\S]*dependsOnTaskId: readiness\.formulationReady \? null : formulationTaskId/,
+      "paid plan adoption should queue product matching early behind formulation when needed"
+    );
+    assert.match(
+      taskWorkerSource,
+      /enqueueNutritionPlanTasks[\s\S]*nutritionReportDependencies[\s\S]*enqueueNutritionReportTask/,
+      "paid plan adoption should queue final report copy early with dependencies when needed"
+    );
+    assert.match(
+      taskWorkerSource,
+      /enqueuePaymentCheckoutPregenerationTasks[\s\S]*checkout-pregeneration:food-guidance[\s\S]*enqueueNutritionReportTask/,
+      "checkout pre-generation should ensure food guidance exists before queueing the dependent report task"
+    );
+    assert.match(
+      taskWorkerSource,
       /dependsOnTaskId: formulationTaskId[\s\S]*parentTaskId: formulationTaskId/,
       "assessment product matching must be queued immediately but depend on supplement generation"
     );
@@ -265,6 +290,11 @@ describe("external worker boundaries", () => {
       taskWorkerSource,
       /dependencies: dependencyTaskId[\s\S]*type: "successful"/,
       "pending product matching must use task dependencies so reservation stays blocked until supplement success"
+    );
+    assert.match(
+      taskWorkerSource,
+      /product_recommendation_runs[\s\S]*generated_at >= greatest/,
+      "late product-matching enqueue points must not create duplicate runs when current recommendations already exist"
     );
   });
 

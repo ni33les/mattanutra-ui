@@ -38,6 +38,7 @@ drop table if exists
   public.food_nutrient_profiles,
   public.food_safety_rules,
   public.food_serving_sizes,
+  public.food_translations,
   public.foods,
   public.formulations,
   public.goals,
@@ -907,10 +908,38 @@ CREATE TABLE public.foods (
     list_status text DEFAULT 'whitelisted'::text NOT NULL,
     is_active boolean DEFAULT true NOT NULL,
     source text,
+    image_path text,
+    image_source text,
+    image_updated_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT foods_list_status_check CHECK ((list_status = ANY (ARRAY['whitelisted'::text, 'review_required'::text, 'blacklisted'::text, 'inactive'::text])))
 );
+
+
+--
+-- Name: food_translations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.food_translations (
+    food_id uuid NOT NULL,
+    locale text NOT NULL,
+    name text NOT NULL,
+    category text,
+    primary_use_case text,
+    image_alt text,
+    status text DEFAULT 'missing'::text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT food_translations_pkey PRIMARY KEY (food_id, locale),
+    CONSTRAINT food_translations_status_check CHECK ((status = ANY (ARRAY['complete'::text, 'draft'::text, 'missing'::text])))
+);
+
+
+--
+-- Name: TABLE food_translations; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.food_translations IS 'Locale-scalable managed food display copy and image alt text.';
 
 
 --
@@ -3163,6 +3192,13 @@ CREATE INDEX food_serving_sizes_food_idx ON public.food_serving_sizes USING btre
 
 
 --
+-- Name: food_translations_locale_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX food_translations_locale_idx ON public.food_translations USING btree (locale, status);
+
+
+--
 -- Name: foods_benefit_tags_gin_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4091,6 +4127,14 @@ ALTER TABLE ONLY public.food_safety_rules
 
 ALTER TABLE ONLY public.food_serving_sizes
     ADD CONSTRAINT food_serving_sizes_food_id_fkey FOREIGN KEY (food_id) REFERENCES public.foods(id) ON DELETE CASCADE;
+
+
+--
+-- Name: food_translations food_translations_food_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.food_translations
+    ADD CONSTRAINT food_translations_food_id_fkey FOREIGN KEY (food_id) REFERENCES public.foods(id) ON DELETE CASCADE;
 
 
 --

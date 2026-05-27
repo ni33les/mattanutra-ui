@@ -175,6 +175,17 @@ describe("plan reveal V3 migration", () => {
     assert.match(formulationResults, /productRecommendations/);
   });
 
+  it("renders managed food support after products without changing product coverage", () => {
+    assert.match(formulationTypes, /foodGapSupport\?: FoodGapSupport/);
+    assert.match(assessmentStore, /foodGapSupport: storedFoodGapSupport/);
+    assert.match(formulationResults, /<RevealProductsSection/);
+    assert.match(formulationResults, /<RevealFoodSupportSection/);
+    assert.match(formulationResults, /Food support, after the products/);
+    assert.match(formulationResults, /selectedNeedCoverage/);
+    assert.match(formulationResults, /item\.imagePath/);
+    assert.match(formulationResults, /Foods do not change the product coverage score/);
+  });
+
   it("uses V14 public fonts and colour tokens as the site-wide public system", () => {
     assert.match(localeLayout, /DM_Sans/);
     assert.doesNotMatch(localeLayout, /Manrope/);

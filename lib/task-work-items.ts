@@ -41,6 +41,10 @@ import {
   type ProductRecommendationNeed,
   type ProductStackPreference
 } from "@/lib/product-recommendations";
+import type {
+  FoodGapProductVariant,
+  ManagedFoodCatalogItem
+} from "@/lib/food-gap-support";
 import {
   buildReassessmentEmailHtml,
   buildReassessmentEmailSubject
@@ -87,6 +91,21 @@ export type FoodGuidanceWorkItem = Readonly<{
   previousFormulation: FormulationBlueprint | null;
   taskId: string;
   taskType: "generate_food_guidance";
+}>;
+
+export type FoodGapSupportWorkItem = Readonly<{
+  answers: unknown;
+  chatMessages: PlanChatMessage[];
+  locale: Locale;
+  managedFoods: ManagedFoodCatalogItem[];
+  plan: AssessmentPlan;
+  planFeedback: PlanFeedbackItem[];
+  planId: string;
+  previousFoodGuidance: FoodGuidanceBlueprint | null;
+  previousFormulation: FormulationBlueprint | null;
+  productVariants: FoodGapProductVariant[];
+  taskId: string;
+  taskType: "generate_food_gap_guidance";
 }>;
 
 export type ExampleEmailWorkItem = Readonly<{
@@ -201,6 +220,7 @@ export type TaskWorkItem =
   | ContentStatusChangeWorkItem
   | DigitalOceanBillingSyncWorkItem
   | ExampleEmailWorkItem
+  | FoodGapSupportWorkItem
   | FoodGuidanceWorkItem
   | FormulationWorkItem
   | HealthScoreWorkItem
@@ -504,6 +524,219 @@ async function buildFoodGuidanceWorkItem(task: TaskRecord) {
     taskId: task.id,
     taskType: "generate_food_guidance"
   } satisfies FoodGuidanceWorkItem;
+}
+
+function localizedFoodTranslation(
+  translations: Record<string, unknown>,
+  locale: "en" | "th",
+  fallback: Readonly<{
+    category: string;
+    imageAlt: string;
+    name: string;
+    primaryUseCase: string | null;
+  }>
+) {
+  const record = payloadRecord(translations[locale]);
+
+  return {
+    category: payloadText(record, "category") || fallback.category,
+    imageAlt: payloadText(record, "imageAlt") || fallback.imageAlt || fallback.name,
+    name: payloadText(record, "name") || fallback.name,
+    primaryUseCase:
+      payloadText(record, "primaryUseCase") ||
+      fallback.primaryUseCase ||
+      fallback.category
+  };
+}
+
+async function loadManagedFoodCatalog(
+  sql: NonNullable<ReturnType<typeof getSql>>
+): Promise<ManagedFoodCatalogItem[]> {
+  const rows = await sql<Array<{
+    benefit_tags: string[] | null;
+    category: string;
+    id: string;
+    image_path: string | null;
+    name: string;
+    normalized_name: string;
+    nutrient_tags: string[] | null;
+    primary_use_case: string | null;
+    translations: unknown;
+  }>>`
+    select
+      foods.id::text,
+      foods.name,
+      foods.normalized_name,
+      foods.category,
+      foods.primary_use_case,
+      foods.benefit_tags,
+      foods.nutrient_tags,
+      foods.image_path,
+      coalesce(
+        jsonb_object_agg(
+          food_translations.locale,
+          jsonb_build_object(
+            'name', food_translations.name,
+            'category', food_translations.category,
+            'primaryUseCase', food_translations.primary_use_case,
+            'imageAlt', food_translations.image_alt
+          )
+        ) filter (where food_translations.locale in ('en', 'th')),
+        '{}'::jsonb
+      ) as translations
+    from public.foods
+    left join public.food_translations
+      on food_translations.food_id = foods.id
+      and food_translations.locale in ('en', 'th')
+      and food_translations.status = 'complete'
+    where foods.is_active = true
+      and foods.list_status = 'whitelisted'
+      and coalesce(foods.image_path, '') <> ''
+    group by foods.id
+    order by foods.name
+  `;
+
+  return rows.flatMap((row): ManagedFoodCatalogItem[] => {
+    if (!row.image_path) {
+      return [];
+    }
+
+    const translations = payloadRecord(row.translations);
+    const fallback = {
+      category: row.category || "Other",
+      imageAlt: row.name,
+      name: row.name,
+      primaryUseCase: row.primary_use_case
+    };
+    const en = localizedFoodTranslation(translations, "en", fallback);
+    const th = localizedFoodTranslation(translations, "th", fallback);
+
+    if (!en.name || !th.name || !en.imageAlt || !th.imageAlt) {
+      return [];
+    }
+
+    return [{
+      benefitTags: row.benefit_tags ?? [],
+      category: row.category,
+      foodId: row.id,
+      imagePath: row.image_path,
+      normalizedName: row.normalized_name,
+      nutrientTags: row.nutrient_tags ?? [],
+      primaryUseCase: row.primary_use_case,
+      translations: { en, th }
+    }];
+  });
+}
+
+function productNeedCoverageFromDiagnostics(value: unknown) {
+  const diagnostics = payloadRecord(value);
+  const candidates = [
+    ...(
+      Array.isArray(diagnostics.matchedNeeds)
+        ? diagnostics.matchedNeeds
+        : []
+    ),
+    ...(
+      Array.isArray(diagnostics.unmatchedNeeds)
+        ? diagnostics.unmatchedNeeds
+        : []
+    )
+  ];
+
+  return candidates.flatMap((candidate): FoodGapProductVariant["needCoverage"] => {
+    const item = payloadRecord(candidate);
+    const id = payloadText(item, "id");
+    const displayName = payloadText(item, "displayName");
+    const rawItemType = payloadText(item, "itemType");
+    const itemType = rawItemType === "food" ? "food" : "supplement";
+    const coveragePercent = Number(item.coveragePercent);
+
+    if (!id || !displayName || !Number.isFinite(coveragePercent)) {
+      return [];
+    }
+
+    return [{
+      bestRejectedProductId: payloadText(item, "bestRejectedProductId") || null,
+      bestRejectedReason: payloadText(item, "bestRejectedReason") || null,
+      coveragePercent,
+      displayName,
+      id,
+      itemType
+    }];
+  });
+}
+
+async function loadFoodGapProductVariants(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  planId: string
+): Promise<FoodGapProductVariant[]> {
+  const rows = await sql<Array<{
+    diagnostics: unknown;
+    id: string;
+    recommendation_count: number;
+    stack_coverage_percent: number | string | null;
+    stack_preference: string;
+  }>>`
+    select distinct on (coalesce(diagnostics ->> 'stackPreference', 'balanced'))
+      id::text,
+      diagnostics,
+      coalesce(diagnostics ->> 'stackPreference', 'balanced') as stack_preference,
+      stack_coverage_percent,
+      (
+        select count(*)::int
+        from public.product_recommendation_items
+        where product_recommendation_items.run_id = product_recommendation_runs.id
+      ) as recommendation_count
+    from public.product_recommendation_runs
+    where product_recommendation_runs.plan_id = ${planId}::uuid
+      and product_recommendation_runs.status in ('completed', 'partial')
+      and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
+    order by
+      coalesce(diagnostics ->> 'stackPreference', 'balanced'),
+      generated_at desc
+  `;
+
+  return rows.flatMap((row): FoodGapProductVariant[] => {
+    const stackPreference = normalizeProductStackPreference(row.stack_preference);
+    const needCoverage = productNeedCoverageFromDiagnostics(row.diagnostics);
+
+    return [{
+      needCoverage,
+      recommendationCount: Number(row.recommendation_count) || 0,
+      runId: row.id,
+      stackCoveragePercent: Number(row.stack_coverage_percent) || 0,
+      stackPreference
+    }];
+  });
+}
+
+async function buildFoodGapSupportWorkItem(task: TaskRecord) {
+  const sql = getSql();
+
+  if (!sql || !task.planId) {
+    throw new Error("Food gap support work item is missing a plan");
+  }
+
+  const [context, managedFoods, productVariants] = await Promise.all([
+    loadPlanGenerationContext(sql, task.planId, taskPlanOverride(task)),
+    loadManagedFoodCatalog(sql),
+    loadFoodGapProductVariants(sql, task.planId)
+  ]);
+
+  return {
+    answers: context.answers,
+    chatMessages: context.chatMessages,
+    locale: context.locale,
+    managedFoods,
+    plan: context.plan,
+    planFeedback: context.planFeedback,
+    planId: task.planId,
+    previousFoodGuidance: context.foodGuidance,
+    previousFormulation: context.formulation,
+    productVariants,
+    taskId: task.id,
+    taskType: "generate_food_gap_guidance"
+  } satisfies FoodGapSupportWorkItem;
 }
 
 async function buildExampleEmailWorkItem(task: TaskRecord) {
@@ -1059,6 +1292,10 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
 
   if (task.taskType === "generate_food_guidance") {
     return buildFoodGuidanceWorkItem(task);
+  }
+
+  if (task.taskType === "generate_food_gap_guidance") {
+    return buildFoodGapSupportWorkItem(task);
   }
 
   if (task.taskType === "send_example_email") {

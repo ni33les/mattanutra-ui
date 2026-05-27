@@ -13,6 +13,7 @@ import {
   toFreePreviewFormulationResult
 } from "@/lib/formulation-preview";
 import {
+  type FoodGapSupport,
   type FoodGuidanceItem,
   type FormulationCaution,
   type FormulationIngredient,
@@ -77,6 +78,19 @@ function toJsonRecord(value: unknown) {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return toJsonRecord(value);
+}
+
+function asFoodGapSupport(value: unknown): FoodGapSupport | undefined {
+  const record = asRecord(value);
+  const variants = asRecord(record.variants);
+  const balanced = asRecord(variants.balanced);
+  const compact = asRecord(variants.compact);
+
+  return record.version === "food-gap:v1" &&
+    Array.isArray(balanced.items) &&
+    Array.isArray(compact.items)
+    ? (record as FoodGapSupport)
+    : undefined;
 }
 
 export function hasHealthScoreAdvice(value: unknown) {
@@ -1719,6 +1733,9 @@ export async function getStoredFormulationResult(
   const storedFoodGuidance = asArray<FoodGuidanceItem>(
     storedFoodGuidanceRecord.foodGuidance
   );
+  const storedFoodGapSupport = asFoodGapSupport(
+    storedFoodGuidanceRecord.foodGapSupport
+  );
   const reconciledSafety = await reconcileResolvedSafetyReviewFlags(
     sql,
     planId,
@@ -1987,6 +2004,7 @@ export async function getStoredFormulationResult(
     ...(foodSafetySummary ? { foodSafetySummary } : {}),
     ...(cautions.length > 0 ? { cautions } : {}),
     ...(marketingPoints.length > 0 ? { marketingPoints } : {}),
+    ...(storedFoodGapSupport ? { foodGapSupport: storedFoodGapSupport } : {}),
     foodGuidance,
     supplementBreakdown
   } satisfies FormulationResult;

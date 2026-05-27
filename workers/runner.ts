@@ -178,6 +178,7 @@ const WORKER_PROFILES: Record<WorkerProfileMode, WorkerAgentConfig> = {
     "send_reassessment_email"
   ]),
   food: agentProfile("foodGuidanceWorker", [
+    "generate_food_gap_guidance",
     "generate_food_guidance"
   ]),
   formulation: agentProfile("formulationWorker", [

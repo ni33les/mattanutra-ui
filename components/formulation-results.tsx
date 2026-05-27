@@ -1,6 +1,7 @@
 "use client";
 
 import { startTransition, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import {
   ExclamationTriangleIcon,
   InformationCircleIcon
@@ -9,9 +10,11 @@ import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import { LandingReveal } from "@/components/landing-reveal";
 import { NutritionProgress } from "@/components/nutrition-progress";
 import type {
+  FoodGapSupportItem,
   FormulationIngredient,
   FormulationResult,
   LocalizedText,
+  ProductNeedCoverage,
   ProductRecommendationOption,
   ProductStackPreference,
   RecommendedProduct
@@ -29,6 +32,7 @@ import {
   nutritionHealthScorePath,
   nutritionRevealPath
 } from "@/lib/nutrition-paths";
+import { managedFoodSeeds } from "@/lib/managed-foods";
 
 type FormulationResultsProps = Readonly<{
   initialResult?: FormulationResult | null;
@@ -41,7 +45,6 @@ type LoadState = "loading" | "ready" | "error";
 const MAX_PRODUCT_MATCHING_POLLS = 80;
 const PENDING_SECTION_POLL_INTERVAL_MS = 1_000;
 const PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS = 750;
-const FOOD_GUIDANCE_VISIBLE = false;
 
 const supplementBenefitRules = [
   {
@@ -494,6 +497,89 @@ function selectProductRecommendationOption(
   );
 }
 
+function localizedPair(value: LocalizedText, fallback = "") {
+  return {
+    en: getLocalizedText(value, "en") || fallback,
+    th: getLocalizedText(value, "th") || getLocalizedText(value, "en") || fallback
+  };
+}
+
+function normalizeFoodText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9ก-๙]+/g, " ")
+    .trim();
+}
+
+function managedSeedForFoodItem(item: FormulationResult["foodGuidance"][number]) {
+  const itemText = normalizeFoodText([
+    item.foodId,
+    typeof item.food === "string" ? item.food : Object.values(item.food).join(" ")
+  ].filter(Boolean).join(" "));
+
+  return managedFoodSeeds.find((seed) => {
+    const seedKeys = [
+      seed.normalizedName,
+      seed.normalizedName.replace(/_/g, " "),
+      seed.name.en,
+      seed.name.th
+    ].map(normalizeFoodText);
+
+    return seedKeys.some((key) => key && itemText.includes(key));
+  });
+}
+
+function fallbackFoodSupportItems(result: FormulationResult): FoodGapSupportItem[] {
+  return (result.foodGuidance ?? [])
+    .filter((item) => item.safety?.visibility !== "hidden")
+    .sort((first, second) => first.effectivenessRank - second.effectivenessRank)
+    .slice(0, 6)
+    .map((item, index) => {
+      const seed = managedSeedForFoodItem(item);
+      const food = seed
+        ? { en: seed.name.en, th: seed.name.th }
+        : localizedPair(item.food, `Food ${index + 1}`);
+      const category = {
+        en: seed?.category.en ?? item.category,
+        th: seed?.category.th ?? item.category
+      };
+
+      return {
+        category,
+        food,
+        foodId: item.foodId ?? item.id,
+        frequency: localizedPair(item.frequency),
+        gapNeedIds: [],
+        imageAlt: seed?.imageAlt ?? (
+          item.imageAlt ? localizedPair(item.imageAlt, food.en) : food
+        ),
+        imagePath: item.imagePath ?? seed?.imagePath ?? "",
+        position: index + 1,
+        rationale: localizedPair(item.rationale),
+        serving: localizedPair(item.serving)
+      };
+    });
+}
+
+function selectedFoodSupport(
+  result: FormulationResult,
+  selectedPreference?: ProductStackPreference | null
+) {
+  const variant =
+    selectedPreference && result.foodGapSupport?.variants[selectedPreference]
+      ? result.foodGapSupport.variants[selectedPreference]
+      : result.foodGapSupport?.variants.balanced ??
+        result.foodGapSupport?.variants.compact ??
+        null;
+
+  return {
+    fallbackItems: variant ? [] : fallbackFoodSupportItems(result),
+    variant
+  };
+}
+
 export function FormulationResults({
   initialResult = null,
   locale,
@@ -640,9 +726,7 @@ export function FormulationResults({
     foods: (result.foodGuidance ?? []).length > 0 ? "ready" : "pending",
     supplements: orderedIngredients.length > 0 ? "ready" : "pending"
   };
-  const nutritionPending =
-    (FOOD_GUIDANCE_VISIBLE && sectionStatuses.foods !== "ready") ||
-    sectionStatuses.supplements !== "ready";
+  const nutritionPending = sectionStatuses.supplements !== "ready";
   const unlockHref = planPaywallHref(locale, effectiveResultPlanId);
   const productRecommendationOptions = productRecommendationOptionsForResult(result);
   const selectedProductRecommendationOption = selectProductRecommendationOption(
@@ -749,6 +833,16 @@ const revealCopy = {
     formulaMetaNrv: "PRODUCT FIT · SELECTED STACK",
     formulaMetaFocus: "Focus",
     formulaSignedPrefix: "Composed",
+    foodSupportDefaultBody:
+      "Foods do not change the product coverage score. They give the plan practical support where the product stack is either incomplete or already strong enough.",
+    foodSupportDefaultHeadline: "Food support, after the products.",
+    foodSupportEmpty:
+      "Food support will appear here once the managed food catalogue and product stack are ready.",
+    foodSupportEyebrow: "Food support",
+    foodSupportFrequency: "Frequency",
+    foodSupportGapLabel: "Supports",
+    foodSupportServing: "Serving",
+    foodSupportTitle: "Foods chosen to support the gaps.",
     heroEyebrow: "Your Right Amount Has Arrived",
     heroFor: "For",
     heroTitle: "Your formula has arrived",
@@ -837,6 +931,16 @@ const revealCopy = {
     formulaMetaNrv: "ความพอดีของสินค้า · ชุดที่เลือก",
     formulaMetaFocus: "เป้าหมาย",
     formulaSignedPrefix: "จัดทำ",
+    foodSupportDefaultBody:
+      "อาหารไม่เปลี่ยนคะแนนความครอบคลุมของผลิตภัณฑ์ แต่ช่วยให้แผนทำได้จริงในส่วนที่ผลิตภัณฑ์ยังไม่ครอบคลุมเต็มที่ หรือเสริมพื้นฐานเมื่อครอบคลุมดีแล้ว",
+    foodSupportDefaultHeadline: "อาหารสนับสนุนหลังจากชุดผลิตภัณฑ์",
+    foodSupportEmpty:
+      "คำแนะนำอาหารจะแสดงที่นี่เมื่อแคตตาล็อกอาหารและชุดผลิตภัณฑ์พร้อม",
+    foodSupportEyebrow: "อาหารสนับสนุน",
+    foodSupportFrequency: "ความถี่",
+    foodSupportGapLabel: "สนับสนุน",
+    foodSupportServing: "ปริมาณ",
+    foodSupportTitle: "อาหารที่เลือกเพื่อช่วยเติมช่องว่าง",
     heroEyebrow: "ปริมาณที่พอดีของคุณพร้อมแล้ว",
     heroFor: "สำหรับ",
     heroTitle: "สูตรของคุณพร้อมแล้ว",
@@ -1416,6 +1520,10 @@ function RevealResultsPage({
 
     return option ? [option] : [];
   });
+  const selectedProductRecommendationOption = selectProductRecommendationOption(
+    productOptions,
+    selectedProductStackPreference ?? null
+  );
   const displayFirstName =
     typeof result.firstName === "string" && result.firstName.trim()
       ? result.firstName.trim()
@@ -1652,6 +1760,20 @@ function RevealResultsPage({
         selectedCoverage={selectedCoverage}
         selectedProductStackPreference={selectedProductStackPreference}
         supplementLabelById={supplementLabelById}
+      />
+
+      <RevealFoodSupportSection
+        copy={copy}
+        locale={locale}
+        result={result}
+        selectedNeedCoverage={
+          selectedProductRecommendationOption?.productRecommendations.needCoverage ??
+          result.productRecommendations?.needCoverage ??
+          []
+        }
+        selectedProductStackPreference={
+          selectedProductRecommendationOption?.id ?? selectedProductStackPreference
+        }
       />
 
       <RevealClosingSection
@@ -2088,6 +2210,160 @@ function RevealProductsSection({
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RevealFoodSupportSection({
+  copy,
+  locale,
+  result,
+  selectedNeedCoverage,
+  selectedProductStackPreference
+}: Readonly<{
+  copy: typeof revealCopy.en;
+  locale: Locale;
+  result: FormulationResult;
+  selectedNeedCoverage: readonly ProductNeedCoverage[];
+  selectedProductStackPreference?: ProductStackPreference | null;
+}>) {
+  const { fallbackItems, variant } = selectedFoodSupport(
+    result,
+    selectedProductStackPreference
+  );
+  const items = variant?.items ?? fallbackItems;
+  const headline = variant
+    ? getLocalizedText(variant.headline, locale)
+    : copy.foodSupportDefaultHeadline;
+  const body = variant
+    ? getLocalizedText(variant.body, locale)
+    : copy.foodSupportDefaultBody;
+  const needLabelById = new Map(
+    selectedNeedCoverage.map((need) => [need.id, need.displayName])
+  );
+
+  if (items.length < 1) {
+    return (
+      <section className="border-t border-[var(--mn-line)] bg-[var(--mn-cream)] py-16">
+        <div className="mx-auto w-full max-w-6xl px-6 text-center sm:px-8" data-reveal>
+          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
+            05 · {copy.foodSupportEyebrow}
+          </p>
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]">
+            {copy.foodSupportEmpty}
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="border-t border-[var(--mn-line)] bg-[var(--mn-cream)] py-20">
+      <div className="mx-auto w-full max-w-6xl px-6 sm:px-8">
+        <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
+          <div data-reveal>
+            <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
+              05 · {copy.foodSupportEyebrow}
+            </p>
+            <h2
+              className={`mt-4 font-serif text-4xl font-medium text-[var(--mn-ink)] sm:text-5xl ${
+                locale === "th"
+                  ? "leading-[1.38] break-words [overflow-wrap:anywhere]"
+                  : "leading-tight text-balance"
+              }`}
+            >
+              {headline || copy.foodSupportTitle}
+            </h2>
+          </div>
+          <p className="text-base leading-8 text-[var(--mn-ink-soft)]" data-reveal>
+            {body}
+          </p>
+        </div>
+
+        <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {items.map((item) => {
+            const name = getLocalizedText(item.food, locale);
+            const gapLabels = item.gapNeedIds
+              .map((needId) => needLabelById.get(needId))
+              .filter((label): label is string => Boolean(label))
+              .slice(0, 3);
+
+            return (
+              <article
+                className="overflow-hidden rounded-[1.25rem] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]"
+                data-reveal
+                key={`${selectedProductStackPreference ?? "food"}:${item.foodId}:${item.position}`}
+              >
+                <div className="relative h-52 overflow-hidden bg-[var(--mn-mint)]">
+                  {item.imagePath ? (
+                    <Image
+                      alt={getLocalizedText(item.imageAlt, locale)}
+                      className="object-cover"
+                      fill={true}
+                      loading="lazy"
+                      src={item.imagePath}
+                    />
+                  ) : (
+                    <div className="grid h-full place-items-center bg-[var(--mn-mint)] font-serif text-5xl italic text-[var(--mn-teal-deep)]">
+                      {name.slice(0, 1)}
+                    </div>
+                  )}
+                  <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]">
+                    {String(item.position).padStart(2, "0")}
+                  </span>
+                </div>
+                <div className="p-5">
+                  <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)]">
+                    {getLocalizedText(item.category, locale)}
+                  </p>
+                  <h3
+                    className={`mt-2 font-serif text-2xl font-medium text-[var(--mn-ink)] ${
+                      locale === "th" ? "leading-9" : "leading-tight"
+                    }`}
+                  >
+                    {name}
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                    {getLocalizedText(item.rationale, locale)}
+                  </p>
+
+                  {gapLabels.length > 0 ? (
+                    <div className="mt-4 flex flex-wrap gap-1.5">
+                      {gapLabels.map((label) => (
+                        <span
+                          className="rounded-full bg-[var(--mn-gold-tint)] px-2.5 py-1 text-xs font-semibold text-[#6d5427]"
+                          key={label}
+                        >
+                          {copy.foodSupportGapLabel}: {label}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="mt-5 grid gap-3 rounded-lg bg-[var(--mn-cream)] p-4 text-sm ring-1 ring-[var(--mn-line)] sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--mn-ash)]">
+                        {copy.foodSupportServing}
+                      </p>
+                      <p className="mt-1 font-semibold text-[var(--mn-ink)]">
+                        {getLocalizedText(item.serving, locale)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--mn-ash)]">
+                        {copy.foodSupportFrequency}
+                      </p>
+                      <p className="mt-1 font-semibold text-[var(--mn-ink)]">
+                        {getLocalizedText(item.frequency, locale)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>

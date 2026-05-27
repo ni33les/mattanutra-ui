@@ -202,6 +202,10 @@ function validateNoForbiddenCopy(value: unknown, errors: string[]) {
     if (/<\/?[a-z][\s\S]*>/i.test(item)) {
       errors.push("copy must not include HTML tags");
     }
+
+    if (/\b1\s+things\b/i.test(item)) {
+      errors.push("copy must use singular grammar for 1 thing");
+    }
   });
 }
 

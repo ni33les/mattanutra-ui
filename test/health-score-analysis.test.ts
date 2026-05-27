@@ -159,6 +159,23 @@ describe("HealthScore AI copy validator", () => {
     );
   });
 
+  it("rejects singular/plural anomalies in localized copy", () => {
+    const response = mutableResponse();
+
+    response.pageCopy.findingsHeadline = {
+      en: "1 things a generic vitamin quiz would have missed.",
+      th: "1 เรื่องที่แบบทดสอบวิตามินทั่วไปมักมองข้าม"
+    };
+
+    const validation = validate(response);
+
+    assert.ok(
+      validation.errors.some((error) =>
+        error.includes("singular grammar for 1 thing")
+      )
+    );
+  });
+
   it("rejects wrong card counts", () => {
     const response = mutableResponse();
 

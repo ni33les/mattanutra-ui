@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { managedFoodSeeds } from "../lib/managed-foods.ts";
 
 const schema = readFileSync(new URL("../db-schema.sql", import.meta.url), "utf8");
 const taskResultApplier = readFileSync(
   new URL("../lib/task-result-applier.ts", import.meta.url),
+  "utf8"
+);
+const foodSchemaApplyScript = readFileSync(
+  new URL("../scripts/apply-food-schema.ts", import.meta.url),
   "utf8"
 );
 
@@ -29,6 +34,30 @@ describe("task-only schema", () => {
     assert.match(schema, /\bnutrient_tags\s+text\[\]\s+not\s+null\s+default\s+'\{\}'::text\[\]/i);
     assert.match(schema, /\bfoods_benefit_tags_gin_idx\b/i);
     assert.match(schema, /\bfoods_nutrient_tags_gin_idx\b/i);
+  });
+
+  it("stores managed food media and translations", () => {
+    assert.match(schema, /\bimage_path\s+text\b/i);
+    assert.match(schema, /\bimage_source\s+text\b/i);
+    assert.match(schema, /\bimage_updated_at\s+timestamp with time zone\b/i);
+    assert.match(schema, /\bcreate\s+table\s+public\.food_translations\b/i);
+    assert.match(schema, /\bprimary\s+key\s+\(food_id,\s*locale\)/i);
+    assert.match(schema, /\bfood_translations_locale_idx\b/i);
+    assert.match(foodSchemaApplyScript, /managedFoodSeeds/);
+    assert.match(foodSchemaApplyScript, /food_translations/);
+    assert.match(foodSchemaApplyScript, /join\(process\.cwd\(\), "public", food\.imagePath/);
+  });
+
+  it("ships a local image path for every managed food seed", () => {
+    const files = new Set(readdirSync(new URL("../public/foods/", import.meta.url)));
+
+    for (const seed of managedFoodSeeds) {
+      assert.equal(
+        files.has(seed.imagePath.replace("/foods/", "")),
+        true,
+        `${seed.normalizedName} should have a local food image`
+      );
+    }
   });
 
   it("stores food nutrient facts separately from display tags", () => {

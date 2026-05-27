@@ -87,6 +87,26 @@ describe("HealthScore v4 deterministic scoring", () => {
     assert.ok(findings.some((finding) => finding.code === "VITD_ROUTINE"));
   });
 
+  it("uses singular grammar when only one finding is caught", () => {
+    const result = computeHealthScore(
+      {
+        age: "36-45",
+        country: "Thailand",
+        goals: ["energy"],
+        sex: "male",
+        sun: "15-30",
+        sunscreen: "daily"
+      },
+      "en"
+    );
+
+    assert.equal(result.pageContent?.copySeeds.findings.length, 1);
+    assert.equal(
+      result.pageContent?.copySeeds.findingsHeadline,
+      "1 thing a generic vitamin quiz would have missed."
+    );
+  });
+
   it("uses gap-framed relativity below median", () => {
     const result = computeHealthScore(profileOne(), "en");
     const relativity = result.pageContent?.copySeeds.relativity;

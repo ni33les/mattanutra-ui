@@ -21,6 +21,16 @@ export type FoodListStatus =
   | "whitelisted";
 
 export type FoodConfidence = "high" | "low" | "moderate";
+export type AdminFoodTranslationStatus = "complete" | "draft" | "missing";
+
+export type AdminFoodTranslation = Readonly<{
+  category: string | null;
+  imageAlt: string | null;
+  name: string | null;
+  primaryUseCase: string | null;
+  status: AdminFoodTranslationStatus;
+  updatedAt?: string | null;
+}>;
 
 export type AdminFoodRow = Readonly<{
   aliases: string[];
@@ -31,12 +41,15 @@ export type AdminFoodRow = Readonly<{
   confidence: FoodConfidence;
   defaultServing: FoodServingSize | null;
   id: string;
+  imagePath: string | null;
+  imageSource: string | null;
   listStatus: FoodListStatus;
   name: string;
   nutrientProfile: FoodNutrientProfileValue[];
   nutrientTags: FoodNutrientTag[];
   primaryUseCase: string | null;
   safetyNotes: string | null;
+  translations: Record<string, AdminFoodTranslation>;
   updatedAt: string;
 }>;
 
@@ -64,12 +77,15 @@ type FoodDbRow = Readonly<{
   nutrient_profile: unknown;
   default_serving: unknown;
   id: string;
+  image_path: string | null;
+  image_source: string | null;
   is_active: boolean;
   list_status: FoodListStatus;
   name: string;
   nutrient_tags: string[] | null;
   primary_use_case: string | null;
   safety_notes: string | null;
+  translations: unknown;
   updated_at: Date | string;
 }>;
 
@@ -79,10 +95,13 @@ export type UpdateAdminFoodInput = Readonly<{
   confidence: FoodConfidence;
   defaultServing?: FoodServingSize | null;
   id: string;
+  imagePath?: string | null;
+  imageSource?: string | null;
   listStatus: FoodListStatus;
   nutrientProfile?: FoodNutrientProfileValue[];
   nutrientTags?: FoodNutrientTag[];
   safetyNotes: string | null;
+  translations?: Record<string, AdminFoodTranslation>;
 }>;
 
 const listStatuses = new Set<FoodListStatus>([
@@ -93,6 +112,11 @@ const listStatuses = new Set<FoodListStatus>([
 ]);
 
 const confidences = new Set<FoodConfidence>(["high", "low", "moderate"]);
+const translationStatuses = new Set<AdminFoodTranslationStatus>([
+  "complete",
+  "draft",
+  "missing"
+]);
 
 export function isFoodListStatus(value: string): value is FoodListStatus {
   return listStatuses.has(value as FoodListStatus);
@@ -120,6 +144,7 @@ export function emptyAdminFoodsData(): AdminFoodsData {
 
 function rowFromDb(row: FoodDbRow): AdminFoodRow {
   const defaultServing = normalizeFoodServingSize(row.default_serving);
+  const translations = adminFoodTranslationsFromRow(row);
 
   return {
     aliases: row.aliases ?? [],
@@ -130,14 +155,72 @@ function rowFromDb(row: FoodDbRow): AdminFoodRow {
     confidence: row.confidence ?? "moderate",
     defaultServing,
     id: row.id,
+    imagePath: row.image_path,
+    imageSource: row.image_source,
     listStatus: row.is_active ? row.list_status : "inactive",
     name: row.name,
     nutrientProfile: completeFoodNutrientProfile(row.nutrient_profile),
     nutrientTags: normalizeFoodNutrientTags(row.nutrient_tags),
     primaryUseCase: row.primary_use_case,
     safetyNotes: row.safety_notes,
+    translations,
     updatedAt: new Date(row.updated_at).toISOString()
   };
+}
+
+function recordFromUnknown(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function nullableText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function translationStatus(value: unknown): AdminFoodTranslationStatus {
+  return typeof value === "string" &&
+    translationStatuses.has(value as AdminFoodTranslationStatus)
+    ? (value as AdminFoodTranslationStatus)
+    : "missing";
+}
+
+function normalizeFoodTranslations(
+  value: unknown
+): Record<string, AdminFoodTranslation> {
+  const translations: Record<string, AdminFoodTranslation> = {};
+
+  for (const [locale, rawTranslation] of Object.entries(recordFromUnknown(value))) {
+    const record = recordFromUnknown(rawTranslation);
+
+    translations[locale] = {
+      category: nullableText(record.category),
+      imageAlt: nullableText(record.imageAlt),
+      name: nullableText(record.name),
+      primaryUseCase: nullableText(record.primaryUseCase),
+      status: translationStatus(record.status),
+      updatedAt: nullableText(record.updatedAt)
+    };
+  }
+
+  return translations;
+}
+
+function adminFoodTranslationsFromRow(row: FoodDbRow) {
+  const translations = normalizeFoodTranslations(row.translations);
+
+  if (!translations.en) {
+    translations.en = {
+      category: row.category,
+      imageAlt: row.name,
+      name: row.name,
+      primaryUseCase: row.primary_use_case,
+      status: "complete",
+      updatedAt: new Date(row.updated_at).toISOString()
+    };
+  }
+
+  return translations;
 }
 
 function buildSummary(rows: AdminFoodRow[]) {
@@ -184,6 +267,8 @@ export async function getAdminFoodsData(): Promise<AdminFoodsData> {
         foods.benefit_tags,
         foods.nutrient_tags,
         foods.list_status,
+        foods.image_path,
+        foods.image_source,
         foods.is_active,
         foods.updated_at,
         rules.allergen_flags,
@@ -192,6 +277,7 @@ export async function getAdminFoodsData(): Promise<AdminFoodsData> {
         rules.safety_notes,
         coalesce(alias_rows.aliases, '{}'::text[]) as aliases,
         default_serving.default_serving,
+        coalesce(translation_rows.translations, '{}'::jsonb) as translations,
         coalesce(nutrient_rows.nutrient_profile, '[]'::jsonb) as nutrient_profile
       from public.foods foods
       left join lateral (
@@ -222,6 +308,22 @@ export async function getAdminFoodsData(): Promise<AdminFoodsData> {
         order by food_serving_sizes.updated_at desc
         limit 1
       ) default_serving on true
+      left join lateral (
+        select jsonb_object_agg(
+          food_translations.locale,
+          jsonb_build_object(
+            'category', food_translations.category,
+            'imageAlt', food_translations.image_alt,
+            'name', food_translations.name,
+            'primaryUseCase', food_translations.primary_use_case,
+            'status', food_translations.status,
+            'updatedAt', food_translations.updated_at
+          )
+          order by food_translations.locale
+        ) as translations
+        from public.food_translations
+        where food_translations.food_id = foods.id
+      ) translation_rows on true
       left join lateral (
         select coalesce(
           jsonb_agg(
@@ -278,6 +380,14 @@ export async function updateAdminFood(input: UpdateAdminFoodInput) {
     input.nutrientProfile
   );
   const nutrientTags = normalizeFoodNutrientTags(input.nutrientTags);
+  const imagePath =
+    input.imagePath === undefined ? undefined : nullableText(input.imagePath);
+  const imageSource =
+    input.imageSource === undefined
+      ? undefined
+      : nullableText(input.imageSource) ?? "admin";
+  const imagePathValue = imagePath ?? null;
+  const imageSourceValue = imageSource ?? null;
   const rows = await sql<FoodDbRow[]>`
     with updated_food as (
       update public.foods set
@@ -286,6 +396,19 @@ export async function updateAdminFood(input: UpdateAdminFoodInput) {
           else ${benefitTags}::text[]
         end,
         list_status = ${input.listStatus},
+        image_path = case
+          when ${input.imagePath === undefined} then image_path
+          else ${imagePathValue}
+        end,
+        image_source = case
+          when ${input.imageSource === undefined} then image_source
+          else ${imageSourceValue}
+        end,
+        image_updated_at = case
+          when ${input.imagePath === undefined && input.imageSource === undefined}
+            then image_updated_at
+          else now()
+        end,
         nutrient_tags = case
           when ${input.nutrientTags === undefined} then nutrient_tags
           else ${nutrientTags}::text[]
@@ -341,6 +464,8 @@ export async function updateAdminFood(input: UpdateAdminFoodInput) {
       updated_food.benefit_tags,
       updated_food.nutrient_tags,
       updated_food.list_status,
+      updated_food.image_path,
+      updated_food.image_source,
       updated_food.is_active,
       updated_food.updated_at,
       inserted_rule.allergen_flags,
@@ -351,7 +476,24 @@ export async function updateAdminFood(input: UpdateAdminFoodInput) {
         select coalesce(array_remove(array_agg(alias), null), '{}'::text[])
         from public.food_aliases
         where food_id = updated_food.id
-      ) as aliases
+      ) as aliases,
+      (
+        select coalesce(jsonb_object_agg(
+          food_translations.locale,
+          jsonb_build_object(
+            'category', food_translations.category,
+            'imageAlt', food_translations.image_alt,
+            'name', food_translations.name,
+            'primaryUseCase', food_translations.primary_use_case,
+            'status', food_translations.status,
+            'updatedAt', food_translations.updated_at
+          )
+        ), '{}'::jsonb)
+        from public.food_translations
+        where food_translations.food_id = updated_food.id
+      ) as translations,
+      null::jsonb as default_serving,
+      '[]'::jsonb as nutrient_profile
     from updated_food
     join inserted_rule on inserted_rule.food_id = updated_food.id
   `;
@@ -359,6 +501,46 @@ export async function updateAdminFood(input: UpdateAdminFoodInput) {
 
   if (!row) {
     return null;
+  }
+
+  if (input.translations) {
+    for (const [locale, translation] of Object.entries(input.translations)) {
+      const normalizedLocale = locale.trim().toLowerCase();
+
+      if (!/^[a-z]{2}(?:-[a-z0-9]{2,8})?$/.test(normalizedLocale)) {
+        continue;
+      }
+
+      await sql`
+        insert into public.food_translations (
+          food_id,
+          locale,
+          name,
+          category,
+          primary_use_case,
+          image_alt,
+          status,
+          updated_at
+        )
+        values (
+          ${input.id}::uuid,
+          ${normalizedLocale},
+          ${nullableText(translation.name) ?? row.name},
+          ${nullableText(translation.category)},
+          ${nullableText(translation.primaryUseCase)},
+          ${nullableText(translation.imageAlt)},
+          ${translationStatus(translation.status)},
+          now()
+        )
+        on conflict (food_id, locale) do update set
+          name = excluded.name,
+          category = excluded.category,
+          primary_use_case = excluded.primary_use_case,
+          image_alt = excluded.image_alt,
+          status = excluded.status,
+          updated_at = now()
+      `;
+    }
   }
 
   if (input.defaultServing !== undefined) {

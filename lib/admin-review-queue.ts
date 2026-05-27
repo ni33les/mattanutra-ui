@@ -21,7 +21,10 @@ import {
 import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
 import { safetyReviewItemColumnsAvailable } from "@/lib/safety-review-schema";
 import { notifyTaskQueueChanged } from "@/lib/task-wakeup";
-import { enqueueProductRecommendationsTask } from "@/lib/task-worker";
+import {
+  enqueueFoodGapSupportTask,
+  enqueueProductRecommendationsTask
+} from "@/lib/task-worker";
 import {
   applyReviewDecisionToFoodGuidance,
   applyReviewDecisionToFormulation,
@@ -166,10 +169,19 @@ async function queueProductMatchAfterPlanReview(input: Readonly<{
   }
 
   try {
-    await enqueueProductRecommendationsTask({
+    const productRecommendationTaskId = await enqueueProductRecommendationsTask({
       parentTaskId: input.parentTaskId,
       planId: input.planId
     });
+
+    if (productRecommendationTaskId) {
+      await enqueueFoodGapSupportTask({
+        dependsOnTaskId: productRecommendationTaskId,
+        parentTaskId: productRecommendationTaskId,
+        planId: input.planId,
+        source: "plan_review_product_matching"
+      });
+    }
   } catch (error) {
     console.error("Unable to queue product recommendations after review", error);
   }

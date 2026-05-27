@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import type {
   AdminFoodRow,
@@ -129,10 +130,13 @@ export function AdminFoodsView({
           benefitTags: row.benefitTags,
           confidence: row.confidence,
           defaultServing: row.defaultServing,
+          imagePath: row.imagePath,
+          imageSource: row.imageSource,
           listStatus: row.listStatus,
           nutrientProfile: row.nutrientProfile,
           nutrientTags: row.nutrientTags,
-          safetyNotes: row.safetyNotes
+          safetyNotes: row.safetyNotes,
+          translations: row.translations
         }),
         headers: {
           "Content-Type": "application/json"
@@ -213,6 +217,21 @@ export function AdminFoodsView({
               type="button"
             >
               <div className="flex items-start justify-between gap-4">
+                <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-gray-50 ring-1 ring-gray-100">
+                  {row.imagePath ? (
+                    <Image
+                      alt={row.translations.en?.imageAlt ?? row.name}
+                      className="object-cover"
+                      fill
+                      sizes="80px"
+                      src={row.imagePath}
+                    />
+                  ) : (
+                    <div className="grid size-full place-items-center text-xs font-semibold text-gray-400">
+                      {labels.image}
+                    </div>
+                  )}
+                </div>
                 <div className="min-w-0">
                   <h3 className="truncate text-base font-semibold text-gray-900">
                     {row.name}
@@ -339,6 +358,29 @@ function FoodDetailsModal({
 }>) {
   const inputClass =
     "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]";
+  const updateTranslation = (
+    localeCode: "en" | "th",
+    patch: Partial<AdminFoodRow["translations"][string]>
+  ) => {
+    const current = draft.translations[localeCode] ?? {
+      category: null,
+      imageAlt: null,
+      name: null,
+      primaryUseCase: null,
+      status: "missing" as const
+    };
+
+    onChange({
+      translations: {
+        ...draft.translations,
+        [localeCode]: {
+          ...current,
+          ...patch,
+          status: patch.status ?? "complete"
+        }
+      }
+    });
+  };
 
   return (
     <AdminModal onClose={onClose} panelClassName="max-w-2xl">
@@ -360,6 +402,124 @@ function FoodDetailsModal({
           </div>
 
           <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">
+            <div className="grid gap-4 rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100 sm:grid-cols-[9rem_1fr]">
+              <div className="relative aspect-square overflow-hidden rounded-xl bg-white ring-1 ring-gray-200">
+                {draft.imagePath ? (
+                  <Image
+                    alt={draft.translations.en?.imageAlt ?? draft.name}
+                    className="object-cover"
+                    fill
+                    sizes="144px"
+                    src={draft.imagePath}
+                  />
+                ) : (
+                  <div className="grid size-full place-items-center text-sm font-semibold text-gray-400">
+                    {labels.image}
+                  </div>
+                )}
+              </div>
+              <div className="grid gap-4">
+                <label className="grid gap-2 text-sm font-medium text-gray-700">
+                  {labels.imagePath}
+                  <input
+                    className={inputClass}
+                    onChange={(event) =>
+                      onChange({ imagePath: event.target.value })
+                    }
+                    value={draft.imagePath ?? ""}
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-gray-700">
+                  {labels.imageSource}
+                  <input
+                    className={inputClass}
+                    onChange={(event) =>
+                      onChange({ imageSource: event.target.value })
+                    }
+                    value={draft.imageSource ?? ""}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <fieldset className="rounded-xl bg-white p-4 ring-1 ring-gray-200">
+              <legend className="px-1 text-sm font-semibold text-gray-700">
+                {labels.translations}
+              </legend>
+              <div className="mt-3 grid gap-5">
+                {(["en", "th"] as const).map((localeCode) => {
+                  const translation = draft.translations[localeCode] ?? {
+                    category: "",
+                    imageAlt: "",
+                    name: "",
+                    primaryUseCase: "",
+                    status: "missing"
+                  };
+
+                  return (
+                    <div
+                      className="grid gap-3 rounded-xl bg-gray-50 p-3 ring-1 ring-gray-100"
+                      key={localeCode}
+                    >
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-500">
+                        {localeCode}
+                      </p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="grid gap-1 text-xs font-semibold text-gray-600">
+                          {labels.details}
+                          <input
+                            className={inputClass}
+                            onChange={(event) =>
+                              updateTranslation(localeCode, {
+                                name: event.target.value
+                              })
+                            }
+                            value={translation.name ?? ""}
+                          />
+                        </label>
+                        <label className="grid gap-1 text-xs font-semibold text-gray-600">
+                          {labels.category}
+                          <input
+                            className={inputClass}
+                            onChange={(event) =>
+                              updateTranslation(localeCode, {
+                                category: event.target.value
+                              })
+                            }
+                            value={translation.category ?? ""}
+                          />
+                        </label>
+                      </div>
+                      <label className="grid gap-1 text-xs font-semibold text-gray-600">
+                        {labels.primaryUseCase}
+                        <input
+                          className={inputClass}
+                          onChange={(event) =>
+                            updateTranslation(localeCode, {
+                              primaryUseCase: event.target.value
+                            })
+                          }
+                          value={translation.primaryUseCase ?? ""}
+                        />
+                      </label>
+                      <label className="grid gap-1 text-xs font-semibold text-gray-600">
+                        {labels.imageAlt}
+                        <input
+                          className={inputClass}
+                          onChange={(event) =>
+                            updateTranslation(localeCode, {
+                              imageAlt: event.target.value
+                            })
+                          }
+                          value={translation.imageAlt ?? ""}
+                        />
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </fieldset>
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <SupplementListMeta
                 label={labels.category}

@@ -1719,6 +1719,16 @@ function subtractionCopy(
   };
 }
 
+function findingsHeadline(count: number, locale: Locale) {
+  if (locale === "th") {
+    return `${count} เรื่องที่แบบทดสอบวิตามินทั่วไปมักมองข้าม`;
+  }
+
+  return count === 1
+    ? "1 thing a generic vitamin quiz would have missed."
+    : `${count} things a generic vitamin quiz would have missed.`;
+}
+
 function buildPageContent({
   answers,
   chosenNutrients = 8,
@@ -1759,9 +1769,7 @@ function buildPageContent({
       bandLine: bandLine(engine.final, engine.band, locale),
       findings: selectedFindings,
       findingsHeadline: findings.length > 0
-        ? locale === "th"
-          ? `${selectedFindings.length} เรื่องที่แบบทดสอบวิตามินทั่วไปมักมองข้าม`
-          : `${selectedFindings.length} things a generic vitamin quiz would have missed.`
+        ? findingsHeadline(selectedFindings.length, locale)
         : locale === "th"
           ? "สิ่งที่คุณทำได้ดีอยู่แล้วก็เป็นส่วนหนึ่งของแผน"
           : "What you are already doing well matters too.",
