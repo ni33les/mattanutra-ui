@@ -11,7 +11,7 @@ import type {
   ProductStackPreference
 } from "@/lib/formulation-types";
 import { foodGapSupportVersion } from "@/lib/managed-foods";
-import { defaultLocale, type Locale } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 
 type AnalysisAuditEvent = {
   eventType: string;
@@ -69,24 +69,8 @@ type AnalysisResult = Readonly<{
   usage?: unknown;
 }>;
 
-type XaiChatCompletion = {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
-  }>;
-  id?: string;
-  model?: string;
-  usage?: unknown;
-};
-
-const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
-const DEFAULT_GROK_MODEL = "grok-4.3";
-const DEFAULT_REASONING_EFFORT = "low";
 const DEFAULT_PROMPT_VERSION = "food-gap:v1";
 const FOOD_GAP_COVERAGE_THRESHOLD = 90;
-const MAX_ATTEMPTS = 2;
-const REQUEST_TIMEOUT_MS = 240_000;
 const STACK_PREFERENCES = ["balanced", "compact"] as const;
 const ALLOWED_TOP_LEVEL_KEYS = new Set(["variants"]);
 const ALLOWED_VARIANT_KEYS = new Set(["body", "headline", "items"]);
@@ -101,6 +85,14 @@ const ALLOWED_ITEM_KEYS = new Set([
 const bannedCopyPattern =
   /\b(?:cure|diagnose|heal|prevent|prescribe|reverse|treat|treatment)\b/i;
 const markdownOrHtmlPattern = /(?:<[^>]+>|\*\*|__|```|^#{1,6}\s)/m;
+const placeholderCopyValues = new Set([
+  "english body",
+  "english headline",
+  "one plain wellness sentence no medical claims",
+  "thai body",
+  "thai headline",
+  "หนึ่งประโยคภาษาไทยเพื่อสุขภาวะ ไม่ใช่คำกล่าวอ้างทางการแพทย์"
+]);
 
 const servingByFood: Record<string, Record<"en" | "th", string>> = {
   brown_rice: { en: "1 small bowl", th: "1 ถ้วยเล็ก" },
@@ -162,8 +154,13 @@ const foodNeedRules = [
   },
   {
     foods: ["salmon", "sardines"],
-    patterns: ["vitamin d"],
+    patterns: ["vitamin d", "vitamin d3", "d3", "cholecalciferol"],
     tags: ["vitamin_d"]
+  },
+  {
+    foods: ["salmon", "sardines", "unsweetened_yogurt"],
+    patterns: ["vitamin b12", "b12", "cobalamin"],
+    tags: ["vitamin_b12", "b12"]
   },
   {
     foods: ["oats", "lentils", "chickpeas", "mung_beans", "chia_seeds", "flaxseed"],
@@ -176,8 +173,13 @@ const foodNeedRules = [
     tags: ["probiotic", "gut_health"]
   },
   {
+    foods: ["turmeric"],
+    patterns: ["curcumin", "turmeric"],
+    tags: ["curcumin"]
+  },
+  {
     foods: ["green_tea", "holy_basil", "moringa_leaves", "turmeric", "papaya"],
-    patterns: ["polyphenol", "antioxidant", "inflamm", "curcumin"],
+    patterns: ["polyphenol", "antioxidant", "inflamm"],
     tags: ["polyphenols", "anti_inflammatory", "antioxidant"]
   },
   {
@@ -187,32 +189,15 @@ const foodNeedRules = [
   }
 ] as const;
 
-function configured(value: string | undefined) {
-  return value?.trim() ?? "";
-}
+const animalManagedFoods = new Set(["salmon", "sardines", "unsweetened_yogurt"]);
 
-function getGrokConfig() {
-  const apiKey = configured(process.env.XAI_API_KEY);
-
-  if (!apiKey) {
-    return null;
-  }
-
-  return {
-    apiKey,
-    model:
-      configured(process.env.FOOD_GAP_SUPPORT_MODEL) ||
-      configured(process.env.GROK_MODEL) ||
-      DEFAULT_GROK_MODEL,
-    promptVersion:
-      configured(process.env.FOOD_GAP_SUPPORT_PROMPT_VERSION) ||
-      DEFAULT_PROMPT_VERSION,
-    reasoningEffort:
-      configured(process.env.FOOD_GAP_SUPPORT_REASONING_EFFORT) ||
-      configured(process.env.FOOD_GUIDANCE_REASONING_EFFORT) ||
-      DEFAULT_REASONING_EFFORT
-  };
-}
+const managedFoodAllergenMap: Record<string, readonly string[]> = {
+  dairy: ["unsweetened_yogurt"],
+  fish: ["salmon", "sardines"],
+  milk: ["unsweetened_yogurt"],
+  sesame: ["sesame_seeds"],
+  soy: ["tofu"]
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -231,6 +216,78 @@ function textSearch(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9ก-๙]+/g, " ")
     .trim();
+}
+
+function textSearchTokens(value: string) {
+  return textSearch(value).split(/\s+/).filter(Boolean);
+}
+
+function textSearchMatchesPattern(value: string, pattern: string) {
+  const valueTokens = textSearchTokens(value);
+  const patternTokens = textSearchTokens(pattern);
+
+  if (patternTokens.length < 1 || valueTokens.length < 1) {
+    return false;
+  }
+
+  if (patternTokens.length === 1) {
+    const [patternToken] = patternTokens;
+
+    if (!patternToken) {
+      return false;
+    }
+
+    return valueTokens.some((token) =>
+      patternToken.length <= 3
+        ? token === patternToken
+        : token === patternToken || token.startsWith(patternToken)
+    );
+  }
+
+  return valueTokens.some((_, startIndex) =>
+    patternTokens.every((patternToken, offset) => {
+      const token = valueTokens[startIndex + offset];
+
+      return Boolean(
+        token &&
+          (token === patternToken ||
+            (patternToken.length > 1 && token.startsWith(patternToken)))
+      );
+    })
+  );
+}
+
+function recordValue(value: unknown, key: string) {
+  return isRecord(value) ? value[key] : undefined;
+}
+
+function answerText(value: unknown) {
+  if (typeof value === "string") {
+    return textSearch(value);
+  }
+
+  if (isRecord(value)) {
+    const candidate =
+      value.value ??
+      value.answer ??
+      value.label ??
+      value.en ??
+      value.th;
+
+    return answerText(candidate);
+  }
+
+  return "";
+}
+
+function answerTextValues(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => answerTextValues(item));
+  }
+
+  const text = answerText(value);
+
+  return text ? [text] : [];
 }
 
 function localizedCopy(
@@ -261,6 +318,10 @@ function localizedNeedNames(needs: readonly ProductNeedCoverage[], locale: "en" 
   return names.length === 1 ? names[0] : `${names[0]} and ${names[1]}`;
 }
 
+function englishFoodSupportVerb(foodName: string) {
+  return foodName.endsWith("s") ? "give" : "gives";
+}
+
 export function foodGapNeedsForVariant(
   variant: FoodGapProductVariant,
   threshold = FOOD_GAP_COVERAGE_THRESHOLD
@@ -272,6 +333,67 @@ export function foodGapNeedsForVariant(
       need.coveragePercent < threshold
     )
     .sort((first, second) => first.coveragePercent - second.coveragePercent);
+}
+
+export function managedFoodSupportsNeed(
+  food: ManagedFoodCatalogItem,
+  need: ProductNeedCoverage
+) {
+  const needText = `${need.id} ${need.displayName}`;
+
+  return foodNeedRules.some((rule) => {
+    const ruleMatchesNeed =
+      rule.patterns.some((pattern) => textSearchMatchesPattern(needText, pattern)) ||
+      rule.tags.some((tag) =>
+        textSearchMatchesPattern(needText, tag.replace(/_/g, " "))
+      );
+
+    return ruleMatchesNeed && rule.foods.includes(food.normalizedName as never);
+  });
+}
+
+function foodExcludedByAssessment(
+  food: ManagedFoodCatalogItem,
+  answers: unknown
+) {
+  const diet = answerText(recordValue(answers, "diet"));
+
+  if (
+    (diet.includes("plant") || diet.includes("vegan")) &&
+    animalManagedFoods.has(food.normalizedName)
+  ) {
+    return true;
+  }
+
+  const allergyValues = new Set([
+    ...answerTextValues(recordValue(answers, "allergies")),
+    ...answerTextValues(recordValue(answers, "allergy"))
+  ].filter((value) => value && value !== "none"));
+
+  for (const allergy of allergyValues) {
+    const excludedFoods = managedFoodAllergenMap[allergy] ?? [];
+
+    if (excludedFoods.includes(food.normalizedName)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function eligibleManagedFoods(input: AnalysisInput) {
+  return input.managedFoods.filter((food) =>
+    !foodExcludedByAssessment(food, input.answers)
+  );
+}
+
+function supportableFoodGapNeedsForVariant(
+  variant: FoodGapProductVariant,
+  managedFoods: readonly ManagedFoodCatalogItem[]
+) {
+  return foodGapNeedsForVariant(variant).filter((need) =>
+    managedFoods.some((food) => managedFoodSupportsNeed(food, need))
+  );
 }
 
 function scoreFoodForNeeds(
@@ -291,12 +413,18 @@ function scoreFoodForNeeds(
   let score = 0;
 
   for (const need of needs) {
-    const needText = textSearch(`${need.id} ${need.displayName}`);
+    if (!managedFoodSupportsNeed(food, need)) {
+      continue;
+    }
+
+    const needText = `${need.id} ${need.displayName}`;
 
     for (const rule of foodNeedRules) {
       const ruleMatchesNeed =
-        rule.patterns.some((pattern) => needText.includes(pattern)) ||
-        rule.tags.some((tag) => needText.includes(tag.replace(/_/g, " ")));
+        rule.patterns.some((pattern) => textSearchMatchesPattern(needText, pattern)) ||
+        rule.tags.some((tag) =>
+          textSearchMatchesPattern(needText, tag.replace(/_/g, " "))
+        );
 
       if (!ruleMatchesNeed) {
         continue;
@@ -310,12 +438,12 @@ function scoreFoodForNeeds(
         score += 6;
       }
 
-      if (rule.patterns.some((pattern) => foodText.includes(pattern))) {
+      if (rule.patterns.some((pattern) => textSearchMatchesPattern(foodText, pattern))) {
         score += 3;
       }
     }
 
-    if (foodText.includes(needText)) {
+    if (textSearchMatchesPattern(foodText, need.displayName)) {
       score += 2;
     }
   }
@@ -345,14 +473,20 @@ function fallbackFoodSelection(
   input: AnalysisInput,
   variant: FoodGapProductVariant
 ) {
-  const gaps = foodGapNeedsForVariant(variant);
+  const gaps = supportableFoodGapNeedsForVariant(variant, input.managedFoods);
+
+  if (gaps.length < 1) {
+    return [];
+  }
+
   const scored = input.managedFoods
     .map((food, index) => ({
       food,
       index,
       previousRank: previousFoodRank(food, input.previousFoodGuidance),
-      score: gaps.length > 0 ? scoreFoodForNeeds(food, gaps) : 0
+      score: scoreFoodForNeeds(food, gaps)
     }))
+    .filter((item) => item.score > 0)
     .sort((first, second) => {
       if (second.score !== first.score) {
         return second.score - first.score;
@@ -366,19 +500,11 @@ function fallbackFoodSelection(
     });
 
   return scored
-    .filter((item) => gaps.length < 1 || item.score > 0)
     .slice(0, 6)
     .map((item) => item.food)
-    .concat(
-      scored
-        .filter((item) => gaps.length < 1 || item.score <= 0)
-        .slice(0, 6)
-        .map((item) => item.food)
-    )
     .filter((food, index, all) =>
       index === all.findIndex((candidate) => candidate.foodId === food.foodId)
-    )
-    .slice(0, Math.min(6, Math.max(3, input.managedFoods.length)));
+    );
 }
 
 function fallbackItem(
@@ -387,11 +513,11 @@ function fallbackItem(
   gaps: readonly ProductNeedCoverage[]
 ): FoodGapSupportItem {
   const relatedGaps = [...gaps]
+    .filter((gap) => managedFoodSupportsNeed(food, gap))
     .sort((first, second) =>
       scoreFoodForNeeds(food, [second]) - scoreFoodForNeeds(food, [first])
     )
     .slice(0, 2);
-  const hasGaps = relatedGaps.length > 0;
   const enName = localizedFoodName(food, "en");
   const thName = localizedFoodName(food, "th");
   const serving =
@@ -414,15 +540,10 @@ function fallbackItem(
     },
     imagePath: food.imagePath,
     position,
-    rationale: hasGaps
-      ? localizedCopy(
-          `${enName} gives food-level support around ${localizedNeedNames(relatedGaps, "en")} without changing the product coverage math.`,
-          `${thName} ช่วยเสริมจากอาหารสำหรับ ${localizedNeedNames(relatedGaps, "th")} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`
-        )
-      : localizedCopy(
-          `${enName} keeps the plan grounded in everyday food while the product stack handles the formula.`,
-          `${thName} ช่วยให้แผนยังยึดกับอาหารในชีวิตประจำวัน ขณะที่ชุดผลิตภัณฑ์ทำหน้าที่ตามสูตร`
-        ),
+    rationale: localizedCopy(
+      `${enName} ${englishFoodSupportVerb(enName)} food-level support around ${localizedNeedNames(relatedGaps, "en")} without changing the product coverage math.`,
+      `${thName} ช่วยเสริมจากอาหารสำหรับ ${localizedNeedNames(relatedGaps, "th")} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`
+    ),
     serving
   };
 }
@@ -431,29 +552,18 @@ function fallbackVariant(
   input: AnalysisInput,
   variant: FoodGapProductVariant
 ): FoodGapSupportVariant {
-  const gaps = foodGapNeedsForVariant(variant);
-  const hasGaps = gaps.length > 0;
+  const gaps = supportableFoodGapNeedsForVariant(variant, input.managedFoods);
   const selectedFoods = fallbackFoodSelection(input, variant);
 
   return {
-    body: hasGaps
-      ? localizedCopy(
-          "These foods come from the managed catalogue and are selected for the needs the current product stack does not fully cover.",
-          "อาหารเหล่านี้มาจากแคตตาล็อกที่จัดการไว้ และเลือกตามส่วนที่ชุดผลิตภัณฑ์ยังครอบคลุมได้ไม่เต็มที่"
-        )
-      : localizedCopy(
-          "Products cover the formula well, so this section shifts to food foundations that keep the plan practical.",
-          "เมื่อผลิตภัณฑ์ครอบคลุมสูตรได้ดี ส่วนนี้จึงเน้นอาหารพื้นฐานที่ช่วยให้แผนทำได้จริง"
-        ),
-    headline: hasGaps
-      ? localizedCopy(
-          "Food support for the remaining gaps.",
-          "อาหารเสริมแรงสำหรับช่องว่างที่เหลือ"
-        )
-      : localizedCopy(
-          "Food foundations for the plan.",
-          "อาหารพื้นฐานสำหรับแผนนี้"
-        ),
+    body: localizedCopy(
+      "These foods come from the managed catalogue and are selected only for supplement needs the current product stack does not fully cover.",
+      "อาหารเหล่านี้มาจากแคตตาล็อกที่จัดการไว้ และเลือกเฉพาะส่วนของสารอาหารที่ชุดผลิตภัณฑ์ยังครอบคลุมได้ไม่เต็มที่"
+    ),
+    headline: localizedCopy(
+      "Food support for the remaining gaps.",
+      "อาหารเสริมแรงสำหรับช่องว่างที่เหลือ"
+    ),
     items: selectedFoods.map((food, index) =>
       fallbackItem(food, index + 1, gaps)
     )
@@ -476,12 +586,23 @@ function variantForPreference(
 }
 
 export function buildFoodGapSupportFallback(input: AnalysisInput): FoodGapSupport {
+  const fallbackInput = {
+    ...input,
+    managedFoods: eligibleManagedFoods(input)
+  } satisfies AnalysisInput;
+
   return {
     generatedAt: new Date().toISOString(),
     version: foodGapSupportVersion,
     variants: {
-      balanced: fallbackVariant(input, variantForPreference(input.productVariants, "balanced")),
-      compact: fallbackVariant(input, variantForPreference(input.productVariants, "compact"))
+      balanced: fallbackVariant(
+        fallbackInput,
+        variantForPreference(fallbackInput.productVariants, "balanced")
+      ),
+      compact: fallbackVariant(
+        fallbackInput,
+        variantForPreference(fallbackInput.productVariants, "compact")
+      )
     }
   };
 }
@@ -510,6 +631,10 @@ function readLocalizedObject(
   }
 
   for (const [locale, text] of Object.entries({ en, th })) {
+    if (placeholderCopyValues.has(textSearch(text))) {
+      errors.push(`${path}.${locale} must not copy the schema placeholder text`);
+    }
+
     if (markdownOrHtmlPattern.test(text)) {
       errors.push(`${path}.${locale} must not include HTML or markdown`);
     }
@@ -527,6 +652,8 @@ function validateFoodGapVariant(
   preference: ProductStackPreference,
   catalogById: ReadonlyMap<string, ManagedFoodCatalogItem>,
   allowedNeedIds: ReadonlySet<string>,
+  supportableGapNeedIds: ReadonlySet<string>,
+  gapById: ReadonlyMap<string, ProductNeedCoverage>,
   errors: string[]
 ): FoodGapSupportVariant {
   const fallback = {
@@ -555,8 +682,15 @@ function validateFoodGapVariant(
 
   if (!Array.isArray(rawItems)) {
     errors.push(`variants.${preference}.items must be an array`);
-  } else if (rawItems.length < 3 || rawItems.length > 6) {
-    errors.push(`variants.${preference}.items must contain 3 to 6 foods`);
+  } else if (supportableGapNeedIds.size < 1 && rawItems.length !== 0) {
+    errors.push(
+      `variants.${preference}.items must be empty when no product gaps are food-supportable`
+    );
+  } else if (
+    supportableGapNeedIds.size > 0 &&
+    (rawItems.length < 1 || rawItems.length > 6)
+  ) {
+    errors.push(`variants.${preference}.items must contain 1 to 6 foods`);
   } else {
     const seenFoods = new Set<string>();
     const seenPositions = new Set<number>();
@@ -602,6 +736,12 @@ function validateFoodGapVariant(
         errors.push(`variants.${preference}.items[${index}].gapNeedIds must be an array`);
       }
 
+      if (supportableGapNeedIds.size > 0 && gapNeedIds.length < 1) {
+        errors.push(
+          `variants.${preference}.items[${index}].gapNeedIds must reference at least one supportable product gap`
+        );
+      }
+
       const unknownNeedIds = gapNeedIds.filter((needId) =>
         !allowedNeedIds.has(needId)
       );
@@ -609,6 +749,30 @@ function validateFoodGapVariant(
       if (unknownNeedIds.length > 0) {
         errors.push(
           `variants.${preference}.items[${index}].gapNeedIds includes unknown needs: ${unknownNeedIds.join(", ")}`
+        );
+      }
+
+      const nonGapNeedIds = gapNeedIds.filter((needId) =>
+        supportableGapNeedIds.size > 0
+          ? !supportableGapNeedIds.has(needId)
+          : allowedNeedIds.has(needId)
+      );
+
+      if (nonGapNeedIds.length > 0) {
+        errors.push(
+          `variants.${preference}.items[${index}].gapNeedIds must reference supportable supplement gaps below 90% only: ${nonGapNeedIds.join(", ")}`
+        );
+      }
+
+      const unsupportedNeedIds = gapNeedIds.filter((needId) => {
+        const need = gapById.get(needId);
+
+        return need ? !managedFoodSupportsNeed(food, need) : false;
+      });
+
+      if (unsupportedNeedIds.length > 0) {
+        errors.push(
+          `variants.${preference}.items[${index}].gapNeedIds includes needs not supported by ${food.translations.en.name}: ${unsupportedNeedIds.join(", ")}`
         );
       }
 
@@ -671,7 +835,7 @@ function validateFoodGapVariant(
   };
 }
 
-export function validateFoodGapSupportAiResponse(
+export function validateFoodGapSupportPayload(
   value: unknown,
   input: Readonly<{
     managedFoods: readonly ManagedFoodCatalogItem[];
@@ -713,12 +877,27 @@ export function validateFoodGapSupportAiResponse(
         (need) => need.id
       )
     );
+  const variantGapById = (preference: ProductStackPreference) =>
+    new Map(
+      foodGapNeedsForVariant(variantForPreference(input.productVariants, preference))
+        .map((need) => [need.id, need] as const)
+    );
+  const variantGapNeedIds = (preference: ProductStackPreference) =>
+    new Set(
+      supportableFoodGapNeedsForVariant(
+        variantForPreference(input.productVariants, preference),
+        input.managedFoods
+      )
+        .map((need) => need.id)
+    );
   const variants = {
     balanced: validateFoodGapVariant(
       value.variants.balanced,
       "balanced",
       catalogById,
       variantNeedIds("balanced"),
+      variantGapNeedIds("balanced"),
+      variantGapById("balanced"),
       errors
     ),
     compact: validateFoodGapVariant(
@@ -726,6 +905,8 @@ export function validateFoodGapSupportAiResponse(
       "compact",
       catalogById,
       variantNeedIds("compact"),
+      variantGapNeedIds("compact"),
+      variantGapById("compact"),
       errors
     )
   };
@@ -744,329 +925,38 @@ export function validateFoodGapSupportAiResponse(
   };
 }
 
-function systemPrompt(promptVersion: string) {
-  return [
-    `MattaNutra food gap support engine ${promptVersion}.`,
-    "You are selecting supportive managed foods for a paid nutrition reveal page.",
-    "The product stack coverage numbers are locked. Foods must never be described as product replacements and must not change product coverage math.",
-    "Select only foodId values from the managedFoods catalogue in the user payload. Unknown foods are invalid.",
-    "Use foods to support supplement needs with product coverage below 90%. If there are no gaps, choose practical food foundations from the same managed catalogue.",
-    "Return copy in English and Thai for every localized field.",
-    "Do not include supplements, products, marketplace links, diagnoses, treatment claims, HTML, markdown, or prose outside JSON.",
-    "The first character of your response must be { and the last character must be }.",
-    "Use double-quoted JSON only. Do not use comments, markdown fences, or trailing commas."
-  ].join("\n");
-}
-
-function userPrompt(input: AnalysisInput) {
-  const variants = STACK_PREFERENCES.map((preference) => {
-    const variant = variantForPreference(input.productVariants, preference);
-    const gaps = foodGapNeedsForVariant(variant);
-
-    return {
-      gapNeedsBelow90Percent: gaps.map((need) => ({
-        coveragePercent: need.coveragePercent,
-        displayName: need.displayName,
-        id: need.id,
-        reason: need.bestRejectedReason
-      })),
-      needCoverage: variant.needCoverage.map((need) => ({
-        coveragePercent: need.coveragePercent,
-        displayName: need.displayName,
-        id: need.id,
-        itemType: need.itemType
-      })),
-      recommendationCount: variant.recommendationCount ?? 0,
-      stackCoveragePercent: variant.stackCoveragePercent ?? 0,
-      stackPreference: preference
-    };
-  });
-
-  return JSON.stringify(
-    {
-      assessment: input.answers,
-      context: {
-        chatMessages: (input.chatMessages ?? []).map((message) => ({
-          body: message.body,
-          role: message.role
-        })),
-        planFeedback: input.planFeedback ?? [],
-        previousFoodGuidance: input.previousFoodGuidance,
-        previousSupplementGuidance: input.previousFormulation
-          ? {
-              supplementBreakdown:
-                input.previousFormulation.supplementBreakdown?.map((item) => ({
-                  dailyDose: item.dailyDose,
-                  id: item.id,
-                  rationale: item.rationale,
-                  status: item.status,
-                  supplement: item.supplement
-                })) ?? [],
-              safetySummary: input.previousFormulation.safetySummary
-            }
-          : null
-      },
-      contract: {
-        variants: {
-          balanced: {
-            body: { en: "English body", th: "Thai body" },
-            headline: { en: "English headline", th: "Thai headline" },
-            items: [
-              {
-                foodId: "managed food UUID only",
-                frequency: { en: "3-4 times/week", th: "3-4 ครั้งต่อสัปดาห์" },
-                gapNeedIds: ["use ids from that variant's needCoverage only"],
-                position: 1,
-                rationale: {
-                  en: "One plain wellness sentence; no medical claims",
-                  th: "หนึ่งประโยคภาษาไทยเพื่อสุขภาวะ ไม่ใช่คำกล่าวอ้างทางการแพทย์"
-                },
-                serving: { en: "1 practical serving", th: "1 ส่วนที่รับประทานได้จริง" }
-              }
-            ]
-          },
-          compact: "same shape as balanced"
-        }
-      },
-      instructions: [
-        "Return exactly one top-level key: variants.",
-        "Return exactly variants.balanced and variants.compact.",
-        "Each variant must include headline, body, and 3 to 6 items.",
-        "Each item must include foodId, gapNeedIds, serving, frequency, rationale, and position.",
-        "Use unique foodIds and positions within each variant.",
-        "Use only managedFoods.foodId values.",
-        "gapNeedIds may be empty only for food-foundation items when product coverage has no relevant gap.",
-        "Do not invent or mention products, supplements, counts, doses, safety outcomes, FDA status, or coverage values.",
-        "Food copy can be personalized to goals, diet, safety flags, and the product gaps, but must not change locked facts."
-      ],
-      locale: input.locale,
-      managedFoods: input.managedFoods.map((food) => ({
-        benefitTags: food.benefitTags,
-        category: food.category,
-        foodId: food.foodId,
-        name: food.translations,
-        normalizedName: food.normalizedName,
-        nutrientTags: food.nutrientTags,
-        primaryUseCase: food.primaryUseCase
-      })),
-      plan: input.plan,
-      planId: input.planId,
-      productVariants: variants,
-      requiredOutputLocales: [defaultLocale, "th"]
-    },
-    null,
-    2
-  );
-}
-
-function retryPrompt(errors: string[]) {
-  return [
-    "The previous JSON response failed validation.",
-    "Return corrected JSON only, matching the required contract.",
-    "Do not include markdown or prose.",
-    "Validation errors:",
-    ...errors.map((error) => `- ${error}`)
-  ].join("\n");
-}
-
-function parseJsonObject(content: string | null | undefined) {
-  if (!content) {
-    throw new Error("Model returned empty content");
-  }
-
-  const trimmed = content
-    .trim()
-    .replace(/^```(?:json)?/i, "")
-    .replace(/```$/i, "")
-    .trim();
-
-  try {
-    return JSON.parse(trimmed) as unknown;
-  } catch {
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-
-    if (start >= 0 && end > start) {
-      const candidate = trimmed
-        .slice(start, end + 1)
-        .replace(/,\s*([}\]])/g, "$1");
-
-      return JSON.parse(candidate) as unknown;
-    }
-
-    throw new Error("Model returned content that was not valid JSON");
-  }
-}
-
-async function callGrok({
-  apiKey,
-  messages,
-  model,
-  reasoningEffort
-}: Readonly<{
-  apiKey: string;
-  messages: Array<{ content: string; role: "assistant" | "system" | "user" }>;
-  model: string;
-  reasoningEffort?: string;
-}>) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
-      body: JSON.stringify({
-        messages,
-        model,
-        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
-        response_format: { type: "json_object" },
-        stream: false,
-        temperature: 0.15
-      }),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      method: "POST",
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `xAI request failed with ${response.status}: ${body.slice(0, 500)}`
-      );
-    }
-
-    return (await response.json()) as XaiChatCompletion;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 async function audit(input: AnalysisInput, event: AnalysisAuditEvent) {
   await input.audit?.(event);
 }
 
-export async function analyzeFoodGapSupportWithGrok(
+export async function analyzeFoodGapSupportDeterministically(
   input: AnalysisInput
 ): Promise<AnalysisResult> {
-  const fallback = () => buildFoodGapSupportFallback(input);
-  const config = getGrokConfig();
-
-  if (!config || input.managedFoods.length < 1) {
-    return {
-      attempts: 0,
-      fallbackUsed: true,
-      foodGapSupport: fallback(),
-      model: "deterministic",
-      promptVersion: DEFAULT_PROMPT_VERSION,
-      reasoningEffort: "none"
-    };
-  }
-
-  const messages: Array<{
-    content: string;
-    role: "assistant" | "system" | "user";
-  }> = [
-    { content: systemPrompt(config.promptVersion), role: "system" },
-    { content: userPrompt(input), role: "user" }
-  ];
-  let lastErrors: string[] = [];
-
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    await audit(input, {
-      eventType: "food_gap_grok_attempt_started",
-      level: "low",
-      payload: {
-        attempt,
-        model: config.model,
-        promptVersion: config.promptVersion,
-        reasoningEffort: config.reasoningEffort
-      }
-    });
-
-    try {
-      const completion = await callGrok({
-        apiKey: config.apiKey,
-        messages,
-        model: config.model,
-        reasoningEffort: config.reasoningEffort
-      });
-      const content = completion.choices?.[0]?.message?.content;
-      const parsed = parseJsonObject(content);
-      const validation = validateFoodGapSupportAiResponse(parsed, {
-        managedFoods: input.managedFoods,
-        productVariants: input.productVariants
-      });
-
-      if (validation.foodGapSupport) {
-        await audit(input, {
-          eventType: "food_gap_grok_validation_passed",
-          level: "low",
-          payload: {
-            attempt,
-            model: completion.model ?? config.model,
-            promptVersion: config.promptVersion,
-            reasoningEffort: config.reasoningEffort,
-            responseId: completion.id,
-            usage: completion.usage
-          }
-        });
-
-        return {
-          attempts: attempt,
-          foodGapSupport: validation.foodGapSupport,
-          model: completion.model ?? config.model,
-          promptVersion: config.promptVersion,
-          reasoningEffort: config.reasoningEffort,
-          responseId: completion.id,
-          usage: completion.usage
-        };
-      }
-
-      lastErrors = validation.errors;
-      await audit(input, {
-        eventType: "food_gap_grok_validation_failed",
-        level: "medium",
-        payload: {
-          attempt,
-          errors: lastErrors,
-          responseId: completion.id
-        }
-      });
-      messages.push({ content: content ?? "", role: "assistant" });
-      messages.push({ content: retryPrompt(lastErrors), role: "user" });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown xAI food gap support error";
-      lastErrors = [message];
-      await audit(input, {
-        eventType: "food_gap_grok_attempt_failed",
-        level: "medium",
-        payload: {
-          attempt,
-          error: message
-        }
-      });
-      messages.push({ content: retryPrompt(lastErrors), role: "user" });
-    }
-  }
+  const analysisInput = {
+    ...input,
+    managedFoods: eligibleManagedFoods(input)
+  } satisfies AnalysisInput;
 
   await audit(input, {
-    eventType: "food_gap_grok_fallback_used",
-    level: "medium",
+    eventType: "food_gap_deterministic_generated",
+    level: "low",
     payload: {
-      errors: lastErrors,
-      promptVersion: config.promptVersion
+      managedFoodCount: analysisInput.managedFoods.length,
+      promptVersion: DEFAULT_PROMPT_VERSION,
+      supportableGapVariants: STACK_PREFERENCES.filter((preference) =>
+        supportableFoodGapNeedsForVariant(
+          variantForPreference(analysisInput.productVariants, preference),
+          analysisInput.managedFoods
+        ).length > 0
+      )
     }
   });
 
   return {
-    attempts: MAX_ATTEMPTS,
-    fallbackUsed: true,
-    foodGapSupport: fallback(),
-    model: config.model,
-    promptVersion: config.promptVersion,
-    reasoningEffort: config.reasoningEffort
+    attempts: 0,
+    foodGapSupport: buildFoodGapSupportFallback(analysisInput),
+    model: "deterministic",
+    promptVersion: DEFAULT_PROMPT_VERSION,
+    reasoningEffort: "none"
   };
 }

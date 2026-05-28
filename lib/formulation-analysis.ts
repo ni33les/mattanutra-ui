@@ -12,6 +12,12 @@ import type {
   PlanFeedbackItem,
   FormulationStatus
 } from "@/lib/formulation-types";
+import {
+  callGrokChatCompletion,
+  configuredGrokModel,
+  configuredGrokValue,
+  getRequiredXaiApiKey
+} from "@/lib/grok-client";
 
 type AnalysisAuditEvent = {
   eventType: string;
@@ -43,19 +49,6 @@ type AnalysisResult = Readonly<{
   usage?: unknown;
 }>;
 
-type XaiChatCompletion = {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
-  }>;
-  id?: string;
-  model?: string;
-  usage?: unknown;
-};
-
-const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
-const DEFAULT_GROK_MODEL = "grok-4.3";
 const DEFAULT_FORMULATION_REASONING_EFFORT = "low";
 const DEFAULT_PROMPT_VERSION = "v1";
 const MAX_ATTEMPTS = 3;
@@ -71,25 +64,15 @@ const VALID_CAUTION_SEVERITIES = new Set<FormulationCaution["severity"]>([
   "review"
 ]);
 
-function getConfiguredValue(value: string | undefined) {
-  return value?.trim() ?? "";
-}
-
 function getGrokConfig() {
-  const apiKey = getConfiguredValue(process.env.XAI_API_KEY);
-
-  if (!apiKey) {
-    throw new Error("XAI_API_KEY is not configured");
-  }
-
   return {
-    apiKey,
-    model: getConfiguredValue(process.env.GROK_MODEL) || DEFAULT_GROK_MODEL,
+    apiKey: getRequiredXaiApiKey(),
+    model: configuredGrokModel(process.env.GROK_MODEL),
     promptVersion:
-      getConfiguredValue(process.env.FORMULATION_PROMPT_VERSION) ||
+      configuredGrokValue(process.env.FORMULATION_PROMPT_VERSION) ||
       DEFAULT_PROMPT_VERSION,
     reasoningEffort:
-      getConfiguredValue(process.env.FORMULATION_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.FORMULATION_REASONING_EFFORT) ||
       DEFAULT_FORMULATION_REASONING_EFFORT
   };
 }
@@ -373,38 +356,15 @@ async function callGrok({
   model: string;
   reasoningEffort?: string;
 }>) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
-      body: JSON.stringify({
-        messages,
-        model,
-        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
-        response_format: { type: "json_object" },
-        stream: false,
-        temperature: 0.2
-      }),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      method: "POST",
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `xAI request failed with ${response.status}: ${body.slice(0, 500)}`
-      );
-    }
-
-    return (await response.json()) as XaiChatCompletion;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return callGrokChatCompletion({
+    apiKey,
+    messages,
+    model,
+    purpose: "formulation request",
+    reasoningEffort,
+    temperature: 0.2,
+    timeoutMs: REQUEST_TIMEOUT_MS
+  });
 }
 
 function parseJsonObject(content: string | null | undefined) {

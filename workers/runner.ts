@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import nextEnv from "@next/env";
 import { executeTaskWorkItem } from "../lib/task-execution.ts";
@@ -31,6 +32,7 @@ const MAX_AGENT_RESTART_BACKOFF_MS = 30_000;
 const MAX_POLLING_BACKOFF_MS = 30_000;
 const MAX_WORKER_PROFILE_CONCURRENCY = 8;
 const WORKER_PROFILE_STARTUP_STAGGER_MS = 350;
+const WORKER_RUN_ID = randomUUID();
 const WORKER_PROFILE_MODES: readonly WorkerProfileMode[] = [
   "advisor",
   "communications",
@@ -165,7 +167,6 @@ function agentProfile(
 
 const WORKER_PROFILES: Record<WorkerProfileMode, WorkerAgentConfig> = {
   advisor: agentProfile("nutritionPlanAdvisor", [
-    "generate_nutrition_report",
     "nutrition_plan_chat_reply",
     "refine_nutrition_plan"
   ]),
@@ -177,10 +178,7 @@ const WORKER_PROFILES: Record<WorkerProfileMode, WorkerAgentConfig> = {
     "send_example_email",
     "send_reassessment_email"
   ]),
-  food: agentProfile("foodGuidanceWorker", [
-    "generate_food_gap_guidance",
-    "generate_food_guidance"
-  ]),
+  food: agentProfile("foodGuidanceWorker", ["generate_food_gap_guidance"]),
   formulation: agentProfile("formulationWorker", [
     "generate_example_supplement_guidance",
     "generate_supplement_guidance"
@@ -264,6 +262,12 @@ async function runAgentLoop(
         agent: agentConfig,
         concurrency: 1,
         instanceId: instanceId(mode, slotIndex, slotCount),
+        metadata: {
+          profileMode: mode,
+          runId: WORKER_RUN_ID,
+          slotCount,
+          slotIndex
+        },
         workerVersion: workerVersion()
       }),
     5

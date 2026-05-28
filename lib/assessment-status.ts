@@ -8,10 +8,6 @@ export function healthScoreAnalysisStatusFromTaskStatuses(
     return "ready";
   }
 
-  if (statuses.some((status) => status === "completed")) {
-    return "ready";
-  }
-
   if (
     statuses.some(
       (status) =>
@@ -30,6 +26,7 @@ export function healthScoreAnalysisStatusFromTaskStatuses(
       (status) =>
         status === "failed" ||
         status === "cancelled" ||
+        status === "completed" ||
         status === "skipped"
     )
   ) {

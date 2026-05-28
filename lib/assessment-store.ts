@@ -1143,7 +1143,8 @@ export async function getStoredAssessmentSnapshot(planId: string) {
         from public.tasks
         where status = 'queued'
           and task_type in (
-            'generate_food_guidance',
+            'generate_food_gap_guidance',
+            'generate_product_recommendations',
             'generate_supplement_guidance',
             'generate_example_supplement_guidance'
           )
@@ -1345,6 +1346,7 @@ export async function getStoredFormulationResult(
       product_recommendation_items_payload.recommendations as product_recommendation_items_payload,
       product_recommendation_options_payload.options as product_recommendation_options_payload,
       product_recommendation_task.status as product_recommendation_task_status,
+      food_gap_support_task.status as food_gap_support_task_status,
       supplement_catalogue.active_supplement_count,
       product_catalogue.approved_product_count
     from assessments
@@ -1694,6 +1696,14 @@ export async function getStoredFormulationResult(
       limit 1
     ) product_recommendation_task on true
     left join lateral (
+      select status
+      from tasks
+      where tasks.plan_id = assessments.plan_id
+        and task_type = 'generate_food_gap_guidance'
+      order by created_at desc
+      limit 1
+    ) food_gap_support_task on true
+    left join lateral (
       select count(*)::int as active_supplement_count
       from public.supplements
     ) supplement_catalogue on true
@@ -1804,6 +1814,25 @@ export async function getStoredFormulationResult(
           : productRecommendationPending || hasNutritionReportRecord
             ? "pending"
             : undefined;
+  const foodGapSupportTaskStatus =
+    typeof row.food_gap_support_task_status === "string"
+      ? row.food_gap_support_task_status
+      : "";
+  const foodGapSupportPending = [
+    "queued",
+    "reserved",
+    "running",
+    "needs_review",
+    "waiting_approval"
+  ].includes(foodGapSupportTaskStatus);
+  const foodGapSupportStatus =
+    storedFoodGapSupport
+      ? "ready"
+      : foodGapSupportTaskStatus === "failed"
+        ? "failed"
+        : foodGapSupportPending || productRecommendationStatus === "pending"
+          ? "pending"
+          : undefined;
   const productRecommendationGeneratedAt =
     row.product_recommendation_generated_at instanceof Date
       ? row.product_recommendation_generated_at.toISOString()
@@ -1996,6 +2025,7 @@ export async function getStoredFormulationResult(
     recommendations: reconciledRecommendations,
     schemaVersion: 1,
     sectionStatuses: {
+      ...(foodGapSupportStatus ? { foodSupport: foodGapSupportStatus } : {}),
       foods: foodsReady && !refinementPending ? "ready" : "pending",
       ...(reportStatus ? { report: reportStatus } : {}),
       supplements: supplementsReady && !refinementPending ? "ready" : "pending"

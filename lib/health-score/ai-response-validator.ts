@@ -151,6 +151,61 @@ function readPaywallFeatures(
       };
     }
 
+    const localizedCardKeys = Object.keys(item).filter((itemKey) =>
+      /^[a-z]{2}(?:-[A-Z0-9]{2,8})?$/.test(itemKey)
+    );
+    const hasLocalizedCardShape =
+      localizedCardKeys.length > 0 &&
+      localizedCardKeys.length === Object.keys(item).length &&
+      localizedCardKeys.every((localeKey) => isRecord(item[localeKey]));
+    const hasLocalizedStringCardShape =
+      localizedCardKeys.length > 0 &&
+      localizedCardKeys.length === Object.keys(item).length &&
+      localizedCardKeys.every((localeKey) => typeof item[localeKey] === "string");
+
+    if (hasLocalizedCardShape) {
+      return {
+        description: readLocalizedTextValue(
+          Object.fromEntries(
+            localizedCardKeys.map((localeKey) => [
+              localeKey,
+              isRecord(item[localeKey])
+                ? item[localeKey].description
+                : undefined
+            ])
+          ),
+          `${path}.paywallFeatures[${index}].description`,
+          errors,
+          locales
+        ),
+        name: readLocalizedTextValue(
+          Object.fromEntries(
+            localizedCardKeys.map((localeKey) => [
+              localeKey,
+              isRecord(item[localeKey]) ? item[localeKey].name : undefined
+            ])
+          ),
+          `${path}.paywallFeatures[${index}].name`,
+          errors,
+          locales
+        )
+      } satisfies HealthScorePaywallFeature;
+    }
+
+    if (hasLocalizedStringCardShape) {
+      const localizedCardText = readLocalizedTextValue(
+        item,
+        `${path}.paywallFeatures[${index}]`,
+        errors,
+        locales
+      );
+
+      return {
+        description: localizedCardText,
+        name: localizedCardText
+      } satisfies HealthScorePaywallFeature;
+    }
+
     const unexpectedKeys = Object.keys(item).filter(
       (itemKey) => itemKey !== "description" && itemKey !== "name"
     );

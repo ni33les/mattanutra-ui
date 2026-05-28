@@ -13,6 +13,7 @@ export type BpmEventType =
   | "email"
   | "error"
   | "formulation"
+  | "fulfillment"
   | "funnel"
   | "payment"
   | "plan"
@@ -98,6 +99,7 @@ const EVENT_TYPES = new Set<BpmEventType>([
   "email",
   "error",
   "formulation",
+  "fulfillment",
   "funnel",
   "payment",
   "plan",

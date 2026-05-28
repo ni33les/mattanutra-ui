@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   ExclamationTriangleIcon,
@@ -36,6 +36,7 @@ import { managedFoodSeeds } from "@/lib/managed-foods";
 
 type FormulationResultsProps = Readonly<{
   initialResult?: FormulationResult | null;
+  initialStackPreference?: ProductStackPreference | null;
   locale: Locale;
   planId: string;
 }>;
@@ -386,6 +387,69 @@ function getLocalizedText(value: LocalizedText, locale: Locale) {
   return resolveLocalizedText(value, locale);
 }
 
+const supplementNameFallbacks: Record<string, Record<"en" | "th", string>> = {
+  citicoline: { en: "Citicoline (CDP-choline)", th: "ซิติโคลีน (ซีดีพี-โคลีน)" },
+  coq10: { en: "CoQ10", th: "โคคิวเท็น" },
+  magnesium: { en: "Magnesium", th: "แมกนีเซียม" },
+  omega_3: { en: "Omega-3", th: "โอเมกา 3" },
+  theanine: { en: "Theanine", th: "แอล-ธีอะนีน" },
+  vitamin_d3: { en: "Vitamin D3", th: "วิตามินดี 3" }
+};
+
+function supplementFallbackKey(id: string, name: string) {
+  const search = normalizeFoodText(`${id} ${name}`);
+
+  if (/citicoline|cdp choline/.test(search)) {
+    return "citicoline";
+  }
+
+  if (/coq10|coenzyme q10|ubiquin/.test(search)) {
+    return "coq10";
+  }
+
+  if (/magnesium/.test(search)) {
+    return "magnesium";
+  }
+
+  if (/omega 3|omega3|fish oil|epa|dha/.test(search)) {
+    return "omega_3";
+  }
+
+  if (/theanine/.test(search)) {
+    return "theanine";
+  }
+
+  if (/vitamin d|vitamin d3|cholecalciferol/.test(search)) {
+    return "vitamin_d3";
+  }
+
+  return "";
+}
+
+function localizedSupplementName(
+  value: LocalizedText,
+  id: string,
+  locale: Locale
+) {
+  const localized = getLocalizedText(value, locale);
+
+  if (locale === "en") {
+    return localized;
+  }
+
+  const english = getLocalizedText(value, "en");
+  const hasLocaleSpecificText = localized && localized !== english;
+
+  if (hasLocaleSpecificText) {
+    return localized;
+  }
+
+  const fallback =
+    supplementNameFallbacks[supplementFallbackKey(id, english || localized)];
+
+  return fallback?.[locale] ?? localized;
+}
+
 function searchableLocalizedText(value: LocalizedText) {
   return localizedTextSearchValue(value);
 }
@@ -414,6 +478,35 @@ function planRevealHref(locale: Locale, planId: string) {
   return nutritionRevealPath(locale, planId);
 }
 
+function planRevealStackHref(
+  locale: Locale,
+  planId: string,
+  stackPreference: ProductStackPreference
+) {
+  const params = new URLSearchParams({
+    plan: planId,
+    stack: stackPreference
+  });
+
+  return `/${locale}/nutrition/reveal?${params.toString()}`;
+}
+
+function replaceRevealStackUrl(
+  locale: Locale,
+  planId: string,
+  stackPreference: ProductStackPreference
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.history.replaceState(
+    window.history.state,
+    "",
+    planRevealStackHref(locale, planId, stackPreference)
+  );
+}
+
 function planPaywallHref(locale: Locale, planId: string) {
   return nutritionHealthScorePath(locale, planId);
 }
@@ -423,7 +516,8 @@ function resultHasPendingSections(result: FormulationResult) {
 
   return Boolean(
     statuses &&
-      (statuses.foods === "pending" ||
+      (statuses.foodSupport === "pending" ||
+        statuses.foods === "pending" ||
         statuses.supplements === "pending" ||
         statuses.report === "pending")
   );
@@ -497,13 +591,6 @@ function selectProductRecommendationOption(
   );
 }
 
-function localizedPair(value: LocalizedText, fallback = "") {
-  return {
-    en: getLocalizedText(value, "en") || fallback,
-    th: getLocalizedText(value, "th") || getLocalizedText(value, "en") || fallback
-  };
-}
-
 function normalizeFoodText(value: string) {
   return value
     .toLowerCase()
@@ -511,6 +598,424 @@ function normalizeFoodText(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9ก-๙]+/g, " ")
     .trim();
+}
+
+function normalizedFoodTokens(value: string) {
+  return normalizeFoodText(value).split(/\s+/).filter(Boolean);
+}
+
+function normalizedFoodTextMatchesPattern(value: string, pattern: string) {
+  const valueTokens = normalizedFoodTokens(value);
+  const patternTokens = normalizedFoodTokens(pattern);
+
+  if (patternTokens.length < 1 || valueTokens.length < 1) {
+    return false;
+  }
+
+  if (patternTokens.length === 1) {
+    const [patternToken] = patternTokens;
+
+    if (!patternToken) {
+      return false;
+    }
+
+    return valueTokens.some((token) =>
+      patternToken.length <= 3
+        ? token === patternToken
+        : token === patternToken || token.startsWith(patternToken)
+    );
+  }
+
+  return valueTokens.some((_, startIndex) =>
+    patternTokens.every((patternToken, offset) => {
+      const token = valueTokens[startIndex + offset];
+
+      return Boolean(
+        token &&
+          (token === patternToken ||
+            (patternToken.length > 1 && token.startsWith(patternToken)))
+      );
+    })
+  );
+}
+
+const managedFoodServing: Record<string, Record<"en" | "th", string>> = {
+  brown_rice: { en: "1 small bowl", th: "1 ถ้วยเล็ก" },
+  chia_seeds: { en: "1 tbsp", th: "1 ช้อนโต๊ะ" },
+  chickpeas: { en: "1/2 cup cooked", th: "ถั่วสุก 1/2 ถ้วย" },
+  flaxseed: { en: "1 tbsp ground", th: "บด 1 ช้อนโต๊ะ" },
+  ginger_tea: { en: "1 cup", th: "1 ถ้วย" },
+  green_tea: { en: "1 cup", th: "1 ถ้วย" },
+  holy_basil: { en: "1 handful cooked", th: "ปรุงสุก 1 กำมือ" },
+  kimchi: { en: "2-3 tbsp", th: "2-3 ช้อนโต๊ะ" },
+  lentils: { en: "1/2 cup cooked", th: "เลนทิลสุก 1/2 ถ้วย" },
+  moringa_leaves: { en: "1 small bowl cooked", th: "ปรุงสุก 1 ถ้วยเล็ก" },
+  mung_beans: { en: "1/2 cup cooked", th: "ถั่วเขียวสุก 1/2 ถ้วย" },
+  oats: { en: "1 small bowl", th: "1 ถ้วยเล็ก" },
+  papaya: { en: "1 small bowl", th: "1 ถ้วยเล็ก" },
+  pumpkin_seeds: { en: "1 small handful", th: "1 กำมือเล็ก" },
+  salmon: { en: "1 palm-sized portion", th: "1 ชิ้นขนาดฝ่ามือ" },
+  sardines: { en: "1 small tin or portion", th: "1 กระป๋องเล็กหรือ 1 ส่วน" },
+  sesame_seeds: { en: "1 tbsp", th: "1 ช้อนโต๊ะ" },
+  tofu: { en: "1 palm-sized portion", th: "1 ชิ้นขนาดฝ่ามือ" },
+  turmeric: { en: "1-2 tsp in cooking", th: "1-2 ช้อนชาในอาหาร" },
+  unsweetened_yogurt: { en: "1 small bowl", th: "1 ถ้วยเล็ก" }
+};
+
+const managedFoodFrequency: Record<string, Record<"en" | "th", string>> = {
+  ginger_tea: { en: "3-5 times/week", th: "3-5 ครั้งต่อสัปดาห์" },
+  green_tea: { en: "3-5 times/week", th: "3-5 ครั้งต่อสัปดาห์" },
+  kimchi: { en: "3-4 times/week", th: "3-4 ครั้งต่อสัปดาห์" },
+  salmon: { en: "1-2 times/week", th: "1-2 ครั้งต่อสัปดาห์" },
+  sardines: { en: "1-2 times/week", th: "1-2 ครั้งต่อสัปดาห์" },
+  turmeric: { en: "most cooking days", th: "ในมื้ออาหารหลายวันต่อสัปดาห์" }
+};
+
+const foodSupportNeedLabels: Record<string, Record<"en" | "th", string>> = {
+  calcium: { en: "calcium", th: "แคลเซียม" },
+  citicoline: { en: "citicoline", th: "ซิติโคลีน" },
+  coq10: { en: "CoQ10", th: "โคคิวเท็น" },
+  curcumin: { en: "curcumin", th: "เคอร์คูมิน" },
+  magnesium: { en: "magnesium", th: "แมกนีเซียม" },
+  omega: { en: "omega-3", th: "โอเมกา 3" },
+  probiotic: { en: "probiotic", th: "โปรไบโอติก" },
+  theanine: { en: "theanine", th: "ทีอะนีน" },
+  vitamin_b12: { en: "vitamin B12", th: "วิตามินบี 12" },
+  vitamin_c: { en: "vitamin C", th: "วิตามินซี" },
+  vitamin_d: { en: "vitamin D", th: "วิตามินดี" },
+  zinc: { en: "zinc", th: "สังกะสี" }
+};
+
+const foodSupportPlaceholderValues = new Set([
+  "english body",
+  "english headline",
+  "one plain wellness sentence no medical claims",
+  "thai body",
+  "thai headline",
+  "หนึ่งประโยคภาษาไทยเพื่อสุขภาวะ ไม่ใช่คำกล่าวอ้างทางการแพทย์"
+]);
+
+const managedFoodNeedRules = [
+  {
+    foods: ["salmon", "sardines", "chia_seeds", "flaxseed"],
+    patterns: ["omega", "dha", "epa", "fatty acid"]
+  },
+  {
+    foods: ["pumpkin_seeds", "chia_seeds", "sesame_seeds", "brown_rice", "oats"],
+    patterns: ["magnesium"]
+  },
+  {
+    foods: ["salmon", "sardines"],
+    patterns: ["vitamin d", "vitamin d3", "d3", "cholecalciferol"]
+  },
+  {
+    foods: ["salmon", "sardines", "unsweetened_yogurt"],
+    patterns: ["vitamin b12", "b12", "cobalamin"]
+  },
+  {
+    foods: ["sardines", "sesame_seeds", "unsweetened_yogurt", "tofu"],
+    patterns: ["calcium"]
+  },
+  {
+    foods: ["papaya", "moringa_leaves"],
+    patterns: ["vitamin c", "ascorb"]
+  },
+  {
+    foods: ["pumpkin_seeds", "sesame_seeds", "chickpeas", "lentils"],
+    patterns: ["zinc"]
+  },
+  {
+    foods: ["oats", "lentils", "chickpeas", "mung_beans", "chia_seeds", "flaxseed"],
+    patterns: ["fiber", "fibre", "prebiotic", "gut"]
+  },
+  {
+    foods: ["kimchi", "unsweetened_yogurt"],
+    patterns: ["probiotic", "microbiome", "gut"]
+  },
+  {
+    foods: ["turmeric"],
+    patterns: ["curcumin", "turmeric"]
+  },
+  {
+    foods: ["green_tea", "holy_basil", "moringa_leaves", "turmeric", "papaya"],
+    patterns: ["antioxidant", "inflamm", "polyphenol"]
+  },
+  {
+    foods: ["tofu", "chickpeas", "lentils", "mung_beans"],
+    patterns: ["muscle", "protein", "recovery"]
+  }
+] as const;
+
+const managedFoodFallbackPriority: Record<string, number> = {
+  pumpkin_seeds: 1,
+  chia_seeds: 2,
+  sesame_seeds: 3,
+  sardines: 4,
+  salmon: 5,
+  oats: 6,
+  unsweetened_yogurt: 7,
+  tofu: 8,
+  lentils: 9,
+  chickpeas: 10,
+  brown_rice: 11,
+  flaxseed: 12,
+  green_tea: 13,
+  turmeric: 14,
+  ginger_tea: 15,
+  kimchi: 16,
+  holy_basil: 17,
+  moringa_leaves: 18,
+  mung_beans: 19,
+  papaya: 20
+};
+
+function managedFoodPriority(seed: (typeof managedFoodSeeds)[number]) {
+  return managedFoodFallbackPriority[seed.normalizedName] ?? 999;
+}
+
+function foodSupportGaps(needCoverage: readonly ProductNeedCoverage[]) {
+  return needCoverage
+    .filter((need) =>
+      need.itemType === "supplement" &&
+      Number.isFinite(need.coveragePercent) &&
+      need.coveragePercent < 90
+    )
+    .sort((first, second) => first.coveragePercent - second.coveragePercent);
+}
+
+function foodSupportableGaps(gaps: readonly ProductNeedCoverage[]) {
+  return gaps.filter((gap) =>
+    managedFoodNeedRules.some((rule) => ruleMatchesNeed(rule, gap))
+  );
+}
+
+function foodSupportNeedText(need: ProductNeedCoverage) {
+  return normalizeFoodText(`${need.id} ${need.displayName}`);
+}
+
+function ruleMatchesNeed(
+  rule: (typeof managedFoodNeedRules)[number],
+  need: ProductNeedCoverage
+) {
+  const text = `${need.id} ${need.displayName}`;
+
+  return rule.patterns.some((pattern) =>
+    normalizedFoodTextMatchesPattern(text, pattern)
+  );
+}
+
+function managedFoodSeedMatchesGap(
+  seed: (typeof managedFoodSeeds)[number],
+  gap: ProductNeedCoverage
+) {
+  return managedFoodNeedRules.some((rule) =>
+    ruleMatchesNeed(rule, gap) &&
+    rule.foods.includes(seed.normalizedName as never)
+  );
+}
+
+function scoreManagedFoodSeed(
+  seed: (typeof managedFoodSeeds)[number],
+  gaps: readonly ProductNeedCoverage[]
+) {
+  return gaps.reduce(
+    (score, gap) =>
+      score + (
+        managedFoodSeedMatchesGap(seed, gap)
+          ? Math.max(10, 100 - gap.coveragePercent)
+          : 0
+      ),
+    0
+  );
+}
+
+function relatedFoodGapIds(
+  seed: (typeof managedFoodSeeds)[number],
+  gaps: readonly ProductNeedCoverage[]
+) {
+  return gaps
+    .filter((gap) => managedFoodSeedMatchesGap(seed, gap))
+    .map((gap) => gap.id)
+    .slice(0, 2);
+}
+
+function managedSeedForFoodSupportItem(item: FoodGapSupportItem) {
+  const itemText = normalizeFoodText([
+    item.foodId,
+    item.food.en,
+    item.food.th
+  ].filter(Boolean).join(" "));
+
+  return managedFoodSeeds.find((seed) => {
+    const seedKeys = [
+      seed.normalizedName,
+      seed.normalizedName.replace(/_/g, " "),
+      seed.name.en,
+      seed.name.th
+    ].map(normalizeFoodText);
+
+    return seedKeys.some((key) =>
+      key && (itemText.includes(key) || key.includes(itemText))
+    );
+  });
+}
+
+function foodSupportNeedLabel(need: ProductNeedCoverage, locale: "en" | "th") {
+  const text = foodSupportNeedText(need);
+  const key = Object.keys(foodSupportNeedLabels).find((candidate) =>
+    text.includes(candidate.replace(/_/g, " "))
+  );
+
+  if (key) {
+    return foodSupportNeedLabels[key][locale];
+  }
+
+  return need.displayName;
+}
+
+function needIngredientMatchTexts(ingredient: FormulationIngredient) {
+  return [
+    ingredient.id,
+    getLocalizedText(ingredient.supplement, "en"),
+    getLocalizedText(ingredient.supplement, "th"),
+    supplementFallbackKey(
+      ingredient.id,
+      getLocalizedText(ingredient.supplement, "en")
+    ).replace(/_/g, " ")
+  ]
+    .map(normalizeFoodText)
+    .filter(Boolean);
+}
+
+function productNeedMatchTexts(need: ProductNeedCoverage) {
+  return [
+    need.id,
+    need.id.replace(/^supplement:/, ""),
+    need.displayName
+  ]
+    .map(normalizeFoodText)
+    .filter(Boolean);
+}
+
+function productNeedMatchesIngredient(
+  need: ProductNeedCoverage,
+  ingredient: FormulationIngredient
+) {
+  const needTexts = productNeedMatchTexts(need);
+  const ingredientTexts = needIngredientMatchTexts(ingredient);
+
+  return needTexts.some((needText) =>
+    ingredientTexts.some((ingredientText) =>
+      ingredientText.includes(needText) || needText.includes(ingredientText)
+    )
+  );
+}
+
+function formulaIngredientRowNumbers(ingredients: readonly FormulationIngredient[]) {
+  const rowNumbers = new Map<string, number>();
+  let rowNumber = 0;
+
+  for (const [, group] of groupedFormulaIngredients([...ingredients])) {
+    for (const ingredient of group) {
+      rowNumber += 1;
+      rowNumbers.set(ingredient.id, rowNumber);
+    }
+  }
+
+  return rowNumbers;
+}
+
+type FoodSupportFormulaGap = Readonly<{
+  coveragePercent: number;
+  dailyDose: string;
+  id: string;
+  label: string;
+  rowNumber: number | null;
+}>;
+
+function foodSupportFormulaGapsForItem(
+  item: FoodGapSupportItem,
+  selectedNeedCoverage: readonly ProductNeedCoverage[],
+  ingredients: readonly FormulationIngredient[],
+  locale: Locale
+): FoodSupportFormulaGap[] {
+  const seed = managedSeedForFoodSupportItem(item);
+  const supportableGaps = seed
+    ? foodSupportGaps(selectedNeedCoverage).filter((gap) =>
+        managedFoodSeedMatchesGap(seed, gap)
+      )
+    : [];
+  const explicitIds = new Set(item.gapNeedIds);
+  const inferredIds = new Set(
+    seed ? relatedFoodGapIds(seed, supportableGaps) : []
+  );
+  const rowNumbers = formulaIngredientRowNumbers(ingredients);
+
+  return supportableGaps
+    .filter((gap) => explicitIds.has(gap.id) || inferredIds.has(gap.id))
+    .map((gap) => {
+      const ingredient = ingredients.find((candidate) =>
+        productNeedMatchesIngredient(gap, candidate)
+      );
+
+      return {
+        coveragePercent: Math.min(100, Math.max(0, Math.round(gap.coveragePercent))),
+        dailyDose: ingredient ? getLocalizedText(ingredient.dailyDose, locale) : "",
+        id: gap.id,
+        label: ingredient
+          ? localizedSupplementName(ingredient.supplement, ingredient.id, locale)
+          : foodSupportNeedLabel(gap, locale),
+        rowNumber: ingredient ? rowNumbers.get(ingredient.id) ?? null : null
+      };
+    });
+}
+
+function joinFoodSupportNeeds(
+  needs: readonly ProductNeedCoverage[],
+  locale: "en" | "th"
+) {
+  const labels = needs.map((need) => foodSupportNeedLabel(need, locale)).slice(0, 2);
+
+  if (labels.length < 1) {
+    return locale === "th" ? "ช่องว่างที่เหลือ" : "the remaining gaps";
+  }
+
+  return labels.length === 1
+    ? labels[0]
+    : locale === "th"
+      ? labels.join(" และ ")
+      : `${labels[0]} and ${labels[1]}`;
+}
+
+function joinFoodSupportFormulaGapLabels(
+  gaps: readonly FoodSupportFormulaGap[],
+  locale: "en" | "th"
+) {
+  const labels = gaps.map((gap) => gap.label).filter(Boolean).slice(0, 2);
+
+  if (labels.length < 1) {
+    return locale === "th" ? "ช่องว่างที่เหลือ" : "the remaining gaps";
+  }
+
+  return labels.length === 1
+    ? labels[0]
+    : locale === "th"
+      ? labels.join(" และ ")
+      : `${labels[0]} and ${labels[1]}`;
+}
+
+function isFoodSupportPlaceholderCopy(value: string) {
+  return foodSupportPlaceholderValues.has(normalizeFoodText(value));
+}
+
+function safeFoodSupportCopy(
+  value: LocalizedText,
+  locale: Locale,
+  fallback: string
+) {
+  const text = getLocalizedText(value, locale);
+
+  return text && !isFoodSupportPlaceholderCopy(text) ? text : fallback;
 }
 
 function managedSeedForFoodItem(item: FormulationResult["foodGuidance"][number]) {
@@ -527,44 +1032,138 @@ function managedSeedForFoodItem(item: FormulationResult["foodGuidance"][number])
       seed.name.th
     ].map(normalizeFoodText);
 
-    return seedKeys.some((key) => key && itemText.includes(key));
+    return seedKeys.some((key) =>
+      key && (itemText.includes(key) || key.includes(itemText))
+    );
   });
 }
 
-function fallbackFoodSupportItems(result: FormulationResult): FoodGapSupportItem[] {
-  return (result.foodGuidance ?? [])
+function previousFoodGuidanceRank(
+  seed: (typeof managedFoodSeeds)[number],
+  result: FormulationResult
+) {
+  const index = (result.foodGuidance ?? [])
     .filter((item) => item.safety?.visibility !== "hidden")
-    .sort((first, second) => first.effectivenessRank - second.effectivenessRank)
-    .slice(0, 6)
-    .map((item, index) => {
-      const seed = managedSeedForFoodItem(item);
-      const food = seed
-        ? { en: seed.name.en, th: seed.name.th }
-        : localizedPair(item.food, `Food ${index + 1}`);
-      const category = {
-        en: seed?.category.en ?? item.category,
-        th: seed?.category.th ?? item.category
-      };
+    .findIndex((item) => managedSeedForFoodItem(item)?.normalizedName === seed.normalizedName);
 
-      return {
-        category,
-        food,
-        foodId: item.foodId ?? item.id,
-        frequency: localizedPair(item.frequency),
-        gapNeedIds: [],
-        imageAlt: seed?.imageAlt ?? (
-          item.imageAlt ? localizedPair(item.imageAlt, food.en) : food
-        ),
-        imagePath: item.imagePath ?? seed?.imagePath ?? "",
-        position: index + 1,
-        rationale: localizedPair(item.rationale),
-        serving: localizedPair(item.serving)
-      };
+  return index >= 0 ? index + 1 : 999;
+}
+
+function fallbackManagedFoodSupportItems(
+  result: FormulationResult,
+  selectedNeedCoverage: readonly ProductNeedCoverage[]
+): FoodGapSupportItem[] {
+  const gaps = foodSupportGaps(selectedNeedCoverage);
+  const supportableGaps = foodSupportableGaps(gaps);
+
+  if (supportableGaps.length < 1) {
+    return [];
+  }
+
+  const selectedSeeds: Array<(typeof managedFoodSeeds)[number]> = [];
+  for (const gap of supportableGaps) {
+    const matchingSeeds = managedFoodSeeds
+      .filter((seed) => managedFoodSeedMatchesGap(seed, gap))
+      .sort((first, second) => managedFoodPriority(first) - managedFoodPriority(second));
+    let addedForGap = 0;
+
+    for (const seed of matchingSeeds) {
+      if (selectedSeeds.some((candidate) => candidate.normalizedName === seed.normalizedName)) {
+        continue;
+      }
+
+      selectedSeeds.push(seed);
+      addedForGap += 1;
+
+      if (addedForGap >= 2) {
+        break;
+      }
+    }
+  }
+  const scored = managedFoodSeeds
+    .map((seed, index) => ({
+      index,
+      previousRank: previousFoodGuidanceRank(seed, result),
+      score: scoreManagedFoodSeed(seed, gaps),
+      seed
+    }))
+    .sort((first, second) => {
+      if (second.score !== first.score) {
+        return second.score - first.score;
+      }
+
+      if (gaps.length > 0) {
+        return managedFoodPriority(first.seed) - managedFoodPriority(second.seed) ||
+          first.index - second.index;
+      }
+
+      if (first.previousRank !== second.previousRank) {
+        return first.previousRank - second.previousRank;
+      }
+
+      return managedFoodPriority(first.seed) - managedFoodPriority(second.seed) ||
+        first.index - second.index;
     });
+  const selected = [
+    ...selectedSeeds.map((seed) => ({
+      index: managedFoodSeeds.findIndex((candidate) => candidate.normalizedName === seed.normalizedName),
+      previousRank: previousFoodGuidanceRank(seed, result),
+      score: scoreManagedFoodSeed(seed, gaps),
+      seed
+    })),
+    ...scored.filter((item) =>
+      !selectedSeeds.some((seed) => seed.normalizedName === item.seed.normalizedName) &&
+      item.score > 0
+    )
+  ].slice(0, 6);
+
+  return selected.map(({ seed }, index) => {
+    const gapNeedIds = relatedFoodGapIds(seed, gaps);
+    const relatedNeeds = gaps.filter((gap) => gapNeedIds.includes(gap.id));
+    const enNeedText = joinFoodSupportNeeds(relatedNeeds, "en");
+    const thNeedText = joinFoodSupportNeeds(relatedNeeds, "th");
+
+    return {
+      category: { en: seed.category.en, th: seed.category.th },
+      food: { en: seed.name.en, th: seed.name.th },
+      foodId: seed.normalizedName,
+      frequency:
+        managedFoodFrequency[seed.normalizedName] ??
+        { en: "3-4 times/week", th: "3-4 ครั้งต่อสัปดาห์" },
+      gapNeedIds,
+      imageAlt: { en: seed.imageAlt.en, th: seed.imageAlt.th },
+      imagePath: seed.imagePath,
+      position: index + 1,
+      rationale: relatedNeeds.length > 0
+        ? {
+            en: `${seed.name.en} gives food-level support around ${enNeedText} while products stay responsible for the formula math.`,
+            th: `${seed.name.th} ช่วยเสริมจากอาหารในส่วนของ${thNeedText} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`
+          }
+        : {
+            en: `${seed.name.en} keeps the plan grounded in everyday food while the product stack handles the formula.`,
+            th: `${seed.name.th} ช่วยให้แผนยังยึดกับอาหารในชีวิตประจำวัน ขณะที่ชุดผลิตภัณฑ์ทำหน้าที่ตามสูตร`
+          },
+      serving:
+        managedFoodServing[seed.normalizedName] ??
+        { en: "1 practical serving", th: "1 ส่วนที่รับประทานได้จริง" }
+    };
+  });
+}
+
+function fallbackFoodSupportItems(
+  result: FormulationResult,
+  selectedNeedCoverage: readonly ProductNeedCoverage[]
+): FoodGapSupportItem[] {
+  if (selectedNeedCoverage.length > 0) {
+    return fallbackManagedFoodSupportItems(result, selectedNeedCoverage);
+  }
+
+  return [];
 }
 
 function selectedFoodSupport(
   result: FormulationResult,
+  selectedNeedCoverage: readonly ProductNeedCoverage[],
   selectedPreference?: ProductStackPreference | null
 ) {
   const variant =
@@ -575,12 +1174,13 @@ function selectedFoodSupport(
         null;
 
   return {
-    fallbackItems: variant ? [] : fallbackFoodSupportItems(result),
+    fallbackItems: variant ? [] : fallbackFoodSupportItems(result, selectedNeedCoverage),
     variant
   };
 }
 
 export function FormulationResults({
+  initialStackPreference = null,
   initialResult = null,
   locale,
   planId
@@ -592,8 +1192,26 @@ export function FormulationResults({
   );
   const [result, setResult] = useState<FormulationResult | null>(initialResult);
   const [selectedProductStackPreference, setSelectedProductStackPreference] =
-    useState<ProductStackPreference | null>(null);
+    useState<ProductStackPreference | null>(() => initialStackPreference);
   const productPollAttemptsRef = useRef(0);
+
+  const refreshFormulationResult = useCallback(async () => {
+    const response = await fetch(
+      `/api/assessment/${encodeURIComponent(effectivePlanId)}/formulation?locale=${locale}`,
+      { cache: "no-store" }
+    );
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const payload = (await response.json()) as FormulationResult;
+
+    setResult(payload);
+    setLoadState("ready");
+
+    return true;
+  }, [effectivePlanId, locale]);
 
   useEffect(() => {
     let cancelled = false;
@@ -648,7 +1266,7 @@ export function FormulationResults({
       }
     }
 
-    fetchFormulation();
+    void fetchFormulation();
 
     return () => {
       cancelled = true;
@@ -760,6 +1378,7 @@ export function FormulationResults({
       labels={labels}
       locale={locale}
       onProductStackPreferenceChange={setSelectedProductStackPreference}
+      onProductStackRefresh={refreshFormulationResult}
       planId={effectiveResultPlanId}
       productCoverageBySupplementId={productCoverageBySupplementId}
       productRecommendationOptions={productRecommendationOptions}
@@ -834,14 +1453,19 @@ const revealCopy = {
     formulaMetaFocus: "Focus",
     formulaSignedPrefix: "Composed",
     foodSupportDefaultBody:
-      "Foods do not change the product coverage score. They give the plan practical support where the product stack is either incomplete or already strong enough.",
+      "Foods do not change the product coverage score. They only appear when the product stack leaves a supplement gap that a managed food can credibly support.",
     foodSupportDefaultHeadline: "Food support, after the products.",
     foodSupportEmpty:
       "Food support will appear here once the managed food catalogue and product stack are ready.",
     foodSupportEyebrow: "Food support",
     foodSupportFrequency: "Frequency",
     foodSupportGapLabel: "Supports",
+    foodSupportGapBodyTemplate:
+      "These foods come from the managed catalogue and are selected around {gaps}. They support the plan in everyday meals without changing product coverage numbers.",
+    foodSupportGapHeadlineTemplate: "Food support for {gaps}.",
     foodSupportServing: "Serving",
+    foodSupportFormulaGapLabel: "Formula gap",
+    foodSupportProductCoverage: "Product coverage",
     foodSupportTitle: "Foods chosen to support the gaps.",
     heroEyebrow: "Your Right Amount Has Arrived",
     heroFor: "For",
@@ -932,14 +1556,19 @@ const revealCopy = {
     formulaMetaFocus: "เป้าหมาย",
     formulaSignedPrefix: "จัดทำ",
     foodSupportDefaultBody:
-      "อาหารไม่เปลี่ยนคะแนนความครอบคลุมของผลิตภัณฑ์ แต่ช่วยให้แผนทำได้จริงในส่วนที่ผลิตภัณฑ์ยังไม่ครอบคลุมเต็มที่ หรือเสริมพื้นฐานเมื่อครอบคลุมดีแล้ว",
+      "อาหารไม่เปลี่ยนคะแนนความครอบคลุมของผลิตภัณฑ์ และจะแสดงเฉพาะเมื่อชุดผลิตภัณฑ์ยังเหลือช่องว่างของสารอาหารที่อาหารในแคตตาล็อกช่วยเสริมได้อย่างน่าเชื่อถือ",
     foodSupportDefaultHeadline: "อาหารสนับสนุนหลังจากชุดผลิตภัณฑ์",
     foodSupportEmpty:
       "คำแนะนำอาหารจะแสดงที่นี่เมื่อแคตตาล็อกอาหารและชุดผลิตภัณฑ์พร้อม",
     foodSupportEyebrow: "อาหารสนับสนุน",
     foodSupportFrequency: "ความถี่",
     foodSupportGapLabel: "สนับสนุน",
+    foodSupportGapBodyTemplate:
+      "อาหารเหล่านี้มาจากแคตตาล็อกที่จัดการไว้ และเลือกโดยดูจาก {gaps} เพื่อช่วยให้แผนทำได้จริงในมื้ออาหาร โดยไม่เปลี่ยนตัวเลขความครอบคลุมของผลิตภัณฑ์",
+    foodSupportGapHeadlineTemplate: "อาหารสนับสนุนสำหรับ {gaps}",
     foodSupportServing: "ปริมาณ",
+    foodSupportFormulaGapLabel: "ช่องว่างในสูตร",
+    foodSupportProductCoverage: "ความครอบคลุมของผลิตภัณฑ์",
     foodSupportTitle: "อาหารที่เลือกเพื่อช่วยเติมช่องว่าง",
     heroEyebrow: "ปริมาณที่พอดีของคุณพร้อมแล้ว",
     heroFor: "สำหรับ",
@@ -1476,6 +2105,7 @@ function RevealResultsPage({
   labels,
   locale,
   onProductStackPreferenceChange,
+  onProductStackRefresh,
   planId,
   productCoverageBySupplementId,
   productRecommendationOptions,
@@ -1491,6 +2121,7 @@ function RevealResultsPage({
   labels: PanelLabels;
   locale: Locale;
   onProductStackPreferenceChange: (preference: ProductStackPreference) => void;
+  onProductStackRefresh: () => Promise<boolean>;
   planId: string;
   productCoverageBySupplementId: ReadonlyMap<string, number>;
   productRecommendationOptions: ProductRecommendationOption[];
@@ -1505,7 +2136,7 @@ function RevealResultsPage({
   const supplementLabelById = new Map(
     visibleIngredients.map((ingredient) => [
       ingredient.id,
-      getLocalizedText(ingredient.supplement, locale)
+      localizedSupplementName(ingredient.supplement, ingredient.id, locale)
     ])
   );
   const catalogueSupplementCount = Math.max(
@@ -1752,6 +2383,7 @@ function RevealResultsPage({
         copy={copy}
         locale={locale}
         onProductStackPreferenceChange={onProductStackPreferenceChange}
+        onProductStackRefresh={onProductStackRefresh}
         planId={planId}
         productNeedCount={productNeedCount}
         productOptions={productOptions}
@@ -1804,14 +2436,7 @@ function RevealFormulaSection({
   productCoverageBySupplementId: ReadonlyMap<string, number>;
   result: FormulationResult;
 }>) {
-  // Compute stable row numbers declaratively (avoids mutation during render)
-  const ingredientRowNumber = new Map<string, number>();
-  let n = 0;
-  for (const [, group] of groupedFormulaIngredients(ingredients)) {
-    for (const ing of group) {
-      ingredientRowNumber.set(ing.id, ++n);
-    }
-  }
+  const ingredientRowNumber = formulaIngredientRowNumbers(ingredients);
   const supplementSelectedText = localizedCountText(ingredients.length, locale, true);
   const formulaLead = revealSlotCopy(result, "formulaLead", locale, copy.formulaLead);
   const formulaTitle = formatTemplate(copy.formulaTitleTemplate, {
@@ -1899,7 +2524,11 @@ function RevealFormulaSection({
               </div>
               {group.map((ingredient) => {
                 const rowNumber = ingredientRowNumber.get(ingredient.id) ?? 0;
-                const supplement = getLocalizedText(ingredient.supplement, locale);
+                const supplement = localizedSupplementName(
+                  ingredient.supplement,
+                  ingredient.id,
+                  locale
+                );
                 const rationale = getLocalizedText(ingredient.rationale, locale);
                 const dailyDose = getLocalizedText(ingredient.dailyDose, locale);
                 const coverage =
@@ -1963,6 +2592,7 @@ function RevealProductsSection({
   copy,
   locale,
   onProductStackPreferenceChange,
+  onProductStackRefresh,
   planId,
   productNeedCount,
   productOptions,
@@ -1975,6 +2605,7 @@ function RevealProductsSection({
   copy: typeof revealCopy.en;
   locale: Locale;
   onProductStackPreferenceChange: (preference: ProductStackPreference) => void;
+  onProductStackRefresh: () => Promise<boolean>;
   planId: string;
   productNeedCount: number;
   productOptions: ProductRecommendationOption[];
@@ -1985,6 +2616,8 @@ function RevealProductsSection({
   supplementLabelById: ReadonlyMap<string, string>;
 }>) {
   const labels = productRecommendationCopy[locale];
+  const [pendingStackPreference, setPendingStackPreference] =
+    useState<ProductStackPreference | null>(null);
   const supplementSelectedCount = result.supplementBreakdown.filter(
     (ingredient) => ingredient.safety?.visibility !== "hidden"
   ).length;
@@ -2019,6 +2652,56 @@ function RevealProductsSection({
         coveredText: localizedCountText(coveredProductNeedCount, locale),
         supplementSelectedText: localizedCountText(supplementSelectedCount, locale)
       });
+  const productOptionsById = new Map(
+    productOptions.map((option) => [option.id, option])
+  );
+  const controlPreferences =
+    productOptions.length > 0 || result.productRecommendations
+      ? productStackPreferenceOrder
+      : [];
+
+  async function requestProductStackPreference(preference: ProductStackPreference) {
+    const existingOption = productOptionsById.get(preference);
+
+    if (existingOption) {
+      onProductStackPreferenceChange(preference);
+      return;
+    }
+
+    setPendingStackPreference(preference);
+
+    try {
+      const response = await fetch(
+        `/api/assessment/${encodeURIComponent(planId)}/product-recommendations`,
+        {
+          body: JSON.stringify({ stackPreference: preference }),
+          cache: "no-store",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          method: "POST"
+        }
+      );
+
+      if (response.ok) {
+        window.setTimeout(() => {
+          void onProductStackRefresh();
+        }, 1000);
+        window.setTimeout(() => {
+          void onProductStackRefresh();
+        }, 3000);
+        window.setTimeout(() => {
+          void onProductStackRefresh();
+        }, 6000);
+      }
+    } finally {
+      window.setTimeout(() => {
+        setPendingStackPreference((current) =>
+          current === preference ? null : current
+        );
+      }, 1200);
+    }
+  }
 
   return (
     <section className="border-t border-[var(--mn-line)] bg-[var(--mn-cream-deep)] py-20">
@@ -2055,26 +2738,65 @@ function RevealProductsSection({
           </p>
         </div>
 
-        {productOptions.length > 1 ? (
+        {controlPreferences.length > 1 ? (
           <div className="mt-8 flex justify-center" data-reveal>
             <div className="inline-flex flex-wrap justify-center gap-2 rounded-full bg-[var(--mn-paper)] p-1 ring-1 ring-[var(--mn-line)]">
-              {productOptions.map((option) => (
-                <button
-                  aria-pressed={option.id === selectedProductStackPreference}
-                  className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] ${
-                    option.id === selectedProductStackPreference
-                      ? "bg-[var(--mn-teal)] text-white"
-                      : "text-[var(--mn-ink-soft)] hover:bg-[var(--mn-mint)]"
-                  }`}
-                  key={option.id}
-                  onClick={() => onProductStackPreferenceChange(option.id)}
-                  type="button"
-                >
-                  {option.id === "compact"
-                      ? labels.preferenceCompact
-                      : labels.preferenceBalanced}
-                </button>
-              ))}
+              {controlPreferences.map((preference) => {
+                const available = productOptionsById.has(preference);
+                const pending = pendingStackPreference === preference;
+                const selected = preference === selectedProductStackPreference;
+                const className = `rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] transition disabled:cursor-wait disabled:opacity-70 ${
+                  selected
+                    ? "bg-[var(--mn-teal)] text-white"
+                    : available
+                      ? "text-[var(--mn-ink-soft)] hover:bg-[var(--mn-mint)]"
+                      : "text-[var(--mn-ash)] hover:bg-[var(--mn-mint)]"
+                }`;
+                const label = pending
+                  ? labels.preferenceUpdating
+                  : preference === "compact"
+                    ? labels.preferenceCompact
+                    : labels.preferenceBalanced;
+                const title = pending
+                  ? labels.preferenceUpdating
+                  : preference === "compact"
+                    ? labels.preferenceCompactHint
+                    : labels.preferenceBalancedHint;
+
+                if (available) {
+                  return (
+                    <button
+                      aria-pressed={selected}
+                      className={className}
+                      key={preference}
+                      onClick={() => {
+                        onProductStackPreferenceChange(preference);
+                        replaceRevealStackUrl(locale, planId, preference);
+                      }}
+                      title={title}
+                      type="button"
+                    >
+                      {label}
+                    </button>
+                  );
+                }
+
+                return (
+                  <button
+                    aria-pressed={selected}
+                    className={className}
+                    disabled={pending}
+                    key={preference}
+                    onClick={() => {
+                      void requestProductStackPreference(preference);
+                    }}
+                    title={title}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : null}
@@ -2086,11 +2808,10 @@ function RevealProductsSection({
             </p>
           </div>
         ) : (
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4" data-reveal>
             {products.map((product, index) => (
               <article
                 className="group flex flex-col overflow-hidden rounded-[1.25rem] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] transition hover:-translate-y-1 hover:ring-[var(--mn-teal)] motion-reduce:transition-none"
-                data-reveal
                 key={`${product.recommendationRunId ?? "product"}:${product.id}`}
               >
                 <div className="relative flex h-60 items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#fff,var(--mn-mint))]">
@@ -2231,32 +2952,57 @@ function RevealFoodSupportSection({
 }>) {
   const { fallbackItems, variant } = selectedFoodSupport(
     result,
+    selectedNeedCoverage,
     selectedProductStackPreference
   );
-  const items = variant?.items ?? fallbackItems;
-  const headline = variant
-    ? getLocalizedText(variant.headline, locale)
-    : copy.foodSupportDefaultHeadline;
-  const body = variant
-    ? getLocalizedText(variant.body, locale)
-    : copy.foodSupportDefaultBody;
-  const needLabelById = new Map(
-    selectedNeedCoverage.map((need) => [need.id, need.displayName])
+  const visibleIngredients = visibleFormulaIngredients(result.supplementBreakdown);
+  const items = (variant?.items ?? fallbackItems).filter((item) =>
+    foodSupportFormulaGapsForItem(
+      item,
+      selectedNeedCoverage,
+      visibleIngredients,
+      locale
+    ).length > 0
   );
+  const fallbackGaps = foodSupportGaps(selectedNeedCoverage);
+  const fallbackSupportableGaps = foodSupportableGaps(fallbackGaps);
+  const fallbackGapText = joinFoodSupportNeeds(
+    fallbackSupportableGaps.length > 0 ? fallbackSupportableGaps : fallbackGaps,
+    locale
+  );
+  const headline = variant
+    ? safeFoodSupportCopy(
+        variant.headline,
+        locale,
+        fallbackGaps.length > 0
+          ? formatTemplate(copy.foodSupportGapHeadlineTemplate, {
+              gaps: fallbackGapText
+            })
+          : copy.foodSupportDefaultHeadline
+      )
+    : fallbackGaps.length > 0
+      ? formatTemplate(copy.foodSupportGapHeadlineTemplate, {
+          gaps: fallbackGapText
+        })
+      : copy.foodSupportDefaultHeadline;
+  const body = variant
+    ? safeFoodSupportCopy(
+        variant.body,
+        locale,
+        fallbackGaps.length > 0
+          ? formatTemplate(copy.foodSupportGapBodyTemplate, {
+              gaps: fallbackGapText
+            })
+          : copy.foodSupportDefaultBody
+      )
+    : fallbackGaps.length > 0
+      ? formatTemplate(copy.foodSupportGapBodyTemplate, {
+          gaps: fallbackGapText
+        })
+      : copy.foodSupportDefaultBody;
 
   if (items.length < 1) {
-    return (
-      <section className="border-t border-[var(--mn-line)] bg-[var(--mn-cream)] py-16">
-        <div className="mx-auto w-full max-w-6xl px-6 text-center sm:px-8" data-reveal>
-          <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
-            05 · {copy.foodSupportEyebrow}
-          </p>
-          <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]">
-            {copy.foodSupportEmpty}
-          </p>
-        </div>
-      </section>
-    );
+    return null;
   }
 
   return (
@@ -2285,10 +3031,25 @@ function RevealFoodSupportSection({
         <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {items.map((item) => {
             const name = getLocalizedText(item.food, locale);
-            const gapLabels = item.gapNeedIds
-              .map((needId) => needLabelById.get(needId))
-              .filter((label): label is string => Boolean(label))
-              .slice(0, 3);
+            const formulaGaps = foodSupportFormulaGapsForItem(
+              item,
+              selectedNeedCoverage,
+              visibleIngredients,
+              locale
+            ).slice(0, 3);
+            const itemRationale = safeFoodSupportCopy(
+              item.rationale,
+              locale,
+              locale === "th"
+                ? `${name} ช่วยเสริมจากอาหารในส่วนของ${joinFoodSupportFormulaGapLabels(
+                    formulaGaps,
+                    "th"
+                  )} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`
+                : `${name} ${name.endsWith("s") ? "give" : "gives"} food-level support around ${joinFoodSupportFormulaGapLabels(
+                    formulaGaps,
+                    "en"
+                  )} while product coverage stays separate.`
+            );
 
             return (
               <article
@@ -2326,19 +3087,55 @@ function RevealFoodSupportSection({
                     {name}
                   </h3>
                   <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                    {getLocalizedText(item.rationale, locale)}
+                    {itemRationale}
                   </p>
 
-                  {gapLabels.length > 0 ? (
-                    <div className="mt-4 flex flex-wrap gap-1.5">
-                      {gapLabels.map((label) => (
-                        <span
-                          className="rounded-full bg-[var(--mn-gold-tint)] px-2.5 py-1 text-xs font-semibold text-[#6d5427]"
-                          key={label}
-                        >
-                          {copy.foodSupportGapLabel}: {label}
-                        </span>
-                      ))}
+                  {formulaGaps.length > 0 ? (
+                    <div className="mt-4 rounded-lg bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
+                      <p
+                        className={`text-xs font-bold text-[var(--mn-ash)] ${
+                          locale === "th"
+                            ? ""
+                            : "uppercase tracking-[0.12em]"
+                        }`}
+                      >
+                        {copy.foodSupportGapLabel}
+                      </p>
+                      <div className="mt-3 space-y-2">
+                        {formulaGaps.map((gap) => (
+                          <div
+                            className="grid gap-3 rounded-md bg-[var(--mn-paper)] p-3 ring-1 ring-[var(--mn-line)] sm:grid-cols-[1fr_auto] sm:items-center"
+                            key={gap.id}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-[0.7rem] font-semibold text-[var(--mn-ash)]">
+                                {copy.foodSupportFormulaGapLabel}
+                                {gap.rowNumber
+                                  ? ` ${String(gap.rowNumber).padStart(2, "0")}`
+                                  : ""}
+                              </p>
+                              <p
+                                className={`mt-1 font-serif text-lg font-medium text-[var(--mn-ink)] ${
+                                  locale === "th" ? "leading-7" : "leading-tight"
+                                }`}
+                              >
+                                {gap.label}
+                              </p>
+                              {gap.dailyDose ? (
+                                <p className="mt-1 text-xs font-semibold text-[var(--mn-ink-soft)]">
+                                  {gap.dailyDose}
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="rounded-full bg-[var(--mn-gold-tint)] px-3 py-2 text-left text-xs font-bold text-[#6d5427] sm:text-right">
+                              <span className="block font-mono text-sm">
+                                {gap.coveragePercent}%
+                              </span>
+                              <span>{copy.foodSupportProductCoverage}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ) : null}
 
@@ -2394,7 +3191,7 @@ function RevealClosingSection({
         title:
           caution.title
             ? getLocalizedText(caution.title, locale)
-            : getLocalizedText(ingredient.supplement, locale)
+            : localizedSupplementName(ingredient.supplement, ingredient.id, locale)
       }))
     )
   ];

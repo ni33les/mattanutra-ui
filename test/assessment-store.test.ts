@@ -10,14 +10,21 @@ describe("assessment score analysis status", () => {
     );
   });
 
-  it("treats any completed score analysis as ready despite later duplicate active tasks", () => {
+  it("keeps score analysis preparing while active work exists even if stale completed rows exist", () => {
     assert.equal(
       healthScoreAnalysisStatusFromTaskStatuses(false, [
         "queued",
         "reserved",
         "completed"
       ]),
-      "ready"
+      "preparing"
+    );
+  });
+
+  it("does not mark completed score analysis ready without stored copy", () => {
+    assert.equal(
+      healthScoreAnalysisStatusFromTaskStatuses(false, ["completed"]),
+      "failed"
     );
   });
 

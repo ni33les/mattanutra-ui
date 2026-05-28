@@ -316,6 +316,7 @@ export type FormulationResult = FormulationBlueprint & FoodGuidanceBlueprint & {
   recommendations: RecommendedProduct[];
   schemaVersion: 1;
   sectionStatuses?: {
+    foodSupport?: NutritionSectionStatus;
     foods: NutritionSectionStatus;
     report?: NutritionSectionStatus;
     supplements: NutritionSectionStatus;

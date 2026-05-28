@@ -83,13 +83,23 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
+      /WORKER_RUN_ID = randomUUID\(\)/,
+      "worker sessions must carry a run id so stale profiles can be replaced"
+    );
+    assert.match(
+      source,
+      /metadata: \{[\s\S]*profileMode: mode[\s\S]*runId: WORKER_RUN_ID/,
+      "worker registration must send profile metadata for freshness reconciliation"
+    );
+    assert.match(
+      source,
       /WORKER_PROFILE_MODES[\s\S]*"advisor"[\s\S]*"food"[\s\S]*"formulation"[\s\S]*"healthscore"[\s\S]*"products"/,
       "worker:all must include every active customer task profile"
     );
     assert.match(
       source,
-      /food:\s*agentProfile\("foodGuidanceWorker",\s*\[[\s\S]*"generate_food_gap_guidance"[\s\S]*"generate_food_guidance"[\s\S]*\]\)/,
-      "food workers must explicitly claim food guidance and food gap tasks"
+      /food:\s*agentProfile\("foodGuidanceWorker",\s*\[\s*"generate_food_gap_guidance"\s*\]\)/,
+      "food workers must explicitly claim the post-product food gap task"
     );
     assert.match(
       source,
@@ -160,6 +170,16 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
+      /superseded_by_worker_registration/,
+      "worker registration should mark stale same-profile sessions offline"
+    );
+    assert.match(
+      source,
+      /status <> 'offline' or \$\{status\} = 'offline'/,
+      "offline worker sessions must not be revived by stale heartbeats"
+    );
+    assert.match(
+      source,
       /leaseSeconds: 180/,
       "default worker leases should release crashed sessions quickly"
     );
@@ -177,19 +197,36 @@ describe("external worker boundaries", () => {
 
   it("keeps interactive worker pickup on a fast reserve poll", async () => {
     const source = await readFile("app/api/tasks/reserve/route.ts", "utf8");
+    const completeRouteSource = await readFile(
+      "app/api/tasks/[id]/complete/route.ts",
+      "utf8"
+    );
+    const failRouteSource = await readFile(
+      "app/api/tasks/[id]/fail/route.ts",
+      "utf8"
+    );
     const visibilityEventsSource = await readFile(
       "app/api/admin/visibility/events/route.ts",
       "utf8"
     );
     const adminSseSource = await readFile("lib/admin-sse.ts", "utf8");
     const taskWorkerSource = await readFile("lib/task-worker.ts", "utf8");
+    const taskResultApplierSource = await readFile(
+      "lib/task-result-applier.ts",
+      "utf8"
+    );
     const serviceSource = await readFile("lib/task-service.ts", "utf8");
     const runnerSource = await readFile("workers/runner.ts", "utf8");
 
     assert.match(
       source,
-      /INTERACTIVE_TASK_TYPES[\s\S]*analyze_healthscore[\s\S]*generate_food_gap_guidance[\s\S]*generate_food_guidance[\s\S]*generate_supplement_guidance/,
+      /INTERACTIVE_TASK_TYPES[\s\S]*analyze_healthscore[\s\S]*generate_food_gap_guidance[\s\S]*generate_supplement_guidance/,
       "blocking UI task types must be on the interactive reserve path"
+    );
+    assert.equal(
+      /INTERACTIVE_TASK_TYPES[\s\S]*generate_food_guidance/.test(source),
+      false,
+      "legacy food guidance must stay off the interactive reserve path"
     );
     assert.match(
       source,
@@ -201,6 +238,9 @@ describe("external worker boundaries", () => {
       /waitForTaskQueueChange/,
       "long-polling workers should wake immediately when the task queue changes"
     );
+    assert.match(source, /eventName: "task_reserved"/);
+    assert.match(completeRouteSource, /eventName: "task_completed"/);
+    assert.match(failRouteSource, /eventName: "task_failed"/);
     assert.match(
       source,
       /buildTaskWorkItem[\s\S]*failTask[\s\S]*continue;/,
@@ -251,35 +291,62 @@ describe("external worker boundaries", () => {
       /exampleFormulation: 150/,
       "free example formulation must remain a low-value background task"
     );
+    const assessmentPregenerationSource = taskWorkerSource.slice(
+      taskWorkerSource.indexOf("export async function enqueueAssessmentPregenerationTasks"),
+      taskWorkerSource.indexOf("export async function enqueueNutritionPlanTasks")
+    );
+    const paidPlanSource = taskWorkerSource.slice(
+      taskWorkerSource.indexOf("export async function enqueueNutritionPlanTasks"),
+      taskWorkerSource.indexOf("export async function enqueuePaymentCheckoutPregenerationTasks")
+    );
+    const checkoutPregenerationSource = taskWorkerSource.slice(
+      taskWorkerSource.indexOf("export async function enqueuePaymentCheckoutPregenerationTasks"),
+      taskWorkerSource.indexOf("export async function enqueueFormulationTask")
+    );
     assert.match(
-      taskWorkerSource,
-      /enqueueAssessmentPregenerationTasks[\s\S]*enqueueHealthScoreAnalysisTask[\s\S]*generate_food_guidance[\s\S]*generate_supplement_guidance[\s\S]*enqueueProductRecommendationsTask/,
-      "assessment capture should create the healthscore, food, supplement, and product-matching task graph"
+      assessmentPregenerationSource,
+      /enqueueHealthScoreAnalysisTask[\s\S]*generate_supplement_guidance[\s\S]*enqueueProductRecommendationsTask[\s\S]*enqueueFoodGapSupportTask/,
+      "assessment capture should prequeue the single HealthScore, supplement, product, and food-gap graph"
     );
     assert.match(
       taskWorkerSource,
-      /enqueueAssessmentPregenerationTasks[\s\S]*enqueueFoodGapSupportTask\(\{[\s\S]*dependsOnTaskId: productRecommendationTaskId/,
+      /activeTaskRows[\s\S]*task_type = 'analyze_healthscore'[\s\S]*status in \([\s\S]*'queued'[\s\S]*'reserved'[\s\S]*'waiting_approval'[\s\S]*if \(activeTaskRows\[0\]\) \{[\s\S]*return null;/,
+      "HealthScore status polling must not enqueue a second HealthScore while the first AI copy task is still active"
+    );
+    assert.equal(
+      /taskType: "generate_food_guidance"/.test(assessmentPregenerationSource),
+      false,
+      "assessment capture must not prequeue legacy food guidance"
+    );
+    assert.match(
+      assessmentPregenerationSource,
+      /enqueueFoodGapSupportTask\(\{[\s\S]*dependsOnTaskId: productRecommendationTaskId/,
       "assessment capture should queue food-gap support early behind product matching"
     );
-    assert.match(
-      taskWorkerSource,
-      /enqueueAssessmentPregenerationTasks[\s\S]*enqueueNutritionReportTask\(\{[\s\S]*dependsOnTaskIds: \[foodGuidanceTaskId, formulationTaskId\]/,
-      "assessment capture should queue final report copy early behind food and supplement generation"
+    assert.equal(
+      /enqueueNutritionReportTask/.test(assessmentPregenerationSource),
+      false,
+      "assessment capture must not prequeue a separate nutrition report task"
     );
     assert.match(
-      taskWorkerSource,
-      /enqueueNutritionPlanTasks[\s\S]*enqueueProductRecommendationsTask\(\{[\s\S]*dependsOnTaskId: readiness\.formulationReady \? null : formulationTaskId/,
+      paidPlanSource,
+      /enqueueProductRecommendationsTask\(\{[\s\S]*dependsOnTaskId: readiness\.formulationReady \? null : formulationTaskId/,
       "paid plan adoption should queue product matching early behind formulation when needed"
     );
-    assert.match(
-      taskWorkerSource,
-      /enqueueNutritionPlanTasks[\s\S]*nutritionReportDependencies[\s\S]*enqueueNutritionReportTask/,
-      "paid plan adoption should queue final report copy early with dependencies when needed"
+    assert.equal(
+      /enqueueNutritionReportTask/.test(paidPlanSource),
+      false,
+      "paid plan adoption must not queue a separate nutrition report task"
     );
-    assert.match(
-      taskWorkerSource,
-      /enqueuePaymentCheckoutPregenerationTasks[\s\S]*checkout-pregeneration:food-guidance[\s\S]*enqueueNutritionReportTask/,
-      "checkout pre-generation should ensure food guidance exists before queueing the dependent report task"
+    assert.equal(
+      /taskType: "generate_food_guidance"/.test(checkoutPregenerationSource),
+      false,
+      "checkout pre-generation must not queue legacy food guidance"
+    );
+    assert.equal(
+      /enqueueNutritionReportTask/.test(checkoutPregenerationSource),
+      false,
+      "checkout pre-generation must not queue a separate nutrition report task"
     );
     assert.match(
       taskWorkerSource,
@@ -295,6 +362,13 @@ describe("external worker boundaries", () => {
       taskWorkerSource,
       /product_recommendation_runs[\s\S]*generated_at >= greatest/,
       "late product-matching enqueue points must not create duplicate runs when current recommendations already exist"
+    );
+    assert.equal(
+      /refreshHealthScoreProductSubtraction[\s\S]*enqueueHealthScoreAnalysisTask/.test(
+        taskResultApplierSource
+      ),
+      false,
+      "product readiness must update locked HealthScore subtraction without queuing a second HealthScore AI task"
     );
   });
 
@@ -345,7 +419,7 @@ describe("external worker boundaries", () => {
     assert.match(
       source,
       /const status = nutritionReady \? "ready" : "queued"/,
-      "reused food and supplement outputs must resolve the paid assessment instead of leaving it queued"
+      "reused supplement output must resolve the paid assessment instead of leaving it queued"
     );
   });
 

@@ -1,16 +1,11 @@
 import { recordXaiUsageCost } from "@/lib/finance-ledger";
+import {
+  callGrokChatCompletion,
+  configuredGrokModel,
+  configuredGrokValue,
+  getRequiredXaiApiKey
+} from "@/lib/grok-client";
 import type { Locale } from "@/lib/i18n";
-
-type XaiChatCompletion = {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
-  }>;
-  id?: string;
-  model?: string;
-  usage?: unknown;
-};
 
 export type FoodReviewSuggestionInput = Readonly<{
   currentFrequency?: string | null;
@@ -30,28 +25,16 @@ export type FoodReviewSuggestion = Readonly<{
   serving: string;
 }>;
 
-const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
-const DEFAULT_GROK_MODEL = "grok-4.3";
 const DEFAULT_REASONING_EFFORT = "low";
 const REQUEST_TIMEOUT_MS = 90_000;
 
-function configured(value: string | undefined) {
-  return value?.trim() ?? "";
-}
-
 function config() {
-  const apiKey = configured(process.env.XAI_API_KEY);
-
-  if (!apiKey) {
-    throw new Error("XAI_API_KEY is not configured");
-  }
-
   return {
-    apiKey,
-    model: configured(process.env.GROK_MODEL) || DEFAULT_GROK_MODEL,
+    apiKey: getRequiredXaiApiKey(),
+    model: configuredGrokModel(process.env.GROK_MODEL),
     reasoningEffort:
-      configured(process.env.FOOD_REVIEW_REASONING_EFFORT) ||
-      configured(process.env.FOOD_GUIDANCE_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.FOOD_REVIEW_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.FOOD_GUIDANCE_REASONING_EFFORT) ||
       DEFAULT_REASONING_EFFORT
   };
 }
@@ -92,15 +75,13 @@ function text(value: unknown, fallback: string) {
 
 async function callGrok(input: FoodReviewSuggestionInput) {
   const grok = config();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  try {
-    const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
-      body: JSON.stringify({
-        messages: [
-          {
-            content: [
+  const completion = await callGrokChatCompletion({
+    apiKey: grok.apiKey,
+    maxTokens: 350,
+    messages: [
+      {
+        content: [
               "You draft conservative food guidance details for MattaNutra human review.",
               "This is internal wellness review support, not medical advice.",
               "Return JSON only. No markdown, no prose outside JSON.",
@@ -109,11 +90,11 @@ async function callGrok(input: FoodReviewSuggestionInput) {
               "Use short practical serving sizes, ordinary food language, and conservative frequency.",
               "Avoid extreme dieting, fasting, detox language, weight-loss pressure, and medical treatment claims.",
               "Write in the requested locale."
-            ].join("\n"),
-            role: "system"
-          },
-          {
-            content: JSON.stringify(
+        ].join("\n"),
+        role: "system"
+      },
+      {
+        content: JSON.stringify(
               {
                 foodReview: input,
                 output: {
@@ -127,49 +108,30 @@ async function callGrok(input: FoodReviewSuggestionInput) {
               },
               null,
               2
-            ),
-            role: "user"
-          }
-        ],
-        model: grok.model,
-        max_tokens: 350,
-        reasoning_effort: grok.reasoningEffort,
-        response_format: { type: "json_object" },
-        stream: false,
-        temperature: 0.1
-      }),
-      headers: {
-        Authorization: `Bearer ${grok.apiKey}`,
-        "Content-Type": "application/json"
-      },
-      method: "POST",
-      signal: controller.signal
-    });
+        ),
+        role: "user"
+      }
+    ],
+    model: grok.model,
+    purpose: "food review suggestion",
+    reasoningEffort: grok.reasoningEffort,
+    temperature: 0.1,
+    timeoutMs: REQUEST_TIMEOUT_MS
+  });
 
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `xAI food review suggestion failed with ${response.status}: ${body.slice(0, 500)}`
-      );
-    }
+  await recordXaiUsageCost({
+    metadata: {
+      foodName: input.foodName,
+      reviewKind: input.reviewKind
+    },
+    model: completion.model ?? grok.model,
+    purpose: "food_review_suggestion",
+    reasoningEffort: grok.reasoningEffort,
+    responseId: completion.id,
+    usage: completion.usage
+  });
 
-    const completion = (await response.json()) as XaiChatCompletion;
-    await recordXaiUsageCost({
-      metadata: {
-        foodName: input.foodName,
-        reviewKind: input.reviewKind
-      },
-      model: completion.model ?? grok.model,
-      purpose: "food_review_suggestion",
-      reasoningEffort: grok.reasoningEffort,
-      responseId: completion.id,
-      usage: completion.usage
-    });
-
-    return completion;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return completion;
 }
 
 export async function suggestFoodReviewDetails(

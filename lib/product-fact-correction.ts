@@ -12,17 +12,13 @@ import {
   type ProductAudience,
   type ProductConfidence
 } from "@/lib/product-recommendations";
-
-type XaiChatCompletion = {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
-  }>;
-  id?: string;
-  model?: string;
-  usage?: unknown;
-};
+import {
+  callGrokChatCompletion,
+  configuredGrokModel,
+  configuredGrokValue,
+  getRequiredXaiApiKey,
+  type GrokChatCompletion
+} from "@/lib/grok-client";
 
 type ProductForCorrection = Readonly<{
   brandName: string | null;
@@ -110,28 +106,16 @@ export type ProductCatalogueEnrichmentDraftResult = Readonly<{
   warnings: string[];
 }>;
 
-const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
-const DEFAULT_GROK_MODEL = "grok-4.3";
 const DEFAULT_REASONING_EFFORT = "low";
 const REQUEST_TIMEOUT_MS = 120_000;
 
-function configured(value: string | undefined) {
-  return value?.trim() ?? "";
-}
-
 function config() {
-  const apiKey = configured(process.env.XAI_API_KEY);
-
-  if (!apiKey) {
-    throw new Error("XAI_API_KEY is not configured");
-  }
-
   return {
-    apiKey,
-    model: configured(process.env.GROK_MODEL) || DEFAULT_GROK_MODEL,
+    apiKey: getRequiredXaiApiKey(),
+    model: configuredGrokModel(process.env.GROK_MODEL),
     reasoningEffort:
-      configured(process.env.PRODUCT_FACT_CORRECTION_REASONING_EFFORT) ||
-      configured(process.env.FORMULATION_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.PRODUCT_FACT_CORRECTION_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.FORMULATION_REASONING_EFFORT) ||
       DEFAULT_REASONING_EFFORT
   };
 }
@@ -467,8 +451,6 @@ async function callGrok(input: Readonly<{
   purpose?: string;
 }>) {
   const grok = config();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const fallbackInstructions = input.allowPublicKnowledgeFallback
     ? [
       "Fallback mode is enabled because deterministic page parsing and strict correction did not produce usable facts.",
@@ -482,12 +464,12 @@ async function callGrok(input: Readonly<{
       "Never invent ingredients or doses that are not supported by the supplied product page data."
     ];
 
-  try {
-    const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
-      body: JSON.stringify({
-        messages: [
-          {
-            content: [
+  const completion = await callGrokChatCompletion({
+    apiKey: grok.apiKey,
+    maxTokens: 2200,
+    messages: [
+      {
+        content: [
               "You correct product label facts for MattaNutra's supplement product catalogue.",
               "This is internal catalogue cleanup for product matching, not customer advice.",
               "Return JSON only. No markdown and no prose outside JSON.",
@@ -509,11 +491,11 @@ async function callGrok(input: Readonly<{
               "Recognize PEA, Palmidrol, Levagen+ and palmitoylethanolamide as the same active ingredient family.",
               ...fallbackInstructions,
               "Use confidence high only when both identity and dose are explicit; moderate for clear identity with uncertain dose; low for weak or inferred identity."
-            ].join("\n"),
-            role: "system"
-          },
-          {
-            content: JSON.stringify(
+        ].join("\n"),
+        role: "system"
+      },
+      {
+        content: JSON.stringify(
               {
                 canonicalSupplementCatalogue: input.catalogue.map((item) => ({
                   aliases: item.aliases,
@@ -554,50 +536,31 @@ async function callGrok(input: Readonly<{
               },
               null,
               2
-            ),
-            role: "user"
-          }
-        ],
-        model: grok.model,
-        max_tokens: 2200,
-        reasoning_effort: grok.reasoningEffort,
-        response_format: { type: "json_object" },
-        stream: false,
-        temperature: 0.1
-      }),
-      headers: {
-        Authorization: `Bearer ${grok.apiKey}`,
-        "Content-Type": "application/json"
-      },
-      method: "POST",
-      signal: controller.signal
-    });
+        ),
+        role: "user"
+      }
+    ],
+    model: grok.model,
+    purpose: "product fact correction",
+    reasoningEffort: grok.reasoningEffort,
+    temperature: 0.1,
+    timeoutMs: REQUEST_TIMEOUT_MS
+  });
 
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `xAI product fact correction failed with ${response.status}: ${body.slice(0, 500)}`
-      );
-    }
+  await recordXaiUsageCost({
+    metadata: {
+      productId: input.product.id,
+      productTitle: input.product.title,
+      productUrl: input.product.productUrl
+    },
+    model: completion.model ?? grok.model,
+    purpose: input.purpose ?? "product_fact_correction",
+    reasoningEffort: grok.reasoningEffort,
+    responseId: completion.id,
+    usage: completion.usage
+  });
 
-    const completion = (await response.json()) as XaiChatCompletion;
-    await recordXaiUsageCost({
-      metadata: {
-        productId: input.product.id,
-        productTitle: input.product.title,
-        productUrl: input.product.productUrl
-      },
-      model: completion.model ?? grok.model,
-      purpose: input.purpose ?? "product_fact_correction",
-      reasoningEffort: grok.reasoningEffort,
-      responseId: completion.id,
-      usage: completion.usage
-    });
-
-    return completion;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return completion;
 }
 
 async function callGrokCatalogueEnrichment(input: Readonly<{
@@ -606,8 +569,6 @@ async function callGrokCatalogueEnrichment(input: Readonly<{
   product: ProductForCorrection;
 }>) {
   const grok = config();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const systemMessage = {
     content: [
       "You enrich a supplement product catalogue for MattaNutra product matching.",
@@ -632,7 +593,7 @@ async function callGrokCatalogueEnrichment(input: Readonly<{
       "If the product clearly contains an active but dose is unavailable, keep amount and unit null and confidence low or moderate.",
       "Default productAudience to both unless clearly sex-specific."
     ].join("\n"),
-    role: "system"
+    role: "system" as const
   };
   const textContent = JSON.stringify(
     {
@@ -696,7 +657,7 @@ async function callGrokCatalogueEnrichment(input: Readonly<{
   });
   const textUserMessage = {
     content: textContent,
-    role: "user"
+    role: "user" as const
   };
   const visionUserMessage = imageParts.length > 0
     ? {
@@ -704,72 +665,52 @@ async function callGrokCatalogueEnrichment(input: Readonly<{
         { text: textContent, type: "text" },
         ...imageParts
       ],
-      role: "user"
+      role: "user" as const
     }
     : textUserMessage;
 
-  async function request(messages: unknown[]) {
-    const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
-      body: JSON.stringify({
-        messages,
-        model: grok.model,
-        max_tokens: 2600,
-        reasoning_effort: grok.reasoningEffort,
-        response_format: { type: "json_object" },
-        stream: false,
-        temperature: 0
-      }),
-      headers: {
-        Authorization: `Bearer ${grok.apiKey}`,
-        "Content-Type": "application/json"
-      },
-      method: "POST",
-      signal: controller.signal
+  async function request(messages: Array<{ content: unknown; role: "system" | "user" }>) {
+    return callGrokChatCompletion({
+      apiKey: grok.apiKey,
+      maxTokens: 2600,
+      messages,
+      model: grok.model,
+      purpose: "product catalogue enrichment",
+      reasoningEffort: grok.reasoningEffort,
+      temperature: 0,
+      timeoutMs: REQUEST_TIMEOUT_MS
     });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `xAI product catalogue enrichment failed with ${response.status}: ${body.slice(0, 500)}`
-      );
-    }
-
-    return (await response.json()) as XaiChatCompletion;
   }
+
+  let imageRetry = false;
+  let completion: GrokChatCompletion;
 
   try {
-    let imageRetry = false;
-    let completion: XaiChatCompletion;
-
-    try {
-      completion = await request([systemMessage, visionUserMessage]);
-    } catch (error) {
-      if (imageParts.length < 1) {
-        throw error;
-      }
-
-      imageRetry = true;
-      completion = await request([systemMessage, textUserMessage]);
+    completion = await request([systemMessage, visionUserMessage]);
+  } catch (error) {
+    if (imageParts.length < 1) {
+      throw error;
     }
 
-    await recordXaiUsageCost({
-      metadata: {
-        imageRetry,
-        productId: input.product.id,
-        productTitle: input.product.title,
-        productUrl: input.product.productUrl
-      },
-      model: completion.model ?? grok.model,
-      purpose: "product_catalogue_enrichment",
-      reasoningEffort: grok.reasoningEffort,
-      responseId: completion.id,
-      usage: completion.usage
-    });
-
-    return completion;
-  } finally {
-    clearTimeout(timeout);
+    imageRetry = true;
+    completion = await request([systemMessage, textUserMessage]);
   }
+
+  await recordXaiUsageCost({
+    metadata: {
+      imageRetry,
+      productId: input.product.id,
+      productTitle: input.product.title,
+      productUrl: input.product.productUrl
+    },
+    model: completion.model ?? grok.model,
+    purpose: "product_catalogue_enrichment",
+    reasoningEffort: grok.reasoningEffort,
+    responseId: completion.id,
+    usage: completion.usage
+  });
+
+  return completion;
 }
 
 function warningsValue(value: unknown) {

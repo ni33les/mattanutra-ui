@@ -8,6 +8,7 @@ import {
 import { applyTaskFailureResult } from "@/lib/task-result-applier";
 import { buildTaskWorkItem } from "@/lib/task-work-items";
 import { enqueueMissingProductRecommendationsForReadyPlans } from "@/lib/task-worker";
+import { writeBpmEvent } from "@/lib/bpm";
 import {
   failTask,
   getTaskBundle,
@@ -26,7 +27,6 @@ const INTERACTIVE_RESERVE_POLL_INTERVAL_MS = 1_000;
 const INTERACTIVE_TASK_TYPES = new Set([
   "analyze_healthscore",
   "generate_food_gap_guidance",
-  "generate_food_guidance",
   "generate_supplement_guidance",
   "generate_product_recommendations"
 ]);
@@ -177,6 +177,23 @@ export async function POST(request: Request) {
         });
         continue;
       }
+
+      await writeBpmEvent({
+        actorType: "worker",
+        eventName: "task_reserved",
+        eventStatus: "reserved",
+        eventType: "system",
+        planId: reserved.task.planId,
+        properties: {
+          agentId: reserved.agent.id,
+          reservationId: reserved.reservationId,
+          taskGroupId: reserved.task.taskGroupId,
+          taskId: reserved.task.id,
+          taskType: reserved.task.taskType,
+          workerSessionId
+        },
+        severity: "low"
+      });
 
       return openClawJson({
         agent: reserved.agent,

@@ -14,6 +14,7 @@ type NutritionRevealPageProps = Readonly<{
   }>;
   searchParams: Promise<{
     plan?: string;
+    stack?: string;
   }>;
 }>;
 
@@ -33,8 +34,10 @@ export default async function NutritionRevealPage({
 
   const locale: Locale = rawLocale;
   const dictionary = getDictionary(locale);
-  const { plan } = await searchParams;
+  const { plan, stack } = await searchParams;
   const planId = typeof plan === "string" && isUuid(plan) ? plan : "";
+  const initialStackPreference =
+    stack === "compact" || stack === "balanced" ? stack : null;
 
   if (!planId) {
     notFound();
@@ -70,6 +73,7 @@ export default async function NutritionRevealPage({
         title={dictionary.hero.eyebrow}
       />
       <FormulationResults
+        initialStackPreference={initialStackPreference}
         initialResult={initialResult}
         locale={locale}
         planId={planId}

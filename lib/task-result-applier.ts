@@ -58,7 +58,6 @@ import {
   enqueueExampleEmailIfPreviewReady,
   enqueueExampleEmailsForReadyFullPlan,
   enqueueFoodGapSupportTask,
-  enqueueHealthScoreAnalysisTask,
   enqueueNutritionPlanRefinementTask,
   enqueueProductRecommendationsTask,
   enqueueRefinedNutritionPlanTasks,
@@ -109,7 +108,7 @@ async function updateAssessmentReadyIfNutritionReady(
   planId: string
 ) {
   const rows = await sql<Array<{
-    food_guidance_ready: boolean;
+    food_gap_support_ready: boolean;
     formulation_ready: boolean;
   }>>`
     select
@@ -130,11 +129,12 @@ async function updateAssessmentReadyIfNutritionReady(
             model_version is null
             or model_version not like '%:example'
           )
-      ) as food_guidance_ready
+          and guidance ? 'foodGapSupport'
+      ) as food_gap_support_ready
   `;
   const formulationReady = rows[0]?.formulation_ready === true;
-  const foodGuidanceReady = rows[0]?.food_guidance_ready === true;
-  const ready = formulationReady && foodGuidanceReady;
+  const foodGapSupportReady = rows[0]?.food_gap_support_ready === true;
+  const ready = formulationReady;
 
   await appendAssessmentVersion(sql, {
     afterPayload: {
@@ -144,7 +144,7 @@ async function updateAssessmentReadyIfNutritionReady(
       status: ready ? "ready" : "preparing"
     },
     changeReason: "nutrition_readiness_refreshed",
-    eventPayload: { foodGuidanceReady, formulationReady },
+    eventPayload: { foodGapSupportReady, formulationReady },
     eventType: "assessment_status_projection_update",
     planId,
     source: "task_result_applier"
@@ -2001,12 +2001,10 @@ function sameHealthScoreSubtractionStats(
 }
 
 async function refreshHealthScoreProductSubtraction({
-  afterCommit,
   result,
   sql,
   task
 }: Readonly<{
-  afterCommit?: AfterCommitScheduler;
   result: ProductRecommendationResult;
   sql: TaskServiceDb;
   task: TaskRecord;
@@ -2064,15 +2062,6 @@ async function refreshHealthScoreProductSubtraction({
       updated_at = now()
     where plan_id = ${task.planId}::uuid
   `;
-
-  await eventually(afterCommit, async () => {
-    await enqueueHealthScoreAnalysisTask({
-      force: true,
-      planId: task.planId as string,
-      source: "product_recommendations_ready",
-      taskGroupId: task.taskGroupId
-    });
-  });
 
   return healthScore;
 }
@@ -2199,7 +2188,6 @@ async function applyProductRecommendationsResult(
   `;
 
   await refreshHealthScoreProductSubtraction({
-    afterCommit,
     result,
     sql,
     task

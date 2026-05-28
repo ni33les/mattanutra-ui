@@ -94,6 +94,7 @@ export class WorkerApiClient {
     agent: WorkerAgentConfig;
     concurrency: number;
     instanceId: string;
+    metadata?: JsonRecord;
     workerVersion?: string | null;
   }>) {
     return this.post<WorkerRegistration>("/api/workers/register", {
@@ -108,6 +109,7 @@ export class WorkerApiClient {
       capabilities: input.agent.capabilities,
       concurrency: input.concurrency,
       instanceId: input.instanceId,
+      metadata: input.metadata ?? {},
       taskTypes: input.agent.taskTypes,
       workerVersion: input.workerVersion ?? null
     });

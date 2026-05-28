@@ -49,7 +49,7 @@ export function HealthspanLogo({
       </span>
 
       <span className="inline-grid leading-none">
-        <span className="mn-logo-wordmark flex items-baseline gap-1 text-[22px] font-medium tracking-normal sm:text-[23px]">
+        <span className="mn-logo-wordmark inline-flex items-baseline whitespace-nowrap text-[22px] font-medium tracking-normal sm:text-[23px]">
           <span className="text-[var(--mn-logo-ink,var(--mn-ink))]">Matta</span>
           <span className="text-[var(--mn-teal)]">Nutra</span>
         </span>

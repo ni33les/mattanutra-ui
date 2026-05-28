@@ -1037,6 +1037,9 @@ export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
     input.capabilities ?? input.agent.capabilities
   );
   const taskTypes = normalizeCapabilities(input.taskTypes);
+  const sessionMetadata = input.metadata ?? {};
+  const profileMode = optionalText(sessionMetadata.profileMode);
+  const runId = optionalText(sessionMetadata.runId);
   const agent = await upsertAgentRecord(sql, {
     capabilities,
     id: input.agent.id,
@@ -1073,7 +1076,7 @@ export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
       ${taskTypes},
       ${positiveInteger(input.concurrency, 1)},
       ${optionalText(input.workerVersion)},
-      ${sql.json(toJsonValue(input.metadata ?? {}))},
+      ${sql.json(toJsonValue(sessionMetadata))},
       now(),
       now(),
       now()
@@ -1090,6 +1093,30 @@ export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
       updated_at = now()
     returning *
   `;
+  const session = mapWorkerSession(rows[0]);
+
+  await sql`
+    update public.worker_sessions
+    set
+      status = 'offline',
+      current_task_id = null,
+      metadata = metadata || jsonb_build_object(
+        'offlineReason', 'superseded_by_worker_registration',
+        'supersededBySessionId', ${session.id}::text
+      ),
+      updated_at = now()
+    where agent_id = ${agent.id}::uuid
+      and id <> ${session.id}::uuid
+      and status <> 'offline'
+      and (
+        last_seen_at < now() - interval '2 minutes'
+        or (
+          ${profileMode}::text is not null
+          and metadata ->> 'profileMode' = ${profileMode}
+          and coalesce(metadata ->> 'runId', '') <> coalesce(${runId}::text, '')
+        )
+      )
+  `;
 
   return {
     agent,
@@ -1097,7 +1124,7 @@ export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
       leaseSeconds: 180,
       waitSeconds: 20
     },
-    session: mapWorkerSession(rows[0])
+    session
   };
 }
 
@@ -1126,6 +1153,7 @@ export async function heartbeatWorkerSession(input: HeartbeatWorkerSessionInput)
       updated_at = now()
     where id = ${workerSessionId}::uuid
       and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+      and (status <> 'offline' or ${status} = 'offline')
     returning *
   `;
 

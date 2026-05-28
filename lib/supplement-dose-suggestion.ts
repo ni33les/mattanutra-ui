@@ -12,17 +12,12 @@ import {
   type SupplementSafetyFlag
 } from "@/lib/supplement-safety-flags";
 import { recordXaiUsageCost } from "@/lib/finance-ledger";
-
-type XaiChatCompletion = {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
-  }>;
-  id?: string;
-  model?: string;
-  usage?: unknown;
-};
+import {
+  callGrokChatCompletion,
+  configuredGrokModel,
+  configuredGrokValue,
+  getRequiredXaiApiKey
+} from "@/lib/grok-client";
 
 export type SupplementDoseSuggestionInput = Readonly<{
   category?: string | null;
@@ -46,27 +41,15 @@ export type SupplementDoseSuggestion = Readonly<{
   safetyNotes: string;
 }>;
 
-const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
-const DEFAULT_GROK_MODEL = "grok-4.3";
 const DEFAULT_REASONING_EFFORT = "low";
 const REQUEST_TIMEOUT_MS = 120_000;
 
-function configured(value: string | undefined) {
-  return value?.trim() ?? "";
-}
-
 function config() {
-  const apiKey = configured(process.env.XAI_API_KEY);
-
-  if (!apiKey) {
-    throw new Error("XAI_API_KEY is not configured");
-  }
-
   return {
-    apiKey,
-    model: configured(process.env.GROK_MODEL) || DEFAULT_GROK_MODEL,
+    apiKey: getRequiredXaiApiKey(),
+    model: configuredGrokModel(process.env.GROK_MODEL),
     reasoningEffort:
-      configured(process.env.FORMULATION_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.FORMULATION_REASONING_EFFORT) ||
       DEFAULT_REASONING_EFFORT
   };
 }
@@ -164,15 +147,13 @@ function suggestionPayload(parsed: Record<string, unknown>) {
 
 async function callGrok(input: SupplementDoseSuggestionInput) {
   const grok = config();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  try {
-    const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
-      body: JSON.stringify({
-        messages: [
-          {
-            content: [
+  const completion = await callGrokChatCompletion({
+    apiKey: grok.apiKey,
+    maxTokens: 400,
+    messages: [
+      {
+        content: [
               "You prepare conservative supplement safety drafts for MattaNutra admin review.",
               "This is internal safety support, not medical advice.",
               "Return JSON only. No markdown, no prose outside JSON.",
@@ -188,11 +169,11 @@ async function callGrok(input: SupplementDoseSuggestionInput) {
               "If evidence is uncertain, choose a conservative ceiling and confidence low.",
               "Never suggest a dose range.",
               "Write safetyNotes as concise admin-facing notes explaining the status, flags, and dose choice."
-            ].join("\n"),
-            role: "system"
-          },
-          {
-            content: JSON.stringify(
+        ].join("\n"),
+        role: "system"
+      },
+      {
+        content: JSON.stringify(
               {
                 allowedUnits: supplementDoseUnits,
                 allowedSafetyFlags: supplementSafetyFlags,
@@ -208,49 +189,30 @@ async function callGrok(input: SupplementDoseSuggestionInput) {
               },
               null,
               2
-            ),
-            role: "user"
-          }
-        ],
-        model: grok.model,
-        max_tokens: 400,
-        reasoning_effort: grok.reasoningEffort,
-        response_format: { type: "json_object" },
-        stream: false,
-        temperature: 0.1
-      }),
-      headers: {
-        Authorization: `Bearer ${grok.apiKey}`,
-        "Content-Type": "application/json"
-      },
-      method: "POST",
-      signal: controller.signal
-    });
+        ),
+        role: "user"
+      }
+    ],
+    model: grok.model,
+    purpose: "supplement dose suggestion",
+    reasoningEffort: grok.reasoningEffort,
+    temperature: 0.1,
+    timeoutMs: REQUEST_TIMEOUT_MS
+  });
 
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `xAI dose suggestion failed with ${response.status}: ${body.slice(0, 500)}`
-      );
-    }
+  await recordXaiUsageCost({
+    metadata: {
+      category: input.category,
+      supplementName: input.supplementName
+    },
+    model: completion.model ?? grok.model,
+    purpose: "supplement_dose_suggestion",
+    reasoningEffort: grok.reasoningEffort,
+    responseId: completion.id,
+    usage: completion.usage
+  });
 
-    const completion = (await response.json()) as XaiChatCompletion;
-    await recordXaiUsageCost({
-      metadata: {
-        category: input.category,
-        supplementName: input.supplementName
-      },
-      model: completion.model ?? grok.model,
-      purpose: "supplement_dose_suggestion",
-      reasoningEffort: grok.reasoningEffort,
-      responseId: completion.id,
-      usage: completion.usage
-    });
-
-    return completion;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return completion;
 }
 
 export async function suggestSupplementDose(

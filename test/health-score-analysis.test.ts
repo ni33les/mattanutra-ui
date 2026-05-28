@@ -99,16 +99,15 @@ function validate(value: unknown) {
 }
 
 describe("HealthScore AI copy validator", () => {
-  it("uses Grok/xAI for HealthScore copy instead of OpenAI-only configuration", async () => {
+  it("uses the shared Grok/xAI client for HealthScore copy", async () => {
     const source = await readFile(
       new URL("../lib/health-score-analysis.ts", import.meta.url),
       "utf8"
     );
 
-    assert.match(source, /https:\/\/api\.x\.ai\/v1\/chat\/completions/);
-    assert.match(source, /process\.env\.XAI_API_KEY/);
+    assert.match(source, /callGrokChatCompletion/);
+    assert.match(source, /getRequiredXaiApiKey/);
     assert.match(source, /process\.env\.GROK_MODEL/);
-    assert.doesNotMatch(source, /OPENAI_API_KEY|OPENAI_MODEL|api\.openai\.com|OpenAI|callOpenAi|OpenAiChatCompletion/);
   });
 
   it("accepts structured English and Thai page copy in locked slots", () => {
@@ -118,6 +117,48 @@ describe("HealthScore AI copy validator", () => {
     assert.ok(validation.response);
     assert.equal(validation.response.pageCopy.gapTrio?.length, 3);
     assert.equal(validation.response.pageCopy.findings?.length, 3);
+  });
+
+  it("accepts localized paywall feature cards returned by Grok", () => {
+    const response = mutableResponse();
+    const grokPaywallFeatures = Array.from({ length: 3 }, (_, index) => ({
+      en: {
+        description: `English paywall card ${index + 1}`,
+        name: `English card ${index + 1}`
+      },
+      th: {
+        description: `รายละเอียดการ์ด ${index + 1}`,
+        name: `การ์ด ${index + 1}`
+      }
+    }));
+    response.advice.paywallFeatures = grokPaywallFeatures;
+    response.pageCopy.paywallFeatures = grokPaywallFeatures;
+
+    const validation = validate(response);
+
+    assert.deepEqual(validation.errors, []);
+    assert.equal(
+      (validation.response?.advice.paywallFeatures?.[0]?.name as { en: string }).en,
+      "English card 1"
+    );
+  });
+
+  it("accepts localized paywall feature shorthand returned by Grok", () => {
+    const response = mutableResponse();
+    const grokPaywallFeatures = Array.from({ length: 3 }, (_, index) => ({
+      en: `English paywall card ${index + 1}`,
+      th: `รายละเอียดการ์ด ${index + 1}`
+    }));
+    response.advice.paywallFeatures = grokPaywallFeatures;
+    response.pageCopy.paywallFeatures = grokPaywallFeatures;
+
+    const validation = validate(response);
+
+    assert.deepEqual(validation.errors, []);
+    assert.equal(
+      (validation.response?.pageCopy.paywallFeatures?.[0]?.description as { en: string }).en,
+      "English paywall card 1"
+    );
   });
 
   it("rejects missing required locales", () => {

@@ -645,6 +645,35 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.doesNotMatch(result.recommendations[0]?.why ?? "", /Use 2|Use 3/i);
   });
 
+  it("does not treat an undosed ingredient name as coverage when the formula has a target dose", () => {
+    const undosed = product({
+      amount: 0,
+      id: "undosed-taurine",
+      name: "Taurine"
+    });
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        {
+          ...undosed,
+          facts: [{
+            ...undosed.facts[0]!,
+            amount: null,
+            comparableAmount: null,
+            unit: null
+          }]
+        }
+      ],
+      needs: [need("taurine", "Taurine", 5)]
+    });
+
+    assert.equal(result.recommendations.length, 0);
+    assert.equal(result.diagnostics.unmatchedNeeds[0]?.coveragePercent, 0);
+    assert.equal(
+      result.diagnostics.unmatchedNeeds[0]?.bestRejectedReason,
+      "No approved product in the catalogue covers this need"
+    );
+  });
+
   it("prefers safe multiple servings over stacking separate products for the same need", () => {
     const result = recommendProductStackFullBeam({
       candidates: [
@@ -761,6 +790,37 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(balanced.recommendations.length, 2);
     assert.equal(compact.diagnostics.stackPreference, "compact");
     assert.equal(balanced.diagnostics.stackPreference, "balanced");
+  });
+
+  it("keeps balanced mode focused on maximum supplement coverage", () => {
+    const broad: ProductCandidate = {
+      ...product({ amount: 1, id: "broad-multi", name: "Vitamin D" }),
+      facts: [
+        product({ amount: 1, id: "broad-d3", name: "Vitamin D" }).facts[0]!,
+        product({ amount: 1, id: "broad-mag", name: "Magnesium" }).facts[0]!
+      ],
+      productKind: "multi"
+    };
+    const candidates = [
+      broad,
+      product({ amount: 1, id: "perfect-b12", name: "Vitamin B12" })
+    ];
+    const needs = [
+      need("vitamin_d", "Vitamin D", 10),
+      need("magnesium", "Magnesium", 10),
+      need("b12", "Vitamin B12", 1)
+    ];
+    const result = recommendProductStackFullBeam({
+      candidates,
+      needs,
+      stackPreference: "balanced"
+    });
+
+    assert.deepEqual(
+      result.recommendations.map((item) => item.product.id).sort(),
+      ["broad-multi", "perfect-b12"]
+    );
+    assert.equal(result.supplementProductCoveragePercent, 100);
   });
 
   it("lets compact mode trade some coverage for a smaller stack", () => {
@@ -964,6 +1024,28 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.match(
       unmatched?.bestRejectedReason ?? "",
       /pregnancy, breastfeeding, or trying-to-conceive/i
+    );
+  });
+
+  it("reports underdosed approved products separately from blocked catalogue products", () => {
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        product({ amount: 1, id: "magnesium", name: "Magnesium" }),
+        product({ amount: 0.03, id: "taurine-low-dose", name: "Taurine" })
+      ],
+      needs: [
+        need("magnesium", "Magnesium", 5),
+        need("taurine", "Taurine", 1)
+      ]
+    });
+    const unmatched = result.diagnostics.unmatchedNeeds.find(
+      (item) => item.id === "taurine"
+    );
+
+    assert.equal(unmatched?.bestRejectedProductId, null);
+    assert.equal(
+      unmatched?.bestRejectedReason,
+      "Available approved products underdose this formula target"
     );
   });
 

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   CATALOGUE_SNAPSHOT_TABLES,
@@ -77,12 +77,59 @@ const globalsCss = readFileSync(
   new URL("../app/globals.css", import.meta.url),
   "utf8"
 );
+const repoRoot = new URL("..", import.meta.url);
 
 function lineCount(value: string) {
   return value.split(/\r?\n/).length;
 }
 
+function trackedSourceFiles(dir: URL): URL[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (
+      entry.name === ".git" ||
+      entry.name === ".next" ||
+      entry.name === "coverage" ||
+      entry.name === "node_modules"
+    ) {
+      return [];
+    }
+
+    const url = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, dir);
+
+    if (entry.isDirectory()) {
+      return trackedSourceFiles(url);
+    }
+
+    if (!/\.(?:css|json|md|mjs|ts|tsx)$/.test(entry.name)) {
+      return [];
+    }
+
+    return statSync(url).size < 1_000_000 ? [url] : [];
+  });
+}
+
 describe("codebase cleanup guardrails", () => {
+  it("keeps unauthorized AI provider references out of the repo", () => {
+    const provider = ["OPEN", "AI"].join("");
+    const forbidden = [
+      `${provider}_API_KEY`,
+      `${provider}_MODEL`,
+      `api.${provider.toLowerCase()}.com`,
+      provider,
+      `call${provider[0]}${provider.slice(1).toLowerCase()}`,
+      `${provider[0]}${provider.slice(1).toLowerCase()}ChatCompletion`
+    ];
+
+    for (const file of trackedSourceFiles(repoRoot)) {
+      const path = file.pathname;
+      const source = readFileSync(file, "utf8");
+
+      for (const term of forbidden) {
+        assert.equal(source.includes(term), false, `${path} contains ${term}`);
+      }
+    }
+  });
+
   it("defines the cleanup scripts promised by the assessment", () => {
     for (const script of [
       "audit:codebase",

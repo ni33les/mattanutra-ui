@@ -170,8 +170,16 @@ describe("plan reveal V3 migration", () => {
   it("keeps real product catalogue behavior and stack switching in the reveal design", () => {
     assert.match(formulationResults, /product\.imageUrl/);
     assert.match(formulationResults, /trackMarketplaceClick\(planId, product\)/);
+    assert.match(revealPage, /stack\?: string/);
+    assert.match(revealPage, /initialStackPreference/);
+    assert.match(formulationResults, /planRevealStackHref/);
+    assert.match(formulationResults, /replaceRevealStackUrl\(locale, planId, preference\)/);
+    assert.doesNotMatch(formulationResults, /href=\{planRevealStackHref/);
     assert.match(formulationResults, /selectedProductStackPreference/);
-    assert.match(formulationResults, /onProductStackPreferenceChange\(option\.id\)/);
+    assert.match(formulationResults, /useState<ProductStackPreference \| null>\(\(\) => initialStackPreference\)/);
+    assert.match(formulationResults, /onProductStackPreferenceChange\(preference\)/);
+    assert.match(formulationResults, /\/product-recommendations/);
+    assert.match(formulationResults, /onProductStackRefresh/);
     assert.match(formulationResults, /productRecommendations/);
   });
 
@@ -183,7 +191,14 @@ describe("plan reveal V3 migration", () => {
     assert.match(formulationResults, /Food support, after the products/);
     assert.match(formulationResults, /selectedNeedCoverage/);
     assert.match(formulationResults, /item\.imagePath/);
+    assert.match(formulationResults, /foodSupportFormulaGapsForItem/);
+    assert.match(formulationResults, /curcumin/);
+    assert.match(formulationResults, /green_tea", "holy_basil", "moringa_leaves", "turmeric", "papaya"/);
+    assert.match(formulationResults, /safeFoodSupportCopy/);
+    assert.match(formulationResults, /copy\.foodSupportFormulaGapLabel/);
+    assert.match(formulationResults, /copy\.foodSupportProductCoverage/);
     assert.match(formulationResults, /Foods do not change the product coverage score/);
+    assert.match(formulationResults, /return null/);
   });
 
   it("uses V14 public fonts and colour tokens as the site-wide public system", () => {

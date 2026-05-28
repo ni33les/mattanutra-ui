@@ -4,17 +4,13 @@ import {
   updateAdminProduct,
   type AdminProductRow
 } from "@/lib/admin-products";
-
-type XaiChatCompletion = {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
-  }>;
-  id?: string;
-  model?: string;
-  usage?: unknown;
-};
+import {
+  callGrokChatCompletion,
+  configuredGrokModel,
+  configuredGrokValue,
+  getRequiredXaiApiKey,
+  type GrokChatCompletion
+} from "@/lib/grok-client";
 
 type ProductForCopyTranslation = Readonly<{
   brandName: string | null;
@@ -55,29 +51,17 @@ export type ProductCopyTranslationUpdateResult = Readonly<{
   row: AdminProductRow;
 }>;
 
-const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
-const DEFAULT_GROK_MODEL = "grok-4.3";
 const DEFAULT_REASONING_EFFORT = "low";
 const REQUEST_TIMEOUT_MS = 120_000;
 
-function configured(value: string | undefined) {
-  return value?.trim() ?? "";
-}
-
 function config() {
-  const apiKey = configured(process.env.XAI_API_KEY);
-
-  if (!apiKey) {
-    throw new Error("XAI_API_KEY is not configured");
-  }
-
   return {
-    apiKey,
-    model: configured(process.env.GROK_MODEL) || DEFAULT_GROK_MODEL,
+    apiKey: getRequiredXaiApiKey(),
+    model: configuredGrokModel(process.env.GROK_MODEL),
     reasoningEffort:
-      configured(process.env.PRODUCT_COPY_TRANSLATION_REASONING_EFFORT) ||
-      configured(process.env.PRODUCT_FACT_CORRECTION_REASONING_EFFORT) ||
-      configured(process.env.FORMULATION_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.PRODUCT_COPY_TRANSLATION_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.PRODUCT_FACT_CORRECTION_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.FORMULATION_REASONING_EFFORT) ||
       DEFAULT_REASONING_EFFORT
   };
 }
@@ -195,7 +179,7 @@ function productFromDraft(
 
 function resultFromParsed(
   parsed: Record<string, unknown>,
-  completion: XaiChatCompletion
+  completion: GrokChatCompletion
 ): ProductCopyTranslationResult {
   return {
     descriptionEn: textOrNull(parsed.descriptionEn, 1600),
@@ -211,15 +195,13 @@ async function callGrok(input: Readonly<{
   product: ProductForCopyTranslation;
 }>) {
   const grok = config();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  try {
-    const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
-      body: JSON.stringify({
-        messages: [
-          {
-            content: [
+  const completion = await callGrokChatCompletion({
+    apiKey: grok.apiKey,
+    maxTokens: 1400,
+    messages: [
+      {
+        content: [
               "You normalize bilingual product catalogue copy for MattaNutra.",
               "This is internal product catalogue cleanup, not medical advice and not ingredient fact extraction.",
               "Return JSON only. No markdown and no prose outside JSON.",
@@ -239,11 +221,11 @@ async function callGrok(input: Readonly<{
               "Do not include dose tables in descriptions. Ingredient doses belong in canonical facts, not copy fields.",
               "If a field cannot be supported from the supplied evidence, return null for that field.",
               "Keep notes short and admin-facing, explaining the source used or why a field is null."
-            ].join("\n"),
-            role: "system"
-          },
-          {
-            content: JSON.stringify(
+        ].join("\n"),
+        role: "system"
+      },
+      {
+        content: JSON.stringify(
               {
                 output: {
                   descriptionEn: "neutral English display description or null",
@@ -266,50 +248,31 @@ async function callGrok(input: Readonly<{
               },
               null,
               2
-            ),
-            role: "user"
-          }
-        ],
-        model: grok.model,
-        max_tokens: 1400,
-        reasoning_effort: grok.reasoningEffort,
-        response_format: { type: "json_object" },
-        stream: false,
-        temperature: 0.1
-      }),
-      headers: {
-        Authorization: `Bearer ${grok.apiKey}`,
-        "Content-Type": "application/json"
-      },
-      method: "POST",
-      signal: controller.signal
-    });
+        ),
+        role: "user"
+      }
+    ],
+    model: grok.model,
+    purpose: "product copy translation",
+    reasoningEffort: grok.reasoningEffort,
+    temperature: 0.1,
+    timeoutMs: REQUEST_TIMEOUT_MS
+  });
 
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `xAI product copy translation failed with ${response.status}: ${body.slice(0, 500)}`
-      );
-    }
+  await recordXaiUsageCost({
+    metadata: {
+      productId: input.product.id,
+      productTitle: input.product.title,
+      productUrl: input.product.productUrl
+    },
+    model: completion.model ?? grok.model,
+    purpose: "product_copy_translation",
+    reasoningEffort: grok.reasoningEffort,
+    responseId: completion.id,
+    usage: completion.usage
+  });
 
-    const completion = (await response.json()) as XaiChatCompletion;
-    await recordXaiUsageCost({
-      metadata: {
-        productId: input.product.id,
-        productTitle: input.product.title,
-        productUrl: input.product.productUrl
-      },
-      model: completion.model ?? grok.model,
-      purpose: "product_copy_translation",
-      reasoningEffort: grok.reasoningEffort,
-      responseId: completion.id,
-      usage: completion.usage
-    });
-
-    return completion;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return completion;
 }
 
 export async function translateDraftProductCopyWithAi(

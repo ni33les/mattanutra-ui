@@ -820,15 +820,32 @@ function diagnosticNeeds(
   return needs.map((need) => {
     const bestRejected = bestRejectedByNeed.get(need.id);
     const coveragePercent = safePercent((coverage.get(need.id) ?? 0) * 100);
+    const availableCoveragePercent = safePercent(
+      (availableCoverageByNeed.get(need.id) ?? 0) * 100
+    );
+    const hasUsefulCoverage = coveragePercent >= 90;
+    const availableButUnselectedReason =
+      availableCoveragePercent > 0
+        ? availableCoveragePercent < V2_TINY_PARTIAL_PRODUCT_COVERAGE_CEILING * 100
+          ? "Available approved products underdose this formula target"
+          : "Available in the catalogue but not selected by this stack preference"
+        : null;
+    const bestRejectedReason =
+      hasUsefulCoverage
+        ? null
+        : coveragePercent <= 0 && availableButUnselectedReason
+          ? availableButUnselectedReason
+          : bestRejected?.reason ??
+            (coveragePercent <= 0
+              ? "No approved product in the catalogue covers this need"
+              : null);
 
     return {
-      bestRejectedProductId: bestRejected?.productId ?? null,
-      bestRejectedReason: bestRejected?.reason ??
-        (coveragePercent <= 0
-          ? (availableCoverageByNeed.get(need.id) ?? 0) > 0
-            ? "Available in the catalogue but not selected by this stack preference"
-            : "No approved product in the catalogue covers this need"
-          : null),
+      bestRejectedProductId:
+        bestRejectedReason && bestRejectedReason === bestRejected?.reason
+          ? bestRejected.productId
+          : null,
+      bestRejectedReason,
       coveragePercent,
       displayName: need.displayName,
       id: need.id,
@@ -984,7 +1001,7 @@ const V2_FULL_BEAM_ALGORITHM_VERSION = "v2-full-beam" as const;
 export const ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION =
   V2_FULL_BEAM_ALGORITHM_VERSION;
 export const ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION =
-  "stack-preference-3";
+  "stack-preference-4";
 const V2_FULL_BEAM_WIDTH = 32;
 const V2_SHORTLIST_LIMIT = 32;
 const V2_PER_NEED_SHORTLIST = 4;
@@ -1429,11 +1446,16 @@ function factNeedMetric(
       ? baseComparableAmount * Math.max(1, servingMultiplier)
       : null;
   const limitComparableAmount = comparableLimitAmount(fact, need);
+  const needHasTargetDose =
+    need.targetComparableAmount !== null && need.targetComparableAmount > 0;
+
+  if (needHasTargetDose && comparableAmount === null) {
+    return null;
+  }
 
   if (
     comparableAmount !== null &&
-    need.targetComparableAmount !== null &&
-    need.targetComparableAmount > 0
+    needHasTargetDose
   ) {
     const rawRatio = comparableAmount / need.targetComparableAmount;
     const overageMultiplier = rawRatio > TARGET_DOSE_SOFT_MAX ? 0.6 : 1;
@@ -2037,16 +2059,16 @@ function compareStackScores(first: V2StackScore, second: V2StackScore) {
     return coverageDelta;
   }
 
-  const matchedWeightDelta = second.matchedNeedWeight - first.matchedNeedWeight;
-
-  if (Math.abs(matchedWeightDelta) > V2_SCORE_EPSILON) {
-    return matchedWeightDelta;
-  }
-
   const matchedCountDelta = second.matchedNeedCount - first.matchedNeedCount;
 
   if (matchedCountDelta !== 0) {
     return matchedCountDelta;
+  }
+
+  const matchedWeightDelta = second.matchedNeedWeight - first.matchedNeedWeight;
+
+  if (Math.abs(matchedWeightDelta) > V2_SCORE_EPSILON) {
+    return matchedWeightDelta;
   }
 
   if (Math.abs(coverageDelta) > V2_SCORE_EPSILON) {

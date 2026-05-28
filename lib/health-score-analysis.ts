@@ -10,20 +10,15 @@ import type {
 } from "@/lib/health-score";
 import type { ValidatedHealthScoreAiResponse } from "@/lib/health-score/ai-response-validator";
 import { validateHealthScoreAiResponse } from "@/lib/health-score/ai-response-validator";
+import {
+  callGrokChatCompletion,
+  configuredGrokModel,
+  configuredGrokValue,
+  getRequiredXaiApiKey
+} from "@/lib/grok-client";
 import { defaultLocale, type Locale } from "@/lib/i18n";
 
 export { validateHealthScoreAiResponse };
-
-type XaiChatCompletion = {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
-  }>;
-  id?: string;
-  model?: string;
-  usage?: unknown;
-};
 
 export type HealthScoreAdviceAnalysis = Readonly<{
   advice: HealthScoreAdvice;
@@ -36,8 +31,6 @@ export type HealthScoreAdviceAnalysis = Readonly<{
   usage?: unknown;
 }>;
 
-
-const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
 const DEFAULT_HEALTHSCORE_COPY_MODEL = "grok-4.3";
 const DEFAULT_HEALTHSCORE_REASONING_EFFORT = "low";
 const DEFAULT_PROMPT_VERSION = "v6-page-content";
@@ -50,26 +43,17 @@ const globalHealthScoreCache = globalThis as typeof globalThis & {
   mattanutraHealthScoreCacheSchemaReady?: Promise<void>;
 };
 
-function configured(value: string | undefined) {
-  return value?.trim() ?? "";
-}
-
 function grokConfig() {
-  const apiKey = configured(process.env.XAI_API_KEY);
-
-  if (!apiKey) {
-    throw new Error("XAI_API_KEY is not configured");
-  }
-
   return {
-    apiKey,
-    model:
-      configured(process.env.HEALTHSCORE_COPY_MODEL) ||
-      configured(process.env.GROK_MODEL) ||
-      DEFAULT_HEALTHSCORE_COPY_MODEL,
+    apiKey: getRequiredXaiApiKey(),
+    model: configuredGrokModel(
+      process.env.HEALTHSCORE_COPY_MODEL,
+      process.env.GROK_MODEL,
+      DEFAULT_HEALTHSCORE_COPY_MODEL
+    ),
     promptVersion: DEFAULT_PROMPT_VERSION,
     reasoningEffort:
-      configured(process.env.HEALTHSCORE_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.HEALTHSCORE_REASONING_EFFORT) ||
       DEFAULT_HEALTHSCORE_REASONING_EFFORT
   };
 }
@@ -483,45 +467,14 @@ async function callGrok({
   model: string;
   reasoningEffort?: string;
 }>) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
-      body: JSON.stringify({
-        messages,
-        model,
-        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
-        response_format: { type: "json_object" },
-        stream: false
-      }),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      method: "POST",
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `xAI HealthScore request failed with ${response.status}: ${body.slice(0, 500)}`
-      );
-    }
-
-    return (await response.json()) as XaiChatCompletion;
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(
-        `xAI HealthScore request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)} seconds`
-      );
-    }
-
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return callGrokChatCompletion({
+    apiKey,
+    messages,
+    model,
+    purpose: "HealthScore request",
+    reasoningEffort,
+    timeoutMs: REQUEST_TIMEOUT_MS
+  });
 }
 
 function parseJsonObject(content: string | null | undefined) {

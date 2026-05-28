@@ -15,6 +15,12 @@ import {
 } from "@/lib/formulation-types";
 import type { HealthScoreResult } from "@/lib/health-score";
 import { HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS } from "@/lib/health-score";
+import {
+  callGrokChatCompletion,
+  configuredGrokModel,
+  configuredGrokValue,
+  getRequiredXaiApiKey
+} from "@/lib/grok-client";
 import { normalizePlanFeedbackItems } from "@/lib/plan-feedback";
 import type { Locale } from "@/lib/i18n";
 
@@ -34,19 +40,6 @@ type AdvisorInput = Readonly<{
   userMessage?: string | null;
 }>;
 
-type XaiChatCompletion = {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
-  }>;
-  id?: string;
-  model?: string;
-  usage?: unknown;
-};
-
-const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
-const DEFAULT_GROK_MODEL = "grok-4.3";
 const DEFAULT_PROMPT_VERSION = "v1";
 const REQUEST_TIMEOUT_MS = 360_000;
 
@@ -83,26 +76,16 @@ const revealPageSlotGuide: Record<string, string> = {
     "Legacy slot. The UI renders the locked safety headline from deterministic safety context; keep this semantically identical if included."
 };
 
-function configured(value: string | undefined) {
-  return value?.trim() ?? "";
-}
-
 function getGrokConfig(defaultReasoningEffort: "low" | "medium") {
-  const apiKey = configured(process.env.XAI_API_KEY);
-
-  if (!apiKey) {
-    throw new Error("XAI_API_KEY is not configured");
-  }
-
   return {
-    apiKey,
-    model: configured(process.env.GROK_MODEL) || DEFAULT_GROK_MODEL,
+    apiKey: getRequiredXaiApiKey(),
+    model: configuredGrokModel(process.env.GROK_MODEL),
     promptVersion:
-      configured(process.env.NUTRITION_ADVISOR_PROMPT_VERSION) ||
-      configured(process.env.FORMULATION_PROMPT_VERSION) ||
+      configuredGrokValue(process.env.NUTRITION_ADVISOR_PROMPT_VERSION) ||
+      configuredGrokValue(process.env.FORMULATION_PROMPT_VERSION) ||
       DEFAULT_PROMPT_VERSION,
     reasoningEffort:
-      configured(process.env.NUTRITION_ADVISOR_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.NUTRITION_ADVISOR_REASONING_EFFORT) ||
       defaultReasoningEffort
   };
 }
@@ -135,38 +118,15 @@ async function callGrok({
   reasoningEffort: string;
   temperature: number;
 }>) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
-      body: JSON.stringify({
-        messages,
-        model,
-        reasoning_effort: reasoningEffort,
-        response_format: { type: "json_object" },
-        stream: false,
-        temperature
-      }),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      method: "POST",
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(
-        `xAI request failed with ${response.status}${body ? `: ${body.slice(0, 500)}` : ""}`
-      );
-    }
-
-    return (await response.json()) as XaiChatCompletion;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return callGrokChatCompletion({
+    apiKey,
+    messages,
+    model,
+    purpose: "nutrition advisor request",
+    reasoningEffort,
+    temperature,
+    timeoutMs: REQUEST_TIMEOUT_MS
+  });
 }
 
 function contextPayload(input: AdvisorInput) {
