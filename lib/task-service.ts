@@ -1038,8 +1038,6 @@ export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
   );
   const taskTypes = normalizeCapabilities(input.taskTypes);
   const sessionMetadata = input.metadata ?? {};
-  const profileMode = optionalText(sessionMetadata.profileMode);
-  const runId = optionalText(sessionMetadata.runId);
   const agent = await upsertAgentRecord(sql, {
     capabilities,
     id: input.agent.id,
@@ -1108,14 +1106,7 @@ export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
     where agent_id = ${agent.id}::uuid
       and id <> ${session.id}::uuid
       and status <> 'offline'
-      and (
-        last_seen_at < now() - interval '2 minutes'
-        or (
-          ${profileMode}::text is not null
-          and metadata ->> 'profileMode' = ${profileMode}
-          and coalesce(metadata ->> 'runId', '') <> coalesce(${runId}::text, '')
-        )
-      )
+      and last_seen_at < now() - interval '2 minutes'
   `;
 
   return {

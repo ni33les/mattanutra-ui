@@ -84,7 +84,12 @@ describe("external worker boundaries", () => {
     assert.match(
       source,
       /WORKER_RUN_ID = randomUUID\(\)/,
-      "worker sessions must carry a run id so stale profiles can be replaced"
+      "worker sessions must carry a run id so sibling deployments do not share session identity"
+    );
+    assert.match(
+      source,
+      /return `\$\{base\}:\$\{WORKER_RUN_ID\}:\$\{mode\}\$\{slotSuffix\}`/,
+      "worker instance ids must be unique per process run during rolling deploys"
     );
     assert.match(
       source,
@@ -170,8 +175,8 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /superseded_by_worker_registration/,
-      "worker registration should mark stale same-profile sessions offline"
+      /last_seen_at < now\(\) - interval '2 minutes'/,
+      "worker registration should only mark genuinely stale sibling sessions offline"
     );
     assert.match(
       source,

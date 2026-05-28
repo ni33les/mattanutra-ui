@@ -91,7 +91,9 @@ function errorMessage(error: unknown) {
 }
 
 function isStaleWorkerSessionError(error: unknown) {
-  return errorMessage(error).toLowerCase().includes("worker session not found");
+  return /worker session (?:not found|is not active|no longer exists)/i.test(
+    errorMessage(error)
+  );
 }
 
 async function retryApiCall<T>(
@@ -142,7 +144,7 @@ function instanceId(mode: WorkerProfileMode, slotIndex: number, slotCount: numbe
   const base = envText("WORKER_INSTANCE_ID", `${hostname()}:${process.pid}`);
   const slotSuffix = slotCount > 1 ? `:${slotIndex + 1}` : "";
 
-  return `${base}:${mode}${slotSuffix}`;
+  return `${base}:${WORKER_RUN_ID}:${mode}${slotSuffix}`;
 }
 
 function agentProfile(

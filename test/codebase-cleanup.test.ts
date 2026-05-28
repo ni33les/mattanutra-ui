@@ -177,6 +177,7 @@ describe("codebase cleanup guardrails", () => {
 
     for (const table of [
       "blog_posts",
+      "finance_accounts",
       "food_aliases",
       "food_nutrient_profiles",
       "food_safety_rules",
@@ -208,6 +209,7 @@ describe("codebase cleanup guardrails", () => {
       "assessments",
       "bpm",
       "food_admin_audit",
+      "finance_transactions",
       "payments",
       "product_admin_audit",
       "supplement_admin_audit",

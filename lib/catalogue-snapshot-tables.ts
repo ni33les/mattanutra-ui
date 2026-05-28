@@ -13,6 +13,11 @@ export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
     requiredForReload: true
   },
   {
+    description: "Platform finance account master rows required by cost ledgers.",
+    name: "finance_accounts",
+    requiredForReload: true
+  },
+  {
     description: "Nutrient vocabulary used by product facts and managed food profiles.",
     name: "nutrients",
     requiredForReload: true
@@ -136,6 +141,7 @@ export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
 
 export const CATALOGUE_RELOAD_ORDER = [
   "site_locales",
+  "finance_accounts",
   "nutrients",
   "supplements",
   "supplement_aliases",
@@ -187,6 +193,7 @@ export const CATALOGUE_TRUNCATE_ORDER = [
   "supplement_aliases",
   "supplements",
   "nutrients",
+  "finance_accounts",
   "site_locales"
 ] as const;
 

@@ -8,6 +8,7 @@ import {
 type SnapshotTables = Record<string, unknown>;
 
 const REQUIRED_NON_EMPTY_TABLES = [
+  "finance_accounts",
   "supplements",
   "supplement_aliases",
   "supplement_safety_limits",
@@ -17,6 +18,10 @@ const REQUIRED_NON_EMPTY_TABLES = [
   "food_translations",
   "testimonials",
   "blog_posts"
+] as const;
+
+const REQUIRED_FINANCE_ACCOUNT_IDS = [
+  "11111111-1111-4111-8111-111111111111"
 ] as const;
 
 function rowsFor(tableName: string, tables: SnapshotTables) {
@@ -70,6 +75,17 @@ export function validateCuratedMasterSnapshot(
   const foods = rowsFor("foods", tables);
   const translations = rowsFor("food_translations", tables);
   const translationLocalesByFood = new Map<string, Set<string>>();
+  const financeAccountIds = new Set(
+    rowsFor("finance_accounts", tables)
+      .map((row) => textValue(row.id))
+      .filter(Boolean)
+  );
+
+  for (const accountId of REQUIRED_FINANCE_ACCOUNT_IDS) {
+    if (!financeAccountIds.has(accountId)) {
+      errors.push(`finance_accounts is missing required account ${accountId}`);
+    }
+  }
 
   for (const translation of translations) {
     const foodId = textValue(translation.food_id);

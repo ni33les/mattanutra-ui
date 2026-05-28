@@ -35,6 +35,12 @@ function sampleSnapshotTables(overrides: Record<string, unknown[]> = {}) {
         status: "published"
       }
     ],
+    finance_accounts: [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        name: "xAI"
+      }
+    ],
     food_translations: [
       {
         food_id: "food-1",
@@ -88,6 +94,7 @@ describe("UAT destructive rebuild master data guardrails", () => {
     for (const tableName of [
       "assessments",
       "bpm",
+      "finance_transactions",
       "food_admin_audit",
       "payments",
       "product_admin_audit",
@@ -101,6 +108,7 @@ describe("UAT destructive rebuild master data guardrails", () => {
 
   it("orders reloads and truncates around foreign-key dependencies", () => {
     assert.ok(indexOf("site_locales", CATALOGUE_RELOAD_ORDER) < indexOf("testimonials", CATALOGUE_RELOAD_ORDER));
+    assert.ok(indexOf("finance_accounts", CATALOGUE_RELOAD_ORDER) < indexOf("products", CATALOGUE_RELOAD_ORDER));
     assert.ok(indexOf("testimonials", CATALOGUE_RELOAD_ORDER) < indexOf("blog_posts", CATALOGUE_RELOAD_ORDER));
     assert.ok(indexOf("nutrients", CATALOGUE_RELOAD_ORDER) < indexOf("food_nutrient_profiles", CATALOGUE_RELOAD_ORDER));
     assert.ok(indexOf("foods", CATALOGUE_RELOAD_ORDER) < indexOf("food_translations", CATALOGUE_RELOAD_ORDER));
@@ -131,6 +139,13 @@ describe("UAT destructive rebuild master data guardrails", () => {
         blog_posts: [{ id: "blog-archived", status: "archived" }]
       }), { strict: true }).errors.join("; "),
       /blog_posts includes archived/
+    );
+
+    assert.match(
+      validateCuratedMasterSnapshot(sampleSnapshotTables({
+        finance_accounts: []
+      }), { strict: true }).errors.join("; "),
+      /finance_accounts/
     );
 
     assert.match(
