@@ -130,6 +130,32 @@ describe("codebase cleanup guardrails", () => {
     }
   });
 
+  it("keeps direct Grok calls on bounded response budgets", () => {
+    const directCallPattern = /callGrokChatCompletion\(\{/g;
+
+    for (const file of trackedSourceFiles(new URL("../lib/", import.meta.url))) {
+      const path = file.pathname;
+
+      if (path.endsWith("/lib/grok-client.ts")) {
+        continue;
+      }
+
+      const source = readFileSync(file, "utf8");
+      const matches = [...source.matchAll(directCallPattern)];
+
+      for (const match of matches) {
+        const callStart = match.index ?? 0;
+        const callSnippet = source.slice(callStart, callStart + 700);
+
+        assert.match(
+          callSnippet,
+          /maxTokens(?:\s*:|\s*,)/,
+          `${path} has an unbounded direct Grok call`
+        );
+      }
+    }
+  });
+
   it("defines the cleanup scripts promised by the assessment", () => {
     for (const script of [
       "audit:codebase",

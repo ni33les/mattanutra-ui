@@ -41,6 +41,8 @@ type AdvisorInput = Readonly<{
 }>;
 
 const DEFAULT_PROMPT_VERSION = "v1";
+const CHAT_MAX_RESPONSE_TOKENS = 1_200;
+const REPORT_MAX_RESPONSE_TOKENS = 6_500;
 const REQUEST_TIMEOUT_MS = 360_000;
 
 const revealPageSlotGuide: Record<string, string> = {
@@ -107,12 +109,14 @@ function parseJsonObject(content: string | null | undefined) {
 
 async function callGrok({
   apiKey,
+  maxTokens,
   messages,
   model,
   reasoningEffort,
   temperature
 }: Readonly<{
   apiKey: string;
+  maxTokens: number;
   messages: Array<{ content: string; role: "assistant" | "system" | "user" }>;
   model: string;
   reasoningEffort: string;
@@ -120,6 +124,7 @@ async function callGrok({
 }>) {
   return callGrokChatCompletion({
     apiKey,
+    maxTokens,
     messages,
     model,
     purpose: "nutrition advisor request",
@@ -215,6 +220,7 @@ export async function analyzeNutritionPlanChatWithGrok(input: AdvisorInput) {
         role: "user"
       }
     ],
+    maxTokens: CHAT_MAX_RESPONSE_TOKENS,
     model: config.model,
     reasoningEffort: config.reasoningEffort,
     temperature: 0.3
@@ -586,6 +592,7 @@ export async function analyzeNutritionReportWithGrok(input: AdvisorInput) {
         role: "user"
       }
     ],
+    maxTokens: REPORT_MAX_RESPONSE_TOKENS,
     model: config.model,
     reasoningEffort: config.reasoningEffort,
     temperature: 0.2

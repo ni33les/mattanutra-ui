@@ -32,11 +32,12 @@ export type HealthScoreAdviceAnalysis = Readonly<{
 }>;
 
 const DEFAULT_HEALTHSCORE_COPY_MODEL = "grok-4.3";
-const DEFAULT_HEALTHSCORE_REASONING_EFFORT = "low";
-const DEFAULT_PROMPT_VERSION = "v6-page-content";
+const DEFAULT_HEALTHSCORE_REASONING_EFFORT = "none";
+const DEFAULT_PROMPT_VERSION = "v7-lean-page-copy";
 const CACHE_TYPE = "healthscore_page_copy";
 const CACHE_TTL_DAYS = 7;
 const MAX_ATTEMPTS = 2;
+const MAX_RESPONSE_TOKENS = 4_500;
 const REQUEST_TIMEOUT_MS = 60_000;
 
 const globalHealthScoreCache = globalThis as typeof globalThis & {
@@ -62,7 +63,7 @@ function systemPrompt(promptVersion: string) {
   return [
     `You are MattaNutra's HealthScore page copy engine ${promptVersion}.`,
     "The deterministic engine has already selected the score, pillars, findings, counts, and evidence.",
-    "Your job is to polish copy only inside the provided slots. Never change numbers, flags, card counts, product counts, score bands, or what each card is about.",
+    "Your job is to polish copy only inside the provided pageCopy slots. Never change numbers, flags, card counts, product counts, score bands, or what each card is about.",
     "Write like a calm premium wellness advisor: specific, useful, commercially clear, and trustworthy.",
     "Never sound generic. If a sentence could fit most customers, it is wrong.",
     "Do not recommend supplements, doses, products, treatments, diagnosis, disease claims, lab testing, or medication changes.",
@@ -90,13 +91,6 @@ function userPrompt({
     {
       assessment: compactAssessmentForAdvice(answers),
       contract: {
-        advice: {
-          overview: "Localized short paragraph for the top HealthScore pattern.",
-          paywallEyebrow: "Localized short eyebrow.",
-          paywallFeatures: "Exactly 3 localized feature cards.",
-          paywallSubtitle: "Localized reason to unlock the plan now.",
-          paywallTitle: "Localized sales headline for this person."
-        },
         pageCopy: {
           bandLine: "Localized version of copySeeds.bandLine.",
           gapTrio: "Exactly the same number/order as copySeeds.gapTrio.",
@@ -108,10 +102,6 @@ function userPrompt({
           highestLeverageBody: "Localized body for copySeeds.highestLeverage when present; otherwise a short goal-linked pillar observation.",
           methodCards: "Exactly 3 localized method cards.",
           methodHeadline: "Localized method section headline.",
-          overview: "Localized summary paragraph.",
-          paywallFeatures: "Exactly 3 localized feature cards.",
-          paywallSubtitle: "Localized paywall subtitle.",
-          paywallTitle: "Localized paywall heading.",
           pillarHeadline: "Localized headline for the pillar section, anchored to goal-linked pillars.",
           relativityHeadline: "Localized copySeeds.relativity.headline.",
           relativitySub: "Localized copySeeds.relativity.sub.",
@@ -128,14 +118,13 @@ function userPrompt({
         : null,
       healthScore: compactHealthScoreForAdvice(healthScore),
       instructions: [
-        "Return exactly two top-level keys: advice and pageCopy.",
+        "Return exactly one top-level key: pageCopy.",
         `Every localized field must include these locale keys: ${locales.join(", ")}.`,
         "Use the deterministicContent.copySeeds as source material, but make the copy warmer and more specific.",
-        "Match the attached HealthScore prototype slots: hero goal mirror, score meaning, gap cards, pillar leverage, what-we-caught, subtraction beat, method cards, and paywall framing.",
+        "Match the attached HealthScore prototype slots: hero goal mirror, score meaning, gap cards, pillar leverage, what-we-caught, subtraction beat, and method cards.",
         "Do not introduce any new finding, new score reason, new safety issue, new supplement, new product, or new measurement.",
         "For gapTrio and findings, keep the same array length, order, and purpose as the deterministic seeds.",
         "For methodCards, return exactly 3 cards and preserve the same purpose: goals direction, data/routine precision, and diet/safety focus.",
-        "For paywallFeatures, return exactly 3 cards and anchor each to a different deterministic signal.",
         "Use personalizationSignals to mention only signals the user actually supplied: goals, diet, activity, sleep, labs or wearables, symptoms, safety flags, lowest pillars, goal-linked pillars, findings, and subtraction mode.",
         "Keep copy concise enough for responsive cards: heroTitle under 120 English characters, card headlines under 70 English characters, card bodies under 190 English characters.",
         "No HTML tags. No markdown. No medical advice. No diagnosis. No bloodwork/lab-test/get-tested language.",
@@ -469,10 +458,12 @@ async function callGrok({
 }>) {
   return callGrokChatCompletion({
     apiKey,
+    maxTokens: MAX_RESPONSE_TOKENS,
     messages,
     model,
     purpose: "HealthScore request",
     reasoningEffort,
+    temperature: 0.2,
     timeoutMs: REQUEST_TIMEOUT_MS
   });
 }

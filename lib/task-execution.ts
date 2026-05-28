@@ -188,7 +188,7 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
     try {
       const analysis = await analyzeHealthScoreAdviceWithUsage({
         answers: workItem.answers,
-        cache: false,
+        cache: true,
         healthScore: workItem.healthScore,
         locale: workItem.locale
       });

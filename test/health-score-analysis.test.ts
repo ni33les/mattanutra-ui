@@ -52,13 +52,6 @@ function paywallFeatures() {
 
 function validResponse() {
   return {
-    advice: {
-      overview: text,
-      paywallEyebrow: text,
-      paywallFeatures: paywallFeatures(),
-      paywallSubtitle: text,
-      paywallTitle: text
-    },
     pageCopy: {
       bandLine: text,
       findingsHeadline: text,
@@ -70,10 +63,6 @@ function validResponse() {
       highestLeverageBody: text,
       methodCards: localizedCards(3, "title"),
       methodHeadline: text,
-      overview: text,
-      paywallFeatures: paywallFeatures(),
-      paywallSubtitle: text,
-      paywallTitle: text,
       pillarHeadline: text,
       relativityHeadline: text,
       relativitySub: text,
@@ -85,9 +74,21 @@ function validResponse() {
 
 function mutableResponse() {
   return validResponse() as unknown as {
-    advice: Record<string, unknown>;
+    advice?: Record<string, unknown>;
     pageCopy: Record<string, unknown>;
   };
+}
+
+function addLegacyAdvice(response: ReturnType<typeof mutableResponse>) {
+  response.advice = {
+    overview: text,
+    paywallEyebrow: text,
+    paywallFeatures: paywallFeatures(),
+    paywallSubtitle: text,
+    paywallTitle: text
+  };
+
+  return response.advice;
 }
 
 function validate(value: unknown) {
@@ -108,6 +109,11 @@ describe("HealthScore AI copy validator", () => {
     assert.match(source, /callGrokChatCompletion/);
     assert.match(source, /getRequiredXaiApiKey/);
     assert.match(source, /process\.env\.GROK_MODEL/);
+    assert.match(source, /v7-lean-page-copy/);
+    assert.match(source, /Return exactly one top-level key: pageCopy/);
+    assert.match(source, /DEFAULT_HEALTHSCORE_REASONING_EFFORT = "none"/);
+    assert.match(source, /maxTokens: MAX_RESPONSE_TOKENS/);
+    assert.doesNotMatch(source, /paywallFeatures: "Exactly 3 localized feature cards/);
   });
 
   it("accepts structured English and Thai page copy in locked slots", () => {
@@ -117,10 +123,15 @@ describe("HealthScore AI copy validator", () => {
     assert.ok(validation.response);
     assert.equal(validation.response.pageCopy.gapTrio?.length, 3);
     assert.equal(validation.response.pageCopy.findings?.length, 3);
+    assert.equal(
+      (validation.response.advice.overview as { en: string }).en,
+      text.en
+    );
   });
 
-  it("accepts localized paywall feature cards returned by Grok", () => {
+  it("accepts localized paywall feature cards from legacy cached responses", () => {
     const response = mutableResponse();
+    const advice = addLegacyAdvice(response);
     const grokPaywallFeatures = Array.from({ length: 3 }, (_, index) => ({
       en: {
         description: `English paywall card ${index + 1}`,
@@ -131,7 +142,7 @@ describe("HealthScore AI copy validator", () => {
         name: `การ์ด ${index + 1}`
       }
     }));
-    response.advice.paywallFeatures = grokPaywallFeatures;
+    advice.paywallFeatures = grokPaywallFeatures;
     response.pageCopy.paywallFeatures = grokPaywallFeatures;
 
     const validation = validate(response);
@@ -143,13 +154,14 @@ describe("HealthScore AI copy validator", () => {
     );
   });
 
-  it("accepts localized paywall feature shorthand returned by Grok", () => {
+  it("accepts localized paywall feature shorthand from legacy cached responses", () => {
     const response = mutableResponse();
+    const advice = addLegacyAdvice(response);
     const grokPaywallFeatures = Array.from({ length: 3 }, (_, index) => ({
       en: `English paywall card ${index + 1}`,
       th: `รายละเอียดการ์ด ${index + 1}`
     }));
-    response.advice.paywallFeatures = grokPaywallFeatures;
+    advice.paywallFeatures = grokPaywallFeatures;
     response.pageCopy.paywallFeatures = grokPaywallFeatures;
 
     const validation = validate(response);
@@ -261,6 +273,34 @@ describe("HealthScore AI copy validator", () => {
       validation.errors.some((error) =>
         error.includes("gapTrio[2] has unexpected keys")
       )
+    );
+  });
+
+  it("strips harmless deterministic seed metadata echoed inside cards", () => {
+    const response = mutableResponse();
+
+    response.pageCopy.gapTrio = localizedCards(3).map((card, index) => ({
+      ...card,
+      tag: `GAP ${index + 1}`,
+      value: `${index + 1}`
+    }));
+    response.pageCopy.findings = localizedCards(3).map((card, index) => ({
+      ...card,
+      code: `FINDING_${index + 1}`,
+      icon: "*"
+    }));
+
+    const validation = validate(response);
+
+    assert.deepEqual(validation.errors, []);
+    assert.ok(validation.response);
+    assert.equal(
+      (validation.response.pageCopy.gapTrio?.[0]?.headline as { en: string }).en,
+      "Card 1"
+    );
+    assert.equal(
+      "tag" in (validation.response.pageCopy.gapTrio?.[0] ?? {}),
+      false
     );
   });
 });

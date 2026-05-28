@@ -48,6 +48,7 @@ type AnalysisResult = Readonly<{
 const DEFAULT_REASONING_EFFORT = "low";
 const DEFAULT_PROMPT_VERSION = "v1";
 const MAX_ATTEMPTS = 3;
+const MAX_RESPONSE_TOKENS = 5_000;
 const REQUEST_TIMEOUT_MS = 360_000;
 const VALID_STATUSES = new Set<FormulationStatus>([
   "add",
@@ -209,6 +210,7 @@ async function callGrok({
 }>) {
   return callGrokChatCompletion({
     apiKey,
+    maxTokens: MAX_RESPONSE_TOKENS,
     messages,
     model,
     purpose: "food guidance request",

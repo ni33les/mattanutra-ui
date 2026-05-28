@@ -65,6 +65,18 @@ function readLocalizedText(
   return readLocalizedTextValue(record[key], `${path}.${key}`, errors, locales);
 }
 
+function readOptionalLocalizedText(
+  record: Record<string, unknown>,
+  key: string,
+  path: string,
+  errors: string[],
+  locales: readonly string[]
+) {
+  return record[key] === undefined
+    ? undefined
+    : readLocalizedText(record, key, path, errors, locales);
+}
+
 function readLocalizedCards({
   errors,
   expectedLength,
@@ -81,6 +93,11 @@ function readLocalizedCards({
   titleKey?: "headline" | "title";
 }>) {
   const value = parent[key];
+  const ignoredSeedKeys = key === "gapTrio"
+    ? new Set(["tag", "value"])
+    : key === "findings"
+      ? new Set(["code", "icon"])
+      : new Set<string>();
 
   if (!Array.isArray(value)) {
     errors.push(`pageCopy.${key} must be an array`);
@@ -101,7 +118,9 @@ function readLocalizedCards({
     }
 
     const allowed = new Set([titleKey, "body"]);
-    const unexpected = Object.keys(item).filter((itemKey) => !allowed.has(itemKey));
+    const unexpected = Object.keys(item).filter((itemKey) =>
+      !allowed.has(itemKey) && !ignoredSeedKeys.has(itemKey)
+    );
 
     if (unexpected.length > 0) {
       errors.push(`pageCopy.${key}[${index}] has unexpected keys: ${unexpected.join(", ")}`);
@@ -233,6 +252,74 @@ function readPaywallFeatures(
   });
 }
 
+function readOptionalPaywallFeatures(
+  record: Record<string, unknown>,
+  path: string,
+  errors: string[],
+  locales: readonly string[]
+) {
+  return record.paywallFeatures === undefined
+    ? undefined
+    : readPaywallFeatures(record, path, errors, locales);
+}
+
+function fallbackLocalizedText(
+  en: string | undefined,
+  th: string | undefined = en
+): LocalizedHealthScoreText {
+  return {
+    en: en?.trim() || "Your HealthScore is ready.",
+    th: th?.trim() || en?.trim() || "HealthScore ของคุณพร้อมแล้ว"
+  };
+}
+
+function fallbackPaywallFeatures(
+  healthScore: HealthScoreResult,
+  pageCopy: HealthScorePageAiCopy
+): HealthScorePaywallFeature[] {
+  const methodCards = pageCopy.methodCards ?? [];
+  const seedCards = healthScore.pageContent?.copySeeds.methodCards ?? [];
+  const features = methodCards.slice(0, 3).map((card, index) => {
+    const seed = seedCards[index];
+    const title = card.title ?? seed?.title ?? card.body;
+
+    return {
+      description: card.body,
+      name: title
+    } satisfies HealthScorePaywallFeature;
+  });
+
+  while (features.length < 3) {
+    const seed = seedCards[features.length];
+
+    features.push({
+      description: fallbackLocalizedText(seed?.body, seed?.body),
+      name: fallbackLocalizedText(seed?.title, seed?.title)
+    });
+  }
+
+  return features.slice(0, 3);
+}
+
+function synthesizedAdvice(
+  healthScore: HealthScoreResult,
+  pageCopy: HealthScorePageAiCopy
+): HealthScoreAdvice {
+  return {
+    overview:
+      pageCopy.heroBody ??
+      pageCopy.overview ??
+      pageCopy.bandLine ??
+      fallbackLocalizedText(healthScore.summary),
+    paywallEyebrow: fallbackLocalizedText("Your plan is ready"),
+    paywallFeatures: fallbackPaywallFeatures(healthScore, pageCopy),
+    paywallSubtitle: fallbackLocalizedText(
+      "Open the full plan to turn this score into the exact formula and product stack."
+    ),
+    paywallTitle: pageCopy.heroTitle ?? fallbackLocalizedText("Turn your HealthScore into a plan")
+  };
+}
+
 function walkStrings(value: unknown, visit: (item: string) => void) {
   if (typeof value === "string") {
     visit(value);
@@ -293,7 +380,7 @@ export function validateHealthScoreAiResponse({
     );
   }
 
-  if (!isRecord(value.advice)) {
+  if (value.advice !== undefined && !isRecord(value.advice)) {
     errors.push("advice must be an object");
   }
 
@@ -344,13 +431,33 @@ export function validateHealthScoreAiResponse({
     errors.push(`pageCopy includes unexpected keys: ${unexpectedPageKeys.join(", ")}`);
   }
 
-  const advice = {
-    overview: readLocalizedText(adviceRecord, "overview", "advice", errors, locales),
-    paywallEyebrow: readLocalizedText(adviceRecord, "paywallEyebrow", "advice", errors, locales),
-    paywallFeatures: readPaywallFeatures(adviceRecord, "advice", errors, locales),
-    paywallSubtitle: readLocalizedText(adviceRecord, "paywallSubtitle", "advice", errors, locales),
-    paywallTitle: readLocalizedText(adviceRecord, "paywallTitle", "advice", errors, locales)
-  } satisfies HealthScoreAdvice;
+  const legacyOverview = readOptionalLocalizedText(
+    pageCopyRecord,
+    "overview",
+    "pageCopy",
+    errors,
+    locales
+  );
+  const legacyPaywallFeatures = readOptionalPaywallFeatures(
+    pageCopyRecord,
+    "pageCopy",
+    errors,
+    locales
+  );
+  const legacyPaywallSubtitle = readOptionalLocalizedText(
+    pageCopyRecord,
+    "paywallSubtitle",
+    "pageCopy",
+    errors,
+    locales
+  );
+  const legacyPaywallTitle = readOptionalLocalizedText(
+    pageCopyRecord,
+    "paywallTitle",
+    "pageCopy",
+    errors,
+    locales
+  );
 
   const pageCopy = {
     bandLine: readLocalizedText(pageCopyRecord, "bandLine", "pageCopy", errors, locales),
@@ -382,16 +489,25 @@ export function validateHealthScoreAiResponse({
       titleKey: "title"
     }),
     methodHeadline: readLocalizedText(pageCopyRecord, "methodHeadline", "pageCopy", errors, locales),
-    overview: readLocalizedText(pageCopyRecord, "overview", "pageCopy", errors, locales),
-    paywallFeatures: readPaywallFeatures(pageCopyRecord, "pageCopy", errors, locales),
-    paywallSubtitle: readLocalizedText(pageCopyRecord, "paywallSubtitle", "pageCopy", errors, locales),
-    paywallTitle: readLocalizedText(pageCopyRecord, "paywallTitle", "pageCopy", errors, locales),
+    ...(legacyOverview ? { overview: legacyOverview } : {}),
+    ...(legacyPaywallFeatures ? { paywallFeatures: legacyPaywallFeatures } : {}),
+    ...(legacyPaywallSubtitle ? { paywallSubtitle: legacyPaywallSubtitle } : {}),
+    ...(legacyPaywallTitle ? { paywallTitle: legacyPaywallTitle } : {}),
     pillarHeadline: readLocalizedText(pageCopyRecord, "pillarHeadline", "pageCopy", errors, locales),
     relativityHeadline: readLocalizedText(pageCopyRecord, "relativityHeadline", "pageCopy", errors, locales),
     relativitySub: readLocalizedText(pageCopyRecord, "relativitySub", "pageCopy", errors, locales),
     strengthNote: readLocalizedText(pageCopyRecord, "strengthNote", "pageCopy", errors, locales),
     subtractionBody: readLocalizedText(pageCopyRecord, "subtractionBody", "pageCopy", errors, locales)
   } satisfies HealthScorePageAiCopy;
+  const advice = value.advice === undefined
+    ? synthesizedAdvice(healthScore, pageCopy)
+    : {
+        overview: readLocalizedText(adviceRecord, "overview", "advice", errors, locales),
+        paywallEyebrow: readLocalizedText(adviceRecord, "paywallEyebrow", "advice", errors, locales),
+        paywallFeatures: readPaywallFeatures(adviceRecord, "advice", errors, locales),
+        paywallSubtitle: readLocalizedText(adviceRecord, "paywallSubtitle", "advice", errors, locales),
+        paywallTitle: readLocalizedText(adviceRecord, "paywallTitle", "advice", errors, locales)
+      } satisfies HealthScoreAdvice;
 
   validateNoForbiddenCopy({ advice, pageCopy }, errors);
 
