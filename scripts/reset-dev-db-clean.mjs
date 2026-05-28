@@ -5,24 +5,6 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import postgres from "postgres";
 
-const CATALOGUE_SNAPSHOT_TABLE_NAMES = [
-  "supplements",
-  "supplement_aliases",
-  "supplement_safety_limits",
-  "supplement_versions",
-  "supplement_admin_audit",
-  "product_brands",
-  "product_brand_countries",
-  "products",
-  "product_countries",
-  "product_facts",
-  "product_versions",
-  "product_offers",
-  "product_import_runs",
-  "product_imports",
-  "product_admin_audit"
-];
-
 function argValue(name, fallback = null) {
   const prefix = `--${name}=`;
   const found = process.argv.find((arg) => arg.startsWith(prefix));
@@ -92,19 +74,26 @@ async function readSnapshotSummary(snapshotPath) {
   const tables = payload?.tables && typeof payload.tables === "object"
     ? payload.tables
     : {};
+  const tableNames = Array.isArray(payload?.requiredTables)
+    ? payload.requiredTables.filter((table) => typeof table === "string")
+    : Object.keys(tables);
 
-  return Object.fromEntries(
-    Object.entries(tables).map(([table, rows]) => [
-      table,
-      Array.isArray(rows) ? rows.length : 0
-    ])
-  );
+  return {
+    counts: Object.fromEntries(
+      Object.entries(tables).map(([table, rows]) => [
+        table,
+        Array.isArray(rows) ? rows.length : 0
+      ])
+    ),
+    tableNames
+  };
 }
 
 async function printResetSummary(snapshotPath) {
   const connection = process.env.DB_CONNECTION;
-  const catalogueTables = new Set(CATALOGUE_SNAPSHOT_TABLE_NAMES);
-  const snapshotCounts = await readSnapshotSummary(snapshotPath);
+  const snapshot = await readSnapshotSummary(snapshotPath);
+  const catalogueTables = new Set(snapshot.tableNames);
+  const snapshotCounts = snapshot.counts;
 
   if (!connection) {
     fail("DB_CONNECTION is required.");

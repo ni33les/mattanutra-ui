@@ -12,6 +12,8 @@
     "db:reset:dev:clean": "node --env-file-if-exists=.env.local scripts/reset-dev-db-clean.mjs",
     "catalogue:snapshot": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/catalogue-snapshot.ts",
     "catalogue:reload": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/catalogue-reload.ts",
+    "uat:master:snapshot": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/catalogue-snapshot.ts --strict-master-data",
+    "uat:rebuild": "node --env-file-if-exists=.env.local scripts/rebuild-uat-db.mjs",
     "audit:codebase": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/audit-codebase.ts",
     "lint": "eslint .",
     "import:thai-fda-products": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/import-thai-fda-products.ts",

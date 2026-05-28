@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { validateCuratedMasterSnapshot } from "@/lib/catalogue-master-validation";
 import { getSql } from "@/lib/db";
 import {
   CATALOGUE_RELOAD_ORDER,
@@ -113,9 +114,20 @@ if (payload.formatVersion !== 1 || !payload.tables || typeof payload.tables !== 
 
 const tables = payload.tables as Record<string, unknown>;
 const missingTables = catalogueSnapshotTableNames().filter((table) => !(table in tables));
+const strictMasterData =
+  hasArg("strict-master-data") ||
+  process.env.MATTANUTRA_STRICT_MASTER_SNAPSHOT === "true";
 
 if (missingTables.length > 0) {
   fail(`Snapshot is missing required tables: ${missingTables.join(", ")}`);
+}
+
+const validation = validateCuratedMasterSnapshot(tables, {
+  strict: strictMasterData
+});
+
+if (!validation.ok) {
+  fail(`Snapshot failed curated master validation: ${validation.errors.join("; ")}`);
 }
 
 const sql = getSql();
@@ -160,5 +172,6 @@ await sql.end({ timeout: 1 });
 console.log(JSON.stringify({
   counts,
   inputPath,
+  strictMasterData,
   status: "ok"
 }, null, 2));

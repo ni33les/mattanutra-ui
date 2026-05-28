@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   CATALOGUE_SNAPSHOT_TABLES,
+  catalogueSnapshotSelectSql,
   catalogueSnapshotTableNames
 } from "../lib/catalogue-snapshot-tables.ts";
 
@@ -162,6 +163,8 @@ describe("codebase cleanup guardrails", () => {
       "catalogue:reload",
       "catalogue:snapshot",
       "db:reset:dev:clean",
+      "uat:master:snapshot",
+      "uat:rebuild",
       "versions:core:apply",
       "versions:core:check"
     ]) {
@@ -169,32 +172,54 @@ describe("codebase cleanup guardrails", () => {
     }
   });
 
-  it("snapshots every product and supplement catalogue table needed for reload", () => {
+  it("snapshots every curated master data table needed for reload", () => {
     const names = catalogueSnapshotTableNames();
 
     for (const table of [
-      "product_admin_audit",
+      "blog_posts",
+      "food_aliases",
+      "food_nutrient_profiles",
+      "food_safety_rules",
+      "food_serving_sizes",
+      "food_translations",
+      "foods",
+      "nutrients",
       "product_brand_countries",
       "product_brands",
       "product_countries",
       "product_facts",
       "product_import_runs",
       "product_imports",
+      "product_import_translations",
       "product_offers",
+      "product_translations",
       "product_versions",
       "products",
-      "supplement_admin_audit",
       "supplement_aliases",
       "supplement_safety_limits",
       "supplement_versions",
-      "supplements"
+      "supplements",
+      "testimonials"
     ]) {
       assert.ok(names.includes(table), `${table} must be in snapshot scope`);
     }
 
-    assert.ok(
-      CATALOGUE_SNAPSHOT_TABLES.some((table) => !table.requiredForReload),
-      "snapshot should distinguish reload-critical tables from useful audit tables"
+    for (const table of [
+      "assessments",
+      "bpm",
+      "food_admin_audit",
+      "payments",
+      "product_admin_audit",
+      "supplement_admin_audit",
+      "tasks"
+    ]) {
+      assert.equal(names.includes(table), false, `${table} must stay out of snapshot scope`);
+    }
+
+    assert.equal(
+      CATALOGUE_SNAPSHOT_TABLES.every((table) => table.requiredForReload),
+      true,
+      "curated UAT master snapshot should only include reload-critical tables"
     );
   });
 
@@ -207,7 +232,8 @@ describe("codebase cleanup guardrails", () => {
   it("writes both portable and database catalogue backups", () => {
     assert.match(snapshotScript, /writeFile\(outputPath/);
     assert.match(snapshotScript, /create schema if not exists/);
-    assert.match(snapshotScript, /create table [\s\S]+ as select \* from public/);
+    assert.match(snapshotScript, /catalogueSnapshotSelectSql/);
+    assert.match(catalogueSnapshotSelectSql("products"), /select \* from public\."products"/);
   });
 
   it("keeps reload guarded to dev-like database targets", () => {

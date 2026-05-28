@@ -1465,7 +1465,6 @@ const revealCopy = {
     foodSupportGapHeadlineTemplate: "Food support for {gaps}.",
     foodSupportServing: "Serving",
     foodSupportFormulaGapLabel: "Formula gap",
-    foodSupportProductCoverage: "Product coverage",
     foodSupportTitle: "Foods chosen to support the gaps.",
     heroEyebrow: "Your Right Amount Has Arrived",
     heroFor: "For",
@@ -1568,7 +1567,6 @@ const revealCopy = {
     foodSupportGapHeadlineTemplate: "อาหารสนับสนุนสำหรับ {gaps}",
     foodSupportServing: "ปริมาณ",
     foodSupportFormulaGapLabel: "ช่องว่างในสูตร",
-    foodSupportProductCoverage: "ความครอบคลุมของผลิตภัณฑ์",
     foodSupportTitle: "อาหารที่เลือกเพื่อช่วยเติมช่องว่าง",
     heroEyebrow: "ปริมาณที่พอดีของคุณพร้อมแล้ว",
     heroFor: "สำหรับ",
@@ -3104,7 +3102,7 @@ function RevealFoodSupportSection({
                       <div className="mt-3 space-y-2">
                         {formulaGaps.map((gap) => (
                           <div
-                            className="grid gap-3 rounded-md bg-[var(--mn-paper)] p-3 ring-1 ring-[var(--mn-line)] sm:grid-cols-[1fr_auto] sm:items-center"
+                            className="rounded-md bg-[var(--mn-paper)] p-3 ring-1 ring-[var(--mn-line)]"
                             key={gap.id}
                           >
                             <div className="min-w-0">
@@ -3126,12 +3124,6 @@ function RevealFoodSupportSection({
                                   {gap.dailyDose}
                                 </p>
                               ) : null}
-                            </div>
-                            <div className="rounded-full bg-[var(--mn-gold-tint)] px-3 py-2 text-left text-xs font-bold text-[#6d5427] sm:text-right">
-                              <span className="block font-mono text-sm">
-                                {gap.coveragePercent}%
-                              </span>
-                              <span>{copy.foodSupportProductCoverage}</span>
                             </div>
                           </div>
                         ))}

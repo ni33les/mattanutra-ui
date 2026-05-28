@@ -1,8 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { getSql } from "@/lib/db";
+import { validateCuratedMasterSnapshot } from "@/lib/catalogue-master-validation";
 import {
   CATALOGUE_SNAPSHOT_TABLES,
+  catalogueSnapshotSelectSql,
   catalogueSnapshotTableNames
 } from "@/lib/catalogue-snapshot-tables";
 
@@ -37,6 +39,9 @@ const outputPath = resolve(
     `/private/tmp/mattanutra-catalogue-snapshot-${slug}.json`
 );
 const includeDbBackup = !hasArg("no-db-backup");
+const strictMasterData =
+  hasArg("strict-master-data") ||
+  process.env.MATTANUTRA_STRICT_MASTER_SNAPSHOT === "true";
 const schemaName = backupSchemaName(argValue("schema", slug) ?? slug);
 const tables: Record<string, unknown[]> = {};
 const counts: Record<string, number> = {};
@@ -47,18 +52,25 @@ if (includeDbBackup) {
 
 for (const table of CATALOGUE_SNAPSHOT_TABLES) {
   const tableIdentifier = sql(table.name);
-  const rows = await sql`select * from public.${tableIdentifier}`;
+  const rows = await sql.unsafe(catalogueSnapshotSelectSql(table.name));
 
   tables[table.name] = rows;
   counts[table.name] = rows.length;
 
   if (includeDbBackup) {
     await sql`drop table if exists ${sql(schemaName)}.${tableIdentifier}`;
-    await sql`
-      create table ${sql(schemaName)}.${tableIdentifier}
-      as select * from public.${tableIdentifier}
-    `;
+    await sql.unsafe(
+      `create table "${schemaName}"."${table.name}" as ${catalogueSnapshotSelectSql(table.name)}`
+    );
   }
+}
+
+const validation = validateCuratedMasterSnapshot(tables, { strict: strictMasterData });
+
+if (!validation.ok) {
+  throw new Error(
+    `Curated master snapshot validation failed: ${validation.errors.join("; ")}`
+  );
 }
 
 const payload = {
@@ -90,5 +102,6 @@ console.log(JSON.stringify({
   counts,
   dbBackupSchema: includeDbBackup ? schemaName : null,
   outputPath,
+  strictMasterData,
   status: "ok"
 }, null, 2));

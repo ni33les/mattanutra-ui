@@ -196,7 +196,7 @@ describe("plan reveal V3 migration", () => {
     assert.match(formulationResults, /green_tea", "holy_basil", "moringa_leaves", "turmeric", "papaya"/);
     assert.match(formulationResults, /safeFoodSupportCopy/);
     assert.match(formulationResults, /copy\.foodSupportFormulaGapLabel/);
-    assert.match(formulationResults, /copy\.foodSupportProductCoverage/);
+    assert.doesNotMatch(formulationResults, /foodSupportProductCoverage/);
     assert.match(formulationResults, /Foods do not change the product coverage score/);
     assert.match(formulationResults, /return null/);
   });
