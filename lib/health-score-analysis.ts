@@ -14,7 +14,7 @@ import { defaultLocale, type Locale } from "@/lib/i18n";
 
 export { validateHealthScoreAiResponse };
 
-type OpenAiChatCompletion = {
+type XaiChatCompletion = {
   choices?: Array<{
     message?: {
       content?: string | null;
@@ -37,8 +37,8 @@ export type HealthScoreAdviceAnalysis = Readonly<{
 }>;
 
 
-const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
-const DEFAULT_HEALTHSCORE_COPY_MODEL = "gpt-5.5";
+const XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions";
+const DEFAULT_HEALTHSCORE_COPY_MODEL = "grok-4.3";
 const DEFAULT_HEALTHSCORE_REASONING_EFFORT = "low";
 const DEFAULT_PROMPT_VERSION = "v6-page-content";
 const CACHE_TYPE = "healthscore_page_copy";
@@ -54,18 +54,18 @@ function configured(value: string | undefined) {
   return value?.trim() ?? "";
 }
 
-function openAiConfig() {
-  const apiKey = configured(process.env.OPENAI_API_KEY);
+function grokConfig() {
+  const apiKey = configured(process.env.XAI_API_KEY);
 
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+    throw new Error("XAI_API_KEY is not configured");
   }
 
   return {
     apiKey,
     model:
       configured(process.env.HEALTHSCORE_COPY_MODEL) ||
-      configured(process.env.OPENAI_MODEL) ||
+      configured(process.env.GROK_MODEL) ||
       DEFAULT_HEALTHSCORE_COPY_MODEL,
     promptVersion: DEFAULT_PROMPT_VERSION,
     reasoningEffort:
@@ -472,7 +472,7 @@ function retryPrompt(errors: string[]) {
   ].join("\n");
 }
 
-async function callOpenAi({
+async function callGrok({
   apiKey,
   messages,
   model,
@@ -487,7 +487,7 @@ async function callOpenAi({
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
+    const response = await fetch(XAI_CHAT_COMPLETIONS_URL, {
       body: JSON.stringify({
         messages,
         model,
@@ -506,15 +506,15 @@ async function callOpenAi({
     if (!response.ok) {
       const body = await response.text();
       throw new Error(
-        `OpenAI HealthScore request failed with ${response.status}: ${body.slice(0, 500)}`
+        `xAI HealthScore request failed with ${response.status}: ${body.slice(0, 500)}`
       );
     }
 
-    return (await response.json()) as OpenAiChatCompletion;
+    return (await response.json()) as XaiChatCompletion;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error(
-        `OpenAI HealthScore request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)} seconds`
+        `xAI HealthScore request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)} seconds`
       );
     }
 
@@ -749,7 +749,7 @@ export async function analyzeHealthScoreAdviceWithUsage({
   healthScore: HealthScoreResult;
   locale: Locale;
 }>): Promise<HealthScoreAdviceAnalysis> {
-  const config = openAiConfig();
+  const config = grokConfig();
   const key = await cacheKey({
     answers,
     healthScore,
@@ -783,7 +783,7 @@ export async function analyzeHealthScoreAdviceWithUsage({
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
-      const completion = await callOpenAi({
+      const completion = await callGrok({
         apiKey: config.apiKey,
         messages,
         model: config.model,

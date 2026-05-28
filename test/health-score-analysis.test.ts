@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import { computeHealthScore } from "../lib/health-score.ts";
 import { validateHealthScoreAiResponse } from "../lib/health-score-analysis.ts";
@@ -98,6 +99,18 @@ function validate(value: unknown) {
 }
 
 describe("HealthScore AI copy validator", () => {
+  it("uses Grok/xAI for HealthScore copy instead of OpenAI-only configuration", async () => {
+    const source = await readFile(
+      new URL("../lib/health-score-analysis.ts", import.meta.url),
+      "utf8"
+    );
+
+    assert.match(source, /https:\/\/api\.x\.ai\/v1\/chat\/completions/);
+    assert.match(source, /process\.env\.XAI_API_KEY/);
+    assert.match(source, /process\.env\.GROK_MODEL/);
+    assert.doesNotMatch(source, /OPENAI_API_KEY|OPENAI_MODEL|api\.openai\.com|OpenAI|callOpenAi|OpenAiChatCompletion/);
+  });
+
   it("accepts structured English and Thai page copy in locked slots", () => {
     const validation = validate(validResponse());
 
