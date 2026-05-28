@@ -11,6 +11,10 @@ import {
 import { localizedAlternates, localizedMetadata, localizedPath } from "../lib/seo.ts";
 
 const schema = readFileSync(new URL("../db-schema.sql", import.meta.url), "utf8");
+const homePage = readFileSync(
+  new URL("../app/[locale]/page.tsx", import.meta.url),
+  "utf8"
+);
 
 describe("locale registry and SEO helpers", () => {
   it("keeps current public locales registry driven", () => {
@@ -57,5 +61,16 @@ describe("locale registry and SEO helpers", () => {
     assert.match(schema, /CREATE TABLE public\.product_import_translations/);
     assert.doesNotMatch(schema, /locale_check/);
     assert.doesNotMatch(schema, /ARRAY\['en'::text, 'th'::text\]/);
+  });
+
+  it("keeps homepage build-time rendering off the remote database", () => {
+    assert.match(homePage, /NEXT_PHASE === "phase-production-build"/);
+    assert.match(homePage, /blogPosts=\{\[\]\}/);
+    assert.match(homePage, /testimonials=\{\[\]\}/);
+    assert.ok(
+      homePage.indexOf("isProductionBuildPhase()") <
+        homePage.indexOf("checkDatabaseConnection()"),
+      "production build guard must run before homepage DB checks"
+    );
   });
 });

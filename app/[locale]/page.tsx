@@ -26,6 +26,10 @@ export function generateStaticParams() {
 
 export const dynamic = "force-dynamic";
 
+function isProductionBuildPhase() {
+  return process.env.NEXT_PHASE === "phase-production-build";
+}
+
 export async function generateMetadata({
   params
 }: HomeProps): Promise<Metadata> {
@@ -51,6 +55,26 @@ export default async function Home({ params }: HomeProps) {
   const locale: Locale = rawLocale;
   const dictionary = getDictionary(locale);
   const assessmentPath = nutritionQuizPath(locale);
+
+  if (isProductionBuildPhase()) {
+    return (
+      <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
+        <TitleBar
+          currentLocale={locale}
+          currentPath={`/${locale}`}
+          title={dictionary.hero.eyebrow}
+        />
+        <LandingPage
+          assessmentPath={assessmentPath}
+          blogPosts={[]}
+          locale={locale}
+          testimonials={[]}
+        />
+        <SiteFooter content={dictionary.footer} locale={locale} />
+      </main>
+    );
+  }
+
   const databaseReady = await checkDatabaseConnection();
 
   if (!databaseReady) {
