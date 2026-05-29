@@ -225,6 +225,7 @@ export type AdminContent = Readonly<{
     active: string;
     actor: string;
     agents: string;
+    alreadyMember: string;
     assume: string;
     assumed: string;
     audit: string;
@@ -236,10 +237,12 @@ export type AdminContent = Readonly<{
     email: string;
     error: string;
     invite: string;
+    inactivePerson: string;
     invitePerson: string;
     inviteUrl: string;
     invitations: string;
     memberships: string;
+    membershipAdded: string;
     name: string;
     organisation: string;
     organisations: string;
@@ -661,6 +664,7 @@ const baseContent = {
       active: "Active",
       actor: "Signed in as",
       agents: "Agents",
+      alreadyMember: "This person already belongs to that organisation. Use Memberships to change their role or status.",
       assume: "Assume",
       assumed: "Viewing as",
       audit: "Audit",
@@ -672,10 +676,12 @@ const baseContent = {
       email: "Email",
       error: "Could not update access controls.",
       invite: "Invite",
+      inactivePerson: "This person already exists but is not active. Update their person record before adding access.",
       invitePerson: "Invite person",
       inviteUrl: "Invite link",
       invitations: "Invitations",
       memberships: "Memberships",
+      membershipAdded: "Existing person found. Organisation access was added without creating a new passkey invite.",
       name: "Name",
       organisation: "Organisation",
       organisations: "Organisations",
@@ -1193,6 +1199,7 @@ const baseContent = {
       active: "ใช้งาน",
       actor: "เข้าสู่ระบบเป็น",
       agents: "เอเจนต์",
+      alreadyMember: "ผู้ใช้นี้อยู่ในองค์กรนี้แล้ว ใช้ส่วนสมาชิกเพื่อเปลี่ยนบทบาทหรือสถานะ",
       assume: "สวมบทบาท",
       assumed: "กำลังดูเป็น",
       audit: "ประวัติ",
@@ -1204,10 +1211,12 @@ const baseContent = {
       email: "อีเมล",
       error: "ไม่สามารถอัปเดตสิทธิ์ได้",
       invite: "เชิญ",
+      inactivePerson: "ผู้ใช้นี้มีอยู่แล้วแต่ยังไม่ได้เปิดใช้งาน โปรดแก้ไขข้อมูลผู้ใช้ก่อนเพิ่มสิทธิ์",
       invitePerson: "เชิญผู้ใช้",
       inviteUrl: "ลิงก์เชิญ",
       invitations: "คำเชิญ",
       memberships: "สมาชิก",
+      membershipAdded: "พบผู้ใช้เดิมแล้ว เพิ่มสิทธิ์เข้าองค์กรโดยไม่สร้างคำเชิญ passkey ใหม่",
       name: "ชื่อ",
       organisation: "องค์กร",
       organisations: "องค์กร",

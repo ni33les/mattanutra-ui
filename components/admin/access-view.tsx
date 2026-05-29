@@ -9,7 +9,9 @@ import {
 } from "@heroicons/react/24/outline";
 import type {
   AdminAccessData,
-  AdminClientSessionContext
+  AdminClientSessionContext,
+  AdminInviteExistingAccess,
+  AdminInviteMembershipAdded
 } from "@/lib/admin-access";
 import type { AdminRole } from "@/lib/admin-rbac";
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
@@ -133,7 +135,9 @@ async function postAccess(body: Record<string, unknown>) {
   const json = (await response.json().catch(() => ({}))) as {
     data?: AdminAccessData;
     error?: string;
-    invitation?: { inviteUrl?: string };
+    existingAccess?: AdminInviteExistingAccess;
+    inviteUrl?: string;
+    membershipAdded?: AdminInviteMembershipAdded;
     reloaded?: boolean;
   };
 
@@ -182,8 +186,34 @@ export function AdminAccessView({
         setAccessData(result.data);
       }
 
-      if (result.invitation?.inviteUrl) {
-        setMessage(`${labels.access.inviteUrl}: ${result.invitation.inviteUrl}`);
+      if (result.inviteUrl) {
+        setMessage(`${labels.access.inviteUrl}: ${result.inviteUrl}`);
+      } else if (result.membershipAdded) {
+        setMessage(
+          [
+            labels.access.membershipAdded,
+            result.membershipAdded.person.email,
+            result.membershipAdded.organisation.name,
+            roleLabels[locale][result.membershipAdded.membership.role]
+          ].join(" · ")
+        );
+      } else if (result.existingAccess) {
+        const message =
+          result.existingAccess.reason === "inactive_person"
+            ? labels.access.inactivePerson
+            : labels.access.alreadyMember;
+        const role = result.existingAccess.membership
+          ? roleLabels[locale][result.existingAccess.membership.role]
+          : "";
+
+        setMessage(
+          [
+            message,
+            result.existingAccess.person.email,
+            result.existingAccess.organisation.name,
+            role
+          ].filter(Boolean).join(" · ")
+        );
       } else {
         setMessage(labels.access.updated);
       }

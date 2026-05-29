@@ -70,6 +70,19 @@ export type AdminInvitation = Readonly<{
   status: "accepted" | "expired" | "pending" | "revoked";
 }>;
 
+export type AdminInviteExistingAccess = Readonly<{
+  membership: AdminMembership | null;
+  organisation: AdminOrganisation;
+  person: AdminPerson;
+  reason: "existing_membership" | "inactive_person";
+}>;
+
+export type AdminInviteMembershipAdded = Readonly<{
+  membership: AdminMembership;
+  organisation: AdminOrganisation;
+  person: AdminPerson;
+}>;
+
 export type AdminAuditEvent = Readonly<{
   action: string;
   actorPersonId: string | null;
@@ -667,7 +680,10 @@ async function upsertPersonAndMembership({
     set
       display_name = ${displayName},
       preferred_locale = ${locale},
-      status = 'active',
+      status = case
+        when public.people.status = 'disabled' then public.people.status
+        else 'active'
+      end,
       updated_at = now()
     where lower(email) = ${email}
     returning id::text, email, display_name, preferred_locale, status
@@ -678,7 +694,18 @@ async function upsertPersonAndMembership({
     throw new Error("Unable to save admin person");
   }
 
-  await sql`
+  if (person(savedPerson).status !== "active") {
+    throw new Error("This admin person already exists but is not active. Ask an owner to update it.");
+  }
+
+  const memberships = await sql<Array<{
+    id: string;
+    organisation_id: string;
+    person_id: string;
+    role: string;
+    status: string;
+    title: string | null;
+  }>>`
     insert into public.organisation_memberships (
       organisation_id,
       person_id,
@@ -692,10 +719,18 @@ async function upsertPersonAndMembership({
       'active'
     )
     on conflict (person_id, organisation_id) do update set
-      role = excluded.role,
-      status = 'active',
       updated_at = now()
+    returning id::text, organisation_id::text, person_id::text, role, status, title
   `;
+  const savedMembership = memberships[0] ? membership(memberships[0]) : null;
+
+  if (!savedMembership) {
+    throw new Error("Unable to save admin membership");
+  }
+
+  if (savedMembership.status !== "active") {
+    throw new Error("This admin membership already exists but is not active. Ask an owner to update it.");
+  }
 
   return person(savedPerson);
 }
@@ -1668,6 +1703,177 @@ export async function createAdminInvitation({
   const sql = await sqlOrThrow();
   const token = randomAdminToken();
   const normalizedEmail = normalizeEmail(email);
+  const existingRows = await sql<Array<{
+    default_locale: string;
+    display_name: string | null;
+    email: string | null;
+    membership_id: string | null;
+    membership_status: string | null;
+    name: string;
+    organisation_id: string;
+    organisation_status: string;
+    organisation_type: string;
+    person_id: string | null;
+    preferred_locale: string | null;
+    role: string | null;
+    slug: string;
+    title: string | null;
+    user_status: string | null;
+  }>>`
+    select
+      organisations.id::text as organisation_id,
+      organisations.slug,
+      organisations.name,
+      organisations.organisation_type,
+      organisations.status as organisation_status,
+      organisations.default_locale,
+      people.id::text as person_id,
+      people.email,
+      people.display_name,
+      people.preferred_locale,
+      people.status as user_status,
+      organisation_memberships.id::text as membership_id,
+      organisation_memberships.role,
+      organisation_memberships.status as membership_status,
+      organisation_memberships.title
+    from public.organisations
+    left join public.people on lower(people.email) = ${normalizedEmail}
+    left join public.organisation_memberships
+      on organisation_memberships.organisation_id = organisations.id
+      and organisation_memberships.person_id = people.id
+    where organisations.id = ${organisationId}::uuid
+    limit 1
+  `;
+  const existing = existingRows[0];
+
+  if (!existing) {
+    throw new Error("Organisation not found");
+  }
+
+  const existingOrganisation = organisation({
+    default_locale: existing.default_locale,
+    id: existing.organisation_id,
+    name: existing.name,
+    organisation_type: existing.organisation_type,
+    slug: existing.slug,
+    status: existing.organisation_status
+  });
+
+  if (existing.person_id && existing.email && existing.display_name) {
+    const existingPerson = person({
+      display_name: existing.display_name,
+      email: existing.email,
+      id: existing.person_id,
+      preferred_locale: existing.preferred_locale ?? "en",
+      status: existing.user_status ?? "disabled"
+    });
+
+    if (existing.membership_id && existing.role && existing.membership_status) {
+      const existingMembership = membership({
+        id: existing.membership_id,
+        organisation_id: existing.organisation_id,
+        person_id: existing.person_id,
+        role: existing.role,
+        status: existing.membership_status,
+        title: existing.title
+      });
+
+      await recordAdminAudit({
+        action: "admin.invite_existing_member_blocked",
+        actorPersonId: actor.actorPerson.id,
+        assumedPersonId: actor.assumedPerson?.id ?? null,
+        organisationId,
+        resourceId: existingMembership.id,
+        resourceType: "organisation_membership",
+        metadata: { email: normalizedEmail, requestedRole: role }
+      });
+
+      return {
+        existingAccess: {
+          membership: existingMembership,
+          organisation: existingOrganisation,
+          person: existingPerson,
+          reason: "existing_membership" as const
+        }
+      };
+    }
+
+    if (existingPerson.status !== "active") {
+      await recordAdminAudit({
+        action: "admin.invite_inactive_person_blocked",
+        actorPersonId: actor.actorPerson.id,
+        assumedPersonId: actor.assumedPerson?.id ?? null,
+        organisationId,
+        resourceId: existingPerson.id,
+        resourceType: "person",
+        metadata: { email: normalizedEmail, requestedRole: role, status: existingPerson.status }
+      });
+
+      return {
+        existingAccess: {
+          membership: null,
+          organisation: existingOrganisation,
+          person: existingPerson,
+          reason: "inactive_person" as const
+        }
+      };
+    }
+
+    const membershipRows = await sql<Array<{
+      id: string;
+      organisation_id: string;
+      person_id: string;
+      role: string;
+      status: string;
+      title: string | null;
+    }>>`
+      insert into public.organisation_memberships (
+        organisation_id,
+        person_id,
+        role,
+        status
+      )
+      values (
+        ${organisationId}::uuid,
+        ${existingPerson.id}::uuid,
+        ${role},
+        'active'
+      )
+      on conflict (person_id, organisation_id) do nothing
+      returning id::text, organisation_id::text, person_id::text, role, status, title
+    `;
+    const addedMembership = membershipRows[0] ? membership(membershipRows[0]) : null;
+
+    if (!addedMembership) {
+      return {
+        existingAccess: {
+          membership: null,
+          organisation: existingOrganisation,
+          person: existingPerson,
+          reason: "existing_membership" as const
+        }
+      };
+    }
+
+    await recordAdminAudit({
+      action: "admin.membership_added",
+      actorPersonId: actor.actorPerson.id,
+      assumedPersonId: actor.assumedPerson?.id ?? null,
+      organisationId,
+      resourceId: addedMembership.id,
+      resourceType: "organisation_membership",
+      metadata: { email: normalizedEmail, role }
+    });
+
+    return {
+      membershipAdded: {
+        membership: addedMembership,
+        organisation: existingOrganisation,
+        person: existingPerson
+      }
+    };
+  }
+
   const rows = await sql<Array<{
     email: string;
     expires_at: Date | string;

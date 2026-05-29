@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid role" }, { status: 400 });
       }
 
-      const invitation = await createAdminInvitation({
+      const invitationResult = await createAdminInvitation({
         actor: context,
         email: text(body.email),
         organisationId: text(body.organisationId),
@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
         role
       });
 
-      return accessResponse(request, context, { invitation });
+      return accessResponse(request, context, invitationResult);
     }
 
     if (action === "update_membership") {
