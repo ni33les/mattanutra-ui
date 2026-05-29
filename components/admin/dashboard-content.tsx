@@ -4,6 +4,7 @@ import {
   BeakerIcon,
   BuildingOffice2Icon,
   ChatBubbleLeftRightIcon,
+  ClipboardDocumentListIcon,
   CpuChipIcon,
   DocumentTextIcon,
   EnvelopeIcon,
@@ -27,8 +28,10 @@ type BaseLocale = Exclude<Locale, "zh-CN">;
 
 export type AdminDashboardView =
   | "access"
+  | "access-agents"
   | "agents"
   | "alerts"
+  | "audit"
   | "blogs"
   | "campaigns"
   | "content"
@@ -840,7 +843,9 @@ const baseContent = {
     administration: [
       { icon: UserGroupIcon, name: "Access", view: "access" },
       { icon: UserGroupIcon, name: "People", view: "people" },
-      { icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" }
+      { icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" },
+      { icon: CpuChipIcon, name: "Agents", view: "access-agents" },
+      { icon: ClipboardDocumentListIcon, name: "Audit", view: "audit" }
     ],
     administrationTitle: "Administration",
     contentNavigation: [
@@ -869,8 +874,10 @@ const baseContent = {
     executionTitle: "Execution",
     pageTitles: {
       access: "Access",
+      "access-agents": "Access Agents",
       agents: "Agents",
       alerts: "Technical Alerts",
+      audit: "Audit",
       blogs: "Blogs",
       campaigns: "Campaigns",
       content: "Content",
@@ -1369,7 +1376,9 @@ const baseContent = {
     administration: [
       { icon: UserGroupIcon, name: "สิทธิ์เข้าถึง", view: "access" },
       { icon: UserGroupIcon, name: "ผู้ใช้", view: "people" },
-      { icon: BuildingOffice2Icon, name: "องค์กร", view: "organisations" }
+      { icon: BuildingOffice2Icon, name: "องค์กร", view: "organisations" },
+      { icon: CpuChipIcon, name: "เอเจนต์", view: "access-agents" },
+      { icon: ClipboardDocumentListIcon, name: "ประวัติ", view: "audit" }
     ],
     administrationTitle: "การดูแลระบบ",
     contentNavigation: [
@@ -1398,8 +1407,10 @@ const baseContent = {
     executionTitle: "การปฏิบัติงาน",
     pageTitles: {
       access: "สิทธิ์เข้าถึง",
+      "access-agents": "เอเจนต์สิทธิ์เข้าถึง",
       agents: "เอเจนต์",
       alerts: "การแจ้งเตือนทางเทคนิค",
+      audit: "ประวัติ",
       blogs: "บทความ",
       campaigns: "แคมเปญ",
       content: "คอนเทนต์",

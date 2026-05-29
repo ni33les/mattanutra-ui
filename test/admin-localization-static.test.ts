@@ -21,6 +21,21 @@ test("admin dashboard has a registry-driven locale switcher that preserves dashb
   assert.match(dashboard, /<AdminLocaleSwitcher/);
 });
 
+test("admin access management exposes people, organisations, agents, and audit as separate tabs", () => {
+  const content = source("components/admin/dashboard-content.tsx");
+  const dashboard = source("components/admin-dashboard.tsx");
+  const accessView = source("components/admin/access-view.tsx");
+
+  assert.match(content, /name: "People", view: "people"/);
+  assert.match(content, /name: "Organisations", view: "organisations"/);
+  assert.match(content, /name: "Agents", view: "access-agents"/);
+  assert.match(content, /name: "Audit", view: "audit"/);
+  assert.match(dashboard, /view === "access-agents"/);
+  assert.match(dashboard, /view === "audit"/);
+  assert.match(accessView, /view === "access-agents"/);
+  assert.match(accessView, /view === "audit"/);
+});
+
 test("admin login has a working registry-driven locale switcher", () => {
   const login = source("components/admin-login.tsx");
 

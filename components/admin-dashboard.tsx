@@ -2230,7 +2230,13 @@ function adminViewDatabaseAvailable({
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
 }>) {
-  if (view === "access" || view === "organisations" || view === "people") {
+  if (
+    view === "access" ||
+    view === "access-agents" ||
+    view === "audit" ||
+    view === "organisations" ||
+    view === "people"
+  ) {
     return Boolean(accessData);
   }
 
@@ -2572,7 +2578,12 @@ export function AdminDashboard({
             </>
           ) : null}
 
-          {(view === "access" || view === "organisations" || view === "people") && accessData ? (
+          {(view === "access" ||
+            view === "access-agents" ||
+            view === "audit" ||
+            view === "organisations" ||
+            view === "people") &&
+          accessData ? (
             <AdminAccessView
               accessToken={accessToken}
               context={adminContext}

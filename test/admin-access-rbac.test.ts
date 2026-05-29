@@ -16,6 +16,8 @@ describe("admin RBAC", () => {
     };
 
     assert.ok(adminDashboardViews.includes("access"));
+    assert.ok(adminDashboardViews.includes("access-agents"));
+    assert.ok(adminDashboardViews.includes("audit"));
 
     for (const view of adminDashboardViews) {
       assert.equal(adminViewAllowed(principal, view), true, view);
@@ -31,6 +33,8 @@ describe("admin RBAC", () => {
     assert.equal(adminViewAllowed(principal, "glance"), true);
     assert.equal(adminViewAllowed(principal, "flow"), true);
     assert.equal(adminViewAllowed(principal, "access"), false);
+    assert.equal(adminViewAllowed(principal, "access-agents"), false);
+    assert.equal(adminViewAllowed(principal, "audit"), false);
     assert.equal(adminViewAllowed(principal, "financials"), false);
     assert.equal(adminViewAllowed(principal, "products"), false);
     assert.equal(adminViewAllowed(principal, "visibility"), false);

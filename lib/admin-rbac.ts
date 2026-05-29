@@ -160,6 +160,8 @@ const adminViews = [
   "supplement-insights",
   "visibility",
   "access",
+  "access-agents",
+  "audit",
   "people",
   "organisations"
 ] as const satisfies readonly AdminDashboardView[];
@@ -186,7 +188,13 @@ export function hasAdminPermission(
 }
 
 export function adminViewPermission(view: AdminDashboardView): AdminPermission {
-  if (view === "access" || view === "organisations" || view === "people") {
+  if (
+    view === "access" ||
+    view === "access-agents" ||
+    view === "audit" ||
+    view === "organisations" ||
+    view === "people"
+  ) {
     return "access.read";
   }
 

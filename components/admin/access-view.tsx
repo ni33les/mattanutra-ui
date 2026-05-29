@@ -30,7 +30,10 @@ type AdminAccessViewProps = Readonly<{
   data: AdminAccessData;
   labels: AdminContent;
   locale: Locale;
-  view: Extract<AdminDashboardView, "access" | "organisations" | "people">;
+  view: Extract<
+    AdminDashboardView,
+    "access" | "access-agents" | "audit" | "organisations" | "people"
+  >;
 }>;
 
 const roleLabels = {
@@ -692,8 +695,7 @@ export function AdminAccessView({
         </>
       ) : null}
 
-      {view === "access" ? (
-      <div className="grid gap-8 xl:grid-cols-2">
+      {view === "access-agents" ? (
         <Panel title={labels.access.agents}>
           <div className="divide-y divide-gray-100">
             {accessData.agents.map((agent) => (
@@ -732,7 +734,9 @@ export function AdminAccessView({
             ))}
           </div>
         </Panel>
+      ) : null}
 
+      {view === "audit" ? (
         <Panel title={labels.access.audit}>
           <div className="divide-y divide-gray-100">
             {accessData.auditEvents.map((event) => (
@@ -750,7 +754,6 @@ export function AdminAccessView({
             ))}
           </div>
         </Panel>
-      </div>
       ) : null}
     </div>
   );

@@ -329,6 +329,14 @@
     {
       "name": "组织",
       "view": "organisations"
+    },
+    {
+      "name": "代理",
+      "view": "access-agents"
+    },
+    {
+      "name": "审计",
+      "view": "audit"
     }
   ],
   "administrationTitle": "管理",
@@ -391,8 +399,10 @@
   "executionTitle": "执行",
   "pageTitles": {
     "access": "访问",
+    "access-agents": "访问代理",
     "agents": "代理",
     "alerts": "技术警报",
+    "audit": "审计",
     "blogs": "博客",
     "campaigns": "营销活动",
     "content": "内容",
