@@ -66,6 +66,30 @@ function thaiAdminContentSource() {
   return contentSource.slice(start);
 }
 
+function englishAdminContentSource() {
+  const contentSource = source("components/admin/dashboard-content.tsx");
+  const start = contentSource.indexOf("  en: {");
+  const end = contentSource.indexOf("  th: {");
+
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  return contentSource.slice(start, end);
+}
+
+test("English admin performance navigation renders English labels", () => {
+  const english = englishAdminContentSource();
+
+  assert.match(english, /name: "Dashboard", view: "glance"/);
+  assert.match(english, /name: "Conversions", view: "flow"/);
+  assert.match(english, /name: "Financials", view: "financials"/);
+  assert.match(english, /flowTitle: "Conversions"/);
+  assert.match(english, /insightsTitle: "Insights"/);
+  assert.doesNotMatch(english, /name: "(แดชบอร์ด|คอนเวอร์ชัน|การเงิน)"/);
+  assert.doesNotMatch(english, /flowTitle: "คอนเวอร์ชัน"/);
+  assert.doesNotMatch(english, /insightsTitle: "อินไซต์"/);
+});
+
 test("Thai admin nav and page titles do not leak English performance labels", () => {
   const thai = thaiAdminContentSource();
 
