@@ -138,6 +138,7 @@
     "invitePerson": "邀请人员",
     "inviteUrl": "邀请链接",
     "invitations": "邀请",
+    "memberships": "成员关系",
     "name": "名称",
     "organisation": "组织",
     "organisations": "组织",
@@ -320,6 +321,14 @@
     {
       "name": "访问",
       "view": "access"
+    },
+    {
+      "name": "人员",
+      "view": "people"
+    },
+    {
+      "name": "组织",
+      "view": "organisations"
     }
   ],
   "administrationTitle": "管理",
@@ -393,6 +402,8 @@
     "flow": "转化",
     "glance": "仪表盘",
     "leads": "线索",
+    "organisations": "组织",
+    "people": "人员",
     "product-insights": "产品洞察",
     "products": "产品",
     "reviews": "审核",

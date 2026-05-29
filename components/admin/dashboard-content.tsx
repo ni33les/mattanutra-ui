@@ -2,6 +2,7 @@ import type { ComponentType, SVGProps } from "react";
 import {
   BanknotesIcon,
   BeakerIcon,
+  BuildingOffice2Icon,
   ChatBubbleLeftRightIcon,
   CpuChipIcon,
   DocumentTextIcon,
@@ -37,6 +38,8 @@ export type AdminDashboardView =
   | "flow"
   | "glance"
   | "leads"
+  | "organisations"
+  | "people"
   | "product-insights"
   | "products"
   | "reviews"
@@ -233,6 +236,7 @@ export type AdminContent = Readonly<{
     invitePerson: string;
     inviteUrl: string;
     invitations: string;
+    memberships: string;
     name: string;
     organisation: string;
     organisations: string;
@@ -668,6 +672,7 @@ const baseContent = {
       invitePerson: "Invite person",
       inviteUrl: "Invite link",
       invitations: "Invitations",
+      memberships: "Memberships",
       name: "Name",
       organisation: "Organisation",
       organisations: "Organisations",
@@ -833,7 +838,9 @@ const baseContent = {
     ],
     marketingTitle: "Marketing",
     administration: [
-      { icon: UserGroupIcon, name: "Access", view: "access" }
+      { icon: UserGroupIcon, name: "Access", view: "access" },
+      { icon: UserGroupIcon, name: "People", view: "people" },
+      { icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" }
     ],
     administrationTitle: "Administration",
     contentNavigation: [
@@ -873,6 +880,8 @@ const baseContent = {
       flow: "Conversions",
       glance: "Dashboard",
       leads: "Leads",
+      organisations: "Organisations",
+      people: "People",
       "product-insights": "Product Insights",
       products: "Products",
       reviews: "Reviews",
@@ -1192,6 +1201,7 @@ const baseContent = {
       invitePerson: "เชิญผู้ใช้",
       inviteUrl: "ลิงก์เชิญ",
       invitations: "คำเชิญ",
+      memberships: "สมาชิก",
       name: "ชื่อ",
       organisation: "องค์กร",
       organisations: "องค์กร",
@@ -1357,7 +1367,9 @@ const baseContent = {
     ],
     marketingTitle: "การตลาด",
     administration: [
-      { icon: UserGroupIcon, name: "สิทธิ์เข้าถึง", view: "access" }
+      { icon: UserGroupIcon, name: "สิทธิ์เข้าถึง", view: "access" },
+      { icon: UserGroupIcon, name: "ผู้ใช้", view: "people" },
+      { icon: BuildingOffice2Icon, name: "องค์กร", view: "organisations" }
     ],
     administrationTitle: "การดูแลระบบ",
     contentNavigation: [
@@ -1397,6 +1409,8 @@ const baseContent = {
       flow: "คอนเวอร์ชัน",
       glance: "แดชบอร์ด",
       leads: "ลีด",
+      organisations: "องค์กร",
+      people: "ผู้ใช้",
       "product-insights": "ข้อมูลสินค้า",
       products: "สินค้า",
       reviews: "รีวิว",

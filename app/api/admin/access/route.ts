@@ -11,7 +11,9 @@ import {
   resolveAdminSession,
   signAdminSessionContext,
   stopAdminImpersonation,
+  updateOrganisation,
   updateMembershipRole,
+  updatePerson,
   assumeAdminIdentity,
   type AdminSessionContext
 } from "@/lib/admin-access";
@@ -153,6 +155,65 @@ export async function POST(request: NextRequest) {
         name,
         slug,
         type
+      });
+
+      return accessResponse(request, context);
+    }
+
+    if (action === "update_organisation") {
+      if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const slug = normalSlug(body.slug);
+      const name = text(body.name);
+      const status = text(body.status);
+      const type = text(body.type) === "platform" ? "platform" : "tenant";
+
+      if (!slug || !name) {
+        return NextResponse.json(
+          { error: "Organisation name and slug are required" },
+          { status: 400 }
+        );
+      }
+
+      if (status !== "active" && status !== "archived" && status !== "disabled") {
+        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      }
+
+      await updateOrganisation({
+        defaultLocale: localeValue(body.defaultLocale),
+        id: text(body.organisationId),
+        name,
+        slug,
+        status,
+        type
+      });
+
+      return accessResponse(request, context);
+    }
+
+    if (action === "update_person") {
+      if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const displayName = text(body.displayName);
+      const status = text(body.status);
+
+      if (!displayName) {
+        return NextResponse.json({ error: "Person name is required" }, { status: 400 });
+      }
+
+      if (status !== "active" && status !== "disabled" && status !== "invited") {
+        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      }
+
+      await updatePerson({
+        displayName,
+        id: text(body.personId),
+        preferredLocale: localeValue(body.preferredLocale),
+        status
       });
 
       return accessResponse(request, context);

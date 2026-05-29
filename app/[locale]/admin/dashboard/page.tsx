@@ -185,7 +185,7 @@ export default async function LocalizedAdminDashboardPage({
   let supplementsData = emptyAdminSupplementsData();
   let visibilityData = emptyVisibilityData();
 
-  if (view === "access") {
+  if (view === "access" || view === "organisations" || view === "people") {
     accessData = await getAdminAccessData();
   } else if (view === "glance") {
     data = await getAdminDashboardData(range, filters);

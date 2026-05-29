@@ -1581,6 +1581,77 @@ export async function createOrganisation({
   return rows[0] ? organisation(rows[0]) : null;
 }
 
+export async function updateOrganisation({
+  defaultLocale,
+  id,
+  name,
+  slug,
+  status,
+  type
+}: Readonly<{
+  defaultLocale: Locale;
+  id: string;
+  name: string;
+  slug: string;
+  status: "active" | "archived" | "disabled";
+  type: AdminOrganisationType;
+}>) {
+  const sql = await sqlOrThrow();
+  const rows = await sql<Array<{
+    default_locale: string;
+    id: string;
+    name: string;
+    organisation_type: string;
+    slug: string;
+    status: string;
+  }>>`
+    update public.organisations
+    set
+      slug = ${slug.trim().toLowerCase()},
+      name = ${name.trim()},
+      organisation_type = ${type},
+      status = ${status},
+      default_locale = ${defaultLocale},
+      updated_at = now()
+    where id = ${id}::uuid
+    returning id::text, slug, name, organisation_type, status, default_locale
+  `;
+
+  return rows[0] ? organisation(rows[0]) : null;
+}
+
+export async function updatePerson({
+  displayName,
+  id,
+  preferredLocale,
+  status
+}: Readonly<{
+  displayName: string;
+  id: string;
+  preferredLocale: Locale;
+  status: AdminAccessStatus;
+}>) {
+  const sql = await sqlOrThrow();
+  const rows = await sql<Array<{
+    display_name: string;
+    email: string;
+    id: string;
+    preferred_locale: string;
+    status: string;
+  }>>`
+    update public.people
+    set
+      display_name = ${displayName.trim()},
+      preferred_locale = ${preferredLocale},
+      status = ${status},
+      updated_at = now()
+    where id = ${id}::uuid
+    returning id::text, email, display_name, preferred_locale, status
+  `;
+
+  return rows[0] ? person(rows[0]) : null;
+}
+
 export async function createAdminInvitation({
   actor,
   email,

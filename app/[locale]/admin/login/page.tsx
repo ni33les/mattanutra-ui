@@ -62,6 +62,7 @@ export default async function AdminLoginPage({
       inviteToken={firstParam(query.invite) ?? ""}
       locale={locale}
       nextPath={safeNextPath(locale, firstParam(query.next))}
+      setupMode={firstParam(query.setup) === "1"}
     />
   );
 }

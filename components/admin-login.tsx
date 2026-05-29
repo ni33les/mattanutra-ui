@@ -14,6 +14,7 @@ type AdminLoginProps = Readonly<{
   inviteToken: string;
   locale: Locale;
   nextPath: string;
+  setupMode: boolean;
 }>;
 
 const loginCopy = {
@@ -86,7 +87,8 @@ export function AdminLogin({
   email: initialEmail,
   inviteToken,
   locale,
-  nextPath
+  nextPath,
+  setupMode
 }: AdminLoginProps) {
   const labels = loginCopy[locale];
   const [email, setEmail] = useState(initialEmail);
@@ -94,6 +96,7 @@ export function AdminLogin({
   const [setupToken, setSetupToken] = useState(accessToken);
   const [busy, setBusy] = useState<"login" | "register" | null>(null);
   const [error, setError] = useState("");
+  const showRegistration = Boolean(inviteToken || accessToken || setupMode);
 
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -216,6 +219,7 @@ export function AdminLogin({
               </button>
             </form>
 
+            {showRegistration ? (
             <form onSubmit={register} className="space-y-4 border-t border-gray-100 pt-8">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
@@ -279,6 +283,7 @@ export function AdminLogin({
                 {busy === "register" ? labels.signingIn : labels.register}
               </button>
             </form>
+            ) : null}
 
             {error ? (
               <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700 ring-1 ring-red-100">
