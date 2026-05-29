@@ -7,6 +7,7 @@ import {
   type AuthenticatorTransportFuture,
   type RegistrationResponseJSON
 } from "@simplewebauthn/server";
+import type postgres from "postgres";
 import { getSql } from "@/lib/db";
 import { isLocale, type Locale } from "@/lib/i18n";
 import {
@@ -128,6 +129,10 @@ type ChallengeRow = Readonly<{
   person_id: string | null;
 }>;
 
+type RawChallengeRow = Omit<ChallengeRow, "metadata"> & Readonly<{
+  metadata: unknown;
+}>;
+
 type CredentialRow = Readonly<{
   backed_up: boolean;
   counter: number | string;
@@ -178,6 +183,28 @@ function firstForwardedValue(value: string | null) {
 
 function isNonEmptyString(value: string | null): value is string {
   return Boolean(value);
+}
+
+function metadataRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+
+      return metadataRecord(parsed);
+    } catch {
+      return {};
+    }
+  }
+
+  return {};
+}
+
+function toJsonValue(value: unknown): postgres.JSONValue {
+  return JSON.parse(JSON.stringify(value ?? null)) as postgres.JSONValue;
 }
 
 function requestForwardedOrigin(request: Request) {
@@ -418,7 +445,7 @@ async function createChallenge({
       ${challengeType},
       ${personId ?? null},
       ${email ?? null},
-      ${JSON.stringify(metadata ?? {})}::jsonb,
+      ${sql.json(toJsonValue(metadata ?? {}))}::jsonb,
       now() + (${expiresInMinutes}::text || ' minutes')::interval
     )
     returning id::text
@@ -429,7 +456,7 @@ async function createChallenge({
 
 async function consumeChallenge(id: string, challengeType: "authentication" | "registration") {
   const sql = await sqlOrThrow();
-  const rows = await sql<Array<ChallengeRow>>`
+  const rows = await sql<Array<RawChallengeRow>>`
     update public.admin_auth_challenges
     set consumed_at = now()
     where id = ${id}::uuid
@@ -443,8 +470,9 @@ async function consumeChallenge(id: string, challengeType: "authentication" | "r
       email,
       metadata
   `;
+  const row = rows[0];
 
-  return rows[0] ?? null;
+  return row ? { ...row, metadata: metadataRecord(row.metadata) } : null;
 }
 
 async function credentialsForPerson(personId: string) {
@@ -1789,7 +1817,7 @@ export async function recordAdminAudit({
       ${action},
       ${resourceType},
       ${resourceId},
-      ${JSON.stringify(metadata)}::jsonb
+      ${sql.json(toJsonValue(metadata))}::jsonb
     )
   `.catch(() => undefined);
 }

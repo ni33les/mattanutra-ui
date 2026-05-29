@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   adminDashboardViews,
@@ -44,5 +45,12 @@ describe("admin RBAC", () => {
       permissionForAdminRequest("POST", "/api/admin/impersonation/start"),
       "access.write"
     );
+  });
+
+  it("stores admin access metadata as JSON objects, not encoded JSON strings", () => {
+    const source = readFileSync("lib/admin-access.ts", "utf8");
+
+    assert.doesNotMatch(source, /JSON\.stringify\([^)]*metadata[^)]*\)::jsonb/);
+    assert.match(source, /\$\{sql\.json\(toJsonValue\(metadata \?\? \{\}\)\)\}::jsonb/);
   });
 });
