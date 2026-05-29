@@ -4,8 +4,10 @@ import { describe, it } from "node:test";
 import {
   adminDashboardViews,
   adminViewAllowed,
+  adminRoleAllowedForOrganisationType,
   permissionForAdminRequest,
-  permissionsForRole
+  permissionsForRole,
+  rolesForAdminOrganisationType
 } from "../lib/admin-rbac.ts";
 
 describe("admin RBAC", () => {
@@ -25,10 +27,10 @@ describe("admin RBAC", () => {
     }
   });
 
-  it("keeps tenant users out of access, finance, catalogue and execution views", () => {
+  it("keeps retail assistants out of access, finance, catalogue and execution views", () => {
     const principal = {
-      permissions: permissionsForRole("tenant_user"),
-      role: "tenant_user" as const
+      permissions: permissionsForRole("retail_assistant"),
+      role: "retail_assistant" as const
     };
 
     assert.equal(adminViewAllowed(principal, "settings"), true);
@@ -40,6 +42,21 @@ describe("admin RBAC", () => {
     assert.equal(adminViewAllowed(principal, "financials"), false);
     assert.equal(adminViewAllowed(principal, "products"), false);
     assert.equal(adminViewAllowed(principal, "visibility"), false);
+  });
+
+  it("limits assignable roles to platform owner/admin and retail org roles", () => {
+    assert.deepEqual(rolesForAdminOrganisationType("platform"), [
+      "platform_owner",
+      "platform_admin"
+    ]);
+    assert.deepEqual(rolesForAdminOrganisationType("tenant"), [
+      "retail_admin",
+      "retail_agent",
+      "retail_assistant"
+    ]);
+    assert.equal(adminRoleAllowedForOrganisationType("platform_owner", "tenant"), false);
+    assert.equal(adminRoleAllowedForOrganisationType("platform_admin", "tenant"), false);
+    assert.equal(adminRoleAllowedForOrganisationType("retail_admin", "platform"), false);
   });
 
   it("maps admin access APIs to access permissions while leaving passkey auth public", () => {

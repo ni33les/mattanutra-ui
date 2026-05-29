@@ -14,9 +14,9 @@ import type {
   AdminInviteMembershipAdded
 } from "@/lib/admin-access";
 import {
-  rolesForAdminOrganisationCategory,
+  rolesForAdminOrganisationType,
   type AdminRole,
-  type AdminOrganisationCategory
+  type AdminOrganisationType
 } from "@/lib/admin-rbac";
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 import type {
@@ -44,43 +44,25 @@ type AdminAccessViewProps = Readonly<{
 
 const roleLabels = {
   en: {
-    agent_manager: "Agent manager",
-    catalogue_manager: "Catalogue manager",
-    content_manager: "Content manager",
-    finance_viewer: "Finance viewer",
-    ops_manager: "Operations manager",
-    platform_admin: "Platform admin",
-    platform_owner: "Platform owner",
-    platform_viewer: "Platform viewer",
-    tenant_admin: "Retailer admin",
-    tenant_user: "Retailer user",
-    viewer: "Viewer"
+    platform_owner: "Platform Owner",
+    platform_admin: "Platform Admin",
+    retail_admin: "Retail Admin",
+    retail_agent: "Retail Agent",
+    retail_assistant: "Retail Assistant"
   },
   th: {
-    agent_manager: "ผู้จัดการเอเจนต์",
-    catalogue_manager: "ผู้จัดการแคตตาล็อก",
-    content_manager: "ผู้จัดการคอนเทนต์",
-    finance_viewer: "ดูการเงิน",
-    ops_manager: "ผู้จัดการปฏิบัติการ",
-    platform_admin: "แอดมินแพลตฟอร์ม",
     platform_owner: "เจ้าของแพลตฟอร์ม",
-    platform_viewer: "ดูแพลตฟอร์ม",
-    tenant_admin: "แอดมินผู้ค้าปลีก",
-    tenant_user: "ผู้ใช้ผู้ค้าปลีก",
-    viewer: "ผู้ดู"
+    platform_admin: "แอดมินแพลตฟอร์ม",
+    retail_admin: "แอดมินร้านค้า",
+    retail_agent: "เอเจนต์ร้านค้า",
+    retail_assistant: "ผู้ช่วยร้านค้า"
   },
   "zh-CN": {
-    agent_manager: "代理管理员",
-    catalogue_manager: "目录管理员",
-    content_manager: "内容管理员",
-    finance_viewer: "财务查看者",
-    ops_manager: "运营管理员",
-    platform_admin: "平台管理员",
     platform_owner: "平台所有者",
-    platform_viewer: "平台查看者",
-    tenant_admin: "零售商管理员",
-    tenant_user: "零售商用户",
-    viewer: "查看者"
+    platform_admin: "平台管理员",
+    retail_admin: "零售管理员",
+    retail_agent: "零售代理",
+    retail_assistant: "零售助理"
   }
 } satisfies Record<Locale, Record<AdminRole, string>>;
 
@@ -152,13 +134,16 @@ async function postAccess(body: Record<string, unknown>) {
   return json;
 }
 
-function rolesForCategory(
+function rolesForOrganisationType(
   roles: readonly AdminRole[],
-  category: AdminOrganisationCategory
+  type: AdminOrganisationType,
+  canManageOwners: boolean
 ) {
-  const allowed = new Set(rolesForAdminOrganisationCategory(category));
+  const allowed = new Set(rolesForAdminOrganisationType(type));
 
-  return roles.filter((role) => allowed.has(role));
+  return roles.filter((role) =>
+    allowed.has(role) && (canManageOwners || role !== "platform_owner")
+  );
 }
 
 export function AdminAccessView({
@@ -177,20 +162,31 @@ export function AdminAccessView({
     () => new Map(accessData.organisations.map((org) => [org.id, org])),
     [accessData.organisations]
   );
+  const ownerPersonIds = useMemo(
+    () =>
+      new Set(
+        accessData.memberships
+          .filter((membership) => membership.role === "platform_owner")
+          .map((membership) => membership.personId)
+      ),
+    [accessData.memberships]
+  );
   const personById = useMemo(
     () => new Map(accessData.people.map((person) => [person.id, person])),
     [accessData.people]
   );
   const canWrite = context.permissions.includes("access.write");
   const canAssume = context.permissions.includes("impersonation.write") && !context.isLegacy;
+  const canManageOwners = context.role === "platform_owner";
   const [inviteOrganisationId, setInviteOrganisationId] = useState(
     () => accessData.organisations[0]?.id ?? ""
   );
   const inviteOrganisation =
     organisationById.get(inviteOrganisationId) ?? accessData.organisations[0];
-  const inviteRoles = rolesForCategory(
+  const inviteRoles = rolesForOrganisationType(
     accessData.roles,
-    inviteOrganisation?.category ?? "retailer"
+    inviteOrganisation?.type ?? "tenant",
+    canManageOwners
   );
 
   async function mutate(body: Record<string, unknown>) {
@@ -256,7 +252,6 @@ export function AdminAccessView({
 
     void mutate({
       action: "create_organisation",
-      category: String(form.get("category") ?? "retailer"),
       defaultLocale: String(form.get("defaultLocale") ?? "en"),
       name: String(form.get("name") ?? ""),
       slug: String(form.get("slug") ?? "")
@@ -271,7 +266,6 @@ export function AdminAccessView({
 
     void mutate({
       action: "update_organisation",
-      category: String(form.get("category") ?? "retailer"),
       defaultLocale: String(form.get("defaultLocale") ?? "en"),
       name: String(form.get("name") ?? ""),
       organisationId: String(form.get("organisationId") ?? ""),
@@ -302,7 +296,7 @@ export function AdminAccessView({
       email: String(form.get("email") ?? ""),
       organisationId: String(form.get("organisationId") ?? ""),
       preferredLocale: String(form.get("preferredLocale") ?? "en"),
-      role: String(form.get("role") ?? "viewer")
+      role: String(form.get("role") ?? inviteRoles[0] ?? "retail_assistant")
     });
     event.currentTarget.reset();
   }
@@ -314,7 +308,7 @@ export function AdminAccessView({
     void mutate({
       action: "update_membership",
       membershipId: String(form.get("membershipId") ?? ""),
-      role: String(form.get("role") ?? "viewer"),
+      role: String(form.get("role") ?? "retail_assistant"),
       status: String(form.get("status") ?? "active")
     });
   }
@@ -378,7 +372,7 @@ export function AdminAccessView({
           <div className="divide-y divide-gray-100">
             {accessData.organisations.map((organisation) => (
               <form
-                className="grid gap-3 py-4 lg:grid-cols-[1.2fr_1fr_0.9fr_0.9fr_0.9fr_auto]"
+                className="grid gap-3 py-4 lg:grid-cols-[1.2fr_1fr_0.9fr_0.9fr_auto]"
                 key={organisation.id}
                 onSubmit={saveOrganisation}
               >
@@ -402,18 +396,6 @@ export function AdminAccessView({
                     name="slug"
                     required={true}
                   />
-                </label>
-                <label className="grid gap-1 text-xs font-semibold text-gray-500">
-                  {labels.access.category}
-                  <select
-                    className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
-                    defaultValue={organisation.category}
-                    disabled={!canWrite || busy}
-                    name="category"
-                  >
-                    <option value="retailer">{labels.access.retailer}</option>
-                    <option value="platform">{labels.access.platform}</option>
-                  </select>
                 </label>
                 <label className="grid gap-1 text-xs font-semibold text-gray-500">
                   {labels.access.defaultLocale}
@@ -470,14 +452,6 @@ export function AdminAccessView({
                 placeholder={labels.access.slug}
                 required={true}
               />
-              <select
-                className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
-                defaultValue="retailer"
-                name="category"
-              >
-                <option value="retailer">{labels.access.retailer}</option>
-                <option value="platform">{labels.access.platform}</option>
-              </select>
               <select
                 className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
                 name="defaultLocale"
@@ -583,68 +557,72 @@ export function AdminAccessView({
 
           <Panel title={labels.access.people}>
             <div className="divide-y divide-gray-100">
-              {accessData.people.map((person) => (
-                <form
-                  className="grid gap-3 py-4 lg:grid-cols-[1.3fr_1.5fr_0.9fr_0.9fr_auto]"
-                  key={person.id}
-                  onSubmit={savePerson}
-                >
-                  <input type="hidden" name="personId" value={person.id} />
-                  <label className="grid gap-1 text-xs font-semibold text-gray-500">
-                    {labels.access.name}
-                    <input
-                      className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
-                      defaultValue={person.displayName}
-                      disabled={!canWrite || busy}
-                      name="displayName"
-                      required={true}
-                    />
-                  </label>
-                  <div className="grid gap-1 text-xs font-semibold text-gray-500">
-                    {labels.access.email}
-                    <div className="rounded-md bg-gray-50 px-3 py-2 text-sm font-normal text-gray-600 ring-1 ring-inset ring-gray-200">
-                      {person.email}
+              {accessData.people.map((person) => {
+                const personProtected = ownerPersonIds.has(person.id) && !canManageOwners;
+
+                return (
+                  <form
+                    className="grid gap-3 py-4 lg:grid-cols-[1.3fr_1.5fr_0.9fr_0.9fr_auto]"
+                    key={person.id}
+                    onSubmit={savePerson}
+                  >
+                    <input type="hidden" name="personId" value={person.id} />
+                    <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                      {labels.access.name}
+                      <input
+                        className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                        defaultValue={person.displayName}
+                        disabled={!canWrite || busy || personProtected}
+                        name="displayName"
+                        required={true}
+                      />
+                    </label>
+                    <div className="grid gap-1 text-xs font-semibold text-gray-500">
+                      {labels.access.email}
+                      <div className="rounded-md bg-gray-50 px-3 py-2 text-sm font-normal text-gray-600 ring-1 ring-inset ring-gray-200">
+                        {person.email}
+                      </div>
                     </div>
-                  </div>
-                  <label className="grid gap-1 text-xs font-semibold text-gray-500">
-                    {labels.access.preferredLocale}
-                    <select
-                      className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
-                      defaultValue={person.preferredLocale}
-                      disabled={!canWrite || busy}
-                      name="preferredLocale"
-                    >
-                      {publicLocales.map((localeCode) => (
-                        <option key={localeCode} value={localeCode}>
-                          {localeLabels[localeCode]}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="grid gap-1 text-xs font-semibold text-gray-500">
-                    {labels.access.status}
-                    <select
-                      className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
-                      defaultValue={person.status}
-                      disabled={!canWrite || busy}
-                      name="status"
-                    >
-                      <option value="active">{labels.access.active}</option>
-                      <option value="disabled">{labels.access.disabled}</option>
-                      <option value="invited">{labels.access.pending}</option>
-                    </select>
-                  </label>
-                  {canWrite ? (
-                    <button
-                      className="self-end rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-wait disabled:opacity-70"
-                      disabled={busy}
-                      type="submit"
-                    >
-                      {labels.access.save}
-                    </button>
-                  ) : null}
-                </form>
-              ))}
+                    <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                      {labels.access.preferredLocale}
+                      <select
+                        className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                        defaultValue={person.preferredLocale}
+                        disabled={!canWrite || busy || personProtected}
+                        name="preferredLocale"
+                      >
+                        {publicLocales.map((localeCode) => (
+                          <option key={localeCode} value={localeCode}>
+                            {localeLabels[localeCode]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                      {labels.access.status}
+                      <select
+                        className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                        defaultValue={person.status}
+                        disabled={!canWrite || busy || personProtected}
+                        name="status"
+                      >
+                        <option value="active">{labels.access.active}</option>
+                        <option value="disabled">{labels.access.disabled}</option>
+                        <option value="invited">{labels.access.pending}</option>
+                      </select>
+                    </label>
+                    {canWrite ? (
+                      <button
+                        className="self-end rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-wait disabled:opacity-70"
+                        disabled={busy || personProtected}
+                        type="submit"
+                      >
+                        {labels.access.save}
+                      </button>
+                    ) : null}
+                  </form>
+                );
+              })}
             </div>
           </Panel>
 
@@ -664,13 +642,16 @@ export function AdminAccessView({
                   {accessData.memberships.map((membership) => {
                     const person = personById.get(membership.personId);
                     const organisation = organisationById.get(membership.organisationId);
-                    const membershipRoles = rolesForCategory(
+                    const membershipRoles = rolesForOrganisationType(
                       accessData.roles,
-                      organisation?.category ?? "retailer"
+                      organisation?.type ?? "tenant",
+                      canManageOwners
                     );
                     const availableMembershipRoles = membershipRoles.includes(membership.role)
                       ? membershipRoles
                       : [membership.role, ...membershipRoles];
+                    const membershipProtected =
+                      membership.role === "platform_owner" && !canManageOwners;
 
                     return (
                       <tr key={membership.id}>
@@ -689,7 +670,7 @@ export function AdminAccessView({
                             <select
                               className="rounded-md bg-white px-2 py-1 text-sm ring-1 ring-inset ring-gray-300"
                               defaultValue={membership.role}
-                              disabled={!canWrite || busy}
+                              disabled={!canWrite || busy || membershipProtected}
                               name="role"
                             >
                               {availableMembershipRoles.map((role) => (
@@ -701,7 +682,7 @@ export function AdminAccessView({
                             <select
                               className="rounded-md bg-white px-2 py-1 text-sm ring-1 ring-inset ring-gray-300"
                               defaultValue={membership.status}
-                              disabled={!canWrite || busy}
+                              disabled={!canWrite || busy || membershipProtected}
                               name="status"
                             >
                               <option value="active">{labels.access.active}</option>
@@ -711,7 +692,7 @@ export function AdminAccessView({
                             {canWrite ? (
                               <button
                                 className="rounded-md bg-white px-3 py-1 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-wait disabled:opacity-70"
-                                disabled={busy}
+                                disabled={busy || membershipProtected}
                                 type="submit"
                               >
                                 {labels.access.save}

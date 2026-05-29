@@ -19,11 +19,7 @@ import {
   type AdminSessionContext
 } from "@/lib/admin-access";
 import { requestOriginAllowed } from "@/lib/admin-session-cookie";
-import {
-  hasAdminPermission,
-  isAdminRole,
-  type AdminOrganisationCategory
-} from "@/lib/admin-rbac";
+import { hasAdminPermission, isAdminRole } from "@/lib/admin-rbac";
 import { isLocale, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -56,14 +52,6 @@ async function adminContext(
 
 function localeValue(value: unknown): Locale {
   return isLocale(value) ? value : "en";
-}
-
-function organisationCategoryValue(value: unknown): AdminOrganisationCategory {
-  return text(value) === "platform" ? "platform" : "retailer";
-}
-
-function organisationTypeForCategory(category: AdminOrganisationCategory) {
-  return category === "platform" ? "platform" : "tenant";
 }
 
 function normalSlug(value: unknown) {
@@ -188,8 +176,6 @@ export async function POST(request: NextRequest) {
 
       const slug = normalSlug(body.slug);
       const name = text(body.name);
-      const category = organisationCategoryValue(body.category ?? body.type);
-      const type = organisationTypeForCategory(category);
 
       if (!slug || !name) {
         return NextResponse.json(
@@ -199,11 +185,10 @@ export async function POST(request: NextRequest) {
       }
 
       await createOrganisation({
-        category,
         defaultLocale: localeValue(body.defaultLocale),
         name,
         slug,
-        type
+        type: "tenant"
       });
 
       return accessResponse(request, context);
@@ -217,8 +202,6 @@ export async function POST(request: NextRequest) {
       const slug = normalSlug(body.slug);
       const name = text(body.name);
       const status = text(body.status);
-      const category = organisationCategoryValue(body.category ?? body.type);
-      const type = organisationTypeForCategory(category);
 
       if (!slug || !name) {
         return NextResponse.json(
@@ -232,13 +215,11 @@ export async function POST(request: NextRequest) {
       }
 
       await updateOrganisation({
-        category,
         defaultLocale: localeValue(body.defaultLocale),
         id: text(body.organisationId),
         name,
         slug,
-        status,
-        type
+        status
       });
 
       return accessResponse(request, context);
@@ -261,6 +242,7 @@ export async function POST(request: NextRequest) {
       }
 
       await updatePerson({
+        actor: context,
         displayName,
         id: text(body.personId),
         preferredLocale: localeValue(body.preferredLocale),
@@ -309,6 +291,7 @@ export async function POST(request: NextRequest) {
       }
 
       await updateMembershipRole({
+        actor: context,
         membershipId: text(body.membershipId),
         role,
         status

@@ -20,11 +20,11 @@ import {
   verifySignedAdminSession
 } from "@/lib/admin-session-cookie";
 import {
-  adminRoleAllowedForOrganisationCategory,
+  adminRoleAllowedForOrganisationType,
   adminRoleLabels,
-  isAdminRole,
+  normalizeAdminRole,
   permissionsForRole,
-  type AdminOrganisationCategory,
+  type AdminOrganisationType,
   type AdminPermission,
   type AdminRole
 } from "@/lib/admin-rbac";
@@ -33,11 +33,9 @@ import { siteBaseUrl } from "@/lib/site-url";
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
 
-export type AdminOrganisationType = "platform" | "tenant";
 export type AdminAccessStatus = "active" | "disabled" | "invited";
 
 export type AdminOrganisation = Readonly<{
-  category: AdminOrganisationCategory;
   defaultLocale: Locale;
   id: string;
   name: string;
@@ -281,8 +279,13 @@ function localeValue(value: unknown): Locale {
   return isLocale(value) ? value : "en";
 }
 
-function roleValue(value: unknown): AdminRole {
-  return isAdminRole(value) ? value : "viewer";
+function roleValue(
+  value: unknown,
+  organisationType: AdminOrganisationType = "platform"
+): AdminRole {
+  return typeof value === "string"
+    ? normalizeAdminRole(value, organisationType)
+    : normalizeAdminRole(null, organisationType);
 }
 
 function platformBootstrapEmail() {
@@ -308,21 +311,15 @@ function person(row: {
   };
 }
 
-function organisationCategory(type: string): AdminOrganisationCategory {
-  return type === "platform" ? "platform" : "retailer";
-}
-
 function organisation(row: {
   default_locale: string;
   id: string;
-  metadata?: unknown;
   name: string;
   organisation_type: string;
   slug: string;
   status: string;
 }): AdminOrganisation {
   return {
-    category: organisationCategory(row.organisation_type),
     defaultLocale: localeValue(row.default_locale),
     id: row.id,
     name: row.name,
@@ -338,16 +335,20 @@ function organisation(row: {
 function membership(row: {
   id: string;
   organisation_id: string;
+  organisation_type?: string;
   person_id: string;
   role: string;
   status: string;
   title: string | null;
 }): AdminMembership {
+  const organisationType: AdminOrganisationType =
+    row.organisation_type === "tenant" ? "tenant" : "platform";
+
   return {
     id: row.id,
     organisationId: row.organisation_id,
     personId: row.person_id,
-    role: roleValue(row.role),
+    role: roleValue(row.role, organisationType),
     status:
       row.status === "active" || row.status === "disabled" || row.status === "invited"
         ? row.status
@@ -370,7 +371,6 @@ async function platformOrganisation(sql: Db) {
   const rows = await sql<Array<{
     default_locale: string;
     id: string;
-    metadata: unknown;
     name: string;
     organisation_type: string;
     slug: string;
@@ -381,19 +381,17 @@ async function platformOrganisation(sql: Db) {
       name,
       organisation_type,
       status,
-      default_locale,
-      metadata
+      default_locale
     )
     values (
       ${defaultPlatformOrgSlug},
       'MattaNutra',
       'platform',
       'active',
-      'en',
-      ${sql.json(toJsonValue({ category: "platform" }))}::jsonb
+      'en'
     )
     on conflict do nothing
-    returning id::text, slug, name, organisation_type, status, default_locale, metadata
+    returning id::text, slug, name, organisation_type, status, default_locale
   `;
 
   if (rows[0]) {
@@ -403,13 +401,12 @@ async function platformOrganisation(sql: Db) {
   const existing = await sql<Array<{
     default_locale: string;
     id: string;
-    metadata: unknown;
     name: string;
     organisation_type: string;
     slug: string;
     status: string;
   }>>`
-    select id::text, slug, name, organisation_type, status, default_locale, metadata
+    select id::text, slug, name, organisation_type, status, default_locale
     from public.organisations
     where lower(slug) = ${defaultPlatformOrgSlug}
     limit 1
@@ -551,19 +548,23 @@ export async function createRegistrationOptions({
       email: string;
       id: string;
       organisation_id: string;
+      organisation_type: string;
       preferred_locale: string;
       role: string;
     }>>`
       select
-        id::text,
-        organisation_id::text,
-        email,
-        role,
-        preferred_locale
+        admin_invitations.id::text,
+        admin_invitations.organisation_id::text,
+        organisations.organisation_type,
+        admin_invitations.email,
+        admin_invitations.role,
+        admin_invitations.preferred_locale
       from public.admin_invitations
+      join public.organisations
+        on organisations.id = admin_invitations.organisation_id
       where token_hash = ${hashAdminToken(inviteToken)}
-        and status = 'pending'
-        and expires_at > now()
+        and admin_invitations.status = 'pending'
+        and admin_invitations.expires_at > now()
       limit 1
     `;
     const invite = inviteRows[0];
@@ -578,7 +579,10 @@ export async function createRegistrationOptions({
       locale: localeValue(invite.preferred_locale),
       mode: "invite",
       organisationId: invite.organisation_id,
-      role: invite.role
+      role: roleValue(
+        invite.role,
+        invite.organisation_type === "tenant" ? "tenant" : "platform"
+      )
     };
   } else {
     const ownerExists = await hasPlatformOwner();
@@ -1047,7 +1051,6 @@ async function sessionContextFor({
     membership_id: string;
     membership_status: string;
     organisation_id: string;
-    organisation_metadata: unknown;
     organisation_name: string;
     organisation_slug: string;
     organisation_status: string;
@@ -1068,7 +1071,6 @@ async function sessionContextFor({
       organisations.slug as organisation_slug,
       organisations.name as organisation_name,
       organisations.organisation_type,
-      organisations.metadata as organisation_metadata,
       organisations.status as organisation_status,
       organisations.default_locale,
       organisation_memberships.id::text as membership_id,
@@ -1105,7 +1107,6 @@ async function sessionContextFor({
         organisations.slug as organisation_slug,
         organisations.name as organisation_name,
         organisations.organisation_type,
-        organisations.metadata as organisation_metadata,
         organisations.status as organisation_status,
         organisations.default_locale,
         organisation_memberships.id::text as membership_id,
@@ -1135,7 +1136,6 @@ async function sessionContextFor({
   const actorOrganisation = organisation({
     default_locale: actor.default_locale,
     id: actor.organisation_id,
-    metadata: actor.organisation_metadata,
     name: actor.organisation_name,
     organisation_type: actor.organisation_type,
     slug: actor.organisation_slug,
@@ -1144,6 +1144,7 @@ async function sessionContextFor({
   const actorMembership = membership({
     id: actor.membership_id,
     organisation_id: actor.organisation_id,
+    organisation_type: actor.organisation_type,
     person_id: actor.person_id,
     role: actor.role,
     status: actor.membership_status,
@@ -1162,7 +1163,6 @@ async function sessionContextFor({
     ? organisation({
         default_locale: assumed.default_locale,
         id: assumed.organisation_id,
-        metadata: assumed.organisation_metadata,
         name: assumed.organisation_name,
         organisation_type: assumed.organisation_type,
         slug: assumed.organisation_slug,
@@ -1173,6 +1173,7 @@ async function sessionContextFor({
     ? membership({
         id: assumed.membership_id,
         organisation_id: assumed.organisation_id,
+        organisation_type: assumed.organisation_type,
         person_id: assumed.person_id,
         role: assumed.role,
         status: assumed.membership_status,
@@ -1453,13 +1454,12 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
       sql<Array<{
         default_locale: string;
         id: string;
-        metadata: unknown;
         name: string;
         organisation_type: string;
         slug: string;
         status: string;
       }>>`
-        select id::text, slug, name, organisation_type, status, default_locale, metadata
+        select id::text, slug, name, organisation_type, status, default_locale
         from public.organisations
         order by organisation_type asc, lower(name) asc
       `,
@@ -1477,34 +1477,48 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
       sql<Array<{
         id: string;
         organisation_id: string;
+        organisation_type: string;
         person_id: string;
         role: string;
         status: string;
         title: string | null;
       }>>`
-        select id::text, organisation_id::text, person_id::text, role, status, title
+        select
+          organisation_memberships.id::text,
+          organisation_memberships.organisation_id::text,
+          organisations.organisation_type,
+          organisation_memberships.person_id::text,
+          organisation_memberships.role,
+          organisation_memberships.status,
+          organisation_memberships.title
         from public.organisation_memberships
-        order by created_at desc
+        join public.organisations
+          on organisations.id = organisation_memberships.organisation_id
+        order by organisation_memberships.created_at desc
       `,
       sql<Array<{
         email: string;
         expires_at: Date | string;
         id: string;
         organisation_id: string;
+        organisation_type: string;
         preferred_locale: string;
         role: string;
         status: string;
       }>>`
         select
-          id::text,
-          organisation_id::text,
-          email,
-          role,
-          preferred_locale,
-          status,
-          expires_at
+          admin_invitations.id::text,
+          admin_invitations.organisation_id::text,
+          organisations.organisation_type,
+          admin_invitations.email,
+          admin_invitations.role,
+          admin_invitations.preferred_locale,
+          admin_invitations.status,
+          admin_invitations.expires_at
         from public.admin_invitations
-        order by created_at desc
+        join public.organisations
+          on organisations.id = admin_invitations.organisation_id
+        order by admin_invitations.created_at desc
         limit 100
       `,
       sql<Array<{
@@ -1578,7 +1592,10 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
       id: invite.id,
       organisationId: invite.organisation_id,
       preferredLocale: localeValue(invite.preferred_locale),
-      role: roleValue(invite.role),
+      role: roleValue(
+        invite.role,
+        invite.organisation_type === "tenant" ? "tenant" : "platform"
+      ),
       status:
         invite.status === "accepted" ||
         invite.status === "expired" ||
@@ -1596,13 +1613,11 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
 }
 
 export async function createOrganisation({
-  category,
   defaultLocale,
   name,
   slug,
   type
 }: Readonly<{
-  category: AdminOrganisationCategory;
   defaultLocale: Locale;
   name: string;
   slug: string;
@@ -1612,7 +1627,6 @@ export async function createOrganisation({
   const rows = await sql<Array<{
     default_locale: string;
     id: string;
-    metadata: unknown;
     name: string;
     organisation_type: string;
     slug: string;
@@ -1623,45 +1637,38 @@ export async function createOrganisation({
       name,
       organisation_type,
       status,
-      default_locale,
-      metadata
+      default_locale
     )
     values (
       ${slug.trim().toLowerCase()},
       ${name.trim()},
       ${type},
       'active',
-      ${defaultLocale},
-      ${sql.json(toJsonValue({ category }))}::jsonb
+      ${defaultLocale}
     )
-    returning id::text, slug, name, organisation_type, status, default_locale, metadata
+    returning id::text, slug, name, organisation_type, status, default_locale
   `;
 
   return rows[0] ? organisation(rows[0]) : null;
 }
 
 export async function updateOrganisation({
-  category,
   defaultLocale,
   id,
   name,
   slug,
-  status,
-  type
+  status
 }: Readonly<{
-  category: AdminOrganisationCategory;
   defaultLocale: Locale;
   id: string;
   name: string;
   slug: string;
   status: "active" | "archived" | "disabled";
-  type: AdminOrganisationType;
 }>) {
   const sql = await sqlOrThrow();
   const rows = await sql<Array<{
     default_locale: string;
     id: string;
-    metadata: unknown;
     name: string;
     organisation_type: string;
     slug: string;
@@ -1671,35 +1678,49 @@ export async function updateOrganisation({
     set
       slug = ${slug.trim().toLowerCase()},
       name = ${name.trim()},
-      organisation_type = ${type},
       status = ${status},
       default_locale = ${defaultLocale},
-      metadata = jsonb_set(
-        coalesce(metadata, '{}'::jsonb),
-        '{category}',
-        to_jsonb(${category}::text),
-        true
-      ),
       updated_at = now()
     where id = ${id}::uuid
-    returning id::text, slug, name, organisation_type, status, default_locale, metadata
+    returning id::text, slug, name, organisation_type, status, default_locale
   `;
 
   return rows[0] ? organisation(rows[0]) : null;
 }
 
 export async function updatePerson({
+  actor,
   displayName,
   id,
   preferredLocale,
   status
 }: Readonly<{
+  actor: AdminSessionContext;
   displayName: string;
   id: string;
   preferredLocale: Locale;
   status: AdminAccessStatus;
 }>) {
   const sql = await sqlOrThrow();
+
+  if (actor.role !== "platform_owner") {
+    const ownerRows = await sql<Array<{ exists: boolean }>>`
+      select exists (
+        select 1
+        from public.organisation_memberships
+        join public.organisations
+          on organisations.id = organisation_memberships.organisation_id
+        where organisation_memberships.person_id = ${id}::uuid
+          and organisation_memberships.role = 'platform_owner'
+          and organisations.organisation_type = 'platform'
+      ) as exists
+    `;
+
+    if (ownerRows[0]?.exists) {
+      throw new Error("Platform Admin cannot change Platform Owner users");
+    }
+  }
+
   const rows = await sql<Array<{
     display_name: string;
     email: string;
@@ -1792,7 +1813,6 @@ export async function createAdminInvitation({
     membership_status: string | null;
     name: string;
     organisation_id: string;
-    organisation_metadata: unknown;
     organisation_status: string;
     organisation_type: string;
     person_id: string | null;
@@ -1807,7 +1827,6 @@ export async function createAdminInvitation({
       organisations.slug,
       organisations.name,
       organisations.organisation_type,
-      organisations.metadata as organisation_metadata,
       organisations.status as organisation_status,
       organisations.default_locale,
       people.id::text as person_id,
@@ -1836,15 +1855,18 @@ export async function createAdminInvitation({
   const existingOrganisation = organisation({
     default_locale: existing.default_locale,
     id: existing.organisation_id,
-    metadata: existing.organisation_metadata,
     name: existing.name,
     organisation_type: existing.organisation_type,
     slug: existing.slug,
     status: existing.organisation_status
   });
 
-  if (!adminRoleAllowedForOrganisationCategory(role, existingOrganisation.category)) {
-    throw new Error("Role is not allowed for this organisation category");
+  if (!adminRoleAllowedForOrganisationType(role, existingOrganisation.type)) {
+    throw new Error("Role is not allowed for this organisation");
+  }
+
+  if (role === "platform_owner" && actor.role !== "platform_owner") {
+    throw new Error("Platform Admin cannot grant Platform Owner access");
   }
 
   if (existing.person_id && existing.email && existing.display_name) {
@@ -1860,6 +1882,7 @@ export async function createAdminInvitation({
       const existingMembership = membership({
         id: existing.membership_id,
         organisation_id: existing.organisation_id,
+        organisation_type: existing.organisation_type,
         person_id: existing.person_id,
         role: existing.role,
         status: existing.membership_status,
@@ -2039,10 +2062,12 @@ export async function createAdminInvitation({
 }
 
 export async function updateMembershipRole({
+  actor,
   membershipId,
   role,
   status
 }: Readonly<{
+  actor: AdminSessionContext;
   membershipId: string;
   role: AdminRole;
   status: AdminAccessStatus;
@@ -2050,9 +2075,11 @@ export async function updateMembershipRole({
   const sql = await sqlOrThrow();
   const organisationRows = await sql<Array<{
     organisation_type: string;
+    role: string;
   }>>`
     select
-      organisations.organisation_type
+      organisations.organisation_type,
+      organisation_memberships.role
     from public.organisation_memberships
     join public.organisations
       on organisations.id = organisation_memberships.organisation_id
@@ -2065,12 +2092,18 @@ export async function updateMembershipRole({
     return null;
   }
 
-  const category = organisationCategory(
-    organisationRow.organisation_type
-  );
+  const organisationType: AdminOrganisationType =
+    organisationRow.organisation_type === "platform" ? "platform" : "tenant";
 
-  if (!adminRoleAllowedForOrganisationCategory(role, category)) {
-    throw new Error("Role is not allowed for this organisation category");
+  if (!adminRoleAllowedForOrganisationType(role, organisationType)) {
+    throw new Error("Role is not allowed for this organisation");
+  }
+
+  if (
+    actor.role !== "platform_owner" &&
+    (organisationRow.role === "platform_owner" || role === "platform_owner")
+  ) {
+    throw new Error("Platform Admin cannot change Platform Owner access");
   }
 
   const rows = await sql<Array<{

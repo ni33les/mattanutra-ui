@@ -25,19 +25,13 @@ export type AdminPermission =
   | "tasks.write";
 
 export type AdminRole =
-  | "agent_manager"
-  | "catalogue_manager"
-  | "content_manager"
-  | "finance_viewer"
-  | "ops_manager"
-  | "platform_admin"
   | "platform_owner"
-  | "platform_viewer"
-  | "tenant_admin"
-  | "tenant_user"
-  | "viewer";
+  | "platform_admin"
+  | "retail_admin"
+  | "retail_agent"
+  | "retail_assistant";
 
-export type AdminOrganisationCategory = "platform" | "retailer";
+export type AdminOrganisationType = "platform" | "tenant";
 
 export type AdminSessionPrincipal = Readonly<{
   permissions: readonly AdminPermission[];
@@ -70,98 +64,75 @@ const allPermissions = [
 ] as const satisfies readonly AdminPermission[];
 
 export const adminRolePermissions = {
-  agent_manager: [
-    "agents.read",
-    "agents.write",
-    "tasks.read",
-    "tasks.write",
-    "performance.read",
-    "settings.read"
-  ],
-  catalogue_manager: [
-    "catalogue.read",
-    "catalogue.write",
-    "reviews.read",
-    "reviews.write",
-    "performance.read",
-    "settings.read"
-  ],
-  content_manager: [
-    "content.read",
-    "content.write",
-    "marketing.read",
-    "performance.read",
-    "settings.read"
-  ],
-  finance_viewer: ["finance.read", "performance.read", "settings.read"],
-  ops_manager: [
-    "agents.read",
-    "alerts.read",
-    "alerts.write",
-    "communications.read",
-    "communications.write",
-    "performance.read",
-    "reviews.read",
-    "reviews.write",
-    "settings.read",
-    "tasks.read",
-    "tasks.write"
-  ],
-  platform_admin: allPermissions.filter(
-    (permission) => permission !== "access.write"
-  ),
   platform_owner: allPermissions,
-  platform_viewer: [
-    "agents.read",
-    "alerts.read",
-    "catalogue.read",
-    "communications.read",
-    "content.read",
-    "finance.read",
-    "marketing.read",
-    "performance.read",
-    "reviews.read",
-    "settings.read",
-    "tasks.read"
-  ],
-  tenant_admin: ["settings.read"],
-  tenant_user: ["settings.read"],
-  viewer: ["performance.read", "settings.read"]
+  platform_admin: allPermissions,
+  retail_admin: ["settings.read"],
+  retail_agent: ["settings.read"],
+  retail_assistant: ["settings.read"]
 } as const satisfies Record<AdminRole, readonly AdminPermission[]>;
 
 export const adminRoleLabels = {
-  agent_manager: "Agent manager",
-  catalogue_manager: "Catalogue manager",
-  content_manager: "Content manager",
-  finance_viewer: "Finance viewer",
-  ops_manager: "Operations manager",
-  platform_admin: "Platform admin",
-  platform_owner: "Platform owner",
-  platform_viewer: "Platform viewer",
-  tenant_admin: "Retailer admin",
-  tenant_user: "Retailer user",
-  viewer: "Viewer"
+  platform_owner: "Platform Owner",
+  platform_admin: "Platform Admin",
+  retail_admin: "Retail Admin",
+  retail_agent: "Retail Agent",
+  retail_assistant: "Retail Assistant"
 } as const satisfies Record<AdminRole, string>;
 
-const retailerRoles = ["tenant_admin", "tenant_user"] as const satisfies readonly AdminRole[];
-const retailerRoleSet = new Set<AdminRole>(retailerRoles);
-const platformRoles = Object.keys(adminRoleLabels).filter(
-  (role) => !retailerRoleSet.has(role as AdminRole)
-) as AdminRole[];
+const platformRoles = ["platform_owner", "platform_admin"] as const satisfies readonly AdminRole[];
+const retailRoles = [
+  "retail_admin",
+  "retail_agent",
+  "retail_assistant"
+] as const satisfies readonly AdminRole[];
+const platformRoleSet = new Set<AdminRole>(platformRoles);
+const retailRoleSet = new Set<AdminRole>(retailRoles);
 
-export function rolesForAdminOrganisationCategory(
-  category: AdminOrganisationCategory
-) {
-  return category === "retailer" ? retailerRoles : platformRoles;
+export function rolesForAdminOrganisationType(type: AdminOrganisationType) {
+  return type === "tenant" ? retailRoles : platformRoles;
 }
 
-export function adminRoleAllowedForOrganisationCategory(
+export function adminRoleAllowedForOrganisationType(
   role: AdminRole,
-  category: AdminOrganisationCategory
+  type: AdminOrganisationType
 ) {
-  return category === "retailer"
-    ? retailerRoleSet.has(role)
-    : platformRoles.includes(role);
+  return type === "tenant"
+    ? retailRoleSet.has(role)
+    : platformRoleSet.has(role);
+}
+
+export function normalizeAdminRole(
+  role: string | null | undefined,
+  organisationType: AdminOrganisationType = "tenant"
+): AdminRole {
+  if (isAdminRole(role)) {
+    return role;
+  }
+
+  if (role === "admin" || role === "platform_viewer") {
+    return "platform_admin";
+  }
+
+  if (
+    role === "agent_manager" ||
+    role === "catalogue_manager" ||
+    role === "content_manager" ||
+    role === "finance_viewer" ||
+    role === "ops_manager" ||
+    role === "viewer"
+  ) {
+    return organisationType === "platform" ? "platform_admin" : "retail_assistant";
+  }
+
+  if (role === "tenant" || role === "tenant_admin") {
+    return "retail_admin";
+  }
+
+  if (role === "tenant_user") {
+    return "retail_assistant";
+  }
+
+  return organisationType === "platform" ? "platform_admin" : "retail_assistant";
 }
 
 const adminViews = [

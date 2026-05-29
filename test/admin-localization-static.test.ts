@@ -53,26 +53,40 @@ test("admin settings owns profile and logout controls", () => {
   assert.match(settingsView, /labels\.settings\.account/);
 });
 
-test("admin organisations expose retailer category instead of tenant wording", () => {
+test("admin organisations hide type controls and expose only platform and retail roles", () => {
   const access = source("lib/admin-access.ts");
   const rbac = source("lib/admin-rbac.ts");
   const route = source("app/api/admin/access/route.ts");
   const view = source("components/admin/access-view.tsx");
   const content = source("components/admin/dashboard-content.tsx");
 
-  assert.match(rbac, /AdminOrganisationCategory = "platform" \| "retailer"/);
-  assert.match(rbac, /rolesForAdminOrganisationCategory/);
-  assert.match(rbac, /tenant_admin", "tenant_user/);
-  assert.match(access, /metadata = jsonb_set/);
-  assert.match(access, /adminRoleAllowedForOrganisationCategory/);
-  assert.match(route, /body\.category \?\? body\.type/);
-  assert.match(view, /rolesForAdminOrganisationCategory/);
-  assert.match(view, /name="category"/);
-  assert.match(view, /value="retailer"/);
-  assert.match(content, /retailer: "Retailer"/);
+  assert.match(rbac, /AdminOrganisationType = "platform" \| "tenant"/);
+  assert.match(rbac, /rolesForAdminOrganisationType/);
+  assert.match(rbac, /platform_owner/);
+  assert.match(rbac, /platform_admin/);
+  assert.match(rbac, /retail_admin/);
+  assert.match(rbac, /retail_agent/);
+  assert.match(rbac, /retail_assistant/);
+  assert.match(access, /adminRoleAllowedForOrganisationType/);
+  assert.match(access, /Platform Admin cannot change Platform Owner users/);
+  assert.match(access, /Platform Admin cannot grant Platform Owner access/);
+  assert.match(access, /Platform Admin cannot change Platform Owner access/);
+  assert.match(route, /type: "tenant"/);
+  assert.match(view, /rolesForAdminOrganisationType/);
+  assert.match(view, /platform_owner: "Platform Owner"/);
+  assert.match(view, /platform_admin: "Platform Admin"/);
+  assert.match(view, /retail_admin: "Retail Admin"/);
+  assert.match(view, /retail_agent: "Retail Agent"/);
+  assert.match(view, /retail_assistant: "Retail Assistant"/);
 
-  assert.doesNotMatch(view, /Tenant admin|Tenant user|labels\.access\.tenant|value="tenant"/);
-  assert.doesNotMatch(content, /tenant: "Tenant"/);
+  assert.doesNotMatch(access, /metadata = jsonb_set/);
+  assert.doesNotMatch(route, /body\.category|body\.type/);
+  assert.doesNotMatch(view, /name="category"|name="type"|value="retailer"|value="tenant"/);
+  assert.doesNotMatch(
+    view,
+    /Catalogue manager|Agent manager|Content manager|Finance viewer|Operations manager|Tenant admin|Tenant user|labels\.access\.tenant/
+  );
+  assert.doesNotMatch(content, /tenant: "Tenant"|retailer: "Retailer"/);
 });
 
 test("admin sidebar navigation preserves scroll position across menu clicks", () => {

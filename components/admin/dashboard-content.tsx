@@ -232,7 +232,6 @@ export type AdminContent = Readonly<{
     assumed: string;
     audit: string;
     capabilities: string;
-    category: string;
     create: string;
     createOrganisation: string;
     defaultLocale: string;
@@ -253,14 +252,12 @@ export type AdminContent = Readonly<{
     pending: string;
     platform: string;
     preferredLocale: string;
-    retailer: string;
     role: string;
     save: string;
     session: string;
     slug: string;
     status: string;
     stopAssuming: string;
-    type: string;
     updated: string;
   };
   settings: {
@@ -683,9 +680,8 @@ const baseContent = {
       assumed: "Viewing as",
       audit: "Audit",
       capabilities: "Capabilities",
-      category: "Category",
       create: "Create",
-      createOrganisation: "Create organisation",
+      createOrganisation: "Create retailer",
       defaultLocale: "Default language",
       disabled: "Disabled",
       email: "Email",
@@ -704,14 +700,12 @@ const baseContent = {
       pending: "Pending",
       platform: "Platform",
       preferredLocale: "Preferred language",
-      retailer: "Retailer",
       role: "Role",
       save: "Save",
       session: "Session",
       slug: "Slug",
       status: "Status",
       stopAssuming: "Stop assuming",
-      type: "Type",
       updated: "Access controls updated."
     },
     settings: {
@@ -1232,9 +1226,8 @@ const baseContent = {
       assumed: "กำลังดูเป็น",
       audit: "ประวัติ",
       capabilities: "ความสามารถ",
-      category: "หมวดหมู่",
       create: "สร้าง",
-      createOrganisation: "สร้างองค์กร",
+      createOrganisation: "สร้างผู้ค้าปลีก",
       defaultLocale: "ภาษาเริ่มต้น",
       disabled: "ปิดใช้งาน",
       email: "อีเมล",
@@ -1253,14 +1246,12 @@ const baseContent = {
       pending: "รอดำเนินการ",
       platform: "แพลตฟอร์ม",
       preferredLocale: "ภาษาที่ต้องการ",
-      retailer: "ผู้ค้าปลีก",
       role: "บทบาท",
       save: "บันทึก",
       session: "เซสชัน",
       slug: "Slug",
       status: "สถานะ",
       stopAssuming: "หยุดสวมบทบาท",
-      type: "ประเภท",
       updated: "อัปเดตสิทธิ์แล้ว"
     },
     settings: {

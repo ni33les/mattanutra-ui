@@ -46,17 +46,11 @@ create table if not exists public.organisation_memberships (
   updated_at timestamptz not null default now(),
   constraint organisation_memberships_status_check check (status in ('active', 'disabled', 'invited')),
   constraint organisation_memberships_role_check check (role in (
-    'agent_manager',
-    'catalogue_manager',
-    'content_manager',
-    'finance_viewer',
-    'ops_manager',
-    'platform_admin',
     'platform_owner',
-    'platform_viewer',
-    'tenant_admin',
-    'tenant_user',
-    'viewer'
+    'platform_admin',
+    'retail_admin',
+    'retail_agent',
+    'retail_assistant'
   ))
 );
 
@@ -142,17 +136,11 @@ create table if not exists public.admin_invitations (
   updated_at timestamptz not null default now(),
   constraint admin_invitations_status_check check (status in ('accepted', 'expired', 'pending', 'revoked')),
   constraint admin_invitations_role_check check (role in (
-    'agent_manager',
-    'catalogue_manager',
-    'content_manager',
-    'finance_viewer',
-    'ops_manager',
-    'platform_admin',
     'platform_owner',
-    'platform_viewer',
-    'tenant_admin',
-    'tenant_user',
-    'viewer'
+    'platform_admin',
+    'retail_admin',
+    'retail_agent',
+    'retail_assistant'
   ))
 );
 
@@ -161,6 +149,66 @@ create unique index if not exists admin_invitations_token_idx
 
 create index if not exists admin_invitations_org_status_idx
   on public.admin_invitations (organisation_id, status, created_at desc);
+
+alter table public.organisation_memberships
+  drop constraint if exists organisation_memberships_role_check;
+
+update public.organisation_memberships
+set role = case
+  when organisation_memberships.role = 'platform_owner' then 'platform_owner'
+  when organisations.organisation_type = 'platform' then 'platform_admin'
+  when organisation_memberships.role in ('tenant_admin', 'tenant', 'retail_admin') then 'retail_admin'
+  when organisation_memberships.role in ('retail_agent') then 'retail_agent'
+  else 'retail_assistant'
+end
+from public.organisations
+where organisations.id = organisation_memberships.organisation_id
+  and organisation_memberships.role not in (
+    'platform_owner',
+    'platform_admin',
+    'retail_admin',
+    'retail_agent',
+    'retail_assistant'
+  );
+
+alter table public.organisation_memberships
+  add constraint organisation_memberships_role_check check (role in (
+    'platform_owner',
+    'platform_admin',
+    'retail_admin',
+    'retail_agent',
+    'retail_assistant'
+  ));
+
+alter table public.admin_invitations
+  drop constraint if exists admin_invitations_role_check;
+
+update public.admin_invitations
+set role = case
+  when admin_invitations.role = 'platform_owner' then 'platform_owner'
+  when organisations.organisation_type = 'platform' then 'platform_admin'
+  when admin_invitations.role in ('tenant_admin', 'tenant', 'retail_admin') then 'retail_admin'
+  when admin_invitations.role in ('retail_agent') then 'retail_agent'
+  else 'retail_assistant'
+end
+from public.organisations
+where organisations.id = admin_invitations.organisation_id
+  and admin_invitations.role not in (
+    'platform_owner',
+    'platform_admin',
+    'retail_admin',
+    'retail_agent',
+    'retail_assistant'
+  );
+
+alter table public.admin_invitations
+  add constraint admin_invitations_role_check check (role in (
+    'platform_owner',
+    'platform_admin',
+    'retail_admin',
+    'retail_agent',
+    'retail_assistant'
+  ));
 
 create table if not exists public.admin_audit_events (
   id uuid primary key default gen_random_uuid(),
@@ -185,27 +233,16 @@ insert into public.organisations (
   name,
   organisation_type,
   status,
-  default_locale,
-  metadata
+  default_locale
 )
 values (
   'mattanutra',
   'MattaNutra',
   'platform',
   'active',
-  'en',
-  '{"category":"platform"}'::jsonb
+  'en'
 )
 on conflict do nothing;
-
-update public.organisations
-set metadata = jsonb_set(
-  coalesce(metadata, '{}'::jsonb),
-  '{category}',
-  to_jsonb(case when organisation_type = 'platform' then 'platform' else 'retailer' end::text),
-  true
-)
-where metadata->>'category' is null;
 
 alter table public.agents
   add column if not exists organisation_id uuid references public.organisations(id) on delete set null,
