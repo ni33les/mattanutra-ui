@@ -703,7 +703,7 @@ const baseContent = {
       needsWork: "Needs work",
       okay: "Okay"
     },
-    flowTitle: "คอนเวอร์ชัน",
+    flowTitle: "Conversions",
     marketingPages: {
       affiliate: "Affiliate",
       assessmentCompletions: "Completed",
@@ -739,9 +739,9 @@ const baseContent = {
       totalLeads: "Leads"
     },
     performance: [
-      { icon: HomeIcon, name: "แดชบอร์ด", view: "glance" },
-      { icon: FunnelIcon, name: "คอนเวอร์ชัน", view: "flow" },
-      { icon: BanknotesIcon, name: "การเงิน", view: "financials" }
+      { icon: HomeIcon, name: "Dashboard", view: "glance" },
+      { icon: FunnelIcon, name: "Conversions", view: "flow" },
+      { icon: BanknotesIcon, name: "Financials", view: "financials" }
     ],
     performanceTitle: "Performance",
     marketing: [
@@ -769,7 +769,7 @@ const baseContent = {
       { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" },
       { icon: ShoppingBagIcon, name: "Products", view: "product-insights" }
     ],
-    insightsTitle: "อินไซต์",
+    insightsTitle: "Insights",
     openSidebar: "Open sidebar",
     execution: [
       { icon: ExclamationTriangleIcon, name: "Reviews", view: "reviews" },
