@@ -28,6 +28,12 @@ export type ProductImportFactInput = Readonly<{
   unit?: string | null;
 }>;
 
+type ProductTranslationInput = Readonly<{
+  description?: string | null;
+  status?: "complete" | "draft" | "missing";
+  title?: string | null;
+}>;
+
 // This module will eventually own all import run, staging, review, and approval logic.
 
 export type StageProductImportInput = Readonly<{
@@ -36,6 +42,7 @@ export type StageProductImportInput = Readonly<{
   description?: string | null;
   descriptionEn?: string | null;
   descriptionTh?: string | null;
+  descriptionZhCn?: string | null;
   duplicateProductIds?: readonly string[];
   fdaApprovalNumber?: string | null;
   imageUrls?: readonly string[];
@@ -48,6 +55,8 @@ export type StageProductImportInput = Readonly<{
   sourceUrl: string;
   titleEn?: string | null;
   titleTh?: string | null;
+  titleZhCn?: string | null;
+  translations?: Record<string, ProductTranslationInput>;
 }>;
 
 export type StartProductImportRunInput = Readonly<{
@@ -74,6 +83,7 @@ export type ResolveProductImportReviewInput = Readonly<{
   description?: string | null;
   descriptionEn?: string | null;
   descriptionTh?: string | null;
+  descriptionZhCn?: string | null;
   fdaApprovalNumber?: string | null;
   imageUrl?: string | null;
   manufacturerCountryCodes?: readonly string[];
@@ -87,6 +97,8 @@ export type ResolveProductImportReviewInput = Readonly<{
   title?: string | null;
   titleEn?: string | null;
   titleTh?: string | null;
+  titleZhCn?: string | null;
+  translations?: Record<string, ProductTranslationInput>;
 }>;
 
 export function normalizedFactsForStorage(
@@ -418,14 +430,16 @@ export async function stageProductImport(input: StageProductImportInput) {
   const sourceUrl = input.sourceUrl.trim();
   const titleEn = cleanNullableText(input.titleEn, 500);
   const titleTh = cleanNullableText(input.titleTh, 500);
+  const titleZhCn = cleanNullableText(input.titleZhCn, 500);
   const productTitle = preferredProductTitle({
     title: rawProductTitle,
     titleEn
   });
   const descriptionEn = cleanNullableText(input.descriptionEn, 4000);
   const descriptionTh = cleanNullableText(input.descriptionTh, 4000);
+  const descriptionZhCn = cleanNullableText(input.descriptionZhCn, 4000);
   const description = cleanNullableText(
-    input.description ?? descriptionEn ?? descriptionTh,
+    input.description ?? descriptionEn ?? descriptionTh ?? descriptionZhCn,
     4000
   );
   const normalizedBrandName = normalizeProductKey(brandName);
@@ -491,9 +505,12 @@ export async function stageProductImport(input: StageProductImportInput) {
         ...(rawProductTitle !== productTitle ? { originalProductTitle: rawProductTitle } : {}),
         ...(titleEn ? { titleEn } : {}),
         ...(titleTh ? { titleTh } : {}),
+        ...(titleZhCn ? { titleZhCn } : {}),
         ...(description ? { description } : {}),
         ...(descriptionEn ? { descriptionEn } : {}),
-        ...(descriptionTh ? { descriptionTh } : {})
+        ...(descriptionTh ? { descriptionTh } : {}),
+        ...(descriptionZhCn ? { descriptionZhCn } : {}),
+        ...(input.translations ? { translations: input.translations } : {})
       }))}::jsonb,
       ${duplicateProductIds}::uuid[],
       ${input.parseConfidence ?? "moderate"},
@@ -536,6 +553,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       description,
       descriptionEn,
       descriptionTh,
+      descriptionZhCn,
       facts: parsedFacts,
       fdaApprovalNumber: cleanNullableText(input.fdaApprovalNumber, 100),
       imageUrl: imageUrls[0] ?? null,
@@ -554,13 +572,18 @@ export async function stageProductImport(input: StageProductImportInput) {
         ...(rawProductTitle !== productTitle ? { originalProductTitle: rawProductTitle } : {}),
         ...(titleEn ? { titleEn } : {}),
         ...(titleTh ? { titleTh } : {}),
+        ...(titleZhCn ? { titleZhCn } : {}),
         ...(description ? { description } : {}),
         ...(descriptionEn ? { descriptionEn } : {}),
-        ...(descriptionTh ? { descriptionTh } : {})
+        ...(descriptionTh ? { descriptionTh } : {}),
+        ...(descriptionZhCn ? { descriptionZhCn } : {}),
+        ...(input.translations ? { translations: input.translations } : {})
       },
       title: productTitle,
       titleEn,
-      titleTh
+      titleTh,
+      titleZhCn,
+      translations: input.translations
     });
     draftProductId = draftProduct.id;
   }

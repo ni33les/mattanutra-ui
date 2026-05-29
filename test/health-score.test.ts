@@ -179,6 +179,27 @@ describe("HealthScore v4 deterministic scoring", () => {
     assert.deepEqual(hits, []);
   });
 
+  it("keeps deterministic zh-CN copy out of English and Thai fallback text", () => {
+    const result = computeHealthScore(profileOne(), "zh-CN");
+    const leaks: string[] = [];
+    const allowedLatin =
+      /\b(?:HealthScore|CoQ10|Omega|B12|D3|STATIN|AI|ml|kg|min|BMI)\b/g;
+
+    walkStrings(result.pageContent?.copySeeds, (text) => {
+      const normalized = text.replace(allowedLatin, "");
+
+      if (/[\u0E00-\u0E7F]/.test(normalized)) {
+        leaks.push(text);
+      }
+
+      if (/[A-Za-z][A-Za-z0-9+.'&-]*(?:\s+[A-Za-z][A-Za-z0-9+.'&-]*){1,}/.test(normalized)) {
+        leaks.push(text);
+      }
+    });
+
+    assert.deepEqual(leaks, []);
+  });
+
   it("switches subtraction to product mode without changing locked score facts", () => {
     const result = computeHealthScore(profileOne(), "en");
     const productReady = applyHealthScoreProductSubtraction(result, {

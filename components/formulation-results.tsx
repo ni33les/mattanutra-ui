@@ -34,6 +34,8 @@ import {
 } from "@/lib/nutrition-paths";
 import { managedFoodSeeds } from "@/lib/managed-foods";
 
+type BaseLocale = Exclude<Locale, "zh-CN">;
+
 type FormulationResultsProps = Readonly<{
   initialResult?: FormulationResult | null;
   initialStackPreference?: ProductStackPreference | null;
@@ -180,7 +182,7 @@ type CopyLabels = Record<
   safetyNotes: string[];
 };
 
-export const formulationResultsCopy = {
+const baseFormulationResultsCopy = {
   en: {
     benefits: "Benefits",
     connectChatBody:
@@ -381,19 +383,126 @@ export const formulationResultsCopy = {
       "ปรึกษาแพทย์หรือเภสัชกรหากคุณตั้งครรภ์ ให้นมบุตร ใช้ยา หรือมีโรคประจำตัว"
     ]
   }
+} satisfies Record<BaseLocale, CopyLabels>;
+
+export const formulationResultsCopy = {
+  ...baseFormulationResultsCopy,
+  "zh-CN": {
+    "benefits": "益处",
+    "connectChatBody": "选择您偏好的聊天应用，获取针对饮食、作息、旅行、训练和日常生活的定制支持。发送您的计划，顾问可从此推荐继续跟进。",
+    "connectChatButton": "打开聊天",
+    "connectChatEyebrow": "继续在聊天中",
+    "connectChatPlanId": "计划",
+    "connectChatQrAlt": "连接 MattaNutra AI 顾问的二维码",
+    "connectChatTitle": "连接我们的专业 AI 补充剂顾问，获得持续支持与优化建议。",
+    "constraints": "限制",
+    "context": "评估摘要",
+    "cautions": "注意事项",
+    "coveragePrefix": "覆盖",
+    "coverageSuffix": "的推荐补充剂",
+    "productCoverage": "产品覆盖",
+    "doseAdjustedBody": "为保持在 MattaNutra 设定的安全上限内，一种或多种剂量已自动降低。",
+    "error": "配方无法加载。请刷新页面后重试。",
+    "formula": "补充剂明细",
+    "formulaEmptyBody": "每项补充剂建议都需要安全审核后才能显示。审核队列已收到通知。",
+    "formulaEmptyTitle": "安全审核进行中",
+    "formulaHint": "为您建议的补充剂组合，按作用分组，并提供实用的每日剂量指导。",
+    "formulaNoVisibleBody": "已审核的项目不再处于待处理状态。仅显示通过 MattaNutra 审核的补充剂。",
+    "formulaNoVisibleTitle": "暂无可见的补充剂建议",
+    "foods": "食物指导",
+    "foodsEmptyBody": "每项食物建议都需要安全审核后才能显示。审核队列已收到通知。",
+    "foodsEmptyTitle": "食物审核进行中",
+    "foodsHint": "实用的食物与食材建议，可融入餐食、日常作息及未来的管家式对话中。",
+    "foodServing": "份量",
+    "finalizeError": "无法交付营养计划。请重试。",
+    "finalizePlan": "交付营养计划",
+    "finalizeReady": "营养计划已交付",
+    "finalizeWaiting": "补充剂指导必须完成后才能交付。",
+    "finalizingPlan": "正在交付计划",
+    "finalReportDailyFocus": "每日重点",
+    "finalReportNextSteps": "后续步骤",
+    "finalReportSafetyNotes": "安全提示",
+    "finalReportSynergies": "补充剂搭配",
+    "generated": "生成时间",
+    "goals": "目标",
+    "heroSubtitle": "查看根据您的评估选出的配方、产品匹配及安全提示。",
+    "heroTitle": "您的营养展示已就绪",
+    "loading": "正在加载您的配方",
+    "nutritionProgressBody": "我们正在准备您的补充剂指导。一旦全部就绪，展示页面将立即显示。",
+    "nutritionProgressFoods": "食物指导",
+    "nutritionProgressPending": "准备中",
+    "nutritionProgressReady": "就绪",
+    "nutritionProgressSupplements": "补充剂指导",
+    "nutritionProgressTitle": "正在准备您的指导",
+    "dailyDose": "剂量",
+    "plan": "计划",
+    "previewBadge": "免费预览",
+    "previewBody": "您的完整配方已就绪。免费预览显示前三项补充剂推荐；解锁计划后可查看剩余详情并继续。",
+    "previewCta": "解锁完整计划",
+    "previewLockedBody": "其余个性化推荐已就绪，解锁后即可查看。",
+    "previewLockedTitle": "更多推荐已锁定",
+    "previewTitle": "先预览，准备好后再解锁",
+    "profile": "个人资料",
+    "region": "地区",
+    "safety": "注意事项",
+    "safetyCaptureAddress": "联系方式",
+    "safetyCaptureBody": "留下一个联系渠道，我们会在人工审核完成后通知您。",
+    "safetyCaptureChannel": "偏好渠道",
+    "safetyCaptureChatPlaceholder": "您的账号或号码",
+    "safetyCaptureEmailPlaceholder": "you@example.com",
+    "safetyCaptureError": "无法保存该联系方式。请重试。",
+    "safetyCaptureSubmit": "保存联系方式",
+    "safetyCaptureSuccess": "联系方式已保存。我们将通过此渠道发送审核更新。",
+    "safetyCaptureTitle": "需要我们稍后联系您吗？",
+    "safetyChannelEmail": "电子邮件",
+    "safetyChannelLine": "LINE",
+    "safetyChannelTelegram": "Telegram",
+    "safetyChannelWhatsapp": "WhatsApp",
+    "safetyReviewBody": "部分补充剂建议需要人工安全检查。在团队批准前，我们会以审核占位符显示。",
+    "safetyReviewTitle": "安全审核已激活",
+    "foodSafetyReviewBody": "部分食物建议需要人工安全检查。在团队批准前，我们会以审核占位符显示。",
+    "foodSafetyReviewTitle": "食物安全审核已激活",
+    "foodUnderReview": "此食物正在由我们的团队审核。",
+    "supplementUnderReview": "此补充剂正在由我们的团队审核。",
+    "safetyNotes": [
+      "这些是可选的健康产品建议，并非医疗建议。",
+      "购买前请查看所有标签，了解过敏原、成分及每日使用说明。",
+      "如果您处于孕期、哺乳期、正在服药或有健康状况，请咨询合格的临床医生或药师审核该计划。"
+    ]
+  }
 } satisfies Record<Locale, CopyLabels>;
 
-function getLocalizedText(value: LocalizedText, locale: Locale) {
-  return resolveLocalizedText(value, locale);
+function textMatchesLocale(text: string, locale: Locale) {
+  if (!text.trim()) {
+    return false;
+  }
+
+  if (locale === "th") {
+    return thaiScriptPattern.test(text) || !latinWordPattern.test(text);
+  }
+
+  if (locale === "zh-CN") {
+    return chineseScriptPattern.test(text) || !latinWordPattern.test(text);
+  }
+
+  return true;
 }
 
-const supplementNameFallbacks: Record<string, Record<"en" | "th", string>> = {
-  citicoline: { en: "Citicoline (CDP-choline)", th: "ซิติโคลีน (ซีดีพี-โคลีน)" },
-  coq10: { en: "CoQ10", th: "โคคิวเท็น" },
-  magnesium: { en: "Magnesium", th: "แมกนีเซียม" },
-  omega_3: { en: "Omega-3", th: "โอเมกา 3" },
-  theanine: { en: "Theanine", th: "แอล-ธีอะนีน" },
-  vitamin_d3: { en: "Vitamin D3", th: "วิตามินดี 3" }
+function getLocalizedText(value: LocalizedText, locale: Locale) {
+  const text = resolveLocalizedText(value, locale).trim();
+
+  return textMatchesLocale(text, locale) ? text : "";
+}
+
+const supplementNameFallbacks: Record<string, Record<Locale, string>> = {
+  citicoline: { en: "Citicoline (CDP-choline)", th: "ซิติโคลีน (ซีดีพี-โคลีน)", "zh-CN": "胞磷胆碱（CDP-胆碱）" },
+  coq10: { en: "CoQ10", th: "โคคิวเท็น", "zh-CN": "辅酶 Q10" },
+	  magnesium: { en: "Magnesium", th: "แมกนีเซียม", "zh-CN": "镁" },
+	  omega_3: { en: "Omega-3", th: "โอเมกา 3", "zh-CN": "Omega-3 脂肪酸" },
+	  probiotic: { en: "Multi-strain probiotics", th: "โปรไบโอติกหลายสายพันธุ์", "zh-CN": "多菌株益生菌" },
+	  curcumin: { en: "Curcumin", th: "เคอร์คูมิน", "zh-CN": "姜黄素" },
+	  theanine: { en: "Theanine", th: "แอล-ธีอะนีน", "zh-CN": "茶氨酸" },
+  vitamin_d3: { en: "Vitamin D3", th: "วิตามินดี 3", "zh-CN": "维生素 D3" }
 };
 
 function supplementFallbackKey(id: string, name: string) {
@@ -411,9 +520,17 @@ function supplementFallbackKey(id: string, name: string) {
     return "magnesium";
   }
 
-  if (/omega 3|omega3|fish oil|epa|dha/.test(search)) {
-    return "omega_3";
-  }
+	  if (/omega 3|omega3|fish oil|epa|dha/.test(search)) {
+	    return "omega_3";
+	  }
+
+	  if (/probiotic|probiotics|lactobacillus|bifidobacterium/.test(search)) {
+	    return "probiotic";
+	  }
+
+	  if (/curcumin|turmeric/.test(search)) {
+	    return "curcumin";
+	  }
 
   if (/theanine/.test(search)) {
     return "theanine";
@@ -447,7 +564,49 @@ function localizedSupplementName(
   const fallback =
     supplementNameFallbacks[supplementFallbackKey(id, english || localized)];
 
-  return fallback?.[locale] ?? localized;
+  return fallback?.[locale] ?? fallback?.en ?? localized;
+}
+
+function localizedDoseText(value: LocalizedText, locale: Locale) {
+  const text = getLocalizedText(value, locale) || resolveLocalizedText(value, locale).trim();
+
+  if (locale !== "zh-CN") {
+    return text;
+  }
+
+  return text
+    .replace(/\bcapsules?\b/gi, "粒")
+    .replace(/\btablets?\b/gi, "片")
+    .replace(/\bsoftgels?\b/gi, "软胶囊")
+    .replace(/\bservings?\b/gi, "份")
+    .replace(/\b(\d+(?:\.\d+)?)\s*billion\s*CFU\b/gi, (_match, amount: string) => {
+      const value = Number(amount);
+
+      return Number.isFinite(value) ? `${value * 10} 亿 CFU` : `${amount} billion CFU`;
+    })
+    .replace(/\bper day\b/gi, "每天")
+    .replace(/\/day\b/gi, "/天")
+    .replace(/\bday\b/gi, "天");
+}
+
+function localizeKnownInlineTerms(text: string, locale: Locale) {
+  if (locale !== "zh-CN") {
+    return text;
+  }
+
+  return text
+    .replace(/\bSingapore\b/g, "新加坡")
+    .replace(/\bThailand\b/g, "泰国")
+    .replace(/\bCurcumin\b/g, "姜黄素")
+    .replace(/\bVitamin D3\b/g, "维生素 D3")
+    .replace(/\bVitamin D\b/g, "维生素 D")
+    .replace(/\bCoQ10\b/g, "辅酶 Q10")
+    .replace(/\bMagnesium\b/g, "镁")
+    .replace(/\bTheanine\b/g, "茶氨酸")
+    .replace(/\bMulti-strain probiotics\b/g, "多菌株益生菌")
+    .replace(/\bprobiotics\b/gi, "益生菌")
+    .replace(/\bprobiotic\b/gi, "益生菌")
+    .replace(/\b10 billion CFU\b/gi, "100 亿 CFU");
 }
 
 function searchableLocalizedText(value: LocalizedText) {
@@ -472,6 +631,37 @@ function supplementBenefitTags(ingredient: FormulationIngredient) {
     .map((rule) => rule.tag);
 
   return [...new Set([...explicitTags, ...derivedTags])].slice(0, 4);
+}
+
+function localizedIngredientRationale(
+  ingredient: FormulationIngredient,
+  locale: Locale
+) {
+  const text = getLocalizedText(ingredient.rationale, locale);
+
+  if (text) {
+    return text;
+  }
+
+  const supplement = localizedSupplementName(ingredient.supplement, ingredient.id, locale);
+  const benefit = supplementBenefitTags(ingredient)[0];
+  const benefitLabel = benefit ? localizedBenefitTagLabel(benefit, locale) : "";
+
+  if (locale === "th") {
+    return benefitLabel
+      ? `${supplement} อยู่ในแผนนี้เพื่อช่วยด้าน${benefitLabel}ตามลำดับความสำคัญของคุณ`
+      : `${supplement} อยู่ในแผนนี้ตามเป้าหมายและบริบทด้านความปลอดภัยของคุณ`;
+  }
+
+  if (locale === "zh-CN") {
+    return benefitLabel
+      ? `${supplement} 被纳入本方案，用于围绕${benefitLabel}提供有针对性的支持。`
+      : `${supplement} 被纳入本方案，以匹配您的目标、偏好和安全背景。`;
+  }
+
+  return benefitLabel
+    ? `${supplement} is included for targeted support around ${benefitLabel}.`
+    : `${supplement} is included because it fits your goals, preferences, and safety context.`;
 }
 
 function planRevealHref(locale: Locale, planId: string) {
@@ -639,51 +829,51 @@ function normalizedFoodTextMatchesPattern(value: string, pattern: string) {
   );
 }
 
-const managedFoodServing: Record<string, Record<"en" | "th", string>> = {
-  brown_rice: { en: "1 small bowl", th: "1 ถ้วยเล็ก" },
-  chia_seeds: { en: "1 tbsp", th: "1 ช้อนโต๊ะ" },
-  chickpeas: { en: "1/2 cup cooked", th: "ถั่วสุก 1/2 ถ้วย" },
-  flaxseed: { en: "1 tbsp ground", th: "บด 1 ช้อนโต๊ะ" },
-  ginger_tea: { en: "1 cup", th: "1 ถ้วย" },
-  green_tea: { en: "1 cup", th: "1 ถ้วย" },
-  holy_basil: { en: "1 handful cooked", th: "ปรุงสุก 1 กำมือ" },
-  kimchi: { en: "2-3 tbsp", th: "2-3 ช้อนโต๊ะ" },
-  lentils: { en: "1/2 cup cooked", th: "เลนทิลสุก 1/2 ถ้วย" },
-  moringa_leaves: { en: "1 small bowl cooked", th: "ปรุงสุก 1 ถ้วยเล็ก" },
-  mung_beans: { en: "1/2 cup cooked", th: "ถั่วเขียวสุก 1/2 ถ้วย" },
-  oats: { en: "1 small bowl", th: "1 ถ้วยเล็ก" },
-  papaya: { en: "1 small bowl", th: "1 ถ้วยเล็ก" },
-  pumpkin_seeds: { en: "1 small handful", th: "1 กำมือเล็ก" },
-  salmon: { en: "1 palm-sized portion", th: "1 ชิ้นขนาดฝ่ามือ" },
-  sardines: { en: "1 small tin or portion", th: "1 กระป๋องเล็กหรือ 1 ส่วน" },
-  sesame_seeds: { en: "1 tbsp", th: "1 ช้อนโต๊ะ" },
-  tofu: { en: "1 palm-sized portion", th: "1 ชิ้นขนาดฝ่ามือ" },
-  turmeric: { en: "1-2 tsp in cooking", th: "1-2 ช้อนชาในอาหาร" },
-  unsweetened_yogurt: { en: "1 small bowl", th: "1 ถ้วยเล็ก" }
+const managedFoodServing: Record<string, Record<Locale, string>> = {
+  brown_rice: { en: "1 small bowl", th: "1 ถ้วยเล็ก", "zh-CN": "1 小碗" },
+  chia_seeds: { en: "1 tbsp", th: "1 ช้อนโต๊ะ", "zh-CN": "1 汤匙" },
+  chickpeas: { en: "1/2 cup cooked", th: "ถั่วสุก 1/2 ถ้วย", "zh-CN": "熟鹰嘴豆 1/2 杯" },
+  flaxseed: { en: "1 tbsp ground", th: "บด 1 ช้อนโต๊ะ", "zh-CN": "研磨后 1 汤匙" },
+  ginger_tea: { en: "1 cup", th: "1 ถ้วย", "zh-CN": "1 杯" },
+  green_tea: { en: "1 cup", th: "1 ถ้วย", "zh-CN": "1 杯" },
+  holy_basil: { en: "1 handful cooked", th: "ปรุงสุก 1 กำมือ", "zh-CN": "熟食 1 小把" },
+  kimchi: { en: "2-3 tbsp", th: "2-3 ช้อนโต๊ะ", "zh-CN": "2-3 汤匙" },
+  lentils: { en: "1/2 cup cooked", th: "เลนทิลสุก 1/2 ถ้วย", "zh-CN": "熟小扁豆 1/2 杯" },
+  moringa_leaves: { en: "1 small bowl cooked", th: "ปรุงสุก 1 ถ้วยเล็ก", "zh-CN": "熟食 1 小碗" },
+  mung_beans: { en: "1/2 cup cooked", th: "ถั่วเขียวสุก 1/2 ถ้วย", "zh-CN": "熟绿豆 1/2 杯" },
+  oats: { en: "1 small bowl", th: "1 ถ้วยเล็ก", "zh-CN": "1 小碗" },
+  papaya: { en: "1 small bowl", th: "1 ถ้วยเล็ก", "zh-CN": "1 小碗" },
+  pumpkin_seeds: { en: "1 small handful", th: "1 กำมือเล็ก", "zh-CN": "1 小把" },
+  salmon: { en: "1 palm-sized portion", th: "1 ชิ้นขนาดฝ่ามือ", "zh-CN": "1 份手掌大小" },
+  sardines: { en: "1 small tin or portion", th: "1 กระป๋องเล็กหรือ 1 ส่วน", "zh-CN": "1 小罐或 1 份" },
+  sesame_seeds: { en: "1 tbsp", th: "1 ช้อนโต๊ะ", "zh-CN": "1 汤匙" },
+  tofu: { en: "1 palm-sized portion", th: "1 ชิ้นขนาดฝ่ามือ", "zh-CN": "1 份手掌大小" },
+  turmeric: { en: "1-2 tsp in cooking", th: "1-2 ช้อนชาในอาหาร", "zh-CN": "烹调中加入 1-2 茶匙" },
+  unsweetened_yogurt: { en: "1 small bowl", th: "1 ถ้วยเล็ก", "zh-CN": "1 小碗" }
 };
 
-const managedFoodFrequency: Record<string, Record<"en" | "th", string>> = {
-  ginger_tea: { en: "3-5 times/week", th: "3-5 ครั้งต่อสัปดาห์" },
-  green_tea: { en: "3-5 times/week", th: "3-5 ครั้งต่อสัปดาห์" },
-  kimchi: { en: "3-4 times/week", th: "3-4 ครั้งต่อสัปดาห์" },
-  salmon: { en: "1-2 times/week", th: "1-2 ครั้งต่อสัปดาห์" },
-  sardines: { en: "1-2 times/week", th: "1-2 ครั้งต่อสัปดาห์" },
-  turmeric: { en: "most cooking days", th: "ในมื้ออาหารหลายวันต่อสัปดาห์" }
+const managedFoodFrequency: Record<string, Record<Locale, string>> = {
+  ginger_tea: { en: "3-5 times/week", th: "3-5 ครั้งต่อสัปดาห์", "zh-CN": "每周 3-5 次" },
+  green_tea: { en: "3-5 times/week", th: "3-5 ครั้งต่อสัปดาห์", "zh-CN": "每周 3-5 次" },
+  kimchi: { en: "3-4 times/week", th: "3-4 ครั้งต่อสัปดาห์", "zh-CN": "每周 3-4 次" },
+  salmon: { en: "1-2 times/week", th: "1-2 ครั้งต่อสัปดาห์", "zh-CN": "每周 1-2 次" },
+  sardines: { en: "1-2 times/week", th: "1-2 ครั้งต่อสัปดาห์", "zh-CN": "每周 1-2 次" },
+  turmeric: { en: "most cooking days", th: "ในมื้ออาหารหลายวันต่อสัปดาห์", "zh-CN": "多数烹调日" }
 };
 
-const foodSupportNeedLabels: Record<string, Record<"en" | "th", string>> = {
-  calcium: { en: "calcium", th: "แคลเซียม" },
-  citicoline: { en: "citicoline", th: "ซิติโคลีน" },
-  coq10: { en: "CoQ10", th: "โคคิวเท็น" },
-  curcumin: { en: "curcumin", th: "เคอร์คูมิน" },
-  magnesium: { en: "magnesium", th: "แมกนีเซียม" },
-  omega: { en: "omega-3", th: "โอเมกา 3" },
-  probiotic: { en: "probiotic", th: "โปรไบโอติก" },
-  theanine: { en: "theanine", th: "ทีอะนีน" },
-  vitamin_b12: { en: "vitamin B12", th: "วิตามินบี 12" },
-  vitamin_c: { en: "vitamin C", th: "วิตามินซี" },
-  vitamin_d: { en: "vitamin D", th: "วิตามินดี" },
-  zinc: { en: "zinc", th: "สังกะสี" }
+const foodSupportNeedLabels: Record<string, Record<Locale, string>> = {
+  calcium: { en: "calcium", th: "แคลเซียม", "zh-CN": "钙" },
+  citicoline: { en: "citicoline", th: "ซิติโคลีน", "zh-CN": "胞磷胆碱" },
+  coq10: { en: "CoQ10", th: "โคคิวเท็น", "zh-CN": "辅酶 Q10" },
+  curcumin: { en: "curcumin", th: "เคอร์คูมิน", "zh-CN": "姜黄素" },
+  magnesium: { en: "magnesium", th: "แมกนีเซียม", "zh-CN": "镁" },
+  omega: { en: "omega-3", th: "โอเมกา 3", "zh-CN": "Omega-3" },
+  probiotic: { en: "probiotic", th: "โปรไบโอติก", "zh-CN": "益生菌" },
+  theanine: { en: "theanine", th: "ทีอะนีน", "zh-CN": "茶氨酸" },
+  vitamin_b12: { en: "vitamin B12", th: "วิตามินบี 12", "zh-CN": "维生素 B12" },
+  vitamin_c: { en: "vitamin C", th: "วิตามินซี", "zh-CN": "维生素 C" },
+  vitamin_d: { en: "vitamin D", th: "วิตามินดี", "zh-CN": "维生素 D" },
+  zinc: { en: "zinc", th: "สังกะสี", "zh-CN": "锌" }
 };
 
 const foodSupportPlaceholderValues = new Set([
@@ -851,7 +1041,8 @@ function managedSeedForFoodSupportItem(item: FoodGapSupportItem) {
       seed.normalizedName,
       seed.normalizedName.replace(/_/g, " "),
       seed.name.en,
-      seed.name.th
+      seed.name.th,
+      seed.name["zh-CN"]
     ].map(normalizeFoodText);
 
     return seedKeys.some((key) =>
@@ -860,17 +1051,17 @@ function managedSeedForFoodSupportItem(item: FoodGapSupportItem) {
   });
 }
 
-function foodSupportNeedLabel(need: ProductNeedCoverage, locale: "en" | "th") {
+function foodSupportNeedLabel(need: ProductNeedCoverage, locale: Locale) {
   const text = foodSupportNeedText(need);
   const key = Object.keys(foodSupportNeedLabels).find((candidate) =>
     text.includes(candidate.replace(/_/g, " "))
   );
 
   if (key) {
-    return foodSupportNeedLabels[key][locale];
+    return foodSupportNeedLabels[key][locale] ?? foodSupportNeedLabels[key].en;
   }
 
-  return need.displayName;
+  return localizeKnownInlineTerms(need.displayName, locale);
 }
 
 function needIngredientMatchTexts(ingredient: FormulationIngredient) {
@@ -960,7 +1151,7 @@ function foodSupportFormulaGapsForItem(
 
       return {
         coveragePercent: Math.min(100, Math.max(0, Math.round(gap.coveragePercent))),
-        dailyDose: ingredient ? getLocalizedText(ingredient.dailyDose, locale) : "",
+        dailyDose: ingredient ? localizedDoseText(ingredient.dailyDose, locale) : "",
         id: gap.id,
         label: ingredient
           ? localizedSupplementName(ingredient.supplement, ingredient.id, locale)
@@ -972,36 +1163,48 @@ function foodSupportFormulaGapsForItem(
 
 function joinFoodSupportNeeds(
   needs: readonly ProductNeedCoverage[],
-  locale: "en" | "th"
+  locale: Locale
 ) {
   const labels = needs.map((need) => foodSupportNeedLabel(need, locale)).slice(0, 2);
 
   if (labels.length < 1) {
-    return locale === "th" ? "ช่องว่างที่เหลือ" : "the remaining gaps";
+    return locale === "th"
+      ? "ช่องว่างที่เหลือ"
+      : locale === "zh-CN"
+        ? "剩余缺口"
+        : "the remaining gaps";
   }
 
   return labels.length === 1
     ? labels[0]
     : locale === "th"
       ? labels.join(" และ ")
-      : `${labels[0]} and ${labels[1]}`;
+      : locale === "zh-CN"
+        ? labels.join("和")
+        : `${labels[0]} and ${labels[1]}`;
 }
 
 function joinFoodSupportFormulaGapLabels(
   gaps: readonly FoodSupportFormulaGap[],
-  locale: "en" | "th"
+  locale: Locale
 ) {
   const labels = gaps.map((gap) => gap.label).filter(Boolean).slice(0, 2);
 
   if (labels.length < 1) {
-    return locale === "th" ? "ช่องว่างที่เหลือ" : "the remaining gaps";
+    return locale === "th"
+      ? "ช่องว่างที่เหลือ"
+      : locale === "zh-CN"
+        ? "剩余缺口"
+        : "the remaining gaps";
   }
 
   return labels.length === 1
     ? labels[0]
     : locale === "th"
       ? labels.join(" และ ")
-      : `${labels[0]} and ${labels[1]}`;
+      : locale === "zh-CN"
+        ? labels.join("和")
+        : `${labels[0]} and ${labels[1]}`;
 }
 
 function isFoodSupportPlaceholderCopy(value: string) {
@@ -1014,8 +1217,29 @@ function safeFoodSupportCopy(
   fallback: string
 ) {
   const text = getLocalizedText(value, locale);
+  const resolved = text && !isFoodSupportPlaceholderCopy(text) ? text : fallback;
 
-  return text && !isFoodSupportPlaceholderCopy(text) ? text : fallback;
+  return localizeKnownInlineTerms(resolved, locale);
+}
+
+function localizedReportText(value: LocalizedText, locale: Locale, fallback: string) {
+  return getLocalizedText(value, locale) || fallback;
+}
+
+function localizedReportFallbackTitle(locale: Locale) {
+  return locale === "th"
+    ? "แผนโภชนาการฉบับสุดท้าย"
+    : locale === "zh-CN"
+      ? "您的最终营养计划"
+      : "Your final nutrition plan";
+}
+
+function localizedReportFallbackBody(locale: Locale) {
+  return locale === "th"
+    ? "แผนนี้สรุปอาหาร อาหารเสริม ขั้นตอนถัดไป และข้อควรระวังจากข้อมูลที่คุณให้ไว้"
+    : locale === "zh-CN"
+      ? "这份计划汇总了根据您提供的信息生成的食物、补充剂、下一步行动和安全提醒。"
+      : "This plan summarizes food, supplement, next-step, and safety guidance from your answers.";
 }
 
 function managedSeedForFoodItem(item: FormulationResult["foodGuidance"][number]) {
@@ -1029,7 +1253,8 @@ function managedSeedForFoodItem(item: FormulationResult["foodGuidance"][number])
       seed.normalizedName,
       seed.normalizedName.replace(/_/g, " "),
       seed.name.en,
-      seed.name.th
+      seed.name.th,
+      seed.name["zh-CN"]
     ].map(normalizeFoodText);
 
     return seedKeys.some((key) =>
@@ -1425,7 +1650,7 @@ function NutritionGuidancePreparingPanel({
   );
 }
 
-const revealCopy = {
+const baseRevealCopy = {
   en: {
     ingredientCount: "ingredients",
     catalogueProducts: "approved products",
@@ -1629,6 +1854,91 @@ const revealCopy = {
     wellnessOnly:
       "ข้อมูลเพื่อสุขภาวะเท่านั้น โปรดแบ่งปันแผนนี้กับแพทย์หรือเภสัชกรหากคุณใช้ยา ตั้งครรภ์ ให้นมบุตร มีโรคประจำตัว หรือสถานการณ์เปลี่ยนแปลง"
   }
+} satisfies Record<BaseLocale, Record<string, string>>;
+
+const revealCopy = {
+  ...baseRevealCopy,
+  "zh-CN": {
+    "ingredientCount": "成分",
+    "catalogueProducts": "已批准产品",
+    "catalogueSupplements": "已评估成分",
+    "compactCoverageLabel": "目录匹配度",
+    "contributionLabel": "所选配方占比",
+    "distilledEyebrow": "精炼过程",
+    "distilledSummaryTemplate": "{supplementTotal} 种成分已评估。为您精选 {supplementSelected} 种。",
+    "distilledFoot": "每种成分均经过您披露的注意事项、目标以及目录证据的筛选。您的配方中没有任何成分是因为畅销而添加的。每种成分都是因为适合您而被加入的。",
+    "distilledTitle": "我们评估了目录。仅保留了合适的内容。",
+    "distilledTitleTemplate": "我们评估了 {supplementTotalText} 种成分。{supplementSelectedText} 种在您的配方中占有一席之地。",
+    "formulaEyebrow": "您的配方",
+    "formulaLead": "以下每种剂量均根据您的身体、目标以及您分享的安全背景进行调整。产品匹配度显示所选配方对每种营养素的覆盖程度。",
+    "formulaTitle": "恰到好处。",
+    "formulaTitleTemplate": "{supplementSelectedText} 种营养素。恰到好处。",
+    "formulaMetaEvaluated": "精准层级",
+    "formulaMetaSelected": "已选",
+    "formulaMetaNoPadding": "无多余添加",
+    "formulaMetaTier": "配方 · 精准层级",
+    "formulaMetaNrv": "产品匹配度 · 所选配方",
+    "formulaMetaFocus": "专注",
+    "formulaSignedPrefix": "配制于",
+    "foodSupportDefaultBody": "食物不会改变产品覆盖评分。只有当产品配方留下补充剂缺口，且可通过管理食物合理支持时，它们才会出现。",
+    "foodSupportDefaultHeadline": "产品之后，食物支持。",
+    "foodSupportEmpty": "当管理食物目录和产品配方准备就绪后，食物支持将显示在此处。",
+    "foodSupportEyebrow": "食物支持",
+    "foodSupportFrequency": "频率",
+    "foodSupportGapLabel": "支持",
+    "foodSupportGapBodyTemplate": "这些食物来自管理目录，围绕 {gaps} 精选。它们在日常饮食中支持计划，而不改变产品覆盖数字。",
+    "foodSupportGapHeadlineTemplate": "针对 {gaps} 的食物支持。",
+    "foodSupportServing": "份量",
+    "foodSupportFormulaGapLabel": "配方缺口",
+    "foodSupportTitle": "为缺口选择的食物。",
+    "heroEyebrow": "您的 Right Amount 已送达",
+    "heroFor": "针对",
+    "heroTitle": "您的配方已送达",
+    "heroHeadline": "根据您的身体、目标以及实际生活方式打造的配方。",
+    "heroMetaGenerated": "生成于",
+    "heroMetaPlan": "计划 ID",
+    "heroSub": "无需猜测。无需药房货架困惑。{supplementSelectedText} 种营养素，精心挑选，并搭配确切的购买产品。",
+    "personalizationBody": "您的配方始于您是谁。身体、位置、对您真正重要的目标，以及我们毫不妥协地尊重的限制。",
+    "personalizationEyebrow": "基于您的评估打造",
+    "personalizationTitle": "将您告知的一切融入一个计划。",
+    "productsBody": "产品显示为来自已批准目录的最接近可用配方。目标是减少瓶数、清晰覆盖且无不必要的重叠。",
+    "productsLead": "我们在泰国市场搜索了尽可能接近您配方的产品：经过验证的剂量、足够干净的标签，以及可用的直接市场链接。",
+    "productsEmpty": "配方已就绪，但产品目录尚未包含针对这些需求的已批准配方。",
+    "productsEyebrow": "从货架到确定性",
+    "productsTitle": "从货架到确定性。",
+    "productsAllTitleTemplate": "{productSelectedText} 瓶。全部 {supplementSelectedTextLower} 种营养素。",
+    "productsPartialTitleTemplate": "{productSelectedText} 瓶。{coveredText} 种 {supplementSelectedTextLower} 营养素。",
+    "supplementsRecommended": "为您精选",
+    "productsRecommended": "为您推荐的产品",
+    "productDoseRecommended": "推荐剂量",
+    "productVerified": "匹配",
+    "productServingUnit": "份",
+    "productSingleServingUnit": "份",
+    "productMatchTemplate": "匹配 {covers} 并占所选配方的 {percent}%。",
+    "productServingMatchTemplate": "使用 {servings} {servingUnit}。匹配 {covers} 并占所选配方的 {percent}%。",
+    "selectedProducts": "瓶数",
+    "selectedSuffix": "已选",
+    "begin": "开始",
+    "tableAmount": "每日量",
+    "tableCoverage": "产品匹配度",
+    "tableName": "营养素",
+    "tableReason": "为何为您选择此成分",
+    "viewProduct": "查看产品",
+    "cautionsTitle": "安全检查完成。",
+    "statinCautionsTitle": "他汀类药物感知安全检查完成。",
+    "coverageHeadlineTemplate": "已提供全部 {supplementCount} 种营养素。",
+    "coveragePartialHeadlineTemplate": "产品覆盖 {coveredText} 种 {supplementSelectedText} 营养素。",
+    "coverageSub": "每种产品在显示前均已根据您的配方、份量负担和目录数据进行检查。",
+    "bottles": "瓶",
+    "prioritiesCovered": "已覆盖营养素",
+    "closingTitle": "知晓适量的智慧",
+    "closingBody": "您的配方体现了这一理念。正确的营养素。正确的量。在数据足够强的地方选择正确的产品。现在您的身体拥有所需的一切来完成其余部分。",
+    "etymologyLine": "Mattaññutā · Pāli",
+    "print": "下载配方 PDF",
+    "save": "保存到我的计划",
+    "reassess": "安排 60 天重新评估",
+    "wellnessOnly": "仅限健康信息。如果您使用药物、怀孕或哺乳、有健康状况或情况发生变化，请与医生或药剂师分享此计划。"
+  }
 } satisfies Record<Locale, Record<string, string>>;
 
 const benefitTagLabels: Record<Locale, Record<string, string>> = {
@@ -1659,60 +1969,116 @@ const benefitTagLabels: Record<Locale, Record<string, string>> = {
     skin_health: "ดูแลผิว",
     sleep_support: "สนับสนุนการนอน",
     stress_support: "ช่วยรับมือความเครียด"
+  },
+  "zh-CN": {
+    anti_inflammatory: "抗炎支持",
+    bone_health: "骨骼健康",
+    cognitive_support: "认知支持",
+    energy_support: "精力支持",
+    gut_health: "肠道健康",
+    heart_health: "心脏健康",
+    hormone_support: "激素支持",
+    immune_support: "免疫支持",
+    recovery_support: "恢复支持",
+    skin_health: "皮肤健康",
+    sleep_support: "睡眠支持",
+    stress_support: "压力支持"
   }
 };
 
-const formulaCategoryLabels: Record<Locale, Record<string, string>> = {
-  en: {
-    "Advanced Gut Health": "Advanced gut health",
-    "Fatty Acids": "Fatty acids",
+	const formulaCategoryLabels: Record<Locale, Record<string, string>> = {
+	  en: {
+	    "Advanced Gut Health": "Advanced gut health",
+	    Antioxidants: "Antioxidants",
+	    Cardiometabolic: "Cardiometabolic",
+	    "Fatty Acids": "Fatty acids",
     Herbals: "Herbals",
     Longevity: "Longevity",
     Minerals: "Minerals",
     Vitamins: "Vitamins"
   },
-  th: {
-    "Advanced Gut Health": "สุขภาพลำไส้ขั้นสูง",
-    "Fatty Acids": "กรดไขมัน",
+	  th: {
+	    "Advanced Gut Health": "สุขภาพลำไส้ขั้นสูง",
+	    Antioxidants: "สารต้านอนุมูลอิสระ",
+	    Cardiometabolic: "หัวใจและเมตาบอลิซึม",
+	    "Fatty Acids": "กรดไขมัน",
     Herbals: "สมุนไพร",
     Longevity: "การดูแลระยะยาว",
     Minerals: "แร่ธาตุ",
     Vitamins: "วิตามิน"
+  },
+	  "zh-CN": {
+	    "Advanced Gut Health": "高级肠道健康",
+	    Antioxidants: "抗氧化",
+	    Cardiometabolic: "心血管代谢",
+	    "Fatty Acids": "脂肪酸",
+    Herbals: "草本",
+    Longevity: "长寿健康",
+    Minerals: "矿物质",
+    Vitamins: "维生素"
   }
 };
 
 const contextChipLabels: Record<Locale, Record<string, string>> = {
   en: {
-    Energy: "Energy",
-    Fatigue: "Fatigue",
+	    Energy: "Energy",
+	    Digestion: "Digestion",
+	    Fatigue: "Fatigue",
     Female: "Female",
-    Fitness: "Fitness",
-    Focus: "Focus",
+	    Fitness: "Fitness",
+	    Focus: "Focus",
+	    Heart: "Heart",
     Male: "Male",
     Mood: "Mood",
-    Precision: "Precision",
+	    Pro: "Pro",
+	    Precision: "Precision",
     "Regular medication noted": "Regular medication noted",
-    Sleep: "Sleep",
-    Statin: "Statin",
-    Stress: "Stress",
-    "Upcoming surgery noted": "Upcoming surgery noted",
+	    Sleep: "Sleep",
+	    Singapore: "Singapore",
+	    Statin: "Statin",
+	    Stress: "Stress",
+	    "Upcoming surgery noted": "Upcoming surgery noted",
     Thailand: "Thailand"
   },
   th: {
-    Energy: "พลังงาน",
-    Fatigue: "อ่อนเพลีย",
+	    Energy: "พลังงาน",
+	    Digestion: "ระบบย่อย",
+	    Fatigue: "อ่อนเพลีย",
     Female: "หญิง",
-    Fitness: "ฟิตเนส",
-    Focus: "สมาธิ",
+	    Fitness: "ฟิตเนส",
+	    Focus: "สมาธิ",
+	    Heart: "หัวใจ",
     Male: "ชาย",
     Mood: "อารมณ์",
-    Precision: "ความแม่นยำ",
+	    Pro: "โปร",
+	    Precision: "ความแม่นยำ",
     "Regular medication noted": "มีการใช้ยาเป็นประจำ",
-    Sleep: "การนอน",
-    Statin: "สแตติน",
-    Stress: "ความเครียด",
-    "Upcoming surgery noted": "มีแผนผ่าตัด",
+	    Sleep: "การนอน",
+	    Singapore: "สิงคโปร์",
+	    Statin: "สแตติน",
+	    Stress: "ความเครียด",
+	    "Upcoming surgery noted": "มีแผนผ่าตัด",
     Thailand: "ประเทศไทย"
+  },
+  "zh-CN": {
+	    Energy: "精力",
+	    Digestion: "消化",
+	    Fatigue: "疲劳",
+    Female: "女性",
+	    Fitness: "健身",
+	    Focus: "专注",
+	    Heart: "心血管",
+    Male: "男性",
+    Mood: "情绪",
+	    Pro: "专业",
+	    Precision: "精准",
+    "Regular medication noted": "有规律用药",
+	    Sleep: "睡眠",
+	    Singapore: "新加坡",
+	    Statin: "他汀",
+	    Stress: "压力",
+	    "Upcoming surgery noted": "近期有手术安排",
+    Thailand: "泰国"
   }
 };
 
@@ -1726,12 +2092,18 @@ const marketplaceLabels: Record<Locale, Record<string, string>> = {
     "Imported product": "สินค้าในแคตตาล็อก",
     "Lazada Thailand": "ลาซาด้า ประเทศไทย",
     "Shopee Thailand": "ช้อปปี้ ประเทศไทย"
+  },
+  "zh-CN": {
+    "Imported product": "目录产品",
+    "Lazada Thailand": "Lazada 泰国",
+    "Shopee Thailand": "Shopee 泰国"
   }
 };
 
 const revealJoiners = {
   en: ", ",
-  th: " และ "
+  th: " และ ",
+  "zh-CN": "、"
 } satisfies Record<Locale, string>;
 
 function useReducedMotion() {
@@ -1837,6 +2209,8 @@ function CountUpNumber({
 }
 
 const thaiScriptPattern = /[\u0E00-\u0E7F]/;
+const chineseScriptPattern = /[\u3400-\u9FFF]/;
+const latinWordPattern = /[A-Za-z]{2,}/;
 const englishCountWords = new Map<number, string>([
   [0, "no"],
   [1, "one"],
@@ -1866,7 +2240,7 @@ function capitalizeText(value: string) {
 }
 
 function localizedCountText(value: number, locale: Locale, capitalize = false) {
-  if (locale === "th") {
+  if (locale === "th" || locale === "zh-CN") {
     return String(value);
   }
 
@@ -1888,7 +2262,13 @@ function localizedPlanText(value: unknown, locale: Locale, fallback: string) {
   if (typeof value === "string" && value.trim()) {
     const text = value.trim();
 
-    if (locale === "th" ? thaiScriptPattern.test(text) : !thaiScriptPattern.test(text)) {
+    if (
+      locale === "th"
+        ? thaiScriptPattern.test(text)
+        : locale === "zh-CN"
+          ? /[\u3400-\u9FFF]/.test(text)
+          : !thaiScriptPattern.test(text) && !/[\u3400-\u9FFF]/.test(text)
+    ) {
       return text;
     }
   }
@@ -1922,7 +2302,11 @@ function localizedCategoryLabel(value: string, locale: Locale) {
 function localizedContextChip(value: string, locale: Locale) {
   return value
     .split(" / ")
-    .map((part) => contextChipLabels[locale][part] ?? contextChipLabels.en[part] ?? part)
+    .map((part) =>
+      contextChipLabels[locale][part] ??
+      contextChipLabels.en[part] ??
+      localizeKnownInlineTerms(part, locale)
+    )
     .join(" / ");
 }
 
@@ -2026,7 +2410,9 @@ function revealHeroMetaItems(result: FormulationResult, locale: Locale) {
     );
   const values = [...profileParts, result.assessmentSummary.region].filter(Boolean);
 
-  return values.map((value) => (locale === "en" ? value.toUpperCase() : value));
+  return values.map((value) =>
+    locale === "en" ? value.toUpperCase() : localizedContextChip(value, locale)
+  );
 }
 
 function productCoveredNeedCount(products: RecommendedProduct[]) {
@@ -2450,10 +2836,18 @@ function RevealFormulaSection({
   const signedFor = result.firstName?.trim()
     ? locale === "en"
       ? `${copy.formulaSignedPrefix} for ${result.firstName.trim()}, ${formattedDate}.`
-      : `${copy.formulaSignedPrefix}สำหรับ ${result.firstName.trim()}, ${formattedDate}`
+      : locale === "th"
+        ? `${copy.formulaSignedPrefix}สำหรับ ${result.firstName.trim()}, ${formattedDate}`
+        : locale === "zh-CN"
+          ? `${copy.formulaSignedPrefix} ${result.firstName.trim()}，${formattedDate}`
+          : `${copy.formulaSignedPrefix} ${result.firstName.trim()}, ${formattedDate}`
     : locale === "en"
       ? `${copy.formulaSignedPrefix}, ${formattedDate}.`
-      : `${copy.formulaSignedPrefix}เมื่อ ${formattedDate}`;
+      : locale === "th"
+        ? `${copy.formulaSignedPrefix}เมื่อ ${formattedDate}`
+        : locale === "zh-CN"
+          ? `${copy.formulaSignedPrefix} ${formattedDate}`
+          : `${copy.formulaSignedPrefix} ${formattedDate}`;
 
   return (
     <section className="border-t border-[var(--mn-line)] py-20" id="formula">
@@ -2527,8 +2921,8 @@ function RevealFormulaSection({
                   ingredient.id,
                   locale
                 );
-                const rationale = getLocalizedText(ingredient.rationale, locale);
-                const dailyDose = getLocalizedText(ingredient.dailyDose, locale);
+                const rationale = localizedIngredientRationale(ingredient, locale);
+                const dailyDose = localizedDoseText(ingredient.dailyDose, locale);
                 const coverage =
                   productCoverageBySupplementId.get(ingredient.id) ?? 0;
                 const benefit = supplementBenefitTags(ingredient)[0];
@@ -3028,7 +3422,30 @@ function RevealFoodSupportSection({
 
         <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {items.map((item) => {
-            const name = getLocalizedText(item.food, locale);
+            const seed = managedSeedForFoodSupportItem(item);
+            const name =
+              getLocalizedText(item.food, locale) ||
+              seed?.name[locale] ||
+              seed?.name.en ||
+              "";
+            const imageAlt =
+              getLocalizedText(item.imageAlt, locale) ||
+              seed?.imageAlt[locale] ||
+              seed?.imageAlt.en ||
+              name;
+            const category =
+              getLocalizedText(item.category, locale) ||
+              seed?.category[locale] ||
+              seed?.category.en ||
+              "";
+            const serving =
+              getLocalizedText(item.serving, locale) ||
+              (seed ? managedFoodServing[seed.normalizedName]?.[locale] : "") ||
+              "";
+            const frequency =
+              getLocalizedText(item.frequency, locale) ||
+              (seed ? managedFoodFrequency[seed.normalizedName]?.[locale] : "") ||
+              "";
             const formulaGaps = foodSupportFormulaGapsForItem(
               item,
               selectedNeedCoverage,
@@ -3043,6 +3460,11 @@ function RevealFoodSupportSection({
                     formulaGaps,
                     "th"
                   )} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`
+                : locale === "zh-CN"
+                  ? `${name} 可通过食物层面支持 ${joinFoodSupportFormulaGapLabels(
+                      formulaGaps,
+                      "zh-CN"
+                    )}，同时产品覆盖计算保持独立。`
                 : `${name} ${name.endsWith("s") ? "give" : "gives"} food-level support around ${joinFoodSupportFormulaGapLabels(
                     formulaGaps,
                     "en"
@@ -3058,7 +3480,7 @@ function RevealFoodSupportSection({
                 <div className="relative h-52 overflow-hidden bg-[var(--mn-mint)]">
                   {item.imagePath ? (
                     <Image
-                      alt={getLocalizedText(item.imageAlt, locale)}
+                      alt={imageAlt}
                       className="object-cover"
                       fill={true}
                       loading="lazy"
@@ -3075,7 +3497,7 @@ function RevealFoodSupportSection({
                 </div>
                 <div className="p-5">
                   <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)]">
-                    {getLocalizedText(item.category, locale)}
+                    {category}
                   </p>
                   <h3
                     className={`mt-2 font-serif text-2xl font-medium text-[var(--mn-ink)] ${
@@ -3137,7 +3559,7 @@ function RevealFoodSupportSection({
                         {copy.foodSupportServing}
                       </p>
                       <p className="mt-1 font-semibold text-[var(--mn-ink)]">
-                        {getLocalizedText(item.serving, locale)}
+                        {serving}
                       </p>
                     </div>
                     <div>
@@ -3145,7 +3567,7 @@ function RevealFoodSupportSection({
                         {copy.foodSupportFrequency}
                       </p>
                       <p className="mt-1 font-semibold text-[var(--mn-ink)]">
-                        {getLocalizedText(item.frequency, locale)}
+                        {frequency}
                       </p>
                     </div>
                   </div>
@@ -3174,19 +3596,19 @@ function RevealClosingSection({
 }>) {
   const cautions = [
     ...(result.cautions ?? []).map((caution) => ({
-      body: getLocalizedText(caution.body, locale),
+      body: getLocalizedText(caution.body, locale) || copy.wellnessOnly,
       title: caution.title ? getLocalizedText(caution.title, locale) : ""
     })),
     ...result.supplementBreakdown.flatMap((ingredient) =>
       (ingredient.cautions ?? []).map((caution) => ({
-        body: getLocalizedText(caution.body, locale),
+        body: getLocalizedText(caution.body, locale) || copy.wellnessOnly,
         title:
           caution.title
             ? getLocalizedText(caution.title, locale)
             : localizedSupplementName(ingredient.supplement, ingredient.id, locale)
       }))
     )
-  ];
+  ].filter((caution) => caution.body);
   const hasStatinContext = result.assessmentSummary.constraints.some((constraint) =>
     /statin|สแตติน/i.test(constraint)
   );
@@ -3360,10 +3782,10 @@ export function FinalReportPanel({
   return (
     <div className="mt-6 rounded-lg border border-[color-mix(in_srgb,var(--mn-gold)_15%,transparent)] bg-[var(--mn-mint)] p-5">
       <h3 className="text-2xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance">
-        {getLocalizedText(report.title, locale)}
+        {localizedReportText(report.title, locale, localizedReportFallbackTitle(locale))}
       </h3>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">
-        {getLocalizedText(report.summary, locale)}
+        {localizedReportText(report.summary, locale, localizedReportFallbackBody(locale))}
       </p>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
@@ -3379,10 +3801,10 @@ export function FinalReportPanel({
               {section.items.map((item) => (
                 <div key={item.id}>
                   <p className="text-sm font-semibold text-[var(--mn-ink)]">
-                    {getLocalizedText(item.title, locale)}
+                    {localizedReportText(item.title, locale, section.title)}
                   </p>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    {getLocalizedText(item.body, locale)}
+                    {localizedReportText(item.body, locale, localizedReportFallbackBody(locale))}
                   </p>
                 </div>
               ))}
@@ -3398,7 +3820,9 @@ export function FinalReportPanel({
           </h4>
           <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
             {report.safetyNotes.map((note, index) => (
-              <li key={index}>{getLocalizedText(note, locale)}</li>
+              <li key={index}>
+                {localizedReportText(note, locale, labels.safetyNotes[index % labels.safetyNotes.length])}
+              </li>
             ))}
           </ul>
         </div>
@@ -3407,7 +3831,7 @@ export function FinalReportPanel({
   );
 }
 
-const productRecommendationCopy = {
+const baseProductRecommendationCopy = {
   en: {
     completeEmptyBody:
       "Product matching has finished, but the current catalogue does not contain parsed, safe, available products that match this plan yet.",
@@ -3461,6 +3885,37 @@ const productRecommendationCopy = {
     title: "สินค้าแนะนำ",
     unmatchedTitle: "ความต้องการอาหารเสริมที่ยังไม่ครอบคลุม",
     view: "ดูสินค้า"
+  }
+} satisfies Record<BaseLocale, Record<string, string>>;
+
+const productRecommendationCopy = {
+  ...baseProductRecommendationCopy,
+  "zh-CN": {
+    completeEmptyBody:
+      "产品匹配已完成，但当前目录中还没有解析完成、安全、可购买且适合此计划的产品。",
+    completeEmptyTitle: "产品匹配已完成",
+    emptyBody:
+      "我们正在将你的最终计划与泰国目录中的可用产品匹配。营养计划已经准备好，产品匹配会单独更新。",
+    emptyTitle: "正在匹配产品",
+    failedBody:
+      "你的营养计划已经准备好，但产品匹配需要先处理后才能显示产品选项。",
+    failedTitle: "产品匹配需要审核",
+    matched: "已匹配",
+    needsCovered: "产品覆盖的需求",
+    needsReviewed: "已审核的客户需求",
+    needs: "占",
+    ofYourNeeds: "所选组合",
+    preferenceCompact: "精简",
+    preferenceCompactHint: "最多 3 个产品",
+    preferenceBalanced: "均衡",
+    preferenceBalancedHint: "最多 6 个产品，平衡覆盖度、简单度、剂量和成本",
+    preferenceUpdating: "正在切换产品组合...",
+    recommendedDose: "建议剂量",
+    servingInstruction: "每天服用该产品 {count} 份。",
+    stack: "组合覆盖度",
+    title: "推荐产品",
+    unmatchedTitle: "尚未覆盖的补充剂需求",
+    view: "查看产品"
   }
 } satisfies Record<Locale, Record<string, string>>;
 

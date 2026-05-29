@@ -47,6 +47,17 @@ const copy = {
     stripeLoadTimeout:
       "Stripe โหลดไม่เสร็จ โปรดตรวจสอบตัวบล็อกในเบราว์เซอร์หรือลองอีกครั้ง",
     unable: "ไม่สามารถเปิดหน้าชำระเงินได้ โปรดลองอีกครั้ง"
+  },
+  "zh-CN": {
+    cancel: "取消",
+    configError: "结账尚未配置。请稍后重试或联系支持。",
+    creatingSession: "正在创建支付会话...",
+    loading: "正在加载安全结账...",
+    mockCta: "模拟支付成功",
+    mockIntro: "本地开发正在使用模拟支付模式，不需要 Stripe 密钥或银行卡信息。",
+    retry: "重试",
+    stripeLoadTimeout: "Stripe 未完成加载。请检查浏览器拦截器或重试。",
+    unable: "无法打开结账，请重试。"
   }
 };
 

@@ -109,8 +109,12 @@ describe("HealthScore AI copy validator", () => {
     assert.match(source, /callGrokChatCompletion/);
     assert.match(source, /getRequiredXaiApiKey/);
     assert.match(source, /process\.env\.GROK_MODEL/);
-    assert.match(source, /v7-lean-page-copy/);
+    assert.match(source, /v8-single-display-locale/);
     assert.match(source, /Return exactly one top-level key: pageCopy/);
+    assert.match(source, /outputLocaleMode: "single_display_locale"/);
+    assert.match(source, /Return only the requested display locale/);
+    assert.doesNotMatch(source, /Every localized field must include these locale keys/);
+    assert.doesNotMatch(source, /requiredOutputLocales/);
     assert.match(source, /DEFAULT_HEALTHSCORE_REASONING_EFFORT = "none"/);
     assert.match(source, /maxTokens: MAX_RESPONSE_TOKENS/);
     assert.doesNotMatch(source, /paywallFeatures: "Exactly 3 localized feature cards/);
@@ -183,7 +187,7 @@ describe("HealthScore AI copy validator", () => {
     assert.ok(validation.errors.some((error) => error.includes("heroTitle.th")));
   });
 
-  it("requires both English and Thai even when the current locale is English", () => {
+  it("allows single display-locale copy when the current locale is English", () => {
     const response = mutableResponse();
 
     response.pageCopy.heroBody = { en: "English only" };
@@ -194,7 +198,54 @@ describe("HealthScore AI copy validator", () => {
       value: response
     });
 
-    assert.ok(validation.errors.some((error) => error.includes("heroBody.th")));
+    assert.deepEqual(validation.errors, []);
+  });
+
+  it("allows single display-locale copy when the current locale is Chinese", () => {
+    const response = mutableResponse();
+    const chinese = "这是一段贴合当前健康分数的具体说明。";
+
+    for (const key of [
+      "bandLine",
+      "findingsHeadline",
+      "findingsSub",
+      "heroBody",
+      "heroTitle",
+      "highestLeverageBody",
+      "methodHeadline",
+      "pillarHeadline",
+      "relativityHeadline",
+      "relativitySub",
+      "strengthNote",
+      "subtractionBody"
+    ]) {
+      response.pageCopy[key] = chinese;
+    }
+    response.pageCopy.findings = localizedCards(3).map(() => ({
+      body: chinese,
+      headline: chinese
+    }));
+    response.pageCopy.gapTrio = localizedCards(3).map(() => ({
+      body: chinese,
+      headline: chinese
+    }));
+    response.pageCopy.methodCards = localizedCards(3, "title").map(() => ({
+      body: chinese,
+      title: chinese
+    }));
+
+    const validation = validateHealthScoreAiResponse({
+      healthScore: computeHealthScore(profileOne(), "zh-CN"),
+      locale: "zh-CN",
+      value: response
+    });
+
+    assert.deepEqual(validation.errors, []);
+    assert.ok(validation.response);
+    assert.equal(
+      (validation.response.pageCopy.heroTitle as { "zh-CN": string })["zh-CN"],
+      chinese
+    );
   });
 
   it("rejects extra top-level fields that try to alter locked facts", () => {

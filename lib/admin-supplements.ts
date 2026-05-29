@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type postgres from "postgres";
 import { getSql } from "@/lib/db";
 import {
   appendSupplementAliasVersion,
@@ -14,6 +15,7 @@ import {
   getSupplementSelectionStatsBySupplement,
   type AdminSupplementSelectionStats
 } from "@/lib/admin-recommendation-insights";
+import { normalizeLocaleCode, type LocaleCode } from "@/lib/i18n";
 export type { SupplementSafetyFlag } from "@/lib/supplement-safety-flags";
 
 export type SupplementListStatus =
@@ -25,6 +27,17 @@ export type SupplementConfidence = "high" | "low" | "moderate";
 export type AdminSupplementAlias = Readonly<{
   id: string;
   name: string;
+}>;
+
+export type AdminSupplementTranslation = Readonly<{
+  aliases: string[];
+  categoryLabel: string | null;
+  locale: LocaleCode;
+  name: string | null;
+  primaryUseCase: string | null;
+  safetyNotes: string | null;
+  status: "complete" | "draft" | "missing";
+  updatedAt: string | null;
 }>;
 
 export type AdminSupplementRow = Readonly<{
@@ -42,6 +55,7 @@ export type AdminSupplementRow = Readonly<{
   safetyNotes: string | null;
   selectionStats?: AdminSupplementSelectionStats;
   sourceStatus: "core" | "recommended_add";
+  translations: Partial<Record<LocaleCode, AdminSupplementTranslation>>;
   updatedAt: string;
 }>;
 
@@ -72,7 +86,18 @@ type SupplementDbRow = Readonly<{
   safety_flags: string[] | null;
   safety_notes: string | null;
   source_status: "core" | "recommended_add";
+  translations: unknown;
   updated_at: Date | string;
+}>;
+
+export type AdminSupplementTranslationInput = Readonly<{
+  aliases?: string[] | null;
+  categoryLabel?: string | null;
+  locale: LocaleCode;
+  name?: string | null;
+  primaryUseCase?: string | null;
+  safetyNotes?: string | null;
+  status?: "complete" | "draft" | "missing" | null;
 }>;
 
 export type UpdateAdminSupplementInput = Readonly<{
@@ -84,6 +109,7 @@ export type UpdateAdminSupplementInput = Readonly<{
   maxUnit: string;
   safetyFlags: SupplementSafetyFlag[];
   safetyNotes: string | null;
+  translations?: ReadonlyArray<AdminSupplementTranslationInput> | null;
 }>;
 
 export type CreateAdminSupplementInput = Readonly<{
@@ -96,6 +122,7 @@ export type CreateAdminSupplementInput = Readonly<{
   name: string;
   safetyFlags?: SupplementSafetyFlag[] | null;
   safetyNotes?: string | null;
+  translations?: ReadonlyArray<AdminSupplementTranslationInput> | null;
 }>;
 
 export type DeleteAdminSupplementAliasInput = Readonly<{
@@ -161,6 +188,16 @@ function aliasesFromDb(value: unknown): AdminSupplementAlias[] {
     .filter((item): item is AdminSupplementAlias => Boolean(item));
 }
 
+function textOrNull(value: unknown, maxLength = 2000) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed ? trimmed.slice(0, maxLength) : null;
+}
+
 function normalizeAlias(value: string) {
   return value
     .toLowerCase()
@@ -168,6 +205,138 @@ function normalizeAlias(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+}
+
+function translationStatus(value: unknown): AdminSupplementTranslation["status"] {
+  return value === "complete" || value === "missing" ? value : "draft";
+}
+
+function translationAliases(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
+function translationsFromDb(value: unknown): Partial<Record<LocaleCode, AdminSupplementTranslation>> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  const translations: Partial<Record<LocaleCode, AdminSupplementTranslation>> = {};
+
+  for (const [rawLocale, rawTranslation] of Object.entries(value)) {
+    const locale = normalizeLocaleCode(rawLocale);
+
+    if (!locale || !rawTranslation || typeof rawTranslation !== "object" || Array.isArray(rawTranslation)) {
+      continue;
+    }
+
+    const translation = rawTranslation as Record<string, unknown>;
+    translations[locale] = {
+      aliases: translationAliases(translation.aliases),
+      categoryLabel: textOrNull(translation.categoryLabel, 120),
+      locale,
+      name: textOrNull(translation.name, 200),
+      primaryUseCase: textOrNull(translation.primaryUseCase, 500),
+      safetyNotes: textOrNull(translation.safetyNotes, 2000),
+      status: translationStatus(translation.status),
+      updatedAt:
+        typeof translation.updatedAt === "string" && translation.updatedAt
+          ? new Date(translation.updatedAt).toISOString()
+          : null
+    };
+  }
+
+  return translations;
+}
+
+function normalizeTranslationInput(
+  translation: AdminSupplementTranslationInput
+): AdminSupplementTranslationInput | null {
+  const locale = normalizeLocaleCode(translation.locale);
+
+  if (!locale) {
+    return null;
+  }
+
+  return {
+    aliases: translationAliases(translation.aliases),
+    categoryLabel: textOrNull(translation.categoryLabel, 120),
+    locale,
+    name: textOrNull(translation.name, 200),
+    primaryUseCase: textOrNull(translation.primaryUseCase, 500),
+    safetyNotes: textOrNull(translation.safetyNotes, 2000),
+    status: translation.status === "complete" || translation.status === "missing"
+      ? translation.status
+      : "draft"
+  };
+}
+
+async function upsertSupplementTranslations(
+  sql: postgres.Sql | postgres.TransactionSql,
+  supplementId: string,
+  translations: ReadonlyArray<AdminSupplementTranslationInput> | null | undefined,
+  actor: string | null | undefined
+) {
+  if (!translations?.length) {
+    return;
+  }
+
+  for (const translation of translations) {
+    const normalized = normalizeTranslationInput(translation);
+
+    if (!normalized) {
+      continue;
+    }
+
+    await sql`
+      insert into public.supplement_translations (
+        supplement_id,
+        locale,
+        name,
+        primary_use_case,
+        category_label,
+        safety_notes,
+        aliases,
+        status,
+        source,
+        metadata,
+        updated_at
+      )
+      values (
+        ${supplementId}::uuid,
+        ${normalized.locale},
+        ${normalized.name ?? null},
+        ${normalized.primaryUseCase ?? null},
+        ${normalized.categoryLabel ?? null},
+        ${normalized.safetyNotes ?? null},
+        ${normalized.aliases ?? []},
+        ${normalized.status ?? "draft"},
+        'admin',
+        ${sql.json({
+          actor: actor ?? "admin_dashboard",
+          updatedVia: "supplements_admin"
+        })}::jsonb,
+        now()
+      )
+      on conflict (supplement_id, locale) do update set
+        name = excluded.name,
+        primary_use_case = excluded.primary_use_case,
+        category_label = excluded.category_label,
+        safety_notes = excluded.safety_notes,
+        aliases = excluded.aliases,
+        status = excluded.status,
+        source = excluded.source,
+        metadata = public.supplement_translations.metadata || excluded.metadata,
+        updated_at = now()
+    `;
+  }
 }
 
 function rowFromDb(
@@ -189,6 +358,7 @@ function rowFromDb(
     safetyNotes: row.safety_notes,
     ...(selectionStats ? { selectionStats } : {}),
     sourceStatus: row.source_status,
+    translations: translationsFromDb(row.translations),
     updatedAt: new Date(row.updated_at).toISOString()
   };
 }
@@ -252,7 +422,8 @@ export async function getAdminSupplementsData(
         limits.confidence,
         limits.safety_flags,
         limits.safety_notes,
-        coalesce(alias_rows.aliases, '[]'::jsonb) as aliases
+        coalesce(alias_rows.aliases, '[]'::jsonb) as aliases,
+        coalesce(translation_rows.translations, '{}'::jsonb) as translations
       from public.supplements supplements
       left join lateral (
         select *
@@ -276,6 +447,26 @@ export async function getAdminSupplementsData(
         where supplement_aliases.supplement_id = supplements.id
           and supplement_aliases.normalized_alias <> supplements.normalized_name
       ) alias_rows on true
+      left join lateral (
+        select coalesce(
+          jsonb_object_agg(
+            supplement_translations.locale,
+            jsonb_build_object(
+              'aliases', supplement_translations.aliases,
+              'categoryLabel', supplement_translations.category_label,
+              'locale', supplement_translations.locale,
+              'name', supplement_translations.name,
+              'primaryUseCase', supplement_translations.primary_use_case,
+              'safetyNotes', supplement_translations.safety_notes,
+              'status', supplement_translations.status,
+              'updatedAt', supplement_translations.updated_at
+            )
+          ),
+          '{}'::jsonb
+        ) as translations
+        from public.supplement_translations supplement_translations
+        where supplement_translations.supplement_id = supplements.id
+      ) translation_rows on true
       order by supplements.category asc, supplements.name asc
       limit 1000
     `;
@@ -320,7 +511,8 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
       limits.confidence,
       limits.safety_flags,
       limits.safety_notes,
-      coalesce(alias_rows.aliases, '[]'::jsonb) as aliases
+      coalesce(alias_rows.aliases, '[]'::jsonb) as aliases,
+      coalesce(translation_rows.translations, '{}'::jsonb) as translations
     from public.supplements supplements
     left join lateral (
       select *
@@ -344,6 +536,26 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
       where supplement_aliases.supplement_id = supplements.id
         and supplement_aliases.normalized_alias <> supplements.normalized_name
     ) alias_rows on true
+    left join lateral (
+      select coalesce(
+        jsonb_object_agg(
+          supplement_translations.locale,
+          jsonb_build_object(
+            'aliases', supplement_translations.aliases,
+            'categoryLabel', supplement_translations.category_label,
+            'locale', supplement_translations.locale,
+            'name', supplement_translations.name,
+            'primaryUseCase', supplement_translations.primary_use_case,
+            'safetyNotes', supplement_translations.safety_notes,
+            'status', supplement_translations.status,
+            'updatedAt', supplement_translations.updated_at
+          )
+        ),
+        '{}'::jsonb
+      ) as translations
+      from public.supplement_translations supplement_translations
+      where supplement_translations.supplement_id = supplements.id
+    ) translation_rows on true
     where supplements.id = ${input.id}::uuid
     limit 1
   `;
@@ -388,6 +600,13 @@ export async function updateAdminSupplement(input: UpdateAdminSupplementInput) {
     safetyNotes: input.safetyNotes,
     supplementId: input.id
   });
+
+  await upsertSupplementTranslations(
+    sql,
+    input.id,
+    input.translations,
+    input.actor
+  );
 
   await sql`
     insert into public.supplement_admin_audit (
@@ -488,7 +707,8 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
     normalizedName,
     safetyFlags,
     safetyNotes: input.safetyNotes?.trim() || null,
-    sourceStatus: "recommended_add"
+    sourceStatus: "recommended_add",
+    translations: input.translations ?? []
   };
 
   await appendSupplementVersion(sql, {
@@ -582,6 +802,13 @@ export async function createAdminSupplement(input: CreateAdminSupplementInput) {
     safetyNotes: input.safetyNotes?.trim() || null,
     supplementId
   });
+
+  await upsertSupplementTranslations(
+    sql,
+    supplementId,
+    input.translations,
+    input.actor
+  );
 
   await sql`
     insert into public.supplement_admin_audit (

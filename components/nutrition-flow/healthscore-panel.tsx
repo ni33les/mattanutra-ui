@@ -23,7 +23,7 @@ import type { Locale } from "@/lib/i18n";
 import { paymentCheckoutPath } from "@/lib/payment-paths";
 import { cx } from "@/components/nutrition-flow/ui";
 
-const pageCopy = {
+const basePageCopy = {
   en: {
     bodyClass: "leading-7",
     progress: [
@@ -57,10 +57,11 @@ const pageCopy = {
     spectrumHeadroom: "Headroom to 92",
     defaultBandLine:
       "Your score is built from five weighted pillars, safety flags, symptoms, goals, and any verified lab or wearable data you supplied.",
-    bandLabels: {
-      "Needs attention": "Needs attention",
-      "Good, with a clear gap": "Good, with a clear gap",
-      Strong: "Strong",
+	    bandLabels: {
+	      "Building foundation": "Building foundation",
+	      "Needs attention": "Needs attention",
+	      "Good, with a clear gap": "Good, with a clear gap",
+	      Strong: "Strong",
       Excellent: "Excellent"
     },
     pillarLabels: {
@@ -248,10 +249,11 @@ const pageCopy = {
     spectrumHeadroom: "พื้นที่ปรับถึง 92",
     defaultBandLine:
       "คะแนนนี้คำนวณจากเสาหลักห้าด้าน ธงความเหมาะสม อาการ เป้าหมาย และข้อมูลแล็บหรืออุปกรณ์ที่คุณให้มา",
-    bandLabels: {
-      "Needs attention": "ต้องให้ความสำคัญ",
-      "Good, with a clear gap": "ดี และมีช่องว่างที่ชัดเจน",
-      Strong: "แข็งแรง",
+	    bandLabels: {
+	      "Building foundation": "กำลังสร้างพื้นฐาน",
+	      "Needs attention": "ต้องให้ความสำคัญ",
+	      "Good, with a clear gap": "ดี และมีช่องว่างที่ชัดเจน",
+	      Strong: "แข็งแรง",
       Excellent: "ยอดเยี่ยม"
     },
     pillarLabels: {
@@ -408,7 +410,210 @@ const pageCopy = {
   }
 } as const;
 
-type PricePlan = (typeof pageCopy.en.plans)[number] | (typeof pageCopy.th.plans)[number];
+type WidenPageCopy<T> =
+  T extends (...args: infer Args) => string ? (...args: Args) => string :
+  T extends string ? string :
+  T extends number ? number :
+  T extends boolean ? boolean :
+  T extends readonly (infer Item)[] ? readonly WidenPageCopy<Item>[] :
+  T extends object ? { readonly [Key in keyof T]: WidenPageCopy<T[Key]> } :
+  T;
+
+type HealthScorePageCopy = WidenPageCopy<typeof basePageCopy.en>;
+
+const pageCopy = {
+  ...basePageCopy,
+  "zh-CN": {
+        "bodyClass": "leading-relaxed",
+        "progress": [
+            [
+                "发现",
+                "评估完成"
+            ],
+            [
+                "分数",
+                "您的 HealthScore 已就绪"
+            ],
+            [
+                "揭晓",
+                "解锁您的计划"
+            ]
+        ],
+        "heroGreeting"(firstName: string) {
+        return `随时准备就绪，${firstName}。`;
+      },
+      "heroTitle"(score: number) {
+        return `您的 HealthScore 是 ${score}。`;
+      },
+      "heroEyebrow": "您的免费评估结果",
+        "defaultHeroBody": "我们阅读了您的目标、日常作息、安全背景以及真实生活方式，将它们转化为一个数字及其背后的模式。",
+        "heroCta": "解锁我的 Right Amount Plan",
+        "heroSecondary": "查看影响因素",
+        "scoreLabel": "HealthScore",
+        "scoreOutOf": "/100",
+        "topTier": "顶级",
+        "percentile": "百分位",
+        "median": "参考中位数",
+        "spectrumStart": "30",
+        "spectrumEnd": "92",
+        "spectrumTypical": "典型完成者",
+        "spectrumYou": "您",
+        "spectrumWhere": "您的位置",
+        "spectrumGapAhead": "领先距离",
+        "spectrumGapBehind": "与典型完成者的差距",
+        "spectrumHeadroom": "到92分的提升空间",
+        "defaultBandLine": "您的分数由五个加权支柱、安全标志、症状、目标以及您提供的任何已验证实验室或可穿戴设备数据共同构建。",
+	        "bandLabels": {
+            "Building foundation": "正在建立基础",
+	            "Needs attention": "需要关注",
+	            "Good, with a clear gap": "良好，但仍有明显差距",
+            "Strong": "强劲",
+            "Excellent": "优秀"
+        },
+        "pillarLabels": {
+            "activity": "活动与健身",
+            "biomarkers": "生物标志物",
+            "habits": "健康习惯",
+            "nutrition": "营养与饮食",
+            "sleep": "睡眠与恢复",
+            "stress": "压力与平衡"
+        },
+        "tagLabels": {
+            "digestion": "消化",
+            "energy": "能量",
+            "fitness": "健身",
+            "focus": "专注",
+            "heart": "心脏",
+            "immune": "免疫",
+            "mood": "情绪",
+            "sleep": "睡眠"
+        },
+        "scoreMeaningEyebrow"(score: number) {
+        return `${score} 的实际含义`;
+      },
+      "fallbackScoreMeaning"(_score: number, percentile: number) {
+        return `您领先于约 ${percentile}% 完成此评估的人。最后的分数最难获得，也最个性化。`;
+      },
+      "fallbackScoreMeaningSub": "更高的分数并非追求一次性全部达成，而是针对您模式中仍需优化的少数具体调整。",
+        "gapEyebrow": "评估揭示",
+        "gapTitle": "三个通用维生素问卷会直接忽略的要点。",
+        "gapBody": "这些是您答案中的具体信号，完整呈现您的配方依据，毫无保留。",
+        "fallbackGaps": [
+            {
+                "body": "您得分最低的支柱显示首次实际改变应从何处开始。",
+                "headline": "最清晰的差距并非隐藏",
+                "tag": "信号",
+                "value": "01"
+            },
+            {
+                "body": "您的目标决定哪些营养素或产品在计划中获得优先位置。",
+                "headline": "您的目标改变优先级",
+                "tag": "信号",
+                "value": "02"
+            },
+            {
+                "body": "用药、饮食模式、国家和作息背景在任何建议前保持可见。",
+                "headline": "安全背景始终在场",
+                "tag": "信号",
+                "value": "03"
+            }
+        ],
+        "pillarsEyebrow": "五支柱模型",
+        "pillarEyebrow": "您的模式，逐支柱呈现",
+        "pillarsTitle": "跨五个领域的固定评分模型，而非猜测。",
+        "highestLeverageLabel": "您的最高杠杆行动",
+        "whatCaught": "我们捕捉到的",
+        "whatCaughtSub": "完整呈现，毫无保留。",
+        "fallbackFindingTitle": "您的 HealthScore 有明确的起点",
+        "fallbackFindingBody": "得分最低的支柱和安全背景决定计划应优先处理的内容。",
+        "subtractionEyebrow": "您的配方如何构建",
+        "subtractionTitle": "您的 right amount 是移除不适合选项后剩余的内容。",
+        "evaluatedFallback": "已评估",
+        "setAsideFallback": "已排除",
+        "chosenFallback": "适合您的分数",
+        "methodEyebrow": "MattaNutra 的思考方式",
+        "methodTitle": "跨五个领域的固定评分模型，而非猜测或陌生人的平均值。",
+        "fallbackMethodCards": [
+            {
+                "body": "在 AI 撰写任何文案前先计算分数。",
+                "title": "分数优先"
+            },
+            {
+                "body": "仅显示最强的评估信号。",
+                "title": "信号由代码筛选"
+            },
+            {
+                "body": "AI 可润色页面，但无法更改您的分数、标志、计数或发现。",
+                "title": "文案锁定事实"
+            }
+        ],
+        "trustLine": "您的数字每次都按相同规则计算：可追溯，逐点呈现。这是健康指导而非诊断，适合与医生分享。",
+        "pricingEyebrow": "选择下一步",
+        "pricingTitle": "解锁符合您所需支持程度的计划。",
+        "pricingBody": "选择一次性 Right Amount Formula 获得即时清晰度，或选择 90-Day Living Protocol 获得持续帮助，将计划转化为日常习惯。",
+        "preparing": "准备中...",
+        "selectionError": "无法启动您的计划，请重试。",
+        "plans": [
+            {
+                "badge": "限时优惠",
+                "cta": "获取 Right Amount Formula",
+                "description": "您的个性化补充剂配方，包含精确剂量、时机和产品指导。",
+                "eyebrow": "一次性计划",
+                "features": [
+                    "个性化补充剂配方",
+                    "按体型调整的剂量范围",
+                    "时机与使用说明",
+                    "用药与实验室安全标志",
+                    "推荐产品及替代方案",
+                    "60天重新评估提示"
+                ],
+                "fine": "一次性付款 · 终身访问",
+                "guarantee": "清晰度保证",
+                "guaranteeBody": "如果您的计划不够清晰实用，我们将在7天内解决或退款。",
+                "name": "Right Amount Formula",
+                "price": "690",
+                "save": "节省30%",
+                "term": "一次性",
+                "was": "THB 990"
+            },
+            {
+                "badge": "最受欢迎",
+                "cta": "开始 Living Protocol",
+                "description": "随着生活变化保持 right amount 正确，提供饮食指导和持续调整。",
+                "eyebrow": "90天 AI 支持",
+                "extraBlocks": [
+                    {
+                        "body": "当某种成分不足时，了解日常富含该成分的食物，或在餐食已覆盖时跳过补充剂。",
+                        "icon": "❘❘",
+                        "title": "哪些食物能提供您所需"
+                    },
+                    {
+                        "body": "改善睡眠质量，提升能量，建立更好的日常习惯。",
+                        "icon": "☾",
+                        "title": "睡眠、能量与习惯指导"
+                    }
+                ],
+                "features": [
+                    "了解日常食物如何提供所需成分",
+                    "补充剂时机与依从性支持",
+                    "每周进度摘要",
+                    "数据变化时的优先审查"
+                ],
+                "fine": "一次性付款 · 90天支持 · 随时续订",
+                "guarantee": "7天满意保证",
+                "guaranteeBody": "请真正尝试 Living Protocol。如有任何问题，请告知我们，我们将在7天内解决或全额退款。",
+                "includes": "包含 Right Amount Formula 计划。",
+                "name": "Living Protocol",
+                "price": "1,590",
+                "save": "节省16%",
+                "term": "为期90天",
+                "was": "THB 1,890"
+            }
+        ]
+    }
+} as const satisfies Record<Locale, HealthScorePageCopy>;
+
+type PricePlan = HealthScorePageCopy["plans"][number];
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
@@ -555,15 +760,21 @@ function stripInlineMarkup(value: string) {
 }
 
 const thaiScriptPattern = /[\u0E00-\u0E7F]/;
+const cjkScriptPattern = /[\u3400-\u9FFF]/;
 
 function textFitsLocale(value: string, locale: Locale) {
   const hasThai = thaiScriptPattern.test(value);
+  const hasCjk = cjkScriptPattern.test(value);
 
   if (locale === "th") {
     return hasThai;
   }
 
-  return !hasThai;
+  if (locale === "zh-CN") {
+    return hasCjk;
+  }
+
+  return !hasThai && !hasCjk;
 }
 
 function localizedLegacyText(

@@ -35,6 +35,12 @@ const planConciergeCopy = {
     pendingRegion: "ไทย",
     welcome:
       "สวัสดีครับ ผมคือ MattaNutra AI ผมจะช่วยปรับคำแนะนำอาหารและอาหารเสริมให้เข้ากับคุณ\n\nบอกผมได้เลยว่าอยากเอาอะไรออก เปลี่ยนอะไร หรือทำให้ง่ายขึ้น\n\nเมื่อพร้อมแล้ว ให้กด Deliver Nutrition Plan หรือบอกผมว่าไปต่อได้เลย"
+  },
+  "zh-CN": {
+    pendingProfile: "资料待完善",
+    pendingRegion: "中国",
+    welcome:
+      "你好，我是 MattaNutra AI。我会帮你调整食物和补充剂建议，让它更贴合你。\n\n告诉我你想删除、替换、简化或调整什么。\n\n满意后，请点击 Deliver Nutrition Plan，或直接告诉我可以继续。"
   }
 } satisfies Record<Locale, {
   pendingProfile: string;

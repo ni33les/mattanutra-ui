@@ -45,7 +45,8 @@ insert into public.site_locales (
 )
 values
   ('en', 'EN', 'English', 'en', 'ltr', null, true, true, 10),
-  ('th', 'TH', 'ไทย', 'th', 'ltr', 'en', true, true, 20)
+  ('th', 'TH', 'ไทย', 'th', 'ltr', 'en', true, true, 20),
+  ('zh-CN', '中文', '简体中文', 'zh-CN', 'ltr', 'en', true, true, 30)
 on conflict (code) do update set
   label = excluded.label,
   native_label = excluded.native_label,
@@ -56,6 +57,53 @@ on conflict (code) do update set
   is_indexable = excluded.is_indexable,
   sort_order = excluded.sort_order,
   updated_at = now();
+
+alter table public.testimonials
+  add column if not exists translation_group_id uuid;
+
+with grouped as (
+  select
+    id,
+    coalesce(
+      nullif(metadata ->> 'translationGroupId', '')::uuid,
+      nullif(metadata ->> 'sourceTestimonialId', '')::uuid,
+      first_value(id) over (
+        partition by sort_order
+        order by case when locale = 'en' then 0 when locale = 'th' then 1 when locale = 'zh-CN' then 2 else 3 end, created_at, id
+      )
+    ) as group_id
+  from public.testimonials
+)
+update public.testimonials
+set translation_group_id = grouped.group_id
+from grouped
+where testimonials.id = grouped.id
+  and testimonials.translation_group_id is null;
+
+update public.testimonials
+set metadata = metadata || jsonb_build_object('translationGroupId', translation_group_id::text)
+where metadata ->> 'translationGroupId' is distinct from translation_group_id::text;
+
+alter table public.testimonials
+  alter column translation_group_id set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'testimonials_translation_group_locale_key'
+      and conrelid = 'public.testimonials'::regclass
+  ) then
+    alter table public.testimonials
+      add constraint testimonials_translation_group_locale_key
+      unique (translation_group_id, locale);
+  end if;
+end;
+$$;
+
+create index if not exists testimonials_translation_group_idx
+  on public.testimonials (translation_group_id);
 
 create table if not exists public.product_translations (
   product_id uuid not null references public.products(id) on delete cascade,
@@ -149,6 +197,17 @@ cross join lateral (
       coalesce(
         to_jsonb(products) ->> 'description_th',
         products.source_snapshot ->> 'descriptionTh'
+      )
+    ),
+    (
+      'zh-CN',
+      coalesce(
+        products.source_snapshot -> 'aiCopyTranslation' -> 'zh-CN' ->> 'title',
+        products.source_snapshot -> 'aiCopyTranslation' ->> 'title'
+      ),
+      coalesce(
+        products.source_snapshot -> 'aiCopyTranslation' -> 'zh-CN' ->> 'description',
+        products.source_snapshot -> 'aiCopyTranslation' ->> 'description'
       )
     )
 ) as locale_rows(locale, title, description)
@@ -258,6 +317,17 @@ cross join lateral (
         to_jsonb(product_imports) ->> 'description_th',
         product_imports.raw_snapshot ->> 'descriptionTh'
       )
+    ),
+    (
+      'zh-CN',
+      coalesce(
+        product_imports.raw_snapshot -> 'aiCopyTranslation' -> 'zh-CN' ->> 'title',
+        product_imports.raw_snapshot -> 'aiCopyTranslation' ->> 'title'
+      ),
+      coalesce(
+        product_imports.raw_snapshot -> 'aiCopyTranslation' -> 'zh-CN' ->> 'description',
+        product_imports.raw_snapshot -> 'aiCopyTranslation' ->> 'description'
+      )
     )
 ) as locale_rows(locale, title, description)
 where nullif(locale_rows.title, '') is not null
@@ -268,6 +338,55 @@ on conflict (import_id, locale) do update set
   status = excluded.status,
   source = excluded.source,
   updated_at = now();
+
+create table if not exists public.supplement_translations (
+  supplement_id uuid not null references public.supplements(id) on delete cascade,
+  locale text not null references public.site_locales(code),
+  name text null,
+  primary_use_case text null,
+  category_label text null,
+  safety_notes text null,
+  aliases text[] not null default array[]::text[],
+  status text not null default 'draft',
+  source text not null default 'admin',
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (supplement_id, locale),
+  constraint supplement_translations_status_check check (status in ('complete', 'draft', 'missing'))
+);
+
+create index if not exists supplement_translations_locale_idx
+  on public.supplement_translations (locale, status);
+
+insert into public.supplement_translations (
+  supplement_id,
+  locale,
+  name,
+  primary_use_case,
+  category_label,
+  safety_notes,
+  status,
+  source
+)
+select
+  supplements.id,
+  'en',
+  supplements.name,
+  supplements.primary_use_case,
+  supplements.category,
+  limits.safety_notes,
+  case when supplements.name is not null then 'complete' else 'missing' end,
+  'locale_schema_apply'
+from public.supplements supplements
+left join lateral (
+  select safety_notes
+  from public.supplement_safety_limits limits
+  where limits.supplement_id = supplements.id
+  order by version desc
+  limit 1
+) limits on true
+on conflict (supplement_id, locale) do nothing;
 `;
 
 async function main() {

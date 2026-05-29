@@ -1,4 +1,5 @@
 import type postgres from "postgres";
+import { normalizeLocaleCode, publicLocales } from "@/lib/i18n";
 
 export type AdminDashboardFilters = Readonly<{
   affiliate: string;
@@ -68,11 +69,24 @@ function cleanFirstParam(...values: SearchParamValue[]) {
 }
 
 function cleanLocaleFilter(value: SearchParamValue) {
-  const locale = cleanParam(value).toLowerCase();
+  const locale = cleanParam(value);
 
-  return locale === "en" || locale === "th" || locale === "none"
-    ? locale
-    : "";
+  if (locale.toLowerCase() === "none") {
+    return "none";
+  }
+
+  const locales = locale
+    .split(",")
+    .map((item) => normalizeLocaleCode(item))
+    .filter((item): item is (typeof publicLocales)[number] =>
+      Boolean(item && publicLocales.some((locale) => locale === item))
+    );
+
+  if (locales.length === 0 || locales.length === publicLocales.length) {
+    return "";
+  }
+
+  return [...new Set(locales)].join(",");
 }
 
 function cleanDeviceFilter(...values: SearchParamValue[]) {
@@ -159,7 +173,7 @@ export function adminDashboardFilterSql(
   const source = filters.source || null;
 
   return sql`
-    (${locale}::text is null or locale = ${locale})
+    (${locale}::text is null or locale = any(string_to_array(${locale}, ',')))
     and (
       ${device}::text is null
       or lower(coalesce(device_type, '')) = any(string_to_array(${device}, ','))

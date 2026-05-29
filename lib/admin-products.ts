@@ -1296,6 +1296,117 @@ function isUuidValue(value: string | null | undefined): value is string {
   );
 }
 
+function normalizedProductTranslations(
+  translations: Record<string, ProductTranslationInput> | undefined,
+  legacy: Readonly<{
+    descriptionEn?: string | null;
+    descriptionTh?: string | null;
+    descriptionZhCn?: string | null;
+    titleEn?: string | null;
+    titleTh?: string | null;
+    titleZhCn?: string | null;
+  }>
+) {
+  const next = new Map<string, ProductTranslationInput>();
+
+  for (const [locale, translation] of Object.entries(translations ?? {})) {
+    const title = cleanNullableText(translation.title, 500);
+    const description = cleanNullableText(translation.description, 4000);
+    const status = translation.status === "complete" || translation.status === "missing"
+      ? translation.status
+      : title || description
+        ? "draft"
+        : "missing";
+
+    next.set(locale, { description, status, title });
+  }
+
+  const legacyRows = [
+    ["en", legacy.titleEn, legacy.descriptionEn],
+    ["th", legacy.titleTh, legacy.descriptionTh],
+    ["zh-CN", legacy.titleZhCn, legacy.descriptionZhCn]
+  ] as const;
+
+  for (const [locale, title, description] of legacyRows) {
+    if (next.has(locale)) {
+      continue;
+    }
+
+    const cleanTitle = cleanNullableText(title, 500);
+    const cleanDescription = cleanNullableText(description, 4000);
+
+    if (cleanTitle || cleanDescription) {
+      next.set(locale, {
+        description: cleanDescription,
+        status: cleanTitle && cleanDescription ? "complete" : "draft",
+        title: cleanTitle
+      });
+    }
+  }
+
+  return next;
+}
+
+async function upsertProductImportTranslations(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  importId: string,
+  translations: Record<string, ProductTranslationInput> | undefined,
+  legacy: Readonly<{
+    descriptionEn?: string | null;
+    descriptionTh?: string | null;
+    descriptionZhCn?: string | null;
+    titleEn?: string | null;
+    titleTh?: string | null;
+    titleZhCn?: string | null;
+  }>,
+  source: string
+) {
+  const rows = [...normalizedProductTranslations(translations, legacy)]
+    .map(([locale, translation]) => ({
+      description: cleanNullableText(translation.description, 4000),
+      locale,
+      status: translation.status ?? "draft",
+      title: cleanNullableText(translation.title, 500)
+    }))
+    .filter((row) => row.title || row.description);
+
+  if (!rows.length) {
+    return;
+  }
+
+  await sql`
+    insert into public.product_import_translations (
+      import_id,
+      locale,
+      title,
+      description,
+      status,
+      source,
+      metadata
+    )
+    select
+      ${importId}::uuid,
+      translation.locale,
+      translation.title,
+      translation.description,
+      translation.status,
+      ${source},
+      '{}'::jsonb
+    from jsonb_to_recordset(${sql.json(toJsonValue(rows))}::jsonb) as translation(
+      locale text,
+      title text,
+      description text,
+      status text
+    )
+    on conflict (import_id, locale) do update set
+      title = coalesce(excluded.title, public.product_import_translations.title),
+      description = coalesce(excluded.description, public.product_import_translations.description),
+      status = excluded.status,
+      source = excluded.source,
+      updated_at = now()
+  `;
+}
+
 export function normalizedFactsForStorage(
   facts: readonly ProductImportFactInput[] | undefined
 ) {
@@ -1755,14 +1866,16 @@ export async function stageProductImport(input: StageProductImportInput) {
   const sourceUrl = input.sourceUrl.trim();
   const titleEn = cleanNullableText(input.titleEn, 500);
   const titleTh = cleanNullableText(input.titleTh, 500);
+  const titleZhCn = cleanNullableText(input.titleZhCn, 500);
   const productTitle = preferredProductTitle({
     title: rawProductTitle,
     titleEn
   });
   const descriptionEn = cleanNullableText(input.descriptionEn, 4000);
   const descriptionTh = cleanNullableText(input.descriptionTh, 4000);
+  const descriptionZhCn = cleanNullableText(input.descriptionZhCn, 4000);
   const description = cleanNullableText(
-    input.description ?? descriptionEn ?? descriptionTh,
+    input.description ?? descriptionEn ?? descriptionTh ?? descriptionZhCn,
     4000
   );
   const normalizedBrandName = normalizeProductKey(brandName);
@@ -1828,9 +1941,11 @@ export async function stageProductImport(input: StageProductImportInput) {
         ...(rawProductTitle !== productTitle ? { originalProductTitle: rawProductTitle } : {}),
         ...(titleEn ? { titleEn } : {}),
         ...(titleTh ? { titleTh } : {}),
+        ...(titleZhCn ? { titleZhCn } : {}),
         ...(description ? { description } : {}),
         ...(descriptionEn ? { descriptionEn } : {}),
-        ...(descriptionTh ? { descriptionTh } : {})
+        ...(descriptionTh ? { descriptionTh } : {}),
+        ...(descriptionZhCn ? { descriptionZhCn } : {})
       }))}::jsonb,
       ${duplicateProductIds}::uuid[],
       ${input.parseConfidence ?? "moderate"},
@@ -1873,6 +1988,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       description,
       descriptionEn,
       descriptionTh,
+      descriptionZhCn,
       facts: parsedFacts,
       fdaApprovalNumber: cleanNullableText(input.fdaApprovalNumber, 100),
       imageUrl: imageUrls[0] ?? null,
@@ -1891,20 +2007,48 @@ export async function stageProductImport(input: StageProductImportInput) {
         ...(rawProductTitle !== productTitle ? { originalProductTitle: rawProductTitle } : {}),
         ...(titleEn ? { titleEn } : {}),
         ...(titleTh ? { titleTh } : {}),
+        ...(titleZhCn ? { titleZhCn } : {}),
         ...(description ? { description } : {}),
         ...(descriptionEn ? { descriptionEn } : {}),
         ...(descriptionTh ? { descriptionTh } : {}),
+        ...(descriptionZhCn ? { descriptionZhCn } : {}),
         productImportId: importId
       },
       sourceUrl,
       title: productTitle,
       titleEn,
-      titleTh
+      titleTh,
+      titleZhCn,
+      translations: Object.fromEntries(normalizedProductTranslations(input.translations, {
+        descriptionEn,
+        descriptionTh,
+        descriptionZhCn,
+        titleEn,
+        titleTh,
+        titleZhCn
+      }))
     });
     draftProductId = draftProduct.id;
   }
 
-  if (description || descriptionEn || descriptionTh || titleEn || titleTh) {
+  await upsertProductImportTranslations(sql, importId, input.translations, {
+    descriptionEn,
+    descriptionTh,
+    descriptionZhCn,
+    titleEn,
+    titleTh,
+    titleZhCn
+  }, input.actor ?? "manufacturer_scraper");
+
+  if (
+    description ||
+    descriptionEn ||
+    descriptionTh ||
+    descriptionZhCn ||
+    titleEn ||
+    titleTh ||
+    titleZhCn
+  ) {
     try {
       await sql`
         update public.product_imports
@@ -1967,6 +2111,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       description,
       descriptionEn,
       descriptionTh,
+      translations: input.translations,
       imageUrls,
       itemType: "product",
       parsedFacts,
@@ -2121,6 +2266,7 @@ export async function resolveProductImportReview(
     description: string | null;
     description_en: string | null;
     description_th: string | null;
+    description_zh_cn: string | null;
     duplicate_product_ids: string[];
     fda_approval_number: string | null;
     id: string;
@@ -2130,6 +2276,7 @@ export async function resolveProductImportReview(
     product_title: string;
     title_en: string | null;
     title_th: string | null;
+    title_zh_cn: string | null;
     raw_snapshot: Record<string, unknown>;
     source_url: string;
   }>>`
@@ -2139,9 +2286,11 @@ export async function resolveProductImportReview(
       coalesce(to_jsonb(product_imports) ->> 'description', raw_snapshot ->> 'description') as description,
       coalesce(to_jsonb(product_imports) ->> 'description_en', raw_snapshot ->> 'descriptionEn') as description_en,
       coalesce(to_jsonb(product_imports) ->> 'description_th', raw_snapshot ->> 'descriptionTh') as description_th,
+      coalesce(raw_snapshot ->> 'descriptionZhCn', raw_snapshot -> 'translations' -> 'zh-CN' ->> 'description') as description_zh_cn,
       product_title,
       coalesce(to_jsonb(product_imports) ->> 'title_en', raw_snapshot ->> 'titleEn') as title_en,
       coalesce(to_jsonb(product_imports) ->> 'title_th', raw_snapshot ->> 'titleTh') as title_th,
+      coalesce(raw_snapshot ->> 'titleZhCn', raw_snapshot -> 'translations' -> 'zh-CN' ->> 'title') as title_zh_cn,
       source_url,
       image_urls,
       fda_approval_number,
@@ -2182,6 +2331,10 @@ export async function resolveProductImportReview(
     input.descriptionTh === undefined
       ? productImport.description_th
       : cleanNullableText(input.descriptionTh, 4000);
+  const reviewDescriptionZhCn =
+    input.descriptionZhCn === undefined
+      ? productImport.description_zh_cn
+      : cleanNullableText(input.descriptionZhCn, 4000);
   const reviewBrandName = cleanNullableText(input.brandName, 200) ??
     productImport.brand_name;
   const reviewTitle = cleanNullableText(input.title, 500) ??
@@ -2192,6 +2345,9 @@ export async function resolveProductImportReview(
   const reviewTitleTh = input.titleTh === undefined
     ? productImport.title_th
     : cleanNullableText(input.titleTh, 500);
+  const reviewTitleZhCn = input.titleZhCn === undefined
+    ? productImport.title_zh_cn
+    : cleanNullableText(input.titleZhCn, 500);
   const reviewFdaApprovalNumber = input.fdaApprovalNumber === undefined
     ? productImport.fda_approval_number
     : cleanNullableText(input.fdaApprovalNumber, 100);
@@ -2211,6 +2367,7 @@ export async function resolveProductImportReview(
       description: reviewDescription,
       descriptionEn: reviewDescriptionEn,
       descriptionTh: reviewDescriptionTh,
+      descriptionZhCn: reviewDescriptionZhCn,
       facts: reviewFacts,
       fdaApprovalNumber: reviewFdaApprovalNumber,
       imageUrl: reviewImageUrl,
@@ -2228,12 +2385,22 @@ export async function resolveProductImportReview(
         ...productImport.raw_snapshot,
         ...(reviewDescription ? { description: reviewDescription } : {}),
         ...(reviewDescriptionEn ? { descriptionEn: reviewDescriptionEn } : {}),
-        ...(reviewDescriptionTh ? { descriptionTh: reviewDescriptionTh } : {})
+        ...(reviewDescriptionTh ? { descriptionTh: reviewDescriptionTh } : {}),
+        ...(reviewDescriptionZhCn ? { descriptionZhCn: reviewDescriptionZhCn } : {})
       },
       sourceUrl: productImport.source_url,
       title: reviewTitle,
       titleEn: reviewTitleEn,
-      titleTh: reviewTitleTh
+      titleTh: reviewTitleTh,
+      titleZhCn: reviewTitleZhCn,
+      translations: Object.fromEntries(normalizedProductTranslations(input.translations, {
+        descriptionEn: reviewDescriptionEn,
+        descriptionTh: reviewDescriptionTh,
+        descriptionZhCn: reviewDescriptionZhCn,
+        titleEn: reviewTitleEn,
+        titleTh: reviewTitleTh,
+        titleZhCn: reviewTitleZhCn
+      }))
     });
     productId = row.id;
 
@@ -2293,6 +2460,15 @@ export async function resolveProductImportReview(
       updated_at = now()
     where id = ${productImport.id}::uuid
   `;
+
+  await upsertProductImportTranslations(sql, productImport.id, input.translations, {
+    descriptionEn: reviewDescriptionEn,
+    descriptionTh: reviewDescriptionTh,
+    descriptionZhCn: reviewDescriptionZhCn,
+    titleEn: reviewTitleEn,
+    titleTh: reviewTitleTh,
+    titleZhCn: reviewTitleZhCn
+  }, input.actor ?? "admin_dashboard");
 
   await completeProductImportTask(sql, {
     action: input.action,
@@ -2608,6 +2784,7 @@ export type StageProductImportInput = Readonly<{
   description?: string | null;
   descriptionEn?: string | null;
   descriptionTh?: string | null;
+  descriptionZhCn?: string | null;
   duplicateProductIds?: readonly string[];
   fdaApprovalNumber?: string | null;
   imageUrls?: readonly string[];
@@ -2620,6 +2797,7 @@ export type StageProductImportInput = Readonly<{
   sourceUrl: string;
   titleEn?: string | null;
   titleTh?: string | null;
+  titleZhCn?: string | null;
   translations?: Record<string, ProductTranslationInput>;
 }>;
 
@@ -2631,6 +2809,7 @@ export type ResolveProductImportReviewInput = Readonly<{
   description?: string | null;
   descriptionEn?: string | null;
   descriptionTh?: string | null;
+  descriptionZhCn?: string | null;
   fdaApprovalNumber?: string | null;
   imageUrl?: string | null;
   manufacturerCountryCodes?: readonly string[];
@@ -2644,6 +2823,7 @@ export type ResolveProductImportReviewInput = Readonly<{
   title?: string | null;
   titleEn?: string | null;
   titleTh?: string | null;
+  titleZhCn?: string | null;
   translations?: Record<string, ProductTranslationInput>;
 }>;
 
@@ -2662,6 +2842,7 @@ export type CreateAdminProductInput = Readonly<{
   description?: string | null;
   descriptionEn?: string | null;
   descriptionTh?: string | null;
+  descriptionZhCn?: string | null;
   facts?: readonly ProductImportFactInput[];
   imageUrl?: string | null;
   fdaApprovalNumber?: string | null;
@@ -2681,6 +2862,7 @@ export type CreateAdminProductInput = Readonly<{
   title: string;
   titleEn?: string | null;
   titleTh?: string | null;
+  titleZhCn?: string | null;
   translations?: Record<string, ProductTranslationInput>;
 }>;
 
@@ -2696,6 +2878,7 @@ export type UpdateAdminProductInput = Readonly<{
   description?: string | null;
   descriptionEn?: string | null;
   descriptionTh?: string | null;
+  descriptionZhCn?: string | null;
   facts?: readonly ProductImportFactInput[];
   factsSource?: string | null;
   fdaApprovalNumber?: string | null;
@@ -2711,6 +2894,7 @@ export type UpdateAdminProductInput = Readonly<{
   title?: string | null;
   titleEn?: string | null;
   titleTh?: string | null;
+  titleZhCn?: string | null;
   translations?: Record<string, ProductTranslationInput>;
 }>;
 

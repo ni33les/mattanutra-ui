@@ -13,7 +13,9 @@ import {
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
 
-const labels = {
+type BaseLocale = Exclude<Locale, "zh-CN">;
+
+const baseLabels = {
   en: {
     coverage: "Coverage",
     doseBuckets: "Dose buckets",
@@ -50,10 +52,34 @@ const labels = {
     trendSupplements: "ความต้องการอาหารเสริม",
     unmatched: "อาหารเสริมที่ยังไม่จับคู่"
   }
+} satisfies Record<BaseLocale, Record<string, string>>;
+
+const labels = {
+  ...baseLabels,
+  "zh-CN": {
+    coverage: "覆盖率",
+    doseBuckets: "剂量分组",
+    empty: "此时间范围内没有推荐洞察数据。",
+    nearMisses: "接近入选",
+    noDoseBuckets: "此时间范围内没有剂量分组。",
+    productOutcomes: "产品结果",
+    products: "产品",
+    rejectionReasons: "未选原因",
+    safetyHidden: "因安全隐藏",
+    servingBuckets: "服用倍数",
+    supplements: "补充剂",
+    topChosenProducts: "最常入选产品",
+    topSupplements: "最高补充剂需求",
+    trendProducts: "入选产品",
+    trendSupplements: "补充剂需求",
+    unmatched: "未匹配补充剂"
+  }
 } satisfies Record<Locale, Record<string, string>>;
 
 function formatNumber(value: number, locale: Locale) {
-  return new Intl.NumberFormat(locale === "th" ? "th-TH" : "en").format(value);
+  return new Intl.NumberFormat(
+    locale === "th" ? "th-TH" : locale === "zh-CN" ? "zh-CN" : "en"
+  ).format(value);
 }
 
 function RankList({

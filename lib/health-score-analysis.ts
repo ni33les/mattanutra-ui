@@ -16,7 +16,7 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
-import { defaultLocale, type Locale } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 
 export { validateHealthScoreAiResponse };
 
@@ -33,7 +33,7 @@ export type HealthScoreAdviceAnalysis = Readonly<{
 
 const DEFAULT_HEALTHSCORE_COPY_MODEL = "grok-4.3";
 const DEFAULT_HEALTHSCORE_REASONING_EFFORT = "none";
-const DEFAULT_PROMPT_VERSION = "v7-lean-page-copy";
+const DEFAULT_PROMPT_VERSION = "v8-single-display-locale";
 const CACHE_TYPE = "healthscore_page_copy";
 const CACHE_TTL_DAYS = 7;
 const MAX_ATTEMPTS = 2;
@@ -71,9 +71,11 @@ function systemPrompt(promptVersion: string) {
   ].join("\n");
 }
 
-function requiredLocales(locale: Locale) {
-  return [...new Set([defaultLocale, "th", locale])];
-}
+const displayLocaleNames = {
+  en: "English",
+  th: "Thai",
+  "zh-CN": "Simplified Chinese"
+} satisfies Record<Locale, string>;
 
 function userPrompt({
   answers,
@@ -85,7 +87,6 @@ function userPrompt({
   locale: Locale;
 }>) {
   const pageContent = healthScore.pageContent;
-  const locales = requiredLocales(locale);
 
   return JSON.stringify(
     {
@@ -119,7 +120,10 @@ function userPrompt({
       healthScore: compactHealthScoreForAdvice(healthScore),
       instructions: [
         "Return exactly one top-level key: pageCopy.",
-        `Every localized field must include these locale keys: ${locales.join(", ")}.`,
+        `Write every user-facing field in ${displayLocaleNames[locale]} (${locale}).`,
+        "Every pageCopy field must be a plain string in the requested display locale, not a localized object.",
+        "Every card headline/title/body must be a plain string in the requested display locale, not { en, th } or other language maps.",
+        "Return only the requested display locale for user-facing prose. Do not return parallel English/Thai/Chinese copies.",
         "Use the deterministicContent.copySeeds as source material, but make the copy warmer and more specific.",
         "Match the attached HealthScore prototype slots: hero goal mirror, score meaning, gap cards, pillar leverage, what-we-caught, subtraction beat, and method cards.",
         "Do not introduce any new finding, new score reason, new safety issue, new supplement, new product, or new measurement.",
@@ -132,8 +136,9 @@ function userPrompt({
         "Do not alter or restate numbers unless they appear in deterministicContent.locked or copySeeds."
       ],
       locale,
+      outputLocaleMode: "single_display_locale",
       personalizationSignals: buildPersonalizationSignals(answers, healthScore),
-      requiredOutputLocales: locales
+      requestedDisplayLocale: locale
     },
     null,
     2
@@ -521,12 +526,14 @@ function jsonValue(value: unknown) {
 async function cacheKey({
   answers,
   healthScore,
+  locale,
   model,
   promptVersion,
   reasoningEffort
 }: Readonly<{
   answers: unknown;
   healthScore: HealthScoreResult;
+  locale: Locale;
   model: string;
   promptVersion: string;
   reasoningEffort: string;
@@ -536,8 +543,10 @@ async function cacheKey({
       assessment: compactAssessmentForAdvice(answers),
       cacheType: CACHE_TYPE,
       healthScore: compactHealthScoreForAdvice(healthScore),
+      locale,
       pageContent: healthScore.pageContent,
       model,
+      outputLocaleMode: "single_display_locale",
       promptVersion,
       reasoningEffort
     })
@@ -697,6 +706,7 @@ export async function analyzeHealthScoreAdviceWithUsage({
   const key = await cacheKey({
     answers,
     healthScore,
+    locale,
     model: config.model,
     promptVersion: config.promptVersion,
     reasoningEffort: config.reasoningEffort

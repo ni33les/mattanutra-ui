@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { AssessmentFlow } from "@/components/assessment-flow";
 import { ServiceIssue } from "@/components/service-issue";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { checkDatabaseConnection } from "@/lib/db";
+import { devShortcutsEnabledForHost } from "@/lib/dev-shortcuts";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import { getStoredAssessmentPrefill, isUuid } from "@/lib/assessment-store";
@@ -44,6 +46,10 @@ export default async function NutritionQuizPage({
       ? query.payment
       : "";
   const currentPath = nutritionQuizPath(locale, returningPlanId);
+  const requestHeaders = await headers();
+  const showDevShortcut = devShortcutsEnabledForHost(
+    requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host")
+  );
   const databaseReady = await checkDatabaseConnection();
 
   if (!databaseReady) {
@@ -78,6 +84,7 @@ export default async function NutritionQuizPage({
         prefillAnswers={prefill?.answers ?? null}
         returningHealthScore={prefill?.healthScore ?? null}
         returningPlanId={prefill?.planId ?? undefined}
+        showDevShortcut={showDevShortcut}
       />
       <SiteFooter content={dictionary.footer} locale={locale} />
     </main>

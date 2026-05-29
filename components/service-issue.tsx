@@ -14,6 +14,13 @@ const content = {
     cta: "ลองอีกครั้ง",
     eyebrow: "ระบบขัดข้องชั่วคราว",
     title: "เราจะกลับมาให้บริการในไม่ช้า"
+  },
+  "zh-CN": {
+    body:
+      "MattaNutra 系统暂时无法连接。团队已经收到通知，正在处理。",
+    cta: "重试",
+    eyebrow: "临时服务问题",
+    title: "我们很快回来"
   }
 } as const;
 

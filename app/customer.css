@@ -60,6 +60,17 @@
       sans-serif;
   }
 
+  :lang(zh-CN) .mn-customer-shell {
+    font-family:
+      "Noto Sans SC",
+      "PingFang SC",
+      "Microsoft YaHei",
+      var(--mn-font-body),
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
+  }
+
   .mn-customer-shell h1,
   .mn-customer-shell h2,
   .mn-customer-shell h3,
@@ -85,6 +96,29 @@
       sans-serif !important;
     font-style: normal !important;
     line-height: 1.35;
+  }
+
+  :lang(zh-CN) .mn-customer-shell h1,
+  :lang(zh-CN) .mn-customer-shell h2,
+  :lang(zh-CN) .mn-customer-shell h3,
+  :lang(zh-CN) .mn-customer-shell h4,
+  :lang(zh-CN) .mn-customer-shell .font-serif,
+  :lang(zh-CN) .mn-customer-shell [class*="uppercase"],
+  :lang(zh-CN) .mn-customer-shell [class*="tracking-"] {
+    font-family:
+      "Noto Sans SC",
+      "PingFang SC",
+      "Microsoft YaHei",
+      var(--mn-font-body),
+      ui-sans-serif,
+      system-ui,
+      sans-serif !important;
+    font-style: normal !important;
+    letter-spacing: 0 !important;
+    line-height: 1.22;
+    text-transform: none !important;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
   }
 
   .mn-customer-shell code,
@@ -3601,6 +3635,7 @@
   .mn-customer-shell .mn-titlebar-mobile-actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.75rem;
     padding: 1rem;
   }

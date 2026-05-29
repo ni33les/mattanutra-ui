@@ -1,6 +1,6 @@
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { CanonicalSupplementOption } from "@/lib/canonical-supplements";
-import { defaultLocale, type Locale } from "@/lib/i18n";
+import { type Locale } from "@/lib/i18n";
 import type {
   FoodGuidanceBlueprint,
   FormulationBlueprint,
@@ -188,8 +188,6 @@ function userPrompt({
   | "previousFormulation"
   | "planId"
 >) {
-  const requiredOutputLocales = [...new Set([defaultLocale, locale])];
-
   return JSON.stringify(
     {
       assessment: answers,
@@ -221,65 +219,38 @@ function userPrompt({
           {
             category:
               "Foundation | Foundation add-on | Add separately | Targeted | Review",
-            dailyDose: {
-              en: "short English daily dose string, e.g. 200 mg/day",
-              th: "short Thai daily dose string, e.g. 200 mg/day"
-            },
+            dailyDose: "short daily dose string in the requested display locale, e.g. 200 mg/day",
             effectivenessRank:
               "integer starting at 1; 1 is the most effective/highest-impact suggestion for this person",
             id: "stable kebab-case identifier",
-            rationale: {
-              en: "one English sentence explaining the wellness benefit in plain language",
-              th: "one Thai sentence explaining the wellness benefit in plain language"
-            },
+            rationale: "one sentence explaining the wellness benefit in the requested display locale",
             cautions: [
               {
-                body: {
-                  en: "specific English caution tied to the assessment context",
-                  th: "specific Thai caution tied to the assessment context"
-                },
+                body: "specific caution tied to the assessment context in the requested display locale",
                 id: "stable kebab-case identifier",
                 relatedAnswerKeys: ["medTypes", "kidney"],
                 severity: "caution | info | review",
-                title: {
-                  en: "short English caution title",
-                  th: "short Thai caution title"
-                }
+                title: "short caution title in the requested display locale"
               }
             ],
             status: "covered | add | review",
-            supplement: {
-              en: "English supplement name",
-              th: "Thai supplement name"
-            }
+            supplement: "supplement name in the requested display locale"
           }
         ],
         cautions: [
           {
-            body: {
-              en: "plan-level English caution tied to medication, pregnancy, kidney/liver, surgery, antibiotics, allergies, or uncertainty",
-              th: "plan-level Thai caution tied to medication, pregnancy, kidney/liver, surgery, antibiotics, allergies, or uncertainty"
-            },
+            body: "plan-level caution tied to medication, pregnancy, kidney/liver, surgery, antibiotics, allergies, or uncertainty in the requested display locale",
             id: "stable kebab-case identifier",
             relatedAnswerKeys: ["meds", "reproStatus"],
             severity: "caution | info | review",
-            title: {
-              en: "short English caution title",
-              th: "short Thai caution title"
-            }
+            title: "short caution title in the requested display locale"
           }
         ],
         marketingPoints: [
           {
-            body: {
-              en: "one English sentence explaining the personalized value of the plan without medical claims",
-              th: "one Thai sentence explaining the personalized value of the plan without medical claims"
-            },
+            body: "one sentence explaining the personalized value of the plan without medical claims in the requested display locale",
             id: "stable kebab-case identifier",
-            title: {
-              en: "short English title",
-              th: "short Thai title"
-            }
+            title: "short title in the requested display locale"
           }
         ]
       },
@@ -292,7 +263,7 @@ function userPrompt({
         "Every caution must be an object with id, severity, body, optional title, and optional relatedAnswerKeys.",
         "Use cautions for medication, pregnancy, breastfeeding, trying-to-conceive, kidney, liver, surgery, antibiotics, allergy, supplement sensitivity, lab, or uncertainty context.",
         "Do not use warning terminology or output warning-named keys. The user-facing term is caution.",
-        `marketingPoints title and body must each be localized objects including these locale keys: ${requiredOutputLocales.join(", ")}.`,
+        "marketingPoints title and body must each be plain strings in the requested display locale.",
         "Marketing copy must be truthful, benefit-led, and calm. Do not invent discounts, urgency, guarantees, cures, diagnosis, treatment claims, or product availability.",
         "Use marketingPoints to explain why the full bespoke plan is more useful than the free preview: for example prioritization, dose checks, cautions, and food-plus-supplement fit.",
         "When currentPlanContext.planFeedback is present, treat it as client-stated preferences and constraints for this new version.",
@@ -308,17 +279,17 @@ function userPrompt({
         "Every item must include id, category, supplement, dailyDose, effectivenessRank, status, and rationale.",
         "Set effectivenessRank as a unique integer from 1 to the number of items, where 1 is the most effective/highest-impact supplement suggestion for this person's assessment.",
         "Order supplementBreakdown by effectivenessRank ascending.",
-        `supplement, dailyDose, and rationale must each be localized objects including these locale keys: ${requiredOutputLocales.join(", ")}.`,
+        "supplement, dailyDose, and rationale must each be plain strings in the requested display locale.",
         "Keep dailyDose machine-readable: start with one numeric amount and one unit, using mg/day, mcg/day, g/day, or IU/day whenever possible.",
         "Avoid capsule counts, serving sizes, proprietary-blend doses, vague ranges, or multiple units in dailyDose. If uncertain, use a conservative numeric dose and set status=review.",
-        "Write the English fields for a consumer wellness audience, and the Thai fields as natural Thai, not transliterated English unless the ingredient name is normally used that way.",
+        "Write user-facing fields naturally in the requested display locale, not transliterated English unless the ingredient name is normally used that way.",
         "Keep category and status as canonical English values for internal processing.",
         "Use status=review for anything that should be checked before use because of medication, pregnancy, breastfeeding, condition, or uncertainty, and add a linked caution.",
         "Keep rationales benefit-focused, for example: Supports skin, joint, and active lifestyle goals.",
-        "Return English plus the requested locale. Include other locale keys only when they are useful and complete."
+        "Return only the requested display locale for user-facing prose. Do not return parallel English/Thai/Chinese copies."
       ],
       locale,
-      requiredOutputLocales,
+      outputLocaleMode: "single_display_locale",
       plan,
       planId
     },
@@ -333,8 +304,8 @@ function retryPrompt(errors: string[]) {
     "Return corrected JSON only, matching the required contract.",
     "Do not include markdown or prose.",
     "Every supplementBreakdown item must be a JSON object, not a string.",
-    "marketingPoints must contain 3 localized objects with id, title, and body.",
-    "cautions must be an array of localized caution objects.",
+    "marketingPoints must contain 3 objects with id, title, and body in the requested display locale.",
+    "cautions must be an array of caution objects in the requested display locale.",
     "Every item must include a unique integer effectivenessRank where 1 is highest impact.",
     "If a field is uncertain, set status to review and still return valid JSON.",
     "Validation errors:",
@@ -428,10 +399,7 @@ function readLocalizedTextAt(
   const value = record[key];
 
   if (typeof value === "string" && value.trim()) {
-    errors.push(
-      `${path}.${key} must be an object with localized string values, not a plain string`
-    );
-    return {};
+    return value.trim();
   }
 
   if (!isRecord(value)) {

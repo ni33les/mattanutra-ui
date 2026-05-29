@@ -3,6 +3,7 @@ import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import type { SupplementConfidence } from "@/lib/admin-supplements";
 import { suggestSupplementDose } from "@/lib/supplement-dose-suggestion";
 import { normalizeSupplementSafetyFlags } from "@/lib/supplement-safety-flags";
+import { isLocale, type Locale } from "@/lib/i18n";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,10 @@ function confidenceOrNull(value: unknown): SupplementConfidence | null {
   return value === "high" || value === "moderate" || value === "low"
     ? value
     : null;
+}
+
+function localeValue(value: unknown): Locale {
+  return typeof value === "string" && isLocale(value) ? value : "en";
 }
 
 export async function POST(request: Request) {
@@ -73,6 +78,7 @@ export async function POST(request: Request) {
       currentMaxAmount: numberOrNull(body.currentMaxAmount),
       currentMaxUnit: textOrNull(body.currentMaxUnit),
       listStatus: textOrNull(body.listStatus),
+      locale: localeValue(body.locale),
       primaryUseCase: textOrNull(body.primaryUseCase),
       safetyFlags: normalizeSupplementSafetyFlags(body.safetyFlags),
       safetyNotes: textOrNull(body.safetyNotes),

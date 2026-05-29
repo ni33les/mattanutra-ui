@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import postgres from "postgres";
 import { managedFoodSeeds } from "@/lib/managed-foods";
+import { publicLocales } from "@/lib/i18n";
 
 const connection = process.env.DB_CONNECTION;
 
@@ -47,7 +48,7 @@ try {
       where normalized_name = ${food.normalizedName}
     `;
 
-    for (const locale of ["en", "th"] as const) {
+    for (const locale of publicLocales) {
       await sql`
         insert into public.food_translations (
           food_id,

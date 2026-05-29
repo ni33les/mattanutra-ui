@@ -42,6 +42,26 @@ const countryLabels: Record<Locale, Record<string, string>> = {
     TH: "ประเทศไทย",
     US: "สหรัฐอเมริกา",
     VN: "เวียดนาม"
+  },
+  "zh-CN": {
+    AU: "澳大利亚",
+    CA: "加拿大",
+    CN: "中国",
+    DE: "德国",
+    FR: "法国",
+    GB: "英国",
+    ID: "印度尼西亚",
+    IN: "印度",
+    JP: "日本",
+    KR: "韩国",
+    MM: "缅甸",
+    MY: "马来西亚",
+    OTHER: "其他",
+    PH: "菲律宾",
+    SG: "新加坡",
+    TH: "泰国",
+    US: "美国",
+    VN: "越南"
   }
 };
 
@@ -65,6 +85,16 @@ const answerLabels: Record<Locale, Record<string, string>> = {
     male: "ชาย",
     sleep: "การนอน",
     statin: "สแตติน"
+  },
+  "zh-CN": {
+    energy: "精力",
+    fatigue: "疲劳",
+    female: "女性",
+    fitness: "健身",
+    focus: "专注",
+    male: "男性",
+    sleep: "睡眠",
+    statin: "他汀"
   }
 };
 
@@ -76,6 +106,10 @@ const planLabels = {
   th: {
     precision: "ความแม่นยำ",
     pro: "โปร"
+  },
+  "zh-CN": {
+    precision: "精准",
+    pro: "专业"
   }
 } satisfies Record<Locale, Record<AssessmentPlan, string>>;
 
@@ -107,6 +141,20 @@ const summaryCopy = {
     labelMedication: "ใช้ยาเป็นประจำ",
     labelSurgery: "มีการผ่าตัดเร็ว ๆ นี้",
     reviewLabels: "ตรวจฉลากเพื่อดูสารก่อแพ้และความไวต่อส่วนผสม"
+  },
+  "zh-CN": {
+    fallbackGoals: "整体健康",
+    fallbackProfile: "未显示性别 / 未显示身高 / 未显示体重",
+    labelAntibiotics: "近期使用过抗生素",
+    labelKidney(value: string) {
+      return `肾脏：${humanize(value)}`;
+    },
+    labelLiver(value: string) {
+      return `肝脏：${humanize(value)}`;
+    },
+    labelMedication: "有规律用药",
+    labelSurgery: "近期有手术安排",
+    reviewLabels: "检查标签中的过敏原和敏感成分"
   }
 } satisfies Record<Locale, {
   fallbackGoals: string;

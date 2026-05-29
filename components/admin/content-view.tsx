@@ -19,7 +19,12 @@ import type {
   AdminContentInventoryRow,
   AdminContentWorkflowStatus
 } from "@/lib/admin-query-data";
-import type { Locale } from "@/lib/i18n";
+import {
+  isLocale,
+  localeLabels,
+  publicLocales,
+  type Locale
+} from "@/lib/i18n";
 import type {
   AdminContent,
   AdminDashboardView,
@@ -84,6 +89,10 @@ function contentMatchesMetric(
     return row.locale === "th";
   }
 
+  if (metricId === "contentLocaleZh") {
+    return row.locale === "zh-CN";
+  }
+
   if (metricId === "contentDeleted") {
     return row.workflowStatus === "deleted";
   }
@@ -103,12 +112,17 @@ function contentMatchesMetric(
   return true;
 }
 
-function contentTypeLabel(type: AdminContentInventoryRow["contentType"]) {
-  return type === "blog_post" ? "Blog post" : "Testimonial";
+function contentTypeLabel(
+  labels: AdminContent,
+  type: AdminContentInventoryRow["contentType"]
+) {
+  return type === "blog_post"
+    ? labels.contentPages.blogPosts
+    : labels.contentPages.testimonials;
 }
 
 function formatLocalePillLabel(locale: string) {
-  return locale.trim().toUpperCase();
+  return isLocale(locale) ? localeLabels[locale] : locale.trim().toUpperCase();
 }
 
 function contentTranslationLocales(row: AdminContentInventoryRow) {
@@ -179,7 +193,8 @@ export function contentTypeForView(
 }
 
 function contentHref(row: AdminContentInventoryRow, accessToken: string) {
-  const locale = row.locale === "th" ? "th" : "en";
+  const locale =
+    row.locale === "th" ? "th" : row.locale === "zh-CN" ? "zh-CN" : "en";
 
   if (
     row.contentType === "blog_post" &&
@@ -217,7 +232,7 @@ function imageAltFromFileName(value: string) {
 }
 
 function formLocale(value?: string | null): Locale {
-  return value === "th" ? "th" : "en";
+  return isLocale(value) ? value : "en";
 }
 
 function contentEditorForm(editor: NonNullable<ContentEditorState>): ContentEditorForm {
@@ -289,6 +304,10 @@ export function AdminContentView({
         counts.th += 1;
       }
 
+      if (row.locale === "zh-CN") {
+        counts.zh += 1;
+      }
+
       counts[row.workflowStatus] += 1;
 
       return counts;
@@ -303,7 +322,8 @@ export function AdminContentView({
       scheduled: 0,
       testimonials: 0,
       th: 0,
-      total: 0
+      total: 0,
+      zh: 0
     }
   );
   const filteredRows = rows.filter((row) =>
@@ -330,6 +350,13 @@ export function AdminContentView({
       label: labels.contentPages.en,
       series: [],
       value: formatNumber(summary.en, locale)
+    },
+    {
+      color: businessMetricColors.total,
+      id: "contentLocaleZh",
+      label: labels.contentPages.zh,
+      series: [],
+      value: formatNumber(summary.zh, locale)
     },
     {
       color: businessMetricColors.contentPublished,
@@ -675,7 +702,7 @@ function ContentCard({
                   {contentWorkflowStatusLabel(labels, row.workflowStatus)}
                 </span>
                 <span className="inline-flex rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                  {contentTypeLabel(row.contentType)}
+                  {contentTypeLabel(labels, row.contentType)}
                 </span>
                 {contentTranslationLocales(row).map((translationLocale) => (
                   <span
@@ -1019,8 +1046,11 @@ function ContentEditorModal({
                     }
                     value={form.locale}
                   >
-                    <option value="en">EN</option>
-                    <option value="th">TH</option>
+                    {publicLocales.map((localeCode) => (
+                      <option key={localeCode} value={localeCode}>
+                        {localeLabels[localeCode]}
+                      </option>
+                    ))}
                   </Select>
                   <ChevronDownSolidIcon
                     aria-hidden="true"

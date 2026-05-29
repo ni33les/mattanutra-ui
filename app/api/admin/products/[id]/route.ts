@@ -222,6 +222,9 @@ export async function PATCH(
       descriptionTh: body.descriptionTh === undefined
         ? undefined
         : textOrNull(body.descriptionTh, 4000),
+      descriptionZhCn: body.descriptionZhCn === undefined
+        ? undefined
+        : textOrNull(body.descriptionZhCn, 4000),
       fdaApprovalNumber: body.fdaApprovalNumber === undefined
         ? undefined
         : textOrNull(body.fdaApprovalNumber),
@@ -240,6 +243,7 @@ export async function PATCH(
       title,
       titleEn: body.titleEn === undefined ? undefined : textOrNull(body.titleEn, 500),
       titleTh: body.titleTh === undefined ? undefined : textOrNull(body.titleTh, 500),
+      titleZhCn: body.titleZhCn === undefined ? undefined : textOrNull(body.titleZhCn, 500),
       translations: translationsFromBody(body.translations)
     });
     const rows = body.manufacturerCountryCodes !== undefined && row.brandId

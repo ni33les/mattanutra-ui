@@ -147,7 +147,15 @@ export function useLiveAdminData<T>({
 }
 
 export function formatLocale(locale: Locale) {
-  return locale === "th" ? "th-TH-u-nu-latn" : "en-GB";
+  if (locale === "th") {
+    return "th-TH-u-nu-latn";
+  }
+
+  if (locale === "zh-CN") {
+    return "zh-CN";
+  }
+
+  return "en-GB";
 }
 
 export function formatGeneratedAt(value: string, locale: Locale) {
@@ -824,22 +832,22 @@ export function PlanIdLink({
 
 export function taskValueLabel(value: number, locale: Locale) {
   if (value >= 500) {
-    return locale === "th" ? "วิกฤต" : "Critical";
+    return locale === "th" ? "วิกฤต" : locale === "zh-CN" ? "严重" : "Critical";
   }
 
   if (value >= 400) {
-    return locale === "th" ? "สูง" : "High";
+    return locale === "th" ? "สูง" : locale === "zh-CN" ? "高" : "High";
   }
 
   if (value >= 300) {
-    return locale === "th" ? "เร่งด่วน" : "Expedited";
+    return locale === "th" ? "เร่งด่วน" : locale === "zh-CN" ? "加急" : "Expedited";
   }
 
   if (value >= 200) {
-    return locale === "th" ? "ปกติ" : "Normal";
+    return locale === "th" ? "ปกติ" : locale === "zh-CN" ? "正常" : "Normal";
   }
 
-  return locale === "th" ? "ต่ำ" : "Low";
+  return locale === "th" ? "ต่ำ" : locale === "zh-CN" ? "低" : "Low";
 }
 
 export function taskValueClass(value: number) {

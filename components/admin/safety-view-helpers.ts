@@ -57,6 +57,42 @@ export function foodAdminLabels(locale: Locale) {
     };
   }
 
+  if (locale === "zh-CN") {
+    return {
+      allCategories: "所有类别",
+      allStatuses: "所有状态",
+      aliases: "别名",
+      allergenFlags: "过敏原标记",
+      benefits: "益处",
+      blacklisted: "黑名单",
+      category: "类别",
+      close: "关闭",
+      conditionFlags: "安全条件",
+      confidence: "置信度",
+      defaultServing: "默认份量",
+      details: "详情",
+      empty: "没有符合筛选条件的食物。",
+      grams: "克",
+      image: "图片",
+      imageAlt: "图片替代文本",
+      imagePath: "图片文件",
+      imageSource: "图片来源",
+      inactive: "未启用",
+      nutrientProfile: "每 100 克营养信息",
+      nutrients: "营养素",
+      primaryUseCase: "主要用途",
+      reviewRequired: "需要审核",
+      safetyNotes: "安全说明",
+      save: "保存",
+      search: "搜索食物",
+      status: "状态",
+      translations: "翻译",
+      total: "总计",
+      updateError: "无法保存此食物。",
+      whitelisted: "已允许"
+    };
+  }
+
   return {
     allCategories: "All categories",
     allStatuses: "All statuses",
@@ -215,6 +251,8 @@ export function formatFoodTags(
     ? tags.map(foodTagLabel).join(", ")
     : labels.safetyNotes === "Safety notes"
       ? "None"
+      : labels.safetyNotes === "安全说明"
+        ? "无"
       : "ไม่มี";
 }
 
@@ -256,6 +294,8 @@ export function formatFoodFlags(
     ? flags.map((flag) => readableToken(flag)).join(", ")
     : labels.safetyNotes === "Safety notes"
       ? "None"
+      : labels.safetyNotes === "安全说明"
+        ? "无"
       : "ไม่มี";
 }
 

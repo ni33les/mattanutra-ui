@@ -101,12 +101,15 @@ describe("plan reveal V3 migration", () => {
     assert.match(nutritionPaths, /\/nutrition\/reveal/);
     assert.doesNotMatch(nutritionPaths, new RegExp(`nutritionRef${"ine"}Path`));
     assert.match(revealPage, /NutritionRevealPage/);
+    assert.match(revealPage, /redirect\(nutritionQuizPath\(locale\)\)/);
     assert.match(legacyRedirectPage, /redirect\(nutritionRevealPath\(locale, planId\)\)/);
+    assert.match(legacyRedirectPage, /redirect\(nutritionQuizPath\(locale\)\)/);
     assert.doesNotMatch(legacyRedirectPage, /getStoredFormulationResult/);
     assert.match(assessmentFlow, /nutritionRevealPath/);
     assert.match(siteUrl, /nutritionRevealPath/);
     assert.match(stripePayments, /nutritionRevealPath/);
     assert.match(assessmentResultsRedirect, /nutritionRevealPath/);
+    assert.match(assessmentResultsRedirect, /redirect\(nutritionQuizPath\(locale\)\)/);
     assert.match(titleBar, /nutrition\/reveal/);
     assert.match(bpmTracker, /nutrition\\\/reveal/);
     assert.doesNotMatch(assessmentFlow, stalePaidRoute);
@@ -116,13 +119,14 @@ describe("plan reveal V3 migration", () => {
     assert.doesNotMatch(titleBar, stalePaidRoute);
   });
 
-  it("defines every AI-personalized reveal page slot with EN/TH copy", () => {
+  it("defines every AI-personalized reveal page slot with locale-scalable copy", () => {
     for (const slot of revealSlots) {
       assert.match(formulationTypes, new RegExp(`"${slot}"`), slot);
     }
 
     assert.match(formulationTypes, /revealPageCopy\?: RevealPageCopy/);
-    assert.match(formulationTypes, /Readonly<Record<"en" \| "th", string>>/);
+    assert.match(formulationTypes, /LocalizedText = string \| Partial<Record<LocaleCode, string>>/);
+    assert.match(formulationTypes, /RevealPageCopySlot,[\s\S]*LocalizedText/);
     assert.match(nutritionAdvisor, /revealPageCopy is copy-only/);
     assert.match(nutritionAdvisor, /Do not include scores, counts, doses, product names/);
   });

@@ -19,7 +19,7 @@ import {
   buildExampleEmailHtml,
   buildExampleEmailSubject
 } from "@/lib/example-email";
-import { isLocale, type Locale } from "@/lib/i18n";
+import { isLocale, publicLocales, type Locale } from "@/lib/i18n";
 import {
   getProductRecommendationCandidates
 } from "@/lib/admin-products";
@@ -528,7 +528,7 @@ async function buildFoodGuidanceWorkItem(task: TaskRecord) {
 
 function localizedFoodTranslation(
   translations: Record<string, unknown>,
-  locale: "en" | "th",
+  locale: Locale,
   fallback: Readonly<{
     category: string;
     imageAlt: string;
@@ -581,13 +581,13 @@ async function loadManagedFoodCatalog(
             'primaryUseCase', food_translations.primary_use_case,
             'imageAlt', food_translations.image_alt
           )
-        ) filter (where food_translations.locale in ('en', 'th')),
+        ) filter (where food_translations.locale = any(${publicLocales}::text[])),
         '{}'::jsonb
       ) as translations
     from public.foods
     left join public.food_translations
       on food_translations.food_id = foods.id
-      and food_translations.locale in ('en', 'th')
+      and food_translations.locale = any(${publicLocales}::text[])
       and food_translations.status = 'complete'
     where foods.is_active = true
       and foods.list_status = 'whitelisted'
@@ -610,8 +610,9 @@ async function loadManagedFoodCatalog(
     };
     const en = localizedFoodTranslation(translations, "en", fallback);
     const th = localizedFoodTranslation(translations, "th", fallback);
+    const zhCn = localizedFoodTranslation(translations, "zh-CN", fallback);
 
-    if (!en.name || !th.name || !en.imageAlt || !th.imageAlt) {
+    if (!en.name || !th.name || !zhCn.name || !en.imageAlt || !th.imageAlt || !zhCn.imageAlt) {
       return [];
     }
 
@@ -623,7 +624,7 @@ async function loadManagedFoodCatalog(
       normalizedName: row.normalized_name,
       nutrientTags: row.nutrient_tags ?? [],
       primaryUseCase: row.primary_use_case,
-      translations: { en, th }
+      translations: { en, th, "zh-CN": zhCn }
     }];
   });
 }

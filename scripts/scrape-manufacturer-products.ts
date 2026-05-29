@@ -102,6 +102,11 @@ type ScrapedManufacturerProduct = Readonly<{
   skipReason?: string | null;
   titleEn: string | null;
   titleTh: string | null;
+  translations?: Record<string, {
+    description?: string | null;
+    status?: "complete" | "draft" | "missing";
+    title?: string | null;
+  }>;
   rawSnapshot: Record<string, unknown>;
   sourceUrl: string;
 }>;
@@ -2314,7 +2319,7 @@ async function translateProductCopyForImport(
   console.log(`[copy] ${index}/${total} ${product.productTitle}`);
 
   try {
-    const copy = await translateDraftProductCopyWithAi({
+    const enCopy = await translateDraftProductCopyWithAi({
       brandName: product.brandName,
       description: product.description,
       descriptionEn: product.descriptionEn,
@@ -2323,29 +2328,101 @@ async function translateProductCopyForImport(
       productTitleEn: product.titleEn,
       productTitleTh: product.titleTh,
       productUrl: product.sourceUrl,
-      sourceSnapshot: product.rawSnapshot
+      sourceSnapshot: product.rawSnapshot,
+      targetLocale: "en"
     });
+    const thCopy = await translateDraftProductCopyWithAi({
+      brandName: product.brandName,
+      description: product.description,
+      descriptionEn: enCopy.description ?? product.descriptionEn,
+      descriptionTh: product.descriptionTh,
+      productTitle: product.productTitle,
+      productTitleEn: enCopy.title ?? product.titleEn,
+      productTitleTh: product.titleTh,
+      productUrl: product.sourceUrl,
+      sourceSnapshot: product.rawSnapshot,
+      targetLocale: "th"
+    });
+    const zhCopy = await translateDraftProductCopyWithAi({
+      brandName: product.brandName,
+      description: product.description,
+      descriptionEn: enCopy.description ?? product.descriptionEn,
+      descriptionTh: thCopy.description ?? product.descriptionTh,
+      productTitle: product.productTitle,
+      productTitleEn: enCopy.title ?? product.titleEn,
+      productTitleTh: thCopy.title ?? product.titleTh,
+      productUrl: product.sourceUrl,
+      sourceSnapshot: product.rawSnapshot,
+      targetLocale: "zh-CN"
+    });
+    const titleEn = enCopy.title ?? product.titleEn;
+    const descriptionEn = enCopy.description ?? product.descriptionEn;
+    const titleTh = thCopy.title ?? product.titleTh;
+    const descriptionTh = thCopy.description ?? product.descriptionTh;
+    const zhTitle = zhCopy.title;
+    const zhDescription = zhCopy.description;
 
     return {
       failed: false,
       product: {
         ...product,
-        descriptionEn: copy.descriptionEn ?? product.descriptionEn,
-        descriptionTh: copy.descriptionTh ?? product.descriptionTh,
+        descriptionEn,
+        descriptionTh,
         rawSnapshot: {
           ...product.rawSnapshot,
           aiCopyTranslation: {
-            descriptionEn: copy.descriptionEn,
-            descriptionTh: copy.descriptionTh,
-            notes: copy.notes,
-            responseId: copy.responseId ?? null,
-            titleEn: copy.titleEn,
-            titleTh: copy.titleTh,
+            en: {
+              description: descriptionEn,
+              notes: enCopy.notes,
+              responseId: enCopy.responseId ?? null,
+              title: titleEn
+            },
+            th: {
+              description: descriptionTh,
+              notes: thCopy.notes,
+              responseId: thCopy.responseId ?? null,
+              title: titleTh
+            },
+            "zh-CN": {
+              description: zhDescription,
+              notes: zhCopy.notes,
+              responseId: zhCopy.responseId ?? null,
+              title: zhTitle
+            },
+            descriptionEn,
+            descriptionTh,
+            notes: [enCopy.notes, thCopy.notes, zhCopy.notes].filter(Boolean).join(" | ") || null,
+            outputLocaleMode: "single_display_locale",
+            responseIds: {
+              en: enCopy.responseId ?? null,
+              th: thCopy.responseId ?? null,
+              "zh-CN": zhCopy.responseId ?? null
+            },
+            titleEn,
+            titleTh,
             translatedAt: new Date().toISOString()
           }
         },
-        titleEn: copy.titleEn ?? product.titleEn,
-        titleTh: copy.titleTh ?? product.titleTh
+        translations: {
+          ...(product.translations ?? {}),
+          en: {
+            description: descriptionEn,
+            status: titleEn && descriptionEn ? "complete" : "draft",
+            title: titleEn
+          },
+          th: {
+            description: descriptionTh,
+            status: titleTh && descriptionTh ? "complete" : "draft",
+            title: titleTh
+          },
+          "zh-CN": {
+            description: zhDescription,
+            status: zhTitle && zhDescription ? "complete" : zhTitle || zhDescription ? "draft" : "missing",
+            title: zhTitle
+          }
+        },
+        titleEn,
+        titleTh
       },
       translated: true
     };
@@ -2871,8 +2948,25 @@ async function enrichQualityProduct(
             notes: enrichment.notes,
             productAudience: enrichment.productAudience,
             responseId: enrichment.responseId ?? null,
+            titleZhCn: enrichment.titleZhCn,
+            descriptionZhCn: enrichment.descriptionZhCn,
             warnings: enrichment.warnings
           }
+        },
+        translations: {
+          ...(product.translations ?? {}),
+          ...(enrichment.titleZhCn || enrichment.descriptionZhCn
+            ? {
+                "zh-CN": {
+                  description: enrichment.descriptionZhCn,
+                  status:
+                    enrichment.titleZhCn && enrichment.descriptionZhCn
+                      ? "complete" as const
+                      : "draft" as const,
+                  title: enrichment.titleZhCn
+                }
+              }
+            : {})
         },
         titleEn: enrichment.titleEn ?? product.titleEn,
         titleTh: enrichment.titleTh ?? product.titleTh
@@ -3140,6 +3234,29 @@ function applyQualityCache(
       rawSnapshot: {
         ...product.rawSnapshot,
         qualityEnrichment: cachedEnrichment
+      },
+      translations: {
+        ...(product.translations ?? {}),
+        ...(typeof cachedEnrichment.titleZhCn === "string" ||
+        typeof cachedEnrichment.descriptionZhCn === "string"
+          ? {
+              "zh-CN": {
+                description:
+                  typeof cachedEnrichment.descriptionZhCn === "string"
+                    ? cachedEnrichment.descriptionZhCn
+                    : null,
+                status:
+                  typeof cachedEnrichment.titleZhCn === "string" &&
+                  typeof cachedEnrichment.descriptionZhCn === "string"
+                    ? "complete" as const
+                    : "draft" as const,
+                title:
+                  typeof cachedEnrichment.titleZhCn === "string"
+                    ? cachedEnrichment.titleZhCn
+                    : null
+              }
+            }
+          : {})
       },
       titleEn: cached.titleEn ?? product.titleEn,
       titleTh: cached.titleTh ?? product.titleTh
@@ -3700,7 +3817,8 @@ async function main() {
           source: "manufacturer_scrape",
           sourceUrl: product.sourceUrl,
           titleEn: product.titleEn,
-          titleTh: product.titleTh
+          titleTh: product.titleTh,
+          translations: product.translations
         });
         stagedCount += 1;
         recordAppliedProduct(product);

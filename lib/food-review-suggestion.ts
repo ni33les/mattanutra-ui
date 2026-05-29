@@ -27,6 +27,11 @@ export type FoodReviewSuggestion = Readonly<{
 
 const DEFAULT_REASONING_EFFORT = "low";
 const REQUEST_TIMEOUT_MS = 90_000;
+const displayLocaleNames = {
+  en: "English",
+  th: "Thai",
+  "zh-CN": "Simplified Chinese"
+} satisfies Record<Locale, string>;
 
 function config() {
   return {
@@ -89,7 +94,8 @@ async function callGrok(input: FoodReviewSuggestionInput) {
               "Do not approve, reject, override allergies, or override safety rules.",
               "Use short practical serving sizes, ordinary food language, and conservative frequency.",
               "Avoid extreme dieting, fasting, detox language, weight-loss pressure, and medical treatment claims.",
-              "Write in the requested locale."
+              `Write serving, frequency, rationale, and reviewerNote as plain strings in ${displayLocaleNames[input.locale]} (${input.locale}).`,
+              "Return only the requested locale for prose. Do not return localized maps or parallel English/Thai/Chinese copies."
         ].join("\n"),
         role: "system"
       },
@@ -122,6 +128,8 @@ async function callGrok(input: FoodReviewSuggestionInput) {
   await recordXaiUsageCost({
     metadata: {
       foodName: input.foodName,
+      locale: input.locale,
+      outputLocaleMode: "single_display_locale",
       reviewKind: input.reviewKind
     },
     model: completion.model ?? grok.model,

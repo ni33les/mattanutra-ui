@@ -196,9 +196,11 @@ function normalizedTranslationEntries(input: Readonly<{
   description?: string | null;
   descriptionEn?: string | null;
   descriptionTh?: string | null;
+  descriptionZhCn?: string | null;
   title?: string | null;
   titleEn?: string | null;
   titleTh?: string | null;
+  titleZhCn?: string | null;
   translations?: CreateAdminProductInput["translations"] | UpdateAdminProductInput["translations"];
 }>) {
   const translations = new Map<string, {
@@ -231,7 +233,8 @@ function normalizedTranslationEntries(input: Readonly<{
 
   const legacy: Array<[string, string | null | undefined, string | null | undefined]> = [
     ["en", input.titleEn ?? input.title, input.descriptionEn ?? input.description],
-    ["th", input.titleTh, input.descriptionTh]
+    ["th", input.titleTh, input.descriptionTh],
+    ["zh-CN", input.titleZhCn, input.descriptionZhCn]
   ];
 
   for (const [locale, legacyTitle, legacyDescription] of legacy) {
@@ -266,10 +269,12 @@ async function replaceProductTranslations(
     description?: string | null;
     descriptionEn?: string | null;
     descriptionTh?: string | null;
+    descriptionZhCn?: string | null;
     source?: string | null;
     title?: string | null;
     titleEn?: string | null;
     titleTh?: string | null;
+    titleZhCn?: string | null;
     translations?: CreateAdminProductInput["translations"] | UpdateAdminProductInput["translations"];
   }>
 ) {
@@ -1018,12 +1023,14 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
   const rawTitle = input.title.trim();
   const titleEn = cleanNullableText(input.titleEn, 500);
   const titleTh = cleanNullableText(input.titleTh, 500);
+  const titleZhCn = cleanNullableText(input.titleZhCn, 500);
   const title = preferredProductTitle({ title: rawTitle, titleEn });
   const productUrl = input.productUrl.trim();
   const descriptionEn = cleanNullableText(input.descriptionEn, 4000);
   const descriptionTh = cleanNullableText(input.descriptionTh, 4000);
+  const descriptionZhCn = cleanNullableText(input.descriptionZhCn, 4000);
   const description = cleanNullableText(
-    input.description ?? descriptionEn ?? descriptionTh,
+    input.description ?? descriptionEn ?? descriptionTh ?? descriptionZhCn,
     4000
   );
   const sourceSnapshot = {
@@ -1031,8 +1038,10 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
     ...(rawTitle !== title ? { originalProductTitle: rawTitle } : {}),
     ...(titleEn ? { titleEn } : {}),
     ...(titleTh ? { titleTh } : {}),
+    ...(titleZhCn ? { titleZhCn } : {}),
     ...(descriptionEn ? { descriptionEn } : {}),
     ...(descriptionTh ? { descriptionTh } : {}),
+    ...(descriptionZhCn ? { descriptionZhCn } : {}),
     ...(input.translations ? { translations: input.translations } : {})
   };
 
@@ -1193,10 +1202,12 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
     description,
     descriptionEn,
     descriptionTh,
+    descriptionZhCn,
     source: input.source ?? "admin",
     title,
     titleEn,
     titleTh,
+    titleZhCn,
     translations: input.translations
   });
 
@@ -1309,6 +1320,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
   const title = input.title === undefined ? undefined : cleanNullableText(input.title, 500);
   const titleEn = input.titleEn === undefined ? undefined : cleanNullableText(input.titleEn, 500);
   const titleTh = input.titleTh === undefined ? undefined : cleanNullableText(input.titleTh, 500);
+  const titleZhCn = input.titleZhCn === undefined ? undefined : cleanNullableText(input.titleZhCn, 500);
   const brandName = input.brandName === undefined
     ? undefined
     : cleanNullableText(input.brandName, 200);
@@ -1334,12 +1346,15 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 
   const descriptionEn = cleanNullableText(input.descriptionEn, 4000);
   const descriptionTh = cleanNullableText(input.descriptionTh, 4000);
+  const descriptionZhCn = cleanNullableText(input.descriptionZhCn, 4000);
   const localizedSnapshot = {
     ...(input.sourceSnapshotPatch ?? {}),
     ...(input.titleEn !== undefined ? { titleEn } : {}),
     ...(input.titleTh !== undefined ? { titleTh } : {}),
+    ...(input.titleZhCn !== undefined ? { titleZhCn } : {}),
     ...(input.descriptionEn !== undefined ? { descriptionEn } : {}),
     ...(input.descriptionTh !== undefined ? { descriptionTh } : {}),
+    ...(input.descriptionZhCn !== undefined ? { descriptionZhCn } : {}),
     ...(input.translations !== undefined ? { translations: input.translations } : {})
   };
   let brandRows: Array<{ id: string }> = [];
@@ -1511,8 +1526,10 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
     input.translations !== undefined ||
     input.titleEn !== undefined ||
     input.titleTh !== undefined ||
+    input.titleZhCn !== undefined ||
     input.descriptionEn !== undefined ||
     input.descriptionTh !== undefined ||
+    input.descriptionZhCn !== undefined ||
     input.title !== undefined ||
     input.description !== undefined
   ) {
@@ -1520,10 +1537,12 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
       description: input.description,
       descriptionEn,
       descriptionTh,
+      descriptionZhCn,
       source: "admin",
       title,
       titleEn,
       titleTh,
+      titleZhCn,
       translations: input.translations
     });
   }
@@ -1572,6 +1591,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
         description: input.description,
         descriptionEn: input.descriptionEn,
         descriptionTh: input.descriptionTh,
+        descriptionZhCn: input.descriptionZhCn,
         facts: input.facts,
 	        factsSource: input.factsSource,
 	        fdaApprovalNumber: input.fdaApprovalNumber,
@@ -1590,6 +1610,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
         title: input.title,
         titleEn: input.titleEn,
         titleTh: input.titleTh,
+        titleZhCn: input.titleZhCn,
         translations: input.translations,
         version
       })}::jsonb

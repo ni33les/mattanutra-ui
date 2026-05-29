@@ -11,7 +11,7 @@ import type {
   ProductStackPreference
 } from "@/lib/formulation-types";
 import { foodGapSupportVersion } from "@/lib/managed-foods";
-import type { Locale } from "@/lib/i18n";
+import { publicLocales, type Locale } from "@/lib/i18n";
 
 type AnalysisAuditEvent = {
   eventType: string;
@@ -27,7 +27,7 @@ export type ManagedFoodCatalogItem = Readonly<{
   normalizedName: string;
   nutrientTags: string[];
   primaryUseCase: string | null;
-  translations: Readonly<Record<"en" | "th", {
+  translations: Readonly<Record<Locale, {
     category: string;
     imageAlt: string;
     name: string;
@@ -94,36 +94,36 @@ const placeholderCopyValues = new Set([
   "หนึ่งประโยคภาษาไทยเพื่อสุขภาวะ ไม่ใช่คำกล่าวอ้างทางการแพทย์"
 ]);
 
-const servingByFood: Record<string, Record<"en" | "th", string>> = {
-  brown_rice: { en: "1 small bowl", th: "1 ถ้วยเล็ก" },
-  chia_seeds: { en: "1 tbsp", th: "1 ช้อนโต๊ะ" },
-  chickpeas: { en: "1/2 cup cooked", th: "ถั่วสุก 1/2 ถ้วย" },
-  flaxseed: { en: "1 tbsp ground", th: "บด 1 ช้อนโต๊ะ" },
-  ginger_tea: { en: "1 cup", th: "1 ถ้วย" },
-  green_tea: { en: "1 cup", th: "1 ถ้วย" },
-  holy_basil: { en: "1 handful cooked", th: "ปรุงสุก 1 กำมือ" },
-  kimchi: { en: "2-3 tbsp", th: "2-3 ช้อนโต๊ะ" },
-  lentils: { en: "1/2 cup cooked", th: "เลนทิลสุก 1/2 ถ้วย" },
-  moringa_leaves: { en: "1 small bowl cooked", th: "ปรุงสุก 1 ถ้วยเล็ก" },
-  mung_beans: { en: "1/2 cup cooked", th: "ถั่วเขียวสุก 1/2 ถ้วย" },
-  oats: { en: "1 small bowl", th: "1 ถ้วยเล็ก" },
-  papaya: { en: "1 small bowl", th: "1 ถ้วยเล็ก" },
-  pumpkin_seeds: { en: "1 small handful", th: "1 กำมือเล็ก" },
-  salmon: { en: "1 palm-sized portion", th: "1 ชิ้นขนาดฝ่ามือ" },
-  sardines: { en: "1 small tin or portion", th: "1 กระป๋องเล็กหรือ 1 ส่วน" },
-  sesame_seeds: { en: "1 tbsp", th: "1 ช้อนโต๊ะ" },
-  tofu: { en: "1 palm-sized portion", th: "1 ชิ้นขนาดฝ่ามือ" },
-  turmeric: { en: "1-2 tsp in cooking", th: "1-2 ช้อนชาในอาหาร" },
-  unsweetened_yogurt: { en: "1 small bowl", th: "1 ถ้วยเล็ก" }
+const servingByFood: Record<string, Record<Locale, string>> = {
+  brown_rice: { en: "1 small bowl", th: "1 ถ้วยเล็ก", "zh-CN": "1 小碗" },
+  chia_seeds: { en: "1 tbsp", th: "1 ช้อนโต๊ะ", "zh-CN": "1 汤匙" },
+  chickpeas: { en: "1/2 cup cooked", th: "ถั่วสุก 1/2 ถ้วย", "zh-CN": "熟鹰嘴豆 1/2 杯" },
+  flaxseed: { en: "1 tbsp ground", th: "บด 1 ช้อนโต๊ะ", "zh-CN": "研磨后 1 汤匙" },
+  ginger_tea: { en: "1 cup", th: "1 ถ้วย", "zh-CN": "1 杯" },
+  green_tea: { en: "1 cup", th: "1 ถ้วย", "zh-CN": "1 杯" },
+  holy_basil: { en: "1 handful cooked", th: "ปรุงสุก 1 กำมือ", "zh-CN": "熟食 1 小把" },
+  kimchi: { en: "2-3 tbsp", th: "2-3 ช้อนโต๊ะ", "zh-CN": "2-3 汤匙" },
+  lentils: { en: "1/2 cup cooked", th: "เลนทิลสุก 1/2 ถ้วย", "zh-CN": "熟小扁豆 1/2 杯" },
+  moringa_leaves: { en: "1 small bowl cooked", th: "ปรุงสุก 1 ถ้วยเล็ก", "zh-CN": "熟食 1 小碗" },
+  mung_beans: { en: "1/2 cup cooked", th: "ถั่วเขียวสุก 1/2 ถ้วย", "zh-CN": "熟绿豆 1/2 杯" },
+  oats: { en: "1 small bowl", th: "1 ถ้วยเล็ก", "zh-CN": "1 小碗" },
+  papaya: { en: "1 small bowl", th: "1 ถ้วยเล็ก", "zh-CN": "1 小碗" },
+  pumpkin_seeds: { en: "1 small handful", th: "1 กำมือเล็ก", "zh-CN": "1 小把" },
+  salmon: { en: "1 palm-sized portion", th: "1 ชิ้นขนาดฝ่ามือ", "zh-CN": "1 份手掌大小" },
+  sardines: { en: "1 small tin or portion", th: "1 กระป๋องเล็กหรือ 1 ส่วน", "zh-CN": "1 小罐或 1 份" },
+  sesame_seeds: { en: "1 tbsp", th: "1 ช้อนโต๊ะ", "zh-CN": "1 汤匙" },
+  tofu: { en: "1 palm-sized portion", th: "1 ชิ้นขนาดฝ่ามือ", "zh-CN": "1 份手掌大小" },
+  turmeric: { en: "1-2 tsp in cooking", th: "1-2 ช้อนชาในอาหาร", "zh-CN": "烹调中加入 1-2 茶匙" },
+  unsweetened_yogurt: { en: "1 small bowl", th: "1 ถ้วยเล็ก", "zh-CN": "1 小碗" }
 };
 
-const frequencyByFood: Record<string, Record<"en" | "th", string>> = {
-  ginger_tea: { en: "3-5 times/week", th: "3-5 ครั้งต่อสัปดาห์" },
-  green_tea: { en: "3-5 times/week", th: "3-5 ครั้งต่อสัปดาห์" },
-  kimchi: { en: "3-4 times/week", th: "3-4 ครั้งต่อสัปดาห์" },
-  salmon: { en: "1-2 times/week", th: "1-2 ครั้งต่อสัปดาห์" },
-  sardines: { en: "1-2 times/week", th: "1-2 ครั้งต่อสัปดาห์" },
-  turmeric: { en: "most cooking days", th: "ในมื้ออาหารหลายวันต่อสัปดาห์" }
+const frequencyByFood: Record<string, Record<Locale, string>> = {
+  ginger_tea: { en: "3-5 times/week", th: "3-5 ครั้งต่อสัปดาห์", "zh-CN": "每周 3-5 次" },
+  green_tea: { en: "3-5 times/week", th: "3-5 ครั้งต่อสัปดาห์", "zh-CN": "每周 3-5 次" },
+  kimchi: { en: "3-4 times/week", th: "3-4 ครั้งต่อสัปดาห์", "zh-CN": "每周 3-4 次" },
+  salmon: { en: "1-2 times/week", th: "1-2 ครั้งต่อสัปดาห์", "zh-CN": "每周 1-2 次" },
+  sardines: { en: "1-2 times/week", th: "1-2 ครั้งต่อสัปดาห์", "zh-CN": "每周 1-2 次" },
+  turmeric: { en: "most cooking days", th: "ในมื้ออาหารหลายวันต่อสัปดาห์", "zh-CN": "多数烹调日" }
 };
 
 const foodNeedRules = [
@@ -292,27 +292,36 @@ function answerTextValues(value: unknown): string[] {
 
 function localizedCopy(
   en: string,
-  th: string
-): Record<"en" | "th", string> {
-  return { en, th };
+  th: string,
+  zhCn = en
+): Record<Locale, string> {
+  return { en, th, "zh-CN": zhCn };
 }
 
-function localizedFoodName(food: ManagedFoodCatalogItem, locale: "en" | "th") {
+function localizedFoodName(food: ManagedFoodCatalogItem, locale: Locale) {
   return food.translations[locale]?.name || food.translations.en.name;
 }
 
-function localizedNeedNames(needs: readonly ProductNeedCoverage[], locale: "en" | "th") {
+function localizedNeedNames(needs: readonly ProductNeedCoverage[], locale: Locale) {
   const names = needs
     .map((need) => need.displayName.trim())
     .filter(Boolean)
     .slice(0, 2);
 
   if (names.length < 1) {
-    return locale === "th" ? "ช่องว่างของแผน" : "the remaining plan gaps";
+    return locale === "th"
+      ? "ช่องว่างของแผน"
+      : locale === "zh-CN"
+        ? "剩余计划缺口"
+        : "the remaining plan gaps";
   }
 
   if (locale === "th") {
     return names.join(" และ ");
+  }
+
+  if (locale === "zh-CN") {
+    return names.join(" 和 ");
   }
 
   return names.length === 1 ? names[0] : `${names[0]} and ${names[1]}`;
@@ -520,6 +529,7 @@ function fallbackItem(
     .slice(0, 2);
   const enName = localizedFoodName(food, "en");
   const thName = localizedFoodName(food, "th");
+  const zhName = localizedFoodName(food, "zh-CN");
   const serving =
     servingByFood[food.normalizedName] ?? localizedCopy("1 practical serving", "1 ส่วนที่รับประทานได้จริง");
   const frequency =
@@ -528,21 +538,24 @@ function fallbackItem(
   return {
     category: {
       en: food.translations.en.category || food.category,
-      th: food.translations.th.category || food.category
+      th: food.translations.th.category || food.category,
+      "zh-CN": food.translations["zh-CN"].category || food.category
     },
-    food: { en: enName, th: thName },
+    food: { en: enName, th: thName, "zh-CN": zhName },
     foodId: food.foodId,
     frequency,
     gapNeedIds: relatedGaps.map((need) => need.id),
     imageAlt: {
       en: food.translations.en.imageAlt || enName,
-      th: food.translations.th.imageAlt || thName
+      th: food.translations.th.imageAlt || thName,
+      "zh-CN": food.translations["zh-CN"].imageAlt || zhName
     },
     imagePath: food.imagePath,
     position,
     rationale: localizedCopy(
       `${enName} ${englishFoodSupportVerb(enName)} food-level support around ${localizedNeedNames(relatedGaps, "en")} without changing the product coverage math.`,
-      `${thName} ช่วยเสริมจากอาหารสำหรับ ${localizedNeedNames(relatedGaps, "th")} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`
+      `${thName} ช่วยเสริมจากอาหารสำหรับ ${localizedNeedNames(relatedGaps, "th")} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`,
+      `${zhName} 可围绕 ${localizedNeedNames(relatedGaps, "zh-CN")} 提供食物层面的支持，同时不改变产品覆盖率计算。`
     ),
     serving
   };
@@ -558,11 +571,13 @@ function fallbackVariant(
   return {
     body: localizedCopy(
       "These foods come from the managed catalogue and are selected only for supplement needs the current product stack does not fully cover.",
-      "อาหารเหล่านี้มาจากแคตตาล็อกที่จัดการไว้ และเลือกเฉพาะส่วนของสารอาหารที่ชุดผลิตภัณฑ์ยังครอบคลุมได้ไม่เต็มที่"
+      "อาหารเหล่านี้มาจากแคตตาล็อกที่จัดการไว้ และเลือกเฉพาะส่วนของสารอาหารที่ชุดผลิตภัณฑ์ยังครอบคลุมได้ไม่เต็มที่",
+      "这些食物来自托管目录，只针对当前产品组合尚未完全覆盖的补充剂需求。"
     ),
     headline: localizedCopy(
       "Food support for the remaining gaps.",
-      "อาหารเสริมแรงสำหรับช่องว่างที่เหลือ"
+      "อาหารเสริมแรงสำหรับช่องว่างที่เหลือ",
+      "用食物支持剩余缺口。"
     ),
     items: selectedFoods.map((food, index) =>
       fallbackItem(food, index + 1, gaps)
@@ -611,13 +626,13 @@ function readLocalizedObject(
   value: unknown,
   path: string,
   errors: string[]
-): Record<"en" | "th", string> {
+): Record<Locale, string> {
   if (!isRecord(value)) {
-    errors.push(`${path} must be an object with en and th strings`);
-    return { en: "", th: "" };
+    errors.push(`${path} must be an object with en, th, and zh-CN strings`);
+    return { en: "", th: "", "zh-CN": "" };
   }
 
-  const extraLocales = Object.keys(value).filter((key) => key !== "en" && key !== "th");
+  const extraLocales = Object.keys(value).filter((key) => !publicLocales.includes(key as Locale));
 
   if (extraLocales.length > 0) {
     errors.push(`${path} has unsupported locales: ${extraLocales.join(", ")}`);
@@ -625,12 +640,13 @@ function readLocalizedObject(
 
   const en = readText(value, "en");
   const th = readText(value, "th");
+  const zhCn = readText(value, "zh-CN");
 
-  if (!en || !th) {
-    errors.push(`${path} must include non-empty en and th strings`);
+  if (!en || !th || !zhCn) {
+    errors.push(`${path} must include non-empty en, th, and zh-CN strings`);
   }
 
-  for (const [locale, text] of Object.entries({ en, th })) {
+  for (const [locale, text] of Object.entries({ en, th, "zh-CN": zhCn })) {
     if (placeholderCopyValues.has(textSearch(text))) {
       errors.push(`${path}.${locale} must not copy the schema placeholder text`);
     }
@@ -644,7 +660,7 @@ function readLocalizedObject(
     }
   }
 
-  return { en, th };
+  return { en, th, "zh-CN": zhCn };
 }
 
 function validateFoodGapVariant(
@@ -657,8 +673,8 @@ function validateFoodGapVariant(
   errors: string[]
 ): FoodGapSupportVariant {
   const fallback = {
-    body: { en: "", th: "" },
-    headline: { en: "", th: "" },
+    body: { en: "", th: "", "zh-CN": "" },
+    headline: { en: "", th: "", "zh-CN": "" },
     items: []
   };
 
@@ -791,11 +807,13 @@ function validateFoodGapVariant(
       items.push({
         category: {
           en: food.translations.en.category || food.category,
-          th: food.translations.th.category || food.category
+          th: food.translations.th.category || food.category,
+          "zh-CN": food.translations["zh-CN"].category || food.category
         },
         food: {
           en: food.translations.en.name,
-          th: food.translations.th.name
+          th: food.translations.th.name,
+          "zh-CN": food.translations["zh-CN"].name
         },
         foodId,
         frequency: readLocalizedObject(
@@ -806,7 +824,8 @@ function validateFoodGapVariant(
         gapNeedIds,
         imageAlt: {
           en: food.translations.en.imageAlt || food.translations.en.name,
-          th: food.translations.th.imageAlt || food.translations.th.name
+          th: food.translations.th.imageAlt || food.translations.th.name,
+          "zh-CN": food.translations["zh-CN"].imageAlt || food.translations["zh-CN"].name
         },
         imagePath: food.imagePath,
         position,

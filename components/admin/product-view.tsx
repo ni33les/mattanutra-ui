@@ -177,7 +177,9 @@ function productBusinessStateClass(state: ProductBusinessState) {
 }
 
 function productDecisionSummary(row: AdminProductRow, locale: Locale) {
-  const formatter = new Intl.NumberFormat(locale === "th" ? "th-TH" : "en");
+  const formatter = new Intl.NumberFormat(
+    locale === "th" ? "th-TH" : locale === "zh-CN" ? "zh-CN" : "en"
+  );
   const chosen =
     row.decisionStats?.chosenPlanCount ?? row.recommendationHistory.chosenCount;
   const nearMisses = row.decisionStats?.nearMissCount ?? 0;
@@ -186,6 +188,12 @@ function productDecisionSummary(row: AdminProductRow, locale: Locale) {
     return nearMisses > 0
       ? `ถูกเลือก ${formatter.format(chosen)} ครั้ง · เกือบถูกเลือก ${formatter.format(nearMisses)}`
       : `ถูกเลือก ${formatter.format(chosen)} ครั้ง`;
+  }
+
+  if (locale === "zh-CN") {
+    return nearMisses > 0
+      ? `已选择 ${formatter.format(chosen)} 次 · 接近入选 ${formatter.format(nearMisses)} 次`
+      : `已选择 ${formatter.format(chosen)} 次`;
   }
 
   return nearMisses > 0
@@ -1496,19 +1504,23 @@ function ProductModal({
           {draft.decisionStats ? (
             <div>
               <p className="font-semibold text-gray-900">
-                {locale === "th" ? "ข้อมูลการเลือกสินค้า" : "Recommendation decisions"}
+                {locale === "th"
+                  ? "ข้อมูลการเลือกสินค้า"
+                  : locale === "zh-CN"
+                    ? "推荐决策"
+                    : "Recommendation decisions"}
               </p>
               <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <ProductInsightStat
-                  label={locale === "th" ? "ถูกเลือก" : "Chosen"}
+                  label={locale === "th" ? "ถูกเลือก" : locale === "zh-CN" ? "已选择" : "Chosen"}
                   value={draft.decisionStats.chosenPlanCount}
                 />
                 <ProductInsightStat
-                  label={locale === "th" ? "เกือบถูกเลือก" : "Near misses"}
+                  label={locale === "th" ? "เกือบถูกเลือก" : locale === "zh-CN" ? "接近入选" : "Near misses"}
                   value={draft.decisionStats.nearMissCount}
                 />
                 <ProductInsightStat
-                  label={locale === "th" ? "ไม่ผ่าน" : "Rejected"}
+                  label={locale === "th" ? "ไม่ผ่าน" : locale === "zh-CN" ? "已排除" : "Rejected"}
                   value={draft.decisionStats.rejectedCount}
                 />
               </div>

@@ -4,6 +4,7 @@ import {
   createAdminSupplement,
   isSupplementConfidence,
   isSupplementListStatus,
+  type AdminSupplementTranslationInput,
   type SupplementConfidence,
   type SupplementListStatus
 } from "@/lib/admin-supplements";
@@ -47,6 +48,40 @@ function parseConfidence(value: unknown): SupplementConfidence | null {
   const normalized = normalizedKey(value);
 
   return isSupplementConfidence(normalized) ? normalized : null;
+}
+
+function parseTranslations(value: unknown): AdminSupplementTranslationInput[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const translations: AdminSupplementTranslationInput[] = [];
+
+  for (const item of value) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        continue;
+      }
+
+      const translation = item as Record<string, unknown>;
+      const aliases = Array.isArray(translation.aliases)
+        ? translation.aliases.filter((alias): alias is string => typeof alias === "string")
+        : [];
+
+      translations.push({
+        aliases,
+        categoryLabel: textOrNull(translation.categoryLabel, 120),
+        locale: typeof translation.locale === "string" ? translation.locale : "",
+        name: textOrNull(translation.name, 200),
+        primaryUseCase: textOrNull(translation.primaryUseCase),
+        safetyNotes: textOrNull(translation.safetyNotes),
+        status:
+          translation.status === "complete" || translation.status === "missing"
+            ? translation.status
+            : "draft"
+      });
+  }
+
+  return translations;
 }
 
 function errorDetails(error: unknown) {
@@ -113,7 +148,8 @@ export async function POST(request: Request) {
       maxUnit: textOrNull(body.maxUnit, 80),
       name,
       safetyFlags: normalizeSupplementSafetyFlags(body.safetyFlags),
-      safetyNotes: textOrNull(body.safetyNotes)
+      safetyNotes: textOrNull(body.safetyNotes),
+      translations: parseTranslations(body.translations)
     });
 
     return NextResponse.json(

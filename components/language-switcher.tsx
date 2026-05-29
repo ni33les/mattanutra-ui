@@ -1,4 +1,5 @@
 import {
+  isCjkLocale,
   localeLabels,
   publicLocales,
   type Locale,
@@ -29,6 +30,9 @@ const languageSwitcherCopy = {
   },
   th: {
     aria: "ภาษา"
+  },
+  "zh-CN": {
+    aria: "语言"
   }
 } satisfies Record<Locale, { aria: string }>;
 
@@ -42,7 +46,7 @@ export function LanguageSwitcher({
   return (
     <nav
       aria-label={copy.aria}
-      className="flex items-center overflow-hidden rounded-full border border-[var(--mn-line)] bg-transparent text-[13px]"
+      className="mn-language-switcher flex items-center overflow-hidden rounded-full border border-[var(--mn-line)] bg-[var(--mn-paper)] text-[13px] shadow-sm"
     >
       {publicLocales.map((locale) => {
         const isActive = locale === currentLocale;
@@ -52,13 +56,14 @@ export function LanguageSwitcher({
         return (
           <a
             key={locale}
-            href={`/api/locale?locale=${locale}&next=${encodeURIComponent(next)}`}
+            href={next}
             aria-current={isActive ? "page" : undefined}
             className={cn(
               "px-3 py-1.5 font-[family:var(--mn-font-body)] text-xs font-semibold uppercase tracking-normal transition",
+              isCjkLocale(locale) && "normal-case tracking-normal",
               isActive
                 ? "bg-[var(--mn-ink)] text-[var(--mn-paper)] shadow-sm"
-                : "text-[var(--mn-ash)] hover:bg-[var(--mn-paper)] hover:text-[var(--mn-teal-deep)]"
+                : "text-[var(--mn-ash)] hover:bg-[var(--mn-cream)] hover:text-[var(--mn-teal-deep)]"
             )}
           >
             {label}

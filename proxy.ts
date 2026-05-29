@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { defaultLocale, isLocale, type Locale } from "@/lib/i18n";
+import {
+  defaultLocale,
+  isLocale,
+  normalizeLocaleCode,
+  type Locale
+} from "@/lib/i18n";
 import { shouldRedirectToHttps } from "@/lib/https-redirect";
 
 const publicFile = /\.(.*)$/;
@@ -15,10 +20,17 @@ function getPreferredLocale(request: NextRequest): Locale {
   const languages = request.headers
     .get("accept-language")
     ?.split(",")
-    .map((language) => language.trim().split(";")[0]?.split("-")[0])
+    .flatMap((language) => {
+      const tag = language.trim().split(";")[0];
+      const base = tag?.split("-")[0];
+
+      return [tag, base].filter(Boolean);
+    })
     .filter(Boolean);
 
-  const locale = languages?.find((language) => isLocale(language));
+  const locale = languages
+    ?.map((language) => normalizeLocaleCode(language))
+    .find((language): language is Locale => isLocale(language));
 
   return isLocale(locale) ? locale : defaultLocale;
 }
@@ -86,7 +98,6 @@ export function proxy(request: NextRequest) {
 
   if (
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/admin") ||
     pathname.startsWith("/api") ||
     publicFile.test(pathname)
   ) {

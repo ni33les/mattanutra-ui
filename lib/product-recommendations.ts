@@ -14,7 +14,7 @@ import type {
   RecommendedProduct
 } from "@/lib/formulation-types";
 import type { ValidationResult } from "@/lib/product-validation";
-import { resolveLocalizedText } from "@/lib/i18n";
+import { resolveLocalizedText, type Locale } from "@/lib/i18n";
 
 export type ProductStatus =
   | "approved"
@@ -92,6 +92,11 @@ export type ProductCandidate = Readonly<{
   productUrl: string;
   region: string;
   title: string;
+  translations?: Record<string, {
+    description?: string | null;
+    status?: string | null;
+    title?: string | null;
+  }>;
 }>;
 
 export type ProductRecommendationExclusion = Readonly<{
@@ -3830,8 +3835,14 @@ export function recommendProductStack(input: ProductRecommendationInput) {
 export function toRecommendedProduct(
   selection: ProductRecommendationSelection,
   stackCoveragePercent: number,
-  recommendationRunId?: string
+  recommendationRunId?: string,
+  locale: Locale = "en"
 ) {
+  const localizedTitle =
+    selection.product.translations?.[locale]?.title?.trim() ||
+    selection.product.translations?.en?.title?.trim() ||
+    selection.product.title;
+
   return {
     affiliate: selection.affiliate,
     covers: selection.coveredNeeds.map((need) => need.sourceId),
@@ -3839,7 +3850,7 @@ export function toRecommendedProduct(
     id: selection.product.id,
     imageUrl: selection.product.imageUrl ?? null,
     marketplace: marketplaceName(selection.product.platform),
-    name: selection.product.title,
+    name: localizedTitle,
     price:
       selection.product.priceAmount && selection.product.priceAmount > 0
         ? {

@@ -784,63 +784,84 @@ function agentStatusClass(status: string) {
 
 function agentDescription(row: AdminAgentRow, locale: Locale) {
   const thai = locale === "th";
+  const chinese = locale === "zh-CN";
 
   if (row.name === "Product Matcher") {
     return thai
       ? "ตัวทำงานแบบ deterministic สำหรับจับคู่แผนโภชนาการกับสินค้าที่อนุมัติแล้ว โดยใช้ full-beam matcher"
+      : chinese
+        ? "确定性产品推荐 worker，使用 full-beam matcher 将营养计划匹配到已批准目录产品。"
       : "Deterministic product recommendation worker. Matches nutrition plans to approved catalogue products using the full-beam matcher.";
   }
 
   if (row.name === "Nutrition Plan Formulator") {
     return thai
       ? "สร้างคำแนะนำอาหารเสริมจาก HealthScore และบริบทของลูกค้า"
+      : chinese
+        ? "根据 HealthScore 和客户背景生成补充剂指导。"
       : "Builds supplement guidance from the HealthScore and client context.";
   }
 
   if (row.name === "HealthScore Engine") {
     return thai
       ? "วิเคราะห์คำตอบแบบประเมินและสร้างคำอธิบาย HealthScore"
+      : chinese
+        ? "分析评估答案并生成 HealthScore 建议。"
       : "Analyzes assessment answers and produces HealthScore advice.";
   }
 
   if (row.name === "Nutrition Plan Advisor") {
     return thai
       ? "ปรับแต่งแผน ตอบแชต และสรุปแผนโภชนาการฉบับสุดท้าย"
+      : chinese
+        ? "处理计划优化、聊天回复和最终营养报告。"
       : "Handles plan refinement, chat replies, and final nutrition reports.";
   }
 
   if (row.name === "Communications Coordinator") {
     return thai
       ? "ประสานงานข้อความติดตามผลและการแจ้งเตือนลูกค้า"
+      : chinese
+        ? "协调跟进消息和客户通知。"
       : "Coordinates follow-up messages and client notifications.";
   }
 
   if (row.name === "Email Dispatcher") {
     return thai
       ? "ส่งอีเมลธุรกรรมและอีเมลประเมินซ้ำ"
+      : chinese
+        ? "发送交易邮件和复评邮件。"
       : "Sends transactional and reassessment emails.";
   }
 
   if (row.name === "Content Publisher") {
     return thai
       ? "จัดการงานเผยแพร่เนื้อหา"
+      : chinese
+        ? "运行内容发布工作流任务。"
       : "Runs content publishing workflow tasks.";
   }
 
   if (row.name === "Scheduler") {
     return thai
       ? "ดูแลงานตามกำหนดเวลาและงานแพลตฟอร์มเบื้องหลัง"
+      : chinese
+        ? "运行计划任务和平台维护工作。"
       : "Runs scheduled platform and housekeeping work.";
   }
 
   if (row.type === "human") {
     return thai
       ? "คิวงานตรวจสอบโดยคนสำหรับเคสที่ต้องใช้วิจารณญาณ"
+      : chinese
+        ? "人工审核队列，用于需要判断的案例。"
       : "Human review queue for cases that need judgement.";
   }
 
   return thai
     ? "ตัวทำงานของแพลตฟอร์มสำหรับงานที่มีความสามารถเฉพาะ"
+    : chinese
+      ? "面向特定能力范围任务的平台 worker。"
     : "Platform worker for capability-scoped operational tasks.";
 }
 

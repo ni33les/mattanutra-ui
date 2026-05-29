@@ -209,6 +209,8 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
         } satisfies HealthScoreResult,
         xaiUsage: {
           metadata: {
+            locale: workItem.locale,
+            outputLocaleMode: "single_display_locale",
             promptVersion: analysis.promptVersion,
             taskId: workItem.taskId
           },

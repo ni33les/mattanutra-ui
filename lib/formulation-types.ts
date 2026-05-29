@@ -13,7 +13,7 @@ export type FoodGuidanceSafetyAction =
   | "human_review"
   | "unknown_food";
 
-export type LocalizedText = string | Record<LocaleCode, string>;
+export type LocalizedText = string | Partial<Record<LocaleCode, string>>;
 
 export type FormulationCaution = {
   body: LocalizedText;
@@ -78,21 +78,21 @@ export type FoodGuidanceItem = {
 };
 
 export type FoodGapSupportItem = {
-  category: Record<"en" | "th", string>;
-  food: Record<"en" | "th", string>;
+  category: Record<LocaleCode, string>;
+  food: Record<LocaleCode, string>;
   foodId: string;
-  frequency: Record<"en" | "th", string>;
+  frequency: Record<LocaleCode, string>;
   gapNeedIds: string[];
-  imageAlt: Record<"en" | "th", string>;
+  imageAlt: Record<LocaleCode, string>;
   imagePath: string;
   position: number;
-  rationale: Record<"en" | "th", string>;
-  serving: Record<"en" | "th", string>;
+  rationale: Record<LocaleCode, string>;
+  serving: Record<LocaleCode, string>;
 };
 
 export type FoodGapSupportVariant = {
-  body: Record<"en" | "th", string>;
-  headline: Record<"en" | "th", string>;
+  body: Record<LocaleCode, string>;
+  headline: Record<LocaleCode, string>;
   items: FoodGapSupportItem[];
 };
 
@@ -232,7 +232,7 @@ export type RevealPageCopy = Readonly<{
 }> &
   Readonly<Record<
     RevealPageCopySlot,
-    Readonly<Record<"en" | "th", string>>
+    LocalizedText
   >>;
 
 export type ProductRecommendationStatus = "failed" | "partial" | "pending" | "ready";

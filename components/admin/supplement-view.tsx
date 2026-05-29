@@ -644,6 +644,12 @@ function supplementSelectionSummary(row: AdminSupplementRow, locale: Locale) {
       : `ถูกเลือกใน ${chosen} แผน`;
   }
 
+  if (locale === "zh-CN") {
+    return topDose
+      ? `已在 ${chosen} 个计划中选择 · 常见剂量 ${topDose}`
+      : `已在 ${chosen} 个计划中选择`;
+  }
+
   return topDose
     ? `Chosen in ${chosen} plans · top dose ${topDose}`
     : `Chosen in ${chosen} plans`;
@@ -759,6 +765,7 @@ export function SupplementDetailsModal({
           currentMaxAmount: draft.maxAmount,
           currentMaxUnit: draft.maxUnit,
           listStatus: draft.listStatus,
+          locale,
           primaryUseCase: draft.primaryUseCase,
           safetyFlags: draft.safetyFlags,
           safetyNotes: draft.safetyNotes,
@@ -887,23 +894,27 @@ export function SupplementDetailsModal({
             {draft.selectionStats ? (
               <div className="rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                  {locale === "th" ? "การเลือกโดย AI" : "AI selections"}
+                  {locale === "th"
+                    ? "การเลือกโดย AI"
+                    : locale === "zh-CN"
+                      ? "AI 选择"
+                      : "AI selections"}
                 </p>
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <SupplementListMeta
-                    label={locale === "th" ? "แผนที่เลือก" : "Chosen plans"}
+                    label={locale === "th" ? "แผนที่เลือก" : locale === "zh-CN" ? "已选计划" : "Chosen plans"}
                     value={new Intl.NumberFormat(formatLocale(locale)).format(
                       draft.selectionStats.chosenPlanCount
                     )}
                   />
                   <SupplementListMeta
-                    label={locale === "th" ? "ซ่อนเพื่อความปลอดภัย" : "Safety hidden"}
+                    label={locale === "th" ? "ซ่อนเพื่อความปลอดภัย" : locale === "zh-CN" ? "因安全隐藏" : "Safety hidden"}
                     value={new Intl.NumberFormat(formatLocale(locale)).format(
                       draft.selectionStats.safetyHiddenCount
                     )}
                   />
                   <SupplementListMeta
-                    label={locale === "th" ? "ล่าสุด" : "Last chosen"}
+                    label={locale === "th" ? "ล่าสุด" : locale === "zh-CN" ? "最近选择" : "Last chosen"}
                     value={
                       draft.selectionStats.lastSelectedAt
                         ? new Intl.DateTimeFormat(formatLocale(locale), {

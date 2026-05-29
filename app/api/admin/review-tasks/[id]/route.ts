@@ -82,11 +82,45 @@ function productImportFactsFromBody(value: unknown): ProductImportFactInput[] | 
   });
 }
 
+function translationsFromBody(value: unknown) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([locale, item]) => {
+        const record =
+          item && typeof item === "object" && !Array.isArray(item)
+            ? item as Record<string, unknown>
+            : {};
+        const status = record.status === "complete" ||
+          record.status === "missing"
+          ? record.status
+          : "draft";
+
+        return [
+          locale,
+          {
+            description: textOrNull(record.description),
+            status,
+            title: textOrNull(record.title)
+          }
+        ] as const;
+      })
+      .filter(([locale]) => /^[a-z]{2}(?:-[A-Z0-9]{2,8})?$/.test(locale))
+  );
+}
+
 function localizedTextValue(value: unknown): AdminReviewLocalizedText | null {
   if (typeof value === "string") {
     const trimmed = value.trim();
 
-    return trimmed ? { en: trimmed, th: trimmed } : null;
+    return trimmed ? { en: trimmed, th: trimmed, "zh-CN": trimmed } : null;
   }
 
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -96,9 +130,12 @@ function localizedTextValue(value: unknown): AdminReviewLocalizedText | null {
   const record = value as Record<string, unknown>;
   const en = textOrNull(record.en);
   const th = textOrNull(record.th);
-  const fallback = en ?? th;
+  const zhCn = textOrNull(record["zh-CN"]);
+  const fallback = en ?? th ?? zhCn;
 
-  return fallback ? { en: en ?? fallback, th: th ?? fallback } : null;
+  return fallback
+    ? { en: en ?? fallback, th: th ?? fallback, "zh-CN": zhCn ?? fallback }
+    : null;
 }
 
 function normalizedKey(value: unknown) {
@@ -270,6 +307,9 @@ export async function PATCH(
             descriptionTh: body.descriptionTh === undefined
               ? undefined
               : textOrNull(body.descriptionTh),
+            descriptionZhCn: body.descriptionZhCn === undefined
+              ? undefined
+              : textOrNull(body.descriptionZhCn),
             fdaApprovalNumber: body.fdaApprovalNumber === undefined
               ? undefined
               : textOrNull(body.fdaApprovalNumber),
@@ -287,7 +327,9 @@ export async function PATCH(
             taskId: id,
             title: body.title === undefined ? undefined : textOrNull(body.title),
             titleEn: body.titleEn === undefined ? undefined : textOrNull(body.titleEn),
-            titleTh: body.titleTh === undefined ? undefined : textOrNull(body.titleTh)
+            titleTh: body.titleTh === undefined ? undefined : textOrNull(body.titleTh),
+            titleZhCn: body.titleZhCn === undefined ? undefined : textOrNull(body.titleZhCn),
+            translations: translationsFromBody(body.translations)
           })
         : action === "dismiss"
         ? await dismissAdminReviewTask({

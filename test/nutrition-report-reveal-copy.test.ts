@@ -28,7 +28,12 @@ describe("nutrition report reveal page copy validator", () => {
     assert.deepEqual(validation.errors, []);
     assert.ok(validation.copy);
     assert.equal(validation.copy.version, revealPageCopyVersion);
-    assert.equal(validation.copy.heroTitle.en, "Personalised heroTitle copy for the reveal page.");
+    assert.equal(
+      typeof validation.copy.heroTitle === "object"
+        ? validation.copy.heroTitle.en
+        : validation.copy.heroTitle,
+      "Personalised heroTitle copy for the reveal page."
+    );
   });
 
   it("accepts legacy unversioned copy for stored report compatibility", () => {
@@ -52,14 +57,14 @@ describe("nutrition report reveal page copy validator", () => {
     assert.ok(validation.errors.some((error) => error.includes("version")));
   });
 
-  it("rejects missing required locales", () => {
+  it("requires only the requested display locale for new localized objects", () => {
     const copy = validRevealPageCopy() as Record<string, unknown>;
 
     copy.heroSub = { en: "English only reveal copy." };
 
-    const validation = validateRevealPageCopy(copy);
+    const validation = validateRevealPageCopy(copy, "zh-CN");
 
-    assert.ok(validation.errors.some((error) => error.includes("heroSub.th")));
+    assert.ok(validation.errors.some((error) => error.includes("heroSub.zh-CN")));
   });
 
   it("rejects extra fields", () => {
@@ -75,18 +80,15 @@ describe("nutrition report reveal page copy validator", () => {
     );
   });
 
-  it("rejects wrong field shapes", () => {
+  it("accepts single display-locale strings for new reveal copy", () => {
     const copy = validRevealPageCopy() as Record<string, unknown>;
 
-    copy.formulaLead = "Not localized";
+    copy.formulaLead = "Personalized reveal copy in one display locale.";
 
     const validation = validateRevealPageCopy(copy);
 
-    assert.ok(
-      validation.errors.some((error) =>
-        error.includes("formulaLead must be a localized object")
-      )
-    );
+    assert.deepEqual(validation.errors, []);
+    assert.equal(validation.copy?.formulaLead, "Personalized reveal copy in one display locale.");
   });
 
   it("rejects banned medical wording", () => {

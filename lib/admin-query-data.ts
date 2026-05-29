@@ -823,7 +823,7 @@ async function getContentInventory(params: QueryParams) {
             or source_url like '%' || '/blog/' || blog_posts.slug || '%'
           )
       ) view_stats on true
-      where (${locale}::text is null or locale = ${locale})
+      where (${locale}::text is null or locale = any(string_to_array(${locale}, ',')))
       order by updated_at desc
       limit 500
     `,
@@ -838,11 +838,15 @@ async function getContentInventory(params: QueryParams) {
         quote: string;
         source_agent: string | null;
         status: string;
+        translation_group_id: string;
+        translation_locales: string[] | null;
         updated_at: Date | string;
       }>
     >`
       select
         id::text,
+        translation_group_id::text,
+        coalesce(translation_group.locales, array[testimonials.locale]::text[]) as translation_locales,
         locale,
         status,
         quote,
@@ -853,7 +857,16 @@ async function getContentInventory(params: QueryParams) {
         created_at,
         updated_at
       from public.testimonials
-      where (${locale}::text is null or locale = ${locale})
+      left join lateral (
+        select array_agg(sibling_locales.locale order by sibling_locales.locale) as locales
+        from (
+          select distinct sibling.locale
+          from public.testimonials sibling
+          where sibling.translation_group_id = testimonials.translation_group_id
+            and sibling.locale is not null
+        ) sibling_locales
+      ) translation_group on true
+      where (${locale}::text is null or locale = any(string_to_array(${locale}, ',')))
       order by updated_at desc
       limit 500
     `,
@@ -963,8 +976,10 @@ async function getContentInventory(params: QueryParams) {
       status: row.status,
       summary: row.quote,
       title: row.author_name || "Testimonial",
-      translationGroupId: null,
-      translationLocales: [row.locale],
+      translationGroupId: row.translation_group_id,
+      translationLocales:
+        row.translation_locales?.filter((value): value is string => Boolean(value)) ??
+        [row.locale],
       updatedAt: new Date(row.updated_at).toISOString(),
       workflowStatus: workflowStatus("testimonial", row.id, row.status)
     }))

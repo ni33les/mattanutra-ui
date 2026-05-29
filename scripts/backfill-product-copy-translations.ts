@@ -1,6 +1,7 @@
 import { getSql } from "@/lib/db";
 import { translateProductCopyWithAi } from "@/lib/product-copy-translation";
 import { normalizeProductKey } from "@/lib/product-recommendations";
+import { normalizeLocaleCode } from "@/lib/i18n";
 
 type ProductForBackfill = Readonly<{
   brandName: string | null;
@@ -37,7 +38,7 @@ function normalizeBrand(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function hasSuccessfulAiCopyTranslation(snapshot: unknown) {
+function hasSuccessfulAiCopyTranslation(snapshot: unknown, locale: string) {
   if (!snapshot || typeof snapshot !== "object") {
     return false;
   }
@@ -47,7 +48,15 @@ function hasSuccessfulAiCopyTranslation(snapshot: unknown) {
   return Boolean(
     translation &&
     typeof translation === "object" &&
-    "translatedAt" in translation
+    (
+      "translatedAt" in translation ||
+      (
+        locale in translation &&
+        translation[locale as keyof typeof translation] &&
+        typeof translation[locale as keyof typeof translation] === "object" &&
+        "translatedAt" in translation[locale as keyof typeof translation]
+      )
+    )
   );
 }
 
@@ -61,12 +70,34 @@ async function main() {
   const brand = normalizeBrand(argValue("brand") ?? "mega we care");
   const normalizedBrand = normalizeProductKey(brand);
   const limit = positiveInt(argValue("limit"), 500);
+  const targetLocale = normalizeLocaleCode(argValue("locale")) ?? "th";
   const startAt = positiveInt(argValue("start-at"), 1);
   const delayMs = Math.min(10_000, positiveInt(argValue("delay-ms"), 750));
   const force = hasArg("force");
+  const allBrands = hasArg("all");
   const missingDescriptionEnOnly = hasArg("missing-description-en-only");
   const dryRun = hasArg("dry-run");
-  const productRows = await sql<ProductForBackfill[]>`
+  const productRows = allBrands
+    ? await sql<ProductForBackfill[]>`
+      select
+        products.id::text,
+        products.title,
+        products.brand_name as "brandName",
+        products.description_en as "descriptionEn",
+        products.source_snapshot as "sourceSnapshot"
+      from public.products products
+      left join public.product_translations translations
+        on translations.product_id = products.id
+        and translations.locale = ${targetLocale}
+      where ${force}
+         or translations.product_id is null
+         or translations.status <> 'complete'
+         or nullif(translations.title, '') is null
+         or nullif(translations.description, '') is null
+      order by products.brand_name asc nulls last, products.title asc
+      limit ${limit}
+    `
+    : await sql<ProductForBackfill[]>`
     select
       id::text,
       title,
@@ -97,7 +128,7 @@ async function main() {
       continue;
     }
 
-    if (!force && hasSuccessfulAiCopyTranslation(product.sourceSnapshot)) {
+    if (!force && hasSuccessfulAiCopyTranslation(product.sourceSnapshot, targetLocale)) {
       skipped += 1;
       continue;
     }
@@ -112,7 +143,8 @@ async function main() {
     try {
       await translateProductCopyWithAi({
         actor: "product_copy_translation_backfill",
-        productId: product.id
+        productId: product.id,
+        targetLocale
       });
       translated += 1;
     } catch (error) {
@@ -127,11 +159,13 @@ async function main() {
   console.log(JSON.stringify({
     brand,
     dryRun,
+    allBrands,
     failed,
     force,
     missingDescriptionEnOnly,
     products: products.length,
     skipped,
+    targetLocale,
     translated
   }, null, 2));
 }

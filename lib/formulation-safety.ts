@@ -73,8 +73,24 @@ function textFromLocalized(value: LocalizedText) {
   return resolveLocalizedText(value, "en");
 }
 
-function localized(en: string, th = en): LocalizedText {
-  return { en, th };
+function zhSafetyMessage(en: string) {
+  if (en.startsWith("Dose reduced from ")) {
+    return "剂量已降低，以保持在 MattaNutra 配置的安全上限内。";
+  }
+
+  if (en.includes("blocked") || en.includes("blacklisted")) {
+    return "此补充剂未通过 MattaNutra 目录安全规则，因此不会显示为建议。";
+  }
+
+  if (en.includes("not confirmed") || en.includes("health or medication")) {
+    return "此补充剂需要根据您披露的健康或用药情况进行团队安全审核。";
+  }
+
+  return "此补充剂需要经过团队安全审核后才能显示。";
+}
+
+function localized(en: string, th = en, zh = zhSafetyMessage(en)): LocalizedText {
+  return { en, th, "zh-CN": zh };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -65,13 +65,19 @@ export function localizedMetadata(input: Readonly<{
   translatedPaths?: Partial<Record<LocaleCode, string>>;
 }>): Metadata {
   const indexable = input.indexable !== false && indexableLocales.includes(input.locale);
+  const alternates = localizedAlternates({
+    path: input.path,
+    translatedPaths: input.translatedPaths
+  });
+  const currentCanonicalPath =
+    input.translatedPaths?.[input.locale] ?? localizedPath(input.locale, input.path);
 
   return {
     alternates: indexable
-      ? localizedAlternates({
-          path: input.path,
-          translatedPaths: input.translatedPaths
-        })
+      ? {
+          ...alternates,
+          canonical: absoluteUrl(currentCanonicalPath)
+        }
       : undefined,
     description: input.description,
     openGraph: {

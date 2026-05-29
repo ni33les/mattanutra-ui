@@ -4,6 +4,7 @@ import {
   isSupplementConfidence,
   isSupplementListStatus,
   type SupplementConfidence,
+  type AdminSupplementTranslationInput,
   type SupplementListStatus,
   updateAdminSupplement
 } from "@/lib/admin-supplements";
@@ -54,6 +55,40 @@ function parseConfidence(value: unknown): SupplementConfidence | null {
   const normalized = normalizedKey(value);
 
   return isSupplementConfidence(normalized) ? normalized : null;
+}
+
+function parseTranslations(value: unknown): AdminSupplementTranslationInput[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const translations: AdminSupplementTranslationInput[] = [];
+
+  for (const item of value) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        continue;
+      }
+
+      const translation = item as Record<string, unknown>;
+      const aliases = Array.isArray(translation.aliases)
+        ? translation.aliases.filter((alias): alias is string => typeof alias === "string")
+        : [];
+
+      translations.push({
+        aliases,
+        categoryLabel: textOrNull(translation.categoryLabel),
+        locale: typeof translation.locale === "string" ? translation.locale : "",
+        name: textOrNull(translation.name),
+        primaryUseCase: textOrNull(translation.primaryUseCase),
+        safetyNotes: textOrNull(translation.safetyNotes),
+        status:
+          translation.status === "complete" || translation.status === "missing"
+            ? translation.status
+            : "draft"
+      });
+  }
+
+  return translations;
 }
 
 function errorDetails(error: unknown) {
@@ -153,7 +188,8 @@ export async function PATCH(
       maxAmount: amountValue(body.maxAmount),
       maxUnit: textOrNull(body.maxUnit) ?? "",
       safetyFlags,
-      safetyNotes: textOrNull(body.safetyNotes)
+      safetyNotes: textOrNull(body.safetyNotes),
+      translations: parseTranslations(body.translations)
     });
 
     return NextResponse.json(

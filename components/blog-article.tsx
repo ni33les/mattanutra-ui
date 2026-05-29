@@ -9,7 +9,7 @@ import {
 import { HighlightedBrandText } from "@/components/highlighted-brand-text";
 import type { ComponentType } from "react";
 import type { BlogPost } from "@/lib/blog";
-import type { Locale } from "@/lib/i18n";
+import type { LocaleCode } from "@/lib/i18n";
 
 const markdownComponents: Components = {
   a: ({ children, href }) => (
@@ -84,8 +84,11 @@ const blogArticleCopy = {
   },
   th: {
     journal: "บทความ MattaNutra"
+  },
+  "zh-CN": {
+    journal: "MattaNutra 文章"
   }
-} satisfies Record<Locale, { journal: string }>;
+} satisfies Partial<Record<LocaleCode, { journal: string }>>;
 
 function initials(name: string) {
   return name

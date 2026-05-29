@@ -78,6 +78,40 @@ function recordPayload(value: unknown) {
     : {};
 }
 
+function translationsFromBody(value: unknown) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([locale, item]) => {
+        const record =
+          item && typeof item === "object" && !Array.isArray(item)
+            ? item as Record<string, unknown>
+            : {};
+        const status = record.status === "complete" ||
+          record.status === "missing"
+          ? record.status
+          : "draft";
+
+        return [
+          locale,
+          {
+            description: textOrNull(record.description, 4000),
+            status,
+            title: textOrNull(record.title, 500)
+          }
+        ] as const;
+      })
+      .filter(([locale]) => /^[a-z]{2}(?:-[A-Z0-9]{2,8})?$/.test(locale))
+  );
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const accessToken =
@@ -152,6 +186,7 @@ export async function POST(request: Request) {
       description: textOrNull(body.description, 4000),
       descriptionEn: textOrNull(body.descriptionEn, 4000),
       descriptionTh: textOrNull(body.descriptionTh, 4000),
+      descriptionZhCn: textOrNull(body.descriptionZhCn, 4000),
       duplicateProductIds: textArray(body.duplicateProductIds),
       fdaApprovalNumber: textOrNull(body.fdaApprovalNumber, 100),
       imageUrls: textArray(body.imageUrls),
@@ -162,7 +197,9 @@ export async function POST(request: Request) {
       source: textOrNull(body.source, 200),
       sourceUrl,
       titleEn: textOrNull(body.titleEn, 500),
-      titleTh: textOrNull(body.titleTh, 500)
+      titleTh: textOrNull(body.titleTh, 500),
+      titleZhCn: textOrNull(body.titleZhCn, 500),
+      translations: translationsFromBody(body.translations)
     });
 
     return NextResponse.json(

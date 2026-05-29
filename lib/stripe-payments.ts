@@ -132,11 +132,13 @@ const PAYMENT_PLANS: Record<AssessmentPlan, PaymentPlan> = {
     amountMicros: 690 * AMOUNT_MICROS_PER_UNIT,
     description: {
       en: "Your Right Amount Formula with supplement priorities, dose context, cautions, and product direction.",
-      th: "สูตรปริมาณที่พอดี พร้อมลำดับความสำคัญ ปริมาณ ข้อควรระวัง และแนวทางสินค้า"
+      th: "สูตรปริมาณที่พอดี พร้อมลำดับความสำคัญ ปริมาณ ข้อควรระวัง และแนวทางสินค้า",
+      "zh-CN": "你的合适剂量配方，包含补充剂优先级、剂量背景、注意事项和产品方向。"
     },
     name: {
       en: "Right Amount Formula",
-      th: "สูตรปริมาณที่พอดี"
+      th: "สูตรปริมาณที่พอดี",
+      "zh-CN": "合适剂量配方"
     },
     plan: "precision",
     priceEnvName: "STRIPE_PRICE_PRECISION_THB"
@@ -145,11 +147,13 @@ const PAYMENT_PLANS: Record<AssessmentPlan, PaymentPlan> = {
     amountMicros: 1590 * AMOUNT_MICROS_PER_UNIT,
     description: {
       en: "The Right Amount Formula plus 90 days of wellness concierge guidance.",
-      th: "สูตรปริมาณที่พอดี พร้อมคำแนะนำจากผู้ช่วยดูแลสุขภาพ 90 วัน"
+      th: "สูตรปริมาณที่พอดี พร้อมคำแนะนำจากผู้ช่วยดูแลสุขภาพ 90 วัน",
+      "zh-CN": "合适剂量配方，加上 90 天健康顾问指导。"
     },
     name: {
       en: "90-Day Wellness Concierge",
-      th: "ผู้ช่วยดูแลสุขภาพ 90 วัน"
+      th: "ผู้ช่วยดูแลสุขภาพ 90 วัน",
+      "zh-CN": "90 天健康顾问"
     },
     plan: "pro",
     priceEnvName: "STRIPE_PRICE_PRO_THB"
@@ -406,7 +410,8 @@ function stripeClientForConfig(config: StripePaymentConfig) {
 function stripeLocale(locale: Locale) {
   const stripeLocales = {
     en: "en",
-    th: "th"
+    th: "th",
+    "zh-CN": "auto"
   } satisfies Record<Locale, "auto" | "en" | "th">;
 
   return stripeLocales[locale] ?? "auto";

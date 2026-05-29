@@ -15,7 +15,7 @@ import {
   foodNutrientTags,
   foodTagLabel
 } from "@/lib/food-tags";
-import type { Locale } from "@/lib/i18n";
+import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 import {
   BusinessStatsGrid,
   businessMetricColors,
@@ -359,7 +359,7 @@ function FoodDetailsModal({
   const inputClass =
     "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]";
   const updateTranslation = (
-    localeCode: "en" | "th",
+    localeCode: Locale,
     patch: Partial<AdminFoodRow["translations"][string]>
   ) => {
     const current = draft.translations[localeCode] ?? {
@@ -447,7 +447,7 @@ function FoodDetailsModal({
                 {labels.translations}
               </legend>
               <div className="mt-3 grid gap-5">
-                {(["en", "th"] as const).map((localeCode) => {
+                {publicLocales.map((localeCode) => {
                   const translation = draft.translations[localeCode] ?? {
                     category: "",
                     imageAlt: "",
@@ -462,7 +462,7 @@ function FoodDetailsModal({
                       key={localeCode}
                     >
                       <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-500">
-                        {localeCode}
+                        {localeLabels[localeCode]}
                       </p>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label className="grid gap-1 text-xs font-semibold text-gray-600">

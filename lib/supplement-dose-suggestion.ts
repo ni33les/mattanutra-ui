@@ -18,6 +18,7 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
+import type { Locale } from "@/lib/i18n";
 
 export type SupplementDoseSuggestionInput = Readonly<{
   category?: string | null;
@@ -29,6 +30,7 @@ export type SupplementDoseSuggestionInput = Readonly<{
   safetyFlags?: SupplementSafetyFlag[];
   safetyNotes?: string | null;
   supplementName: string;
+  locale?: Locale;
 }>;
 
 export type SupplementDoseSuggestion = Readonly<{
@@ -43,6 +45,11 @@ export type SupplementDoseSuggestion = Readonly<{
 
 const DEFAULT_REASONING_EFFORT = "low";
 const REQUEST_TIMEOUT_MS = 120_000;
+const displayLocaleNames = {
+  en: "English",
+  th: "Thai",
+  "zh-CN": "Simplified Chinese"
+} satisfies Record<Locale, string>;
 
 function config() {
   return {
@@ -147,6 +154,7 @@ function suggestionPayload(parsed: Record<string, unknown>) {
 
 async function callGrok(input: SupplementDoseSuggestionInput) {
   const grok = config();
+  const locale = input.locale ?? "en";
 
   const completion = await callGrokChatCompletion({
     apiKey: grok.apiKey,
@@ -168,7 +176,8 @@ async function callGrok(input: SupplementDoseSuggestionInput) {
               "For blocked, maxAmount may be null and maxUnit may be an empty string.",
               "If evidence is uncertain, choose a conservative ceiling and confidence low.",
               "Never suggest a dose range.",
-              "Write safetyNotes as concise admin-facing notes explaining the status, flags, and dose choice."
+              `Write safetyNotes as concise admin-facing notes in ${displayLocaleNames[locale]} (${locale}) explaining the status, flags, and dose choice.`,
+              "Return only the requested locale for prose. Do not return localized maps or parallel English/Thai/Chinese copies."
         ].join("\n"),
         role: "system"
       },
@@ -203,6 +212,8 @@ async function callGrok(input: SupplementDoseSuggestionInput) {
   await recordXaiUsageCost({
     metadata: {
       category: input.category,
+      locale,
+      outputLocaleMode: "single_display_locale",
       supplementName: input.supplementName
     },
     model: completion.model ?? grok.model,

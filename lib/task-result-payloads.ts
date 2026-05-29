@@ -76,7 +76,11 @@ export function nutritionChatAnalysisPayload(resultPayload: unknown) {
   };
 }
 
-export function refinementQueuedReply(userMessage: string) {
+export function refinementQueuedReply(userMessage: string, locale?: string) {
+  if (locale === "zh-CN" || /[\u3400-\u9FFF]/u.test(userMessage)) {
+    return "好的。我会根据这段对话重新生成您的计划。食物建议、补充剂建议和最终计划会在完成后依次更新。";
+  }
+
   if (/[ก-๙]/u.test(userMessage)) {
     return "รับทราบครับ ผมจะปรับแผนใหม่โดยใช้บทสนทนานี้เป็นบริบท แล้วจะแสดงคำแนะนำอาหาร อาหารเสริม และแผนสรุปฉบับใหม่เมื่อเสร็จ";
   }
@@ -97,4 +101,3 @@ export function nutritionReportAnalysisPayload(resultPayload: unknown) {
     report
   } as Record<string, unknown> & { report: NutritionReport };
 }
-

@@ -19,6 +19,9 @@ import type { AdminFlowNodeId } from "@/lib/admin-flow-data";
 import type { Locale } from "@/lib/i18n";
 import type { SupplementSafetyFlag } from "@/lib/supplement-safety-flags";
 import type { AdminContentInventoryRow } from "@/lib/admin-query-data";
+import zhCnContentOverrides from "./dashboard-content.zh-CN.json";
+
+type BaseLocale = Exclude<Locale, "zh-CN">;
 
 export type AdminDashboardView =
   | "agents"
@@ -45,6 +48,7 @@ export type ContentMetricId =
   | "contentDeleted"
   | "contentDraft"
   | "contentLocaleEn"
+  | "contentLocaleZh"
   | "contentLocaleTh"
   | "contentPageViews"
   | "contentPublished"
@@ -173,6 +177,7 @@ export type AdminContent = Readonly<{
     status: string;
     testimonials: string;
     th: string;
+    zh: string;
     title: string;
     total: string;
     type: string;
@@ -441,7 +446,7 @@ export const rangeOrder: AdminDashboardRange[] = [
 export const supplementDoseSuggestionTimeoutMs = 45_000;
 export const foodReviewSuggestionTimeoutMs = 45_000;
 
-export const content = {
+const baseContent = {
   en: {
     closeSidebar: "Close sidebar",
     dataUnavailable:
@@ -529,6 +534,7 @@ export const content = {
       status: "Status",
       testimonials: "Testimonials",
       th: "TH",
+      zh: "中文",
       title: "Title",
       total: "Total",
       type: "Type",
@@ -971,6 +977,7 @@ export const content = {
       status: "สถานะ",
       testimonials: "คำรับรอง",
       th: "TH",
+      zh: "中文",
       title: "ชื่อ",
       total: "ทั้งหมด",
       type: "ประเภท",
@@ -1326,4 +1333,39 @@ export const content = {
     },
     title: "Performance"
   }
+} satisfies Record<BaseLocale, AdminContent>;
+
+function mergeLocalizedContent<T>(base: T, overrides: unknown): T {
+  if (typeof base === "string") {
+    return (typeof overrides === "string" ? overrides : base) as T;
+  }
+
+  if (Array.isArray(base)) {
+    const overrideItems = Array.isArray(overrides) ? overrides : [];
+
+    return base.map((item, index) =>
+      mergeLocalizedContent(item, overrideItems[index])
+    ) as T;
+  }
+
+  if (base && typeof base === "object") {
+    const overrideRecord =
+      overrides && typeof overrides === "object" && !Array.isArray(overrides)
+        ? (overrides as Record<string, unknown>)
+        : {};
+
+    return Object.fromEntries(
+      Object.entries(base).map(([key, value]) => [
+        key,
+        mergeLocalizedContent(value, overrideRecord[key])
+      ])
+    ) as T;
+  }
+
+  return base;
+}
+
+export const content = {
+  ...baseContent,
+  "zh-CN": mergeLocalizedContent(baseContent.en, zhCnContentOverrides)
 } satisfies Record<Locale, AdminContent>;

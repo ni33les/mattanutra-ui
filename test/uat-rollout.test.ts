@@ -49,6 +49,10 @@ function sampleSnapshotTables(overrides: Record<string, unknown[]> = {}) {
       {
         food_id: "food-1",
         locale: "th"
+      },
+      {
+        food_id: "food-1",
+        locale: "zh-CN"
       }
     ],
     foods: [
@@ -153,6 +157,16 @@ describe("UAT destructive rebuild master data guardrails", () => {
         food_translations: [{ food_id: "food-1", locale: "en" }]
       }), { strict: true }).errors.join("; "),
       /missing th translation/
+    );
+
+    assert.match(
+      validateCuratedMasterSnapshot(sampleSnapshotTables({
+        food_translations: [
+          { food_id: "food-1", locale: "en" },
+          { food_id: "food-1", locale: "th" }
+        ]
+      }), { strict: true }).errors.join("; "),
+      /missing zh-CN translation/
     );
   });
 

@@ -36,6 +36,12 @@ const managedFoods: ManagedFoodCatalogItem[] = [
         imageAlt: "ชิ้นปลาแซลมอน",
         name: "ปลาแซลมอน",
         primaryUseCase: "ปลาที่มีโอเมกา 3"
+      },
+      "zh-CN": {
+        category: "鱼类",
+        imageAlt: "三文鱼鱼排",
+        name: "三文鱼",
+        primaryUseCase: "富含 Omega-3 的鱼类"
       }
     }
   },
@@ -59,6 +65,12 @@ const managedFoods: ManagedFoodCatalogItem[] = [
         imageAlt: "เมล็ดฟักทอง",
         name: "เมล็ดฟักทอง",
         primaryUseCase: "เมล็ดพืชที่มีแมกนีเซียมและสังกะสี"
+      },
+      "zh-CN": {
+        category: "种子",
+        imageAlt: "南瓜籽",
+        name: "南瓜籽",
+        primaryUseCase: "富含镁和锌的种子"
       }
     }
   },
@@ -82,6 +94,12 @@ const managedFoods: ManagedFoodCatalogItem[] = [
         imageAlt: "ข้าวโอ๊ตในชาม",
         name: "ข้าวโอ๊ต",
         primaryUseCase: "ธัญพืชที่มีใยอาหาร"
+      },
+      "zh-CN": {
+        category: "全谷物",
+        imageAlt: "碗里的燕麦",
+        name: "燕麦",
+        primaryUseCase: "含膳食纤维的谷物"
       }
     }
   },
@@ -105,6 +123,12 @@ const managedFoods: ManagedFoodCatalogItem[] = [
         imageAlt: "ชาเขียว",
         name: "ชาเขียว",
         primaryUseCase: "ชาที่มีโพลีฟีนอล"
+      },
+      "zh-CN": {
+        category: "茶饮",
+        imageAlt: "绿茶",
+        name: "绿茶",
+        primaryUseCase: "含多酚的茶饮"
       }
     }
   },
@@ -128,6 +152,12 @@ const managedFoods: ManagedFoodCatalogItem[] = [
         imageAlt: "ขมิ้น",
         name: "ขมิ้น",
         primaryUseCase: "เครื่องเทศที่มีเคอร์คูมิน"
+      },
+      "zh-CN": {
+        category: "香料",
+        imageAlt: "姜黄",
+        name: "姜黄",
+        primaryUseCase: "含姜黄素的香料"
       }
     }
   }
@@ -171,30 +201,30 @@ const compactVariant: FoodGapProductVariant = {
 const validResponse = {
   variants: {
     balanced: {
-      body: { en: "Use foods for the remaining support.", th: "ใช้อาหารเพื่อช่วยเสริมส่วนที่เหลือ" },
-      headline: { en: "Food support for the gaps.", th: "อาหารช่วยเสริมช่องว่าง" },
+      body: { en: "Use foods for the remaining support.", th: "ใช้อาหารเพื่อช่วยเสริมส่วนที่เหลือ", "zh-CN": "用食物来补足剩余支持。" },
+      headline: { en: "Food support for the gaps.", th: "อาหารช่วยเสริมช่องว่าง", "zh-CN": "用食物支持缺口。" },
       items: [
         {
           foodId: "food-pumpkin",
-          frequency: { en: "3 times/week", th: "3 ครั้งต่อสัปดาห์" },
+          frequency: { en: "3 times/week", th: "3 ครั้งต่อสัปดาห์", "zh-CN": "每周 3 次" },
           gapNeedIds: ["supplement:magnesium"],
           position: 1,
-          rationale: { en: "Keeps mineral support practical.", th: "ช่วยให้การเสริมแร่ธาตุทำได้จริง" },
-          serving: { en: "1 handful", th: "1 กำมือ" }
+          rationale: { en: "Keeps mineral support practical.", th: "ช่วยให้การเสริมแร่ธาตุทำได้จริง", "zh-CN": "让矿物质支持更容易执行。" },
+          serving: { en: "1 handful", th: "1 กำมือ", "zh-CN": "1 小把" }
         }
       ]
     },
     compact: {
-      body: { en: "Use foods for compact-stack support.", th: "ใช้อาหารช่วยเสริมชุดแบบกระชับ" },
-      headline: { en: "Compact food support.", th: "อาหารเสริมแรงสำหรับชุดกระชับ" },
+      body: { en: "Use foods for compact-stack support.", th: "ใช้อาหารช่วยเสริมชุดแบบกระชับ", "zh-CN": "用食物支持精简组合。" },
+      headline: { en: "Compact food support.", th: "อาหารเสริมแรงสำหรับชุดกระชับ", "zh-CN": "精简食物支持。" },
       items: [
         {
           foodId: "food-pumpkin",
-          frequency: { en: "3 times/week", th: "3 ครั้งต่อสัปดาห์" },
+          frequency: { en: "3 times/week", th: "3 ครั้งต่อสัปดาห์", "zh-CN": "每周 3 次" },
           gapNeedIds: ["supplement:magnesium"],
           position: 1,
-          rationale: { en: "Keeps mineral support practical.", th: "ช่วยให้การเสริมแร่ธาตุทำได้จริง" },
-          serving: { en: "1 handful", th: "1 กำมือ" }
+          rationale: { en: "Keeps mineral support practical.", th: "ช่วยให้การเสริมแร่ธาตุทำได้จริง", "zh-CN": "让矿物质支持更容易执行。" },
+          serving: { en: "1 handful", th: "1 กำมือ", "zh-CN": "1 小把" }
         }
       ]
     }
@@ -421,7 +451,7 @@ describe("food gap support", () => {
     });
 
     assert.match(validation.errors.join("\n"), /not a managed food/);
-    assert.match(validation.errors.join("\n"), /must include non-empty en and th/);
+    assert.match(validation.errors.join("\n"), /must include non-empty en, th, and zh-CN strings/);
     assert.match(validation.errors.join("\n"), /unsupported keys/);
     assert.match(validation.errors.join("\n"), /banned medical wording/);
   });

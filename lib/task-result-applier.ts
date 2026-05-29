@@ -479,6 +479,8 @@ async function applyPaidFormulationResult(
     await recordTaskXaiUsageCost({
       analysis,
       metadata: {
+        locale,
+        outputLocaleMode: "single_display_locale",
         plan,
         planId
       },
@@ -676,6 +678,8 @@ async function applyFoodGuidanceResult(
     await recordTaskXaiUsageCost({
       analysis,
       metadata: {
+        locale,
+        outputLocaleMode: "single_display_locale",
         planId
       },
       purpose: "food_guidance_analysis",
@@ -889,6 +893,8 @@ async function applyExampleFormulationResult(
     await recordTaskXaiUsageCost({
       analysis,
       metadata: {
+        locale,
+        outputLocaleMode: "single_display_locale",
         plan,
         planId,
         requestId
@@ -1432,7 +1438,9 @@ async function applyNutritionPlanChatResult(
       })
     : null;
   const assistantReply =
-    refinementQueued?.taskId ? refinementQueuedReply(userMessage) : analysis.reply;
+    refinementQueued?.taskId
+      ? refinementQueuedReply(userMessage, textValue(analysis.locale))
+      : analysis.reply;
 
   await sql`
     insert into public.plan_chat_messages (
@@ -1481,6 +1489,10 @@ async function applyNutritionPlanChatResult(
 
   await recordTaskXaiUsageCost({
     analysis,
+    metadata: {
+      locale: isLocale(analysis.locale) ? analysis.locale : undefined,
+      outputLocaleMode: "single_display_locale"
+    },
     purpose: "nutrition_plan_chat_reply",
     sql,
     task
@@ -1591,6 +1603,10 @@ async function applyNutritionReportResult(
 
   await recordTaskXaiUsageCost({
     analysis,
+    metadata: {
+      locale: isLocale(analysis.locale) ? analysis.locale : undefined,
+      outputLocaleMode: "single_display_locale"
+    },
     purpose: "nutrition_report",
     sql,
     task
@@ -2079,6 +2095,13 @@ async function applyProductRecommendationsResult(
   if (!sql || !task.planId) {
     throw new Error("Product recommendation result is missing plan");
   }
+  const [localeRow] = await sql<{ locale: string | null }[]>`
+    select locale
+    from public.assessments
+    where plan_id = ${task.planId}::uuid
+    limit 1
+  `;
+  const locale: Locale = isLocale(localeRow?.locale) ? localeRow.locale : "en";
   const clientSex = await loadProductRecommendationClientSex(sql, task.planId);
   const countryCode = await loadProductRecommendationCountryCode(sql, task.planId);
   const stackPreference = normalizeProductStackPreference(
@@ -2166,7 +2189,7 @@ async function applyProductRecommendationsResult(
   }
 
   const legacyRecommendations = result.recommendations.map((item) =>
-    toRecommendedProduct(item, result.stackCoveragePercent, runId)
+    toRecommendedProduct(item, result.stackCoveragePercent, runId, locale)
   );
 
   await sql`

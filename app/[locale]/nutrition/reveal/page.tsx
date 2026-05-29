@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { FormulationResults } from "@/components/formulation-results";
 import { ServiceIssue } from "@/components/service-issue";
 import { SiteFooter } from "@/components/site-footer";
@@ -6,7 +6,7 @@ import { TitleBar } from "@/components/title-bar";
 import { getStoredFormulationResult, isUuid } from "@/lib/assessment-store";
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
-import { nutritionRevealPath } from "@/lib/nutrition-paths";
+import { nutritionQuizPath, nutritionRevealPath } from "@/lib/nutrition-paths";
 
 type NutritionRevealPageProps = Readonly<{
   params: Promise<{
@@ -40,7 +40,7 @@ export default async function NutritionRevealPage({
     stack === "compact" || stack === "balanced" ? stack : null;
 
   if (!planId) {
-    notFound();
+    redirect(nutritionQuizPath(locale));
   }
 
   const currentPath = nutritionRevealPath(locale, planId);

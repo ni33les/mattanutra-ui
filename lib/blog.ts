@@ -32,6 +32,7 @@ export type BlogTestimonial = Readonly<{
   authorTitle: string;
   id: string;
   quote: string;
+  translationGroupId: string;
 }>;
 
 export type BlogPostSummary = Readonly<{
@@ -106,6 +107,7 @@ type TestimonialRow = {
   sort_order?: number | null;
   source_agent?: string | null;
   status?: string | null;
+  translation_group_id?: string | null;
 };
 
 const dateFormatters = new Map<string, Intl.DateTimeFormat>();
@@ -320,7 +322,11 @@ function mapTestimonial(row: TestimonialRow | BlogPostRow): BlogTestimonial | nu
         ? row.testimonial_author_title
         : row.author_title) ?? "",
     id,
-    quote
+    quote,
+    translationGroupId:
+      "translation_group_id" in row
+        ? row.translation_group_id ?? id
+        : id
   };
 }
 
@@ -869,7 +875,11 @@ function normalizeTestimonialInput(
       toOptionalString(input.sourceAgent ?? input.source_agent) ??
       existing?.source_agent ??
       null,
-    status: toStatus(input.status ?? existing?.status ?? "published")
+    status: toStatus(input.status ?? existing?.status ?? "published"),
+    translationGroupId:
+      toOptionalString(input.translationGroupId ?? input.translation_group_id) ??
+      existing?.translation_group_id ??
+      randomUUID()
   };
 }
 
@@ -1032,6 +1042,7 @@ export async function createTestimonial(input: BlogTestimonialInput) {
   const rows = await sql<TestimonialRow[]>`
     insert into public.testimonials (
       id,
+      translation_group_id,
       locale,
       status,
       quote,
@@ -1046,6 +1057,7 @@ export async function createTestimonial(input: BlogTestimonialInput) {
     )
     values (
       ${testimonial.id},
+      ${testimonial.translationGroupId},
       ${testimonial.locale},
       ${testimonial.status},
       ${testimonial.quote},
@@ -1092,6 +1104,7 @@ export async function updateTestimonial(
     update public.testimonials
     set
       locale = ${testimonial.locale},
+      translation_group_id = ${testimonial.translationGroupId},
       status = ${testimonial.status},
       quote = ${testimonial.quote},
       author_name = ${testimonial.authorName},

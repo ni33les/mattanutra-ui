@@ -1257,6 +1257,7 @@ export async function getStoredAssessmentPrefill(planId: string) {
     select
       answers,
       health_score,
+      locale,
       selected_plan::text
     from assessments
     where plan_id = ${planId}::uuid
@@ -1276,6 +1277,7 @@ export async function getStoredAssessmentPrefill(planId: string) {
       typeof healthScore.score === "number"
         ? (healthScore as AssessmentSnapshot["healthScore"])
         : null,
+    locale: normalizeLocale(row.locale),
     plan: row.selected_plan ? fromStoredPlan(row.selected_plan) : null,
     planId
   };
@@ -1726,7 +1728,7 @@ export async function getStoredFormulationResult(
     return null;
   }
 
-  const locale = normalizeLocale(row.locale);
+  const locale = resultLocale;
   const firstName =
     normalizeAssessmentFirstName(row.first_name) ??
     firstNameFromAssessmentAnswers(row.answers);

@@ -18,7 +18,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function requiredLocales(locale: Locale) {
-  return [...new Set(["en", "th", locale])];
+  return [locale];
 }
 
 function readLocalizedTextValue(
@@ -27,8 +27,12 @@ function readLocalizedTextValue(
   errors: string[],
   locales: readonly string[]
 ): LocalizedHealthScoreText {
+  if (typeof value === "string" && value.trim()) {
+    return { [locales[0] ?? "en"]: value.trim() };
+  }
+
   if (!isRecord(value)) {
-    errors.push(`${path} must be an object with localized string values`);
+    errors.push(`${path} must be a string or an object with localized string values`);
     return {};
   }
 

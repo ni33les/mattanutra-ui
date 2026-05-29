@@ -14,7 +14,7 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
-import { defaultLocale, type Locale } from "@/lib/i18n";
+import { type Locale } from "@/lib/i18n";
 
 type AnalysisAuditEvent = {
   eventType: string;
@@ -106,15 +106,6 @@ function userPrompt({
   | "previousFormulation"
   | "planId"
 >) {
-  const requiredOutputLocales = [...new Set([defaultLocale, locale])];
-  const localizedExample = (english: string, requestedLocale: string) =>
-    Object.fromEntries(
-      requiredOutputLocales.map((localeCode) => [
-        localeCode,
-        localeCode === defaultLocale ? english : requestedLocale
-      ])
-    );
-
   return JSON.stringify(
     {
       assessment: answers,
@@ -135,23 +126,11 @@ function userPrompt({
               "Seeds | Pulses | Teas | Fermented foods | Fish | Whole grains | Fruit and vegetables | Herbs and spices | Thai staples | Other",
             effectivenessRank:
               "integer starting at 1; 1 is the most effective/highest-impact suggestion for this person",
-            food: localizedExample(
-              "English food or ingredient name",
-              "Requested-locale food or ingredient name"
-            ),
-            frequency: localizedExample(
-              "short English frequency, e.g. 3-4 times/week",
-              "short requested-locale frequency"
-            ),
+            food: "food or ingredient name in the requested display locale",
+            frequency: "short frequency in the requested display locale, e.g. 3-4 times/week",
             id: "stable kebab-case identifier",
-            rationale: localizedExample(
-              "one English sentence explaining the wellness benefit in plain language",
-              "one requested-locale sentence explaining the wellness benefit in plain language"
-            ),
-            serving: localizedExample(
-              "short practical serving, e.g. 1 tbsp or 1 small bowl",
-              "short practical requested-locale serving"
-            ),
+            rationale: "one sentence explaining the wellness benefit in the requested display locale",
+            serving: "short practical serving in the requested display locale, e.g. 1 tbsp or 1 small bowl",
             status: "covered | add | review"
           }
         ]
@@ -162,16 +141,16 @@ function userPrompt({
         "Every item must include id, category, food, serving, frequency, effectivenessRank, status, and rationale.",
         "Set effectivenessRank as a unique integer from 1 to the number of items, where 1 is the most effective/highest-impact food suggestion.",
         "Order foodGuidance by effectivenessRank ascending.",
-        `food, serving, frequency, and rationale must each be localized objects including these locale keys: ${requiredOutputLocales.join(", ")}.`,
+        "food, serving, frequency, and rationale must each be plain strings in the requested display locale.",
         "Keep category and status as canonical English values for internal processing.",
         "Use status=review for anything that should be checked before use because of medication, pregnancy, breastfeeding, condition, allergy uncertainty, or digestive sensitivity.",
-        "Return English plus the requested locale. Include other locale keys only when they are useful and complete.",
+        "Return only the requested display locale for user-facing prose. Do not return parallel English/Thai/Chinese copies.",
         "When currentPlanContext.planFeedback is present, treat it as client-stated food preferences, avoidances, cuisine preferences, and safety disclosures for this new version.",
         "Do not reintroduce foods the client asked to remove, avoid, or dislikes.",
         "Use previousFoodGuidance only as context; this response must be a fresh full version, not a patch."
       ],
       locale,
-      requiredOutputLocales,
+      outputLocaleMode: "single_display_locale",
       plan,
       planId
     },
@@ -279,10 +258,7 @@ function readLocalizedText(
   const value = record[key];
 
   if (typeof value === "string" && value.trim()) {
-    errors.push(
-      `foodGuidance[${index}].${key} must be an object with localized string values, not a plain string`
-    );
-    return {};
+    return value.trim();
   }
 
   if (!isRecord(value)) {

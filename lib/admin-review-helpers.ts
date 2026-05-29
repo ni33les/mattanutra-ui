@@ -1,6 +1,7 @@
 export type AdminReviewLocalizedText = Readonly<{
   en: string;
   th: string;
+  "zh-CN"?: string;
 }>;
 
 export function textOrNull(value: unknown) {
@@ -56,9 +57,10 @@ export function localizedReviewText(
 
   const en = textOrNull(record.en);
   const th = textOrNull(record.th);
-  const fallback = en ?? th;
+  const zhCn = textOrNull(record["zh-CN"]);
+  const fallback = en ?? th ?? zhCn;
 
-  return fallback ? { en: en ?? fallback, th: th ?? fallback } : null;
+  return fallback ? { en: en ?? fallback, th: th ?? fallback, "zh-CN": zhCn ?? fallback } : null;
 }
 
 export function formatReviewDose(amount: number | null, unit: string | null) {

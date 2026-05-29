@@ -281,6 +281,7 @@ function reviewRowToSupplementDraft(
     safetyFlags: [],
     safetyNotes: reviewContextText(labels, row),
     sourceStatus: "recommended_add",
+    translations: {},
     updatedAt: row.queuedAt
   };
 }
@@ -337,9 +338,27 @@ function localizedReviewDraft(
     return null;
   }
 
-  return locale === "th"
-    ? { en: existing?.en || trimmed, th: trimmed }
-    : { en: trimmed, th: existing?.th || trimmed };
+  if (locale === "th") {
+    return {
+      en: existing?.en || trimmed,
+      th: trimmed,
+      "zh-CN": existing?.["zh-CN"] || existing?.en || trimmed
+    };
+  }
+
+  if (locale === "zh-CN") {
+    return {
+      en: existing?.en || trimmed,
+      th: existing?.th || existing?.en || trimmed,
+      "zh-CN": trimmed
+    };
+  }
+
+  return {
+    en: trimmed,
+    th: existing?.th || trimmed,
+    "zh-CN": existing?.["zh-CN"] || trimmed
+  };
 }
 
 type FoodReviewDraftFields = Readonly<{
@@ -752,7 +771,12 @@ function ProductImportReviewModal({
     }>,
     description?: string | null,
     descriptionEn?: string | null,
-    descriptionTh?: string | null
+    descriptionTh?: string | null,
+    translations?: Record<string, {
+      description?: string | null;
+      status?: "complete" | "draft" | "missing";
+      title?: string | null;
+    }>
   ) => void;
   productsData: AdminProductsData;
   row: AdminReviewTaskRow;
@@ -769,6 +793,9 @@ function ProductImportReviewModal({
   );
   const [descriptionTh, setDescriptionTh] = useState(
     row.productImport?.descriptionTh ?? ""
+  );
+  const [descriptionZhCn, setDescriptionZhCn] = useState(
+    row.productImport?.translations["zh-CN"]?.description ?? ""
   );
   const [facts, setFacts] = useState<ProductImportFactDraft[]>(() =>
     (row.productImport?.parsedFacts ?? []).map((fact) => ({
@@ -865,7 +892,7 @@ function ProductImportReviewModal({
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
               <label className="grid gap-2 text-sm font-medium text-gray-700">
                 Description EN
                 <textarea
@@ -883,6 +910,14 @@ function ProductImportReviewModal({
                   className={classNames(inputClass, "min-h-24 resize-y")}
                   onChange={(event) => setDescriptionTh(event.target.value)}
                   value={descriptionTh}
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-gray-700">
+                Description 中文
+                <textarea
+                  className={classNames(inputClass, "min-h-24 resize-y")}
+                  onChange={(event) => setDescriptionZhCn(event.target.value)}
+                  value={descriptionZhCn}
                 />
               </label>
             </div>
@@ -1078,9 +1113,26 @@ function ProductImportReviewModal({
                       null,
                       reviewerNote.trim() || null,
                       parsedFacts,
-                      description.trim() || descriptionEn.trim() || descriptionTh.trim() || null,
+                      description.trim() || descriptionEn.trim() || descriptionTh.trim() || descriptionZhCn.trim() || null,
                       descriptionEn.trim() || null,
-                      descriptionTh.trim() || null
+                      descriptionTh.trim() || null,
+                      {
+                        en: {
+                          description: descriptionEn.trim() || null,
+                          status: descriptionEn.trim() ? "draft" : "missing",
+                          title: null
+                        },
+                        th: {
+                          description: descriptionTh.trim() || null,
+                          status: descriptionTh.trim() ? "draft" : "missing",
+                          title: null
+                        },
+                        "zh-CN": {
+                          description: descriptionZhCn.trim() || null,
+                          status: descriptionZhCn.trim() ? "draft" : "missing",
+                          title: null
+                        }
+                      }
                     )
                   }
                   type="button"
@@ -1360,7 +1412,12 @@ export function AdminReviewQueueView({
     }>,
     description?: string | null,
     descriptionEn?: string | null,
-    descriptionTh?: string | null
+    descriptionTh?: string | null,
+    translations?: Record<string, {
+      description?: string | null;
+      status?: "complete" | "draft" | "missing";
+      title?: string | null;
+    }>
   ) {
     setSavingReviewId(row.id);
     setErrorReviewId(null);
@@ -1375,7 +1432,8 @@ export function AdminReviewQueueView({
           descriptionTh,
           mergeProductId,
           parsedFacts,
-          reviewerNote
+          reviewerNote,
+          translations
         }),
         headers: {
           "Content-Type": "application/json"
@@ -1646,7 +1704,7 @@ export function AdminReviewQueueView({
           error={errorReviewId === visibleReview.row.id}
           labels={labels}
           onClose={closeReviewModal}
-          onDecision={(action, mergeProductId, reviewerNote, parsedFacts, description, descriptionEn, descriptionTh) =>
+          onDecision={(action, mergeProductId, reviewerNote, parsedFacts, description, descriptionEn, descriptionTh, translations) =>
             void decideProductImportReview(
               visibleReview.row,
               action,
@@ -1655,7 +1713,8 @@ export function AdminReviewQueueView({
               parsedFacts,
               description,
               descriptionEn,
-              descriptionTh
+              descriptionTh,
+              translations
             )
           }
           productsData={productsData}

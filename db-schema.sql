@@ -83,6 +83,7 @@ drop table if exists
   public.supplement_aliases,
   public.supplement_recommendation_selections,
   public.supplement_safety_limits,
+  public.supplement_translations,
   public.supplement_versions,
   public.supplements,
   public.task_approvals,
@@ -202,7 +203,7 @@ $$;
 -- Name: prevent_task_dependency_cycle(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.prevent_task_dependency_cycle() RETURNS trigger
+create or replace function public.prevent_task_dependency_cycle() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 declare
@@ -902,8 +903,8 @@ CREATE TABLE public.foods (
     normalized_name text NOT NULL,
     category text DEFAULT 'Other'::text NOT NULL,
     primary_use_case text,
-    benefit_tags text[] DEFAULT '{}'::text[] NOT NULL,
-    nutrient_tags text[] DEFAULT '{}'::text[] NOT NULL,
+    benefit_tags text[] NOT NULL DEFAULT '{}'::text[],
+    nutrient_tags text[] NOT NULL DEFAULT '{}'::text[],
     notes text,
     list_status text DEFAULT 'whitelisted'::text NOT NULL,
     is_active boolean DEFAULT true NOT NULL,
@@ -1126,16 +1127,16 @@ CREATE TABLE public.plan_communication_identities (
 
 CREATE TABLE public.plan_feedback (
     id uuid NOT NULL,
-    plan_id uuid NOT NULL,
+    plan_id uuid NOT NULL REFERENCES public.assessments(plan_id),
     source_message_id uuid,
     source_task_id uuid,
-    feedback_type text NOT NULL,
+    feedback_type text NOT NULL CHECK (feedback_type = ANY (ARRAY['budget'::text, 'capsule_limit'::text, 'constraint'::text, 'cuisine'::text, 'dislike'::text, 'preference'::text, 'removal'::text, 'routine'::text, 'safety_disclosure'::text, 'other'::text])),
     item_type text,
     item_id text,
     item_name text,
     normalized_text text NOT NULL,
     body text NOT NULL,
-    urgency text DEFAULT 'normal'::text NOT NULL,
+    urgency text NOT NULL DEFAULT 'normal'::text,
     status text DEFAULT 'active'::text NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -1160,11 +1161,11 @@ COMMENT ON TABLE public.plan_feedback IS 'Durable concierge feedback and prefere
 
 CREATE TABLE public.plan_guidance_adjustments (
     id uuid NOT NULL,
-    plan_id uuid NOT NULL,
+    plan_id uuid NOT NULL REFERENCES public.assessments(plan_id),
     source_message_id uuid,
     source_task_id uuid,
     action text DEFAULT 'remove'::text NOT NULL,
-    item_type text NOT NULL,
+    item_type text NOT NULL CHECK (item_type in ('food', 'supplement')),
     item_id text,
     item_name text NOT NULL,
     normalized_item_name text NOT NULL,
@@ -1861,6 +1862,28 @@ CREATE TABLE public.supplements (
 
 
 --
+-- Name: supplement_translations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.supplement_translations (
+    supplement_id uuid NOT NULL,
+    locale text NOT NULL REFERENCES public.site_locales(code),
+    name text,
+    primary_use_case text,
+    category_label text,
+    safety_notes text,
+    aliases text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    status text DEFAULT 'draft'::text NOT NULL,
+    source text DEFAULT 'admin'::text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT supplement_translations_pkey PRIMARY KEY (supplement_id, locale),
+    CONSTRAINT supplement_translations_status_check CHECK ((status = ANY (ARRAY['complete'::text, 'draft'::text, 'missing'::text])))
+);
+
+
+--
 -- Name: task_approvals; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1992,7 +2015,7 @@ CREATE TABLE public.tasks (
     description text,
     actor_type text DEFAULT 'system'::text NOT NULL,
     status text DEFAULT 'queued'::text NOT NULL,
-    business_value integer DEFAULT 200 NOT NULL,
+    business_value integer NOT NULL DEFAULT 200,
     required_capabilities text[] DEFAULT '{}'::text[] NOT NULL,
     reasoning_effort text DEFAULT 'none'::text NOT NULL,
     context jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -2000,7 +2023,7 @@ CREATE TABLE public.tasks (
     result_payload jsonb DEFAULT '{}'::jsonb NOT NULL,
     error_message text,
     idempotency_key text,
-    idempotency_scope_key text DEFAULT 'global'::text NOT NULL,
+    idempotency_scope_key text NOT NULL DEFAULT 'global'::text,
     scheduled_for timestamp with time zone DEFAULT now() NOT NULL,
     reserved_by_agent_id uuid,
     lease_until timestamp with time zone,
@@ -2010,7 +2033,7 @@ CREATE TABLE public.tasks (
     retry_root_task_id uuid,
     retry_attempt integer DEFAULT 0 NOT NULL,
     max_retries integer DEFAULT 0 NOT NULL,
-    retry_policy jsonb DEFAULT '{}'::jsonb NOT NULL,
+    retry_policy jsonb NOT NULL DEFAULT '{}'::jsonb,
     created_by_agent_id uuid,
     created_by_task_id uuid,
     started_at timestamp with time zone,
@@ -2083,6 +2106,7 @@ COMMENT ON COLUMN public.tasks.reasoning_effort IS 'Declared reasoning level for
 
 CREATE TABLE public.testimonials (
     id uuid NOT NULL,
+    translation_group_id uuid NOT NULL,
     locale text DEFAULT 'en'::text NOT NULL REFERENCES public.site_locales(code),
     status text DEFAULT 'published'::text NOT NULL,
     quote text NOT NULL,
@@ -2121,6 +2145,161 @@ CREATE TABLE public.worker_sessions (
     CONSTRAINT worker_sessions_concurrency_check CHECK ((concurrency > 0)),
     CONSTRAINT worker_sessions_status_check CHECK ((status = ANY (ARRAY['idle'::text, 'polling'::text, 'working'::text, 'offline'::text])))
 );
+
+
+--
+-- Baseline append-only versions for current projections.
+--
+
+INSERT INTO public.assessment_versions (
+    plan_id,
+    version,
+    action,
+    actor,
+    reason,
+    source,
+    snapshot,
+    metadata,
+    created_at
+)
+SELECT
+    assessments.plan_id,
+    1,
+    'baseline',
+    'schema_rebuild',
+    'versioned_projection_baseline',
+    'versioned_projection_baseline',
+    to_jsonb(assessments),
+    jsonb_build_object('source', 'versioned_projection_baseline'),
+    coalesce(assessments.created_at, now())
+FROM public.assessments assessments
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.nutrition_plan_versions (
+    plan_id,
+    version,
+    action,
+    actor,
+    reason,
+    source,
+    task_id,
+    snapshot,
+    metadata,
+    created_at
+)
+SELECT
+    nutrition_reports.plan_id,
+    nutrition_reports.version,
+    'baseline',
+    'schema_rebuild',
+    'versioned_projection_baseline',
+    'versioned_projection_baseline',
+    nutrition_reports.task_id,
+    to_jsonb(nutrition_reports),
+    jsonb_build_object('source', 'versioned_projection_baseline'),
+    coalesce(nutrition_reports.generated_at, now())
+FROM public.nutrition_reports nutrition_reports
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.supplement_versions (
+    supplement_id,
+    version,
+    action,
+    actor,
+    change_reason,
+    source,
+    after_payload,
+    snapshot,
+    metadata,
+    created_at
+)
+SELECT
+    supplements.id,
+    1,
+    'baseline',
+    'schema_rebuild',
+    'versioned_projection_baseline',
+    'versioned_projection_baseline',
+    to_jsonb(supplements),
+    to_jsonb(supplements),
+    jsonb_build_object('source', 'versioned_projection_baseline'),
+    coalesce(supplements.created_at, now())
+FROM public.supplements supplements
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.product_versions (
+    product_id,
+    version,
+    actor,
+    change_note,
+    reason,
+    source,
+    title,
+    title_en,
+    title_th,
+    brand_name,
+    normalized_brand_name,
+    image_url,
+    product_url,
+    normalized_url,
+    description,
+    description_en,
+    description_th,
+    fda_approval_number,
+    product_kind,
+    product_audience,
+    status,
+    label_status,
+    availability_status,
+    affiliate_status,
+    price_amount,
+    currency,
+    validation_status,
+    validation_reasons,
+    validation_summary,
+    validation_checked_at,
+    source_snapshot,
+    snapshot,
+    metadata,
+    created_at
+)
+SELECT
+    products.id,
+    1,
+    'schema_rebuild',
+    'versioned_projection_baseline',
+    'versioned_projection_baseline',
+    'versioned_projection_baseline',
+    products.title,
+    products.title_en,
+    products.title_th,
+    products.brand_name,
+    products.normalized_brand_name,
+    products.image_url,
+    products.product_url,
+    products.normalized_url,
+    products.description,
+    products.description_en,
+    products.description_th,
+    products.fda_approval_number,
+    products.product_kind,
+    products.product_audience,
+    products.status,
+    products.label_status,
+    products.availability_status,
+    products.affiliate_status,
+    products.price_amount,
+    products.currency,
+    products.validation_status,
+    products.validation_reasons,
+    products.validation_summary,
+    products.validation_checked_at,
+    products.source_snapshot,
+    to_jsonb(products),
+    jsonb_build_object('source', 'versioned_projection_baseline'),
+    coalesce(products.created_at, now())
+FROM public.products products
+ON CONFLICT DO NOTHING;
 
 
 --
@@ -2762,6 +2941,13 @@ ALTER TABLE ONLY public.tasks
 ALTER TABLE ONLY public.testimonials
     ADD CONSTRAINT testimonials_pkey PRIMARY KEY (id);
 
+--
+-- Name: testimonials testimonials_translation_group_locale_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.testimonials
+    ADD CONSTRAINT testimonials_translation_group_locale_key UNIQUE (translation_group_id, locale);
+
 
 --
 -- Name: worker_sessions worker_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -3244,7 +3430,7 @@ CREATE INDEX nutrition_reports_latest_idx ON public.nutrition_reports USING btre
 -- Name: nutrition_reports_task_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX nutrition_reports_task_idx ON public.nutrition_reports USING btree (task_id) WHERE (task_id IS NOT NULL);
+CREATE UNIQUE INDEX nutrition_reports_task_idx ON public.nutrition_reports (task_id) WHERE task_id IS NOT NULL;
 
 
 --
@@ -3682,6 +3868,13 @@ CREATE INDEX supplement_safety_limits_supplement_idx ON public.supplement_safety
 
 
 --
+-- Name: supplement_translations_locale_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX supplement_translations_locale_idx ON public.supplement_translations USING btree (locale, status);
+
+
+--
 -- Name: supplement_versions_latest_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3868,6 +4061,12 @@ CREATE INDEX tasks_retry_lineage_idx ON public.tasks USING btree (task_group_id,
 --
 
 CREATE INDEX testimonials_status_idx ON public.testimonials USING btree (locale, status, sort_order, created_at DESC);
+
+--
+-- Name: testimonials_translation_group_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX testimonials_translation_group_idx ON public.testimonials USING btree (translation_group_id);
 
 
 --
@@ -4543,6 +4742,14 @@ ALTER TABLE ONLY public.supplement_recommendation_selections
 
 ALTER TABLE ONLY public.supplement_safety_limits
     ADD CONSTRAINT supplement_safety_limits_supplement_id_fkey FOREIGN KEY (supplement_id) REFERENCES public.supplements(id) ON DELETE CASCADE;
+
+
+--
+-- Name: supplement_translations supplement_translations_supplement_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.supplement_translations
+    ADD CONSTRAINT supplement_translations_supplement_id_fkey FOREIGN KEY (supplement_id) REFERENCES public.supplements(id) ON DELETE CASCADE;
 
 
 --

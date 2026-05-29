@@ -16,6 +16,10 @@ const logoCopy = {
   th: {
     aria: "โลโก้ MattaNutra รู้ปริมาณที่พอดี",
     tagline: "รู้ปริมาณที่พอดี"
+  },
+  "zh-CN": {
+    aria: "MattaNutra 标志。了解合适的剂量。",
+    tagline: "了解合适的剂量"
   }
 } satisfies Record<Locale, { aria: string; tagline: string }>;
 
@@ -53,7 +57,12 @@ export function HealthspanLogo({
           <span className="text-[var(--mn-logo-ink,var(--mn-ink))]">Matta</span>
           <span className="text-[var(--mn-teal)]">Nutra</span>
         </span>
-        <span className="mn-logo-tagline mt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--mn-logo-tagline,var(--muted-foreground))] sm:text-[10.5px]">
+        <span
+          className={cn(
+            "mn-logo-tagline mt-1 text-[10px] font-medium text-[var(--mn-logo-tagline,var(--muted-foreground))] sm:text-[10.5px]",
+            locale === "zh-CN" ? "normal-case tracking-normal" : "uppercase tracking-[0.16em]"
+          )}
+        >
           {copy.tagline}
         </span>
       </span>

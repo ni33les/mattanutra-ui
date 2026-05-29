@@ -9,7 +9,7 @@ import {
   hasAdminDashboardFilters,
   type AdminDashboardFilters
 } from "@/lib/admin-dashboard-filters";
-import type { Locale } from "@/lib/i18n";
+import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 import {
   rangeOrder,
   type AdminContent,
@@ -68,18 +68,16 @@ export function LocaleFilterSelector({
   range: AdminDashboardRange;
   view: AdminDashboardView;
 }>) {
-  const localeOptions = [
-    { label: "EN", value: "en" },
-    { label: "TH", value: "th" }
-  ];
+  const localeOptions = publicLocales.map((value) => ({
+    label: localeLabels[value],
+    value
+  }));
   const activeLocales =
-    filters.locale === "en"
-      ? new Set(["en"])
-      : filters.locale === "th"
-        ? new Set(["th"])
-        : filters.locale === "none"
-          ? new Set<string>()
-          : new Set(["en", "th"]);
+    filters.locale === "none"
+      ? new Set<string>()
+      : filters.locale
+        ? new Set(filters.locale.split(",").filter((value) => publicLocales.includes(value as Locale)))
+        : new Set<string>(publicLocales);
 
   function toggledLocaleFilter(value: string) {
     const next = new Set(activeLocales);
@@ -90,7 +88,7 @@ export function LocaleFilterSelector({
       next.add(value);
     }
 
-    if (next.size === 2) {
+    if (next.size === localeOptions.length) {
       return "";
     }
 
@@ -98,7 +96,7 @@ export function LocaleFilterSelector({
       return "none";
     }
 
-    return next.has("en") ? "en" : "th";
+    return publicLocales.filter((localeCode) => next.has(localeCode)).join(",");
   }
 
   return (

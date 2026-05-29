@@ -4,6 +4,7 @@ import {
   CONTENT_MASTER_STATUSES,
   isContentMasterTable
 } from "@/lib/catalogue-snapshot-tables";
+import { publicLocales } from "@/lib/i18n";
 
 type SnapshotTables = Record<string, unknown>;
 
@@ -119,7 +120,7 @@ export function validateCuratedMasterSnapshot(
 
     const locales = translationLocalesByFood.get(textValue(food.id));
 
-    for (const locale of ["en", "th"]) {
+    for (const locale of publicLocales) {
       if (!locales?.has(locale)) {
         errors.push(`whitelisted food ${normalizedName} is missing ${locale} translation`);
       }

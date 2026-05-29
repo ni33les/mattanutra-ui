@@ -134,6 +134,43 @@ const footerCopy = {
       "MattaNutra เป็นแพลตฟอร์มแนะแนวสุขภาพ ไม่ใช่การวินิจฉัยหรือการรักษาทางการแพทย์ หากคุณตั้งครรภ์ ให้นมบุตร ใช้ยา หรือมีโรคประจำตัว ควรปรึกษาผู้เชี่ยวชาญก่อนเริ่มใช้อาหารเสริม",
     copyright:
       "© 2026 MattaNutra · แผนสุขภาพเฉพาะบุคคลด้วย AI · เชียงใหม่ ประเทศไทย"
+  },
+  "zh-CN": {
+    body:
+      "由 AI 驱动的个性化健康计划，在清迈设计，贴合东南亚生活。古老智慧 · 现代科学。",
+    columns: [
+      {
+        title: "产品",
+        links: [
+          ["免费评估", "/nutrition/quiz"],
+          ["如何运作", "/#how-it-works"],
+          ["四项承诺", "/#promises"],
+          ["价格", "/#pricing"]
+        ]
+      },
+      {
+        title: "了解",
+        links: [
+          ["文章", "/#journal"],
+          ["Mattaññutā", "/#origin"],
+          ["成分库", "/#journal"],
+          ["顾问服务", "/#pricing"]
+        ]
+      },
+      {
+        title: "公司",
+        links: [
+          ["关于", "/#origin"],
+          ["联系", "mailto:hello@mattanutra.com"],
+          ["服务条款", "/terms"],
+          ["隐私政策", "/privacy"]
+        ]
+      }
+    ],
+    disclaimer:
+      "MattaNutra 是健康指导平台，不提供医学诊断或治疗方案。孕期、哺乳期、正在用药或管理疾病的用户，在开始任何补充剂计划前应咨询合格医疗专业人士。",
+    copyright:
+      "© 2026 MattaNutra · AI 个性化健康计划 · 泰国清迈"
   }
 } as const;
 
@@ -196,7 +233,7 @@ export function SiteFooter({
           <span className="mn-site-footer-languages">
             {publicLocales.map((language) => (
               <Link
-                href={`/api/locale?locale=${language}&next=%2F${language}`}
+                href={`/${language}`}
                 key={language}
               >
                 {localeLabels[language]}

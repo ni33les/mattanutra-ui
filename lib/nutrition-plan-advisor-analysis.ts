@@ -22,7 +22,7 @@ import {
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
 import { normalizePlanFeedbackItems } from "@/lib/plan-feedback";
-import type { Locale } from "@/lib/i18n";
+import { publicLocales, type Locale, type LocaleCode } from "@/lib/i18n";
 
 type AdvisorInput = Readonly<{
   answers: unknown;
@@ -44,6 +44,12 @@ const DEFAULT_PROMPT_VERSION = "v1";
 const CHAT_MAX_RESPONSE_TOKENS = 1_200;
 const REPORT_MAX_RESPONSE_TOKENS = 6_500;
 const REQUEST_TIMEOUT_MS = 360_000;
+
+const displayLocaleNames = {
+  en: "English",
+  th: "Thai",
+  "zh-CN": "Simplified Chinese"
+} satisfies Record<Locale, string>;
 
 const revealPageSlotGuide: Record<string, string> = {
   breadcrumbsBody:
@@ -201,7 +207,8 @@ export async function analyzeNutritionPlanChatWithGrok(input: AdvisorInput) {
             context: contextPayload(input),
             instructions: [
               "Return a JSON object with exactly three fields: reply, feedback, and adjustments.",
-              "Use the client's selected locale when possible.",
+              `Write reply and durable feedback body text in ${displayLocaleNames[input.locale]} (${input.locale}).`,
+              "User-facing text must be plain strings in the requested display locale, not localized language maps.",
               "Keep the reply to 2 to 5 short sentences.",
               "Ask at most one useful follow-up question.",
               "Do not ask a follow-up question when the user is clearly asking you to regenerate, rebuild, refine, finalize, deliver, update, or go ahead with the plan.",
@@ -236,7 +243,9 @@ export async function analyzeNutritionPlanChatWithGrok(input: AdvisorInput) {
 
   return {
     attempts: 1,
+    locale: input.locale,
     model: completion.model ?? config.model,
+    outputLocaleMode: "single_display_locale",
     promptVersion: config.promptVersion,
     reasoningEffort: config.reasoningEffort,
     adjustments,
@@ -291,21 +300,33 @@ function normalizeChatAdjustments(value: unknown) {
     .slice(0, 20) as PlanGuidanceAdjustment[];
 }
 
-function localizedText(value: unknown) {
+function localizedText(value: unknown, displayLocale: Locale) {
   if (typeof value === "string") {
-    return value;
+    return value.trim();
   }
 
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const record = value as Record<string, unknown>;
-    const en = typeof record.en === "string" ? record.en.trim() : "";
-    const th = typeof record.th === "string" ? record.th.trim() : "";
+    const requested =
+      typeof record[displayLocale] === "string"
+        ? record[displayLocale].trim()
+        : "";
 
-    if (en || th) {
-      return {
-        en: en || th,
-        th: th || en
-      };
+    if (requested) {
+      return requested;
+    }
+
+    const localized = Object.fromEntries(
+      publicLocales
+        .map((locale) => [
+          locale,
+          typeof record[locale] === "string" ? record[locale].trim() : ""
+        ] as const)
+        .filter(([, text]) => Boolean(text))
+    ) as Partial<Record<LocaleCode, string>>;
+
+    if (Object.keys(localized).length > 0) {
+      return localized;
     }
   }
 
@@ -341,7 +362,7 @@ function hasForbiddenRevealCopy(value: string) {
   return revealCopyForbiddenTerms.find((term) => lower.includes(term));
 }
 
-export function validateRevealPageCopy(value: unknown): {
+export function validateRevealPageCopy(value: unknown, displayLocale?: Locale): {
   copy?: RevealPageCopy;
   errors: string[];
 } {
@@ -367,7 +388,7 @@ export function validateRevealPageCopy(value: unknown): {
     errors.push(`revealPageCopy.version must be ${revealPageCopyVersion}`);
   }
 
-  const copy: Partial<Record<RevealPageCopySlot, { en: string; th: string }>> & {
+  const copy: Partial<Record<RevealPageCopySlot, string | Partial<Record<LocaleCode, string>>>> & {
     version?: typeof revealPageCopyVersion;
   } = {};
 
@@ -378,14 +399,36 @@ export function validateRevealPageCopy(value: unknown): {
   for (const slot of revealPageCopySlots) {
     const localized = record[slot];
 
+    if (typeof localized === "string" && localized.trim()) {
+      const text = localized.trim();
+      const forbidden = hasForbiddenRevealCopy(text);
+
+      if (forbidden) {
+        errors.push(`revealPageCopy.${slot} contains forbidden term: ${forbidden}`);
+      }
+
+      if (hasHtmlOrMarkdown(text)) {
+        errors.push(`revealPageCopy.${slot} must not contain HTML or markdown`);
+      }
+
+      if (hasNumericClaim(text)) {
+        errors.push(`revealPageCopy.${slot} must not introduce numeric claims`);
+      }
+
+      copy[slot] = text;
+      continue;
+    }
+
     if (!localized || typeof localized !== "object" || Array.isArray(localized)) {
-      errors.push(`revealPageCopy.${slot} must be a localized object`);
+      errors.push(`revealPageCopy.${slot} must be a string or localized object`);
       continue;
     }
 
     const localizedRecord = localized as Record<string, unknown>;
     const localeKeys = Object.keys(localizedRecord);
-    const extraLocaleKeys = localeKeys.filter((key) => key !== "en" && key !== "th");
+    const extraLocaleKeys = localeKeys.filter(
+      (key) => !publicLocales.includes(key as Locale)
+    );
 
     if (extraLocaleKeys.length > 0) {
       errors.push(
@@ -393,21 +436,27 @@ export function validateRevealPageCopy(value: unknown): {
       );
     }
 
-    const en = typeof localizedRecord.en === "string" ? localizedRecord.en.trim() : "";
-    const th = typeof localizedRecord.th === "string" ? localizedRecord.th.trim() : "";
+    const localizedValues = Object.fromEntries(
+      publicLocales.map((locale) => [
+        locale,
+        typeof localizedRecord[locale] === "string"
+          ? localizedRecord[locale].trim()
+          : ""
+      ])
+    ) as Record<Locale, string>;
+    const requestedText = displayLocale ? localizedValues[displayLocale] : "";
 
-    if (!en) {
-      errors.push(`revealPageCopy.${slot}.en is required`);
+    if (displayLocale && !requestedText) {
+      errors.push(`revealPageCopy.${slot}.${displayLocale} is required`);
     }
 
-    if (!th) {
-      errors.push(`revealPageCopy.${slot}.th is required`);
+    if (!displayLocale && !localizedValues.en && !localizedValues.th) {
+      errors.push(`revealPageCopy.${slot} must include at least en or th`);
     }
 
-    for (const [locale, text] of [
-      ["en", en],
-      ["th", th]
-    ] as const) {
+    for (const locale of publicLocales) {
+      const text = localizedValues[locale];
+
       if (!text) {
         continue;
       }
@@ -427,8 +476,18 @@ export function validateRevealPageCopy(value: unknown): {
       }
     }
 
-    if (en && th) {
-      copy[slot] = { en, th };
+    if (displayLocale && requestedText) {
+      copy[slot] = requestedText;
+    } else {
+      const normalized = Object.fromEntries(
+        publicLocales
+          .map((locale) => [locale, localizedValues[locale]] as const)
+          .filter(([, text]) => Boolean(text))
+      ) as Partial<Record<LocaleCode, string>>;
+
+      if (Object.keys(normalized).length > 0) {
+        copy[slot] = normalized;
+      }
     }
   }
 
@@ -437,7 +496,7 @@ export function validateRevealPageCopy(value: unknown): {
     : { copy: copy as RevealPageCopy, errors: [] };
 }
 
-function reportSections(value: unknown) {
+function reportSections(value: unknown, displayLocale: Locale) {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -448,8 +507,8 @@ function reportSections(value: unknown) {
         item && typeof item === "object" && !Array.isArray(item)
           ? (item as Record<string, unknown>)
           : {};
-      const title = localizedText(record.title);
-      const body = localizedText(record.body);
+      const title = localizedText(record.title, displayLocale);
+      const body = localizedText(record.body, displayLocale);
 
       if (!title || !body) {
         return null;
@@ -467,23 +526,25 @@ function reportSections(value: unknown) {
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
 }
 
-function normalizeReport(value: unknown): NutritionReport {
+function normalizeReport(value: unknown, displayLocale: Locale): NutritionReport {
   const record =
     value && typeof value === "object" && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
-  const summary = localizedText(record.summary);
-  const title = localizedText(record.title);
-  const dailyFocus = reportSections(record.dailyFocus);
-  const synergies = reportSections(record.synergies);
-  const nextSteps = reportSections(record.nextSteps);
+  const summary = localizedText(record.summary, displayLocale);
+  const title = localizedText(record.title, displayLocale);
+  const dailyFocus = reportSections(record.dailyFocus, displayLocale);
+  const synergies = reportSections(record.synergies, displayLocale);
+  const nextSteps = reportSections(record.nextSteps, displayLocale);
   const safetyNotes = Array.isArray(record.safetyNotes)
-    ? record.safetyNotes.map(localizedText).filter(Boolean)
+    ? record.safetyNotes
+        .map((note) => localizedText(note, displayLocale))
+        .filter(Boolean)
     : [];
   const revealPageCopyResult =
     record.revealPageCopy === undefined
       ? null
-      : validateRevealPageCopy(record.revealPageCopy);
+      : validateRevealPageCopy(record.revealPageCopy, displayLocale);
 
   if (!summary || !title) {
     throw new Error("Nutrition report is missing title or summary");
@@ -521,70 +582,60 @@ export async function analyzeNutritionReportWithGrok(input: AdvisorInput) {
             contract: {
               report: {
                 dailyFocus: [
-                  {
-                    body: { en: "short paragraph", th: "short paragraph" },
-                    id: "stable-kebab-case",
-                    title: { en: "short title", th: "short title" }
-                  }
-                ],
-                nextSteps: [
-                  {
-                    body: { en: "short paragraph", th: "short paragraph" },
-                    id: "stable-kebab-case",
-                    title: { en: "short title", th: "short title" }
-                  }
-                ],
-                safetyNotes: [
-                  {
-                    en: "short conservative safety note",
-                    th: "short conservative safety note"
-                  }
-                ],
-                revealPageCopy: {
-                  version: revealPageCopyVersion,
-                  ...Object.fromEntries(
-                    revealPageCopySlots.map((slot) => [
-                      slot,
-                      {
-                        en: "short personalized copy without numbers or medical claims",
-                        th: "short personalized Thai copy without numbers or medical claims"
-                      }
-                    ])
-                  )
-                },
-                summary: {
-                  en: "one concise summary paragraph",
-                  th: "one concise summary paragraph"
-                },
-                synergies: [
-                  {
-                    body: { en: "short paragraph", th: "short paragraph" },
-                    id: "stable-kebab-case",
-                    title: { en: "short title", th: "short title" }
-                  }
-                ],
-                title: {
-                  en: "Final nutrition plan",
-                  th: "Final nutrition plan"
-                }
-              },
-              revealPageSlotGuide
-            },
-            instructions: [
-              "Return a JSON object with exactly one top-level key: report.",
-              "dailyFocus must contain 3 to 5 practical daily priorities.",
-              "synergies must contain 2 to 4 food-plus-supplement combinations or routines.",
-              "nextSteps must contain 2 to 4 customer actions.",
-              "safetyNotes must contain 2 to 5 conservative notes.",
-              `revealPageCopy is required, must set version to ${revealPageCopyVersion}, and must contain every listed reveal page slot.`,
-              "Every revealPageCopy slot must include English and Thai.",
-              "revealPageCopy is copy-only. Do not include scores, counts, doses, product names, product links, FDA status, diagnoses, treatments, cures, prescriptions, HTML, markdown, or numeric claims.",
-              "Use firstName only as optional display context; if it is missing, write copy that still reads naturally without a name.",
-              "Use healthScore copySeeds, assessment goals, symptoms, safety flags, formulation rows, food guidance, and plan feedback only to phrase the page narrative. Do not alter locked facts.",
-              "English revealPageCopy must stay faithful to the reveal prototype voice and must not rewrite locked template headings or labels.",
-              "Thai revealPageCopy must be natural Thai, not word-for-word English; avoid cramped uppercase-style phrasing and keep sentences easy to wrap on mobile.",
-              "Every display field must include English and Thai."
-            ]
+	                  {
+	                    body: "short paragraph in the requested display locale",
+	                    id: "stable-kebab-case",
+	                    title: "short title in the requested display locale"
+	                  }
+	                ],
+	                nextSteps: [
+	                  {
+	                    body: "short paragraph in the requested display locale",
+	                    id: "stable-kebab-case",
+	                    title: "short title in the requested display locale"
+	                  }
+	                ],
+	                safetyNotes: [
+	                  "short conservative safety note in the requested display locale"
+	                ],
+	                revealPageCopy: {
+	                  version: revealPageCopyVersion,
+	                  ...Object.fromEntries(
+	                    revealPageCopySlots.map((slot) => [
+	                      slot,
+	                      "short personalized copy in the requested display locale without numbers or medical claims"
+	                    ])
+	                  )
+	                },
+	                summary: "one concise summary paragraph in the requested display locale",
+	                synergies: [
+	                  {
+	                    body: "short paragraph in the requested display locale",
+	                    id: "stable-kebab-case",
+	                    title: "short title in the requested display locale"
+	                  }
+	                ],
+	                title: "Final nutrition plan title in the requested display locale"
+	              },
+	              revealPageSlotGuide
+	            },
+	            instructions: [
+	              "Return a JSON object with exactly one top-level key: report.",
+	              `Write every user-facing display field in ${displayLocaleNames[input.locale]} (${input.locale}).`,
+	              "User-facing fields must be plain strings in the requested display locale, not { en, th } or other localized maps.",
+	              "Keep internal ids and enum-like fields in canonical English: section id, feedbackType, itemType, itemId, supplement ids, food ids, product ids, status, category, and safety flag codes.",
+	              "dailyFocus must contain 3 to 5 practical daily priorities.",
+	              "synergies must contain 2 to 4 food-plus-supplement combinations or routines.",
+	              "nextSteps must contain 2 to 4 customer actions.",
+	              "safetyNotes must contain 2 to 5 conservative notes.",
+	              `revealPageCopy is required, must set version to ${revealPageCopyVersion}, and must contain every listed reveal page slot.`,
+	              "Every revealPageCopy slot must be a plain string in the requested display locale.",
+	              "revealPageCopy is copy-only. Do not include scores, counts, doses, product names, product links, FDA status, diagnoses, treatments, cures, prescriptions, HTML, markdown, or numeric claims.",
+	              "Use firstName only as optional display context; if it is missing, write copy that still reads naturally without a name.",
+	              "Use healthScore copySeeds, assessment goals, symptoms, safety flags, formulation rows, food guidance, and plan feedback only to phrase the page narrative. Do not alter locked facts.",
+	              "RevealPageCopy must stay faithful to the reveal prototype voice and must not rewrite locked template headings or labels.",
+	              "For Thai or Simplified Chinese, write natural native-language copy, avoid cramped uppercase-style phrasing, and keep sentences easy to wrap on mobile."
+	            ]
           },
           null,
           2
@@ -598,11 +649,13 @@ export async function analyzeNutritionReportWithGrok(input: AdvisorInput) {
     temperature: 0.2
   });
   const parsed = parseJsonObject(completion.choices?.[0]?.message?.content);
-  const report = normalizeReport(parsed.report);
+  const report = normalizeReport(parsed.report, input.locale);
 
   return {
     attempts: 1,
+    locale: input.locale,
     model: completion.model ?? config.model,
+    outputLocaleMode: "single_display_locale",
     promptVersion: config.promptVersion,
     reasoningEffort: config.reasoningEffort,
     report,

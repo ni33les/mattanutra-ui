@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { isUuid } from "@/lib/assessment-store";
 import { isLocale, locales, type Locale } from "@/lib/i18n";
-import { nutritionRevealPath } from "@/lib/nutrition-paths";
+import { nutritionQuizPath, nutritionRevealPath } from "@/lib/nutrition-paths";
 
 type LegacyNutritionRevealRedirectPageProps = Readonly<{
   params: Promise<{
@@ -31,7 +31,7 @@ export default async function LegacyNutritionRevealRedirectPage({
   const planId = typeof plan === "string" && isUuid(plan) ? plan : "";
 
   if (!planId) {
-    notFound();
+    redirect(nutritionQuizPath(locale));
   }
 
   redirect(nutritionRevealPath(locale, planId));

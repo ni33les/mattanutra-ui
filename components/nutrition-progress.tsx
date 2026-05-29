@@ -46,6 +46,21 @@ const labels = {
       description: "เราแสดงสูตรของคุณ",
       title: "เปิดเผยแผน"
     }
+  },
+  "zh-CN": {
+    aria: "营养计划进度",
+    plan: {
+      description: "我们成为最适合你的营养指南",
+      title: "交付"
+    },
+    quiz: {
+      description: "我们了解你",
+      title: "发现"
+    },
+    reveal: {
+      description: "我们展示你的配方",
+      title: "揭示"
+    }
   }
 } satisfies Record<
   Locale,

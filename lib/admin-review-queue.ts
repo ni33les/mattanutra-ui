@@ -71,6 +71,11 @@ export type AdminReviewTaskRow = Readonly<{
     description: string | null;
     descriptionEn: string | null;
     descriptionTh: string | null;
+    translations: Record<string, {
+      description: string | null;
+      status: string;
+      title: string | null;
+    }>;
     duplicateProductIds: string[];
     fdaApprovalNumber: string | null;
     imageUrls: string[];
@@ -266,6 +271,25 @@ function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
     : reviewKind === "unknown_food" || row.item_type === "food"
       ? "food"
       : "supplement";
+  const productImportTranslations =
+    payload.translations && typeof payload.translations === "object" && !Array.isArray(payload.translations)
+      ? Object.fromEntries(
+          Object.entries(payload.translations as Record<string, unknown>)
+            .map(([locale, value]) => {
+              const record = value && typeof value === "object" && !Array.isArray(value)
+                ? value as Record<string, unknown>
+                : {};
+              return [
+                locale,
+                {
+                  description: textOrNull(record.description),
+                  status: textOrNull(record.status) ?? "draft",
+                  title: textOrNull(record.title)
+                }
+              ] as const;
+            })
+        )
+      : {};
   const clientDoseAmount =
     numberOrNull(row.suggested_dose_value) ??
     numberOrNull(payload.suggestedDoseAmount) ??
@@ -320,6 +344,7 @@ function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
           description: textOrNull(payload.description),
           descriptionEn: textOrNull(payload.descriptionEn),
           descriptionTh: textOrNull(payload.descriptionTh),
+          translations: productImportTranslations,
           duplicateProductIds: textArray(payload.duplicateProductIds),
           fdaApprovalNumber: textOrNull(payload.fdaApprovalNumber),
           imageUrls: textArray(payload.imageUrls),

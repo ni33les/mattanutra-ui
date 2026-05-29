@@ -97,12 +97,14 @@ export type ProductCatalogueEnrichmentDraftInput = Readonly<{
 export type ProductCatalogueEnrichmentDraftResult = Readonly<{
   descriptionEn: string | null;
   descriptionTh: string | null;
+  descriptionZhCn: string | null;
   facts: ProductImportFactInput[];
   notes: string | null;
   productAudience: ProductAudience;
   responseId?: string;
   titleEn: string | null;
   titleTh: string | null;
+  titleZhCn: string | null;
   warnings: string[];
 }>;
 
@@ -574,17 +576,9 @@ async function callGrokCatalogueEnrichment(input: Readonly<{
       "You enrich a supplement product catalogue for MattaNutra product matching.",
       "This is internal catalogue data extraction, not customer advice.",
       "Return JSON only. No markdown and no prose outside JSON.",
-      "Return exactly one root JSON object with keys: titleEn, titleTh, descriptionEn, descriptionTh, facts, productAudience, notes, warnings.",
+      "Return exactly one root JSON object with keys: facts, productAudience, notes, warnings.",
       "Use the supplied source page, label image URLs, and public manufacturer/product knowledge.",
-      "A faithful Thai/English translation or neutral catalogue summary is allowed.",
-      "If the source explicitly contains an English product name, use that exact product name except for whitespace and HTML entity cleanup.",
-      "If the source explicitly contains a Thai product name, use that exact Thai product name except for whitespace cleanup.",
-      "If no explicit Thai product name exists, create a natural Thai display title by translating or transliterating the English product title.",
-      "Never return null for titleTh when an English product title exists.",
-      "For Thai titles, use common Thai brand spellings where applicable: Blackmores = แบลคมอร์ส, DHC = ดีเอชซี, Vistra = วิสทร้า, Swisse = สวิสส์, Mega We Care = เมก้า วี แคร์.",
-      "Preserve meaningful Latin abbreviations and dose markers in titles when Thai readers expect them, such as CoQ10, D3, B12, IU, mg, DHA, EPA, ALA, GABA, ACE, Zinc, Plus, and +.",
-      "Do not return null for descriptionEn or descriptionTh when the supplied evidence contains a product name, product category, pack information, regulatory description, or benefit text; use a minimal neutral catalogue description when needed.",
-      "Do not make medical treatment claims. Keep descriptions neutral and concise.",
+      "Do not generate translated titles or descriptions here. Product display copy is handled by the locale-specific product-copy translation job.",
       "Use canonicalSupplementCatalogue as the vocabulary. If a canonical supplement fits, set name and supplementId exactly.",
       "Only produce high confidence when identity and dose are clear from source page, label image/OCR, or well-known manufacturer-public label data.",
       "Set evidenceSource to page_text, label_image, manufacturer_public, or inferred_name_only for every fact.",
@@ -608,8 +602,6 @@ async function callGrokCatalogueEnrichment(input: Readonly<{
         normalizedName: item.normalizedName
       })),
       output: {
-        descriptionEn: "short neutral English catalogue description",
-        descriptionTh: "short neutral Thai catalogue description",
         facts: [
           {
             amount: "number or null",
@@ -623,8 +615,6 @@ async function callGrokCatalogueEnrichment(input: Readonly<{
         ],
         notes: "short admin-facing enrichment notes",
         productAudience: "both | male | female",
-        titleEn: "English product title",
-        titleTh: "Thai product title",
         warnings: ["short warnings if evidence is weak"]
       },
       product: {
@@ -699,6 +689,7 @@ async function callGrokCatalogueEnrichment(input: Readonly<{
   await recordXaiUsageCost({
     metadata: {
       imageRetry,
+      outputLocaleMode: "canonical_internal_only",
       productId: input.product.id,
       productTitle: input.product.title,
       productUrl: input.product.productUrl
@@ -756,14 +747,16 @@ export async function enrichDraftProductCatalogueWithAi(
   const facts = sanitizedFacts(parsed, catalogue);
 
   return {
-    descriptionEn: textOrNull(parsed.descriptionEn, 1600),
-    descriptionTh: textOrNull(parsed.descriptionTh, 1600),
+    descriptionEn: null,
+    descriptionTh: null,
+    descriptionZhCn: null,
     facts,
     notes: textOrNull(parsed.notes, 1000),
     productAudience: productAudienceValue(parsed.productAudience),
     responseId: completion.id,
-    titleEn: textOrNull(parsed.titleEn, 500),
-    titleTh: textOrNull(parsed.titleTh, 500),
+    titleEn: null,
+    titleTh: null,
+    titleZhCn: null,
     warnings: warningsValue(parsed.warnings)
   };
 }

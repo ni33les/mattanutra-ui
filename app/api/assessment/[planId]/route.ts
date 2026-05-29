@@ -70,6 +70,8 @@ export async function GET(
   const { planId } = await params;
   const url = new URL(request.url);
   const healthScoreView = url.searchParams.get("view") === "healthscore";
+  const requestedLocale = url.searchParams.get("locale");
+  const displayLocale = isLocale(requestedLocale) ? requestedLocale : null;
 
   if (healthScoreView) {
     await enqueueHealthScoreAnalysisTask({ planId });
@@ -92,6 +94,24 @@ export async function GET(
   }
 
   void enqueueDueScheduledActions();
+
+  if (healthScoreView && displayLocale) {
+    const prefill = await getStoredAssessmentPrefill(planId);
+
+    if (prefill?.healthScore && prefill.locale !== displayLocale) {
+      return NextResponse.json(
+        {
+          ...snapshot,
+          healthScore: computeHealthScore(prefill.answers, displayLocale)
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store"
+          }
+        }
+      );
+    }
+  }
 
   return NextResponse.json(snapshot, {
     headers: {

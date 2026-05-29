@@ -52,6 +52,19 @@ const copy = {
         style: "currency"
       }).format(amount),
     title: "ชำระเงินให้เสร็จสมบูรณ์"
+  },
+  "zh-CN": {
+    back: "返回评估",
+    body:
+      "你的付款由 Stripe 安全处理。我们只保存付款状态、所选计划和交易联系信息。",
+    eyebrow: "安全结账",
+    price: (amount: number) =>
+      new Intl.NumberFormat("zh-CN", {
+        currency: "THB",
+        maximumFractionDigits: 0,
+        style: "currency"
+      }).format(amount),
+    title: "完成付款"
   }
 };
 

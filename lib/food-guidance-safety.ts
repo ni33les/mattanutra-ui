@@ -64,8 +64,24 @@ function textFromLocalized(value: LocalizedText) {
   return resolveLocalizedText(value, "en");
 }
 
-function localized(en: string, th = en): LocalizedText {
-  return { en, th };
+function zhSafetyMessage(en: string) {
+  if (en.includes("blocked") || en.includes("blacklisted")) {
+    return "此食物未通过 MattaNutra 食物目录安全规则，因此不会显示为建议。";
+  }
+
+  if (en.includes("acknowledgement was not confirmed")) {
+    return "生成建议前尚未确认食物安全声明，此食物需要团队审核。";
+  }
+
+  if (en.includes("health or medication")) {
+    return "此食物需要根据您披露的健康或用药情况进行团队安全审核。";
+  }
+
+  return "此食物需要经过团队安全审核后才能显示。";
+}
+
+function localized(en: string, th = en, zh = zhSafetyMessage(en)): LocalizedText {
+  return { en, th, "zh-CN": zh };
 }
 
 export function normalizeFoodName(value: string) {

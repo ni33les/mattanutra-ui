@@ -11,6 +11,7 @@ import {
   getRequiredXaiApiKey,
   type GrokChatCompletion
 } from "@/lib/grok-client";
+import { normalizeLocaleCode, type LocaleCode } from "@/lib/i18n";
 
 type ProductForCopyTranslation = Readonly<{
   brandName: string | null;
@@ -35,13 +36,17 @@ export type ProductCopyTranslationDraftInput = Readonly<{
   productTitleTh?: string | null;
   productUrl: string;
   sourceSnapshot?: unknown;
+  targetLocale?: LocaleCode | null;
 }>;
 
 export type ProductCopyTranslationResult = Readonly<{
+  description: string | null;
   descriptionEn: string | null;
   descriptionTh: string | null;
+  locale: LocaleCode;
   notes: string | null;
   responseId?: string;
+  title: string | null;
   titleEn: string | null;
   titleTh: string | null;
 }>;
@@ -179,22 +184,31 @@ function productFromDraft(
 
 function resultFromParsed(
   parsed: Record<string, unknown>,
-  completion: GrokChatCompletion
+  completion: GrokChatCompletion,
+  locale: LocaleCode
 ): ProductCopyTranslationResult {
+  const title = textOrNull(parsed.title, 500);
+  const description = textOrNull(parsed.description, 1600);
+
   return {
-    descriptionEn: textOrNull(parsed.descriptionEn, 1600),
-    descriptionTh: textOrNull(parsed.descriptionTh, 1600),
+    description,
+    descriptionEn: locale === "en" ? description : null,
+    descriptionTh: locale === "th" ? description : null,
+    locale,
     notes: textOrNull(parsed.notes, 1000),
     responseId: completion.id,
-    titleEn: textOrNull(parsed.titleEn, 500),
-    titleTh: textOrNull(parsed.titleTh, 500)
+    title,
+    titleEn: locale === "en" ? title : null,
+    titleTh: locale === "th" ? title : null
   };
 }
 
 async function callGrok(input: Readonly<{
   product: ProductForCopyTranslation;
+  targetLocale?: LocaleCode | null;
 }>) {
   const grok = config();
+  const targetLocale = normalizeLocaleCode(input.targetLocale) ?? "th";
 
   const completion = await callGrokChatCompletion({
     apiKey: grok.apiKey,
@@ -202,24 +216,27 @@ async function callGrok(input: Readonly<{
     messages: [
       {
         content: [
-              "You normalize bilingual product catalogue copy for MattaNutra.",
+              `You normalize product catalogue copy for MattaNutra in locale ${targetLocale}.`,
               "This is internal product catalogue cleanup, not medical advice and not ingredient fact extraction.",
               "Return JSON only. No markdown and no prose outside JSON.",
-              "Return exactly one root JSON object with keys: titleEn, titleTh, descriptionEn, descriptionTh, notes.",
+              "Return exactly one root JSON object with keys: title, description, notes.",
               "Use the manufacturer's source page as authority. Product data may be in Thai, English, or mixed language.",
-              "If the source explicitly contains an English product name, use that exact product name except for whitespace and HTML entity cleanup.",
-              "If the source explicitly contains a Thai product name, use that exact Thai product name except for whitespace cleanup.",
-              "If no explicit Thai product name exists, create a natural Thai display title by translating or transliterating the English product title.",
-              "Never return null for titleTh when an English product title exists.",
+              "Write title and description naturally in the target locale only.",
+              "For zh-CN, use Simplified Chinese with natural spacing and preserve expected Latin abbreviations such as CoQ10, D3, B12, IU, mg, DHA, EPA, ALA, Plus, and +.",
+              "For en, use concise English catalogue wording.",
+              "For th, use natural Thai catalogue wording.",
+              "If the source explicitly contains a product name in the target locale, use that exact product name except for whitespace and HTML entity cleanup.",
+              "If no explicit product name exists in the target locale, create a natural display title by translating or transliterating the best available product title.",
+              "Do not return null for title when an English, Thai, Chinese, or mixed-language product title exists.",
               "For Thai titles, use common Thai brand spellings where applicable: Blackmores = แบลคมอร์ส, DHC = ดีเอชซี, Vistra = วิสทร้า, Swisse = สวิสส์, Mega We Care = เมก้า วี แคร์.",
-              "Preserve meaningful Latin abbreviations and dose markers in titles when Thai readers expect them, such as CoQ10, D3, B12, IU, mg, DHA, EPA, ALA, Plus, and +.",
-              "For descriptionEn, write a concise neutral catalogue description in English from source evidence only; if the evidence is Thai-only, translate or lightly summarize that Thai evidence into English.",
-              "For descriptionTh, write the equivalent concise Thai catalogue description when Thai source evidence exists; if the evidence is English-only, translate or lightly summarize that English evidence into Thai.",
+              "Preserve meaningful Latin abbreviations and dose markers in titles when readers expect them, such as CoQ10, D3, B12, IU, mg, DHA, EPA, ALA, Plus, and +.",
+              "For description, write a concise neutral catalogue description in the target locale from source evidence only.",
               "A faithful translation of source evidence is allowed and is not considered invention.",
               "Do not return null for a description when the supplied evidence contains a product name, product category, pack information, or regulatory description; use a minimal neutral description such as '<product> is a Mega We Care supplement product.' when no richer purpose text exists.",
               "Do not invent ingredients, doses, FDA numbers, warnings, or claims.",
               "Do not include dose tables in descriptions. Ingredient doses belong in canonical facts, not copy fields.",
               "If a field cannot be supported from the supplied evidence, return null for that field.",
+              "Return only the requested target locale for user-facing copy. Do not return parallel English/Thai/Chinese copies or localized maps.",
               "Keep notes short and admin-facing, explaining the source used or why a field is null."
         ].join("\n"),
         role: "system"
@@ -228,11 +245,9 @@ async function callGrok(input: Readonly<{
         content: JSON.stringify(
               {
                 output: {
-                  descriptionEn: "neutral English display description or null",
-                  descriptionTh: "neutral Thai display description or null",
+                  description: "neutral target-locale display description or null",
                   notes: "short admin-facing notes",
-                  titleEn: "English product title or null",
-                  titleTh: "Thai product title"
+                  title: "target-locale product title or null"
                 },
                 product: {
                   brandName: input.product.brandName,
@@ -261,9 +276,12 @@ async function callGrok(input: Readonly<{
 
   await recordXaiUsageCost({
     metadata: {
+      locale: targetLocale,
+      outputLocaleMode: "single_display_locale",
       productId: input.product.id,
       productTitle: input.product.title,
-      productUrl: input.product.productUrl
+      productUrl: input.product.productUrl,
+      targetLocale
     },
     model: completion.model ?? grok.model,
     purpose: "product_copy_translation",
@@ -279,15 +297,17 @@ export async function translateDraftProductCopyWithAi(
   input: ProductCopyTranslationDraftInput
 ): Promise<ProductCopyTranslationResult> {
   const product = productFromDraft(input);
-  const completion = await callGrok({ product });
+  const targetLocale = normalizeLocaleCode(input.targetLocale) ?? "th";
+  const completion = await callGrok({ product, targetLocale });
   const parsed = parseJsonObject(completion.choices?.[0]?.message?.content);
 
-  return resultFromParsed(parsed, completion);
+  return resultFromParsed(parsed, completion, targetLocale);
 }
 
 export async function translateProductCopyWithAi(input: Readonly<{
   actor?: string | null;
   productId: string;
+  targetLocale?: LocaleCode | null;
 }>): Promise<ProductCopyTranslationUpdateResult> {
   const sql = getSql();
 
@@ -296,24 +316,55 @@ export async function translateProductCopyWithAi(input: Readonly<{
   }
 
   const product = await loadProduct(sql, input.productId);
-  const completion = await callGrok({ product });
+  const targetLocale = normalizeLocaleCode(input.targetLocale) ?? "th";
+  const completion = await callGrok({ product, targetLocale });
   const parsed = parseJsonObject(completion.choices?.[0]?.message?.content);
-  const copy = resultFromParsed(parsed, completion);
+  const copy = resultFromParsed(parsed, completion, targetLocale);
+  const usesLegacyFields = targetLocale === "en" || targetLocale === "th";
+  const translatedTitle =
+    copy.title ??
+    (usesLegacyFields && targetLocale === "en" ? copy.titleEn : null) ??
+    (usesLegacyFields && targetLocale === "th" ? copy.titleTh : null);
+  const translatedDescription =
+    copy.description ??
+    (usesLegacyFields && targetLocale === "en" ? copy.descriptionEn : null) ??
+    (usesLegacyFields && targetLocale === "th" ? copy.descriptionTh : null);
   const row = await updateAdminProduct({
     actor: input.actor ?? "product_copy_translation",
     changeNote: "product_copy_translation",
-    descriptionEn: copy.descriptionEn ?? product.descriptionEn,
-    descriptionTh: copy.descriptionTh ?? product.descriptionTh,
+    descriptionEn: targetLocale === "en"
+      ? copy.description ?? copy.descriptionEn ?? product.descriptionEn
+      : copy.descriptionEn ?? product.descriptionEn,
+    descriptionTh: targetLocale === "th"
+      ? copy.description ?? copy.descriptionTh ?? product.descriptionTh
+      : copy.descriptionTh ?? product.descriptionTh,
     id: input.productId,
     sourceSnapshotPatch: {
       aiCopyTranslation: {
-        notes: copy.notes,
-        responseId: copy.responseId ?? null,
-        translatedAt: new Date().toISOString()
+        [targetLocale]: {
+          notes: copy.notes,
+          responseId: copy.responseId ?? null,
+          translatedAt: new Date().toISOString()
+        }
       }
     },
-    titleEn: copy.titleEn ?? product.titleEn,
-    titleTh: copy.titleTh ?? product.titleTh
+    titleEn: targetLocale === "en"
+      ? copy.title ?? copy.titleEn ?? product.titleEn
+      : copy.titleEn ?? product.titleEn,
+    titleTh: targetLocale === "th"
+      ? copy.title ?? copy.titleTh ?? product.titleTh
+      : copy.titleTh ?? product.titleTh,
+    translations: {
+      [targetLocale]: {
+        description: translatedDescription,
+        status: translatedTitle && translatedDescription
+          ? "complete"
+          : translatedTitle || translatedDescription
+            ? "draft"
+            : "missing",
+        title: translatedTitle
+      }
+    }
   });
 
   return { copy, row };

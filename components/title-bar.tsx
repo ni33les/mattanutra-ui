@@ -42,6 +42,21 @@ const titleBarCopy = {
     ],
     menu: "เปิดเมนู",
     navAria: "เมนูหลัก"
+  },
+  "zh-CN": {
+    assessment: "免费评估",
+    availability: "现已覆盖",
+    countries: ["泰国", "新加坡", "马来西亚", "菲律宾"],
+    homeAria: (title: string) => `${title} 首页`,
+    links: [
+      ["#living-protocol", "生活协议"],
+      ["#how-it-works", "如何运作"],
+      ["#promises", "承诺"],
+      ["#pricing", "价格"],
+      ["#journal", "文章"]
+    ],
+    menu: "打开菜单",
+    navAria: "主导航"
   }
 } as const;
 
@@ -110,16 +125,16 @@ export function TitleBar({
           ))}
         </nav>
         <div className="mn-titlebar-actions">
-          <LanguageSwitcher
-            currentLocale={currentLocale}
-            currentPath={currentPath}
-            localizedPaths={localizedPaths}
-          />
           {showAssessmentCta ? (
             <Link className="mn-titlebar-cta" href={assessmentPath}>
               {copy.assessment}
             </Link>
           ) : null}
+          <LanguageSwitcher
+            currentLocale={currentLocale}
+            currentPath={currentPath}
+            localizedPaths={localizedPaths}
+          />
           <details className="mn-titlebar-mobile-menu">
             <summary aria-label={copy.menu}>
               <Menu aria-hidden className="size-5" />

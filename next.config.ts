@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
+import { localeRoutePattern } from "./lib/i18n";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
+// Registry-derived public locales currently include zh-CN.
+const publicLocaleRoutePattern = localeRoutePattern();
 
 const noStoreHeaders = [
   {
@@ -91,11 +94,11 @@ const nextConfig: NextConfig = {
       },
       {
         headers: noStoreHeaders,
-        source: "/:locale(en|th)"
+        source: `/:locale(${publicLocaleRoutePattern})`
       },
       {
         headers: noStoreHeaders,
-        source: "/:locale(en|th)/:path*"
+        source: `/:locale(${publicLocaleRoutePattern})/:path*`
       },
       {
         headers: noStoreHeaders,

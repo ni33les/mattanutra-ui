@@ -14,6 +14,7 @@ import {
   UserRound
 } from "lucide-react";
 import { LandingReveal } from "@/components/landing-reveal";
+import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { BlogPostSummary, BlogTestimonial } from "@/lib/blog";
 import type { Locale } from "@/lib/i18n";
 import { paymentCheckoutPath } from "@/lib/payment-paths";
@@ -43,7 +44,7 @@ const assets = {
   ]
 } as const;
 
-const content = {
+const baseContent = {
   en: {
     hero: {
       eyebrow: "Ancient wisdom · Modern science",
@@ -704,6 +705,434 @@ const content = {
   }
 } as const;
 
+type WidenLandingContent<T> =
+  T extends string ? string :
+  T extends number ? number :
+  T extends boolean ? boolean :
+  T extends readonly (infer Item)[] ? readonly WidenLandingContent<Item>[] :
+  T extends object ? { readonly [Key in keyof T]: WidenLandingContent<T[Key]> } :
+  T;
+
+type LandingContent = WidenLandingContent<typeof baseContent.en>;
+type LandingPricingPlan = Omit<LandingContent["pricing"]["plans"][number], "plan"> & {
+  readonly plan: AssessmentPlan;
+};
+
+const content = {
+  ...baseContent,
+  "zh-CN": {
+    "hero": {
+      "eyebrow": "古老智慧 · 现代科学",
+      "title": "停止猜测。",
+      "accent": "开始了解。",
+      "intro": "AI 驱动的补充剂与健康计划，围绕您的身体、生活方式以及对您真正重要的目标构建，并随生活变化而适应。",
+      "paliTitle": "Mattaññutā",
+      "pali": "Pāli 语，意为“知道适量的智慧”——健康并非来自更多，而是来自恰到好处。",
+      "primary": "开始设计您的适量方案",
+      "secondary": "如何运作",
+      "microcopy": "从免费的 Health Score 开始，了解您的状态。您的个性化 Right Amount Formula 会在您准备好时呈现。",
+      "checks": [
+        "无需信用卡",
+        "评估 120+ 种成分",
+        "包含安全检查"
+      ],
+      "ingredientPills": [
+        "镁",
+        "维生素 D3",
+        "Omega-3",
+        "南非醉茄",
+        "锌"
+      ]
+    },
+    "problem": {
+      "eyebrow": "问题所在",
+      "title": "太多瓶瓶罐罐。",
+      "accent": "太少确定性。",
+      "body": "走进任何药房，补充剂货架都令人眼花缭乱。数百种选择、相互矛盾的建议，却没有明确答案回答唯一重要的问题：我的身体真正需要什么？",
+      "body2": "大多数人最终只能猜测——买了太多不需要的东西，错过了真正需要的，默默怀疑是否有效。",
+      "imageAlt": "面对补充剂选择感到困惑的购物者"
+    },
+    "promises": {
+      "eyebrow": "您可以期待",
+      "title": "四个承诺。",
+      "accent": "一个简单计划。",
+      "intro": "每个 MattaNutra 计划都旨在实现这些目标。",
+      "cards": [
+        [
+          "清晰",
+          "告别困惑"
+        ],
+        [
+          "可信",
+          "值得信赖的指导"
+        ],
+        [
+          "个性化",
+          "专属为您"
+        ],
+        [
+          "自信",
+          "每一次选择都安心"
+        ]
+      ]
+    },
+    "how": {
+      "eyebrow": "如何运作",
+      "title": "适量的问题。",
+      "accent": "不多不少，恰到好处。",
+      "intro": "从简短聚焦的问卷到值得信赖的推荐，仅需四步。",
+      "steps": [
+        [
+          "回答",
+          "简短而详细",
+          "几个聚焦问题，涵盖您的目标、健康优先事项、生活方式、用药、预算以及您真正关心的事。没有术语，没有冗余。"
+        ],
+        [
+          "分析",
+          "120+ 种成分",
+          "您的回答将被映射到补充剂优先级、剂量范围和安全考量。"
+        ],
+        [
+          "匹配",
+          "东南亚适用",
+          "获得产品指导，不再在店内或 Lazada 上猜测。"
+        ],
+        [
+          "优化",
+          "60 天提示",
+          "可选的定期检查会随目标、症状和生活方式变化更新您的计划。"
+        ]
+      ]
+    },
+    "protocol": {
+      "active": "Living Protocol 已激活",
+      "channel": "Line / WhatsApp",
+      "eyebrow": "Living Protocol · 90 天支持",
+      "title": "生活不断变化。",
+      "accent": "您的方案也能跟上。",
+      "intro": "睡眠、压力、旅行和日常作息变化都会改变身体需求。Living Protocol 让您的补充剂以及背后的日常饮食与真实生活保持一致，让今天的适量在下周依然适量。",
+      "primary": "探索 Living Protocol",
+      "secondary": "了解如何运作",
+      "ticks": [
+        "由医师打造——每次调整均对照您的用药和化验结果",
+        "随旅行、压力和睡眠不佳保持一致",
+        "生活变化时减少反复猜测"
+      ],
+      "chat": [
+        "本周有什么不同吗——睡眠、压力、旅行还是作息？",
+        "我明天要去 Tokyo，可能会睡不好。",
+        "收到——Tokyo 六天，预计有睡眠干扰。我已做了三处小调整，其余保持不变。以下是您旅途期间的方案。"
+      ],
+      "updateLabel": "已更新方案",
+      "tripTitle": "您的 Tokyo 之旅——3 处小调整",
+      "updates": [
+        "镁稍早服用——当地时间晚上 7:30 而非 9:30",
+        "飞行途中及每天早晨补充电解质",
+        "其余保持不变"
+      ],
+      "basedOn": "基于：6 天行程 · 预计睡眠干扰 · 会议密集 · 步行增加",
+      "reasoningLabel": "查看推理",
+      "reasoning": [
+        "镁提前服用——帮助您随时差调整，提前进入放松状态。",
+        "增加电解质——支持飞行途中及城市步行增加时的水分平衡。",
+        "适应原保持不变——您的压力虽有上升，但近期睡眠已不稳定，因此暂不叠加调整。"
+      ],
+      "foodNudge": "还有一件事——您上次检查显示镁水平略低。我已纳入计划，您也可以通过天然方式补充：",
+      "foodTags": [
+        "南瓜子",
+        "菠菜",
+        "黑豆"
+      ],
+      "vitaminQuestion": "哦，没想到。关于我的维生素 C——需要补充吗？",
+      "vitaminAnswer": "老实说？您可能不需要。本周水果和蔬菜已足够覆盖。我建议省下这一项——食物已能满足需求。"
+    },
+    "protocolBand": {
+      "title": "您的 Right Amount Formula 是基础。",
+      "accent": "Living Protocol 让它与真实生活保持一致。",
+      "body": "旅行、压力、睡眠不佳和作息变化都会改变身体需求。您的基础不变，但围绕它的微小调整会随之变化。"
+    },
+    "practice": {
+      "eyebrow": "Living Protocol 实践",
+      "title": "三个步骤。",
+      "accent": "无需学习新应用。",
+      "intro": "Living Protocol 融入您已使用的即时通讯。您只需告知变化，其余交给它。",
+      "steps": [
+        [
+          "告诉 MattaNutra 发生了什么变化",
+          "通过 Line 或 WhatsApp 发送简短消息即可——无需表格、无需追踪、无需学习新应用。",
+          [
+            "本周睡眠不好。",
+            "明天出差。",
+            "最近训练强度增加了。"
+          ]
+        ],
+        [
+          "您的方案随您调整",
+          "基于您当前的补充剂、目标和安全标记，MattaNutra 将更新转化为几处精准调整——时间、剂量或临时添加——并推荐支持身体需求的日常食物。",
+          [
+            "本周将镁稍早服用。",
+            "南瓜子是镁的优质天然来源。",
+            "在睡眠恢复前保持适应原剂量不变。"
+          ]
+        ],
+        [
+          "保持一致，无需过度思考",
+          "您无需每次生活忙碌时都重新研究、反复猜测或从头开始。只需做几件简单的事——并确信它们适合您。",
+          [
+            "无需每次生活变化都重新思考日常。",
+            "小调整让计划更现实。",
+            "您的适量始终保持正确。"
+          ]
+        ]
+      ]
+    },
+    "food": {
+      "eyebrow": "食物与补充剂，相辅相成",
+      "title": "最佳来源有时",
+      "accent": "就在您的餐盘上。",
+      "intro": "补充剂填补缺口——但食物优先填补。当 Living Protocol 发现身体需要某物时，它不会只推荐胶囊。它会告诉您哪些日常食物天然富含该成分，让您选择：在晚餐中补充，还是从瓶中补充。无论哪种方式，您都在真正了解，而非猜测。",
+      "cards": [
+        [
+          "镁不足？",
+          "南瓜子、菠菜和黑豆是天然最丰富的来源之一。",
+          [
+            "南瓜子",
+            "菠菜",
+            "黑豆"
+          ]
+        ],
+        [
+          "需要更多铬？",
+          "它出现在意想不到的地方——葡萄汁、西兰花和全谷物。",
+          [
+            "葡萄汁",
+            "西兰花",
+            "全谷物"
+          ]
+        ],
+        [
+          "已经足够？",
+          "如果您的饮食已能满足，Living Protocol 会建议您跳过补充剂——并节省开支。",
+          [
+            "食物已经足够"
+          ]
+        ]
+      ],
+      "note": "无需食物日记。无需计算热量。只需在需要时快速回答，并在有帮助时引导您选择正确的餐盘。"
+    },
+    "difference": {
+      "eyebrow": "为何不同",
+      "title": "不止一个答案。",
+      "accent": "一个了解您的方案。",
+      "paragraphs": [
+        "任何人都能查到旅行如何影响镁。难点在于了解它如何影响您的计划——您的补充剂组合、用药、过去几周的情况——以及实际该怎么做。这正是 Living Protocol 为您处理的。",
+        "它已经知道您服用的一切，因此无需每次变化时重复解释。每次建议的调整都会对照您的用药和化验标记——这种安全保障只有当指导完全围绕您构建时才有效。90 天内，它会逐渐识别您的模式，因此建议不仅反映本周，还反映背后的趋势。",
+        "您无需成为自己的药剂师。只需告诉 MattaNutra 发生了什么变化，它就会让您的方案保持正确。"
+      ]
+    },
+    "bridge": {
+      "title": "准备好设计您的 Right Amount 了吗？",
+      "body": "回答几个聚焦问题，获取免费 Health Score。您的个性化计划——以及添加 Living Protocol 的选项——仅一步之遥。",
+      "cta": "开始设计您的 Right Amount",
+      "note": "查看完整计划和定价。"
+    },
+    "results": {
+      "eyebrow": "真实的人。真实的故事。",
+      "title": "真实的人，真实的起点。",
+      "intro": "不同的生活方式。同一个目标：更好的健康、更清晰的方向，以及可行的日常。",
+      "cta": "开始设计您的 Right Amount",
+      "join": "加入数千名正在为健康做出更明智、更自信选择的人。",
+      "fallback": [
+        {
+          "id": "daniel",
+          "image": "/v14/testimonial-daniel.jpg",
+          "name": "Daniel L.",
+          "place": "40, 曼谷",
+          "role": "项目经理",
+          "quote": "我到了 40 岁，意识到自己一直说想改变，却不知道从哪里开始。我抽屉里塞满随机维生素，却没有真正计划。MattaNutra 给了我清晰的第一步，而没有让整个过程显得压倒性。"
+        },
+        {
+          "id": "meilin",
+          "image": "/v14/testimonial-meilin.jpg",
+          "name": "Mei Lin T.",
+          "place": "45, 新加坡",
+          "role": "运营负责人",
+          "quote": "在工作、旅行和照顾家庭之间，我的健康日常变成了能记住就做的事。MattaNutra 帮助我把杂乱的补充剂架变成适合新加坡真实生活的简单计划。"
+        },
+        {
+          "id": "wanida",
+          "image": "/v14/testimonial-wanida.jpg",
+          "name": "Wanida P.",
+          "place": "43, 孔敬",
+          "role": "店主",
+          "quote": "医生告诉我血压在上升，需要做出改变。我花了几个小时在网上研究补充剂，结果比开始时更困惑。MattaNutra 穿透所有噪音，为我打造了真正适合我生活的方案。"
+        },
+        {
+          "id": "malee",
+          "image": "/v14/testimonial-malee.jpg",
+          "name": "Malee S.",
+          "place": "41, 普吉",
+          "role": "护理助理",
+          "quote": "我在诊所工作，所以大家都以为我确切知道该吃什么补充剂。诚实的真相是，我读得越多，越不确定。MattaNutra 终于给了我一个清晰、合理的计划——这次是为我自己，而不是我的病人。"
+        }
+      ]
+    },
+    "origin": {
+      "eyebrow": "我们的起源",
+      "title": "设计于清迈，",
+      "accent": "适量是一种生活方式。",
+      "body": "MattaNutra 始于泰国北部，那里适度的传统——吃得恰到好处、在正确的时间休息、顺应身体节奏——已悄然精炼了几个世纪。",
+      "body2": "我们打造 MattaNutra，是为了将这种安静的智慧转化为现代、可衡量且个性化的东西：一个了解您身体、随生活变化调整、从不要求您成为别人的计划。",
+      "buildAlt": "MattaNutra 标志从轮廓到完成标记的五个阶段",
+      "founders": "由医师、科学家和创新 AI 思想家共同创立。",
+      "founderParagraphs": [
+        "进入您身体的东西，应该由真正了解其成分的人设计。",
+        "MattaNutra 由一个国际团队创立，团队背景横跨医学、科学、技术、经济学，以及打造长期可用产品的实践。",
+        "我们共同拥有超过一百年的专业实践——在医学、科学、技术以及打造持久事物方面。"
+      ],
+      "signoff": "来自清迈，带着关怀。",
+      "tagline": "古老智慧 · 现代科学"
+    },
+    "pricing": {
+      "eyebrow": "简单定价",
+      "title": "免费开始。",
+      "accent": "准备好时再升级。",
+      "intro": "完成免费问卷即可获得起始计划。仅在需要更精准或持续 AI 支持时升级。",
+      "offer": "限时优惠",
+      "plans": [
+        {
+          "badge": "一次性计划",
+          "name": "Right Amount Formula",
+          "desc": "您的个性化补充剂配方，包含精准剂量、时间和产品指导。",
+          "originalPrice": "THB 990",
+          "saving": "节省 30%",
+          "currency": "THB",
+          "price": "690",
+          "termLabel": "一次性",
+          "term": "一次性付款 · 终身访问",
+          "cta": "获取 Right Amount Formula",
+          "plan": "precision",
+          "best": "想要清晰、自信起点的人——专属的适量。",
+          "features": [
+            "个性化补充剂配方",
+            "按体型调整的剂量范围",
+            "服用时间和使用说明",
+            "用药和化验安全标记",
+            "推荐产品及替代选择",
+            "60 天重新评估提示"
+          ],
+          "guaranteeTitle": "清晰保证。",
+          "guarantee": "如果您的计划感觉不够清晰实用，我们将在 7 天内为您修正或退款。"
+        },
+        {
+          "badge": "高级 · 90 天支持",
+          "popular": "最受欢迎",
+          "name": "Living Protocol",
+          "desc": "让您的适量在生活变化时保持正确。包含 Right Amount Formula 的全部内容，以及生活变化时的持续调整。",
+          "originalPrice": "THB 1,890",
+          "saving": "节省 16%",
+          "currency": "THB",
+          "price": "1,590",
+          "termLabel": "90 天",
+          "term": "一次性付款 · 90 天支持 · 随时续订",
+          "cta": "开始 Living Protocol",
+          "plan": "pro",
+          "best": "希望计划跟上日常生活现实的人。",
+          "features": [
+            "包含完整 Right Amount Formula",
+            "了解哪些日常食物能提供所需",
+            "随生活变化调整时间和剂量",
+            "每次变化均对照用药和化验结果",
+            "90 天内记住您的模式",
+            "只需发送消息告知变化——无需应用、无需追踪",
+            "在旅行、压力和睡眠干扰中保持一致"
+          ],
+          "guaranteeTitle": "7 天满意保证。",
+          "guarantee": "真正试用 Living Protocol。如果有任何不妥，请告诉我们——我们将在 7 天内修复或全额退款。无麻烦。"
+        }
+      ],
+      "trust": [
+        [
+          "安全私密",
+          "您的数据已加密且绝不共享。"
+        ],
+        [
+          "有科学依据",
+          "个性化推荐基于可信证据。"
+        ],
+        [
+          "适应与改进",
+          "计划随身体和目标变化而演进。"
+        ],
+        [
+          "AI + 人工监督",
+          "AI 驱动指导配合人工审核保障。"
+        ]
+      ]
+    },
+    "journal": {
+      "eyebrow": "来自文章",
+      "title": "了解",
+      "accent": "适量。",
+      "browse": "浏览所有文章",
+      "tag": "文章",
+      "readMore": "阅读文章",
+      "fallback": [
+        [
+          "基础",
+          "为什么补充剂“更多”很少是答案",
+          "充足的科学——以及为什么您的身体通常需要少于标签所示。"
+        ],
+        [
+          "营养",
+          "八种比您想象中更富含镁的日常食物",
+          "在伸手拿胶囊前，先看看您的餐盘——这些日常食物在默默发挥作用。"
+        ],
+        [
+          "生活方式",
+          "旅行如何悄然改变身体需求",
+          "时差、睡眠和水分都会改变计算——以下是如何调整而无需过度思考。"
+        ]
+      ]
+    },
+    "faq": {
+      "eyebrow": "问题",
+      "title": "好问题，",
+      "accent": "诚实回答。",
+      "items": [
+        [
+          "我的数据私密吗？",
+          "是的。您的评估属于您自己。我们不销售答案，不与广告商共享，您可随时请求删除。Living Protocol 的对话仅存储以维持计划连续性。"
+        ],
+        [
+          "我在服药——这对我安全吗？",
+          "MattaNutra 会筛查最常见的药物-补充剂相互作用，并在计划中标记。这是健康指导，而非医疗建议。如果您正在服用处方药、怀孕、哺乳或管理医疗状况，请在开始任何补充剂计划前咨询合格的医疗专业人士。"
+        ],
+        [
+          "推荐产品来自哪里？",
+          "我们指向东南亚购物者实际使用的平台上的产品，选择与您的配方匹配。目标是帮助您在已信任的市场中自信购买。"
+        ],
+        [
+          "免费评估真的免费吗？",
+          "是的。问卷和 Health Score 免费，无需信用卡。完成后，您将看到自己的状况和起始方向。如果您选择继续，完整的个性化 Right Amount Formula 和可选 Living Protocol 支持将可用。"
+        ],
+        [
+          "为什么用 Pāli 名称？",
+          "Mattaññutā 意为知道适量。它来自关于节制与平衡的实用智慧传统——繁荣并非来自更多，而是来自恰到好处。"
+        ]
+      ]
+    },
+    "final": {
+      "title": "停止猜测。",
+      "accent": "开始了解。",
+      "body": "回答几个聚焦问题，获取免费 Health Score，并收到您的个性化起始计划——围绕您的身体、目标和日常生活构建。",
+      "primary": "开始设计您的 Right Amount",
+      "secondary": "如何运作",
+      "quote": "Mattaññutā — 知道适量。"
+    }
+  }
+} as const satisfies Record<Locale, LandingContent>;
+
 function SectionIntro({
   accent,
   body,
@@ -753,14 +1182,19 @@ function PricingCard({
 }: Readonly<{
   featured?: boolean;
   locale: Locale;
-  plan: (typeof content.en.pricing.plans)[number] | (typeof content.th.pricing.plans)[number];
+  plan: LandingPricingPlan;
 }>) {
+  const bestForLabel =
+    locale === "th" ? "เหมาะสำหรับ:" : locale === "zh-CN" ? "最适合：" : "Best for:";
+
   return (
     <article
       className={featured ? "mn-v14-price-card mn-v14-price-card--featured" : "mn-v14-price-card"}
       data-reveal
     >
-      {"popular" in plan ? <span className="mn-v14-popular">{plan.popular}</span> : null}
+      {"popular" in plan && typeof plan.popular === "string" ? (
+        <span className="mn-v14-popular">{plan.popular}</span>
+      ) : null}
       <p className={featured ? "mn-v14-eyebrow mn-v14-eyebrow--light" : "mn-v14-eyebrow"}>
         {plan.badge}
       </p>
@@ -797,7 +1231,7 @@ function PricingCard({
         ))}
       </ul>
       <p className={featured ? "mn-v14-best mn-v14-best--dark" : "mn-v14-best"}>
-        <strong>Best for:</strong> {plan.best}
+        <strong>{bestForLabel}</strong> {plan.best}
       </p>
       <p className={featured ? "mn-v14-guarantee mn-v14-guarantee--dark" : "mn-v14-guarantee"}>
         <ShieldCheck aria-hidden className="mt-0.5 size-5 shrink-0" />
