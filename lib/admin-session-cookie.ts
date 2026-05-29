@@ -152,13 +152,55 @@ export function requestOriginAllowed(request: Request) {
   }
 
   try {
-    const requestUrl = new URL(request.url);
     const originUrl = new URL(origin);
+    const allowedOrigins = requestAllowedOrigins(request);
 
-    return requestUrl.origin === originUrl.origin;
+    return allowedOrigins.has(originUrl.origin);
   } catch {
     return false;
   }
+}
+
+function firstHeaderValue(value: string | null) {
+  return value?.split(",")[0]?.trim() || "";
+}
+
+function addOrigin(origins: Set<string>, value: string | null | undefined) {
+  if (!value) {
+    return;
+  }
+
+  try {
+    const url = new URL(value);
+
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      origins.add(url.origin);
+    }
+  } catch {
+    // Ignore malformed forwarded/configured origins.
+  }
+}
+
+function requestAllowedOrigins(request: Request) {
+  const origins = new Set<string>();
+  const requestUrl = new URL(request.url);
+
+  addOrigin(origins, requestUrl.origin);
+
+  const forwardedHost = firstHeaderValue(request.headers.get("x-forwarded-host"));
+  const host = forwardedHost || firstHeaderValue(request.headers.get("host"));
+  const forwardedProto = firstHeaderValue(request.headers.get("x-forwarded-proto"));
+  const proto = forwardedProto || requestUrl.protocol.replace(/:$/, "");
+
+  if (host && (proto === "http" || proto === "https")) {
+    addOrigin(origins, `${proto}://${host}`);
+  }
+
+  addOrigin(origins, process.env.ADMIN_PASSKEY_ORIGIN);
+  addOrigin(origins, process.env.NEXT_PUBLIC_SITE_URL);
+  addOrigin(origins, process.env.MATTANUTRA_PUBLIC_SITE_URL);
+
+  return origins;
 }
 
 export function signedAdminSessionAllowedForRequest(request: Request) {
