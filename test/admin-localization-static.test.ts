@@ -57,6 +57,47 @@ test("admin Chinese label overrides cover the expanded admin UI contract", () =>
   }
 });
 
+function thaiAdminContentSource() {
+  const contentSource = source("components/admin/dashboard-content.tsx");
+  const start = contentSource.indexOf("  th: {");
+
+  assert.notEqual(start, -1);
+
+  return contentSource.slice(start);
+}
+
+test("Thai admin nav and page titles do not leak English performance labels", () => {
+  const thai = thaiAdminContentSource();
+
+  assert.match(thai, /name: "แดชบอร์ด", view: "glance"/);
+  assert.match(thai, /name: "คอนเวอร์ชัน", view: "flow"/);
+  assert.match(thai, /name: "การเงิน", view: "financials"/);
+  assert.match(thai, /financials: "การเงิน"/);
+  assert.match(thai, /flow: "คอนเวอร์ชัน"/);
+  assert.match(thai, /glance: "แดชบอร์ด"/);
+  assert.doesNotMatch(
+    thai,
+    /name: "(Dashboard|Conversions|Financials)", view: "(glance|flow|financials)"/
+  );
+  assert.doesNotMatch(thai, /financials: "Financials"/);
+  assert.doesNotMatch(thai, /flow: "Conversions"/);
+  assert.doesNotMatch(thai, /glance: "Dashboard"/);
+});
+
+test("Thai admin navigation labels are localized for all top-level sections", () => {
+  const thai = thaiAdminContentSource();
+
+  assert.match(thai, /insightsTitle: "อินไซต์"/);
+  assert.match(thai, /name: "งาน", view: "visibility"/);
+  assert.match(thai, /name: "เอเจนต์", view: "agents"/);
+  assert.match(thai, /agents: "เอเจนต์"/);
+  assert.match(thai, /visibility: "งาน"/);
+  assert.doesNotMatch(thai, /name: "(Dashboard|Conversions|Financials|Tasks|Agents)"/);
+  assert.doesNotMatch(thai, /insightsTitle: "Insights"/);
+  assert.doesNotMatch(thai, /agents: "Agents"/);
+  assert.doesNotMatch(thai, /visibility: "Tasks"/);
+});
+
 test("known admin English literals are routed through locale-aware labels", () => {
   const dashboard = source("components/admin-dashboard.tsx");
   const productView = source("components/admin/product-view.tsx");

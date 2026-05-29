@@ -703,7 +703,7 @@ const baseContent = {
       needsWork: "Needs work",
       okay: "Okay"
     },
-    flowTitle: "Conversions",
+    flowTitle: "คอนเวอร์ชัน",
     marketingPages: {
       affiliate: "Affiliate",
       assessmentCompletions: "Completed",
@@ -739,9 +739,9 @@ const baseContent = {
       totalLeads: "Leads"
     },
     performance: [
-      { icon: HomeIcon, name: "Dashboard", view: "glance" },
-      { icon: FunnelIcon, name: "Conversions", view: "flow" },
-      { icon: BanknotesIcon, name: "Financials", view: "financials" }
+      { icon: HomeIcon, name: "แดชบอร์ด", view: "glance" },
+      { icon: FunnelIcon, name: "คอนเวอร์ชัน", view: "flow" },
+      { icon: BanknotesIcon, name: "การเงิน", view: "financials" }
     ],
     performanceTitle: "Performance",
     marketing: [
@@ -769,7 +769,7 @@ const baseContent = {
       { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" },
       { icon: ShoppingBagIcon, name: "Products", view: "product-insights" }
     ],
-    insightsTitle: "Insights",
+    insightsTitle: "อินไซต์",
     openSidebar: "Open sidebar",
     execution: [
       { icon: ExclamationTriangleIcon, name: "Reviews", view: "reviews" },
@@ -1185,7 +1185,7 @@ const baseContent = {
       needsWork: "ควรปรับปรุง",
       okay: "ดี"
     },
-    flowTitle: "Conversions",
+    flowTitle: "คอนเวอร์ชัน",
     marketingPages: {
       affiliate: "Affiliate",
       assessmentCompletions: "เสร็จ",
@@ -1221,9 +1221,9 @@ const baseContent = {
       totalLeads: "ลีด"
     },
     performance: [
-      { icon: HomeIcon, name: "Dashboard", view: "glance" },
-      { icon: FunnelIcon, name: "Conversions", view: "flow" },
-      { icon: BanknotesIcon, name: "Financials", view: "financials" }
+      { icon: HomeIcon, name: "แดชบอร์ด", view: "glance" },
+      { icon: FunnelIcon, name: "คอนเวอร์ชัน", view: "flow" },
+      { icon: BanknotesIcon, name: "การเงิน", view: "financials" }
     ],
     performanceTitle: "ประสิทธิภาพ",
     marketing: [
@@ -1251,26 +1251,26 @@ const baseContent = {
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplement-insights" },
       { icon: ShoppingBagIcon, name: "สินค้า", view: "product-insights" }
     ],
-    insightsTitle: "Insights",
+    insightsTitle: "อินไซต์",
     openSidebar: "เปิดแถบเมนู",
     execution: [
       { icon: ExclamationTriangleIcon, name: "รีวิว", view: "reviews" },
-      { icon: QueueListIcon, name: "Tasks", view: "visibility" },
-      { icon: CpuChipIcon, name: "Agents", view: "agents" },
+      { icon: QueueListIcon, name: "งาน", view: "visibility" },
+      { icon: CpuChipIcon, name: "เอเจนต์", view: "agents" },
       { icon: ExclamationTriangleIcon, name: "แจ้งเตือน", view: "alerts" }
     ],
     executionTitle: "การปฏิบัติงาน",
     pageTitles: {
-      agents: "Agents",
+      agents: "เอเจนต์",
       alerts: "การแจ้งเตือนทางเทคนิค",
       blogs: "บทความ",
       campaigns: "แคมเปญ",
       content: "คอนเทนต์",
       communications: "การสื่อสาร",
-      financials: "Financials",
+      financials: "การเงิน",
       foods: "อาหาร",
-      flow: "Conversions",
-      glance: "Dashboard",
+      flow: "คอนเวอร์ชัน",
+      glance: "แดชบอร์ด",
       leads: "ลีด",
       "product-insights": "ข้อมูลสินค้า",
       products: "สินค้า",
@@ -1278,7 +1278,7 @@ const baseContent = {
       "supplement-insights": "ข้อมูลอาหารเสริม",
       supplements: "อาหารเสริม",
       testimonials: "คำรับรอง",
-      visibility: "Tasks"
+      visibility: "งาน"
     },
     ranges: {
       all: "ทั้งหมด",
