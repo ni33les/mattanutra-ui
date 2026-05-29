@@ -160,12 +160,61 @@ function bytesFromBase64Url(value: string) {
   return Buffer.from(value, "base64url");
 }
 
+function originFromUrl(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+function firstForwardedValue(value: string | null) {
+  return value?.split(",")[0]?.trim() || "";
+}
+
+function isNonEmptyString(value: string | null): value is string {
+  return Boolean(value);
+}
+
+function requestForwardedOrigin(request: Request) {
+  const forwardedHost = firstForwardedValue(request.headers.get("x-forwarded-host"));
+  const host = forwardedHost || firstForwardedValue(request.headers.get("host"));
+
+  if (!host) {
+    return null;
+  }
+
+  const forwardedProto = firstForwardedValue(request.headers.get("x-forwarded-proto"));
+  const protocol =
+    forwardedProto ||
+    originFromUrl(request.url)?.split(":")[0] ||
+    "https";
+
+  return `${protocol}://${host}`;
+}
+
+function configuredPasskeyOrigin() {
+  return (
+    originFromUrl(process.env.ADMIN_PASSKEY_ORIGIN) ||
+    originFromUrl(process.env.APP_BASE_URL) ||
+    originFromUrl(process.env.NEXT_PUBLIC_SITE_URL)
+  );
+}
+
 function requestOrigin(request: Request) {
-  return new URL(request.url).origin;
+  return (
+    configuredPasskeyOrigin() ||
+    requestForwardedOrigin(request) ||
+    new URL(request.url).origin
+  );
 }
 
 function requestRpId(request: Request) {
-  return process.env.ADMIN_PASSKEY_RP_ID?.trim() || new URL(request.url).hostname;
+  return process.env.ADMIN_PASSKEY_RP_ID?.trim() || new URL(requestOrigin(request)).hostname;
 }
 
 function allowedOrigins(request: Request) {
@@ -173,8 +222,16 @@ function allowedOrigins(request: Request) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+  const forwardedOrigin = requestForwardedOrigin(request);
 
-  return Array.from(new Set([requestOrigin(request), ...configured]));
+  return Array.from(
+    new Set([
+      requestOrigin(request),
+      forwardedOrigin,
+      new URL(request.url).origin,
+      ...configured
+    ].filter(isNonEmptyString))
+  );
 }
 
 function localeValue(value: unknown): Locale {
