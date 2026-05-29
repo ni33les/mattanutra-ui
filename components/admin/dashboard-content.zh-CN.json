@@ -319,10 +319,6 @@
   "marketingTitle": "营销",
   "administration": [
     {
-      "name": "访问",
-      "view": "access"
-    },
-    {
       "name": "人员",
       "view": "people"
     },

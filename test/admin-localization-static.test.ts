@@ -25,7 +25,11 @@ test("admin access management exposes people, organisations, agents, and audit a
   const content = source("components/admin/dashboard-content.tsx");
   const dashboard = source("components/admin-dashboard.tsx");
   const accessView = source("components/admin/access-view.tsx");
+  const zh = source("components/admin/dashboard-content.zh-CN.json");
 
+  assert.doesNotMatch(content, /name: "Access", view: "access"/);
+  assert.doesNotMatch(content, /name: "สิทธิ์เข้าถึง", view: "access"/);
+  assert.doesNotMatch(zh, /"name": "访问",\s*"view": "access"/);
   assert.match(content, /name: "People", view: "people"/);
   assert.match(content, /name: "Organisations", view: "organisations"/);
   assert.match(content, /name: "Agents", view: "access-agents"/);
@@ -34,6 +38,17 @@ test("admin access management exposes people, organisations, agents, and audit a
   assert.match(dashboard, /view === "audit"/);
   assert.match(accessView, /view === "access-agents"/);
   assert.match(accessView, /view === "audit"/);
+});
+
+test("admin sidebar navigation preserves scroll position across menu clicks", () => {
+  const shared = source("components/admin/dashboard-shared.tsx");
+
+  assert.match(shared, /import Link from "next\/link"/);
+  assert.match(shared, /ADMIN_SIDEBAR_SCROLL_KEY/);
+  assert.match(shared, /sessionStorage\.setItem\(ADMIN_SIDEBAR_SCROLL_KEY/);
+  assert.match(shared, /sessionStorage\.getItem\(ADMIN_SIDEBAR_SCROLL_KEY\)/);
+  assert.match(shared, /scroll=\{false\}/);
+  assert.match(shared, /onNavigate=\{rememberSidebarScroll\}/);
 });
 
 test("admin login has a working registry-driven locale switcher", () => {

@@ -841,7 +841,6 @@ const baseContent = {
     ],
     marketingTitle: "Marketing",
     administration: [
-      { icon: UserGroupIcon, name: "Access", view: "access" },
       { icon: UserGroupIcon, name: "People", view: "people" },
       { icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" },
       { icon: CpuChipIcon, name: "Agents", view: "access-agents" },
@@ -1374,7 +1373,6 @@ const baseContent = {
     ],
     marketingTitle: "การตลาด",
     administration: [
-      { icon: UserGroupIcon, name: "สิทธิ์เข้าถึง", view: "access" },
       { icon: UserGroupIcon, name: "ผู้ใช้", view: "people" },
       { icon: BuildingOffice2Icon, name: "องค์กร", view: "organisations" },
       { icon: CpuChipIcon, name: "เอเจนต์", view: "access-agents" },

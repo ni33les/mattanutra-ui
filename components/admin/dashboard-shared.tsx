@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRightStartOnRectangleIcon } from "@heroicons/react/24/outline";
 import { HealthspanLogo } from "@/components/healthspan-logo";
 import { adminDashboardFilterEntries, type AdminDashboardFilters } from "@/lib/admin-dashboard-filters";
@@ -15,6 +16,8 @@ import type {
 } from "@/lib/admin-supplements";
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 import type { AdminContent, AdminDashboardView, AdminNavItem } from "@/components/admin/dashboard-content";
+
+const ADMIN_SIDEBAR_SCROLL_KEY = "mattanutra:admin-sidebar-scroll";
 
 export function classNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -314,9 +317,10 @@ function SidebarNavList({
 
           return (
             <li key={item.name}>
-              <a
+              <Link
                 href={href}
                 onClick={onNavigate}
+                scroll={false}
                 aria-current={current ? "page" : undefined}
                 className={classNames(
                   current
@@ -335,7 +339,7 @@ function SidebarNavList({
                   )}
                 />
                 {item.name}
-              </a>
+              </Link>
             </li>
           );
         })}
@@ -449,12 +453,54 @@ export function SidebarContent({
   range: AdminDashboardRange;
   view: AdminDashboardView;
 }>) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const node = scrollRef.current;
+
+    if (!node || typeof window === "undefined") {
+      return;
+    }
+
+    const savedScroll = Number(window.sessionStorage.getItem(ADMIN_SIDEBAR_SCROLL_KEY));
+
+    if (!Number.isFinite(savedScroll) || savedScroll <= 0) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      node.scrollTop = savedScroll;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  function rememberSidebarScroll() {
+    const node = scrollRef.current;
+
+    if (node && typeof window !== "undefined") {
+      window.sessionStorage.setItem(ADMIN_SIDEBAR_SCROLL_KEY, String(node.scrollTop));
+    }
+
+    onNavigate?.();
+  }
+
   return (
-    <div className="flex grow flex-col gap-y-6 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4">
+    <div
+      className="flex grow flex-col gap-y-6 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4"
+      onScroll={() => {
+        const node = scrollRef.current;
+
+        if (node && typeof window !== "undefined") {
+          window.sessionStorage.setItem(ADMIN_SIDEBAR_SCROLL_KEY, String(node.scrollTop));
+        }
+      }}
+      ref={scrollRef}
+    >
       <div className="flex h-20 shrink-0 items-center justify-between gap-3">
         <a
           href={`/${locale}`}
-          onClick={onNavigate}
+          onClick={rememberSidebarScroll}
           aria-label="MattaNutra home"
           className="inline-flex rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
         >
@@ -469,7 +515,7 @@ export function SidebarContent({
             filters={filters}
             items={labels.performance}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.performanceTitle}
             view={view}
@@ -480,7 +526,7 @@ export function SidebarContent({
             filters={filters}
             items={labels.marketing}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.marketingTitle}
             view={view}
@@ -491,7 +537,7 @@ export function SidebarContent({
             filters={filters}
             items={labels.contentNavigation}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.contentTitle}
             view={view}
@@ -502,7 +548,7 @@ export function SidebarContent({
             filters={filters}
             items={labels.governance}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.governanceTitle}
             view={view}
@@ -513,7 +559,7 @@ export function SidebarContent({
             filters={filters}
             items={labels.insights}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.insightsTitle}
             view={view}
@@ -524,7 +570,7 @@ export function SidebarContent({
             filters={filters}
             items={labels.execution}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.executionTitle}
             view={view}
@@ -535,7 +581,7 @@ export function SidebarContent({
             filters={filters}
             items={labels.administration}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.administrationTitle}
             view={view}
