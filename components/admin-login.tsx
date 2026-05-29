@@ -5,8 +5,12 @@ import {
   startAuthentication,
   startRegistration
 } from "@simplewebauthn/browser";
-import { localeLabels, type Locale } from "@/lib/i18n";
-import { classNames, adminLocaleTextClass } from "@/components/admin/dashboard-shared";
+import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
+import {
+  adminLocaleTextClass,
+  buttonGroupItemClasses,
+  classNames
+} from "@/components/admin/dashboard-shared";
 
 type AdminLoginProps = Readonly<{
   accessToken: string;
@@ -26,6 +30,7 @@ const loginCopy = {
     inviteHint: "Accept your invite by creating a passkey.",
     login: "Sign in with passkey",
     loginHint: "Use your registered passkey to open the admin dashboard.",
+    language: "Admin language",
     register: "Create admin passkey",
     registered: "Passkey created.",
     setupToken: "Setup token",
@@ -40,6 +45,7 @@ const loginCopy = {
     inviteHint: "รับคำเชิญโดยสร้าง passkey",
     login: "เข้าสู่ระบบด้วย passkey",
     loginHint: "ใช้ passkey ที่ลงทะเบียนแล้วเพื่อเปิดแดชบอร์ดแอดมิน",
+    language: "ภาษาแอดมิน",
     register: "สร้าง passkey แอดมิน",
     registered: "สร้าง passkey แล้ว",
     setupToken: "Setup token",
@@ -54,6 +60,7 @@ const loginCopy = {
     inviteHint: "创建 passkey 以接受邀请。",
     login: "使用 passkey 登录",
     loginHint: "使用已注册的 passkey 打开管理仪表盘。",
+    language: "管理语言",
     register: "创建管理员 passkey",
     registered: "Passkey 已创建。",
     setupToken: "设置令牌",
@@ -61,6 +68,26 @@ const loginCopy = {
     setupHeading: "创建管理员 passkey"
   }
 } satisfies Record<Locale, Record<string, string>>;
+
+function localizedAdminNextPath(targetLocale: Locale, nextPath: string) {
+  if (nextPath === "/admin/dashboard" || nextPath.startsWith("/admin/dashboard?")) {
+    return `/${targetLocale}${nextPath}`;
+  }
+
+  for (const localeCode of publicLocales) {
+    const prefix = `/${localeCode}/admin/`;
+
+    if (nextPath === `/${localeCode}/admin/dashboard`) {
+      return `/${targetLocale}/admin/dashboard`;
+    }
+
+    if (nextPath.startsWith(prefix)) {
+      return `/${targetLocale}${nextPath.slice(localeCode.length + 1)}`;
+    }
+  }
+
+  return `/${targetLocale}/admin/dashboard`;
+}
 
 async function postJson<T>(url: string, body: Record<string, unknown>) {
   const response = await fetch(url, {
@@ -97,6 +124,30 @@ export function AdminLogin({
   const [busy, setBusy] = useState<"login" | "register" | null>(null);
   const [error, setError] = useState("");
   const showRegistration = Boolean(inviteToken || accessToken || setupMode);
+
+  function loginHref(targetLocale: Locale) {
+    const params = new URLSearchParams();
+
+    if (accessToken) {
+      params.set("access_token", accessToken);
+    }
+
+    if (email) {
+      params.set("email", email);
+    }
+
+    if (inviteToken) {
+      params.set("invite", inviteToken);
+    }
+
+    if (setupMode) {
+      params.set("setup", "1");
+    }
+
+    params.set("next", localizedAdminNextPath(targetLocale, nextPath));
+
+    return `/${targetLocale}/admin/login?${params.toString()}`;
+  }
 
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -166,12 +217,23 @@ export function AdminLogin({
       <div className="w-full max-w-5xl">
         <div className="mb-6 flex justify-end">
           <div
-            className={classNames(
-              "rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200",
-              adminLocaleTextClass(locale, "label")
-            )}
+            aria-label={labels.language}
+            className="isolate inline-flex rounded-md shadow-sm"
           >
-            {localeLabels[locale]}
+            {publicLocales.map((localeCode, index) => (
+              <a
+                aria-current={localeCode === locale ? "page" : undefined}
+                className={classNames(
+                  buttonGroupItemClasses(localeCode === locale, index, publicLocales.length),
+                  adminLocaleTextClass(localeCode, "label")
+                )}
+                href={loginHref(localeCode)}
+                key={localeCode}
+                title={localeLabels[localeCode]}
+              >
+                {localeLabels[localeCode]}
+              </a>
+            ))}
           </div>
         </div>
         <section className="grid overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 lg:grid-cols-[0.9fr_1.1fr]">
@@ -220,69 +282,69 @@ export function AdminLogin({
             </form>
 
             {showRegistration ? (
-            <form onSubmit={register} className="space-y-4 border-t border-gray-100 pt-8">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  {labels.setupHeading}
-                </h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  {inviteToken ? labels.inviteHint : labels.accessHint}
-                </p>
-              </div>
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">
-                  {labels.email}
-                </span>
-                <input
-                  autoComplete="email"
-                  className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-[#1FA77A]"
-                  onChange={(event) => setEmail(event.target.value)}
-                  required={true}
-                  type="email"
-                  value={email}
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">
-                  {labels.displayName}
-                </span>
-                <input
-                  autoComplete="name"
-                  className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-[#1FA77A]"
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  type="text"
-                  value={displayName}
-                />
-              </label>
-              {!inviteToken ? (
-                accessToken ? (
-                  <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 ring-1 ring-emerald-100">
-                    {labels.linkTokenHint}
+              <form onSubmit={register} className="space-y-4 border-t border-gray-100 pt-8">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {labels.setupHeading}
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {inviteToken ? labels.inviteHint : labels.accessHint}
                   </p>
-                ) : (
-                  <label className="block">
-                    <span className="text-sm font-medium text-gray-700">
-                      {labels.setupToken}
-                    </span>
-                    <input
-                      autoComplete="one-time-code"
-                      className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-[#1FA77A]"
-                      onChange={(event) => setSetupToken(event.target.value)}
-                      required={true}
-                      type="password"
-                      value={setupToken}
-                    />
-                  </label>
-                )
-              ) : null}
-              <button
-                className="inline-flex w-full justify-center rounded-md bg-[#20343A] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#16252A] disabled:cursor-wait disabled:opacity-70"
-                disabled={busy !== null}
-                type="submit"
-              >
-                {busy === "register" ? labels.signingIn : labels.register}
-              </button>
-            </form>
+                </div>
+                <label className="block">
+                  <span className="text-sm font-medium text-gray-700">
+                    {labels.email}
+                  </span>
+                  <input
+                    autoComplete="email"
+                    className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-[#1FA77A]"
+                    onChange={(event) => setEmail(event.target.value)}
+                    required={true}
+                    type="email"
+                    value={email}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium text-gray-700">
+                    {labels.displayName}
+                  </span>
+                  <input
+                    autoComplete="name"
+                    className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-[#1FA77A]"
+                    onChange={(event) => setDisplayName(event.target.value)}
+                    type="text"
+                    value={displayName}
+                  />
+                </label>
+                {!inviteToken ? (
+                  accessToken ? (
+                    <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 ring-1 ring-emerald-100">
+                      {labels.linkTokenHint}
+                    </p>
+                  ) : (
+                    <label className="block">
+                      <span className="text-sm font-medium text-gray-700">
+                        {labels.setupToken}
+                      </span>
+                      <input
+                        autoComplete="one-time-code"
+                        className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-[#1FA77A]"
+                        onChange={(event) => setSetupToken(event.target.value)}
+                        required={true}
+                        type="password"
+                        value={setupToken}
+                      />
+                    </label>
+                  )
+                ) : null}
+                <button
+                  className="inline-flex w-full justify-center rounded-md bg-[#20343A] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#16252A] disabled:cursor-wait disabled:opacity-70"
+                  disabled={busy !== null}
+                  type="submit"
+                >
+                  {busy === "register" ? labels.signingIn : labels.register}
+                </button>
+              </form>
             ) : null}
 
             {error ? (

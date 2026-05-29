@@ -21,6 +21,18 @@ test("admin dashboard has a registry-driven locale switcher that preserves dashb
   assert.match(dashboard, /<AdminLocaleSwitcher/);
 });
 
+test("admin login has a working registry-driven locale switcher", () => {
+  const login = source("components/admin-login.tsx");
+
+  assert.match(login, /publicLocales\.map/);
+  assert.match(login, /href=\{loginHref\(localeCode\)\}/);
+  assert.match(login, /localizedAdminNextPath\(targetLocale, nextPath\)/);
+  assert.match(login, /params\.set\("access_token", accessToken\)/);
+  assert.match(login, /params\.set\("invite", inviteToken\)/);
+  assert.match(login, /params\.set\("setup", "1"\)/);
+  assert.match(login, /params\.set\("next", localizedAdminNextPath/);
+});
+
 test("legacy admin dashboard URL is an English compatibility alias", () => {
   const page = source("app/admin/dashboard/page.tsx");
 
