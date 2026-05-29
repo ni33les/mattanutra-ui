@@ -574,7 +574,7 @@ function CreateSupplementModal({
                 disabled={saving}
                 list={categoryListId}
                 onChange={(event) => onCategoryChange(event.target.value)}
-                placeholder="Manual"
+                placeholder={labels.supplements.categoryPlaceholder}
                 value={category}
               />
               <datalist id={categoryListId}>
@@ -666,7 +666,7 @@ export function SupplementListMeta({
 
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+      <p className="text-xs font-semibold tracking-normal text-gray-400">
         {label}
       </p>
       <p className="mt-1 truncate text-sm font-semibold text-gray-900">
@@ -893,7 +893,7 @@ export function SupplementDetailsModal({
 
             {draft.selectionStats ? (
               <div className="rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                <p className="text-xs font-semibold tracking-normal text-emerald-700">
                   {locale === "th"
                     ? "การเลือกโดย AI"
                     : locale === "zh-CN"
@@ -948,7 +948,7 @@ export function SupplementDetailsModal({
             {draft.aliases.length > 0 || onAddAssociation ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                  <p className="text-xs font-semibold tracking-normal text-gray-400">
                     {labels.supplements.associations}
                   </p>
                 </div>
@@ -1354,7 +1354,7 @@ function SupplementAssociationPicker({
 
       {selectedSupplement ? (
         <div className="mt-3 rounded-xl bg-white p-3 ring-1 ring-gray-200">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+          <p className="text-xs font-semibold tracking-normal text-gray-400">
             {labels.supplements.associatedWith}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">

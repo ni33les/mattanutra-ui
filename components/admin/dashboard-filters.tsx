@@ -16,8 +16,10 @@ import {
   type AdminDashboardView
 } from "@/components/admin/dashboard-content";
 import {
+  adminLocaleTextClass,
   adminHref,
-  buttonGroupItemClasses
+  buttonGroupItemClasses,
+  classNames
 } from "@/components/admin/dashboard-shared";
 
 export function TimeframeSelector({
@@ -128,16 +130,23 @@ export function LocaleFilterSelector({
 
 function FilterInput({
   label,
+  locale,
   name,
   value
 }: Readonly<{
   label: string;
+  locale: Locale;
   name: keyof AdminDashboardFilters;
   value: string;
 }>) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+      <span
+        className={classNames(
+          "text-xs font-semibold text-gray-500",
+          locale === "en" ? "uppercase tracking-[0.14em]" : adminLocaleTextClass(locale, "label")
+        )}
+      >
         {label}
       </span>
       <input
@@ -152,18 +161,25 @@ function FilterInput({
 
 function FilterSelect({
   label,
+  locale,
   name,
   options,
   value
 }: Readonly<{
   label: string;
+  locale: Locale;
   name: keyof AdminDashboardFilters;
   options: Array<Readonly<{ label: string; value: string }>>;
   value: string;
 }>) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+      <span
+        className={classNames(
+          "text-xs font-semibold text-gray-500",
+          locale === "en" ? "uppercase tracking-[0.14em]" : adminLocaleTextClass(locale, "label")
+        )}
+      >
         {label}
       </span>
       <select
@@ -211,7 +227,12 @@ export function AdminFilterPanel({
     >
       <summary className="group flex cursor-pointer list-none items-center gap-3 p-5 marker:hidden">
         <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <span className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">
+          <span
+            className={classNames(
+              "text-sm font-semibold text-gray-500",
+              locale === "en" ? "uppercase tracking-[0.16em]" : adminLocaleTextClass(locale, "label")
+            )}
+          >
             {labels.filters.title}
           </span>
           {hasPanelFilters ? (
@@ -246,50 +267,58 @@ export function AdminFilterPanel({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <FilterInput
             label={labels.filters.source}
+            locale={locale}
             name="source"
             value={filters.source}
           />
           <FilterInput
             label={labels.filters.medium}
+            locale={locale}
             name="medium"
             value={filters.medium}
           />
           <FilterInput
             label={labels.filters.campaign}
+            locale={locale}
             name="campaign"
             value={filters.campaign}
           />
           <FilterInput
             label={labels.filters.campaignId}
+            locale={locale}
             name="campaignId"
             value={filters.campaignId}
           />
           <FilterInput
             label={labels.filters.affiliate}
+            locale={locale}
             name="affiliate"
             value={filters.affiliate}
           />
           <FilterInput
             label={labels.filters.promoCode}
+            locale={locale}
             name="promoCode"
             value={filters.promoCode}
           />
           <FilterSelect
             label={labels.filters.selectedPlan}
+            locale={locale}
             name="selectedPlan"
             value={filters.selectedPlan}
             options={[
-              { label: "All", value: "" },
+              { label: labels.contentPages.all, value: "" },
               { label: "Precision", value: "precision" },
               { label: "Pro", value: "pro" }
             ]}
           />
           <FilterSelect
             label={labels.filters.device}
+            locale={locale}
             name="device"
             value={filters.device}
             options={[
-              { label: "All", value: "" },
+              { label: labels.contentPages.all, value: "" },
               { label: "Mobile", value: "mobile" },
               { label: "Tablet", value: "tablet" },
               { label: "Desktop", value: "desktop" }
@@ -297,12 +326,19 @@ export function AdminFilterPanel({
           />
           <FilterInput
             label={labels.filters.planId}
+            locale={locale}
             name="planId"
             value={filters.planId}
           />
-          <FilterInput label={labels.filters.ray} name="ray" value={filters.ray} />
+          <FilterInput
+            label={labels.filters.ray}
+            locale={locale}
+            name="ray"
+            value={filters.ray}
+          />
           <FilterInput
             label={labels.filters.emailHash}
+            locale={locale}
             name="emailHash"
             value={filters.emailHash}
           />

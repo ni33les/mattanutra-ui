@@ -25,6 +25,7 @@ import { productFactObservableIssueMessages } from "@/lib/product-validation";
 import { supplementDoseUnits } from "@/lib/supplement-dose-units";
 import {
   BusinessStatsGrid,
+  adminLocaleTextClass,
   businessMetricColors,
   classNames,
   readableToken,
@@ -102,29 +103,255 @@ function ProductInsightStat({
   );
 }
 
-function productStatusLabel(status: string) {
+const productViewLabels = {
+  en: {
+    activeAffiliates: "Active affiliates",
+    allStates: "All states",
+    approved: "Approved",
+    both: "Both",
+    complete: "Complete",
+    draft: "Draft",
+    duplicateProduct: "Duplicate of existing product",
+    female: "Female only",
+    ignored: "Ignored",
+    male: "Male only",
+    markets: "Markets",
+    missing: "Missing",
+    missingFacts: "Missing facts",
+    missingImages: "Missing images",
+    pendingReview: "Pending Review",
+    products: "Products",
+    search: "Search products",
+    searchPlaceholder: "Search products, brands, ingredients, aliases",
+    sourceTitle: "Source title",
+    status: "Status",
+    translationStatus: "Translation status",
+    noParsedFacts: "No parsed label facts yet.",
+    averageClientFit: "avg client fit",
+    add: "Add",
+    addCountry: "Add country",
+    addFact: "Add fact",
+    addManufacturerCountryFirst: "Add a manufacturer country first.",
+    aiNotes: "AI notes",
+    amount: "Amount",
+    approve: "Approve",
+    audience: "Audience",
+    brand: "Brand",
+    chosen: "Chosen",
+    close: "Close",
+    confidenceHigh: "High",
+    confidenceLow: "Low",
+    confidenceModerate: "Moderate",
+    correctFactsWithAi: "Correct facts with AI",
+    description: "Description",
+    fdaApprovalNumber: "FDA approval number",
+    ignoredAction: "Ignore",
+    importReview: "Import review",
+    importReviewHint:
+      "This draft has an open review task. Use these actions to finish the review and update the catalogue.",
+    increaseLimit: "Increase limit",
+    ingredient: "Ingredient",
+    imageUrl: "Image URL",
+    manufacturerCountries: "Manufacturer countries",
+    markDuplicate: "Mark duplicate",
+    nearMisses: "Near misses",
+    translations: "Translations",
+    noOffers: "No offers yet. The product can still be recommended if it is the best match.",
+    offerUrl: "Offer URL",
+    offers: "Offers",
+    parsedFacts: "Parsed facts",
+    productCountries: "Product countries",
+    productName: "Product name",
+    productType: "Product type",
+    productUrl: "Product URL",
+    recommendationDecisions: "Recommendation decisions",
+    rejected: "Rejected",
+    remove: "Remove",
+    reviewerNote: "Reviewer note",
+    save: "Save",
+    saving: "Saving",
+    source: "Source",
+    staleValidation: "Validation stale",
+    staleValidationHint: "Saved validation cache differs from current facts and limits.",
+    title: "Title",
+    unit: "Unit",
+    validationBlockers: "Validation blockers",
+    updateError: "Unable to update product review"
+  },
+  th: {
+    activeAffiliates: "Affiliate ที่ใช้งาน",
+    allStates: "ทุกสถานะ",
+    approved: "อนุมัติแล้ว",
+    both: "ทั้งหมด",
+    complete: "ครบถ้วน",
+    draft: "ฉบับร่าง",
+    duplicateProduct: "ซ้ำกับสินค้าที่มีอยู่",
+    female: "ผู้หญิงเท่านั้น",
+    ignored: "ไม่ใช้",
+    male: "ผู้ชายเท่านั้น",
+    markets: "ตลาด",
+    missing: "ขาด",
+    missingFacts: "ขาดข้อมูล",
+    missingImages: "ขาดรูปภาพ",
+    pendingReview: "รอตรวจสอบ",
+    products: "สินค้า",
+    search: "ค้นหาสินค้า",
+    searchPlaceholder: "ค้นหาสินค้า แบรนด์ ส่วนผสม หรือชื่ออื่น",
+    sourceTitle: "ชื่อต้นทาง",
+    status: "สถานะ",
+    translationStatus: "สถานะคำแปล",
+    noParsedFacts: "ยังไม่มีข้อมูลฉลากที่อ่านได้",
+    averageClientFit: "ความเหมาะสมเฉลี่ย",
+    add: "เพิ่ม",
+    addCountry: "เพิ่มประเทศ",
+    addFact: "เพิ่มข้อมูล",
+    addManufacturerCountryFirst: "เพิ่มประเทศผู้ผลิตก่อน",
+    aiNotes: "หมายเหตุ AI",
+    amount: "ปริมาณ",
+    approve: "อนุมัติ",
+    audience: "กลุ่มผู้ใช้",
+    brand: "แบรนด์",
+    chosen: "ถูกเลือก",
+    close: "ปิด",
+    confidenceHigh: "สูง",
+    confidenceLow: "ต่ำ",
+    confidenceModerate: "ปานกลาง",
+    correctFactsWithAi: "แก้ข้อมูลด้วย AI",
+    description: "คำอธิบาย",
+    fdaApprovalNumber: "เลข อย.",
+    ignoredAction: "ไม่ใช้",
+    importReview: "รีวิวนำเข้า",
+    importReviewHint:
+      "ร่างนี้มีงานรีวิวที่เปิดอยู่ ใช้ปุ่มเหล่านี้เพื่อจบการรีวิวและอัปเดตแคตตาล็อก",
+    increaseLimit: "เพิ่มขีดจำกัด",
+    ingredient: "ส่วนผสม",
+    imageUrl: "URL รูปภาพ",
+    manufacturerCountries: "ประเทศผู้ผลิต",
+    markDuplicate: "ทำเครื่องหมายว่าซ้ำ",
+    nearMisses: "เกือบถูกเลือก",
+    translations: "คำแปล",
+    noOffers: "ยังไม่มีข้อเสนอ สินค้านี้ยังแนะนำได้ถ้าเป็นตัวเลือกที่เหมาะที่สุด",
+    offerUrl: "URL ข้อเสนอ",
+    offers: "ข้อเสนอ",
+    parsedFacts: "ข้อมูลที่อ่านจากฉลาก",
+    productCountries: "ประเทศที่ขายสินค้า",
+    productName: "ชื่อสินค้า",
+    productType: "ประเภทสินค้า",
+    productUrl: "URL สินค้า",
+    recommendationDecisions: "ข้อมูลการเลือกสินค้า",
+    rejected: "ไม่ผ่าน",
+    remove: "ลบ",
+    reviewerNote: "หมายเหตุผู้รีวิว",
+    save: "บันทึก",
+    saving: "กำลังบันทึก",
+    source: "แหล่งข้อมูล",
+    staleValidation: "ข้อมูลตรวจสอบเก่า",
+    staleValidationHint: "แคชการตรวจสอบที่บันทึกไว้ต่างจากข้อมูลและขีดจำกัดปัจจุบัน",
+    title: "ชื่อ",
+    unit: "หน่วย",
+    validationBlockers: "สิ่งที่ขวางการตรวจสอบ",
+    updateError: "ไม่สามารถอัปเดตรีวิวสินค้าได้"
+  },
+  "zh-CN": {
+    activeAffiliates: "活跃联盟",
+    allStates: "所有状态",
+    approved: "已批准",
+    both: "全部",
+    complete: "已完成",
+    draft: "草稿",
+    duplicateProduct: "与现有产品重复",
+    female: "仅女性",
+    ignored: "已忽略",
+    male: "仅男性",
+    markets: "市场",
+    missing: "缺失",
+    missingFacts: "缺少资料",
+    missingImages: "缺少图片",
+    pendingReview: "待审核",
+    products: "产品",
+    search: "搜索产品",
+    searchPlaceholder: "搜索产品、品牌、成分或别名",
+    sourceTitle: "来源标题",
+    status: "状态",
+    translationStatus: "翻译状态",
+    noParsedFacts: "尚无已解析标签资料。",
+    averageClientFit: "平均客户匹配度",
+    add: "添加",
+    addCountry: "添加国家",
+    addFact: "添加资料",
+    addManufacturerCountryFirst: "请先添加制造商国家。",
+    aiNotes: "AI 备注",
+    amount: "数量",
+    approve: "批准",
+    audience: "适用人群",
+    brand: "品牌",
+    chosen: "已选择",
+    close: "关闭",
+    confidenceHigh: "高",
+    confidenceLow: "低",
+    confidenceModerate: "中",
+    correctFactsWithAi: "使用 AI 修正资料",
+    description: "描述",
+    fdaApprovalNumber: "FDA 批准编号",
+    ignoredAction: "忽略",
+    importReview: "导入审核",
+    importReviewHint: "此草稿有待处理审核任务。使用这些操作完成审核并更新目录。",
+    increaseLimit: "提高上限",
+    ingredient: "成分",
+    imageUrl: "图片 URL",
+    manufacturerCountries: "制造商国家",
+    markDuplicate: "标记为重复",
+    nearMisses: "接近入选",
+    translations: "翻译",
+    noOffers: "暂无报价。如果这是最佳匹配，该产品仍可被推荐。",
+    offerUrl: "报价 URL",
+    offers: "报价",
+    parsedFacts: "已解析资料",
+    productCountries: "产品销售国家",
+    productName: "产品名称",
+    productType: "产品类型",
+    productUrl: "产品 URL",
+    recommendationDecisions: "推荐决策",
+    rejected: "已排除",
+    remove: "移除",
+    reviewerNote: "审核备注",
+    save: "保存",
+    saving: "保存中",
+    source: "来源",
+    staleValidation: "验证已过期",
+    staleValidationHint: "已保存的验证缓存与当前资料和限制不同。",
+    title: "标题",
+    unit: "单位",
+    validationBlockers: "验证阻塞项",
+    updateError: "无法更新产品审核"
+  }
+} satisfies Record<Locale, Record<string, string>>;
+
+function productStatusLabel(status: string, locale: Locale) {
+  const labels = productViewLabels[locale];
+
   if (status === "approved") {
-    return "Approved";
+    return labels.approved;
   }
 
   if (status === "pending_review") {
-    return "Pending Review";
+    return labels.pendingReview;
   }
 
   if (status === "ignored") {
-    return "Ignored";
+    return labels.ignored;
   }
 
   if (status === "both") {
-    return "Both";
+    return labels.both;
   }
 
   if (status === "female") {
-    return "Female only";
+    return labels.female;
   }
 
   if (status === "male") {
-    return "Male only";
+    return labels.male;
   }
 
   return readableToken(status);
@@ -152,16 +379,18 @@ function productBusinessState(
   return "pending_review";
 }
 
-function productBusinessStateLabel(state: ProductBusinessState) {
+function productBusinessStateLabel(state: ProductBusinessState, locale: Locale) {
+  const labels = productViewLabels[locale];
+
   if (state === "approved") {
-    return "Approved";
+    return labels.approved;
   }
 
   if (state === "ignored") {
-    return "Ignored";
+    return labels.ignored;
   }
 
-  return "Pending Review";
+  return labels.pendingReview;
 }
 
 function productBusinessStateClass(state: ProductBusinessState) {
@@ -435,17 +664,20 @@ function productTranslationStatusClass(
 }
 
 function productTranslationStatusLabel(
-  status: AdminProductRow["translations"][string]["status"]
+  status: AdminProductRow["translations"][string]["status"],
+  locale: Locale
 ) {
+  const labels = productViewLabels[locale];
+
   if (status === "complete") {
-    return "Complete";
+    return labels.complete;
   }
 
   if (status === "draft") {
-    return "Draft";
+    return labels.draft;
   }
 
-  return "Missing";
+  return labels.missing;
 }
 
 function productLocaleMeta(locale: string) {
@@ -498,19 +730,23 @@ function productTranslationFor(row: AdminProductRow, locale: string) {
 }
 
 function ProductCountryManager({
+  addCountryLabel,
   allowedCountryCodes,
   countryCodes,
   disabledReason,
   label,
   onAdd,
-  onRemove
+  onRemove,
+  removeLabel
 }: Readonly<{
+  addCountryLabel: string;
   allowedCountryCodes?: readonly string[];
   countryCodes: readonly string[];
   disabledReason?: string | null;
   label: string;
   onAdd: (countryCode: string) => void;
   onRemove: (countryCode: string) => void;
+  removeLabel: string;
 }>) {
   const allowedSet = allowedCountryCodes
     ? new Set(allowedCountryCodes)
@@ -525,7 +761,7 @@ function ProductCountryManager({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-gray-900">{label}</h3>
         <select
-          aria-label={`Add ${label.toLowerCase()}`}
+          aria-label={`${addCountryLabel}: ${label}`}
           className="rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={Boolean(disabledReason) || availableOptions.length < 1}
           onChange={(event) => {
@@ -536,7 +772,7 @@ function ProductCountryManager({
           }}
           value=""
         >
-          <option value="">Add country</option>
+          <option value="">{addCountryLabel}</option>
           {availableOptions.map((country) => (
             <option key={country.code} value={country.code}>
               {country.label}
@@ -552,7 +788,7 @@ function ProductCountryManager({
           >
             {productCountryLabel(countryCode)}
             <button
-              aria-label={`Remove ${productCountryLabel(countryCode)}`}
+              aria-label={`${removeLabel}: ${productCountryLabel(countryCode)}`}
               className="rounded-full p-0.5 text-emerald-500 hover:bg-emerald-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={countryCodes.length <= 1}
               onClick={() => onRemove(countryCode)}
@@ -591,6 +827,7 @@ export function AdminProductsView({
   const [metricFilter, setMetricFilter] =
     useState<ProductMetricFilter>("productsTotal");
   const [manufacturerFilter, setManufacturerFilter] = useState("");
+  const viewLabels = productViewLabels[locale];
   const normalizedSearch = search.trim().toLowerCase();
   const manufacturerStats = productManufacturerStats(rows);
   const summary = rows.reduce(
@@ -623,49 +860,49 @@ export function AdminProductsView({
     safetyMetric({
       color: businessMetricColors.total,
       id: "productsTotal",
-      label: "Products",
+      label: viewLabels.products,
       locale,
       value: summary.total
     }),
     safetyMetric({
       color: businessMetricColors.succeeded,
       id: "productsApproved",
-      label: "Approved",
+      label: viewLabels.approved,
       locale,
       value: summary.approved
     }),
     safetyMetric({
       color: businessMetricColors.pendingReviews,
       id: "productsPendingReview",
-      label: "Pending Review",
+      label: viewLabels.pendingReview,
       locale,
       value: summary.pendingReview
     }),
     safetyMetric({
       color: businessMetricColors.offline,
       id: "productsIgnored",
-      label: "Ignored",
+      label: viewLabels.ignored,
       locale,
       value: summary.ignored
     }),
     safetyMetric({
       color: businessMetricColors.failed,
       id: "productsMissingFacts",
-      label: "Missing facts",
+      label: viewLabels.missingFacts,
       locale,
       value: summary.missingFacts
     }),
     safetyMetric({
       color: businessMetricColors.medium,
       id: "productsMissingImages",
-      label: "Missing images",
+      label: viewLabels.missingImages,
       locale,
       value: summary.missingImage
     }),
     safetyMetric({
       color: businessMetricColors.active,
       id: "productsAffiliates",
-      label: "Active affiliates",
+      label: viewLabels.activeAffiliates,
       locale,
       value: summary.activeAffiliate
     }),
@@ -970,7 +1207,7 @@ export function AdminProductsView({
         throw new Error(
           await adminResponseErrorMessage(
             response,
-            "Unable to update product review"
+            viewLabels.updateError
           )
         );
       }
@@ -1021,7 +1258,7 @@ export function AdminProductsView({
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Unable to update product review"
+          : viewLabels.updateError
       );
       return false;
     } finally {
@@ -1044,25 +1281,25 @@ export function AdminProductsView({
       <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_14rem]">
           <input
-            aria-label="Search products"
+            aria-label={viewLabels.search}
             className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search products, brands, ingredients, aliases"
+            placeholder={viewLabels.searchPlaceholder}
             type="search"
             value={search}
           />
           <select
-            aria-label="Status"
+            aria-label={viewLabels.status}
             className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
             onChange={(event) =>
               handleStatusChange(event.target.value as ProductBusinessState | "")
             }
             value={status}
           >
-            <option value="">All states</option>
+            <option value="">{viewLabels.allStates}</option>
             {productBusinessStates.map((item) => (
               <option key={item} value={item}>
-                {productBusinessStateLabel(item)}
+                {productBusinessStateLabel(item, locale)}
               </option>
             ))}
           </select>
@@ -1097,19 +1334,19 @@ export function AdminProductsView({
                     </h3>
                     {row.title !== row.displayTitle ? (
                       <p className="mt-0.5 text-xs text-gray-400">
-                        Source title: {row.title}
+                        {viewLabels.sourceTitle}: {row.title}
                       </p>
                     ) : null}
                     <p className="mt-1 text-sm text-gray-500">
                       {[
                         row.brandName,
-                        productStatusLabel(row.productKind),
+                        productStatusLabel(row.productKind, locale),
                         row.productAudience === "both"
                           ? null
-                          : productStatusLabel(row.productAudience),
+                          : productStatusLabel(row.productAudience, locale),
                         row.fdaApprovalNumber ? `FDA ${row.fdaApprovalNumber}` : null,
                         row.availableCountryCodes.length > 0
-                          ? `Markets ${row.availableCountryCodes.join(", ")}`
+                          ? `${viewLabels.markets} ${row.availableCountryCodes.join(", ")}`
                           : null,
                         row.priceAmount ? `${row.priceAmount} ${row.currency}` : null
                       ]
@@ -1123,11 +1360,11 @@ export function AdminProductsView({
                       productBusinessStateClass(productBusinessState(row))
                     )}
                   >
-                    {productBusinessStateLabel(productBusinessState(row))}
+                    {productBusinessStateLabel(productBusinessState(row), locale)}
                   </span>
                 </div>
                 <div
-                  aria-label="Translation status"
+                  aria-label={viewLabels.translationStatus}
                   className="mt-3 flex flex-wrap gap-1.5"
                 >
                   {productTranslationLocales(row).map((siteLocale) => {
@@ -1136,13 +1373,18 @@ export function AdminProductsView({
                     return (
                       <span
                         className={classNames(
-                          "rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
+                          "rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                          siteLocale.code === "zh-CN"
+                            ? adminLocaleTextClass("zh-CN", "label")
+                            : siteLocale.code === "th"
+                              ? adminLocaleTextClass("th", "label")
+                              : "uppercase tracking-wide",
                           productTranslationStatusClass(translation.status)
                         )}
                         key={siteLocale.code}
-                        title={`${siteLocale.nativeLabel}: ${productTranslationStatusLabel(translation.status)}`}
+                        title={`${siteLocale.nativeLabel}: ${productTranslationStatusLabel(translation.status, locale)}`}
                       >
-                        {siteLocale.label} {productTranslationStatusLabel(translation.status)}
+                        {siteLocale.label} {productTranslationStatusLabel(translation.status, locale)}
                       </span>
                     );
                   })}
@@ -1160,13 +1402,15 @@ export function AdminProductsView({
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-3 text-sm text-amber-700">No parsed label facts yet.</p>
+                  <p className="mt-3 text-sm text-amber-700">
+                    {viewLabels.noParsedFacts}
+                  </p>
                 )}
                 <p className="mt-3 text-sm text-gray-500">
                   {productDecisionSummary(row, locale)}
                   {(row.decisionStats?.averageProductCoveragePercent ??
                     row.recommendationHistory.averageProductCoveragePercent)
-                    ? ` · avg ${Math.round(row.decisionStats?.averageProductCoveragePercent ?? row.recommendationHistory.averageProductCoveragePercent ?? 0)}% client fit`
+                    ? ` · ${viewLabels.averageClientFit} ${Math.round(row.decisionStats?.averageProductCoveragePercent ?? row.recommendationHistory.averageProductCoveragePercent ?? 0)}%`
                     : ""}
                 </p>
               </div>
@@ -1247,6 +1491,7 @@ function ProductModal({
     draft.productImportDuplicateProductIds.find((id) => id !== draft.id) ?? ""
   );
   const [reviewerNote, setReviewerNote] = useState("");
+  const viewLabels = productViewLabels[locale];
   const hasOpenImportReview = Boolean(draft.importReviewTaskId);
   const approvalBlockedMessage =
     draft.validation.status !== "pass"
@@ -1472,18 +1717,18 @@ function ProductModal({
                   productBusinessStateClass(currentBusinessState)
                 )}
               >
-                {productBusinessStateLabel(currentBusinessState)}
+                {productBusinessStateLabel(currentBusinessState, locale)}
               </span>
             </div>
             <p className="mt-1 text-sm text-gray-500">
               {[
                 draft.brandName,
-                productStatusLabel(draft.productKind),
+                productStatusLabel(draft.productKind, locale),
                 draft.productAudience === "both"
                   ? null
-                  : productStatusLabel(draft.productAudience),
+                  : productStatusLabel(draft.productAudience, locale),
                 safeProductCountryCodes.length > 0
-                  ? `Markets ${safeProductCountryCodes.join(", ")}`
+                  ? `${viewLabels.markets} ${safeProductCountryCodes.join(", ")}`
                   : draft.region
               ]
                 .filter(Boolean)
@@ -1491,7 +1736,7 @@ function ProductModal({
             </p>
           </div>
           <button
-            aria-label="Close"
+            aria-label={viewLabels.close}
             className="rounded-full p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
             onClick={onClose}
             type="button"
@@ -1504,23 +1749,19 @@ function ProductModal({
           {draft.decisionStats ? (
             <div>
               <p className="font-semibold text-gray-900">
-                {locale === "th"
-                  ? "ข้อมูลการเลือกสินค้า"
-                  : locale === "zh-CN"
-                    ? "推荐决策"
-                    : "Recommendation decisions"}
+                {viewLabels.recommendationDecisions}
               </p>
               <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <ProductInsightStat
-                  label={locale === "th" ? "ถูกเลือก" : locale === "zh-CN" ? "已选择" : "Chosen"}
+                  label={viewLabels.chosen}
                   value={draft.decisionStats.chosenPlanCount}
                 />
                 <ProductInsightStat
-                  label={locale === "th" ? "เกือบถูกเลือก" : locale === "zh-CN" ? "接近入选" : "Near misses"}
+                  label={viewLabels.nearMisses}
                   value={draft.decisionStats.nearMissCount}
                 />
                 <ProductInsightStat
-                  label={locale === "th" ? "ไม่ผ่าน" : locale === "zh-CN" ? "已排除" : "Rejected"}
+                  label={viewLabels.rejected}
                   value={draft.decisionStats.rejectedCount}
                 />
               </div>
@@ -1545,16 +1786,18 @@ function ProductModal({
           {draft.validationCacheStatus === "stale" ? (
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-800">
-                Validation stale
+                {viewLabels.staleValidation}
               </span>
               <span className="text-xs text-gray-500">
-                Saved validation cache differs from current facts and limits.
+                {viewLabels.staleValidationHint}
               </span>
             </div>
           ) : null}
           {draft.validation.status !== "pass" ? (
             <div>
-              <p className="font-semibold text-gray-900">Validation blockers</p>
+              <p className="font-semibold text-gray-900">
+                {viewLabels.validationBlockers}
+              </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {draft.validation.reasons.map((reason) => (
                   <span
@@ -1572,13 +1815,17 @@ function ProductModal({
           ) : null}
           {draft.aiCorrectionNotes ? (
             <p>
-              <span className="font-semibold text-gray-900">AI notes: </span>
+              <span className="font-semibold text-gray-900">
+                {viewLabels.aiNotes}:{" "}
+              </span>
               {draft.aiCorrectionNotes}
             </p>
           ) : null}
           {draft.sourceEvidence.sourceUrl ? (
             <p>
-              <span className="font-semibold text-gray-900">Source: </span>
+              <span className="font-semibold text-gray-900">
+                {viewLabels.source}:{" "}
+              </span>
               <a
                 className="text-[#2563EB] hover:text-[#1D4ED8]"
                 href={draft.sourceEvidence.sourceUrl}
@@ -1593,28 +1840,32 @@ function ProductModal({
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <ProductCountryManager
+            addCountryLabel={viewLabels.addCountry}
             countryCodes={manufacturerCountryCodes}
-            label="Manufacturer countries"
+            label={viewLabels.manufacturerCountries}
             onAdd={addManufacturerCountry}
             onRemove={removeManufacturerCountry}
+            removeLabel={viewLabels.remove}
           />
           <ProductCountryManager
+            addCountryLabel={viewLabels.addCountry}
             allowedCountryCodes={manufacturerCountryCodes}
             countryCodes={safeProductCountryCodes}
             disabledReason={
               manufacturerCountryCodes.length < 1
-                ? "Add a manufacturer country first."
+                ? viewLabels.addManufacturerCountryFirst
                 : null
             }
-            label="Product countries"
+            label={viewLabels.productCountries}
             onAdd={addAvailableCountry}
             onRemove={removeAvailableCountry}
+            removeLabel={viewLabels.remove}
           />
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <label className="text-sm font-medium text-gray-700">
-            Product name
+            {viewLabels.productName}
             <input
               className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
               onChange={(event) =>
@@ -1628,7 +1879,7 @@ function ProductModal({
             />
           </label>
           <label className="text-sm font-medium text-gray-700">
-            Brand
+            {viewLabels.brand}
             <input
               className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
               onChange={(event) =>
@@ -1642,7 +1893,7 @@ function ProductModal({
             />
           </label>
           <label className="text-sm font-medium text-gray-700">
-            Product URL
+            {viewLabels.productUrl}
             <input
               className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
               onChange={(event) =>
@@ -1656,7 +1907,7 @@ function ProductModal({
             />
           </label>
           <label className="text-sm font-medium text-gray-700">
-            Image URL
+            {viewLabels.imageUrl}
             <input
               className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
               onChange={(event) =>
@@ -1670,7 +1921,7 @@ function ProductModal({
             />
           </label>
           <label className="text-sm font-medium text-gray-700">
-            Product type
+            {viewLabels.productType}
             <select
               className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
               onChange={(event) =>
@@ -1683,13 +1934,13 @@ function ProductModal({
             >
               {productKinds.map((item) => (
                 <option key={item} value={item}>
-                  {productStatusLabel(item)}
+                  {productStatusLabel(item, locale)}
                 </option>
               ))}
             </select>
           </label>
           <label className="text-sm font-medium text-gray-700">
-            Audience
+            {viewLabels.audience}
             <select
               className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
               onChange={(event) =>
@@ -1702,13 +1953,13 @@ function ProductModal({
             >
               {productAudiences.map((item) => (
                 <option key={item} value={item}>
-                  {productStatusLabel(item)}
+                  {productStatusLabel(item, locale)}
                 </option>
               ))}
             </select>
           </label>
           <label className="text-sm font-medium text-gray-700">
-            FDA approval number
+            {viewLabels.fdaApprovalNumber}
             <input
               className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
               onChange={(event) =>
@@ -1727,7 +1978,7 @@ function ProductModal({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-gray-900">
-                Translations
+                {viewLabels.translations}
               </h3>
             </div>
             <span
@@ -1736,7 +1987,7 @@ function ProductModal({
                 productTranslationStatusClass(activeTranslation.status)
               )}
             >
-              {activeTranslationMeta.label} {productTranslationStatusLabel(activeTranslation.status)}
+              {activeTranslationMeta.label} {productTranslationStatusLabel(activeTranslation.status, locale)}
             </span>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -1747,7 +1998,12 @@ function ProductModal({
               return (
                 <button
                   className={classNames(
-                    "rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide transition",
+                    "rounded-full border px-2 py-0.5 text-[11px] font-semibold transition",
+                    siteLocale.code === "zh-CN"
+                      ? adminLocaleTextClass("zh-CN", "label")
+                      : siteLocale.code === "th"
+                        ? adminLocaleTextClass("th", "label")
+                        : "uppercase tracking-wide",
                     productTranslationStatusClass(translation.status),
                     selected
                       ? "ring-2 ring-[#1FA77A] ring-offset-1"
@@ -1755,17 +2011,17 @@ function ProductModal({
                   )}
                   key={siteLocale.code}
                   onClick={() => setSelectedTranslationLocale(siteLocale.code)}
-                  title={`${siteLocale.nativeLabel}: ${productTranslationStatusLabel(translation.status)}`}
+                  title={`${siteLocale.nativeLabel}: ${productTranslationStatusLabel(translation.status, locale)}`}
                   type="button"
                 >
-                  {siteLocale.label} {productTranslationStatusLabel(translation.status)}
+                  {siteLocale.label} {productTranslationStatusLabel(translation.status, locale)}
                 </button>
               );
             })}
           </div>
           <div className="mt-4 grid gap-4">
             <label className="text-sm font-medium text-gray-700">
-              Title · {activeTranslationMeta.nativeLabel}
+              {viewLabels.title} · {activeTranslationMeta.nativeLabel}
               <input
                 className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
                 onChange={(event) =>
@@ -1778,7 +2034,7 @@ function ProductModal({
               />
             </label>
             <label className="grid gap-2 text-sm font-medium text-gray-700">
-              Description · {activeTranslationMeta.nativeLabel}
+              {viewLabels.description} · {activeTranslationMeta.nativeLabel}
               <textarea
                 className="min-h-28 resize-y rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
                 onChange={(event) =>
@@ -1794,7 +2050,9 @@ function ProductModal({
 
         <div className="mt-5">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-gray-900">Parsed facts</h3>
+            <h3 className="text-sm font-semibold text-gray-900">
+              {viewLabels.parsedFacts}
+            </h3>
             <button
               className="rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50"
               onClick={() =>
@@ -1824,7 +2082,7 @@ function ProductModal({
               }
               type="button"
             >
-              Add fact
+              {viewLabels.addFact}
             </button>
           </div>
           <div className="mt-2 space-y-2">
@@ -1863,7 +2121,7 @@ function ProductModal({
                       )
                     })
                   }
-                  placeholder="Ingredient"
+                  placeholder={viewLabels.ingredient}
                   value={fact.name}
                 />
                 <input
@@ -1891,7 +2149,7 @@ function ProductModal({
                       )
                     });
                   }}
-                  placeholder="Amount"
+                  placeholder={viewLabels.amount}
                   value={fact.amount ?? ""}
                 />
                 <select
@@ -1911,7 +2169,7 @@ function ProductModal({
                   }
                   value={fact.unit ?? ""}
                 >
-                  <option value="">Unit</option>
+                  <option value="">{viewLabels.unit}</option>
                   {productDoseUnitSelectOptions(fact.unit).map((unit) => (
                     <option key={unit} value={unit}>
                       {unit}
@@ -1938,9 +2196,9 @@ function ProductModal({
                   }
                   value={fact.confidence}
                 >
-                  <option value="high">High</option>
-                  <option value="moderate">Moderate</option>
-                  <option value="low">Low</option>
+                  <option value="high">{viewLabels.confidenceHigh}</option>
+                  <option value="moderate">{viewLabels.confidenceModerate}</option>
+                  <option value="low">{viewLabels.confidenceLow}</option>
                 </select>
                 <div className="flex items-center justify-end gap-2">
                   {safetyLimitIncreaseLabel ? (
@@ -1950,7 +2208,7 @@ function ProductModal({
                       onClick={() => void onIncreaseSafetyLimit(draft, fact.id)}
                       type="button"
                     >
-                      Increase limit
+                      {viewLabels.increaseLimit}
                     </button>
                   ) : null}
                   <button
@@ -1963,7 +2221,7 @@ function ProductModal({
                     }
                     type="button"
                   >
-                    Remove
+                    {viewLabels.remove}
                   </button>
                 </div>
                 {fact.sourceText ? (
@@ -1994,13 +2252,15 @@ function ProductModal({
               </div>
               );
             }) : (
-              <span className="text-sm text-amber-700">No parsed facts yet.</span>
+              <span className="text-sm text-amber-700">
+                {viewLabels.noParsedFacts}
+              </span>
             )}
           </div>
         </div>
 
         <div className="mt-5">
-          <h3 className="text-sm font-semibold text-gray-900">Offers</h3>
+          <h3 className="text-sm font-semibold text-gray-900">{viewLabels.offers}</h3>
           {draft.offers.length > 0 ? (
             <div className="mt-2 space-y-2">
               {draft.offers.map((offer) => (
@@ -2019,7 +2279,7 @@ function ProductModal({
                     </a>
                     <p className="mt-0.5 text-xs text-gray-500">
                       {[
-                        productStatusLabel(offer.linkType),
+                        productStatusLabel(offer.linkType, locale),
                         offer.platform,
                         offer.commissionRate !== null
                           ? `${(offer.commissionRate * 100).toFixed(1)}% commission`
@@ -2027,7 +2287,7 @@ function ProductModal({
                         offer.priceAmount !== null
                           ? `${offer.priceAmount} ${offer.currency}`
                           : null,
-                        productStatusLabel(offer.availabilityStatus)
+                        productStatusLabel(offer.availabilityStatus, locale)
                       ].filter(Boolean).join(" · ")}
                     </p>
                   </div>
@@ -2037,22 +2297,21 @@ function ProductModal({
                     onClick={() => void removeOffer(offer.id)}
                     type="button"
                   >
-                    Remove
+                    {viewLabels.remove}
                   </button>
                 </div>
               ))}
             </div>
           ) : (
             <p className="mt-2 text-sm text-gray-500">
-              No offers yet. The product can still be recommended if it is the
-              best match.
+              {viewLabels.noOffers}
             </p>
           )}
           <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto]">
             <input
               className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
               onChange={(event) => setNewOfferUrl(event.target.value)}
-              placeholder="Offer URL"
+              placeholder={viewLabels.offerUrl}
               type="url"
               value={newOfferUrl}
             />
@@ -2073,7 +2332,7 @@ function ProductModal({
               onClick={() => void addOffer()}
               type="button"
             >
-              Add
+              {viewLabels.add}
             </button>
           </div>
         </div>
@@ -2082,11 +2341,10 @@ function ProductModal({
           <div className="mt-5 space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
             <div>
               <h3 className="text-sm font-semibold text-gray-900">
-                Import review
+                {viewLabels.importReview}
               </h3>
               <p className="mt-1 text-sm text-gray-600">
-                This draft has an open review task. Use these actions to finish
-                the review and update the catalogue.
+                {viewLabels.importReviewHint}
               </p>
               {approvalBlockedMessage ? (
                 <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
@@ -2096,12 +2354,12 @@ function ProductModal({
             </div>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
               <select
-                aria-label="Duplicate of product"
+                aria-label={viewLabels.duplicateProduct}
                 className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
                 onChange={(event) => setMergeProductId(event.target.value)}
                 value={mergeProductId}
               >
-                <option value="">Duplicate of existing product</option>
+                <option value="">{viewLabels.duplicateProduct}</option>
                 {mergeOptions.map((product) => (
                   <option key={product.id} value={product.id}>
                     {[product.title, product.brandName].filter(Boolean).join(" · ")}
@@ -2125,11 +2383,11 @@ function ProductModal({
                 }}
                 type="button"
               >
-                Mark duplicate
+                {viewLabels.markDuplicate}
               </button>
             </div>
             <label className="grid gap-2 text-sm font-medium text-gray-700">
-              Reviewer note
+              {viewLabels.reviewerNote}
               <textarea
                 className="min-h-20 resize-y rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
                 onChange={(event) => setReviewerNote(event.target.value)}
@@ -2141,18 +2399,18 @@ function ProductModal({
 
         {error ? (
           <p className="mt-4 text-sm font-medium text-red-700">
-            {errorMessage ?? "Could not save this product."}
+            {errorMessage ?? viewLabels.updateError}
           </p>
         ) : null}
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <button
-              aria-label="Correct facts with AI"
+              aria-label={viewLabels.correctFactsWithAi}
               className="inline-flex size-9 items-center justify-center rounded-md bg-[#2563EB] text-white ring-1 ring-[#2563EB] hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={saving}
               onClick={() => void onCorrectFacts(draft)}
-              title="Correct facts with AI"
+              title={viewLabels.correctFactsWithAi}
               type="button"
             >
               <SparklesIcon className="size-5" />
@@ -2166,7 +2424,7 @@ function ProductModal({
                 onClick={onClose}
                 type="button"
               >
-                Close
+                {viewLabels.close}
               </button>
               <button
                 className="relative -ml-px inline-flex items-center rounded-r-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
@@ -2174,7 +2432,7 @@ function ProductModal({
                 onClick={() => void onSave(draft)}
                 type="button"
               >
-                {saving ? "Saving" : "Save"}
+                {saving ? viewLabels.saving : viewLabels.save}
               </button>
             </span>
             <span className="isolate inline-flex rounded-md shadow-xs">
@@ -2208,7 +2466,7 @@ function ProductModal({
                 }}
                 type="button"
               >
-                Ignore
+                {viewLabels.ignoredAction}
               </button>
               <button
                 className="relative -ml-px inline-flex items-center rounded-r-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] focus:z-10 disabled:cursor-not-allowed disabled:opacity-60"
@@ -2242,7 +2500,7 @@ function ProductModal({
                 title={approvalBlockedMessage ?? undefined}
                 type="button"
               >
-                Approve
+                {viewLabels.approve}
               </button>
             </span>
           </div>

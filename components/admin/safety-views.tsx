@@ -18,6 +18,7 @@ import {
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 import {
   BusinessStatsGrid,
+  adminLocaleTextClass,
   businessMetricColors,
   classNames,
   foodConfidences,
@@ -314,6 +315,7 @@ export function AdminFoodsView({
           draft={draft}
           error={errorId === draft.id}
           labels={labels}
+          locale={locale}
           onChange={(patch) =>
             setDraft((currentDraft) =>
               currentDraft ? { ...currentDraft, ...patch } : currentDraft
@@ -343,6 +345,7 @@ function FoodDetailsModal({
   draft,
   error,
   labels,
+  locale,
   onChange,
   onClose,
   onSave,
@@ -351,6 +354,7 @@ function FoodDetailsModal({
   draft: AdminFoodRow;
   error: boolean;
   labels: ReturnType<typeof foodAdminLabels>;
+  locale: Locale;
   onChange: (patch: Partial<AdminFoodRow>) => void;
   onClose: () => void;
   onSave: () => void;
@@ -461,7 +465,14 @@ function FoodDetailsModal({
                       className="grid gap-3 rounded-xl bg-gray-50 p-3 ring-1 ring-gray-100"
                       key={localeCode}
                     >
-                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-500">
+                      <p
+                        className={classNames(
+                          "text-xs font-bold text-gray-500",
+                          localeCode === "en"
+                            ? "uppercase tracking-[0.14em]"
+                            : adminLocaleTextClass(localeCode, "label")
+                        )}
+                      >
                         {localeLabels[localeCode]}
                       </p>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -567,7 +578,12 @@ function FoodDetailsModal({
 
             {draft.aliases.length > 0 ? (
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                <p
+                  className={classNames(
+                    "text-xs font-semibold text-gray-400",
+                    locale === "en" ? "uppercase tracking-[0.14em]" : adminLocaleTextClass(locale, "label")
+                  )}
+                >
                   {labels.aliases}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -653,7 +669,7 @@ function FoodDetailsModal({
                       defaultServing: {
                         grams: Math.max(0.1, Number(event.target.value) || 0.1),
                         isDefault: true,
-                        label: draft.defaultServing?.label || "Serving",
+                        label: draft.defaultServing?.label || labels.defaultServing,
                         source: draft.defaultServing?.source ?? "admin"
                       }
                     })
@@ -732,7 +748,12 @@ function FoodDetailsModal({
 
                     return (
                       <div key={categoryName}>
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                        <p
+                          className={classNames(
+                            "text-xs font-semibold text-gray-400",
+                            locale === "en" ? "uppercase tracking-[0.14em]" : adminLocaleTextClass(locale, "label")
+                          )}
+                        >
                           {categoryName}
                         </p>
                         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">

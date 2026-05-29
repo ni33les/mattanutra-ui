@@ -8,6 +8,10 @@ import {
   type BlogTestimonial
 } from "@/lib/blog";
 import { isLocale, type Locale } from "@/lib/i18n";
+import {
+  adminContentPreviewCopy,
+  readablePreviewToken
+} from "@/components/admin/content-preview-copy";
 
 type ContentPreviewPageProps = Readonly<{
   params: Promise<{
@@ -31,140 +35,6 @@ function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function readableToken(value: string | undefined) {
-  return value
-    ? value
-        .split("_")
-        .filter(Boolean)
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(" ")
-    : "Content";
-}
-
-const previewLabels = {
-  en: {
-    adminPreview: "Admin preview",
-    content: "Content",
-    testimonialPreview: "Testimonial preview"
-  },
-  th: {
-    adminPreview: "ตัวอย่างสำหรับแอดมิน",
-    content: "คอนเทนต์",
-    testimonialPreview: "ตัวอย่างคำรับรอง"
-  },
-  "zh-CN": {
-    adminPreview: "管理员预览",
-    content: "内容",
-    testimonialPreview: "见证预览"
-  }
-} satisfies Record<
-  Locale,
-  Record<"adminPreview" | "content" | "testimonialPreview", string>
->;
-
-function readablePreviewToken(
-  locale: Locale,
-  value: string | undefined,
-  fallback: string
-) {
-  if (!value) {
-    return fallback;
-  }
-
-  if (locale === "zh-CN") {
-    if (value === "blog_post") {
-      return "博客文章";
-    }
-
-    if (value === "testimonial") {
-      return "见证";
-    }
-
-    if (value === "published") {
-      return "已发布";
-    }
-
-    if (value === "scheduled") {
-      return "已定时";
-    }
-
-    if (value === "draft") {
-      return "草稿";
-    }
-
-    if (value === "deleted" || value === "archived") {
-      return "已删除";
-    }
-  }
-
-  if (locale === "th") {
-    if (value === "blog_post") {
-      return "บทความ";
-    }
-
-    if (value === "testimonial") {
-      return "คำรับรอง";
-    }
-
-    if (value === "published") {
-      return "เผยแพร่แล้ว";
-    }
-
-    if (value === "scheduled") {
-      return "ตั้งเวลาแล้ว";
-    }
-
-    if (value === "draft") {
-      return "ฉบับร่าง";
-    }
-
-    if (value === "deleted" || value === "archived") {
-      return "ลบแล้ว";
-    }
-  }
-
-  return readableToken(value);
-}
-
-function previewCta(locale: Locale) {
-  if (locale === "th") {
-    return {
-      body:
-        "ใช้เวลาเพียงไม่กี่นาทีเพื่อดู HealthScore ของคุณ และเริ่มบทสนทนาที่เป็นส่วนตัวมากขึ้นเกี่ยวกับพลังงาน การนอน อาหาร งบประมาณ และสิ่งที่เหมาะกับชีวิตประจำวันของคุณจริงๆ",
-      eyebrow: "ขั้นตอนถัดไป",
-      href: "/th/nutrition/quiz",
-      primaryLabel: "เริ่มทำแบบประเมิน",
-      secondaryHref: "/th",
-      secondaryLabel: "กลับหน้าหลัก",
-      title: "เริ่มจาก HealthScore ของคุณ แล้วค่อยๆ สร้างแผนที่เหมาะกับคุณ"
-    };
-  }
-
-  if (locale === "zh-CN") {
-    return {
-      body:
-        "花几分钟了解您的 HealthScore，并围绕精力、睡眠、饮食、预算以及真正适合日常生活的支持，开启更个性化的对话。",
-      eyebrow: "下一步",
-      href: "/zh-CN/nutrition/quiz",
-      primaryLabel: "开始评估",
-      secondaryHref: "/zh-CN",
-      secondaryLabel: "返回首页",
-      title: "从您的 HealthScore 开始，再逐步建立适合您的计划"
-    };
-  }
-
-  return {
-    body:
-      "Take a few minutes to discover your HealthScore and begin a more personal conversation about your energy, sleep, diet, budget, and what support actually fits your day.",
-    eyebrow: "Your next step",
-    href: "/en/nutrition/quiz",
-    primaryLabel: "Start the assessment",
-    secondaryHref: "/en",
-    secondaryLabel: "Back to home",
-    title: "Start with your HealthScore, then build from there"
-  };
-}
-
 function PreviewBar({
   locale,
   status,
@@ -174,7 +44,7 @@ function PreviewBar({
   status: string | undefined;
   type: string | undefined;
 }>) {
-  const labels = previewLabels[locale];
+  const labels = adminContentPreviewCopy[locale].labels;
 
   return (
     <div className="sticky top-0 z-50 border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm font-semibold text-amber-900">
@@ -195,7 +65,7 @@ function TestimonialPreview({
   testimonial: BlogTestimonial;
   type: string | undefined;
 }>) {
-  const labels = previewLabels[locale];
+  const labels = adminContentPreviewCopy[locale].labels;
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -266,7 +136,7 @@ export default async function ContentPreviewPage({
   return (
     <main className="min-h-screen bg-white">
       <PreviewBar locale={locale} status={status} type={type} />
-      <BlogArticle cta={previewCta(post.locale)} post={post} />
+      <BlogArticle cta={adminContentPreviewCopy[post.locale].cta} post={post} />
     </main>
   );
 }

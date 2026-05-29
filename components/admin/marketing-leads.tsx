@@ -9,6 +9,7 @@ import { SupplementListMeta } from "@/components/admin/safety-views";
 import {
   BusinessStatsGrid,
   PlanIdLink,
+  adminLocaleTextClass,
   businessMetricColors,
   classNames,
   compactId,
@@ -154,7 +155,10 @@ export function AdminLeadsView({
                   labels.marketingPages.lastSeen
                 ].map((heading) => (
                   <th
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-500"
+                    className={classNames(
+                      "px-4 py-3 text-left text-xs font-semibold text-gray-500",
+                      locale === "en" ? "uppercase tracking-[0.14em]" : adminLocaleTextClass(locale, "label")
+                    )}
                     key={heading}
                     scope="col"
                   >
@@ -284,7 +288,12 @@ function LeadDetailsModal({
     <AdminModal onClose={onClose} panelClassName="max-w-4xl">
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+              <p
+                className={classNames(
+                  "text-xs font-semibold text-gray-400",
+                  locale === "en" ? "uppercase tracking-[0.16em]" : adminLocaleTextClass(locale, "label")
+                )}
+              >
                 {labels.marketingPages.interactionThread}
               </p>
               <h2 className="mt-2 text-xl font-semibold text-gray-900">
@@ -338,7 +347,12 @@ function LeadDetailsModal({
             </div>
 
             <div>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+              <p
+                className={classNames(
+                  "mb-3 text-xs font-semibold text-gray-400",
+                  locale === "en" ? "uppercase tracking-[0.16em]" : adminLocaleTextClass(locale, "label")
+                )}
+              >
                 {labels.marketingPages.events}
               </p>
               {row.events.length > 0 ? (
@@ -353,7 +367,12 @@ function LeadDetailsModal({
                       >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
-                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                            <p
+                              className={classNames(
+                                "text-xs font-semibold text-gray-400",
+                                locale === "en" ? "uppercase tracking-[0.14em]" : adminLocaleTextClass(locale, "label")
+                              )}
+                            >
                               {readableToken(event.eventType)} ·{" "}
                               {readableToken(event.eventStatus)} ·{" "}
                               {readableToken(event.actorType)}
@@ -390,4 +409,3 @@ function LeadDetailsModal({
     </AdminModal>
   );
 }
-

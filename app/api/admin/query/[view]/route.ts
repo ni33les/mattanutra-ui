@@ -2,9 +2,10 @@ import {
   getAdminExternalQueryData,
   normalizeAdminExternalQueryView
 } from "@/lib/admin-query-data";
+import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import {
   openClawJson,
-  requireOpenClawRequest,
+  openClawUnauthorized,
   taskApiError
 } from "@/lib/openclaw-api";
 
@@ -18,7 +19,13 @@ type AdminQueryRouteProps = Readonly<{
 }>;
 
 export async function GET(request: Request, { params }: AdminQueryRouteProps) {
-  const unauthorized = requireOpenClawRequest(request);
+  const url = new URL(request.url);
+  const unauthorized = adminDashboardOrClawRequestAllowed(
+    request,
+    url.searchParams.get("access_token")
+  )
+    ? null
+    : openClawUnauthorized();
 
   if (unauthorized) {
     return unauthorized;
@@ -32,8 +39,6 @@ export async function GET(request: Request, { params }: AdminQueryRouteProps) {
   }
 
   try {
-    const url = new URL(request.url);
-
     return openClawJson(await getAdminExternalQueryData(view, url.searchParams));
   } catch (error) {
     return taskApiError(error, "Unable to load admin query");

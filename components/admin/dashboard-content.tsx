@@ -90,6 +90,7 @@ export type AdminNavItem = Readonly<{
 }>;
 
 export type AdminContent = Readonly<{
+  adminLanguage: string;
   closeSidebar: string;
   dataUnavailable: string;
   emptyFlow: string;
@@ -123,6 +124,7 @@ export type AdminContent = Readonly<{
     provider: string;
     queued: string;
     retry: string;
+    retryError: string;
     retrying: string;
     sent: string;
     skipped: string;
@@ -329,18 +331,27 @@ export type AdminContent = Readonly<{
   ranges: Record<AdminDashboardRange, string>;
   reviewQueue: {
     approve: string;
+    confidenceHigh: string;
+    confidenceLow: string;
+    confidenceModerate: string;
     clientDose: string;
     disapprove: string;
+    duplicateProduct: string;
     doseReduced: string;
     empty: string;
     flagReason: string;
     foodFrequency: string;
+    foodItem: string;
     foodRationale: string;
     foodServing: string;
+    foodReviewHint: string;
     highValue: string;
+    ingredient: string;
     lowValue: string;
     mediumValue: string;
     newDose: string;
+    noParsedFacts: string;
+    productItem: string;
     originalDose: string;
     plan: string;
     planLink: string;
@@ -352,6 +363,10 @@ export type AdminContent = Readonly<{
     supplementReview: string;
     reviewerNote: string;
     reviewRequired: string;
+    remove: string;
+    reviewPlanSafety: string;
+    selectProduct: string;
+    suppItem: string;
     suggestFoodReview: string;
     suggestFoodReviewBusy: string;
     suggestFoodReviewError: string;
@@ -376,17 +391,40 @@ export type AdminContent = Readonly<{
   visibility: {
     active: string;
     actor: string;
+    agent: string;
+    agentSeen: string;
+    agentSession: string;
     blocked: string;
     capabilities: string;
     completed: string;
+    disconnected: string;
     empty: string;
     failed: string;
+    group: string;
+    heartbeat: string;
+    heartbeatStale: string;
     human: string;
+    idle: string;
+    lastEvent: string;
+    lease: string;
+    leaseExpired: string;
+    live: string;
+    liveUpdated: string;
+    liveUpdates: string;
+    noWorkerHeartbeat: string;
+    plan: string;
     queued: string;
+    ray: string;
+    reasoning: string;
+    reservation: string;
+    reserved: string;
+    runtime: string;
+    scheduled: string;
+    seen: string;
+    session: string;
     status: string;
     task: string;
     total: string;
-    agent: string;
   };
   supplements: {
     active: string;
@@ -395,6 +433,7 @@ export type AdminContent = Readonly<{
     addSupplement: string;
     blocked: string;
     category: string;
+    categoryPlaceholder: string;
     confidence: string;
     close: string;
     create: string;
@@ -448,6 +487,7 @@ export const foodReviewSuggestionTimeoutMs = 45_000;
 
 const baseContent = {
   en: {
+    adminLanguage: "Admin language",
     closeSidebar: "Close sidebar",
     dataUnavailable:
       "Dashboard data is unavailable. Check the database connection.",
@@ -482,6 +522,7 @@ const baseContent = {
       provider: "Provider",
       queued: "Queued",
       retry: "Retry",
+      retryError: "Unable to retry this message.",
       retrying: "Retrying...",
       sent: "Sent",
       skipped: "Skipped",
@@ -767,18 +808,27 @@ const baseContent = {
     },
     reviewQueue: {
       approve: "Approve",
+      confidenceHigh: "High",
+      confidenceLow: "Low",
+      confidenceModerate: "Moderate",
       clientDose: "Client dose",
       disapprove: "Disapprove",
+      duplicateProduct: "Duplicate of existing product",
       doseReduced: "Dose reduced",
       empty: "No supplement review tasks are waiting.",
       flagReason: "Review reason",
       foodFrequency: "Frequency",
+      foodItem: "Food",
       foodRationale: "Rationale",
       foodServing: "Serving",
+      foodReviewHint: "Review whether this food can be shown in the client guidance.",
       highValue: "High Value",
+      ingredient: "Ingredient",
       lowValue: "Low Value",
       mediumValue: "Medium Value",
       newDose: "New dose",
+      noParsedFacts: "No parsed facts yet.",
+      productItem: "Product",
       originalDose: "Original dose",
       plan: "Plan",
       planLink: "Open plan",
@@ -790,6 +840,10 @@ const baseContent = {
       supplementReview: "Supplement review",
       reviewerNote: "Reviewer note",
       reviewRequired: "Review required",
+      remove: "Remove",
+      reviewPlanSafety: "Review nutrition safety for plan",
+      selectProduct: "Select product",
+      suppItem: "Supp",
       suggestFoodReview: "Suggest food details with AI",
       suggestFoodReviewBusy: "AI is drafting food details...",
       suggestFoodReviewError: "Could not suggest food details.",
@@ -814,17 +868,40 @@ const baseContent = {
     visibility: {
       active: "Processing",
       actor: "Actor",
+      agent: "Agent",
+      agentSeen: "Agent seen",
+      agentSession: "Agent session",
       blocked: "Blocked",
       capabilities: "Capabilities",
       completed: "Completed",
+      disconnected: "Disconnected",
       empty: "No tasks are visible in this timeframe.",
       failed: "Failed",
+      group: "Group",
+      heartbeat: "Heartbeat",
+      heartbeatStale: "Agent heartbeat is stale.",
       human: "Human",
+      idle: "Idle",
+      lastEvent: "Last event",
+      lease: "Lease",
+      leaseExpired: "Lease expired before the agent completed the task.",
+      live: "Live",
+      liveUpdated: "Live",
+      liveUpdates: "Live updates",
+      noWorkerHeartbeat: "No worker heartbeat",
+      plan: "Plan",
       queued: "Queued",
+      ray: "Ray",
+      reasoning: "Reasoning",
+      reservation: "Reservation",
+      reserved: "Reserved",
+      runtime: "Runtime",
+      scheduled: "Scheduled",
+      seen: "Seen",
+      session: "Session",
       status: "Status",
       task: "Task",
-      total: "Total",
-      agent: "Agent"
+      total: "Total"
     },
     supplements: {
       active: "Active",
@@ -833,6 +910,7 @@ const baseContent = {
       addSupplement: "Add supplement",
       blocked: "Blocked",
       category: "Category",
+      categoryPlaceholder: "Manual",
       confidence: "Confidence",
       close: "Close",
       create: "Create",
@@ -891,6 +969,7 @@ const baseContent = {
     title: "Performance"
   },
   th: {
+    adminLanguage: "ภาษาแอดมิน",
     closeSidebar: "ปิดแถบเมนู",
     dataUnavailable:
       "ไม่สามารถโหลดข้อมูลแดชบอร์ดได้ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล",
@@ -925,6 +1004,7 @@ const baseContent = {
       provider: "Provider",
       queued: "รอส่ง",
       retry: "ลองอีกครั้ง",
+      retryError: "ไม่สามารถลองส่งข้อความนี้ใหม่ได้",
       retrying: "กำลังลองอีกครั้ง...",
       sent: "ส่งแล้ว",
       skipped: "ข้าม",
@@ -1210,18 +1290,27 @@ const baseContent = {
     },
     reviewQueue: {
       approve: "อนุมัติ",
+      confidenceHigh: "สูง",
+      confidenceLow: "ต่ำ",
+      confidenceModerate: "ปานกลาง",
       clientDose: "ขนาดสำหรับลูกค้า",
       disapprove: "ไม่อนุมัติ",
+      duplicateProduct: "ซ้ำกับสินค้าที่มีอยู่",
       doseReduced: "ลดขนาดแล้ว",
       empty: "ไม่มีงานรีวิวอาหารเสริมที่รอดำเนินการ",
       flagReason: "เหตุผลที่ต้องรีวิว",
       foodFrequency: "ความถี่",
+      foodItem: "อาหาร",
       foodRationale: "เหตุผล",
       foodServing: "ปริมาณ",
+      foodReviewHint: "ตรวจสอบว่าอาหารนี้สามารถแสดงในคำแนะนำลูกค้าได้หรือไม่",
       highValue: "มูลค่าสูง",
+      ingredient: "ส่วนผสม",
       lowValue: "มูลค่าต่ำ",
       mediumValue: "มูลค่าปานกลาง",
       newDose: "ขนาดใหม่",
+      noParsedFacts: "ยังไม่มีข้อมูลฉลากที่อ่านได้",
+      productItem: "สินค้า",
       originalDose: "ขนาดเดิม",
       plan: "แผน",
       planLink: "เปิดแผน",
@@ -1233,6 +1322,10 @@ const baseContent = {
       supplementReview: "รีวิวอาหารเสริม",
       reviewerNote: "หมายเหตุผู้รีวิว",
       reviewRequired: "ต้องรีวิว",
+      remove: "ลบ",
+      reviewPlanSafety: "รีวิวความปลอดภัยของแผนโภชนาการ",
+      selectProduct: "เลือกสินค้า",
+      suppItem: "อาหารเสริม",
       suggestFoodReview: "แนะนำรายละเอียดอาหารด้วย AI",
       suggestFoodReviewBusy: "AI กำลังร่างรายละเอียดอาหาร...",
       suggestFoodReviewError: "ไม่สามารถแนะนำรายละเอียดอาหารได้",
@@ -1257,17 +1350,40 @@ const baseContent = {
     visibility: {
       active: "กำลังประมวลผล",
       actor: "ผู้ทำ",
+      agent: "Agent",
+      agentSeen: "Agent เห็นล่าสุด",
+      agentSession: "เซสชัน Agent",
       blocked: "ติดขัด",
       capabilities: "ความสามารถ",
       completed: "สำเร็จ",
+      disconnected: "ขาดการเชื่อมต่อ",
       empty: "ไม่มีงานในช่วงเวลานี้",
       failed: "ล้มเหลว",
+      group: "กลุ่ม",
+      heartbeat: "Heartbeat",
+      heartbeatStale: "heartbeat ของ agent เก่าเกินไป",
       human: "คน",
+      idle: "พัก",
+      lastEvent: "เหตุการณ์ล่าสุด",
+      lease: "Lease",
+      leaseExpired: "lease หมดอายุก่อน agent ทำงานเสร็จ",
+      live: "สด",
+      liveUpdated: "สด",
+      liveUpdates: "อัปเดตสด",
+      noWorkerHeartbeat: "ไม่มี heartbeat จาก worker",
+      plan: "แผน",
       queued: "รอคิว",
+      ray: "Ray",
+      reasoning: "Reasoning",
+      reservation: "Reservation",
+      reserved: "จองแล้ว",
+      runtime: "Runtime",
+      scheduled: "ตั้งเวลา",
+      seen: "เห็นล่าสุด",
+      session: "เซสชัน",
       status: "สถานะ",
       task: "งาน",
-      total: "ทั้งหมด",
-      agent: "Agent"
+      total: "ทั้งหมด"
     },
     supplements: {
       active: "ใช้งาน",
@@ -1276,6 +1392,7 @@ const baseContent = {
       addSupplement: "เพิ่มอาหารเสริม",
       blocked: "บล็อก",
       category: "หมวดหมู่",
+      categoryPlaceholder: "กรอกเอง",
       confidence: "ความมั่นใจ",
       close: "ปิด",
       create: "สร้าง",

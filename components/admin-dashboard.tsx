@@ -69,7 +69,9 @@ import {
   type TaskMetricId
 } from "@/components/admin/dashboard-content";
 import {
+  AdminLocaleSwitcher,
   SidebarContent,
+  adminLocaleTextClass,
   adminExecutionEventsHref,
   adminTaskVisibilityHref,
   classNames,
@@ -183,8 +185,8 @@ function taskActorClass(actorType: string) {
   return "bg-cyan-50 text-cyan-700 ring-cyan-100";
 }
 
-function taskActorLabel(actorType: string) {
-  return actorType === "human" ? "Human" : "Agent";
+function taskActorLabel(actorType: string, labels: AdminContent) {
+  return actorType === "human" ? labels.visibility.human : labels.visibility.agent;
 }
 
 function relativeDuration(
@@ -206,7 +208,11 @@ function relativeDuration(
   return formatTaskDuration(snapshotTime - valueTime, locale);
 }
 
-function taskRuntimeWarning(row: AdminTaskVisibilityRow, snapshotAt: string) {
+function taskRuntimeWarning(
+  row: AdminTaskVisibilityRow,
+  snapshotAt: string,
+  labels: AdminContent
+) {
   const snapshotTime = new Date(snapshotAt).getTime();
   const lastSeenTime = row.workerSessionLastSeenAt
     ? new Date(row.workerSessionLastSeenAt).getTime()
@@ -225,7 +231,7 @@ function taskRuntimeWarning(row: AdminTaskVisibilityRow, snapshotAt: string) {
     Number.isFinite(leaseUntilTime) &&
     leaseUntilTime < snapshotTime
   ) {
-    return "Lease expired before the agent completed the task.";
+    return labels.visibility.leaseExpired;
   }
 
   if (
@@ -233,7 +239,7 @@ function taskRuntimeWarning(row: AdminTaskVisibilityRow, snapshotAt: string) {
     Number.isFinite(lastSeenTime) &&
     snapshotTime - lastSeenTime > 120_000
   ) {
-    return "Agent heartbeat is stale.";
+    return labels.visibility.heartbeatStale;
   }
 
   return "";
@@ -242,24 +248,25 @@ function taskRuntimeWarning(row: AdminTaskVisibilityRow, snapshotAt: string) {
 function taskRuntimeSummary(
   row: AdminTaskVisibilityRow,
   snapshotAt: string,
+  labels: AdminContent,
   locale: Locale
 ) {
   const parts = [
     row.agentName ?? null,
     row.reservationStatus
-      ? `Reservation ${readableToken(row.reservationStatus)}`
+      ? `${labels.visibility.reservation} ${readableToken(row.reservationStatus)}`
       : null,
     row.reservedAt
-      ? `reserved ${relativeDuration(row.reservedAt, snapshotAt, locale)} ago`
+      ? `${labels.visibility.reserved} ${relativeDuration(row.reservedAt, snapshotAt, locale)}`
       : null,
     row.workerSessionStatus
-      ? `session ${readableToken(row.workerSessionStatus)}`
+      ? `${labels.visibility.session} ${readableToken(row.workerSessionStatus)}`
       : null,
     row.workerSessionLastSeenAt
-      ? `seen ${relativeDuration(row.workerSessionLastSeenAt, snapshotAt, locale)} ago`
+      ? `${labels.visibility.seen} ${relativeDuration(row.workerSessionLastSeenAt, snapshotAt, locale)}`
       : null,
     row.latestEventType
-      ? `last event ${readableToken(row.latestEventType)}`
+      ? `${labels.visibility.lastEvent} ${readableToken(row.latestEventType)}`
       : null
   ].filter(Boolean);
 
@@ -444,7 +451,7 @@ function AdminCommunicationsView({
       <div className="flex justify-end">
         <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
           <span className="size-2 rounded-full bg-[#1FA77A]" />
-          Live · {labels.contentPages.updated}{" "}
+          {labels.visibility.liveUpdated} · {labels.contentPages.updated}{" "}
           {formatGeneratedAt(data.generatedAt, locale)}
         </span>
       </div>
@@ -509,7 +516,7 @@ function AdminCommunicationsView({
                     ) : null}
                     {retryErrorId === row.id ? (
                       <p className="mt-3 text-sm font-medium text-red-700">
-                        Unable to retry this message.
+                        {labels.communications.retryError}
                       </p>
                     ) : null}
                   </div>
@@ -622,7 +629,12 @@ function AdminTechnicalAlertsView({
                       </p>
                     ) : null}
                     <div className="mt-3 rounded-xl bg-red-50 px-4 py-3 ring-1 ring-red-100">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                      <div
+                        className={classNames(
+                          "text-xs font-semibold text-red-700",
+                          locale === "en" ? "uppercase tracking-wide" : adminLocaleTextClass(locale, "label")
+                        )}
+                      >
                         {labels.technicalAlerts.rootCause}
                       </div>
                       <p className="mt-1 text-sm leading-6 text-red-900">
@@ -692,7 +704,7 @@ function LiveUpdatedBadge({
     <div className="flex justify-end">
       <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
         <span className="size-2 rounded-full bg-[#1FA77A]" />
-        Live · {labels.contentPages.updated}{" "}
+        {labels.visibility.liveUpdated} · {labels.contentPages.updated}{" "}
         {formatGeneratedAt(generatedAt, locale)}
       </span>
     </div>
@@ -700,8 +712,10 @@ function LiveUpdatedBadge({
 }
 
 function LiveStatusBadge({
+  labels,
   pulseAt
 }: Readonly<{
+  labels: AdminContent;
   pulseAt: number;
 }>) {
   const [now, setNow] = useState(() => Date.now());
@@ -715,7 +729,11 @@ function LiveStatusBadge({
         ? "idle"
         : "disconnected";
   const stateLabel =
-    state === "live" ? "Live" : state === "idle" ? "Idle" : "Disconnected";
+    state === "live"
+      ? labels.visibility.live
+      : state === "idle"
+        ? labels.visibility.idle
+        : labels.visibility.disconnected;
   const dotClass =
     state === "live"
       ? "bg-[#1FA77A]"
@@ -732,9 +750,9 @@ function LiveStatusBadge({
   return (
     <div className="flex justify-end">
       <span
-        aria-label={`Live updates ${state}`}
+        aria-label={`${labels.visibility.liveUpdates}: ${stateLabel}`}
         className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600 shadow-sm ring-1 ring-gray-200 transition-colors"
-        title={`Live updates ${state}`}
+        title={`${labels.visibility.liveUpdates}: ${stateLabel}`}
       >
         <span
           aria-hidden="true"
@@ -946,8 +964,8 @@ function AgentHeartbeatIndicator({
       )}
       title={
         row.lastSeenAt
-          ? `Last heartbeat ${formatGeneratedAt(row.lastSeenAt, locale)}`
-          : "No worker heartbeat"
+          ? `${labels.visibility.heartbeat} ${formatGeneratedAt(row.lastSeenAt, locale)}`
+          : labels.visibility.noWorkerHeartbeat
       }
     >
       <HeartIcon
@@ -959,7 +977,7 @@ function AgentHeartbeatIndicator({
         key={`${row.id}:${row.lastSeenAt ?? "none"}`}
       />
       <span className="sr-only">
-        {active ? labels.agents.heartbeat : "No worker heartbeat"}
+        {active ? labels.agents.heartbeat : labels.visibility.noWorkerHeartbeat}
       </span>
     </span>
   );
@@ -1096,6 +1114,7 @@ function AdminVisibilityView({
   return (
     <section className="mt-8 space-y-6">
       <LiveStatusBadge
+        labels={labels}
         pulseAt={heartbeatAt}
       />
 
@@ -1155,8 +1174,8 @@ function VisibilityTaskRow({
   row: AdminTaskVisibilityRow;
   snapshotAt: string;
 }>) {
-  const runtimeSummary = taskRuntimeSummary(row, snapshotAt, locale);
-  const runtimeWarning = taskRuntimeWarning(row, snapshotAt);
+  const runtimeSummary = taskRuntimeSummary(row, snapshotAt, labels, locale);
+  const runtimeWarning = taskRuntimeWarning(row, snapshotAt, labels);
   const groupTint = groupCount > 1 ? taskGroupTint(row.taskGroupId) : "";
 
   return (
@@ -1192,7 +1211,7 @@ function VisibilityTaskRow({
             "w-max rounded-full px-2.5 py-1 text-xs font-semibold ring-1"
           )}
         >
-          {taskActorLabel(row.actorType)}
+          {taskActorLabel(row.actorType, labels)}
         </span>
         <h2 className="min-w-0 truncate text-sm font-semibold text-gray-900 sm:text-base">
           {row.title}
@@ -1228,8 +1247,8 @@ function VisibilityTaskDetailsModal({
   row: AdminTaskVisibilityRow;
   snapshotAt: string;
 }>) {
-  const runtimeSummary = taskRuntimeSummary(row, snapshotAt, locale);
-  const runtimeWarning = taskRuntimeWarning(row, snapshotAt);
+  const runtimeSummary = taskRuntimeSummary(row, snapshotAt, labels, locale);
+  const runtimeWarning = taskRuntimeWarning(row, snapshotAt, labels);
 
   return (
     <AdminModal onClose={onClose} panelClassName="max-w-3xl">
@@ -1273,12 +1292,12 @@ function VisibilityTaskDetailsModal({
           <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <SupplementListMeta
-                label="Group"
+                label={labels.visibility.group}
                 value={row.groupLabel ?? compactId(row.taskGroupId)}
               />
               <SupplementListMeta
                 label={labels.visibility.actor}
-                value={readableToken(row.actorType)}
+                value={taskActorLabel(row.actorType, labels)}
               />
               <SupplementListMeta
                 label={labels.visibility.agent}
@@ -1305,17 +1324,17 @@ function VisibilityTaskDetailsModal({
                 value={formatGeneratedAt(row.createdAt, locale)}
               />
               <SupplementListMeta
-                label="Scheduled"
+                label={labels.visibility.scheduled}
                 value={formatGeneratedAt(row.scheduledFor, locale)}
               />
               <SupplementListMeta
-                label="Lease"
+                label={labels.visibility.lease}
                 value={
                   row.leaseUntil ? formatGeneratedAt(row.leaseUntil, locale) : ""
                 }
               />
               <SupplementListMeta
-                label="Plan"
+                label={labels.visibility.plan}
                 value={
                   <PlanIdLink
                     compact={true}
@@ -1325,17 +1344,22 @@ function VisibilityTaskDetailsModal({
                 }
               />
               <SupplementListMeta
-                label="Ray"
+                label={labels.visibility.ray}
                 value={row.rayId ? compactId(row.rayId) : ""}
               />
               <SupplementListMeta
-                label="Reasoning"
+                label={labels.visibility.reasoning}
                 value={readableToken(row.reasoningEffort)}
               />
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+              <p
+                className={classNames(
+                  "mb-2 text-xs font-semibold text-gray-400",
+                  locale === "en" ? "uppercase tracking-[0.16em]" : adminLocaleTextClass(locale, "label")
+                )}
+              >
                 {labels.visibility.capabilities}
               </p>
               <CapabilityList values={row.requiredCapabilities} />
@@ -1348,12 +1372,17 @@ function VisibilityTaskDetailsModal({
             ) : null}
 
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
-                Runtime
+              <p
+                className={classNames(
+                  "mb-2 text-xs font-semibold text-gray-400",
+                  locale === "en" ? "uppercase tracking-[0.16em]" : adminLocaleTextClass(locale, "label")
+                )}
+              >
+                {labels.visibility.runtime}
               </p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <SupplementListMeta
-                  label="Reservation"
+                  label={labels.visibility.reservation}
                   value={
                     row.reservationId
                       ? `${readableToken(row.reservationStatus ?? "unknown")} · ${compactId(row.reservationId)}`
@@ -1361,23 +1390,23 @@ function VisibilityTaskDetailsModal({
                   }
                 />
                 <SupplementListMeta
-                  label="Reserved"
+                  label={labels.visibility.reserved}
                   value={
                     row.reservedAt
-                      ? `${formatGeneratedAt(row.reservedAt, locale)} · ${relativeDuration(row.reservedAt, snapshotAt, locale)} ago`
+                      ? `${formatGeneratedAt(row.reservedAt, locale)} · ${relativeDuration(row.reservedAt, snapshotAt, locale)}`
                       : ""
                   }
                 />
                 <SupplementListMeta
-                  label="Heartbeat"
+                  label={labels.visibility.heartbeat}
                   value={
                     row.reservationHeartbeatAt
-                      ? `${formatGeneratedAt(row.reservationHeartbeatAt, locale)} · ${relativeDuration(row.reservationHeartbeatAt, snapshotAt, locale)} ago`
+                      ? `${formatGeneratedAt(row.reservationHeartbeatAt, locale)} · ${relativeDuration(row.reservationHeartbeatAt, snapshotAt, locale)}`
                       : ""
                   }
                 />
                 <SupplementListMeta
-                  label="Agent session"
+                  label={labels.visibility.agentSession}
                   value={
                     row.workerSessionId
                       ? `${readableToken(row.workerSessionStatus ?? "unknown")} · ${compactId(row.workerSessionId)}`
@@ -1385,15 +1414,15 @@ function VisibilityTaskDetailsModal({
                   }
                 />
                 <SupplementListMeta
-                  label="Agent seen"
+                  label={labels.visibility.agentSeen}
                   value={
                     row.workerSessionLastSeenAt
-                      ? `${formatGeneratedAt(row.workerSessionLastSeenAt, locale)} · ${relativeDuration(row.workerSessionLastSeenAt, snapshotAt, locale)} ago`
+                      ? `${formatGeneratedAt(row.workerSessionLastSeenAt, locale)} · ${relativeDuration(row.workerSessionLastSeenAt, snapshotAt, locale)}`
                       : ""
                   }
                 />
                 <SupplementListMeta
-                  label="Last event"
+                  label={labels.visibility.lastEvent}
                   value={
                     row.latestEventType
                       ? [
@@ -1403,7 +1432,7 @@ function VisibilityTaskDetailsModal({
                             ? readableToken(row.latestEventSeverity)
                             : null,
                           row.latestEventAt
-                            ? `${relativeDuration(row.latestEventAt, snapshotAt, locale)} ago`
+                            ? relativeDuration(row.latestEventAt, snapshotAt, locale)
                             : null
                         ]
                           .filter(Boolean)
@@ -1622,7 +1651,12 @@ function AgentCard({
       </div>
 
       <div className="mt-5">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+        <p
+          className={classNames(
+            "mb-2 text-xs font-semibold text-gray-400",
+            locale === "en" ? "uppercase tracking-[0.16em]" : adminLocaleTextClass(locale, "label")
+          )}
+        >
           {labels.agents.capabilities}
         </p>
         <CapabilityList values={row.capabilities} />
@@ -2371,6 +2405,8 @@ export function AdminDashboard({
             locale={locale}
             onNavigate={() => setSidebarOpen(false)}
             range={data.range}
+            reviewTaskId={selectedReviewTaskId}
+            taskId={selectedTaskId}
             view={view}
           />
           <button
@@ -2391,6 +2427,8 @@ export function AdminDashboard({
           labels={labels}
           locale={locale}
           range={data.range}
+          reviewTaskId={selectedReviewTaskId}
+          taskId={selectedTaskId}
           view={view}
         />
       </aside>
@@ -2407,6 +2445,16 @@ export function AdminDashboard({
         <div className="flex-1 text-sm/6 font-semibold text-gray-900">
           {labels.pageTitles[view]}
         </div>
+        <AdminLocaleSwitcher
+          accessToken={accessToken}
+          filters={filters}
+          labels={labels}
+          locale={locale}
+          range={data.range}
+          reviewTaskId={selectedReviewTaskId}
+          taskId={selectedTaskId}
+          view={view}
+        />
         <span className="inline-flex size-8 items-center justify-center rounded-full bg-[#1FA77A]/10 text-xs font-semibold text-[#126B4F] ring-1 ring-[#1FA77A]/20">
           MN
         </span>
@@ -2416,7 +2464,12 @@ export function AdminDashboard({
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-5">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+              <h1
+                className={classNames(
+                  "text-3xl font-bold text-gray-900",
+                  adminLocaleTextClass(locale, "heading")
+                )}
+              >
                 {labels.pageTitles[view]}
               </h1>
               {view === "glance" ? (

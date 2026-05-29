@@ -155,7 +155,6 @@ describe("API auth boundaries", () => {
 
   it("keeps OpenClaw/admin integration reads off public access", async () => {
     const openClawRoutes = [
-      "app/api/admin/query/[view]/route.ts",
       "app/api/blog/posts/route.ts",
       "app/api/blog/posts/[idOrSlug]/route.ts",
       "app/api/blog/testimonials/route.ts",
@@ -180,6 +179,26 @@ describe("API auth boundaries", () => {
         `${file} must require ADMIN_CLAW_TOKEN`
       );
     }
+  });
+
+  it("lets the dashboard token read admin query data without making it public", async () => {
+    const source = await readFile("app/api/admin/query/[view]/route.ts", "utf8");
+
+    assert.match(
+      source,
+      /adminDashboardOrClawRequestAllowed/,
+      "admin query data must accept the dashboard token used by the admin UI"
+    );
+    assert.match(
+      source,
+      /searchParams\.get\("access_token"\)/,
+      "admin query data must read the access_token preserved in dashboard links"
+    );
+    assert.match(
+      source,
+      /openClawUnauthorized/,
+      "admin query data must still reject unauthenticated requests"
+    );
   });
 
   it("keeps communication send actions limited to worker or OpenClaw callers", async () => {

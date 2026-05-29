@@ -5,7 +5,9 @@ import type { Locale } from "@/lib/i18n";
 import type { AdminContent } from "@/components/admin/dashboard-content";
 import {
   BusinessStatsGrid,
+  adminLocaleTextClass,
   businessMetricColors,
+  classNames,
   formatGeneratedAt,
   formatNumber,
   formatPercent,
@@ -82,7 +84,10 @@ export function AdminCampaignsView({
                   labels.marketingPages.lastSeen
                 ].map((heading) => (
                   <th
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-500"
+                    className={classNames(
+                      "px-4 py-3 text-left text-xs font-semibold text-gray-500",
+                      locale === "en" ? "uppercase tracking-[0.14em]" : adminLocaleTextClass(locale, "label")
+                    )}
                     key={heading}
                     scope="col"
                   >
@@ -181,5 +186,4 @@ function CampaignRow({
     </tr>
   );
 }
-
 

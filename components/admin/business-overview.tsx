@@ -12,6 +12,7 @@ import type { AdminContent } from "@/components/admin/dashboard-content";
 import {
   BusinessStatsGrid,
   BusinessTrendChart,
+  adminLocaleTextClass,
   adminHref,
   businessMetricColors,
   classNames,
@@ -543,7 +544,12 @@ export function AdminAtAGlanceView({
         <BusinessFunnelTable flowData={flowData} labels={labels} locale={locale} />
 
         <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">
+          <h2
+            className={classNames(
+              "text-sm font-semibold text-gray-500",
+              locale === "en" ? "uppercase tracking-[0.16em]" : adminLocaleTextClass(locale, "label")
+            )}
+          >
             {labels.atAGlance.attentionTitle}
           </h2>
           <div className="mt-4 space-y-3">
@@ -571,5 +577,4 @@ export function AdminAtAGlanceView({
     </>
   );
 }
-
 

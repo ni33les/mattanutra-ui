@@ -12,7 +12,7 @@ import type {
   SupplementConfidence,
   SupplementListStatus
 } from "@/lib/admin-supplements";
-import type { Locale } from "@/lib/i18n";
+import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 import type { AdminContent, AdminDashboardView, AdminNavItem } from "@/components/admin/dashboard-content";
 
 export function classNames(...classes: Array<string | false | null | undefined>) {
@@ -31,12 +31,32 @@ export function buttonGroupItemClasses(active: boolean, index: number, total: nu
   );
 }
 
+export function adminLocaleTextClass(locale: Locale, intent: "body" | "heading" | "label" = "body") {
+  if (locale === "zh-CN") {
+    return intent === "heading"
+      ? "font-sans tracking-normal leading-tight break-words"
+      : "font-sans tracking-normal leading-relaxed";
+  }
+
+  if (locale === "th") {
+    return intent === "heading"
+      ? "font-sans tracking-normal leading-snug break-words"
+      : "font-sans tracking-normal leading-relaxed";
+  }
+
+  return intent === "heading" ? "tracking-tight" : "";
+}
+
 export function adminHref(
   locale: Locale,
   accessToken: string,
   range: AdminDashboardRange,
   view: AdminDashboardView,
-  filters?: AdminDashboardFilters
+  filters?: AdminDashboardFilters,
+  state?: Readonly<{
+    reviewTaskId?: string | null;
+    taskId?: string | null;
+  }>
 ) {
   const params = new URLSearchParams({
     access_token: accessToken,
@@ -48,6 +68,14 @@ export function adminHref(
     adminDashboardFilterEntries(filters).forEach(([key, value]) => {
       params.set(key, value);
     });
+  }
+
+  if (state?.reviewTaskId) {
+    params.set("review", state.reviewTaskId);
+  }
+
+  if (state?.taskId) {
+    params.set("task", state.taskId);
   }
 
   return `/${locale}/admin/dashboard?${params.toString()}`;
@@ -248,7 +276,12 @@ function SidebarNavList({
   return (
     <li>
       {title ? (
-        <div className="text-xs/6 font-semibold uppercase tracking-[0.16em] text-gray-400">
+        <div
+          className={classNames(
+            "text-xs/6 font-semibold text-gray-400",
+            locale === "en" ? "uppercase tracking-[0.16em]" : adminLocaleTextClass(locale, "label")
+          )}
+        >
           {title}
         </div>
       ) : null}
@@ -291,6 +324,48 @@ function SidebarNavList({
   );
 }
 
+export function AdminLocaleSwitcher({
+  accessToken,
+  filters,
+  labels,
+  locale,
+  range,
+  reviewTaskId,
+  taskId,
+  view
+}: Readonly<{
+  accessToken: string;
+  filters: AdminDashboardFilters;
+  labels: AdminContent;
+  locale: Locale;
+  range: AdminDashboardRange;
+  reviewTaskId?: string | null;
+  taskId?: string | null;
+  view: AdminDashboardView;
+}>) {
+  return (
+    <div aria-label={labels.adminLanguage} className="isolate inline-flex rounded-md shadow-sm">
+      {publicLocales.map((localeCode, index) => (
+        <a
+          aria-current={localeCode === locale ? "page" : undefined}
+          className={classNames(
+            buttonGroupItemClasses(localeCode === locale, index, publicLocales.length),
+            adminLocaleTextClass(localeCode, "label")
+          )}
+          href={adminHref(localeCode, accessToken, range, view, filters, {
+            reviewTaskId,
+            taskId
+          })}
+          key={localeCode}
+          title={localeLabels[localeCode]}
+        >
+          {localeLabels[localeCode]}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 export function SidebarContent({
   accessToken,
   filters,
@@ -298,6 +373,8 @@ export function SidebarContent({
   locale,
   onNavigate,
   range,
+  reviewTaskId,
+  taskId,
   view
 }: Readonly<{
   accessToken: string;
@@ -306,11 +383,13 @@ export function SidebarContent({
   locale: Locale;
   onNavigate?: () => void;
   range: AdminDashboardRange;
+  reviewTaskId?: string | null;
+  taskId?: string | null;
   view: AdminDashboardView;
 }>) {
   return (
     <div className="flex grow flex-col gap-y-6 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4">
-      <div className="flex h-20 shrink-0 items-center">
+      <div className="flex h-20 shrink-0 items-center justify-between gap-3">
         <a
           href={`/${locale}`}
           onClick={onNavigate}
@@ -320,6 +399,16 @@ export function SidebarContent({
           <HealthspanLogo />
         </a>
       </div>
+      <AdminLocaleSwitcher
+        accessToken={accessToken}
+        filters={filters}
+        labels={labels}
+        locale={locale}
+        range={range}
+        reviewTaskId={reviewTaskId}
+        taskId={taskId}
+        view={view}
+      />
 
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-8">

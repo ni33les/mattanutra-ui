@@ -23,6 +23,7 @@ import {
   BusinessStatsGrid,
   PlanIdLink,
   ReviewAgeTimer,
+  adminLocaleTextClass,
   businessMetricColors,
   classNames,
   formatGeneratedAt,
@@ -518,8 +519,15 @@ function PlanSafetyReviewModal({
               </h2>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
                 <span>{formatGeneratedAt(row.queuedAt, locale)}</span>
-                <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">
-                  {row.itemType === "food" ? "Food" : "Supplement"}
+                <span
+                  className={classNames(
+                    "rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600",
+                    locale === "en" ? "uppercase tracking-[0.08em]" : adminLocaleTextClass(locale, "label")
+                  )}
+                >
+                  {row.itemType === "food"
+                    ? labels.reviewQueue.foodItem
+                    : labels.reviewQueue.suppItem}
                 </span>
               </div>
             </div>
@@ -544,8 +552,7 @@ function PlanSafetyReviewModal({
             {foodReview ? (
               <>
                 <div className="rounded-xl bg-gray-50 p-4 text-sm leading-6 text-gray-700 ring-1 ring-gray-100">
-                  {row.flagReason ||
-                    "Review whether this food can be shown in the client guidance."}
+                  {row.flagReason || labels.reviewQueue.foodReviewHint}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -962,7 +969,7 @@ function ProductImportReviewModal({
                           )
                         )
                       }
-                      placeholder="Ingredient"
+                      placeholder={labels.reviewQueue.ingredient}
                       value={fact.name}
                     />
                     <input
@@ -977,7 +984,7 @@ function ProductImportReviewModal({
                           )
                         )
                       }
-                      placeholder="Amount"
+                      placeholder={labels.supplements.maxAmount}
                       value={fact.amount}
                     />
                     <select
@@ -993,7 +1000,7 @@ function ProductImportReviewModal({
                       }
                       value={fact.unit}
                     >
-                      <option value="">Unit</option>
+                      <option value="">{labels.supplements.maxUnit}</option>
                       {productDoseUnitSelectOptions(fact.unit).map((unit) => (
                         <option key={unit} value={unit}>
                           {unit}
@@ -1016,9 +1023,11 @@ function ProductImportReviewModal({
                       }
                       value={fact.confidence}
                     >
-                      <option value="high">High</option>
-                      <option value="moderate">Moderate</option>
-                      <option value="low">Low</option>
+                      <option value="high">{labels.reviewQueue.confidenceHigh}</option>
+                      <option value="moderate">
+                        {labels.reviewQueue.confidenceModerate}
+                      </option>
+                      <option value="low">{labels.reviewQueue.confidenceLow}</option>
                     </select>
                     <button
                       className="rounded-md bg-white px-2.5 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50"
@@ -1029,23 +1038,25 @@ function ProductImportReviewModal({
                       }
                       type="button"
                     >
-                      Remove
+                      {labels.reviewQueue.remove}
                     </button>
                   </div>
                 )) : (
-                  <span className="text-sm text-amber-700">No parsed facts yet.</span>
+                  <span className="text-sm text-amber-700">
+                    {labels.reviewQueue.noParsedFacts}
+                  </span>
                 )}
               </div>
             </div>
 
             <label className="grid gap-2 text-sm font-medium text-gray-700">
-              Duplicate of existing product
+              {labels.reviewQueue.duplicateProduct}
               <select
                 className={inputClass}
                 onChange={(event) => setMergeProductId(event.target.value)}
                 value={mergeProductId}
               >
-                <option value="">Select product</option>
+                <option value="">{labels.reviewQueue.selectProduct}</option>
                 {mergeOptions.map((product) => (
                   <option key={product.id} value={product.id}>
                     {[product.title, product.brandName].filter(Boolean).join(" · ")}
@@ -1137,7 +1148,7 @@ function ProductImportReviewModal({
                   }
                   type="button"
                 >
-                  {saving ? "..." : "Approve"}
+                  {saving ? "..." : labels.reviewQueue.approve}
                 </button>
               </span>
             </div>
@@ -1587,7 +1598,7 @@ export function AdminReviewQueueView({
                   <h3 className="flex flex-wrap items-baseline gap-x-1 text-sm font-semibold text-gray-900">
                     {group.planReview && group.planId ? (
                       <>
-                        <span>Review nutrition safety for plan</span>
+                        <span>{labels.reviewQueue.reviewPlanSafety}</span>
                         <PlanIdLink
                           className="break-all"
                           locale={locale}
@@ -1659,12 +1670,17 @@ export function AdminReviewQueueView({
                       {reviewScopeLabel(labels, row)}
                     </span>
                     <h3 className="min-w-0 truncate text-sm font-semibold text-gray-900 sm:text-base">
-                      <span className="mr-2 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">
+                      <span
+                        className={classNames(
+                          "mr-2 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-500",
+                          locale === "en" ? "uppercase tracking-[0.08em]" : adminLocaleTextClass(locale, "label")
+                        )}
+                      >
                       {row.itemType === "food"
-                        ? "Food"
+                        ? labels.reviewQueue.foodItem
                         : row.itemType === "product"
-                          ? "Product"
-                          : "Supp"}
+                          ? labels.reviewQueue.productItem
+                          : labels.reviewQueue.suppItem}
                       </span>{" "}
                       {row.supplementName}
                     </h3>
