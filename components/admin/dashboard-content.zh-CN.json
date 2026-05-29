@@ -3,6 +3,7 @@
   "closeSidebar": "关闭侧边栏",
   "dataUnavailable": "仪表盘数据不可用。请检查数据库连接。",
   "emptyFlow": "此时间段内无流程事件。",
+  "logout": "退出登录",
   "filters": {
     "active": "已启用筛选",
     "affiliate": "联盟",

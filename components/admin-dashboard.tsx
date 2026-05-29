@@ -75,6 +75,7 @@ import {
 } from "@/components/admin/dashboard-content";
 import {
   AdminLocaleSwitcher,
+  AdminLogoutButton,
   SidebarContent,
   adminLocaleTextClass,
   adminExecutionEventsHref,
@@ -2465,16 +2466,19 @@ export function AdminDashboard({
         <span className="hidden size-8 items-center justify-center rounded-full bg-[#1FA77A]/10 text-xs font-semibold text-[#126B4F] ring-1 ring-[#1FA77A]/20 sm:inline-flex">
           MN
         </span>
-        <AdminLocaleSwitcher
-          accessToken={accessToken}
-          filters={filters}
-          labels={labels}
-          locale={locale}
-          range={data.range}
-          reviewTaskId={selectedReviewTaskId}
-          taskId={selectedTaskId}
-          view={view}
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          <AdminLocaleSwitcher
+            accessToken={accessToken}
+            filters={filters}
+            labels={labels}
+            locale={locale}
+            range={data.range}
+            reviewTaskId={selectedReviewTaskId}
+            taskId={selectedTaskId}
+            view={view}
+          />
+          <AdminLogoutButton label={labels.logout} locale={locale} />
+        </div>
       </div>
 
       <main className="py-8 lg:pl-72">
@@ -2495,7 +2499,7 @@ export function AdminDashboard({
                 </p>
               ) : null}
             </div>
-            <div className="hidden lg:flex lg:justify-end">
+            <div className="hidden items-center gap-3 lg:flex lg:justify-end">
               <AdminLocaleSwitcher
                 accessToken={accessToken}
                 filters={filters}
@@ -2506,6 +2510,7 @@ export function AdminDashboard({
                 taskId={selectedTaskId}
                 view={view}
               />
+              <AdminLogoutButton label={labels.logout} locale={locale} />
             </div>
           </div>
 

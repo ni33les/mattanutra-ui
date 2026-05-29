@@ -96,6 +96,7 @@ export type AdminContent = Readonly<{
   closeSidebar: string;
   dataUnavailable: string;
   emptyFlow: string;
+  logout: string;
   filters: {
     active: string;
     affiliate: string;
@@ -532,6 +533,7 @@ const baseContent = {
     dataUnavailable:
       "Dashboard data is unavailable. Check the database connection.",
     emptyFlow: "No flow events in this timeframe.",
+    logout: "Log out",
     filters: {
       active: "Active filters",
       affiliate: "Affiliate",
@@ -1055,6 +1057,7 @@ const baseContent = {
     dataUnavailable:
       "ไม่สามารถโหลดข้อมูลแดชบอร์ดได้ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล",
     emptyFlow: "ยังไม่มีข้อมูล Flow ในช่วงเวลานี้",
+    logout: "ออกจากระบบ",
     filters: {
       active: "ตัวกรองที่ใช้",
       affiliate: "Affiliate",
