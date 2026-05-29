@@ -373,8 +373,6 @@ export function SidebarContent({
   locale,
   onNavigate,
   range,
-  reviewTaskId,
-  taskId,
   view
 }: Readonly<{
   accessToken: string;
@@ -383,8 +381,6 @@ export function SidebarContent({
   locale: Locale;
   onNavigate?: () => void;
   range: AdminDashboardRange;
-  reviewTaskId?: string | null;
-  taskId?: string | null;
   view: AdminDashboardView;
 }>) {
   return (
@@ -399,17 +395,6 @@ export function SidebarContent({
           <HealthspanLogo />
         </a>
       </div>
-      <AdminLocaleSwitcher
-        accessToken={accessToken}
-        filters={filters}
-        labels={labels}
-        locale={locale}
-        range={range}
-        reviewTaskId={reviewTaskId}
-        taskId={taskId}
-        view={view}
-      />
-
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-8">
           <SidebarNavList

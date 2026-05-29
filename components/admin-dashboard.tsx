@@ -2405,8 +2405,6 @@ export function AdminDashboard({
             locale={locale}
             onNavigate={() => setSidebarOpen(false)}
             range={data.range}
-            reviewTaskId={selectedReviewTaskId}
-            taskId={selectedTaskId}
             view={view}
           />
           <button
@@ -2427,13 +2425,11 @@ export function AdminDashboard({
           labels={labels}
           locale={locale}
           range={data.range}
-          reviewTaskId={selectedReviewTaskId}
-          taskId={selectedTaskId}
           view={view}
         />
       </aside>
 
-      <div className="sticky top-0 z-40 flex items-center gap-x-6 border-b border-gray-200 bg-white px-4 py-4 shadow-sm sm:px-6 lg:hidden">
+      <div className="sticky top-0 z-40 flex items-center gap-x-4 border-b border-gray-200 bg-white px-4 py-4 shadow-sm sm:px-6 lg:hidden">
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
@@ -2445,6 +2441,9 @@ export function AdminDashboard({
         <div className="flex-1 text-sm/6 font-semibold text-gray-900">
           {labels.pageTitles[view]}
         </div>
+        <span className="hidden size-8 items-center justify-center rounded-full bg-[#1FA77A]/10 text-xs font-semibold text-[#126B4F] ring-1 ring-[#1FA77A]/20 sm:inline-flex">
+          MN
+        </span>
         <AdminLocaleSwitcher
           accessToken={accessToken}
           filters={filters}
@@ -2455,14 +2454,11 @@ export function AdminDashboard({
           taskId={selectedTaskId}
           view={view}
         />
-        <span className="inline-flex size-8 items-center justify-center rounded-full bg-[#1FA77A]/10 text-xs font-semibold text-[#126B4F] ring-1 ring-[#1FA77A]/20">
-          MN
-        </span>
       </div>
 
       <main className="py-8 lg:pl-72">
         <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h1
                 className={classNames(
@@ -2477,6 +2473,18 @@ export function AdminDashboard({
                   {labels.generated}: {formatGeneratedAt(data.generatedAt, locale)}
                 </p>
               ) : null}
+            </div>
+            <div className="hidden lg:flex lg:justify-end">
+              <AdminLocaleSwitcher
+                accessToken={accessToken}
+                filters={filters}
+                labels={labels}
+                locale={locale}
+                range={data.range}
+                reviewTaskId={selectedReviewTaskId}
+                taskId={selectedTaskId}
+                view={view}
+              />
             </div>
           </div>
 
