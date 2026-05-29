@@ -1,4 +1,4 @@
-import { adminDashboardTokenAllowed } from "@/lib/admin-auth";
+import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
 import { normalizeAdminDashboardRange } from "@/lib/admin-dashboard-data";
 import { getAdminTaskVisibilityData } from "@/lib/admin-execution";
 import { streamAdminSnapshots } from "@/lib/admin-sse";
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const accessToken = url.searchParams.get("access_token");
 
-  if (!adminDashboardTokenAllowed(accessToken)) {
+  if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

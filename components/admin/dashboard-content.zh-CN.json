@@ -118,6 +118,42 @@
     "undeployed": "未部署",
     "working": "工作中"
   },
+  "access": {
+    "accessControl": "访问控制",
+    "active": "活跃",
+    "actor": "登录身份",
+    "agents": "代理",
+    "assume": "代入身份",
+    "assumed": "当前查看身份",
+    "audit": "审计",
+    "capabilities": "能力",
+    "create": "创建",
+    "createOrganisation": "创建组织",
+    "defaultLocale": "默认语言",
+    "disabled": "已禁用",
+    "email": "邮箱",
+    "error": "无法更新访问控制。",
+    "invite": "邀请",
+    "invitePerson": "邀请人员",
+    "inviteUrl": "邀请链接",
+    "invitations": "邀请",
+    "name": "名称",
+    "organisation": "组织",
+    "organisations": "组织",
+    "people": "人员",
+    "pending": "待处理",
+    "platform": "平台",
+    "preferredLocale": "首选语言",
+    "role": "角色",
+    "save": "保存",
+    "session": "会话",
+    "slug": "Slug",
+    "status": "状态",
+    "stopAssuming": "停止代入",
+    "tenant": "租户",
+    "type": "类型",
+    "updated": "访问控制已更新。"
+  },
   "generated": "生成时间",
   "financials": {
     "aiCost": "AI 成本",
@@ -279,6 +315,13 @@
     }
   ],
   "marketingTitle": "营销",
+  "administration": [
+    {
+      "name": "访问",
+      "view": "access"
+    }
+  ],
+  "administrationTitle": "管理",
   "contentNavigation": [
     {
       "name": "博客",
@@ -337,6 +380,7 @@
   ],
   "executionTitle": "执行",
   "pageTitles": {
+    "access": "访问",
     "agents": "代理",
     "alerts": "技术警报",
     "blogs": "博客",

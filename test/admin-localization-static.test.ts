@@ -29,6 +29,17 @@ test("legacy admin dashboard URL is an English compatibility alias", () => {
   assert.match(page, /params\.toString\(\)/);
 });
 
+test("bare admin URLs redirect to the localized dashboard", () => {
+  const localized = source("app/[locale]/admin/page.tsx");
+  const legacy = source("app/admin/page.tsx");
+
+  assert.match(localized, /isLocale\(rawLocale\)/);
+  assert.match(localized, /redirect\(dashboardAliasUrl\(rawLocale, query\)\)/);
+  assert.match(localized, /`\/\$\{locale\}\/admin\/dashboard/);
+  assert.match(legacy, /redirect\(`\/en\/admin\/dashboard/);
+  assert.match(legacy, /params\.append/);
+});
+
 test("admin Chinese label overrides cover the expanded admin UI contract", () => {
   const zh = JSON.parse(
     source("components/admin/dashboard-content.zh-CN.json")

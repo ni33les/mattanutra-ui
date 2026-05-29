@@ -206,10 +206,13 @@ function contentHref(row: AdminContentInventoryRow, accessToken: string) {
   }
 
   const params = new URLSearchParams({
-    access_token: accessToken,
     status: row.workflowStatus,
     type: row.contentType
   });
+
+  if (accessToken) {
+    params.set("access_token", accessToken);
+  }
 
   return `/${locale}/admin/content/preview/${encodeURIComponent(row.id)}?${params.toString()}`;
 }

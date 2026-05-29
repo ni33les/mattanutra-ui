@@ -59,10 +59,13 @@ export function adminHref(
   }>
 ) {
   const params = new URLSearchParams({
-    access_token: accessToken,
     range,
     view
   });
+
+  if (accessToken) {
+    params.set("access_token", accessToken);
+  }
 
   if (filters) {
     adminDashboardFilterEntries(filters).forEach(([key, value]) => {
@@ -93,11 +96,14 @@ export function adminTaskVisibilityHref({
   taskId: string;
 }>) {
   const params = new URLSearchParams({
-    access_token: accessToken,
     range,
     task: taskId,
     view: "visibility"
   });
+
+  if (accessToken) {
+    params.set("access_token", accessToken);
+  }
 
   return `/${locale}/admin/dashboard?${params.toString()}`;
 }
@@ -112,9 +118,12 @@ export function adminExecutionEventsHref({
   view: "agents" | "visibility";
 }>) {
   const params = new URLSearchParams({
-    access_token: accessToken,
     range
   });
+
+  if (accessToken) {
+    params.set("access_token", accessToken);
+  }
 
   return `/api/admin/${view}/events?${params.toString()}`;
 }
@@ -256,6 +265,7 @@ export function formatPercent(value: number, locale: Locale) {
 
 function SidebarNavList({
   accessToken,
+  allowedViews,
   filters,
   items,
   locale,
@@ -265,6 +275,7 @@ function SidebarNavList({
   view
 }: Readonly<{
   accessToken: string;
+  allowedViews?: readonly AdminDashboardView[];
   filters: AdminDashboardFilters;
   items: AdminNavItem[];
   locale: Locale;
@@ -273,6 +284,14 @@ function SidebarNavList({
   title?: string;
   view: AdminDashboardView;
 }>) {
+  const visibleItems = allowedViews
+    ? items.filter((item) => !item.view || allowedViews.includes(item.view))
+    : items;
+
+  if (visibleItems.length === 0) {
+    return null;
+  }
+
   return (
     <li>
       {title ? (
@@ -286,7 +305,7 @@ function SidebarNavList({
         </div>
       ) : null}
       <ul role="list" className={classNames("-mx-2 space-y-1", title && "mt-2")}>
-        {items.map((item) => {
+        {visibleItems.map((item) => {
           const current = item.view === view;
           const href = item.view
             ? adminHref(locale, accessToken, range, item.view, filters)
@@ -368,6 +387,7 @@ export function AdminLocaleSwitcher({
 
 export function SidebarContent({
   accessToken,
+  allowedViews,
   filters,
   labels,
   locale,
@@ -376,6 +396,7 @@ export function SidebarContent({
   view
 }: Readonly<{
   accessToken: string;
+  allowedViews?: readonly AdminDashboardView[];
   filters: AdminDashboardFilters;
   labels: AdminContent;
   locale: Locale;
@@ -399,6 +420,7 @@ export function SidebarContent({
         <ul role="list" className="flex flex-1 flex-col gap-y-8">
           <SidebarNavList
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             items={labels.performance}
             locale={locale}
@@ -409,6 +431,7 @@ export function SidebarContent({
           />
           <SidebarNavList
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             items={labels.marketing}
             locale={locale}
@@ -419,6 +442,7 @@ export function SidebarContent({
           />
           <SidebarNavList
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             items={labels.contentNavigation}
             locale={locale}
@@ -429,6 +453,7 @@ export function SidebarContent({
           />
           <SidebarNavList
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             items={labels.governance}
             locale={locale}
@@ -439,6 +464,7 @@ export function SidebarContent({
           />
           <SidebarNavList
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             items={labels.insights}
             locale={locale}
@@ -449,12 +475,24 @@ export function SidebarContent({
           />
           <SidebarNavList
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             items={labels.execution}
             locale={locale}
             onNavigate={onNavigate}
             range={range}
             title={labels.executionTitle}
+            view={view}
+          />
+          <SidebarNavList
+            accessToken={accessToken}
+            allowedViews={allowedViews}
+            filters={filters}
+            items={labels.administration}
+            locale={locale}
+            onNavigate={onNavigate}
+            range={range}
+            title={labels.administrationTitle}
             view={view}
           />
         </ul>

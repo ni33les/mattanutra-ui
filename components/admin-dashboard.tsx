@@ -61,6 +61,11 @@ import type {
   AdminContentInventoryData,
   AdminLeadsData
 } from "@/lib/admin-query-data";
+import type {
+  AdminAccessData,
+  AdminClientSessionContext
+} from "@/lib/admin-access";
+import { allowedAdminViews } from "@/lib/admin-rbac";
 import type { Locale } from "@/lib/i18n";
 import {
   content,
@@ -106,6 +111,7 @@ import {
 import { AdminAtAGlanceView, BusinessFunnelTable } from "@/components/admin/business-overview";
 import { AdminCampaignsView } from "@/components/admin/marketing-campaigns";
 import { AdminLeadsView } from "@/components/admin/marketing-leads";
+import { AdminAccessView } from "@/components/admin/access-view";
 import { AdminContentView, contentTypeForView } from "@/components/admin/content-view";
 import {
   AdminFoodsView,
@@ -2187,6 +2193,7 @@ function FinancialDetailRow({
 }
 
 function adminViewDatabaseAvailable({
+  accessData,
   alertsData,
   agentsData,
   campaignsData,
@@ -2204,6 +2211,7 @@ function adminViewDatabaseAvailable({
   visibilityData,
   view
 }: Readonly<{
+  accessData: AdminAccessData | null;
   alertsData: AdminTechnicalAlertsData;
   agentsData: AdminAgentsData;
   campaignsData: AdminCampaignsData;
@@ -2221,6 +2229,10 @@ function adminViewDatabaseAvailable({
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
 }>) {
+  if (view === "access") {
+    return Boolean(accessData);
+  }
+
   if (view === "glance") {
     return (
       alertsData.databaseAvailable &&
@@ -2292,6 +2304,8 @@ function adminViewDatabaseAvailable({
 
 export function AdminDashboard({
   accessToken,
+  accessData,
+  adminContext,
   alertsData,
   agentsData,
   campaignsData,
@@ -2314,6 +2328,8 @@ export function AdminDashboard({
   view
 }: Readonly<{
   accessToken: string;
+  accessData: AdminAccessData | null;
+  adminContext: AdminClientSessionContext;
   alertsData: AdminTechnicalAlertsData;
   agentsData: AdminAgentsData;
   campaignsData: AdminCampaignsData;
@@ -2336,6 +2352,7 @@ export function AdminDashboard({
   view: AdminDashboardView;
 }>) {
   const labels = content[locale];
+  const allowedViews = allowedAdminViews(adminContext);
   const contentManagementView =
     view === "blogs" || view === "content" || view === "testimonials";
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -2344,11 +2361,12 @@ export function AdminDashboard({
     setVisibilityHeartbeatAt(Date.now());
   }, []);
   const visibilityStreamKey = `${view}:${data.range}:visibility`;
+  const liveAuthEnabled = Boolean(accessToken || adminContext.sessionId);
   const liveVisibilityData = useLiveAdminData({
-    enabled: view === "visibility" && Boolean(accessToken),
+    enabled: view === "visibility" && liveAuthEnabled,
     eventName: "visibility",
     href:
-      accessToken && view === "visibility"
+      liveAuthEnabled && view === "visibility"
         ? adminExecutionEventsHref({
             accessToken,
             range: data.range,
@@ -2361,10 +2379,10 @@ export function AdminDashboard({
   });
   const agentsStreamKey = `${view}:${data.range}:agents`;
   const liveAgentsData = useLiveAdminData({
-    enabled: view === "agents" && Boolean(accessToken),
+    enabled: view === "agents" && liveAuthEnabled,
     eventName: "agents",
     href:
-      accessToken && view === "agents"
+      liveAuthEnabled && view === "agents"
         ? adminExecutionEventsHref({
             accessToken,
             range: data.range,
@@ -2376,6 +2394,7 @@ export function AdminDashboard({
   });
 
   const databaseAvailable = adminViewDatabaseAvailable({
+    accessData,
     alertsData,
     agentsData: liveAgentsData,
     campaignsData,
@@ -2400,6 +2419,7 @@ export function AdminDashboard({
         <AdminDrawer onClose={() => setSidebarOpen(false)}>
           <SidebarContent
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             labels={labels}
             locale={locale}
@@ -2421,6 +2441,7 @@ export function AdminDashboard({
       <aside className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
         <SidebarContent
           accessToken={accessToken}
+          allowedViews={allowedViews}
           filters={filters}
           labels={labels}
           locale={locale}
@@ -2546,7 +2567,15 @@ export function AdminDashboard({
             </>
           ) : null}
 
-          {view === "campaigns" ? (
+          {view === "access" && accessData ? (
+            <AdminAccessView
+              accessToken={accessToken}
+              context={adminContext}
+              data={accessData}
+              labels={labels}
+              locale={locale}
+            />
+          ) : view === "campaigns" ? (
             <AdminCampaignsView
               data={campaignsData}
               labels={labels}

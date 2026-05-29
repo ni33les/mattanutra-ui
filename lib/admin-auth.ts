@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { signedAdminSessionAllowedForRequest } from "@/lib/admin-session-cookie";
 
 function hash(value: string) {
   return createHash("sha256").update(value).digest();
@@ -75,6 +76,7 @@ export function adminDashboardOrClawRequestAllowed(
     adminClawRequestAllowed(request) ||
     adminDashboardTokenAllowed(
       dashboardToken ?? request.headers.get("x-admin-dashboard-token")
-    )
+    ) ||
+    signedAdminSessionAllowedForRequest(request)
   );
 }

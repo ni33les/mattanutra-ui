@@ -12,7 +12,8 @@ import {
   MegaphoneIcon,
   QueueListIcon,
   ShoppingBagIcon,
-  SparklesIcon
+  SparklesIcon,
+  UserGroupIcon
 } from "@heroicons/react/24/outline";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import type { AdminFlowNodeId } from "@/lib/admin-flow-data";
@@ -24,6 +25,7 @@ import zhCnContentOverrides from "./dashboard-content.zh-CN.json";
 type BaseLocale = Exclude<Locale, "zh-CN">;
 
 export type AdminDashboardView =
+  | "access"
   | "agents"
   | "alerts"
   | "blogs"
@@ -211,6 +213,42 @@ export type AdminContent = Readonly<{
     undeployed: string;
     working: string;
   };
+  access: {
+    accessControl: string;
+    active: string;
+    actor: string;
+    agents: string;
+    assume: string;
+    assumed: string;
+    audit: string;
+    capabilities: string;
+    create: string;
+    createOrganisation: string;
+    defaultLocale: string;
+    disabled: string;
+    email: string;
+    error: string;
+    invite: string;
+    invitePerson: string;
+    inviteUrl: string;
+    invitations: string;
+    name: string;
+    organisation: string;
+    organisations: string;
+    people: string;
+    pending: string;
+    platform: string;
+    preferredLocale: string;
+    role: string;
+    save: string;
+    session: string;
+    slug: string;
+    status: string;
+    stopAssuming: string;
+    tenant: string;
+    type: string;
+    updated: string;
+  };
   generated: string;
   financials: {
     aiCost: string;
@@ -316,6 +354,8 @@ export type AdminContent = Readonly<{
     source: string;
     totalLeads: string;
   };
+  administration: AdminNavItem[];
+  administrationTitle: string;
   execution: AdminNavItem[];
   executionTitle: string;
   governance: AdminNavItem[];
@@ -607,6 +647,42 @@ const baseContent = {
       undeployed: "Undeployed",
       working: "Working"
     },
+    access: {
+      accessControl: "Access control",
+      active: "Active",
+      actor: "Signed in as",
+      agents: "Agents",
+      assume: "Assume",
+      assumed: "Viewing as",
+      audit: "Audit",
+      capabilities: "Capabilities",
+      create: "Create",
+      createOrganisation: "Create organisation",
+      defaultLocale: "Default language",
+      disabled: "Disabled",
+      email: "Email",
+      error: "Could not update access controls.",
+      invite: "Invite",
+      invitePerson: "Invite person",
+      inviteUrl: "Invite link",
+      invitations: "Invitations",
+      name: "Name",
+      organisation: "Organisation",
+      organisations: "Organisations",
+      people: "People",
+      pending: "Pending",
+      platform: "Platform",
+      preferredLocale: "Preferred language",
+      role: "Role",
+      save: "Save",
+      session: "Session",
+      slug: "Slug",
+      status: "Status",
+      stopAssuming: "Stop assuming",
+      tenant: "Tenant",
+      type: "Type",
+      updated: "Access controls updated."
+    },
     generated: "Generated",
     financials: {
       aiCost: "AI cost",
@@ -754,6 +830,10 @@ const baseContent = {
       }
     ],
     marketingTitle: "Marketing",
+    administration: [
+      { icon: UserGroupIcon, name: "Access", view: "access" }
+    ],
+    administrationTitle: "Administration",
     contentNavigation: [
       { icon: DocumentTextIcon, name: "Blogs", view: "blogs" },
       { icon: SparklesIcon, name: "Testimonials", view: "testimonials" }
@@ -779,6 +859,7 @@ const baseContent = {
     ],
     executionTitle: "Execution",
     pageTitles: {
+      access: "Access",
       agents: "Agents",
       alerts: "Technical Alerts",
       blogs: "Blogs",
@@ -1089,6 +1170,42 @@ const baseContent = {
       undeployed: "ยังไม่ deploy",
       working: "กำลังทำ"
     },
+    access: {
+      accessControl: "การควบคุมสิทธิ์",
+      active: "ใช้งาน",
+      actor: "เข้าสู่ระบบเป็น",
+      agents: "เอเจนต์",
+      assume: "สวมบทบาท",
+      assumed: "กำลังดูเป็น",
+      audit: "ประวัติ",
+      capabilities: "ความสามารถ",
+      create: "สร้าง",
+      createOrganisation: "สร้างองค์กร",
+      defaultLocale: "ภาษาเริ่มต้น",
+      disabled: "ปิดใช้งาน",
+      email: "อีเมล",
+      error: "ไม่สามารถอัปเดตสิทธิ์ได้",
+      invite: "เชิญ",
+      invitePerson: "เชิญผู้ใช้",
+      inviteUrl: "ลิงก์เชิญ",
+      invitations: "คำเชิญ",
+      name: "ชื่อ",
+      organisation: "องค์กร",
+      organisations: "องค์กร",
+      people: "ผู้ใช้",
+      pending: "รอดำเนินการ",
+      platform: "แพลตฟอร์ม",
+      preferredLocale: "ภาษาที่ต้องการ",
+      role: "บทบาท",
+      save: "บันทึก",
+      session: "เซสชัน",
+      slug: "Slug",
+      status: "สถานะ",
+      stopAssuming: "หยุดสวมบทบาท",
+      tenant: "ลูกค้า",
+      type: "ประเภท",
+      updated: "อัปเดตสิทธิ์แล้ว"
+    },
     generated: "สร้างเมื่อ",
     financials: {
       aiCost: "ค่า AI",
@@ -1236,6 +1353,10 @@ const baseContent = {
       }
     ],
     marketingTitle: "การตลาด",
+    administration: [
+      { icon: UserGroupIcon, name: "สิทธิ์เข้าถึง", view: "access" }
+    ],
+    administrationTitle: "การดูแลระบบ",
     contentNavigation: [
       { icon: DocumentTextIcon, name: "บทความ", view: "blogs" },
       { icon: SparklesIcon, name: "คำรับรอง", view: "testimonials" }
@@ -1261,6 +1382,7 @@ const baseContent = {
     ],
     executionTitle: "การปฏิบัติงาน",
     pageTitles: {
+      access: "สิทธิ์เข้าถึง",
       agents: "เอเจนต์",
       alerts: "การแจ้งเตือนทางเทคนิค",
       blogs: "บทความ",

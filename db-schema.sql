@@ -14,7 +14,12 @@ create extension if not exists pgcrypto;
 
 drop table if exists
   public.admin_alert_acknowledgements,
+  public.admin_audit_events,
+  public.admin_auth_challenges,
   public.admin_conversion_targets,
+  public.admin_invitations,
+  public.admin_passkey_credentials,
+  public.admin_sessions,
   public.agents,
   public.ai_response_cache,
   public.assessment_events,
@@ -49,8 +54,11 @@ drop table if exists
   public.nutrients,
   public.nutrition_plan_versions,
   public.nutrition_reports,
+  public.organisation_memberships,
+  public.organisations,
   public.payment_versions,
   public.payments,
+  public.people,
   public.plan_chat_messages,
   public.plan_communication_identities,
   public.plan_feedback,
@@ -300,6 +308,159 @@ CREATE TABLE public.admin_conversion_targets (
 
 
 --
+-- Name: organisations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organisations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    slug text NOT NULL,
+    name text NOT NULL,
+    organisation_type text DEFAULT 'tenant'::text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    default_locale text DEFAULT 'en'::text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organisations_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'archived'::text]))),
+    CONSTRAINT organisations_type_check CHECK ((organisation_type = ANY (ARRAY['platform'::text, 'tenant'::text])))
+);
+
+
+--
+-- Name: people; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.people (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    email text NOT NULL,
+    display_name text NOT NULL,
+    preferred_locale text DEFAULT 'en'::text NOT NULL,
+    status text DEFAULT 'invited'::text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT people_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'invited'::text])))
+);
+
+
+--
+-- Name: organisation_memberships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organisation_memberships (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    organisation_id uuid NOT NULL REFERENCES public.organisations(id) ON DELETE CASCADE,
+    person_id uuid NOT NULL REFERENCES public.people(id) ON DELETE CASCADE,
+    role text NOT NULL,
+    title text,
+    status text DEFAULT 'active'::text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organisation_memberships_role_check CHECK ((role = ANY (ARRAY['agent_manager'::text, 'catalogue_manager'::text, 'content_manager'::text, 'finance_viewer'::text, 'ops_manager'::text, 'platform_admin'::text, 'platform_owner'::text, 'platform_viewer'::text, 'tenant_admin'::text, 'tenant_user'::text, 'viewer'::text]))),
+    CONSTRAINT organisation_memberships_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'invited'::text])))
+);
+
+
+--
+-- Name: admin_passkey_credentials; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_passkey_credentials (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    person_id uuid NOT NULL REFERENCES public.people(id) ON DELETE CASCADE,
+    credential_id text NOT NULL,
+    credential_public_key text NOT NULL,
+    counter bigint DEFAULT 0 NOT NULL,
+    transports text[] DEFAULT '{}'::text[] NOT NULL,
+    device_type text,
+    backed_up boolean DEFAULT false NOT NULL,
+    label text,
+    last_used_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: admin_auth_challenges; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_auth_challenges (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    challenge text NOT NULL,
+    challenge_type text NOT NULL,
+    person_id uuid REFERENCES public.people(id) ON DELETE CASCADE,
+    email text,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    consumed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT admin_auth_challenges_type_check CHECK ((challenge_type = ANY (ARRAY['authentication'::text, 'registration'::text])))
+);
+
+
+--
+-- Name: admin_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_sessions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    session_hash text NOT NULL,
+    person_id uuid NOT NULL REFERENCES public.people(id) ON DELETE CASCADE,
+    organisation_id uuid NOT NULL REFERENCES public.organisations(id) ON DELETE CASCADE,
+    assumed_person_id uuid REFERENCES public.people(id) ON DELETE SET NULL,
+    assumed_organisation_id uuid REFERENCES public.organisations(id) ON DELETE SET NULL,
+    csrf_token_hash text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    revoked_at timestamp with time zone,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: admin_invitations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_invitations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    organisation_id uuid NOT NULL REFERENCES public.organisations(id) ON DELETE CASCADE,
+    email text NOT NULL,
+    role text NOT NULL,
+    invited_by_person_id uuid REFERENCES public.people(id) ON DELETE SET NULL,
+    token_hash text NOT NULL,
+    preferred_locale text DEFAULT 'en'::text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    accepted_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT admin_invitations_role_check CHECK ((role = ANY (ARRAY['agent_manager'::text, 'catalogue_manager'::text, 'content_manager'::text, 'finance_viewer'::text, 'ops_manager'::text, 'platform_admin'::text, 'platform_owner'::text, 'platform_viewer'::text, 'tenant_admin'::text, 'tenant_user'::text, 'viewer'::text]))),
+    CONSTRAINT admin_invitations_status_check CHECK ((status = ANY (ARRAY['accepted'::text, 'expired'::text, 'pending'::text, 'revoked'::text])))
+);
+
+
+--
+-- Name: admin_audit_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_audit_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    organisation_id uuid REFERENCES public.organisations(id) ON DELETE SET NULL,
+    actor_person_id uuid REFERENCES public.people(id) ON DELETE SET NULL,
+    assumed_person_id uuid REFERENCES public.people(id) ON DELETE SET NULL,
+    action text NOT NULL,
+    resource_type text,
+    resource_id text,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: agents; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -311,6 +472,8 @@ CREATE TABLE public.agents (
     capabilities text[] DEFAULT '{}'::text[] NOT NULL,
     model text,
     endpoint_url text,
+    organisation_id uuid REFERENCES public.organisations(id) ON DELETE SET NULL,
+    person_id uuid REFERENCES public.people(id) ON DELETE SET NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     last_seen_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -2964,11 +3127,44 @@ ALTER TABLE ONLY public.worker_sessions
 CREATE INDEX admin_alert_acknowledgements_status_idx ON public.admin_alert_acknowledgements USING btree (status, updated_at DESC);
 
 
+CREATE INDEX admin_audit_events_actor_idx ON public.admin_audit_events USING btree (actor_person_id, created_at DESC);
+
+
+CREATE INDEX admin_audit_events_created_idx ON public.admin_audit_events USING btree (created_at DESC);
+
+
+CREATE INDEX admin_auth_challenges_lookup_idx ON public.admin_auth_challenges USING btree (id, challenge_type, expires_at) WHERE (consumed_at IS NULL);
+
+
+CREATE INDEX admin_invitations_org_status_idx ON public.admin_invitations USING btree (organisation_id, status, created_at DESC);
+
+
+CREATE UNIQUE INDEX admin_invitations_token_idx ON public.admin_invitations USING btree (token_hash);
+
+
+CREATE UNIQUE INDEX admin_passkey_credentials_credential_idx ON public.admin_passkey_credentials USING btree (credential_id);
+
+
+CREATE INDEX admin_passkey_credentials_person_idx ON public.admin_passkey_credentials USING btree (person_id, updated_at DESC);
+
+
+CREATE UNIQUE INDEX admin_sessions_hash_idx ON public.admin_sessions USING btree (session_hash);
+
+
+CREATE INDEX admin_sessions_person_active_idx ON public.admin_sessions USING btree (person_id, expires_at DESC) WHERE (revoked_at IS NULL);
+
+
 --
 -- Name: agents_capabilities_gin_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX agents_capabilities_gin_idx ON public.agents USING gin (capabilities);
+
+
+CREATE INDEX agents_organisation_idx ON public.agents USING btree (organisation_id, status, updated_at DESC);
+
+
+CREATE INDEX agents_person_idx ON public.agents USING btree (person_id) WHERE (person_id IS NOT NULL);
 
 
 --
@@ -2983,6 +3179,18 @@ CREATE UNIQUE INDEX agents_name_idx ON public.agents USING btree (lower(name));
 --
 
 CREATE INDEX agents_status_idx ON public.agents USING btree (status, agent_type, updated_at DESC);
+
+
+CREATE UNIQUE INDEX organisation_memberships_person_org_idx ON public.organisation_memberships USING btree (person_id, organisation_id);
+
+
+CREATE INDEX organisation_memberships_org_status_idx ON public.organisation_memberships USING btree (organisation_id, status, role);
+
+
+CREATE UNIQUE INDEX organisations_slug_idx ON public.organisations USING btree (lower(slug));
+
+
+CREATE UNIQUE INDEX people_email_idx ON public.people USING btree (lower(email));
 
 
 --
@@ -4910,6 +5118,23 @@ ALTER TABLE ONLY public.tasks
 
 ALTER TABLE ONLY public.worker_sessions
     ADD CONSTRAINT worker_sessions_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES public.agents(id) ON DELETE CASCADE;
+
+
+INSERT INTO public.organisations (
+    slug,
+    name,
+    organisation_type,
+    status,
+    default_locale
+)
+VALUES (
+    'mattanutra',
+    'MattaNutra',
+    'platform',
+    'active',
+    'en'
+)
+ON CONFLICT DO NOTHING;
 
 
 --
