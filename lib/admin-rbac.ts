@@ -20,6 +20,7 @@ export type AdminPermission =
   | "performance.write"
   | "reviews.read"
   | "reviews.write"
+  | "settings.read"
   | "tasks.read"
   | "tasks.write";
 
@@ -35,6 +36,8 @@ export type AdminRole =
   | "tenant_admin"
   | "tenant_user"
   | "viewer";
+
+export type AdminOrganisationCategory = "platform" | "retailer";
 
 export type AdminSessionPrincipal = Readonly<{
   permissions: readonly AdminPermission[];
@@ -61,6 +64,7 @@ const allPermissions = [
   "performance.write",
   "reviews.read",
   "reviews.write",
+  "settings.read",
   "tasks.read",
   "tasks.write"
 ] as const satisfies readonly AdminPermission[];
@@ -71,22 +75,25 @@ export const adminRolePermissions = {
     "agents.write",
     "tasks.read",
     "tasks.write",
-    "performance.read"
+    "performance.read",
+    "settings.read"
   ],
   catalogue_manager: [
     "catalogue.read",
     "catalogue.write",
     "reviews.read",
     "reviews.write",
-    "performance.read"
+    "performance.read",
+    "settings.read"
   ],
   content_manager: [
     "content.read",
     "content.write",
     "marketing.read",
-    "performance.read"
+    "performance.read",
+    "settings.read"
   ],
-  finance_viewer: ["finance.read", "performance.read"],
+  finance_viewer: ["finance.read", "performance.read", "settings.read"],
   ops_manager: [
     "agents.read",
     "alerts.read",
@@ -96,6 +103,7 @@ export const adminRolePermissions = {
     "performance.read",
     "reviews.read",
     "reviews.write",
+    "settings.read",
     "tasks.read",
     "tasks.write"
   ],
@@ -113,17 +121,12 @@ export const adminRolePermissions = {
     "marketing.read",
     "performance.read",
     "reviews.read",
+    "settings.read",
     "tasks.read"
   ],
-  tenant_admin: [
-    "agents.read",
-    "communications.read",
-    "performance.read",
-    "reviews.read",
-    "tasks.read"
-  ],
-  tenant_user: ["performance.read"],
-  viewer: ["performance.read"]
+  tenant_admin: ["settings.read"],
+  tenant_user: ["settings.read"],
+  viewer: ["performance.read", "settings.read"]
 } as const satisfies Record<AdminRole, readonly AdminPermission[]>;
 
 export const adminRoleLabels = {
@@ -135,10 +138,31 @@ export const adminRoleLabels = {
   platform_admin: "Platform admin",
   platform_owner: "Platform owner",
   platform_viewer: "Platform viewer",
-  tenant_admin: "Tenant admin",
-  tenant_user: "Tenant user",
+  tenant_admin: "Retailer admin",
+  tenant_user: "Retailer user",
   viewer: "Viewer"
 } as const satisfies Record<AdminRole, string>;
+
+const retailerRoles = ["tenant_admin", "tenant_user"] as const satisfies readonly AdminRole[];
+const retailerRoleSet = new Set<AdminRole>(retailerRoles);
+const platformRoles = Object.keys(adminRoleLabels).filter(
+  (role) => !retailerRoleSet.has(role as AdminRole)
+) as AdminRole[];
+
+export function rolesForAdminOrganisationCategory(
+  category: AdminOrganisationCategory
+) {
+  return category === "retailer" ? retailerRoles : platformRoles;
+}
+
+export function adminRoleAllowedForOrganisationCategory(
+  role: AdminRole,
+  category: AdminOrganisationCategory
+) {
+  return category === "retailer"
+    ? retailerRoleSet.has(role)
+    : platformRoles.includes(role);
+}
 
 const adminViews = [
   "glance",
@@ -163,7 +187,8 @@ const adminViews = [
   "access-agents",
   "audit",
   "people",
-  "organisations"
+  "organisations",
+  "settings"
 ] as const satisfies readonly AdminDashboardView[];
 
 export const adminDashboardViews = adminViews;
@@ -238,6 +263,10 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
 
   if (view === "visibility") {
     return "tasks.read";
+  }
+
+  if (view === "settings") {
+    return "settings.read";
   }
 
   return "performance.read";

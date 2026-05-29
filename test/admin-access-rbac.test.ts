@@ -18,6 +18,7 @@ describe("admin RBAC", () => {
     assert.ok(adminDashboardViews.includes("access"));
     assert.ok(adminDashboardViews.includes("access-agents"));
     assert.ok(adminDashboardViews.includes("audit"));
+    assert.ok(adminDashboardViews.includes("settings"));
 
     for (const view of adminDashboardViews) {
       assert.equal(adminViewAllowed(principal, view), true, view);
@@ -30,8 +31,9 @@ describe("admin RBAC", () => {
       role: "tenant_user" as const
     };
 
-    assert.equal(adminViewAllowed(principal, "glance"), true);
-    assert.equal(adminViewAllowed(principal, "flow"), true);
+    assert.equal(adminViewAllowed(principal, "settings"), true);
+    assert.equal(adminViewAllowed(principal, "glance"), false);
+    assert.equal(adminViewAllowed(principal, "flow"), false);
     assert.equal(adminViewAllowed(principal, "access"), false);
     assert.equal(adminViewAllowed(principal, "access-agents"), false);
     assert.equal(adminViewAllowed(principal, "audit"), false);

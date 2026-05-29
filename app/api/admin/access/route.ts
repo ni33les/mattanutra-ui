@@ -13,12 +13,17 @@ import {
   stopAdminImpersonation,
   updateOrganisation,
   updateMembershipRole,
+  updateOwnPerson,
   updatePerson,
   assumeAdminIdentity,
   type AdminSessionContext
 } from "@/lib/admin-access";
 import { requestOriginAllowed } from "@/lib/admin-session-cookie";
-import { hasAdminPermission, isAdminRole } from "@/lib/admin-rbac";
+import {
+  hasAdminPermission,
+  isAdminRole,
+  type AdminOrganisationCategory
+} from "@/lib/admin-rbac";
 import { isLocale, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +56,14 @@ async function adminContext(
 
 function localeValue(value: unknown): Locale {
   return isLocale(value) ? value : "en";
+}
+
+function organisationCategoryValue(value: unknown): AdminOrganisationCategory {
+  return text(value) === "platform" ? "platform" : "retailer";
+}
+
+function organisationTypeForCategory(category: AdminOrganisationCategory) {
+  return category === "platform" ? "platform" : "tenant";
 }
 
 function normalSlug(value: unknown) {
@@ -134,6 +147,40 @@ export async function POST(request: NextRequest) {
   try {
     const action = text(body.action);
 
+    if (action === "update_self") {
+      if (context.isLegacy) {
+        return NextResponse.json(
+          { error: "A passkey session is required to update settings" },
+          { status: 400 }
+        );
+      }
+
+      const displayName = text(body.displayName);
+
+      if (!displayName) {
+        return NextResponse.json({ error: "Person name is required" }, { status: 400 });
+      }
+
+      const updatedContext = await updateOwnPerson({
+        context,
+        displayName,
+        preferredLocale: localeValue(body.preferredLocale)
+      });
+
+      if (!updatedContext) {
+        return NextResponse.json({ error: "Person not found" }, { status: 404 });
+      }
+
+      const response = NextResponse.json({
+        session: clientAdminSessionContext(updatedContext),
+        updated: true
+      });
+
+      await refreshSessionCookie(request, response);
+
+      return response;
+    }
+
     if (action === "create_organisation") {
       if (!hasAdminPermission(context, "access.write")) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -141,7 +188,8 @@ export async function POST(request: NextRequest) {
 
       const slug = normalSlug(body.slug);
       const name = text(body.name);
-      const type = text(body.type) === "platform" ? "platform" : "tenant";
+      const category = organisationCategoryValue(body.category ?? body.type);
+      const type = organisationTypeForCategory(category);
 
       if (!slug || !name) {
         return NextResponse.json(
@@ -151,6 +199,7 @@ export async function POST(request: NextRequest) {
       }
 
       await createOrganisation({
+        category,
         defaultLocale: localeValue(body.defaultLocale),
         name,
         slug,
@@ -168,7 +217,8 @@ export async function POST(request: NextRequest) {
       const slug = normalSlug(body.slug);
       const name = text(body.name);
       const status = text(body.status);
-      const type = text(body.type) === "platform" ? "platform" : "tenant";
+      const category = organisationCategoryValue(body.category ?? body.type);
+      const type = organisationTypeForCategory(category);
 
       if (!slug || !name) {
         return NextResponse.json(
@@ -182,6 +232,7 @@ export async function POST(request: NextRequest) {
       }
 
       await updateOrganisation({
+        category,
         defaultLocale: localeValue(body.defaultLocale),
         id: text(body.organisationId),
         name,

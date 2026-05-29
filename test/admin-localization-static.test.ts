@@ -34,10 +34,45 @@ test("admin access management exposes people, organisations, agents, and audit a
   assert.match(content, /name: "Organisations", view: "organisations"/);
   assert.match(content, /name: "Agents", view: "access-agents"/);
   assert.match(content, /name: "Audit", view: "audit"/);
+  assert.match(content, /name: "Settings", view: "settings"/);
   assert.match(dashboard, /view === "access-agents"/);
   assert.match(dashboard, /view === "audit"/);
+  assert.match(dashboard, /view === "settings"/);
   assert.match(accessView, /view === "access-agents"/);
   assert.match(accessView, /view === "audit"/);
+});
+
+test("admin settings owns profile and logout controls", () => {
+  const dashboard = source("components/admin-dashboard.tsx");
+  const settingsView = source("components/admin/settings-view.tsx");
+
+  assert.doesNotMatch(dashboard, /AdminLogoutButton/);
+  assert.match(settingsView, /AdminLogoutButton/);
+  assert.match(settingsView, /action: "update_self"/);
+  assert.match(settingsView, /labels\.settings\.profile/);
+  assert.match(settingsView, /labels\.settings\.account/);
+});
+
+test("admin organisations expose retailer category instead of tenant wording", () => {
+  const access = source("lib/admin-access.ts");
+  const rbac = source("lib/admin-rbac.ts");
+  const route = source("app/api/admin/access/route.ts");
+  const view = source("components/admin/access-view.tsx");
+  const content = source("components/admin/dashboard-content.tsx");
+
+  assert.match(rbac, /AdminOrganisationCategory = "platform" \| "retailer"/);
+  assert.match(rbac, /rolesForAdminOrganisationCategory/);
+  assert.match(rbac, /tenant_admin", "tenant_user/);
+  assert.match(access, /metadata = jsonb_set/);
+  assert.match(access, /adminRoleAllowedForOrganisationCategory/);
+  assert.match(route, /body\.category \?\? body\.type/);
+  assert.match(view, /rolesForAdminOrganisationCategory/);
+  assert.match(view, /name="category"/);
+  assert.match(view, /value="retailer"/);
+  assert.match(content, /retailer: "Retailer"/);
+
+  assert.doesNotMatch(view, /Tenant admin|Tenant user|labels\.access\.tenant|value="tenant"/);
+  assert.doesNotMatch(content, /tenant: "Tenant"/);
 });
 
 test("admin sidebar navigation preserves scroll position across menu clicks", () => {
@@ -87,12 +122,15 @@ test("admin Chinese label overrides cover the expanded admin UI contract", () =>
     source("components/admin/dashboard-content.zh-CN.json")
   ) as {
     adminLanguage?: string;
+    settings?: Record<string, string>;
     communications?: Record<string, string>;
     visibility?: Record<string, string>;
   };
 
   assert.equal(zh.adminLanguage, "管理语言");
   assert.equal(zh.communications?.retryError, "无法重试此消息。");
+  assert.equal(zh.settings?.profile, "个人资料");
+  assert.equal(zh.settings?.account, "账户");
 
   for (const key of [
     "agentSeen",

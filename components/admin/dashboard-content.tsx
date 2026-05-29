@@ -5,6 +5,7 @@ import {
   BuildingOffice2Icon,
   ChatBubbleLeftRightIcon,
   ClipboardDocumentListIcon,
+  Cog6ToothIcon,
   CpuChipIcon,
   DocumentTextIcon,
   EnvelopeIcon,
@@ -46,6 +47,7 @@ export type AdminDashboardView =
   | "product-insights"
   | "products"
   | "reviews"
+  | "settings"
   | "supplement-insights"
   | "supplements"
   | "testimonials"
@@ -230,6 +232,7 @@ export type AdminContent = Readonly<{
     assumed: string;
     audit: string;
     capabilities: string;
+    category: string;
     create: string;
     createOrganisation: string;
     defaultLocale: string;
@@ -250,15 +253,26 @@ export type AdminContent = Readonly<{
     pending: string;
     platform: string;
     preferredLocale: string;
+    retailer: string;
     role: string;
     save: string;
     session: string;
     slug: string;
     status: string;
     stopAssuming: string;
-    tenant: string;
     type: string;
     updated: string;
+  };
+  settings: {
+    account: string;
+    displayName: string;
+    email: string;
+    language: string;
+    logoutHint: string;
+    profile: string;
+    save: string;
+    saved: string;
+    saveError: string;
   };
   generated: string;
   financials: {
@@ -669,6 +683,7 @@ const baseContent = {
       assumed: "Viewing as",
       audit: "Audit",
       capabilities: "Capabilities",
+      category: "Category",
       create: "Create",
       createOrganisation: "Create organisation",
       defaultLocale: "Default language",
@@ -689,15 +704,26 @@ const baseContent = {
       pending: "Pending",
       platform: "Platform",
       preferredLocale: "Preferred language",
+      retailer: "Retailer",
       role: "Role",
       save: "Save",
       session: "Session",
       slug: "Slug",
       status: "Status",
       stopAssuming: "Stop assuming",
-      tenant: "Tenant",
       type: "Type",
       updated: "Access controls updated."
+    },
+    settings: {
+      account: "Account",
+      displayName: "Name",
+      email: "Email",
+      language: "Language",
+      logoutHint: "End this admin session on this device.",
+      profile: "Profile",
+      save: "Save",
+      saved: "Settings saved.",
+      saveError: "Could not save settings."
     },
     generated: "Generated",
     financials: {
@@ -850,7 +876,8 @@ const baseContent = {
       { icon: UserGroupIcon, name: "People", view: "people" },
       { icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" },
       { icon: CpuChipIcon, name: "Agents", view: "access-agents" },
-      { icon: ClipboardDocumentListIcon, name: "Audit", view: "audit" }
+      { icon: ClipboardDocumentListIcon, name: "Audit", view: "audit" },
+      { icon: Cog6ToothIcon, name: "Settings", view: "settings" }
     ],
     administrationTitle: "Administration",
     contentNavigation: [
@@ -897,6 +924,7 @@ const baseContent = {
       "product-insights": "Product Insights",
       products: "Products",
       reviews: "Reviews",
+      settings: "Settings",
       "supplement-insights": "Supplement Insights",
       supplements: "Supplements",
       testimonials: "Testimonials",
@@ -1204,6 +1232,7 @@ const baseContent = {
       assumed: "กำลังดูเป็น",
       audit: "ประวัติ",
       capabilities: "ความสามารถ",
+      category: "หมวดหมู่",
       create: "สร้าง",
       createOrganisation: "สร้างองค์กร",
       defaultLocale: "ภาษาเริ่มต้น",
@@ -1224,15 +1253,26 @@ const baseContent = {
       pending: "รอดำเนินการ",
       platform: "แพลตฟอร์ม",
       preferredLocale: "ภาษาที่ต้องการ",
+      retailer: "ผู้ค้าปลีก",
       role: "บทบาท",
       save: "บันทึก",
       session: "เซสชัน",
       slug: "Slug",
       status: "สถานะ",
       stopAssuming: "หยุดสวมบทบาท",
-      tenant: "ลูกค้า",
       type: "ประเภท",
       updated: "อัปเดตสิทธิ์แล้ว"
+    },
+    settings: {
+      account: "บัญชี",
+      displayName: "ชื่อ",
+      email: "อีเมล",
+      language: "ภาษา",
+      logoutHint: "ออกจากเซสชันแอดมินบนอุปกรณ์นี้",
+      profile: "โปรไฟล์",
+      save: "บันทึก",
+      saved: "บันทึกการตั้งค่าแล้ว",
+      saveError: "ไม่สามารถบันทึกการตั้งค่าได้"
     },
     generated: "สร้างเมื่อ",
     financials: {
@@ -1385,7 +1425,8 @@ const baseContent = {
       { icon: UserGroupIcon, name: "ผู้ใช้", view: "people" },
       { icon: BuildingOffice2Icon, name: "องค์กร", view: "organisations" },
       { icon: CpuChipIcon, name: "เอเจนต์", view: "access-agents" },
-      { icon: ClipboardDocumentListIcon, name: "ประวัติ", view: "audit" }
+      { icon: ClipboardDocumentListIcon, name: "ประวัติ", view: "audit" },
+      { icon: Cog6ToothIcon, name: "การตั้งค่า", view: "settings" }
     ],
     administrationTitle: "การดูแลระบบ",
     contentNavigation: [
@@ -1432,6 +1473,7 @@ const baseContent = {
       "product-insights": "ข้อมูลสินค้า",
       products: "สินค้า",
       reviews: "รีวิว",
+      settings: "การตั้งค่า",
       "supplement-insights": "ข้อมูลอาหารเสริม",
       supplements: "อาหารเสริม",
       testimonials: "คำรับรอง",

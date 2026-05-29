@@ -75,7 +75,6 @@ import {
 } from "@/components/admin/dashboard-content";
 import {
   AdminLocaleSwitcher,
-  AdminLogoutButton,
   SidebarContent,
   adminLocaleTextClass,
   adminExecutionEventsHref,
@@ -113,6 +112,7 @@ import { AdminAtAGlanceView, BusinessFunnelTable } from "@/components/admin/busi
 import { AdminCampaignsView } from "@/components/admin/marketing-campaigns";
 import { AdminLeadsView } from "@/components/admin/marketing-leads";
 import { AdminAccessView } from "@/components/admin/access-view";
+import { AdminSettingsView } from "@/components/admin/settings-view";
 import { AdminContentView, contentTypeForView } from "@/components/admin/content-view";
 import {
   AdminFoodsView,
@@ -2240,6 +2240,10 @@ function adminViewDatabaseAvailable({
     return Boolean(accessData);
   }
 
+  if (view === "settings") {
+    return true;
+  }
+
   if (view === "glance") {
     return (
       alertsData.databaseAvailable &&
@@ -2483,7 +2487,6 @@ export function AdminDashboard({
             taskId={selectedTaskId}
             view={view}
           />
-          <AdminLogoutButton label={labels.logout} locale={locale} />
         </div>
       </div>
 
@@ -2516,7 +2519,6 @@ export function AdminDashboard({
                 taskId={selectedTaskId}
                 view={view}
               />
-              <AdminLogoutButton label={labels.logout} locale={locale} />
             </div>
           </div>
 
@@ -2591,6 +2593,12 @@ export function AdminDashboard({
               labels={labels}
               locale={locale}
               view={view}
+            />
+          ) : view === "settings" ? (
+            <AdminSettingsView
+              context={adminContext}
+              labels={labels}
+              locale={locale}
             />
           ) : view === "campaigns" ? (
             <AdminCampaignsView

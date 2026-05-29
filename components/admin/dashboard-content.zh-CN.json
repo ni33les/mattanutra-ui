@@ -129,6 +129,7 @@
     "assumed": "当前查看身份",
     "audit": "审计",
     "capabilities": "能力",
+    "category": "类别",
     "create": "创建",
     "createOrganisation": "创建组织",
     "defaultLocale": "默认语言",
@@ -149,15 +150,26 @@
     "pending": "待处理",
     "platform": "平台",
     "preferredLocale": "首选语言",
+    "retailer": "零售商",
     "role": "角色",
     "save": "保存",
     "session": "会话",
     "slug": "Slug",
     "status": "状态",
     "stopAssuming": "停止代入",
-    "tenant": "租户",
     "type": "类型",
     "updated": "访问控制已更新。"
+  },
+  "settings": {
+    "account": "账户",
+    "displayName": "姓名",
+    "email": "邮箱",
+    "language": "语言",
+    "logoutHint": "结束此设备上的管理会话。",
+    "profile": "个人资料",
+    "save": "保存",
+    "saved": "设置已保存。",
+    "saveError": "无法保存设置。"
   },
   "generated": "生成时间",
   "financials": {
@@ -336,6 +348,10 @@
     {
       "name": "审计",
       "view": "audit"
+    },
+    {
+      "name": "设置",
+      "view": "settings"
     }
   ],
   "administrationTitle": "管理",
@@ -416,6 +432,7 @@
     "product-insights": "产品洞察",
     "products": "产品",
     "reviews": "审核",
+    "settings": "设置",
     "supplement-insights": "补充剂洞察",
     "supplements": "补充剂",
     "testimonials": "见证",

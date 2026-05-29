@@ -16,6 +16,9 @@ create table if not exists public.organisations (
 create unique index if not exists organisations_slug_idx
   on public.organisations (lower(slug));
 
+alter table public.organisations
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
 create table if not exists public.people (
   id uuid primary key default gen_random_uuid(),
   email text not null,
@@ -182,16 +185,27 @@ insert into public.organisations (
   name,
   organisation_type,
   status,
-  default_locale
+  default_locale,
+  metadata
 )
 values (
   'mattanutra',
   'MattaNutra',
   'platform',
   'active',
-  'en'
+  'en',
+  '{"category":"platform"}'::jsonb
 )
 on conflict do nothing;
+
+update public.organisations
+set metadata = jsonb_set(
+  coalesce(metadata, '{}'::jsonb),
+  '{category}',
+  to_jsonb(case when organisation_type = 'platform' then 'platform' else 'retailer' end::text),
+  true
+)
+where metadata->>'category' is null;
 
 alter table public.agents
   add column if not exists organisation_id uuid references public.organisations(id) on delete set null,

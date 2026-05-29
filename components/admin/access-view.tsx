@@ -13,7 +13,11 @@ import type {
   AdminInviteExistingAccess,
   AdminInviteMembershipAdded
 } from "@/lib/admin-access";
-import type { AdminRole } from "@/lib/admin-rbac";
+import {
+  rolesForAdminOrganisationCategory,
+  type AdminRole,
+  type AdminOrganisationCategory
+} from "@/lib/admin-rbac";
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 import type {
   AdminContent,
@@ -48,8 +52,8 @@ const roleLabels = {
     platform_admin: "Platform admin",
     platform_owner: "Platform owner",
     platform_viewer: "Platform viewer",
-    tenant_admin: "Tenant admin",
-    tenant_user: "Tenant user",
+    tenant_admin: "Retailer admin",
+    tenant_user: "Retailer user",
     viewer: "Viewer"
   },
   th: {
@@ -61,8 +65,8 @@ const roleLabels = {
     platform_admin: "แอดมินแพลตฟอร์ม",
     platform_owner: "เจ้าของแพลตฟอร์ม",
     platform_viewer: "ดูแพลตฟอร์ม",
-    tenant_admin: "แอดมินองค์กร",
-    tenant_user: "ผู้ใช้องค์กร",
+    tenant_admin: "แอดมินผู้ค้าปลีก",
+    tenant_user: "ผู้ใช้ผู้ค้าปลีก",
     viewer: "ผู้ดู"
   },
   "zh-CN": {
@@ -74,8 +78,8 @@ const roleLabels = {
     platform_admin: "平台管理员",
     platform_owner: "平台所有者",
     platform_viewer: "平台查看者",
-    tenant_admin: "组织管理员",
-    tenant_user: "组织用户",
+    tenant_admin: "零售商管理员",
+    tenant_user: "零售商用户",
     viewer: "查看者"
   }
 } satisfies Record<Locale, Record<AdminRole, string>>;
@@ -148,6 +152,15 @@ async function postAccess(body: Record<string, unknown>) {
   return json;
 }
 
+function rolesForCategory(
+  roles: readonly AdminRole[],
+  category: AdminOrganisationCategory
+) {
+  const allowed = new Set(rolesForAdminOrganisationCategory(category));
+
+  return roles.filter((role) => allowed.has(role));
+}
+
 export function AdminAccessView({
   accessToken,
   context,
@@ -170,6 +183,15 @@ export function AdminAccessView({
   );
   const canWrite = context.permissions.includes("access.write");
   const canAssume = context.permissions.includes("impersonation.write") && !context.isLegacy;
+  const [inviteOrganisationId, setInviteOrganisationId] = useState(
+    () => accessData.organisations[0]?.id ?? ""
+  );
+  const inviteOrganisation =
+    organisationById.get(inviteOrganisationId) ?? accessData.organisations[0];
+  const inviteRoles = rolesForCategory(
+    accessData.roles,
+    inviteOrganisation?.category ?? "retailer"
+  );
 
   async function mutate(body: Record<string, unknown>) {
     setBusy(true);
@@ -234,10 +256,10 @@ export function AdminAccessView({
 
     void mutate({
       action: "create_organisation",
+      category: String(form.get("category") ?? "retailer"),
       defaultLocale: String(form.get("defaultLocale") ?? "en"),
       name: String(form.get("name") ?? ""),
-      slug: String(form.get("slug") ?? ""),
-      type: String(form.get("type") ?? "tenant")
+      slug: String(form.get("slug") ?? "")
     });
     event.currentTarget.reset();
   }
@@ -249,12 +271,12 @@ export function AdminAccessView({
 
     void mutate({
       action: "update_organisation",
+      category: String(form.get("category") ?? "retailer"),
       defaultLocale: String(form.get("defaultLocale") ?? "en"),
       name: String(form.get("name") ?? ""),
       organisationId: String(form.get("organisationId") ?? ""),
       slug: String(form.get("slug") ?? ""),
-      status,
-      type: String(form.get("type") ?? "tenant")
+      status
     });
   }
 
@@ -382,14 +404,14 @@ export function AdminAccessView({
                   />
                 </label>
                 <label className="grid gap-1 text-xs font-semibold text-gray-500">
-                  {labels.access.type}
+                  {labels.access.category}
                   <select
                     className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
-                    defaultValue={organisation.type}
+                    defaultValue={organisation.category}
                     disabled={!canWrite || busy}
-                    name="type"
+                    name="category"
                   >
-                    <option value="tenant">{labels.access.tenant}</option>
+                    <option value="retailer">{labels.access.retailer}</option>
                     <option value="platform">{labels.access.platform}</option>
                   </select>
                 </label>
@@ -450,9 +472,10 @@ export function AdminAccessView({
               />
               <select
                 className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
-                name="type"
+                defaultValue="retailer"
+                name="category"
               >
-                <option value="tenant">{labels.access.tenant}</option>
+                <option value="retailer">{labels.access.retailer}</option>
                 <option value="platform">{labels.access.platform}</option>
               </select>
               <select
@@ -493,6 +516,8 @@ export function AdminAccessView({
                 <select
                   className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
                   name="organisationId"
+                  onChange={(event) => setInviteOrganisationId(event.target.value)}
+                  value={inviteOrganisationId}
                 >
                   {accessData.organisations.map((organisation) => (
                     <option key={organisation.id} value={organisation.id}>
@@ -505,7 +530,7 @@ export function AdminAccessView({
                     className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
                     name="role"
                   >
-                    {accessData.roles.map((role) => (
+                    {inviteRoles.map((role) => (
                       <option key={role} value={role}>
                         {roleLabels[locale][role]}
                       </option>
@@ -639,6 +664,13 @@ export function AdminAccessView({
                   {accessData.memberships.map((membership) => {
                     const person = personById.get(membership.personId);
                     const organisation = organisationById.get(membership.organisationId);
+                    const membershipRoles = rolesForCategory(
+                      accessData.roles,
+                      organisation?.category ?? "retailer"
+                    );
+                    const availableMembershipRoles = membershipRoles.includes(membership.role)
+                      ? membershipRoles
+                      : [membership.role, ...membershipRoles];
 
                     return (
                       <tr key={membership.id}>
@@ -660,7 +692,7 @@ export function AdminAccessView({
                               disabled={!canWrite || busy}
                               name="role"
                             >
-                              {accessData.roles.map((role) => (
+                              {availableMembershipRoles.map((role) => (
                                 <option key={role} value={role}>
                                   {roleLabels[locale][role]}
                                 </option>
