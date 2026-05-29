@@ -9,6 +9,10 @@ import type {
   FoodConfidence,
   FoodListStatus
 } from "@/lib/admin-foods";
+import {
+  adminLocalizedFallbackLabel,
+  adminLocalizedFoodText
+} from "@/lib/admin-localized-display";
 import { foodNutrientCatalog } from "@/lib/food-nutrients";
 import {
   foodBenefitTags,
@@ -46,6 +50,18 @@ import { SupplementListMeta } from "@/components/admin/supplement-view";
 export { AdminProductsView } from "@/components/admin/product-view";
 export { SupplementListMeta } from "@/components/admin/supplement-view";
 
+function LocalizedFallbackBadge({
+  label
+}: Readonly<{
+  label: string | null;
+}>) {
+  return label ? (
+    <span className="inline-flex w-max rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+      {label}
+    </span>
+  ) : null;
+}
+
 export function AdminFoodsView({
   accessToken,
   data,
@@ -67,7 +83,7 @@ export function AdminFoodsView({
   const summary = listStatusSummary(rows);
   const filteredRows = rows.filter((row) => {
     const matchesSearch =
-      !normalizedSearch || foodSearchText(row).includes(normalizedSearch);
+      !normalizedSearch || foodSearchText(row, locale).includes(normalizedSearch);
     const matchesCategory = !category || row.category === category;
     const matchesStatus = !status || row.listStatus === status;
 
@@ -206,10 +222,17 @@ export function AdminFoodsView({
 
       {filteredRows.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {filteredRows.map((row) => (
+          {filteredRows.map((row) => {
+            const localized = adminLocalizedFoodText(row, locale);
+            const fallbackLabel = adminLocalizedFallbackLabel(
+              localized.name,
+              locale
+            );
+
+            return (
             <button
               key={row.id}
-              aria-label={`${labels.details}: ${row.name}`}
+              aria-label={`${labels.details}: ${localized.name.value}`}
               className="rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
               onClick={() => {
                 setDraft(row);
@@ -221,7 +244,7 @@ export function AdminFoodsView({
                 <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-gray-50 ring-1 ring-gray-100">
                   {row.imagePath ? (
                     <Image
-                      alt={row.translations.en?.imageAlt ?? row.name}
+                      alt={localized.imageAlt.value}
                       className="object-cover"
                       fill
                       sizes="80px"
@@ -235,9 +258,18 @@ export function AdminFoodsView({
                 </div>
                 <div className="min-w-0">
                   <h3 className="truncate text-base font-semibold text-gray-900">
-                    {row.name}
+                    {localized.name.value}
                   </h3>
-                  <p className="mt-1 text-sm text-gray-500">{row.category}</p>
+                  <LocalizedFallbackBadge label={fallbackLabel} />
+                  <p className="mt-1 text-sm text-gray-500">
+                    {localized.category.value}
+                  </p>
+                  {localized.name.canonicalValue &&
+                  localized.name.canonicalValue !== localized.name.value ? (
+                    <p className="mt-0.5 text-xs text-gray-400">
+                      {labels.details}: {localized.name.canonicalValue}
+                    </p>
+                  ) : null}
                 </div>
                 <span
                   className={classNames(
@@ -249,9 +281,9 @@ export function AdminFoodsView({
                 </span>
               </div>
 
-              {row.primaryUseCase ? (
+              {localized.primaryUseCase.value ? (
                 <p className="mt-4 line-clamp-2 min-h-12 text-sm leading-6 text-gray-600">
-                  {row.primaryUseCase}
+                  {localized.primaryUseCase.value}
                 </p>
               ) : (
                 <div className="mt-4 min-h-12" />
@@ -286,7 +318,7 @@ export function AdminFoodsView({
               <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <SupplementListMeta
                   label={labels.category}
-                  value={row.category}
+                  value={localized.category.value}
                 />
                 <SupplementListMeta
                   label={labels.confidence}
@@ -302,7 +334,8 @@ export function AdminFoodsView({
                 />
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="rounded-2xl bg-white px-5 py-12 text-center text-sm font-medium text-gray-500 shadow-sm ring-1 ring-gray-200">
@@ -362,6 +395,8 @@ function FoodDetailsModal({
 }>) {
   const inputClass =
     "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]";
+  const localized = adminLocalizedFoodText(draft, locale);
+  const fallbackLabel = adminLocalizedFallbackLabel(localized.name, locale);
   const updateTranslation = (
     localeCode: Locale,
     patch: Partial<AdminFoodRow["translations"][string]>
@@ -391,9 +426,18 @@ function FoodDetailsModal({
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
-                {draft.name}
+                {localized.name.value}
               </h2>
-              <p className="mt-1 text-sm text-gray-500">{draft.category}</p>
+              <LocalizedFallbackBadge label={fallbackLabel} />
+              <p className="mt-1 text-sm text-gray-500">
+                {localized.category.value}
+              </p>
+              {localized.name.canonicalValue &&
+              localized.name.canonicalValue !== localized.name.value ? (
+                <p className="mt-1 text-xs text-gray-400">
+                  {labels.details}: {localized.name.canonicalValue}
+                </p>
+              ) : null}
             </div>
             <button
               aria-label={labels.close}
@@ -410,7 +454,7 @@ function FoodDetailsModal({
               <div className="relative aspect-square overflow-hidden rounded-xl bg-white ring-1 ring-gray-200">
                 {draft.imagePath ? (
                   <Image
-                    alt={draft.translations.en?.imageAlt ?? draft.name}
+                    alt={localized.imageAlt.value}
                     className="object-cover"
                     fill
                     sizes="144px"
@@ -534,7 +578,7 @@ function FoodDetailsModal({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <SupplementListMeta
                 label={labels.category}
-                value={draft.category}
+                value={localized.category.value}
               />
               <SupplementListMeta
                 label={labels.confidence}
@@ -570,9 +614,9 @@ function FoodDetailsModal({
               />
             </div>
 
-            {draft.primaryUseCase ? (
+            {localized.primaryUseCase.value ? (
               <div className="rounded-xl bg-gray-50 p-4 text-sm leading-6 text-gray-700 ring-1 ring-gray-100">
-                {draft.primaryUseCase}
+                {localized.primaryUseCase.value}
               </div>
             ) : null}
 

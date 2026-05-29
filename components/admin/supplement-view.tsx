@@ -16,6 +16,10 @@ import type {
   SupplementListStatus
 } from "@/lib/admin-supplements";
 import {
+  adminLocalizedFallbackLabel,
+  adminLocalizedSupplementText
+} from "@/lib/admin-localized-display";
+import {
   supplementSafetyFlags,
   type SupplementSafetyFlag
 } from "@/lib/supplement-safety-flags";
@@ -46,6 +50,18 @@ import {
   toggleSupplementSafetyFlag
 } from "@/components/admin/safety-view-helpers";
 import { ChevronDownIcon as ChevronDownSolidIcon } from "@heroicons/react/20/solid";
+
+function LocalizedFallbackBadge({
+  label
+}: Readonly<{
+  label: string | null;
+}>) {
+  return label ? (
+    <span className="inline-flex w-max rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+      {label}
+    </span>
+  ) : null;
+}
 
 export function AdminSupplementsView({
   accessToken,
@@ -84,7 +100,7 @@ export function AdminSupplementsView({
   const filteredRows = rows.filter((row) => {
     const matchesSearch =
       !normalizedSearch ||
-      supplementSearchText(labels, row).includes(normalizedSearch);
+      supplementSearchText(labels, row, locale).includes(normalizedSearch);
     const matchesCategory = !category || row.category === category;
     const matchesStatus = !status || row.listStatus === status;
 
@@ -357,10 +373,17 @@ export function AdminSupplementsView({
 
       {filteredRows.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {filteredRows.map((row) => (
+          {filteredRows.map((row) => {
+            const localized = adminLocalizedSupplementText(row, locale);
+            const fallbackLabel = adminLocalizedFallbackLabel(
+              localized.name,
+              locale
+            );
+
+            return (
             <button
               key={row.id}
-              aria-label={`${labels.supplements.details}: ${row.name}`}
+              aria-label={`${labels.supplements.details}: ${localized.name.value}`}
               className="rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
               onClick={() => {
                 setDraft(row);
@@ -371,11 +394,18 @@ export function AdminSupplementsView({
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <h3 className="truncate text-base font-semibold text-gray-900">
-                    {row.name}
+                    {localized.name.value}
                   </h3>
+                  <LocalizedFallbackBadge label={fallbackLabel} />
                   <p className="mt-1 text-sm text-gray-500">
-                    {row.ingredientType ?? row.category}
+                    {row.ingredientType ?? localized.category.value}
                   </p>
+                  {localized.name.canonicalValue &&
+                  localized.name.canonicalValue !== localized.name.value ? (
+                    <p className="mt-0.5 text-xs text-gray-400">
+                      {labels.supplements.name}: {localized.name.canonicalValue}
+                    </p>
+                  ) : null}
                 </div>
                 <span
                   className={classNames(
@@ -387,22 +417,22 @@ export function AdminSupplementsView({
                 </span>
               </div>
 
-              {row.primaryUseCase ? (
+              {localized.primaryUseCase.value ? (
                 <p className="mt-4 line-clamp-2 min-h-12 text-sm leading-6 text-gray-600">
-                  {row.primaryUseCase}
+                  {localized.primaryUseCase.value}
                 </p>
               ) : (
                 <div className="mt-4 min-h-12" />
               )}
 
-              {row.aliases.length > 0 ? (
+              {localized.aliases.length > 0 ? (
                 <div className="mt-4 flex min-h-6 flex-wrap gap-1.5">
-                  {row.aliases.map((alias) => (
+                  {localized.aliases.map((alias) => (
                     <span
                       className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100"
-                      key={alias.id}
+                      key={alias}
                     >
-                      {alias.name}
+                      {alias}
                     </span>
                   ))}
                 </div>
@@ -413,7 +443,7 @@ export function AdminSupplementsView({
               <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <SupplementListMeta
                   label={labels.supplements.category}
-                  value={row.category}
+                  value={localized.category.value}
                 />
                 <SupplementListMeta
                   label={labels.supplements.dose}
@@ -430,7 +460,8 @@ export function AdminSupplementsView({
                 </p>
               ) : null}
             </button>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="rounded-2xl bg-white px-5 py-12 text-center text-sm font-medium text-gray-500 shadow-sm ring-1 ring-gray-200">
@@ -734,6 +765,8 @@ export function SupplementDetailsModal({
       ? [draft.maxUnit, ...supplementDoseUnits]
       : supplementDoseUnits;
   const trimmedNewAlias = newAlias.trim();
+  const localized = adminLocalizedSupplementText(draft, locale);
+  const fallbackLabel = adminLocalizedFallbackLabel(localized.name, locale);
 
   async function addAssociation() {
     if (!onAddAssociation || !trimmedNewAlias || addingAssociation) {
@@ -852,11 +885,18 @@ export function SupplementDetailsModal({
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
-                {draft.name}
+                {localized.name.value}
               </h2>
+              <LocalizedFallbackBadge label={fallbackLabel} />
               <p className="mt-1 text-sm text-gray-500">
-                {draft.ingredientType ?? draft.category}
+                {draft.ingredientType ?? localized.category.value}
               </p>
+              {localized.name.canonicalValue &&
+              localized.name.canonicalValue !== localized.name.value ? (
+                <p className="mt-1 text-xs text-gray-400">
+                  {labels.supplements.name}: {localized.name.canonicalValue}
+                </p>
+              ) : null}
               {headerNote ? (
                 <p className="mt-1 text-sm text-gray-500">{headerNote}</p>
               ) : null}
@@ -875,7 +915,7 @@ export function SupplementDetailsModal({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <SupplementListMeta
                 label={labels.supplements.category}
-                value={draft.category}
+                value={localized.category.value}
               />
               <SupplementListMeta
                 label={labels.supplements.dose}
@@ -939,9 +979,9 @@ export function SupplementDetailsModal({
               </div>
             ) : null}
 
-            {draft.primaryUseCase ? (
+            {localized.primaryUseCase.value ? (
               <div className="rounded-xl bg-gray-50 p-4 text-sm leading-6 text-gray-700 ring-1 ring-gray-100">
-                {draft.primaryUseCase}
+                {localized.primaryUseCase.value}
               </div>
             ) : null}
 

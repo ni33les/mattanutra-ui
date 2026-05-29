@@ -168,10 +168,14 @@ export default async function LocalizedAdminDashboardPage({
   } else if (view === "products") {
     productsData = await getAdminProductsData(range);
   } else if (view === "product-insights" || view === "supplement-insights") {
-    recommendationInsightsData = await getAdminRecommendationInsightsData(range);
+    recommendationInsightsData = await getAdminRecommendationInsightsData(
+      range,
+      locale
+    );
     productsData = await getAdminProductsData(range);
     supplementsData = await getAdminSupplementsData(range);
   } else if (view === "reviews") {
+    foodsData = await getAdminFoodsData();
     reviewQueueData = await getAdminReviewQueueData();
     productsData = await getAdminProductsData(range);
     supplementsData = await getAdminSupplementsData(range);

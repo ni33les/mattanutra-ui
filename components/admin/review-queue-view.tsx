@@ -8,6 +8,12 @@ import type {
   AdminReviewTaskRow
 } from "@/lib/admin-review-queue";
 import type { AdminProductsData } from "@/lib/admin-products";
+import type { AdminFoodsData } from "@/lib/admin-foods";
+import {
+  adminLocalizedFoodText,
+  adminLocalizedProductText,
+  adminLocalizedSupplementText
+} from "@/lib/admin-localized-display";
 import type {
   AdminSupplementRow,
   AdminSupplementsData
@@ -42,6 +48,51 @@ import {
   SupplementListMeta
 } from "@/components/admin/supplement-view";
 import { AdminModal } from "@/components/admin/ui";
+
+function reviewDisplayName(
+  row: AdminReviewTaskRow,
+  locale: Locale,
+  productsData: AdminProductsData,
+  supplementsData: AdminSupplementsData,
+  foodsData: AdminFoodsData
+) {
+  const normalizedName = row.supplementName.trim().toLowerCase();
+
+  if (row.itemType === "product") {
+    const product = productsData.rows.find((item) =>
+      item.id === row.productImport?.productImportId ||
+      item.productImportId === row.productImport?.productImportId ||
+      item.title.trim().toLowerCase() === normalizedName
+    );
+
+    if (product) {
+      return adminLocalizedProductText(product, locale).title.value;
+    }
+
+    const translatedTitle = row.productImport?.translations?.[locale]?.title ??
+      row.productImport?.translations?.en?.title;
+
+    return translatedTitle?.trim() || row.supplementName;
+  }
+
+  if (row.itemType === "food") {
+    const food = foodsData.rows.find((item) =>
+      item.name.trim().toLowerCase() === normalizedName ||
+      item.aliases.some((alias) => alias.trim().toLowerCase() === normalizedName)
+    );
+
+    return food ? adminLocalizedFoodText(food, locale).name.value : row.supplementName;
+  }
+
+  const supplement = supplementsData.rows.find((item) =>
+    item.name.trim().toLowerCase() === normalizedName ||
+    item.aliases.some((alias) => alias.name.trim().toLowerCase() === normalizedName)
+  );
+
+  return supplement
+    ? adminLocalizedSupplementText(supplement, locale).name.value
+    : row.supplementName;
+}
 
 function reviewKindLabel(labels: AdminContent, row: AdminReviewTaskRow) {
   if (row.reviewKind === "dose_reduced") {
@@ -370,6 +421,7 @@ type FoodReviewDraftFields = Readonly<{
 
 function PlanSafetyReviewModal({
   accessToken,
+  displayName,
   error,
   labels,
   locale,
@@ -379,6 +431,7 @@ function PlanSafetyReviewModal({
   saving
 }: Readonly<{
   accessToken: string;
+  displayName: string;
   error: boolean;
   labels: AdminContent;
   locale: Locale;
@@ -515,7 +568,7 @@ function PlanSafetyReviewModal({
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
-                {row.supplementName}
+                {displayName}
               </h2>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
                 <span>{formatGeneratedAt(row.queuedAt, locale)}</span>
@@ -755,16 +808,20 @@ type ProductImportFactDraft = {
 };
 
 function ProductImportReviewModal({
+  displayName,
   error,
   labels,
+  locale,
   onClose,
   onDecision,
   productsData,
   row,
   saving
 }: Readonly<{
+  displayName: string;
   error: boolean;
   labels: AdminContent;
+  locale: Locale;
   onClose: () => void;
   onDecision: (
     action: "approve_product" | "ignore_import" | "merge_product",
@@ -850,7 +907,7 @@ function ProductImportReviewModal({
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
             <div className="min-w-0">
               <h2 className="text-xl font-semibold text-gray-900">
-                {row.supplementName}
+                {displayName}
               </h2>
               {row.productImport?.fdaApprovalNumber ? (
                 <p className="mt-1 text-sm text-gray-500">
@@ -1057,11 +1114,15 @@ function ProductImportReviewModal({
                 value={mergeProductId}
               >
                 <option value="">{labels.reviewQueue.selectProduct}</option>
-                {mergeOptions.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {[product.title, product.brandName].filter(Boolean).join(" · ")}
-                  </option>
-                ))}
+                {mergeOptions.map((product) => {
+                  const title = adminLocalizedProductText(product, locale).title.value;
+
+                  return (
+                    <option key={product.id} value={product.id}>
+                      {[title, product.brandName].filter(Boolean).join(" · ")}
+                    </option>
+                  );
+                })}
               </select>
             </label>
 
@@ -1160,6 +1221,7 @@ function ProductImportReviewModal({
 export function AdminReviewQueueView({
   accessToken,
   data,
+  foodsData,
   labels,
   locale,
   productsData,
@@ -1168,6 +1230,7 @@ export function AdminReviewQueueView({
 }: Readonly<{
   accessToken: string;
   data: AdminReviewQueueData;
+  foodsData: AdminFoodsData;
   labels: AdminContent;
   locale: Locale;
   productsData: AdminProductsData;
@@ -1682,7 +1745,13 @@ export function AdminReviewQueueView({
                           ? labels.reviewQueue.productItem
                           : labels.reviewQueue.suppItem}
                       </span>{" "}
-                      {row.supplementName}
+                      {reviewDisplayName(
+                        row,
+                        locale,
+                        productsData,
+                        supplementsData,
+                        foodsData
+                      )}
                     </h3>
                     {row.planId ? (
                       <span className="truncate text-sm font-semibold text-gray-700">
@@ -1717,8 +1786,16 @@ export function AdminReviewQueueView({
       {visibleReview?.row.reviewKind === "product_import" &&
       visibleReview.row.itemType === "product" ? (
         <ProductImportReviewModal
+          displayName={reviewDisplayName(
+            visibleReview.row,
+            locale,
+            productsData,
+            supplementsData,
+            foodsData
+          )}
           error={errorReviewId === visibleReview.row.id}
           labels={labels}
+          locale={locale}
           onClose={closeReviewModal}
           onDecision={(action, mergeProductId, reviewerNote, parsedFacts, description, descriptionEn, descriptionTh, translations) =>
             void decideProductImportReview(
@@ -1781,6 +1858,13 @@ export function AdminReviewQueueView({
         <PlanSafetyReviewModal
           key={visibleReview.row.id}
           accessToken={accessToken}
+          displayName={reviewDisplayName(
+            visibleReview.row,
+            locale,
+            productsData,
+            supplementsData,
+            foodsData
+          )}
           error={errorReviewId === visibleReview.row.id}
           labels={labels}
           locale={locale}

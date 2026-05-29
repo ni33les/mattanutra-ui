@@ -98,3 +98,43 @@ test("admin typography has locale-aware spacing for Chinese and Thai labels", ()
   assert.match(previewPage, /adminContentPreviewCopy/);
   assert.doesNotMatch(previewPage, /function previewCta/);
 });
+
+test("admin DB object titles are rendered through localized translation helpers", () => {
+  const displayHelper = source("lib/admin-localized-display.ts");
+  const productView = source("components/admin/product-view.tsx");
+  const supplementView = source("components/admin/supplement-view.tsx");
+  const foodView = source("components/admin/safety-views.tsx");
+  const reviewQueue = source("components/admin/review-queue-view.tsx");
+  const insights = source("lib/admin-recommendation-insights.ts");
+  const dashboardPage = source("app/[locale]/admin/dashboard/page.tsx");
+  const dashboard = source("components/admin-dashboard.tsx");
+
+  assert.match(displayHelper, /export function adminLocalizedProductText/);
+  assert.match(displayHelper, /export function adminLocalizedSupplementText/);
+  assert.match(displayHelper, /export function adminLocalizedFoodText/);
+  assert.match(displayHelper, /fallbackUsed/);
+
+  assert.match(productView, /adminLocalizedProductText\(row, locale\)/);
+  assert.match(productView, /adminLocalizedProductText\(draft, locale\)/);
+  assert.match(productView, /LocalizedFallbackBadge/);
+
+  assert.match(supplementView, /adminLocalizedSupplementText\(row, locale\)/);
+  assert.match(supplementView, /adminLocalizedSupplementText\(draft, locale\)/);
+  assert.match(supplementView, /supplementSearchText\(labels, row, locale\)/);
+
+  assert.match(foodView, /adminLocalizedFoodText\(row, locale\)/);
+  assert.match(foodView, /adminLocalizedFoodText\(draft, locale\)/);
+  assert.match(foodView, /foodSearchText\(row, locale\)/);
+
+  assert.match(reviewQueue, /function reviewDisplayName/);
+  assert.match(reviewQueue, /adminLocalizedProductText\(product, locale\)/);
+  assert.match(reviewQueue, /adminLocalizedSupplementText\(supplement, locale\)/);
+  assert.match(reviewQueue, /adminLocalizedFoodText\(food, locale\)/);
+  assert.match(dashboard, /foodsData=\{foodsData\}/);
+
+  assert.match(dashboardPage, /getAdminRecommendationInsightsData\(\s*range,\s*locale\s*\)/);
+  assert.match(insights, /left join public\.product_translations/);
+  assert.match(insights, /left join public\.supplement_translations/);
+  assert.match(insights, /product_translations\.locale = \$\{locale\}/);
+  assert.match(insights, /supplement_translations\.locale = \$\{locale\}/);
+});

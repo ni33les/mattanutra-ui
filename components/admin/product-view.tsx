@@ -6,6 +6,10 @@ import type {
   AdminProductRow,
   AdminProductsData
 } from "@/lib/admin-products";
+import {
+  adminLocalizedFallbackLabel,
+  adminLocalizedProductText
+} from "@/lib/admin-localized-display";
 import { productMatchesSearch } from "@/lib/admin-product-search-client";
 import {
   defaultProductCountryCode,
@@ -101,6 +105,18 @@ function ProductInsightStat({
       <p className="mt-1 text-lg font-semibold text-gray-900">{value}</p>
     </div>
   );
+}
+
+function LocalizedFallbackBadge({
+  label
+}: Readonly<{
+  label: string | null;
+}>) {
+  return label ? (
+    <span className="inline-flex w-max rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+      {label}
+    </span>
+  ) : null;
 }
 
 const productViewLabels = {
@@ -1307,8 +1323,15 @@ export function AdminProductsView({
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        {filteredRows.map((row) => (
-          <button
+        {filteredRows.map((row) => {
+          const localized = adminLocalizedProductText(row, locale);
+          const fallbackLabel = adminLocalizedFallbackLabel(
+            localized.title,
+            locale
+          );
+
+          return (
+            <button
             className="self-start rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-gray-200 transition hover:-translate-y-0.5 hover:shadow-md"
             key={row.id}
             onClick={() => setDraft(row)}
@@ -1329,12 +1352,16 @@ export function AdminProductsView({
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-base font-semibold leading-6 text-gray-900">
-                      {row.displayTitle}
-                    </h3>
-                    {row.title !== row.displayTitle ? (
+                    <div className="flex flex-col gap-1">
+                      <h3 className="text-base font-semibold leading-6 text-gray-900">
+                        {localized.title.value}
+                      </h3>
+                      <LocalizedFallbackBadge label={fallbackLabel} />
+                    </div>
+                    {localized.title.canonicalValue &&
+                    localized.title.canonicalValue !== localized.title.value ? (
                       <p className="mt-0.5 text-xs text-gray-400">
-                        {viewLabels.sourceTitle}: {row.title}
+                        {viewLabels.sourceTitle}: {localized.title.canonicalValue}
                       </p>
                     ) : null}
                     <p className="mt-1 text-sm text-gray-500">
@@ -1416,7 +1443,8 @@ export function AdminProductsView({
               </div>
             </div>
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {draft ? (
@@ -1525,6 +1553,8 @@ function ProductModal({
     : translationLocales[0]?.code ?? "en";
   const activeTranslationMeta = productLocaleMeta(activeTranslationLocale);
   const activeTranslation = productTranslationFor(draft, activeTranslationLocale);
+  const localized = adminLocalizedProductText(draft, locale);
+  const fallbackLabel = adminLocalizedFallbackLabel(localized.title, locale);
 
   function translationFor(locale: string) {
     return productTranslationFor(draft, locale);
@@ -1710,7 +1740,12 @@ function ProductModal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-xl font-semibold leading-8 text-gray-900">{draft.title}</h2>
+              <div className="flex flex-col gap-1">
+                <h2 className="text-xl font-semibold leading-8 text-gray-900">
+                  {localized.title.value}
+                </h2>
+                <LocalizedFallbackBadge label={fallbackLabel} />
+              </div>
               <span
                 className={classNames(
                   "rounded-full border px-2.5 py-1 text-xs font-medium",
@@ -1720,6 +1755,12 @@ function ProductModal({
                 {productBusinessStateLabel(currentBusinessState, locale)}
               </span>
             </div>
+            {localized.title.canonicalValue &&
+            localized.title.canonicalValue !== localized.title.value ? (
+              <p className="mt-1 text-xs text-gray-400">
+                {viewLabels.sourceTitle}: {localized.title.canonicalValue}
+              </p>
+            ) : null}
             <p className="mt-1 text-sm text-gray-500">
               {[
                 draft.brandName,
@@ -2360,11 +2401,18 @@ function ProductModal({
                 value={mergeProductId}
               >
                 <option value="">{viewLabels.duplicateProduct}</option>
-                {mergeOptions.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {[product.title, product.brandName].filter(Boolean).join(" · ")}
-                  </option>
-                ))}
+                {mergeOptions.map((product) => {
+                  const productTitle = adminLocalizedProductText(
+                    product,
+                    locale
+                  ).title.value;
+
+                  return (
+                    <option key={product.id} value={product.id}>
+                      {[productTitle, product.brandName].filter(Boolean).join(" · ")}
+                    </option>
+                  );
+                })}
               </select>
               <button
                 className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"

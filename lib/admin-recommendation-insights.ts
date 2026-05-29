@@ -3,6 +3,7 @@ import {
   adminDashboardRangeStart,
   type AdminDashboardRange
 } from "@/lib/admin-dashboard-data";
+import type { Locale } from "@/lib/i18n";
 
 export type InsightRankRow = Readonly<{
   count: number;
@@ -454,7 +455,8 @@ export async function getProductDecisionStatsByProduct(
 }
 
 export async function getAdminRecommendationInsightsData(
-  range: AdminDashboardRange
+  range: AdminDashboardRange,
+  locale: Locale = "en"
 ): Promise<AdminRecommendationInsightsData> {
   const sql = getSql();
 
@@ -475,12 +477,13 @@ export async function getAdminRecommendationInsightsData(
         sql<Array<{ count: number | string; id: string; label: string }>>`
           select
             selection_rows.id,
-            coalesce(max(selection_rows.canonical_name), min(selection_rows.label_text)) as label,
+            coalesce(max(selection_rows.localized_name), max(selection_rows.canonical_name), min(selection_rows.label_text)) as label,
             count(distinct selection_rows.plan_id) as count
           from (
             select
               coalesce(supplement_recommendation_selections.supplement_id::text, 'unmatched:' || supplement_recommendation_selections.supplement_name_text) as id,
               supplements.name as canonical_name,
+              supplement_translations.name as localized_name,
               supplement_recommendation_selections.supplement_name_text as label_text,
               supplement_recommendation_selections.plan_id
             from public.supplement_recommendation_selections
@@ -488,6 +491,9 @@ export async function getAdminRecommendationInsightsData(
               on assessments.plan_id = supplement_recommendation_selections.plan_id
             left join public.supplements
               on supplements.id = supplement_recommendation_selections.supplement_id
+            left join public.supplement_translations
+              on supplement_translations.supplement_id = supplements.id
+             and supplement_translations.locale = ${locale}
             where supplement_recommendation_selections.is_current = true
               and coalesce(supplement_recommendation_selections.safety_visibility, 'visible') <> 'hidden'
               and assessments.selected_plan is not null
@@ -505,7 +511,7 @@ export async function getAdminRecommendationInsightsData(
           parent_label: string;
         }>>`
           select
-            coalesce(supplements.name, supplement_recommendation_selections.supplement_name_text) as parent_label,
+            coalesce(supplement_translations.name, supplements.name, supplement_recommendation_selections.supplement_name_text) as parent_label,
             supplement_recommendation_selections.dose_amount,
             supplement_recommendation_selections.dose_unit,
             supplement_recommendation_selections.daily_dose_text,
@@ -515,6 +521,9 @@ export async function getAdminRecommendationInsightsData(
             on assessments.plan_id = supplement_recommendation_selections.plan_id
           left join public.supplements
             on supplements.id = supplement_recommendation_selections.supplement_id
+          left join public.supplement_translations
+            on supplement_translations.supplement_id = supplements.id
+           and supplement_translations.locale = ${locale}
           where supplement_recommendation_selections.is_current = true
             and coalesce(supplement_recommendation_selections.safety_visibility, 'visible') <> 'hidden'
             and assessments.selected_plan is not null
@@ -571,34 +580,40 @@ export async function getAdminRecommendationInsightsData(
       sql<Array<{ count: number | string; id: string; label: string; secondary_label: string | null }>>`
         select
           product_recommendation_decisions.product_id::text as id,
-          product_recommendation_decisions.product_title as label,
+          coalesce(product_translations.title, product_recommendation_decisions.product_title) as label,
           avg(product_recommendation_decisions.product_coverage_percent)::text as secondary_label,
           count(distinct product_recommendation_decisions.plan_id) as count
         from public.product_recommendation_decisions
         join public.assessments
           on assessments.plan_id = product_recommendation_decisions.plan_id
+        left join public.product_translations
+          on product_translations.product_id = product_recommendation_decisions.product_id
+         and product_translations.locale = ${locale}
         where product_recommendation_decisions.is_current = true
           and product_recommendation_decisions.outcome = 'chosen'
           and assessments.selected_plan is not null
           and (${start}::timestamptz is null or product_recommendation_decisions.generated_at >= ${start})
-        group by product_recommendation_decisions.product_id, product_recommendation_decisions.product_title
+        group by product_recommendation_decisions.product_id, coalesce(product_translations.title, product_recommendation_decisions.product_title)
         order by count desc, label asc
         limit 12
       `,
       sql<Array<{ count: number | string; id: string; label: string; secondary_label: string | null }>>`
         select
           product_recommendation_decisions.product_id::text as id,
-          product_recommendation_decisions.product_title as label,
+          coalesce(product_translations.title, product_recommendation_decisions.product_title) as label,
           product_recommendation_decisions.reason as secondary_label,
           count(*) as count
         from public.product_recommendation_decisions
         join public.assessments
           on assessments.plan_id = product_recommendation_decisions.plan_id
+        left join public.product_translations
+          on product_translations.product_id = product_recommendation_decisions.product_id
+         and product_translations.locale = ${locale}
         where product_recommendation_decisions.is_current = true
           and product_recommendation_decisions.outcome = 'near_miss'
           and assessments.selected_plan is not null
           and (${start}::timestamptz is null or product_recommendation_decisions.generated_at >= ${start})
-        group by product_recommendation_decisions.product_id, product_recommendation_decisions.product_title, product_recommendation_decisions.reason
+        group by product_recommendation_decisions.product_id, coalesce(product_translations.title, product_recommendation_decisions.product_title), product_recommendation_decisions.reason
         order by count desc, label asc
         limit 12
       `,

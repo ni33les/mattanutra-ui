@@ -2609,6 +2609,7 @@ export function AdminDashboard({
             <AdminReviewQueueView
               accessToken={accessToken}
               data={reviewQueueData}
+              foodsData={foodsData}
               labels={labels}
               locale={locale}
               productsData={productsData}

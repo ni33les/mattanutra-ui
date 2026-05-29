@@ -8,6 +8,10 @@ import type {
   AdminFoodRow,
   FoodListStatus
 } from "@/lib/admin-foods";
+import {
+  adminLocalizedFoodText,
+  adminLocalizedSupplementText
+} from "@/lib/admin-localized-display";
 import type {
   AdminSupplementRow,
   SupplementListStatus
@@ -165,14 +169,27 @@ export function formatSupplementSafetyFlags(
 
 export function supplementSearchText(
   labels: AdminContent,
-  row: AdminSupplementRow
+  row: AdminSupplementRow,
+  locale: Locale
 ) {
+  const localized = adminLocalizedSupplementText(row, locale);
+
   return [
     row.name,
+    localized.name.value,
     row.category,
+    localized.category.value,
     row.ingredientType,
     row.primaryUseCase,
+    localized.primaryUseCase.value,
     row.aliases.map((alias) => alias.name).join(" "),
+    localized.aliases.join(" "),
+    ...Object.values(row.translations ?? {}).flatMap((translation) => [
+      translation?.name,
+      translation?.primaryUseCase,
+      translation?.categoryLabel,
+      ...(translation?.aliases ?? [])
+    ]),
     ...row.safetyFlags.map((flag) => supplementSafetyFlagLabel(labels, flag))
   ]
     .filter(Boolean)
@@ -224,12 +241,22 @@ export function foodStatusClass(status: FoodListStatus) {
   return "bg-amber-50 text-amber-800 ring-amber-200";
 }
 
-export function foodSearchText(row: AdminFoodRow) {
+export function foodSearchText(row: AdminFoodRow, locale: Locale) {
+  const localized = adminLocalizedFoodText(row, locale);
+
   return [
     row.name,
+    localized.name.value,
     row.category,
+    localized.category.value,
     row.primaryUseCase,
+    localized.primaryUseCase.value,
     row.aliases.join(" "),
+    ...Object.values(row.translations ?? {}).flatMap((translation) => [
+      translation?.name,
+      translation?.primaryUseCase,
+      translation?.category
+    ]),
     row.benefitTags.join(" "),
     row.nutrientTags.join(" "),
     row.nutrientProfile
