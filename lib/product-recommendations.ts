@@ -1,869 +1,144 @@
 import {
   comparableDoseAmount,
   normalizeDoseUnit,
-  parseDose,
-  parseDoseLimit,
-  type ParsedDose
+  parseDoseLimit
 } from "@/lib/dose-conversion";
+import { supplementProductNeeds } from "@/lib/product-recommendation-needs";
+import {
+  fuzzyTokensMatch,
+  matchKeyAliases,
+  normalizeProductFactKey,
+  normalizeProductKey,
+  productFactAliasKeys,
+  productFactLooksLikeConcentration
+} from "@/lib/product-key-matching";
+import {
+  confidenceMultiplier,
+  diagnosticNeeds,
+  exclusionReason,
+  factAllowedForClient,
+  factComparableAmount,
+  factIssueExclusions,
+  positiveNumber,
+  productAudienceMismatchReason,
+  productFactAudienceMismatchReason,
+  safePercent,
+  stackCoveragePercent,
+  visibleCoveragePercent,
+  whyProductMatches,
+  type CoverageResult
+} from "@/lib/product-recommendation-metrics";
 import type {
-  FoodGuidanceBlueprint,
-  FoodGuidanceItem,
-  FormulationBlueprint,
-  FormulationIngredient,
-  LocalizedText,
-  RecommendedProduct
-} from "@/lib/formulation-types";
-import type { ValidationResult } from "@/lib/product-validation";
-import { resolveLocalizedText, type Locale } from "@/lib/i18n";
+  ProductClientSex,
+  ProductCandidate,
+  ProductCandidateFact,
+  ProductRecommendationAlgorithmVersion,
+  ProductRecommendationExclusion,
+  ProductRecommendationSelection,
+  ProductRecommendationResult,
+  ProductRecommendationNeed,
+  ProductRecommendationInput,
+  ProductStackPreference,
+  ProductRecommendationTrace
+} from "@/lib/product-recommendation-types";
+import {
+  SAFETY_FLAG_BLEEDING_RISK,
+  SAFETY_FLAG_CONDITION_CAUTION,
+  SAFETY_FLAG_HORMONE_CAUTION,
+  SAFETY_FLAG_MEDICATION_INTERACTION,
+  SAFETY_FLAG_PREGNANCY_CAUTION,
+  V2_ALGORITHM_VERSION,
+  V2_BALANCED_MATERIAL_COVERAGE_DELTA_PERCENT,
+  V2_COMPACT_CRITICAL_NEED_LOSS_TOLERANCE,
+  V2_COMPACT_CRITICAL_WEIGHT_FLOOR,
+  V2_COMPACT_MIN_COVERAGE_RATIO,
+  V2_DIVERSITY_SCORE_EPSILON,
+  V2_DUPLICATE_NEED_PRODUCT_PENALTY_WEIGHT,
+  V2_EXCESSIVE_EXTRAS_PENALTY_WEIGHT,
+  V2_EXTRA_SERVING_SIMPLICITY_PENALTY,
+  V2_FULL_BEAM_ALGORITHM_VERSION,
+  V2_FULL_BEAM_WIDTH,
+  V2_MATERIAL_COVERAGE_DELTA_PERCENT,
+  V2_MAX_SERVING_MULTIPLIER,
+  V2_MIN_MARGINAL_PRODUCT_CONTRIBUTION_PERCENT,
+  V2_MULTISERVING_REQUIRED_COVERAGE_GAIN_PERCENT,
+  V2_PER_NEED_SHORTLIST,
+  V2_SCORE_EPSILON,
+  V2_SHORTLIST_LIMIT,
+  V2_STACK_DOSE_LIMIT_SLACK_MULTIPLIER,
+  V2_TINY_PARTIAL_PRODUCT_COVERAGE_CEILING,
+  V2_TOP_AFFILIATE_SHORTLIST,
+  V2_TOP_BROAD_SHORTLIST,
+  V2_TOP_OVERALL_SHORTLIST,
+  budgetAmountFromContext,
+  clamp01,
+  excessiveExtrasPenalty,
+  normalizedV2Weights,
+  roundScore,
+  safetyContextBlockReasonForMask,
+  safetyContextFromClientContext,
+  safetyContextPenaltyForMask,
+  usefulExtrasScore,
+  v2ContextSignals,
+  type V2Weights
+} from "@/lib/product-recommendation-v2-config";
+import { normalizeProductStackPreference } from "@/lib/product-stack-preferences";
 
-export type ProductStatus =
-  | "approved"
-  | "ignored"
-  | "pending_review";
+export {
+  normalizeProductFactKey,
+  normalizeProductFactName,
+  normalizeProductKey,
+  productFactAliasKeys,
+  productFactLooksLikeConcentration,
+  productKeysMatch
+} from "@/lib/product-key-matching";
 
-export type ProductPlatform = "lazada" | "manual" | "shopee";
-export type ProductKind = "food" | "multi" | "other" | "supplement";
-export type ProductAudience = "both" | "female" | "male";
-export type ProductClientSex = "female" | "male";
-export type ProductAvailabilityStatus =
-  | "in_stock"
-  | "out_of_stock"
-  | "unavailable"
-  | "unknown";
-export type ProductConfidence = "high" | "low" | "moderate";
+export {
+  buildProductNeeds,
+  buildProductSearchQueries
+} from "@/lib/product-recommendation-needs";
 
-export type ProductRecommendationNeed = Readonly<{
-  aliasKeys?: readonly string[];
-  category: string;
-  displayName: string;
-  id: string;
-  itemType: "food" | "nutrient" | "supplement";
-  normalizedName: string;
-  sourceId: string;
-  targetComparableAmount: number | null;
-  targetDose: ParsedDose | null;
-  targetText: string | null;
-  weight: number;
-}>;
+export { toRecommendedProduct } from "@/lib/product-recommendation-output";
 
-export type ProductCandidateFact = Readonly<{
-  aliasKeys?: readonly string[];
-  amount: number | null;
-  comparableAmount: number | null;
-  confidence: ProductConfidence;
-  foodId?: string | null;
-  itemType: "food" | "nutrient" | "supplement";
-  maxAmount?: number | null;
-  maxUnit?: string | null;
-  name: string;
-  normalizedName: string;
-  nutrientId?: string | null;
-  servingLabel?: string | null;
-  safetyFlags?: readonly string[];
-  supplementAudience?: ProductAudience | null;
-  supplementId?: string | null;
-  unit: string | null;
-}>;
+export {
+  PRODUCT_STACK_VARIANT_CONFIGS,
+  normalizeProductStackPreference
+} from "@/lib/product-stack-preferences";
 
-export type ProductCandidate = Readonly<{
-  activeOfferId?: string | null;
-  activeAffiliateUrl?: string | null;
-  activeAffiliateCommissionRate?: number | null;
-  activeAffiliatePriority?: number | null;
-  activeAffiliateType?: "affiliate" | "direct" | null;
-  affiliateStatus: "active" | "flagged_stale" | "none";
-  automatedSafetyPassed: boolean;
-  availabilityStatus: ProductAvailabilityStatus;
-  availableCountryCodes?: readonly string[];
-  brandName?: string | null;
-  brandStatus?: ProductStatus | null;
-  currency: string;
-  facts: ProductCandidateFact[];
-  id: string;
-  imageUrl?: string | null;
-  labelStatus: "failed" | "missing" | "parsed" | "stale";
-  status: ProductStatus;
-  platform: ProductPlatform;
-  productAudience?: ProductAudience | null;
-  productKind?: ProductKind | null;
-  validation?: ValidationResult | null;
-  priceAmount?: number | null;
-  productDataExpiresAt?: string | null;
-  productUrl: string;
-  region: string;
-  title: string;
-  translations?: Record<string, {
-    description?: string | null;
-    status?: string | null;
-    title?: string | null;
-  }>;
-}>;
+export {
+  ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION,
+  ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION
+} from "@/lib/product-recommendation-v2-config";
 
-export type ProductRecommendationExclusion = Readonly<{
-  productId: string;
-  reason: string;
-  title: string;
-}>;
+export type {
+  ProductStatus,
+  ProductPlatform,
+  ProductKind,
+  ProductAudience,
+  ProductClientSex,
+  ProductAvailabilityStatus,
+  ProductConfidence,
+  ProductRecommendationNeed,
+  ProductCandidateFact,
+  ProductCandidate,
+  ProductRecommendationExclusion,
+  ProductRecommendationNeedDiagnostic,
+  ProductRecommendationAlgorithmVersion,
+  ProductStackPreference,
+  ProductRecommendationDiagnostics,
+  ProductRecommendationSelection,
+  ProductRecommendationResult,
+  ProductRecommendationClientContext,
+  ProductRecommendationInput,
+  ProductRecommendationTrace
+} from "@/lib/product-recommendation-types";
 
-export type ProductRecommendationNeedDiagnostic = Readonly<{
-  bestRejectedProductId: string | null;
-  bestRejectedReason: string | null;
-  displayName: string;
-  id: string;
-  itemType: ProductRecommendationNeed["itemType"];
-  coveragePercent: number;
-}>;
-
-export type ProductRecommendationAlgorithmVersion =
-  | "v2-exact-shortlist"
-  | "v2-full-beam";
-export type ProductStackPreference = "balanced" | "compact";
-
-export type ProductRecommendationDiagnostics = Readonly<{
-  algorithmVersion?: ProductRecommendationAlgorithmVersion;
-  blockedProducts: ProductRecommendationExclusion[];
-  coverage: {
-    foodCoveragePercent: number;
-    supplementProductCoveragePercent: number;
-    totalPlanCoveragePercent: number;
-  };
-  factIssues: ProductRecommendationExclusion[];
-  matchedNeeds: ProductRecommendationNeedDiagnostic[];
-  marketRegion?: string;
-  nearMisses: Array<Readonly<{
-    coveragePercent: number;
-    productId: string;
-    reason: string;
-    title: string;
-  }>>;
-  productsConsidered: number;
-  stackPreference?: ProductStackPreference;
-  trace?: ProductRecommendationTrace;
-  unmatchedNeeds: ProductRecommendationNeedDiagnostic[];
-}>;
-
-export type ProductRecommendationSelection = Readonly<{
-  affiliate: boolean;
-  offerId: string | null;
-  coveredNeeds: ProductRecommendationNeed[];
-  product: ProductCandidate;
-  productCoveragePercent: number;
-  rank: number;
-  score: number;
-  servingMultiplier: number;
-  stackContributionPercent: number;
-  url: string;
-  unknownAtRecommendation: boolean;
-  why: string;
-}>;
-
-export type ProductRecommendationResult = Readonly<{
-  clientNeeds: ProductRecommendationNeed[];
-  diagnostics: ProductRecommendationDiagnostics;
-  exclusions: ProductRecommendationExclusion[];
-  recommendations: ProductRecommendationSelection[];
-  supplementProductCoveragePercent: number;
-  foodCoveragePercent: number;
-  totalPlanCoveragePercent: number;
-  stackCoveragePercent: number;
-}>;
-
-export type ProductRecommendationClientContext = Readonly<{
-  budgetAmount?: number | null;
-  budgetPreference?: string | null;
-  conditions?: readonly string[];
-  currentSupplements?: string | null;
-  guidanceAdjustmentCount?: number;
-  lifestage?: string | null;
-  medicationTypes?: readonly string[];
-  medications?: string | null;
-  pillLimit?: string | null;
-  planFeedbackTypes?: readonly string[];
-  preferredForm?: string | null;
-}>;
-
-export type ProductRecommendationInput = Readonly<{
-  budgetAmount?: number | null;
-  candidates: ProductCandidate[];
-  clientContext?: ProductRecommendationClientContext | null;
-  clientSex?: ProductClientSex | null;
-  countryCode?: string | null;
-  maxProducts?: number;
-  needs: ProductRecommendationNeed[];
-  stackPreference?: ProductStackPreference | null;
-  targetProducts?: number;
-}>;
-
-export type ProductRecommendationTrace = Readonly<{
-  alternativeStacks: Array<Readonly<{
-    productIds: string[];
-    productTitles: string[];
-    score: number;
-    supplementProductCoveragePercent: number;
-    totalPlanCoveragePercent: number;
-  }>>;
-  candidatePoolSize?: number;
-  componentScores: Record<string, number>;
-  contextSignals: Record<string, unknown>;
-  evaluatedStackCount?: number;
-  excludedPredicates: ProductRecommendationExclusion[];
-  maxProducts?: number;
-  searchMode?: "full-beam" | "shortlist";
-  shortfalls: Array<Readonly<{
-    coveragePercent: number;
-    displayName: string;
-    id: string;
-    shortfallPercent: number;
-  }>>;
-  shortlistSize: number;
-  stackPreference?: ProductStackPreference;
-  targetProducts?: number;
-  timingMs?: Record<string, number>;
-  utilityScore: number;
-  weightDeltas: Record<string, number>;
-  weights: Record<string, number>;
-}>;
-
-type CoverageResult = Readonly<{
-  coverageByNeed: Map<string, number>;
-  coveredNeeds: ProductRecommendationNeed[];
-  percent: number;
-}>;
+export type { ProductStackVariantConfig } from "@/lib/product-stack-preferences";
 
 const DEFAULT_MAX_COUNT = 6;
 const TARGET_DOSE_SWEET_SPOT_MIN = 0.7;
 const TARGET_DOSE_SWEET_SPOT_MAX = 1.3;
 const TARGET_DOSE_SOFT_MAX = 1.5;
-const GENERIC_BASE_PRODUCT_QUERIES = [
-  "multivitamin",
-  "multivitamin mineral",
-  "วิตามินรวม",
-  "อาหารเสริม วิตามินรวม"
-];
-const SEARCH_TOKEN_REPLACEMENTS: Record<string, string[]> = {
-  ashwagandha: ["ashwagandha", "withania somnifera"],
-  coq10: ["coq10", "coenzyme q10"],
-  curcumin: ["curcumin", "turmeric extract", "curcuminoids"],
-  l_glutamine: ["l-glutamine", "glutamine"],
-  magnesium: ["magnesium", "magnesium glycinate", "แมกนีเซียม"],
-  multi_strain_probiotics: ["probiotics", "probiotic blend"],
-  omega_3: ["omega 3", "fish oil", "น้ำมันปลา"],
-  theanine: ["l-theanine", "theanine"],
-  vitamin_b12: ["vitamin b12", "b12"],
-  vitamin_c: ["vitamin c", "วิตามินซี"],
-  vitamin_d: ["vitamin d3", "vitamin d", "วิตามินดี"],
-  vitamin_d3: ["vitamin d3", "vitamin d", "วิตามินดี"],
-  zinc: ["zinc", "สังกะสี"]
-};
-const PRODUCT_FACT_DOSE_UNIT_PATTERN = "(?:mcg|µg|ug|mg|g|iu)";
-const PRODUCT_FACT_PER_UNIT_PATTERN =
-  "(?:mcg|µg|ug|mg|g|kg|ml|l)";
-const PRODUCT_FACT_CONCENTRATION_PATTERN = new RegExp(
-  `\\b\\d+(?:[,.]\\d+)?\\s*${PRODUCT_FACT_DOSE_UNIT_PATTERN}\\s*(?:\\/|\\bper\\b|\\s+)\\s*${PRODUCT_FACT_PER_UNIT_PATTERN}\\b`,
-  "i"
-);
-const PRODUCT_FACT_CONCENTRATION_REPLACE_PATTERN = new RegExp(
-  PRODUCT_FACT_CONCENTRATION_PATTERN.source,
-  "gi"
-);
-const PRODUCT_FACT_DOSE_PATTERN = new RegExp(
-  `\\b\\d+(?:[,.]\\d+)?\\s*${PRODUCT_FACT_DOSE_UNIT_PATTERN}\\b`,
-  "gi"
-);
-const PRODUCT_FACT_PERCENT_PATTERN = /\b\d+(?:[,.]\d+)?\s*%/g;
-const PRODUCT_FACT_PERCENT_PARENS_PATTERN = /\([^)]*\b\d+(?:[,.]\d+)?\s*%[^)]*\)/g;
-const MATCH_ALIAS_GROUPS: readonly (readonly string[])[] = [
-  ["vitamin_a", "retinol", "retinyl_palmitate", "retinyl_acetate"],
-  ["beta_carotene", "provitamin_a"],
-  ["vitamin_b1", "thiamine", "thiamin", "thiamine_nitrate", "thiamine_hydrochloride"],
-  ["vitamin_b2", "riboflavin"],
-  ["vitamin_b3", "niacin", "niacinamide", "nicotinamide", "nicotinic_acid"],
-  ["vitamin_b5", "pantothenic_acid", "calcium_pantothenate"],
-  ["vitamin_b6", "pyridoxine", "pyridoxine_hcl", "pyridoxine_hydrochloride"],
-  ["vitamin_b7", "biotin"],
-  ["vitamin_b9", "folate", "folic_acid", "methylfolate", "l_5_mthf"],
-  ["vitamin_b12", "b12", "cobalamin", "cyanocobalamin", "methylcobalamin"],
-  ["vitamin_c", "ascorbic_acid", "calcium_ascorbate", "sodium_ascorbate"],
-  ["vitamin_d", "vitamin_d3", "d3", "cholecalciferol"],
-  ["vitamin_e", "tocopherol", "alpha_tocopherol", "tocopheryl_acetate", "tocopheryl_succinate"],
-  ["vitamin_k", "vitamin_k1", "phytonadione", "phylloquinone"],
-  ["vitamin_k2", "menaquinone", "mk_7", "mk7"],
-  ["coq10", "coenzyme_q10", "ubiquinone", "ubiquinol"],
-  ["pea", "palmidrol", "palmitoylethanolamide"],
-  ["ashwagandha", "ashwaganda", "withania_somnifera", "ashwagandha_root_extract"],
-  ["curcumin", "curacumin", "curcuminoids", "turmeric_extract", "curcuma_longa"],
-  ["multi_strain_probiotics", "probiotics", "probiotic", "probiotic_blend"],
-  [
-    "omega_3",
-    "omega_3_fatty_acids",
-    "fish_oil",
-    "epa",
-    "dha",
-    "eicosapentaenoic_acid",
-    "docosahexaenoic_acid"
-  ],
-  ["theanine", "l_theanine", "alpha_wave_l_theanine"],
-  ["l_glutamine", "glutamine"],
-  ["magnesium", "magnesium_citrate", "magnesium_glycinate", "magnesium_bisglycinate", "magnesium_glyconate", "magnesium_oxide", "magnesium_threonate"],
-  ["iron", "ferrous_fumarate", "ferrous_sulfate", "ferrous_bisglycinate"],
-  ["zinc", "zinc_amino_acid_chelate", "zinc_citrate", "zinc_gluconate", "zinc_oxide", "zinc_sulfate"],
-  ["selenium", "selenomethionine", "sodium_selenite"],
-  ["iodine", "iodide", "potassium_iodide"],
-  ["copper", "copper_gluconate", "copper_sulfate"],
-  ["chromium", "chromium_picolinate"],
-  ["manganese", "manganese_sulfate"],
-  ["calcium", "calcium_carbonate", "calcium_citrate"]
-];
-const MATCH_KEY_ALIASES: Record<string, readonly string[]> =
-  Object.fromEntries(
-    MATCH_ALIAS_GROUPS.flatMap((group) => {
-      const aliases = [...new Set(group.map((alias) => normalizeProductKey(alias)))];
-
-      return aliases.map((alias) => [alias, aliases] as const);
-    })
-  );
-const MATCH_TOKEN_STOP_WORDS = new Set([
-  "acid",
-  "active",
-  "amino",
-  "chelate",
-  "compound",
-  "dietary",
-  "extract",
-  "hcl",
-  "hydrochloride",
-  "mineral",
-  "minerals",
-  "nitrate",
-  "oxide",
-  "plus",
-  "supplement",
-  "supplements",
-  "tablet",
-  "tablets",
-  "vitamin",
-  "vitamins"
-]);
-
-export function normalizeProductKey(value: string) {
-  return value
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
-
-function factTextForParsing(value: string) {
-  return value.replace(/_/g, " ");
-}
-
-export function productFactLooksLikeConcentration(value: string | null | undefined) {
-  return Boolean(
-    value &&
-      PRODUCT_FACT_CONCENTRATION_PATTERN.test(factTextForParsing(value))
-  );
-}
-
-export function normalizeProductFactName(value: string) {
-  return factTextForParsing(value)
-    .replace(/\([^)]*\)/g, (match) =>
-      productFactLooksLikeConcentration(match) ? " " : match
-    )
-    .replace(PRODUCT_FACT_PERCENT_PARENS_PATTERN, " ")
-    .replace(PRODUCT_FACT_CONCENTRATION_REPLACE_PATTERN, " ")
-    .replace(PRODUCT_FACT_DOSE_PATTERN, " ")
-    .replace(PRODUCT_FACT_PERCENT_PATTERN, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/[.,;:()[\]-]+$/g, "")
-    .trim();
-}
-
-export function normalizeProductFactKey(value: string) {
-  return normalizeProductKey(normalizeProductFactName(value) || value);
-}
-
-export function productFactAliasKeys(
-  value: string,
-  extraAliases: readonly string[] = []
-) {
-  const normalized = normalizeProductFactKey(value);
-  const inferredAliases: string[] = [];
-
-  if (/(^|_)l?_?theanine($|_)/.test(normalized)) {
-    inferredAliases.push("theanine", "l_theanine");
-  }
-
-  if (
-    /(^|_)dha($|_)/.test(normalized) ||
-    normalized.includes("docosahexaenoic_acid")
-  ) {
-    inferredAliases.push("omega_3", "dha", "docosahexaenoic_acid");
-  }
-
-  if (
-    /(^|_)epa($|_)/.test(normalized) ||
-    normalized.includes("eicosapentaenoic_acid")
-  ) {
-    inferredAliases.push("omega_3", "epa", "eicosapentaenoic_acid");
-  }
-
-  const seed = [
-    normalized,
-    ...inferredAliases,
-    ...extraAliases.map((alias) => normalizeProductFactKey(alias))
-  ].filter(Boolean);
-  const aliases = seed.flatMap((key) => MATCH_KEY_ALIASES[key] ?? [key]);
-
-  return [...new Set(aliases.map((alias) => normalizeProductFactKey(alias)).filter(Boolean))];
-}
-
-function matchKeyAliases(
-  value: string,
-  extraAliases: readonly string[] = []
-) {
-  return new Set(productFactAliasKeys(value, extraAliases));
-}
-
-function keyTokens(key: string) {
-  return normalizeProductFactKey(key)
-    .split("_")
-    .filter((token) => token.length > 1 && !MATCH_TOKEN_STOP_WORDS.has(token));
-}
-
-function editDistanceWithinOne(left: string, right: string) {
-  if (left === right) {
-    return true;
-  }
-
-  if (left.length < 5 || right.length < 5) {
-    return false;
-  }
-
-  if (Math.abs(left.length - right.length) > 1) {
-    return false;
-  }
-
-  let edits = 0;
-  let leftIndex = 0;
-  let rightIndex = 0;
-
-  while (leftIndex < left.length && rightIndex < right.length) {
-    if (left[leftIndex] === right[rightIndex]) {
-      leftIndex += 1;
-      rightIndex += 1;
-      continue;
-    }
-
-    edits += 1;
-
-    if (edits > 1) {
-      return false;
-    }
-
-    if (left.length > right.length) {
-      leftIndex += 1;
-    } else if (right.length > left.length) {
-      rightIndex += 1;
-    } else {
-      leftIndex += 1;
-      rightIndex += 1;
-    }
-  }
-
-  return edits + (left.length - leftIndex) + (right.length - rightIndex) <= 1;
-}
-
-function fuzzyTokensMatch(left: string, right: string) {
-  const leftTokens = keyTokens(left);
-  const rightTokens = keyTokens(right);
-
-  if (leftTokens.length < 1 || rightTokens.length < 1) {
-    return false;
-  }
-
-  const shorter = leftTokens.length <= rightTokens.length ? leftTokens : rightTokens;
-  const longer = leftTokens.length <= rightTokens.length ? rightTokens : leftTokens;
-  const matched = shorter.filter((token) =>
-    longer.some((candidate) => editDistanceWithinOne(token, candidate))
-  ).length;
-
-  return matched === shorter.length && matched / longer.length >= 0.6;
-}
-
-export function productKeysMatch(
-  left: string,
-  right: string,
-  leftAliases: readonly string[] = [],
-  rightAliases: readonly string[] = []
-) {
-  const leftKeys = matchKeyAliases(left, leftAliases);
-  const rightKeys = matchKeyAliases(right, rightAliases);
-
-  if ([...leftKeys].some((alias) => rightKeys.has(alias))) {
-    return true;
-  }
-
-  return [...leftKeys].some((leftKey) =>
-    [...rightKeys].some((rightKey) => fuzzyTokensMatch(leftKey, rightKey))
-  );
-}
-
-function textValue(value: LocalizedText) {
-  return resolveLocalizedText(value, "en");
-}
-
-function safePercent(value: number) {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function visibleCoveragePercent(value: number, hasCoverage: boolean) {
-  const percent = safePercent(value);
-
-  return hasCoverage && value > 0 && percent === 0 ? 1 : percent;
-}
-
-function positiveNumber(value: unknown) {
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-function doseFromAmount(
-  amount: number | null,
-  unit: string | null
-): ParsedDose | null {
-  if (amount === null || amount <= 0 || !unit) {
-    return null;
-  }
-
-  const normalizedUnit = normalizeDoseUnit(unit);
-
-  return normalizedUnit
-    ? {
-        amount,
-        originalText: `${amount} ${normalizedUnit}`,
-        unit: normalizedUnit
-      }
-    : null;
-}
-
-function effectWeight(rank: number, itemType: "food" | "nutrient" | "supplement") {
-  const normalizedRank = Number.isFinite(rank) && rank > 0 ? Math.round(rank) : 5;
-  const base = Math.max(1, 8 - normalizedRank);
-
-  return itemType === "food" ? base * 0.8 : base;
-}
-
-function supplementProductNeeds(
-  needs: readonly ProductRecommendationNeed[]
-) {
-  return needs.filter((need) => need.itemType === "supplement");
-}
-
-function visibleSafetyStatus(
-  item: Pick<FormulationIngredient | FoodGuidanceItem, "safety">,
-) {
-  return item.safety?.visibility !== "hidden";
-}
-
-export function buildProductNeeds(input: Readonly<{
-  foodGuidance: FoodGuidanceBlueprint | null;
-  formulation: FormulationBlueprint | null;
-}>) {
-  const supplementNeeds =
-    input.formulation?.supplementBreakdown
-      ?.filter((item) => visibleSafetyStatus(item))
-      .map((item) => {
-        const displayName = textValue(item.supplement);
-        const normalizedName = normalizeProductFactKey(displayName);
-        const targetText = textValue(item.dailyDose);
-        const targetDose = parseDose(targetText, normalizedName);
-
-        return {
-          category: item.category,
-          displayName,
-          id: `supplement:${item.id}`,
-          itemType: "supplement" as const,
-          normalizedName,
-          sourceId: item.id,
-          targetComparableAmount: targetDose
-            ? comparableDoseAmount(targetDose, normalizedName)
-            : null,
-          targetDose,
-          targetText,
-          weight: effectWeight(item.effectivenessRank, "supplement")
-        } satisfies ProductRecommendationNeed;
-      }) ?? [];
-  return supplementNeeds;
-}
-
-function humanSearchName(need: ProductRecommendationNeed) {
-  const replacement = SEARCH_TOKEN_REPLACEMENTS[need.normalizedName];
-
-  if (replacement) {
-    return replacement;
-  }
-
-  return [
-    need.displayName
-      .replace(/\([^)]*\)/g, "")
-      .replace(/\b\d+(\.\d+)?\s*(mcg|µg|ug|mg|g|iu)\b/gi, "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .toLowerCase()
-  ].filter(Boolean);
-}
-
-export function buildProductSearchQueries(
-  needs: readonly ProductRecommendationNeed[],
-  limit = 16
-) {
-  const weightedNeeds = supplementProductNeeds(needs)
-    .sort((first, second) => second.weight - first.weight);
-  const queries: string[] = [...GENERIC_BASE_PRODUCT_QUERIES];
-
-  for (const need of weightedNeeds) {
-    for (const name of humanSearchName(need)) {
-      queries.push(name);
-
-      if (
-        need.itemType !== "food" &&
-        !/supplement|vitamin|วิตามิน|อาหารเสริม/i.test(name)
-      ) {
-        queries.push(`${name} supplement`);
-      }
-    }
-  }
-
-  return [...new Set(queries.map((query) => query.trim()).filter(Boolean))]
-    .slice(0, Math.max(1, limit));
-}
-
-function factComparableAmount(fact: ProductCandidateFact) {
-  if (
-    productFactLooksLikeConcentration(fact.name) ||
-    productFactLooksLikeConcentration(fact.normalizedName)
-  ) {
-    return null;
-  }
-
-  if (typeof fact.comparableAmount === "number" && fact.comparableAmount > 0) {
-    return fact.comparableAmount;
-  }
-
-  const dose = doseFromAmount(positiveNumber(fact.amount), fact.unit);
-
-  if (!dose) {
-    return null;
-  }
-
-  const keys = [
-    normalizeProductFactKey(fact.name),
-    normalizeProductFactKey(fact.normalizedName),
-    ...productFactAliasKeys(fact.name || fact.normalizedName, fact.aliasKeys)
-  ];
-
-  for (const key of [...new Set(keys)].filter(Boolean)) {
-    const comparableAmount = comparableDoseAmount(dose, key);
-
-    if (comparableAmount !== null) {
-      return comparableAmount;
-    }
-  }
-
-  return null;
-}
-
-function confidenceMultiplier(confidence: ProductConfidence) {
-  if (confidence === "high") {
-    return 1;
-  }
-
-  return confidence === "moderate" ? 0.85 : 0.65;
-}
-
-function matchesNeed(fact: ProductCandidateFact, need: ProductRecommendationNeed) {
-  if (fact.itemType !== need.itemType && fact.itemType !== "nutrient") {
-    return false;
-  }
-
-  if (fact.itemType === "supplement" && fact.supplementId === need.sourceId) {
-    return true;
-  }
-
-  if (fact.itemType === "food" && fact.foodId === need.sourceId) {
-    return true;
-  }
-
-  return productKeysMatch(
-    fact.name || fact.normalizedName,
-    need.displayName || need.normalizedName,
-    fact.aliasKeys,
-    need.aliasKeys
-  );
-}
-
-function factAudienceMismatchReason(
-  fact: ProductCandidateFact,
-  clientSex?: ProductClientSex | null
-) {
-  const audience = fact.supplementAudience ?? "both";
-
-  if (!clientSex || audience === "both" || audience === clientSex) {
-    return null;
-  }
-
-  return audience === "female"
-    ? "Supplement is for women only"
-    : "Supplement is for men only";
-}
-
-function factAllowedForClient(
-  fact: ProductCandidateFact,
-  clientSex?: ProductClientSex | null
-) {
-  return !factAudienceMismatchReason(fact, clientSex);
-}
-
-function productFactAudienceMismatchReason(
-  product: ProductCandidate,
-  needs: readonly ProductRecommendationNeed[],
-  clientSex?: ProductClientSex | null
-) {
-  if (!clientSex) {
-    return null;
-  }
-
-  const mismatched = product.facts.find(
-    (fact) =>
-      factAudienceMismatchReason(fact, clientSex) &&
-      needs.some((need) => matchesNeed(fact, need))
-  );
-
-  return mismatched ? factAudienceMismatchReason(mismatched, clientSex) : null;
-}
-
-function exclusionReason(product: ProductCandidate) {
-  if (product.brandStatus === "ignored") {
-    return "Brand is ignored";
-  }
-
-  if (product.status === "ignored") {
-    return "Product is ignored";
-  }
-
-  if (product.labelStatus !== "parsed" || product.facts.length < 1) {
-    return "Product label facts are missing";
-  }
-
-  if (product.validation && product.validation.status !== "pass") {
-    return `Product validation needs review: ${product.validation.summary}`;
-  }
-
-  if (
-    product.status !== "approved" ||
-    product.brandStatus !== "approved"
-  ) {
-    return "Product is not approved yet";
-  }
-
-  if (
-    product.productDataExpiresAt &&
-    new Date(product.productDataExpiresAt).getTime() < Date.now()
-  ) {
-    return "Product cache expired";
-  }
-
-  if (!product.automatedSafetyPassed) {
-    return "Product failed automated safety checks";
-  }
-
-  return null;
-}
-
-function productAudienceMismatchReason(
-  product: ProductCandidate,
-  clientSex?: ProductClientSex | null
-) {
-  const audience = product.productAudience ?? "both";
-
-  if (!clientSex || audience === "both" || audience === clientSex) {
-    return null;
-  }
-
-  return audience === "female"
-    ? "Product is for women only"
-    : "Product is for men only";
-}
-
-function stackCoveragePercent(
-  coverage: Map<string, number>,
-  needs: readonly ProductRecommendationNeed[]
-) {
-  const totalWeight = needs.reduce((total, need) => total + need.weight, 0);
-  const weightedCoverage = needs.reduce(
-    (total, need) => total + (coverage.get(need.id) ?? 0) * need.weight,
-    0
-  );
-
-  return totalWeight > 0 ? (weightedCoverage / totalWeight) * 100 : 0;
-}
-
-function diagnosticNeeds(
-  needs: ProductRecommendationNeed[],
-  coverage: Map<string, number>,
-  bestRejectedByNeed: ReadonlyMap<string, ProductRecommendationExclusion>,
-  availableCoverageByNeed: ReadonlyMap<string, number> = new Map()
-) {
-  return needs.map((need) => {
-    const bestRejected = bestRejectedByNeed.get(need.id);
-    const coveragePercent = safePercent((coverage.get(need.id) ?? 0) * 100);
-    const availableCoveragePercent = safePercent(
-      (availableCoverageByNeed.get(need.id) ?? 0) * 100
-    );
-    const hasUsefulCoverage = coveragePercent >= 90;
-    const availableButUnselectedReason =
-      availableCoveragePercent > 0
-        ? availableCoveragePercent < V2_TINY_PARTIAL_PRODUCT_COVERAGE_CEILING * 100
-          ? "Available approved products underdose this formula target"
-          : "Available in the catalogue but not selected by this stack preference"
-        : null;
-    const bestRejectedReason =
-      hasUsefulCoverage
-        ? null
-        : coveragePercent <= 0 && availableButUnselectedReason
-          ? availableButUnselectedReason
-          : bestRejected?.reason ??
-            (coveragePercent <= 0
-              ? "No approved product in the catalogue covers this need"
-              : null);
-
-    return {
-      bestRejectedProductId:
-        bestRejectedReason && bestRejectedReason === bestRejected?.reason
-          ? bestRejected.productId
-          : null,
-      bestRejectedReason,
-      coveragePercent,
-      displayName: need.displayName,
-      id: need.id,
-      itemType: need.itemType
-    } satisfies ProductRecommendationNeedDiagnostic;
-  });
-}
-
-function factIssueExclusions(exclusions: ProductRecommendationExclusion[]) {
-  return exclusions.filter((item) =>
-    /validation|label|fact|safety|cache|approved|unavailable|blocked/i.test(item.reason)
-  );
-}
 
 function bestAvailableCoverageByNeed(entries: readonly V2ProductEntry[]) {
   const coverageByNeed = new Map<string, number>();
@@ -882,47 +157,6 @@ function bestAvailableCoverageByNeed(entries: readonly V2ProductEntry[]) {
 
   return coverageByNeed;
 }
-
-function marketplaceName(platform: ProductPlatform): RecommendedProduct["marketplace"] {
-  if (platform === "lazada") {
-    return "Lazada Thailand";
-  }
-
-  return platform === "shopee" ? "Shopee Thailand" : "Imported product";
-}
-
-function whyProductMatches(
-  product: ProductCandidate,
-  coveredNeeds: ProductRecommendationNeed[],
-  stackContributionPercent: number,
-  servingMultiplier = 1
-) {
-  const names = coveredNeeds.slice(0, 3).map((need) => need.displayName);
-  const servingPrefix = servingMultiplier > 1
-    ? `Use ${servingMultiplier} servings; `
-    : "";
-  const prefix = `${servingPrefix}Strong match`;
-  const contribution = safePercent(stackContributionPercent);
-
-  if (names.length < 1) {
-    return contribution > 0
-      ? `${prefix}; accounts for ${contribution}% of the selected stack.`
-      : `${prefix}; fills an otherwise uncovered need.`;
-  }
-
-  return contribution > 0
-    ? `${prefix} for ${names.join(", ")}; accounts for ${contribution}% of the selected stack.`
-    : `${prefix} for ${names.join(", ")}; fills an otherwise uncovered need.`;
-}
-
-type V2Weights = Readonly<{
-  confidence: number;
-  cost: number;
-  coverage: number;
-  dose: number;
-  extras: number;
-  simplicity: number;
-}>;
 
 type V2NeedMetrics = Readonly<{
   comparableAmount: number | null;
@@ -994,245 +228,8 @@ type V2BeamState = Readonly<{
   totalPlanCoveragePercent: number;
 }>;
 
-type V2SafetyContext = Readonly<{
-  bloodThinner: boolean;
-  hasConditionContext: boolean;
-  hasMedicationContext: boolean;
-  reproductiveCaution: boolean;
-}>;
-
-const V2_ALGORITHM_VERSION = "v2-exact-shortlist" as const;
-const V2_FULL_BEAM_ALGORITHM_VERSION = "v2-full-beam" as const;
-export const ACTIVE_PRODUCT_RECOMMENDATION_ALGORITHM_VERSION =
-  V2_FULL_BEAM_ALGORITHM_VERSION;
-export const ACTIVE_PRODUCT_RECOMMENDATION_IMPLEMENTATION_VERSION =
-  "stack-preference-4";
-const V2_FULL_BEAM_WIDTH = 32;
-const V2_SHORTLIST_LIMIT = 32;
-const V2_PER_NEED_SHORTLIST = 4;
-const V2_TOP_OVERALL_SHORTLIST = 16;
-const V2_TOP_BROAD_SHORTLIST = 8;
-const V2_TOP_AFFILIATE_SHORTLIST = 8;
-const V2_MAX_SERVING_MULTIPLIER = 3;
-const V2_SCORE_EPSILON = 0.000001;
-const V2_STACK_DOSE_LIMIT_SLACK_MULTIPLIER = 1;
-const V2_DIVERSITY_SCORE_EPSILON = 0.005;
-const V2_MATERIAL_COVERAGE_DELTA_PERCENT = 3;
-const V2_MIN_MARGINAL_PRODUCT_CONTRIBUTION_PERCENT =
-  V2_MATERIAL_COVERAGE_DELTA_PERCENT;
-const V2_TINY_PARTIAL_PRODUCT_COVERAGE_CEILING = 0.2;
-const V2_BALANCED_MATERIAL_COVERAGE_DELTA_PERCENT = 15;
-const V2_MULTISERVING_REQUIRED_COVERAGE_GAIN_PERCENT = 15;
-const V2_COMPACT_MIN_COVERAGE_RATIO = 0.65;
-const V2_COMPACT_CRITICAL_WEIGHT_FLOOR = 9;
-const V2_COMPACT_CRITICAL_NEED_LOSS_TOLERANCE = 0.35;
-const V2_EXTRA_SERVING_SIMPLICITY_PENALTY = 0.02;
-const V2_DUPLICATE_NEED_PRODUCT_PENALTY_WEIGHT = 0.24;
-const V2_USEFUL_EXTRAS_LIMIT = 8;
-const V2_EXCESSIVE_EXTRAS_PENALTY_WEIGHT = 0.4;
-const V2_EXCESSIVE_EXTRAS_PENALTY_RANGE = 24;
-const SAFETY_FLAG_PREGNANCY_CAUTION = 1;
-const SAFETY_FLAG_MEDICATION_INTERACTION = 2;
-const SAFETY_FLAG_BLEEDING_RISK = 4;
-const SAFETY_FLAG_CONDITION_CAUTION = 8;
-const SAFETY_FLAG_HORMONE_CAUTION = 16;
-const V2_BASE_WEIGHTS: V2Weights = {
-  confidence: 0.05,
-  cost: 0.1,
-  coverage: 0.45,
-  dose: 0.2,
-  extras: 0.05,
-  simplicity: 0.15
-};
-
-export type ProductStackVariantConfig = Readonly<{
-  maxProducts: number;
-  stackPreference: ProductStackPreference;
-  targetProducts: number;
-}>;
-
-export const PRODUCT_STACK_VARIANT_CONFIGS: readonly ProductStackVariantConfig[] = [
-  {
-    maxProducts: 3,
-    stackPreference: "compact",
-    targetProducts: 3
-  },
-  {
-    maxProducts: 6,
-    stackPreference: "balanced",
-    targetProducts: 3
-  }
-];
-
-export function normalizeProductStackPreference(
-  value: unknown
-): ProductStackPreference {
-  return value === "compact" || value === "balanced"
-    ? value
-    : "balanced";
-}
-
-function clamp(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
-
-  return Math.max(min, Math.min(max, value));
-}
-
-function clamp01(value: number) {
-  return clamp(value, 0, 1);
-}
-
-function usefulExtrasScore(extrasCount: number) {
-  return clamp01(Math.min(extrasCount, V2_USEFUL_EXTRAS_LIMIT) / V2_USEFUL_EXTRAS_LIMIT);
-}
-
-function excessiveExtrasPenalty(extrasCount: number) {
-  return clamp01(
-    Math.max(0, extrasCount - V2_USEFUL_EXTRAS_LIMIT) /
-      V2_EXCESSIVE_EXTRAS_PENALTY_RANGE
-  );
-}
-
-function roundScore(value: number) {
-  return Number((Number.isFinite(value) ? value : 0).toFixed(6));
-}
-
 function normalizedNeedWeightTotal(needs: readonly ProductRecommendationNeed[]) {
   return needs.reduce((total, need) => total + Math.max(0, need.weight), 0);
-}
-
-function contextArray(value: readonly string[] | undefined) {
-  return (value ?? [])
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function budgetAmountFromContext(
-  input: ProductRecommendationInput
-) {
-  if (typeof input.budgetAmount === "number" && input.budgetAmount > 0) {
-    return input.budgetAmount;
-  }
-
-  if (
-    typeof input.clientContext?.budgetAmount === "number" &&
-    input.clientContext.budgetAmount > 0
-  ) {
-    return input.clientContext.budgetAmount;
-  }
-
-  switch (input.clientContext?.budgetPreference) {
-    case "low":
-      return 1000;
-    case "mid":
-      return 2500;
-    case "good":
-      return 5000;
-    default:
-      return null;
-  }
-}
-
-function normalizedV2Weights(
-  context: ProductRecommendationClientContext | null | undefined
-) {
-  const rawWeights = { ...V2_BASE_WEIGHTS };
-  const deltas: Record<string, number> = {};
-  const addDelta = (key: keyof V2Weights, delta: number) => {
-    rawWeights[key] += delta;
-    deltas[key] = roundScore((deltas[key] ?? 0) + delta);
-  };
-  const feedbackTypes = new Set(contextArray(context?.planFeedbackTypes));
-  const medicationTypes = contextArray(context?.medicationTypes);
-  const conditions = contextArray(context?.conditions).filter((item) => item !== "none");
-  const hasMedicationContext =
-    context?.medications === "yes" || medicationTypes.length > 0;
-  const lifestage = context?.lifestage?.toLowerCase() ?? "";
-  const hasReproductiveCaution =
-    lifestage.includes("pregnant") ||
-    lifestage.includes("breastfeeding") ||
-    lifestage.includes("ttc") ||
-    lifestage.includes("trying");
-  const hasSafetyContext =
-    hasMedicationContext ||
-    conditions.length > 0 ||
-    hasReproductiveCaution ||
-    feedbackTypes.has("safety_disclosure");
-
-  if (context?.budgetPreference === "low") {
-    addDelta("cost", 0.12);
-    addDelta("simplicity", 0.03);
-    addDelta("coverage", -0.06);
-    addDelta("extras", -0.03);
-  } else if (context?.budgetPreference === "mid") {
-    addDelta("cost", 0.06);
-    addDelta("coverage", -0.03);
-  } else if (context?.budgetPreference === "high") {
-    addDelta("coverage", 0.03);
-    addDelta("cost", -0.03);
-  }
-
-  if (context?.pillLimit === "1-3") {
-    addDelta("simplicity", 0.12);
-    addDelta("coverage", -0.05);
-    addDelta("dose", -0.02);
-    addDelta("extras", -0.03);
-  } else if (context?.pillLimit === "4-6") {
-    addDelta("simplicity", 0.06);
-    addDelta("coverage", -0.03);
-  } else if (context?.pillLimit === "unlimited") {
-    addDelta("coverage", 0.03);
-    addDelta("simplicity", -0.03);
-  }
-
-  if (feedbackTypes.has("budget")) {
-    addDelta("cost", 0.05);
-  }
-
-  if (feedbackTypes.has("capsule_limit")) {
-    addDelta("simplicity", 0.08);
-    addDelta("coverage", -0.03);
-  }
-
-  if (hasSafetyContext) {
-    addDelta("dose", 0.05);
-    addDelta("confidence", 0.05);
-    addDelta("extras", -0.04);
-    addDelta("coverage", -0.03);
-  }
-
-  for (const key of Object.keys(rawWeights) as Array<keyof V2Weights>) {
-    rawWeights[key] = clamp(rawWeights[key], 0.05, 0.6);
-  }
-
-  const total = Object.values(rawWeights).reduce((sum, value) => sum + value, 0);
-  const weights = Object.fromEntries(
-    (Object.entries(rawWeights) as Array<[keyof V2Weights, number]>)
-      .map(([key, value]) => [key, roundScore(value / total)])
-  ) as unknown as V2Weights;
-
-  return { deltas, weights };
-}
-
-function v2ContextSignals(input: ProductRecommendationInput) {
-  const context = input.clientContext;
-
-  return {
-    budgetAmount: budgetAmountFromContext(input),
-    budgetPreference: context?.budgetPreference ?? null,
-    clientSex: input.clientSex ?? null,
-    conditions: contextArray(context?.conditions),
-    currentSupplements: context?.currentSupplements ?? null,
-    guidanceAdjustmentCount: context?.guidanceAdjustmentCount ?? 0,
-    lifestage: context?.lifestage ?? null,
-    medicationTypes: contextArray(context?.medicationTypes),
-    medications: context?.medications ?? null,
-    pillLimit: context?.pillLimit ?? null,
-    planFeedbackTypes: contextArray(context?.planFeedbackTypes),
-    preferredForm: context?.preferredForm ?? null
-  };
 }
 
 function factNeedMatchScore(
@@ -1820,82 +817,6 @@ function productSafetyMask(entry: V2ProductEntry) {
   }
 
   return mask;
-}
-
-function safetyContextFromClientContext(
-  context: ProductRecommendationClientContext | null | undefined
-): V2SafetyContext {
-  const medicationTypes = new Set(contextArray(context?.medicationTypes));
-  const conditions = contextArray(context?.conditions).filter((item) => item !== "none");
-  const lifestage = context?.lifestage?.toLowerCase() ?? "";
-
-  return {
-    bloodThinner: medicationTypes.has("blood-thinner"),
-    hasConditionContext: conditions.length > 0,
-    hasMedicationContext: context?.medications === "yes" || medicationTypes.size > 0,
-    reproductiveCaution:
-      lifestage.includes("pregnant") ||
-      lifestage.includes("breastfeeding") ||
-      lifestage.includes("ttc") ||
-      lifestage.includes("trying")
-  };
-}
-
-function safetyContextBlockReasonForMask(
-  safetyMask: number,
-  context: V2SafetyContext
-) {
-  if (
-    context.reproductiveCaution &&
-    (
-      safetyMask & SAFETY_FLAG_PREGNANCY_CAUTION ||
-      safetyMask & SAFETY_FLAG_HORMONE_CAUTION
-    )
-  ) {
-    return "Blocked by pregnancy, breastfeeding, or trying-to-conceive safety context";
-  }
-
-  return null;
-}
-
-function safetyContextPenaltyForMask(
-  safetyMask: number,
-  context: V2SafetyContext
-) {
-  let penalty = 0;
-
-  if (
-    context.reproductiveCaution &&
-    (
-      safetyMask & SAFETY_FLAG_PREGNANCY_CAUTION ||
-      safetyMask & SAFETY_FLAG_HORMONE_CAUTION
-    )
-  ) {
-    penalty += 1;
-  }
-
-  if (
-    context.hasMedicationContext &&
-    safetyMask & SAFETY_FLAG_MEDICATION_INTERACTION
-  ) {
-    penalty += 0.8;
-  }
-
-  if (
-    context.bloodThinner &&
-    (
-      safetyMask & SAFETY_FLAG_BLEEDING_RISK ||
-      safetyMask & SAFETY_FLAG_MEDICATION_INTERACTION
-    )
-  ) {
-    penalty += 1;
-  }
-
-  if (context.hasConditionContext && safetyMask & SAFETY_FLAG_CONDITION_CAUTION) {
-    penalty += 0.5;
-  }
-
-  return clamp01(penalty);
 }
 
 function totalStackPrice(entries: readonly V2ProductEntry[]) {
@@ -3830,45 +2751,4 @@ export function recommendProductStackFullBeam(input: ProductRecommendationInput)
 
 export function recommendProductStack(input: ProductRecommendationInput) {
   return recommendProductStackFullBeam(input);
-}
-
-export function toRecommendedProduct(
-  selection: ProductRecommendationSelection,
-  stackCoveragePercent: number,
-  recommendationRunId?: string,
-  locale: Locale = "en"
-) {
-  const localizedTitle =
-    selection.product.translations?.[locale]?.title?.trim() ||
-    selection.product.translations?.en?.title?.trim() ||
-    selection.product.title;
-
-  return {
-    affiliate: selection.affiliate,
-    covers: selection.coveredNeeds.map((need) => need.sourceId),
-    description: selection.why,
-    id: selection.product.id,
-    imageUrl: selection.product.imageUrl ?? null,
-    marketplace: marketplaceName(selection.product.platform),
-    name: localizedTitle,
-    price:
-      selection.product.priceAmount && selection.product.priceAmount > 0
-        ? {
-            amount: selection.product.priceAmount,
-            currency: selection.product.currency || "THB"
-          }
-        : null,
-    priority: selection.rank,
-    productCoveragePercent: selection.productCoveragePercent,
-    productId: selection.product.id,
-    rank: selection.rank,
-    recommendationRunId,
-    servingMultiplier: selection.servingMultiplier > 1
-      ? selection.servingMultiplier
-      : undefined,
-    stackContributionPercent: selection.stackContributionPercent,
-    stackCoveragePercent,
-    tag: selection.affiliate ? "Best match + affiliate" : "Best match",
-    url: selection.url
-  } satisfies RecommendedProduct;
 }

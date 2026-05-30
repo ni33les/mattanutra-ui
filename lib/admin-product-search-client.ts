@@ -1,4 +1,4 @@
-import type { AdminProductRow } from "@/lib/admin-products";
+import type { AdminProductRow } from "@/lib/admin-product-types";
 
 function normalizeProductSearchText(value: unknown) {
   return String(value ?? "")

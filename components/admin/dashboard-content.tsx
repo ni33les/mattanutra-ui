@@ -2,7 +2,10 @@ import type { ComponentType, SVGProps } from "react";
 import {
   BanknotesIcon,
   BeakerIcon,
+  BuildingOffice2Icon,
   ChatBubbleLeftRightIcon,
+  ClipboardDocumentListIcon,
+  Cog6ToothIcon,
   CpuChipIcon,
   DocumentTextIcon,
   EnvelopeIcon,
@@ -12,7 +15,8 @@ import {
   MegaphoneIcon,
   QueueListIcon,
   ShoppingBagIcon,
-  SparklesIcon
+  SparklesIcon,
+  UserGroupIcon
 } from "@heroicons/react/24/outline";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
 import type { AdminFlowNodeId } from "@/lib/admin-flow-data";
@@ -24,8 +28,11 @@ import zhCnContentOverrides from "./dashboard-content.zh-CN.json";
 type BaseLocale = Exclude<Locale, "zh-CN">;
 
 export type AdminDashboardView =
+  | "access"
+  | "access-agents"
   | "agents"
   | "alerts"
+  | "audit"
   | "blogs"
   | "campaigns"
   | "content"
@@ -35,9 +42,13 @@ export type AdminDashboardView =
   | "flow"
   | "glance"
   | "leads"
+  | "memberships"
+  | "organisations"
+  | "people"
   | "product-insights"
   | "products"
   | "reviews"
+  | "settings"
   | "supplement-insights"
   | "supplements"
   | "testimonials"
@@ -94,6 +105,7 @@ export type AdminContent = Readonly<{
   closeSidebar: string;
   dataUnavailable: string;
   emptyFlow: string;
+  logout: string;
   filters: {
     active: string;
     affiliate: string;
@@ -211,6 +223,70 @@ export type AdminContent = Readonly<{
     undeployed: string;
     working: string;
   };
+  access: {
+    accessControl: string;
+    accepted: string;
+    active: string;
+    actor: string;
+    addMembership: string;
+    addOrganisation: string;
+    agents: string;
+    alreadyMember: string;
+    allOrganisations: string;
+    allPeople: string;
+    assume: string;
+    assumed: string;
+    audit: string;
+    capabilities: string;
+    create: string;
+    createOrganisation: string;
+    defaultLocale: string;
+    deleted: string;
+    deleteInvitation: string;
+    deleteMembership: string;
+    disabled: string;
+    email: string;
+    error: string;
+    expired: string;
+    expiresAt: string;
+    filterByOrganisation: string;
+    filterByPerson: string;
+    invite: string;
+    inactivePerson: string;
+    invitePerson: string;
+    inviteUrl: string;
+    invitations: string;
+    invitationDeleted: string;
+    memberships: string;
+    membershipAdded: string;
+    membershipDeleted: string;
+    name: string;
+    organisation: string;
+    organisations: string;
+    people: string;
+    pending: string;
+    platform: string;
+    preferredLocale: string;
+    role: string;
+    revoked: string;
+    save: string;
+    session: string;
+    slug: string;
+    status: string;
+    stopAssuming: string;
+    updated: string;
+  };
+  settings: {
+    account: string;
+    displayName: string;
+    email: string;
+    language: string;
+    logoutHint: string;
+    profile: string;
+    save: string;
+    saved: string;
+    saveError: string;
+  };
   generated: string;
   financials: {
     aiCost: string;
@@ -316,6 +392,8 @@ export type AdminContent = Readonly<{
     source: string;
     totalLeads: string;
   };
+  administration: AdminNavItem[];
+  administrationTitle: string;
   execution: AdminNavItem[];
   executionTitle: string;
   governance: AdminNavItem[];
@@ -492,6 +570,7 @@ const baseContent = {
     dataUnavailable:
       "Dashboard data is unavailable. Check the database connection.",
     emptyFlow: "No flow events in this timeframe.",
+    logout: "Log out",
     filters: {
       active: "Active filters",
       affiliate: "Affiliate",
@@ -606,6 +685,70 @@ const baseContent = {
       type: "Type",
       undeployed: "Undeployed",
       working: "Working"
+    },
+    access: {
+      accessControl: "Access control",
+      accepted: "Accepted",
+      active: "Active",
+      actor: "Signed in as",
+      addMembership: "Add membership",
+      addOrganisation: "Add Organisation",
+      agents: "Agents",
+      alreadyMember: "This person already belongs to that organisation. Use Memberships to change their role or status.",
+      allOrganisations: "All organisations",
+      allPeople: "All people",
+      assume: "Assume",
+      assumed: "Viewing as",
+      audit: "Audit",
+      capabilities: "Capabilities",
+      create: "Create",
+      createOrganisation: "Create retailer",
+      defaultLocale: "Default language",
+      deleted: "Deleted",
+      deleteInvitation: "Delete invite",
+      deleteMembership: "Delete membership",
+      disabled: "Disabled",
+      email: "Email",
+      error: "Could not update access controls.",
+      expired: "Expired",
+      expiresAt: "Expires",
+      filterByOrganisation: "Filter by organisation",
+      filterByPerson: "Filter by person",
+      invite: "Invite",
+      inactivePerson: "This person already exists but is not active. Update their person record before adding access.",
+      invitePerson: "Invite person",
+      inviteUrl: "Invite link",
+      invitations: "Invitations",
+      invitationDeleted: "Invite deleted.",
+      memberships: "Memberships",
+      membershipAdded: "Existing person found. Organisation access was added without creating a new passkey invite.",
+      membershipDeleted: "Membership deleted.",
+      name: "Name",
+      organisation: "Organisation",
+      organisations: "Organisations",
+      people: "People",
+      pending: "Pending",
+      platform: "Platform",
+      preferredLocale: "Preferred language",
+      role: "Role",
+      revoked: "Revoked",
+      save: "Save",
+      session: "Session",
+      slug: "Slug",
+      status: "Status",
+      stopAssuming: "Stop assuming",
+      updated: "Access controls updated."
+    },
+    settings: {
+      account: "Account",
+      displayName: "Name",
+      email: "Email",
+      language: "Language",
+      logoutHint: "End this admin session on this device.",
+      profile: "Profile",
+      save: "Save",
+      saved: "Settings saved.",
+      saveError: "Could not save settings."
     },
     generated: "Generated",
     financials: {
@@ -754,6 +897,15 @@ const baseContent = {
       }
     ],
     marketingTitle: "Marketing",
+    administration: [
+      { icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" },
+      { icon: UserGroupIcon, name: "Memberships", view: "memberships" },
+      { icon: UserGroupIcon, name: "People", view: "people" },
+      { icon: CpuChipIcon, name: "Agents", view: "access-agents" },
+      { icon: ClipboardDocumentListIcon, name: "Audit", view: "audit" },
+      { icon: Cog6ToothIcon, name: "Settings", view: "settings" }
+    ],
+    administrationTitle: "Administration",
     contentNavigation: [
       { icon: DocumentTextIcon, name: "Blogs", view: "blogs" },
       { icon: SparklesIcon, name: "Testimonials", view: "testimonials" }
@@ -779,8 +931,11 @@ const baseContent = {
     ],
     executionTitle: "Execution",
     pageTitles: {
+      access: "Access",
+      "access-agents": "Access Agents",
       agents: "Agents",
       alerts: "Technical Alerts",
+      audit: "Audit",
       blogs: "Blogs",
       campaigns: "Campaigns",
       content: "Content",
@@ -790,9 +945,13 @@ const baseContent = {
       flow: "Conversions",
       glance: "Dashboard",
       leads: "Leads",
+      memberships: "Memberships",
+      organisations: "Organisations",
+      people: "People",
       "product-insights": "Product Insights",
       products: "Products",
       reviews: "Reviews",
+      settings: "Settings",
       "supplement-insights": "Supplement Insights",
       supplements: "Supplements",
       testimonials: "Testimonials",
@@ -974,6 +1133,7 @@ const baseContent = {
     dataUnavailable:
       "ไม่สามารถโหลดข้อมูลแดชบอร์ดได้ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล",
     emptyFlow: "ยังไม่มีข้อมูล Flow ในช่วงเวลานี้",
+    logout: "ออกจากระบบ",
     filters: {
       active: "ตัวกรองที่ใช้",
       affiliate: "Affiliate",
@@ -1088,6 +1248,70 @@ const baseContent = {
       type: "ประเภท",
       undeployed: "ยังไม่ deploy",
       working: "กำลังทำ"
+    },
+    access: {
+      accessControl: "การควบคุมสิทธิ์",
+      accepted: "ตอบรับแล้ว",
+      active: "ใช้งาน",
+      actor: "เข้าสู่ระบบเป็น",
+      addMembership: "เพิ่มสมาชิก",
+      addOrganisation: "เพิ่มองค์กร",
+      agents: "เอเจนต์",
+      alreadyMember: "ผู้ใช้นี้อยู่ในองค์กรนี้แล้ว ใช้ส่วนสมาชิกเพื่อเปลี่ยนบทบาทหรือสถานะ",
+      allOrganisations: "ทุกองค์กร",
+      allPeople: "ผู้ใช้ทั้งหมด",
+      assume: "สวมบทบาท",
+      assumed: "กำลังดูเป็น",
+      audit: "ประวัติ",
+      capabilities: "ความสามารถ",
+      create: "สร้าง",
+      createOrganisation: "สร้างผู้ค้าปลีก",
+      defaultLocale: "ภาษาเริ่มต้น",
+      deleted: "ลบแล้ว",
+      deleteInvitation: "ลบคำเชิญ",
+      deleteMembership: "ลบสมาชิก",
+      disabled: "ปิดใช้งาน",
+      email: "อีเมล",
+      error: "ไม่สามารถอัปเดตสิทธิ์ได้",
+      expired: "หมดอายุ",
+      expiresAt: "หมดอายุ",
+      filterByOrganisation: "กรองตามองค์กร",
+      filterByPerson: "กรองตามผู้ใช้",
+      invite: "เชิญ",
+      inactivePerson: "ผู้ใช้นี้มีอยู่แล้วแต่ยังไม่ได้เปิดใช้งาน โปรดแก้ไขข้อมูลผู้ใช้ก่อนเพิ่มสิทธิ์",
+      invitePerson: "เชิญผู้ใช้",
+      inviteUrl: "ลิงก์เชิญ",
+      invitations: "คำเชิญ",
+      invitationDeleted: "ลบคำเชิญแล้ว",
+      memberships: "สมาชิก",
+      membershipAdded: "พบผู้ใช้เดิมแล้ว เพิ่มสิทธิ์เข้าองค์กรโดยไม่สร้างคำเชิญ passkey ใหม่",
+      membershipDeleted: "ลบสมาชิกแล้ว",
+      name: "ชื่อ",
+      organisation: "องค์กร",
+      organisations: "องค์กร",
+      people: "ผู้ใช้",
+      pending: "รอดำเนินการ",
+      platform: "แพลตฟอร์ม",
+      preferredLocale: "ภาษาที่ต้องการ",
+      role: "บทบาท",
+      revoked: "ยกเลิกแล้ว",
+      save: "บันทึก",
+      session: "เซสชัน",
+      slug: "Slug",
+      status: "สถานะ",
+      stopAssuming: "หยุดสวมบทบาท",
+      updated: "อัปเดตสิทธิ์แล้ว"
+    },
+    settings: {
+      account: "บัญชี",
+      displayName: "ชื่อ",
+      email: "อีเมล",
+      language: "ภาษา",
+      logoutHint: "ออกจากเซสชันแอดมินบนอุปกรณ์นี้",
+      profile: "โปรไฟล์",
+      save: "บันทึก",
+      saved: "บันทึกการตั้งค่าแล้ว",
+      saveError: "ไม่สามารถบันทึกการตั้งค่าได้"
     },
     generated: "สร้างเมื่อ",
     financials: {
@@ -1236,6 +1460,15 @@ const baseContent = {
       }
     ],
     marketingTitle: "การตลาด",
+    administration: [
+      { icon: BuildingOffice2Icon, name: "องค์กร", view: "organisations" },
+      { icon: UserGroupIcon, name: "สมาชิก", view: "memberships" },
+      { icon: UserGroupIcon, name: "ผู้ใช้", view: "people" },
+      { icon: CpuChipIcon, name: "เอเจนต์", view: "access-agents" },
+      { icon: ClipboardDocumentListIcon, name: "ประวัติ", view: "audit" },
+      { icon: Cog6ToothIcon, name: "การตั้งค่า", view: "settings" }
+    ],
+    administrationTitle: "การดูแลระบบ",
     contentNavigation: [
       { icon: DocumentTextIcon, name: "บทความ", view: "blogs" },
       { icon: SparklesIcon, name: "คำรับรอง", view: "testimonials" }
@@ -1261,8 +1494,11 @@ const baseContent = {
     ],
     executionTitle: "การปฏิบัติงาน",
     pageTitles: {
+      access: "สิทธิ์เข้าถึง",
+      "access-agents": "เอเจนต์สิทธิ์เข้าถึง",
       agents: "เอเจนต์",
       alerts: "การแจ้งเตือนทางเทคนิค",
+      audit: "ประวัติ",
       blogs: "บทความ",
       campaigns: "แคมเปญ",
       content: "คอนเทนต์",
@@ -1272,9 +1508,13 @@ const baseContent = {
       flow: "คอนเวอร์ชัน",
       glance: "แดชบอร์ด",
       leads: "ลีด",
+      memberships: "สมาชิก",
+      organisations: "องค์กร",
+      people: "ผู้ใช้",
       "product-insights": "ข้อมูลสินค้า",
       products: "สินค้า",
       reviews: "รีวิว",
+      settings: "การตั้งค่า",
       "supplement-insights": "ข้อมูลอาหารเสริม",
       supplements: "อาหารเสริม",
       testimonials: "คำรับรอง",

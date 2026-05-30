@@ -6,6 +6,32 @@ const formulationResults = readFileSync(
   new URL("../components/formulation-results.tsx", import.meta.url),
   "utf8"
 );
+const formulationResultsHelpers = readFileSync(
+  new URL("../components/formulation-results-helpers.tsx", import.meta.url),
+  "utf8"
+);
+const formulationRevealCopy = readFileSync(
+  new URL("../components/formulation-reveal-copy.ts", import.meta.url),
+  "utf8"
+);
+const formulationSupportHelpers = readFileSync(
+  new URL("../components/formulation-support-helpers.ts", import.meta.url),
+  "utf8"
+);
+const productClickTracking = readFileSync(
+  new URL("../components/product-click-tracking.ts", import.meta.url),
+  "utf8"
+);
+const formulationRevealSources = [
+  formulationResults,
+  formulationResultsHelpers,
+  formulationRevealCopy,
+  formulationSupportHelpers
+].join("\n");
+const productRecommendationSources = [
+  formulationResults,
+  productClickTracking
+].join("\n");
 const assessmentFlow = readFileSync(
   new URL("../components/assessment-flow.tsx", import.meta.url),
   "utf8"
@@ -153,38 +179,38 @@ describe("plan reveal V3 migration", () => {
     assert.match(formulationResults, /data-reveal/);
     assert.match(formulationResults, /CountUpNumber/);
     assert.match(formulationResults, /RevealDistillationCard/);
-    assert.match(formulationResults, /Your Right Amount Has Arrived/);
-    assert.match(formulationResults, /A formula built around your body, your goals/);
-    assert.match(formulationResults, /Everything you told us, folded into one plan/);
-    assert.match(formulationResults, /We evaluated \{supplementTotalText\} ingredients/);
-    assert.match(formulationResults, /\{supplementSelectedText\} nutrients\. Exactly enough\./);
-    assert.match(formulationResults, /\{productSelectedText\} bottles\. All \{supplementSelectedTextLower\} nutrients\./);
-    assert.match(formulationResults, /\{productSelectedText\} bottles\. \{coveredText\} of \{supplementSelectedTextLower\} nutrients\./);
+    assert.match(formulationRevealCopy, /Your Right Amount Has Arrived/);
+    assert.match(formulationRevealCopy, /A formula built around your body, your goals/);
+    assert.match(formulationRevealCopy, /Everything you told us, folded into one plan/);
+    assert.match(formulationRevealCopy, /We evaluated \{supplementTotalText\} ingredients/);
+    assert.match(formulationRevealCopy, /\{supplementSelectedText\} nutrients\. Exactly enough\./);
+    assert.match(formulationRevealCopy, /\{productSelectedText\} bottles\. All \{supplementSelectedTextLower\} nutrients\./);
+    assert.match(formulationRevealCopy, /\{productSelectedText\} bottles\. \{coveredText\} of \{supplementSelectedTextLower\} nutrients\./);
     assert.doesNotMatch(formulationResults, /copy\.heroMetaPlan/);
     assert.doesNotMatch(formulationResults, /copy\.heroMetaGenerated/);
-    assert.match(formulationResults, /localizedPlanText\(revealPageCopy\[slot\]/);
+    assert.match(formulationRevealCopy, /localizedPlanText\(revealPageCopy\[slot\]/);
   });
 
   it("gates stale reveal AI copy behind the current template version", () => {
     assert.match(formulationTypes, /revealPageCopyVersion = "reveal:v3-template"/);
-    assert.match(formulationResults, /revealPageCopy\?\.version !== revealPageCopyVersion/);
+    assert.match(formulationRevealCopy, /revealPageCopy\?\.version !== revealPageCopyVersion/);
     assert.match(nutritionAdvisor, /must set version to \$\{revealPageCopyVersion\}/);
   });
 
   it("keeps real product catalogue behavior and stack switching in the reveal design", () => {
     assert.match(formulationResults, /product\.imageUrl/);
-    assert.match(formulationResults, /trackMarketplaceClick\(planId, product\)/);
+    assert.match(productRecommendationSources, /trackMarketplaceClick\(planId, product\)/);
     assert.match(revealPage, /stack\?: string/);
     assert.match(revealPage, /initialStackPreference/);
-    assert.match(formulationResults, /planRevealStackHref/);
+    assert.match(formulationRevealSources, /planRevealStackHref/);
     assert.match(formulationResults, /replaceRevealStackUrl\(locale, planId, preference\)/);
     assert.doesNotMatch(formulationResults, /href=\{planRevealStackHref/);
     assert.match(formulationResults, /selectedProductStackPreference/);
     assert.match(formulationResults, /useState<ProductStackPreference \| null>\(\(\) => initialStackPreference\)/);
     assert.match(formulationResults, /onProductStackPreferenceChange\(preference\)/);
-    assert.match(formulationResults, /\/product-recommendations/);
+    assert.match(productRecommendationSources, /\/product-recommendations/);
     assert.match(formulationResults, /onProductStackRefresh/);
-    assert.match(formulationResults, /productRecommendations/);
+    assert.match(productRecommendationSources, /productRecommendations/);
   });
 
   it("renders managed food support after products without changing product coverage", () => {
@@ -192,16 +218,16 @@ describe("plan reveal V3 migration", () => {
     assert.match(assessmentStore, /foodGapSupport: storedFoodGapSupport/);
     assert.match(formulationResults, /<RevealProductsSection/);
     assert.match(formulationResults, /<RevealFoodSupportSection/);
-    assert.match(formulationResults, /Food support, after the products/);
+    assert.match(formulationRevealSources, /Food support, after the products/);
     assert.match(formulationResults, /selectedNeedCoverage/);
     assert.match(formulationResults, /item\.imagePath/);
-    assert.match(formulationResults, /foodSupportFormulaGapsForItem/);
-    assert.match(formulationResults, /curcumin/);
-    assert.match(formulationResults, /green_tea", "holy_basil", "moringa_leaves", "turmeric", "papaya"/);
-    assert.match(formulationResults, /safeFoodSupportCopy/);
+    assert.match(formulationRevealSources, /foodSupportFormulaGapsForItem/);
+    assert.match(formulationSupportHelpers, /curcumin/);
+    assert.match(formulationSupportHelpers, /green_tea", "holy_basil", "moringa_leaves", "turmeric", "papaya"/);
+    assert.match(formulationRevealSources, /safeFoodSupportCopy/);
     assert.match(formulationResults, /copy\.foodSupportFormulaGapLabel/);
     assert.doesNotMatch(formulationResults, /foodSupportProductCoverage/);
-    assert.match(formulationResults, /Foods do not change the product coverage score/);
+    assert.match(formulationRevealSources, /Foods do not change the product coverage score/);
     assert.match(formulationResults, /return null/);
   });
 
@@ -217,6 +243,6 @@ describe("plan reveal V3 migration", () => {
 
   it("keeps old reports without revealPageCopy readable", () => {
     assert.match(nutritionAdvisor, /record\.revealPageCopy === undefined\s*\?\s*null/);
-    assert.match(formulationResults, /fallback: string/);
+    assert.match(formulationRevealSources, /fallback: string/);
   });
 });

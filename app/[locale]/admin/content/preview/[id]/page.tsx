@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { BlogArticle } from "@/components/blog-article";
 import { adminDashboardTokenAllowed } from "@/lib/admin-auth";
+import {
+  adminCsrfCookieName,
+  adminSessionCookieName,
+  resolveAdminSession
+} from "@/lib/admin-access";
 import {
   getBlogPostForApi,
   getTestimonialForApi,
@@ -101,8 +107,13 @@ export default async function ContentPreviewPage({
   const { id, locale: rawLocale } = await params;
   const query = await searchParams;
   const accessToken = firstParam(query.access_token);
+  const cookieStore = await cookies();
+  const session = await resolveAdminSession({
+    csrfToken: cookieStore.get(adminCsrfCookieName)?.value,
+    sessionCookie: cookieStore.get(adminSessionCookieName)?.value
+  });
 
-  if (!isLocale(rawLocale) || !adminDashboardTokenAllowed(accessToken)) {
+  if (!isLocale(rawLocale) || (!session && !adminDashboardTokenAllowed(accessToken))) {
     notFound();
   }
 

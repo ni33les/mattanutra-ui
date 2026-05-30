@@ -164,6 +164,179 @@ export type ProductImportRunRow = Readonly<{
   totalProducts: number;
 }>;
 
+export type ProductImportFactInput = Readonly<{
+  amount?: number | null;
+  confidence?: ProductConfidence;
+  itemType?: "food" | "nutrient" | "supplement";
+  name: string;
+  servingLabel?: string | null;
+  sourceText?: string | null;
+  sourceUrl?: string | null;
+  supplementId?: string | null;
+  unit?: string | null;
+}>;
+
+export type ProductTranslationInput = Readonly<{
+  description?: string | null;
+  status?: AdminProductTranslationStatus;
+  title?: string | null;
+}>;
+
+export type StartProductImportRunInput = Readonly<{
+  autoApprove?: boolean;
+  brandName: string;
+  source?: string | null;
+  totalProducts?: number;
+}>;
+
+export type FinishProductImportRunInput = Readonly<{
+  approvedCount?: number;
+  failedCount?: number;
+  importRunId: string;
+  notes?: string | null;
+  stagedCount?: number;
+  status: "completed" | "failed";
+}>;
+
+export type StageProductImportInput = Readonly<{
+  actor?: string | null;
+  brandName: string;
+  description?: string | null;
+  descriptionEn?: string | null;
+  descriptionTh?: string | null;
+  descriptionZhCn?: string | null;
+  duplicateProductIds?: readonly string[];
+  fdaApprovalNumber?: string | null;
+  imageUrls?: readonly string[];
+  importRunId?: string | null;
+  parsedFacts?: readonly ProductImportFactInput[];
+  parseConfidence?: ProductConfidence;
+  productTitle: string;
+  rawSnapshot?: Record<string, unknown> | null;
+  source?: string | null;
+  sourceUrl: string;
+  titleEn?: string | null;
+  titleTh?: string | null;
+  titleZhCn?: string | null;
+  translations?: Record<string, ProductTranslationInput>;
+}>;
+
+export type ResolveProductImportReviewInput = Readonly<{
+  action: "approve" | "duplicate" | "ignore";
+  actor?: string | null;
+  availableCountryCodes?: readonly string[];
+  brandName?: string | null;
+  description?: string | null;
+  descriptionEn?: string | null;
+  descriptionTh?: string | null;
+  descriptionZhCn?: string | null;
+  fdaApprovalNumber?: string | null;
+  imageUrl?: string | null;
+  manufacturerCountryCodes?: readonly string[];
+  mergeProductId?: string | null;
+  parsedFacts?: readonly ProductImportFactInput[];
+  productAudience?: ProductAudience;
+  productUrl?: string | null;
+  reviewerNote?: string | null;
+  returnRow?: boolean;
+  taskId: string;
+  title?: string | null;
+  titleEn?: string | null;
+  titleTh?: string | null;
+  titleZhCn?: string | null;
+  translations?: Record<string, ProductTranslationInput>;
+}>;
+
+export type CreateAdminProductInput = Readonly<{
+  actor?: string | null;
+  affiliateUrl?: string | null;
+  availabilityStatus?: ProductAvailabilityStatus;
+  availableCountryCodes?: readonly string[];
+  brandStatus?: ProductStatus;
+  brandName?: string | null;
+  manufacturerCountryCodes?: readonly string[];
+  currency?: string | null;
+  description?: string | null;
+  descriptionEn?: string | null;
+  descriptionTh?: string | null;
+  descriptionZhCn?: string | null;
+  facts?: readonly ProductImportFactInput[];
+  imageUrl?: string | null;
+  fdaApprovalNumber?: string | null;
+  labelStatus?: ProductLabelStatus;
+  status?: ProductStatus;
+  externalProductId?: string | null;
+  platform: ProductPlatform;
+  priceAmount?: number | null;
+  productAudience?: ProductAudience;
+  productKind?: ProductKind;
+  productUrl: string;
+  region?: string | null;
+  replaceFacts?: boolean;
+  source?: string;
+  sourceSnapshot?: Record<string, unknown> | null;
+  sourceUrl?: string | null;
+  title: string;
+  titleEn?: string | null;
+  titleTh?: string | null;
+  titleZhCn?: string | null;
+  translations?: Record<string, ProductTranslationInput>;
+}>;
+
+export type UpdateAdminProductInput = Readonly<{
+  actor?: string | null;
+  adminNotes?: string | null;
+  affiliateStatus?: ProductAffiliateStatus;
+  availabilityStatus?: ProductAvailabilityStatus;
+  availableCountryCodes?: readonly string[];
+  brandName?: string | null;
+  manufacturerCountryCodes?: readonly string[];
+  changeNote?: string | null;
+  description?: string | null;
+  descriptionEn?: string | null;
+  descriptionTh?: string | null;
+  descriptionZhCn?: string | null;
+  facts?: readonly ProductImportFactInput[];
+  factsSource?: string | null;
+  fdaApprovalNumber?: string | null;
+  id: string;
+  imageUrl?: string | null;
+  labelStatus?: ProductLabelStatus;
+  status?: ProductStatus;
+  priceAmount?: number | null;
+  productAudience?: ProductAudience;
+  productKind?: ProductKind;
+  productUrl?: string | null;
+  sourceSnapshotPatch?: Record<string, unknown> | null;
+  title?: string | null;
+  titleEn?: string | null;
+  titleTh?: string | null;
+  titleZhCn?: string | null;
+  translations?: Record<string, ProductTranslationInput>;
+}>;
+
+export type UpsertProductOfferInput = Readonly<{
+  actor?: string | null;
+  availabilityStatus?: string;
+  commissionRate?: number | null;
+  currency?: string | null;
+  linkType?: "affiliate" | "direct";
+  network?: string | null;
+  platform?: string | null;
+  priceAmount?: number | null;
+  priority?: number;
+  productId: string;
+  status?: string;
+  trackingId?: string | null;
+  url: string;
+}>;
+
+export type RemoveProductOfferInput = Readonly<{
+  actor?: string | null;
+  offerId: string;
+  productId: string;
+}>;
+
 export function isProductStatus(value: string): value is ProductStatus {
   return productStatuses.has(value as ProductStatus);
 }

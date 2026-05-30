@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import { localeRoutePattern } from "./lib/i18n";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
+const skipBuildTypecheck = process.env.NEXT_BUILD_SKIP_TYPECHECK === "1";
 // Registry-derived public locales currently include zh-CN.
 const publicLocaleRoutePattern = localeRoutePattern();
 
@@ -76,6 +77,9 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   images: {
     unoptimized: true
+  },
+  typescript: {
+    ignoreBuildErrors: skipBuildTypecheck
   },
   async headers() {
     return [

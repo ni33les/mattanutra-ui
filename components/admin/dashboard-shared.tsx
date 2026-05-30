@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { HealthspanLogo } from "@/components/healthspan-logo";
 import { adminDashboardFilterEntries, type AdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import type { AdminTaskVisibilityRow } from "@/lib/admin-execution";
@@ -14,6 +15,8 @@ import type {
 } from "@/lib/admin-supplements";
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 import type { AdminContent, AdminDashboardView, AdminNavItem } from "@/components/admin/dashboard-content";
+
+const ADMIN_SIDEBAR_SCROLL_KEY = "mattanutra:admin-sidebar-scroll";
 
 export function classNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -59,10 +62,13 @@ export function adminHref(
   }>
 ) {
   const params = new URLSearchParams({
-    access_token: accessToken,
     range,
     view
   });
+
+  if (accessToken) {
+    params.set("access_token", accessToken);
+  }
 
   if (filters) {
     adminDashboardFilterEntries(filters).forEach(([key, value]) => {
@@ -93,11 +99,14 @@ export function adminTaskVisibilityHref({
   taskId: string;
 }>) {
   const params = new URLSearchParams({
-    access_token: accessToken,
     range,
     task: taskId,
     view: "visibility"
   });
+
+  if (accessToken) {
+    params.set("access_token", accessToken);
+  }
 
   return `/${locale}/admin/dashboard?${params.toString()}`;
 }
@@ -112,9 +121,12 @@ export function adminExecutionEventsHref({
   view: "agents" | "visibility";
 }>) {
   const params = new URLSearchParams({
-    access_token: accessToken,
     range
   });
+
+  if (accessToken) {
+    params.set("access_token", accessToken);
+  }
 
   return `/api/admin/${view}/events?${params.toString()}`;
 }
@@ -256,6 +268,7 @@ export function formatPercent(value: number, locale: Locale) {
 
 function SidebarNavList({
   accessToken,
+  allowedViews,
   filters,
   items,
   locale,
@@ -265,6 +278,7 @@ function SidebarNavList({
   view
 }: Readonly<{
   accessToken: string;
+  allowedViews?: readonly AdminDashboardView[];
   filters: AdminDashboardFilters;
   items: AdminNavItem[];
   locale: Locale;
@@ -273,6 +287,14 @@ function SidebarNavList({
   title?: string;
   view: AdminDashboardView;
 }>) {
+  const visibleItems = allowedViews
+    ? items.filter((item) => !item.view || allowedViews.includes(item.view))
+    : items;
+
+  if (visibleItems.length === 0) {
+    return null;
+  }
+
   return (
     <li>
       {title ? (
@@ -286,7 +308,7 @@ function SidebarNavList({
         </div>
       ) : null}
       <ul role="list" className={classNames("-mx-2 space-y-1", title && "mt-2")}>
-        {items.map((item) => {
+        {visibleItems.map((item) => {
           const current = item.view === view;
           const href = item.view
             ? adminHref(locale, accessToken, range, item.view, filters)
@@ -294,9 +316,10 @@ function SidebarNavList({
 
           return (
             <li key={item.name}>
-              <a
+              <Link
                 href={href}
                 onClick={onNavigate}
+                scroll={false}
                 aria-current={current ? "page" : undefined}
                 className={classNames(
                   current
@@ -315,7 +338,7 @@ function SidebarNavList({
                   )}
                 />
                 {item.name}
-              </a>
+              </Link>
             </li>
           );
         })}
@@ -366,8 +389,52 @@ export function AdminLocaleSwitcher({
   );
 }
 
+export function AdminLogoutButton({
+  label,
+  locale
+}: Readonly<{
+  label: string;
+  locale: Locale;
+}>) {
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function logout() {
+    if (loggingOut) {
+      return;
+    }
+
+    setLoggingOut(true);
+
+    try {
+      await fetch("/api/admin/auth/logout", {
+        credentials: "same-origin",
+        method: "POST"
+      });
+    } finally {
+      window.location.assign(`/${locale}/admin/login`);
+    }
+  }
+
+  return (
+    <button
+      aria-label={label}
+      className={classNames(
+        "inline-flex h-10 items-center justify-center rounded-md bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-wait disabled:opacity-70",
+        adminLocaleTextClass(locale, "label")
+      )}
+      disabled={loggingOut}
+      onClick={logout}
+      title={label}
+      type="button"
+    >
+      <span>{label}</span>
+    </button>
+  );
+}
+
 export function SidebarContent({
   accessToken,
+  allowedViews,
   filters,
   labels,
   locale,
@@ -376,6 +443,7 @@ export function SidebarContent({
   view
 }: Readonly<{
   accessToken: string;
+  allowedViews?: readonly AdminDashboardView[];
   filters: AdminDashboardFilters;
   labels: AdminContent;
   locale: Locale;
@@ -383,12 +451,54 @@ export function SidebarContent({
   range: AdminDashboardRange;
   view: AdminDashboardView;
 }>) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const node = scrollRef.current;
+
+    if (!node || typeof window === "undefined") {
+      return;
+    }
+
+    const savedScroll = Number(window.sessionStorage.getItem(ADMIN_SIDEBAR_SCROLL_KEY));
+
+    if (!Number.isFinite(savedScroll) || savedScroll <= 0) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      node.scrollTop = savedScroll;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  function rememberSidebarScroll() {
+    const node = scrollRef.current;
+
+    if (node && typeof window !== "undefined") {
+      window.sessionStorage.setItem(ADMIN_SIDEBAR_SCROLL_KEY, String(node.scrollTop));
+    }
+
+    onNavigate?.();
+  }
+
   return (
-    <div className="flex grow flex-col gap-y-6 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4">
+    <div
+      className="flex grow flex-col gap-y-6 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4"
+      onScroll={() => {
+        const node = scrollRef.current;
+
+        if (node && typeof window !== "undefined") {
+          window.sessionStorage.setItem(ADMIN_SIDEBAR_SCROLL_KEY, String(node.scrollTop));
+        }
+      }}
+      ref={scrollRef}
+    >
       <div className="flex h-20 shrink-0 items-center justify-between gap-3">
         <a
           href={`/${locale}`}
-          onClick={onNavigate}
+          onClick={rememberSidebarScroll}
           aria-label="MattaNutra home"
           className="inline-flex rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
         >
@@ -399,62 +509,79 @@ export function SidebarContent({
         <ul role="list" className="flex flex-1 flex-col gap-y-8">
           <SidebarNavList
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             items={labels.performance}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.performanceTitle}
             view={view}
           />
           <SidebarNavList
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             items={labels.marketing}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.marketingTitle}
             view={view}
           />
           <SidebarNavList
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             items={labels.contentNavigation}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.contentTitle}
             view={view}
           />
           <SidebarNavList
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             items={labels.governance}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.governanceTitle}
             view={view}
           />
           <SidebarNavList
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             items={labels.insights}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.insightsTitle}
             view={view}
           />
           <SidebarNavList
             accessToken={accessToken}
+            allowedViews={allowedViews}
             filters={filters}
             items={labels.execution}
             locale={locale}
-            onNavigate={onNavigate}
+            onNavigate={rememberSidebarScroll}
             range={range}
             title={labels.executionTitle}
+            view={view}
+          />
+          <SidebarNavList
+            accessToken={accessToken}
+            allowedViews={allowedViews}
+            filters={filters}
+            items={labels.administration}
+            locale={locale}
+            onNavigate={rememberSidebarScroll}
+            range={range}
+            title={labels.administrationTitle}
             view={view}
           />
         </ul>

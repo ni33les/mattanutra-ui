@@ -2,6 +2,7 @@
 
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
+import postgres from "postgres";
 
 function argValue(name, fallback = null) {
   const prefix = `--${name}=`;
@@ -48,6 +49,47 @@ function runNpmScript(scriptName, env = process.env) {
   return run(npmCommand, ["run", scriptName], env);
 }
 
+function shouldUseSsl(connectionString) {
+  const url = new URL(connectionString);
+  const sslMode = url.searchParams.get("sslmode")?.toLowerCase();
+
+  return (
+    url.hostname.endsWith(".db.ondigitalocean.com") ||
+    sslMode === "require" ||
+    sslMode === "verify-ca" ||
+    sslMode === "verify-full"
+  );
+}
+
+async function terminateTargetSessions(env) {
+  if (!env.DB_CONNECTION) {
+    fail("DB_CONNECTION is required.");
+  }
+
+  const sql = postgres(env.DB_CONNECTION, {
+    connect_timeout: Number(env.DB_CONNECT_TIMEOUT_SECONDS ?? 10),
+    idle_timeout: 5,
+    max: 1,
+    prepare: false,
+    ...(shouldUseSsl(env.DB_CONNECTION) ? { ssl: "require" } : {})
+  });
+
+  try {
+    const [summary] = await sql`
+      select count(*) filter (where pg_terminate_backend(pid))::int as terminated
+      from pg_stat_activity
+      where pid <> pg_backend_pid()
+        and datname = current_database()
+    `;
+
+    if (summary.terminated > 0) {
+      console.log(`[uat-rebuild] Terminated ${summary.terminated} existing UAT database session(s).`);
+    }
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
 const snapshot = argValue("snapshot") ?? process.env.MATTANUTRA_CATALOGUE_SNAPSHOT;
 
 if (!snapshot) {
@@ -73,17 +115,22 @@ if (process.env.MATTANUTRA_ALLOW_REMOTE_DEV_RESET !== "true") {
 const snapshotPath = resolve(snapshot);
 const rebuildEnv = {
   ...process.env,
+  DB_ALLOW_DIRECT_CONNECTION: process.env.DB_ALLOW_DIRECT_CONNECTION ?? "true",
+  DB_APPLICATION_NAME: process.env.DB_APPLICATION_NAME ?? "mattanutra-uat-rebuild",
+  DB_POOL_MAX: process.env.DB_POOL_MAX ?? "1",
   MATTANUTRA_STRICT_MASTER_SNAPSHOT: "true"
 };
 
 console.log(`[uat-rebuild] Rebuilding UAT from ${snapshotPath}`);
 
+await terminateTargetSessions(rebuildEnv);
 await runNode([
   "--env-file-if-exists=.env.local",
   "scripts/reset-dev-db.mjs",
   "--confirm-blitz"
 ], rebuildEnv);
 
+await terminateTargetSessions(rebuildEnv);
 await runNode([
   "--env-file-if-exists=.env.local",
   "--experimental-strip-types",
@@ -101,6 +148,7 @@ for (const scriptName of [
   "versions:core:check",
   "products:validation-consistency"
 ]) {
+  await terminateTargetSessions(rebuildEnv);
   await runNpmScript(scriptName, rebuildEnv);
 }
 

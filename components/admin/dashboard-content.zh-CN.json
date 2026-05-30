@@ -3,6 +3,7 @@
   "closeSidebar": "关闭侧边栏",
   "dataUnavailable": "仪表盘数据不可用。请检查数据库连接。",
   "emptyFlow": "此时间段内无流程事件。",
+  "logout": "退出登录",
   "filters": {
     "active": "已启用筛选",
     "affiliate": "联盟",
@@ -117,6 +118,70 @@
     "type": "类型",
     "undeployed": "未部署",
     "working": "工作中"
+  },
+  "access": {
+    "accessControl": "访问控制",
+    "accepted": "已接受",
+    "active": "活跃",
+    "actor": "登录身份",
+    "addMembership": "添加成员关系",
+    "addOrganisation": "添加组织",
+    "agents": "代理",
+    "alreadyMember": "此人员已属于该组织。请在成员关系中更改其角色或状态。",
+    "allOrganisations": "所有组织",
+    "allPeople": "所有人员",
+    "assume": "代入身份",
+    "assumed": "当前查看身份",
+    "audit": "审计",
+    "capabilities": "能力",
+    "create": "创建",
+    "createOrganisation": "创建零售商",
+    "defaultLocale": "默认语言",
+    "deleted": "已删除",
+    "deleteInvitation": "删除邀请",
+    "deleteMembership": "删除成员关系",
+    "disabled": "已禁用",
+    "email": "邮箱",
+    "error": "无法更新访问控制。",
+    "expired": "已过期",
+    "expiresAt": "过期时间",
+    "filterByOrganisation": "按组织筛选",
+    "filterByPerson": "按人员筛选",
+    "invite": "邀请",
+    "inactivePerson": "此人员已存在但未启用。请先更新人员记录，再添加访问权限。",
+    "invitePerson": "邀请人员",
+    "inviteUrl": "邀请链接",
+    "invitations": "邀请",
+    "invitationDeleted": "邀请已删除。",
+    "memberships": "成员关系",
+    "membershipAdded": "已找到现有人员。已添加组织访问权限，未创建新的 passkey 邀请。",
+    "membershipDeleted": "成员关系已删除。",
+    "name": "名称",
+    "organisation": "组织",
+    "organisations": "组织",
+    "people": "人员",
+    "pending": "待处理",
+    "platform": "平台",
+    "preferredLocale": "首选语言",
+    "role": "角色",
+    "revoked": "已撤销",
+    "save": "保存",
+    "session": "会话",
+    "slug": "Slug",
+    "status": "状态",
+    "stopAssuming": "停止代入",
+    "updated": "访问控制已更新。"
+  },
+  "settings": {
+    "account": "账户",
+    "displayName": "姓名",
+    "email": "邮箱",
+    "language": "语言",
+    "logoutHint": "结束此设备上的管理会话。",
+    "profile": "个人资料",
+    "save": "保存",
+    "saved": "设置已保存。",
+    "saveError": "无法保存设置。"
   },
   "generated": "生成时间",
   "financials": {
@@ -279,6 +344,33 @@
     }
   ],
   "marketingTitle": "营销",
+  "administration": [
+    {
+      "name": "组织",
+      "view": "organisations"
+    },
+    {
+      "name": "成员关系",
+      "view": "memberships"
+    },
+    {
+      "name": "人员",
+      "view": "people"
+    },
+    {
+      "name": "代理",
+      "view": "access-agents"
+    },
+    {
+      "name": "审计",
+      "view": "audit"
+    },
+    {
+      "name": "设置",
+      "view": "settings"
+    }
+  ],
+  "administrationTitle": "管理",
   "contentNavigation": [
     {
       "name": "博客",
@@ -337,8 +429,11 @@
   ],
   "executionTitle": "执行",
   "pageTitles": {
+    "access": "访问",
+    "access-agents": "访问代理",
     "agents": "代理",
     "alerts": "技术警报",
+    "audit": "审计",
     "blogs": "博客",
     "campaigns": "营销活动",
     "content": "内容",
@@ -348,9 +443,13 @@
     "flow": "转化",
     "glance": "仪表盘",
     "leads": "线索",
+    "memberships": "成员关系",
+    "organisations": "组织",
+    "people": "人员",
     "product-insights": "产品洞察",
     "products": "产品",
     "reviews": "审核",
+    "settings": "设置",
     "supplement-insights": "补充剂洞察",
     "supplements": "补充剂",
     "testimonials": "见证",

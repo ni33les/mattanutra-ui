@@ -1,7 +1,18 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
+import { notFound, redirect } from "next/navigation";
 import { AdminDashboard } from "@/components/admin-dashboard";
-import { adminDashboardTokenAllowed } from "@/lib/admin-auth";
+import {
+  adminCsrfCookieName,
+  adminSessionCookieName,
+  clientAdminSessionContext,
+  getAdminAccessData,
+  getAdminSettingsData,
+  legacyAdminContext,
+  resolveAdminSession,
+  type AdminAccessData,
+  type AdminSettingsData
+} from "@/lib/admin-access";
 import {
   emptyAdminDashboardData,
   getAdminDashboardData,
@@ -53,6 +64,11 @@ import {
   getAdminTechnicalAlertsData
 } from "@/lib/admin-technical";
 import { isLocale, type Locale } from "@/lib/i18n";
+import {
+  adminViewAllowed,
+  firstAllowedAdminView,
+  isAdminDashboardView
+} from "@/lib/admin-rbac";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +91,36 @@ function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function dashboardUrl(
+  locale: Locale,
+  query: Record<string, string | string[] | undefined>,
+  overrides?: Record<string, string | undefined>
+) {
+  const params = new URLSearchParams();
+
+  Object.entries(query).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.forEach((item) => params.append(key, item));
+      return;
+    }
+
+    if (value !== undefined) {
+      params.set(key, value);
+    }
+  });
+
+  Object.entries(overrides ?? {}).forEach(([key, value]) => {
+    if (value === undefined) {
+      params.delete(key);
+      return;
+    }
+
+    params.set(key, value);
+  });
+
+  return `/${locale}/admin/dashboard${params.size > 0 ? `?${params.toString()}` : ""}`;
+}
+
 export default async function LocalizedAdminDashboardPage({
   params,
   searchParams
@@ -92,36 +138,40 @@ export default async function LocalizedAdminDashboardPage({
   const accessToken = firstParam(query.access_token);
   const range = normalizeAdminDashboardRange(query.range);
   const rawView = firstParam(query.view);
-  const view =
-    rawView === "alerts" ||
-    rawView === "agents" ||
-    rawView === "blogs" ||
-    rawView === "campaigns" ||
-    rawView === "content" ||
-    rawView === "communications" ||
-    rawView === "financials" ||
-    rawView === "foods" ||
-    rawView === "flow" ||
-    rawView === "glance" ||
-    rawView === "leads" ||
-    rawView === "product-insights" ||
-    rawView === "products" ||
-    rawView === "reviews" ||
-    rawView === "supplement-insights" ||
-    rawView === "supplements" ||
-    rawView === "testimonials" ||
-    rawView === "visibility"
-      ? rawView
-      : "glance";
+  const view = isAdminDashboardView(rawView) ? rawView : "glance";
   const filters = normalizeAdminDashboardFilters(query);
   const selectedReviewTaskId = firstParam(query.review);
   const selectedTaskId = firstParam(query.task);
+  const cookieStore = await cookies();
+  const sessionContext = await resolveAdminSession({
+    csrfToken: cookieStore.get(adminCsrfCookieName)?.value,
+    sessionCookie: cookieStore.get(adminSessionCookieName)?.value
+  });
+  const adminContext =
+    sessionContext ?? (await legacyAdminContext(accessToken).catch(() => null));
 
-  if (!adminDashboardTokenAllowed(accessToken)) {
-    notFound();
+  if (!adminContext) {
+    const loginParams = new URLSearchParams({
+      next: dashboardUrl(locale, query)
+    });
+
+    if (accessToken) {
+      loginParams.set("access_token", accessToken);
+    }
+
+    redirect(`/${locale}/admin/login?${loginParams.toString()}`);
+  }
+
+  if (!adminViewAllowed(adminContext, view)) {
+    redirect(
+      dashboardUrl(locale, query, {
+        view: firstAllowedAdminView(adminContext)
+      })
+    );
   }
 
   let alertsData = emptyAlertsData();
+  let accessData: AdminAccessData | null = null;
   let agentsData = emptyAgentsData();
   let campaignsData = emptyCampaignsData();
   let contentData = emptyContentData();
@@ -134,10 +184,22 @@ export default async function LocalizedAdminDashboardPage({
   let productsData = emptyAdminProductsData();
   let recommendationInsightsData = emptyAdminRecommendationInsightsData(range);
   let reviewQueueData = emptyAdminReviewQueueData();
+  let settingsData: AdminSettingsData | null = null;
   let supplementsData = emptyAdminSupplementsData();
   let visibilityData = emptyVisibilityData();
 
-  if (view === "glance") {
+  if (
+    view === "access" ||
+    view === "access-agents" ||
+    view === "audit" ||
+    view === "memberships" ||
+    view === "organisations" ||
+    view === "people"
+  ) {
+    accessData = await getAdminAccessData(adminContext);
+  } else if (view === "settings") {
+    settingsData = await getAdminSettingsData(adminContext);
+  } else if (view === "glance") {
     data = await getAdminDashboardData(range, filters);
     flowData = await getAdminFlowData(range, filters);
     reviewQueueData = await getAdminReviewQueueData();
@@ -188,6 +250,8 @@ export default async function LocalizedAdminDashboardPage({
   return (
     <AdminDashboard
       accessToken={accessToken ?? ""}
+      accessData={accessData}
+      adminContext={clientAdminSessionContext(adminContext)}
       alertsData={alertsData}
       agentsData={agentsData}
       campaignsData={campaignsData}
@@ -205,6 +269,7 @@ export default async function LocalizedAdminDashboardPage({
       reviewQueueData={reviewQueueData}
       selectedReviewTaskId={selectedReviewTaskId}
       selectedTaskId={selectedTaskId}
+      settingsData={settingsData}
       supplementsData={supplementsData}
       visibilityData={visibilityData}
       view={view}

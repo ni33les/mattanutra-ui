@@ -70,14 +70,17 @@ describe("task-only schema", () => {
 
   it("stores plan chat refinements as task-native adjustment records", () => {
     assert.match(schema, /\bcreate\s+table\s+public\.plan_guidance_adjustments\b/i);
-    assert.match(schema, /\bplan_id\s+uuid\s+not\s+null\s+references\s+public\.assessments\(plan_id\)/i);
-    assert.match(schema, /\bitem_type\s+text\s+not\s+null\s+check\s+\(item_type\s+in\s+\('food',\s+'supplement'\)\)/i);
+    assert.match(schema, /\bplan_id\s+uuid\s+not\s+null\b/i);
+    assert.match(schema, /\bplan_guidance_adjustments_plan_id_fkey\b[\s\S]*\bforeign\s+key\s+\(plan_id\)\s+references\s+public\.assessments\(plan_id\)/i);
+    assert.match(schema, /\bplan_guidance_adjustments_item_type_check\b[\s\S]*\bitem_type\s+=\s+any\s+\(array\['food'::text,\s+'supplement'::text\]\)/i);
     assert.match(schema, /\bplan_guidance_adjustments_active_unique_idx\b/i);
   });
 
   it("stores concierge feedback separately from generated plan versions", () => {
     assert.match(schema, /\bcreate\s+table\s+public\.plan_feedback\b/i);
-    assert.match(schema, /\bfeedback_type\s+text\s+not\s+null\s+check\b/i);
+    assert.match(schema, /\bfeedback_type\s+text\s+not\s+null\b/i);
+    assert.match(schema, /\bplan_feedback_plan_id_fkey\b[\s\S]*\bforeign\s+key\s+\(plan_id\)\s+references\s+public\.assessments\(plan_id\)/i);
+    assert.match(schema, /\bplan_feedback_feedback_type_check\b[\s\S]*\bfeedback_type\s+=\s+any\s+\(array\['budget'::text/i);
     assert.match(schema, /\burgency\s+text\s+not\s+null\s+default\s+'normal'/i);
     assert.match(schema, /\bplan_feedback_active_unique_idx\b/i);
   });
