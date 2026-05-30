@@ -22,11 +22,16 @@ const productClickTracking = readFileSync(
   new URL("../components/product-click-tracking.ts", import.meta.url),
   "utf8"
 );
+const landingReveal = readFileSync(
+  new URL("../components/landing-reveal.tsx", import.meta.url),
+  "utf8"
+);
 const formulationRevealSources = [
   formulationResults,
   formulationResultsHelpers,
   formulationRevealCopy,
-  formulationSupportHelpers
+  formulationSupportHelpers,
+  landingReveal
 ].join("\n");
 const productRecommendationSources = [
   formulationResults,
@@ -177,6 +182,8 @@ describe("plan reveal V3 migration", () => {
   it("renders the paid reveal page from locked data with fallback copy", () => {
     assert.match(formulationResults, /<LandingReveal \/>/);
     assert.match(formulationResults, /data-reveal/);
+    assert.match(landingReveal, /MutationObserver/);
+    assert.match(landingReveal, /addedNodes/);
     assert.match(formulationResults, /CountUpNumber/);
     assert.match(formulationResults, /RevealDistillationCard/);
     assert.match(formulationRevealCopy, /Your Right Amount Has Arrived/);
@@ -208,6 +215,11 @@ describe("plan reveal V3 migration", () => {
     assert.match(formulationResults, /selectedProductStackPreference/);
     assert.match(formulationResults, /useState<ProductStackPreference \| null>\(\(\) => initialStackPreference\)/);
     assert.match(formulationResults, /onProductStackPreferenceChange\(preference\)/);
+    assert.match(formulationResults, /onProductStackPollingStart\(preference\)/);
+    assert.match(formulationResults, /productStackLoading/);
+    assert.match(formulationResults, /revealProductPendingCards\[locale\]\.map/);
+    assert.match(formulationResults, /productCoveragePending/);
+    assert.match(formulationResults, /productMatchingPending \? \(/);
     assert.match(productRecommendationSources, /\/product-recommendations/);
     assert.match(formulationResults, /onProductStackRefresh/);
     assert.match(productRecommendationSources, /productRecommendations/);
@@ -228,7 +240,11 @@ describe("plan reveal V3 migration", () => {
     assert.match(formulationResults, /copy\.foodSupportFormulaGapLabel/);
     assert.doesNotMatch(formulationResults, /foodSupportProductCoverage/);
     assert.match(formulationRevealSources, /Foods do not change the product coverage score/);
-    assert.match(formulationResults, /return null/);
+    assert.match(formulationResults, /loading="eager"[\s\S]*src=\{item\.imagePath\}/);
+    assert.match(formulationResults, /productCoveragePending=\{productCoveragePending\}/);
+    assert.match(formulationResults, /copy\.foodSupportPendingHeadline/);
+    assert.match(formulationRevealSources, /revealFoodSupportPendingCards/);
+    assert.match(formulationSupportHelpers, /items: fallbackItems\.length > 0 \? fallbackItems : variant\?\.items \?\? \[\]/);
   });
 
   it("uses V14 public fonts and colour tokens as the site-wide public system", () => {

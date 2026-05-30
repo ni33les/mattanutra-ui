@@ -250,11 +250,14 @@ export function diagnosticNeeds(
       (availableCoverageByNeed.get(need.id) ?? 0) * 100
     );
     const hasUsefulCoverage = coveragePercent >= 90;
+    const underdosedAvailableProduct =
+      availableCoveragePercent <
+      V2_TINY_PARTIAL_PRODUCT_COVERAGE_CEILING * 100;
     const availableButUnselectedReason =
       availableCoveragePercent > 0
-        ? availableCoveragePercent < V2_TINY_PARTIAL_PRODUCT_COVERAGE_CEILING * 100
+        ? underdosedAvailableProduct
           ? "Available approved products underdose this formula target"
-          : "Available in the catalogue but not selected by this stack preference"
+          : "Available in the catalogue but not selected after dose-limit and stack-fit checks"
         : null;
     const bestRejectedReason =
       hasUsefulCoverage

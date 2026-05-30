@@ -9,7 +9,6 @@ import {
 import { NutritionProgress } from "@/components/nutrition-progress";
 import type {
   FormulationResult,
-  ProductRecommendationOption,
   ProductStackPreference,
   RecommendedProduct,
 } from "@/lib/formulation-types";
@@ -18,6 +17,16 @@ import {
   nutritionHealthScorePath,
   nutritionRevealPath,
 } from "@/lib/nutrition-paths";
+export {
+  defaultProductStackPreferenceForResult,
+  productRecommendationOptionsForResult,
+  selectProductRecommendationOption,
+} from "@/lib/product-recommendation-options";
+export {
+  resultHasPendingProductRecommendations,
+  resultHasProductStackRows,
+  resultHasTransientEmptyProductRecommendations,
+} from "@/lib/product-recommendation-readiness";
 
 export function planRevealHref(locale: Locale, planId: string) {
   return nutritionRevealPath(locale, planId);
@@ -68,26 +77,6 @@ export function resultHasPendingSections(result: FormulationResult) {
   );
 }
 
-export function resultHasPendingProductRecommendations(
-  result: FormulationResult,
-) {
-  if (result.access === "preview") {
-    return false;
-  }
-
-  const productStatus = result.productRecommendations?.status;
-
-  if (productStatus === "pending") {
-    return true;
-  }
-
-  return Boolean(
-    !productStatus &&
-    result.sectionStatuses?.foods === "ready" &&
-    result.sectionStatuses?.supplements === "ready",
-  );
-}
-
 export function supplementProductCoverageById(
   productRecommendations:
     | FormulationResult["productRecommendations"]
@@ -111,37 +100,6 @@ export function supplementProductCoverageById(
   }
 
   return coverage;
-}
-
-export function productRecommendationOptionsForResult(
-  result: FormulationResult,
-) {
-  if (result.productRecommendationOptions?.length) {
-    return result.productRecommendationOptions;
-  }
-
-  if (!result.productRecommendations) {
-    return [];
-  }
-
-  return [
-    {
-      id: result.productRecommendations.stackPreference ?? "balanced",
-      productRecommendations: result.productRecommendations,
-      recommendations: result.recommendations,
-    },
-  ] satisfies ProductRecommendationOption[];
-}
-
-export function selectProductRecommendationOption(
-  options: readonly ProductRecommendationOption[],
-  selectedPreference: ProductStackPreference | null,
-) {
-  return (
-    options.find((option) => option.id === selectedPreference) ??
-    options.find((option) => option.id === "balanced") ??
-    options[0]
-  );
 }
 
 export type PanelLabels = (typeof formulationResultsCopy)["en"];

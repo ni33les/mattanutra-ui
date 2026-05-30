@@ -4,14 +4,13 @@ import nextEnv from "@next/env";
 
 nextEnv.loadEnvConfig(process.cwd());
 
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const port = Number(process.env.PORT || process.env.NEXT_PORT || 3000);
 const host = "127.0.0.1";
 const workerMode = process.env.PLATFORM_WORKER_MODE || "all";
 const workerApiBaseUrl =
   process.env.PLATFORM_WORKER_API_BASE_URL || `http://${host}:${port}`;
 const startupTimeoutMs = Number(process.env.PLATFORM_STARTUP_TIMEOUT_MS || 120_000);
-const shutdownTimeoutMs = Number(process.env.PLATFORM_SHUTDOWN_TIMEOUT_MS || 10_000);
+const shutdownTimeoutMs = Number(process.env.PLATFORM_SHUTDOWN_TIMEOUT_MS || 25_000);
 
 const children = new Map();
 let shuttingDown = false;
@@ -30,8 +29,8 @@ function workerAgentKeyConfigured() {
   );
 }
 
-function startProcess(name, args, env = process.env) {
-  const child = spawn(npmCommand, args, {
+function startProcess(name, command, args, env = process.env) {
+  const child = spawn(command, args, {
     detached: process.platform !== "win32",
     env,
     stdio: "inherit"
@@ -130,12 +129,22 @@ async function shutdown(exitCode = 0) {
   }
 
   shuttingDown = true;
+  const deadline = Date.now() + shutdownTimeoutMs;
+  const worker = children.get("worker");
 
-  for (const child of children.values()) {
-    terminate(child, "SIGTERM");
+  if (worker) {
+    terminate(worker, "SIGTERM");
   }
 
-  const deadline = Date.now() + shutdownTimeoutMs;
+  while (children.has("worker") && Date.now() < deadline) {
+    await sleep(100);
+  }
+
+  const web = children.get("web");
+
+  if (web) {
+    terminate(web, "SIGTERM");
+  }
 
   while (children.size > 0 && Date.now() < deadline) {
     await sleep(100);
@@ -151,10 +160,22 @@ async function shutdown(exitCode = 0) {
 function startWorker() {
   workerRestartDelayMs = Math.max(workerRestartDelayMs, 1_000);
 
-  startProcess("worker", ["run", `worker:${workerMode}`], {
-    ...process.env,
-    WORKER_API_BASE_URL: workerApiBaseUrl
-  });
+  startProcess(
+    "worker",
+    process.execPath,
+    [
+      "--env-file-if-exists=.env.local",
+      "--experimental-strip-types",
+      "--import",
+      "./scripts/register-ts-path-loader.mjs",
+      "workers/runner.ts",
+      workerMode
+    ],
+    {
+      ...process.env,
+      WORKER_API_BASE_URL: workerApiBaseUrl
+    }
+  );
 }
 
 async function main() {
@@ -168,7 +189,14 @@ async function main() {
     );
   }
 
-  startProcess("web", ["run", "start"]);
+  startProcess("web", process.execPath, [
+    "node_modules/next/dist/bin/next",
+    "start",
+    "-H",
+    host,
+    "-p",
+    String(port)
+  ]);
   await waitForWeb();
 
   console.log(`[platform] web is listening on ${host}:${port}`);

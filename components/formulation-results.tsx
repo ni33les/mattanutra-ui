@@ -15,11 +15,13 @@ import { formulationResultsCopy } from "@/components/formulation-results-copy";
 import {
   NutritionGuidancePreparingPanel,
   RevealDistillationCard,
+  defaultProductStackPreferenceForResult,
   planPaywallHref,
   productCoveredNeedCount,
   productRecommendationOptionsForResult,
   replaceRevealStackUrl,
   resultHasPendingProductRecommendations,
+  resultHasProductStackRows,
   resultHasPendingSections,
   revealContextChips,
   revealHeroMetaItems,
@@ -58,7 +60,9 @@ import {
   localizedMarketplaceName,
   localizedProductDescription,
   revealCopy,
+  revealFoodSupportPendingCards,
   revealJoiners,
+  revealProductPendingCards,
   revealSlotCopy,
 } from "@/components/formulation-reveal-copy";
 import { CountUpNumber } from "@/components/formulation-results-motion";
@@ -91,9 +95,9 @@ type FormulationResultsProps = Readonly<{
 
 type LoadState = "loading" | "ready" | "error";
 
-const MAX_PRODUCT_MATCHING_POLLS = 80;
+const MAX_PRODUCT_MATCHING_POLLS = 240;
 const PENDING_SECTION_POLL_INTERVAL_MS = 1_000;
-const PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS = 750;
+const PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS = 1_000;
 
 export function FormulationResults({
   initialStackPreference = null,
@@ -108,6 +112,8 @@ export function FormulationResults({
   );
   const [result, setResult] = useState<FormulationResult | null>(initialResult);
   const [selectedProductStackPreference, setSelectedProductStackPreference] =
+    useState<ProductStackPreference | null>(() => initialStackPreference);
+  const [productPollingPreference, setProductPollingPreference] =
     useState<ProductStackPreference | null>(() => initialStackPreference);
   const productPollAttemptsRef = useRef(0);
 
@@ -128,6 +134,14 @@ export function FormulationResults({
 
     return true;
   }, [effectivePlanId, locale]);
+
+  const startProductStackPolling = useCallback(
+    (preference: ProductStackPreference) => {
+      productPollAttemptsRef.current = 0;
+      setProductPollingPreference(preference);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -157,7 +171,11 @@ export function FormulationResults({
           setLoadState("ready");
 
           const productMatchingPending =
-            resultHasPendingProductRecommendations(payload);
+            resultHasPendingProductRecommendations(payload) ||
+            Boolean(
+              productPollingPreference &&
+                !resultHasProductStackRows(payload, productPollingPreference),
+            );
           const shouldPollProductMatching =
             productMatchingPending &&
             productPollAttemptsRef.current < MAX_PRODUCT_MATCHING_POLLS;
@@ -173,6 +191,8 @@ export function FormulationResults({
                 ? PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS
                 : PENDING_SECTION_POLL_INTERVAL_MS,
             );
+          } else if (productPollingPreference) {
+            setProductPollingPreference(null);
           }
         }
       } catch {
@@ -191,7 +211,7 @@ export function FormulationResults({
         window.clearTimeout(retryTimer);
       }
     };
-  }, [effectivePlanId, locale]);
+  }, [effectivePlanId, locale, productPollingPreference]);
 
   useEffect(() => {
     if (!result) {
@@ -199,20 +219,18 @@ export function FormulationResults({
     }
 
     const options = productRecommendationOptionsForResult(result);
-    const defaultPreference =
-      result.productRecommendations?.stackPreference ??
-      options.find((option) => option.id === "balanced")?.id ??
-      options[0]?.id ??
-      null;
+    const defaultPreference = defaultProductStackPreferenceForResult(result);
 
     startTransition(() => {
       setSelectedProductStackPreference((current) =>
-        current && options.some((option) => option.id === current)
+        current &&
+        (options.some((option) => option.id === current) ||
+          current === productPollingPreference)
           ? current
           : defaultPreference,
       );
     });
-  }, [result]);
+  }, [productPollingPreference, result]);
 
   if (loadState === "loading") {
     return <NutritionGuidancePreparingPanel labels={labels} locale={locale} />;
@@ -252,16 +270,37 @@ export function FormulationResults({
   const unlockHref = planPaywallHref(locale, effectiveResultPlanId);
   const productRecommendationOptions =
     productRecommendationOptionsForResult(result);
-  const selectedProductRecommendationOption = selectProductRecommendationOption(
-    productRecommendationOptions,
-    selectedProductStackPreference,
+  const explicitProductStackPreference = selectedProductStackPreference ?? null;
+  const exactSelectedProductRecommendationOption =
+    explicitProductStackPreference
+      ? productRecommendationOptions.find(
+          (option) => option.id === explicitProductStackPreference,
+        )
+      : undefined;
+  const selectedProductRecommendationOption = explicitProductStackPreference
+    ? exactSelectedProductRecommendationOption
+    : selectProductRecommendationOption(productRecommendationOptions, null);
+  const selectedProductStackUnavailable = Boolean(
+    explicitProductStackPreference && !exactSelectedProductRecommendationOption,
   );
+  const productStackLoading = Boolean(
+    explicitProductStackPreference &&
+      (productPollingPreference === explicitProductStackPreference ||
+        selectedProductStackUnavailable) &&
+      !resultHasProductStackRows(result, explicitProductStackPreference),
+  );
+  const productCoveragePending =
+    productStackLoading || resultHasPendingProductRecommendations(result);
   const activeProductRecommendations =
-    selectedProductRecommendationOption?.productRecommendations ??
-    result.productRecommendations;
+    selectedProductStackUnavailable
+      ? undefined
+      : selectedProductRecommendationOption?.productRecommendations ??
+        result.productRecommendations;
   const activeProductRecommendationItems =
-    selectedProductRecommendationOption?.recommendations ??
-    result.recommendations;
+    selectedProductStackUnavailable
+      ? []
+      : selectedProductRecommendationOption?.recommendations ??
+        result.recommendations;
   const productCoverageBySupplementId = supplementProductCoverageById(
     activeProductRecommendations,
   );
@@ -279,10 +318,13 @@ export function FormulationResults({
       labels={labels}
       locale={locale}
       onProductStackPreferenceChange={setSelectedProductStackPreference}
+      onProductStackPollingStart={startProductStackPolling}
       onProductStackRefresh={refreshFormulationResult}
       planId={effectiveResultPlanId}
       productCoverageBySupplementId={productCoverageBySupplementId}
+      productCoveragePending={productCoveragePending}
       productRecommendationOptions={productRecommendationOptions}
+      productStackLoading={productStackLoading}
       products={activeProductRecommendationItems}
       result={result}
       selectedProductStackPreference={
@@ -302,10 +344,13 @@ function RevealResultsPage({
   labels,
   locale,
   onProductStackPreferenceChange,
+  onProductStackPollingStart,
   onProductStackRefresh,
   planId,
   productCoverageBySupplementId,
+  productCoveragePending,
   productRecommendationOptions,
+  productStackLoading,
   products,
   result,
   selectedProductStackPreference,
@@ -318,10 +363,13 @@ function RevealResultsPage({
   labels: PanelLabels;
   locale: Locale;
   onProductStackPreferenceChange: (preference: ProductStackPreference) => void;
+  onProductStackPollingStart: (preference: ProductStackPreference) => void;
   onProductStackRefresh: () => Promise<boolean>;
   planId: string;
   productCoverageBySupplementId: ReadonlyMap<string, number>;
+  productCoveragePending: boolean;
   productRecommendationOptions: ProductRecommendationOption[];
+  productStackLoading: boolean;
   products: RecommendedProduct[];
   result: FormulationResult;
   selectedProductStackPreference?: ProductStackPreference | null;
@@ -597,6 +645,7 @@ function RevealResultsPage({
         ingredients={visibleIngredients}
         locale={locale}
         productCoverageBySupplementId={productCoverageBySupplementId}
+        productCoveragePending={productCoveragePending}
         result={result}
       />
 
@@ -604,10 +653,12 @@ function RevealResultsPage({
         copy={copy}
         locale={locale}
         onProductStackPreferenceChange={onProductStackPreferenceChange}
+        onProductStackPollingStart={onProductStackPollingStart}
         onProductStackRefresh={onProductStackRefresh}
         planId={planId}
         productNeedCount={productNeedCount}
         productOptions={productOptions}
+        productStackLoading={productStackLoading}
         products={products}
         result={result}
         selectedCoverage={selectedCoverage}
@@ -618,12 +669,12 @@ function RevealResultsPage({
       <RevealFoodSupportSection
         copy={copy}
         locale={locale}
+        productCoveragePending={productCoveragePending}
         result={result}
         selectedNeedCoverage={
-          selectedProductRecommendationOption?.productRecommendations
-            .needCoverage ??
-          result.productRecommendations?.needCoverage ??
-          []
+          productCoveragePending
+            ? []
+            : activeProductRecommendations?.needCoverage ?? []
         }
         selectedProductStackPreference={
           selectedProductRecommendationOption?.id ??
@@ -649,6 +700,7 @@ function RevealFormulaSection({
   ingredients,
   locale,
   productCoverageBySupplementId,
+  productCoveragePending,
   result,
 }: Readonly<{
   catalogueSupplementCount: number;
@@ -657,6 +709,7 @@ function RevealFormulaSection({
   ingredients: FormulationIngredient[];
   locale: Locale;
   productCoverageBySupplementId: ReadonlyMap<string, number>;
+  productCoveragePending: boolean;
   result: FormulationResult;
 }>) {
   const ingredientRowNumber = formulaIngredientRowNumbers(ingredients);
@@ -739,7 +792,9 @@ function RevealFormulaSection({
               {copy.formulaMetaFocus}: {formulaFocus}
             </p>
             <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)] sm:text-right">
-              {copy.formulaMetaNrv}
+              {productCoveragePending
+                ? copy.formulaMetaProductFitPending
+                : copy.formulaMetaNrv}
             </p>
           </div>
 
@@ -754,7 +809,9 @@ function RevealFormulaSection({
             <div>{copy.tableName}</div>
             <div>{copy.tableReason}</div>
             <div>{copy.tableAmount}</div>
-            <div className="text-right">{copy.tableCoverage}</div>
+            <div className="text-right">
+              {productCoveragePending ? copy.productsPendingBadge : copy.tableCoverage}
+            </div>
           </div>
 
           {groupedFormulaIngredients(ingredients).map(([category, group]) => (
@@ -781,8 +838,9 @@ function RevealFormulaSection({
                   ingredient.dailyDose,
                   locale,
                 );
-                const coverage =
-                  productCoverageBySupplementId.get(ingredient.id) ?? 0;
+                const coverage = productCoveragePending
+                  ? null
+                  : productCoverageBySupplementId.get(ingredient.id) ?? 0;
                 const benefit = supplementBenefitTags(ingredient)[0];
 
                 return (
@@ -814,7 +872,7 @@ function RevealFormulaSection({
                       {dailyDose}
                     </div>
                     <div className="font-mono text-sm font-semibold text-[var(--mn-teal-deep)] lg:text-right">
-                      {coverage}%
+                      {coverage === null ? copy.productsPendingBadge : `${coverage}%`}
                     </div>
                   </article>
                 );
@@ -842,10 +900,12 @@ function RevealProductsSection({
   copy,
   locale,
   onProductStackPreferenceChange,
+  onProductStackPollingStart,
   onProductStackRefresh,
   planId,
   productNeedCount,
   productOptions,
+  productStackLoading,
   products,
   result,
   selectedCoverage,
@@ -855,10 +915,12 @@ function RevealProductsSection({
   copy: typeof revealCopy.en;
   locale: Locale;
   onProductStackPreferenceChange: (preference: ProductStackPreference) => void;
+  onProductStackPollingStart: (preference: ProductStackPreference) => void;
   onProductStackRefresh: () => Promise<boolean>;
   planId: string;
   productNeedCount: number;
   productOptions: ProductRecommendationOption[];
+  productStackLoading: boolean;
   products: RecommendedProduct[];
   result: FormulationResult;
   selectedCoverage: number;
@@ -866,6 +928,10 @@ function RevealProductsSection({
   supplementLabelById: ReadonlyMap<string, string>;
 }>) {
   const labels = productRecommendationCopy[locale];
+  const pendingBadgeClass =
+    locale === "en"
+      ? "text-[0.65rem] font-bold uppercase tracking-[0.14em] text-[var(--mn-ash)]"
+      : "text-[0.7rem] font-bold tracking-normal text-[var(--mn-ash)]";
   const [pendingStackPreference, setPendingStackPreference] =
     useState<ProductStackPreference | null>(null);
   const supplementSelectedCount = result.supplementBreakdown.filter(
@@ -886,6 +952,9 @@ function RevealProductsSection({
   const hasFullProductCoverage =
     supplementSelectedCount > 0 &&
     coveredProductNeedCount >= supplementSelectedCount;
+  const productMatchingPending =
+    products.length < 1 &&
+    (productStackLoading || resultHasPendingProductRecommendations(result));
   const fallbackProductsTitle = formatTemplate(
     hasFullProductCoverage
       ? copy.productsAllTitleTemplate
@@ -900,13 +969,12 @@ function RevealProductsSection({
       ),
     },
   );
-  const productsTitle = fallbackProductsTitle;
-  const productsLead = revealSlotCopy(
-    result,
-    "productsLead",
-    locale,
-    copy.productsLead,
-  );
+  const productsTitle = productMatchingPending
+    ? copy.productsPendingTitle
+    : fallbackProductsTitle;
+  const productsLead = productMatchingPending
+    ? copy.productsPending
+    : revealSlotCopy(result, "productsLead", locale, copy.productsLead);
   const coverageHeadline = hasFullProductCoverage
     ? formatTemplate(copy.coverageHeadlineTemplate, {
         supplementCount: supplementSelectedCount,
@@ -933,6 +1001,12 @@ function RevealProductsSection({
 
     if (existingOption) {
       onProductStackPreferenceChange(preference);
+      replaceRevealStackUrl(locale, planId, preference);
+
+      if (existingOption.recommendations.length < 1) {
+        onProductStackPollingStart(preference);
+      }
+
       return;
     }
 
@@ -952,15 +1026,10 @@ function RevealProductsSection({
       );
 
       if (response.ok) {
-        window.setTimeout(() => {
-          void onProductStackRefresh();
-        }, 1000);
-        window.setTimeout(() => {
-          void onProductStackRefresh();
-        }, 3000);
-        window.setTimeout(() => {
-          void onProductStackRefresh();
-        }, 6000);
+        onProductStackPreferenceChange(preference);
+        onProductStackPollingStart(preference);
+        replaceRevealStackUrl(locale, planId, preference);
+        void onProductStackRefresh();
       }
     } finally {
       window.setTimeout(() => {
@@ -985,7 +1054,9 @@ function RevealProductsSection({
                 : "leading-tight text-balance"
             }`}
           >
-            {locale === "en" ? (
+            {productMatchingPending ? (
+              productsTitle
+            ) : locale === "en" ? (
               <>
                 {productSelectedText} {bottleNoun}.{" "}
                 <em>
@@ -1010,8 +1081,14 @@ function RevealProductsSection({
           <div className="mt-8 flex justify-center" data-reveal>
             <div className="inline-flex flex-wrap justify-center gap-2 rounded-full bg-[var(--mn-paper)] p-1 ring-1 ring-[var(--mn-line)]">
               {controlPreferences.map((preference) => {
-                const available = productOptionsById.has(preference);
-                const pending = pendingStackPreference === preference;
+                const option = productOptionsById.get(preference);
+                const available = Boolean(
+                  option && option.recommendations.length > 0,
+                );
+                const pending =
+                  pendingStackPreference === preference ||
+                  (productStackLoading &&
+                    preference === selectedProductStackPreference);
                 const selected = preference === selectedProductStackPreference;
                 const className = `rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] transition disabled:cursor-wait disabled:opacity-70 ${
                   selected
@@ -1069,7 +1146,44 @@ function RevealProductsSection({
           </div>
         ) : null}
 
-        {products.length < 1 ? (
+        {products.length < 1 && productMatchingPending ? (
+          <div
+            aria-live="polite"
+            className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4"
+            data-reveal
+          >
+            {revealProductPendingCards[locale].map((card, index) => (
+              <article
+                className="overflow-hidden rounded-[1.25rem] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]"
+                key={card.title}
+              >
+                <div className="relative flex h-60 items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#fff,var(--mn-mint))]">
+                  <span className="absolute left-4 top-4 z-10 font-serif text-3xl italic text-[var(--mn-gold)]">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className="absolute right-4 top-4 z-10 rounded-full bg-white/85 px-3 py-1 text-[0.65rem] font-bold text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]">
+                    {copy.productsPendingBadge}
+                  </span>
+                  <div className="h-28 w-28 rounded-full bg-white/70 ring-1 ring-[var(--mn-line)] motion-safe:animate-pulse" />
+                </div>
+                <div className="flex flex-1 flex-col p-5">
+                  <p className={pendingBadgeClass}>
+                    {copy.productsPendingBadge}
+                  </p>
+                  <h3 className="mt-2 font-serif text-2xl font-medium leading-tight text-[var(--mn-ink)]">
+                    {card.title}
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                    {card.body}
+                  </p>
+                  <div className="mt-5 h-2 overflow-hidden rounded-full bg-[var(--mn-mint)]">
+                    <div className="h-full w-1/2 rounded-full bg-[var(--mn-teal)] motion-safe:animate-pulse" />
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : products.length < 1 ? (
           <div className="mt-10 rounded-lg bg-[var(--mn-paper)] p-8 text-center ring-1 ring-[var(--mn-line)]">
             <p className="text-sm leading-6 text-[var(--mn-ink-soft)]">
               {copy.productsEmpty}
@@ -1098,9 +1212,10 @@ function RevealProductsSection({
                   />
                   {product.imageUrl ? (
                     <Image
-                      alt=""
+                      alt={product.name}
                       className="relative z-[1] h-full w-full object-contain p-8 transition duration-500 group-hover:-translate-y-1 group-hover:scale-[1.03] motion-reduce:transition-none"
                       height={240}
+                      loading="eager"
                       unoptimized={true}
                       src={product.imageUrl}
                       width={320}
@@ -1177,66 +1292,105 @@ function RevealProductsSection({
           className="mt-8 rounded-xl bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]"
           data-reveal
         >
-          <div className="grid gap-5 md:grid-cols-[1fr_1.2fr] md:items-center">
-            <div>
-              <h3 className="font-serif text-3xl font-medium leading-tight text-[var(--mn-ink)]">
-                {coverageHeadline}
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                {copy.coverageSub}
-              </p>
-            </div>
-            <div>
-              <div className="h-3 overflow-hidden rounded-full bg-[var(--mn-line)]">
-                <div
-                  className="h-full rounded-full bg-[var(--mn-teal)] transition-[width] duration-1000 motion-reduce:transition-none"
-                  style={{
-                    width: `${Math.min(100, Math.max(0, selectedCoverage))}%`,
-                  }}
-                />
+          {productMatchingPending ? (
+            <div
+              aria-live="polite"
+              className="grid gap-5 md:grid-cols-[1fr_1.2fr] md:items-center"
+            >
+              <div>
+                <p className={pendingBadgeClass}>
+                  {copy.productsPendingBadge}
+                </p>
+                <h3 className="mt-2 font-serif text-3xl font-medium leading-tight text-[var(--mn-ink)]">
+                  {copy.productsPendingTitle}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                  {copy.productsPending}
+                </p>
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-                <div>
-                  <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
-                    <CountUpNumber
-                      active={true}
-                      duration={900}
-                      value={products.length}
-                    />
-                  </p>
-                  <p className="text-sm text-[var(--mn-ash)]">
-                    {copy.selectedProducts}
-                  </p>
+              <div>
+                <div className="h-3 overflow-hidden rounded-full bg-[var(--mn-line)]">
+                  <div className="h-full w-1/2 rounded-full bg-[var(--mn-teal)] motion-safe:animate-pulse" />
                 </div>
-                <div>
-                  <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
-                    <CountUpNumber
-                      active={true}
-                      duration={1000}
-                      value={productNeedCount}
-                    />
-                    /{Math.max(productNeedCount, supplementSelectedCount)}
-                  </p>
-                  <p className="text-sm text-[var(--mn-ash)]">
-                    {copy.prioritiesCovered}
-                  </p>
-                </div>
-                <div>
-                  <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
-                    <CountUpNumber
-                      active={true}
-                      duration={1100}
-                      value={selectedCoverage}
-                    />
-                    %
-                  </p>
-                  <p className="text-sm text-[var(--mn-ash)]">
-                    {copy.compactCoverageLabel}
-                  </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  {revealProductPendingCards[locale].map((card) => (
+                    <div
+                      className="rounded-lg bg-[var(--mn-cream)] p-3 ring-1 ring-[var(--mn-line)]"
+                      key={`summary-${card.title}`}
+                    >
+                      <p className="font-serif text-lg font-medium leading-tight text-[var(--mn-teal-deep)]">
+                        {card.title}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--mn-ash)]">
+                        {card.body}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-[1fr_1.2fr] md:items-center">
+              <div>
+                <h3 className="font-serif text-3xl font-medium leading-tight text-[var(--mn-ink)]">
+                  {coverageHeadline}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                  {copy.coverageSub}
+                </p>
+              </div>
+              <div>
+                <div className="h-3 overflow-hidden rounded-full bg-[var(--mn-line)]">
+                  <div
+                    className="h-full rounded-full bg-[var(--mn-teal)] transition-[width] duration-1000 motion-reduce:transition-none"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, selectedCoverage))}%`,
+                    }}
+                  />
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
+                      <CountUpNumber
+                        active={true}
+                        duration={900}
+                        value={products.length}
+                      />
+                    </p>
+                    <p className="text-sm text-[var(--mn-ash)]">
+                      {copy.selectedProducts}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
+                      <CountUpNumber
+                        active={true}
+                        duration={1000}
+                        value={productNeedCount}
+                      />
+                      /{Math.max(productNeedCount, supplementSelectedCount)}
+                    </p>
+                    <p className="text-sm text-[var(--mn-ash)]">
+                      {copy.prioritiesCovered}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
+                      <CountUpNumber
+                        active={true}
+                        duration={1100}
+                        value={selectedCoverage}
+                      />
+                      %
+                    </p>
+                    <p className="text-sm text-[var(--mn-ash)]">
+                      {copy.compactCoverageLabel}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -1246,17 +1400,19 @@ function RevealProductsSection({
 function RevealFoodSupportSection({
   copy,
   locale,
+  productCoveragePending,
   result,
   selectedNeedCoverage,
   selectedProductStackPreference,
 }: Readonly<{
   copy: typeof revealCopy.en;
   locale: Locale;
+  productCoveragePending: boolean;
   result: FormulationResult;
   selectedNeedCoverage: readonly ProductNeedCoverage[];
   selectedProductStackPreference?: ProductStackPreference | null;
 }>) {
-  const { fallbackItems, variant } = selectedFoodSupport(
+  const { items: selectedFoodItems, variant } = selectedFoodSupport(
     result,
     selectedNeedCoverage,
     selectedProductStackPreference,
@@ -1264,22 +1420,24 @@ function RevealFoodSupportSection({
   const visibleIngredients = visibleFormulaIngredients(
     result.supplementBreakdown,
   );
-  const items = (variant?.items ?? fallbackItems).filter(
-    (item) =>
-      foodSupportFormulaGapsForItem(
-        item,
-        selectedNeedCoverage,
-        visibleIngredients,
-        locale,
-      ).length > 0,
-  );
   const fallbackGaps = foodSupportGaps(selectedNeedCoverage);
   const fallbackSupportableGaps = foodSupportableGaps(fallbackGaps);
+  const items = productCoveragePending
+    ? []
+    : selectedFoodItems.filter(
+        (item) =>
+          foodSupportFormulaGapsForItem(
+            item,
+            selectedNeedCoverage,
+            visibleIngredients,
+            locale,
+          ).length > 0,
+      );
   const fallbackGapText = joinFoodSupportNeeds(
     fallbackSupportableGaps.length > 0 ? fallbackSupportableGaps : fallbackGaps,
     locale,
   );
-  const headline = variant
+  const variantHeadline = variant
     ? safeFoodSupportCopy(
         variant.headline,
         locale,
@@ -1294,7 +1452,7 @@ function RevealFoodSupportSection({
           gaps: fallbackGapText,
         })
       : copy.foodSupportDefaultHeadline;
-  const body = variant
+  const variantBody = variant
     ? safeFoodSupportCopy(
         variant.body,
         locale,
@@ -1309,10 +1467,16 @@ function RevealFoodSupportSection({
           gaps: fallbackGapText,
         })
       : copy.foodSupportDefaultBody;
-
-  if (items.length < 1) {
-    return null;
-  }
+  const headline = productCoveragePending
+    ? copy.foodSupportPendingHeadline
+    : items.length < 1
+      ? copy.foodSupportNoGapsHeadline
+      : variantHeadline;
+  const body = productCoveragePending
+    ? copy.foodSupportPendingBody
+    : items.length < 1
+      ? copy.foodSupportNoGapsBody
+      : variantBody;
 
   return (
     <section className="border-t border-[var(--mn-line)] bg-[var(--mn-cream)] py-20">
@@ -1324,7 +1488,7 @@ function RevealFoodSupportSection({
             </p>
             <h2
               className={`mt-4 font-serif text-4xl font-medium text-[var(--mn-ink)] sm:text-5xl ${
-                locale === "th"
+                locale === "th" || locale === "zh-CN"
                   ? "leading-[1.38] break-words [overflow-wrap:anywhere]"
                   : "leading-tight text-balance"
               }`}
@@ -1340,164 +1504,235 @@ function RevealFoodSupportSection({
           </p>
         </div>
 
-        <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {items.map((item) => {
-            const seed = managedSeedForFoodSupportItem(item);
-            const name =
-              getLocalizedText(item.food, locale) ||
-              seed?.name[locale] ||
-              seed?.name.en ||
-              "";
-            const imageAlt =
-              getLocalizedText(item.imageAlt, locale) ||
-              seed?.imageAlt[locale] ||
-              seed?.imageAlt.en ||
-              name;
-            const category =
-              getLocalizedText(item.category, locale) ||
-              seed?.category[locale] ||
-              seed?.category.en ||
-              "";
-            const serving =
-              getLocalizedText(item.serving, locale) ||
-              (seed ? managedFoodServing[seed.normalizedName]?.[locale] : "") ||
-              "";
-            const frequency =
-              getLocalizedText(item.frequency, locale) ||
-              (seed
-                ? managedFoodFrequency[seed.normalizedName]?.[locale]
-                : "") ||
-              "";
-            const formulaGaps = foodSupportFormulaGapsForItem(
-              item,
-              selectedNeedCoverage,
-              visibleIngredients,
-              locale,
-            ).slice(0, 3);
-            const itemRationale = safeFoodSupportCopy(
-              item.rationale,
-              locale,
-              locale === "th"
-                ? `${name} ช่วยเสริมจากอาหารในส่วนของ${joinFoodSupportFormulaGapLabels(
-                    formulaGaps,
-                    "th",
-                  )} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`
-                : locale === "zh-CN"
-                  ? `${name} 可通过食物层面支持 ${joinFoodSupportFormulaGapLabels(
-                      formulaGaps,
-                      "zh-CN",
-                    )}，同时产品覆盖计算保持独立。`
-                  : `${name} ${name.endsWith("s") ? "give" : "gives"} food-level support around ${joinFoodSupportFormulaGapLabels(
-                      formulaGaps,
-                      "en",
-                    )} while product coverage stays separate.`,
-            );
-
-            return (
-              <article
-                className="overflow-hidden rounded-[1.25rem] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]"
-                data-reveal
-                key={`${selectedProductStackPreference ?? "food"}:${item.foodId}:${item.position}`}
-              >
-                <div className="relative h-52 overflow-hidden bg-[var(--mn-mint)]">
-                  {item.imagePath ? (
-                    <Image
-                      alt={imageAlt}
-                      className="object-cover"
-                      fill={true}
-                      loading="lazy"
-                      src={item.imagePath}
-                    />
-                  ) : (
-                    <div className="grid h-full place-items-center bg-[var(--mn-mint)] font-serif text-5xl italic text-[var(--mn-teal-deep)]">
-                      {name.slice(0, 1)}
-                    </div>
-                  )}
-                  <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]">
-                    {String(item.position).padStart(2, "0")}
-                  </span>
+        {productCoveragePending ? (
+          <div
+            aria-live="polite"
+            className="mt-10 overflow-hidden rounded-xl bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]"
+            data-reveal
+          >
+            <div className="grid gap-0 md:grid-cols-[0.8fr_1.2fr]">
+              <div className="bg-[var(--mn-mint)] p-6">
+                <p
+                  className={`text-xs font-bold text-[var(--mn-teal-deep)] ${
+                    locale === "en" ? "uppercase tracking-[0.14em]" : ""
+                  }`}
+                >
+                  {copy.productsPendingBadge}
+                </p>
+                <div className="mt-6 h-3 overflow-hidden rounded-full bg-white/70">
+                  <div className="h-full w-1/2 rounded-full bg-[var(--mn-teal)] motion-safe:animate-pulse" />
                 </div>
-                <div className="p-5">
-                  <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)]">
-                    {category}
-                  </p>
-                  <h3
-                    className={`mt-2 font-serif text-2xl font-medium text-[var(--mn-ink)] ${
-                      locale === "th" ? "leading-9" : "leading-tight"
-                    }`}
+              </div>
+              <div className="grid gap-3 p-6 sm:grid-cols-3">
+                {revealFoodSupportPendingCards[locale].map((card) => (
+                  <div
+                    className="rounded-lg bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]"
+                    key={`food-support-${card.title}`}
                   >
-                    {name}
-                  </h3>
-                  <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                    {itemRationale}
-                  </p>
+                    <p className="font-serif text-lg font-medium leading-tight text-[var(--mn-ink)]">
+                      {card.title}
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-[var(--mn-ink-soft)]">
+                      {card.body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : items.length < 1 ? (
+          <div
+            className="mt-10 rounded-xl bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:p-8"
+            data-reveal
+          >
+            <p className="max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]">
+              {copy.foodSupportEmpty}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {items.map((item) => {
+              const seed = managedSeedForFoodSupportItem(item);
+              const name =
+                getLocalizedText(item.food, locale) ||
+                seed?.name[locale] ||
+                seed?.name.en ||
+                "";
+              const imageAlt =
+                getLocalizedText(item.imageAlt, locale) ||
+                seed?.imageAlt[locale] ||
+                seed?.imageAlt.en ||
+                name;
+              const category =
+                getLocalizedText(item.category, locale) ||
+                seed?.category[locale] ||
+                seed?.category.en ||
+                "";
+              const serving =
+                getLocalizedText(item.serving, locale) ||
+                (seed
+                  ? managedFoodServing[seed.normalizedName]?.[locale]
+                  : "") ||
+                "";
+              const frequency =
+                getLocalizedText(item.frequency, locale) ||
+                (seed
+                  ? managedFoodFrequency[seed.normalizedName]?.[locale]
+                  : "") ||
+                "";
+              const formulaGaps = foodSupportFormulaGapsForItem(
+                item,
+                selectedNeedCoverage,
+                visibleIngredients,
+                locale,
+              ).slice(0, 3);
+              const itemRationale = safeFoodSupportCopy(
+                item.rationale,
+                locale,
+                locale === "th"
+                  ? `${name} ช่วยเสริมจากอาหารในส่วนของ${joinFoodSupportFormulaGapLabels(
+                      formulaGaps,
+                      "th",
+                    )} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`
+                  : locale === "zh-CN"
+                    ? `${name} 可通过食物层面支持 ${joinFoodSupportFormulaGapLabels(
+                        formulaGaps,
+                        "zh-CN",
+                      )}，同时产品覆盖计算保持独立。`
+                    : `${name} ${name.endsWith("s") ? "give" : "gives"} food-level support around ${joinFoodSupportFormulaGapLabels(
+                        formulaGaps,
+                        "en",
+                      )} while product coverage stays separate.`,
+              );
 
-                  {formulaGaps.length > 0 ? (
-                    <div className="mt-4 rounded-lg bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
-                      <p
-                        className={`text-xs font-bold text-[var(--mn-ash)] ${
-                          locale === "th" ? "" : "uppercase tracking-[0.12em]"
-                        }`}
-                      >
-                        {copy.foodSupportGapLabel}
-                      </p>
-                      <div className="mt-3 space-y-2">
-                        {formulaGaps.map((gap) => (
-                          <div
-                            className="rounded-md bg-[var(--mn-paper)] p-3 ring-1 ring-[var(--mn-line)]"
-                            key={gap.id}
-                          >
-                            <div className="min-w-0">
-                              <p className="text-[0.7rem] font-semibold text-[var(--mn-ash)]">
-                                {copy.foodSupportFormulaGapLabel}
-                                {gap.rowNumber
-                                  ? ` ${String(gap.rowNumber).padStart(2, "0")}`
-                                  : ""}
-                              </p>
-                              <p
-                                className={`mt-1 font-serif text-lg font-medium text-[var(--mn-ink)] ${
-                                  locale === "th"
-                                    ? "leading-7"
-                                    : "leading-tight"
-                                }`}
-                              >
-                                {gap.label}
-                              </p>
-                              {gap.dailyDose ? (
-                                <p className="mt-1 text-xs font-semibold text-[var(--mn-ink-soft)]">
-                                  {gap.dailyDose}
+              return (
+                <article
+                  className="overflow-hidden rounded-[1.25rem] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]"
+                  data-reveal
+                  key={`${selectedProductStackPreference ?? "food"}:${item.foodId}:${item.position}`}
+                >
+                  <div className="relative h-52 overflow-hidden bg-[var(--mn-mint)]">
+                    {item.imagePath ? (
+                      <Image
+                        alt={imageAlt}
+                        className="object-cover"
+                        fill={true}
+                        loading="eager"
+                        src={item.imagePath}
+                      />
+                    ) : (
+                      <div className="grid h-full place-items-center bg-[var(--mn-mint)] font-serif text-5xl italic text-[var(--mn-teal-deep)]">
+                        {name.slice(0, 1)}
+                      </div>
+                    )}
+                    <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]">
+                      {String(item.position).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <div className="p-5">
+                    <p
+                      className={`text-[0.65rem] font-bold text-[var(--mn-ash)] ${
+                        locale === "en"
+                          ? "mn-mono-label uppercase tracking-[0.16em]"
+                          : "tracking-normal"
+                      }`}
+                    >
+                      {category}
+                    </p>
+                    <h3
+                      className={`mt-2 font-serif text-2xl font-medium text-[var(--mn-ink)] ${
+                        locale === "th" || locale === "zh-CN"
+                          ? "leading-9"
+                          : "leading-tight"
+                      }`}
+                    >
+                      {name}
+                    </h3>
+                    <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                      {itemRationale}
+                    </p>
+
+                    {formulaGaps.length > 0 ? (
+                      <div className="mt-4 rounded-lg bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
+                        <p
+                          className={`text-xs font-bold text-[var(--mn-ash)] ${
+                            locale === "en"
+                              ? "uppercase tracking-[0.12em]"
+                              : "tracking-normal"
+                          }`}
+                        >
+                          {copy.foodSupportGapLabel}
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          {formulaGaps.map((gap) => (
+                            <div
+                              className="rounded-md bg-[var(--mn-paper)] p-3 ring-1 ring-[var(--mn-line)]"
+                              key={gap.id}
+                            >
+                              <div className="min-w-0">
+                                <p className="text-[0.7rem] font-semibold text-[var(--mn-ash)]">
+                                  {copy.foodSupportFormulaGapLabel}
+                                  {gap.rowNumber
+                                    ? ` ${String(gap.rowNumber).padStart(2, "0")}`
+                                    : ""}
                                 </p>
-                              ) : null}
+                                <p
+                                  className={`mt-1 font-serif text-lg font-medium text-[var(--mn-ink)] ${
+                                    locale === "th" || locale === "zh-CN"
+                                      ? "leading-7"
+                                      : "leading-tight"
+                                  }`}
+                                >
+                                  {gap.label}
+                                </p>
+                                {gap.dailyDose ? (
+                                  <p className="mt-1 text-xs font-semibold text-[var(--mn-ink-soft)]">
+                                    {gap.dailyDose}
+                                  </p>
+                                ) : null}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="mt-5 grid gap-3 rounded-lg bg-[var(--mn-cream)] p-4 text-sm ring-1 ring-[var(--mn-line)] sm:grid-cols-2">
+                      <div>
+                        <p
+                          className={`text-xs font-bold text-[var(--mn-ash)] ${
+                            locale === "en"
+                              ? "uppercase tracking-[0.12em]"
+                              : "tracking-normal"
+                          }`}
+                        >
+                          {copy.foodSupportServing}
+                        </p>
+                        <p className="mt-1 font-semibold text-[var(--mn-ink)]">
+                          {serving}
+                        </p>
+                      </div>
+                      <div>
+                        <p
+                          className={`text-xs font-bold text-[var(--mn-ash)] ${
+                            locale === "en"
+                              ? "uppercase tracking-[0.12em]"
+                              : "tracking-normal"
+                          }`}
+                        >
+                          {copy.foodSupportFrequency}
+                        </p>
+                        <p className="mt-1 font-semibold text-[var(--mn-ink)]">
+                          {frequency}
+                        </p>
                       </div>
                     </div>
-                  ) : null}
-
-                  <div className="mt-5 grid gap-3 rounded-lg bg-[var(--mn-cream)] p-4 text-sm ring-1 ring-[var(--mn-line)] sm:grid-cols-2">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--mn-ash)]">
-                        {copy.foodSupportServing}
-                      </p>
-                      <p className="mt-1 font-semibold text-[var(--mn-ink)]">
-                        {serving}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--mn-ash)]">
-                        {copy.foodSupportFrequency}
-                      </p>
-                      <p className="mt-1 font-semibold text-[var(--mn-ink)]">
-                        {frequency}
-                      </p>
-                    </div>
                   </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );

@@ -823,6 +823,64 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(result.supplementProductCoveragePercent, 100);
   });
 
+  it("uses balanced stack capacity to cover otherwise uncovered needs", () => {
+    const broadFoundation: ProductCandidate = {
+      ...product({ amount: 1, id: "foundation", name: "Omega-3" }),
+      facts: [
+        product({ amount: 0.78, id: "omega", name: "Omega-3" }).facts[0]!,
+        product({ amount: 0.2, id: "d3", name: "Vitamin D3" }).facts[0]!,
+        product({ amount: 1, id: "mag", name: "Magnesium" }).facts[0]!,
+        product({ amount: 0.1, id: "b12", name: "Vitamin B12" }).facts[0]!
+      ],
+      productKind: "multi"
+    };
+    const ashwagandhaPlus: ProductCandidate = {
+      ...product({ amount: 0.5, id: "ashwagandha-plus", name: "Ashwagandha" }),
+      facts: [
+        product({ amount: 0.5, id: "ash", name: "Ashwagandha" }).facts[0]!,
+        product({ amount: 0.06, id: "ash-mag", name: "Magnesium" }).facts[0]!,
+        product({ amount: 0.05, id: "ash-b12", name: "Vitamin B12" }).facts[0]!,
+        product({ amount: 0.1, id: "ash-b1", name: "Vitamin B1" }).facts[0]!,
+        product({ amount: 0.1, id: "ash-b2", name: "Vitamin B2" }).facts[0]!,
+        product({ amount: 0.1, id: "ash-zinc", name: "Zinc" }).facts[0]!
+      ],
+      productKind: "multi"
+    };
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        broadFoundation,
+        product({ amount: 1, id: "coq10", name: "CoQ10" }),
+        product({ amount: 1, id: "theanine", name: "Theanine" }),
+        product({ amount: 0.58, id: "curcumin", name: "Curcumin" }),
+        ashwagandhaPlus
+      ],
+      maxProducts: 6,
+      needs: [
+        need("omega_3", "Omega-3", 1),
+        need("vitamin_d3", "Vitamin D3", 1),
+        need("magnesium", "Magnesium", 1),
+        need("coq10", "CoQ10", 1),
+        need("theanine", "Theanine", 1),
+        need("curcumin", "Curcumin", 1),
+        need("vitamin_b12", "Vitamin B12", 1),
+        need("ashwagandha", "Ashwagandha", 1)
+      ],
+      stackPreference: "balanced",
+      targetProducts: 3
+    });
+    const recommendedIds = new Set(
+      result.recommendations.map((item) => item.product.id)
+    );
+
+    assert.equal(recommendedIds.has("ashwagandha-plus"), true);
+    assert.equal(
+      result.diagnostics.unmatchedNeeds.some(
+        (item) => item.displayName === "Ashwagandha"
+      ),
+      false
+    );
+  });
+
   it("lets compact mode trade some coverage for a smaller stack", () => {
     const broad: ProductCandidate = {
       ...product({ amount: 0.67, id: "broad-multi", name: "Vitamin D" }),
@@ -862,6 +920,42 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(compact.supplementProductCoveragePercent, 67);
     assert.equal(balanced.supplementProductCoveragePercent, 100);
     assert.equal(balanced.recommendations.length, 3);
+  });
+
+  it("honours the compact target count when another product materially improves coverage", () => {
+    const partialFoundation: ProductCandidate = {
+      ...product({ amount: 0.85, id: "partial-foundation", name: "Vitamin D" }),
+      facts: [
+        product({ amount: 0.85, id: "partial-d3", name: "Vitamin D" }).facts[0]!,
+        product({ amount: 0.85, id: "partial-mag", name: "Magnesium" }).facts[0]!
+      ],
+      productKind: "multi"
+    };
+    const candidates = [
+      partialFoundation,
+      product({ amount: 0.3, id: "weak-zinc", name: "Zinc" }),
+      product({ amount: 1, id: "perfect-d3", name: "Vitamin D" }),
+      product({ amount: 1, id: "perfect-magnesium", name: "Magnesium" }),
+      product({ amount: 1, id: "perfect-zinc", name: "Zinc" })
+    ];
+    const needs = [
+      need("vitamin_d", "Vitamin D", 5),
+      need("magnesium", "Magnesium", 5),
+      need("zinc", "Zinc", 5)
+    ];
+    const compact = recommendProductStackFullBeam({
+      candidates,
+      maxProducts: 3,
+      needs,
+      stackPreference: "compact",
+      targetProducts: 3
+    });
+
+    assert.deepEqual(
+      new Set(compact.recommendations.map((item) => item.product.id)),
+      new Set(["perfect-d3", "perfect-magnesium", "perfect-zinc"])
+    );
+    assert.equal(compact.supplementProductCoveragePercent, 100);
   });
 
   it("reports distinct alternative stack fingerprints", () => {
