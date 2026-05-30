@@ -9,12 +9,14 @@ import { workerRequestAllowed } from "../lib/worker-auth.ts";
 
 const previousAdminClawToken = process.env.ADMIN_CLAW_TOKEN;
 const previousAdminDashboardToken = process.env.ADMIN_DASHBOARD_TOKEN;
+const previousLegacyTokenAuth = process.env.MATTANUTRA_LEGACY_TOKEN_AUTH;
 const previousWorkerToken = process.env.WORKER_API_TOKEN;
 
 describe("admin claw token auth", () => {
   before(() => {
     process.env.ADMIN_CLAW_TOKEN = "test-openclaw-token";
     process.env.ADMIN_DASHBOARD_TOKEN = "test-dashboard-token";
+    process.env.MATTANUTRA_LEGACY_TOKEN_AUTH = "allow";
     process.env.WORKER_API_TOKEN = "test-worker-token";
   });
 
@@ -35,6 +37,12 @@ describe("admin claw token auth", () => {
       delete process.env.WORKER_API_TOKEN;
     } else {
       process.env.WORKER_API_TOKEN = previousWorkerToken;
+    }
+
+    if (previousLegacyTokenAuth === undefined) {
+      delete process.env.MATTANUTRA_LEGACY_TOKEN_AUTH;
+    } else {
+      process.env.MATTANUTRA_LEGACY_TOKEN_AUTH = previousLegacyTokenAuth;
     }
   });
 
@@ -122,7 +130,57 @@ describe("admin claw token auth", () => {
       false
     );
   });
-});
+
+	  it("can disable legacy shared token auth during rollout cutoff", () => {
+	    process.env.MATTANUTRA_LEGACY_TOKEN_AUTH = "deny";
+
+	    try {
+      assert.equal(
+        adminClawRequestAllowed(
+          new Request("https://example.test/api/tasks", {
+            headers: { authorization: "Bearer test-openclaw-token" }
+          })
+        ),
+        false
+      );
+      assert.equal(
+        workerRequestAllowed(
+          new Request("https://example.test/api/tasks/reserve", {
+            headers: { authorization: "Bearer test-worker-token" }
+          })
+        ),
+        false
+      );
+    } finally {
+	      process.env.MATTANUTRA_LEGACY_TOKEN_AUTH = "allow";
+	    }
+	  });
+
+	  it("denies legacy shared token auth by default", () => {
+	    delete process.env.MATTANUTRA_LEGACY_TOKEN_AUTH;
+
+	    try {
+	      assert.equal(
+	        adminClawRequestAllowed(
+	          new Request("https://example.test/api/tasks", {
+	            headers: { authorization: "Bearer test-openclaw-token" }
+	          })
+	        ),
+	        false
+	      );
+	      assert.equal(
+	        workerRequestAllowed(
+	          new Request("https://example.test/api/tasks/reserve", {
+	            headers: { authorization: "Bearer test-worker-token" }
+	          })
+	        ),
+	        false
+	      );
+	    } finally {
+	      process.env.MATTANUTRA_LEGACY_TOKEN_AUTH = "allow";
+	    }
+	  });
+	});
 
 describe("API auth boundaries", () => {
   it("keeps worker task APIs on worker-only auth", async () => {
@@ -142,8 +200,8 @@ describe("API auth boundaries", () => {
 
       assert.match(
         source,
-        /requireWorkerRequest/,
-        `${file} must require WORKER_API_TOKEN`
+        /requireWorkerAccess/,
+        `${file} must resolve a worker agent principal`
       );
       assert.doesNotMatch(
         source,
@@ -175,8 +233,8 @@ describe("API auth boundaries", () => {
 
       assert.match(
         source,
-        /requireOpenClawRequest/,
-        `${file} must require ADMIN_CLAW_TOKEN`
+        /requireOpenClawAccess/,
+        `${file} must resolve an OpenClaw agent principal`
       );
     }
   });
@@ -212,12 +270,12 @@ describe("API auth boundaries", () => {
 
       assert.match(
         source,
-        /adminClawRequestAllowed/,
+        /requireOpenClawAccess/,
         `${file} must accept protected OpenClaw callers`
       );
       assert.match(
         source,
-        /workerRequestAllowed/,
+        /requireWorkerAccess/,
         `${file} must accept protected worker callers`
       );
       assert.doesNotMatch(

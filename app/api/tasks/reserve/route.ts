@@ -18,7 +18,7 @@ import {
 } from "@/lib/task-service";
 import type { AgentType } from "@/lib/task-service";
 import { waitForTaskQueueChange } from "@/lib/task-wakeup";
-import { requireWorkerRequest } from "@/lib/worker-auth";
+import { requireWorkerAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
 
@@ -63,7 +63,8 @@ function reservePollIntervalMs(taskTypes: readonly string[]) {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = requireWorkerRequest(request);
+  const access = await requireWorkerAccess(request);
+  const unauthorized = access.unauthorized;
 
   if (unauthorized) {
     return unauthorized;
@@ -71,6 +72,8 @@ export async function POST(request: Request) {
 
   const body = await readJsonObject(request);
   const agent = objectValue(body.agent);
+  const principal = access.principal;
+  const agentId = principal?.agentId ?? textValue(agent.id);
   const workerSessionId = textValue(body.workerSessionId);
   const taskTypes = textArray(body.taskTypes);
   const deadline = Date.now() + waitSeconds(body.waitSeconds) * 1000;
@@ -85,7 +88,8 @@ export async function POST(request: Request) {
 
   try {
     await heartbeatWorkerSession({
-      agentId: textValue(agent.id),
+      accessScope: access.scope,
+      agentId,
       status: "polling",
       workerSessionId
     });
@@ -109,12 +113,13 @@ export async function POST(request: Request) {
 
     while (true) {
       const reserved = await reserveNextTask({
+        accessScope: access.scope,
         agent: {
-          capabilities: agent.capabilities,
-          id: textValue(agent.id),
+          capabilities: principal?.capabilities ?? agent.capabilities,
+          id: agentId,
           metadata: objectValue(agent.metadata),
           model: textValue(agent.model),
-          name: textValue(agent.name) ?? "Unnamed agent",
+          name: principal?.agentName ?? textValue(agent.name) ?? "Unnamed agent",
           type: agentType(agent.type)
         },
         leaseSeconds: body.leaseSeconds,
@@ -127,7 +132,8 @@ export async function POST(request: Request) {
         if (Date.now() >= deadline) {
           if (workerSessionId) {
             await heartbeatWorkerSession({
-              agentId: textValue(agent.id),
+              accessScope: access.scope,
+              agentId,
               status: "idle",
               workerSessionId
             });
@@ -142,13 +148,17 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const bundle = await getTaskBundle({ taskId: reserved.task.id });
+      const bundle = await getTaskBundle({
+        accessScope: access.scope,
+        taskId: reserved.task.id
+      });
       let workItem;
 
       try {
         workItem = await buildTaskWorkItem(bundle.task);
       } catch (error) {
         await failTask({
+          accessScope: access.scope,
           agentId: reserved.agent.id,
           applyFailure: (context) =>
             applyTaskFailureResult({

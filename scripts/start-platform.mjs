@@ -21,8 +21,13 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function envText(name) {
-  return process.env[name]?.trim() || "";
+function workerAgentKeyConfigured() {
+  return Object.entries(process.env).some(
+    ([key, value]) =>
+      key.startsWith("WORKER_") &&
+      key.endsWith("_AGENT_API_KEY") &&
+      value?.trim()
+  );
 }
 
 function startProcess(name, args, env = process.env) {
@@ -157,8 +162,10 @@ async function main() {
     throw new Error(`Invalid PORT/NEXT_PORT value: ${process.env.PORT}`);
   }
 
-  if (!envText("WORKER_API_TOKEN")) {
-    throw new Error("WORKER_API_TOKEN is required when using npm run start:platform");
+  if (!workerAgentKeyConfigured()) {
+    throw new Error(
+      "DB-managed agent API keys are required when using npm run start:platform. Set profile-specific WORKER_<MODE>_AGENT_API_KEY values."
+    );
   }
 
   startProcess("web", ["run", "start"]);

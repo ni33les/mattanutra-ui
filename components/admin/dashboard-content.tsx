@@ -228,6 +228,8 @@ export type AdminContent = Readonly<{
     accepted: string;
     active: string;
     actor: string;
+    addAgent: string;
+    addAgentAssociation: string;
     addMembership: string;
     addOrganisation: string;
     agents: string;
@@ -238,12 +240,15 @@ export type AdminContent = Readonly<{
     assumed: string;
     audit: string;
     capabilities: string;
+    credentials: string;
+    createdAt: string;
     create: string;
     createOrganisation: string;
     defaultLocale: string;
     deleted: string;
     deleteInvitation: string;
     deleteMembership: string;
+    details: string;
     disabled: string;
     email: string;
     error: string;
@@ -251,6 +256,8 @@ export type AdminContent = Readonly<{
     expiresAt: string;
     filterByOrganisation: string;
     filterByPerson: string;
+    generateKey: string;
+    grokModel: string;
     invite: string;
     inactivePerson: string;
     invitePerson: string;
@@ -260,20 +267,33 @@ export type AdminContent = Readonly<{
     memberships: string;
     membershipAdded: string;
     membershipDeleted: string;
+    model: string;
     name: string;
+    noCredentials: string;
+    noPrompt: string;
     organisation: string;
     organisations: string;
+    owner: string;
     people: string;
     pending: string;
     platform: string;
     preferredLocale: string;
+    prompt: string;
+    keyLabel: string;
+    apiKey: string;
+    keyShownOnce: string;
+    lastUsedAt: string;
+    reasoningLevel: string;
     role: string;
     revoked: string;
+    revokeKey: string;
+    rotateKey: string;
     save: string;
     session: string;
     slug: string;
     status: string;
     stopAssuming: string;
+    type: string;
     updated: string;
   };
   settings: {
@@ -691,7 +711,9 @@ const baseContent = {
       accepted: "Accepted",
       active: "Active",
       actor: "Signed in as",
-      addMembership: "Add membership",
+      addAgent: "Invite agent",
+      addAgentAssociation: "Associate Agent",
+      addMembership: "Associate Person",
       addOrganisation: "Add Organisation",
       agents: "Agents",
       alreadyMember: "This person already belongs to that organisation. Use Memberships to change their role or status.",
@@ -701,12 +723,15 @@ const baseContent = {
       assumed: "Viewing as",
       audit: "Audit",
       capabilities: "Capabilities",
+      credentials: "Credentials",
+      createdAt: "Created",
       create: "Create",
       createOrganisation: "Create retailer",
       defaultLocale: "Default language",
       deleted: "Deleted",
       deleteInvitation: "Delete invite",
       deleteMembership: "Delete membership",
+      details: "Details",
       disabled: "Disabled",
       email: "Email",
       error: "Could not update access controls.",
@@ -714,6 +739,8 @@ const baseContent = {
       expiresAt: "Expires",
       filterByOrganisation: "Filter by organisation",
       filterByPerson: "Filter by person",
+      generateKey: "Generate key",
+      grokModel: "Grok model",
       invite: "Invite",
       inactivePerson: "This person already exists but is not active. Update their person record before adding access.",
       invitePerson: "Invite person",
@@ -723,20 +750,33 @@ const baseContent = {
       memberships: "Memberships",
       membershipAdded: "Existing person found. Organisation access was added without creating a new passkey invite.",
       membershipDeleted: "Membership deleted.",
+      model: "Model",
       name: "Name",
+      noCredentials: "No active credentials yet.",
+      noPrompt: "No prompt stored.",
       organisation: "Organisation",
       organisations: "Organisations",
+      owner: "Owner",
       people: "People",
       pending: "Pending",
       platform: "Platform",
       preferredLocale: "Preferred language",
+      prompt: "Prompt",
+      keyLabel: "Key label",
+      apiKey: "API key",
+      keyShownOnce: "This key is shown once. Store it in the worker or integration secret store now.",
+      lastUsedAt: "Last used",
+      reasoningLevel: "Reasoning",
       role: "Role",
       revoked: "Revoked",
+      revokeKey: "Revoke key",
+      rotateKey: "Rotate key",
       save: "Save",
       session: "Session",
       slug: "Slug",
       status: "Status",
       stopAssuming: "Stop assuming",
+      type: "Type",
       updated: "Access controls updated."
     },
     settings: {
@@ -1254,7 +1294,9 @@ const baseContent = {
       accepted: "ตอบรับแล้ว",
       active: "ใช้งาน",
       actor: "เข้าสู่ระบบเป็น",
-      addMembership: "เพิ่มสมาชิก",
+      addAgent: "เชิญเอเจนต์",
+      addAgentAssociation: "เชื่อมโยงเอเจนต์",
+      addMembership: "เชื่อมโยงผู้ใช้",
       addOrganisation: "เพิ่มองค์กร",
       agents: "เอเจนต์",
       alreadyMember: "ผู้ใช้นี้อยู่ในองค์กรนี้แล้ว ใช้ส่วนสมาชิกเพื่อเปลี่ยนบทบาทหรือสถานะ",
@@ -1264,12 +1306,15 @@ const baseContent = {
       assumed: "กำลังดูเป็น",
       audit: "ประวัติ",
       capabilities: "ความสามารถ",
+      credentials: "คีย์",
+      createdAt: "สร้างเมื่อ",
       create: "สร้าง",
       createOrganisation: "สร้างผู้ค้าปลีก",
       defaultLocale: "ภาษาเริ่มต้น",
       deleted: "ลบแล้ว",
       deleteInvitation: "ลบคำเชิญ",
       deleteMembership: "ลบสมาชิก",
+      details: "รายละเอียด",
       disabled: "ปิดใช้งาน",
       email: "อีเมล",
       error: "ไม่สามารถอัปเดตสิทธิ์ได้",
@@ -1277,6 +1322,8 @@ const baseContent = {
       expiresAt: "หมดอายุ",
       filterByOrganisation: "กรองตามองค์กร",
       filterByPerson: "กรองตามผู้ใช้",
+      generateKey: "สร้างคีย์",
+      grokModel: "โมเดล Grok",
       invite: "เชิญ",
       inactivePerson: "ผู้ใช้นี้มีอยู่แล้วแต่ยังไม่ได้เปิดใช้งาน โปรดแก้ไขข้อมูลผู้ใช้ก่อนเพิ่มสิทธิ์",
       invitePerson: "เชิญผู้ใช้",
@@ -1286,20 +1333,33 @@ const baseContent = {
       memberships: "สมาชิก",
       membershipAdded: "พบผู้ใช้เดิมแล้ว เพิ่มสิทธิ์เข้าองค์กรโดยไม่สร้างคำเชิญ passkey ใหม่",
       membershipDeleted: "ลบสมาชิกแล้ว",
+      model: "โมเดล",
       name: "ชื่อ",
+      noCredentials: "ยังไม่มีคีย์ที่ใช้งานอยู่",
+      noPrompt: "ยังไม่มี prompt ที่บันทึกไว้",
       organisation: "องค์กร",
       organisations: "องค์กร",
+      owner: "เจ้าของ",
       people: "ผู้ใช้",
       pending: "รอดำเนินการ",
       platform: "แพลตฟอร์ม",
       preferredLocale: "ภาษาที่ต้องการ",
+      prompt: "Prompt",
+      keyLabel: "ชื่อคีย์",
+      apiKey: "API key",
+      keyShownOnce: "คีย์นี้จะแสดงครั้งเดียว โปรดเก็บไว้ใน secret store ของ worker หรือ integration ตอนนี้",
+      lastUsedAt: "ใช้ล่าสุด",
+      reasoningLevel: "ระดับ reasoning",
       role: "บทบาท",
       revoked: "ยกเลิกแล้ว",
+      revokeKey: "ยกเลิกคีย์",
+      rotateKey: "หมุนคีย์",
       save: "บันทึก",
       session: "เซสชัน",
       slug: "Slug",
       status: "สถานะ",
       stopAssuming: "หยุดสวมบทบาท",
+      type: "ประเภท",
       updated: "อัปเดตสิทธิ์แล้ว"
     },
     settings: {

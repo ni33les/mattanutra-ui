@@ -1,6 +1,6 @@
 import {
   openClawJson,
-  requireOpenClawRequest
+  requireOpenClawAccess
 } from "@/lib/openclaw-api";
 
 export const runtime = "nodejs";
@@ -17,14 +17,14 @@ type OpenClawPlanRouteProps = Readonly<{
  * This surface exists so OpenClaw (and future external concierges) can store
  * and retrieve chat turns against a MattaNutra nutrition plan.
  *
- * Currently a minimal stub that satisfies the ADMIN_CLAW_TOKEN auth boundary
+ * Currently a minimal stub that satisfies the OpenClaw auth boundary
  * test while the full bidirectional chat + advisor handoff is completed.
  *
  * TODO: Implement using loadPlanChatMessages + appendPlanChatMessage from
  *       lib/plan-concierge.ts + enqueue appropriate follow-up tasks.
  */
 export async function GET(request: Request, { params }: OpenClawPlanRouteProps) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request);
   if (unauthorized) {
     return unauthorized;
   }
@@ -39,7 +39,7 @@ export async function GET(request: Request, { params }: OpenClawPlanRouteProps) 
 }
 
 export async function POST(request: Request, { params }: OpenClawPlanRouteProps) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request);
   if (unauthorized) {
     return unauthorized;
   }

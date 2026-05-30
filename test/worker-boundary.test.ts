@@ -140,12 +140,22 @@ describe("external worker boundaries", () => {
     assert.match(
       platformSource,
       /nextEnv\.loadEnvConfig\(process\.cwd\(\)\)/,
-      "start:platform must load .env.local before checking WORKER_API_TOKEN and spawning workers"
+      "start:platform must load .env.local before checking profile agent keys and spawning workers"
     );
     assert.match(
       runnerSource,
       /nextEnv\.loadEnvConfig\(process\.cwd\(\)\)/,
       "direct worker commands must load .env.local before registering with the worker API"
+    );
+    assert.doesNotMatch(
+      `${platformSource}\n${runnerSource}`,
+      /WORKER_API_TOKEN/,
+      "worker runtime startup must not fall back to the legacy shared worker token"
+    );
+    assert.match(
+      runnerSource,
+      /WORKER_\$\{mode\.toUpperCase\(\)\}_AGENT_API_KEY/,
+      "each worker profile must use its own DB-managed agent credential"
     );
   });
 
@@ -169,6 +179,41 @@ describe("external worker boundaries", () => {
       source,
       /tasks\.required_capabilities <@ \$\{reserveCapabilities\}::text\[\]/,
       "task reservation must match tasks against session-scoped capabilities"
+    );
+    assert.match(
+      source,
+      /join public\.organisations task_organisations[\s\S]*task_organisations\.id = tasks\.organisation_id/,
+      "task reservation must join the task organisation before selecting work"
+    );
+    assert.match(
+      source,
+      /\$\{accessScope\.role\}::text = 'platform_agent'[\s\S]*task_organisations\.organisation_type = 'platform'/,
+      "platform agents must only reserve platform organisation tasks"
+    );
+    assert.match(
+      source,
+      /\$\{accessScope\.role\}::text = 'retail_agent'[\s\S]*task_organisations\.organisation_type = 'tenant'[\s\S]*tasks\.organisation_id = \$\{accessScope\.organisationId\}::uuid/,
+      "retail agents must only reserve tasks for their own retail organisation"
+    );
+    assert.match(
+      source,
+      /organisation_id = \$\{organisationId\}::uuid/,
+      "task idempotency lookups must be scoped to the resolved organisation"
+    );
+    assert.match(
+      source,
+      /membership_id,\s*worker_session_id/,
+      "task reservations must persist the executing membership"
+    );
+    assert.match(
+      agentsSource,
+      /on conflict \(membership_id, instance_id\)/,
+      "worker sessions must be unique per agent membership and runtime instance"
+    );
+    assert.match(
+      agentsSource,
+      /intersectCapabilities\(accessScope\.capabilities, requestedCapabilities\)/,
+      "request bodies must not broaden DB-authenticated agent capabilities"
     );
     assert.match(
       alertsSource,

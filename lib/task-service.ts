@@ -60,13 +60,14 @@ import type {
   SpawnChildTaskInput,
   TaskAfterCommitEffect,
   TaskAgent,
+  TaskAgentAccessScope,
   TaskBundle,
   TaskDependency,
   TaskFailureContext,
   TaskRecord,
   TaskServiceDb,
-  WorkerSessionRow,
-  TaskRow
+  TaskRow,
+  WorkerSessionRow
 } from "@/lib/task-service-types";
 export {
   ensureWorkerSessionSchema,
@@ -95,6 +96,7 @@ export type {
   TaskActorType,
   TaskAfterCommitEffect,
   TaskAgent,
+  TaskAgentAccessScope,
   TaskBundle,
   TaskComment,
   TaskCommentType,
@@ -124,11 +126,13 @@ type Db = TaskServiceDb;
 type ActiveReservationRow = {
   agent_id: string;
   id: string;
+  membership_id: string | null;
   worker_session_id: string | null;
 };
 type TaskReservationResultRow = TaskRow & {
   reservation_agent_id: string | null;
   reservation_id: string | null;
+  reservation_membership_id: string | null;
   reservation_worker_session_id: string | null;
 };
 type ExpiredReservationClaimRow = ExpiredReservationRow & {
@@ -159,6 +163,122 @@ function normalizeExpiredReservationSweepLimit(value: number | undefined) {
 
 function uniqueUuids(values: ReadonlyArray<string | null | undefined>) {
   return [...new Set(values.flatMap((value) => uuidOrNull(value) ?? []))];
+}
+
+async function platformOrganisationId(sql: Db) {
+  const rows = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.organisations
+    where slug = 'mattanutra'
+      and organisation_type = 'platform'
+      and status = 'active'
+    limit 1
+  `;
+
+  if (!rows[0]?.id) {
+    throw new Error("Platform organisation is required to create tasks");
+  }
+
+  return rows[0].id;
+}
+
+function scopeAgentId(
+  input: Readonly<{
+    accessScope?: TaskAgentAccessScope | null;
+    agentId?: string | null;
+  }>
+) {
+  return uuidOrNull(input.accessScope?.agentId ?? input.agentId);
+}
+
+function scopeMembershipId(
+  input: Readonly<{
+    accessScope?: TaskAgentAccessScope | null;
+  }>
+) {
+  return uuidOrNull(input.accessScope?.membershipId);
+}
+
+async function ensurePlatformMembershipForAgent(
+  sql: Db,
+  agent: TaskAgent
+): Promise<TaskAgentAccessScope> {
+  const organisationId = await platformOrganisationId(sql);
+
+  await sql`
+    update public.agents
+    set
+      organisation_id = coalesce(organisation_id, ${organisationId}::uuid),
+      role = 'platform_agent',
+      updated_at = now()
+    where id = ${agent.id}::uuid
+  `;
+
+  const rows = await sql<Array<{ id: string }>>`
+    insert into public.organisation_memberships (
+      organisation_id,
+      principal_type,
+      agent_id,
+      role,
+      status,
+      metadata
+    )
+    values (
+      ${organisationId}::uuid,
+      'agent',
+      ${agent.id}::uuid,
+      'platform_agent',
+      'active',
+      jsonb_build_object('backfilledAt', now(), 'source', 'legacy_task_runtime')
+    )
+    on conflict (agent_id, organisation_id)
+      where principal_type = 'agent' and status <> 'deleted'
+    do update set
+      role = 'platform_agent',
+      status = 'active',
+      updated_at = now()
+    returning id::text
+  `;
+
+  if (!rows[0]?.id) {
+    throw new Error("Unable to resolve platform agent membership");
+  }
+
+  return {
+    agentId: agent.id,
+    agentName: agent.name,
+    capabilities: agent.capabilities,
+    membershipId: rows[0].id,
+    organisationId,
+    role: "platform_agent"
+  };
+}
+
+async function assertAccessScopeCanAccessTask(
+  sql: Db,
+  task: Pick<TaskRecord, "id" | "organisationId">,
+  accessScope?: TaskAgentAccessScope | null
+) {
+  if (!accessScope) {
+    return;
+  }
+
+  const rows = await sql<Array<{ organisation_type: string }>>`
+    select organisation_type
+    from public.organisations
+    where id = ${task.organisationId}::uuid
+      and status = 'active'
+    limit 1
+  `;
+  const organisationType = rows[0]?.organisation_type;
+  const allowed = accessScope.role === "platform_agent"
+    ? organisationType === "platform"
+    : organisationType === "tenant" &&
+      task.organisationId === accessScope.organisationId;
+
+  if (!allowed) {
+    throw new Error(`Agent membership cannot access task ${task.id}`);
+  }
 }
 
 async function insertTaskEvent(sql: Db, input: AddTaskEventInput) {
@@ -204,13 +324,15 @@ export async function addTaskEventWithDb(
 async function getActiveReservation(
   sql: Db,
   input: Readonly<{
+    accessScope?: TaskAgentAccessScope | null;
     agentId?: string | null;
     reservationId?: string | null;
     taskId: string;
     workerSessionId?: string | null;
   }>
 ) {
-  const agentId = uuidOrNull(input.agentId);
+  const agentId = scopeAgentId(input);
+  const membershipId = scopeMembershipId(input);
   const reservationId = uuidOrNull(input.reservationId);
   const workerSessionId = uuidOrNull(input.workerSessionId);
 
@@ -231,12 +353,13 @@ async function getActiveReservation(
   }
 
   const rows = await sql<ActiveReservationRow[]>`
-    select id::text, agent_id::text, worker_session_id::text
+    select id::text, agent_id::text, membership_id::text, worker_session_id::text
     from public.task_reservations
     where task_id = ${input.taskId}::uuid
       and status = 'active'
       and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
       and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+      and (${membershipId}::uuid is null or membership_id = ${membershipId}::uuid)
       and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
     order by reserved_at desc
     limit 1
@@ -397,17 +520,20 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
   let inheritedGroupId: string | null = null;
   let inheritedRayId: string | null = null;
   let inheritedPlanId: string | null = null;
+  let inheritedOrganisationId: string | null = null;
   let inheritedGroupLabel: string | null = null;
 
   if (parentContextTaskId) {
     const parentRows = await sql<Array<{
       group_label: string | null;
+      organisation_id: string | null;
       plan_id: string | null;
       ray_id: string | null;
       task_group_id: string;
     }>>`
       select
         group_label,
+        organisation_id::text,
         plan_id::text,
         ray_id::text,
         task_group_id::text
@@ -418,9 +544,18 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
     inheritedGroupId = parentRows[0]?.task_group_id ?? null;
     inheritedRayId = parentRows[0]?.ray_id ?? null;
     inheritedPlanId = parentRows[0]?.plan_id ?? null;
+    inheritedOrganisationId = parentRows[0]?.organisation_id ?? null;
     inheritedGroupLabel = parentRows[0]?.group_label ?? null;
   }
 
+  const organisationId =
+    uuidOrNull(input.organisationId) ??
+    inheritedOrganisationId ??
+    await platformOrganisationId(sql);
+
+  if (!organisationId) {
+    throw new Error("Task organisation could not be resolved");
+  }
   const taskGroupId =
     uuidOrNull(input.taskGroupId) ?? inheritedGroupId ?? taskId;
   const rayId = uuidOrNull(input.rayId) ?? inheritedRayId;
@@ -460,17 +595,18 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
     ? new Date(Date.now() + DEPENDENCY_BOOTSTRAP_DELAY_MS)
     : intendedScheduledFor;
 
-  if (idempotencyKey) {
-    const existing = await sql<TaskRow[]>`
-      select *
-      from public.tasks
-      where idempotency_scope_key = ${idempotencyScopeKey}
-        and idempotency_key = ${idempotencyKey}
-        and (
-          status not in ('completed', 'failed', 'cancelled', 'skipped')
-          or (
-            ${includeSuccessfulIdempotencyMatches}
-            and status in ('completed', 'skipped')
+	  if (idempotencyKey) {
+	    const existing = await sql<TaskRow[]>`
+	      select *
+	      from public.tasks
+	      where idempotency_scope_key = ${idempotencyScopeKey}
+	        and idempotency_key = ${idempotencyKey}
+	        and organisation_id = ${organisationId}::uuid
+	        and (
+	          status not in ('completed', 'failed', 'cancelled', 'skipped')
+	          or (
+	            ${includeSuccessfulIdempotencyMatches}
+	            and status in ('completed', 'skipped')
           )
         )
       order by
@@ -492,6 +628,7 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
   const inserted = await sql<TaskRow[]>`
     insert into public.tasks (
       id,
+      organisation_id,
       parent_task_id,
       plan_id,
       ray_id,
@@ -525,6 +662,7 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
     )
     values (
       ${taskId}::uuid,
+      ${organisationId}::uuid,
       ${parentTaskId}::uuid,
       ${planId}::uuid,
       ${rayId}::uuid,
@@ -891,7 +1029,12 @@ export async function addTaskEvent(input: AddTaskEventInput) {
   return insertTaskEvent(sql, input);
 }
 
-export async function getTaskBundle(input: Readonly<{ taskId: string }>) {
+export async function getTaskBundle(
+  input: Readonly<{
+    accessScope?: TaskAgentAccessScope | null;
+    taskId: string;
+  }>
+) {
   const sql = getRequiredSql();
   const taskId = uuidOrNull(input.taskId);
 
@@ -911,6 +1054,9 @@ export async function getTaskBundle(input: Readonly<{ taskId: string }>) {
   }
 
   const task = mapTask(taskRows[0]);
+
+  await assertAccessScopeCanAccessTask(sql, task, input.accessScope);
+
   const [commentRows, dependencyRows] = await Promise.all([
     sql<CommentRow[]>`
       select *
@@ -939,6 +1085,7 @@ export async function getTaskBundle(input: Readonly<{ taskId: string }>) {
 
 export async function assertActiveTaskReservation(
   input: Readonly<{
+    accessScope?: TaskAgentAccessScope | null;
     agentId?: string | null;
     reservationId?: string | null;
     taskId: string;
@@ -1021,6 +1168,7 @@ async function claimExpiredReservationsBatch(
       select
         task_reservations.id as reservation_id,
         task_reservations.agent_id as reservation_agent_id,
+        task_reservations.membership_id as reservation_membership_id,
         task_reservations.worker_session_id as reservation_worker_session_id,
         tasks.id as task_id,
         (tasks.attempts >= tasks.max_attempts) as exhausted,
@@ -1046,6 +1194,7 @@ async function claimExpiredReservationsBatch(
       returning
         expired.reservation_id,
         expired.reservation_agent_id,
+        expired.reservation_membership_id,
         expired.reservation_worker_session_id,
         expired.task_id,
         expired.exhausted,
@@ -1072,6 +1221,7 @@ async function claimExpiredReservationsBatch(
         public.tasks.*,
         released.reservation_id::text as reservation_id,
         released.reservation_agent_id::text as reservation_agent_id,
+        released.reservation_membership_id::text as reservation_membership_id,
         released.reservation_worker_session_id::text as reservation_worker_session_id,
         released.exhausted,
         released.retry_will_be_scheduled
@@ -1439,22 +1589,47 @@ export async function reserveNextTask(
   }
 
   let agent: TaskAgent;
+  let accessScope: TaskAgentAccessScope;
   let registeredTaskTypes: string[] = [];
   let reserveCapabilities: string[] = [];
 
   if (workerSessionId) {
+    const hasAuthenticatedScope = Boolean(input.accessScope);
     const sessionRows = await sql<Array<{
       agent: AgentRow;
+      membership_id: string;
+      organisation_id: string;
+      role: string;
       session: WorkerSessionRow;
     }>>`
       select
         to_jsonb(agents.*) as agent,
+        organisation_memberships.id::text as membership_id,
+        organisation_memberships.organisation_id::text as organisation_id,
+        organisation_memberships.role,
         to_jsonb(worker_sessions.*) as session
       from public.worker_sessions
       join public.agents on agents.id = worker_sessions.agent_id
+      join public.organisation_memberships
+        on organisation_memberships.id = worker_sessions.membership_id
+        and organisation_memberships.agent_id = worker_sessions.agent_id
+        and organisation_memberships.principal_type = 'agent'
+      join public.organisations
+        on organisations.id = organisation_memberships.organisation_id
       where worker_sessions.id = ${workerSessionId}::uuid
         and worker_sessions.status <> 'offline'
         and agents.status = 'active'
+        and organisation_memberships.status = 'active'
+        and organisations.status = 'active'
+        and (${input.accessScope?.agentId ?? null}::uuid is null or agents.id = ${input.accessScope?.agentId ?? null}::uuid)
+        and (${input.accessScope?.membershipId ?? null}::uuid is null or organisation_memberships.id = ${input.accessScope?.membershipId ?? null}::uuid)
+        and (
+          ${hasAuthenticatedScope}
+          or (
+            organisation_memberships.role = 'platform_agent'
+            and organisations.organisation_type = 'platform'
+          )
+        )
       limit 1
     `;
     const sessionRow = sessionRows[0];
@@ -1465,11 +1640,47 @@ export async function reserveNextTask(
 
     agent = mapAgent(sessionRow.agent);
     const session = mapWorkerSession(sessionRow.session);
+    accessScope = {
+      agentId: agent.id,
+      agentName: agent.name,
+      capabilities: agent.capabilities,
+      membershipId: sessionRow.membership_id,
+      organisationId: sessionRow.organisation_id,
+      role: sessionRow.role === "retail_agent" ? "retail_agent" : "platform_agent"
+    };
+    agent = {
+      ...agent,
+      organisationId: accessScope.organisationId,
+      role: accessScope.role
+    };
     reserveCapabilities = intersectCapabilities(
-      agent.capabilities,
+      accessScope.capabilities,
       session.capabilities
     );
     registeredTaskTypes = session.taskTypes;
+  } else if (input.accessScope) {
+    const agentRows = await sql<AgentRow[]>`
+      update public.agents set
+        last_seen_at = now(),
+        updated_at = now()
+      where id = ${input.accessScope.agentId}::uuid
+        and status = 'active'
+      returning *
+    `;
+
+    if (!agentRows[0]) {
+      throw new Error("Agent is not active");
+    }
+
+    accessScope = input.accessScope;
+    agent = {
+      ...mapAgent(agentRows[0]),
+      capabilities: accessScope.capabilities,
+      name: accessScope.agentName,
+      organisationId: accessScope.organisationId,
+      role: accessScope.role
+    };
+    reserveCapabilities = accessScope.capabilities;
   } else {
     agent = await upsertAgentRecord(sql, {
       capabilities: input.agent.capabilities,
@@ -1479,7 +1690,8 @@ export async function reserveNextTask(
       name: input.agent.name,
       type: input.agent.type ?? "external"
     });
-    reserveCapabilities = agent.capabilities;
+    accessScope = await ensurePlatformMembershipForAgent(sql, agent);
+    reserveCapabilities = accessScope.capabilities;
   }
 
   const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
@@ -1504,6 +1716,8 @@ export async function reserveNextTask(
     with candidate as (
       select tasks.*
       from public.tasks
+      join public.organisations task_organisations
+        on task_organisations.id = tasks.organisation_id
       where tasks.status = 'queued'
         and tasks.scheduled_for <= now()
         and tasks.attempts < tasks.max_attempts
@@ -1524,6 +1738,17 @@ export async function reserveNextTask(
         and (
           ${taskTypes.length < 1}
           or tasks.task_type = any(${taskTypes}::text[])
+        )
+        and (
+          (
+            ${accessScope.role}::text = 'platform_agent'
+            and task_organisations.organisation_type = 'platform'
+          )
+          or (
+            ${accessScope.role}::text = 'retail_agent'
+            and task_organisations.organisation_type = 'tenant'
+            and tasks.organisation_id = ${accessScope.organisationId}::uuid
+          )
         )
         and not exists (
           select 1
@@ -1567,7 +1792,7 @@ export async function reserveNextTask(
     claimed_task as (
       update public.tasks set
         status = 'reserved',
-        reserved_by_agent_id = ${agent.id}::uuid,
+        reserved_by_agent_id = ${accessScope.agentId}::uuid,
         lease_until = now() + make_interval(secs => ${leaseSeconds}),
         started_at = coalesce(public.tasks.started_at, now()),
         attempts = public.tasks.attempts + 1,
@@ -1581,6 +1806,7 @@ export async function reserveNextTask(
         id,
         task_id,
         agent_id,
+        membership_id,
         worker_session_id,
         status,
         reserved_at,
@@ -1590,7 +1816,8 @@ export async function reserveNextTask(
       select
         ${reservationId}::uuid,
         claimed_task.id,
-        ${agent.id}::uuid,
+        ${accessScope.agentId}::uuid,
+        ${accessScope.membershipId}::uuid,
         ${workerSessionId}::uuid,
         'active',
         now(),
@@ -1598,8 +1825,11 @@ export async function reserveNextTask(
         ${sql.json(
           toJsonValue({
             capabilities: reserveCapabilities,
+            membershipId: accessScope.membershipId,
+            organisationId: accessScope.organisationId,
             registeredTaskTypes,
             requestedTaskTypes,
+            role: accessScope.role,
             workerSessionId
           })
         )}::jsonb
@@ -1621,7 +1851,7 @@ export async function reserveNextTask(
       select
         gen_random_uuid(),
         claimed_task.id,
-        ${agent.id}::uuid,
+        ${accessScope.agentId}::uuid,
         'task_reserved',
         'accepted',
         'low',
@@ -1661,7 +1891,8 @@ export async function reserveNextTask(
         last_seen_at = now(),
         updated_at = now()
       where id = ${workerSessionId}::uuid
-        and agent_id = ${agent.id}::uuid
+        and agent_id = ${accessScope.agentId}::uuid
+        and membership_id = ${accessScope.membershipId}::uuid
     `;
   }
 
@@ -1686,7 +1917,8 @@ async function claimTaskCompletionApplication(
 ) {
   const taskId = uuidOrNull(input.taskId);
   const reservationId = uuidOrNull(input.reservationId);
-  const agentId = uuidOrNull(input.agentId);
+  const agentId = scopeAgentId(input);
+  const membershipId = scopeMembershipId(input);
   const workerSessionId = uuidOrNull(input.workerSessionId);
 
   if (!taskId) {
@@ -1708,12 +1940,13 @@ async function claimTaskCompletionApplication(
   const requiresReservation = Boolean(reservationId || agentId || workerSessionId);
   const rows = await sql<TaskReservationResultRow[]>`
     with active_reservation as (
-      select id, agent_id, worker_session_id
+      select id, agent_id, membership_id, worker_session_id
       from public.task_reservations
       where task_id = ${taskId}::uuid
         and status = 'active'
         and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
         and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+        and (${membershipId}::uuid is null or membership_id = ${membershipId}::uuid)
         and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
       order by reserved_at desc
       limit 1
@@ -1733,12 +1966,13 @@ async function claimTaskCompletionApplication(
       returning
         active_reservation.id::text,
         active_reservation.agent_id::text,
+        active_reservation.membership_id::text,
         active_reservation.worker_session_id::text
     ),
     reservation_info as (
       select * from extended_reservation
       union all
-      select null::text, null::text, null::text
+      select null::text, null::text, null::text, null::text
       where ${!requiresReservation}
     ),
     updated_task as (
@@ -1761,6 +1995,7 @@ async function claimTaskCompletionApplication(
         public.tasks.*,
         reservation_info.id as reservation_id,
         reservation_info.agent_id as reservation_agent_id,
+        reservation_info.membership_id as reservation_membership_id,
         reservation_info.worker_session_id as reservation_worker_session_id
     ),
     task_event as (
@@ -1805,6 +2040,7 @@ async function claimTaskCompletionApplication(
       ? {
           agent_id: row.reservation_agent_id ?? "",
           id: row.reservation_id,
+          membership_id: row.reservation_membership_id,
           worker_session_id: row.reservation_worker_session_id
         }
       : null,
@@ -1822,8 +2058,12 @@ async function finalizeTaskCompletion(
 ) {
   const taskId = uuidOrNull(input.completionInput.taskId);
   const agentId =
-    uuidOrNull(input.completionInput.agentId) ??
+    scopeAgentId(input.completionInput) ??
     input.claim.activeReservation?.agent_id ??
+    null;
+  const membershipId =
+    scopeMembershipId(input.completionInput) ??
+    input.claim.activeReservation?.membership_id ??
     null;
   const reservationId =
     uuidOrNull(input.completionInput.reservationId) ??
@@ -1841,21 +2081,22 @@ async function finalizeTaskCompletion(
 
   const rows = await sql<TaskReservationResultRow[]>`
     with active_reservation as (
-      select id, agent_id, worker_session_id
+      select id, agent_id, membership_id, worker_session_id
       from public.task_reservations
       where task_id = ${taskId}::uuid
         and status = 'active'
         and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
         and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+        and (${membershipId}::uuid is null or membership_id = ${membershipId}::uuid)
         and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
       order by reserved_at desc
       limit 1
     ),
     reservation_info as (
-      select id::text, agent_id::text, worker_session_id::text
+      select id::text, agent_id::text, membership_id::text, worker_session_id::text
       from active_reservation
       union all
-      select null::text, null::text, null::text
+      select null::text, null::text, null::text, null::text
       where ${!requiresReservation}
     ),
     updated_task as (
@@ -1878,6 +2119,7 @@ async function finalizeTaskCompletion(
         public.tasks.*,
         reservation_info.id as reservation_id,
         reservation_info.agent_id as reservation_agent_id,
+        reservation_info.membership_id as reservation_membership_id,
         reservation_info.worker_session_id as reservation_worker_session_id
     ),
     updated_reservation as (
@@ -1931,7 +2173,8 @@ async function finalizeTaskCompletion(
         current_task_id = null,
         last_seen_at = now(),
         updated_at = now()
-      where id = ${row.reservation_worker_session_id}::uuid
+	      where id = ${row.reservation_worker_session_id}::uuid
+        and (${row.reservation_membership_id ?? null}::uuid is null or membership_id = ${row.reservation_membership_id ?? null}::uuid)
     `;
   }
 
@@ -1952,7 +2195,7 @@ export async function completeTask(input: CompleteTaskInput) {
       input.applyResult
         ? await input.applyResult({
             afterCommit: (effect) => afterCommitEffects.push(effect),
-            agentId: input.agentId ?? claim.activeReservation?.agent_id,
+            agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
             reservationId: claim.activeReservation?.id ?? input.reservationId,
             resultPayload: input.resultPayload ?? {},
             sql,
@@ -1962,7 +2205,7 @@ export async function completeTask(input: CompleteTaskInput) {
     );
   } catch (error) {
     await addTaskEvent({
-      agentId: input.agentId ?? claim.activeReservation?.agent_id,
+      agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
       eventPayload: {
         error: errorMessage(error, "Task completion side effect failed."),
         reservationId: claim.activeReservation?.id,
@@ -1986,7 +2229,7 @@ export async function completeTask(input: CompleteTaskInput) {
   notifyTaskQueueChanged();
 
   await runTaskAfterCommitEffects({
-    agentId: input.agentId ?? claim.activeReservation?.agent_id,
+    agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
     effects: afterCommitEffects,
     taskId: task.id
   });
@@ -1998,7 +2241,8 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
   const sql = getRequiredSql();
   const taskId = uuidOrNull(input.taskId);
   const reservationId = uuidOrNull(input.reservationId);
-  const agentId = uuidOrNull(input.agentId);
+  const agentId = scopeAgentId(input);
+  const membershipId = scopeMembershipId(input);
   const workerSessionId = uuidOrNull(input.workerSessionId);
 
   if (!taskId || (!reservationId && !agentId && !workerSessionId)) {
@@ -2010,12 +2254,13 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
   const leaseSeconds = normalizeLeaseSeconds(input.leaseSeconds);
   const rows = await sql<TaskReservationResultRow[]>`
     with active_reservation as (
-      select id, agent_id, worker_session_id
+      select id, agent_id, membership_id, worker_session_id
       from public.task_reservations
       where task_id = ${taskId}::uuid
         and status = 'active'
         and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
         and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+        and (${membershipId}::uuid is null or membership_id = ${membershipId}::uuid)
         and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
       order by reserved_at desc
       limit 1
@@ -2032,6 +2277,7 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
         public.tasks.*,
         active_reservation.id::text as reservation_id,
         active_reservation.agent_id::text as reservation_agent_id,
+        active_reservation.membership_id::text as reservation_membership_id,
         active_reservation.worker_session_id::text as reservation_worker_session_id
     ),
     updated_reservation as (
@@ -2088,6 +2334,7 @@ export async function renewTaskLease(input: RenewTaskLeaseInput) {
         last_seen_at = now(),
         updated_at = now()
       where id = ${workerSessionId}::uuid
+        and (${row.reservation_membership_id ?? null}::uuid is null or membership_id = ${row.reservation_membership_id ?? null}::uuid)
     `;
   }
 
@@ -2113,7 +2360,8 @@ async function claimTaskFailureApplication(
 ) {
   const taskId = uuidOrNull(input.taskId);
   const reservationId = uuidOrNull(input.reservationId);
-  const agentId = uuidOrNull(input.agentId);
+  const agentId = scopeAgentId(input);
+  const membershipId = scopeMembershipId(input);
   const workerSessionId = uuidOrNull(input.workerSessionId);
 
   if (!taskId) {
@@ -2135,12 +2383,13 @@ async function claimTaskFailureApplication(
   const requiresReservation = Boolean(reservationId || agentId || workerSessionId);
   const rows = await sql<TaskReservationResultRow[]>`
     with active_reservation as (
-      select id, agent_id, worker_session_id
+      select id, agent_id, membership_id, worker_session_id
       from public.task_reservations
       where task_id = ${taskId}::uuid
         and status = 'active'
         and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
         and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+        and (${membershipId}::uuid is null or membership_id = ${membershipId}::uuid)
         and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
       order by reserved_at desc
       limit 1
@@ -2160,12 +2409,13 @@ async function claimTaskFailureApplication(
       returning
         active_reservation.id::text,
         active_reservation.agent_id::text,
+        active_reservation.membership_id::text,
         active_reservation.worker_session_id::text
     ),
     reservation_info as (
       select * from extended_reservation
       union all
-      select null::text, null::text, null::text
+      select null::text, null::text, null::text, null::text
       where ${!requiresReservation}
     ),
     updated_task as (
@@ -2188,6 +2438,7 @@ async function claimTaskFailureApplication(
         public.tasks.*,
         reservation_info.id as reservation_id,
         reservation_info.agent_id as reservation_agent_id,
+        reservation_info.membership_id as reservation_membership_id,
         reservation_info.worker_session_id as reservation_worker_session_id
     ),
     task_event as (
@@ -2232,6 +2483,7 @@ async function claimTaskFailureApplication(
       ? {
           agent_id: row.reservation_agent_id ?? "",
           id: row.reservation_id,
+          membership_id: row.reservation_membership_id,
           worker_session_id: row.reservation_worker_session_id
         }
       : null,
@@ -2249,8 +2501,12 @@ async function finalizeTaskFailure(
 ) {
   const taskId = uuidOrNull(input.failureInput.taskId);
   const agentId =
-    uuidOrNull(input.failureInput.agentId) ??
+    scopeAgentId(input.failureInput) ??
     input.claim.activeReservation?.agent_id ??
+    null;
+  const membershipId =
+    scopeMembershipId(input.failureInput) ??
+    input.claim.activeReservation?.membership_id ??
     null;
   const reservationId =
     uuidOrNull(input.failureInput.reservationId) ??
@@ -2268,21 +2524,22 @@ async function finalizeTaskFailure(
 
   const rows = await sql<TaskReservationResultRow[]>`
     with active_reservation as (
-      select id, agent_id, worker_session_id
+      select id, agent_id, membership_id, worker_session_id
       from public.task_reservations
       where task_id = ${taskId}::uuid
         and status = 'active'
         and (${reservationId}::uuid is null or id = ${reservationId}::uuid)
         and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+        and (${membershipId}::uuid is null or membership_id = ${membershipId}::uuid)
         and (${workerSessionId}::uuid is null or worker_session_id = ${workerSessionId}::uuid)
       order by reserved_at desc
       limit 1
     ),
     reservation_info as (
-      select id::text, agent_id::text, worker_session_id::text
+      select id::text, agent_id::text, membership_id::text, worker_session_id::text
       from active_reservation
       union all
-      select null::text, null::text, null::text
+      select null::text, null::text, null::text, null::text
       where ${!requiresReservation}
     ),
     updated_task as (
@@ -2305,6 +2562,7 @@ async function finalizeTaskFailure(
         public.tasks.*,
         reservation_info.id as reservation_id,
         reservation_info.agent_id as reservation_agent_id,
+        reservation_info.membership_id as reservation_membership_id,
         reservation_info.worker_session_id as reservation_worker_session_id
     ),
     updated_reservation as (
@@ -2362,6 +2620,7 @@ async function finalizeTaskFailure(
         last_seen_at = now(),
         updated_at = now()
       where id = ${row.reservation_worker_session_id}::uuid
+        and (${row.reservation_membership_id ?? null}::uuid is null or membership_id = ${row.reservation_membership_id ?? null}::uuid)
     `;
   }
 
@@ -2381,9 +2640,9 @@ export async function failTask(input: FailTaskInput) {
   try {
     resultPayload = payloadRecord(
       input.applyFailure
-        ? await input.applyFailure({
+	        ? await input.applyFailure({
             afterCommit: (effect) => afterCommitEffects.push(effect),
-            agentId: input.agentId ?? claim.activeReservation?.agent_id,
+            agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
             errorMessage: input.errorMessage,
             reservationId: claim.activeReservation?.id ?? input.reservationId,
             resultPayload: input.resultPayload ?? {},
@@ -2401,7 +2660,7 @@ export async function failTask(input: FailTaskInput) {
       failureApplicationError: message
     };
     await addTaskEvent({
-      agentId: input.agentId ?? claim.activeReservation?.agent_id,
+      agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
       eventPayload: {
         error: message,
         reservationId: claim.activeReservation?.id,
@@ -2422,7 +2681,7 @@ export async function failTask(input: FailTaskInput) {
 
   await scheduleRetryForFailedTask(sql, {
     errorMessage: input.errorMessage,
-    failedByAgentId: input.agentId ?? claim.activeReservation?.agent_id,
+    failedByAgentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
     resultPayload,
     task
   });
@@ -2430,7 +2689,7 @@ export async function failTask(input: FailTaskInput) {
   notifyTaskQueueChanged();
 
   await runTaskAfterCommitEffects({
-    agentId: input.agentId ?? claim.activeReservation?.agent_id,
+    agentId: input.accessScope?.agentId ?? input.agentId ?? claim.activeReservation?.agent_id,
     effects: afterCommitEffects,
     taskId: task.id
   });
@@ -2453,9 +2712,12 @@ export async function spawnChildTask(input: SpawnChildTaskInput) {
   }
 
   const parent = mapTask(parentRows[0]);
+  await assertAccessScopeCanAccessTask(sql, parent, input.accessScope);
+
   const created = await createTaskRecord(sql, {
     ...input,
     createdByTaskId: parent.id,
+    organisationId: parent.organisationId,
     parentTaskId: parent.id,
     planId: input.planId ?? parent.planId,
     rayId: input.rayId ?? parent.rayId,

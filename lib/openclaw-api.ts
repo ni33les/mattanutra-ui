@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import { adminClawRequestAllowed } from "@/lib/admin-auth";
+import {
+  resolveAccessPrincipal,
+  type AgentPrincipal
+} from "@/lib/access-principal";
+import { taskAgentAccessScopeFromPrincipal } from "@/lib/task-agent-access";
+import type { AdminPermission } from "@/lib/admin-rbac";
+import type { TaskAgentAccessScope } from "@/lib/task-service-types";
 
 const noStoreHeaders = {
   "Cache-Control": "no-store"
@@ -22,6 +29,49 @@ export function openClawUnauthorized() {
 
 export function requireOpenClawRequest(request: Request) {
   return adminClawRequestAllowed(request) ? null : openClawUnauthorized();
+}
+
+export type OpenClawAccess = Readonly<{
+  legacy: boolean;
+  principal: AgentPrincipal | null;
+  scope: TaskAgentAccessScope | null;
+  unauthorized: ReturnType<typeof openClawUnauthorized> | null;
+}>;
+
+export async function requireOpenClawAccess(
+  request: Request,
+  permission: AdminPermission = "tasks.write"
+): Promise<OpenClawAccess> {
+  const principal = await resolveAccessPrincipal(request, {
+    allowAgent: true,
+    allowLegacy: "admin_claw",
+    requiredPermission: permission
+  });
+
+  if (principal?.type === "agent") {
+    return {
+      legacy: false,
+      principal,
+      scope: taskAgentAccessScopeFromPrincipal(principal),
+      unauthorized: null
+    };
+  }
+
+  if (principal?.type === "legacy_token") {
+    return {
+      legacy: true,
+      principal: null,
+      scope: null,
+      unauthorized: null
+    };
+  }
+
+  return {
+    legacy: false,
+    principal: null,
+    scope: null,
+    unauthorized: openClawUnauthorized()
+  };
 }
 
 export function openClawJson(

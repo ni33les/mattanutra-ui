@@ -422,7 +422,7 @@ function FoodDetailsModal({
 
   return (
     <AdminModal onClose={onClose} panelClassName="max-w-2xl">
-          <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+          <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 pr-14">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
                 {localized.name.value}
@@ -438,14 +438,6 @@ function FoodDetailsModal({
                 </p>
               ) : null}
             </div>
-            <button
-              aria-label={labels.close}
-              className="rounded-md px-3 py-1.5 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
-              onClick={onClose}
-              type="button"
-            >
-              {labels.close}
-            </button>
           </div>
 
           <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">

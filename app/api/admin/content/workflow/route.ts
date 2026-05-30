@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  adminClawRequestAllowed,
-  adminDashboardOrClawRequestAllowed
-} from "@/lib/admin-auth";
+import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
+import { resolveAccessPrincipal } from "@/lib/access-principal";
 import { isUuid } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
@@ -90,8 +88,14 @@ export async function POST(request: Request) {
   >;
   const accessToken =
     request.headers.get("x-admin-dashboard-token") ?? textOrNull(body.accessToken);
+  const principal = await resolveAccessPrincipal(request, {
+    allowAgent: true,
+    allowLegacy: "admin_claw",
+    allowSession: true,
+    requiredPermission: "content.write"
+  });
 
-  if (!adminDashboardOrClawRequestAllowed(request, accessToken)) {
+  if (!principal && !adminDashboardOrClawRequestAllowed(request, accessToken)) {
     return NextResponse.json(
       { message: "Not found" },
       {
@@ -133,7 +137,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const machineRequest = adminClawRequestAllowed(request);
+    const machineRequest =
+      principal?.type === "agent" ||
+      (principal?.type === "legacy_token" && principal.source === "admin_claw");
     const targetStatus = storageStatus(requestedStatus);
     const scheduledFor =
       requestedStatus === "scheduled" && publishAt ? publishAt : new Date();
@@ -158,12 +164,15 @@ export async function POST(request: Request) {
         commentType: "instruction",
         visibility: "worker"
       },
+      organisationId:
+        principal?.type === "agent" ? principal.organisation.id : undefined,
       payload: {
         contentId,
         contentType: selectedContentType,
         publishAt: publishAt?.toISOString() ?? null,
         requestedStatus,
-        requestedBy: machineRequest ? "machine_api" : "admin_dashboard",
+        requestedBy:
+          principal?.type === "agent" ? principal.agentName : machineRequest ? "machine_api" : "admin_dashboard",
         targetStatus
       },
       reasoningEffort: "none",

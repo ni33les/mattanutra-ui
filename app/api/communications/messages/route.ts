@@ -1,6 +1,6 @@
 import {
   openClawJson,
-  requireOpenClawRequest,
+  requireOpenClawAccess,
   taskApiError
 } from "@/lib/openclaw-api";
 import {
@@ -33,7 +33,7 @@ function limitValue(value: string | null) {
 }
 
 export async function GET(request: Request) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "communications.read");
 
   if (unauthorized) {
     return unauthorized;

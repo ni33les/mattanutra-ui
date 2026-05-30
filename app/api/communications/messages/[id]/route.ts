@@ -1,7 +1,7 @@
 import {
   openClawJson,
   readJsonObject,
-  requireOpenClawRequest,
+  requireOpenClawAccess,
   taskApiError,
   textValue
 } from "@/lib/openclaw-api";
@@ -35,7 +35,7 @@ function statusValue(value: unknown): CommunicationMessageStatus | null {
 }
 
 export async function GET(request: Request, { params }: MessageRouteProps) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "communications.read");
 
   if (unauthorized) {
     return unauthorized;
@@ -60,7 +60,7 @@ export async function GET(request: Request, { params }: MessageRouteProps) {
 }
 
 export async function PATCH(request: Request, { params }: MessageRouteProps) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "communications.write");
 
   if (unauthorized) {
     return unauthorized;

@@ -50,6 +50,20 @@ export function AdminModal({
   title?: ReactNode;
 }>) {
   const handleClose = closeDisabled ? () => undefined : onClose;
+  const closeButton = (
+    <button
+      aria-label={closeLabel}
+      className={cx(
+        "inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-white text-xl leading-none text-gray-500 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60",
+        title ? "" : "absolute right-4 top-4 z-10"
+      )}
+      disabled={closeDisabled}
+      onClick={onClose}
+      type="button"
+    >
+      <span aria-hidden="true">&times;</span>
+    </button>
+  );
 
   return (
     <Dialog className="relative z-[100]" onClose={handleClose} open={open}>
@@ -77,18 +91,13 @@ export function AdminModal({
                     <div className="mt-1 text-sm text-gray-500">{description}</div>
                   ) : null}
                 </div>
-                <button
-                  aria-label={closeLabel}
-                  className="rounded-md px-3 py-1.5 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={closeDisabled}
-                  onClick={onClose}
-                  type="button"
-                >
-                  {closeLabel}
-                </button>
+                {closeButton}
               </div>
             ) : (
-              <DialogTitle className="sr-only">{label}</DialogTitle>
+              <>
+                <DialogTitle className="sr-only">{label}</DialogTitle>
+                {closeButton}
+              </>
             )}
             {children}
           </DialogPanel>

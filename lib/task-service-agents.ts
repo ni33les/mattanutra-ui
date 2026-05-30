@@ -7,6 +7,7 @@ import {
 } from "@/lib/task-service-utils";
 import {
   cleanText,
+  intersectCapabilities,
   mapAgent,
   mapWorkerSession,
   optionalText,
@@ -21,6 +22,8 @@ import type {
   AgentType,
   HeartbeatWorkerSessionInput,
   RegisterWorkerSessionInput,
+  TaskAgent,
+  TaskAgentAccessScope,
   TaskServiceDb,
   WorkerSessionRow
 } from "@/lib/task-service-types";
@@ -46,10 +49,11 @@ export async function ensureWorkerSessionSchema(sql?: postgres.Sql) {
 
   globalTaskServiceAgents.mattanutraWorkerSessionSchemaReady ??= (async () => {
     const requiredColumns = {
-      task_reservations: ["worker_session_id"],
+      task_reservations: ["membership_id", "worker_session_id"],
       worker_sessions: [
         "id",
         "agent_id",
+        "membership_id",
         "instance_id",
         "status",
         "capabilities",
@@ -222,33 +226,148 @@ export async function upsertAgent(input: Parameters<typeof upsertAgentRecord>[1]
   return upsertAgentRecord(sql, input);
 }
 
+async function platformOrganisationId(sql: Db) {
+  const rows = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.organisations
+    where slug = 'mattanutra'
+      and organisation_type = 'platform'
+      and status = 'active'
+    limit 1
+  `;
+
+  if (!rows[0]?.id) {
+    throw new Error("Platform organisation is required for legacy worker access");
+  }
+
+  return rows[0].id;
+}
+
+async function ensurePlatformMembershipForAgent(
+  sql: Db,
+  agent: TaskAgent
+): Promise<TaskAgentAccessScope> {
+  const organisationId = await platformOrganisationId(sql);
+
+  await sql`
+    update public.agents
+    set
+      organisation_id = coalesce(organisation_id, ${organisationId}::uuid),
+      role = 'platform_agent',
+      updated_at = now()
+    where id = ${agent.id}::uuid
+  `;
+
+  const rows = await sql<Array<{ id: string }>>`
+    insert into public.organisation_memberships (
+      organisation_id,
+      principal_type,
+      agent_id,
+      role,
+      status,
+      metadata
+    )
+    values (
+      ${organisationId}::uuid,
+      'agent',
+      ${agent.id}::uuid,
+      'platform_agent',
+      'active',
+      jsonb_build_object('backfilledAt', now(), 'source', 'legacy_worker_runtime')
+    )
+    on conflict (agent_id, organisation_id)
+      where principal_type = 'agent' and status <> 'deleted'
+    do update set
+      role = 'platform_agent',
+      status = case
+        when public.organisation_memberships.status = 'deleted' then 'deleted'
+        else 'active'
+      end,
+      updated_at = now()
+    returning id::text
+  `;
+
+  if (!rows[0]?.id) {
+    throw new Error("Unable to resolve platform agent membership");
+  }
+
+  return {
+    agentId: agent.id,
+    agentName: agent.name,
+    capabilities: agent.capabilities,
+    membershipId: rows[0].id,
+    organisationId,
+    role: "platform_agent"
+  };
+}
+
+async function scopedAgentFromDb(
+  sql: Db,
+  accessScope: TaskAgentAccessScope
+): Promise<TaskAgent> {
+  const rows = await sql<AgentRow[]>`
+    update public.agents set
+      last_seen_at = now(),
+      updated_at = now()
+    where id = ${accessScope.agentId}::uuid
+      and status = 'active'
+    returning *
+  `;
+
+  if (!rows[0]) {
+    throw new Error("Agent is not active");
+  }
+
+  return {
+    ...mapAgent(rows[0]),
+    capabilities: accessScope.capabilities,
+    name: accessScope.agentName,
+    organisationId: accessScope.organisationId,
+    role: accessScope.role
+  };
+}
+
 export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
   const sql = getRequiredSql();
 
   await ensureWorkerSessionSchema(sql);
   await hideLegacyAggregateWorkerAgent(sql);
 
-  const capabilities = normalizeCapabilities(
+  const requestedCapabilities = normalizeCapabilities(
     input.capabilities ?? input.agent.capabilities
   );
   const taskTypes = normalizeCapabilities(input.taskTypes);
   const sessionMetadata = input.metadata ?? {};
-  const agent = await upsertAgentRecord(sql, {
-    capabilities,
-    id: input.agent.id,
-    metadata: {
-      ...(input.agent.metadata ?? {}),
-      externalWorker: true
-    },
-    model: input.agent.model,
-    name: input.agent.name,
-    status: "active",
-    type: input.agent.type ?? "external"
-  });
+  let agent: TaskAgent;
+  let accessScope: TaskAgentAccessScope;
+
+  if (input.accessScope) {
+    accessScope = input.accessScope;
+    agent = await scopedAgentFromDb(sql, accessScope);
+  } else {
+    agent = await upsertAgentRecord(sql, {
+      capabilities: requestedCapabilities,
+      id: input.agent.id,
+      metadata: {
+        ...(input.agent.metadata ?? {}),
+        externalWorker: true
+      },
+      model: input.agent.model,
+      name: input.agent.name,
+      status: "active",
+      type: input.agent.type ?? "external"
+    });
+    accessScope = await ensurePlatformMembershipForAgent(sql, agent);
+  }
+
+  const capabilities = requestedCapabilities.length > 0
+    ? intersectCapabilities(accessScope.capabilities, requestedCapabilities)
+    : accessScope.capabilities;
   const rows = await sql<WorkerSessionRow[]>`
     insert into public.worker_sessions (
       id,
       agent_id,
+      membership_id,
       instance_id,
       status,
       capabilities,
@@ -262,7 +381,8 @@ export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
     )
     values (
       ${randomUUID()}::uuid,
-      ${agent.id}::uuid,
+      ${accessScope.agentId}::uuid,
+      ${accessScope.membershipId}::uuid,
       ${cleanText(input.instanceId, agent.name)},
       'idle',
       ${capabilities},
@@ -274,9 +394,10 @@ export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
       now(),
       now()
     )
-    on conflict (agent_id, instance_id)
+    on conflict (membership_id, instance_id)
     do update set
       status = 'idle',
+      agent_id = excluded.agent_id,
       capabilities = excluded.capabilities,
       task_types = excluded.task_types,
       concurrency = excluded.concurrency,
@@ -299,6 +420,7 @@ export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
       ),
       updated_at = now()
     where agent_id = ${agent.id}::uuid
+      and membership_id = ${accessScope.membershipId}::uuid
       and id <> ${session.id}::uuid
       and status <> 'offline'
       and last_seen_at < now() - interval '2 minutes'
@@ -317,7 +439,8 @@ export async function registerWorkerSession(input: RegisterWorkerSessionInput) {
 export async function heartbeatWorkerSession(input: HeartbeatWorkerSessionInput) {
   const sql = getRequiredSql();
   const workerSessionId = uuidOrNull(input.workerSessionId);
-  const agentId = uuidOrNull(input.agentId);
+  const agentId = uuidOrNull(input.accessScope?.agentId ?? input.agentId);
+  const membershipId = uuidOrNull(input.accessScope?.membershipId);
   const currentTaskId = uuidOrNull(input.currentTaskId);
 
   await ensureWorkerSessionSchema(sql);
@@ -339,6 +462,7 @@ export async function heartbeatWorkerSession(input: HeartbeatWorkerSessionInput)
       updated_at = now()
     where id = ${workerSessionId}::uuid
       and (${agentId}::uuid is null or agent_id = ${agentId}::uuid)
+      and (${membershipId}::uuid is null or membership_id = ${membershipId}::uuid)
       and (status <> 'offline' or ${status} = 'offline')
     returning *
   `;

@@ -1,4 +1,5 @@
 import type postgres from "postgres";
+import type { AgentRole } from "@/lib/admin-rbac";
 import type {
   NormalizedTaskRetryPolicy,
   TaskBusinessValue,
@@ -82,9 +83,21 @@ export type TaskAgent = Readonly<{
   metadata: unknown;
   model: string | null;
   name: string;
+  organisationId: string | null;
+  personId: string | null;
+  role: AgentRole;
   status: AgentStatus;
   type: AgentType;
   updatedAt: string;
+}>;
+
+export type TaskAgentAccessScope = Readonly<{
+  agentId: string;
+  agentName: string;
+  capabilities: string[];
+  membershipId: string;
+  organisationId: string;
+  role: AgentRole;
 }>;
 
 export type WorkerSession = Readonly<{
@@ -96,6 +109,7 @@ export type WorkerSession = Readonly<{
   id: string;
   instanceId: string;
   lastSeenAt: string | null;
+  membershipId: string;
   metadata: unknown;
   status: WorkerSessionStatus;
   taskTypes: string[];
@@ -120,6 +134,7 @@ export type TaskRecord = Readonly<{
   leaseUntil: string | null;
   maxAttempts: number;
   maxRetries: number;
+  organisationId: string;
   parentTaskId: string | null;
   payload: unknown;
   planId: string | null;
@@ -186,6 +201,9 @@ export type AgentRow = {
   metadata: unknown;
   model: string | null;
   name: string;
+  organisation_id: string | null;
+  person_id: string | null;
+  role: AgentRole;
   status: AgentStatus;
   agent_type: AgentType;
   updated_at: Date | string;
@@ -200,6 +218,7 @@ export type WorkerSessionRow = {
   id: string;
   instance_id: string;
   last_seen_at: Date | string | null;
+  membership_id: string | null;
   metadata: unknown;
   status: WorkerSessionStatus;
   task_types: string[];
@@ -224,6 +243,7 @@ export type TaskRow = {
   lease_until: Date | string | null;
   max_attempts: number;
   max_retries: number;
+  organisation_id: string;
   parent_task_id: string | null;
   payload: unknown;
   plan_id: string | null;
@@ -269,6 +289,7 @@ export type DependencyRow = {
 export type ExpiredReservationRow = TaskRow & {
   reservation_agent_id: string;
   reservation_id: string;
+  reservation_membership_id: string | null;
   reservation_worker_session_id: string | null;
 };
 
@@ -299,6 +320,7 @@ export type CreateTaskInput = Readonly<{
   initialComment?: Omit<AddTaskCommentInput, "taskId">;
   maxAttempts?: number;
   maxRetries?: unknown;
+  organisationId?: string | null;
   parentTaskId?: string | null;
   payload?: Record<string, unknown>;
   planId?: string | null;
@@ -337,6 +359,7 @@ export type AddTaskEventInput = Readonly<{
 }>;
 
 export type ReserveNextTaskInput = Readonly<{
+  accessScope?: TaskAgentAccessScope | null;
   agent: Readonly<{
     capabilities?: unknown;
     id?: string | null;
@@ -362,6 +385,7 @@ export type RetryFailedTaskInput = Readonly<{
 }>;
 
 export type CompleteTaskInput = Readonly<{
+  accessScope?: TaskAgentAccessScope | null;
   agentId?: string | null;
   applyResult?: (context: TaskCompletionContext) => Promise<unknown>;
   reservationId?: string | null;
@@ -373,6 +397,7 @@ export type CompleteTaskInput = Readonly<{
 export type TaskAfterCommitEffect = () => Promise<void>;
 
 export type FailTaskInput = Readonly<{
+  accessScope?: TaskAgentAccessScope | null;
   agentId?: string | null;
   applyFailure?: (context: TaskFailureContext) => Promise<unknown>;
   errorMessage: string;
@@ -403,6 +428,7 @@ export type TaskFailureContext = Readonly<{
 }>;
 
 export type RenewTaskLeaseInput = Readonly<{
+  accessScope?: TaskAgentAccessScope | null;
   agentId?: string | null;
   leaseSeconds?: unknown;
   reservationId?: string | null;
@@ -411,6 +437,7 @@ export type RenewTaskLeaseInput = Readonly<{
 }>;
 
 export type RegisterWorkerSessionInput = Readonly<{
+  accessScope?: TaskAgentAccessScope | null;
   agent: Readonly<{
     capabilities?: unknown;
     id?: string | null;
@@ -428,6 +455,7 @@ export type RegisterWorkerSessionInput = Readonly<{
 }>;
 
 export type HeartbeatWorkerSessionInput = Readonly<{
+  accessScope?: TaskAgentAccessScope | null;
   agentId?: string | null;
   currentTaskId?: string | null;
   metadata?: Record<string, unknown>;
@@ -437,6 +465,7 @@ export type HeartbeatWorkerSessionInput = Readonly<{
 
 export type SpawnChildTaskInput = Omit<CreateTaskInput, "createdByTaskId" | "parentTaskId"> &
   Readonly<{
+    accessScope?: TaskAgentAccessScope | null;
     parentTaskId: string;
   }>;
 

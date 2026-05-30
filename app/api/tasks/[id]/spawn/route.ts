@@ -12,7 +12,7 @@ import {
   type TaskDependencyType,
   type TaskReasoningEffort
 } from "@/lib/task-service";
-import { requireWorkerRequest } from "@/lib/worker-auth";
+import { requireWorkerAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
 
@@ -66,7 +66,8 @@ function dependencies(value: unknown) {
 }
 
 export async function POST(request: Request, { params }: SpawnTaskRouteProps) {
-  const unauthorized = requireWorkerRequest(request);
+  const access = await requireWorkerAccess(request);
+  const unauthorized = access.unauthorized;
 
   if (unauthorized) {
     return unauthorized;
@@ -92,9 +93,11 @@ export async function POST(request: Request, { params }: SpawnTaskRouteProps) {
   }
 
   try {
-    const agentId = textValue(body.createdByAgentId);
+    const agentId =
+      access.principal?.agentId ?? textValue(body.createdByAgentId);
 
     await assertActiveTaskReservation({
+      accessScope: access.scope,
       agentId,
       reservationId,
       taskId: id,
@@ -102,6 +105,7 @@ export async function POST(request: Request, { params }: SpawnTaskRouteProps) {
     });
 
     const created = await spawnChildTask({
+      accessScope: access.scope,
       actorType: actorType(body.actorType),
       createdByAgentId: agentId,
       dependencies: dependencies(body.dependencies),

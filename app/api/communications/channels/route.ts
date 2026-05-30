@@ -2,7 +2,7 @@ import {
   objectValue,
   openClawJson,
   readJsonObject,
-  requireOpenClawRequest,
+  requireOpenClawAccess,
   taskApiError,
   textValue
 } from "@/lib/openclaw-api";
@@ -26,7 +26,7 @@ function numberValue(value: unknown) {
 }
 
 export async function GET(request: Request) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "communications.read");
 
   if (unauthorized) {
     return unauthorized;
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "communications.write");
 
   if (unauthorized) {
     return unauthorized;
