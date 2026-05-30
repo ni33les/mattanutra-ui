@@ -38,6 +38,11 @@ export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
     requiredForReload: true
   },
   {
+    description: "Locale-scalable supplement display copy and aliases.",
+    name: "supplement_translations",
+    requiredForReload: true
+  },
+  {
     description: "Append-only supplement identity/status versions.",
     name: "supplement_versions",
     requiredForReload: true
@@ -146,6 +151,7 @@ export const CATALOGUE_RELOAD_ORDER = [
   "supplements",
   "supplement_aliases",
   "supplement_safety_limits",
+  "supplement_translations",
   "supplement_versions",
   "product_brands",
   "product_brand_countries",
@@ -189,6 +195,7 @@ export const CATALOGUE_TRUNCATE_ORDER = [
   "product_brand_countries",
   "product_brands",
   "supplement_versions",
+  "supplement_translations",
   "supplement_safety_limits",
   "supplement_aliases",
   "supplements",

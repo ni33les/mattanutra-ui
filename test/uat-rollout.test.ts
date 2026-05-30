@@ -66,9 +66,37 @@ function sampleSnapshotTables(overrides: Record<string, unknown[]> = {}) {
     ],
     product_facts: [{ id: "fact-1" }],
     products: [{ id: "product-1" }],
+    product_translations: [
+      {
+        product_id: "product-1",
+        locale: "en"
+      },
+      {
+        product_id: "product-1",
+        locale: "th"
+      },
+      {
+        product_id: "product-1",
+        locale: "zh-CN"
+      }
+    ],
     supplement_aliases: [{ id: "alias-1" }],
     supplement_safety_limits: [{ id: "limit-1" }],
     supplements: [{ id: "supplement-1" }],
+    supplement_translations: [
+      {
+        supplement_id: "supplement-1",
+        locale: "en"
+      },
+      {
+        supplement_id: "supplement-1",
+        locale: "th"
+      },
+      {
+        supplement_id: "supplement-1",
+        locale: "zh-CN"
+      }
+    ],
     testimonials: [
       {
         id: "testimonial-1",
@@ -86,6 +114,8 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.match(packageJson.scripts?.["uat:rebuild"] ?? "", /rebuild-uat-db\.mjs/);
     assert.match(uatRebuildScript, /scripts\/reset-dev-db\.mjs/);
     assert.match(uatRebuildScript, /scripts\/catalogue-reload\.ts/);
+    assert.match(uatRebuildScript, /DB_ALLOW_DIRECT_CONNECTION/);
+    assert.match(uatRebuildScript, /DB_POOL_MAX/);
     assert.match(uatRebuildScript, /foods:schema:apply/);
     assert.match(uatRebuildScript, /locales:schema:apply/);
     assert.match(uatRebuildScript, /versions:core:check/);
@@ -112,6 +142,7 @@ describe("UAT destructive rebuild master data guardrails", () => {
 
   it("orders reloads and truncates around foreign-key dependencies", () => {
     assert.ok(indexOf("site_locales", CATALOGUE_RELOAD_ORDER) < indexOf("testimonials", CATALOGUE_RELOAD_ORDER));
+    assert.ok(indexOf("supplements", CATALOGUE_RELOAD_ORDER) < indexOf("supplement_translations", CATALOGUE_RELOAD_ORDER));
     assert.ok(indexOf("finance_accounts", CATALOGUE_RELOAD_ORDER) < indexOf("products", CATALOGUE_RELOAD_ORDER));
     assert.ok(indexOf("testimonials", CATALOGUE_RELOAD_ORDER) < indexOf("blog_posts", CATALOGUE_RELOAD_ORDER));
     assert.ok(indexOf("nutrients", CATALOGUE_RELOAD_ORDER) < indexOf("food_nutrient_profiles", CATALOGUE_RELOAD_ORDER));
@@ -121,6 +152,7 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.ok(indexOf("blog_posts", CATALOGUE_TRUNCATE_ORDER) < indexOf("testimonials", CATALOGUE_TRUNCATE_ORDER));
     assert.ok(indexOf("food_translations", CATALOGUE_TRUNCATE_ORDER) < indexOf("foods", CATALOGUE_TRUNCATE_ORDER));
     assert.ok(indexOf("product_facts", CATALOGUE_TRUNCATE_ORDER) < indexOf("products", CATALOGUE_TRUNCATE_ORDER));
+    assert.ok(indexOf("supplement_translations", CATALOGUE_TRUNCATE_ORDER) < indexOf("supplements", CATALOGUE_TRUNCATE_ORDER));
   });
 
   it("filters archived content out of snapshot SQL", () => {
@@ -150,6 +182,26 @@ describe("UAT destructive rebuild master data guardrails", () => {
         finance_accounts: []
       }), { strict: true }).errors.join("; "),
       /finance_accounts/
+    );
+
+    assert.match(
+      validateCuratedMasterSnapshot(sampleSnapshotTables({
+        product_translations: [
+          { product_id: "product-1", locale: "en" },
+          { product_id: "product-1", locale: "th" }
+        ]
+      }), { strict: true }).errors.join("; "),
+      /product product-1 is missing zh-CN translation/
+    );
+
+    assert.match(
+      validateCuratedMasterSnapshot(sampleSnapshotTables({
+        supplement_translations: [
+          { supplement_id: "supplement-1", locale: "en" },
+          { supplement_id: "supplement-1", locale: "th" }
+        ]
+      }), { strict: true }).errors.join("; "),
+      /supplement supplement-1 is missing zh-CN translation/
     );
 
     assert.match(

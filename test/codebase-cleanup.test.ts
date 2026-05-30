@@ -198,6 +198,7 @@ describe("codebase cleanup guardrails", () => {
       "products",
       "supplement_aliases",
       "supplement_safety_limits",
+      "supplement_translations",
       "supplement_versions",
       "supplements",
       "testimonials"

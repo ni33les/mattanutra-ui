@@ -13,7 +13,9 @@ const REQUIRED_NON_EMPTY_TABLES = [
   "supplements",
   "supplement_aliases",
   "supplement_safety_limits",
+  "supplement_translations",
   "products",
+  "product_translations",
   "product_facts",
   "foods",
   "food_translations",
@@ -47,6 +49,50 @@ function foodImageFileExists(imagePath: string) {
   return existsSync(join(process.cwd(), "public", imagePath.replace(/^\//, "")));
 }
 
+function localeCoverageById(rows: readonly Record<string, unknown>[], idColumn: string) {
+  const localesById = new Map<string, Set<string>>();
+
+  for (const row of rows) {
+    const id = textValue(row[idColumn]);
+    const locale = textValue(row.locale);
+
+    if (!id || !locale) {
+      continue;
+    }
+
+    const locales = localesById.get(id) ?? new Set<string>();
+    locales.add(locale);
+    localesById.set(id, locales);
+  }
+
+  return localesById;
+}
+
+function validateLocaleCoverage(
+  errors: string[],
+  options: Readonly<{
+    entityLabel: string;
+    entityName: (row: Record<string, unknown>) => string;
+    idColumn: string;
+    rows: readonly Record<string, unknown>[];
+    translations: readonly Record<string, unknown>[];
+  }>
+) {
+  const localesById = localeCoverageById(options.translations, options.idColumn);
+
+  for (const row of options.rows) {
+    const id = textValue(row.id);
+    const name = options.entityName(row);
+    const locales = localesById.get(id);
+
+    for (const locale of publicLocales) {
+      if (!locales?.has(locale)) {
+        errors.push(`${options.entityLabel} ${name} is missing ${locale} translation`);
+      }
+    }
+  }
+}
+
 export function validateCuratedMasterSnapshot(
   tables: SnapshotTables,
   options: Readonly<{ strict?: boolean }> = {}
@@ -75,7 +121,6 @@ export function validateCuratedMasterSnapshot(
 
   const foods = rowsFor("foods", tables);
   const translations = rowsFor("food_translations", tables);
-  const translationLocalesByFood = new Map<string, Set<string>>();
   const financeAccountIds = new Set(
     rowsFor("finance_accounts", tables)
       .map((row) => textValue(row.id))
@@ -88,18 +133,23 @@ export function validateCuratedMasterSnapshot(
     }
   }
 
-  for (const translation of translations) {
-    const foodId = textValue(translation.food_id);
-    const locale = textValue(translation.locale);
+  validateLocaleCoverage(errors, {
+    entityLabel: "product",
+    entityName: (row) => textValue(row.title) || textValue(row.name) || textValue(row.id),
+    idColumn: "product_id",
+    rows: rowsFor("products", tables),
+    translations: rowsFor("product_translations", tables)
+  });
 
-    if (!foodId || !locale) {
-      continue;
-    }
+  validateLocaleCoverage(errors, {
+    entityLabel: "supplement",
+    entityName: (row) => textValue(row.name) || textValue(row.id),
+    idColumn: "supplement_id",
+    rows: rowsFor("supplements", tables),
+    translations: rowsFor("supplement_translations", tables)
+  });
 
-    const locales = translationLocalesByFood.get(foodId) ?? new Set<string>();
-    locales.add(locale);
-    translationLocalesByFood.set(foodId, locales);
-  }
+  const translationLocalesByFood = localeCoverageById(translations, "food_id");
 
   for (const food of foods) {
     const active = boolValue(food.is_active, true);

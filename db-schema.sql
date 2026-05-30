@@ -1290,10 +1290,10 @@ CREATE TABLE public.plan_communication_identities (
 
 CREATE TABLE public.plan_feedback (
     id uuid NOT NULL,
-    plan_id uuid NOT NULL REFERENCES public.assessments(plan_id),
+    plan_id uuid NOT NULL,
     source_message_id uuid,
     source_task_id uuid,
-    feedback_type text NOT NULL CHECK (feedback_type = ANY (ARRAY['budget'::text, 'capsule_limit'::text, 'constraint'::text, 'cuisine'::text, 'dislike'::text, 'preference'::text, 'removal'::text, 'routine'::text, 'safety_disclosure'::text, 'other'::text])),
+    feedback_type text NOT NULL,
     item_type text,
     item_id text,
     item_name text,
@@ -1324,11 +1324,11 @@ COMMENT ON TABLE public.plan_feedback IS 'Durable concierge feedback and prefere
 
 CREATE TABLE public.plan_guidance_adjustments (
     id uuid NOT NULL,
-    plan_id uuid NOT NULL REFERENCES public.assessments(plan_id),
+    plan_id uuid NOT NULL,
     source_message_id uuid,
     source_task_id uuid,
     action text DEFAULT 'remove'::text NOT NULL,
-    item_type text NOT NULL CHECK (item_type in ('food', 'supplement')),
+    item_type text NOT NULL,
     item_id text,
     item_name text NOT NULL,
     normalized_item_name text NOT NULL,
@@ -2334,7 +2334,7 @@ SELECT
     'versioned_projection_baseline',
     to_jsonb(assessments),
     jsonb_build_object('source', 'versioned_projection_baseline'),
-    coalesce(assessments.created_at, now())
+    coalesce(assessments.captured_at, now())
 FROM public.assessments assessments
 ON CONFLICT DO NOTHING;
 
