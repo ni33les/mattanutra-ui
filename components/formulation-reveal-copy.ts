@@ -77,6 +77,7 @@ const baseRevealCopy = {
     formulaMetaNoPadding: "no padding",
     formulaMetaTier: "FORMULA · PRECISION TIER",
     formulaMetaNrv: "PRODUCT FIT · SELECTED STACK",
+    formulaMetaProductFitPending: "PRODUCT FIT · PROCESSING",
     formulaMetaFocus: "Focus",
     formulaSignedPrefix: "Composed",
     foodSupportDefaultBody:
@@ -186,6 +187,7 @@ const baseRevealCopy = {
     formulaMetaNoPadding: "ไม่เติมเกินจำเป็น",
     formulaMetaTier: "สูตร · ระดับความแม่นยำ",
     formulaMetaNrv: "ความพอดีของสินค้า · ชุดที่เลือก",
+    formulaMetaProductFitPending: "ความพอดีของสินค้า · กำลังประมวลผล",
     formulaMetaFocus: "เป้าหมาย",
     formulaSignedPrefix: "จัดทำ",
     foodSupportDefaultBody:
@@ -294,6 +296,7 @@ export const revealCopy = {
     "formulaMetaNoPadding": "无多余添加",
     "formulaMetaTier": "配方 · 精准层级",
     "formulaMetaNrv": "产品匹配度 · 所选配方",
+    "formulaMetaProductFitPending": "产品匹配度 · 处理中",
     "formulaMetaFocus": "专注",
     "formulaSignedPrefix": "配制于",
     "foodSupportDefaultBody": "食物不会改变产品覆盖评分。只有当产品配方留下补充剂缺口，且可通过管理食物合理支持时，它们才会出现。",
@@ -361,6 +364,51 @@ export const revealCopy = {
     "wellnessOnly": "仅限健康信息。如果您使用药物、怀孕或哺乳、有健康状况或情况发生变化，请与医生或药剂师分享此计划。"
   }
 } satisfies Record<Locale, Record<string, string>>;
+
+export const revealProductPendingCards = {
+  en: [
+    {
+      body: "Reading the formula gaps the product stack needs to cover.",
+      title: "Reading your formula",
+    },
+    {
+      body: "Filtering for approved products, labels, images, and marketplace links.",
+      title: "Checking approved products",
+    },
+    {
+      body: "Comparing dose fit, safety ceilings, overlap, and serving burden.",
+      title: "Scoring the stack",
+    },
+  ],
+  th: [
+    {
+      body: "กำลังอ่านช่องว่างในสูตรที่ชุดผลิตภัณฑ์ต้องครอบคลุม",
+      title: "อ่านสูตรของคุณ",
+    },
+    {
+      body: "กรองผลิตภัณฑ์ที่อนุมัติแล้ว ฉลาก รูปภาพ และลิงก์ซื้อ",
+      title: "ตรวจผลิตภัณฑ์ที่อนุมัติ",
+    },
+    {
+      body: "เทียบปริมาณ ความปลอดภัย ความซ้ำซ้อน และจำนวนเสิร์ฟ",
+      title: "ให้คะแนนชุดผลิตภัณฑ์",
+    },
+  ],
+  "zh-CN": [
+    {
+      body: "读取产品组合需要覆盖的配方缺口。",
+      title: "读取您的配方",
+    },
+    {
+      body: "筛选已批准产品、标签、图片和购买链接。",
+      title: "检查已批准产品",
+    },
+    {
+      body: "比较剂量匹配、安全上限、重叠和服用负担。",
+      title: "评分产品组合",
+    },
+  ],
+} satisfies Record<Locale, Array<{ body: string; title: string }>>;
 
 const benefitTagLabels: Record<Locale, Record<string, string>> = {
   en: {

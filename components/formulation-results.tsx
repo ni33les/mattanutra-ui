@@ -60,6 +60,7 @@ import {
   localizedProductDescription,
   revealCopy,
   revealJoiners,
+  revealProductPendingCards,
   revealSlotCopy,
 } from "@/components/formulation-reveal-copy";
 import { CountUpNumber } from "@/components/formulation-results-motion";
@@ -290,6 +291,8 @@ export function FormulationResults({
         selectedProductStackUnavailable) &&
       !resultHasProductStackRows(result, explicitProductStackPreference),
   );
+  const productCoveragePending =
+    productStackLoading || resultHasPendingProductRecommendations(result);
   const activeProductRecommendations =
     selectedProductStackUnavailable
       ? undefined
@@ -321,6 +324,7 @@ export function FormulationResults({
       onProductStackRefresh={refreshFormulationResult}
       planId={effectiveResultPlanId}
       productCoverageBySupplementId={productCoverageBySupplementId}
+      productCoveragePending={productCoveragePending}
       productRecommendationOptions={productRecommendationOptions}
       productStackLoading={productStackLoading}
       products={activeProductRecommendationItems}
@@ -346,6 +350,7 @@ function RevealResultsPage({
   onProductStackRefresh,
   planId,
   productCoverageBySupplementId,
+  productCoveragePending,
   productRecommendationOptions,
   productStackLoading,
   products,
@@ -364,6 +369,7 @@ function RevealResultsPage({
   onProductStackRefresh: () => Promise<boolean>;
   planId: string;
   productCoverageBySupplementId: ReadonlyMap<string, number>;
+  productCoveragePending: boolean;
   productRecommendationOptions: ProductRecommendationOption[];
   productStackLoading: boolean;
   products: RecommendedProduct[];
@@ -641,6 +647,7 @@ function RevealResultsPage({
         ingredients={visibleIngredients}
         locale={locale}
         productCoverageBySupplementId={productCoverageBySupplementId}
+        productCoveragePending={productCoveragePending}
         result={result}
       />
 
@@ -666,10 +673,9 @@ function RevealResultsPage({
         locale={locale}
         result={result}
         selectedNeedCoverage={
-          selectedProductRecommendationOption?.productRecommendations
-            .needCoverage ??
-          result.productRecommendations?.needCoverage ??
-          []
+          productCoveragePending
+            ? []
+            : activeProductRecommendations?.needCoverage ?? []
         }
         selectedProductStackPreference={
           selectedProductRecommendationOption?.id ??
@@ -695,6 +701,7 @@ function RevealFormulaSection({
   ingredients,
   locale,
   productCoverageBySupplementId,
+  productCoveragePending,
   result,
 }: Readonly<{
   catalogueSupplementCount: number;
@@ -703,6 +710,7 @@ function RevealFormulaSection({
   ingredients: FormulationIngredient[];
   locale: Locale;
   productCoverageBySupplementId: ReadonlyMap<string, number>;
+  productCoveragePending: boolean;
   result: FormulationResult;
 }>) {
   const ingredientRowNumber = formulaIngredientRowNumbers(ingredients);
@@ -785,7 +793,9 @@ function RevealFormulaSection({
               {copy.formulaMetaFocus}: {formulaFocus}
             </p>
             <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)] sm:text-right">
-              {copy.formulaMetaNrv}
+              {productCoveragePending
+                ? copy.formulaMetaProductFitPending
+                : copy.formulaMetaNrv}
             </p>
           </div>
 
@@ -800,7 +810,9 @@ function RevealFormulaSection({
             <div>{copy.tableName}</div>
             <div>{copy.tableReason}</div>
             <div>{copy.tableAmount}</div>
-            <div className="text-right">{copy.tableCoverage}</div>
+            <div className="text-right">
+              {productCoveragePending ? copy.productsPendingBadge : copy.tableCoverage}
+            </div>
           </div>
 
           {groupedFormulaIngredients(ingredients).map(([category, group]) => (
@@ -827,8 +839,9 @@ function RevealFormulaSection({
                   ingredient.dailyDose,
                   locale,
                 );
-                const coverage =
-                  productCoverageBySupplementId.get(ingredient.id) ?? 0;
+                const coverage = productCoveragePending
+                  ? null
+                  : productCoverageBySupplementId.get(ingredient.id) ?? 0;
                 const benefit = supplementBenefitTags(ingredient)[0];
 
                 return (
@@ -860,7 +873,7 @@ function RevealFormulaSection({
                       {dailyDose}
                     </div>
                     <div className="font-mono text-sm font-semibold text-[var(--mn-teal-deep)] lg:text-right">
-                      {coverage}%
+                      {coverage === null ? copy.productsPendingBadge : `${coverage}%`}
                     </div>
                   </article>
                 );
@@ -1140,10 +1153,10 @@ function RevealProductsSection({
             className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4"
             data-reveal
           >
-            {Array.from({ length: 4 }).map((_, index) => (
+            {revealProductPendingCards[locale].map((card, index) => (
               <article
                 className="overflow-hidden rounded-[1.25rem] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]"
-                key={`pending-product-${index}`}
+                key={card.title}
               >
                 <div className="relative flex h-60 items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#fff,var(--mn-mint))]">
                   <span className="absolute left-4 top-4 z-10 font-serif text-3xl italic text-[var(--mn-gold)]">
@@ -1159,10 +1172,10 @@ function RevealProductsSection({
                     {copy.productsPendingBadge}
                   </p>
                   <h3 className="mt-2 font-serif text-2xl font-medium leading-tight text-[var(--mn-ink)]">
-                    {copy.productsPendingCardTitle}
+                    {card.title}
                   </h3>
                   <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                    {copy.productsPendingCardBody}
+                    {card.body}
                   </p>
                   <div className="mt-5 h-2 overflow-hidden rounded-full bg-[var(--mn-mint)]">
                     <div className="h-full w-1/2 rounded-full bg-[var(--mn-teal)] motion-safe:animate-pulse" />
