@@ -183,12 +183,6 @@ async function main() {
     throw new Error(`Invalid PORT/NEXT_PORT value: ${process.env.PORT}`);
   }
 
-  if (!workerAgentKeyConfigured()) {
-    throw new Error(
-      "DB-managed agent API keys are required when using npm run start:platform. Set profile-specific WORKER_<MODE>_AGENT_API_KEY values."
-    );
-  }
-
   startProcess("web", process.execPath, [
     "node_modules/next/dist/bin/next",
     "start",
@@ -200,6 +194,14 @@ async function main() {
   await waitForWeb();
 
   console.log(`[platform] web is listening on ${host}:${port}`);
+
+  if (!workerAgentKeyConfigured()) {
+    console.error(
+      "[platform] DB-managed agent API keys are not configured; web is running without platform workers. Set profile-specific WORKER_<MODE>_AGENT_API_KEY values to enable workers."
+    );
+    return;
+  }
+
   console.log(`[platform] worker API base URL: ${workerApiBaseUrl}`);
   startWorker();
 }

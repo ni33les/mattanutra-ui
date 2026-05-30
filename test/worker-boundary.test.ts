@@ -157,6 +157,11 @@ describe("external worker boundaries", () => {
       /WORKER_\$\{mode\.toUpperCase\(\)\}_AGENT_API_KEY/,
       "each worker profile must use its own DB-managed agent credential"
     );
+    assert.match(
+      platformSource,
+      /web is running without platform workers/,
+      "missing worker credentials must not prevent the web service from booting"
+    );
   });
 
   it("keeps reservation constrained by the registered worker session", async () => {
