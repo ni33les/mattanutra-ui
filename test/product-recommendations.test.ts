@@ -864,6 +864,42 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(balanced.recommendations.length, 3);
   });
 
+  it("honours the compact target count when another product materially improves coverage", () => {
+    const partialFoundation: ProductCandidate = {
+      ...product({ amount: 0.85, id: "partial-foundation", name: "Vitamin D" }),
+      facts: [
+        product({ amount: 0.85, id: "partial-d3", name: "Vitamin D" }).facts[0]!,
+        product({ amount: 0.85, id: "partial-mag", name: "Magnesium" }).facts[0]!
+      ],
+      productKind: "multi"
+    };
+    const candidates = [
+      partialFoundation,
+      product({ amount: 0.3, id: "weak-zinc", name: "Zinc" }),
+      product({ amount: 1, id: "perfect-d3", name: "Vitamin D" }),
+      product({ amount: 1, id: "perfect-magnesium", name: "Magnesium" }),
+      product({ amount: 1, id: "perfect-zinc", name: "Zinc" })
+    ];
+    const needs = [
+      need("vitamin_d", "Vitamin D", 5),
+      need("magnesium", "Magnesium", 5),
+      need("zinc", "Zinc", 5)
+    ];
+    const compact = recommendProductStackFullBeam({
+      candidates,
+      maxProducts: 3,
+      needs,
+      stackPreference: "compact",
+      targetProducts: 3
+    });
+
+    assert.deepEqual(
+      new Set(compact.recommendations.map((item) => item.product.id)),
+      new Set(["perfect-d3", "perfect-magnesium", "perfect-zinc"])
+    );
+    assert.equal(compact.supplementProductCoveragePercent, 100);
+  });
+
   it("reports distinct alternative stack fingerprints", () => {
     const broad: ProductCandidate = {
       ...product({ amount: 0.67, id: "broad-multi", name: "Vitamin D" }),

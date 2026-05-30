@@ -1131,10 +1131,58 @@ function compareCompactStackScores(
   return compareStackScores(first, second);
 }
 
+function compareTargetedCompactStackScores(
+  targetProducts: number | undefined,
+  first: V2StackScore,
+  second: V2StackScore
+) {
+  if (!targetProducts || targetProducts <= 1) {
+    return compareCompactStackScores(first, second);
+  }
+
+  const firstUnderTarget = first.entries.length < targetProducts;
+  const secondUnderTarget = second.entries.length < targetProducts;
+
+  if (firstUnderTarget !== secondUnderTarget) {
+    const firstCoverageGain =
+      first.supplementProductCoveragePercent -
+      second.supplementProductCoveragePercent;
+
+    if (
+      !firstUnderTarget &&
+      firstCoverageGain >= V2_MATERIAL_COVERAGE_DELTA_PERCENT
+    ) {
+      return -1;
+    }
+
+    if (
+      !secondUnderTarget &&
+      -firstCoverageGain >= V2_MATERIAL_COVERAGE_DELTA_PERCENT
+    ) {
+      return 1;
+    }
+
+    return compareCompactStackScores(first, second);
+  }
+
+  if (firstUnderTarget && first.entries.length !== second.entries.length) {
+    const coverageDelta =
+      second.supplementProductCoveragePercent -
+      first.supplementProductCoveragePercent;
+
+    if (Math.abs(coverageDelta) >= V2_MATERIAL_COVERAGE_DELTA_PERCENT) {
+      return coverageDelta;
+    }
+  }
+
+  return compareCompactStackScores(first, second);
+}
+
 function selectStackForPreference(
   scores: readonly V2StackScore[],
   needs: readonly ProductRecommendationNeed[],
-  stackPreference: ProductStackPreference
+  stackPreference: ProductStackPreference,
+  targetProducts?: number
 ) {
   const uniqueScores = uniqueStackScores(scores);
 
@@ -1158,7 +1206,9 @@ function selectStackForPreference(
   );
 
   return [...(compactCandidates.length > 0 ? compactCandidates : uniqueScores)]
-    .sort(compareCompactStackScores)[0] ?? null;
+    .sort((first, second) =>
+      compareTargetedCompactStackScores(targetProducts, first, second)
+    )[0] ?? null;
 }
 
 function distinctAlternativeStacks(
@@ -2629,7 +2679,8 @@ function recommendProductStackExact(
   const bestStack = selectStackForPreference(
     stackScores,
     scoringNeeds,
-    stackPreference
+    stackPreference,
+    input.targetProducts
   );
   const finalCoverage = bestStack
     ? stackCoverageForNeeds(bestStack.entries, scoringNeeds)
