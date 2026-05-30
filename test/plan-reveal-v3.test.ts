@@ -212,6 +212,7 @@ describe("plan reveal V3 migration", () => {
     assert.match(formulationResults, /productStackLoading/);
     assert.match(formulationResults, /revealProductPendingCards\[locale\]\.map/);
     assert.match(formulationResults, /productCoveragePending/);
+    assert.match(formulationResults, /productMatchingPending \? \(/);
     assert.match(productRecommendationSources, /\/product-recommendations/);
     assert.match(formulationResults, /onProductStackRefresh/);
     assert.match(productRecommendationSources, /productRecommendations/);

@@ -1292,66 +1292,105 @@ function RevealProductsSection({
           className="mt-8 rounded-xl bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]"
           data-reveal
         >
-          <div className="grid gap-5 md:grid-cols-[1fr_1.2fr] md:items-center">
-            <div>
-              <h3 className="font-serif text-3xl font-medium leading-tight text-[var(--mn-ink)]">
-                {coverageHeadline}
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                {copy.coverageSub}
-              </p>
-            </div>
-            <div>
-              <div className="h-3 overflow-hidden rounded-full bg-[var(--mn-line)]">
-                <div
-                  className="h-full rounded-full bg-[var(--mn-teal)] transition-[width] duration-1000 motion-reduce:transition-none"
-                  style={{
-                    width: `${Math.min(100, Math.max(0, selectedCoverage))}%`,
-                  }}
-                />
+          {productMatchingPending ? (
+            <div
+              aria-live="polite"
+              className="grid gap-5 md:grid-cols-[1fr_1.2fr] md:items-center"
+            >
+              <div>
+                <p className={pendingBadgeClass}>
+                  {copy.productsPendingBadge}
+                </p>
+                <h3 className="mt-2 font-serif text-3xl font-medium leading-tight text-[var(--mn-ink)]">
+                  {copy.productsPendingTitle}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                  {copy.productsPending}
+                </p>
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-                <div>
-                  <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
-                    <CountUpNumber
-                      active={true}
-                      duration={900}
-                      value={products.length}
-                    />
-                  </p>
-                  <p className="text-sm text-[var(--mn-ash)]">
-                    {copy.selectedProducts}
-                  </p>
+              <div>
+                <div className="h-3 overflow-hidden rounded-full bg-[var(--mn-line)]">
+                  <div className="h-full w-1/2 rounded-full bg-[var(--mn-teal)] motion-safe:animate-pulse" />
                 </div>
-                <div>
-                  <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
-                    <CountUpNumber
-                      active={true}
-                      duration={1000}
-                      value={productNeedCount}
-                    />
-                    /{Math.max(productNeedCount, supplementSelectedCount)}
-                  </p>
-                  <p className="text-sm text-[var(--mn-ash)]">
-                    {copy.prioritiesCovered}
-                  </p>
-                </div>
-                <div>
-                  <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
-                    <CountUpNumber
-                      active={true}
-                      duration={1100}
-                      value={selectedCoverage}
-                    />
-                    %
-                  </p>
-                  <p className="text-sm text-[var(--mn-ash)]">
-                    {copy.compactCoverageLabel}
-                  </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  {revealProductPendingCards[locale].map((card) => (
+                    <div
+                      className="rounded-lg bg-[var(--mn-cream)] p-3 ring-1 ring-[var(--mn-line)]"
+                      key={`summary-${card.title}`}
+                    >
+                      <p className="font-serif text-lg font-medium leading-tight text-[var(--mn-teal-deep)]">
+                        {card.title}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--mn-ash)]">
+                        {card.body}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-[1fr_1.2fr] md:items-center">
+              <div>
+                <h3 className="font-serif text-3xl font-medium leading-tight text-[var(--mn-ink)]">
+                  {coverageHeadline}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                  {copy.coverageSub}
+                </p>
+              </div>
+              <div>
+                <div className="h-3 overflow-hidden rounded-full bg-[var(--mn-line)]">
+                  <div
+                    className="h-full rounded-full bg-[var(--mn-teal)] transition-[width] duration-1000 motion-reduce:transition-none"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, selectedCoverage))}%`,
+                    }}
+                  />
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
+                      <CountUpNumber
+                        active={true}
+                        duration={900}
+                        value={products.length}
+                      />
+                    </p>
+                    <p className="text-sm text-[var(--mn-ash)]">
+                      {copy.selectedProducts}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
+                      <CountUpNumber
+                        active={true}
+                        duration={1000}
+                        value={productNeedCount}
+                      />
+                      /{Math.max(productNeedCount, supplementSelectedCount)}
+                    </p>
+                    <p className="text-sm text-[var(--mn-ash)]">
+                      {copy.prioritiesCovered}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-serif text-4xl font-medium text-[var(--mn-teal-deep)]">
+                      <CountUpNumber
+                        active={true}
+                        duration={1100}
+                        value={selectedCoverage}
+                      />
+                      %
+                    </p>
+                    <p className="text-sm text-[var(--mn-ash)]">
+                      {copy.compactCoverageLabel}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
