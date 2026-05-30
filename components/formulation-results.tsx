@@ -886,6 +886,8 @@ function RevealProductsSection({
   const hasFullProductCoverage =
     supplementSelectedCount > 0 &&
     coveredProductNeedCount >= supplementSelectedCount;
+  const productMatchingPending =
+    products.length < 1 && resultHasPendingProductRecommendations(result);
   const fallbackProductsTitle = formatTemplate(
     hasFullProductCoverage
       ? copy.productsAllTitleTemplate
@@ -900,13 +902,12 @@ function RevealProductsSection({
       ),
     },
   );
-  const productsTitle = fallbackProductsTitle;
-  const productsLead = revealSlotCopy(
-    result,
-    "productsLead",
-    locale,
-    copy.productsLead,
-  );
+  const productsTitle = productMatchingPending
+    ? copy.productsPendingTitle
+    : fallbackProductsTitle;
+  const productsLead = productMatchingPending
+    ? copy.productsPending
+    : revealSlotCopy(result, "productsLead", locale, copy.productsLead);
   const coverageHeadline = hasFullProductCoverage
     ? formatTemplate(copy.coverageHeadlineTemplate, {
         supplementCount: supplementSelectedCount,
@@ -1072,7 +1073,9 @@ function RevealProductsSection({
         {products.length < 1 ? (
           <div className="mt-10 rounded-lg bg-[var(--mn-paper)] p-8 text-center ring-1 ring-[var(--mn-line)]">
             <p className="text-sm leading-6 text-[var(--mn-ink-soft)]">
-              {copy.productsEmpty}
+              {productMatchingPending
+                ? copy.productsPending
+                : copy.productsEmpty}
             </p>
           </div>
         ) : (

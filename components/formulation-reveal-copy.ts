@@ -112,6 +112,9 @@ const baseRevealCopy = {
       "We searched the Thai market for products that meet your formula as closely as the catalogue allows: verified dosing, clean enough labels, and direct marketplace links where available.",
     productsEmpty:
       "The formula is ready, but the product catalogue does not yet contain an approved stack for these needs.",
+    productsPending:
+      "Product matching is still finishing. This page will update automatically as soon as the matched stack is ready.",
+    productsPendingTitle: "Matching your products now.",
     productsEyebrow: "From shelves to certainty",
     productsTitle: "From shelves to certainty.",
     productsAllTitleTemplate:
@@ -213,6 +216,9 @@ const baseRevealCopy = {
       "เราค้นหาผลิตภัณฑ์ในตลาดไทยที่ตรงกับสูตรของคุณมากที่สุดเท่าที่แคตตาล็อกรองรับ โดยดูปริมาณที่ตรวจได้ ฉลากที่ชัดเจน และลิงก์ซื้อเมื่อมีข้อมูลเพียงพอ",
     productsEmpty:
       "สูตรพร้อมแล้ว แต่แคตตาล็อกยังไม่มีชุดผลิตภัณฑ์ที่อนุมัติสำหรับความต้องการนี้",
+    productsPending:
+      "การจับคู่ผลิตภัณฑ์ยังดำเนินอยู่ หน้านี้จะอัปเดตอัตโนมัติทันทีที่ชุดผลิตภัณฑ์พร้อม",
+    productsPendingTitle: "กำลังจับคู่ผลิตภัณฑ์ของคุณ",
     productsEyebrow: "จากชั้นวางสู่ความชัดเจน",
     productsTitle: "จากชั้นวางสู่ความชัดเจน",
     productsAllTitleTemplate:
@@ -306,6 +312,8 @@ export const revealCopy = {
     "productsBody": "产品显示为来自已批准目录的最接近可用配方。目标是减少瓶数、清晰覆盖且无不必要的重叠。",
     "productsLead": "我们在泰国市场搜索了尽可能接近您配方的产品：经过验证的剂量、足够干净的标签，以及可用的直接市场链接。",
     "productsEmpty": "配方已就绪，但产品目录尚未包含针对这些需求的已批准配方。",
+    "productsPending": "产品匹配仍在完成中。匹配组合准备好后，本页会自动更新。",
+    "productsPendingTitle": "正在匹配您的产品。",
     "productsEyebrow": "从货架到确定性",
     "productsTitle": "从货架到确定性。",
     "productsAllTitleTemplate": "{productSelectedText} 瓶。全部 {supplementSelectedTextLower} 种营养素。",

@@ -18,6 +18,10 @@ import {
   nutritionHealthScorePath,
   nutritionRevealPath,
 } from "@/lib/nutrition-paths";
+export {
+  resultHasPendingProductRecommendations,
+  resultHasTransientEmptyProductRecommendations,
+} from "@/lib/product-recommendation-readiness";
 
 export function planRevealHref(locale: Locale, planId: string) {
   return nutritionRevealPath(locale, planId);
@@ -65,26 +69,6 @@ export function resultHasPendingSections(result: FormulationResult) {
       statuses.foods === "pending" ||
       statuses.supplements === "pending" ||
       statuses.report === "pending"),
-  );
-}
-
-export function resultHasPendingProductRecommendations(
-  result: FormulationResult,
-) {
-  if (result.access === "preview") {
-    return false;
-  }
-
-  const productStatus = result.productRecommendations?.status;
-
-  if (productStatus === "pending") {
-    return true;
-  }
-
-  return Boolean(
-    !productStatus &&
-    result.sectionStatuses?.foods === "ready" &&
-    result.sectionStatuses?.supplements === "ready",
   );
 }
 
