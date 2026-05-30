@@ -20,6 +20,7 @@ import {
   productRecommendationOptionsForResult,
   replaceRevealStackUrl,
   resultHasPendingProductRecommendations,
+  resultHasProductStackRows,
   resultHasPendingSections,
   revealContextChips,
   revealHeroMetaItems,
@@ -91,9 +92,9 @@ type FormulationResultsProps = Readonly<{
 
 type LoadState = "loading" | "ready" | "error";
 
-const MAX_PRODUCT_MATCHING_POLLS = 80;
+const MAX_PRODUCT_MATCHING_POLLS = 240;
 const PENDING_SECTION_POLL_INTERVAL_MS = 1_000;
-const PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS = 750;
+const PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS = 1_000;
 
 export function FormulationResults({
   initialStackPreference = null,
@@ -108,6 +109,8 @@ export function FormulationResults({
   );
   const [result, setResult] = useState<FormulationResult | null>(initialResult);
   const [selectedProductStackPreference, setSelectedProductStackPreference] =
+    useState<ProductStackPreference | null>(() => initialStackPreference);
+  const [productPollingPreference, setProductPollingPreference] =
     useState<ProductStackPreference | null>(() => initialStackPreference);
   const productPollAttemptsRef = useRef(0);
 
@@ -128,6 +131,14 @@ export function FormulationResults({
 
     return true;
   }, [effectivePlanId, locale]);
+
+  const startProductStackPolling = useCallback(
+    (preference: ProductStackPreference) => {
+      productPollAttemptsRef.current = 0;
+      setProductPollingPreference(preference);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -157,7 +168,11 @@ export function FormulationResults({
           setLoadState("ready");
 
           const productMatchingPending =
-            resultHasPendingProductRecommendations(payload);
+            resultHasPendingProductRecommendations(payload) ||
+            Boolean(
+              productPollingPreference &&
+                !resultHasProductStackRows(payload, productPollingPreference),
+            );
           const shouldPollProductMatching =
             productMatchingPending &&
             productPollAttemptsRef.current < MAX_PRODUCT_MATCHING_POLLS;
@@ -173,6 +188,8 @@ export function FormulationResults({
                 ? PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS
                 : PENDING_SECTION_POLL_INTERVAL_MS,
             );
+          } else if (productPollingPreference) {
+            setProductPollingPreference(null);
           }
         }
       } catch {
@@ -191,7 +208,7 @@ export function FormulationResults({
         window.clearTimeout(retryTimer);
       }
     };
-  }, [effectivePlanId, locale]);
+  }, [effectivePlanId, locale, productPollingPreference]);
 
   useEffect(() => {
     if (!result) {
@@ -207,12 +224,14 @@ export function FormulationResults({
 
     startTransition(() => {
       setSelectedProductStackPreference((current) =>
-        current && options.some((option) => option.id === current)
+        current &&
+        (options.some((option) => option.id === current) ||
+          current === productPollingPreference)
           ? current
           : defaultPreference,
       );
     });
-  }, [result]);
+  }, [productPollingPreference, result]);
 
   if (loadState === "loading") {
     return <NutritionGuidancePreparingPanel labels={labels} locale={locale} />;
@@ -252,16 +271,35 @@ export function FormulationResults({
   const unlockHref = planPaywallHref(locale, effectiveResultPlanId);
   const productRecommendationOptions =
     productRecommendationOptionsForResult(result);
-  const selectedProductRecommendationOption = selectProductRecommendationOption(
-    productRecommendationOptions,
-    selectedProductStackPreference,
+  const explicitProductStackPreference = selectedProductStackPreference ?? null;
+  const exactSelectedProductRecommendationOption =
+    explicitProductStackPreference
+      ? productRecommendationOptions.find(
+          (option) => option.id === explicitProductStackPreference,
+        )
+      : undefined;
+  const selectedProductRecommendationOption = explicitProductStackPreference
+    ? exactSelectedProductRecommendationOption
+    : selectProductRecommendationOption(productRecommendationOptions, null);
+  const selectedProductStackUnavailable = Boolean(
+    explicitProductStackPreference && !exactSelectedProductRecommendationOption,
+  );
+  const productStackLoading = Boolean(
+    explicitProductStackPreference &&
+      (productPollingPreference === explicitProductStackPreference ||
+        selectedProductStackUnavailable) &&
+      !resultHasProductStackRows(result, explicitProductStackPreference),
   );
   const activeProductRecommendations =
-    selectedProductRecommendationOption?.productRecommendations ??
-    result.productRecommendations;
+    selectedProductStackUnavailable
+      ? undefined
+      : selectedProductRecommendationOption?.productRecommendations ??
+        result.productRecommendations;
   const activeProductRecommendationItems =
-    selectedProductRecommendationOption?.recommendations ??
-    result.recommendations;
+    selectedProductStackUnavailable
+      ? []
+      : selectedProductRecommendationOption?.recommendations ??
+        result.recommendations;
   const productCoverageBySupplementId = supplementProductCoverageById(
     activeProductRecommendations,
   );
@@ -279,10 +317,12 @@ export function FormulationResults({
       labels={labels}
       locale={locale}
       onProductStackPreferenceChange={setSelectedProductStackPreference}
+      onProductStackPollingStart={startProductStackPolling}
       onProductStackRefresh={refreshFormulationResult}
       planId={effectiveResultPlanId}
       productCoverageBySupplementId={productCoverageBySupplementId}
       productRecommendationOptions={productRecommendationOptions}
+      productStackLoading={productStackLoading}
       products={activeProductRecommendationItems}
       result={result}
       selectedProductStackPreference={
@@ -302,10 +342,12 @@ function RevealResultsPage({
   labels,
   locale,
   onProductStackPreferenceChange,
+  onProductStackPollingStart,
   onProductStackRefresh,
   planId,
   productCoverageBySupplementId,
   productRecommendationOptions,
+  productStackLoading,
   products,
   result,
   selectedProductStackPreference,
@@ -318,10 +360,12 @@ function RevealResultsPage({
   labels: PanelLabels;
   locale: Locale;
   onProductStackPreferenceChange: (preference: ProductStackPreference) => void;
+  onProductStackPollingStart: (preference: ProductStackPreference) => void;
   onProductStackRefresh: () => Promise<boolean>;
   planId: string;
   productCoverageBySupplementId: ReadonlyMap<string, number>;
   productRecommendationOptions: ProductRecommendationOption[];
+  productStackLoading: boolean;
   products: RecommendedProduct[];
   result: FormulationResult;
   selectedProductStackPreference?: ProductStackPreference | null;
@@ -604,10 +648,12 @@ function RevealResultsPage({
         copy={copy}
         locale={locale}
         onProductStackPreferenceChange={onProductStackPreferenceChange}
+        onProductStackPollingStart={onProductStackPollingStart}
         onProductStackRefresh={onProductStackRefresh}
         planId={planId}
         productNeedCount={productNeedCount}
         productOptions={productOptions}
+        productStackLoading={productStackLoading}
         products={products}
         result={result}
         selectedCoverage={selectedCoverage}
@@ -842,10 +888,12 @@ function RevealProductsSection({
   copy,
   locale,
   onProductStackPreferenceChange,
+  onProductStackPollingStart,
   onProductStackRefresh,
   planId,
   productNeedCount,
   productOptions,
+  productStackLoading,
   products,
   result,
   selectedCoverage,
@@ -855,10 +903,12 @@ function RevealProductsSection({
   copy: typeof revealCopy.en;
   locale: Locale;
   onProductStackPreferenceChange: (preference: ProductStackPreference) => void;
+  onProductStackPollingStart: (preference: ProductStackPreference) => void;
   onProductStackRefresh: () => Promise<boolean>;
   planId: string;
   productNeedCount: number;
   productOptions: ProductRecommendationOption[];
+  productStackLoading: boolean;
   products: RecommendedProduct[];
   result: FormulationResult;
   selectedCoverage: number;
@@ -866,6 +916,10 @@ function RevealProductsSection({
   supplementLabelById: ReadonlyMap<string, string>;
 }>) {
   const labels = productRecommendationCopy[locale];
+  const pendingBadgeClass =
+    locale === "en"
+      ? "text-[0.65rem] font-bold uppercase tracking-[0.14em] text-[var(--mn-ash)]"
+      : "text-[0.7rem] font-bold tracking-normal text-[var(--mn-ash)]";
   const [pendingStackPreference, setPendingStackPreference] =
     useState<ProductStackPreference | null>(null);
   const supplementSelectedCount = result.supplementBreakdown.filter(
@@ -887,7 +941,8 @@ function RevealProductsSection({
     supplementSelectedCount > 0 &&
     coveredProductNeedCount >= supplementSelectedCount;
   const productMatchingPending =
-    products.length < 1 && resultHasPendingProductRecommendations(result);
+    products.length < 1 &&
+    (productStackLoading || resultHasPendingProductRecommendations(result));
   const fallbackProductsTitle = formatTemplate(
     hasFullProductCoverage
       ? copy.productsAllTitleTemplate
@@ -934,6 +989,12 @@ function RevealProductsSection({
 
     if (existingOption) {
       onProductStackPreferenceChange(preference);
+      replaceRevealStackUrl(locale, planId, preference);
+
+      if (existingOption.recommendations.length < 1) {
+        onProductStackPollingStart(preference);
+      }
+
       return;
     }
 
@@ -953,15 +1014,10 @@ function RevealProductsSection({
       );
 
       if (response.ok) {
-        window.setTimeout(() => {
-          void onProductStackRefresh();
-        }, 1000);
-        window.setTimeout(() => {
-          void onProductStackRefresh();
-        }, 3000);
-        window.setTimeout(() => {
-          void onProductStackRefresh();
-        }, 6000);
+        onProductStackPreferenceChange(preference);
+        onProductStackPollingStart(preference);
+        replaceRevealStackUrl(locale, planId, preference);
+        void onProductStackRefresh();
       }
     } finally {
       window.setTimeout(() => {
@@ -986,7 +1042,9 @@ function RevealProductsSection({
                 : "leading-tight text-balance"
             }`}
           >
-            {locale === "en" ? (
+            {productMatchingPending ? (
+              productsTitle
+            ) : locale === "en" ? (
               <>
                 {productSelectedText} {bottleNoun}.{" "}
                 <em>
@@ -1011,8 +1069,14 @@ function RevealProductsSection({
           <div className="mt-8 flex justify-center" data-reveal>
             <div className="inline-flex flex-wrap justify-center gap-2 rounded-full bg-[var(--mn-paper)] p-1 ring-1 ring-[var(--mn-line)]">
               {controlPreferences.map((preference) => {
-                const available = productOptionsById.has(preference);
-                const pending = pendingStackPreference === preference;
+                const option = productOptionsById.get(preference);
+                const available = Boolean(
+                  option && option.recommendations.length > 0,
+                );
+                const pending =
+                  pendingStackPreference === preference ||
+                  (productStackLoading &&
+                    preference === selectedProductStackPreference);
                 const selected = preference === selectedProductStackPreference;
                 const className = `rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] transition disabled:cursor-wait disabled:opacity-70 ${
                   selected
@@ -1070,12 +1134,47 @@ function RevealProductsSection({
           </div>
         ) : null}
 
-        {products.length < 1 ? (
+        {products.length < 1 && productMatchingPending ? (
+          <div
+            aria-live="polite"
+            className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4"
+            data-reveal
+          >
+            {Array.from({ length: 4 }).map((_, index) => (
+              <article
+                className="overflow-hidden rounded-[1.25rem] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]"
+                key={`pending-product-${index}`}
+              >
+                <div className="relative flex h-60 items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#fff,var(--mn-mint))]">
+                  <span className="absolute left-4 top-4 z-10 font-serif text-3xl italic text-[var(--mn-gold)]">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className="absolute right-4 top-4 z-10 rounded-full bg-white/85 px-3 py-1 text-[0.65rem] font-bold text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]">
+                    {copy.productsPendingBadge}
+                  </span>
+                  <div className="h-28 w-28 rounded-full bg-white/70 ring-1 ring-[var(--mn-line)] motion-safe:animate-pulse" />
+                </div>
+                <div className="flex flex-1 flex-col p-5">
+                  <p className={pendingBadgeClass}>
+                    {copy.productsPendingBadge}
+                  </p>
+                  <h3 className="mt-2 font-serif text-2xl font-medium leading-tight text-[var(--mn-ink)]">
+                    {copy.productsPendingCardTitle}
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                    {copy.productsPendingCardBody}
+                  </p>
+                  <div className="mt-5 h-2 overflow-hidden rounded-full bg-[var(--mn-mint)]">
+                    <div className="h-full w-1/2 rounded-full bg-[var(--mn-teal)] motion-safe:animate-pulse" />
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : products.length < 1 ? (
           <div className="mt-10 rounded-lg bg-[var(--mn-paper)] p-8 text-center ring-1 ring-[var(--mn-line)]">
             <p className="text-sm leading-6 text-[var(--mn-ink-soft)]">
-              {productMatchingPending
-                ? copy.productsPending
-                : copy.productsEmpty}
+              {copy.productsEmpty}
             </p>
           </div>
         ) : (

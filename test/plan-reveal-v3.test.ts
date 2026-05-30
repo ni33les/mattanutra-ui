@@ -208,6 +208,9 @@ describe("plan reveal V3 migration", () => {
     assert.match(formulationResults, /selectedProductStackPreference/);
     assert.match(formulationResults, /useState<ProductStackPreference \| null>\(\(\) => initialStackPreference\)/);
     assert.match(formulationResults, /onProductStackPreferenceChange\(preference\)/);
+    assert.match(formulationResults, /onProductStackPollingStart\(preference\)/);
+    assert.match(formulationResults, /productStackLoading/);
+    assert.match(formulationResults, /copy\.productsPendingCardTitle/);
     assert.match(productRecommendationSources, /\/product-recommendations/);
     assert.match(formulationResults, /onProductStackRefresh/);
     assert.match(productRecommendationSources, /productRecommendations/);

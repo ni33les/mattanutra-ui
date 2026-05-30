@@ -20,6 +20,7 @@ import {
 } from "@/lib/nutrition-paths";
 export {
   resultHasPendingProductRecommendations,
+  resultHasProductStackRows,
   resultHasTransientEmptyProductRecommendations,
 } from "@/lib/product-recommendation-readiness";
 

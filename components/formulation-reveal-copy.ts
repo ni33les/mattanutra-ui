@@ -114,6 +114,10 @@ const baseRevealCopy = {
       "The formula is ready, but the product catalogue does not yet contain an approved stack for these needs.",
     productsPending:
       "Product matching is still finishing. This page will update automatically as soon as the matched stack is ready.",
+    productsPendingBadge: "Processing",
+    productsPendingCardBody:
+      "Checking dose fit, safety limits, serving burden, and marketplace links.",
+    productsPendingCardTitle: "Matching against the catalogue",
     productsPendingTitle: "Matching your products now.",
     productsEyebrow: "From shelves to certainty",
     productsTitle: "From shelves to certainty.",
@@ -218,6 +222,10 @@ const baseRevealCopy = {
       "สูตรพร้อมแล้ว แต่แคตตาล็อกยังไม่มีชุดผลิตภัณฑ์ที่อนุมัติสำหรับความต้องการนี้",
     productsPending:
       "การจับคู่ผลิตภัณฑ์ยังดำเนินอยู่ หน้านี้จะอัปเดตอัตโนมัติทันทีที่ชุดผลิตภัณฑ์พร้อม",
+    productsPendingBadge: "กำลังประมวลผล",
+    productsPendingCardBody:
+      "กำลังตรวจปริมาณ ความปลอดภัย จำนวนเสิร์ฟ และลิงก์ซื้อสินค้า",
+    productsPendingCardTitle: "กำลังจับคู่กับแคตตาล็อก",
     productsPendingTitle: "กำลังจับคู่ผลิตภัณฑ์ของคุณ",
     productsEyebrow: "จากชั้นวางสู่ความชัดเจน",
     productsTitle: "จากชั้นวางสู่ความชัดเจน",
@@ -313,6 +321,9 @@ export const revealCopy = {
     "productsLead": "我们在泰国市场搜索了尽可能接近您配方的产品：经过验证的剂量、足够干净的标签，以及可用的直接市场链接。",
     "productsEmpty": "配方已就绪，但产品目录尚未包含针对这些需求的已批准配方。",
     "productsPending": "产品匹配仍在完成中。匹配组合准备好后，本页会自动更新。",
+    "productsPendingBadge": "处理中",
+    "productsPendingCardBody": "正在检查剂量匹配、安全上限、服用负担和购买链接。",
+    "productsPendingCardTitle": "正在与目录匹配",
     "productsPendingTitle": "正在匹配您的产品。",
     "productsEyebrow": "从货架到确定性",
     "productsTitle": "从货架到确定性。",

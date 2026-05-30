@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   resultHasPendingProductRecommendations,
+  resultHasProductStackRows,
   resultHasTransientEmptyProductRecommendations,
 } from "../lib/product-recommendation-readiness.ts";
 import type {
@@ -110,6 +111,24 @@ describe("formulation results product recommendation readiness", () => {
 
     assert.equal(resultHasTransientEmptyProductRecommendations(payload), false);
     assert.equal(resultHasPendingProductRecommendations(payload), false);
+  });
+
+  it("knows when a requested stack has rows instead of falling back to another stack", () => {
+    const payload = result({
+      productRecommendationOptions: [
+        option({
+          id: "compact",
+          recommendations: [product()],
+        }),
+        option({
+          id: "balanced",
+          recommendations: [],
+        }),
+      ],
+    });
+
+    assert.equal(resultHasProductStackRows(payload, "compact"), true);
+    assert.equal(resultHasProductStackRows(payload, "balanced"), false);
   });
 
   it("does not treat a genuine zero-coverage run as transient", () => {

@@ -1,10 +1,35 @@
 import type { FormulationResult } from "@/lib/formulation-types";
 
+export function resultHasProductStackRows(
+  result: FormulationResult,
+  stackPreference: "balanced" | "compact",
+) {
+  const option = result.productRecommendationOptions?.find(
+    (item) => item.id === stackPreference,
+  );
+
+  if (option) {
+    return option.recommendations.length > 0;
+  }
+
+  const mainStackPreference =
+    result.productRecommendations?.stackPreference ??
+    (result.productRecommendations ? "balanced" : null);
+
+  return (
+    mainStackPreference === stackPreference && result.recommendations.length > 0
+  );
+}
+
 function productRecommendationSummaryExpectsRows(
   summary: FormulationResult["productRecommendations"] | undefined,
 ) {
   if (!summary || !["partial", "ready"].includes(summary.status)) {
     return false;
+  }
+
+  if (summary.matchedCount > 0) {
+    return true;
   }
 
   if (summary.stackCoveragePercent > 0) {
