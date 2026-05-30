@@ -470,7 +470,7 @@ CREATE TABLE public.admin_audit_events (
 --
 
 CREATE TABLE public.agents (
-    id uuid NOT NULL,
+    id uuid PRIMARY KEY,
     name text NOT NULL,
     agent_type text DEFAULT 'system'::text NOT NULL,
     role text DEFAULT 'platform_agent'::text NOT NULL,
@@ -2536,14 +2536,6 @@ ALTER TABLE ONLY public.admin_alert_acknowledgements
 
 ALTER TABLE ONLY public.admin_conversion_targets
     ADD CONSTRAINT admin_conversion_targets_pkey PRIMARY KEY (target_id);
-
-
---
--- Name: agents agents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agents
-    ADD CONSTRAINT agents_pkey PRIMARY KEY (id);
 
 
 --
