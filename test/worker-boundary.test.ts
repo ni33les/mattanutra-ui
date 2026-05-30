@@ -247,6 +247,16 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       agentsSource,
+      /status === "offline"[\s\S]*releaseOfflineWorkerReservations/,
+      "offline worker heartbeats must release active reservations immediately"
+    );
+    assert.match(
+      agentsSource,
+      /status = 'released'[\s\S]*releaseReason', 'worker_session_offline'/,
+      "offline reservation release must be auditable instead of waiting for lease expiry"
+    );
+    assert.match(
+      agentsSource,
       /leaseSeconds: 180/,
       "default worker leases should release crashed sessions quickly"
     );

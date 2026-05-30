@@ -5,6 +5,7 @@ import { getSql } from "@/lib/db";
 import {
   normalizeCapabilities
 } from "@/lib/task-service-utils";
+import { notifyTaskQueueChanged } from "@/lib/task-wakeup";
 import {
   cleanText,
   intersectCapabilities,
@@ -450,6 +451,16 @@ export async function heartbeatWorkerSession(input: HeartbeatWorkerSessionInput)
   }
 
   const status = workerSessionStatus(input.status);
+  let releasedReservationCount = 0;
+
+  if (status === "offline") {
+    releasedReservationCount = await releaseOfflineWorkerReservations(sql, {
+      agentId,
+      membershipId,
+      workerSessionId
+    });
+  }
+
   const rows = await sql<WorkerSessionRow[]>`
     update public.worker_sessions set
       status = ${status},
@@ -479,5 +490,119 @@ export async function heartbeatWorkerSession(input: HeartbeatWorkerSessionInput)
     where id = ${rows[0].agent_id}::uuid
   `;
 
+  if (releasedReservationCount > 0) {
+    notifyTaskQueueChanged();
+  }
+
   return mapWorkerSession(rows[0]);
+}
+
+async function releaseOfflineWorkerReservations(
+  sql: Db,
+  input: Readonly<{
+    agentId: string | null;
+    membershipId: string | null;
+    workerSessionId: string;
+  }>
+) {
+  const rows = await sql<Array<{ released_count: number }>>`
+    with active_reservations as (
+      select
+        task_reservations.id as reservation_id,
+        task_reservations.task_id,
+        task_reservations.agent_id,
+        task_reservations.worker_session_id,
+        (tasks.attempts >= tasks.max_attempts) as exhausted
+      from public.task_reservations
+      join public.tasks
+        on tasks.id = task_reservations.task_id
+      where task_reservations.worker_session_id = ${input.workerSessionId}::uuid
+        and task_reservations.status = 'active'
+        and (${input.agentId}::uuid is null or task_reservations.agent_id = ${input.agentId}::uuid)
+        and (${input.membershipId}::uuid is null or task_reservations.membership_id = ${input.membershipId}::uuid)
+        and tasks.status in ('reserved', 'running')
+      for update skip locked
+    ),
+    released_reservations as (
+      update public.task_reservations set
+        status = 'released',
+        released_at = now(),
+        metadata = metadata || jsonb_build_object(
+          'releaseReason', 'worker_session_offline',
+          'releasedAt', now()
+        )
+      from active_reservations
+      where task_reservations.id = active_reservations.reservation_id
+      returning
+        active_reservations.reservation_id,
+        active_reservations.task_id,
+        active_reservations.agent_id,
+        active_reservations.worker_session_id,
+        active_reservations.exhausted
+    ),
+    updated_tasks as (
+      update public.tasks set
+        status = case
+          when released_reservations.exhausted then 'failed'
+          else 'queued'
+        end,
+        reserved_by_agent_id = null,
+        lease_until = null,
+        error_message = case
+          when released_reservations.exhausted then 'Task worker session went offline after maximum attempts.'
+          else null
+        end,
+        result_payload = case
+          when released_reservations.exhausted then '{}'::jsonb
+          else public.tasks.result_payload
+        end,
+        updated_at = now()
+      from released_reservations
+      where public.tasks.id = released_reservations.task_id
+        and public.tasks.status in ('reserved', 'running')
+      returning
+        public.tasks.id,
+        released_reservations.reservation_id,
+        released_reservations.agent_id,
+        released_reservations.worker_session_id,
+        released_reservations.exhausted
+    ),
+    task_events as (
+      insert into public.task_events (
+        id,
+        task_id,
+        agent_id,
+        event_type,
+        event_status,
+        severity,
+        event_payload,
+        occurred_at,
+        created_at
+      )
+      select
+        gen_random_uuid(),
+        updated_tasks.id,
+        updated_tasks.agent_id,
+        case
+          when updated_tasks.exhausted then 'task_failed_after_worker_offline'
+          else 'reservation_released'
+        end,
+        case when updated_tasks.exhausted then 'failed' else 'observed' end,
+        case when updated_tasks.exhausted then 'high' else 'medium' end,
+        jsonb_build_object(
+          'reservationId', updated_tasks.reservation_id,
+          'workerSessionId', updated_tasks.worker_session_id,
+          'releaseReason', 'worker_session_offline',
+          'exhausted', updated_tasks.exhausted
+        ),
+        now(),
+        now()
+      from updated_tasks
+      returning id
+    )
+    select count(*)::int as released_count
+    from updated_tasks
+  `;
+
+  return rows[0]?.released_count ?? 0;
 }
