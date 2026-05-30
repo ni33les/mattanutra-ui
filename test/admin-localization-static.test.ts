@@ -71,8 +71,11 @@ test("admin organisations hide type controls and expose only platform and retail
   assert.match(access, /Platform Admin cannot change Platform Owner users/);
   assert.match(access, /Platform Admin cannot grant Platform Owner access/);
   assert.match(access, /Platform Admin cannot change Platform Owner access/);
+  assert.match(access, /Platform Admin cannot assume Platform Owner access/);
   assert.match(route, /type: "tenant"/);
   assert.match(view, /rolesForAdminOrganisationType/);
+  assert.match(view, /context\.actorMembership\.role === "platform_owner"/);
+  assert.match(view, /context\.effectiveOrganisation\.type === "platform"/);
   assert.match(view, /platform_owner: "Platform Owner"/);
   assert.match(view, /platform_admin: "Platform Admin"/);
   assert.match(view, /retail_admin: "Retail Admin"/);
@@ -272,9 +275,11 @@ test("admin typography has locale-aware spacing for Chinese and Thai labels", ()
 test("admin DB object titles are rendered through localized translation helpers", () => {
   const displayHelper = source("lib/admin-localized-display.ts");
   const productView = source("components/admin/product-view.tsx");
+  const productViewUi = source("components/admin/product-view-ui.tsx");
   const supplementView = source("components/admin/supplement-view.tsx");
   const foodView = source("components/admin/safety-views.tsx");
   const reviewQueue = source("components/admin/review-queue-view.tsx");
+  const reviewQueueHelpers = source("components/admin/review-queue-helpers.ts");
   const insights = source("lib/admin-recommendation-insights.ts");
   const dashboardPage = source("app/[locale]/admin/dashboard/page.tsx");
   const dashboard = source("components/admin-dashboard.tsx");
@@ -284,9 +289,9 @@ test("admin DB object titles are rendered through localized translation helpers"
   assert.match(displayHelper, /export function adminLocalizedFoodText/);
   assert.match(displayHelper, /fallbackUsed/);
 
-  assert.match(productView, /adminLocalizedProductText\(row, locale\)/);
+  assert.match(productViewUi, /adminLocalizedProductText\(row, locale\)/);
   assert.match(productView, /adminLocalizedProductText\(draft, locale\)/);
-  assert.match(productView, /LocalizedFallbackBadge/);
+  assert.match(`${productView}\n${productViewUi}`, /LocalizedFallbackBadge/);
 
   assert.match(supplementView, /adminLocalizedSupplementText\(row, locale\)/);
   assert.match(supplementView, /adminLocalizedSupplementText\(draft, locale\)/);
@@ -296,10 +301,11 @@ test("admin DB object titles are rendered through localized translation helpers"
   assert.match(foodView, /adminLocalizedFoodText\(draft, locale\)/);
   assert.match(foodView, /foodSearchText\(row, locale\)/);
 
-  assert.match(reviewQueue, /function reviewDisplayName/);
-  assert.match(reviewQueue, /adminLocalizedProductText\(product, locale\)/);
-  assert.match(reviewQueue, /adminLocalizedSupplementText\(supplement, locale\)/);
-  assert.match(reviewQueue, /adminLocalizedFoodText\(food, locale\)/);
+  assert.match(reviewQueueHelpers, /function reviewDisplayName/);
+  assert.match(reviewQueue, /reviewDisplayName/);
+  assert.match(reviewQueueHelpers, /adminLocalizedProductText\(product, locale\)/);
+  assert.match(reviewQueueHelpers, /adminLocalizedSupplementText\(supplement, locale\)/);
+  assert.match(reviewQueueHelpers, /adminLocalizedFoodText\(food, locale\)/);
   assert.match(dashboard, /foodsData=\{foodsData\}/);
 
   assert.match(dashboardPage, /getAdminRecommendationInsightsData\(\s*range,\s*locale\s*\)/);

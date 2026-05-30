@@ -1,33 +1,15 @@
 import { getSql } from "@/lib/db";
 import { toJsonValue } from "@/lib/assessment-store";
-import { clearProductRecommendationCandidateCache } from "./admin-products.ts";
+import { clearProductRecommendationCandidateCache } from "./admin-product-search.ts";
 import { loadAdminProductRow } from "./admin-product-read-model.ts";
 import { cleanNullableText, isUuidValue } from "./admin-product-helpers.ts";
+import type {
+  RemoveProductOfferInput,
+  UpsertProductOfferInput
+} from "./admin-product-types.ts";
 
 // Offer (link) management for products.
 // Extracted as part of Sprint 2 split of admin-products.
-
-export type UpsertProductOfferInput = Readonly<{
-  actor?: string | null;
-  availabilityStatus?: string;
-  commissionRate?: number | null;
-  currency?: string | null;
-  linkType?: "affiliate" | "direct";
-  network?: string | null;
-  platform?: string | null;
-  priceAmount?: number | null;
-  priority?: number;
-  productId: string;
-  status?: string;
-  trackingId?: string | null;
-  url: string;
-}>;
-
-export type RemoveProductOfferInput = Readonly<{
-  actor?: string | null;
-  offerId: string;
-  productId: string;
-}>;
 
 export async function upsertProductOffer(
   input: UpsertProductOfferInput

@@ -1,6 +1,10 @@
-import type { AdminProductRow } from "@/lib/admin-products";
-import { getAdminProductsData } from "@/lib/admin-products"; // transitional - will use read-model directly later
-import { productSafetyPasses } from "@/lib/admin-product-mappers";
+import type { AdminProductRow } from "@/lib/admin-product-types";
+import { loadProductRows } from "@/lib/admin-product-read-model";
+import {
+  productSafetyPasses,
+  rowFromDb
+} from "@/lib/admin-product-mappers";
+import { normalizeProductCountryCode } from "@/lib/product-countries";
 import type { ProductCandidate } from "@/lib/product-recommendations";
 
 function normalizeProductSearchText(value: unknown) {
@@ -96,15 +100,8 @@ export function productMatchesSearch(row: AdminProductRow, search: string) {
   return terms.every((term) => productSearchTermMatches(index, term));
 }
 
-// ---------------------------------------------------------------------------
-// Recommendation Candidates (with cache)
-// This is the proper home for getProductRecommendationCandidates + cache.
-// ---------------------------------------------------------------------------
-
-let productRecommendationCandidateCache: ProductCandidate[] | null = null;
-
 export function clearProductRecommendationCandidateCache() {
-  productRecommendationCandidateCache = null;
+  // Kept as a public invalidation hook for product mutation paths.
 }
 
 export async function getProductRecommendationCandidates(input: Readonly<{
@@ -113,46 +110,69 @@ export async function getProductRecommendationCandidates(input: Readonly<{
   limit?: number;
   productId?: string | null;
 }>) {
-  if (!productRecommendationCandidateCache) {
-    const data = await getAdminProductsData();
-    const rows = data.rows;
+  const rows = await loadProductRows(input.productId ?? null);
 
-    productRecommendationCandidateCache = rows.map((row) => {
-      const automatedSafetyPassed = productSafetyPasses(row.facts, row.sourceEvidence?.importStatus ?? null);
+  if (!rows) {
+    return [] as ProductCandidate[];
+  }
 
-      return {
-        ...row,
-        automatedSafetyPassed,
-        // Ensure shape matches what recommendProductStackFullBeam expects
-        activeOfferId: row.offers[0]?.id ?? null,
-        activeAffiliateUrl: row.offers.find(o => o.linkType === "affiliate")?.url ?? null,
-        activeAffiliateCommissionRate: row.offers.find(o => o.linkType === "affiliate")?.commissionRate ?? null,
-        activeAffiliatePriority: row.offers[0]?.priority ?? null,
-        activeAffiliateType: row.offers[0]?.linkType ?? null,
-      } as ProductCandidate;
+  const countryCode = input.countryCode
+    ? normalizeProductCountryCode(input.countryCode)
+    : null;
+  let candidates = rows.map((sourceRow) => {
+    const row = rowFromDb(sourceRow);
+    const activeOffer =
+      row.offers.find((offer) =>
+        offer.status === "active" &&
+        offer.availabilityStatus !== "out_of_stock" &&
+        offer.availabilityStatus !== "unavailable" &&
+        offer.linkType === "affiliate"
+      ) ??
+      row.offers.find((offer) =>
+        offer.status === "active" &&
+        offer.availabilityStatus !== "out_of_stock" &&
+        offer.availabilityStatus !== "unavailable"
+      ) ??
+      null;
+
+    return {
+      ...row,
+      activeOfferId: activeOffer?.id ?? null,
+      activeAffiliateUrl:
+        activeOffer?.linkType === "affiliate" ? activeOffer.url : null,
+      activeAffiliateCommissionRate:
+        activeOffer?.linkType === "affiliate"
+          ? activeOffer.commissionRate
+          : null,
+      activeAffiliatePriority: activeOffer?.priority ?? null,
+      activeAffiliateType: activeOffer?.linkType ?? null,
+      automatedSafetyPassed:
+        row.validation.status === "pass" &&
+        productSafetyPasses(row.facts, sourceRow.facts)
+    } satisfies ProductCandidate;
+  });
+
+  if (countryCode) {
+    candidates = candidates.filter((candidate) => {
+      const productCountries = candidate.availableCountryCodes ?? [];
+      const manufacturerCountries = candidate.manufacturerCountryCodes ?? [];
+
+      return (
+        productCountries.includes(countryCode) &&
+        (manufacturerCountries.length < 1 ||
+          manufacturerCountries.includes(countryCode))
+      );
     });
   }
 
-  let candidates = productRecommendationCandidateCache;
-
-  if (input.countryCode) {
-    candidates = candidates.filter((c) =>
-      !c.availableCountryCodes ||
-      c.availableCountryCodes.includes(input.countryCode!)
+  if (!input.includeIneligible) {
+    candidates = candidates.filter((candidate) =>
+      candidate.status === "approved" &&
+      candidate.brandStatus === "approved" &&
+      candidate.validation?.status === "pass" &&
+      candidate.automatedSafetyPassed
     );
   }
 
-  if (!input.includeIneligible) {
-    candidates = candidates.filter((c) => c.automatedSafetyPassed && c.status === "approved");
-  }
-
-  if (input.productId) {
-    candidates = candidates.filter((c) => c.id === input.productId);
-  }
-
-  if (input.limit) {
-    candidates = candidates.slice(0, input.limit);
-  }
-
-  return candidates;
+  return input.limit ? candidates.slice(0, input.limit) : candidates;
 }

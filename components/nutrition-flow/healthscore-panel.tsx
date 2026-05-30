@@ -8,7 +8,7 @@ import {
   ClipboardDocumentCheckIcon,
   LockClosedIcon,
   ShieldCheckIcon,
-  SparklesIcon
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
@@ -17,603 +17,15 @@ import type {
   HealthScoreMethodCard,
   HealthScorePageAiCard,
   HealthScoreResult,
-  LocalizedHealthScoreText
+  LocalizedHealthScoreText,
 } from "@/lib/health-score";
 import type { Locale } from "@/lib/i18n";
+import {
+  pageCopy,
+  type PricePlan,
+} from "@/components/nutrition-flow/healthscore-panel-copy";
 import { paymentCheckoutPath } from "@/lib/payment-paths";
 import { cx } from "@/components/nutrition-flow/ui";
-
-const basePageCopy = {
-  en: {
-    bodyClass: "leading-7",
-    progress: [
-      ["Discover", "Assessment complete"],
-      ["Score", "Your HealthScore is ready"],
-      ["Reveal", "Unlock your plan"]
-    ],
-    heroEyebrow: "Your free assessment result",
-    heroGreeting(firstName: string) {
-      return `Ready when you are, ${firstName}.`;
-    },
-    heroTitle(score: number) {
-      return `Your HealthScore is ${score}.`;
-    },
-    defaultHeroBody:
-      "We read your goals, daily routine, safety context, and the way you actually live, then turned them into one number and the pattern underneath it.",
-    heroCta: "Unlock my Right Amount Plan",
-    heroSecondary: "See what shaped it",
-    scoreLabel: "HealthScore",
-    scoreOutOf: "/100",
-    topTier: "Top tier",
-    percentile: "Percentile",
-    median: "Reference median",
-    spectrumStart: "30",
-    spectrumEnd: "92",
-    spectrumTypical: "Typical finisher",
-    spectrumYou: "YOU",
-    spectrumWhere: "Where you are",
-    spectrumGapAhead: "How far ahead you sit",
-    spectrumGapBehind: "Gap to typical finisher",
-    spectrumHeadroom: "Headroom to 92",
-    defaultBandLine:
-      "Your score is built from five weighted pillars, safety flags, symptoms, goals, and any verified lab or wearable data you supplied.",
-	    bandLabels: {
-	      "Building foundation": "Building foundation",
-	      "Needs attention": "Needs attention",
-	      "Good, with a clear gap": "Good, with a clear gap",
-	      Strong: "Strong",
-      Excellent: "Excellent"
-    },
-    pillarLabels: {
-      activity: "Activity & Fitness",
-      biomarkers: "Biomarkers",
-      habits: "Health Habits",
-      nutrition: "Nutrition & Diet",
-      sleep: "Sleep & Recovery",
-      stress: "Stress & Balance"
-    },
-    tagLabels: {
-      digestion: "Digestion",
-      energy: "Energy",
-      fitness: "Fitness",
-      focus: "Focus",
-      heart: "Heart",
-      immune: "Immune",
-      mood: "Mood",
-      sleep: "Sleep"
-    },
-    scoreMeaningEyebrow(score: number) {
-      return `What ${score} actually means`;
-    },
-    fallbackScoreMeaning(score: number, percentile: number) {
-      return `You are ahead of about ${percentile}% of people who finish this assessment. The last points are the hardest, and the most personal.`;
-    },
-    fallbackScoreMeaningSub:
-      "A higher score is not about chasing everything at once. It is about the few specific refinements that still matter for your pattern.",
-    gapEyebrow: "Assessment revealed",
-    gapTitle: "Three things a generic vitamin quiz would have walked straight past.",
-    gapBody:
-      "These are the specific signals in your answers that shape your formula, laid out in full, nothing held back.",
-    fallbackGaps: [
-      {
-        body: "Your lowest pillar shows where the first practical change should start.",
-        headline: "The clearest gap is not hidden",
-        tag: "Signal",
-        value: "01"
-      },
-      {
-        body: "Your goals change which nutrients or products earn space in the plan.",
-        headline: "Your goals change the order",
-        tag: "Signal",
-        value: "02"
-      },
-      {
-        body: "Medication, diet pattern, country, and routine context stay visible before anything is suggested.",
-        headline: "Safety context stays in the room",
-        tag: "Signal",
-        value: "03"
-      }
-    ],
-    pillarsEyebrow: "Five-pillar model",
-    pillarEyebrow: "Your pattern, pillar by pillar",
-    pillarsTitle: "A fixed scoring model across five domains, not a guess.",
-    highestLeverageLabel: "Your highest-leverage move",
-    whatCaught: "What we caught",
-    whatCaughtSub: "Laid out in full, nothing held back.",
-    fallbackFindingTitle: "Your HealthScore has a clear starting point",
-    fallbackFindingBody:
-      "The lowest pillar and safety context decide what the plan should prioritise first.",
-    subtractionEyebrow: "How your formula was built",
-    subtractionTitle: "Your right amount is what remains after the unsuitable options are removed.",
-    evaluatedFallback: "evaluated",
-    setAsideFallback: "set aside",
-    chosenFallback: "right for your score",
-    methodEyebrow: "How MattaNutra thinks",
-    methodTitle:
-      "A fixed scoring model across five domains, not a guess and not an average of strangers.",
-    fallbackMethodCards: [
-      {
-        body: "The score is computed before AI writes a single line of copy.",
-        title: "Score first"
-      },
-      {
-        body: "Only the strongest assessment signals are shown on the page.",
-        title: "Signals selected by code"
-      },
-      {
-        body: "AI can phrase the page, but it cannot change your score, flags, counts, or findings.",
-        title: "Copy locked to facts"
-      }
-    ],
-    trustLine:
-      "Your number is computed by the same rules every time: traceable, point by point. This is wellness guidance, not a diagnosis, and it is built to be shared with your doctor.",
-    pricingEyebrow: "Choose your next step",
-    pricingTitle: "Unlock the plan that fits how much support you want.",
-    pricingBody:
-      "Choose the one-time Right Amount Formula for immediate clarity, or the 90-Day Living Protocol for ongoing help turning the plan into daily habits.",
-    preparing: "Preparing...",
-    selectionError: "We could not start your plan. Please try again.",
-    plans: [
-      {
-        badge: "Limited time offer",
-        cta: "Get the Right Amount Formula",
-        description:
-          "Your personalised supplement formula with precise dosing, timing, and product guidance.",
-        eyebrow: "One-time plan",
-        features: [
-          "Personalised supplement formula",
-          "Body-size adjusted dose ranges",
-          "Timing and usage instructions",
-          "Medication and lab safety flags",
-          "Recommended products and alternatives",
-          "60-day reassessment prompt"
-        ],
-        fine: "One-time payment · Lifetime access",
-        guarantee: "Clarity Guarantee",
-        guaranteeBody:
-          "If your plan does not feel clear and useful, we will make it right or refund you within 7 days.",
-        name: "Right Amount Formula",
-        price: "690",
-        save: "Save 30%",
-        term: "one-time",
-        was: "THB 990"
-      },
-      {
-        badge: "Most popular",
-        cta: "Start Living Protocol",
-        description:
-          "Keep your right amount right as life changes, with food guidance and ongoing adjustments.",
-        eyebrow: "90-day AI support",
-        extraBlocks: [
-          {
-            body:
-              "When something runs low, learn the everyday foods naturally rich in it, or skip the supplement when your meals already cover it.",
-            icon: "❘❘",
-            title: "Which Foods Give You What You Need"
-          },
-          {
-            body: "Improve sleep quality, boost energy, and build better daily habits.",
-            icon: "☾",
-            title: "Sleep, Energy and Habits Guidance"
-          }
-        ],
-        features: [
-          "Learn which everyday foods give you what you need",
-          "Supplement timing and adherence support",
-          "Weekly progress summaries",
-          "Priority review as your data changes"
-        ],
-        fine: "One payment · 90 days of support · Renew anytime",
-        guarantee: "7-Day Satisfaction Guarantee",
-        guaranteeBody:
-          "Give Living Protocol a real try. If anything is not right, tell us and we will fix it, or refund you in full within 7 days.",
-        includes: "Includes Right Amount Formula Plan.",
-        name: "Living Protocol",
-        price: "1,590",
-        save: "Save 16%",
-        term: "for 90 days",
-        was: "THB 1,890"
-      }
-    ]
-  },
-  th: {
-    bodyClass: "leading-8 [word-break:keep-all]",
-    progress: [
-      ["ค้นพบ", "แบบประเมินเสร็จแล้ว"],
-      ["ให้คะแนน", "คะแนนสุขภาพพร้อมแล้ว"],
-      ["เปิดแผน", "ปลดล็อกแผนของคุณ"]
-    ],
-    heroEyebrow: "ผลประเมินฟรีของคุณ",
-    heroGreeting(firstName: string) {
-      return `พร้อมแล้วสำหรับคุณ ${firstName}`;
-    },
-    heroTitle(score: number) {
-      return `คะแนนสุขภาพของคุณคือ ${score}`;
-    },
-    defaultHeroBody:
-      "เราอ่านเป้าหมาย กิจวัตร บริบทความเหมาะสม และชีวิตจริงของคุณ แล้วแปลงเป็นคะแนนเดียวพร้อมรูปแบบที่อยู่ข้างใต้",
-    heroCta: "ปลดล็อกแผนปริมาณที่พอดี",
-    heroSecondary: "ดูสิ่งที่ใช้คำนวณ",
-    scoreLabel: "คะแนนสุขภาพ",
-    scoreOutOf: "/100",
-    topTier: "ระดับสูง",
-    percentile: "เปอร์เซ็นไทล์",
-    median: "ค่ากลางอ้างอิง",
-    spectrumStart: "30",
-    spectrumEnd: "92",
-    spectrumTypical: "ผู้ทำแบบประเมินทั่วไป",
-    spectrumYou: "คุณ",
-    spectrumWhere: "ตำแหน่งของคุณ",
-    spectrumGapAhead: "ระยะที่คุณอยู่ข้างหน้า",
-    spectrumGapBehind: "ช่องว่างถึงค่าทั่วไป",
-    spectrumHeadroom: "พื้นที่ปรับถึง 92",
-    defaultBandLine:
-      "คะแนนนี้คำนวณจากเสาหลักห้าด้าน ธงความเหมาะสม อาการ เป้าหมาย และข้อมูลแล็บหรืออุปกรณ์ที่คุณให้มา",
-	    bandLabels: {
-	      "Building foundation": "กำลังสร้างพื้นฐาน",
-	      "Needs attention": "ต้องให้ความสำคัญ",
-	      "Good, with a clear gap": "ดี และมีช่องว่างที่ชัดเจน",
-	      Strong: "แข็งแรง",
-      Excellent: "ยอดเยี่ยม"
-    },
-    pillarLabels: {
-      activity: "กิจกรรมและความฟิต",
-      biomarkers: "ตัวชี้วัดสุขภาพ",
-      habits: "พฤติกรรมสุขภาพ",
-      nutrition: "โภชนาการและอาหาร",
-      sleep: "การนอนและการฟื้นตัว",
-      stress: "ความเครียดและสมดุล"
-    },
-    tagLabels: {
-      digestion: "ระบบย่อย",
-      energy: "พลังงาน",
-      fitness: "ฟิตเนส",
-      focus: "โฟกัส",
-      heart: "หัวใจ",
-      immune: "ภูมิคุ้มกัน",
-      mood: "อารมณ์",
-      sleep: "การนอน"
-    },
-    scoreMeaningEyebrow(score: number) {
-      return `${score} คะแนนหมายความว่าอะไร`;
-    },
-    fallbackScoreMeaning(score: number, percentile: number) {
-      return `คุณอยู่ข้างหน้าประมาณ ${percentile}% ของคนที่ทำแบบประเมินนี้ คะแนนที่เหลือคือจุดที่เฉพาะตัวที่สุด`;
-    },
-    fallbackScoreMeaningSub:
-      "คะแนนที่สูงขึ้นไม่ได้มาจากการไล่ทำทุกอย่างพร้อมกัน แต่มาจากการปรับไม่กี่จุดที่ยังสำคัญกับรูปแบบของคุณ",
-    gapEyebrow: "สิ่งที่แบบประเมินพบ",
-    gapTitle: "สามเรื่องที่แบบทดสอบวิตามินทั่วไปมักมองข้าม",
-    gapBody:
-      "นี่คือสัญญาณเฉพาะจากคำตอบของคุณที่มีผลต่อสูตร โดยแสดงอย่างชัดเจน",
-    fallbackGaps: [
-      {
-        body: "เสาหลักที่ต่ำที่สุดบอกว่าควรเริ่มปรับจากจุดไหนก่อน",
-        headline: "ช่องว่างที่ชัดที่สุดไม่ได้ถูกซ่อนไว้",
-        tag: "สัญญาณ",
-        value: "01"
-      },
-      {
-        body: "เป้าหมายของคุณเปลี่ยนลำดับของสารอาหารหรือผลิตภัณฑ์ที่ควรอยู่ในแผน",
-        headline: "เป้าหมายของคุณเปลี่ยนลำดับ",
-        tag: "สัญญาณ",
-        value: "02"
-      },
-      {
-        body: "บริบทยา รูปแบบอาหาร ประเทศ และกิจวัตรยังถูกนำมาพิจารณาก่อนแนะนำสิ่งใด",
-        headline: "บริบทความเหมาะสมยังอยู่ในภาพ",
-        tag: "สัญญาณ",
-        value: "03"
-      }
-    ],
-    pillarsEyebrow: "โมเดลห้าเสาหลัก",
-    pillarEyebrow: "รูปแบบของคุณ ทีละเสาหลัก",
-    pillarsTitle: "โมเดลคะแนนคงที่ห้าด้าน ไม่ใช่การเดา",
-    highestLeverageLabel: "จุดที่ให้แรงส่งสูงที่สุด",
-    whatCaught: "สิ่งที่เราจับได้",
-    whatCaughtSub: "แสดงอย่างชัดเจน ไม่ปิดบัง",
-    fallbackFindingTitle: "คะแนนสุขภาพของคุณมีจุดเริ่มต้นที่ชัดเจน",
-    fallbackFindingBody:
-      "เสาหลักที่ต่ำที่สุดและบริบทความเหมาะสมเป็นตัวกำหนดว่าแผนควรเริ่มจากอะไร",
-    subtractionEyebrow: "สูตรของคุณถูกสร้างอย่างไร",
-    subtractionTitle: "ปริมาณที่พอดีคือสิ่งที่เหลือหลังตัดตัวเลือกที่ไม่เหมาะออก",
-    evaluatedFallback: "ประเมิน",
-    setAsideFallback: "ตัดออก",
-    chosenFallback: "เหมาะกับคะแนนของคุณ",
-    methodEyebrow: "วิธีคิดของ MattaNutra",
-    methodTitle:
-      "โมเดลคะแนนคงที่ห้าด้าน ไม่ใช่การเดา และไม่ใช่ค่าเฉลี่ยของคนอื่น",
-    fallbackMethodCards: [
-      {
-        body: "คะแนนถูกคำนวณก่อนที่ AI จะเขียนข้อความบนหน้า",
-        title: "คำนวณคะแนนก่อน"
-      },
-      {
-        body: "หน้าจะแสดงเฉพาะสัญญาณจากแบบประเมินที่สำคัญที่สุด",
-        title: "เลือกสัญญาณด้วยโค้ด"
-      },
-      {
-        body: "AI เขียนภาษาได้ แต่เปลี่ยนคะแนน ธง จำนวน หรือสิ่งที่พบไม่ได้",
-        title: "ข้อความถูกล็อกกับข้อเท็จจริง"
-      }
-    ],
-    trustLine:
-      "คะแนนของคุณคำนวณด้วยกฎเดียวกันทุกครั้ง ตรวจสอบย้อนกลับได้ทีละจุด นี่คือข้อมูลสุขภาวะ ไม่ใช่การวินิจฉัย และออกแบบมาให้คุยต่อกับแพทย์ได้",
-    pricingEyebrow: "เลือกขั้นต่อไป",
-    pricingTitle: "ปลดล็อกแผนที่ตรงกับระดับการสนับสนุนที่คุณต้องการ",
-    pricingBody:
-      "เลือกสูตรปริมาณที่พอดีแบบครั้งเดียวเพื่อความชัดเจนทันที หรือเลือก Living Protocol 90 วันสำหรับการช่วยเปลี่ยนแผนเป็นกิจวัตรจริง",
-    preparing: "กำลังเตรียม...",
-    selectionError: "ไม่สามารถเริ่มแผนได้ กรุณาลองอีกครั้ง",
-    plans: [
-      {
-        badge: "ข้อเสนอพิเศษ",
-        cta: "รับสูตรปริมาณที่พอดี",
-        description:
-          "สูตรอาหารเสริมส่วนตัว พร้อมปริมาณ เวลาใช้ และคำแนะนำผลิตภัณฑ์",
-        eyebrow: "แผนครั้งเดียว",
-        features: [
-          "สูตรอาหารเสริมส่วนตัว",
-          "ช่วงปริมาณที่ปรับตามร่างกาย",
-          "คำแนะนำเวลาและวิธีใช้",
-          "ธงความปลอดภัยจากยาและแล็บ",
-          "ผลิตภัณฑ์ที่แนะนำและทางเลือก",
-          "แจ้งเตือนประเมินซ้ำใน 60 วัน"
-        ],
-        fine: "ชำระครั้งเดียว · เข้าถึงได้ตลอด",
-        guarantee: "รับประกันความชัดเจน",
-        guaranteeBody:
-          "หากแผนไม่ชัดเจนหรือไม่มีประโยชน์ เราจะปรับให้หรือคืนเงินภายใน 7 วัน",
-        name: "สูตรปริมาณที่พอดี",
-        price: "690",
-        save: "ประหยัด 30%",
-        term: "ครั้งเดียว",
-        was: "THB 990"
-      },
-      {
-        badge: "นิยมที่สุด",
-        cta: "เริ่ม Living Protocol",
-        description:
-          "รักษาปริมาณที่พอดีให้ยังพอดีเมื่อชีวิตเปลี่ยน พร้อมคำแนะนำอาหารและการปรับต่อเนื่อง",
-        eyebrow: "AI ดูแล 90 วัน",
-        extraBlocks: [
-          {
-            body:
-              "เมื่อบางอย่างยังขาด ให้รู้ว่าอาหารประจำวันชนิดใดมีสิ่งนั้นตามธรรมชาติ หรือข้ามอาหารเสริมได้เมื่อมื้ออาหารครอบคลุมแล้ว",
-            icon: "❘❘",
-            title: "อาหารชนิดใดให้สิ่งที่คุณต้องการ"
-          },
-          {
-            body: "ช่วยปรับคุณภาพการนอน พลังงาน และนิสัยประจำวันให้ดีขึ้น",
-            icon: "☾",
-            title: "คำแนะนำเรื่องการนอน พลังงาน และนิสัย"
-          }
-        ],
-        features: [
-          "เรียนรู้ว่าอาหารประจำวันชนิดใดให้สิ่งที่คุณต้องการ",
-          "ช่วยเรื่องเวลาใช้และความสม่ำเสมอของอาหารเสริม",
-          "สรุปความคืบหน้ารายสัปดาห์",
-          "ทบทวนเมื่อข้อมูลเปลี่ยน"
-        ],
-        fine: "ชำระครั้งเดียว · ดูแล 90 วัน · ต่ออายุได้",
-        guarantee: "รับประกันความพึงพอใจ 7 วัน",
-        guaranteeBody:
-          "ลองใช้ Living Protocol อย่างจริงจัง หากมีสิ่งใดไม่ตรงใจ บอกเรา เราจะปรับให้หรือคืนเงินเต็มจำนวนภายใน 7 วัน",
-        includes: "รวมแผนสูตรปริมาณที่พอดี",
-        name: "Living Protocol",
-        price: "1,590",
-        save: "ประหยัด 16%",
-        term: "90 วัน",
-        was: "THB 1,890"
-      }
-    ]
-  }
-} as const;
-
-type WidenPageCopy<T> =
-  T extends (...args: infer Args) => string ? (...args: Args) => string :
-  T extends string ? string :
-  T extends number ? number :
-  T extends boolean ? boolean :
-  T extends readonly (infer Item)[] ? readonly WidenPageCopy<Item>[] :
-  T extends object ? { readonly [Key in keyof T]: WidenPageCopy<T[Key]> } :
-  T;
-
-type HealthScorePageCopy = WidenPageCopy<typeof basePageCopy.en>;
-
-const pageCopy = {
-  ...basePageCopy,
-  "zh-CN": {
-        "bodyClass": "leading-relaxed",
-        "progress": [
-            [
-                "发现",
-                "评估完成"
-            ],
-            [
-                "分数",
-                "您的 HealthScore 已就绪"
-            ],
-            [
-                "揭晓",
-                "解锁您的计划"
-            ]
-        ],
-        "heroGreeting"(firstName: string) {
-        return `随时准备就绪，${firstName}。`;
-      },
-      "heroTitle"(score: number) {
-        return `您的 HealthScore 是 ${score}。`;
-      },
-      "heroEyebrow": "您的免费评估结果",
-        "defaultHeroBody": "我们阅读了您的目标、日常作息、安全背景以及真实生活方式，将它们转化为一个数字及其背后的模式。",
-        "heroCta": "解锁我的 Right Amount Plan",
-        "heroSecondary": "查看影响因素",
-        "scoreLabel": "HealthScore",
-        "scoreOutOf": "/100",
-        "topTier": "顶级",
-        "percentile": "百分位",
-        "median": "参考中位数",
-        "spectrumStart": "30",
-        "spectrumEnd": "92",
-        "spectrumTypical": "典型完成者",
-        "spectrumYou": "您",
-        "spectrumWhere": "您的位置",
-        "spectrumGapAhead": "领先距离",
-        "spectrumGapBehind": "与典型完成者的差距",
-        "spectrumHeadroom": "到92分的提升空间",
-        "defaultBandLine": "您的分数由五个加权支柱、安全标志、症状、目标以及您提供的任何已验证实验室或可穿戴设备数据共同构建。",
-	        "bandLabels": {
-            "Building foundation": "正在建立基础",
-	            "Needs attention": "需要关注",
-	            "Good, with a clear gap": "良好，但仍有明显差距",
-            "Strong": "强劲",
-            "Excellent": "优秀"
-        },
-        "pillarLabels": {
-            "activity": "活动与健身",
-            "biomarkers": "生物标志物",
-            "habits": "健康习惯",
-            "nutrition": "营养与饮食",
-            "sleep": "睡眠与恢复",
-            "stress": "压力与平衡"
-        },
-        "tagLabels": {
-            "digestion": "消化",
-            "energy": "能量",
-            "fitness": "健身",
-            "focus": "专注",
-            "heart": "心脏",
-            "immune": "免疫",
-            "mood": "情绪",
-            "sleep": "睡眠"
-        },
-        "scoreMeaningEyebrow"(score: number) {
-        return `${score} 的实际含义`;
-      },
-      "fallbackScoreMeaning"(_score: number, percentile: number) {
-        return `您领先于约 ${percentile}% 完成此评估的人。最后的分数最难获得，也最个性化。`;
-      },
-      "fallbackScoreMeaningSub": "更高的分数并非追求一次性全部达成，而是针对您模式中仍需优化的少数具体调整。",
-        "gapEyebrow": "评估揭示",
-        "gapTitle": "三个通用维生素问卷会直接忽略的要点。",
-        "gapBody": "这些是您答案中的具体信号，完整呈现您的配方依据，毫无保留。",
-        "fallbackGaps": [
-            {
-                "body": "您得分最低的支柱显示首次实际改变应从何处开始。",
-                "headline": "最清晰的差距并非隐藏",
-                "tag": "信号",
-                "value": "01"
-            },
-            {
-                "body": "您的目标决定哪些营养素或产品在计划中获得优先位置。",
-                "headline": "您的目标改变优先级",
-                "tag": "信号",
-                "value": "02"
-            },
-            {
-                "body": "用药、饮食模式、国家和作息背景在任何建议前保持可见。",
-                "headline": "安全背景始终在场",
-                "tag": "信号",
-                "value": "03"
-            }
-        ],
-        "pillarsEyebrow": "五支柱模型",
-        "pillarEyebrow": "您的模式，逐支柱呈现",
-        "pillarsTitle": "跨五个领域的固定评分模型，而非猜测。",
-        "highestLeverageLabel": "您的最高杠杆行动",
-        "whatCaught": "我们捕捉到的",
-        "whatCaughtSub": "完整呈现，毫无保留。",
-        "fallbackFindingTitle": "您的 HealthScore 有明确的起点",
-        "fallbackFindingBody": "得分最低的支柱和安全背景决定计划应优先处理的内容。",
-        "subtractionEyebrow": "您的配方如何构建",
-        "subtractionTitle": "您的 right amount 是移除不适合选项后剩余的内容。",
-        "evaluatedFallback": "已评估",
-        "setAsideFallback": "已排除",
-        "chosenFallback": "适合您的分数",
-        "methodEyebrow": "MattaNutra 的思考方式",
-        "methodTitle": "跨五个领域的固定评分模型，而非猜测或陌生人的平均值。",
-        "fallbackMethodCards": [
-            {
-                "body": "在 AI 撰写任何文案前先计算分数。",
-                "title": "分数优先"
-            },
-            {
-                "body": "仅显示最强的评估信号。",
-                "title": "信号由代码筛选"
-            },
-            {
-                "body": "AI 可润色页面，但无法更改您的分数、标志、计数或发现。",
-                "title": "文案锁定事实"
-            }
-        ],
-        "trustLine": "您的数字每次都按相同规则计算：可追溯，逐点呈现。这是健康指导而非诊断，适合与医生分享。",
-        "pricingEyebrow": "选择下一步",
-        "pricingTitle": "解锁符合您所需支持程度的计划。",
-        "pricingBody": "选择一次性 Right Amount Formula 获得即时清晰度，或选择 90-Day Living Protocol 获得持续帮助，将计划转化为日常习惯。",
-        "preparing": "准备中...",
-        "selectionError": "无法启动您的计划，请重试。",
-        "plans": [
-            {
-                "badge": "限时优惠",
-                "cta": "获取 Right Amount Formula",
-                "description": "您的个性化补充剂配方，包含精确剂量、时机和产品指导。",
-                "eyebrow": "一次性计划",
-                "features": [
-                    "个性化补充剂配方",
-                    "按体型调整的剂量范围",
-                    "时机与使用说明",
-                    "用药与实验室安全标志",
-                    "推荐产品及替代方案",
-                    "60天重新评估提示"
-                ],
-                "fine": "一次性付款 · 终身访问",
-                "guarantee": "清晰度保证",
-                "guaranteeBody": "如果您的计划不够清晰实用，我们将在7天内解决或退款。",
-                "name": "Right Amount Formula",
-                "price": "690",
-                "save": "节省30%",
-                "term": "一次性",
-                "was": "THB 990"
-            },
-            {
-                "badge": "最受欢迎",
-                "cta": "开始 Living Protocol",
-                "description": "随着生活变化保持 right amount 正确，提供饮食指导和持续调整。",
-                "eyebrow": "90天 AI 支持",
-                "extraBlocks": [
-                    {
-                        "body": "当某种成分不足时，了解日常富含该成分的食物，或在餐食已覆盖时跳过补充剂。",
-                        "icon": "❘❘",
-                        "title": "哪些食物能提供您所需"
-                    },
-                    {
-                        "body": "改善睡眠质量，提升能量，建立更好的日常习惯。",
-                        "icon": "☾",
-                        "title": "睡眠、能量与习惯指导"
-                    }
-                ],
-                "features": [
-                    "了解日常食物如何提供所需成分",
-                    "补充剂时机与依从性支持",
-                    "每周进度摘要",
-                    "数据变化时的优先审查"
-                ],
-                "fine": "一次性付款 · 90天支持 · 随时续订",
-                "guarantee": "7天满意保证",
-                "guaranteeBody": "请真正尝试 Living Protocol。如有任何问题，请告知我们，我们将在7天内解决或全额退款。",
-                "includes": "包含 Right Amount Formula 计划。",
-                "name": "Living Protocol",
-                "price": "1,590",
-                "save": "节省16%",
-                "term": "为期90天",
-                "was": "THB 1,890"
-            }
-        ]
-    }
-} as const satisfies Record<Locale, HealthScorePageCopy>;
-
-type PricePlan = HealthScorePageCopy["plans"][number];
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
@@ -627,7 +39,7 @@ function useReducedMotion() {
   const [reduced, setReduced] = useState(() =>
     typeof window === "undefined"
       ? false
-      : window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
 
   useEffect(() => {
@@ -668,7 +80,7 @@ function useInViewOnce<T extends HTMLElement>(margin = "0px 0px -12% 0px") {
           observer.disconnect();
         }
       },
-      { rootMargin: margin, threshold: 0.1 }
+      { rootMargin: margin, threshold: 0.1 },
     );
 
     observer.observe(element);
@@ -688,7 +100,7 @@ function useInViewOnce<T extends HTMLElement>(margin = "0px 0px -12% 0px") {
 function RevealBlock({
   children,
   className = "",
-  delay = 0
+  delay = 0,
 }: Readonly<{
   children: ReactNode;
   className?: string;
@@ -706,7 +118,7 @@ function RevealBlock({
         delay === 3 && "motion-safe:delay-300",
         delay === 4 && "motion-safe:delay-[420ms]",
         visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6",
-        className
+        className,
       )}
     >
       {children}
@@ -718,7 +130,7 @@ function CountUpNumber({
   active = true,
   className,
   duration = 900,
-  value
+  value,
 }: Readonly<{
   active?: boolean;
   className?: string;
@@ -752,7 +164,11 @@ function CountUpNumber({
     return () => cancelAnimationFrame(frame);
   }, [active, duration, reducedMotion, value]);
 
-  return <span className={className}>{reducedMotion || !active ? value : display}</span>;
+  return (
+    <span className={className}>
+      {reducedMotion || !active ? value : display}
+    </span>
+  );
 }
 
 function stripInlineMarkup(value: string) {
@@ -780,7 +196,7 @@ function textFitsLocale(value: string, locale: Locale) {
 function localizedLegacyText(
   value: string | null | undefined,
   locale: Locale,
-  fallback = ""
+  fallback = "",
 ) {
   if (!value) {
     return fallback;
@@ -796,7 +212,7 @@ function localizedLegacyText(
 function localize(
   value: LocalizedHealthScoreText | undefined,
   locale: Locale,
-  fallback = ""
+  fallback = "",
 ) {
   if (!value) {
     return fallback;
@@ -811,7 +227,7 @@ function localize(
 
 export function localizeHealthScoreText(
   value: LocalizedHealthScoreText | undefined,
-  locale: Locale
+  locale: Locale,
 ) {
   return localize(value, locale);
 }
@@ -819,7 +235,7 @@ export function localizeHealthScoreText(
 function aiCardHeadline(
   card: HealthScorePageAiCard | undefined,
   locale: Locale,
-  fallback: string
+  fallback: string,
 ) {
   return localize(card?.headline ?? card?.title, locale, fallback);
 }
@@ -827,7 +243,7 @@ function aiCardHeadline(
 function aiCardBody(
   card: HealthScorePageAiCard | undefined,
   locale: Locale,
-  fallback: string
+  fallback: string,
 ) {
   return localize(card?.body, locale, fallback);
 }
@@ -839,16 +255,23 @@ function displayBand(band: string, locale: Locale) {
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
-  return labels[band as keyof typeof labels] ?? labels[normalized as keyof typeof labels] ?? band;
+  return (
+    labels[band as keyof typeof labels] ??
+    labels[normalized as keyof typeof labels] ??
+    band
+  );
 }
 
 function displayPillarLabel(
   pillar: ReturnType<typeof normalizedPillars>[number],
-  locale: Locale
+  locale: Locale,
 ) {
   const labels = pageCopy[locale].pillarLabels;
 
-  return labels[pillar.id as keyof typeof labels] ?? localizedLegacyText(pillar.label, locale);
+  return (
+    labels[pillar.id as keyof typeof labels] ??
+    localizedLegacyText(pillar.label, locale)
+  );
 }
 
 function displayPillarTag(tag: string | null | undefined, locale: Locale) {
@@ -884,26 +307,28 @@ function normalizedPillars(result: HealthScoreResult) {
       id: domain.id,
       label: domain.label,
       tag: null,
-      value: domain.score
+      value: domain.score,
     }))
   );
 }
 
 function fallbackGapCards(
   result: HealthScoreResult,
-  locale: Locale
+  locale: Locale,
 ): HealthScoreGapCard[] {
   const lowest = lowestDomain(result);
-  const cards: HealthScoreGapCard[] = pageCopy[locale].fallbackGaps.map((card) => ({
-    ...card
-  }));
+  const cards: HealthScoreGapCard[] = pageCopy[locale].fallbackGaps.map(
+    (card) => ({
+      ...card,
+    }),
+  );
 
   if (lowest) {
     cards[0] = {
       body: lowest.description || cards[0].body,
       headline: lowest.label,
       tag: cards[0].tag,
-      value: `${lowest.score}`
+      value: `${lowest.score}`,
     };
   }
 
@@ -911,14 +336,15 @@ function fallbackGapCards(
 }
 
 function gapCards(result: HealthScoreResult, locale: Locale) {
-  const seeds = result.pageContent?.copySeeds.gapTrio ?? fallbackGapCards(result, locale);
+  const seeds =
+    result.pageContent?.copySeeds.gapTrio ?? fallbackGapCards(result, locale);
 
   return seeds.slice(0, 3);
 }
 
 function methodCards(
   result: HealthScoreResult,
-  locale: Locale
+  locale: Locale,
 ): HealthScoreMethodCard[] {
   return (
     result.pageContent?.copySeeds.methodCards ??
@@ -940,13 +366,13 @@ function findings(result: HealthScoreResult, locale: Locale) {
       body: lowest?.description ?? pageCopy[locale].fallbackFindingBody,
       code: lowest?.id ?? "LOWEST_PILLAR",
       headline: lowest?.label ?? pageCopy[locale].fallbackFindingTitle,
-      icon: "spark"
-    }
+      icon: "spark",
+    },
   ];
 }
 
 function HealthScoreProgress({
-  locale
+  locale,
 }: Readonly<{
   locale: Locale;
 }>) {
@@ -972,8 +398,9 @@ function HealthScoreProgress({
             <span
               className={cx(
                 "inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-[var(--mn-ash-soft)] sm:px-3",
-                active && "bg-white text-[var(--mn-ink)] shadow-[var(--mn-shadow-soft)]",
-                complete && "text-[var(--mn-teal-deep)]"
+                active &&
+                  "bg-white text-[var(--mn-ink)] shadow-[var(--mn-shadow-soft)]",
+                complete && "text-[var(--mn-teal-deep)]",
               )}
             >
               <span
@@ -983,7 +410,7 @@ function HealthScoreProgress({
                     ? "border-[var(--mn-teal-deep)] bg-[var(--mn-teal-deep)] text-white"
                     : active
                       ? "border-2 border-[var(--mn-teal)] text-[var(--mn-teal)]"
-                      : "border-current"
+                      : "border-current",
                 )}
               >
                 {complete ? "✓" : index + 1}
@@ -1000,7 +427,7 @@ function HealthScoreProgress({
 
 function ScoreSpectrum({
   locale,
-  result
+  result,
 }: Readonly<{
   locale: Locale;
   result: HealthScoreResult;
@@ -1073,7 +500,7 @@ function ScoreSpectrum({
 function HealthScoreHero({
   firstName,
   locale,
-  result
+  result,
 }: Readonly<{
   firstName?: string;
   locale: Locale;
@@ -1086,20 +513,29 @@ function HealthScoreHero({
   const heroTitle = localize(
     ai?.heroTitle,
     locale,
-    localizedLegacyText(page?.copySeeds.goalMirror, locale, copy.heroTitle(score))
+    localizedLegacyText(
+      page?.copySeeds.goalMirror,
+      locale,
+      copy.heroTitle(score),
+    ),
   );
   const heroBody = localize(
     ai?.heroBody,
     locale,
-    localizedLegacyText(page?.copySeeds.heroBody ?? result.summary, locale, copy.defaultHeroBody)
+    localizedLegacyText(
+      page?.copySeeds.heroBody ?? result.summary,
+      locale,
+      copy.defaultHeroBody,
+    ),
   );
   const bandLine = localize(
     ai?.bandLine,
     locale,
-    localizedLegacyText(page?.copySeeds.bandLine, locale, copy.defaultBandLine)
+    localizedLegacyText(page?.copySeeds.bandLine, locale, copy.defaultBandLine),
   );
   const percentile = page?.locked.percentile ?? null;
-  const { ref: scoreRef, visible: scoreVisible } = useInViewOnce<HTMLDivElement>();
+  const { ref: scoreRef, visible: scoreVisible } =
+    useInViewOnce<HTMLDivElement>();
 
   return (
     <header className="space-y-8 text-center">
@@ -1119,7 +555,7 @@ function HealthScoreHero({
           <h1
             className={cx(
               "mn-hero-title mx-auto mt-5 max-w-[16ch] font-serif text-[clamp(2rem,5.4vw,3.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)]",
-              locale === "en" ? "text-balance" : "break-words"
+              locale === "en" ? "text-balance" : "break-words",
             )}
           >
             {heroTitle}
@@ -1129,7 +565,7 @@ function HealthScoreHero({
           <p
             className={cx(
               "mn-hero-subtitle mx-auto mt-5 max-w-[54ch] text-[1.05rem] text-[var(--mn-ink-soft)]",
-              copy.bodyClass
+              copy.bodyClass,
             )}
           >
             {heroBody}
@@ -1145,35 +581,37 @@ function HealthScoreHero({
               <span className="rounded-full bg-[var(--mn-gold-tint)] px-3 py-1.5 font-[family:var(--mn-font-mono)] text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-[#8a6d23]">
                 {displayBand(result.band, locale)}
               </span>
-            {percentile !== null ? (
-              <span className="rounded-full bg-[var(--mn-mint)] px-3 py-1.5 font-[family:var(--mn-font-mono)] text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
-                {percentile >= 80 ? copy.topTier : `${copy.percentile}: ${percentile}`}
-              </span>
-            ) : null}
+              {percentile !== null ? (
+                <span className="rounded-full bg-[var(--mn-mint)] px-3 py-1.5 font-[family:var(--mn-font-mono)] text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
+                  {percentile >= 80
+                    ? copy.topTier
+                    : `${copy.percentile}: ${percentile}`}
+                </span>
+              ) : null}
             </div>
 
             <div className="mt-5 flex items-start justify-center">
-            <CountUpNumber
+              <CountUpNumber
                 active={scoreVisible}
                 className="font-serif text-[clamp(6rem,17vw,9.75rem)] font-light leading-[0.9] tracking-[-0.04em] text-[var(--mn-ink)]"
                 duration={1100}
-              value={score}
-            />
+                value={score}
+              />
               <span className="mt-4 font-[family:var(--mn-font-mono)] text-[clamp(1.25rem,4vw,2.1rem)] font-semibold text-[var(--mn-ash-soft)]">
-              {copy.scoreOutOf}
-            </span>
-          </div>
+                {copy.scoreOutOf}
+              </span>
+            </div>
 
-          <ScoreSpectrum locale={locale} result={result} />
+            <ScoreSpectrum locale={locale} result={result} />
 
-          <p
-            className={cx(
+            <p
+              className={cx(
                 "mx-auto mt-7 max-w-[46ch] text-base text-[var(--mn-ink-soft)]",
-              copy.bodyClass
-            )}
-          >
-            {bandLine}
-          </p>
+                copy.bodyClass,
+              )}
+            >
+              {bandLine}
+            </p>
           </aside>
         </RevealBlock>
       </div>
@@ -1183,7 +621,7 @@ function HealthScoreHero({
 
 function GapCards({
   locale,
-  result
+  result,
 }: Readonly<{
   locale: Locale;
   result: HealthScoreResult;
@@ -1197,12 +635,16 @@ function GapCards({
   const title = localize(
     ai?.relativityHeadline,
     locale,
-    localizedLegacyText(relativity?.headline, locale, copy.fallbackScoreMeaning(score, percentile))
+    localizedLegacyText(
+      relativity?.headline,
+      locale,
+      copy.fallbackScoreMeaning(score, percentile),
+    ),
   );
   const body = localize(
     ai?.relativitySub,
     locale,
-    localizedLegacyText(relativity?.sub, locale, copy.fallbackScoreMeaningSub)
+    localizedLegacyText(relativity?.sub, locale, copy.fallbackScoreMeaningSub),
   );
   const cards = gapCards(result, locale);
 
@@ -1211,11 +653,16 @@ function GapCards({
       <RevealBlock className="max-w-[60ch]">
         <p className="font-[family:var(--mn-font-mono)] text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
           {copy.scoreMeaningEyebrow(score)}
-          </p>
+        </p>
         <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">
-            {title}
-          </h2>
-        <p className={cx("mt-4 max-w-[54ch] text-[1.05rem] text-[var(--mn-ink-soft)]", copy.bodyClass)}>
+          {title}
+        </h2>
+        <p
+          className={cx(
+            "mt-4 max-w-[54ch] text-[1.05rem] text-[var(--mn-ink-soft)]",
+            copy.bodyClass,
+          )}
+        >
           {body}
         </p>
       </RevealBlock>
@@ -1226,29 +673,41 @@ function GapCards({
           const tag = localizedLegacyText(card.tag, locale, fallbackCard.tag);
 
           return (
-            <RevealBlock delay={(index + 1) as 1 | 2 | 3} key={`${card.tag}-${card.value}-${index}`}>
+            <RevealBlock
+              delay={(index + 1) as 1 | 2 | 3}
+              key={`${card.tag}-${card.value}-${index}`}
+            >
               <article className="relative h-full rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-soft)] motion-safe:transition motion-safe:duration-300 motion-safe:hover:-translate-y-1">
                 <span className="font-[family:var(--mn-font-mono)] text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-[var(--mn-ash-soft)]">
-                    {tag}
-                  </span>
+                  {tag}
+                </span>
                 <div className="mt-2 font-serif text-4xl font-medium leading-none text-[var(--mn-teal-deep)]">
                   {card.value}
                 </div>
                 <h3 className="mt-3 text-lg font-semibold leading-snug text-[var(--mn-ink)]">
-                {aiCardHeadline(
-                  aiCard,
-                  locale,
-                  localizedLegacyText(card.headline, locale, fallbackCard.headline)
-                )}
-              </h3>
-              <p className={cx("mt-3 text-sm text-[var(--mn-ink-soft)]", copy.bodyClass)}>
-                {aiCardBody(
-                  aiCard,
-                  locale,
-                  localizedLegacyText(card.body, locale, fallbackCard.body)
-                )}
-              </p>
-            </article>
+                  {aiCardHeadline(
+                    aiCard,
+                    locale,
+                    localizedLegacyText(
+                      card.headline,
+                      locale,
+                      fallbackCard.headline,
+                    ),
+                  )}
+                </h3>
+                <p
+                  className={cx(
+                    "mt-3 text-sm text-[var(--mn-ink-soft)]",
+                    copy.bodyClass,
+                  )}
+                >
+                  {aiCardBody(
+                    aiCard,
+                    locale,
+                    localizedLegacyText(card.body, locale, fallbackCard.body),
+                  )}
+                </p>
+              </article>
             </RevealBlock>
           );
         })}
@@ -1259,7 +718,7 @@ function GapCards({
 
 function PillarBars({
   locale,
-  result
+  result,
 }: Readonly<{
   locale: Locale;
   result: HealthScoreResult;
@@ -1271,7 +730,11 @@ function PillarBars({
   const headline = localize(
     ai?.pillarHeadline,
     locale,
-    localizedLegacyText(page?.copySeeds.pillarHeadline, locale, copy.pillarsTitle)
+    localizedLegacyText(
+      page?.copySeeds.pillarHeadline,
+      locale,
+      copy.pillarsTitle,
+    ),
   );
   const highestLeverage = page?.copySeeds.highestLeverage;
   const highestLeverageBody = localize(
@@ -1280,13 +743,13 @@ function PillarBars({
     localizedLegacyText(
       highestLeverage?.text ? stripInlineMarkup(highestLeverage.text) : "",
       locale,
-      ""
-    )
+      "",
+    ),
   );
   const strengthNote = localize(
     ai?.strengthNote,
     locale,
-    localizedLegacyText(page?.copySeeds.strengthNote, locale, "")
+    localizedLegacyText(page?.copySeeds.strengthNote, locale, ""),
   );
   const { ref, visible } = useInViewOnce<HTMLDivElement>();
   const leveragePillar = highestLeverage
@@ -1298,10 +761,10 @@ function PillarBars({
       <RevealBlock className="max-w-[60ch]">
         <p className="font-[family:var(--mn-font-mono)] text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
           {copy.pillarEyebrow}
-          </p>
+        </p>
         <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">
-            {headline}
-          </h2>
+          {headline}
+        </h2>
       </RevealBlock>
 
       <RevealBlock delay={1}>
@@ -1309,62 +772,74 @@ function PillarBars({
           className="mt-8 rounded-3xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-soft)] sm:p-8"
           ref={ref}
         >
-          {pillars.map((pillar) => (
+          {pillars.map((pillar) =>
             (() => {
               const pillarTag = displayPillarTag(pillar.tag, locale);
 
               return (
-            <div
-              className={cx(
-                "grid gap-2 border-b border-[var(--mn-line)] py-4 last:border-b-0 sm:grid-cols-[11rem_1fr_3.5rem] sm:items-center sm:gap-4",
-                leveragePillar?.id === pillar.id &&
-                  "rounded-2xl border-b-0 bg-[var(--mn-mint)] px-4 sm:-mx-4"
-              )}
-              key={pillar.id}
-            >
-              <div className="min-w-0">
-                <h3 className="flex flex-col gap-1 text-[0.95rem] font-semibold leading-snug text-[var(--mn-ink)]">
-                    {displayPillarLabel(pillar, locale)}
-                  {pillarTag ? (
-                    <span className={cx(
-                      "w-fit rounded-full bg-[var(--mn-mint)] px-2 py-0.5 font-[family:var(--mn-font-mono)] text-[0.58rem] font-semibold text-[var(--mn-teal-deep)]",
-                      locale === "en" && "uppercase tracking-[0.12em]"
-                    )}>
-                      {pillarTag}
-                    </span>
-                  ) : null}
-                </h3>
-              </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-[var(--mn-cream-deep)]">
                 <div
                   className={cx(
-                    "h-full rounded-full motion-safe:transition-[width] motion-safe:duration-[1300ms] motion-safe:ease-out",
-                    pillar.value >= 70
-                      ? "bg-[linear-gradient(90deg,var(--mn-teal-deep),var(--mn-teal-light))]"
-                      : "bg-[linear-gradient(90deg,#C98A2B,var(--mn-gold-soft))]"
+                    "grid gap-2 border-b border-[var(--mn-line)] py-4 last:border-b-0 sm:grid-cols-[11rem_1fr_3.5rem] sm:items-center sm:gap-4",
+                    leveragePillar?.id === pillar.id &&
+                      "rounded-2xl border-b-0 bg-[var(--mn-mint)] px-4 sm:-mx-4",
                   )}
-                  style={{ width: visible ? `${clamp(pillar.value)}%` : 0 }}
-                />
-              </div>
-              <span className="font-[family:var(--mn-font-mono)] text-sm font-semibold text-[var(--mn-ink)] sm:text-right">
-                  {pillar.value}
-                </span>
-            </div>
+                  key={pillar.id}
+                >
+                  <div className="min-w-0">
+                    <h3 className="flex flex-col gap-1 text-[0.95rem] font-semibold leading-snug text-[var(--mn-ink)]">
+                      {displayPillarLabel(pillar, locale)}
+                      {pillarTag ? (
+                        <span
+                          className={cx(
+                            "w-fit rounded-full bg-[var(--mn-mint)] px-2 py-0.5 font-[family:var(--mn-font-mono)] text-[0.58rem] font-semibold text-[var(--mn-teal-deep)]",
+                            locale === "en" && "uppercase tracking-[0.12em]",
+                          )}
+                        >
+                          {pillarTag}
+                        </span>
+                      ) : null}
+                    </h3>
+                  </div>
+                  <div className="h-2.5 overflow-hidden rounded-full bg-[var(--mn-cream-deep)]">
+                    <div
+                      className={cx(
+                        "h-full rounded-full motion-safe:transition-[width] motion-safe:duration-[1300ms] motion-safe:ease-out",
+                        pillar.value >= 70
+                          ? "bg-[linear-gradient(90deg,var(--mn-teal-deep),var(--mn-teal-light))]"
+                          : "bg-[linear-gradient(90deg,#C98A2B,var(--mn-gold-soft))]",
+                      )}
+                      style={{ width: visible ? `${clamp(pillar.value)}%` : 0 }}
+                    />
+                  </div>
+                  <span className="font-[family:var(--mn-font-mono)] text-sm font-semibold text-[var(--mn-ink)] sm:text-right">
+                    {pillar.value}
+                  </span>
+                </div>
               );
-            })()
-          ))}
+            })(),
+          )}
           {highestLeverageBody ? (
             <div className="mt-6 rounded-r-2xl border-l-4 border-[var(--mn-teal)] bg-[var(--mn-mint)] px-5 py-4">
               <p className="text-sm font-semibold text-[var(--mn-teal-deep)]">
                 {copy.highestLeverageLabel}
               </p>
-              <p className={cx("mt-2 text-sm text-[var(--mn-ink-soft)]", copy.bodyClass)}>
+              <p
+                className={cx(
+                  "mt-2 text-sm text-[var(--mn-ink-soft)]",
+                  copy.bodyClass,
+                )}
+              >
                 {highestLeverageBody}
               </p>
             </div>
           ) : null}
           {strengthNote ? (
-            <p className={cx("mt-4 text-sm text-[var(--mn-ash)]", copy.bodyClass)}>
+            <p
+              className={cx(
+                "mt-4 text-sm text-[var(--mn-ash)]",
+                copy.bodyClass,
+              )}
+            >
               {strengthNote}
             </p>
           ) : null}
@@ -1375,7 +850,7 @@ function PillarBars({
 }
 
 function FindingIcon({
-  index
+  index,
 }: Readonly<{
   index: number;
 }>) {
@@ -1386,7 +861,9 @@ function FindingIcon({
   }
 
   if (index === 2) {
-    return <ClipboardDocumentCheckIcon aria-hidden={true} className={className} />;
+    return (
+      <ClipboardDocumentCheckIcon aria-hidden={true} className={className} />
+    );
   }
 
   return <SparklesIcon aria-hidden={true} className={className} />;
@@ -1394,7 +871,7 @@ function FindingIcon({
 
 function FindingsSection({
   locale,
-  result
+  result,
 }: Readonly<{
   locale: Locale;
   result: HealthScoreResult;
@@ -1406,24 +883,39 @@ function FindingsSection({
   const headline = localize(
     ai?.findingsHeadline,
     locale,
-    localizedLegacyText(page?.copySeeds.findingsHeadline, locale, copy.gapTitle)
+    localizedLegacyText(
+      page?.copySeeds.findingsHeadline,
+      locale,
+      copy.gapTitle,
+    ),
   );
   const sub = localize(
     ai?.findingsSub,
     locale,
-    localizedLegacyText(page?.copySeeds.findingsSub, locale, copy.whatCaughtSub)
+    localizedLegacyText(
+      page?.copySeeds.findingsSub,
+      locale,
+      copy.whatCaughtSub,
+    ),
   );
 
   return (
     <section>
       <RevealBlock className="max-w-[60ch]">
         <p className="font-[family:var(--mn-font-mono)] text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
-            {page?.copySeeds.findingsMode === "strengths" ? copy.pillarsEyebrow : copy.whatCaught}
-          </p>
+          {page?.copySeeds.findingsMode === "strengths"
+            ? copy.pillarsEyebrow
+            : copy.whatCaught}
+        </p>
         <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">
-            {headline}
-          </h2>
-        <p className={cx("mt-4 text-[1.05rem] text-[var(--mn-ink-soft)]", copy.bodyClass)}>
+          {headline}
+        </h2>
+        <p
+          className={cx(
+            "mt-4 text-[1.05rem] text-[var(--mn-ink-soft)]",
+            copy.bodyClass,
+          )}
+        >
           {sub}
         </p>
       </RevealBlock>
@@ -1433,7 +925,7 @@ function FindingsSection({
           const isSingle = items.length === 1;
           const fallbackCard = copy.fallbackGaps[index] ?? {
             body: copy.fallbackFindingBody,
-            headline: copy.fallbackFindingTitle
+            headline: copy.fallbackFindingTitle,
           };
 
           return (
@@ -1445,27 +937,36 @@ function FindingsSection({
               <article
                 className={cx(
                   "h-full min-h-56 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-soft)]",
-                  isSingle && "border-[var(--mn-teal-glow)]"
+                  isSingle && "border-[var(--mn-teal-glow)]",
                 )}
               >
                 <div className="grid size-10 place-items-center rounded-xl bg-[var(--mn-mint)] text-[var(--mn-teal-deep)]">
-                <FindingIcon index={index} />
+                  <FindingIcon index={index} />
                 </div>
                 <h3 className="mt-5 text-xl font-semibold leading-snug text-[var(--mn-ink)]">
-                {aiCardHeadline(
-                  aiCard,
-                  locale,
-                  localizedLegacyText(item.headline, locale, fallbackCard.headline)
-                )}
-              </h3>
-              <p className={cx("mt-3 text-sm text-[var(--mn-ink-soft)]", copy.bodyClass)}>
-                {aiCardBody(
-                  aiCard,
-                  locale,
-                  localizedLegacyText(item.body, locale, fallbackCard.body)
-                )}
-              </p>
-            </article>
+                  {aiCardHeadline(
+                    aiCard,
+                    locale,
+                    localizedLegacyText(
+                      item.headline,
+                      locale,
+                      fallbackCard.headline,
+                    ),
+                  )}
+                </h3>
+                <p
+                  className={cx(
+                    "mt-3 text-sm text-[var(--mn-ink-soft)]",
+                    copy.bodyClass,
+                  )}
+                >
+                  {aiCardBody(
+                    aiCard,
+                    locale,
+                    localizedLegacyText(item.body, locale, fallbackCard.body),
+                  )}
+                </p>
+              </article>
             </RevealBlock>
           );
         })}
@@ -1476,7 +977,7 @@ function FindingsSection({
 
 function SubtractionBeat({
   locale,
-  result
+  result,
 }: Readonly<{
   locale: Locale;
   result: HealthScoreResult;
@@ -1488,20 +989,24 @@ function SubtractionBeat({
     chosen: 8,
     evaluated: 120,
     mode: "nutrients" as const,
-    setAside: 112
+    setAside: 112,
   };
   const seed = page?.copySeeds.subtraction;
   const body = localize(
     ai?.subtractionBody,
     locale,
-    localizedLegacyText(seed?.body, locale, copy.subtractionTitle)
+    localizedLegacyText(seed?.body, locale, copy.subtractionTitle),
   );
   const labels = [
     localizedLegacyText(seed?.labelEvaluated, locale, copy.evaluatedFallback),
     localizedLegacyText(seed?.labelSetAside, locale, copy.setAsideFallback),
-    localizedLegacyText(seed?.labelChosen, locale, copy.chosenFallback)
+    localizedLegacyText(seed?.labelChosen, locale, copy.chosenFallback),
   ];
-  const numbers = [subtraction.evaluated, subtraction.setAside, subtraction.chosen];
+  const numbers = [
+    subtraction.evaluated,
+    subtraction.setAside,
+    subtraction.chosen,
+  ];
   const { ref, visible } = useInViewOnce<HTMLDivElement>();
 
   return (
@@ -1512,8 +1017,8 @@ function SubtractionBeat({
           ref={ref}
         >
           <p className="font-[family:var(--mn-font-mono)] text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
-          {copy.subtractionEyebrow}
-        </p>
+            {copy.subtractionEyebrow}
+          </p>
           <div className="mt-6 grid gap-5 sm:flex sm:items-end sm:justify-center sm:gap-x-7 lg:gap-x-12">
             {numbers.map((number, index) => (
               <div
@@ -1530,7 +1035,7 @@ function SubtractionBeat({
                       index === 1 &&
                         "text-[clamp(3.25rem,15vw,5.125rem)] text-[var(--mn-ink-soft)] sm:text-[clamp(3rem,8vw,5.125rem)]",
                       index === 2 &&
-                        "text-[clamp(4rem,18vw,7rem)] text-[var(--mn-teal-deep)] sm:text-[clamp(4.4rem,12vw,8rem)]"
+                        "text-[clamp(4rem,18vw,7rem)] text-[var(--mn-teal-deep)] sm:text-[clamp(4.4rem,12vw,8rem)]",
                     )}
                     duration={900 + index * 200}
                     value={number}
@@ -1539,7 +1044,9 @@ function SubtractionBeat({
                     className={cx(
                       "mt-2 max-w-[11rem] text-center font-[family:var(--mn-font-mono)] text-[0.68rem] font-semibold leading-[1.35]",
                       locale === "en" && "uppercase tracking-[0.12em]",
-                      index === 2 ? "text-[var(--mn-teal-deep)]" : "text-[var(--mn-ash)]"
+                      index === 2
+                        ? "text-[var(--mn-teal-deep)]"
+                        : "text-[var(--mn-ash)]",
                     )}
                   >
                     {labels[index]}
@@ -1554,10 +1061,15 @@ function SubtractionBeat({
               </div>
             ))}
           </div>
-          <p className={cx("mx-auto mt-7 max-w-[58ch] text-base text-[var(--mn-ink-soft)]", copy.bodyClass)}>
-          {body}
-        </p>
-      </div>
+          <p
+            className={cx(
+              "mx-auto mt-7 max-w-[58ch] text-base text-[var(--mn-ink-soft)]",
+              copy.bodyClass,
+            )}
+          >
+            {body}
+          </p>
+        </div>
       </RevealBlock>
     </section>
   );
@@ -1565,7 +1077,7 @@ function SubtractionBeat({
 
 function MethodCards({
   locale,
-  result
+  result,
 }: Readonly<{
   locale: Locale;
   result: HealthScoreResult;
@@ -1576,7 +1088,11 @@ function MethodCards({
   const headline = localize(
     ai?.methodHeadline,
     locale,
-    localizedLegacyText(page?.copySeeds.methodHeadline, locale, copy.methodTitle)
+    localizedLegacyText(
+      page?.copySeeds.methodHeadline,
+      locale,
+      copy.methodTitle,
+    ),
   );
   const cards = methodCards(result, locale);
   const icons = [BeakerIcon, AdjustmentsHorizontalIcon, LockClosedIcon];
@@ -1598,34 +1114,48 @@ function MethodCards({
           const fallbackCard = copy.fallbackMethodCards[index] ?? card;
 
           return (
-            <RevealBlock delay={(index + 1) as 1 | 2 | 3} key={`${card.title}-${index}`}>
+            <RevealBlock
+              delay={(index + 1) as 1 | 2 | 3}
+              key={`${card.title}-${index}`}
+            >
               <article className="h-full rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-soft)]">
                 <div className="font-serif text-3xl leading-none text-[var(--mn-teal-glow)]">
                   {index + 1}
-              </div>
+                </div>
                 <h3 className="mt-3 text-base font-semibold leading-snug text-[var(--mn-ink)]">
-                {aiCardHeadline(
-                  aiCard,
-                  locale,
-                  localizedLegacyText(card.title, locale, fallbackCard.title)
-                )}
-              </h3>
-                <p className={cx("mt-2 text-sm text-[var(--mn-ink-soft)]", copy.bodyClass)}>
-                {aiCardBody(
-                  aiCard,
-                  locale,
-                  localizedLegacyText(card.body, locale, fallbackCard.body)
-                )}
-              </p>
-                <Icon aria-hidden={true} className="mt-5 size-5 text-[var(--mn-teal-deep)]" />
-            </article>
+                  {aiCardHeadline(
+                    aiCard,
+                    locale,
+                    localizedLegacyText(card.title, locale, fallbackCard.title),
+                  )}
+                </h3>
+                <p
+                  className={cx(
+                    "mt-2 text-sm text-[var(--mn-ink-soft)]",
+                    copy.bodyClass,
+                  )}
+                >
+                  {aiCardBody(
+                    aiCard,
+                    locale,
+                    localizedLegacyText(card.body, locale, fallbackCard.body),
+                  )}
+                </p>
+                <Icon
+                  aria-hidden={true}
+                  className="mt-5 size-5 text-[var(--mn-teal-deep)]"
+                />
+              </article>
             </RevealBlock>
           );
         })}
       </div>
       <RevealBlock delay={2}>
         <div className="mt-7 flex items-start gap-3 rounded-2xl bg-[var(--mn-mint)] px-5 py-4 text-[var(--mn-teal-deep)]">
-          <CheckCircleIcon aria-hidden={true} className="mt-0.5 size-5 shrink-0" />
+          <CheckCircleIcon
+            aria-hidden={true}
+            className="mt-0.5 size-5 shrink-0"
+          />
           <p className={cx("text-sm", copy.bodyClass)}>{copy.trustLine}</p>
         </div>
       </RevealBlock>
@@ -1639,7 +1169,7 @@ function PriceCard({
   isPending = false,
   onSelect,
   pendingLabel,
-  plan
+  plan,
 }: Readonly<{
   disabled?: boolean;
   featured?: boolean;
@@ -1657,7 +1187,7 @@ function PriceCard({
         "relative flex flex-col rounded-3xl p-6 shadow-[var(--mn-shadow-soft)] sm:p-8",
         featured
           ? "bg-[linear-gradient(165deg,#11385C_0%,var(--mn-ink)_70%)] text-white"
-          : "border border-[var(--mn-line)] bg-[var(--mn-paper)] text-[var(--mn-ink)]"
+          : "border border-[var(--mn-line)] bg-[var(--mn-paper)] text-[var(--mn-ink)]",
       )}
     >
       <span
@@ -1665,7 +1195,7 @@ function PriceCard({
           "absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full px-4 py-2 text-center font-[family:var(--mn-font-mono)] text-[0.64rem] font-semibold uppercase tracking-[0.16em] whitespace-nowrap",
           featured
             ? "bg-[linear-gradient(90deg,var(--mn-gold),var(--mn-gold-soft))] text-[#3a2d08]"
-            : "bg-[var(--mn-gold-tint)] text-[#8a6d23]"
+            : "bg-[var(--mn-gold-tint)] text-[#8a6d23]",
         )}
       >
         {plan.badge}
@@ -1673,7 +1203,9 @@ function PriceCard({
       <p
         className={cx(
           "mt-3 flex items-center gap-2 font-[family:var(--mn-font-mono)] text-[0.68rem] font-semibold uppercase tracking-[0.13em]",
-          featured ? "text-[var(--mn-teal-light)]" : "text-[var(--mn-teal-deep)]"
+          featured
+            ? "text-[var(--mn-teal-light)]"
+            : "text-[var(--mn-teal-deep)]",
         )}
       >
         <span
@@ -1681,7 +1213,7 @@ function PriceCard({
             "grid size-8 place-items-center rounded-lg",
             featured
               ? "bg-white/10 text-[var(--mn-teal-light)]"
-              : "bg-[var(--mn-mint)] text-[var(--mn-teal-deep)]"
+              : "bg-[var(--mn-mint)] text-[var(--mn-teal-deep)]",
           )}
         >
           {featured ? "♡" : "◎"}
@@ -1694,35 +1226,61 @@ function PriceCard({
       <p
         className={cx(
           "mt-3 min-h-12 text-sm leading-6",
-          featured ? "text-white/70" : "text-[var(--mn-ink-soft)]"
+          featured ? "text-white/70" : "text-[var(--mn-ink-soft)]",
         )}
       >
         {plan.description}
       </p>
       <div
-        className={cx(
-          "mt-5",
-          featured ? "text-white" : "text-[var(--mn-ink)]"
-        )}
+        className={cx("mt-5", featured ? "text-white" : "text-[var(--mn-ink)]")}
       >
-        <p className={cx("text-sm", featured ? "text-white/55" : "text-[var(--mn-ash)]")}>
+        <p
+          className={cx(
+            "text-sm",
+            featured ? "text-white/55" : "text-[var(--mn-ash)]",
+          )}
+        >
           <s>{plan.was}</s>{" "}
-          <span className={cx("font-bold uppercase", featured ? "text-[var(--mn-gold-soft)]" : "text-[var(--mn-gold)]")}>
+          <span
+            className={cx(
+              "font-bold uppercase",
+              featured ? "text-[var(--mn-gold-soft)]" : "text-[var(--mn-gold)]",
+            )}
+          >
             {plan.save}
           </span>
         </p>
         <p className="mt-2 flex flex-wrap items-end gap-2">
-          <span className={cx("pb-2 text-sm font-bold", featured ? "text-[var(--mn-teal-light)]" : "text-[var(--mn-teal-deep)]")}>
+          <span
+            className={cx(
+              "pb-2 text-sm font-bold",
+              featured
+                ? "text-[var(--mn-teal-light)]"
+                : "text-[var(--mn-teal-deep)]",
+            )}
+          >
             THB
           </span>
           <strong className="font-serif text-6xl font-medium leading-none tracking-normal">
             {plan.price}
           </strong>
-          <span className={cx("pb-2 text-xs font-bold uppercase tracking-normal", featured ? "text-[var(--mn-teal-light)]" : "text-[var(--mn-teal-deep)]")}>
+          <span
+            className={cx(
+              "pb-2 text-xs font-bold uppercase tracking-normal",
+              featured
+                ? "text-[var(--mn-teal-light)]"
+                : "text-[var(--mn-teal-deep)]",
+            )}
+          >
             {plan.term}
           </span>
         </p>
-        <p className={cx("mt-2 text-xs", featured ? "text-white/55" : "text-[var(--mn-ash)]")}>
+        <p
+          className={cx(
+            "mt-2 text-xs",
+            featured ? "text-white/55" : "text-[var(--mn-ash)]",
+          )}
+        >
           {plan.fine}
         </p>
       </div>
@@ -1732,18 +1290,23 @@ function PriceCard({
           featured
             ? "bg-[var(--mn-teal-light)] text-[#06281d] hover:bg-[var(--mn-teal-glow)]"
             : "bg-[var(--mn-teal-deep)] text-white hover:bg-[var(--mn-teal)]",
-          disabled ? "cursor-not-allowed opacity-50" : ""
+          disabled ? "cursor-not-allowed opacity-50" : "",
         )}
         disabled={disabled}
         onClick={onSelect}
         type="button"
       >
         {isPending ? pendingLabel : plan.cta}
-        {isPending ? null : <ArrowRightIcon aria-hidden={true} className="size-4" />}
+        {isPending ? null : (
+          <ArrowRightIcon aria-hidden={true} className="size-4" />
+        )}
       </button>
       {includes ? (
         <div className="mt-5 flex flex-wrap items-center gap-2 rounded-2xl border border-white/15 p-4 text-sm text-white/90">
-          <CheckCircleIcon aria-hidden={true} className="size-5 text-[var(--mn-teal-light)]" />
+          <CheckCircleIcon
+            aria-hidden={true}
+            className="size-5 text-[var(--mn-teal-light)]"
+          />
           <span>{includes}</span>
           <span className="ml-auto font-[family:var(--mn-font-mono)] text-[0.68rem] uppercase tracking-[0.14em] text-[var(--mn-gold-soft)]">
             PLUS
@@ -1766,7 +1329,7 @@ function PriceCard({
           <li
             className={cx(
               "flex gap-3 text-sm leading-6",
-              featured ? "text-white/75" : "text-[var(--mn-ink-soft)]"
+              featured ? "text-white/75" : "text-[var(--mn-ink-soft)]",
             )}
             key={feature}
           >
@@ -1774,7 +1337,9 @@ function PriceCard({
               aria-hidden={true}
               className={cx(
                 "mt-0.5 size-4 shrink-0",
-                featured ? "text-[var(--mn-teal-light)]" : "text-[var(--mn-teal)]"
+                featured
+                  ? "text-[var(--mn-teal-light)]"
+                  : "text-[var(--mn-teal)]",
               )}
             />
             {feature}
@@ -1786,7 +1351,7 @@ function PriceCard({
           "mt-6 grid grid-cols-[2.5rem_1fr] gap-3 rounded-2xl p-4 text-sm leading-6",
           featured
             ? "bg-white/8 text-white/75 ring-1 ring-white/15"
-            : "bg-[var(--mn-gold-tint)] text-[#6d5427]"
+            : "bg-[var(--mn-gold-tint)] text-[#6d5427]",
         )}
       >
         <ShieldCheckIcon
@@ -1795,11 +1360,16 @@ function PriceCard({
             "size-10 rounded-full p-2 ring-1",
             featured
               ? "text-[var(--mn-gold-soft)] ring-[var(--mn-gold-soft)]"
-              : "text-[var(--mn-gold)] ring-[var(--mn-gold)]"
+              : "text-[var(--mn-gold)] ring-[var(--mn-gold)]",
           )}
         />
         <div>
-          <strong className={cx("block", featured ? "text-white" : "text-[var(--mn-ink)]")}>
+          <strong
+            className={cx(
+              "block",
+              featured ? "text-white" : "text-[var(--mn-ink)]",
+            )}
+          >
             {plan.guarantee}
           </strong>
           <p>{plan.guaranteeBody}</p>
@@ -1811,7 +1381,7 @@ function PriceCard({
 
 function PricingSection({
   locale,
-  planId
+  planId,
 }: Readonly<{
   locale: Locale;
   planId?: string;
@@ -1828,7 +1398,7 @@ function PricingSection({
     window.location.href = paymentCheckoutPath(locale, {
       plan,
       planId,
-      sourceSurface: "healthscore"
+      sourceSurface: "healthscore",
     });
   }
 
@@ -1841,7 +1411,12 @@ function PricingSection({
         <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">
           {copy.pricingTitle}
         </h2>
-        <p className={cx("mt-4 max-w-[54ch] text-[1.05rem] text-[var(--mn-ink-soft)]", copy.bodyClass)}>
+        <p
+          className={cx(
+            "mt-4 max-w-[54ch] text-[1.05rem] text-[var(--mn-ink-soft)]",
+            copy.bodyClass,
+          )}
+        >
           {copy.pricingBody}
         </p>
       </RevealBlock>
@@ -1871,7 +1446,7 @@ function HealthScoreExperience({
   locale,
   planId,
   result,
-  showPricing
+  showPricing,
 }: Readonly<{
   firstName?: string;
   locale: Locale;
@@ -1895,7 +1470,7 @@ function HealthScoreExperience({
 export function HealthScorePanel({
   firstName,
   locale,
-  result
+  result,
 }: Readonly<{
   firstName?: string;
   locale: Locale;
@@ -1917,7 +1492,7 @@ export function HealthScorePaymentPanel({
   firstName,
   locale,
   planId,
-  result
+  result,
 }: Readonly<{
   firstName?: string;
   locale: Locale;

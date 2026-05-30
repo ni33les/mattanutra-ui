@@ -177,7 +177,9 @@ export function AdminAccessView({
   );
   const canWrite = context.permissions.includes("access.write");
   const canAssume = context.permissions.includes("impersonation.write") && !context.isLegacy;
-  const canManageOwners = context.role === "platform_owner";
+  const canManageOwners = context.actorMembership.role === "platform_owner";
+  const canManageOrganisations =
+    canWrite && context.effectiveOrganisation.type === "platform";
   const [inviteOrganisationId, setInviteOrganisationId] = useState(
     () => accessData.organisations[0]?.id ?? ""
   );
@@ -382,7 +384,7 @@ export function AdminAccessView({
                   <input
                     className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
                     defaultValue={organisation.name}
-                    disabled={!canWrite || busy}
+                    disabled={!canManageOrganisations || busy}
                     name="name"
                     required={true}
                   />
@@ -392,7 +394,7 @@ export function AdminAccessView({
                   <input
                     className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
                     defaultValue={organisation.slug}
-                    disabled={!canWrite || busy}
+                    disabled={!canManageOrganisations || busy}
                     name="slug"
                     required={true}
                   />
@@ -402,7 +404,7 @@ export function AdminAccessView({
                   <select
                     className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
                     defaultValue={organisation.defaultLocale}
-                    disabled={!canWrite || busy}
+                    disabled={!canManageOrganisations || busy}
                     name="defaultLocale"
                   >
                     {publicLocales.map((localeCode) => (
@@ -417,7 +419,7 @@ export function AdminAccessView({
                   <select
                     className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
                     defaultValue={organisation.status}
-                    disabled={!canWrite || busy}
+                    disabled={!canManageOrganisations || busy}
                     name="status"
                   >
                     <option value="active">{labels.access.active}</option>
@@ -425,7 +427,7 @@ export function AdminAccessView({
                     <option value="archived">{readableToken("archived")}</option>
                   </select>
                 </label>
-                {canWrite ? (
+                {canManageOrganisations ? (
                   <button
                     className="self-end rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-wait disabled:opacity-70"
                     disabled={busy}
@@ -438,7 +440,7 @@ export function AdminAccessView({
             ))}
           </div>
 
-          {canWrite ? (
+          {canManageOrganisations ? (
             <form onSubmit={createOrganisation} className="mt-5 grid gap-3 border-t border-gray-100 pt-5 sm:grid-cols-2">
               <input
                 className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
@@ -711,7 +713,9 @@ export function AdminAccessView({
                           </span>
                         </td>
                         <td className="py-3">
-                          {canAssume && membership.personId !== context.actorPerson.id ? (
+                          {canAssume &&
+                          membership.personId !== context.actorPerson.id &&
+                          (membership.role !== "platform_owner" || canManageOwners) ? (
                             <button
                               className="inline-flex items-center gap-1 rounded-md bg-[#1FA77A] px-3 py-1 text-sm font-semibold text-white shadow-sm hover:bg-[#188B66] disabled:cursor-wait disabled:opacity-70"
                               disabled={busy}

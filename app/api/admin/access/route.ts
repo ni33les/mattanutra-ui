@@ -64,7 +64,7 @@ function normalSlug(value: unknown) {
 
 async function accessPayload(context: AdminSessionContext) {
   return {
-    data: await getAdminAccessData(),
+    data: await getAdminAccessData(context),
     session: clientAdminSessionContext(context)
   };
 }
@@ -174,6 +174,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
 
+      if (context.effectiveOrganisation.type !== "platform") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
       const slug = normalSlug(body.slug);
       const name = text(body.name);
 
@@ -196,6 +200,10 @@ export async function POST(request: NextRequest) {
 
     if (action === "update_organisation") {
       if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      if (context.effectiveOrganisation.type !== "platform") {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
 

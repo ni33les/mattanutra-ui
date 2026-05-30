@@ -3,129 +3,35 @@ import { defaultProductCountryCode } from "@/lib/product-countries";
 import { toJsonValue } from "@/lib/assessment-store";
 import {
   normalizeProductKey,
-  normalizeProductFactName,
-  productFactAliasKeys,
-  normalizeProductFactKey,
-  productKeysMatch
+  normalizeProductFactKey
 } from "@/lib/product-recommendations";
-import type { ProductConfidence } from "@/lib/product-recommendations";
-import type { ProductAudience } from "@/lib/product-recommendations";
 import { validateProduct } from "@/lib/product-validation";
-import { numberOrNull, isoOrNull, cleanNullableText, normalizedUrl } from "./admin-product-helpers.ts";
-import { preferredProductTitle, clearProductRecommendationCandidateCache, createAdminProduct } from "./admin-products.ts";
-import { productAudienceFromSnapshot, isUuidValue } from "./admin-product-helpers.ts";
-// Local copy of the fact input shape for this module's input types and helpers.
-// (Will be centralized in admin-product-types.ts in a later cleanup pass.)
-export type ProductImportFactInput = Readonly<{
-  amount?: number | null;
-  confidence?: ProductConfidence;
-  itemType?: "food" | "nutrient" | "supplement";
-  name: string;
-  servingLabel?: string | null;
-  sourceText?: string | null;
-  sourceUrl?: string | null;
-  supplementId?: string | null;
-  unit?: string | null;
-}>;
+import {
+  numberOrNull,
+  isoOrNull,
+  cleanNullableText,
+  normalizedUrl,
+  preferredProductTitle,
+  productAudienceFromSnapshot,
+  isUuidValue
+} from "./admin-product-helpers.ts";
+import { clearProductRecommendationCandidateCache } from "./admin-product-search.ts";
+import { createAdminProduct } from "./admin-product-writes.ts";
+import {
+  normalizedFactsForStorage,
+  supplementIdsForFacts
+} from "./admin-product-facts.ts";
+import type {
+  FinishProductImportRunInput,
+  ProductImportFactInput,
+  StageProductImportInput,
+  StartProductImportRunInput
+} from "./admin-product-types.ts";
 
-type ProductTranslationInput = Readonly<{
-  description?: string | null;
-  status?: "complete" | "draft" | "missing";
-  title?: string | null;
-}>;
-
-// This module will eventually own all import run, staging, review, and approval logic.
-
-export type StageProductImportInput = Readonly<{
-  actor?: string | null;
-  brandName: string;
-  description?: string | null;
-  descriptionEn?: string | null;
-  descriptionTh?: string | null;
-  descriptionZhCn?: string | null;
-  duplicateProductIds?: readonly string[];
-  fdaApprovalNumber?: string | null;
-  imageUrls?: readonly string[];
-  importRunId?: string | null;
-  parsedFacts?: readonly ProductImportFactInput[];
-  parseConfidence?: ProductConfidence;
-  productTitle: string;
-  rawSnapshot?: Record<string, unknown> | null;
-  source?: string | null;
-  sourceUrl: string;
-  titleEn?: string | null;
-  titleTh?: string | null;
-  titleZhCn?: string | null;
-  translations?: Record<string, ProductTranslationInput>;
-}>;
-
-export type StartProductImportRunInput = Readonly<{
-  autoApprove?: boolean;
-  brandName: string;
-  source?: string | null;
-  totalProducts?: number;
-}>;
-
-export type FinishProductImportRunInput = Readonly<{
-  approvedCount?: number;
-  failedCount?: number;
-  importRunId: string;
-  notes?: string | null;
-  stagedCount?: number;
-  status: "completed" | "failed";
-}>;
-
-export type ResolveProductImportReviewInput = Readonly<{
-  action: "approve" | "duplicate" | "ignore";
-  actor?: string | null;
-  availableCountryCodes?: readonly string[];
-  brandName?: string | null;
-  description?: string | null;
-  descriptionEn?: string | null;
-  descriptionTh?: string | null;
-  descriptionZhCn?: string | null;
-  fdaApprovalNumber?: string | null;
-  imageUrl?: string | null;
-  manufacturerCountryCodes?: readonly string[];
-  mergeProductId?: string | null;
-  parsedFacts?: readonly ProductImportFactInput[];
-  productAudience?: ProductAudience;
-  productUrl?: string | null;
-  reviewerNote?: string | null;
-  returnRow?: boolean;
-  taskId: string;
-  title?: string | null;
-  titleEn?: string | null;
-  titleTh?: string | null;
-  titleZhCn?: string | null;
-  translations?: Record<string, ProductTranslationInput>;
-}>;
-
-export function normalizedFactsForStorage(
-  facts: readonly ProductImportFactInput[] | undefined
-) {
-  return (facts ?? [])
-    .map((fact) => {
-      const name = normalizeProductFactName(fact.name.trim()) || fact.name.trim();
-
-      if (!name) {
-        return null;
-      }
-
-      return {
-        amount: numberOrNull(fact.amount),
-        confidence: fact.confidence ?? "moderate",
-        itemType: fact.itemType ?? "supplement",
-        name,
-        servingLabel: cleanNullableText(fact.servingLabel, 200),
-        sourceText: cleanNullableText(fact.sourceText, 1000),
-        sourceUrl: cleanNullableText(fact.sourceUrl, 2000),
-        supplementId: isUuidValue(fact.supplementId) ? fact.supplementId : null,
-        unit: cleanNullableText(fact.unit, 40)
-      };
-    })
-    .filter((fact): fact is NonNullable<typeof fact> => Boolean(fact));
-}
+export {
+  normalizedFactsForStorage,
+  supplementIdsForFacts
+};
 
 export async function startProductImportRun(input: StartProductImportRunInput) {
   const sql = getSql();
@@ -253,49 +159,6 @@ export async function getProductImportRuns(input: Readonly<{
 }
 
 
-
-export async function supplementIdsForFacts(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  facts: readonly ProductImportFactInput[]
-) {
-  const factAliases = facts.map((fact) => ({
-    aliases: productFactAliasKeys(fact.name),
-    key: normalizeProductFactKey(fact.name)
-  }));
-  const normalizedNames = [...new Set(factAliases.flatMap((fact) => fact.aliases))];
-
-  if (normalizedNames.length < 1) {
-    return new Map<string, { id: string; name: string }>();
-  }
-
-  const rows = await sql<Array<{
-    id: string;
-    name: string;
-    normalized_alias: string;
-  }>>`
-    select supplements.id::text, supplements.name, supplement_aliases.normalized_alias
-    from public.supplement_aliases
-    join public.supplements
-      on supplements.id = supplement_aliases.supplement_id
-    where supplement_aliases.normalized_alias = any(${normalizedNames}::text[])
-       or supplements.normalized_name = any(${normalizedNames}::text[])
-  `;
-  const byKey = new Map<string, { id: string; name: string }>();
-
-  for (const fact of factAliases) {
-    const match = rows.find((row) =>
-      fact.aliases.some((alias) =>
-        row.normalized_alias === alias || productKeysMatch(alias, row.normalized_alias)
-      )
-    );
-
-    if (match) {
-      byKey.set(fact.key, { id: match.id, name: match.name });
-    }
-  }
-
-  return byKey;
-}
 
 export async function validateProductImportForApproval(input: Readonly<{
   facts: readonly ProductImportFactInput[];

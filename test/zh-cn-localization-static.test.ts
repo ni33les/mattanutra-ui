@@ -5,9 +5,19 @@ import ts from "typescript";
 
 const customerCopyFiles = [
   "../components/assessment-flow.tsx",
+  "../components/assessment-flow-copy.ts",
+  "../components/assessment-flow-copy-en.ts",
+  "../components/assessment-flow-copy-th.ts",
+  "../components/assessment-flow-copy-zh-cn.ts",
+  "../components/formulation-reveal-copy.ts",
   "../components/formulation-results.tsx",
+  "../components/formulation-results-copy.ts",
+  "../components/formulation-support-helpers.ts",
+  "../components/landing-page-copy.ts",
   "../components/landing-page.tsx",
   "../components/nutrition-flow/healthscore-panel.tsx",
+  "../components/nutrition-flow/healthscore-panel-copy.ts",
+  "../components/product-recommendations-panel-copy.ts",
   "../app/[locale]/order/track/[token]/page.tsx",
   "../lib/i18n.ts",
   "../lib/legal-content.ts"
@@ -104,15 +114,20 @@ describe("zh-CN localization guardrails", () => {
       /"zh-CN"\s*:\s*baseContent\.en/
     );
     assert.doesNotMatch(
-      source("../components/landing-page.tsx"),
+      source("../components/landing-page-copy.ts"),
       /"zh-CN"\s*:\s*baseContent\.en/
     );
     assert.doesNotMatch(
-      source("../components/nutrition-flow/healthscore-panel.tsx"),
+      source("../components/nutrition-flow/healthscore-panel-copy.ts"),
       /"zh-CN"\s*:\s*basePageCopy\.en/
     );
     assert.doesNotMatch(
-      source("../components/formulation-results.tsx"),
+      [
+        source("../components/formulation-results.tsx"),
+        source("../components/formulation-reveal-copy.ts"),
+        source("../components/formulation-results-copy.ts"),
+        source("../components/formulation-support-helpers.ts")
+      ].join("\n"),
       /"zh-CN"\s*:\s*base[A-Za-z0-9]+\.en/
     );
     assert.match(
@@ -130,12 +145,16 @@ describe("zh-CN localization guardrails", () => {
   });
 
   it("keeps product import review translations first-class for zh-CN", () => {
+    const productImportModal = source(
+      "../components/admin/product-import-review-modal.tsx"
+    );
+
     assert.match(
-      source("../components/admin/review-queue-view.tsx"),
+      productImportModal,
       /Description 中文/
     );
     assert.match(
-      source("../components/admin/review-queue-view.tsx"),
+      productImportModal,
       /"zh-CN":\s*\{[\s\S]*?description:\s*descriptionZhCn/
     );
     assert.match(

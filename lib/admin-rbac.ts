@@ -24,12 +24,15 @@ export type AdminPermission =
   | "tasks.read"
   | "tasks.write";
 
-export type AdminRole =
-  | "platform_owner"
-  | "platform_admin"
-  | "retail_admin"
-  | "retail_agent"
-  | "retail_assistant";
+export const adminRoles = [
+  "platform_owner",
+  "platform_admin",
+  "retail_admin",
+  "retail_agent",
+  "retail_assistant"
+] as const;
+
+export type AdminRole = (typeof adminRoles)[number];
 
 export type AdminOrganisationType = "platform" | "tenant";
 
@@ -66,7 +69,7 @@ const allPermissions = [
 export const adminRolePermissions = {
   platform_owner: allPermissions,
   platform_admin: allPermissions,
-  retail_admin: ["settings.read"],
+  retail_admin: ["access.read", "access.write", "settings.read"],
   retail_agent: ["settings.read"],
   retail_assistant: ["settings.read"]
 } as const satisfies Record<AdminRole, readonly AdminPermission[]>;
@@ -79,17 +82,20 @@ export const adminRoleLabels = {
   retail_assistant: "Retail Assistant"
 } as const satisfies Record<AdminRole, string>;
 
-const platformRoles = ["platform_owner", "platform_admin"] as const satisfies readonly AdminRole[];
-const retailRoles = [
+export const platformAdminRoles = [
+  "platform_owner",
+  "platform_admin"
+] as const satisfies readonly AdminRole[];
+export const retailAdminRoles = [
   "retail_admin",
   "retail_agent",
   "retail_assistant"
 ] as const satisfies readonly AdminRole[];
-const platformRoleSet = new Set<AdminRole>(platformRoles);
-const retailRoleSet = new Set<AdminRole>(retailRoles);
+const platformRoleSet = new Set<AdminRole>(platformAdminRoles);
+const retailRoleSet = new Set<AdminRole>(retailAdminRoles);
 
 export function rolesForAdminOrganisationType(type: AdminOrganisationType) {
-  return type === "tenant" ? retailRoles : platformRoles;
+  return type === "tenant" ? retailAdminRoles : platformAdminRoles;
 }
 
 export function adminRoleAllowedForOrganisationType(
@@ -109,27 +115,12 @@ export function normalizeAdminRole(
     return role;
   }
 
-  if (role === "admin" || role === "platform_viewer") {
+  if (role === "admin" && organisationType === "platform") {
     return "platform_admin";
   }
 
-  if (
-    role === "agent_manager" ||
-    role === "catalogue_manager" ||
-    role === "content_manager" ||
-    role === "finance_viewer" ||
-    role === "ops_manager" ||
-    role === "viewer"
-  ) {
-    return organisationType === "platform" ? "platform_admin" : "retail_assistant";
-  }
-
-  if (role === "tenant" || role === "tenant_admin") {
+  if (role === "tenant" && organisationType === "tenant") {
     return "retail_admin";
-  }
-
-  if (role === "tenant_user") {
-    return "retail_assistant";
   }
 
   return organisationType === "platform" ? "platform_admin" : "retail_assistant";
@@ -154,11 +145,11 @@ const adminViews = [
   "product-insights",
   "supplement-insights",
   "visibility",
-  "access",
-  "access-agents",
-  "audit",
   "people",
   "organisations",
+  "access-agents",
+  "audit",
+  "access",
   "settings"
 ] as const satisfies readonly AdminDashboardView[];
 
@@ -253,7 +244,7 @@ export function firstAllowedAdminView(
   principal: AdminSessionPrincipal,
   fallback: AdminDashboardView = "glance"
 ) {
-  return allowedAdminViews(principal)[0] ?? fallback;
+  return allowedAdminViews(principal).find((view) => view !== "access") ?? fallback;
 }
 
 export function adminViewAllowed(

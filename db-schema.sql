@@ -357,7 +357,7 @@ CREATE TABLE public.organisation_memberships (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT organisation_memberships_role_check CHECK ((role = ANY (ARRAY['agent_manager'::text, 'catalogue_manager'::text, 'content_manager'::text, 'finance_viewer'::text, 'ops_manager'::text, 'platform_admin'::text, 'platform_owner'::text, 'platform_viewer'::text, 'tenant_admin'::text, 'tenant_user'::text, 'viewer'::text]))),
+    CONSTRAINT organisation_memberships_role_check CHECK ((role = ANY (ARRAY['platform_owner'::text, 'platform_admin'::text, 'retail_admin'::text, 'retail_agent'::text, 'retail_assistant'::text]))),
     CONSTRAINT organisation_memberships_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'invited'::text])))
 );
 
@@ -438,7 +438,7 @@ CREATE TABLE public.admin_invitations (
     accepted_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT admin_invitations_role_check CHECK ((role = ANY (ARRAY['agent_manager'::text, 'catalogue_manager'::text, 'content_manager'::text, 'finance_viewer'::text, 'ops_manager'::text, 'platform_admin'::text, 'platform_owner'::text, 'platform_viewer'::text, 'tenant_admin'::text, 'tenant_user'::text, 'viewer'::text]))),
+    CONSTRAINT admin_invitations_role_check CHECK ((role = ANY (ARRAY['platform_owner'::text, 'platform_admin'::text, 'retail_admin'::text, 'retail_agent'::text, 'retail_assistant'::text]))),
     CONSTRAINT admin_invitations_status_check CHECK ((status = ANY (ARRAY['accepted'::text, 'expired'::text, 'pending'::text, 'revoked'::text])))
 );
 

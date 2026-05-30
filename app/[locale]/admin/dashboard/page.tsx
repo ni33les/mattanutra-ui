@@ -192,7 +192,7 @@ export default async function LocalizedAdminDashboardPage({
     view === "organisations" ||
     view === "people"
   ) {
-    accessData = await getAdminAccessData();
+    accessData = await getAdminAccessData(adminContext);
   } else if (view === "glance") {
     data = await getAdminDashboardData(range, filters);
     flowData = await getAdminFlowData(range, filters);

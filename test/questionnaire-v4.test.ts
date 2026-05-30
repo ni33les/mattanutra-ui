@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const assessmentFlow = readFileSync(new URL("../components/assessment-flow.tsx", import.meta.url), "utf8");
+const assessmentState = readFileSync(new URL("../components/assessment-flow-state.ts", import.meta.url), "utf8");
 const assessmentStore = readFileSync(new URL("../lib/assessment-store.ts", import.meta.url), "utf8");
 const schema = readFileSync(new URL("../db-schema.sql", import.meta.url), "utf8");
 const packageJson = readFileSync(new URL("../package.json", import.meta.url), "utf8");
@@ -34,8 +35,8 @@ function sourceFiles(directory: string): string[] {
 
 describe("questionnaire V4 first name capture", () => {
   it("keeps first name optional in the React questionnaire payload", () => {
-    assert.match(assessmentFlow, /\bfirstName:\s*string\b/);
-    assert.match(assessmentFlow, /\bfirstName:\s*""/);
+    assert.match(assessmentState, /\bfirstName:\s*string\b/);
+    assert.match(assessmentState, /\bfirstName:\s*""/);
     assert.match(assessmentFlow, /\bmaxLength=\{ASSESSMENT_FIRST_NAME_MAX_LENGTH\}/);
     assert.match(assessmentFlow, /copy\.about\.firstNameOptional/);
     assert.match(assessmentFlow, /normalizeAssessmentFirstName\(answers\.firstName\)/);

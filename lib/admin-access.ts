@@ -22,118 +22,40 @@ import {
 import {
   adminRoleAllowedForOrganisationType,
   adminRoleLabels,
+  adminRoles,
   normalizeAdminRole,
   permissionsForRole,
   type AdminOrganisationType,
-  type AdminPermission,
   type AdminRole
 } from "@/lib/admin-rbac";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 import { siteBaseUrl } from "@/lib/site-url";
+import type {
+  AdminAccessData,
+  AdminAccessStatus,
+  AdminClientSessionContext,
+  AdminMembership,
+  AdminOrganisation,
+  AdminPerson,
+  AdminSessionContext
+} from "@/lib/admin-access-types";
+
+export type {
+  AdminAccessAgent,
+  AdminAccessData,
+  AdminAccessStatus,
+  AdminAuditEvent,
+  AdminClientSessionContext,
+  AdminInvitation,
+  AdminInviteExistingAccess,
+  AdminInviteMembershipAdded,
+  AdminMembership,
+  AdminOrganisation,
+  AdminPerson,
+  AdminSessionContext
+} from "@/lib/admin-access-types";
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
-
-export type AdminAccessStatus = "active" | "disabled" | "invited";
-
-export type AdminOrganisation = Readonly<{
-  defaultLocale: Locale;
-  id: string;
-  name: string;
-  slug: string;
-  status: "active" | "archived" | "disabled";
-  type: AdminOrganisationType;
-}>;
-
-export type AdminPerson = Readonly<{
-  displayName: string;
-  email: string;
-  id: string;
-  preferredLocale: Locale;
-  status: AdminAccessStatus;
-}>;
-
-export type AdminMembership = Readonly<{
-  id: string;
-  organisationId: string;
-  personId: string;
-  role: AdminRole;
-  status: AdminAccessStatus;
-  title: string | null;
-}>;
-
-export type AdminInvitation = Readonly<{
-  email: string;
-  expiresAt: string;
-  id: string;
-  organisationId: string;
-  preferredLocale: Locale;
-  role: AdminRole;
-  status: "accepted" | "expired" | "pending" | "revoked";
-}>;
-
-export type AdminInviteExistingAccess = Readonly<{
-  membership: AdminMembership | null;
-  organisation: AdminOrganisation;
-  person: AdminPerson;
-  reason: "existing_membership" | "inactive_person";
-}>;
-
-export type AdminInviteMembershipAdded = Readonly<{
-  membership: AdminMembership;
-  organisation: AdminOrganisation;
-  person: AdminPerson;
-}>;
-
-export type AdminAuditEvent = Readonly<{
-  action: string;
-  actorPersonId: string | null;
-  assumedPersonId: string | null;
-  createdAt: string;
-  id: string;
-  organisationId: string | null;
-  resourceId: string | null;
-  resourceType: string | null;
-}>;
-
-export type AdminAccessAgent = Readonly<{
-  capabilities: string[];
-  id: string;
-  name: string;
-  organisationId: string | null;
-  personId: string | null;
-  status: string;
-  type: string;
-}>;
-
-export type AdminAccessData = Readonly<{
-  agents: AdminAccessAgent[];
-  auditEvents: AdminAuditEvent[];
-  invitations: AdminInvitation[];
-  memberships: AdminMembership[];
-  organisations: AdminOrganisation[];
-  people: AdminPerson[];
-  roleLabels: Record<AdminRole, string>;
-  roles: AdminRole[];
-}>;
-
-export type AdminSessionContext = Readonly<{
-  actorMembership: AdminMembership;
-  actorOrganisation: AdminOrganisation;
-  actorPerson: AdminPerson;
-  assumedMembership: AdminMembership | null;
-  assumedOrganisation: AdminOrganisation | null;
-  assumedPerson: AdminPerson | null;
-  csrfToken: string | null;
-  effectiveMembership: AdminMembership;
-  effectiveOrganisation: AdminOrganisation;
-  effectivePerson: AdminPerson;
-  expiresAt: string;
-  isLegacy: boolean;
-  permissions: AdminPermission[];
-  role: AdminRole;
-  sessionCookie: string | null;
-  sessionId: string | null;
-}>;
 
 type ChallengeRow = Readonly<{
   challenge: string;
@@ -365,6 +287,58 @@ async function sqlOrThrow() {
   }
 
   return sql;
+}
+
+async function personHasPlatformOwnerMembership(sql: Db, personId: string) {
+  const rows = await sql<Array<{ exists: boolean }>>`
+    select exists (
+      select 1
+      from public.organisation_memberships
+      join public.organisations
+        on organisations.id = organisation_memberships.organisation_id
+      where organisation_memberships.person_id = ${personId}::uuid
+        and organisation_memberships.role = 'platform_owner'
+        and organisations.organisation_type = 'platform'
+    ) as exists
+  `;
+
+  return Boolean(rows[0]?.exists);
+}
+
+function hasPlatformAccessScope(context: AdminSessionContext) {
+  return context.effectiveOrganisation.type === "platform";
+}
+
+function scopedAccessOrganisationId(context?: AdminSessionContext | null) {
+  if (!context || hasPlatformAccessScope(context)) {
+    return null;
+  }
+
+  return context.effectiveOrganisation.id;
+}
+
+function canAccessOrganisation(
+  context: AdminSessionContext,
+  organisationId: string
+) {
+  return hasPlatformAccessScope(context) || context.effectiveOrganisation.id === organisationId;
+}
+
+async function personBelongsToOrganisation(
+  sql: Db,
+  personId: string,
+  organisationId: string
+) {
+  const rows = await sql<Array<{ exists: boolean }>>`
+    select exists (
+      select 1
+      from public.organisation_memberships
+      where person_id = ${personId}::uuid
+        and organisation_id = ${organisationId}::uuid
+    ) as exists
+  `;
+
+  return Boolean(rows[0]?.exists);
 }
 
 async function platformOrganisation(sql: Db) {
@@ -1413,11 +1387,6 @@ export async function legacyAdminContext(accessToken: string | null | undefined)
   } satisfies AdminSessionContext;
 }
 
-export type AdminClientSessionContext = Omit<
-  AdminSessionContext,
-  "csrfToken" | "sessionCookie"
->;
-
 export function clientAdminSessionContext(
   context: AdminSessionContext
 ): AdminClientSessionContext {
@@ -1447,8 +1416,36 @@ export function signAdminSessionContext(context: AdminSessionContext) {
   });
 }
 
-export async function getAdminAccessData(): Promise<AdminAccessData> {
+export async function getAdminAccessData(
+  context?: AdminSessionContext | null
+): Promise<AdminAccessData> {
   const sql = await sqlOrThrow();
+  const scopeOrganisationId = scopedAccessOrganisationId(context);
+  const organisationScope = scopeOrganisationId
+    ? sql`where organisations.id = ${scopeOrganisationId}::uuid`
+    : sql``;
+  const peopleScope = scopeOrganisationId
+    ? sql`
+        where exists (
+          select 1
+          from public.organisation_memberships scoped_memberships
+          where scoped_memberships.person_id = people.id
+            and scoped_memberships.organisation_id = ${scopeOrganisationId}::uuid
+        )
+      `
+    : sql``;
+  const membershipScope = scopeOrganisationId
+    ? sql`where organisation_memberships.organisation_id = ${scopeOrganisationId}::uuid`
+    : sql``;
+  const invitationScope = scopeOrganisationId
+    ? sql`where admin_invitations.organisation_id = ${scopeOrganisationId}::uuid`
+    : sql``;
+  const auditScope = scopeOrganisationId
+    ? sql`where organisation_id = ${scopeOrganisationId}::uuid`
+    : sql``;
+  const agentScope = scopeOrganisationId
+    ? sql`where organisation_id = ${scopeOrganisationId}::uuid`
+    : sql``;
   const [organisations, people, memberships, invitations, auditEvents, agents] =
     await Promise.all([
       sql<Array<{
@@ -1461,6 +1458,7 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
       }>>`
         select id::text, slug, name, organisation_type, status, default_locale
         from public.organisations
+        ${organisationScope}
         order by organisation_type asc, lower(name) asc
       `,
       sql<Array<{
@@ -1470,8 +1468,9 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
         preferred_locale: string;
         status: string;
       }>>`
-        select id::text, email, display_name, preferred_locale, status
+        select people.id::text, people.email, people.display_name, people.preferred_locale, people.status
         from public.people
+        ${peopleScope}
         order by lower(display_name), lower(email)
       `,
       sql<Array<{
@@ -1494,6 +1493,7 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
         from public.organisation_memberships
         join public.organisations
           on organisations.id = organisation_memberships.organisation_id
+        ${membershipScope}
         order by organisation_memberships.created_at desc
       `,
       sql<Array<{
@@ -1518,6 +1518,7 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
         from public.admin_invitations
         join public.organisations
           on organisations.id = admin_invitations.organisation_id
+        ${invitationScope}
         order by admin_invitations.created_at desc
         limit 100
       `,
@@ -1541,6 +1542,7 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
           resource_id,
           created_at
         from public.admin_audit_events
+        ${auditScope}
         order by created_at desc
         limit 100
       `,
@@ -1562,6 +1564,7 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
           organisation_id::text,
           person_id::text
         from public.agents
+        ${agentScope}
         order by lower(name) asc
       `
     ]);
@@ -1608,7 +1611,7 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
     organisations: organisations.map(organisation),
     people: people.map(person),
     roleLabels: adminRoleLabels,
-    roles: Object.keys(adminRoleLabels) as AdminRole[]
+    roles: [...adminRoles]
   };
 }
 
@@ -1703,20 +1706,15 @@ export async function updatePerson({
 }>) {
   const sql = await sqlOrThrow();
 
-  if (actor.role !== "platform_owner") {
-    const ownerRows = await sql<Array<{ exists: boolean }>>`
-      select exists (
-        select 1
-        from public.organisation_memberships
-        join public.organisations
-          on organisations.id = organisation_memberships.organisation_id
-        where organisation_memberships.person_id = ${id}::uuid
-          and organisation_memberships.role = 'platform_owner'
-          and organisations.organisation_type = 'platform'
-      ) as exists
-    `;
+  if (
+    !hasPlatformAccessScope(actor) &&
+    !(await personBelongsToOrganisation(sql, id, actor.effectiveOrganisation.id))
+  ) {
+    throw new Error("Retail admins can only update people in their own organisation");
+  }
 
-    if (ownerRows[0]?.exists) {
+  if (actor.actorMembership.role !== "platform_owner") {
+    if (await personHasPlatformOwnerMembership(sql, id)) {
       throw new Error("Platform Admin cannot change Platform Owner users");
     }
   }
@@ -1852,6 +1850,10 @@ export async function createAdminInvitation({
     throw new Error("Organisation not found");
   }
 
+  if (!canAccessOrganisation(actor, existing.organisation_id)) {
+    throw new Error("Retail admins can only invite people to their own organisation");
+  }
+
   const existingOrganisation = organisation({
     default_locale: existing.default_locale,
     id: existing.organisation_id,
@@ -1865,7 +1867,7 @@ export async function createAdminInvitation({
     throw new Error("Role is not allowed for this organisation");
   }
 
-  if (role === "platform_owner" && actor.role !== "platform_owner") {
+  if (role === "platform_owner" && actor.actorMembership.role !== "platform_owner") {
     throw new Error("Platform Admin cannot grant Platform Owner access");
   }
 
@@ -1877,6 +1879,13 @@ export async function createAdminInvitation({
       preferred_locale: existing.preferred_locale ?? "en",
       status: existing.user_status ?? "disabled"
     });
+
+    if (
+      actor.actorMembership.role !== "platform_owner" &&
+      await personHasPlatformOwnerMembership(sql, existingPerson.id)
+    ) {
+      throw new Error("Platform Admin cannot change Platform Owner users");
+    }
 
     if (existing.membership_id && existing.role && existing.membership_status) {
       const existingMembership = membership({
@@ -2074,10 +2083,12 @@ export async function updateMembershipRole({
 }>) {
   const sql = await sqlOrThrow();
   const organisationRows = await sql<Array<{
+    organisation_id: string;
     organisation_type: string;
     role: string;
   }>>`
     select
+      organisation_memberships.organisation_id::text,
       organisations.organisation_type,
       organisation_memberships.role
     from public.organisation_memberships
@@ -2095,12 +2106,16 @@ export async function updateMembershipRole({
   const organisationType: AdminOrganisationType =
     organisationRow.organisation_type === "platform" ? "platform" : "tenant";
 
+  if (!canAccessOrganisation(actor, organisationRow.organisation_id)) {
+    throw new Error("Retail admins can only update memberships in their own organisation");
+  }
+
   if (!adminRoleAllowedForOrganisationType(role, organisationType)) {
     throw new Error("Role is not allowed for this organisation");
   }
 
   if (
-    actor.role !== "platform_owner" &&
+    actor.actorMembership.role !== "platform_owner" &&
     (organisationRow.role === "platform_owner" || role === "platform_owner")
   ) {
     throw new Error("Platform Admin cannot change Platform Owner access");
@@ -2142,8 +2157,9 @@ export async function assumeAdminIdentity({
   const rows = await sql<Array<{
     organisation_id: string;
     person_id: string;
+    role: string;
   }>>`
-    select person_id::text, organisation_id::text
+    select person_id::text, organisation_id::text, role
     from public.organisation_memberships
     where id = ${membershipId}::uuid
       and status = 'active'
@@ -2153,6 +2169,10 @@ export async function assumeAdminIdentity({
 
   if (!target) {
     throw new Error("That identity is not active");
+  }
+
+  if (target.role === "platform_owner" && actor.actorMembership.role !== "platform_owner") {
+    throw new Error("Platform Admin cannot assume Platform Owner access");
   }
 
   await sql`

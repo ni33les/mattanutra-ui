@@ -151,6 +151,8 @@ describe("external worker boundaries", () => {
 
   it("keeps reservation constrained by the registered worker session", async () => {
     const source = await readFile("lib/task-service.ts", "utf8");
+    const agentsSource = await readFile("lib/task-service-agents.ts", "utf8");
+    const workerSessionSource = `${source}\n${agentsSource}`;
     const alertsSource = await readFile("lib/admin-technical.ts", "utf8");
 
     assert.match(
@@ -174,27 +176,27 @@ describe("external worker boundaries", () => {
       "worker availability alerts must use the same session-plus-agent capability envelope"
     );
     assert.match(
-      source,
+      agentsSource,
       /last_seen_at < now\(\) - interval '2 minutes'/,
       "worker registration should only mark genuinely stale sibling sessions offline"
     );
     assert.match(
-      source,
+      agentsSource,
       /status <> 'offline' or \$\{status\} = 'offline'/,
       "offline worker sessions must not be revived by stale heartbeats"
     );
     assert.match(
-      source,
+      agentsSource,
       /leaseSeconds: 180/,
       "default worker leases should release crashed sessions quickly"
     );
     assert.equal(
-      /ensureWorkerSessionSchema[\s\S]*alter table public\.worker_sessions/.test(source),
+      /ensureWorkerSessionSchema[\s\S]*alter table public\.worker_sessions/.test(workerSessionSource),
       false,
       "worker startup must not run owner-only worker_sessions schema migrations"
     );
     assert.equal(
-      /ensureWorkerSessionSchema[\s\S]*create table if not exists public\.worker_sessions/.test(source),
+      /ensureWorkerSessionSchema[\s\S]*create table if not exists public\.worker_sessions/.test(workerSessionSource),
       false,
       "worker startup must not create worker_sessions at runtime"
     );

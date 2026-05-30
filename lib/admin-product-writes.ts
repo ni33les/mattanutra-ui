@@ -10,20 +10,26 @@
 
 import { getSql } from "@/lib/db";
 import { toJsonValue } from "@/lib/assessment-store";
-import { clearProductRecommendationCandidateCache } from "./admin-products.ts"; // transitional
-import { loadAdminProductRow } from "./admin-product-read-model.ts";
+import { clearProductRecommendationCandidateCache } from "./admin-product-search.ts";
+import {
+  loadAdminProductRow,
+  loadProductRows
+} from "./admin-product-read-model.ts";
 import { rowFromDb } from "./admin-product-mappers.ts";
-import { isUuidValue, cleanNullableText, numberOrNull } from "./admin-product-helpers.ts";
+import {
+  isUuidValue,
+  cleanNullableText,
+  numberOrNull,
+  preferredProductTitle
+} from "./admin-product-helpers.ts";
 import type {
   AdminProductRow,
   CreateAdminProductInput,
-  UpdateAdminProductInput,
-  ProductImportFactInput,
   ProductDbRow,
-  ProductLabelStatus
-} from "./admin-products.ts"; // transitional for Input types until centralized in types.ts
-
-import { loadProductRows } from "./admin-products.ts"; // transitional until loadProductRows is also extracted to read-model
+  ProductImportFactInput,
+  ProductLabelStatus,
+  UpdateAdminProductInput
+} from "./admin-product-types.ts";
 
 import type { ProductStatus } from "@/lib/product-recommendations";
 import type { ValidationResult } from "@/lib/product-validation";
@@ -44,8 +50,10 @@ import {
 // Use Web Crypto API (available in Node runtime for Next.js server code)
 const randomUUID = () => globalThis.crypto.randomUUID();
 
-import { preferredProductTitle } from "./admin-products.ts"; // transitional
-import { supplementIdsForFacts } from "./admin-products.ts"; // transitional
+import {
+  normalizedFactsForStorage,
+  supplementIdsForFacts
+} from "./admin-product-facts.ts";
 import {
   replaceBrandCountryCodes,
   ensureBrandCountryCodes
@@ -64,7 +72,6 @@ import {
 } from "./admin-product-countries.ts";
 import type { ProductCountryCode } from "./admin-product-types.ts";
 import { sameProductCountryCodes } from "./admin-product-helpers.ts";
-import { normalizedFactsForStorage } from "./admin-products.ts"; // transitional
 
 // ---------------------------------------------------------------------------
 // Internal write helpers (moved from the god file)
