@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
 import type {
   AdminTaskVisibilityData,
   AdminTaskVisibilityRow,
@@ -528,11 +527,11 @@ function VisibilityTaskDetailsModal({
         </div>
         <button
           aria-label={labels.supplements.close}
-          className="rounded-md p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
+          className="rounded-md px-3 py-1.5 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
           onClick={onClose}
           type="button"
         >
-          <XMarkIcon aria-hidden={true} className="size-5" />
+          {labels.supplements.close}
         </button>
       </div>
 

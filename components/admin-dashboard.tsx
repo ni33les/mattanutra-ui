@@ -4,10 +4,6 @@ import {
   useCallback,
   useState
 } from "react";
-import {
-  Bars3Icon,
-  XMarkIcon
-} from "@heroicons/react/24/outline";
 import type {
   AdminDashboardData
 } from "@/lib/admin-dashboard-data";
@@ -46,7 +42,8 @@ import type {
 } from "@/lib/admin-query-data";
 import type {
   AdminAccessData,
-  AdminClientSessionContext
+  AdminClientSessionContext,
+  AdminSettingsData
 } from "@/lib/admin-access";
 import { allowedAdminViews } from "@/lib/admin-rbac";
 import type { Locale } from "@/lib/i18n";
@@ -130,6 +127,7 @@ function adminViewDatabaseAvailable({
     view === "access" ||
     view === "access-agents" ||
     view === "audit" ||
+    view === "memberships" ||
     view === "organisations" ||
     view === "people"
   ) {
@@ -230,6 +228,7 @@ export function AdminDashboard({
   reviewQueueData,
   selectedReviewTaskId,
   selectedTaskId,
+  settingsData,
   supplementsData,
   visibilityData,
   view
@@ -254,6 +253,7 @@ export function AdminDashboard({
   reviewQueueData: AdminReviewQueueData;
   selectedReviewTaskId?: string | null;
   selectedTaskId?: string | null;
+  settingsData: AdminSettingsData | null;
   supplementsData: AdminSupplementsData;
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
@@ -337,10 +337,9 @@ export function AdminDashboard({
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
-            className="absolute left-full top-5 ml-4 rounded-md p-2 text-white"
+            className="absolute left-full top-5 ml-4 rounded-md bg-[#20343A] px-3 py-2 text-sm font-semibold text-white ring-1 ring-white/20 hover:bg-[#16252A]"
           >
-            <span className="sr-only">{labels.closeSidebar}</span>
-            <XMarkIcon aria-hidden={true} className="size-6" />
+            {labels.closeSidebar}
           </button>
         </AdminDrawer>
       ) : null}
@@ -361,10 +360,9 @@ export function AdminDashboard({
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
-          className="-m-2.5 p-2.5 text-gray-700 hover:text-gray-900"
+          className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900"
         >
-          <span className="sr-only">{labels.openSidebar}</span>
-          <Bars3Icon aria-hidden={true} className="size-6" />
+          {labels.openSidebar}
         </button>
         <div className="flex-1 text-sm/6 font-semibold text-gray-900">
           {labels.pageTitles[view]}
@@ -479,6 +477,7 @@ export function AdminDashboard({
           {(view === "access" ||
             view === "access-agents" ||
             view === "audit" ||
+            view === "memberships" ||
             view === "organisations" ||
             view === "people") &&
           accessData ? (
@@ -495,6 +494,7 @@ export function AdminDashboard({
               context={adminContext}
               labels={labels}
               locale={locale}
+              settingsData={settingsData}
             />
           ) : view === "campaigns" ? (
             <AdminCampaignsView

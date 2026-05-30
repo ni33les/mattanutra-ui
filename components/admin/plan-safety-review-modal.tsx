@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { SparklesIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import type { AdminReviewTaskRow } from "@/lib/admin-review-queue";
 import { supplementDoseUnits } from "@/lib/supplement-dose-units";
 import type { Locale } from "@/lib/i18n";
@@ -201,11 +200,11 @@ export function PlanSafetyReviewModal({
         </div>
         <button
           aria-label={labels.supplements.close}
-          className="rounded-md p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
+          className="rounded-md px-3 py-1.5 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
           onClick={onClose}
           type="button"
         >
-          <XMarkIcon aria-hidden={true} className="size-5" />
+          {labels.supplements.close}
         </button>
       </div>
 
@@ -343,19 +342,13 @@ export function PlanSafetyReviewModal({
           {foodReview ? (
             <button
               aria-label={labels.reviewQueue.suggestFoodReview}
-              className="inline-flex size-9 items-center justify-center rounded-md bg-[#3A7BD5] text-white shadow-sm transition hover:bg-[#2F67B8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3A7BD5] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#3A7BD5] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#2F67B8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3A7BD5] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={saving || suggestingFoodReview}
               onClick={() => void suggestFoodReviewDetails()}
               title={labels.reviewQueue.suggestFoodReview}
               type="button"
             >
-              <SparklesIcon
-                aria-hidden={true}
-                className={classNames(
-                  "size-5",
-                  suggestingFoodReview ? "animate-pulse" : "",
-                )}
-              />
+              {labels.reviewQueue.suggestFoodReview}
             </button>
           ) : null}
           {suggestingFoodReview ? (

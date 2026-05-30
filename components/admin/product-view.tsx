@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { SparklesIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import type { AdminProductRow, AdminProductsData } from "@/lib/admin-products";
 import {
   adminLocalizedFallbackLabel,
@@ -666,11 +665,11 @@ function ProductModal({
         </div>
         <button
           aria-label={viewLabels.close}
-          className="rounded-full p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
+          className="rounded-md px-3 py-1.5 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900"
           onClick={onClose}
           type="button"
         >
-          <XMarkIcon className="size-5" />
+          {viewLabels.close}
         </button>
       </div>
 
@@ -1005,13 +1004,13 @@ function ProductModal({
         <div className="flex items-center gap-2">
           <button
             aria-label={viewLabels.correctFactsWithAi}
-            className="inline-flex size-9 items-center justify-center rounded-md bg-[#2563EB] text-white ring-1 ring-[#2563EB] hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#2563EB] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#2563EB] hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={saving}
             onClick={() => void onCorrectFacts(draft)}
             title={viewLabels.correctFactsWithAi}
             type="button"
           >
-            <SparklesIcon className="size-5" />
+            {viewLabels.correctFactsWithAi}
           </button>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

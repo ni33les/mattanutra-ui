@@ -121,10 +121,15 @@
   },
   "access": {
     "accessControl": "访问控制",
+    "accepted": "已接受",
     "active": "活跃",
     "actor": "登录身份",
+    "addMembership": "添加成员关系",
+    "addOrganisation": "添加组织",
     "agents": "代理",
     "alreadyMember": "此人员已属于该组织。请在成员关系中更改其角色或状态。",
+    "allOrganisations": "所有组织",
+    "allPeople": "所有人员",
     "assume": "代入身份",
     "assumed": "当前查看身份",
     "audit": "审计",
@@ -132,16 +137,25 @@
     "create": "创建",
     "createOrganisation": "创建零售商",
     "defaultLocale": "默认语言",
+    "deleted": "已删除",
+    "deleteInvitation": "删除邀请",
+    "deleteMembership": "删除成员关系",
     "disabled": "已禁用",
     "email": "邮箱",
     "error": "无法更新访问控制。",
+    "expired": "已过期",
+    "expiresAt": "过期时间",
+    "filterByOrganisation": "按组织筛选",
+    "filterByPerson": "按人员筛选",
     "invite": "邀请",
     "inactivePerson": "此人员已存在但未启用。请先更新人员记录，再添加访问权限。",
     "invitePerson": "邀请人员",
     "inviteUrl": "邀请链接",
     "invitations": "邀请",
+    "invitationDeleted": "邀请已删除。",
     "memberships": "成员关系",
     "membershipAdded": "已找到现有人员。已添加组织访问权限，未创建新的 passkey 邀请。",
+    "membershipDeleted": "成员关系已删除。",
     "name": "名称",
     "organisation": "组织",
     "organisations": "组织",
@@ -150,6 +164,7 @@
     "platform": "平台",
     "preferredLocale": "首选语言",
     "role": "角色",
+    "revoked": "已撤销",
     "save": "保存",
     "session": "会话",
     "slug": "Slug",
@@ -331,12 +346,16 @@
   "marketingTitle": "营销",
   "administration": [
     {
-      "name": "人员",
-      "view": "people"
-    },
-    {
       "name": "组织",
       "view": "organisations"
+    },
+    {
+      "name": "成员关系",
+      "view": "memberships"
+    },
+    {
+      "name": "人员",
+      "view": "people"
     },
     {
       "name": "代理",
@@ -424,6 +443,7 @@
     "flow": "转化",
     "glance": "仪表盘",
     "leads": "线索",
+    "memberships": "成员关系",
     "organisations": "组织",
     "people": "人员",
     "product-insights": "产品洞察",

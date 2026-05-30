@@ -1,12 +1,6 @@
 "use client";
 
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
-import {
-  ArrowPathIcon,
-  BuildingOffice2Icon,
-  KeyIcon,
-  UserGroupIcon
-} from "@heroicons/react/24/outline";
 import type {
   AdminAccessData,
   AdminClientSessionContext,
@@ -29,6 +23,7 @@ import {
   formatGeneratedAt,
   readableToken
 } from "@/components/admin/dashboard-shared";
+import { AdminModal } from "@/components/admin/ui";
 
 type AdminAccessViewProps = Readonly<{
   accessToken: string;
@@ -38,7 +33,12 @@ type AdminAccessViewProps = Readonly<{
   locale: Locale;
   view: Extract<
     AdminDashboardView,
-    "access" | "access-agents" | "audit" | "organisations" | "people"
+    | "access"
+    | "access-agents"
+    | "audit"
+    | "memberships"
+    | "organisations"
+    | "people"
   >;
 }>;
 
@@ -67,21 +67,30 @@ const roleLabels = {
 } satisfies Record<Locale, Record<AdminRole, string>>;
 
 function Panel({
+  action,
   children,
   title
 }: Readonly<{
+  action?: ReactNode;
   children: ReactNode;
   title: string;
 }>) {
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-      <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
       <div className="mt-5">{children}</div>
     </section>
   );
 }
 
 function statusLabel(labels: AdminContent, status: string) {
+  if (status === "accepted") {
+    return labels.access.accepted;
+  }
+
   if (status === "active") {
     return labels.access.active;
   }
@@ -90,8 +99,20 @@ function statusLabel(labels: AdminContent, status: string) {
     return labels.access.disabled;
   }
 
+  if (status === "deleted") {
+    return labels.access.deleted;
+  }
+
   if (status === "pending" || status === "invited") {
     return labels.access.pending;
+  }
+
+  if (status === "expired") {
+    return labels.access.expired;
+  }
+
+  if (status === "revoked") {
+    return labels.access.revoked;
   }
 
   return readableToken(status);
@@ -109,6 +130,24 @@ function statusClass(status: string) {
   return "bg-amber-50 text-amber-800 ring-amber-100";
 }
 
+function actionButtonClass(intent: "assume" | "delete" | "primary" | "save") {
+  const base =
+    "inline-flex min-w-[5.5rem] items-center justify-center rounded-md px-3 py-1.5 text-sm font-semibold ring-1 transition disabled:cursor-wait disabled:opacity-70";
+
+  if (intent === "assume" || intent === "primary") {
+    return classNames(
+      base,
+      "bg-[#1FA77A] text-white shadow-sm ring-transparent hover:bg-[#188B66]"
+    );
+  }
+
+  if (intent === "delete") {
+    return classNames(base, "bg-white text-red-700 ring-red-200 hover:bg-red-50");
+  }
+
+  return classNames(base, "bg-white text-gray-700 ring-gray-200 hover:bg-gray-50");
+}
+
 async function postAccess(body: Record<string, unknown>) {
   const response = await fetch("/api/admin/access", {
     body: JSON.stringify(body),
@@ -122,8 +161,10 @@ async function postAccess(body: Record<string, unknown>) {
     data?: AdminAccessData;
     error?: string;
     existingAccess?: AdminInviteExistingAccess;
+    invitationDeleted?: boolean;
     inviteUrl?: string;
     membershipAdded?: AdminInviteMembershipAdded;
+    membershipDeleted?: boolean;
     reloaded?: boolean;
   };
 
@@ -158,6 +199,12 @@ export function AdminAccessView({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [auditPersonId, setAuditPersonId] = useState("");
+  const [addMembershipOpen, setAddMembershipOpen] = useState(false);
+  const [createOrganisationOpen, setCreateOrganisationOpen] = useState(false);
+  const [invitePersonOpen, setInvitePersonOpen] = useState(false);
+  const [membershipFilterOrganisationId, setMembershipFilterOrganisationId] =
+    useState("");
   const organisationById = useMemo(
     () => new Map(accessData.organisations.map((org) => [org.id, org])),
     [accessData.organisations]
@@ -178,17 +225,70 @@ export function AdminAccessView({
   const canWrite = context.permissions.includes("access.write");
   const canAssume = context.permissions.includes("impersonation.write") && !context.isLegacy;
   const canManageOwners = context.actorMembership.role === "platform_owner";
+  const canAddMembership =
+    canWrite &&
+    (context.actorMembership.role === "platform_owner" ||
+      context.actorMembership.role === "platform_admin");
+  const canInvitePeople =
+    canWrite &&
+    (context.actorMembership.role === "platform_owner" ||
+      context.actorMembership.role === "platform_admin");
   const canManageOrganisations =
     canWrite && context.effectiveOrganisation.type === "platform";
+  const canFilterMembershipOrganisations =
+    context.effectiveOrganisation.type === "platform" &&
+    accessData.organisations.length > 1;
   const [inviteOrganisationId, setInviteOrganisationId] = useState(
+    () => accessData.organisations[0]?.id ?? ""
+  );
+  const [membershipOrganisationId, setMembershipOrganisationId] = useState(
     () => accessData.organisations[0]?.id ?? ""
   );
   const inviteOrganisation =
     organisationById.get(inviteOrganisationId) ?? accessData.organisations[0];
+  const membershipOrganisation =
+    organisationById.get(membershipOrganisationId) ?? accessData.organisations[0];
   const inviteRoles = rolesForOrganisationType(
     accessData.roles,
     inviteOrganisation?.type ?? "tenant",
     canManageOwners
+  );
+  const addMembershipRoles = rolesForOrganisationType(
+    accessData.roles,
+    membershipOrganisation?.type ?? "tenant",
+    canManageOwners
+  );
+  const activePeople = useMemo(
+    () => accessData.people.filter((person) => person.status === "active"),
+    [accessData.people]
+  );
+  const filteredAuditEvents = useMemo(
+    () =>
+      auditPersonId
+        ? accessData.auditEvents.filter(
+            (event) =>
+              event.actorPersonId === auditPersonId ||
+              event.assumedPersonId === auditPersonId
+          )
+        : accessData.auditEvents,
+    [accessData.auditEvents, auditPersonId]
+  );
+  const visibleInvitations = useMemo(
+    () =>
+      accessData.invitations.filter(
+        (invite) => invite.status === "pending" || invite.status === "expired"
+      ),
+    [accessData.invitations]
+  );
+  const filteredMemberships = useMemo(
+    () =>
+      membershipFilterOrganisationId
+        ? accessData.memberships.filter(
+            (membership) =>
+              membership.organisationId === membershipFilterOrganisationId
+          )
+        : accessData.memberships,
+    [accessData.memberships, membershipFilterOrganisationId]
   );
 
   async function mutate(body: Record<string, unknown>) {
@@ -206,7 +306,11 @@ export function AdminAccessView({
         setAccessData(result.data);
       }
 
-      if (result.inviteUrl) {
+      if (result.invitationDeleted) {
+        setMessage(labels.access.invitationDeleted);
+      } else if (result.membershipDeleted) {
+        setMessage(labels.access.membershipDeleted);
+      } else if (result.inviteUrl) {
         setMessage(`${labels.access.inviteUrl}: ${result.inviteUrl}`);
       } else if (result.membershipAdded) {
         setMessage(
@@ -241,24 +345,32 @@ export function AdminAccessView({
       if (result.reloaded) {
         window.location.reload();
       }
+
+      return true;
     } catch (mutationError) {
       setError(mutationError instanceof Error ? mutationError.message : labels.access.error);
+      return false;
     } finally {
       setBusy(false);
     }
   }
 
-  function createOrganisation(event: FormEvent<HTMLFormElement>) {
+  async function createOrganisation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
 
-    void mutate({
+    const updated = await mutate({
       action: "create_organisation",
       defaultLocale: String(form.get("defaultLocale") ?? "en"),
       name: String(form.get("name") ?? ""),
       slug: String(form.get("slug") ?? "")
     });
-    event.currentTarget.reset();
+
+    if (updated) {
+      formElement.reset();
+      setCreateOrganisationOpen(false);
+    }
   }
 
   function saveOrganisation(event: FormEvent<HTMLFormElement>) {
@@ -289,18 +401,49 @@ export function AdminAccessView({
     });
   }
 
-  function invitePerson(event: FormEvent<HTMLFormElement>) {
+  async function invitePerson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
 
-    void mutate({
+    const updated = await mutate({
       action: "invite_person",
       email: String(form.get("email") ?? ""),
       organisationId: String(form.get("organisationId") ?? ""),
       preferredLocale: String(form.get("preferredLocale") ?? "en"),
       role: String(form.get("role") ?? inviteRoles[0] ?? "retail_assistant")
     });
-    event.currentTarget.reset();
+
+    if (updated) {
+      formElement.reset();
+      setInvitePersonOpen(false);
+    }
+  }
+
+  function deleteInvitation(invitationId: string) {
+    void mutate({
+      action: "delete_invitation",
+      invitationId
+    });
+  }
+
+  async function addMembership(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+
+    const updated = await mutate({
+      action: "add_membership",
+      organisationId: String(form.get("organisationId") ?? ""),
+      personId: String(form.get("personId") ?? ""),
+      role: String(form.get("role") ?? addMembershipRoles[0] ?? "retail_assistant"),
+      status: String(form.get("status") ?? "active")
+    });
+
+    if (updated) {
+      formElement.reset();
+      setAddMembershipOpen(false);
+    }
   }
 
   function saveMembership(event: FormEvent<HTMLFormElement>) {
@@ -344,12 +487,11 @@ export function AdminAccessView({
           </div>
           {context.assumedPerson ? (
             <button
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-[#20343A] shadow-sm hover:bg-gray-50 disabled:cursor-wait disabled:opacity-70"
+              className={actionButtonClass("save")}
               disabled={busy}
               onClick={() => void mutate({ action: "stop_impersonation" })}
               type="button"
             >
-              <ArrowPathIcon aria-hidden={true} className="size-4" />
               {labels.access.stopAssuming}
             </button>
           ) : null}
@@ -370,7 +512,21 @@ export function AdminAccessView({
       ) : null}
 
       {view === "organisations" ? (
-        <Panel title={labels.access.organisations}>
+        <Panel
+          action={
+            canManageOrganisations ? (
+              <button
+                className={actionButtonClass("primary")}
+                disabled={busy}
+                onClick={() => setCreateOrganisationOpen(true)}
+                type="button"
+              >
+                {labels.access.addOrganisation}
+              </button>
+            ) : null
+          }
+          title={labels.access.organisations}
+        >
           <div className="divide-y divide-gray-100">
             {accessData.organisations.map((organisation) => (
               <form
@@ -429,7 +585,7 @@ export function AdminAccessView({
                 </label>
                 {canManageOrganisations ? (
                   <button
-                    className="self-end rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-wait disabled:opacity-70"
+                    className={classNames("self-end", actionButtonClass("save"))}
                     disabled={busy}
                     type="submit"
                   >
@@ -439,23 +595,46 @@ export function AdminAccessView({
               </form>
             ))}
           </div>
+        </Panel>
+      ) : null}
 
-          {canManageOrganisations ? (
-            <form onSubmit={createOrganisation} className="mt-5 grid gap-3 border-t border-gray-100 pt-5 sm:grid-cols-2">
+      {createOrganisationOpen && canManageOrganisations ? (
+        <AdminModal
+          closeDisabled={busy}
+          closeLabel={labels.contentPages.cancel}
+          label={labels.access.addOrganisation}
+          onClose={() => setCreateOrganisationOpen(false)}
+          size="md"
+          title={
+            <span className={adminLocaleTextClass(locale, "heading")}>
+              {labels.access.addOrganisation}
+            </span>
+          }
+        >
+          <form className="grid gap-4 p-6" onSubmit={createOrganisation}>
+            <label className="grid gap-1 text-xs font-semibold text-gray-500">
+              {labels.access.name}
               <input
-                className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                disabled={busy}
                 name="name"
-                placeholder={labels.access.name}
                 required={true}
               />
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-gray-500">
+              {labels.access.slug}
               <input
-                className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                disabled={busy}
                 name="slug"
-                placeholder={labels.access.slug}
                 required={true}
               />
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-gray-500">
+              {labels.access.defaultLocale}
               <select
-                className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                disabled={busy}
                 name="defaultLocale"
               >
                 {publicLocales.map((localeCode) => (
@@ -464,98 +643,201 @@ export function AdminAccessView({
                   </option>
                 ))}
               </select>
+            </label>
+            <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
               <button
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#188B66] disabled:cursor-wait disabled:opacity-70 sm:col-span-2"
+                className={actionButtonClass("save")}
+                disabled={busy}
+                onClick={() => setCreateOrganisationOpen(false)}
+                type="button"
+              >
+                {labels.contentPages.cancel}
+              </button>
+              <button
+                className={actionButtonClass("primary")}
                 disabled={busy}
                 type="submit"
               >
-                <BuildingOffice2Icon aria-hidden={true} className="size-4" />
-                {labels.access.createOrganisation}
+                {labels.access.addOrganisation}
               </button>
-            </form>
-          ) : null}
-        </Panel>
+            </div>
+          </form>
+        </AdminModal>
       ) : null}
 
       {view === "people" ? (
         <>
-          <Panel title={labels.access.invitePerson}>
-            {canWrite ? (
-              <form onSubmit={invitePerson} className="grid gap-3">
-                <input
-                  className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
-                  name="email"
-                  placeholder={labels.access.email}
-                  required={true}
-                  type="email"
-                />
-                <select
-                  className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
-                  name="organisationId"
-                  onChange={(event) => setInviteOrganisationId(event.target.value)}
-                  value={inviteOrganisationId}
-                >
-                  {accessData.organisations.map((organisation) => (
-                    <option key={organisation.id} value={organisation.id}>
-                      {organisation.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <select
-                    className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
-                    name="role"
-                  >
-                    {inviteRoles.map((role) => (
-                      <option key={role} value={role}>
-                        {roleLabels[locale][role]}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="rounded-md bg-white px-3 py-2 text-sm ring-1 ring-inset ring-gray-300"
-                    name="preferredLocale"
-                  >
-                    {publicLocales.map((localeCode) => (
-                      <option key={localeCode} value={localeCode}>
-                        {localeLabels[localeCode]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          <Panel
+            action={
+              canInvitePeople ? (
                 <button
-                  className="inline-flex items-center justify-center gap-2 rounded-md bg-[#20343A] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#16252A] disabled:cursor-wait disabled:opacity-70"
+                  className={actionButtonClass("primary")}
                   disabled={busy}
-                  type="submit"
+                  onClick={() => setInvitePersonOpen(true)}
+                  type="button"
                 >
-                  <KeyIcon aria-hidden={true} className="size-4" />
                   {labels.access.invite}
                 </button>
-              </form>
-            ) : null}
-
-            <div className="mt-5 divide-y divide-gray-100 border-t border-gray-100 pt-2">
-              {accessData.invitations.slice(0, 8).map((invite) => (
-                <div key={invite.id} className="flex items-center justify-between gap-3 py-3 text-sm">
-                  <div>
-                    <div className="font-medium text-gray-900">{invite.email}</div>
-                    <div className="text-xs text-gray-500">
-                      {organisationById.get(invite.organisationId)?.name ?? labels.access.organisation} ·{" "}
-                      {roleLabels[locale][invite.role]} · {formatGeneratedAt(invite.expiresAt, locale)}
-                    </div>
-                  </div>
-                  <span
-                    className={classNames(
-                      "shrink-0 rounded-full px-2 py-1 text-xs font-medium ring-1",
-                      statusClass(invite.status)
-                    )}
-                  >
-                    {statusLabel(labels, invite.status)}
-                  </span>
-                </div>
-              ))}
+              ) : null
+            }
+            title={labels.access.invitations}
+          >
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-semibold text-gray-500">
+                    <th className="py-2 pr-4">{labels.access.email}</th>
+                    <th className="py-2 pr-4">{labels.access.organisation}</th>
+                    <th className="py-2 pr-4">{labels.access.role}</th>
+                    <th className="py-2 pr-4">{labels.access.expiresAt}</th>
+                    <th className="py-2 pr-4">{labels.access.status}</th>
+                    <th className="py-2">{labels.contentPages.actions}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {visibleInvitations.slice(0, 8).map((invite) => (
+                    <tr key={invite.id}>
+                      <td className="py-3 pr-4 font-medium text-gray-900">
+                        {invite.email}
+                      </td>
+                      <td className="py-3 pr-4 text-gray-600">
+                        {organisationById.get(invite.organisationId)?.name ??
+                          labels.access.organisation}
+                      </td>
+                      <td className="py-3 pr-4 text-gray-600">
+                        {roleLabels[locale][invite.role]}
+                      </td>
+                      <td className="py-3 pr-4 text-gray-600">
+                        {formatGeneratedAt(invite.expiresAt, locale)}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span
+                          className={classNames(
+                            "inline-flex rounded-full px-2 py-1 text-xs font-medium ring-1",
+                            statusClass(invite.status)
+                          )}
+                        >
+                          {statusLabel(labels, invite.status)}
+                        </span>
+                      </td>
+                      <td className="py-3">
+                        {canWrite &&
+                        (invite.status === "pending" || invite.status === "expired") ? (
+                          <button
+                            aria-label={`${labels.access.deleteInvitation}: ${invite.email}`}
+                            className={actionButtonClass("delete")}
+                            disabled={busy}
+                            onClick={() => deleteInvitation(invite.id)}
+                            title={labels.access.deleteInvitation}
+                            type="button"
+                          >
+                            {labels.contentPages.deleteAction}
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </Panel>
+
+          {invitePersonOpen && canInvitePeople ? (
+            <AdminModal
+              closeDisabled={busy}
+              closeLabel={labels.contentPages.cancel}
+              label={labels.access.invitePerson}
+              onClose={() => setInvitePersonOpen(false)}
+              size="md"
+              title={
+                <span className={adminLocaleTextClass(locale, "heading")}>
+                  {labels.access.invitePerson}
+                </span>
+              }
+            >
+              <form className="grid gap-4 p-6" onSubmit={invitePerson}>
+                <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                  {labels.access.email}
+                  <input
+                    className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                    disabled={busy}
+                    name="email"
+                    required={true}
+                    type="email"
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                  {labels.access.organisation}
+                  <select
+                    className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                    disabled={busy || accessData.organisations.length === 0}
+                    name="organisationId"
+                    onChange={(event) => setInviteOrganisationId(event.target.value)}
+                    required={true}
+                    value={inviteOrganisationId}
+                  >
+                    {accessData.organisations.map((organisation) => (
+                      <option key={organisation.id} value={organisation.id}>
+                        {organisation.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                    {labels.access.role}
+                    <select
+                      className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                      disabled={busy || inviteRoles.length === 0}
+                      key={inviteOrganisationId}
+                      name="role"
+                    >
+                      {inviteRoles.map((role) => (
+                        <option key={role} value={role}>
+                          {roleLabels[locale][role]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                    {labels.access.preferredLocale}
+                    <select
+                      className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                      disabled={busy}
+                      name="preferredLocale"
+                    >
+                      {publicLocales.map((localeCode) => (
+                        <option key={localeCode} value={localeCode}>
+                          {localeLabels[localeCode]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
+                  <button
+                    className={actionButtonClass("save")}
+                    disabled={busy}
+                    onClick={() => setInvitePersonOpen(false)}
+                    type="button"
+                  >
+                    {labels.contentPages.cancel}
+                  </button>
+                  <button
+                    className={actionButtonClass("primary")}
+                    disabled={
+                      busy ||
+                      accessData.organisations.length === 0 ||
+                      inviteRoles.length === 0
+                    }
+                    type="submit"
+                  >
+                    {labels.access.invite}
+                  </button>
+                </div>
+              </form>
+            </AdminModal>
+          ) : null}
 
           <Panel title={labels.access.people}>
             <div className="divide-y divide-gray-100">
@@ -615,7 +897,7 @@ export function AdminAccessView({
                     </label>
                     {canWrite ? (
                       <button
-                        className="self-end rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-wait disabled:opacity-70"
+                        className={classNames("self-end", actionButtonClass("save"))}
                         disabled={busy || personProtected}
                         type="submit"
                       >
@@ -627,97 +909,140 @@ export function AdminAccessView({
               })}
             </div>
           </Panel>
+        </>
+      ) : null}
 
-          <Panel title={labels.access.memberships}>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead>
-                  <tr className="text-left text-xs font-semibold text-gray-500">
-                    <th className="py-2 pr-4">{labels.access.name}</th>
-                    <th className="py-2 pr-4">{labels.access.organisation}</th>
-                    <th className="py-2 pr-4">{labels.access.role}</th>
-                    <th className="py-2 pr-4">{labels.access.status}</th>
-                    <th className="py-2">{labels.contentPages.actions}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {accessData.memberships.map((membership) => {
-                    const person = personById.get(membership.personId);
-                    const organisation = organisationById.get(membership.organisationId);
-                    const membershipRoles = rolesForOrganisationType(
-                      accessData.roles,
-                      organisation?.type ?? "tenant",
-                      canManageOwners
-                    );
-                    const availableMembershipRoles = membershipRoles.includes(membership.role)
-                      ? membershipRoles
-                      : [membership.role, ...membershipRoles];
-                    const membershipProtected =
-                      membership.role === "platform_owner" && !canManageOwners;
+      {view === "memberships" ? (
+        <Panel
+          action={
+            canAddMembership ? (
+              <button
+                className={actionButtonClass("primary")}
+                disabled={busy}
+                onClick={() => setAddMembershipOpen(true)}
+                type="button"
+              >
+                {labels.access.addMembership}
+              </button>
+            ) : null
+          }
+          title={labels.access.memberships}
+        >
+          {canFilterMembershipOrganisations ? (
+            <label className="mb-4 block max-w-sm text-xs font-semibold text-gray-500">
+              {labels.access.filterByOrganisation}
+              <select
+                className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                onChange={(event) =>
+                  setMembershipFilterOrganisationId(event.target.value)
+                }
+                value={membershipFilterOrganisationId}
+              >
+                <option value="">{labels.access.allOrganisations}</option>
+                {accessData.organisations.map((organisation) => (
+                  <option key={organisation.id} value={organisation.id}>
+                    {organisation.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
-                    return (
-                      <tr key={membership.id}>
-                        <td className="py-3 pr-4">
-                          <div className="font-medium text-gray-900">
-                            {person?.displayName ?? labels.access.people}
-                          </div>
-                          <div className="text-xs text-gray-500">{person?.email}</div>
-                        </td>
-                        <td className="py-3 pr-4 text-gray-600">
-                          {organisation?.name ?? labels.access.organisation}
-                        </td>
-                        <td className="py-3 pr-4">
-                          <form onSubmit={saveMembership} className="flex flex-wrap gap-2">
-                            <input type="hidden" name="membershipId" value={membership.id} />
-                            <select
-                              className="rounded-md bg-white px-2 py-1 text-sm ring-1 ring-inset ring-gray-300"
-                              defaultValue={membership.role}
-                              disabled={!canWrite || busy || membershipProtected}
-                              name="role"
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead>
+                <tr className="text-left text-xs font-semibold text-gray-500">
+                  <th className="py-2 pr-4">{labels.access.name}</th>
+                  <th className="py-2 pr-4">{labels.access.organisation}</th>
+                  <th className="py-2 pr-4">{labels.access.role}</th>
+                  <th className="py-2 pr-4">{labels.access.status}</th>
+                  <th className="py-2">{labels.contentPages.actions}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredMemberships.map((membership) => {
+                  const person = personById.get(membership.personId);
+                  const organisation = organisationById.get(membership.organisationId);
+                  const membershipRoles = rolesForOrganisationType(
+                    accessData.roles,
+                    organisation?.type ?? "tenant",
+                    canManageOwners
+                  );
+                  const availableMembershipRoles = membershipRoles.includes(
+                    membership.role
+                  )
+                    ? membershipRoles
+                    : [membership.role, ...membershipRoles];
+                  const membershipProtected =
+                    membership.role === "platform_owner" && !canManageOwners;
+                  const membershipIsActiveSession =
+                    membership.id === context.actorMembership.id ||
+                    membership.id === context.effectiveMembership.id;
+                  const membershipFormId = `membership-form-${membership.id}`;
+
+                  return (
+                    <tr key={membership.id}>
+                      <td className="py-3 pr-4">
+                        <div className="font-medium text-gray-900">
+                          {person?.displayName ?? labels.access.people}
+                        </div>
+                        <div className="text-xs text-gray-500">{person?.email}</div>
+                      </td>
+                      <td className="py-3 pr-4 text-gray-600">
+                        {organisation?.name ?? labels.access.organisation}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <select
+                          className="rounded-md bg-white px-2 py-1 text-sm ring-1 ring-inset ring-gray-300"
+                          defaultValue={membership.role}
+                          disabled={!canWrite || busy || membershipProtected}
+                          form={membershipFormId}
+                          name="role"
+                        >
+                          {availableMembershipRoles.map((role) => (
+                            <option key={role} value={role}>
+                              {roleLabels[locale][role]}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <select
+                          className="rounded-md bg-white px-2 py-1 text-sm ring-1 ring-inset ring-gray-300"
+                          defaultValue={membership.status}
+                          disabled={!canWrite || busy || membershipProtected}
+                          form={membershipFormId}
+                          name="status"
+                        >
+                          <option value="active">{labels.access.active}</option>
+                          <option value="disabled">{labels.access.disabled}</option>
+                          <option value="invited">{labels.access.pending}</option>
+                          {!membershipProtected && !membershipIsActiveSession ? (
+                            <option value="deleted">{labels.access.deleted}</option>
+                          ) : null}
+                        </select>
+                      </td>
+                      <td className="py-3">
+                        <form id={membershipFormId} onSubmit={saveMembership}>
+                          <input type="hidden" name="membershipId" value={membership.id} />
+                        </form>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {canWrite ? (
+                            <button
+                              className={actionButtonClass("save")}
+                              disabled={busy || membershipProtected}
+                              form={membershipFormId}
+                              type="submit"
                             >
-                              {availableMembershipRoles.map((role) => (
-                                <option key={role} value={role}>
-                                  {roleLabels[locale][role]}
-                                </option>
-                              ))}
-                            </select>
-                            <select
-                              className="rounded-md bg-white px-2 py-1 text-sm ring-1 ring-inset ring-gray-300"
-                              defaultValue={membership.status}
-                              disabled={!canWrite || busy || membershipProtected}
-                              name="status"
-                            >
-                              <option value="active">{labels.access.active}</option>
-                              <option value="disabled">{labels.access.disabled}</option>
-                              <option value="invited">{labels.access.pending}</option>
-                            </select>
-                            {canWrite ? (
-                              <button
-                                className="rounded-md bg-white px-3 py-1 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-wait disabled:opacity-70"
-                                disabled={busy || membershipProtected}
-                                type="submit"
-                              >
-                                {labels.access.save}
-                              </button>
-                            ) : null}
-                          </form>
-                        </td>
-                        <td className="py-3 pr-4">
-                          <span
-                            className={classNames(
-                              "inline-flex rounded-full px-2 py-1 text-xs font-medium ring-1",
-                              statusClass(membership.status)
-                            )}
-                          >
-                            {statusLabel(labels, membership.status)}
-                          </span>
-                        </td>
-                        <td className="py-3">
+                              {labels.access.save}
+                            </button>
+                          ) : null}
                           {canAssume &&
-                          membership.personId !== context.actorPerson.id &&
+                          membership.status === "active" &&
+                          !membershipIsActiveSession &&
                           (membership.role !== "platform_owner" || canManageOwners) ? (
                             <button
-                              className="inline-flex items-center gap-1 rounded-md bg-[#1FA77A] px-3 py-1 text-sm font-semibold text-white shadow-sm hover:bg-[#188B66] disabled:cursor-wait disabled:opacity-70"
+                              className={actionButtonClass("assume")}
                               disabled={busy}
                               onClick={() =>
                                 void mutate({
@@ -727,19 +1052,120 @@ export function AdminAccessView({
                               }
                               type="button"
                             >
-                              <UserGroupIcon aria-hidden={true} className="size-4" />
                               {labels.access.assume}
                             </button>
                           ) : null}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      ) : null}
+
+      {addMembershipOpen && canAddMembership ? (
+        <AdminModal
+          closeDisabled={busy}
+          closeLabel={labels.contentPages.cancel}
+          label={labels.access.addMembership}
+          onClose={() => setAddMembershipOpen(false)}
+          size="lg"
+          title={
+            <span className={adminLocaleTextClass(locale, "heading")}>
+              {labels.access.addMembership}
+            </span>
+          }
+        >
+          <form className="grid gap-4 p-6" onSubmit={addMembership}>
+            <label className="grid gap-1 text-xs font-semibold text-gray-500">
+              {labels.access.people}
+              <select
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                disabled={busy || activePeople.length === 0}
+                name="personId"
+                required={true}
+              >
+                {activePeople.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.displayName} · {person.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-gray-500">
+              {labels.access.organisation}
+              <select
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                disabled={busy || accessData.organisations.length === 0}
+                name="organisationId"
+                onChange={(event) => setMembershipOrganisationId(event.target.value)}
+                required={true}
+                value={membershipOrganisationId}
+              >
+                {accessData.organisations.map((organisation) => (
+                  <option key={organisation.id} value={organisation.id}>
+                    {organisation.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                {labels.access.role}
+                <select
+                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                  disabled={busy || addMembershipRoles.length === 0}
+                  key={membershipOrganisationId}
+                  name="role"
+                >
+                  {addMembershipRoles.map((role) => (
+                    <option key={role} value={role}>
+                      {roleLabels[locale][role]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                {labels.access.status}
+                <select
+                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                  defaultValue="active"
+                  disabled={busy}
+                  name="status"
+                >
+                  <option value="active">{labels.access.active}</option>
+                  <option value="disabled">{labels.access.disabled}</option>
+                  <option value="invited">{labels.access.pending}</option>
+                </select>
+              </label>
             </div>
-          </Panel>
-        </>
+            <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
+              <button
+                className={actionButtonClass("save")}
+                disabled={busy}
+                onClick={() => setAddMembershipOpen(false)}
+                type="button"
+              >
+                {labels.contentPages.cancel}
+              </button>
+              <button
+                className={actionButtonClass("primary")}
+                disabled={
+                  busy ||
+                  activePeople.length === 0 ||
+                  accessData.organisations.length === 0 ||
+                  addMembershipRoles.length === 0
+                }
+                type="submit"
+              >
+                {labels.access.addMembership}
+              </button>
+            </div>
+          </form>
+        </AdminModal>
       ) : null}
 
       {view === "access-agents" ? (
@@ -785,8 +1211,23 @@ export function AdminAccessView({
 
       {view === "audit" ? (
         <Panel title={labels.access.audit}>
+          <label className="mb-4 block max-w-sm text-xs font-semibold text-gray-500">
+            {labels.access.filterByPerson}
+            <select
+              className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+              onChange={(event) => setAuditPersonId(event.target.value)}
+              value={auditPersonId}
+            >
+              <option value="">{labels.access.allPeople}</option>
+              {accessData.people.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.displayName} · {person.email}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="divide-y divide-gray-100">
-            {accessData.auditEvents.map((event) => (
+            {filteredAuditEvents.map((event) => (
               <div key={event.id} className="py-3 text-sm">
                 <div className="font-medium text-gray-900">
                   {readableToken(event.action)}

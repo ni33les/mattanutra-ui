@@ -8,7 +8,6 @@ import {
   ComboboxOption,
   ComboboxOptions
 } from "@headlessui/react";
-import { PlusIcon, SparklesIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import type {
   AdminSupplementRow,
   AdminSupplementsData,
@@ -367,7 +366,7 @@ export function AdminSupplementsView({
             }}
             type="button"
           >
-            <PlusIcon aria-hidden={true} className="size-5" />
+            {labels.supplements.addSupplement}
           </button>
         </div>
       </div>
@@ -785,11 +784,11 @@ export function SupplementDetailsModal({
             </div>
             <button
               aria-label={labels.supplements.close}
-              className="rounded-md p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
+              className="rounded-md px-3 py-1.5 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
               onClick={onClose}
               type="button"
             >
-              <XMarkIcon aria-hidden={true} className="size-5" />
+              {labels.supplements.close}
             </button>
           </div>
 
@@ -884,12 +883,12 @@ export function SupplementDetailsModal({
                       {onDeleteAssociation ? (
                         <button
                           aria-label={`${labels.supplements.removeAssociation}: ${alias.name}`}
-                          className="rounded-full p-0.5 text-emerald-500 hover:bg-white hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                          className="rounded-full px-1.5 py-0.5 text-[0.65rem] font-semibold text-emerald-600 ring-1 ring-emerald-100 hover:bg-white hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                           disabled={deletingAssociationId === alias.id}
                           onClick={() => onDeleteAssociation(alias.id)}
                           type="button"
                         >
-                          <XMarkIcon aria-hidden={true} className="size-3.5" />
+                          {labels.supplements.removeAssociation}
                         </button>
                       ) : null}
                     </span>
@@ -1104,19 +1103,13 @@ export function SupplementDetailsModal({
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <button
                 aria-label={labels.supplements.suggestDose}
-                className="inline-flex size-9 items-center justify-center rounded-md bg-[#3A7BD5] text-white shadow-sm transition hover:bg-[#2F67B8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3A7BD5] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#3A7BD5] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#2F67B8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3A7BD5] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={suggestingDose || associationLocked}
                 onClick={() => void suggestDose()}
                 title={labels.supplements.suggestDose}
                 type="button"
               >
-                <SparklesIcon
-                  aria-hidden={true}
-                  className={classNames(
-                    "size-5",
-                    suggestingDose ? "animate-pulse" : ""
-                  )}
-                />
+                {labels.supplements.suggestDose}
               </button>
               {suggestingDose ? (
                 <p className="text-sm font-medium text-[#3A7BD5]">

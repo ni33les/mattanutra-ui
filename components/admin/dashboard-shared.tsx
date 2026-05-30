@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRightStartOnRectangleIcon } from "@heroicons/react/24/outline";
 import { HealthspanLogo } from "@/components/healthspan-logo";
 import { adminDashboardFilterEntries, type AdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import type { AdminTaskVisibilityRow } from "@/lib/admin-execution";
@@ -420,7 +419,7 @@ export function AdminLogoutButton({
     <button
       aria-label={label}
       className={classNames(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-md bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-wait disabled:opacity-70",
+        "inline-flex h-10 items-center justify-center rounded-md bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-wait disabled:opacity-70",
         adminLocaleTextClass(locale, "label")
       )}
       disabled={loggingOut}
@@ -428,8 +427,7 @@ export function AdminLogoutButton({
       title={label}
       type="button"
     >
-      <ArrowRightStartOnRectangleIcon aria-hidden={true} className="size-5" />
-      <span className="hidden sm:inline">{label}</span>
+      <span>{label}</span>
     </button>
   );
 }

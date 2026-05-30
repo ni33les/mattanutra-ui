@@ -3,9 +3,12 @@ import {
   adminCookieOptions,
   adminCsrfCookieName,
   adminSessionCookieName,
+  addAdminMembership,
   clientAdminSessionContext,
   createAdminInvitation,
   createOrganisation,
+  deleteAdminInvitation,
+  deleteAdminMembership,
   getAdminAccessData,
   legacyAdminContext,
   resolveAdminSession,
@@ -265,6 +268,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
 
+      if (
+        context.actorMembership.role !== "platform_owner" &&
+        context.actorMembership.role !== "platform_admin"
+      ) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
       const role = text(body.role);
 
       if (!isAdminRole(role)) {
@@ -282,8 +292,15 @@ export async function POST(request: NextRequest) {
       return accessResponse(request, context, invitationResult);
     }
 
-    if (action === "update_membership") {
+    if (action === "add_membership") {
       if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      if (
+        context.actorMembership.role !== "platform_owner" &&
+        context.actorMembership.role !== "platform_admin"
+      ) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
 
@@ -298,6 +315,51 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid status" }, { status: 400 });
       }
 
+      const addResult = await addAdminMembership({
+        actor: context,
+        organisationId: text(body.organisationId),
+        personId: text(body.personId),
+        role,
+        status
+      });
+
+      return accessResponse(request, context, addResult);
+    }
+
+    if (action === "delete_invitation") {
+      if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      await deleteAdminInvitation({
+        actor: context,
+        invitationId: text(body.invitationId)
+      });
+
+      return accessResponse(request, context, { invitationDeleted: true });
+    }
+
+    if (action === "update_membership") {
+      if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const role = text(body.role);
+      const status = text(body.status);
+
+      if (!isAdminRole(role)) {
+        return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+      }
+
+      if (
+        status !== "active" &&
+        status !== "deleted" &&
+        status !== "disabled" &&
+        status !== "invited"
+      ) {
+        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      }
+
       await updateMembershipRole({
         actor: context,
         membershipId: text(body.membershipId),
@@ -305,7 +367,24 @@ export async function POST(request: NextRequest) {
         status
       });
 
-      return accessResponse(request, context);
+      return accessResponse(
+        request,
+        context,
+        status === "deleted" ? { membershipDeleted: true } : {}
+      );
+    }
+
+    if (action === "delete_membership") {
+      if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      await deleteAdminMembership({
+        actor: context,
+        membershipId: text(body.membershipId)
+      });
+
+      return accessResponse(request, context, { membershipDeleted: true });
     }
 
     if (action === "assume_identity") {

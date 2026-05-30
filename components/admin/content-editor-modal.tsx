@@ -8,7 +8,7 @@ import {
   Select,
   Textarea,
 } from "@headlessui/react";
-import { PhotoIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { PhotoIcon } from "@heroicons/react/24/outline";
 import { ChevronDownIcon as ChevronDownSolidIcon } from "@heroicons/react/20/solid";
 import type { AdminContentInventoryRow } from "@/lib/admin-query-data";
 import {
@@ -245,11 +245,11 @@ export function ContentEditorModal({
           </div>
           <button
             aria-label={labels.contentPages.cancel}
-            className="inline-flex size-9 items-center justify-center rounded-md bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-900 focus:outline-2 focus:outline-offset-2 focus:outline-[#1FA77A]"
+            className="inline-flex items-center justify-center rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-2 focus:outline-offset-2 focus:outline-[#1FA77A]"
             onClick={onClose}
             type="button"
           >
-            <XMarkIcon aria-hidden="true" className="size-5" />
+            {labels.contentPages.cancel}
           </button>
         </div>
 

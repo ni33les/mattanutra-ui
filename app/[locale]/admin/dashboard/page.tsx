@@ -7,9 +7,11 @@ import {
   adminSessionCookieName,
   clientAdminSessionContext,
   getAdminAccessData,
+  getAdminSettingsData,
   legacyAdminContext,
   resolveAdminSession,
-  type AdminAccessData
+  type AdminAccessData,
+  type AdminSettingsData
 } from "@/lib/admin-access";
 import {
   emptyAdminDashboardData,
@@ -182,6 +184,7 @@ export default async function LocalizedAdminDashboardPage({
   let productsData = emptyAdminProductsData();
   let recommendationInsightsData = emptyAdminRecommendationInsightsData(range);
   let reviewQueueData = emptyAdminReviewQueueData();
+  let settingsData: AdminSettingsData | null = null;
   let supplementsData = emptyAdminSupplementsData();
   let visibilityData = emptyVisibilityData();
 
@@ -189,10 +192,13 @@ export default async function LocalizedAdminDashboardPage({
     view === "access" ||
     view === "access-agents" ||
     view === "audit" ||
+    view === "memberships" ||
     view === "organisations" ||
     view === "people"
   ) {
     accessData = await getAdminAccessData(adminContext);
+  } else if (view === "settings") {
+    settingsData = await getAdminSettingsData(adminContext);
   } else if (view === "glance") {
     data = await getAdminDashboardData(range, filters);
     flowData = await getAdminFlowData(range, filters);
@@ -263,6 +269,7 @@ export default async function LocalizedAdminDashboardPage({
       reviewQueueData={reviewQueueData}
       selectedReviewTaskId={selectedReviewTaskId}
       selectedTaskId={selectedTaskId}
+      settingsData={settingsData}
       supplementsData={supplementsData}
       visibilityData={visibilityData}
       view={view}

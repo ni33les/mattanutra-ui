@@ -21,7 +21,7 @@ test("admin dashboard has a registry-driven locale switcher that preserves dashb
   assert.match(dashboard, /<AdminLocaleSwitcher/);
 });
 
-test("admin access management exposes people, organisations, agents, and audit as separate tabs", () => {
+test("admin access management exposes people, organisations, memberships, agents, and audit as separate tabs", () => {
   const content = source("components/admin/dashboard-content.tsx");
   const dashboard = source("components/admin-dashboard.tsx");
   const accessView = source("components/admin/access-view.tsx");
@@ -30,25 +30,114 @@ test("admin access management exposes people, organisations, agents, and audit a
   assert.doesNotMatch(content, /name: "Access", view: "access"/);
   assert.doesNotMatch(content, /name: "สิทธิ์เข้าถึง", view: "access"/);
   assert.doesNotMatch(zh, /"name": "访问",\s*"view": "access"/);
-  assert.match(content, /name: "People", view: "people"/);
   assert.match(content, /name: "Organisations", view: "organisations"/);
+  assert.match(content, /name: "People", view: "people"/);
+  assert.match(content, /name: "Memberships", view: "memberships"/);
   assert.match(content, /name: "Agents", view: "access-agents"/);
   assert.match(content, /name: "Audit", view: "audit"/);
   assert.match(content, /name: "Settings", view: "settings"/);
+  assert.match(
+    content,
+    /administration: \[\s*\{ icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" \},\s*\{ icon: UserGroupIcon, name: "Memberships", view: "memberships" \},\s*\{ icon: UserGroupIcon, name: "People", view: "people" \}/
+  );
+  assert.match(
+    zh,
+    /"administration": \[\s*\{\s*"name": "组织",\s*"view": "organisations"\s*\},\s*\{\s*"name": "成员关系",\s*"view": "memberships"\s*\},\s*\{\s*"name": "人员",\s*"view": "people"/
+  );
   assert.match(dashboard, /view === "access-agents"/);
   assert.match(dashboard, /view === "audit"/);
+  assert.match(dashboard, /view === "memberships"/);
   assert.match(dashboard, /view === "settings"/);
   assert.match(accessView, /view === "access-agents"/);
   assert.match(accessView, /view === "audit"/);
+  assert.match(accessView, /view === "memberships"/);
+  assert.match(accessView, /action: "delete_invitation"/);
+  assert.match(accessView, /labels\.access\.deleteInvitation/);
+  assert.match(accessView, /labels\.access\.addMembership/);
+  assert.match(accessView, /labels\.access\.addOrganisation/);
+  assert.match(accessView, /labels\.access\.deleted/);
+  assert.match(accessView, /<option value="deleted">\{labels\.access\.deleted\}<\/option>/);
+  assert.match(accessView, /labels\.contentPages\.deleteAction/);
+  assert.doesNotMatch(accessView, /action: "delete_membership"/);
+  assert.doesNotMatch(accessView, /labels\.access\.deleteMembership/);
+  assert.match(accessView, /labels\.access\.expiresAt/);
+  assert.match(accessView, /labels\.access\.status/);
+  assert.match(accessView, /labels\.contentPages\.actions/);
+  assert.match(accessView, /visibleInvitations/);
+  assert.match(accessView, /invite\.status === "pending" \|\| invite\.status === "expired"/);
+  assert.match(accessView, /setInvitePersonOpen/);
+  assert.match(accessView, /labels\.access\.invitePerson/);
+  assert.doesNotMatch(accessView, /<form onSubmit=\{invitePerson\} className="grid gap-3"/);
+  assert.match(accessView, /membership\.id === context\.actorMembership\.id/);
+  assert.match(accessView, /membership\.id === context\.effectiveMembership\.id/);
+  assert.match(accessView, /membership\.status === "active"/);
+  assert.match(accessView, /!membershipIsActiveSession/);
+  assert.doesNotMatch(accessView, /membership\.personId !== context\.actorPerson\.id/);
+  assert.match(accessView, /function actionButtonClass/);
+  assert.match(accessView, /action: "add_membership"/);
+  assert.match(accessView, /setAddMembershipOpen/);
+  assert.match(accessView, /setCreateOrganisationOpen/);
+  assert.match(accessView, /<AdminModal/);
+  assert.doesNotMatch(accessView, /className="mt-5 grid gap-3 border-t border-gray-100 pt-5 sm:grid-cols-2"/);
+  assert.doesNotMatch(accessView, /className="mb-5 grid gap-3 rounded-lg bg-gray-50 p-3 ring-1 ring-gray-100/);
+  assert.match(accessView, /filteredMemberships/);
+  assert.match(accessView, /canFilterMembershipOrganisations/);
+  assert.match(accessView, /context\.effectiveOrganisation\.type === "platform"/);
+  assert.match(accessView, /labels\.access\.filterByOrganisation/);
+  assert.match(accessView, /setMembershipFilterOrganisationId/);
+  assert.match(accessView, /setMembershipOrganisationId/);
+  assert.match(accessView, /const membershipFormId = `membership-form-\$\{membership\.id\}`/);
+  assert.match(accessView, /form=\{membershipFormId\}/);
+  assert.match(accessView, /labels\.access\.filterByPerson/);
+  assert.match(accessView, /setAuditPersonId/);
+});
+
+test("admin action buttons render as text buttons without decorative action icons", () => {
+  const files = [
+    "components/admin-dashboard.tsx",
+    "components/admin/dashboard-shared.tsx",
+    "components/admin/access-view.tsx",
+    "components/admin/ui.tsx",
+    "components/admin/safety-views.tsx",
+    "components/admin/product-import-review-modal.tsx",
+    "components/admin/marketing-leads.tsx",
+    "components/admin/visibility-view.tsx",
+    "components/admin/product-view-ui.tsx",
+    "components/admin/plan-safety-review-modal.tsx",
+    "components/admin/supplement-view.tsx",
+    "components/admin/supplement-create-modal.tsx",
+    "components/admin/financials-view.tsx",
+    "components/admin/product-view.tsx",
+    "components/admin/content-editor-modal.tsx"
+  ];
+
+  for (const file of files) {
+    const text = source(file);
+
+    assert.doesNotMatch(
+      text,
+      /ArrowPathIcon|ArrowRightStartOnRectangleIcon|Bars3Icon|BuildingOffice2Icon|KeyIcon|PlusIcon|SparklesIcon|TrashIcon|UserGroupIcon|XMarkIcon/,
+      file
+    );
+  }
 });
 
 test("admin settings owns profile and logout controls", () => {
   const dashboard = source("components/admin-dashboard.tsx");
+  const page = source("app/[locale]/admin/dashboard/page.tsx");
+  const rbac = source("lib/admin-rbac.ts");
+  const route = source("app/api/admin/settings/route.ts");
   const settingsView = source("components/admin/settings-view.tsx");
 
   assert.doesNotMatch(dashboard, /AdminLogoutButton/);
+  assert.match(dashboard, /settingsData=\{settingsData\}/);
+  assert.match(page, /getAdminSettingsData\(adminContext\)/);
+  assert.match(rbac, /pathname\.startsWith\("\/api\/admin\/settings"\)/);
+  assert.match(route, /updateEffectiveOrganisationSettings/);
   assert.match(settingsView, /AdminLogoutButton/);
   assert.match(settingsView, /action: "update_self"/);
+  assert.match(settingsView, /action: "update_organisation"/);
+  assert.match(settingsView, /showRetailPeople/);
   assert.match(settingsView, /labels\.settings\.profile/);
   assert.match(settingsView, /labels\.settings\.account/);
 });

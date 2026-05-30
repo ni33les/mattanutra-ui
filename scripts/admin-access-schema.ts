@@ -44,7 +44,7 @@ create table if not exists public.organisation_memberships (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint organisation_memberships_status_check check (status in ('active', 'disabled', 'invited')),
+  constraint organisation_memberships_status_check check (status in ('active', 'deleted', 'disabled', 'invited')),
   constraint organisation_memberships_role_check check (role in (
     'platform_owner',
     'platform_admin',
@@ -149,6 +149,22 @@ create unique index if not exists admin_invitations_token_idx
 
 create index if not exists admin_invitations_org_status_idx
   on public.admin_invitations (organisation_id, status, created_at desc);
+
+alter table public.organisation_memberships
+  drop constraint if exists organisation_memberships_status_check;
+
+update public.organisation_memberships
+set status = 'deleted'
+where metadata ? 'deletedAt'
+  and status <> 'deleted';
+
+alter table public.organisation_memberships
+  add constraint organisation_memberships_status_check check (status in (
+    'active',
+    'deleted',
+    'disabled',
+    'invited'
+  ));
 
 alter table public.organisation_memberships
   drop constraint if exists organisation_memberships_role_check;

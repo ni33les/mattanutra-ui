@@ -2,7 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 import { UserCircleIcon } from "@heroicons/react/24/outline";
-import type { AdminClientSessionContext } from "@/lib/admin-access";
+import type {
+  AdminClientSessionContext,
+  AdminSettingsData
+} from "@/lib/admin-access";
+import type { AdminRole } from "@/lib/admin-rbac";
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 import type { AdminContent } from "@/components/admin/dashboard-content";
 import {
@@ -14,11 +18,48 @@ import {
 type SaveProfileResponse = Readonly<{
   error?: string;
   session?: AdminClientSessionContext;
+  settingsData?: AdminSettingsData;
   updated?: boolean;
 }>;
 
-async function saveProfile(body: Record<string, unknown>) {
-  const response = await fetch("/api/admin/access", {
+const roleLabels = {
+  en: {
+    platform_owner: "Platform Owner",
+    platform_admin: "Platform Admin",
+    retail_admin: "Retail Admin",
+    retail_agent: "Retail Agent",
+    retail_assistant: "Retail Assistant"
+  },
+  th: {
+    platform_owner: "เจ้าของแพลตฟอร์ม",
+    platform_admin: "แอดมินแพลตฟอร์ม",
+    retail_admin: "แอดมินร้านค้า",
+    retail_agent: "เอเจนต์ร้านค้า",
+    retail_assistant: "ผู้ช่วยร้านค้า"
+  },
+  "zh-CN": {
+    platform_owner: "平台所有者",
+    platform_admin: "平台管理员",
+    retail_admin: "零售管理员",
+    retail_agent: "零售代理",
+    retail_assistant: "零售助理"
+  }
+} satisfies Record<Locale, Record<AdminRole, string>>;
+
+function statusLabel(labels: AdminContent, status: string) {
+  if (status === "active") {
+    return labels.access.active;
+  }
+
+  if (status === "disabled") {
+    return labels.access.disabled;
+  }
+
+  return labels.access.pending;
+}
+
+async function saveSettings(body: Record<string, unknown>) {
+  const response = await fetch("/api/admin/settings", {
     body: JSON.stringify(body),
     credentials: "same-origin",
     headers: {
@@ -38,21 +79,48 @@ async function saveProfile(body: Record<string, unknown>) {
 export function AdminSettingsView({
   context,
   labels,
-  locale
+  locale,
+  settingsData: initialSettingsData
 }: Readonly<{
   context: AdminClientSessionContext;
   labels: AdminContent;
   locale: Locale;
+  settingsData: AdminSettingsData | null;
 }>) {
   const [session, setSession] = useState(context);
+  const [settingsData, setSettingsData] = useState(initialSettingsData);
   const [displayName, setDisplayName] = useState(context.actorPerson.displayName);
   const [preferredLocale, setPreferredLocale] = useState<Locale>(
     context.actorPerson.preferredLocale
+  );
+  const [organisationName, setOrganisationName] = useState(
+    initialSettingsData?.organisation.name ?? ""
+  );
+  const [organisationLocale, setOrganisationLocale] = useState<Locale>(
+    initialSettingsData?.organisation.defaultLocale ?? "en"
   );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const canSave = !session.isLegacy;
+  const canEditOrganisation =
+    canSave && Boolean(settingsData?.canEditOrganisation);
+  const showRetailPeople =
+    session.effectiveOrganisation.type === "tenant" &&
+    session.effectiveMembership.role === "retail_admin" &&
+    Boolean(settingsData);
+
+  function applyResult(result: SaveProfileResponse) {
+    if (result.session) {
+      setSession(result.session);
+    }
+
+    if (result.settingsData) {
+      setSettingsData(result.settingsData);
+      setOrganisationName(result.settingsData.organisation.name);
+      setOrganisationLocale(result.settingsData.organisation.defaultLocale);
+    }
+  }
 
   async function submitProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,16 +134,40 @@ export function AdminSettingsView({
     setError("");
 
     try {
-      const result = await saveProfile({
+      const result = await saveSettings({
         action: "update_self",
         displayName,
         preferredLocale
       });
 
-      if (result.session) {
-        setSession(result.session);
-      }
+      applyResult(result);
+      setMessage(labels.settings.saved);
+    } catch {
+      setError(labels.settings.saveError);
+    } finally {
+      setBusy(false);
+    }
+  }
 
+  async function submitOrganisation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canEditOrganisation) {
+      return;
+    }
+
+    setBusy(true);
+    setMessage("");
+    setError("");
+
+    try {
+      const result = await saveSettings({
+        action: "update_organisation",
+        defaultLocale: organisationLocale,
+        name: organisationName
+      });
+
+      applyResult(result);
       setMessage(labels.settings.saved);
     } catch {
       setError(labels.settings.saveError);
@@ -164,6 +256,66 @@ export function AdminSettingsView({
         </form>
       </section>
 
+      {settingsData ? (
+        <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+          <h2
+            className={classNames(
+              "text-base font-semibold text-gray-900",
+              adminLocaleTextClass(locale, "heading")
+            )}
+          >
+            {labels.access.organisation}
+          </h2>
+          <form className="mt-5 grid gap-4" onSubmit={submitOrganisation}>
+            <label className="grid gap-1 text-xs font-semibold text-gray-500">
+              {labels.access.name}
+              <input
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
+                disabled={!canEditOrganisation || busy}
+                onChange={(event) => setOrganisationName(event.target.value)}
+                required={true}
+                value={organisationName}
+              />
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-gray-500">
+              {labels.access.defaultLocale}
+              <select
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
+                disabled={!canEditOrganisation || busy}
+                onChange={(event) => setOrganisationLocale(event.target.value as Locale)}
+                value={organisationLocale}
+              >
+                {publicLocales.map((localeCode) => (
+                  <option key={localeCode} value={localeCode}>
+                    {localeLabels[localeCode]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grid gap-1 text-xs font-semibold text-gray-500">
+              {labels.access.slug}
+              <div className="rounded-md bg-gray-50 px-3 py-2 text-sm font-normal text-gray-600 ring-1 ring-inset ring-gray-200">
+                {settingsData.organisation.slug}
+              </div>
+            </div>
+            {canEditOrganisation ? (
+              <div>
+                <button
+                  className={classNames(
+                    "inline-flex items-center justify-center rounded-md bg-[#20343A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#16252A] disabled:cursor-not-allowed disabled:opacity-60",
+                    adminLocaleTextClass(locale, "label")
+                  )}
+                  disabled={busy}
+                  type="submit"
+                >
+                  {labels.settings.save}
+                </button>
+              </div>
+            ) : null}
+          </form>
+        </section>
+      ) : null}
+
       <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
         <h2
           className={classNames(
@@ -180,6 +332,47 @@ export function AdminSettingsView({
           <AdminLogoutButton label={labels.logout} locale={locale} />
         </div>
       </section>
+
+      {showRetailPeople && settingsData ? (
+        <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200 xl:col-span-2">
+          <h2
+            className={classNames(
+              "text-base font-semibold text-gray-900",
+              adminLocaleTextClass(locale, "heading")
+            )}
+          >
+            {labels.access.people}
+          </h2>
+          <div className="mt-5 overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead>
+                <tr className="text-left text-xs font-semibold text-gray-500">
+                  <th className="py-2 pr-4">{labels.access.name}</th>
+                  <th className="py-2 pr-4">{labels.access.email}</th>
+                  <th className="py-2 pr-4">{labels.access.role}</th>
+                  <th className="py-2 pr-4">{labels.access.status}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {settingsData.people.map((person) => (
+                  <tr key={person.id}>
+                    <td className="py-3 pr-4 font-medium text-gray-900">
+                      {person.displayName}
+                    </td>
+                    <td className="py-3 pr-4 text-gray-600">{person.email}</td>
+                    <td className="py-3 pr-4 text-gray-600">
+                      {roleLabels[locale][person.role]}
+                    </td>
+                    <td className="py-3 pr-4 text-gray-600">
+                      {statusLabel(labels, person.membershipStatus)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

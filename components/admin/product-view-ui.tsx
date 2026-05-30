@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { XMarkIcon } from "@heroicons/react/24/outline";
 import type { AdminProductRow } from "@/lib/admin-products";
 import {
   adminLocalizedFallbackLabel,
@@ -121,12 +120,12 @@ export function ProductCountryManager({
             {productCountryLabel(countryCode)}
             <button
               aria-label={`${removeLabel}: ${productCountryLabel(countryCode)}`}
-              className="rounded-full p-0.5 text-emerald-500 hover:bg-emerald-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full px-1.5 py-0.5 text-[0.65rem] font-semibold text-emerald-600 ring-1 ring-emerald-100 hover:bg-emerald-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={countryCodes.length <= 1}
               onClick={() => onRemove(countryCode)}
               type="button"
             >
-              <XMarkIcon aria-hidden={true} className="size-3.5" />
+              {removeLabel}
             </button>
           </span>
         ))}

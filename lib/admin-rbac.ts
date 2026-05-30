@@ -69,7 +69,7 @@ const allPermissions = [
 export const adminRolePermissions = {
   platform_owner: allPermissions,
   platform_admin: allPermissions,
-  retail_admin: ["access.read", "access.write", "settings.read"],
+  retail_admin: ["settings.read"],
   retail_agent: ["settings.read"],
   retail_assistant: ["settings.read"]
 } as const satisfies Record<AdminRole, readonly AdminPermission[]>;
@@ -146,6 +146,7 @@ const adminViews = [
   "supplement-insights",
   "visibility",
   "people",
+  "memberships",
   "organisations",
   "access-agents",
   "audit",
@@ -179,6 +180,7 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
     view === "access" ||
     view === "access-agents" ||
     view === "audit" ||
+    view === "memberships" ||
     view === "organisations" ||
     view === "people"
   ) {
@@ -262,6 +264,12 @@ export function permissionForAdminRequest(
 
   if (pathname.startsWith("/api/admin/auth/")) {
     return null;
+  }
+
+  if (
+    pathname.startsWith("/api/admin/settings")
+  ) {
+    return "settings.read";
   }
 
   if (

@@ -5,7 +5,7 @@ import type {
   AdminRole
 } from "@/lib/admin-rbac";
 
-export type AdminAccessStatus = "active" | "disabled" | "invited";
+export type AdminAccessStatus = "active" | "deleted" | "disabled" | "invited";
 
 export type AdminOrganisation = Readonly<{
   defaultLocale: Locale;
@@ -86,6 +86,23 @@ export type AdminAccessData = Readonly<{
   people: AdminPerson[];
   roleLabels: Record<AdminRole, string>;
   roles: AdminRole[];
+}>;
+
+export type AdminSettingsPerson = Readonly<{
+  displayName: string;
+  email: string;
+  id: string;
+  membershipStatus: AdminAccessStatus;
+  preferredLocale: Locale;
+  role: AdminRole;
+  status: AdminAccessStatus;
+  title: string | null;
+}>;
+
+export type AdminSettingsData = Readonly<{
+  canEditOrganisation: boolean;
+  organisation: AdminOrganisation;
+  people: AdminSettingsPerson[];
 }>;
 
 export type AdminSessionContext = Readonly<{

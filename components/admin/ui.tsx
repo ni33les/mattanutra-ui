@@ -11,7 +11,6 @@ import {
   DialogPanel,
   DialogTitle
 } from "@headlessui/react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
 
 type AdminModalSize = "sm" | "md" | "lg" | "xl" | "2xl";
 
@@ -80,12 +79,12 @@ export function AdminModal({
                 </div>
                 <button
                   aria-label={closeLabel}
-                  className="rounded-md p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md px-3 py-1.5 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={closeDisabled}
                   onClick={onClose}
                   type="button"
                 >
-                  <XMarkIcon aria-hidden={true} className="size-5" />
+                  {closeLabel}
                 </button>
               </div>
             ) : (

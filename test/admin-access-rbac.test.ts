@@ -37,6 +37,7 @@ describe("admin RBAC", () => {
     assert.ok(adminDashboardViews.includes("access"));
     assert.ok(adminDashboardViews.includes("access-agents"));
     assert.ok(adminDashboardViews.includes("audit"));
+    assert.ok(adminDashboardViews.includes("memberships"));
     assert.ok(adminDashboardViews.includes("settings"));
 
     for (const view of adminDashboardViews) {
@@ -56,25 +57,30 @@ describe("admin RBAC", () => {
     assert.equal(adminViewAllowed(principal, "access"), false);
     assert.equal(adminViewAllowed(principal, "access-agents"), false);
     assert.equal(adminViewAllowed(principal, "audit"), false);
+    assert.equal(adminViewAllowed(principal, "memberships"), false);
     assert.equal(adminViewAllowed(principal, "financials"), false);
     assert.equal(adminViewAllowed(principal, "products"), false);
     assert.equal(adminViewAllowed(principal, "visibility"), false);
     assert.equal(firstAllowedAdminView(principal), "settings");
   });
 
-  it("lets retail admins manage scoped access without opening global operating views", () => {
+  it("limits retail admins to settings while keeping organisation people visible there", () => {
     const principal = {
       permissions: permissionsForRole("retail_admin"),
       role: "retail_admin" as const
     };
 
-    assert.equal(adminViewAllowed(principal, "people"), true);
-    assert.equal(adminViewAllowed(principal, "organisations"), true);
     assert.equal(adminViewAllowed(principal, "settings"), true);
+    assert.equal(adminViewAllowed(principal, "people"), false);
+    assert.equal(adminViewAllowed(principal, "memberships"), false);
+    assert.equal(adminViewAllowed(principal, "organisations"), false);
+    assert.equal(adminViewAllowed(principal, "access"), false);
+    assert.equal(adminViewAllowed(principal, "access-agents"), false);
+    assert.equal(adminViewAllowed(principal, "audit"), false);
     assert.equal(adminViewAllowed(principal, "financials"), false);
     assert.equal(adminViewAllowed(principal, "products"), false);
     assert.equal(adminViewAllowed(principal, "visibility"), false);
-    assert.equal(firstAllowedAdminView(principal), "people");
+    assert.equal(firstAllowedAdminView(principal), "settings");
   });
 
   it("limits assignable roles to platform owner/admin and retail org roles", () => {
@@ -124,6 +130,7 @@ describe("admin RBAC", () => {
   it("maps admin access APIs to access permissions while leaving passkey auth public", () => {
     assert.equal(permissionForAdminRequest("GET", "/api/admin/auth/session"), null);
     assert.equal(permissionForAdminRequest("POST", "/api/admin/auth/logout"), null);
+    assert.equal(permissionForAdminRequest("POST", "/api/admin/settings"), "settings.read");
     assert.equal(permissionForAdminRequest("GET", "/api/admin/access"), "access.read");
     assert.equal(permissionForAdminRequest("POST", "/api/admin/access"), "access.write");
     assert.equal(
@@ -161,9 +168,77 @@ describe("admin RBAC", () => {
     assert.match(access, /context\.effectiveOrganisation\.id/);
     assert.match(access, /Retail admins can only invite people to their own organisation/);
     assert.match(access, /Retail admins can only update memberships in their own organisation/);
+    assert.match(access, /Retail admins can only delete memberships in their own organisation/);
+    assert.match(access, /Retail admins can only delete invites in their own organisation/);
     assert.match(route, /getAdminAccessData\(context\)/);
     assert.match(page, /getAdminAccessData\(adminContext\)/);
     assert.match(route, /context\.effectiveOrganisation\.type !== "platform"/);
+  });
+
+  it("keeps retail organisation settings separate from platform-only invites", () => {
+    const access = readFileSync("lib/admin-access.ts", "utf8");
+    const accessRoute = readFileSync("app/api/admin/access/route.ts", "utf8");
+    const settingsRoute = readFileSync("app/api/admin/settings/route.ts", "utf8");
+    const settingsView = readFileSync("components/admin/settings-view.tsx", "utf8");
+
+    assert.match(access, /export async function getAdminSettingsData/);
+    assert.match(access, /export async function updateEffectiveOrganisationSettings/);
+    assert.match(access, /context\.effectiveMembership\.role !== "retail_admin"/);
+    assert.match(accessRoute, /context\.actorMembership\.role !== "platform_owner"/);
+    assert.match(accessRoute, /context\.actorMembership\.role !== "platform_admin"/);
+    assert.match(settingsRoute, /hasAdminPermission\(context, "settings\.read"\)/);
+    assert.match(settingsRoute, /action === "update_organisation"/);
+    assert.match(settingsView, /showRetailPeople/);
+    assert.match(settingsView, /settingsData\.people\.map/);
+    assert.match(settingsView, /fetch\("\/api\/admin\/settings"/);
+  });
+
+  it("expires and deletes pending admin invitations before they can be accepted", () => {
+    const access = readFileSync("lib/admin-access.ts", "utf8");
+    const route = readFileSync("app/api/admin/access/route.ts", "utf8");
+
+    assert.match(access, /function expirePendingAdminInvitations/);
+    assert.match(access, /const inviteDays = 7/);
+    assert.match(access, /set status = 'expired', updated_at = now\(\)/);
+    assert.match(access, /export async function deleteAdminInvitation/);
+    assert.match(access, /status in \('pending', 'expired'\)/);
+    assert.match(access, /set status = 'revoked', updated_at = now\(\)/);
+    assert.match(access, /Registration invite expired or was deleted/);
+    assert.match(route, /action === "delete_invitation"/);
+    assert.match(route, /deleteAdminInvitation/);
+  });
+
+  it("soft deletes memberships with active-session and platform-owner safeguards", () => {
+    const access = readFileSync("lib/admin-access.ts", "utf8");
+    const route = readFileSync("app/api/admin/access/route.ts", "utf8");
+    const schema = readFileSync("scripts/admin-access-schema.ts", "utf8");
+    const view = readFileSync("components/admin/access-view.tsx", "utf8");
+
+    assert.match(access, /export async function addAdminMembership/);
+    assert.match(access, /Retail admins can only add memberships in their own organisation/);
+    assert.match(route, /action === "add_membership"/);
+    assert.match(route, /addAdminMembership/);
+    assert.match(view, /labels\.access\.addMembership/);
+    assert.match(view, /<option value="deleted">\{labels\.access\.deleted\}<\/option>/);
+    assert.doesNotMatch(view, /labels\.access\.deleteMembership/);
+    assert.match(access, /export async function deleteAdminMembership/);
+    assert.match(access, /if \(status === "deleted"\)/);
+    assert.match(access, /status = 'deleted'/);
+    assert.match(access, /status <> 'deleted'/);
+    assert.match(access, /'deletedAt', now\(\)/);
+    assert.match(access, /'deletedStatus', status/);
+    assert.match(access, /metadata \? 'deletedAt'/);
+    assert.doesNotMatch(access, /delete from public\.organisation_memberships/);
+    assert.match(schema, /organisation_memberships_status_check check \(status in \('active', 'deleted', 'disabled', 'invited'\)\)/);
+    assert.match(schema, /set status = 'deleted'\s+where metadata \? 'deletedAt'/);
+    assert.match(access, /You cannot delete the active session membership/);
+    assert.match(access, /Platform Admin cannot change Platform Owner access/);
+    assert.match(access, /At least one active Platform Owner membership is required/);
+    assert.match(access, /action: "admin\.membership_deleted"/);
+    assert.match(route, /status !== "deleted"/);
+    assert.match(route, /action === "delete_membership"/);
+    assert.match(route, /deleteAdminMembership/);
+    assert.match(route, /membershipDeleted: true/);
   });
 
   it("stores admin access metadata as JSON objects, not encoded JSON strings", () => {

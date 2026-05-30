@@ -42,6 +42,7 @@ export type AdminDashboardView =
   | "flow"
   | "glance"
   | "leads"
+  | "memberships"
   | "organisations"
   | "people"
   | "product-insights"
@@ -224,10 +225,15 @@ export type AdminContent = Readonly<{
   };
   access: {
     accessControl: string;
+    accepted: string;
     active: string;
     actor: string;
+    addMembership: string;
+    addOrganisation: string;
     agents: string;
     alreadyMember: string;
+    allOrganisations: string;
+    allPeople: string;
     assume: string;
     assumed: string;
     audit: string;
@@ -235,16 +241,25 @@ export type AdminContent = Readonly<{
     create: string;
     createOrganisation: string;
     defaultLocale: string;
+    deleted: string;
+    deleteInvitation: string;
+    deleteMembership: string;
     disabled: string;
     email: string;
     error: string;
+    expired: string;
+    expiresAt: string;
+    filterByOrganisation: string;
+    filterByPerson: string;
     invite: string;
     inactivePerson: string;
     invitePerson: string;
     inviteUrl: string;
     invitations: string;
+    invitationDeleted: string;
     memberships: string;
     membershipAdded: string;
+    membershipDeleted: string;
     name: string;
     organisation: string;
     organisations: string;
@@ -253,6 +268,7 @@ export type AdminContent = Readonly<{
     platform: string;
     preferredLocale: string;
     role: string;
+    revoked: string;
     save: string;
     session: string;
     slug: string;
@@ -672,10 +688,15 @@ const baseContent = {
     },
     access: {
       accessControl: "Access control",
+      accepted: "Accepted",
       active: "Active",
       actor: "Signed in as",
+      addMembership: "Add membership",
+      addOrganisation: "Add Organisation",
       agents: "Agents",
       alreadyMember: "This person already belongs to that organisation. Use Memberships to change their role or status.",
+      allOrganisations: "All organisations",
+      allPeople: "All people",
       assume: "Assume",
       assumed: "Viewing as",
       audit: "Audit",
@@ -683,16 +704,25 @@ const baseContent = {
       create: "Create",
       createOrganisation: "Create retailer",
       defaultLocale: "Default language",
+      deleted: "Deleted",
+      deleteInvitation: "Delete invite",
+      deleteMembership: "Delete membership",
       disabled: "Disabled",
       email: "Email",
       error: "Could not update access controls.",
+      expired: "Expired",
+      expiresAt: "Expires",
+      filterByOrganisation: "Filter by organisation",
+      filterByPerson: "Filter by person",
       invite: "Invite",
       inactivePerson: "This person already exists but is not active. Update their person record before adding access.",
       invitePerson: "Invite person",
       inviteUrl: "Invite link",
       invitations: "Invitations",
+      invitationDeleted: "Invite deleted.",
       memberships: "Memberships",
       membershipAdded: "Existing person found. Organisation access was added without creating a new passkey invite.",
+      membershipDeleted: "Membership deleted.",
       name: "Name",
       organisation: "Organisation",
       organisations: "Organisations",
@@ -701,6 +731,7 @@ const baseContent = {
       platform: "Platform",
       preferredLocale: "Preferred language",
       role: "Role",
+      revoked: "Revoked",
       save: "Save",
       session: "Session",
       slug: "Slug",
@@ -867,8 +898,9 @@ const baseContent = {
     ],
     marketingTitle: "Marketing",
     administration: [
-      { icon: UserGroupIcon, name: "People", view: "people" },
       { icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" },
+      { icon: UserGroupIcon, name: "Memberships", view: "memberships" },
+      { icon: UserGroupIcon, name: "People", view: "people" },
       { icon: CpuChipIcon, name: "Agents", view: "access-agents" },
       { icon: ClipboardDocumentListIcon, name: "Audit", view: "audit" },
       { icon: Cog6ToothIcon, name: "Settings", view: "settings" }
@@ -913,6 +945,7 @@ const baseContent = {
       flow: "Conversions",
       glance: "Dashboard",
       leads: "Leads",
+      memberships: "Memberships",
       organisations: "Organisations",
       people: "People",
       "product-insights": "Product Insights",
@@ -1218,10 +1251,15 @@ const baseContent = {
     },
     access: {
       accessControl: "การควบคุมสิทธิ์",
+      accepted: "ตอบรับแล้ว",
       active: "ใช้งาน",
       actor: "เข้าสู่ระบบเป็น",
+      addMembership: "เพิ่มสมาชิก",
+      addOrganisation: "เพิ่มองค์กร",
       agents: "เอเจนต์",
       alreadyMember: "ผู้ใช้นี้อยู่ในองค์กรนี้แล้ว ใช้ส่วนสมาชิกเพื่อเปลี่ยนบทบาทหรือสถานะ",
+      allOrganisations: "ทุกองค์กร",
+      allPeople: "ผู้ใช้ทั้งหมด",
       assume: "สวมบทบาท",
       assumed: "กำลังดูเป็น",
       audit: "ประวัติ",
@@ -1229,16 +1267,25 @@ const baseContent = {
       create: "สร้าง",
       createOrganisation: "สร้างผู้ค้าปลีก",
       defaultLocale: "ภาษาเริ่มต้น",
+      deleted: "ลบแล้ว",
+      deleteInvitation: "ลบคำเชิญ",
+      deleteMembership: "ลบสมาชิก",
       disabled: "ปิดใช้งาน",
       email: "อีเมล",
       error: "ไม่สามารถอัปเดตสิทธิ์ได้",
+      expired: "หมดอายุ",
+      expiresAt: "หมดอายุ",
+      filterByOrganisation: "กรองตามองค์กร",
+      filterByPerson: "กรองตามผู้ใช้",
       invite: "เชิญ",
       inactivePerson: "ผู้ใช้นี้มีอยู่แล้วแต่ยังไม่ได้เปิดใช้งาน โปรดแก้ไขข้อมูลผู้ใช้ก่อนเพิ่มสิทธิ์",
       invitePerson: "เชิญผู้ใช้",
       inviteUrl: "ลิงก์เชิญ",
       invitations: "คำเชิญ",
+      invitationDeleted: "ลบคำเชิญแล้ว",
       memberships: "สมาชิก",
       membershipAdded: "พบผู้ใช้เดิมแล้ว เพิ่มสิทธิ์เข้าองค์กรโดยไม่สร้างคำเชิญ passkey ใหม่",
+      membershipDeleted: "ลบสมาชิกแล้ว",
       name: "ชื่อ",
       organisation: "องค์กร",
       organisations: "องค์กร",
@@ -1247,6 +1294,7 @@ const baseContent = {
       platform: "แพลตฟอร์ม",
       preferredLocale: "ภาษาที่ต้องการ",
       role: "บทบาท",
+      revoked: "ยกเลิกแล้ว",
       save: "บันทึก",
       session: "เซสชัน",
       slug: "Slug",
@@ -1413,8 +1461,9 @@ const baseContent = {
     ],
     marketingTitle: "การตลาด",
     administration: [
-      { icon: UserGroupIcon, name: "ผู้ใช้", view: "people" },
       { icon: BuildingOffice2Icon, name: "องค์กร", view: "organisations" },
+      { icon: UserGroupIcon, name: "สมาชิก", view: "memberships" },
+      { icon: UserGroupIcon, name: "ผู้ใช้", view: "people" },
       { icon: CpuChipIcon, name: "เอเจนต์", view: "access-agents" },
       { icon: ClipboardDocumentListIcon, name: "ประวัติ", view: "audit" },
       { icon: Cog6ToothIcon, name: "การตั้งค่า", view: "settings" }
@@ -1459,6 +1508,7 @@ const baseContent = {
       flow: "คอนเวอร์ชัน",
       glance: "แดชบอร์ด",
       leads: "ลีด",
+      memberships: "สมาชิก",
       organisations: "องค์กร",
       people: "ผู้ใช้",
       "product-insights": "ข้อมูลสินค้า",
