@@ -5,10 +5,13 @@ import nextEnv from "@next/env";
 nextEnv.loadEnvConfig(process.cwd());
 
 const port = Number(process.env.PORT || process.env.NEXT_PORT || 3000);
-const host = "127.0.0.1";
+const bindHost = process.env.PLATFORM_BIND_HOST || "0.0.0.0";
+const probeHost =
+  process.env.PLATFORM_PROBE_HOST ||
+  (bindHost === "0.0.0.0" || bindHost === "::" ? "127.0.0.1" : bindHost);
 const workerMode = process.env.PLATFORM_WORKER_MODE || "all";
 const workerApiBaseUrl =
-  process.env.PLATFORM_WORKER_API_BASE_URL || `http://${host}:${port}`;
+  process.env.PLATFORM_WORKER_API_BASE_URL || `http://127.0.0.1:${port}`;
 const startupTimeoutMs = Number(process.env.PLATFORM_STARTUP_TIMEOUT_MS || 120_000);
 const shutdownTimeoutMs = Number(process.env.PLATFORM_SHUTDOWN_TIMEOUT_MS || 25_000);
 
@@ -70,7 +73,7 @@ function startProcess(name, command, args, env = process.env) {
 
 function connectToPort() {
   return new Promise((resolve, reject) => {
-    const socket = net.connect({ host, port }, () => {
+    const socket = net.connect({ host: probeHost, port }, () => {
       socket.end();
       resolve();
     });
@@ -79,7 +82,7 @@ function connectToPort() {
     socket.once("error", reject);
     socket.once("timeout", () => {
       socket.destroy();
-      reject(new Error(`Timed out waiting for ${host}:${port}`));
+      reject(new Error(`Timed out waiting for ${probeHost}:${port}`));
     });
   });
 }
@@ -99,7 +102,7 @@ async function waitForWeb() {
   }
 
   throw new Error(
-    `Web server did not listen on ${host}:${port} within ${startupTimeoutMs}ms: ${
+    `Web server did not listen on ${probeHost}:${port} within ${startupTimeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : "unknown error"
     }`
   );
@@ -187,13 +190,15 @@ async function main() {
     "node_modules/next/dist/bin/next",
     "start",
     "-H",
-    host,
+    bindHost,
     "-p",
     String(port)
   ]);
   await waitForWeb();
 
-  console.log(`[platform] web is listening on ${host}:${port}`);
+  console.log(
+    `[platform] web is listening on ${bindHost}:${port} (probe ${probeHost}:${port})`
+  );
 
   if (!workerAgentKeyConfigured()) {
     console.error(

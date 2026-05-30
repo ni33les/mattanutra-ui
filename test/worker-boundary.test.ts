@@ -162,6 +162,16 @@ describe("external worker boundaries", () => {
       /web is running without platform workers/,
       "missing worker credentials must not prevent the web service from booting"
     );
+    assert.match(
+      platformSource,
+      /const bindHost = process\.env\.PLATFORM_BIND_HOST \|\| "0\.0\.0\.0"/,
+      "App Platform startup must bind Next to the container network interface for readiness probes"
+    );
+    assert.match(
+      platformSource,
+      /const workerApiBaseUrl =[\s\S]*`http:\/\/127\.0\.0\.1:\$\{port\}`/,
+      "workers should still call the co-located web process through loopback by default"
+    );
   });
 
   it("keeps reservation constrained by the registered worker session", async () => {
