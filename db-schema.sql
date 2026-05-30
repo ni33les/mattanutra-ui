@@ -496,9 +496,6 @@ CREATE TABLE public.agents (
 
 COMMENT ON TABLE public.agents IS 'Humans, AI agents, deterministic workers, and external workers that may reserve and process tasks by capability.';
 
-ALTER TABLE public.organisation_memberships
-    ADD CONSTRAINT organisation_memberships_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES public.agents(id) ON DELETE CASCADE;
-
 
 --
 -- Name: agent_credentials; Type: TABLE; Schema: public; Owner: -
@@ -2547,6 +2544,14 @@ ALTER TABLE ONLY public.admin_conversion_targets
 
 ALTER TABLE ONLY public.agents
     ADD CONSTRAINT agents_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organisation_memberships organisation_memberships_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.organisation_memberships
+    ADD CONSTRAINT organisation_memberships_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES public.agents(id) ON DELETE CASCADE;
 
 
 --
