@@ -823,6 +823,64 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(result.supplementProductCoveragePercent, 100);
   });
 
+  it("uses balanced stack capacity to cover otherwise uncovered needs", () => {
+    const broadFoundation: ProductCandidate = {
+      ...product({ amount: 1, id: "foundation", name: "Omega-3" }),
+      facts: [
+        product({ amount: 0.78, id: "omega", name: "Omega-3" }).facts[0]!,
+        product({ amount: 0.2, id: "d3", name: "Vitamin D3" }).facts[0]!,
+        product({ amount: 1, id: "mag", name: "Magnesium" }).facts[0]!,
+        product({ amount: 0.1, id: "b12", name: "Vitamin B12" }).facts[0]!
+      ],
+      productKind: "multi"
+    };
+    const ashwagandhaPlus: ProductCandidate = {
+      ...product({ amount: 0.5, id: "ashwagandha-plus", name: "Ashwagandha" }),
+      facts: [
+        product({ amount: 0.5, id: "ash", name: "Ashwagandha" }).facts[0]!,
+        product({ amount: 0.06, id: "ash-mag", name: "Magnesium" }).facts[0]!,
+        product({ amount: 0.05, id: "ash-b12", name: "Vitamin B12" }).facts[0]!,
+        product({ amount: 0.1, id: "ash-b1", name: "Vitamin B1" }).facts[0]!,
+        product({ amount: 0.1, id: "ash-b2", name: "Vitamin B2" }).facts[0]!,
+        product({ amount: 0.1, id: "ash-zinc", name: "Zinc" }).facts[0]!
+      ],
+      productKind: "multi"
+    };
+    const result = recommendProductStackFullBeam({
+      candidates: [
+        broadFoundation,
+        product({ amount: 1, id: "coq10", name: "CoQ10" }),
+        product({ amount: 1, id: "theanine", name: "Theanine" }),
+        product({ amount: 0.58, id: "curcumin", name: "Curcumin" }),
+        ashwagandhaPlus
+      ],
+      maxProducts: 6,
+      needs: [
+        need("omega_3", "Omega-3", 1),
+        need("vitamin_d3", "Vitamin D3", 1),
+        need("magnesium", "Magnesium", 1),
+        need("coq10", "CoQ10", 1),
+        need("theanine", "Theanine", 1),
+        need("curcumin", "Curcumin", 1),
+        need("vitamin_b12", "Vitamin B12", 1),
+        need("ashwagandha", "Ashwagandha", 1)
+      ],
+      stackPreference: "balanced",
+      targetProducts: 3
+    });
+    const recommendedIds = new Set(
+      result.recommendations.map((item) => item.product.id)
+    );
+
+    assert.equal(recommendedIds.has("ashwagandha-plus"), true);
+    assert.equal(
+      result.diagnostics.unmatchedNeeds.some(
+        (item) => item.displayName === "Ashwagandha"
+      ),
+      false
+    );
+  });
+
   it("lets compact mode trade some coverage for a smaller stack", () => {
     const broad: ProductCandidate = {
       ...product({ amount: 0.67, id: "broad-multi", name: "Vitamin D" }),

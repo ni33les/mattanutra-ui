@@ -781,30 +781,49 @@ function fallbackManagedFoodSupportItems(
     const relatedNeeds = gaps.filter((gap) => gapNeedIds.includes(gap.id));
     const enNeedText = joinFoodSupportNeeds(relatedNeeds, "en");
     const thNeedText = joinFoodSupportNeeds(relatedNeeds, "th");
+    const zhNeedText = joinFoodSupportNeeds(relatedNeeds, "zh-CN");
 
     return {
-      category: { en: seed.category.en, th: seed.category.th },
-      food: { en: seed.name.en, th: seed.name.th },
+      category: {
+        en: seed.category.en,
+        th: seed.category.th,
+        "zh-CN": seed.category["zh-CN"],
+      },
+      food: { en: seed.name.en, th: seed.name.th, "zh-CN": seed.name["zh-CN"] },
       foodId: seed.normalizedName,
       frequency:
         managedFoodFrequency[seed.normalizedName] ??
-        { en: "3-4 times/week", th: "3-4 ครั้งต่อสัปดาห์" },
+        {
+          en: "3-4 times/week",
+          th: "3-4 ครั้งต่อสัปดาห์",
+          "zh-CN": "每周 3-4 次",
+        },
       gapNeedIds,
-      imageAlt: { en: seed.imageAlt.en, th: seed.imageAlt.th },
+      imageAlt: {
+        en: seed.imageAlt.en,
+        th: seed.imageAlt.th,
+        "zh-CN": seed.imageAlt["zh-CN"],
+      },
       imagePath: seed.imagePath,
       position: index + 1,
       rationale: relatedNeeds.length > 0
         ? {
             en: `${seed.name.en} gives food-level support around ${enNeedText} while products stay responsible for the formula math.`,
-            th: `${seed.name.th} ช่วยเสริมจากอาหารในส่วนของ${thNeedText} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`
+            th: `${seed.name.th} ช่วยเสริมจากอาหารในส่วนของ${thNeedText} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`,
+            "zh-CN": `${seed.name["zh-CN"]} 可通过食物层面支持 ${zhNeedText}，同时产品覆盖计算保持独立。`,
           }
         : {
             en: `${seed.name.en} keeps the plan grounded in everyday food while the product stack handles the formula.`,
-            th: `${seed.name.th} ช่วยให้แผนยังยึดกับอาหารในชีวิตประจำวัน ขณะที่ชุดผลิตภัณฑ์ทำหน้าที่ตามสูตร`
+            th: `${seed.name.th} ช่วยให้แผนยังยึดกับอาหารในชีวิตประจำวัน ขณะที่ชุดผลิตภัณฑ์ทำหน้าที่ตามสูตร`,
+            "zh-CN": `${seed.name["zh-CN"]} 让计划继续贴近日常饮食，同时产品组合负责配方覆盖。`,
           },
       serving:
         managedFoodServing[seed.normalizedName] ??
-        { en: "1 practical serving", th: "1 ส่วนที่รับประทานได้จริง" }
+        {
+          en: "1 practical serving",
+          th: "1 ส่วนที่รับประทานได้จริง",
+          "zh-CN": "1 份实际可用份量",
+        }
     };
   });
 }
@@ -831,9 +850,11 @@ export function selectedFoodSupport(
       : result.foodGapSupport?.variants.balanced ??
         result.foodGapSupport?.variants.compact ??
         null;
+  const fallbackItems = fallbackFoodSupportItems(result, selectedNeedCoverage);
 
   return {
-    fallbackItems: variant ? [] : fallbackFoodSupportItems(result, selectedNeedCoverage),
+    fallbackItems,
+    items: fallbackItems.length > 0 ? fallbackItems : variant?.items ?? [],
     variant
   };
 }

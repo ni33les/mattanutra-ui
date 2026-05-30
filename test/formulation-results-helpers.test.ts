@@ -5,6 +5,9 @@ import {
   resultHasProductStackRows,
   resultHasTransientEmptyProductRecommendations,
 } from "../lib/product-recommendation-readiness.ts";
+import {
+  defaultProductStackPreferenceForResult,
+} from "../lib/product-recommendation-options.ts";
 import type {
   FormulationResult,
   ProductRecommendationOption,
@@ -129,6 +132,42 @@ describe("formulation results product recommendation readiness", () => {
 
     assert.equal(resultHasProductStackRows(payload, "compact"), true);
     assert.equal(resultHasProductStackRows(payload, "balanced"), false);
+  });
+
+  it("defaults to balanced when compact and balanced options both exist", () => {
+    const payload = result({
+      productRecommendationOptions: [
+        option({
+          id: "compact",
+          productRecommendations: {
+            matchedCount: 3,
+            needsCount: 8,
+            stackCoveragePercent: 68,
+            stackPreference: "compact",
+            status: "ready",
+          },
+        }),
+        option({
+          id: "balanced",
+          productRecommendations: {
+            matchedCount: 6,
+            needsCount: 8,
+            stackCoveragePercent: 87,
+            stackPreference: "balanced",
+            status: "ready",
+          },
+        }),
+      ],
+      productRecommendations: {
+        matchedCount: 3,
+        needsCount: 8,
+        stackCoveragePercent: 68,
+        stackPreference: "compact",
+        status: "ready",
+      },
+    });
+
+    assert.equal(defaultProductStackPreferenceForResult(payload), "balanced");
   });
 
   it("does not treat a genuine zero-coverage run as transient", () => {

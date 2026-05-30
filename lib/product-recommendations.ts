@@ -2474,6 +2474,133 @@ function pruneLowContributionStackEntries(
   );
 }
 
+function marginalCoverageGainPercentForEntry(
+  entry: V2ProductEntry,
+  stack: V2StackScore,
+  needs: readonly ProductRecommendationNeed[]
+) {
+  const totalWeight = normalizedNeedWeightTotal(needs);
+
+  if (totalWeight <= 0) {
+    return 0;
+  }
+
+  const weightedGain = needs.reduce((total, need) => {
+    const currentCoverage = clamp01(stack.achievedCoverage.get(need.id) ?? 0);
+    const entryCoverage = entry.metricsByNeed.get(need.id)?.coverage ?? 0;
+    const nextCoverage = clamp01(currentCoverage + entryCoverage);
+
+    return total + Math.max(0, nextCoverage - currentCoverage) * need.weight;
+  }, 0);
+
+  return (weightedGain / totalWeight) * 100;
+}
+
+function uncoveredNeedGainForEntry(
+  entry: V2ProductEntry,
+  stack: V2StackScore,
+  needs: readonly ProductRecommendationNeed[]
+) {
+  return needs.reduce(
+    (summary, need) => {
+      const currentCoverage = clamp01(stack.achievedCoverage.get(need.id) ?? 0);
+      const entryCoverage = entry.metricsByNeed.get(need.id)?.coverage ?? 0;
+
+      if (currentCoverage <= V2_SCORE_EPSILON && entryCoverage > V2_SCORE_EPSILON) {
+        return {
+          count: summary.count + 1,
+          weight: summary.weight + need.weight
+        };
+      }
+
+      return summary;
+    },
+    { count: 0, weight: 0 }
+  );
+}
+
+function stackAlreadyHasProductOrVariant(
+  stack: V2StackScore,
+  entry: V2ProductEntry
+) {
+  return stack.entries.some(
+    (stackEntry) =>
+      stackEntry.product.id === entry.product.id ||
+      productVariantKey(stackEntry.product) === productVariantKey(entry.product)
+  );
+}
+
+function fillBalancedStackUncoveredNeeds(
+  stack: V2StackScore,
+  entries: readonly V2ProductEntry[],
+  input: ProductRecommendationInput,
+  scoringNeeds: readonly ProductRecommendationNeed[],
+  allNeeds: readonly ProductRecommendationNeed[],
+  weights: V2Weights,
+  maxProducts: number
+) {
+  let currentStack = stack;
+
+  while (currentStack.entries.length < maxProducts) {
+    const nextChoice = entries
+      .filter((entry) => !stackAlreadyHasProductOrVariant(currentStack, entry))
+      .map((entry) => {
+        const uncoveredGain = uncoveredNeedGainForEntry(
+          entry,
+          currentStack,
+          scoringNeeds
+        );
+        const marginalGain = marginalCoverageGainPercentForEntry(
+          entry,
+          currentStack,
+          scoringNeeds
+        );
+
+        if (
+          uncoveredGain.count < 1 ||
+          marginalGain + V2_SCORE_EPSILON <
+            V2_MIN_MARGINAL_PRODUCT_CONTRIBUTION_PERCENT
+        ) {
+          return null;
+        }
+
+        const score = scoreV2StackEntries(
+          [...currentStack.entries, entry],
+          input,
+          scoringNeeds,
+          allNeeds,
+          weights
+        );
+
+        return score
+          ? {
+              entry,
+              marginalGain,
+              score,
+              uncoveredGain
+            }
+          : null;
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item))
+      .sort((first, second) =>
+        second.uncoveredGain.count - first.uncoveredGain.count ||
+        second.uncoveredGain.weight - first.uncoveredGain.weight ||
+        second.marginalGain - first.marginalGain ||
+        second.score.supplementProductCoveragePercent -
+          first.score.supplementProductCoveragePercent ||
+        compareProductEntries(first.entry, second.entry)
+      )[0];
+
+    if (!nextChoice) {
+      break;
+    }
+
+    currentStack = nextChoice.score;
+  }
+
+  return currentStack;
+}
+
 function recommendationsFromV2Stack(
   stack: V2StackScore,
   scoringNeeds: readonly ProductRecommendationNeed[]
@@ -2682,11 +2809,23 @@ function recommendProductStackExact(
     stackPreference,
     input.targetProducts
   );
-  const finalCoverage = bestStack
-    ? stackCoverageForNeeds(bestStack.entries, scoringNeeds)
+  const selectedStack =
+    bestStack && stackPreference === "balanced"
+      ? fillBalancedStackUncoveredNeeds(
+          bestStack,
+          entries,
+          input,
+          scoringNeeds,
+          scoringNeeds,
+          weights,
+          maxProducts
+        )
+      : bestStack;
+  const finalCoverage = selectedStack
+    ? stackCoverageForNeeds(selectedStack.entries, scoringNeeds)
     : new Map<string, number>();
-  const productNeedsCoverage = bestStack
-    ? stackCoverageForNeeds(bestStack.entries, scoringNeeds)
+  const productNeedsCoverage = selectedStack
+    ? stackCoverageForNeeds(selectedStack.entries, scoringNeeds)
     : new Map<string, number>();
   const supplementProductCoveragePercent = safePercent(
     stackCoveragePercent(productNeedsCoverage, scoringNeeds)
@@ -2726,7 +2865,7 @@ function recommendProductStackExact(
   const trace: ProductRecommendationTrace = {
     alternativeStacks: distinctAlternativeStacks(
       stackScores,
-      bestStack,
+      selectedStack,
       scoringNeeds
     )
       .map((stack) => ({
@@ -2737,7 +2876,7 @@ function recommendProductStackExact(
         totalPlanCoveragePercent: stack.totalPlanCoveragePercent
       })),
     candidatePoolSize: entries.length,
-    componentScores: bestStack?.componentScores ?? {},
+    componentScores: selectedStack?.componentScores ?? {},
     contextSignals: v2ContextSignals(input),
     evaluatedStackCount: stackSearch.evaluatedStackCount,
     excludedPredicates: exclusions.filter(
@@ -2749,7 +2888,7 @@ function recommendProductStackExact(
     shortlistSize: candidatePool.length,
     stackPreference,
     targetProducts: input.targetProducts ?? undefined,
-    utilityScore: roundScore(bestStack?.score ?? 0),
+    utilityScore: roundScore(selectedStack?.score ?? 0),
     weightDeltas: deltas,
     weights
   };
@@ -2776,8 +2915,8 @@ function recommendProductStackExact(
       unmatchedNeeds: needDiagnostics.filter((item) => item.coveragePercent <= 0)
     },
     exclusions,
-    recommendations: bestStack
-      ? recommendationsFromV2Stack(bestStack, scoringNeeds)
+    recommendations: selectedStack
+      ? recommendationsFromV2Stack(selectedStack, scoringNeeds)
       : [],
     foodCoveragePercent,
     stackCoveragePercent: supplementProductCoveragePercent,

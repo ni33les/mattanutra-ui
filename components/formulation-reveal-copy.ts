@@ -84,13 +84,19 @@ const baseRevealCopy = {
       "Foods do not change the product coverage score. They only appear when the product stack leaves a supplement gap that a managed food can credibly support.",
     foodSupportDefaultHeadline: "Food support, after the products.",
     foodSupportEmpty:
-      "Food support will appear here once the managed food catalogue and product stack are ready.",
+      "Food cards are shown only when the selected stack leaves a supportable formula gap.",
     foodSupportEyebrow: "Food support",
     foodSupportFrequency: "Frequency",
     foodSupportGapLabel: "Supports",
     foodSupportGapBodyTemplate:
       "These foods come from the managed catalogue and are selected around {gaps}. They support the plan in everyday meals without changing product coverage numbers.",
     foodSupportGapHeadlineTemplate: "Food support for {gaps}.",
+    foodSupportNoGapsBody:
+      "The selected stack has no remaining supportable formula gaps for the managed food catalogue. Keep meals simple and use the products for the measured coverage.",
+    foodSupportNoGapsHeadline: "No extra food support needed for this stack.",
+    foodSupportPendingBody:
+      "Food support updates after product matching finishes because compact and balanced stacks can leave different formula gaps.",
+    foodSupportPendingHeadline: "Checking food support for this stack.",
     foodSupportServing: "Serving",
     foodSupportFormulaGapLabel: "Formula gap",
     foodSupportTitle: "Foods chosen to support the gaps.",
@@ -194,13 +200,19 @@ const baseRevealCopy = {
       "อาหารไม่เปลี่ยนคะแนนความครอบคลุมของผลิตภัณฑ์ และจะแสดงเฉพาะเมื่อชุดผลิตภัณฑ์ยังเหลือช่องว่างของสารอาหารที่อาหารในแคตตาล็อกช่วยเสริมได้อย่างน่าเชื่อถือ",
     foodSupportDefaultHeadline: "อาหารสนับสนุนหลังจากชุดผลิตภัณฑ์",
     foodSupportEmpty:
-      "คำแนะนำอาหารจะแสดงที่นี่เมื่อแคตตาล็อกอาหารและชุดผลิตภัณฑ์พร้อม",
+      "การ์ดอาหารจะแสดงเฉพาะเมื่อชุดที่เลือกยังเหลือช่องว่างในสูตรที่อาหารช่วยเสริมได้",
     foodSupportEyebrow: "อาหารสนับสนุน",
     foodSupportFrequency: "ความถี่",
     foodSupportGapLabel: "สนับสนุน",
     foodSupportGapBodyTemplate:
       "อาหารเหล่านี้มาจากแคตตาล็อกที่จัดการไว้ และเลือกโดยดูจาก {gaps} เพื่อช่วยให้แผนทำได้จริงในมื้ออาหาร โดยไม่เปลี่ยนตัวเลขความครอบคลุมของผลิตภัณฑ์",
     foodSupportGapHeadlineTemplate: "อาหารสนับสนุนสำหรับ {gaps}",
+    foodSupportNoGapsBody:
+      "ชุดที่เลือกตอนนี้ไม่มีช่องว่างในสูตรที่แคตตาล็อกอาหารช่วยเสริมได้อย่างเหมาะสม ให้มื้ออาหารเรียบง่าย และใช้ผลิตภัณฑ์สำหรับความครอบคลุมที่คำนวณไว้",
+    foodSupportNoGapsHeadline: "ชุดนี้ยังไม่ต้องมีอาหารเสริมช่องว่างเพิ่มเติม",
+    foodSupportPendingBody:
+      "คำแนะนำอาหารจะอัปเดตหลังจับคู่ผลิตภัณฑ์เสร็จ เพราะชุดแบบ compact และ balanced อาจเหลือช่องว่างในสูตรต่างกัน",
+    foodSupportPendingHeadline: "กำลังตรวจอาหารที่เหมาะกับชุดนี้",
     foodSupportServing: "ปริมาณ",
     foodSupportFormulaGapLabel: "ช่องว่างในสูตร",
     foodSupportTitle: "อาหารที่เลือกเพื่อช่วยเติมช่องว่าง",
@@ -301,12 +313,16 @@ export const revealCopy = {
     "formulaSignedPrefix": "配制于",
     "foodSupportDefaultBody": "食物不会改变产品覆盖评分。只有当产品配方留下补充剂缺口，且可通过管理食物合理支持时，它们才会出现。",
     "foodSupportDefaultHeadline": "产品之后，食物支持。",
-    "foodSupportEmpty": "当管理食物目录和产品配方准备就绪后，食物支持将显示在此处。",
+    "foodSupportEmpty": "只有当所选组合留下可由食物支持的配方缺口时，才会显示食物卡片。",
     "foodSupportEyebrow": "食物支持",
     "foodSupportFrequency": "频率",
     "foodSupportGapLabel": "支持",
     "foodSupportGapBodyTemplate": "这些食物来自管理目录，围绕 {gaps} 精选。它们在日常饮食中支持计划，而不改变产品覆盖数字。",
     "foodSupportGapHeadlineTemplate": "针对 {gaps} 的食物支持。",
+    "foodSupportNoGapsBody": "所选组合目前没有可由管理食物目录合理支持的剩余配方缺口。日常饮食可保持简单，由产品负责已计算的覆盖。",
+    "foodSupportNoGapsHeadline": "此组合无需额外食物支持。",
+    "foodSupportPendingBody": "食物支持会在产品匹配完成后更新，因为精简和均衡组合可能留下不同的配方缺口。",
+    "foodSupportPendingHeadline": "正在检查此组合的食物支持。",
     "foodSupportServing": "份量",
     "foodSupportFormulaGapLabel": "配方缺口",
     "foodSupportTitle": "为缺口选择的食物。",
@@ -406,6 +422,51 @@ export const revealProductPendingCards = {
     {
       body: "比较剂量匹配、安全上限、重叠和服用负担。",
       title: "评分产品组合",
+    },
+  ],
+} satisfies Record<Locale, Array<{ body: string; title: string }>>;
+
+export const revealFoodSupportPendingCards = {
+  en: [
+    {
+      body: "Reading the exact gaps left by the selected product stack.",
+      title: "Waiting for the stack",
+    },
+    {
+      body: "Matching only managed foods that credibly support those gaps.",
+      title: "Checking food fit",
+    },
+    {
+      body: "Keeping food support separate from the measured product coverage.",
+      title: "Keeping scores clean",
+    },
+  ],
+  th: [
+    {
+      body: "อ่านช่องว่างจริงที่ชุดผลิตภัณฑ์ที่เลือกยังเหลือไว้",
+      title: "รอชุดผลิตภัณฑ์",
+    },
+    {
+      body: "จับคู่เฉพาะอาหารในแคตตาล็อกที่ช่วยเสริมช่องว่างนั้นได้อย่างสมเหตุผล",
+      title: "ตรวจความเหมาะของอาหาร",
+    },
+    {
+      body: "แยกอาหารสนับสนุนออกจากคะแนนความครอบคลุมของผลิตภัณฑ์",
+      title: "แยกคะแนนให้ชัด",
+    },
+  ],
+  "zh-CN": [
+    {
+      body: "读取所选产品组合留下的确切缺口。",
+      title: "等待产品组合",
+    },
+    {
+      body: "只匹配能够合理支持这些缺口的管理食物。",
+      title: "检查食物匹配",
+    },
+    {
+      body: "将食物支持与产品覆盖评分保持分离。",
+      title: "保持评分清晰",
     },
   ],
 } satisfies Record<Locale, Array<{ body: string; title: string }>>;

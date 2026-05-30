@@ -15,6 +15,7 @@ import { formulationResultsCopy } from "@/components/formulation-results-copy";
 import {
   NutritionGuidancePreparingPanel,
   RevealDistillationCard,
+  defaultProductStackPreferenceForResult,
   planPaywallHref,
   productCoveredNeedCount,
   productRecommendationOptionsForResult,
@@ -59,6 +60,7 @@ import {
   localizedMarketplaceName,
   localizedProductDescription,
   revealCopy,
+  revealFoodSupportPendingCards,
   revealJoiners,
   revealProductPendingCards,
   revealSlotCopy,
@@ -217,11 +219,7 @@ export function FormulationResults({
     }
 
     const options = productRecommendationOptionsForResult(result);
-    const defaultPreference =
-      result.productRecommendations?.stackPreference ??
-      options.find((option) => option.id === "balanced")?.id ??
-      options[0]?.id ??
-      null;
+    const defaultPreference = defaultProductStackPreferenceForResult(result);
 
     startTransition(() => {
       setSelectedProductStackPreference((current) =>
@@ -671,6 +669,7 @@ function RevealResultsPage({
       <RevealFoodSupportSection
         copy={copy}
         locale={locale}
+        productCoveragePending={productCoveragePending}
         result={result}
         selectedNeedCoverage={
           productCoveragePending
@@ -1213,9 +1212,10 @@ function RevealProductsSection({
                   />
                   {product.imageUrl ? (
                     <Image
-                      alt=""
+                      alt={product.name}
                       className="relative z-[1] h-full w-full object-contain p-8 transition duration-500 group-hover:-translate-y-1 group-hover:scale-[1.03] motion-reduce:transition-none"
                       height={240}
+                      loading="eager"
                       unoptimized={true}
                       src={product.imageUrl}
                       width={320}
@@ -1400,17 +1400,19 @@ function RevealProductsSection({
 function RevealFoodSupportSection({
   copy,
   locale,
+  productCoveragePending,
   result,
   selectedNeedCoverage,
   selectedProductStackPreference,
 }: Readonly<{
   copy: typeof revealCopy.en;
   locale: Locale;
+  productCoveragePending: boolean;
   result: FormulationResult;
   selectedNeedCoverage: readonly ProductNeedCoverage[];
   selectedProductStackPreference?: ProductStackPreference | null;
 }>) {
-  const { fallbackItems, variant } = selectedFoodSupport(
+  const { items: selectedFoodItems, variant } = selectedFoodSupport(
     result,
     selectedNeedCoverage,
     selectedProductStackPreference,
@@ -1418,22 +1420,24 @@ function RevealFoodSupportSection({
   const visibleIngredients = visibleFormulaIngredients(
     result.supplementBreakdown,
   );
-  const items = (variant?.items ?? fallbackItems).filter(
-    (item) =>
-      foodSupportFormulaGapsForItem(
-        item,
-        selectedNeedCoverage,
-        visibleIngredients,
-        locale,
-      ).length > 0,
-  );
   const fallbackGaps = foodSupportGaps(selectedNeedCoverage);
   const fallbackSupportableGaps = foodSupportableGaps(fallbackGaps);
+  const items = productCoveragePending
+    ? []
+    : selectedFoodItems.filter(
+        (item) =>
+          foodSupportFormulaGapsForItem(
+            item,
+            selectedNeedCoverage,
+            visibleIngredients,
+            locale,
+          ).length > 0,
+      );
   const fallbackGapText = joinFoodSupportNeeds(
     fallbackSupportableGaps.length > 0 ? fallbackSupportableGaps : fallbackGaps,
     locale,
   );
-  const headline = variant
+  const variantHeadline = variant
     ? safeFoodSupportCopy(
         variant.headline,
         locale,
@@ -1448,7 +1452,7 @@ function RevealFoodSupportSection({
           gaps: fallbackGapText,
         })
       : copy.foodSupportDefaultHeadline;
-  const body = variant
+  const variantBody = variant
     ? safeFoodSupportCopy(
         variant.body,
         locale,
@@ -1463,10 +1467,16 @@ function RevealFoodSupportSection({
           gaps: fallbackGapText,
         })
       : copy.foodSupportDefaultBody;
-
-  if (items.length < 1) {
-    return null;
-  }
+  const headline = productCoveragePending
+    ? copy.foodSupportPendingHeadline
+    : items.length < 1
+      ? copy.foodSupportNoGapsHeadline
+      : variantHeadline;
+  const body = productCoveragePending
+    ? copy.foodSupportPendingBody
+    : items.length < 1
+      ? copy.foodSupportNoGapsBody
+      : variantBody;
 
   return (
     <section className="border-t border-[var(--mn-line)] bg-[var(--mn-cream)] py-20">
@@ -1478,7 +1488,7 @@ function RevealFoodSupportSection({
             </p>
             <h2
               className={`mt-4 font-serif text-4xl font-medium text-[var(--mn-ink)] sm:text-5xl ${
-                locale === "th"
+                locale === "th" || locale === "zh-CN"
                   ? "leading-[1.38] break-words [overflow-wrap:anywhere]"
                   : "leading-tight text-balance"
               }`}
@@ -1494,164 +1504,235 @@ function RevealFoodSupportSection({
           </p>
         </div>
 
-        <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {items.map((item) => {
-            const seed = managedSeedForFoodSupportItem(item);
-            const name =
-              getLocalizedText(item.food, locale) ||
-              seed?.name[locale] ||
-              seed?.name.en ||
-              "";
-            const imageAlt =
-              getLocalizedText(item.imageAlt, locale) ||
-              seed?.imageAlt[locale] ||
-              seed?.imageAlt.en ||
-              name;
-            const category =
-              getLocalizedText(item.category, locale) ||
-              seed?.category[locale] ||
-              seed?.category.en ||
-              "";
-            const serving =
-              getLocalizedText(item.serving, locale) ||
-              (seed ? managedFoodServing[seed.normalizedName]?.[locale] : "") ||
-              "";
-            const frequency =
-              getLocalizedText(item.frequency, locale) ||
-              (seed
-                ? managedFoodFrequency[seed.normalizedName]?.[locale]
-                : "") ||
-              "";
-            const formulaGaps = foodSupportFormulaGapsForItem(
-              item,
-              selectedNeedCoverage,
-              visibleIngredients,
-              locale,
-            ).slice(0, 3);
-            const itemRationale = safeFoodSupportCopy(
-              item.rationale,
-              locale,
-              locale === "th"
-                ? `${name} ช่วยเสริมจากอาหารในส่วนของ${joinFoodSupportFormulaGapLabels(
-                    formulaGaps,
-                    "th",
-                  )} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`
-                : locale === "zh-CN"
-                  ? `${name} 可通过食物层面支持 ${joinFoodSupportFormulaGapLabels(
-                      formulaGaps,
-                      "zh-CN",
-                    )}，同时产品覆盖计算保持独立。`
-                  : `${name} ${name.endsWith("s") ? "give" : "gives"} food-level support around ${joinFoodSupportFormulaGapLabels(
-                      formulaGaps,
-                      "en",
-                    )} while product coverage stays separate.`,
-            );
-
-            return (
-              <article
-                className="overflow-hidden rounded-[1.25rem] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]"
-                data-reveal
-                key={`${selectedProductStackPreference ?? "food"}:${item.foodId}:${item.position}`}
-              >
-                <div className="relative h-52 overflow-hidden bg-[var(--mn-mint)]">
-                  {item.imagePath ? (
-                    <Image
-                      alt={imageAlt}
-                      className="object-cover"
-                      fill={true}
-                      loading="lazy"
-                      src={item.imagePath}
-                    />
-                  ) : (
-                    <div className="grid h-full place-items-center bg-[var(--mn-mint)] font-serif text-5xl italic text-[var(--mn-teal-deep)]">
-                      {name.slice(0, 1)}
-                    </div>
-                  )}
-                  <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]">
-                    {String(item.position).padStart(2, "0")}
-                  </span>
+        {productCoveragePending ? (
+          <div
+            aria-live="polite"
+            className="mt-10 overflow-hidden rounded-xl bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]"
+            data-reveal
+          >
+            <div className="grid gap-0 md:grid-cols-[0.8fr_1.2fr]">
+              <div className="bg-[var(--mn-mint)] p-6">
+                <p
+                  className={`text-xs font-bold text-[var(--mn-teal-deep)] ${
+                    locale === "en" ? "uppercase tracking-[0.14em]" : ""
+                  }`}
+                >
+                  {copy.productsPendingBadge}
+                </p>
+                <div className="mt-6 h-3 overflow-hidden rounded-full bg-white/70">
+                  <div className="h-full w-1/2 rounded-full bg-[var(--mn-teal)] motion-safe:animate-pulse" />
                 </div>
-                <div className="p-5">
-                  <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[var(--mn-ash)]">
-                    {category}
-                  </p>
-                  <h3
-                    className={`mt-2 font-serif text-2xl font-medium text-[var(--mn-ink)] ${
-                      locale === "th" ? "leading-9" : "leading-tight"
-                    }`}
+              </div>
+              <div className="grid gap-3 p-6 sm:grid-cols-3">
+                {revealFoodSupportPendingCards[locale].map((card) => (
+                  <div
+                    className="rounded-lg bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]"
+                    key={`food-support-${card.title}`}
                   >
-                    {name}
-                  </h3>
-                  <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                    {itemRationale}
-                  </p>
+                    <p className="font-serif text-lg font-medium leading-tight text-[var(--mn-ink)]">
+                      {card.title}
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-[var(--mn-ink-soft)]">
+                      {card.body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : items.length < 1 ? (
+          <div
+            className="mt-10 rounded-xl bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:p-8"
+            data-reveal
+          >
+            <p className="max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]">
+              {copy.foodSupportEmpty}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {items.map((item) => {
+              const seed = managedSeedForFoodSupportItem(item);
+              const name =
+                getLocalizedText(item.food, locale) ||
+                seed?.name[locale] ||
+                seed?.name.en ||
+                "";
+              const imageAlt =
+                getLocalizedText(item.imageAlt, locale) ||
+                seed?.imageAlt[locale] ||
+                seed?.imageAlt.en ||
+                name;
+              const category =
+                getLocalizedText(item.category, locale) ||
+                seed?.category[locale] ||
+                seed?.category.en ||
+                "";
+              const serving =
+                getLocalizedText(item.serving, locale) ||
+                (seed
+                  ? managedFoodServing[seed.normalizedName]?.[locale]
+                  : "") ||
+                "";
+              const frequency =
+                getLocalizedText(item.frequency, locale) ||
+                (seed
+                  ? managedFoodFrequency[seed.normalizedName]?.[locale]
+                  : "") ||
+                "";
+              const formulaGaps = foodSupportFormulaGapsForItem(
+                item,
+                selectedNeedCoverage,
+                visibleIngredients,
+                locale,
+              ).slice(0, 3);
+              const itemRationale = safeFoodSupportCopy(
+                item.rationale,
+                locale,
+                locale === "th"
+                  ? `${name} ช่วยเสริมจากอาหารในส่วนของ${joinFoodSupportFormulaGapLabels(
+                      formulaGaps,
+                      "th",
+                    )} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`
+                  : locale === "zh-CN"
+                    ? `${name} 可通过食物层面支持 ${joinFoodSupportFormulaGapLabels(
+                        formulaGaps,
+                        "zh-CN",
+                      )}，同时产品覆盖计算保持独立。`
+                    : `${name} ${name.endsWith("s") ? "give" : "gives"} food-level support around ${joinFoodSupportFormulaGapLabels(
+                        formulaGaps,
+                        "en",
+                      )} while product coverage stays separate.`,
+              );
 
-                  {formulaGaps.length > 0 ? (
-                    <div className="mt-4 rounded-lg bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
-                      <p
-                        className={`text-xs font-bold text-[var(--mn-ash)] ${
-                          locale === "th" ? "" : "uppercase tracking-[0.12em]"
-                        }`}
-                      >
-                        {copy.foodSupportGapLabel}
-                      </p>
-                      <div className="mt-3 space-y-2">
-                        {formulaGaps.map((gap) => (
-                          <div
-                            className="rounded-md bg-[var(--mn-paper)] p-3 ring-1 ring-[var(--mn-line)]"
-                            key={gap.id}
-                          >
-                            <div className="min-w-0">
-                              <p className="text-[0.7rem] font-semibold text-[var(--mn-ash)]">
-                                {copy.foodSupportFormulaGapLabel}
-                                {gap.rowNumber
-                                  ? ` ${String(gap.rowNumber).padStart(2, "0")}`
-                                  : ""}
-                              </p>
-                              <p
-                                className={`mt-1 font-serif text-lg font-medium text-[var(--mn-ink)] ${
-                                  locale === "th"
-                                    ? "leading-7"
-                                    : "leading-tight"
-                                }`}
-                              >
-                                {gap.label}
-                              </p>
-                              {gap.dailyDose ? (
-                                <p className="mt-1 text-xs font-semibold text-[var(--mn-ink-soft)]">
-                                  {gap.dailyDose}
+              return (
+                <article
+                  className="overflow-hidden rounded-[1.25rem] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]"
+                  data-reveal
+                  key={`${selectedProductStackPreference ?? "food"}:${item.foodId}:${item.position}`}
+                >
+                  <div className="relative h-52 overflow-hidden bg-[var(--mn-mint)]">
+                    {item.imagePath ? (
+                      <Image
+                        alt={imageAlt}
+                        className="object-cover"
+                        fill={true}
+                        loading="eager"
+                        src={item.imagePath}
+                      />
+                    ) : (
+                      <div className="grid h-full place-items-center bg-[var(--mn-mint)] font-serif text-5xl italic text-[var(--mn-teal-deep)]">
+                        {name.slice(0, 1)}
+                      </div>
+                    )}
+                    <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]">
+                      {String(item.position).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <div className="p-5">
+                    <p
+                      className={`text-[0.65rem] font-bold text-[var(--mn-ash)] ${
+                        locale === "en"
+                          ? "mn-mono-label uppercase tracking-[0.16em]"
+                          : "tracking-normal"
+                      }`}
+                    >
+                      {category}
+                    </p>
+                    <h3
+                      className={`mt-2 font-serif text-2xl font-medium text-[var(--mn-ink)] ${
+                        locale === "th" || locale === "zh-CN"
+                          ? "leading-9"
+                          : "leading-tight"
+                      }`}
+                    >
+                      {name}
+                    </h3>
+                    <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                      {itemRationale}
+                    </p>
+
+                    {formulaGaps.length > 0 ? (
+                      <div className="mt-4 rounded-lg bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
+                        <p
+                          className={`text-xs font-bold text-[var(--mn-ash)] ${
+                            locale === "en"
+                              ? "uppercase tracking-[0.12em]"
+                              : "tracking-normal"
+                          }`}
+                        >
+                          {copy.foodSupportGapLabel}
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          {formulaGaps.map((gap) => (
+                            <div
+                              className="rounded-md bg-[var(--mn-paper)] p-3 ring-1 ring-[var(--mn-line)]"
+                              key={gap.id}
+                            >
+                              <div className="min-w-0">
+                                <p className="text-[0.7rem] font-semibold text-[var(--mn-ash)]">
+                                  {copy.foodSupportFormulaGapLabel}
+                                  {gap.rowNumber
+                                    ? ` ${String(gap.rowNumber).padStart(2, "0")}`
+                                    : ""}
                                 </p>
-                              ) : null}
+                                <p
+                                  className={`mt-1 font-serif text-lg font-medium text-[var(--mn-ink)] ${
+                                    locale === "th" || locale === "zh-CN"
+                                      ? "leading-7"
+                                      : "leading-tight"
+                                  }`}
+                                >
+                                  {gap.label}
+                                </p>
+                                {gap.dailyDose ? (
+                                  <p className="mt-1 text-xs font-semibold text-[var(--mn-ink-soft)]">
+                                    {gap.dailyDose}
+                                  </p>
+                                ) : null}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="mt-5 grid gap-3 rounded-lg bg-[var(--mn-cream)] p-4 text-sm ring-1 ring-[var(--mn-line)] sm:grid-cols-2">
+                      <div>
+                        <p
+                          className={`text-xs font-bold text-[var(--mn-ash)] ${
+                            locale === "en"
+                              ? "uppercase tracking-[0.12em]"
+                              : "tracking-normal"
+                          }`}
+                        >
+                          {copy.foodSupportServing}
+                        </p>
+                        <p className="mt-1 font-semibold text-[var(--mn-ink)]">
+                          {serving}
+                        </p>
+                      </div>
+                      <div>
+                        <p
+                          className={`text-xs font-bold text-[var(--mn-ash)] ${
+                            locale === "en"
+                              ? "uppercase tracking-[0.12em]"
+                              : "tracking-normal"
+                          }`}
+                        >
+                          {copy.foodSupportFrequency}
+                        </p>
+                        <p className="mt-1 font-semibold text-[var(--mn-ink)]">
+                          {frequency}
+                        </p>
                       </div>
                     </div>
-                  ) : null}
-
-                  <div className="mt-5 grid gap-3 rounded-lg bg-[var(--mn-cream)] p-4 text-sm ring-1 ring-[var(--mn-line)] sm:grid-cols-2">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--mn-ash)]">
-                        {copy.foodSupportServing}
-                      </p>
-                      <p className="mt-1 font-semibold text-[var(--mn-ink)]">
-                        {serving}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--mn-ash)]">
-                        {copy.foodSupportFrequency}
-                      </p>
-                      <p className="mt-1 font-semibold text-[var(--mn-ink)]">
-                        {frequency}
-                      </p>
-                    </div>
                   </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );
