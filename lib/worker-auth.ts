@@ -1,4 +1,14 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import {
+  bearerToken,
+  configuredLegacyToken,
+  legacyTokenMatches
+} from "@/lib/legacy-token-auth";
+import {
+  resolveAccessPrincipal,
+  type AgentPrincipal
+} from "@/lib/access-principal";
+import { taskAgentAccessScopeFromPrincipal } from "@/lib/task-agent-access";
+import type { TaskAgentAccessScope } from "@/lib/task-service-types";
 
 const noStoreHeaders = {
   "Cache-Control": "no-store"
@@ -9,30 +19,8 @@ const unauthorizedHeaders = {
   "WWW-Authenticate": 'Bearer realm="mattanutra-worker-api"'
 } as const;
 
-function hash(value: string) {
-  return createHash("sha256").update(value).digest();
-}
-
 function configuredWorkerToken() {
-  return process.env.WORKER_API_TOKEN?.trim() || "";
-}
-
-function bearerToken(request: Request) {
-  const authHeader = request.headers.get("authorization") ?? "";
-
-  return authHeader.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length).trim()
-    : "";
-}
-
-function tokenMatches(supplied: string, configuredToken: string) {
-  const trimmed = supplied.trim();
-
-  if (!configuredToken || !trimmed) {
-    return false;
-  }
-
-  return timingSafeEqual(hash(trimmed), hash(configuredToken));
+  return configuredLegacyToken("worker");
 }
 
 export function workerApiTokenConfigured() {
@@ -40,7 +28,7 @@ export function workerApiTokenConfigured() {
 }
 
 export function workerApiTokenAllowed(token: unknown) {
-  return typeof token === "string" && tokenMatches(token, configuredWorkerToken());
+  return legacyTokenMatches("worker", token);
 }
 
 export function workerRequestAllowed(request: Request) {
@@ -62,4 +50,44 @@ export function workerUnauthorized() {
 
 export function requireWorkerRequest(request: Request) {
   return workerRequestAllowed(request) ? null : workerUnauthorized();
+}
+
+export type WorkerAccess = Readonly<{
+  legacy: boolean;
+  principal: AgentPrincipal | null;
+  scope: TaskAgentAccessScope | null;
+  unauthorized: Response | null;
+}>;
+
+export async function requireWorkerAccess(request: Request): Promise<WorkerAccess> {
+  const principal = await resolveAccessPrincipal(request, {
+    allowAgent: true,
+    allowLegacy: "worker",
+    requiredPermission: "tasks.write"
+  });
+
+  if (principal?.type === "agent") {
+    return {
+      legacy: false,
+      principal,
+      scope: taskAgentAccessScopeFromPrincipal(principal),
+      unauthorized: null
+    };
+  }
+
+  if (principal?.type === "legacy_token") {
+    return {
+      legacy: true,
+      principal: null,
+      scope: null,
+      unauthorized: null
+    };
+  }
+
+  return {
+    legacy: false,
+    principal: null,
+    scope: null,
+    unauthorized: workerUnauthorized()
+  };
 }

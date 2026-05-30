@@ -6,7 +6,7 @@ import {
 import {
   openClawJson,
   readJsonObject,
-  requireOpenClawRequest
+  requireOpenClawAccess
 } from "@/lib/openclaw-api";
 
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ export async function GET(
   request: Request,
   { params }: TestimonialRouteProps
 ) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "content.read");
 
   if (unauthorized) {
     return unauthorized;
@@ -46,7 +46,7 @@ export async function PATCH(
   request: Request,
   { params }: TestimonialRouteProps
 ) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "content.write");
 
   if (unauthorized) {
     return unauthorized;
@@ -89,7 +89,7 @@ export async function DELETE(
   request: Request,
   { params }: TestimonialRouteProps
 ) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "content.write");
 
   if (unauthorized) {
     return unauthorized;

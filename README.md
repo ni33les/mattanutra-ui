@@ -55,7 +55,7 @@ Authorization: Bearer <ADMIN_CLAW_TOKEN>
 
 The cron endpoint scans due cron actions and queues task-backed work only. It does not execute worker tasks. Scheduled content publishing runs through the normal `content_status_change` task queue once its `scheduled_for` time is due.
 
-A worker process must be running with `WORKER_API_TOKEN`. Start all local worker capabilities with `npm run worker:all`, or run one of the narrower `worker:*` scripts. Workers register with `/api/workers/register`, heartbeat with `/api/workers/heartbeat`, long-poll `/api/tasks/reserve`, and complete/fail tasks through the task API. In DigitalOcean App Platform, `npm run start:platform` is the no-extra-component deployment mode: the web service owns a colocated worker process, but task execution still goes through the protected worker API rather than web-app internals.
+A worker process must be running with DB-managed agent API keys. `npm run worker:all` requires profile-specific keys such as `WORKER_HEALTHSCORE_AGENT_API_KEY`, `WORKER_FORMULATION_AGENT_API_KEY`, and `WORKER_PRODUCTS_AGENT_API_KEY`; each key resolves to the matching agent membership and organisation scope. Workers register with `/api/workers/register`, heartbeat with `/api/workers/heartbeat`, long-poll `/api/tasks/reserve`, and complete/fail tasks through the task API. In DigitalOcean App Platform, `npm run start:platform` is the no-extra-component deployment mode: the web service owns a colocated worker process, but task execution still goes through the protected worker API rather than web-app internals.
 
 UI-blocking work such as HealthScore analysis and paid formulation uses the interactive reserve path, so online workers check for newly queued work quickly while long-polling. Free example formulation is lower-value background work because it does not block the assessment UX. `WORKER_CONCURRENCY` starts multiple independent sessions per agent profile, and profile-specific overrides such as `WORKER_HEALTHSCORE_CONCURRENCY=2` and `WORKER_FORMULATION_CONCURRENCY=2` let you keep extra capacity for those user-facing tasks without speeding up background jobs. Default worker leases are short and renewed while work is active, so crashed workers release reserved tasks quickly.
 
@@ -67,7 +67,7 @@ Financial rows default to `nominal`, which is used for fine-grained cost accrual
 
 ## Admin Machine APIs
 
-OpenClaw and admin machine APIs use `ADMIN_CLAW_TOKEN`. Worker execution APIs use `WORKER_API_TOKEN`.
+OpenClaw and admin machine APIs use DB-managed agent keys where possible; legacy `ADMIN_CLAW_TOKEN` is only available when `MATTANUTRA_LEGACY_TOKEN_AUTH=allow`. Worker execution APIs use DB-managed agent keys, not `WORKER_API_TOKEN`.
 
 Send either header:
 

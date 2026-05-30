@@ -20,6 +20,7 @@ drop table if exists
   public.admin_invitations,
   public.admin_passkey_credentials,
   public.admin_sessions,
+  public.agent_credentials,
   public.agents,
   public.ai_response_cache,
   public.assessment_events,
@@ -350,15 +351,19 @@ CREATE TABLE public.people (
 CREATE TABLE public.organisation_memberships (
     id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
     organisation_id uuid NOT NULL REFERENCES public.organisations(id) ON DELETE CASCADE,
-    person_id uuid NOT NULL REFERENCES public.people(id) ON DELETE CASCADE,
+    principal_type text DEFAULT 'person'::text NOT NULL,
+    person_id uuid REFERENCES public.people(id) ON DELETE CASCADE,
+    agent_id uuid,
     role text NOT NULL,
     title text,
     status text DEFAULT 'active'::text NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT organisation_memberships_role_check CHECK ((role = ANY (ARRAY['platform_owner'::text, 'platform_admin'::text, 'retail_admin'::text, 'retail_agent'::text, 'retail_assistant'::text]))),
-    CONSTRAINT organisation_memberships_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'invited'::text])))
+    CONSTRAINT organisation_memberships_principal_type_check CHECK ((principal_type = ANY (ARRAY['person'::text, 'agent'::text]))),
+    CONSTRAINT organisation_memberships_principal_check CHECK ((((principal_type = 'person'::text) AND (person_id IS NOT NULL) AND (agent_id IS NULL)) OR ((principal_type = 'agent'::text) AND (agent_id IS NOT NULL) AND (person_id IS NULL)))),
+    CONSTRAINT organisation_memberships_role_check CHECK (((principal_type = 'person'::text) AND (role = ANY (ARRAY['platform_owner'::text, 'platform_admin'::text, 'retail_admin'::text, 'retail_agent'::text, 'retail_assistant'::text])) OR ((principal_type = 'agent'::text) AND (role = ANY (ARRAY['platform_agent'::text, 'retail_agent'::text]))))),
+    CONSTRAINT organisation_memberships_status_check CHECK ((status = ANY (ARRAY['active'::text, 'deleted'::text, 'disabled'::text, 'invited'::text])))
 );
 
 
@@ -465,9 +470,10 @@ CREATE TABLE public.admin_audit_events (
 --
 
 CREATE TABLE public.agents (
-    id uuid NOT NULL,
+    id uuid PRIMARY KEY,
     name text NOT NULL,
     agent_type text DEFAULT 'system'::text NOT NULL,
+    role text DEFAULT 'platform_agent'::text NOT NULL,
     status text DEFAULT 'active'::text NOT NULL,
     capabilities text[] DEFAULT '{}'::text[] NOT NULL,
     model text,
@@ -479,6 +485,7 @@ CREATE TABLE public.agents (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT agents_agent_type_check CHECK ((agent_type = ANY (ARRAY['human'::text, 'ai'::text, 'deterministic'::text, 'external'::text, 'system'::text]))),
+    CONSTRAINT agents_role_check CHECK ((role = ANY (ARRAY['platform_agent'::text, 'retail_agent'::text]))),
     CONSTRAINT agents_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'offline'::text, 'retired'::text])))
 );
 
@@ -488,6 +495,37 @@ CREATE TABLE public.agents (
 --
 
 COMMENT ON TABLE public.agents IS 'Humans, AI agents, deterministic workers, and external workers that may reserve and process tasks by capability.';
+
+
+--
+-- Name: agent_credentials; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_credentials (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    agent_id uuid NOT NULL REFERENCES public.agents(id) ON DELETE CASCADE,
+    membership_id uuid REFERENCES public.organisation_memberships(id) ON DELETE SET NULL,
+    credential_hash text NOT NULL,
+    display_prefix text NOT NULL,
+    label text,
+    status text DEFAULT 'active'::text NOT NULL,
+    expires_at timestamp with time zone,
+    last_used_at timestamp with time zone,
+    created_by_person_id uuid REFERENCES public.people(id) ON DELETE SET NULL,
+    revoked_by_person_id uuid REFERENCES public.people(id) ON DELETE SET NULL,
+    revoked_at timestamp with time zone,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT agent_credentials_status_check CHECK ((status = ANY (ARRAY['active'::text, 'revoked'::text])))
+);
+
+
+--
+-- Name: TABLE agent_credentials; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.agent_credentials IS 'Hash-only API credentials for first-class agent principals.';
 
 
 --
@@ -2150,6 +2188,7 @@ CREATE TABLE public.task_reservations (
     id uuid NOT NULL,
     task_id uuid NOT NULL,
     agent_id uuid NOT NULL,
+    membership_id uuid NOT NULL,
     worker_session_id uuid,
     status text DEFAULT 'active'::text NOT NULL,
     reserved_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -2168,6 +2207,7 @@ CREATE TABLE public.task_reservations (
 
 CREATE TABLE public.tasks (
     id uuid NOT NULL,
+    organisation_id uuid NOT NULL REFERENCES public.organisations(id),
     parent_task_id uuid,
     plan_id uuid,
     ray_id uuid,
@@ -2294,6 +2334,7 @@ CREATE TABLE public.testimonials (
 CREATE TABLE public.worker_sessions (
     id uuid NOT NULL,
     agent_id uuid NOT NULL,
+    membership_id uuid NOT NULL,
     instance_id text NOT NULL,
     status text DEFAULT 'idle'::text NOT NULL,
     capabilities text[] DEFAULT '{}'::text[] NOT NULL,
@@ -2498,11 +2539,11 @@ ALTER TABLE ONLY public.admin_conversion_targets
 
 
 --
--- Name: agents agents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: organisation_memberships organisation_memberships_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.agents
-    ADD CONSTRAINT agents_pkey PRIMARY KEY (id);
+ALTER TABLE public.organisation_memberships
+    ADD CONSTRAINT organisation_memberships_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES public.agents(id) ON DELETE CASCADE;
 
 
 --
@@ -3154,6 +3195,15 @@ CREATE UNIQUE INDEX admin_sessions_hash_idx ON public.admin_sessions USING btree
 CREATE INDEX admin_sessions_person_active_idx ON public.admin_sessions USING btree (person_id, expires_at DESC) WHERE (revoked_at IS NULL);
 
 
+CREATE INDEX agent_credentials_agent_status_idx ON public.agent_credentials USING btree (agent_id, status, created_at DESC);
+
+
+CREATE UNIQUE INDEX agent_credentials_hash_idx ON public.agent_credentials USING btree (credential_hash);
+
+
+CREATE INDEX agent_credentials_membership_status_idx ON public.agent_credentials USING btree (membership_id, status, created_at DESC) WHERE (membership_id IS NOT NULL);
+
+
 --
 -- Name: agents_capabilities_gin_idx; Type: INDEX; Schema: public; Owner: -
 --
@@ -3181,10 +3231,16 @@ CREATE UNIQUE INDEX agents_name_idx ON public.agents USING btree (lower(name));
 CREATE INDEX agents_status_idx ON public.agents USING btree (status, agent_type, updated_at DESC);
 
 
-CREATE UNIQUE INDEX organisation_memberships_person_org_idx ON public.organisation_memberships USING btree (person_id, organisation_id);
+CREATE UNIQUE INDEX organisation_memberships_agent_org_active_idx ON public.organisation_memberships USING btree (agent_id, organisation_id) WHERE ((principal_type = 'agent'::text) AND (status <> 'deleted'::text));
 
 
-CREATE INDEX organisation_memberships_org_status_idx ON public.organisation_memberships USING btree (organisation_id, status, role);
+CREATE INDEX organisation_memberships_agent_status_idx ON public.organisation_memberships USING btree (agent_id, status, updated_at DESC) WHERE (principal_type = 'agent'::text);
+
+
+CREATE UNIQUE INDEX organisation_memberships_person_org_active_idx ON public.organisation_memberships USING btree (person_id, organisation_id) WHERE ((principal_type = 'person'::text) AND (status <> 'deleted'::text));
+
+
+CREATE INDEX organisation_memberships_org_status_idx ON public.organisation_memberships USING btree (organisation_id, principal_type, status, role);
 
 
 CREATE UNIQUE INDEX organisations_slug_idx ON public.organisations USING btree (lower(slug));
@@ -4188,6 +4244,13 @@ CREATE INDEX task_reservations_agent_idx ON public.task_reservations USING btree
 
 
 --
+-- Name: task_reservations_membership_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX task_reservations_membership_idx ON public.task_reservations USING btree (membership_id, status, reserved_at DESC);
+
+
+--
 -- Name: task_reservations_lease_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4227,6 +4290,9 @@ CREATE INDEX tasks_parent_idx ON public.tasks USING btree (parent_task_id, creat
 --
 
 CREATE INDEX tasks_plan_idx ON public.tasks USING btree (plan_id, created_at DESC) WHERE (plan_id IS NOT NULL);
+
+
+CREATE INDEX tasks_organisation_status_idx ON public.tasks USING btree (organisation_id, status, scheduled_for DESC);
 
 
 --
@@ -4281,7 +4347,14 @@ CREATE INDEX testimonials_translation_group_idx ON public.testimonials USING btr
 -- Name: worker_sessions_agent_instance_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX worker_sessions_agent_instance_idx ON public.worker_sessions USING btree (agent_id, instance_id);
+CREATE INDEX worker_sessions_agent_idx ON public.worker_sessions USING btree (agent_id, status, last_seen_at DESC);
+
+
+--
+-- Name: worker_sessions_membership_instance_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX worker_sessions_membership_instance_idx ON public.worker_sessions USING btree (membership_id, instance_id);
 
 
 --
@@ -5041,6 +5114,14 @@ ALTER TABLE ONLY public.task_reservations
 
 
 --
+-- Name: task_reservations task_reservations_membership_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_reservations
+    ADD CONSTRAINT task_reservations_membership_id_fkey FOREIGN KEY (membership_id) REFERENCES public.organisation_memberships(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: task_reservations task_reservations_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5118,6 +5199,14 @@ ALTER TABLE ONLY public.tasks
 
 ALTER TABLE ONLY public.worker_sessions
     ADD CONSTRAINT worker_sessions_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES public.agents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: worker_sessions worker_sessions_membership_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.worker_sessions
+    ADD CONSTRAINT worker_sessions_membership_id_fkey FOREIGN KEY (membership_id) REFERENCES public.organisation_memberships(id) ON DELETE RESTRICT;
 
 
 INSERT INTO public.organisations (

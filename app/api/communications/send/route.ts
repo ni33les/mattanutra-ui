@@ -2,21 +2,27 @@ import {
   objectValue,
   openClawJson,
   readJsonObject,
+  requireOpenClawAccess,
   taskApiError,
   textValue
 } from "@/lib/openclaw-api";
-import { adminClawRequestAllowed } from "@/lib/admin-auth";
 import {
   normalizeCommunicationChannelType,
   sendCommunication
 } from "@/lib/communications";
-import { workerRequestAllowed, workerUnauthorized } from "@/lib/worker-auth";
+import { requireWorkerAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  if (!adminClawRequestAllowed(request) && !workerRequestAllowed(request)) {
-    return workerUnauthorized();
+  const openClawAccess = await requireOpenClawAccess(request, "communications.write");
+
+  if (openClawAccess.unauthorized) {
+    const workerAccess = await requireWorkerAccess(request);
+
+    if (workerAccess.unauthorized) {
+      return workerAccess.unauthorized;
+    }
   }
 
   const body = await readJsonObject(request);

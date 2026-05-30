@@ -3,26 +3,32 @@ import {
   adminCookieOptions,
   adminCsrfCookieName,
   adminSessionCookieName,
+  addAgentMembership,
   addAdminMembership,
   clientAdminSessionContext,
   createAdminInvitation,
   createOrganisation,
   deleteAdminInvitation,
   deleteAdminMembership,
+  generateAgentCredential,
   getAdminAccessData,
+  inviteAgent,
   legacyAdminContext,
+  revokeAgentCredential,
+  rotateAgentCredential,
   resolveAdminSession,
   signAdminSessionContext,
   stopAdminImpersonation,
   updateOrganisation,
   updateMembershipRole,
   updateOwnPerson,
+  updateAgent,
   updatePerson,
   assumeAdminIdentity,
   type AdminSessionContext
 } from "@/lib/admin-access";
 import { requestOriginAllowed } from "@/lib/admin-session-cookie";
-import { hasAdminPermission, isAdminRole } from "@/lib/admin-rbac";
+import { hasAdminPermission, isAdminRole, isAgentRole } from "@/lib/admin-rbac";
 import { isLocale, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -109,7 +115,11 @@ async function accessResponse(
 export async function GET(request: NextRequest) {
   const context = await adminContext(request);
 
-  if (!context || !hasAdminPermission(context, "access.read")) {
+  if (
+    !context ||
+    (!hasAdminPermission(context, "access.read") &&
+      !hasAdminPermission(context, "access.agents.read"))
+  ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -385,6 +395,184 @@ export async function POST(request: NextRequest) {
       });
 
       return accessResponse(request, context, { membershipDeleted: true });
+    }
+
+    if (action === "add_agent_membership") {
+      if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      if (context.effectiveOrganisation.type !== "platform") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const role = text(body.role);
+
+      if (!isAgentRole(role)) {
+        return NextResponse.json({ error: "Invalid agent role" }, { status: 400 });
+      }
+
+      await addAgentMembership({
+        actor: context,
+        agentId: text(body.agentId),
+        organisationId: text(body.organisationId),
+        role,
+        status: text(body.status) || "active"
+      });
+
+      return accessResponse(request, context);
+    }
+
+    if (action === "invite_agent" || action === "create_agent") {
+      if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      if (context.effectiveOrganisation.type !== "platform") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const role = text(body.role);
+
+      if (!isAgentRole(role)) {
+        return NextResponse.json({ error: "Invalid agent role" }, { status: 400 });
+      }
+
+      await inviteAgent({
+        actor: context,
+        agentStatus: text(body.agentStatus) || "active",
+        capabilities: body.capabilities,
+        membershipStatus: text(body.membershipStatus) || "invited",
+        model: text(body.model) || null,
+        name: text(body.name),
+        organisationId: text(body.organisationId),
+        personId: text(body.personId) || null,
+        role,
+        status: text(body.agentStatus) || "active",
+        type: text(body.agentType) || "system"
+      });
+
+      return accessResponse(request, context);
+    }
+
+    if (action === "update_agent") {
+      if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      if (context.effectiveOrganisation.type !== "platform") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const role = text(body.role);
+
+      if (!isAgentRole(role)) {
+        return NextResponse.json({ error: "Invalid agent role" }, { status: 400 });
+      }
+
+      await updateAgent({
+        actor: context,
+        agentId: text(body.agentId),
+        capabilities: body.capabilities,
+        membershipId: text(body.membershipId),
+        membershipStatus: text(body.membershipStatus) || text(body.status) || "active",
+        model: text(body.model) || null,
+        name: text(body.name),
+        organisationId: text(body.organisationId),
+        personId: text(body.personId) || null,
+        role,
+        status: text(body.agentStatus) || text(body.status) || "active",
+        type: text(body.agentType) || "system"
+      });
+
+      return accessResponse(request, context);
+    }
+
+    if (action === "activate_agent_membership") {
+      if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      if (context.effectiveOrganisation.type !== "platform") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const role = text(body.role);
+
+      if (!isAgentRole(role)) {
+        return NextResponse.json({ error: "Invalid agent role" }, { status: 400 });
+      }
+
+      await updateAgent({
+        actor: context,
+        agentId: text(body.agentId),
+        capabilities: body.capabilities,
+        membershipId: text(body.membershipId),
+        membershipStatus: "active",
+        model: text(body.model) || null,
+        name: text(body.name),
+        organisationId: text(body.organisationId),
+        personId: text(body.personId) || null,
+        role,
+        status: text(body.agentStatus) || "active",
+        type: text(body.agentType) || "system"
+      });
+
+      return accessResponse(request, context);
+    }
+
+    if (action === "generate_agent_credential") {
+      if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      if (context.effectiveOrganisation.type !== "platform") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const credential = await generateAgentCredential({
+        actor: context,
+        expiresAt: text(body.expiresAt) || null,
+        label: text(body.label) || null,
+        membershipId: text(body.membershipId)
+      });
+
+      return accessResponse(request, context, { credential });
+    }
+
+    if (action === "revoke_agent_credential") {
+      if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      if (context.effectiveOrganisation.type !== "platform") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      await revokeAgentCredential({
+        actor: context,
+        credentialId: text(body.credentialId)
+      });
+
+      return accessResponse(request, context);
+    }
+
+    if (action === "rotate_agent_credential") {
+      if (!hasAdminPermission(context, "access.write")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      if (context.effectiveOrganisation.type !== "platform") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const credential = await rotateAgentCredential({
+        actor: context,
+        credentialId: text(body.credentialId),
+        label: text(body.label) || null
+      });
+
+      return accessResponse(request, context, { credential });
     }
 
     if (action === "assume_identity") {

@@ -211,16 +211,22 @@ function workerConcurrency(mode: WorkerProfileMode) {
   );
 }
 
-function requireConfig() {
+function workerAgentKey(mode: WorkerProfileMode) {
+  return envText(`WORKER_${mode.toUpperCase()}_AGENT_API_KEY`);
+}
+
+function requireConfig(mode: WorkerProfileMode) {
   const baseUrl =
     envText("WORKER_API_BASE_URL") ||
     envText("MATTANUTRA_API_BASE_URL") ||
     envText("APP_BASE_URL") ||
     "http://localhost:3000";
-  const token = envText("WORKER_API_TOKEN");
+  const token = workerAgentKey(mode);
 
   if (!token) {
-    throw new Error("WORKER_API_TOKEN is required for external workers");
+    throw new Error(
+      `A DB-managed agent API key is required for the ${mode} worker. Set WORKER_${mode.toUpperCase()}_AGENT_API_KEY.`
+    );
   }
 
   return { baseUrl, token };
@@ -539,10 +545,10 @@ async function shutdown() {
 }
 
 async function runWorker(mode: WorkerMode) {
-  const config = requireConfig();
   const modes =
     mode === "all" ? WORKER_PROFILE_MODES : ([mode] as readonly WorkerProfileMode[]);
   const loops = modes.flatMap((profileMode, profileIndex) => {
+    const config = requireConfig(profileMode);
     const concurrency = workerConcurrency(profileMode);
 
     return Array.from({ length: concurrency }, (_, slotIndex) =>

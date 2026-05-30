@@ -2,6 +2,7 @@ import type { AdminDashboardView } from "@/components/admin/dashboard-content";
 
 export type AdminPermission =
   | "access.read"
+  | "access.agents.read"
   | "access.write"
   | "agents.read"
   | "agents.write"
@@ -35,14 +36,25 @@ export const adminRoles = [
 export type AdminRole = (typeof adminRoles)[number];
 
 export type AdminOrganisationType = "platform" | "tenant";
+export type AgentRole = "platform_agent" | "retail_agent";
 
 export type AdminSessionPrincipal = Readonly<{
   permissions: readonly AdminPermission[];
   role: AdminRole;
 }>;
 
+export type AgentPrincipal = Readonly<{
+  agentId: string;
+  capabilities: readonly string[];
+  membershipId: string;
+  organisationId: string;
+  permissions: readonly AdminPermission[];
+  role: AgentRole;
+}>;
+
 const allPermissions = [
   "access.read",
+  "access.agents.read",
   "access.write",
   "agents.read",
   "agents.write",
@@ -69,7 +81,7 @@ const allPermissions = [
 export const adminRolePermissions = {
   platform_owner: allPermissions,
   platform_admin: allPermissions,
-  retail_admin: ["settings.read"],
+  retail_admin: ["access.agents.read", "settings.read"],
   retail_agent: ["settings.read"],
   retail_assistant: ["settings.read"]
 } as const satisfies Record<AdminRole, readonly AdminPermission[]>;
@@ -91,6 +103,41 @@ export const retailAdminRoles = [
   "retail_agent",
   "retail_assistant"
 ] as const satisfies readonly AdminRole[];
+export const agentRoles = [
+  "platform_agent",
+  "retail_agent"
+] as const satisfies readonly AgentRole[];
+export const agentRoleLabels = {
+  platform_agent: "Platform Agent",
+  retail_agent: "Retail Agent"
+} as const satisfies Record<AgentRole, string>;
+export const agentRolePermissions = {
+  platform_agent: [
+    "agents.read",
+    "alerts.read",
+    "alerts.write",
+    "catalogue.read",
+    "catalogue.write",
+    "communications.read",
+    "communications.write",
+    "content.read",
+    "content.write",
+    "marketing.read",
+    "performance.read",
+    "performance.write",
+    "reviews.read",
+    "reviews.write",
+    "tasks.read",
+    "tasks.write"
+  ],
+  retail_agent: [
+    "communications.read",
+    "communications.write",
+    "settings.read",
+    "tasks.read",
+    "tasks.write"
+  ]
+} as const satisfies Record<AgentRole, readonly AdminPermission[]>;
 const platformRoleSet = new Set<AdminRole>(platformAdminRoles);
 const retailRoleSet = new Set<AdminRole>(retailAdminRoles);
 
@@ -168,6 +215,25 @@ export function isAdminRole(value: unknown): value is AdminRole {
   return typeof value === "string" && value in adminRolePermissions;
 }
 
+export function isAgentRole(value: unknown): value is AgentRole {
+  return typeof value === "string" && value in agentRolePermissions;
+}
+
+export function normalizeAgentRole(
+  role: string | null | undefined,
+  organisationType: AdminOrganisationType = "platform"
+): AgentRole {
+  if (isAgentRole(role)) {
+    return role;
+  }
+
+  return organisationType === "platform" ? "platform_agent" : "retail_agent";
+}
+
+export function permissionsForAgentRole(role: string | null | undefined) {
+  return role && isAgentRole(role) ? agentRolePermissions[role] : [];
+}
+
 export function hasAdminPermission(
   principal: AdminSessionPrincipal | null | undefined,
   permission: AdminPermission
@@ -176,9 +242,12 @@ export function hasAdminPermission(
 }
 
 export function adminViewPermission(view: AdminDashboardView): AdminPermission {
+  if (view === "access-agents") {
+    return "access.agents.read";
+  }
+
   if (
     view === "access" ||
-    view === "access-agents" ||
     view === "audit" ||
     view === "memberships" ||
     view === "organisations" ||
@@ -246,7 +315,11 @@ export function firstAllowedAdminView(
   principal: AdminSessionPrincipal,
   fallback: AdminDashboardView = "glance"
 ) {
-  return allowedAdminViews(principal).find((view) => view !== "access") ?? fallback;
+  return (
+    allowedAdminViews(principal).find(
+      (view) => view !== "access" && view !== "access-agents"
+    ) ?? fallback
+  );
 }
 
 export function adminViewAllowed(

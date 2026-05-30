@@ -6,7 +6,7 @@ import {
   textValue
 } from "@/lib/openclaw-api";
 import { registerWorkerSession, type AgentType } from "@/lib/task-service";
-import { requireWorkerRequest } from "@/lib/worker-auth";
+import { requireWorkerAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
 
@@ -22,7 +22,8 @@ function agentType(value: unknown): AgentType {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = requireWorkerRequest(request);
+  const access = await requireWorkerAccess(request);
+  const unauthorized = access.unauthorized;
 
   if (unauthorized) {
     return unauthorized;
@@ -30,7 +31,8 @@ export async function POST(request: Request) {
 
   const body = await readJsonObject(request);
   const agent = objectValue(body.agent);
-  const name = textValue(agent.name) ?? textValue(body.name);
+  const principal = access.principal;
+  const name = principal?.agentName ?? textValue(agent.name) ?? textValue(body.name);
   const instanceId = textValue(body.instanceId);
 
   if (!name || !instanceId) {
@@ -42,15 +44,16 @@ export async function POST(request: Request) {
 
   try {
     const registration = await registerWorkerSession({
+      accessScope: access.scope,
       agent: {
-        capabilities: agent.capabilities ?? body.capabilities,
-        id: textValue(agent.id),
+        capabilities: principal?.capabilities ?? agent.capabilities ?? body.capabilities,
+        id: principal?.agentId ?? textValue(agent.id),
         metadata: objectValue(agent.metadata),
         model: textValue(agent.model),
         name,
         type: agentType(agent.type ?? body.agentType)
       },
-      capabilities: body.capabilities ?? agent.capabilities,
+      capabilities: principal?.capabilities ?? body.capabilities ?? agent.capabilities,
       concurrency: body.concurrency,
       instanceId,
       metadata: objectValue(body.metadata),

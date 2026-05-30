@@ -234,7 +234,7 @@ export function ContentEditorModal({
   return (
     <AdminModal onClose={onClose} panelClassName="max-w-2xl">
       <form onSubmit={submitEditor}>
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 pr-14">
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-gray-900">
               {modalTitle}
@@ -243,14 +243,6 @@ export function ContentEditorModal({
               {editing ? labels.contentPages.edit : labels.contentPages.draft}
             </p>
           </div>
-          <button
-            aria-label={labels.contentPages.cancel}
-            className="inline-flex items-center justify-center rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-2 focus:outline-offset-2 focus:outline-[#1FA77A]"
-            onClick={onClose}
-            type="button"
-          >
-            {labels.contentPages.cancel}
-          </button>
         </div>
 
         <div className="space-y-5 px-5 py-5">

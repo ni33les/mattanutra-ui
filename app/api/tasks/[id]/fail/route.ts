@@ -8,7 +8,7 @@ import {
 import { applyTaskFailureResult } from "@/lib/task-result-applier";
 import { writeBpmEvent } from "@/lib/bpm";
 import { failTask } from "@/lib/task-service";
-import { requireWorkerRequest } from "@/lib/worker-auth";
+import { requireWorkerAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
 
@@ -19,7 +19,8 @@ type FailTaskRouteProps = Readonly<{
 }>;
 
 export async function POST(request: Request, { params }: FailTaskRouteProps) {
-  const unauthorized = requireWorkerRequest(request);
+  const access = await requireWorkerAccess(request);
+  const unauthorized = access.unauthorized;
 
   if (unauthorized) {
     return unauthorized;
@@ -46,9 +47,10 @@ export async function POST(request: Request, { params }: FailTaskRouteProps) {
 
   try {
     const errorMessage = textValue(body.errorMessage) ?? "Task failed.";
-    const agentId = textValue(body.agentId);
+    const agentId = access.principal?.agentId ?? textValue(body.agentId);
 
     const task = await failTask({
+      accessScope: access.scope,
       agentId,
       applyFailure: (context) =>
         applyTaskFailureResult({

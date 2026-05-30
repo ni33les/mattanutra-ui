@@ -498,7 +498,7 @@ function VisibilityTaskDetailsModal({
 
   return (
     <AdminModal onClose={onClose} panelClassName="max-w-3xl">
-      <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+      <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 pr-14">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span
@@ -525,14 +525,6 @@ function VisibilityTaskDetailsModal({
             {readableToken(row.taskType)} · {compactId(row.id)}
           </p>
         </div>
-        <button
-          aria-label={labels.supplements.close}
-          className="rounded-md px-3 py-1.5 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A]"
-          onClick={onClose}
-          type="button"
-        >
-          {labels.supplements.close}
-        </button>
       </div>
 
       <div className="max-h-[75vh] space-y-6 overflow-y-auto px-6 py-6">
@@ -703,6 +695,15 @@ function VisibilityTaskDetailsModal({
             </pre>
           ) : null}
         </div>
+      </div>
+      <div className="flex justify-end border-t border-gray-100 px-6 py-4">
+        <button
+          className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+          onClick={onClose}
+          type="button"
+        >
+          {labels.supplements.close}
+        </button>
       </div>
     </AdminModal>
   );

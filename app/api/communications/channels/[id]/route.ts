@@ -2,7 +2,7 @@ import {
   objectValue,
   openClawJson,
   readJsonObject,
-  requireOpenClawRequest,
+  requireOpenClawAccess,
   taskApiError,
   textValue
 } from "@/lib/openclaw-api";
@@ -40,7 +40,7 @@ function statusValue(value: unknown): CommunicationChannelStatus | null {
 }
 
 export async function PATCH(request: Request, { params }: ChannelRouteProps) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "communications.write");
 
   if (unauthorized) {
     return unauthorized;

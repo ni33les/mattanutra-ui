@@ -1,6 +1,6 @@
 import {
   openClawJson,
-  requireOpenClawRequest,
+  requireOpenClawAccess,
   taskApiError
 } from "@/lib/openclaw-api";
 import { loadOpenClawPlanContext } from "@/lib/plan-concierge";
@@ -17,7 +17,7 @@ export async function GET(
   request: Request,
   { params }: OpenClawPlanRouteProps
 ) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "tasks.read");
 
   if (unauthorized) {
     return unauthorized;

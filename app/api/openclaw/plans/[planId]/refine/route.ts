@@ -1,7 +1,7 @@
 import {
   openClawJson,
   readJsonObject,
-  requireOpenClawRequest,
+  requireOpenClawAccess,
   taskApiError,
   textValue
 } from "@/lib/openclaw-api";
@@ -19,7 +19,7 @@ export async function POST(
   request: Request,
   { params }: OpenClawPlanRouteProps
 ) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized, principal } = await requireOpenClawAccess(request);
 
   if (unauthorized) {
     return unauthorized;
@@ -31,7 +31,10 @@ export async function POST(
   try {
     const queued = await enqueueNutritionPlanRefinementTask({
       planId,
-      requestedBy: textValue(body.requestedBy) ?? "openclaw"
+      requestedBy:
+        principal?.type === "agent"
+          ? principal.agentName
+          : textValue(body.requestedBy) ?? "openclaw"
     });
 
     if (!queued.taskId) {

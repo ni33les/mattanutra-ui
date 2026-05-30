@@ -23,17 +23,24 @@ import {
   adminRoleAllowedForOrganisationType,
   adminRoleLabels,
   adminRoles,
+  isAgentRole,
   normalizeAdminRole,
+  normalizeAgentRole,
   permissionsForRole,
+  type AgentRole,
   type AdminOrganisationType,
   type AdminRole
 } from "@/lib/admin-rbac";
+import { configuredGrokModel, configuredGrokValue } from "@/lib/grok-client";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 import { siteBaseUrl } from "@/lib/site-url";
+import { normalizeCapabilities } from "@/lib/task-service-utils";
 import type {
   AdminAccessData,
   AdminAccessStatus,
   AdminClientSessionContext,
+  AgentCredentialCreated,
+  AgentCredentialSummary,
   AdminMembership,
   AdminOrganisation,
   AdminPerson,
@@ -45,6 +52,7 @@ export type {
   AdminAccessAgent,
   AdminAccessData,
   AdminAccessStatus,
+  AdminAgentMembership,
   AdminAuditEvent,
   AdminClientSessionContext,
   AdminInvitation,
@@ -55,7 +63,9 @@ export type {
   AdminPerson,
   AdminSettingsData,
   AdminSettingsPerson,
-  AdminSessionContext
+  AdminSessionContext,
+  AgentCredentialCreated,
+  AgentCredentialSummary
 } from "@/lib/admin-access-types";
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
@@ -140,6 +150,117 @@ function metadataRecord(value: unknown): Record<string, unknown> {
   }
 
   return {};
+}
+
+function metadataText(
+  metadata: Record<string, unknown>,
+  keys: readonly string[],
+  options: Readonly<{ allowStructured?: boolean }> = {}
+) {
+  for (const key of keys) {
+    const value = metadata[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+
+    if (options.allowStructured && value && typeof value === "object") {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  return null;
+}
+
+function configuredAgentGrokModel(model: string | null, metadata: Record<string, unknown>) {
+  const explicit = metadataText(metadata, [
+    "actualGrokModel",
+    "grokModel",
+    "modelName",
+    "xaiModel"
+  ]);
+
+  if (explicit) {
+    return explicit;
+  }
+
+  if (!model) {
+    return null;
+  }
+
+  if (model.startsWith("grok-")) {
+    return model;
+  }
+
+  if (model === "grok:healthscore") {
+    return configuredGrokModel(process.env.HEALTHSCORE_COPY_MODEL, process.env.GROK_MODEL);
+  }
+
+  if (model.startsWith("grok:")) {
+    return configuredGrokModel(process.env.GROK_MODEL);
+  }
+
+  return null;
+}
+
+function configuredAgentReasoningLevel(
+  model: string | null,
+  metadata: Record<string, unknown>
+) {
+  const explicit = metadataText(metadata, [
+    "reasoningLevel",
+    "reasoningEffort",
+    "reasoning_effort"
+  ]);
+
+  if (explicit) {
+    return explicit;
+  }
+
+  if (model === "grok:formulation") {
+    return configuredGrokValue(process.env.FORMULATION_REASONING_EFFORT) || "low";
+  }
+
+  if (model === "grok:food-guidance") {
+    return (
+      configuredGrokValue(process.env.FOOD_GUIDANCE_REASONING_EFFORT) ||
+      configuredGrokValue(process.env.FORMULATION_REASONING_EFFORT) ||
+      "low"
+    );
+  }
+
+  if (model === "grok:healthscore") {
+    return configuredGrokValue(process.env.HEALTHSCORE_REASONING_EFFORT) || "none";
+  }
+
+  if (model === "grok:nutrition-advisor") {
+    return configuredGrokValue(process.env.NUTRITION_ADVISOR_REASONING_EFFORT) || null;
+  }
+
+  return null;
+}
+
+function configuredAgentPrompt(metadata: Record<string, unknown>) {
+  return metadataText(
+    metadata,
+    [
+      "systemPrompt",
+      "system_prompt",
+      "prompt",
+      "promptText",
+      "promptMessages",
+      "messages"
+    ],
+    { allowStructured: true }
+  );
 }
 
 function toJsonValue(value: unknown): postgres.JSONValue {
@@ -285,6 +406,27 @@ function membership(row: {
   };
 }
 
+function agentCredentialSummary(row: Record<string, unknown>): AgentCredentialSummary {
+  const status =
+    row.status === "revoked"
+      ? "revoked"
+      : row.expiresAt && new Date(String(row.expiresAt)).getTime() <= Date.now()
+        ? "expired"
+        : "active";
+
+  return {
+    createdAt: new Date(String(row.createdAt)).toISOString(),
+    displayPrefix: String(row.displayPrefix ?? ""),
+    expiresAt: row.expiresAt ? new Date(String(row.expiresAt)).toISOString() : null,
+    id: String(row.id ?? ""),
+    label: typeof row.label === "string" ? row.label : null,
+    lastUsedAt: row.lastUsedAt ? new Date(String(row.lastUsedAt)).toISOString() : null,
+    membershipId: typeof row.membershipId === "string" ? row.membershipId : null,
+    revokedAt: row.revokedAt ? new Date(String(row.revokedAt)).toISOString() : null,
+    status
+  };
+}
+
 async function sqlOrThrow() {
   const sql = getSql();
 
@@ -303,6 +445,7 @@ async function personHasPlatformOwnerMembership(sql: Db, personId: string) {
       join public.organisations
         on organisations.id = organisation_memberships.organisation_id
       where organisation_memberships.person_id = ${personId}::uuid
+        and organisation_memberships.principal_type = 'person'
         and organisation_memberships.role = 'platform_owner'
         and organisation_memberships.status <> 'deleted'
         and not (organisation_memberships.metadata ? 'deletedAt')
@@ -367,6 +510,7 @@ async function personBelongsToOrganisation(
       from public.organisation_memberships
       where person_id = ${personId}::uuid
         and organisation_id = ${organisationId}::uuid
+        and principal_type = 'person'
         and status <> 'deleted'
         and not (metadata ? 'deletedAt')
     ) as exists
@@ -437,6 +581,7 @@ export async function hasPlatformOwner() {
         on organisations.id = organisation_memberships.organisation_id
       join public.people on people.id = organisation_memberships.person_id
       where organisations.organisation_type = 'platform'
+        and organisation_memberships.principal_type = 'person'
         and organisation_memberships.role = 'platform_owner'
         and organisation_memberships.status = 'active'
         and people.status = 'active'
@@ -735,17 +880,21 @@ async function upsertPersonAndMembership({
   }>>`
     insert into public.organisation_memberships (
       organisation_id,
+      principal_type,
       person_id,
       role,
       status
     )
     values (
       ${organisationId}::uuid,
+      'person',
       ${savedPerson.id}::uuid,
       ${role},
       'active'
     )
-    on conflict (person_id, organisation_id) do update set
+    on conflict (person_id, organisation_id)
+      where principal_type = 'person' and status <> 'deleted'
+    do update set
       updated_at = now()
     returning id::text, organisation_id::text, person_id::text, role, status, title
   `;
@@ -1027,6 +1176,7 @@ export async function verifyAuthenticationAndCreateSession({
     join public.organisations on organisations.id = organisation_memberships.organisation_id
     join public.people on people.id = organisation_memberships.person_id
     where organisation_memberships.person_id = ${credential.person_id}::uuid
+      and organisation_memberships.principal_type = 'person'
       and organisation_memberships.status = 'active'
       and organisations.status = 'active'
       and people.status = 'active'
@@ -1119,6 +1269,7 @@ async function sessionContextFor({
       and organisations.id = ${organisationId}::uuid
       and people.status = 'active'
       and organisations.status = 'active'
+      and organisation_memberships.principal_type = 'person'
       and organisation_memberships.status = 'active'
     limit 1
   `;
@@ -1155,6 +1306,7 @@ async function sessionContextFor({
         and organisations.id = ${assumedOrganisationId}::uuid
         and people.status = 'active'
         and organisations.status = 'active'
+        and organisation_memberships.principal_type = 'person'
         and organisation_memberships.status = 'active'
       limit 1
     `;
@@ -1494,6 +1646,7 @@ export async function getAdminAccessData(
           select 1
           from public.organisation_memberships scoped_memberships
           where scoped_memberships.person_id = people.id
+            and scoped_memberships.principal_type = 'person'
             and scoped_memberships.organisation_id = ${scopeOrganisationId}::uuid
             and scoped_memberships.status <> 'deleted'
             and not (scoped_memberships.metadata ? 'deletedAt')
@@ -1503,11 +1656,13 @@ export async function getAdminAccessData(
   const membershipScope = scopeOrganisationId
     ? sql`
         where organisation_memberships.organisation_id = ${scopeOrganisationId}::uuid
+          and organisation_memberships.principal_type = 'person'
           and organisation_memberships.status <> 'deleted'
           and not (organisation_memberships.metadata ? 'deletedAt')
       `
     : sql`
         where organisation_memberships.status <> 'deleted'
+          and organisation_memberships.principal_type = 'person'
           and not (organisation_memberships.metadata ? 'deletedAt')
       `;
   const invitationScope = scopeOrganisationId
@@ -1517,8 +1672,15 @@ export async function getAdminAccessData(
     ? sql`where organisation_id = ${scopeOrganisationId}::uuid`
     : sql``;
   const agentScope = scopeOrganisationId
-    ? sql`where organisation_id = ${scopeOrganisationId}::uuid`
-    : sql``;
+    ? sql`
+        where organisation_memberships.organisation_id = ${scopeOrganisationId}::uuid
+          and organisation_memberships.principal_type = 'agent'
+          and organisation_memberships.status <> 'deleted'
+      `
+    : sql`
+        where organisation_memberships.principal_type = 'agent'
+          and organisation_memberships.status <> 'deleted'
+      `;
   const [organisations, people, memberships, invitations, auditEvents, agents] =
     await Promise.all([
       sql<Array<{
@@ -1621,37 +1783,102 @@ export async function getAdminAccessData(
       `,
       sql<Array<{
         capabilities: string[] | null;
+        credential_count: number;
+        credentials: unknown;
         id: string;
+        metadata: unknown;
+        membership_id: string;
+        membership_status: string;
+        membership_title: string | null;
+        model: string | null;
         name: string;
-        organisation_id: string | null;
+        organisation_id: string;
         person_id: string | null;
+        role: string;
         status: string;
         type: string;
       }>>`
         select
-          id::text,
-          name,
-          agent_type as type,
-          status,
-          capabilities,
-          organisation_id::text,
-          person_id::text
+          agents.id::text,
+          organisation_memberships.id::text as membership_id,
+          agents.name,
+          agents.agent_type as type,
+          organisation_memberships.role,
+          agents.status,
+          agents.capabilities,
+          agents.model,
+          agents.metadata,
+          organisation_memberships.organisation_id::text,
+          organisation_memberships.status as membership_status,
+          organisation_memberships.title as membership_title,
+          agents.person_id::text,
+          count(agent_credentials.id)::int as credential_count,
+          coalesce(
+            jsonb_agg(
+              jsonb_build_object(
+                'createdAt', agent_credentials.created_at,
+                'displayPrefix', agent_credentials.display_prefix,
+                'expiresAt', agent_credentials.expires_at,
+                'id', agent_credentials.id::text,
+                'label', agent_credentials.label,
+                'lastUsedAt', agent_credentials.last_used_at,
+                'membershipId', agent_credentials.membership_id::text,
+                'revokedAt', agent_credentials.revoked_at,
+                'status', agent_credentials.status
+              )
+              order by agent_credentials.created_at desc
+            ) filter (where agent_credentials.id is not null),
+            '[]'::jsonb
+          ) as credentials
         from public.agents
+        join public.organisation_memberships
+          on organisation_memberships.agent_id = agents.id
+        left join public.agent_credentials
+          on agent_credentials.agent_id = agents.id
+          and agent_credentials.membership_id = organisation_memberships.id
         ${agentScope}
-        order by lower(name) asc
+        group by agents.id, organisation_memberships.id
+        order by lower(agents.name) asc, organisation_memberships.created_at asc
       `
     ]);
 
   return {
-    agents: agents.map((agent) => ({
-      capabilities: agent.capabilities ?? [],
-      id: agent.id,
-      name: agent.name,
-      organisationId: agent.organisation_id,
-      personId: agent.person_id,
-      status: agent.status,
-      type: agent.type
-    })),
+    agents: agents.map((agent) => {
+      const metadata = metadataRecord(agent.metadata);
+
+      return {
+        capabilities: agent.capabilities ?? [],
+        credentialCount: agent.credential_count,
+        credentials: Array.isArray(agent.credentials)
+          ? agent.credentials.map((credential) =>
+              agentCredentialSummary(credential as Record<string, unknown>)
+            )
+          : [],
+        grokModel: configuredAgentGrokModel(agent.model, metadata),
+        id: agent.id,
+        membershipId: agent.membership_id,
+        membershipStatus:
+          agent.membership_status === "active" ||
+          agent.membership_status === "deleted" ||
+          agent.membership_status === "disabled" ||
+          agent.membership_status === "invited"
+            ? agent.membership_status
+            : "disabled",
+        membershipTitle: agent.membership_title,
+        model: agent.model,
+        name: agent.name,
+        organisationId: agent.organisation_id,
+        personId: agent.person_id,
+        prompt: configuredAgentPrompt(metadata),
+        reasoningLevel: configuredAgentReasoningLevel(agent.model, metadata),
+        role: normalizeAgentRole(
+          isAgentRole(agent.role) ? agent.role : null,
+          agent.role === "retail_agent" ? "tenant" : "platform"
+        ),
+        status: agent.status,
+        type: agent.type
+      };
+    }),
     auditEvents: auditEvents.map((event) => ({
       action: event.action,
       actorPersonId: event.actor_person_id,
@@ -1728,6 +1955,7 @@ export async function getAdminSettingsData(
       from public.organisation_memberships
       join public.people on people.id = organisation_memberships.person_id
       where organisation_memberships.organisation_id = ${context.effectiveOrganisation.id}::uuid
+        and organisation_memberships.principal_type = 'person'
         and organisation_memberships.status <> 'deleted'
         and not (organisation_memberships.metadata ? 'deletedAt')
       order by lower(people.display_name), lower(people.email)
@@ -1838,6 +2066,704 @@ export async function updateOrganisation({
   `;
 
   return rows[0] ? organisation(rows[0]) : null;
+}
+
+function agentStatus(value: string): "active" | "offline" | "paused" | "retired" {
+  return value === "offline" || value === "paused" || value === "retired"
+    ? value
+    : "active";
+}
+
+function agentType(value: string): "ai" | "deterministic" | "external" | "human" | "system" {
+  return value === "ai" ||
+    value === "deterministic" ||
+    value === "external" ||
+    value === "human"
+    ? value
+    : "system";
+}
+
+function membershipStatusValue(value: string): AdminAccessStatus {
+  return value === "active" ||
+    value === "deleted" ||
+    value === "disabled" ||
+    value === "invited"
+    ? value
+    : "invited";
+}
+
+async function organisationTypeForAgent(sql: Db, organisationId: string) {
+  const rows = await sql<Array<{
+    organisation_type: string;
+  }>>`
+    select organisation_type
+    from public.organisations
+    where id = ${organisationId}::uuid
+      and status <> 'archived'
+    limit 1
+  `;
+
+  return rows[0]?.organisation_type === "tenant" ? "tenant" : "platform";
+}
+
+function roleForAgentOrganisation(role: AgentRole, organisationType: AdminOrganisationType) {
+  return organisationType === "platform" ? "platform_agent" : role === "retail_agent" ? "retail_agent" : "retail_agent";
+}
+
+export async function inviteAgent({
+  actor,
+  agentStatus: requestedAgentStatus = "active",
+  capabilities,
+  membershipStatus: requestedMembershipStatus = "invited",
+  model,
+  name,
+  organisationId,
+  personId,
+  role,
+  status,
+  type
+}: Readonly<{
+  actor: AdminSessionContext;
+  agentStatus?: string;
+  capabilities: unknown;
+  membershipStatus?: AdminAccessStatus | string;
+  model?: string | null;
+  name: string;
+  organisationId: string;
+  personId?: string | null;
+  role: AgentRole;
+  status: string;
+  type: string;
+}>) {
+  const sql = await sqlOrThrow();
+
+  if (!hasPlatformAccessScope(actor)) {
+    throw new Error("Only platform admins can create agents");
+  }
+
+  const organisationType = await organisationTypeForAgent(sql, organisationId);
+  const normalizedRole = roleForAgentOrganisation(role, organisationType);
+  const ownerPersonId = personId || null;
+  const normalizedMembershipStatus = membershipStatusValue(
+    String(requestedMembershipStatus)
+  );
+
+  if (ownerPersonId && !(await personBelongsToOrganisation(sql, ownerPersonId, organisationId))) {
+    throw new Error("Agent owner must belong to the selected organisation");
+  }
+
+  const rows = await sql<Array<{ id: string }>>`
+    insert into public.agents (
+      name,
+      agent_type,
+      role,
+      status,
+      capabilities,
+      model,
+      organisation_id,
+      person_id,
+      metadata,
+      created_at,
+      updated_at
+    )
+    values (
+      ${name.trim()},
+      ${agentType(type)},
+      ${normalizedRole},
+      ${agentStatus(requestedAgentStatus || status)},
+      ${normalizeCapabilities(capabilities)},
+      ${model?.trim() || null},
+      ${organisationId}::uuid,
+      ${ownerPersonId}::uuid,
+      '{}'::jsonb,
+      now(),
+      now()
+    )
+    returning id::text
+  `;
+  const id = rows[0]?.id ?? null;
+
+  if (!id) {
+    throw new Error("Agent could not be invited");
+  }
+
+  const membershipRows = await sql<Array<{ id: string }>>`
+    insert into public.organisation_memberships (
+      organisation_id,
+      principal_type,
+      agent_id,
+      role,
+      status,
+      metadata
+    )
+    values (
+      ${organisationId}::uuid,
+      'agent',
+      ${id}::uuid,
+      ${normalizedRole},
+      ${normalizedMembershipStatus},
+      jsonb_build_object(
+        'invitedAt', now(),
+        'invitedByPersonId', ${actor.actorPerson.id},
+        'source', 'admin'
+      )
+    )
+    on conflict (agent_id, organisation_id)
+      where principal_type = 'agent' and status <> 'deleted'
+    do nothing
+    returning id::text
+  `;
+  const membershipId = membershipRows[0]?.id ?? null;
+
+  if (!membershipId) {
+    throw new Error("Agent membership could not be invited");
+  }
+
+  await recordAdminAudit({
+    action: "admin.agent_invited",
+    actorPersonId: actor.actorPerson.id,
+    assumedPersonId: actor.assumedPerson?.id ?? null,
+    organisationId,
+    resourceId: membershipId,
+    resourceType: "organisation_membership",
+    metadata: {
+      agentId: id,
+      role: normalizedRole,
+      status: normalizedMembershipStatus
+    }
+  });
+
+  return id;
+}
+
+export const createAgent = inviteAgent;
+
+export async function addAgentMembership({
+  actor,
+  agentId,
+  organisationId,
+  role,
+  status
+}: Readonly<{
+  actor: AdminSessionContext;
+  agentId: string;
+  organisationId: string;
+  role: AgentRole;
+  status: AdminAccessStatus | string;
+}>) {
+  const sql = await sqlOrThrow();
+
+  if (!hasPlatformAccessScope(actor)) {
+    throw new Error("Only platform admins can add agent memberships");
+  }
+
+  const organisationType = await organisationTypeForAgent(sql, organisationId);
+  const normalizedRole = roleForAgentOrganisation(role, organisationType);
+  const normalizedStatus = membershipStatusValue(String(status));
+
+  if (normalizedStatus === "deleted") {
+    throw new Error("New agent memberships cannot start deleted");
+  }
+
+  const agentRows = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.agents
+    where id = ${agentId}::uuid
+    limit 1
+  `;
+
+  if (!agentRows[0]) {
+    throw new Error("Agent not found");
+  }
+
+  const rows = await sql<Array<{ id: string }>>`
+    insert into public.organisation_memberships (
+      organisation_id,
+      principal_type,
+      agent_id,
+      role,
+      status,
+      metadata
+    )
+    values (
+      ${organisationId}::uuid,
+      'agent',
+      ${agentId}::uuid,
+      ${normalizedRole},
+      ${normalizedStatus},
+      jsonb_build_object(
+        'addedAt', now(),
+        'addedByPersonId', ${actor.actorPerson.id}::uuid,
+        'source', 'admin'
+      )
+    )
+    on conflict (agent_id, organisation_id)
+      where principal_type = 'agent' and status <> 'deleted'
+    do nothing
+    returning id::text
+  `;
+  const membershipId = rows[0]?.id ?? null;
+
+  if (!membershipId) {
+    throw new Error("This agent is already associated with that organisation");
+  }
+
+  await recordAdminAudit({
+    action: "admin.agent_membership_added",
+    actorPersonId: actor.actorPerson.id,
+    assumedPersonId: actor.assumedPerson?.id ?? null,
+    organisationId,
+    resourceId: membershipId,
+    resourceType: "organisation_membership",
+    metadata: {
+      agentId,
+      role: normalizedRole,
+      status: normalizedStatus
+    }
+  });
+
+  return membershipId;
+}
+
+export async function deleteAgentMembership({
+  actor,
+  membershipId
+}: Readonly<{
+  actor: AdminSessionContext;
+  membershipId: string;
+}>) {
+  const sql = await sqlOrThrow();
+
+  if (!hasPlatformAccessScope(actor)) {
+    throw new Error("Only platform admins can delete agent memberships");
+  }
+
+  const rows = await sql<Array<{
+    agent_id: string;
+    id: string;
+    organisation_id: string;
+    role: string;
+    status: string;
+  }>>`
+    select
+      id::text,
+      organisation_id::text,
+      agent_id::text,
+      role,
+      status
+    from public.organisation_memberships
+    where id = ${membershipId}::uuid
+      and principal_type = 'agent'
+      and status <> 'deleted'
+    limit 1
+  `;
+  const target = rows[0];
+
+  if (!target) {
+    throw new Error("Agent membership not found");
+  }
+
+  await sql`
+    update public.organisation_memberships
+    set
+      status = 'deleted',
+      metadata = metadata || jsonb_build_object(
+        'deletedAt', now(),
+        'deletedByPersonId', ${actor.actorPerson.id},
+        'deletedBySessionId', ${actor.sessionId},
+        'deletedRole', role,
+        'deletedStatus', status
+      ),
+      updated_at = now()
+    where id = ${membershipId}::uuid
+      and principal_type = 'agent'
+      and status <> 'deleted'
+  `;
+
+  await recordAdminAudit({
+    action: "admin.agent_membership_deleted",
+    actorPersonId: actor.actorPerson.id,
+    assumedPersonId: actor.assumedPerson?.id ?? null,
+    organisationId: target.organisation_id,
+    resourceId: target.id,
+    resourceType: "organisation_membership",
+    metadata: {
+      agentId: target.agent_id,
+      role: target.role,
+      status: target.status
+    }
+  });
+}
+
+export async function updateAgent({
+  actor,
+  agentId,
+  capabilities,
+  membershipId,
+  membershipStatus,
+  model,
+  name,
+  organisationId,
+  personId,
+  role,
+  status,
+  type
+}: Readonly<{
+  actor: AdminSessionContext;
+  agentId: string;
+  capabilities: unknown;
+  membershipId: string;
+  membershipStatus: AdminAccessStatus | string;
+  model?: string | null;
+  name: string;
+  organisationId: string;
+  personId?: string | null;
+  role: AgentRole;
+  status: string;
+  type: string;
+}>) {
+  const sql = await sqlOrThrow();
+
+  if (!hasPlatformAccessScope(actor)) {
+    throw new Error("Only platform admins can update agents");
+  }
+
+  const organisationType = await organisationTypeForAgent(sql, organisationId);
+  const normalizedRole = roleForAgentOrganisation(role, organisationType);
+  const normalizedMembershipStatus = membershipStatusValue(String(membershipStatus));
+  const ownerPersonId = personId || null;
+
+  if (ownerPersonId && !(await personBelongsToOrganisation(sql, ownerPersonId, organisationId))) {
+    throw new Error("Agent owner must belong to the selected organisation");
+  }
+
+  const membershipRows = await sql<Array<{
+    id: string;
+    organisation_id: string;
+    previous_role: string;
+    previous_status: string;
+  }>>`
+    select
+      organisation_memberships.id::text,
+      organisation_memberships.organisation_id::text,
+      organisation_memberships.role as previous_role,
+      organisation_memberships.status as previous_status
+    from public.organisation_memberships
+    where organisation_memberships.id = ${membershipId}::uuid
+      and organisation_memberships.agent_id = ${agentId}::uuid
+      and organisation_memberships.principal_type = 'agent'
+      and organisation_memberships.status <> 'deleted'
+    limit 1
+  `;
+  const existingMembership = membershipRows[0];
+
+  if (!existingMembership) {
+    throw new Error("Agent membership not found");
+  }
+
+  if (normalizedMembershipStatus === "deleted") {
+    await deleteAgentMembership({ actor, membershipId });
+    return;
+  }
+
+  await sql`
+    update public.agents
+    set
+      name = ${name.trim()},
+      agent_type = ${agentType(type)},
+      role = ${normalizedRole},
+      status = ${agentStatus(status)},
+      capabilities = ${normalizeCapabilities(capabilities)},
+      model = ${model?.trim() || null},
+      organisation_id = ${organisationId}::uuid,
+      person_id = ${ownerPersonId}::uuid,
+      updated_at = now()
+    where id = ${agentId}::uuid
+  `;
+
+  await sql`
+    update public.organisation_memberships
+    set
+      organisation_id = ${organisationId}::uuid,
+      role = ${normalizedRole},
+      status = ${normalizedMembershipStatus},
+      metadata = metadata
+        - 'deletedAt'
+        - 'deletedByPersonId'
+        - 'deletedBySessionId'
+        - 'deletedRole'
+        - 'deletedStatus',
+      updated_at = now()
+    where id = ${membershipId}::uuid
+      and agent_id = ${agentId}::uuid
+      and principal_type = 'agent'
+      and status <> 'deleted'
+  `;
+
+  await recordAdminAudit({
+    action: "admin.agent_membership_updated",
+    actorPersonId: actor.actorPerson.id,
+    assumedPersonId: actor.assumedPerson?.id ?? null,
+    organisationId,
+    resourceId: membershipId,
+    resourceType: "organisation_membership",
+    metadata: {
+      agentId,
+      previousOrganisationId: existingMembership.organisation_id,
+      previousRole: existingMembership.previous_role,
+      previousStatus: existingMembership.previous_status,
+      role: normalizedRole,
+      status: normalizedMembershipStatus
+    }
+  });
+}
+
+export async function generateAgentCredential({
+  actor,
+  expiresAt,
+  label,
+  membershipId
+}: Readonly<{
+  actor: AdminSessionContext;
+  expiresAt?: string | null;
+  label?: string | null;
+  membershipId: string;
+}>): Promise<AgentCredentialCreated> {
+  const sql = await sqlOrThrow();
+
+  if (!hasPlatformAccessScope(actor)) {
+    throw new Error("Only platform admins can generate agent credentials");
+  }
+
+  const apiKey = `mnag_${randomAdminToken(32)}`;
+  const membershipRows = await sql<Array<{
+    agent_id: string;
+    organisation_id: string;
+  }>>`
+    select
+      organisation_memberships.agent_id::text,
+      organisation_memberships.organisation_id::text
+    from public.organisation_memberships
+    join public.agents
+      on agents.id = organisation_memberships.agent_id
+    join public.organisations
+      on organisations.id = organisation_memberships.organisation_id
+    where organisation_memberships.id = ${membershipId}::uuid
+      and organisation_memberships.principal_type = 'agent'
+      and organisation_memberships.status = 'active'
+      and agents.status = 'active'
+      and organisations.status = 'active'
+    limit 1
+  `;
+  const membershipRow = membershipRows[0];
+
+  if (!membershipRow) {
+    throw new Error("Agent membership must be active before a key can be generated");
+  }
+
+  const rows = await sql<Array<{
+    created_at: Date | string;
+    display_prefix: string;
+    expires_at: Date | string | null;
+    id: string;
+    label: string | null;
+    last_used_at: Date | string | null;
+    membership_id: string;
+    revoked_at: Date | string | null;
+    status: string;
+  }>>`
+    insert into public.agent_credentials (
+      agent_id,
+      membership_id,
+      credential_hash,
+      display_prefix,
+      label,
+      expires_at,
+      created_by_person_id,
+      metadata,
+      created_at,
+      updated_at
+    )
+    values (
+      ${membershipRow.agent_id}::uuid,
+      ${membershipId}::uuid,
+      ${hashAdminToken(apiKey)},
+      ${apiKey.slice(0, 12)},
+      ${label?.trim() || null},
+      ${expiresAt || null}::timestamptz,
+      ${actor.actorPerson.id}::uuid,
+      '{}'::jsonb,
+      now(),
+      now()
+    )
+    returning
+      id::text,
+      membership_id::text,
+      display_prefix,
+      label,
+      status,
+      expires_at,
+      last_used_at,
+      revoked_at,
+      created_at
+  `;
+  const credential = rows[0];
+
+  if (!credential) {
+    throw new Error("Agent credential could not be created");
+  }
+
+  await recordAdminAudit({
+    action: "admin.agent_credential_generated",
+    actorPersonId: actor.actorPerson.id,
+    assumedPersonId: actor.assumedPerson?.id ?? null,
+    organisationId: membershipRow.organisation_id,
+    resourceId: membershipId,
+    resourceType: "agent_credential",
+    metadata: {
+      agentId: membershipRow.agent_id,
+      credentialId: credential.id,
+      displayPrefix: credential.display_prefix
+    }
+  });
+
+  return {
+    ...agentCredentialSummary({
+      createdAt: credential.created_at,
+      displayPrefix: credential.display_prefix,
+      expiresAt: credential.expires_at,
+      id: credential.id,
+      label: credential.label,
+      lastUsedAt: credential.last_used_at,
+      membershipId: credential.membership_id,
+      revokedAt: credential.revoked_at,
+      status: credential.status
+    }),
+    apiKey
+  };
+}
+
+export async function revokeAgentCredential({
+  actor,
+  credentialId
+}: Readonly<{
+  actor: AdminSessionContext;
+  credentialId: string;
+}>) {
+  const sql = await sqlOrThrow();
+
+  if (!hasPlatformAccessScope(actor)) {
+    throw new Error("Only platform admins can revoke agent credentials");
+  }
+
+  const rows = await sql<Array<{
+    agent_id: string;
+    membership_id: string | null;
+    organisation_id: string | null;
+  }>>`
+    update public.agent_credentials
+    set
+      status = 'revoked',
+      revoked_by_person_id = ${actor.actorPerson.id}::uuid,
+      revoked_at = coalesce(revoked_at, now()),
+      updated_at = now()
+    from public.agents
+    where agent_credentials.id = ${credentialId}::uuid
+      and agents.id = agent_credentials.agent_id
+    returning
+      agent_credentials.agent_id::text,
+      agent_credentials.membership_id::text,
+      coalesce(
+        (
+          select organisation_memberships.organisation_id
+          from public.organisation_memberships
+          where organisation_memberships.id = agent_credentials.membership_id
+          limit 1
+        ),
+        agents.organisation_id
+      )::text as organisation_id
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error("Agent credential was not found");
+  }
+
+  await recordAdminAudit({
+    action: "admin.agent_credential_revoked",
+    actorPersonId: actor.actorPerson.id,
+    assumedPersonId: actor.assumedPerson?.id ?? null,
+    organisationId: row?.organisation_id ?? actor.effectiveOrganisation.id,
+    resourceId: row?.membership_id ?? credentialId,
+    resourceType: "agent_credential",
+    metadata: {
+      agentId: row.agent_id,
+      credentialId
+    }
+  });
+
+  return {
+    agentId: row.agent_id,
+    membershipId: row.membership_id,
+    organisationId: row.organisation_id
+  };
+}
+
+export async function rotateAgentCredential({
+  actor,
+  credentialId,
+  label
+}: Readonly<{
+  actor: AdminSessionContext;
+  credentialId: string;
+  label?: string | null;
+}>) {
+  const sql = await sqlOrThrow();
+
+  if (!hasPlatformAccessScope(actor)) {
+    throw new Error("Only platform admins can rotate agent credentials");
+  }
+
+  const rows = await sql<Array<{
+    agent_id: string;
+    expires_at: Date | string | null;
+    label: string | null;
+    membership_id: string;
+  }>>`
+    select
+      agent_credentials.agent_id::text,
+      agent_credentials.membership_id::text,
+      agent_credentials.label,
+      agent_credentials.expires_at
+    from public.agent_credentials
+    join public.agents
+      on agents.id = agent_credentials.agent_id
+    join public.organisation_memberships
+      on organisation_memberships.id = agent_credentials.membership_id
+      and organisation_memberships.agent_id = agent_credentials.agent_id
+      and organisation_memberships.principal_type = 'agent'
+    where agent_credentials.id = ${credentialId}::uuid
+      and agent_credentials.status = 'active'
+      and agent_credentials.revoked_at is null
+      and organisation_memberships.status = 'active'
+    limit 1
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    throw new Error("Active agent credential was not found");
+  }
+
+  const credential = await generateAgentCredential({
+    actor,
+    expiresAt: row.expires_at ? new Date(row.expires_at).toISOString() : null,
+    label: label?.trim() || row.label || "rotated",
+    membershipId: row.membership_id
+  });
+
+  await revokeAgentCredential({ actor, credentialId });
+
+  return credential;
 }
 
 export async function updatePerson({
@@ -2055,6 +2981,8 @@ export async function createAdminInvitation({
     left join public.organisation_memberships
       on organisation_memberships.organisation_id = organisations.id
       and organisation_memberships.person_id = people.id
+      and organisation_memberships.principal_type = 'person'
+      and organisation_memberships.principal_type = 'person'
     where organisations.id = ${organisationId}::uuid
     limit 1
   `;
@@ -2215,17 +3143,21 @@ export async function createAdminInvitation({
     }>>`
       insert into public.organisation_memberships (
         organisation_id,
+        principal_type,
         person_id,
         role,
         status
       )
       values (
         ${organisationId}::uuid,
+        'person',
         ${existingPerson.id}::uuid,
         ${role},
         'active'
       )
-      on conflict (person_id, organisation_id) do nothing
+      on conflict (person_id, organisation_id)
+        where principal_type = 'person' and status <> 'deleted'
+      do nothing
       returning id::text, organisation_id::text, person_id::text, role, status, title
     `;
     const addedMembership = membershipRows[0] ? membership(membershipRows[0]) : null;
@@ -2547,17 +3479,21 @@ export async function addAdminMembership({
   }>>`
     insert into public.organisation_memberships (
       organisation_id,
+      principal_type,
       person_id,
       role,
       status
     )
     values (
       ${organisationId}::uuid,
+      'person',
       ${existingPerson.id}::uuid,
       ${role},
       ${status}
     )
-    on conflict (person_id, organisation_id) do nothing
+    on conflict (person_id, organisation_id)
+      where principal_type = 'person' and status <> 'deleted'
+    do nothing
     returning id::text, organisation_id::text, person_id::text, role, status, title
   `;
   const addedMembership = membershipRows[0] ? membership(membershipRows[0]) : null;
@@ -2667,6 +3603,7 @@ export async function deleteAdminMembership({
     join public.organisations
       on organisations.id = organisation_memberships.organisation_id
     where organisation_memberships.id = ${membershipId}::uuid
+      and organisation_memberships.principal_type = 'person'
       and organisation_memberships.status <> 'deleted'
       and not (organisation_memberships.metadata ? 'deletedAt')
     limit 1
@@ -2698,6 +3635,7 @@ export async function deleteAdminMembership({
         select 1
         from public.organisation_memberships
         where role = 'platform_owner'
+          and principal_type = 'person'
           and status = 'active'
           and status <> 'deleted'
           and not (metadata ? 'deletedAt')
@@ -2723,6 +3661,7 @@ export async function deleteAdminMembership({
       ),
       updated_at = now()
     where id = ${membershipId}::uuid
+      and principal_type = 'person'
       and status <> 'deleted'
       and not (metadata ? 'deletedAt')
   `;
@@ -2767,6 +3706,7 @@ export async function updateMembershipRole({
     join public.organisations
       on organisations.id = organisation_memberships.organisation_id
     where organisation_memberships.id = ${membershipId}::uuid
+      and organisation_memberships.principal_type = 'person'
       and organisation_memberships.status <> 'deleted'
     limit 1
   `;
@@ -2811,6 +3751,7 @@ export async function updateMembershipRole({
     update public.organisation_memberships
     set role = ${role}, status = ${status}, updated_at = now()
     where id = ${membershipId}::uuid
+      and principal_type = 'person'
       and status <> 'deleted'
     returning id::text, organisation_id::text, person_id::text, role, status, title
   `;
@@ -2842,6 +3783,7 @@ export async function assumeAdminIdentity({
     select person_id::text, organisation_id::text, role
     from public.organisation_memberships
     where id = ${membershipId}::uuid
+      and principal_type = 'person'
       and status = 'active'
     limit 1
   `;

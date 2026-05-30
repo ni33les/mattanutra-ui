@@ -5,7 +5,7 @@ import {
   textValue
 } from "@/lib/openclaw-api";
 import { renewTaskLease } from "@/lib/task-service";
-import { requireWorkerRequest } from "@/lib/worker-auth";
+import { requireWorkerAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
 
@@ -16,7 +16,8 @@ type RenewTaskRouteProps = Readonly<{
 }>;
 
 export async function POST(request: Request, { params }: RenewTaskRouteProps) {
-  const unauthorized = requireWorkerRequest(request);
+  const access = await requireWorkerAccess(request);
+  const unauthorized = access.unauthorized;
 
   if (unauthorized) {
     return unauthorized;
@@ -44,7 +45,8 @@ export async function POST(request: Request, { params }: RenewTaskRouteProps) {
   try {
     return openClawJson(
       await renewTaskLease({
-        agentId: textValue(body.agentId),
+        accessScope: access.scope,
+        agentId: access.principal?.agentId ?? textValue(body.agentId),
         leaseSeconds: body.leaseSeconds,
         reservationId,
         taskId: id,

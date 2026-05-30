@@ -8,7 +8,7 @@ import {
 import { applyTaskCompletionResult } from "@/lib/task-result-applier";
 import { writeBpmEvent } from "@/lib/bpm";
 import { completeTask } from "@/lib/task-service";
-import { requireWorkerRequest } from "@/lib/worker-auth";
+import { requireWorkerAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
 
@@ -22,7 +22,8 @@ export async function POST(
   request: Request,
   { params }: CompleteTaskRouteProps
 ) {
-  const unauthorized = requireWorkerRequest(request);
+  const access = await requireWorkerAccess(request);
+  const unauthorized = access.unauthorized;
 
   if (unauthorized) {
     return unauthorized;
@@ -48,9 +49,10 @@ export async function POST(
   }
 
   try {
-    const agentId = textValue(body.agentId);
+    const agentId = access.principal?.agentId ?? textValue(body.agentId);
 
     const task = await completeTask({
+      accessScope: access.scope,
       agentId,
       applyResult: (context) =>
         applyTaskCompletionResult({

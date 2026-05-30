@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isAgentRole } from "@/lib/admin-rbac";
 import { isUuid, toJsonValue } from "@/lib/assessment-store";
 import {
   normalizeCapabilities,
@@ -143,6 +144,9 @@ export function mapAgent(row: AgentRow): TaskAgent {
     metadata: row.metadata,
     model: row.model,
     name: row.name,
+    organisationId: row.organisation_id,
+    personId: row.person_id,
+    role: isAgentRole(row.role) ? row.role : "platform_agent",
     status: row.status,
     type: row.agent_type,
     updatedAt: isoDate(row.updated_at) ?? new Date().toISOString()
@@ -159,6 +163,7 @@ export function mapWorkerSession(row: WorkerSessionRow): WorkerSession {
     id: row.id,
     instanceId: row.instance_id,
     lastSeenAt: isoDate(row.last_seen_at),
+    membershipId: row.membership_id ?? "",
     metadata: row.metadata,
     status: row.status,
     taskTypes: normalizeCapabilities(row.task_types),
@@ -195,6 +200,7 @@ export function mapTask(row: TaskRow): TaskRecord {
     leaseUntil: isoDate(row.lease_until),
     maxAttempts: row.max_attempts,
     maxRetries: row.max_retries,
+    organisationId: row.organisation_id,
     parentTaskId: row.parent_task_id,
     payload: row.payload,
     planId: row.plan_id,

@@ -9,7 +9,7 @@ import {
   heartbeatWorkerSession,
   type WorkerSessionStatus
 } from "@/lib/task-service";
-import { requireWorkerRequest } from "@/lib/worker-auth";
+import { requireWorkerAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
 
@@ -23,7 +23,8 @@ function sessionStatus(value: unknown): WorkerSessionStatus {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = requireWorkerRequest(request);
+  const access = await requireWorkerAccess(request);
+  const unauthorized = access.unauthorized;
 
   if (unauthorized) {
     return unauthorized;
@@ -41,7 +42,8 @@ export async function POST(request: Request) {
 
   try {
     const session = await heartbeatWorkerSession({
-      agentId: textValue(body.agentId),
+      accessScope: access.scope,
+      agentId: access.principal?.agentId ?? textValue(body.agentId),
       currentTaskId: textValue(body.currentTaskId),
       metadata: objectValue(body.metadata),
       status: sessionStatus(body.status),

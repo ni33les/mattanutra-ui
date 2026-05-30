@@ -5,6 +5,9 @@ import {
   adminDashboardViews,
   adminRoleLabels,
   adminRoles,
+  agentRoleLabels,
+  agentRolePermissions,
+  agentRoles,
   adminViewAllowed,
   firstAllowedAdminView,
   adminRoleAllowedForOrganisationType,
@@ -26,6 +29,18 @@ describe("admin RBAC", () => {
 
     assert.deepEqual(adminRoles, canonicalRoles);
     assert.deepEqual(Object.keys(adminRoleLabels), canonicalRoles);
+  });
+
+  it("keeps machine agents as separate RBAC principals", () => {
+    assert.deepEqual(agentRoles, ["platform_agent", "retail_agent"]);
+    assert.deepEqual(Object.keys(agentRoleLabels), agentRoles);
+    assert.ok(agentRolePermissions.platform_agent.includes("tasks.write"));
+    assert.ok(agentRolePermissions.platform_agent.includes("content.write"));
+    assert.ok(agentRolePermissions.retail_agent.includes("tasks.write"));
+    assert.equal(
+      (agentRolePermissions.retail_agent as readonly string[]).includes("access.write"),
+      false
+    );
   });
 
   it("keeps platform owners first-class across every dashboard view", () => {
@@ -75,7 +90,7 @@ describe("admin RBAC", () => {
     assert.equal(adminViewAllowed(principal, "memberships"), false);
     assert.equal(adminViewAllowed(principal, "organisations"), false);
     assert.equal(adminViewAllowed(principal, "access"), false);
-    assert.equal(adminViewAllowed(principal, "access-agents"), false);
+    assert.equal(adminViewAllowed(principal, "access-agents"), true);
     assert.equal(adminViewAllowed(principal, "audit"), false);
     assert.equal(adminViewAllowed(principal, "financials"), false);
     assert.equal(adminViewAllowed(principal, "products"), false);
@@ -115,7 +130,7 @@ describe("admin RBAC", () => {
 
     assert.match(
       source,
-      /organisation_memberships_role_check CHECK \(\(role = ANY \(ARRAY\['platform_owner'::text, 'platform_admin'::text, 'retail_admin'::text, 'retail_agent'::text, 'retail_assistant'::text\]\)\)\)/
+      /organisation_memberships_role_check CHECK \(\(\(principal_type = 'person'::text\) AND \(role = ANY \(ARRAY\['platform_owner'::text, 'platform_admin'::text, 'retail_admin'::text, 'retail_agent'::text, 'retail_assistant'::text\]\)\) OR \(\(principal_type = 'agent'::text\) AND \(role = ANY \(ARRAY\['platform_agent'::text, 'retail_agent'::text\]\)\)\)\)/
     );
     assert.match(
       source,
@@ -126,6 +141,73 @@ describe("admin RBAC", () => {
       /agent_manager|catalogue_manager|content_manager|finance_viewer|ops_manager|platform_viewer|tenant_admin|tenant_user|'viewer'::text/
     );
   });
+
+	  it("stores agent roles and credentials in first-class DB tables", () => {
+	    const schema = readFileSync("db-schema.sql", "utf8");
+	    const migration = readFileSync("scripts/admin-access-schema.ts", "utf8");
+
+	    assert.match(schema, /CREATE TABLE public\.agent_credentials/);
+	    assert.match(schema, /membership_id uuid REFERENCES public\.organisation_memberships\(id\) ON DELETE SET NULL/);
+	    assert.match(schema, /credential_hash text NOT NULL/);
+	    assert.match(schema, /display_prefix text NOT NULL/);
+	    assert.match(schema, /agents_role_check CHECK \(\(role = ANY \(ARRAY\['platform_agent'::text, 'retail_agent'::text\]\)\)\)/);
+	    assert.match(schema, /organisation_id uuid REFERENCES public\.organisations\(id\) ON DELETE SET NULL/);
+	    assert.match(migration, /create table if not exists public\.agent_credentials/);
+	    assert.match(migration, /add column if not exists membership_id uuid references public\.organisation_memberships\(id\) on delete set null/);
+	    assert.match(migration, /organisation_memberships_agent_org_active_idx/);
+	  });
+
+	  it("makes task execution organisation-owned and membership-scoped", () => {
+	    const schema = readFileSync("db-schema.sql", "utf8");
+	    const migration = readFileSync("scripts/admin-access-schema.ts", "utf8");
+
+	    assert.match(
+	      schema,
+	      /CREATE TABLE public\.tasks \([\s\S]*organisation_id uuid NOT NULL REFERENCES public\.organisations\(id\)/
+	    );
+	    assert.match(
+	      schema,
+	      /CREATE TABLE public\.worker_sessions \([\s\S]*membership_id uuid NOT NULL/
+	    );
+	    assert.match(
+	      schema,
+	      /CREATE TABLE public\.task_reservations \([\s\S]*membership_id uuid NOT NULL/
+	    );
+	    assert.match(schema, /worker_sessions_membership_instance_idx/);
+	    assert.match(schema, /task_reservations_membership_idx/);
+	    assert.match(schema, /worker_sessions_membership_id_fkey[\s\S]*ON DELETE RESTRICT/);
+	    assert.match(schema, /task_reservations_membership_id_fkey[\s\S]*ON DELETE RESTRICT/);
+	    assert.match(migration, /alter table public\.tasks\s+add column if not exists organisation_id uuid/);
+	    assert.match(migration, /alter column organisation_id set not null/);
+	    assert.match(migration, /foreign key \(organisation_id\) references public\.organisations\(id\)/);
+	    assert.match(migration, /alter table public\.worker_sessions\s+add column if not exists membership_id uuid references public\.organisation_memberships\(id\) on delete restrict/);
+	    assert.match(migration, /alter table public\.task_reservations\s+add column if not exists membership_id uuid references public\.organisation_memberships\(id\) on delete restrict/);
+	  });
+
+	  it("authenticates agent keys through active organisation memberships", () => {
+	    const resolver = readFileSync("lib/access-principal.ts", "utf8");
+	    const access = readFileSync("lib/admin-access.ts", "utf8");
+	    const route = readFileSync("app/api/admin/access/route.ts", "utf8");
+	    const accessView = readFileSync("components/admin/access-view.tsx", "utf8");
+
+	    assert.match(resolver, /join public\.organisation_memberships/);
+	    assert.match(resolver, /organisation_memberships\.id = agent_credentials\.membership_id/);
+	    assert.match(resolver, /organisation_memberships\.status = 'active'/);
+	    assert.match(resolver, /membershipId: row\.membership_id/);
+    assert.match(access, /export async function inviteAgent/);
+    assert.match(access, /action: "admin\.agent_invited"/);
+    assert.match(access, /export async function addAgentMembership/);
+    assert.match(access, /action: "admin\.agent_membership_added"/);
+    assert.match(access, /export async function deleteAgentMembership/);
+    assert.match(access, /status = 'deleted'/);
+	    assert.match(access, /resourceType: "agent_credential"/);
+	    assert.match(route, /action === "invite_agent"/);
+	    assert.match(route, /action === "add_agent_membership"/);
+	    assert.match(route, /membershipId: text\(body\.membershipId\)/);
+	    assert.match(accessView, /filteredMembershipAgents/);
+	    assert.match(accessView, /setAddAgentAssociationOpen\(true\)/);
+	    assert.match(accessView, /setSelectedAgentMembershipId\(agent\.membershipId\)/);
+	  });
 
   it("maps admin access APIs to access permissions while leaving passkey auth public", () => {
     assert.equal(permissionForAdminRequest("GET", "/api/admin/auth/session"), null);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireOpenClawRequest } from "@/lib/openclaw-api";
+import { requireOpenClawAccess } from "@/lib/openclaw-api";
 import {
   enqueueDigitalOceanBillingSyncTask,
   enqueueDueScheduledActions
@@ -8,7 +8,7 @@ import {
 export const runtime = "nodejs";
 
 async function runDueWork(request: Request) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request);
 
   if (unauthorized) {
     return unauthorized;

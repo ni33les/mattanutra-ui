@@ -624,7 +624,7 @@ function ProductModal({
 
   return (
     <AdminModal onClose={onClose} panelClassName="max-w-3xl p-6 ring-gray-200">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 pr-12">
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex flex-col gap-1">
@@ -663,14 +663,6 @@ function ProductModal({
               .join(" · ")}
           </p>
         </div>
-        <button
-          aria-label={viewLabels.close}
-          className="rounded-md px-3 py-1.5 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900"
-          onClick={onClose}
-          type="button"
-        >
-          {viewLabels.close}
-        </button>
       </div>
 
       <div className="mt-5 grid gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">

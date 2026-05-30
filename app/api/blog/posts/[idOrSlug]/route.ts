@@ -7,7 +7,7 @@ import { isLocale } from "@/lib/i18n";
 import {
   openClawJson,
   readJsonObject,
-  requireOpenClawRequest
+  requireOpenClawAccess
 } from "@/lib/openclaw-api";
 
 export const runtime = "nodejs";
@@ -25,7 +25,7 @@ function localeFromUrl(request: Request) {
 }
 
 export async function GET(request: Request, { params }: BlogPostRouteProps) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "content.read");
 
   if (unauthorized) {
     return unauthorized;
@@ -47,7 +47,7 @@ export async function GET(request: Request, { params }: BlogPostRouteProps) {
 }
 
 export async function PATCH(request: Request, { params }: BlogPostRouteProps) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "content.write");
 
   if (unauthorized) {
     return unauthorized;
@@ -86,7 +86,7 @@ export async function PATCH(request: Request, { params }: BlogPostRouteProps) {
 }
 
 export async function DELETE(request: Request, { params }: BlogPostRouteProps) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "content.write");
 
   if (unauthorized) {
     return unauthorized;

@@ -1,38 +1,16 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { signedAdminSessionAllowedForRequest } from "@/lib/admin-session-cookie";
-
-function hash(value: string) {
-  return createHash("sha256").update(value).digest();
-}
+import {
+  bearerToken,
+  configuredLegacyToken,
+  legacyTokenMatches
+} from "@/lib/legacy-token-auth";
 
 function configuredDashboardToken() {
-  return (
-    process.env.ADMIN_DASHBOARD_TOKEN?.trim() ||
-    process.env.admin_dashboard_token?.trim() ||
-    ""
-  );
+  return configuredLegacyToken("admin_dashboard");
 }
 
 function configuredClawToken() {
-  return process.env.ADMIN_CLAW_TOKEN?.trim() || "";
-}
-
-function bearerToken(request: Request) {
-  const authHeader = request.headers.get("authorization") ?? "";
-
-  return authHeader.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length).trim()
-    : "";
-}
-
-function tokenMatches(supplied: string, configuredToken: string) {
-  const trimmed = supplied.trim();
-
-  if (!configuredToken || !trimmed) {
-    return false;
-  }
-
-  return timingSafeEqual(hash(trimmed), hash(configuredToken));
+  return configuredLegacyToken("admin_claw");
 }
 
 export function adminDashboardTokenConfigured() {
@@ -40,13 +18,11 @@ export function adminDashboardTokenConfigured() {
 }
 
 export function adminDashboardTokenAllowed(token: unknown) {
-  const configuredToken = configuredDashboardToken();
-
   if (typeof token !== "string") {
     return false;
   }
 
-  return tokenMatches(token, configuredToken);
+  return legacyTokenMatches("admin_dashboard", token);
 }
 
 export function adminClawTokenConfigured() {
@@ -58,7 +34,7 @@ export function adminClawTokenAllowed(token: unknown) {
     return false;
   }
 
-  return tokenMatches(token, configuredClawToken());
+  return legacyTokenMatches("admin_claw", token);
 }
 
 export function adminClawRequestAllowed(request: Request) {

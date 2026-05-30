@@ -5,13 +5,13 @@ import {
 import {
   openClawJson,
   readJsonObject,
-  requireOpenClawRequest
+  requireOpenClawAccess
 } from "@/lib/openclaw-api";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "content.read");
 
   if (unauthorized) {
     return unauthorized;
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = requireOpenClawRequest(request);
+  const { unauthorized } = await requireOpenClawAccess(request, "content.write");
 
   if (unauthorized) {
     return unauthorized;

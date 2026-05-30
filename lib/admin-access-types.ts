@@ -2,7 +2,8 @@ import type { Locale } from "@/lib/i18n";
 import type {
   AdminOrganisationType,
   AdminPermission,
-  AdminRole
+  AdminRole,
+  AgentRole
 } from "@/lib/admin-rbac";
 
 export type AdminAccessStatus = "active" | "deleted" | "disabled" | "invited";
@@ -29,6 +30,17 @@ export type AdminMembership = Readonly<{
   organisationId: string;
   personId: string;
   role: AdminRole;
+  status: AdminAccessStatus;
+  title: string | null;
+}>;
+
+export type AgentMembershipRole = AgentRole;
+
+export type AdminAgentMembership = Readonly<{
+  agentId: string;
+  id: string;
+  organisationId: string;
+  role: AgentMembershipRole;
   status: AdminAccessStatus;
   title: string | null;
 }>;
@@ -69,12 +81,38 @@ export type AdminAuditEvent = Readonly<{
 
 export type AdminAccessAgent = Readonly<{
   capabilities: string[];
+  credentialCount: number;
+  credentials: AgentCredentialSummary[];
+  grokModel: string | null;
   id: string;
+  membershipId: string;
+  membershipStatus: AdminAccessStatus;
+  membershipTitle: string | null;
+  model: string | null;
   name: string;
   organisationId: string | null;
   personId: string | null;
+  prompt: string | null;
+  reasoningLevel: string | null;
+  role: AgentMembershipRole;
   status: string;
   type: string;
+}>;
+
+export type AgentCredentialSummary = Readonly<{
+  createdAt: string;
+  displayPrefix: string;
+  expiresAt: string | null;
+  id: string;
+  label: string | null;
+  lastUsedAt: string | null;
+  membershipId: string | null;
+  revokedAt: string | null;
+  status: "active" | "expired" | "revoked";
+}>;
+
+export type AgentCredentialCreated = AgentCredentialSummary & Readonly<{
+  apiKey: string;
 }>;
 
 export type AdminAccessData = Readonly<{
@@ -123,6 +161,34 @@ export type AdminSessionContext = Readonly<{
   sessionCookie: string | null;
   sessionId: string | null;
 }>;
+
+export type AgentPrincipal = Readonly<{
+  agentId: string;
+  agentName: string;
+  capabilities: string[];
+  credentialId: string;
+  membershipId: string;
+  organisation: AdminOrganisation;
+  permissions: AdminPermission[];
+  person: AdminPerson | null;
+  role: AgentRole;
+  type: "agent";
+}>;
+
+export type LegacyTokenPrincipal = Readonly<{
+  permissions: AdminPermission[];
+  source: "admin_claw" | "admin_dashboard" | "worker";
+  type: "legacy_token";
+}>;
+
+export type AccessPrincipal =
+  | AgentPrincipal
+  | LegacyTokenPrincipal
+  | Readonly<{
+      context: AdminSessionContext;
+      permissions: AdminPermission[];
+      type: "person";
+    }>;
 
 export type AdminClientSessionContext = Omit<
   AdminSessionContext,

@@ -45,6 +45,8 @@
     "test": "node scripts/run-tests.mjs all",
     "test:all": "node scripts/run-tests.mjs all",
     "test:changed": "node scripts/run-tests.mjs changed",
+    "test:e2e": "playwright test",
+    "test:e2e:admin": "playwright test test/e2e/admin-associate-agent.spec.ts",
     "test:one": "node scripts/run-tests.mjs one",
     "typecheck": "tsc --noEmit",
     "verify:dev": "node scripts/verify-dev.mjs",
@@ -86,6 +88,8 @@
     "postcss": "$postcss"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4.2.4",
     "@types/node": "^22.15.0",
     "@types/react": "^19.2.0",
