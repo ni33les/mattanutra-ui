@@ -30,6 +30,7 @@ export type FinanceTransactionInput = Readonly<{
   entryType?: FinanceEntryType | null;
   from: string;
   fromAccountId?: string | null;
+  fxRateId?: string | null;
   metadata?: Record<string, unknown>;
   occurredAt?: Date | string | null;
   provider?: string | null;
@@ -249,6 +250,7 @@ export async function recordFinanceTransaction(input: FinanceTransactionInput) {
       source,
       source_ref,
       provider,
+      fx_rate_id,
       task_id,
       from_account_id,
       to_account_id,
@@ -271,6 +273,7 @@ export async function recordFinanceTransaction(input: FinanceTransactionInput) {
       ${source},
       ${input.sourceRef?.trim() || null},
       ${input.provider?.trim() || null},
+      ${input.fxRateId?.trim() || null}::uuid,
       ${input.taskId?.trim() || null}::uuid,
       ${input.fromAccountId?.trim() || null}::uuid,
       ${input.toAccountId?.trim() || null}::uuid,
@@ -291,6 +294,7 @@ export async function recordFinanceTransaction(input: FinanceTransactionInput) {
       category = excluded.category,
       entry_type = excluded.entry_type,
       provider = excluded.provider,
+      fx_rate_id = excluded.fx_rate_id,
       task_id = excluded.task_id,
       from_account_id = excluded.from_account_id,
       to_account_id = excluded.to_account_id,

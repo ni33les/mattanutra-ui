@@ -36,6 +36,9 @@ test("admin access management exposes people, organisations, memberships, agents
   assert.match(content, /name: "Agents", view: "access-agents"/);
   assert.match(content, /name: "Audit", view: "audit"/);
   assert.match(content, /name: "Settings", view: "settings"/);
+  assert.match(content, /name: "Stock", view: "stock"/);
+  assert.match(content, /name: "สต็อก", view: "stock"/);
+  assert.match(zh, /"name": "库存",\s*"view": "stock"/);
   assert.match(
     content,
     /administration: \[\s*\{ icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" \},\s*\{ icon: UserGroupIcon, name: "Memberships", view: "memberships" \},\s*\{ icon: UserGroupIcon, name: "People", view: "people" \}/
@@ -108,7 +111,8 @@ test("admin action buttons render as text buttons without decorative action icon
     "components/admin/supplement-create-modal.tsx",
     "components/admin/financials-view.tsx",
     "components/admin/product-view.tsx",
-    "components/admin/content-editor-modal.tsx"
+    "components/admin/content-editor-modal.tsx",
+    "components/admin/retail-stock-view.tsx"
   ];
 
   for (const file of files) {
@@ -230,6 +234,7 @@ test("admin Chinese label overrides cover the expanded admin UI contract", () =>
     adminLanguage?: string;
     settings?: Record<string, string>;
     communications?: Record<string, string>;
+    stock?: Record<string, string>;
     visibility?: Record<string, string>;
   };
 
@@ -237,6 +242,9 @@ test("admin Chinese label overrides cover the expanded admin UI contract", () =>
   assert.equal(zh.communications?.retryError, "无法重试此消息。");
   assert.equal(zh.settings?.profile, "个人资料");
   assert.equal(zh.settings?.account, "账户");
+  assert.equal(zh.settings?.currency, "货币");
+  assert.equal(zh.stock?.title, "库存");
+  assert.equal(zh.stock?.addProduct, "添加产品");
 
   for (const key of [
     "agentSeen",

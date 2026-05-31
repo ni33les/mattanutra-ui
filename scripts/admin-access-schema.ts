@@ -6,11 +6,13 @@ create table if not exists public.organisations (
   organisation_type text not null default 'tenant',
   status text not null default 'active',
   default_locale text not null default 'en' references public.site_locales(code),
+  currency text not null default 'THB',
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint organisations_type_check check (organisation_type in ('platform', 'tenant')),
-  constraint organisations_status_check check (status in ('active', 'disabled', 'archived'))
+  constraint organisations_status_check check (status in ('active', 'disabled', 'archived')),
+  constraint organisations_currency_check check (currency ~ '^[A-Z]{3}$')
 );
 
 create unique index if not exists organisations_slug_idx
@@ -18,6 +20,19 @@ create unique index if not exists organisations_slug_idx
 
 alter table public.organisations
   add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table public.organisations
+  add column if not exists currency text not null default 'THB';
+
+update public.organisations
+set currency = case when organisation_type = 'platform' then 'USD' else 'THB' end
+where currency is null or currency !~ '^[A-Z]{3}$';
+
+alter table public.organisations
+  drop constraint if exists organisations_currency_check;
+
+alter table public.organisations
+  add constraint organisations_currency_check check (currency ~ '^[A-Z]{3}$');
 
 create table if not exists public.people (
   id uuid primary key default gen_random_uuid(),
@@ -286,16 +301,24 @@ insert into public.organisations (
   name,
   organisation_type,
   status,
-  default_locale
+  default_locale,
+  currency
 )
 values (
   'mattanutra',
   'MattaNutra',
   'platform',
   'active',
-  'en'
+  'en',
+  'USD'
 )
 on conflict do nothing;
+
+update public.organisations
+set currency = 'USD'
+where slug = 'mattanutra'
+  and organisation_type = 'platform'
+  and currency = 'THB';
 
 alter table public.agents
   add column if not exists organisation_id uuid references public.organisations(id) on delete set null,

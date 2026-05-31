@@ -37,6 +37,7 @@ drop table if exists
   public.communication_messages,
   public.cron,
   public.finance_accounts,
+  public.finance_fx_rates,
   public.finance_transactions,
   public.food_admin_audit,
   public.food_aliases,
@@ -84,6 +85,7 @@ drop table if exists
   public.products,
   public.rays,
   public.recommendations,
+  public.retail_product_stock,
   public.safety_reviews,
   public.site_locales,
   public.stripe_webhook_events,
@@ -319,9 +321,11 @@ CREATE TABLE public.organisations (
     organisation_type text DEFAULT 'tenant'::text NOT NULL,
     status text DEFAULT 'active'::text NOT NULL,
     default_locale text DEFAULT 'en'::text NOT NULL,
+    currency text DEFAULT 'THB'::text NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organisations_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
     CONSTRAINT organisations_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'archived'::text]))),
     CONSTRAINT organisations_type_check CHECK ((organisation_type = ANY (ARRAY['platform'::text, 'tenant'::text])))
 );
@@ -927,6 +931,7 @@ CREATE TABLE public.finance_transactions (
     source text NOT NULL,
     source_ref text,
     provider text,
+    fx_rate_id uuid,
     task_id uuid,
     from_account_id uuid,
     to_account_id uuid,
@@ -996,6 +1001,38 @@ COMMENT ON COLUMN public.finance_transactions.amount IS 'Positive integer amount
 --
 
 COMMENT ON COLUMN public.finance_transactions.usd_rate IS 'Conversion rate from one unit of transaction currency to USD at booking time.';
+
+
+--
+-- Name: finance_fx_rates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.finance_fx_rates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    base_currency text NOT NULL,
+    quote_currency text NOT NULL,
+    provider text NOT NULL,
+    source text NOT NULL,
+    bid numeric(20,10),
+    ask numeric(20,10),
+    mid numeric(20,10) NOT NULL,
+    fetched_at timestamp with time zone DEFAULT now() NOT NULL,
+    valid_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    raw_payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT finance_fx_rates_currency_check CHECK (((base_currency ~ '^[A-Z]{3}$'::text) AND (quote_currency ~ '^[A-Z]{3}$'::text))),
+    CONSTRAINT finance_fx_rates_mid_check CHECK ((mid > (0)::numeric)),
+    CONSTRAINT finance_fx_rates_spread_check CHECK ((((bid IS NULL) OR (bid > (0)::numeric)) AND ((ask IS NULL) OR (ask > (0)::numeric))))
+);
+
+
+--
+-- Name: TABLE finance_fx_rates; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.finance_fx_rates IS 'Reusable FX observations. finance_transactions.usd_rate keeps the immutable booked snapshot.';
 
 
 --
@@ -1802,6 +1839,41 @@ CREATE TABLE public.product_translations (
 --
 
 COMMENT ON TABLE public.product_translations IS 'Locale-scalable product title and description projection. Legacy title_en/title_th columns are compatibility fields.';
+
+
+--
+-- Name: retail_product_stock; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_product_stock (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organisation_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    stock_quantity integer DEFAULT 0 NOT NULL,
+    lead_time_days integer DEFAULT 0 NOT NULL,
+    wholesale_price_amount numeric(20,6),
+    retail_price_amount numeric(20,6),
+    currency text NOT NULL,
+    expires_at date,
+    notes text,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_product_stock_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT retail_product_stock_lead_time_check CHECK ((lead_time_days >= 0)),
+    CONSTRAINT retail_product_stock_price_check CHECK ((((wholesale_price_amount IS NULL) OR (wholesale_price_amount >= (0)::numeric)) AND ((retail_price_amount IS NULL) OR (retail_price_amount >= (0)::numeric)))),
+    CONSTRAINT retail_product_stock_quantity_check CHECK ((stock_quantity >= 0)),
+    CONSTRAINT retail_product_stock_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'deleted'::text]))),
+    CONSTRAINT retail_product_stock_active_price_check CHECK (((status <> 'active'::text) OR (retail_price_amount IS NOT NULL)))
+);
+
+
+--
+-- Name: TABLE retail_product_stock; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.retail_product_stock IS 'Retailer-owned stock projection for approved master products. Prices are stored in the owning organisation currency.';
 
 
 --
@@ -2667,6 +2739,14 @@ ALTER TABLE ONLY public.finance_transactions
 
 
 --
+-- Name: finance_fx_rates finance_fx_rates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.finance_fx_rates
+    ADD CONSTRAINT finance_fx_rates_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: food_admin_audit food_admin_audit_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2976,6 +3056,22 @@ ALTER TABLE ONLY public.products
 
 ALTER TABLE ONLY public.products
     ADD CONSTRAINT products_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_product_stock retail_product_stock_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock
+    ADD CONSTRAINT retail_product_stock_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_product_stock retail_product_stock_org_product_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock
+    ADD CONSTRAINT retail_product_stock_org_product_key UNIQUE (organisation_id, product_id);
 
 
 --
@@ -3586,10 +3682,24 @@ CREATE UNIQUE INDEX finance_transactions_source_ref_idx ON public.finance_transa
 
 
 --
+-- Name: finance_transactions_fx_rate_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX finance_transactions_fx_rate_idx ON public.finance_transactions USING btree (fx_rate_id) WHERE (fx_rate_id IS NOT NULL);
+
+
+--
 -- Name: finance_transactions_task_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX finance_transactions_task_idx ON public.finance_transactions USING btree (task_id, occurred_at DESC) WHERE (task_id IS NOT NULL);
+
+
+--
+-- Name: finance_fx_rates_pair_valid_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX finance_fx_rates_pair_valid_idx ON public.finance_fx_rates USING btree (base_currency, quote_currency, provider, valid_at DESC, expires_at DESC);
 
 
 --
@@ -3912,6 +4022,20 @@ CREATE INDEX product_offers_product_idx ON public.product_offers USING btree (pr
 --
 
 CREATE UNIQUE INDEX product_offers_product_url_idx ON public.product_offers USING btree (product_id, url);
+
+
+--
+-- Name: retail_product_stock_org_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_product_stock_org_status_idx ON public.retail_product_stock USING btree (organisation_id, status, updated_at DESC);
+
+
+--
+-- Name: retail_product_stock_product_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_product_stock_product_idx ON public.retail_product_stock USING btree (product_id);
 
 
 --
@@ -4538,6 +4662,14 @@ ALTER TABLE ONLY public.finance_transactions
 
 
 --
+-- Name: finance_transactions finance_transactions_fx_rate_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.finance_transactions
+    ADD CONSTRAINT finance_transactions_fx_rate_id_fkey FOREIGN KEY (fx_rate_id) REFERENCES public.finance_fx_rates(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: finance_transactions finance_transactions_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4930,6 +5062,22 @@ ALTER TABLE ONLY public.product_translations
 
 
 --
+-- Name: retail_product_stock retail_product_stock_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock
+    ADD CONSTRAINT retail_product_stock_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_product_stock retail_product_stock_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock
+    ADD CONSTRAINT retail_product_stock_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: products products_brand_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5214,14 +5362,16 @@ INSERT INTO public.organisations (
     name,
     organisation_type,
     status,
-    default_locale
+    default_locale,
+    currency
 )
 VALUES (
     'mattanutra',
     'MattaNutra',
     'platform',
     'active',
-    'en'
+    'en',
+    'USD'
 )
 ON CONFLICT DO NOTHING;
 

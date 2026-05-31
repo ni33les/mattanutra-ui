@@ -1,4 +1,5 @@
 import { getSql } from "@/lib/db";
+import { resolveUsdRateForCurrency } from "@/lib/finance-fx";
 import { recordFinanceTransaction } from "@/lib/finance-ledger";
 import type { 
   AgentAttributedRevenue, 
@@ -93,6 +94,8 @@ export async function recordPlatformFeeReceivable(
   const sql = getSql();
   if (!sql) throw new Error("Database unavailable");
 
+  const fx = await resolveUsdRateForCurrency(attributedRevenue.currency, { sql });
+
   // Record in finance ledger as a receivable from the agent
   await recordFinanceTransaction({
     amount: attributedRevenue.calculatedPlatformFee,
@@ -108,12 +111,17 @@ export async function recordPlatformFeeReceivable(
       grossRevenue: attributedRevenue.grossRevenue,
       platformFeeRate: attributedRevenue.platformFeeRate,
       source: "agent_platform_fee_calculation",
+      fxFallbackUsed: fx.fallbackUsed,
+      fxProvider: fx.provider,
+      fxRateId: fx.fxRateId,
+      fxSource: fx.source,
     },
     occurredAt: new Date(),
     source: "agent_platform_fee",
     sourceRef: `platform-fee:${attributedRevenue.fulfillmentAgentId}:${attributedRevenue.periodStart}:${attributedRevenue.periodEnd}`,
     to: "mattanutra:platform",
-    usdRate: 1, // TODO: proper FX handling
+    fxRateId: fx.fxRateId,
+    usdRate: fx.usdRate,
   });
 
   // TODO: Also create a row in an agent_platform_fee_settlements table for tracking

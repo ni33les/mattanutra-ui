@@ -40,6 +40,10 @@ import {
   getAdminProductsData
 } from "@/lib/admin-products";
 import {
+  emptyAdminRetailStockData,
+  getAdminRetailStockData
+} from "@/lib/admin-retail-stock";
+import {
   emptyAdminRecommendationInsightsData,
   getAdminRecommendationInsightsData
 } from "@/lib/admin-recommendation-insights";
@@ -182,6 +186,7 @@ export default async function LocalizedAdminDashboardPage({
   let flowData = emptyFlow(range);
   let leadsData = emptyLeadsData();
   let productsData = emptyAdminProductsData();
+  let retailStockData = emptyAdminRetailStockData();
   let recommendationInsightsData = emptyAdminRecommendationInsightsData(range);
   let reviewQueueData = emptyAdminReviewQueueData();
   let settingsData: AdminSettingsData | null = null;
@@ -229,6 +234,8 @@ export default async function LocalizedAdminDashboardPage({
     leadsData = await getAdminLeadsData(range, filters);
   } else if (view === "products") {
     productsData = await getAdminProductsData(range);
+  } else if (view === "stock") {
+    retailStockData = await getAdminRetailStockData(adminContext, locale);
   } else if (view === "product-insights" || view === "supplement-insights") {
     recommendationInsightsData = await getAdminRecommendationInsightsData(
       range,
@@ -265,6 +272,7 @@ export default async function LocalizedAdminDashboardPage({
       leadsData={leadsData}
       locale={locale}
       productsData={productsData}
+      retailStockData={retailStockData}
       recommendationInsightsData={recommendationInsightsData}
       reviewQueueData={reviewQueueData}
       selectedReviewTaskId={selectedReviewTaskId}

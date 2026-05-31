@@ -194,6 +194,7 @@
   },
   "settings": {
     "account": "账户",
+    "currency": "货币",
     "displayName": "姓名",
     "email": "邮箱",
     "language": "语言",
@@ -202,6 +203,30 @@
     "save": "保存",
     "saved": "设置已保存。",
     "saveError": "无法保存设置。"
+  },
+  "stock": {
+    "actions": "操作",
+    "addProduct": "添加产品",
+    "allOrganisations": "所有组织",
+    "cancel": "取消",
+    "currency": "货币",
+    "disabled": "已禁用",
+    "empty": "暂无库存记录。",
+    "expiresAt": "有效期",
+    "leadTimeDays": "交付天数",
+    "notes": "备注",
+    "organisation": "组织",
+    "outOfStock": "缺货",
+    "product": "产品",
+    "retailPrice": "零售价",
+    "save": "保存",
+    "saveError": "无法保存库存。",
+    "selectProduct": "选择产品",
+    "status": "状态",
+    "stockQuantity": "库存",
+    "title": "库存",
+    "updated": "已更新",
+    "wholesalePrice": "批发价"
   },
   "generated": "生成时间",
   "financials": {
@@ -412,6 +437,10 @@
       "view": "products"
     },
     {
+      "name": "库存",
+      "view": "stock"
+    },
+    {
       "name": "补充剂",
       "view": "supplements"
     }
@@ -470,6 +499,7 @@
     "products": "产品",
     "reviews": "审核",
     "settings": "设置",
+    "stock": "库存",
     "supplement-insights": "补充剂洞察",
     "supplements": "补充剂",
     "testimonials": "见证",

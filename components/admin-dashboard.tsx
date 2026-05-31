@@ -33,6 +33,9 @@ import type {
   AdminProductsData
 } from "@/lib/admin-products";
 import type {
+  AdminRetailStockData
+} from "@/lib/admin-retail-stock";
+import type {
   AdminRecommendationInsightsData
 } from "@/lib/admin-recommendation-insights";
 import type {
@@ -75,6 +78,7 @@ import { AdminTechnicalAlertsView } from "@/components/admin/technical-alerts-vi
 import { AdminFinancialsView } from "@/components/admin/financials-view";
 import { AdminAccessView } from "@/components/admin/access-view";
 import { AdminSettingsView } from "@/components/admin/settings-view";
+import { AdminRetailStockView } from "@/components/admin/retail-stock-view";
 import { AdminContentView, contentTypeForView } from "@/components/admin/content-view";
 import {
   AdminFoodsView,
@@ -99,6 +103,7 @@ function adminViewDatabaseAvailable({
   flowData,
   leadsData,
   productsData,
+  retailStockData,
   recommendationInsightsData,
   reviewQueueData,
   supplementsData,
@@ -117,6 +122,7 @@ function adminViewDatabaseAvailable({
   flowData: AdminFlowData;
   leadsData: AdminLeadsData;
   productsData: AdminProductsData;
+  retailStockData: AdminRetailStockData;
   recommendationInsightsData: AdminRecommendationInsightsData;
   reviewQueueData: AdminReviewQueueData;
   supplementsData: AdminSupplementsData;
@@ -188,6 +194,10 @@ function adminViewDatabaseAvailable({
     return productsData.databaseAvailable;
   }
 
+  if (view === "stock") {
+    return retailStockData.databaseAvailable;
+  }
+
   if (view === "product-insights" || view === "supplement-insights") {
     return recommendationInsightsData.databaseAvailable;
   }
@@ -224,6 +234,7 @@ export function AdminDashboard({
   leadsData,
   locale,
   productsData,
+  retailStockData,
   recommendationInsightsData,
   reviewQueueData,
   selectedReviewTaskId,
@@ -249,6 +260,7 @@ export function AdminDashboard({
   leadsData: AdminLeadsData;
   locale: Locale;
   productsData: AdminProductsData;
+  retailStockData: AdminRetailStockData;
   recommendationInsightsData: AdminRecommendationInsightsData;
   reviewQueueData: AdminReviewQueueData;
   selectedReviewTaskId?: string | null;
@@ -313,6 +325,7 @@ export function AdminDashboard({
     flowData,
     leadsData,
     productsData,
+    retailStockData,
     recommendationInsightsData,
     reviewQueueData,
     supplementsData,
@@ -584,6 +597,12 @@ export function AdminDashboard({
             <AdminProductsView
               accessToken={accessToken}
               data={productsData}
+              locale={locale}
+            />
+          ) : view === "stock" ? (
+            <AdminRetailStockView
+              data={retailStockData}
+              labels={labels}
               locale={locale}
             />
           ) : view === "product-insights" || view === "supplement-insights" ? (

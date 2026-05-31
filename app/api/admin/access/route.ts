@@ -202,6 +202,7 @@ export async function POST(request: NextRequest) {
       }
 
       await createOrganisation({
+        actor: context,
         defaultLocale: localeValue(body.defaultLocale),
         name,
         slug,
@@ -236,6 +237,7 @@ export async function POST(request: NextRequest) {
       }
 
       await updateOrganisation({
+        actor: context,
         defaultLocale: localeValue(body.defaultLocale),
         id: text(body.organisationId),
         name,

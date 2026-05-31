@@ -22,6 +22,8 @@ export type AdminPermission =
   | "reviews.read"
   | "reviews.write"
   | "settings.read"
+  | "stock.read"
+  | "stock.write"
   | "tasks.read"
   | "tasks.write";
 
@@ -74,6 +76,8 @@ const allPermissions = [
   "reviews.read",
   "reviews.write",
   "settings.read",
+  "stock.read",
+  "stock.write",
   "tasks.read",
   "tasks.write"
 ] as const satisfies readonly AdminPermission[];
@@ -81,9 +85,9 @@ const allPermissions = [
 export const adminRolePermissions = {
   platform_owner: allPermissions,
   platform_admin: allPermissions,
-  retail_admin: ["access.agents.read", "settings.read"],
-  retail_agent: ["settings.read"],
-  retail_assistant: ["settings.read"]
+  retail_admin: ["access.agents.read", "settings.read", "stock.read", "stock.write"],
+  retail_agent: ["settings.read", "stock.read", "stock.write"],
+  retail_assistant: ["settings.read", "stock.read"]
 } as const satisfies Record<AdminRole, readonly AdminPermission[]>;
 
 export const adminRoleLabels = {
@@ -134,6 +138,8 @@ export const agentRolePermissions = {
     "communications.read",
     "communications.write",
     "settings.read",
+    "stock.read",
+    "stock.write",
     "tasks.read",
     "tasks.write"
   ]
@@ -184,6 +190,7 @@ const adminViews = [
   "testimonials",
   "foods",
   "products",
+  "stock",
   "supplements",
   "reviews",
   "agents",
@@ -294,6 +301,10 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
     return "reviews.read";
   }
 
+  if (view === "stock") {
+    return "stock.read";
+  }
+
   if (view === "visibility") {
     return "tasks.read";
   }
@@ -343,6 +354,10 @@ export function permissionForAdminRequest(
     pathname.startsWith("/api/admin/settings")
   ) {
     return "settings.read";
+  }
+
+  if (pathname.startsWith("/api/admin/retail-stock")) {
+    return write ? "stock.write" : "stock.read";
   }
 
   if (

@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
 
       const updatedContext = await updateEffectiveOrganisationSettings({
         context,
+        currency: text(body.currency),
         defaultLocale: localeValue(body.defaultLocale),
         name
       });

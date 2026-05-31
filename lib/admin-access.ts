@@ -358,6 +358,7 @@ function person(row: {
 }
 
 function organisation(row: {
+  currency?: string | null;
   default_locale: string;
   id: string;
   name: string;
@@ -365,7 +366,15 @@ function organisation(row: {
   slug: string;
   status: string;
 }): AdminOrganisation {
+  const organisationType = row.organisation_type === "platform" ? "platform" : "tenant";
+  const currency = row.currency?.trim().toUpperCase() ?? "";
+
   return {
+    currency: /^[A-Z]{3}$/.test(currency)
+      ? currency
+      : organisationType === "platform"
+        ? "USD"
+        : "THB",
     defaultLocale: localeValue(row.default_locale),
     id: row.id,
     name: row.name,
@@ -374,7 +383,7 @@ function organisation(row: {
       row.status === "active" || row.status === "archived" || row.status === "disabled"
         ? row.status
         : "disabled",
-    type: row.organisation_type === "platform" ? "platform" : "tenant"
+    type: organisationType
   };
 }
 
@@ -521,6 +530,7 @@ async function personBelongsToOrganisation(
 
 async function platformOrganisation(sql: Db) {
   const rows = await sql<Array<{
+    currency: string | null;
     default_locale: string;
     id: string;
     name: string;
@@ -533,17 +543,19 @@ async function platformOrganisation(sql: Db) {
       name,
       organisation_type,
       status,
-      default_locale
+      default_locale,
+      currency
     )
     values (
       ${defaultPlatformOrgSlug},
       'MattaNutra',
       'platform',
       'active',
-      'en'
+      'en',
+      'USD'
     )
     on conflict do nothing
-    returning id::text, slug, name, organisation_type, status, default_locale
+    returning id::text, slug, name, organisation_type, status, default_locale, currency
   `;
 
   if (rows[0]) {
@@ -551,6 +563,7 @@ async function platformOrganisation(sql: Db) {
   }
 
   const existing = await sql<Array<{
+    currency: string | null;
     default_locale: string;
     id: string;
     name: string;
@@ -558,7 +571,7 @@ async function platformOrganisation(sql: Db) {
     slug: string;
     status: string;
   }>>`
-    select id::text, slug, name, organisation_type, status, default_locale
+    select id::text, slug, name, organisation_type, status, default_locale, currency
     from public.organisations
     where lower(slug) = ${defaultPlatformOrgSlug}
     limit 1
@@ -1921,6 +1934,7 @@ export async function getAdminSettingsData(
   const sql = await sqlOrThrow();
   const [organisationRows, peopleRows] = await Promise.all([
     sql<Array<{
+      currency: string | null;
       default_locale: string;
       id: string;
       name: string;
@@ -1928,7 +1942,7 @@ export async function getAdminSettingsData(
       slug: string;
       status: string;
     }>>`
-      select id::text, slug, name, organisation_type, status, default_locale
+      select id::text, slug, name, organisation_type, status, default_locale, currency
       from public.organisations
       where id = ${context.effectiveOrganisation.id}::uuid
       limit 1
@@ -1967,8 +1981,15 @@ export async function getAdminSettingsData(
 
   return {
     canEditOrganisation:
-      currentOrganisation.type === "tenant" &&
-      context.effectiveMembership.role === "retail_admin",
+      !context.isLegacy &&
+      (
+        context.effectiveMembership.role === "platform_owner" ||
+        context.effectiveMembership.role === "platform_admin" ||
+        (
+          currentOrganisation.type === "tenant" &&
+          context.effectiveMembership.role === "retail_admin"
+        )
+      ),
     organisation: currentOrganisation,
     people: peopleRows.map((row) => ({
       displayName: row.display_name,
@@ -1993,11 +2014,13 @@ export async function getAdminSettingsData(
 }
 
 export async function createOrganisation({
+  actor,
   defaultLocale,
   name,
   slug,
   type
 }: Readonly<{
+  actor?: AdminSessionContext | null;
   defaultLocale: Locale;
   name: string;
   slug: string;
@@ -2005,6 +2028,7 @@ export async function createOrganisation({
 }>) {
   const sql = await sqlOrThrow();
   const rows = await sql<Array<{
+    currency: string | null;
     default_locale: string;
     id: string;
     name: string;
@@ -2017,28 +2041,52 @@ export async function createOrganisation({
       name,
       organisation_type,
       status,
-      default_locale
+      default_locale,
+      currency
     )
     values (
       ${slug.trim().toLowerCase()},
       ${name.trim()},
       ${type},
       'active',
-      ${defaultLocale}
+      ${defaultLocale},
+      ${type === "platform" ? "USD" : "THB"}
     )
-    returning id::text, slug, name, organisation_type, status, default_locale
+    returning id::text, slug, name, organisation_type, status, default_locale, currency
   `;
 
-  return rows[0] ? organisation(rows[0]) : null;
+  const savedOrganisation = rows[0] ? organisation(rows[0]) : null;
+
+  if (savedOrganisation && actor) {
+    await recordAdminAudit({
+      action: "admin.organisation_created",
+      actorPersonId: actor.actorPerson.id,
+      assumedPersonId: actor.assumedPerson?.id ?? null,
+      organisationId: savedOrganisation.id,
+      resourceId: savedOrganisation.id,
+      resourceType: "organisation",
+      metadata: {
+        currency: savedOrganisation.currency,
+        defaultLocale,
+        name: savedOrganisation.name,
+        slug: savedOrganisation.slug,
+        type: savedOrganisation.type
+      }
+    });
+  }
+
+  return savedOrganisation;
 }
 
 export async function updateOrganisation({
+  actor,
   defaultLocale,
   id,
   name,
   slug,
   status
 }: Readonly<{
+  actor?: AdminSessionContext | null;
   defaultLocale: Locale;
   id: string;
   name: string;
@@ -2046,7 +2094,24 @@ export async function updateOrganisation({
   status: "active" | "archived" | "disabled";
 }>) {
   const sql = await sqlOrThrow();
+  const beforeRows = actor
+    ? await sql<Array<{
+        currency: string | null;
+        default_locale: string;
+        id: string;
+        name: string;
+        organisation_type: string;
+        slug: string;
+        status: string;
+      }>>`
+        select id::text, slug, name, organisation_type, status, default_locale, currency
+        from public.organisations
+        where id = ${id}::uuid
+        limit 1
+      `
+    : [];
   const rows = await sql<Array<{
+    currency: string | null;
     default_locale: string;
     id: string;
     name: string;
@@ -2062,10 +2127,29 @@ export async function updateOrganisation({
       default_locale = ${defaultLocale},
       updated_at = now()
     where id = ${id}::uuid
-    returning id::text, slug, name, organisation_type, status, default_locale
+    returning id::text, slug, name, organisation_type, status, default_locale, currency
   `;
 
-  return rows[0] ? organisation(rows[0]) : null;
+  const savedOrganisation = rows[0] ? organisation(rows[0]) : null;
+
+  if (savedOrganisation && actor) {
+    const before = beforeRows[0] ? organisation(beforeRows[0]) : null;
+
+    await recordAdminAudit({
+      action: "admin.organisation_updated",
+      actorPersonId: actor.actorPerson.id,
+      assumedPersonId: actor.assumedPerson?.id ?? null,
+      organisationId: savedOrganisation.id,
+      resourceId: savedOrganisation.id,
+      resourceType: "organisation",
+      metadata: {
+        after: savedOrganisation,
+        before
+      }
+    });
+  }
+
+  return savedOrganisation;
 }
 
 function agentStatus(value: string): "active" | "offline" | "paused" | "retired" {
@@ -2811,7 +2895,25 @@ export async function updatePerson({
     returning id::text, email, display_name, preferred_locale, status
   `;
 
-  return rows[0] ? person(rows[0]) : null;
+  const savedPerson = rows[0] ? person(rows[0]) : null;
+
+  if (savedPerson) {
+    await recordAdminAudit({
+      action: "admin.person_updated",
+      actorPersonId: actor.actorPerson.id,
+      assumedPersonId: actor.assumedPerson?.id ?? null,
+      organisationId: actor.effectiveOrganisation.id,
+      resourceId: savedPerson.id,
+      resourceType: "person",
+      metadata: {
+        displayName: savedPerson.displayName,
+        preferredLocale: savedPerson.preferredLocale,
+        status: savedPerson.status
+      }
+    });
+  }
+
+  return savedPerson;
 }
 
 export async function updateOwnPerson({
@@ -2864,22 +2966,38 @@ export async function updateOwnPerson({
 
 export async function updateEffectiveOrganisationSettings({
   context,
+  currency,
   defaultLocale,
   name
 }: Readonly<{
   context: AdminSessionContext;
+  currency?: string | null;
   defaultLocale: Locale;
   name: string;
 }>) {
   if (
-    context.effectiveOrganisation.type !== "tenant" ||
-    context.effectiveMembership.role !== "retail_admin"
+    !(
+      context.effectiveMembership.role === "platform_owner" ||
+      context.effectiveMembership.role === "platform_admin" ||
+      (
+        context.effectiveOrganisation.type === "tenant" &&
+        context.effectiveMembership.role === "retail_admin"
+      )
+    )
   ) {
-    throw new Error("Retail Admin can only update basic settings for their own organisation");
+    throw new Error("You can only update basic settings for your own organisation");
+  }
+
+  const normalizedCurrency =
+    currency?.trim().toUpperCase() || context.effectiveOrganisation.currency;
+
+  if (!/^[A-Z]{3}$/.test(normalizedCurrency)) {
+    throw new Error("Currency must be a three-letter ISO-4217 code");
   }
 
   const sql = await sqlOrThrow();
   const rows = await sql<Array<{
+    currency: string | null;
     default_locale: string;
     id: string;
     name: string;
@@ -2891,10 +3009,10 @@ export async function updateEffectiveOrganisationSettings({
     set
       name = ${name.trim()},
       default_locale = ${defaultLocale},
+      currency = ${normalizedCurrency},
       updated_at = now()
     where id = ${context.effectiveOrganisation.id}::uuid
-      and organisation_type = 'tenant'
-    returning id::text, slug, name, organisation_type, status, default_locale
+    returning id::text, slug, name, organisation_type, status, default_locale, currency
   `;
   const savedOrganisation = rows[0] ? organisation(rows[0]) : null;
 
@@ -3697,11 +3815,13 @@ export async function updateMembershipRole({
     organisation_id: string;
     organisation_type: string;
     role: string;
+    status: string;
   }>>`
     select
       organisation_memberships.organisation_id::text,
       organisations.organisation_type,
-      organisation_memberships.role
+      organisation_memberships.role,
+      organisation_memberships.status
     from public.organisation_memberships
     join public.organisations
       on organisations.id = organisation_memberships.organisation_id
@@ -3756,7 +3876,31 @@ export async function updateMembershipRole({
     returning id::text, organisation_id::text, person_id::text, role, status, title
   `;
 
-  return rows[0] ? membership(rows[0]) : null;
+  const savedMembership = rows[0] ? membership(rows[0]) : null;
+
+  if (savedMembership) {
+    await recordAdminAudit({
+      action: "admin.membership_updated",
+      actorPersonId: actor.actorPerson.id,
+      assumedPersonId: actor.assumedPerson?.id ?? null,
+      organisationId: savedMembership.organisationId,
+      resourceId: savedMembership.id,
+      resourceType: "organisation_membership",
+      metadata: {
+        after: {
+          role: savedMembership.role,
+          status: savedMembership.status
+        },
+        before: {
+          role: organisationRow.role,
+          status: organisationRow.status
+        },
+        personId: savedMembership.personId
+      }
+    });
+  }
+
+  return savedMembership;
 }
 
 export async function assumeAdminIdentity({

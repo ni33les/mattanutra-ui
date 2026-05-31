@@ -49,6 +49,7 @@ export type AdminDashboardView =
   | "products"
   | "reviews"
   | "settings"
+  | "stock"
   | "supplement-insights"
   | "supplements"
   | "testimonials"
@@ -298,6 +299,7 @@ export type AdminContent = Readonly<{
   };
   settings: {
     account: string;
+    currency: string;
     displayName: string;
     email: string;
     language: string;
@@ -306,6 +308,30 @@ export type AdminContent = Readonly<{
     save: string;
     saved: string;
     saveError: string;
+  };
+  stock: {
+    actions: string;
+    addProduct: string;
+    allOrganisations: string;
+    cancel: string;
+    currency: string;
+    disabled: string;
+    empty: string;
+    expiresAt: string;
+    leadTimeDays: string;
+    notes: string;
+    organisation: string;
+    outOfStock: string;
+    product: string;
+    retailPrice: string;
+    save: string;
+    saveError: string;
+    selectProduct: string;
+    status: string;
+    stockQuantity: string;
+    title: string;
+    updated: string;
+    wholesalePrice: string;
   };
   generated: string;
   financials: {
@@ -781,6 +807,7 @@ const baseContent = {
     },
     settings: {
       account: "Account",
+      currency: "Currency",
       displayName: "Name",
       email: "Email",
       language: "Language",
@@ -789,6 +816,30 @@ const baseContent = {
       save: "Save",
       saved: "Settings saved.",
       saveError: "Could not save settings."
+    },
+    stock: {
+      actions: "Actions",
+      addProduct: "Add Product",
+      allOrganisations: "All organisations",
+      cancel: "Cancel",
+      currency: "Currency",
+      disabled: "Disabled",
+      empty: "No stock rows yet.",
+      expiresAt: "Expiry",
+      leadTimeDays: "Lead time",
+      notes: "Notes",
+      organisation: "Organisation",
+      outOfStock: "Out of stock",
+      product: "Product",
+      retailPrice: "Retail price",
+      save: "Save",
+      saveError: "Could not save stock.",
+      selectProduct: "Select product",
+      status: "Status",
+      stockQuantity: "Stock",
+      title: "Stock",
+      updated: "Updated",
+      wholesalePrice: "Wholesale price"
     },
     generated: "Generated",
     financials: {
@@ -954,6 +1005,7 @@ const baseContent = {
     governance: [
       { icon: SparklesIcon, name: "Foods", view: "foods" },
       { icon: ShoppingBagIcon, name: "Products", view: "products" },
+      { icon: ShoppingBagIcon, name: "Stock", view: "stock" },
       { icon: BeakerIcon, name: "Supplements", view: "supplements" }
     ],
     governanceTitle: "Safety",
@@ -992,6 +1044,7 @@ const baseContent = {
       products: "Products",
       reviews: "Reviews",
       settings: "Settings",
+      stock: "Stock",
       "supplement-insights": "Supplement Insights",
       supplements: "Supplements",
       testimonials: "Testimonials",
@@ -1364,6 +1417,7 @@ const baseContent = {
     },
     settings: {
       account: "บัญชี",
+      currency: "สกุลเงิน",
       displayName: "ชื่อ",
       email: "อีเมล",
       language: "ภาษา",
@@ -1372,6 +1426,30 @@ const baseContent = {
       save: "บันทึก",
       saved: "บันทึกการตั้งค่าแล้ว",
       saveError: "ไม่สามารถบันทึกการตั้งค่าได้"
+    },
+    stock: {
+      actions: "การดำเนินการ",
+      addProduct: "เพิ่มสินค้า",
+      allOrganisations: "ทุกองค์กร",
+      cancel: "ยกเลิก",
+      currency: "สกุลเงิน",
+      disabled: "ปิดใช้งาน",
+      empty: "ยังไม่มีรายการสต็อก",
+      expiresAt: "วันหมดอายุ",
+      leadTimeDays: "ระยะเวลานำ",
+      notes: "หมายเหตุ",
+      organisation: "องค์กร",
+      outOfStock: "สินค้าหมด",
+      product: "สินค้า",
+      retailPrice: "ราคาขายปลีก",
+      save: "บันทึก",
+      saveError: "ไม่สามารถบันทึกสต็อกได้",
+      selectProduct: "เลือกสินค้า",
+      status: "สถานะ",
+      stockQuantity: "สต็อก",
+      title: "สต็อก",
+      updated: "อัปเดต",
+      wholesalePrice: "ราคาส่ง"
     },
     generated: "สร้างเมื่อ",
     financials: {
@@ -1537,6 +1615,7 @@ const baseContent = {
     governance: [
       { icon: SparklesIcon, name: "อาหาร", view: "foods" },
       { icon: ShoppingBagIcon, name: "สินค้า", view: "products" },
+      { icon: ShoppingBagIcon, name: "สต็อก", view: "stock" },
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplements" }
     ],
     governanceTitle: "ความปลอดภัย",
@@ -1575,6 +1654,7 @@ const baseContent = {
       products: "สินค้า",
       reviews: "รีวิว",
       settings: "การตั้งค่า",
+      stock: "สต็อก",
       "supplement-insights": "ข้อมูลอาหารเสริม",
       supplements: "อาหารเสริม",
       testimonials: "คำรับรอง",

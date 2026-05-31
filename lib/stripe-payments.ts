@@ -11,6 +11,10 @@ import {
   FINANCE_ACCOUNT_IDS,
   recordFinanceTransaction
 } from "@/lib/finance-ledger";
+import {
+  resolveUsdRateForCurrency,
+  type ResolvedUsdRate
+} from "@/lib/finance-fx";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath, nutritionRevealPath } from "@/lib/nutrition-paths";
 import { paymentReturnPath, type PaymentSourceSurface } from "@/lib/payment-paths";
@@ -27,7 +31,6 @@ import {
   stripeLineItemForPlan,
   stripeLocale,
   stripePaymentConfig,
-  thbUsdRate,
   type CheckoutSessionInput,
   type PaymentProviderMode,
   type StripePaymentConfig,
@@ -365,6 +368,8 @@ async function recordStripePaymentNominalRevenue(
   payment: PaymentRow,
   metadata: Record<string, unknown> = {}
 ) {
+  const fx = await resolveUsdRateForCurrency(payment.currency, { sql });
+
   return recordFinanceTransaction({
     amount: payment.amount,
     category: "revenue",
@@ -373,6 +378,7 @@ async function recordStripePaymentNominalRevenue(
     entryType: "nominal",
     from: paymentCustomerLedgerAccount(payment),
     metadata: {
+      ...fxMetadata(fx),
       paymentId: payment.id,
       paymentStatus: payment.status,
       planId: payment.plan_id,
@@ -389,8 +395,19 @@ async function recordStripePaymentNominalRevenue(
     sql,
     to: "mattanutra:revenue",
     toAccountId: FINANCE_ACCOUNT_IDS.mattanutraRevenue,
-    usdRate: thbUsdRate()
+    fxRateId: fx.fxRateId,
+    usdRate: fx.usdRate
   });
+}
+
+function fxMetadata(rate: ResolvedUsdRate) {
+  return {
+    fxFallbackUsed: rate.fallbackUsed,
+    fxProvider: rate.provider,
+    fxRateId: rate.fxRateId,
+    fxSource: rate.source,
+    usdRate: rate.usdRate
+  };
 }
 
 function stringId(value: unknown) {
@@ -470,6 +487,8 @@ async function recordStripePaymentAccounting(
     const feeMicros = amountMicrosFromStripeAmount(balanceTransaction?.fee);
 
     if (balanceTransaction?.id && feeMicros) {
+      const fx = await resolveUsdRateForCurrency(payment.currency, { sql });
+
       await recordFinanceTransaction({
         amount: feeMicros,
         category: "payment_fee",
@@ -479,6 +498,7 @@ async function recordStripePaymentAccounting(
         from: "mattanutra:stripe-clearing",
         fromAccountId: FINANCE_ACCOUNT_IDS.stripeClearing,
         metadata: {
+          ...fxMetadata(fx),
           accountingBasis: "cash_fee",
           paymentId: payment.id,
           selectedPlan: payment.selected_plan,
@@ -491,7 +511,8 @@ async function recordStripePaymentAccounting(
         sql,
         to: "stripe:fees",
         toAccountId: FINANCE_ACCOUNT_IDS.stripe,
-        usdRate: thbUsdRate()
+        fxRateId: fx.fxRateId,
+        usdRate: fx.usdRate
       });
     }
 
@@ -553,6 +574,8 @@ async function recordStripePayoutAccounting(
     throw new Error("Stripe payout amount or currency is invalid");
   }
 
+  const fx = await resolveUsdRateForCurrency(currency, { sql });
+
   await recordFinanceTransaction({
     amount: amountMicros,
     category: "payout",
@@ -562,6 +585,7 @@ async function recordStripePayoutAccounting(
     from: `stripe:payout:${payout.id}`,
     fromAccountId: FINANCE_ACCOUNT_IDS.stripeClearing,
     metadata: {
+      ...fxMetadata(fx),
       accountingBasis: "stripe_payout",
       arrivalDate: payout.arrival_date ?? null,
       balanceTransactionId: stringId(payout.balance_transaction),
@@ -579,7 +603,8 @@ async function recordStripePayoutAccounting(
     sql,
     to: "mattanutra:bank",
     toAccountId: FINANCE_ACCOUNT_IDS.mattanutraBank,
-    usdRate: thbUsdRate()
+    fxRateId: fx.fxRateId,
+    usdRate: fx.usdRate
   });
 
   await writePaymentBpmEvent({
