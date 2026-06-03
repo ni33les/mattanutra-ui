@@ -3,6 +3,7 @@ import Image from "next/image";
 import { BookmarkTrackingButton } from "@/components/retail-checkout/bookmark-tracking-button";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
+import { formatCurrencyAmount } from "@/lib/currencies";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { getTrackingOrderByReference } from "@/lib/retail-product-checkout";
 
@@ -116,11 +117,7 @@ function addressLines(address: Record<string, unknown>) {
 }
 
 function formatAmount(locale: Locale, amount: number, currency: string) {
-  return new Intl.NumberFormat(locale, {
-    currency,
-    maximumFractionDigits: 0,
-    style: "currency"
-  }).format(amount);
+  return formatCurrencyAmount(locale, amount, currency);
 }
 
 function statusLabel(status: string) {

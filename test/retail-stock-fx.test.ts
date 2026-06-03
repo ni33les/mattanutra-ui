@@ -385,7 +385,11 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /!\s*showCustomerOrderWorkbench \? \(/);
 	    assert.match(view, /labels\.stock\.backToCustomerOrders/);
 	    assert.match(view, /labels\.stock\.allocatedTo/);
-	    assert.match(view, /function formatWholeAmount/);
+	    const retailStockFormatters = readFileSync("components/admin/retail-stock-formatters.ts", "utf8");
+	    assert.match(view, /from "@\/components\/admin\/retail-stock-formatters"/);
+	    assert.match(retailStockFormatters, /export function formatPrice/);
+	    assert.match(retailStockFormatters, /export function formatAmount/);
+	    assert.match(retailStockFormatters, /export function formatWholeAmount/);
 	    assert.doesNotMatch(view, /function pipelineCapitalValues/);
 	    assert.doesNotMatch(view, /customerOrderListPipelineSummary/);
 	    assert.doesNotMatch(view, /customerOrderDetailCapitalValues/);
@@ -654,7 +658,7 @@ describe("retail stock and FX infrastructure", () => {
     assert.match(cartService, /export type RegionalBasketAvailability/);
     assert.match(cartService, /selectedRetailerOrganisationId/);
     assert.match(cartService, /organisations\.country_code = \$\{shippingCountry\}/);
-    assert.match(cartService, /products\.region = \$\{shippingCountry\}/);
+    assert.doesNotMatch(cartService, /products\.region = \$\{shippingCountry\}/);
     assert.match(service, /queueRetailOperationTask/);
     assert.match(service, /admin\.retail_purchase_order_created/);
     assert.match(service, /admin\.retail_customer_order_created/);

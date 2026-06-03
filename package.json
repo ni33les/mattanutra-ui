@@ -92,7 +92,6 @@
     "postcss": "$postcss"
   },
   "devDependencies": {
-    "@playwright/test": "^1.60.0",
     "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4.2.4",
     "@types/node": "^22.15.0",

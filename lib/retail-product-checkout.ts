@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import Stripe from "stripe";
 import type postgres from "postgres";
 import { isUuid } from "@/lib/assessment-store";
+import { formatCurrencyAmount } from "@/lib/currencies";
 import { getSql } from "@/lib/db";
 import { FINANCE_ACCOUNT_IDS, recordFinanceTransaction } from "@/lib/finance-ledger";
 import { resolveUsdRateForCurrency } from "@/lib/finance-fx";
@@ -134,11 +135,7 @@ function stripeMinorAmountFromMicros(micros: number) {
 }
 
 function formatEmailAmount(amount: number, currency: string) {
-  return new Intl.NumberFormat("en", {
-    currency,
-    maximumFractionDigits: 0,
-    style: "currency"
-  }).format(amount);
+  return formatCurrencyAmount("en", amount, currency);
 }
 
 function stripeLocale(locale: Locale) {

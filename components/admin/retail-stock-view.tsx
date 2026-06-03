@@ -35,6 +35,11 @@ import type {
   AdminDashboardView
 } from "@/components/admin/dashboard-content";
 import {
+  formatAmount,
+  formatPrice,
+  formatWholeAmount
+} from "@/components/admin/retail-stock-formatters";
+import {
   BusinessStatsGrid,
   adminHref,
   adminLocaleTextClass,
@@ -483,37 +488,8 @@ function orgProductKey(organisationId: string, productId: string | null | undefi
   return `${organisationId}:${productId ?? "unknown"}`;
 }
 
-function priceFormatter(locale: Locale, currency: string) {
-  return new Intl.NumberFormat(locale, {
-    currency,
-    maximumFractionDigits: 2,
-    style: "currency"
-  });
-}
-
-function formatPrice(locale: Locale, currency: string, value: number | null) {
-  return value === null ? null : priceFormatter(locale, currency).format(value);
-}
-
 function customerOrderRetailValue(order: AdminRetailCustomerOrder) {
   return order.pricingSnapshot?.totalAmount ?? order.totalRetailAmount;
-}
-
-function formatAmount(locale: Locale, value: number | null) {
-  return value === null
-    ? null
-    : new Intl.NumberFormat(locale, {
-        maximumFractionDigits: 2,
-        minimumFractionDigits: Number.isInteger(value) ? 0 : 2
-      }).format(value);
-}
-
-function formatWholeAmount(locale: Locale, value: number | null) {
-  return value === null
-    ? null
-    : new Intl.NumberFormat(locale, {
-        maximumFractionDigits: 0
-      }).format(value);
 }
 
 function formatDate(value: string | null, locale: Locale) {
