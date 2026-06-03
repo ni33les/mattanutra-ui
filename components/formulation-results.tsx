@@ -113,7 +113,12 @@ export function FormulationResults({
   );
   const [result, setResult] = useState<FormulationResult | null>(initialResult);
   const [selectedProductStackPreference, setSelectedProductStackPreference] =
-    useState<ProductStackPreference | null>(() => initialStackPreference);
+    useState<ProductStackPreference | null>(() =>
+      initialStackPreference ??
+      (initialResult
+        ? defaultProductStackPreferenceForResult(initialResult)
+        : "balanced"),
+    );
   const [productPollingPreference, setProductPollingPreference] =
     useState<ProductStackPreference | null>(() => initialStackPreference);
   const productPollAttemptsRef = useRef(0);

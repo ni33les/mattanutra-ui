@@ -92,6 +92,6 @@ export const productRecommendationCopy = {
 } satisfies Record<Locale, Record<string, string>>;
 
 export const productStackPreferenceOrder: ProductStackPreference[] = [
-  "compact",
-  "balanced"
+  "balanced",
+  "compact"
 ];
