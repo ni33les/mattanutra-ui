@@ -495,6 +495,26 @@ describe("external worker boundaries", () => {
     );
   });
 
+  it("keeps public healthscore subtraction counts bounded to catalogue-scale values", async () => {
+    const source = await readFile("lib/task-result-applier.ts", "utf8");
+
+    assert.match(
+      source,
+      /maxPublicProductEvaluatedCount = 1000/,
+      "healthscore subtraction cards must not expose matcher search-space counts"
+    );
+    assert.match(
+      source,
+      /diagnosticsProductsConsidered > maxPublicProductEvaluatedCount[\s\S]*return null/,
+      "oversized productsConsidered diagnostics should leave the existing ingredient subtraction alone"
+    );
+    assert.match(
+      source,
+      /if \(!stats\) \{[\s\S]*return null;[\s\S]*\}/,
+      "invalid public subtraction stats should skip assessment version updates"
+    );
+  });
+
   it("keeps checkout pre-generation hidden until paid selection is adopted", async () => {
     const taskWorker = await readFile("lib/task-worker.ts", "utf8");
     const workItems = await readFile("lib/task-work-items.ts", "utf8");

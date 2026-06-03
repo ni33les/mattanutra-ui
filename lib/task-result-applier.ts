@@ -1992,11 +1992,22 @@ async function insertProductRecommendationResult({
 function healthScoreProductSubtractionStats(
   result: ProductRecommendationResult
 ) {
+  const maxPublicProductEvaluatedCount = 1000;
   const productsChosen = Math.max(0, result.recommendations.length);
-  const productsEvaluated = Math.max(
-    productsChosen,
-    Math.round(Number(result.diagnostics.productsConsidered) || productsChosen)
+  const diagnosticsProductsConsidered = Math.round(
+    Number(result.diagnostics.productsConsidered) || 0
   );
+
+  if (
+    productsChosen <= 0 ||
+    productsChosen > maxPublicProductEvaluatedCount ||
+    diagnosticsProductsConsidered <= 0 ||
+    diagnosticsProductsConsidered > maxPublicProductEvaluatedCount
+  ) {
+    return null;
+  }
+
+  const productsEvaluated = Math.max(productsChosen, diagnosticsProductsConsidered);
 
   return {
     productsChosen,
@@ -2006,7 +2017,7 @@ function healthScoreProductSubtractionStats(
 
 function sameHealthScoreSubtractionStats(
   healthScore: HealthScoreResult,
-  stats: ReturnType<typeof healthScoreProductSubtractionStats>
+  stats: NonNullable<ReturnType<typeof healthScoreProductSubtractionStats>>
 ) {
   const subtraction = healthScore.pageContent?.locked.subtraction;
 
@@ -2046,6 +2057,10 @@ async function refreshHealthScoreProductSubtraction({
   }
 
   const stats = healthScoreProductSubtractionStats(result);
+
+  if (!stats) {
+    return null;
+  }
 
   if (sameHealthScoreSubtractionStats(current, stats)) {
     return null;
