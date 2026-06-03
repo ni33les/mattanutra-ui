@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS,
-  applyHealthScoreProductSubtraction,
   computeHealthScore
 } from "../lib/health-score.ts";
 
@@ -198,20 +197,5 @@ describe("HealthScore v4 deterministic scoring", () => {
     });
 
     assert.deepEqual(leaks, []);
-  });
-
-  it("switches subtraction to product mode without changing locked score facts", () => {
-    const result = computeHealthScore(profileOne(), "en");
-    const productReady = applyHealthScoreProductSubtraction(result, {
-      productsChosen: 4,
-      productsEvaluated: 37
-    });
-
-    assert.equal(productReady.score, 47);
-    assert.equal(productReady.pageContent?.locked.subtraction.mode, "products");
-    assert.equal(productReady.pageContent?.locked.subtraction.evaluated, 37);
-    assert.equal(productReady.pageContent?.locked.subtraction.setAside, 33);
-    assert.equal(productReady.pageContent?.locked.subtraction.chosen, 4);
-    assert.equal(productReady.pageContent?.aiCopy, undefined);
   });
 });

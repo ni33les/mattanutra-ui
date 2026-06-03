@@ -415,12 +415,10 @@ describe("external worker boundaries", () => {
       /product_recommendation_runs[\s\S]*generated_at >= greatest/,
       "late product-matching enqueue points must not create duplicate runs when current recommendations already exist"
     );
-    assert.equal(
-      /refreshHealthScoreProductSubtraction[\s\S]*enqueueHealthScoreAnalysisTask/.test(
-        taskResultApplierSource
-      ),
-      false,
-      "product readiness must update locked HealthScore subtraction without queuing a second HealthScore AI task"
+    assert.doesNotMatch(
+      taskResultApplierSource,
+      /applyHealthScoreProductSubtraction|refreshHealthScoreProductSubtraction|healthscore_product_subtraction_ready/,
+      "product readiness must not rewrite the HealthScore ingredient subtraction card"
     );
   });
 
@@ -495,24 +493,12 @@ describe("external worker boundaries", () => {
     );
   });
 
-  it("keeps public healthscore subtraction counts bounded to catalogue-scale values", async () => {
+  it("keeps public healthscore subtraction in ingredient mode", async () => {
     const source = await readFile("lib/task-result-applier.ts", "utf8");
 
-    assert.match(
-      source,
-      /maxPublicProductEvaluatedCount = 1000/,
-      "healthscore subtraction cards must not expose matcher search-space counts"
-    );
-    assert.match(
-      source,
-      /diagnosticsProductsConsidered > maxPublicProductEvaluatedCount[\s\S]*return null/,
-      "oversized productsConsidered diagnostics should leave the existing ingredient subtraction alone"
-    );
-    assert.match(
-      source,
-      /if \(!stats\) \{[\s\S]*return null;[\s\S]*\}/,
-      "invalid public subtraction stats should skip assessment version updates"
-    );
+    assert.doesNotMatch(source, /productsConsidered[\s\S]*healthScore/);
+    assert.doesNotMatch(source, /eventType: "healthscore_subtraction_mode_updated"/);
+    assert.doesNotMatch(source, /changeReason: "healthscore_product_subtraction_ready"/);
   });
 
   it("keeps checkout pre-generation hidden until paid selection is adopted", async () => {

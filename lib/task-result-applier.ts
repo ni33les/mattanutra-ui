@@ -49,10 +49,7 @@ import type {
   FoodGuidanceBlueprint,
   FormulationBlueprint
 } from "@/lib/formulation-types";
-import {
-  applyHealthScoreProductSubtraction,
-  type HealthScoreResult
-} from "@/lib/health-score";
+import type { HealthScoreResult } from "@/lib/health-score";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { recordPaymentPregenerationProgress } from "@/lib/stripe-payments";
 import {
@@ -1989,115 +1986,6 @@ async function insertProductRecommendationResult({
   return runId;
 }
 
-function healthScoreProductSubtractionStats(
-  result: ProductRecommendationResult
-) {
-  const maxPublicProductEvaluatedCount = 1000;
-  const productsChosen = Math.max(0, result.recommendations.length);
-  const diagnosticsProductsConsidered = Math.round(
-    Number(result.diagnostics.productsConsidered) || 0
-  );
-
-  if (
-    productsChosen <= 0 ||
-    productsChosen > maxPublicProductEvaluatedCount ||
-    diagnosticsProductsConsidered <= 0 ||
-    diagnosticsProductsConsidered > maxPublicProductEvaluatedCount
-  ) {
-    return null;
-  }
-
-  const productsEvaluated = Math.max(productsChosen, diagnosticsProductsConsidered);
-
-  return {
-    productsChosen,
-    productsEvaluated
-  };
-}
-
-function sameHealthScoreSubtractionStats(
-  healthScore: HealthScoreResult,
-  stats: NonNullable<ReturnType<typeof healthScoreProductSubtractionStats>>
-) {
-  const subtraction = healthScore.pageContent?.locked.subtraction;
-
-  return (
-    subtraction?.mode === "products" &&
-    subtraction.evaluated === stats.productsEvaluated &&
-    subtraction.chosen === stats.productsChosen
-  );
-}
-
-async function refreshHealthScoreProductSubtraction({
-  result,
-  sql,
-  task
-}: Readonly<{
-  result: ProductRecommendationResult;
-  sql: TaskServiceDb;
-  task: TaskRecord;
-}>) {
-  if (!task.planId) {
-    return null;
-  }
-
-  const rows = await sql<Array<{
-    health_score: unknown;
-    locale: unknown;
-  }>>`
-    select health_score, locale
-    from public.assessments
-    where plan_id = ${task.planId}::uuid
-    limit 1
-  `;
-  const current = rows[0]?.health_score as HealthScoreResult | undefined;
-
-  if (!current || typeof current.score !== "number" || !current.pageContent) {
-    return null;
-  }
-
-  const stats = healthScoreProductSubtractionStats(result);
-
-  if (!stats) {
-    return null;
-  }
-
-  if (sameHealthScoreSubtractionStats(current, stats)) {
-    return null;
-  }
-
-  const healthScore = applyHealthScoreProductSubtraction(current, stats);
-  const locale: Locale = isLocale(rows[0]?.locale) ? rows[0].locale : "en";
-
-  await appendAssessmentVersion(sql, {
-    actor: task.reservedByAgentId,
-    afterPayload: {
-      healthScore,
-      updatedAt: "now"
-    },
-    changeReason: "healthscore_product_subtraction_ready",
-    eventPayload: {
-      locale,
-      productsChosen: stats.productsChosen,
-      productsEvaluated: stats.productsEvaluated,
-      taskType: task.taskType
-    },
-    eventType: "healthscore_subtraction_mode_updated",
-    planId: task.planId,
-    source: "task_result_applier",
-    taskId: task.id
-  });
-
-  await sql`
-    update public.assessments set
-      health_score = ${sql.json(toJsonValue(healthScore))},
-      updated_at = now()
-    where plan_id = ${task.planId}::uuid
-  `;
-
-  return healthScore;
-}
-
 async function applyProductRecommendationsResult(
   task: TaskRecord,
   resultPayload: unknown,
@@ -2272,12 +2160,6 @@ async function applyProductRecommendationsResult(
     from public.recommendations
     where plan_id = ${task.planId}::uuid
   `;
-
-  await refreshHealthScoreProductSubtraction({
-    result,
-    sql,
-    task
-  });
 
   await eventually(afterCommit, async () => {
     await enqueueFoodGapSupportTask({
