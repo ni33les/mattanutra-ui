@@ -4,7 +4,7 @@ import { BookmarkTrackingButton } from "@/components/retail-checkout/bookmark-tr
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
-import { getTrackingOrderByToken } from "@/lib/retail-product-checkout";
+import { getTrackingOrderByReference } from "@/lib/retail-product-checkout";
 
 type Props = {
   params: Promise<{ locale: string; token: string }>;
@@ -151,7 +151,7 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
   const copy = orderTrackingCopy[locale];
   const dictionary = getDictionary(locale);
-  const order = await getTrackingOrderByToken(token, locale);
+  const order = await getTrackingOrderByReference(token, locale);
   const currentPath = `/${locale}/order/track/${encodeURIComponent(token)}`;
 
   if (!order) {

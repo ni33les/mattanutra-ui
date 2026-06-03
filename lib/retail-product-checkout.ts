@@ -672,7 +672,22 @@ async function createRetailCustomerOrderFromPayment(
   payment: CheckoutPaymentRow
 ) {
   if (payment.retail_customer_order_id) {
-    return payment.retail_customer_order_id;
+    const existingRows = await sql<Array<{ id: string; order_number: string }>>`
+      select id::text, order_number
+      from public.retail_customer_orders
+      where id = ${payment.retail_customer_order_id}::uuid
+      limit 1
+    `;
+    const existing = existingRows[0];
+
+    if (existing) {
+      return { orderId: existing.id, orderNumber: existing.order_number };
+    }
+
+    return {
+      orderId: payment.retail_customer_order_id,
+      orderNumber: payment.retail_customer_order_id
+    };
   }
 
   const quoteLines = arrayValue<QuoteLine>(payment.quote_lines);
@@ -784,7 +799,7 @@ async function createRetailCustomerOrderFromPayment(
     taskType: "retail_customer_order_allocate"
   });
 
-  return order.id;
+  return { orderId: order.id, orderNumber: order.order_number };
 }
 
 async function recordRetailCheckoutFinance(
@@ -851,8 +866,8 @@ async function recordRetailCheckoutFinance(
   }
 }
 
-function retailCheckoutTrackingUrl(locale: string, token: string) {
-  return `${siteBaseUrl()}/${locale}/order/track/${encodeURIComponent(token)}`;
+function retailCheckoutTrackingUrl(locale: string, reference: string) {
+  return `${siteBaseUrl()}/${locale}/order/track/${encodeURIComponent(reference)}`;
 }
 
 function retailOrderConfirmationHtml(input: Readonly<{
@@ -942,9 +957,9 @@ function retailOrderConfirmationHtml(input: Readonly<{
 
 async function sendRetailOrderConfirmationEmail(input: Readonly<{
   orderId: string;
+  orderNumber: string;
   payment: CheckoutPaymentRow;
   sql: RetailCheckoutDb;
-  trackingToken: string;
 }>) {
   const email = cleanText(input.payment.customer_email);
 
@@ -959,10 +974,10 @@ async function sendRetailOrderConfirmationEmail(input: Readonly<{
     return;
   }
 
-  const trackingUrl = retailCheckoutTrackingUrl(input.payment.locale, input.trackingToken);
+  const trackingUrl = retailCheckoutTrackingUrl(input.payment.locale, input.orderNumber);
   const delivery = await sendTransactionalEmail({
     html: retailOrderConfirmationHtml({
-      orderId: input.orderId,
+      orderId: input.orderNumber,
       payment: input.payment,
       trackingUrl
     }),
@@ -978,6 +993,7 @@ async function sendRetailOrderConfirmationEmail(input: Readonly<{
         reason: delivery.reason ?? null,
         sent: delivery.sent,
         sentAt: delivery.sent ? new Date().toISOString() : null,
+        trackingReference: input.orderNumber,
         trackingUrl
       }
     }))}::jsonb,
@@ -997,6 +1013,7 @@ async function sendRetailOrderConfirmationEmail(input: Readonly<{
     properties: {
       checkoutPaymentId: input.payment.id,
       orderId: input.orderId,
+      orderNumber: input.orderNumber,
       reason: delivery.reason ?? null
     }
   });
@@ -1010,7 +1027,7 @@ async function fulfillRetailCheckoutPayment(
     return payment;
   }
 
-  const orderId = await createRetailCustomerOrderFromPayment(sql, payment);
+  const { orderId, orderNumber } = await createRetailCustomerOrderFromPayment(sql, payment);
   const trackingToken = randomBytes(32).toString("base64url");
   const trackingHash = hashToken(trackingToken);
 
@@ -1051,15 +1068,16 @@ async function fulfillRetailCheckoutPayment(
 
   await sendRetailOrderConfirmationEmail({
     orderId,
+    orderNumber,
     payment: updated,
-    sql,
-    trackingToken
+    sql
   });
 
   return {
     ...updated,
     metadata: {
       ...objectValue(updated.metadata),
+      trackingReference: orderNumber,
       trackingToken
     }
   } as CheckoutPaymentRow;
@@ -1124,11 +1142,14 @@ export async function completeMockRetailCheckout(input: Readonly<{
   });
 
   const fulfilled = await fulfillRetailCheckoutPayment(sql, payment);
-  const token = cleanText(objectValue(fulfilled.metadata).trackingToken);
+  const metadata = objectValue(fulfilled.metadata);
+  const trackingReference =
+    cleanText(metadata.trackingReference) ||
+    cleanText(metadata.trackingToken);
 
   return {
-    destination: token
-      ? `/${payment.locale}/order/track/${encodeURIComponent(token)}`
+    destination: trackingReference
+      ? `/${payment.locale}/order/track/${encodeURIComponent(trackingReference)}`
       : `/${payment.locale}/basket/return?payment=${payment.id}`,
     paymentId: payment.id
   };
@@ -1197,11 +1218,14 @@ export async function fulfillRetailCheckoutSession(input: Readonly<{
     });
 
     const fulfilled = await fulfillRetailCheckoutPayment(sql, payment);
-    const token = cleanText(objectValue(fulfilled.metadata).trackingToken);
+    const metadata = objectValue(fulfilled.metadata);
+    const trackingReference =
+      cleanText(metadata.trackingReference) ||
+      cleanText(metadata.trackingToken);
 
     return {
-      destination: token
-        ? `/${payment.locale}/order/track/${encodeURIComponent(token)}`
+      destination: trackingReference
+        ? `/${payment.locale}/order/track/${encodeURIComponent(trackingReference)}`
         : `/${payment.locale}`,
       paymentId: payment.id,
       status: "fulfilled" as const
@@ -1259,11 +1283,13 @@ export async function markRetailCheckoutOpened(paymentId: string) {
   return payment;
 }
 
-export async function getTrackingOrderByToken(
-  token: string,
+export async function getTrackingOrderByReference(
+  reference: string,
   locale: Locale
 ): Promise<TrackingOrder | null> {
-  if (!token || token.length < 32) {
+  const trackingReference = cleanText(reference);
+
+  if (!trackingReference) {
     return null;
   }
 
@@ -1275,6 +1301,7 @@ export async function getTrackingOrderByToken(
 
   await ensureRetailCheckoutSchema(sql);
 
+  const isTokenReference = trackingReference.length >= 32;
   const rows = await sql<Array<CheckoutPaymentRow & {
     order_number: string | null;
     order_status: string | null;
@@ -1290,7 +1317,11 @@ export async function getTrackingOrderByToken(
       on retail_customer_orders.id = retail_checkout_payments.retail_customer_order_id
     left join public.organisations
       on organisations.id = retail_checkout_payments.selected_retailer_organisation_id
-    where retail_checkout_payments.tracking_token_hash = ${hashToken(token)}
+    where ${
+      isTokenReference
+        ? sql`retail_checkout_payments.tracking_token_hash = ${hashToken(trackingReference)}`
+        : sql`upper(retail_customer_orders.order_number) = upper(${trackingReference})`
+    }
     limit 1
   `;
   const row = rows[0] ?? null;
@@ -1309,7 +1340,9 @@ export async function getTrackingOrderByToken(
     properties: {
       checkoutPaymentId: row.id,
       orderId: row.retail_customer_order_id,
-      tokenPrefix: token.slice(0, 8)
+      trackingReference: isTokenReference
+        ? `${trackingReference.slice(0, 8)}...`
+        : trackingReference
     }
   });
 
@@ -1324,7 +1357,7 @@ export async function getTrackingOrderByToken(
     retailerName: row.retailer_name,
     status: row.order_status ?? row.status,
     totalAmount: Number(row.amount) / AMOUNT_MICROS_PER_UNIT,
-    trackingUrl: `/${locale}/order/track/${encodeURIComponent(token)}`
+    trackingUrl: `/${locale}/order/track/${encodeURIComponent(row.order_number ?? trackingReference)}`
   };
 }
 
