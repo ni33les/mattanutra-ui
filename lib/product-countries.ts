@@ -24,6 +24,15 @@ const productCountryCodes: ReadonlySet<string> =
   new Set(productCountryOptions.map((item) => item.code));
 
 export type ProductCountryCode = (typeof productCountryOptions)[number]["code"];
+export type ProductCountryPricingStatus = "missing" | "ready" | "review";
+
+export type ProductCountryPricing = Readonly<{
+  countryCode: ProductCountryCode;
+  currency: string;
+  priceUpdatedAt: string | null;
+  pricingStatus: ProductCountryPricingStatus;
+  rrpPriceAmount: number | null;
+}>;
 
 export function normalizeProductCountryCode(value: unknown): ProductCountryCode | null {
   const code = typeof value === "string" ? value.trim().toUpperCase() : "";
@@ -53,4 +62,26 @@ export function normalizeProductCountryCodes(
 
 export function productCountryLabel(code: string) {
   return productCountryOptions.find((item) => item.code === code)?.label ?? code;
+}
+
+export function normalizeProductCountryPricingStatus(
+  value: unknown,
+  rrpPriceAmount: number | null = null
+): ProductCountryPricingStatus {
+  if (value === "ready" || value === "review" || value === "missing") {
+    return value;
+  }
+
+  return rrpPriceAmount !== null ? "ready" : "missing";
+}
+
+export function normalizeCurrencyCode(value: unknown, fallback = "THB") {
+  const currency = typeof value === "string" ? value.trim().toUpperCase() : "";
+  const fallbackCurrency = fallback.trim().toUpperCase();
+
+  if (/^[A-Z]{3}$/.test(currency)) {
+    return currency;
+  }
+
+  return /^[A-Z]{3}$/.test(fallbackCurrency) ? fallbackCurrency : "THB";
 }

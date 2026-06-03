@@ -13,6 +13,10 @@ import {
   legacyTokenMatches,
   type LegacyTokenSource
 } from "@/lib/legacy-token-auth";
+import {
+  defaultProductCountryCode,
+  normalizeProductCountryCode
+} from "@/lib/product-countries";
 import { normalizeCapabilities } from "@/lib/task-service-utils";
 import type {
   AccessPrincipal,
@@ -183,6 +187,7 @@ async function agentPrincipalFromToken(
     capabilities: string[] | null;
     credential_id: string;
     membership_id: string;
+    organisation_country_code: string | null;
     organisation_id: string;
     organisation_currency: string | null;
     organisation_default_locale: string;
@@ -211,6 +216,7 @@ async function agentPrincipalFromToken(
       organisations.organisation_type,
       organisations.status as organisation_status,
       organisations.default_locale as organisation_default_locale,
+      organisations.country_code as organisation_country_code,
       organisations.currency as organisation_currency,
       people.id::text as person_id,
       people.email as person_email,
@@ -250,6 +256,9 @@ async function agentPrincipalFromToken(
     credentialId: row.credential_id,
     membershipId: row.membership_id,
     organisation: {
+      countryCode:
+        normalizeProductCountryCode(row.organisation_country_code) ??
+        defaultProductCountryCode,
       currency:
         typeof row.organisation_currency === "string" &&
         /^[A-Z]{3}$/.test(row.organisation_currency)
@@ -342,6 +351,7 @@ function sessionPrincipalFromRequest(
         title: null
       },
       actorOrganisation: {
+        countryCode: defaultProductCountryCode,
         currency: "USD",
         defaultLocale: "en",
         id: session.organisationId,
@@ -370,6 +380,7 @@ function sessionPrincipalFromRequest(
         title: null
       },
       effectiveOrganisation: {
+        countryCode: defaultProductCountryCode,
         currency: "USD",
         defaultLocale: "en",
         id: session.assumedOrganisationId ?? session.organisationId,

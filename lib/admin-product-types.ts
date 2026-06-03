@@ -8,7 +8,10 @@ import type {
 } from "@/lib/product-recommendations";
 import type { ValidationResult } from "@/lib/product-validation";
 import type { ProductCandidateFact } from "@/lib/product-recommendations";
-import type { ProductCountryCode } from "@/lib/product-countries";
+import type {
+  ProductCountryCode,
+  ProductCountryPricing
+} from "@/lib/product-countries";
 import type { AdminProductDecisionStats } from "@/lib/admin-recommendation-insights";
 
 export type { ProductCountryCode } from "@/lib/product-countries";
@@ -98,6 +101,7 @@ export type AdminProductRow = Readonly<{
   importStatus: string | null;
   labelStatus: ProductLabelStatus;
   manufacturerCountryCodes: ProductCountryCode[];
+  countryPricing: ProductCountryPricing[];
   status: ProductStatus;
   validation: ValidationResult;
   validationCacheStatus: ProductValidationCacheStatus;
@@ -225,6 +229,7 @@ export type ResolveProductImportReviewInput = Readonly<{
   action: "approve" | "duplicate" | "ignore";
   actor?: string | null;
   availableCountryCodes?: readonly string[];
+  countryPricing?: readonly ProductCountryPricing[];
   brandName?: string | null;
   description?: string | null;
   descriptionEn?: string | null;
@@ -252,6 +257,7 @@ export type CreateAdminProductInput = Readonly<{
   affiliateUrl?: string | null;
   availabilityStatus?: ProductAvailabilityStatus;
   availableCountryCodes?: readonly string[];
+  countryPricing?: readonly ProductCountryPricing[];
   brandStatus?: ProductStatus;
   brandName?: string | null;
   manufacturerCountryCodes?: readonly string[];
@@ -289,6 +295,7 @@ export type UpdateAdminProductInput = Readonly<{
   affiliateStatus?: ProductAffiliateStatus;
   availabilityStatus?: ProductAvailabilityStatus;
   availableCountryCodes?: readonly string[];
+  countryPricing?: readonly ProductCountryPricing[];
   brandName?: string | null;
   manufacturerCountryCodes?: readonly string[];
   changeNote?: string | null;
@@ -392,6 +399,7 @@ export type ProductDbRow = Readonly<{
   affiliate_status: ProductAffiliateStatus;
   availability_status: ProductAvailabilityStatus;
   available_country_codes: string[] | null;
+  country_pricing: unknown;
   brand_id: string | null;
   brand_name: string | null;
   brand_status: ProductStatus | null;
@@ -446,6 +454,7 @@ export type ProductRecommendationDbRow = Readonly<{
   active_affiliate_type: "affiliate" | "direct" | null;
   active_affiliate_url: string | null;
   available_country_codes: string[] | null;
+  country_pricing: unknown;
   brand_name: string | null;
   brand_status: ProductStatus | null;
   currency: string;

@@ -4,18 +4,26 @@ import {
   BeakerIcon,
   BuildingOffice2Icon,
   ChatBubbleLeftRightIcon,
+  ArchiveBoxIcon,
+  ArrowPathRoundedSquareIcon,
+  ArrowsRightLeftIcon,
+  ClipboardDocumentCheckIcon,
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
   CpuChipIcon,
+  DocumentMagnifyingGlassIcon,
   DocumentTextIcon,
   EnvelopeIcon,
   ExclamationTriangleIcon,
   FunnelIcon,
   HomeIcon,
+  InboxArrowDownIcon,
   MegaphoneIcon,
   QueueListIcon,
   ShoppingBagIcon,
+  ShoppingCartIcon,
   SparklesIcon,
+  TruckIcon,
   UserGroupIcon
 } from "@heroicons/react/24/outline";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
@@ -48,6 +56,14 @@ export type AdminDashboardView =
   | "product-insights"
   | "products"
   | "reviews"
+  | "retail-customer-orders"
+  | "retail-audit"
+  | "retail-fulfillment"
+  | "retail-movements"
+  | "retail-purchase-orders"
+  | "retail-receiving"
+  | "retail-reorder"
+  | "retail-task-queue"
   | "settings"
   | "stock"
   | "supplement-insights"
@@ -242,6 +258,7 @@ export type AdminContent = Readonly<{
     audit: string;
     capabilities: string;
     credentials: string;
+    country: string;
     createdAt: string;
     create: string;
     createOrganisation: string;
@@ -300,6 +317,7 @@ export type AdminContent = Readonly<{
   settings: {
     account: string;
     currency: string;
+    customerMargin: string;
     displayName: string;
     email: string;
     language: string;
@@ -311,28 +329,198 @@ export type AdminContent = Readonly<{
   };
   stock: {
     actions: string;
+    addItem: string;
     addProduct: string;
-    allOrganisations: string;
+    addPurchaseOrder: string;
+    addCustomerOrder: string;
+    agentTasks: string;
+    allocate: string;
+    allocatedTo: string;
+    audit: string;
+	    allOrganisations: string;
+	    availability: string;
+	    allocateAvailable: string;
+	    availableNow: string;
+    backorderAllowed: string;
+    backToCustomerOrders: string;
+    backorderDisabled: string;
+    backorderPolicy: string;
     cancel: string;
+    capital: string;
+	    claimedBy: string;
+	    claimTask: string;
+	    completeTask: string;
+	    confidence: string;
+    applyShoppingList: string;
+    available: string;
+    customer: string;
+    customerDemand: string;
+    customerOrderDetails: string;
+    customerOrders: string;
+    customerOrderSaveError: string;
+    createPo: string;
+    createShoppingList: string;
     currency: string;
-    disabled: string;
+	    daysCover: string;
+	    disabled: string;
+	    draftPo: string;
+    dueAt: string;
     empty: string;
+    escalateTask: string;
     expiresAt: string;
+    editStock: string;
+    exportCsv: string;
+    expectedAt: string;
+    event: string;
+    fastestDelivery: string;
+    fulfill: string;
+    insightActiveProducts: string;
+    insightOutOfStock: string;
+    insightRecommendationPressure: string;
+    insightRetailValue: string;
+    insightsTab: string;
+    importCsv: string;
+	    inStock: string;
+	    incomingPo: string;
+	    chooseProduct: string;
     leadTimeDays: string;
+    lowStock: string;
+    lots: string;
+    movementAdjustment: string;
+    movementExpiryWriteOff: string;
+    movementReceive: string;
+    movementReturn: string;
+    movementSale: string;
+    movementTransferIn: string;
+    movementTransferOut: string;
+    movementVoid: string;
+    movementType: string;
+    movementsTab: string;
+    noItemsSelected: string;
+    noProductMatches: string;
+    notSet: string;
     notes: string;
+    onTrack: string;
     organisation: string;
+    orderItems: string;
     outOfStock: string;
+    partial: string;
+	    pack: string;
+	    partiallyAllocated: string;
+	    payable: string;
+    pick: string;
+    placeOrder: string;
+    pipelineUnavailable: string;
+    placedAt: string;
     product: string;
+    priceOverride: string;
+    purchased: string;
+    profitImpact: string;
+    purchaseOrders: string;
+    purchaseOrderNumber: string;
+    purchaseOrderStatusAll: string;
+    purchaseOrderStatusDraft: string;
+    purchaseOrderStatusOrdered: string;
+    purchaseOrderStatusPartial: string;
+    purchaseOrderStatusReceived: string;
+    purchaseOrderStatusClosed: string;
+    purchaseOrderStatusVoid: string;
+    quantity: string;
+    ordered: string;
+    receivedNow: string;
+	    reason: string;
+	    receiveStock: string;
+	    receive: string;
+	    receiveAll: string;
+	    receiveQuantityError: string;
+      recheckWorkflow: string;
+	    recordMovement: string;
+    remaining: string;
+    removeItem: string;
+    regionalCheckout: string;
+    reorderBy: string;
+    recommendedOrder: string;
+    reorderRisk: string;
+    reorderTab: string;
+    review: string;
+    purchaseOrderDetails: string;
     retailPrice: string;
+    retailValue: string;
+    riskOk: string;
+    riskOutOfStock: string;
+    riskReorder: string;
+    riskWatch: string;
     save: string;
     saveError: string;
-    selectProduct: string;
-    status: string;
+    ship: string;
+    snoozeTask: string;
+    cheapestPrice: string;
+	    basketLines: string;
+	    buildDraftPo: string;
+    deliver: string;
+    directRetailer: string;
+    lineTotal: string;
+    shortfall: string;
+    shortfallHandling: string;
+    shortfallReference: string;
+    shortfallExpectedAt: string;
+    supplierBackorder: string;
+    replacementShipment: string;
+    supplierCredit: string;
+    supplierRefund: string;
+    closeShort: string;
+    damagedRejected: string;
+    closedShort: string;
+    noSupplierShortfall: string;
+    noOrders: string;
+    mockPaidOrder: string;
+    nextAction: string;
+    supplier: string;
+    supplierContact: string;
+	    selectProduct: string;
+	    search: string;
+	    searchProducts: string;
+	    searchOrders: string;
+	    searchStock: string;
+	    status: string;
+	    stockDetails: string;
+	    stockListTab: string;
+	    stockPipeline: string;
     stockQuantity: string;
+    stuck: string;
+    suggestedOrder: string;
+    taskDetails: string;
+    taskQueue: string;
+    taskPriority: string;
     title: string;
+    total: string;
+    unitCost: string;
+    units: string;
     updated: string;
-    wholesalePrice: string;
-  };
+    unavailable: string;
+    unclaimed: string;
+    unorderedNeed: string;
+    unorderedNeedDescription: string;
+    voidMovement: string;
+    voidPurchaseOrder: string;
+	    wholesalePrice: string;
+    wholesalerTried: string;
+	    waitingForPo: string;
+	    workflow: string;
+	    routingPreference: string;
+	    selectedRetailer: string;
+    shippingCountry: string;
+    shoppingList: string;
+    restockingAdvice: string;
+    restockingAdviceDescription: string;
+    reorderAdviceDetails: string;
+    reorderBackorders: string;
+    reorderBackordersDescription: string;
+    reorderAdvise: string;
+    reorderAdviseDescription: string;
+    reorderRequired: string;
+    reorderAdvisory: string;
+	  };
   generated: string;
   financials: {
     aiCost: string;
@@ -374,11 +562,11 @@ export type AdminContent = Readonly<{
     deviation: string;
     dropoff: string;
     editTargets: string;
-    freeRequests: string;
     healthScoreViews: string;
     landingVisitors: string;
     pendingReviews: string;
     precisionConversions: string;
+    productOrders: string;
     proConversions: string;
     saveTargets: string;
     targetSaveError: string;
@@ -452,6 +640,14 @@ export type AdminContent = Readonly<{
   pageTitles: Record<AdminDashboardView, string>;
   performance: AdminNavItem[];
   performanceTitle: string;
+  retailBuyingNavigation: AdminNavItem[];
+  retailBuyingTitle: string;
+  retailInventoryNavigation: AdminNavItem[];
+  retailInventoryTitle: string;
+  retailSellingNavigation: AdminNavItem[];
+  retailSellingTitle: string;
+  retailTasksNavigation: AdminNavItem[];
+  retailTasksTitle: string;
   ranges: Record<AdminDashboardRange, string>;
   reviewQueue: {
     approve: string;
@@ -515,9 +711,11 @@ export type AdminContent = Readonly<{
   visibility: {
     active: string;
     actor: string;
+    age: string;
     agent: string;
     agentSeen: string;
     agentSession: string;
+    assignee: string;
     blocked: string;
     capabilities: string;
     completed: string;
@@ -536,7 +734,9 @@ export type AdminContent = Readonly<{
     liveUpdated: string;
     liveUpdates: string;
     noWorkerHeartbeat: string;
+    organisation: string;
     plan: string;
+    priority: string;
     queued: string;
     ray: string;
     reasoning: string;
@@ -549,6 +749,7 @@ export type AdminContent = Readonly<{
     status: string;
     task: string;
     total: string;
+    unassigned: string;
   };
   supplements: {
     active: string;
@@ -727,7 +928,7 @@ const baseContent = {
       sessions: "Sessions",
       status: "Status",
       successRate: "Success",
-      total: "Total",
+      total: "All",
       type: "Type",
       undeployed: "Undeployed",
       working: "Working"
@@ -750,6 +951,7 @@ const baseContent = {
       audit: "Audit",
       capabilities: "Capabilities",
       credentials: "Credentials",
+      country: "Country",
       createdAt: "Created",
       create: "Create",
       createOrganisation: "Create retailer",
@@ -808,6 +1010,7 @@ const baseContent = {
     settings: {
       account: "Account",
       currency: "Currency",
+      customerMargin: "Customer margin %",
       displayName: "Name",
       email: "Email",
       language: "Language",
@@ -819,28 +1022,202 @@ const baseContent = {
     },
     stock: {
       actions: "Actions",
-      addProduct: "Add Product",
+      addItem: "Add item",
+      addProduct: "Add Sellable Product",
+      addPurchaseOrder: "New Purchase Order",
+      addCustomerOrder: "Add Customer Order",
+      agentTasks: "Agent tasks",
+      allocate: "Allocate",
+      allocatedTo: "Allocated to",
+      audit: "Audit",
       allOrganisations: "All organisations",
+      availability: "Checking availability",
+      allocateAvailable: "Allocate available",
+      availableNow: "Available now",
+      backorderAllowed: "Allowed",
+      backToCustomerOrders: "Back to customer orders",
+      backorderDisabled: "Disabled",
+      backorderPolicy: "Backorder policy",
+      basketLines: "Basket lines",
       cancel: "Cancel",
+      capital: "Capital",
+      cheapestPrice: "Cheapest price",
+      claimedBy: "Claimed",
+      claimTask: "Claim",
+      completeTask: "Complete",
+      confidence: "Confidence",
+      applyShoppingList: "Apply list",
+      available: "Available",
+      customer: "Customer",
+      customerDemand: "Demand",
+      customerOrderDetails: "Customer order details",
+      customerOrders: "Customer Orders",
+      customerOrderSaveError: "Could not save customer order.",
+      createPo: "Create PO",
+      createShoppingList: "Create shopping list",
       currency: "Currency",
+      daysCover: "Days cover",
+      deliver: "Deliver",
       disabled: "Disabled",
+      directRetailer: "Direct retailer",
+      draftPo: "Draft PO",
+      dueAt: "Due date",
       empty: "No stock rows yet.",
+      escalateTask: "Escalate",
       expiresAt: "Expiry",
+      editStock: "Edit sellable product",
+      exportCsv: "Export CSV",
+      expectedAt: "Expected",
+      event: "Event",
+      fastestDelivery: "Fastest delivery",
+      fulfill: "Fulfill",
+      insightActiveProducts: "Active products",
+      insightOutOfStock: "Out of stock",
+      insightRecommendationPressure: "Recommendation pressure",
+      insightRetailValue: "Retail stock value",
+      insightsTab: "Insights",
+      importCsv: "Import CSV",
+      inStock: "In stock",
+      incomingPo: "Incoming PO",
+      chooseProduct: "Choose product",
       leadTimeDays: "Lead time",
+      lowStock: "Low stock",
+      lots: "Lots",
+      movementAdjustment: "Adjustment",
+      movementExpiryWriteOff: "Expiry write-off",
+      movementReceive: "Receive",
+      movementReturn: "Return",
+      movementSale: "Sale",
+      movementTransferIn: "Transfer in",
+      movementTransferOut: "Transfer out",
+      movementVoid: "Void",
+      movementType: "Movement",
+      movementsTab: "Movements",
+      noItemsSelected: "No items selected.",
+      noProductMatches: "No matching products.",
+      notSet: "Not set",
       notes: "Notes",
+      onTrack: "On track",
       organisation: "Organisation",
+      orderItems: "Order items",
       outOfStock: "Out of stock",
+      partial: "Partial",
+      pack: "Pack",
+      partiallyAllocated: "Partially allocated",
+      payable: "Payable",
+      pick: "Pick",
+      placeOrder: "Place order",
+      pipelineUnavailable: "Pipeline unavailable. Recheck workflow.",
+      placedAt: "Placed",
       product: "Product",
-      retailPrice: "Retail price",
+      priceOverride: "Price override",
+      purchased: "Purchased",
+      profitImpact: "Profit impact",
+      purchaseOrders: "Purchase Orders",
+      purchaseOrderNumber: "PO number",
+      purchaseOrderStatusAll: "All",
+      purchaseOrderStatusDraft: "Draft",
+      purchaseOrderStatusOrdered: "Ordered",
+      purchaseOrderStatusPartial: "Partial",
+      purchaseOrderStatusReceived: "Received",
+      purchaseOrderStatusClosed: "Closed",
+      purchaseOrderStatusVoid: "Void",
+      quantity: "Quantity",
+      ordered: "Ordered",
+      receivedNow: "Received",
+	      reason: "Reason",
+	      receive: "Receive",
+      receiveAll: "All",
+      receiveQuantityError: "Invalid quantity.",
+      receiveStock: "Receive stock",
+      recheckWorkflow: "Recheck workflow",
+      recordMovement: "Record movement",
+      remaining: "Remaining",
+      removeItem: "Remove",
+      regionalCheckout: "Regional checkout",
+      reorderBy: "Reorder by",
+      recommendedOrder: "Recommended order",
+      reorderRisk: "Risk",
+      reorderTab: "Reorder",
+      review: "Review",
+      purchaseOrderDetails: "Purchase order details",
+      retailPrice: "Retail",
+      retailValue: "Retail value",
+      riskOk: "OK",
+      riskOutOfStock: "Out of stock",
+      riskReorder: "Reorder",
+      riskWatch: "Watch",
       save: "Save",
       saveError: "Could not save stock.",
-      selectProduct: "Select product",
+      ship: "Ship",
+      snoozeTask: "Snooze",
+      buildDraftPo: "Build draft PO",
+      lineTotal: "Line total",
+      shortfall: "Shortfall",
+      shortfallHandling: "Shortfall handling",
+      shortfallReference: "Reference",
+      shortfallExpectedAt: "Expected follow-up",
+      supplierBackorder: "Supplier backorder",
+      replacementShipment: "Replacement shipment",
+      supplierCredit: "Supplier credit",
+      supplierRefund: "Supplier refund",
+      closeShort: "Close short",
+      damagedRejected: "Damaged/rejected",
+      closedShort: "Closed short",
+      noSupplierShortfall: "No shortfall",
+      noOrders: "No orders",
+      mockPaidOrder: "Mock paid checkout",
+      nextAction: "Next action",
+      routingPreference: "Routing preference",
+      selectedRetailer: "Selected retailer",
+      shippingCountry: "Shipping country",
+      shoppingList: "Shopping list",
+      supplier: "Supplier",
+	      supplierContact: "Supplier contact",
+	      selectProduct: "Select product",
+	      search: "Search",
+	      searchProducts: "Search",
+	      searchOrders: "Search",
+	      searchStock: "Search",
       status: "Status",
+      stockDetails: "Sellable product details",
+      stockListTab: "Sellable products",
+      stockPipeline: "Stock pipeline",
       stockQuantity: "Stock",
-      title: "Stock",
+      stuck: "Stuck",
+      suggestedOrder: "Suggested order",
+      taskDetails: "Task details",
+      taskPriority: "Priority",
+      taskQueue: "Task Queue",
+      title: "Sellable Products",
+      total: "Total",
+      unitCost: "Unit cost",
+      units: "Units",
       updated: "Updated",
-      wholesalePrice: "Wholesale price"
-    },
+      unavailable: "Unavailable",
+      unclaimed: "Unclaimed",
+      unorderedNeed: "Unordered demand",
+      unorderedNeedDescription:
+        "These products have customer demand that is not covered by stock, incoming purchase orders, or draft purchase orders. Select the lines to turn into a supplier PO.",
+      voidMovement: "Void movement",
+      voidPurchaseOrder: "Void purchase order",
+	      waitingForPo: "Waiting for PO",
+	      wholesalePrice: "Wholesale",
+      wholesalerTried: "Wholesaler tried",
+	      workflow: "Workflow",
+      restockingAdvice: "Restocking advice",
+      restockingAdviceDescription:
+        "Required rows cover customer demand that is not yet supplied. Advisory rows are stock-planning suggestions. Select lines to create one supplier PO.",
+      reorderAdviceDetails: "Reorder advice details",
+      reorderBackorders: "Backorders",
+      reorderBackordersDescription:
+        "These items are required to cover active customer orders.",
+      reorderAdvise: "Advise",
+      reorderAdviseDescription:
+        "We suggest you order these items to satisfy future demand",
+      reorderRequired: "Required",
+      reorderAdvisory: "Advisory"
+	    },
     generated: "Generated",
     financials: {
       aiCost: "AI cost",
@@ -882,11 +1259,11 @@ const baseContent = {
       deviation: "Actual vs target",
       dropoff: "Drop-off",
       editTargets: "Edit targets",
-      freeRequests: "Free requests",
       healthScoreViews: "HealthScore views",
       landingVisitors: "Landed visitors",
       pendingReviews: "Pending reviews",
       precisionConversions: "Precision conversions",
+      productOrders: "Product orders",
       proConversions: "Pro conversions",
       saveTargets: "Save targets",
       stage: "Stage",
@@ -901,23 +1278,30 @@ const baseContent = {
       dropoffAfterAssessment: "Dropped after assessment",
       dropoffAfterAssessmentStart: "Dropped after start",
       dropoffAfterFormulation: "Dropped after nutrition plan",
-      dropoffAfterFreeEmailRequest: "Dropped after Free request",
       dropoffAfterHealthScore: "Dropped after HealthScore",
       dropoffAfterLanding: "Dropped after landing",
       dropoffAfterPlanSelection: "Dropped after plan",
+      dropoffAfterDeliveryDetails: "Dropped after delivery details",
+      dropoffAfterProductCheckout: "Dropped after checkout",
+      dropoffAfterProductPayment: "Dropped after product payment",
       dropoffAfterPrecisionPayment: "Dropped after Precision",
       dropoffAfterProPayment: "Dropped after Pro",
+      dropoffAfterRetailOrder: "Dropped after order",
       dropoffAfterResults: "Dropped after results",
       dropoffAfterSubmission: "Dropped after submission",
+      deliveryDetailsConfirmed: "Delivery confirmed",
       formulationReady: "Nutrition plan",
-      freeEmailRequested: "Free email",
-      freeEmailSent: "Email sent",
       healthscoreViewed: "HealthScore",
       landingViewed: "Landing",
       marketplaceClicked: "Marketplace",
+      orderTrackingViewed: "Tracking viewed",
       planSelected: "Plan selected",
       precisionPaid: "Precision paid",
+      productCheckoutStarted: "Product payment started",
+      productCheckoutViewed: "Product checkout",
+      productPaymentSucceeded: "Product paid",
       proPaid: "Pro paid",
+      retailOrderCreated: "Product order",
       resultsViewed: "Results"
     },
     flowMetrics: {
@@ -1005,10 +1389,29 @@ const baseContent = {
     governance: [
       { icon: SparklesIcon, name: "Foods", view: "foods" },
       { icon: ShoppingBagIcon, name: "Products", view: "products" },
-      { icon: ShoppingBagIcon, name: "Stock", view: "stock" },
       { icon: BeakerIcon, name: "Supplements", view: "supplements" }
     ],
-    governanceTitle: "Safety",
+    governanceTitle: "Catalogue",
+    retailTasksNavigation: [
+      { icon: ClipboardDocumentCheckIcon, name: "Task Queue", view: "retail-task-queue" },
+      { icon: DocumentMagnifyingGlassIcon, name: "Audit", view: "retail-audit" }
+    ],
+    retailTasksTitle: "Retail Tasks",
+    retailBuyingNavigation: [
+      { icon: ClipboardDocumentListIcon, name: "Shopping List", view: "retail-reorder" },
+      { icon: InboxArrowDownIcon, name: "Receiving", view: "retail-receiving" }
+    ],
+    retailBuyingTitle: "Buying Stock",
+    retailInventoryNavigation: [
+      { icon: ArchiveBoxIcon, name: "Stock", view: "stock" },
+      { icon: ArrowsRightLeftIcon, name: "Stock Movements", view: "retail-movements" }
+    ],
+    retailInventoryTitle: "Stock",
+    retailSellingNavigation: [
+      { icon: ShoppingCartIcon, name: "Customer Orders", view: "retail-customer-orders" },
+      { icon: TruckIcon, name: "Fulfillment", view: "retail-fulfillment" }
+    ],
+    retailSellingTitle: "Selling Stock",
     insights: [
       { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" },
       { icon: ShoppingBagIcon, name: "Products", view: "product-insights" }
@@ -1042,6 +1445,14 @@ const baseContent = {
       people: "People",
       "product-insights": "Product Insights",
       products: "Products",
+      "retail-customer-orders": "Customer Orders",
+      "retail-audit": "Audit",
+      "retail-fulfillment": "Fulfillment",
+      "retail-movements": "Stock Movements",
+      "retail-purchase-orders": "Purchase Orders",
+      "retail-receiving": "Receiving",
+      "retail-reorder": "Shopping List",
+      "retail-task-queue": "Task Queue",
       reviews: "Reviews",
       settings: "Settings",
       stock: "Stock",
@@ -1120,9 +1531,11 @@ const baseContent = {
     visibility: {
       active: "Processing",
       actor: "Actor",
+      age: "Age",
       agent: "Agent",
       agentSeen: "Agent seen",
       agentSession: "Agent session",
+      assignee: "Assigned to",
       blocked: "Blocked",
       capabilities: "Capabilities",
       completed: "Completed",
@@ -1141,7 +1554,9 @@ const baseContent = {
       liveUpdated: "Live",
       liveUpdates: "Live updates",
       noWorkerHeartbeat: "No worker heartbeat",
+      organisation: "Organisation",
       plan: "Plan",
+      priority: "Priority",
       queued: "Queued",
       ray: "Ray",
       reasoning: "Reasoning",
@@ -1153,7 +1568,8 @@ const baseContent = {
       session: "Session",
       status: "Status",
       task: "Task",
-      total: "Total"
+      total: "All",
+      unassigned: "Unassigned"
     },
     supplements: {
       active: "Active",
@@ -1360,6 +1776,7 @@ const baseContent = {
       audit: "ประวัติ",
       capabilities: "ความสามารถ",
       credentials: "คีย์",
+      country: "ประเทศ",
       createdAt: "สร้างเมื่อ",
       create: "สร้าง",
       createOrganisation: "สร้างผู้ค้าปลีก",
@@ -1418,6 +1835,7 @@ const baseContent = {
     settings: {
       account: "บัญชี",
       currency: "สกุลเงิน",
+      customerMargin: "มาร์จินลูกค้า %",
       displayName: "ชื่อ",
       email: "อีเมล",
       language: "ภาษา",
@@ -1429,28 +1847,202 @@ const baseContent = {
     },
     stock: {
       actions: "การดำเนินการ",
-      addProduct: "เพิ่มสินค้า",
+      addItem: "เพิ่มรายการ",
+      addProduct: "เพิ่มสินค้าที่ขายได้",
+      addPurchaseOrder: "สร้างใบสั่งซื้อใหม่",
+      addCustomerOrder: "เพิ่มคำสั่งซื้อ",
+      agentTasks: "งานของ Agent",
+      allocate: "จัดสรร",
+      allocatedTo: "จัดสรรให้",
+      audit: "บันทึกเหตุการณ์",
       allOrganisations: "ทุกองค์กร",
+      availability: "กำลังตรวจสอบความพร้อม",
+      allocateAvailable: "จัดสรรที่มีอยู่",
+      availableNow: "พร้อมจัดสรรตอนนี้",
+      backorderAllowed: "อนุญาต",
+      backToCustomerOrders: "กลับไปคำสั่งซื้อลูกค้า",
+      backorderDisabled: "ปิดใช้งาน",
+      backorderPolicy: "นโยบายสั่งจอง",
+      basketLines: "รายการในตะกร้า",
       cancel: "ยกเลิก",
+      capital: "เงินทุน",
+      cheapestPrice: "ราคาถูกที่สุด",
+      claimedBy: "รับงานโดย",
+      claimTask: "รับงาน",
+      completeTask: "เสร็จสิ้น",
+      confidence: "ความมั่นใจ",
+      applyShoppingList: "นำรายการไปใช้",
+      available: "มีสินค้า",
+      customer: "ลูกค้า",
+      customerDemand: "ความต้องการ",
+      customerOrderDetails: "รายละเอียดคำสั่งซื้อลูกค้า",
+      customerOrders: "คำสั่งซื้อลูกค้า",
+      customerOrderSaveError: "ไม่สามารถบันทึกคำสั่งซื้อลูกค้าได้",
+      createPo: "สร้าง PO",
+      createShoppingList: "สร้างรายการซื้อ",
       currency: "สกุลเงิน",
+      daysCover: "วันที่ครอบคลุม",
+      deliver: "ส่งมอบ",
       disabled: "ปิดใช้งาน",
+      directRetailer: "เลือกร้านโดยตรง",
+      draftPo: "ร่าง PO",
+      dueAt: "วันที่ครบกำหนด",
       empty: "ยังไม่มีรายการสต็อก",
+      escalateTask: "ยกระดับ",
       expiresAt: "วันหมดอายุ",
+      editStock: "แก้ไขสินค้าที่ขายได้",
+      exportCsv: "ส่งออก CSV",
+      expectedAt: "วันที่คาดว่าจะถึง",
+      event: "เหตุการณ์",
+      fastestDelivery: "ส่งเร็วที่สุด",
+      fulfill: "ดำเนินการจัดส่ง",
+      insightActiveProducts: "สินค้าที่ใช้งาน",
+      insightOutOfStock: "สินค้าหมด",
+      insightRecommendationPressure: "แรงกดดันจากคำแนะนำ",
+      insightRetailValue: "มูลค่าสต็อกขายปลีก",
+      insightsTab: "ข้อมูลเชิงลึก",
+      importCsv: "นำเข้า CSV",
+      inStock: "มีสินค้า",
+      incomingPo: "PO ที่กำลังมา",
+      chooseProduct: "เลือกสินค้า",
       leadTimeDays: "ระยะเวลานำ",
+      lowStock: "สต็อกต่ำ",
+      lots: "ล็อต",
+      movementAdjustment: "ปรับปรุง",
+      movementExpiryWriteOff: "ตัดจำหน่ายหมดอายุ",
+      movementReceive: "รับเข้า",
+      movementReturn: "คืนสินค้า",
+      movementSale: "ขาย",
+      movementTransferIn: "โอนเข้า",
+      movementTransferOut: "โอนออก",
+      movementVoid: "ยกเลิก",
+      movementType: "การเคลื่อนไหว",
+      movementsTab: "การเคลื่อนไหว",
+      noItemsSelected: "ยังไม่ได้เลือกรายการ",
+      noProductMatches: "ไม่พบสินค้าที่ตรงกัน",
+      notSet: "ยังไม่ได้ตั้งค่า",
       notes: "หมายเหตุ",
+      onTrack: "ปกติ",
       organisation: "องค์กร",
+      orderItems: "รายการสั่งซื้อ",
       outOfStock: "สินค้าหมด",
+      partial: "บางส่วน",
+      pack: "แพ็ก",
+      partiallyAllocated: "จัดสรรบางส่วน",
+      payable: "ชำระเงินได้",
+      pick: "หยิบสินค้า",
+      placeOrder: "สั่งซื้อ",
+      pipelineUnavailable: "ไม่มีข้อมูลไปป์ไลน์ ตรวจสอบเวิร์กโฟลว์อีกครั้ง",
+      placedAt: "เวลาสั่งซื้อ",
       product: "สินค้า",
+      priceOverride: "ปรับราคา",
+      purchased: "ซื้อแล้ว",
+      profitImpact: "ผลกระทบกำไร",
+      purchaseOrders: "ใบสั่งซื้อ",
+      purchaseOrderNumber: "เลข PO",
+      purchaseOrderStatusAll: "ทั้งหมด",
+      purchaseOrderStatusDraft: "ร่าง",
+      purchaseOrderStatusOrdered: "สั่งซื้อแล้ว",
+      purchaseOrderStatusPartial: "รับบางส่วน",
+      purchaseOrderStatusReceived: "รับครบแล้ว",
+      purchaseOrderStatusClosed: "ปิดแล้ว",
+      purchaseOrderStatusVoid: "ยกเลิก",
+      quantity: "จำนวน",
+      ordered: "สั่งซื้อ",
+      receivedNow: "รับแล้ว",
+	      reason: "เหตุผล",
+	      receive: "รับเข้า",
+      receiveAll: "ทั้งหมด",
+      receiveQuantityError: "จำนวนไม่ถูกต้อง",
+      receiveStock: "รับสต็อก",
+      recheckWorkflow: "ตรวจสอบเวิร์กโฟลว์อีกครั้ง",
+      recordMovement: "บันทึกการเคลื่อนไหว",
+      remaining: "คงเหลือ",
+      removeItem: "ลบ",
+      regionalCheckout: "จำลองเช็กเอาต์ตามภูมิภาค",
+      reorderBy: "สั่งซื้อภายใน",
+      recommendedOrder: "จำนวนแนะนำให้สั่ง",
+      reorderRisk: "ความเสี่ยง",
+      reorderTab: "สั่งซื้อเพิ่ม",
+      review: "ตรวจสอบ",
+      purchaseOrderDetails: "รายละเอียดใบสั่งซื้อ",
       retailPrice: "ราคาขายปลีก",
+      retailValue: "มูลค่าขายปลีก",
+      riskOk: "ปกติ",
+      riskOutOfStock: "สินค้าหมด",
+      riskReorder: "ควรสั่งซื้อ",
+      riskWatch: "เฝ้าระวัง",
       save: "บันทึก",
       saveError: "ไม่สามารถบันทึกสต็อกได้",
-      selectProduct: "เลือกสินค้า",
+      ship: "จัดส่ง",
+      snoozeTask: "เลื่อน",
+      buildDraftPo: "สร้างร่าง PO",
+      lineTotal: "รวมรายการ",
+      shortfall: "ส่วนขาด",
+      shortfallHandling: "การจัดการส่วนขาด",
+      shortfallReference: "เลขอ้างอิง",
+      shortfallExpectedAt: "วันที่ติดตาม",
+      supplierBackorder: "ซัพพลายเออร์ค้างส่ง",
+      replacementShipment: "ส่งทดแทน",
+      supplierCredit: "เครดิตจากซัพพลายเออร์",
+      supplierRefund: "คืนเงินจากซัพพลายเออร์",
+      closeShort: "ปิดส่วนขาด",
+      damagedRejected: "เสียหาย/ปฏิเสธรับ",
+      closedShort: "ปิดส่วนขาดแล้ว",
+      noSupplierShortfall: "ไม่มีส่วนขาด",
+      noOrders: "ไม่มีคำสั่งซื้อ",
+      mockPaidOrder: "เช็กเอาต์จำลองที่ชำระแล้ว",
+      nextAction: "ขั้นตอนถัดไป",
+      routingPreference: "รูปแบบการเลือกผู้จัดส่ง",
+      selectedRetailer: "ร้านที่เลือก",
+      shippingCountry: "ประเทศจัดส่ง",
+      shoppingList: "รายการซื้อ",
+      supplier: "ซัพพลายเออร์",
+	      supplierContact: "ข้อมูลติดต่อซัพพลายเออร์",
+	      selectProduct: "เลือกสินค้า",
+	      search: "ค้นหา",
+	      searchProducts: "ค้นหา",
+	      searchOrders: "ค้นหา",
+	      searchStock: "ค้นหา",
       status: "สถานะ",
+      stockDetails: "รายละเอียดสินค้าที่ขายได้",
+      stockListTab: "สินค้าที่ขายได้",
+      stockPipeline: "ไปป์ไลน์สต็อก",
       stockQuantity: "สต็อก",
-      title: "สต็อก",
+      stuck: "ติดขัด",
+      suggestedOrder: "จำนวนแนะนำ",
+      taskDetails: "รายละเอียดงาน",
+      taskPriority: "ลำดับความสำคัญ",
+      taskQueue: "คิวงาน",
+      title: "สินค้าที่ขายได้",
+      total: "รวม",
+      unitCost: "ต้นทุนต่อหน่วย",
+      units: "หน่วย",
       updated: "อัปเดต",
-      wholesalePrice: "ราคาส่ง"
-    },
+      unavailable: "ไม่พร้อมขาย",
+      unclaimed: "ยังไม่มีผู้รับงาน",
+      unorderedNeed: "ความต้องการที่ยังไม่ได้สั่งซื้อ",
+      unorderedNeedDescription:
+        "สินค้าเหล่านี้มีคำสั่งซื้อจากลูกค้าที่ยังไม่มีสต็อก PO ที่สั่งแล้ว หรือร่าง PO รองรับ เลือกรายการที่ต้องการนำไปสร้าง PO ให้ซัพพลายเออร์",
+      voidMovement: "ยกเลิกรายการ",
+      voidPurchaseOrder: "ยกเลิกใบสั่งซื้อ",
+	      waitingForPo: "รอ PO",
+	      wholesalePrice: "ราคาส่ง",
+      wholesalerTried: "ร้านส่งที่ลองแล้ว",
+	      workflow: "เวิร์กโฟลว์",
+      restockingAdvice: "คำแนะนำเติมสต็อก",
+      restockingAdviceDescription:
+        "รายการจำเป็นมาจากความต้องการของลูกค้าที่ยังไม่มีสินค้าเติมให้ ส่วนรายการแนะนำมาจากการวางแผนสต็อก เลือกรายการเพื่อสร้าง PO เดียวให้ซัพพลายเออร์",
+      reorderAdviceDetails: "รายละเอียดคำแนะนำสั่งซื้อเพิ่ม",
+      reorderBackorders: "รายการค้างส่ง",
+      reorderBackordersDescription:
+        "รายการเหล่านี้จำเป็นเพื่อรองรับคำสั่งซื้อจากลูกค้าที่เปิดอยู่",
+      reorderAdvise: "คำแนะนำ",
+      reorderAdviseDescription:
+        "เราแนะนำให้สั่งซื้อรายการเหล่านี้เพื่อรองรับความต้องการในอนาคต",
+      reorderRequired: "จำเป็น",
+      reorderAdvisory: "แนะนำ"
+	    },
     generated: "สร้างเมื่อ",
     financials: {
       aiCost: "ค่า AI",
@@ -1492,11 +2084,11 @@ const baseContent = {
       deviation: "จริงเทียบเป้า",
       dropoff: "หลุดออก",
       editTargets: "แก้เป้า",
-      freeRequests: "คำขอฟรี",
       healthScoreViews: "ดู HealthScore",
       landingVisitors: "ผู้เข้าเว็บ",
       pendingReviews: "รีวิวที่รออยู่",
       precisionConversions: "คอนเวอร์ชัน Precision",
+      productOrders: "คำสั่งซื้อสินค้า",
       proConversions: "คอนเวอร์ชัน Pro",
       saveTargets: "บันทึกเป้า",
       stage: "ขั้นตอน",
@@ -1511,23 +2103,30 @@ const baseContent = {
       dropoffAfterAssessment: "ออกหลังแบบประเมิน",
       dropoffAfterAssessmentStart: "ออกหลังเริ่มทำ",
       dropoffAfterFormulation: "ออกหลังแผนโภชนาการ",
-      dropoffAfterFreeEmailRequest: "ออกหลังขออีเมลฟรี",
       dropoffAfterHealthScore: "ออกหลัง HealthScore",
       dropoffAfterLanding: "ออกหลังหน้าแรก",
       dropoffAfterPlanSelection: "ออกหลังเลือกแผน",
+      dropoffAfterDeliveryDetails: "ออกหลังยืนยันที่อยู่",
+      dropoffAfterProductCheckout: "ออกหลังเช็กเอาต์สินค้า",
+      dropoffAfterProductPayment: "ออกหลังชำระค่าสินค้า",
       dropoffAfterPrecisionPayment: "ออกหลัง Precision",
       dropoffAfterProPayment: "ออกหลัง Pro",
+      dropoffAfterRetailOrder: "ออกหลังสร้างคำสั่งซื้อ",
       dropoffAfterResults: "ออกหลังผลลัพธ์",
       dropoffAfterSubmission: "ออกหลังส่งแบบประเมิน",
+      deliveryDetailsConfirmed: "ยืนยันที่อยู่จัดส่ง",
       formulationReady: "แผนโภชนาการ",
-      freeEmailRequested: "อีเมลฟรี",
-      freeEmailSent: "ส่งอีเมลแล้ว",
       healthscoreViewed: "HealthScore",
       landingViewed: "หน้าแรก",
       marketplaceClicked: "มาร์เก็ตเพลส",
+      orderTrackingViewed: "ดูสถานะคำสั่งซื้อ",
       planSelected: "เลือกแผน",
       precisionPaid: "Precision ชำระแล้ว",
+      productCheckoutStarted: "เริ่มชำระค่าสินค้า",
+      productCheckoutViewed: "เช็กเอาต์สินค้า",
+      productPaymentSucceeded: "ชำระค่าสินค้าแล้ว",
       proPaid: "Pro ชำระแล้ว",
+      retailOrderCreated: "คำสั่งซื้อสินค้า",
       resultsViewed: "ผลลัพธ์"
     },
     flowMetrics: {
@@ -1615,10 +2214,29 @@ const baseContent = {
     governance: [
       { icon: SparklesIcon, name: "อาหาร", view: "foods" },
       { icon: ShoppingBagIcon, name: "สินค้า", view: "products" },
-      { icon: ShoppingBagIcon, name: "สต็อก", view: "stock" },
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplements" }
     ],
-    governanceTitle: "ความปลอดภัย",
+    governanceTitle: "แค็ตตาล็อก",
+    retailTasksNavigation: [
+      { icon: ClipboardDocumentCheckIcon, name: "คิวงาน", view: "retail-task-queue" },
+      { icon: DocumentMagnifyingGlassIcon, name: "บันทึกเหตุการณ์", view: "retail-audit" }
+    ],
+    retailTasksTitle: "งานค้าปลีก",
+    retailBuyingNavigation: [
+      { icon: ClipboardDocumentListIcon, name: "รายการซื้อ", view: "retail-reorder" },
+      { icon: InboxArrowDownIcon, name: "รับเข้า", view: "retail-receiving" }
+    ],
+    retailBuyingTitle: "ซื้อสต็อก",
+    retailInventoryNavigation: [
+      { icon: ArchiveBoxIcon, name: "สต็อก", view: "stock" },
+      { icon: ArrowsRightLeftIcon, name: "การเคลื่อนไหวสต็อก", view: "retail-movements" }
+    ],
+    retailInventoryTitle: "สต็อก",
+    retailSellingNavigation: [
+      { icon: ShoppingCartIcon, name: "คำสั่งซื้อลูกค้า", view: "retail-customer-orders" },
+      { icon: TruckIcon, name: "จัดส่ง", view: "retail-fulfillment" }
+    ],
+    retailSellingTitle: "ขายสต็อก",
     insights: [
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplement-insights" },
       { icon: ShoppingBagIcon, name: "สินค้า", view: "product-insights" }
@@ -1652,6 +2270,14 @@ const baseContent = {
       people: "ผู้ใช้",
       "product-insights": "ข้อมูลสินค้า",
       products: "สินค้า",
+      "retail-customer-orders": "คำสั่งซื้อลูกค้า",
+      "retail-audit": "บันทึกเหตุการณ์",
+      "retail-fulfillment": "จัดส่ง",
+      "retail-movements": "การเคลื่อนไหวสต็อก",
+      "retail-purchase-orders": "ใบสั่งซื้อ",
+      "retail-receiving": "รับเข้า",
+      "retail-reorder": "รายการซื้อ",
+      "retail-task-queue": "คิวงาน",
       reviews: "รีวิว",
       settings: "การตั้งค่า",
       stock: "สต็อก",
@@ -1730,9 +2356,11 @@ const baseContent = {
     visibility: {
       active: "กำลังประมวลผล",
       actor: "ผู้ทำ",
+      age: "อายุ",
       agent: "Agent",
       agentSeen: "Agent เห็นล่าสุด",
       agentSession: "เซสชัน Agent",
+      assignee: "มอบหมายให้",
       blocked: "ติดขัด",
       capabilities: "ความสามารถ",
       completed: "สำเร็จ",
@@ -1751,7 +2379,9 @@ const baseContent = {
       liveUpdated: "สด",
       liveUpdates: "อัปเดตสด",
       noWorkerHeartbeat: "ไม่มี heartbeat จาก worker",
+      organisation: "องค์กร",
       plan: "แผน",
+      priority: "ความสำคัญ",
       queued: "รอคิว",
       ray: "Ray",
       reasoning: "Reasoning",
@@ -1763,7 +2393,8 @@ const baseContent = {
       session: "เซสชัน",
       status: "สถานะ",
       task: "งาน",
-      total: "ทั้งหมด"
+      total: "ทั้งหมด",
+      unassigned: "ยังไม่มอบหมาย"
     },
     supplements: {
       active: "ใช้งาน",

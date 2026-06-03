@@ -60,6 +60,12 @@ await sql`
     url_used text,
     price_amount numeric,
     currency text default 'THB' not null,
+    selected_retailer_organisation_id uuid,
+    retail_sellable_product_id uuid,
+    availability_status text,
+    unit_price_amount numeric,
+    price_source text,
+    eta_date date,
     unknown_at_recommendation boolean default false not null,
     is_current boolean default false not null,
     generated_at timestamptz default now() not null,
@@ -74,6 +80,16 @@ await sql`create index if not exists supplement_recommendation_selections_supple
 await sql`create index if not exists product_recommendation_decisions_current_idx on public.product_recommendation_decisions (is_current, outcome, generated_at desc)`;
 await sql`create index if not exists product_recommendation_decisions_product_idx on public.product_recommendation_decisions (product_id, outcome, generated_at desc)`;
 await sql`create index if not exists product_recommendation_decisions_run_idx on public.product_recommendation_decisions (run_id, outcome)`;
+
+await sql`
+  alter table public.product_recommendation_decisions
+    add column if not exists selected_retailer_organisation_id uuid,
+    add column if not exists retail_sellable_product_id uuid,
+    add column if not exists availability_status text,
+    add column if not exists unit_price_amount numeric,
+    add column if not exists price_source text,
+    add column if not exists eta_date date
+`;
 
 const formulationRows = await sql<Array<{
   formulation: unknown;
@@ -164,6 +180,12 @@ for (const run of runRows) {
       product_recommendation_items.url_used,
       product_recommendation_items.price_amount,
       product_recommendation_items.currency,
+      product_recommendation_items.selected_retailer_organisation_id::text,
+      product_recommendation_items.retail_sellable_product_id::text,
+      product_recommendation_items.availability_status,
+      product_recommendation_items.unit_price_amount,
+      product_recommendation_items.price_source,
+      product_recommendation_items.eta_date::text,
       product_recommendation_items.unknown_at_recommendation
     from public.product_recommendation_items
     join public.products

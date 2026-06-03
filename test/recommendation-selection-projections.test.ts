@@ -20,16 +20,35 @@ describe("recommendation selection projections", () => {
       "components/admin/dashboard-content.tsx",
       "utf8"
     );
+    const productSearch = readFileSync("lib/admin-product-search.ts", "utf8");
+    const taskExecution = readFileSync("lib/task-execution.ts", "utf8");
+    const taskWorker = readFileSync("lib/task-worker.ts", "utf8");
 
     assert.match(schema, /product_recommendation_decisions/);
+    assert.match(schema, /selected_retailer_organisation_id uuid/);
+    assert.match(schema, /retail_sellable_product_id uuid/);
+    assert.match(schema, /availability_status text/);
+    assert.match(schema, /unit_price_amount numeric/);
+    assert.match(schema, /price_source text/);
+    assert.match(schema, /eta_date date/);
     assert.match(schema, /supplement_recommendation_selections/);
     assert.match(packageJson, /recommendation-insights:schema:apply/);
     assert.match(applyScript, /projectSupplementRecommendationSelections/);
     assert.match(applyScript, /productDecisionRowsFromStoredRun/);
+    assert.match(applyScript, /add column if not exists selected_retailer_organisation_id uuid/);
     assert.match(dashboardContent, /insightsTitle/);
     assert.match(dashboardContent, /supplement-insights/);
     assert.match(dashboardContent, /product-insights/);
     assert.match(adminDashboard, /AdminRecommendationInsightsView/);
+    assert.match(productSearch, /getRetailerAwareProductRecommendationCandidateSets/);
+    assert.match(productSearch, /sellable\.status = 'active'/);
+    assert.match(productSearch, /availableNow <= 0 && !backorderAllowed/);
+    assert.match(productSearch, /retailOverridePriceAmount === null[\s\S]*master_list_country_rrp_margin[\s\S]*retail_override/);
+    assert.match(taskExecution, /retailerCandidateSets\.map/);
+    assert.match(taskExecution, /selectRetailerRecommendationOption/);
+    assert.match(taskExecution, /retailerOptions: retailerOptions\.map/);
+    assert.match(taskWorker, /retail_catalogue_revision/);
+    assert.match(taskWorker, /retail_catalogue_updated_at/);
   });
 
   it("projects supplement selections with parsed dose and safety visibility", () => {
@@ -110,6 +129,9 @@ describe("recommendation selection projections", () => {
           affiliate: true,
           coveredNeeds: [],
           offerId: "offer",
+          availabilityStatus: "backorder",
+          etaDate: "2026-06-05",
+          priceSource: "retail_override",
           product: {
             activeAffiliateUrl: "https://example.com/chosen",
             activeOfferId: "offer",
@@ -123,6 +145,11 @@ describe("recommendation selection projections", () => {
             labelStatus: "parsed",
             platform: "lazada",
             priceAmount: 120,
+            retailAvailabilityStatus: "backorder",
+            retailEtaDate: "2026-06-05",
+            retailSellableProductId: "sellable",
+            selectedRetailerOrganisationId: "retailer",
+            unitPriceAmount: 120,
             productUrl: "https://example.com/chosen",
             region: "TH",
             status: "approved",
@@ -130,7 +157,9 @@ describe("recommendation selection projections", () => {
           },
           productCoveragePercent: 80,
           rank: 1,
+          retailSellableProductId: "sellable",
           score: 0.8,
+          selectedRetailerOrganisationId: "retailer",
           servingMultiplier: 2,
           stackContributionPercent: 80,
           unknownAtRecommendation: false,
@@ -149,7 +178,15 @@ describe("recommendation selection projections", () => {
       rows.map((row) => row.outcome),
       ["chosen", "near_miss", "rejected"]
     );
-    assert.equal(rows.find((row) => row.outcome === "chosen")?.servingMultiplier, 2);
+    const chosen = rows.find((row) => row.outcome === "chosen");
+
+    assert.equal(chosen?.servingMultiplier, 2);
+    assert.equal(chosen?.selectedRetailerOrganisationId, "retailer");
+    assert.equal(chosen?.retailSellableProductId, "sellable");
+    assert.equal(chosen?.availabilityStatus, "backorder");
+    assert.equal(chosen?.unitPriceAmount, 120);
+    assert.equal(chosen?.priceSource, "retail_override");
+    assert.equal(chosen?.etaDate, "2026-06-05");
     assert.equal(rows.some((row) => row.productId === "irrelevant"), false);
   });
 });

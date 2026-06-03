@@ -73,7 +73,7 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /runSupervisedAgentLoop\(\s*profileMode,\s*config,\s*slotIndex,\s*concurrency,/,
+      /runSupervisedAgentLoop\(\s*profileMode,\s*config,\s*slotIndex,\s*slotCount,/,
       "worker:all must supervise each real agent profile independently"
     );
     assert.match(

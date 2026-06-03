@@ -36,8 +36,7 @@ export default async function NutritionRevealPage({
   const dictionary = getDictionary(locale);
   const { plan, stack } = await searchParams;
   const planId = typeof plan === "string" && isUuid(plan) ? plan : "";
-  const initialStackPreference =
-    stack === "compact" || stack === "balanced" ? stack : null;
+  const initialStackPreference = stack === "balanced" ? stack : null;
 
   if (!planId) {
     redirect(nutritionQuizPath(locale));

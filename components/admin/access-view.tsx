@@ -15,6 +15,11 @@ import {
   type AdminRole,
   type AdminOrganisationType
 } from "@/lib/admin-rbac";
+import { supportedOrganisationCurrencies } from "@/lib/currencies";
+import {
+  productCountryLabel,
+  productCountryOptions
+} from "@/lib/product-countries";
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 import type {
   AdminContent,
@@ -136,6 +141,17 @@ function statusLabel(labels: AdminContent, status: string) {
   }
 
   return readableToken(status);
+}
+
+function currencyOptions(currentCurrency?: string | null) {
+  const normalizedCurrency = currentCurrency?.trim().toUpperCase() ?? "";
+
+  return normalizedCurrency &&
+    !supportedOrganisationCurrencies.some(
+      (currency) => currency === normalizedCurrency
+    )
+    ? [normalizedCurrency, ...supportedOrganisationCurrencies]
+    : supportedOrganisationCurrencies;
 }
 
 function agentStatusLabel(labels: AdminContent, status: string) {
@@ -298,6 +314,7 @@ export function AdminAccessView({
       context.actorMembership.role === "platform_admin");
   const canManageOrganisations =
     canWrite && context.effectiveOrganisation.type === "platform";
+  const showOrganisationContext = context.effectiveOrganisation.type === "platform";
   const canFilterMembershipOrganisations =
     context.effectiveOrganisation.type === "platform" &&
     accessData.organisations.length > 1;
@@ -496,6 +513,8 @@ export function AdminAccessView({
 
     const updated = await mutate({
       action: "create_organisation",
+      countryCode: String(form.get("countryCode") ?? "TH"),
+      currency: String(form.get("currency") ?? "THB"),
       defaultLocale: String(form.get("defaultLocale") ?? "en"),
       name: String(form.get("name") ?? ""),
       slug: String(form.get("slug") ?? "")
@@ -514,6 +533,8 @@ export function AdminAccessView({
 
     void mutate({
       action: "update_organisation",
+      countryCode: String(form.get("countryCode") ?? "TH"),
+      currency: String(form.get("currency") ?? ""),
       defaultLocale: String(form.get("defaultLocale") ?? "en"),
       name: String(form.get("name") ?? ""),
       organisationId: String(form.get("organisationId") ?? ""),
@@ -681,44 +702,6 @@ export function AdminAccessView({
 
   return (
     <div className="mt-8 space-y-8">
-      <section className="rounded-2xl bg-[#20343A] p-5 text-white shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-[#7DDDB8]">
-              {labels.access.session}
-            </p>
-            <h2
-              className={classNames(
-                "mt-1 text-2xl font-bold",
-                adminLocaleTextClass(locale, "heading")
-              )}
-            >
-              {labels.access.actor}: {context.actorPerson.displayName}
-            </h2>
-            {context.assumedPerson ? (
-              <p className="mt-1 text-sm text-white/75">
-                {labels.access.assumed}: {context.assumedPerson.displayName} ·{" "}
-                {roleLabels[locale][context.role]}
-              </p>
-            ) : (
-              <p className="mt-1 text-sm text-white/75">
-                {context.actorOrganisation.name} · {roleLabels[locale][context.role]}
-              </p>
-            )}
-          </div>
-          {context.assumedPerson ? (
-            <button
-              className={actionButtonClass("save")}
-              disabled={busy}
-              onClick={() => void mutate({ action: "stop_impersonation" })}
-              type="button"
-            >
-              {labels.access.stopAssuming}
-            </button>
-          ) : null}
-        </div>
-      </section>
-
       {message || error ? (
         <div
           className={classNames(
@@ -751,7 +734,7 @@ export function AdminAccessView({
           <div className="divide-y divide-gray-100">
             {accessData.organisations.map((organisation) => (
               <form
-                className="grid gap-3 py-4 lg:grid-cols-[1.2fr_1fr_0.9fr_0.9fr_auto]"
+                className="grid gap-3 py-4 lg:grid-cols-[1.2fr_1fr_0.8fr_0.7fr_0.7fr_0.8fr_auto]"
                 key={organisation.id}
                 onSubmit={saveOrganisation}
               >
@@ -787,6 +770,36 @@ export function AdminAccessView({
                     {publicLocales.map((localeCode) => (
                       <option key={localeCode} value={localeCode}>
                         {localeLabels[localeCode]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                  {labels.access.country}
+                  <select
+                    className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                    defaultValue={organisation.countryCode}
+                    disabled={!canManageOrganisations || busy}
+                    name="countryCode"
+                  >
+                    {productCountryOptions.map((country) => (
+                      <option key={country.code} value={country.code}>
+                        {productCountryLabel(country.code)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                  {labels.settings.currency}
+                  <select
+                    className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                    defaultValue={organisation.currency}
+                    disabled={!canManageOrganisations || busy}
+                    name="currency"
+                  >
+                    {currencyOptions(organisation.currency).map((currency) => (
+                      <option key={currency} value={currency}>
+                        {currency}
                       </option>
                     ))}
                   </select>
@@ -865,6 +878,36 @@ export function AdminAccessView({
                 ))}
               </select>
             </label>
+            <label className="grid gap-1 text-xs font-semibold text-gray-500">
+              {labels.settings.currency}
+              <select
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                defaultValue="THB"
+                disabled={busy}
+                name="currency"
+              >
+                {supportedOrganisationCurrencies.map((currency) => (
+                  <option key={currency} value={currency}>
+                    {currency}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-gray-500">
+              {labels.access.country}
+              <select
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                defaultValue="TH"
+                disabled={busy}
+                name="countryCode"
+              >
+                {productCountryOptions.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {productCountryLabel(country.code)}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
               <button
                 className={actionButtonClass("save")}
@@ -906,11 +949,13 @@ export function AdminAccessView({
 	          <div className="overflow-x-auto">
 	            <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead>
-                  <tr className="text-left text-xs font-semibold text-gray-500">
-                    <th className="py-2 pr-4">{labels.access.email}</th>
-                    <th className="py-2 pr-4">{labels.access.organisation}</th>
-                    <th className="py-2 pr-4">{labels.access.role}</th>
-                    <th className="py-2 pr-4">{labels.access.expiresAt}</th>
+	                  <tr className="text-left text-xs font-semibold text-gray-500">
+	                    <th className="py-2 pr-4">{labels.access.email}</th>
+	                    {showOrganisationContext ? (
+	                      <th className="py-2 pr-4">{labels.access.organisation}</th>
+	                    ) : null}
+	                    <th className="py-2 pr-4">{labels.access.role}</th>
+	                    <th className="py-2 pr-4">{labels.access.expiresAt}</th>
                     <th className="py-2 pr-4">{labels.access.status}</th>
                     <th className="py-2">{labels.contentPages.actions}</th>
                   </tr>
@@ -918,16 +963,18 @@ export function AdminAccessView({
                 <tbody className="divide-y divide-gray-100">
                   {visibleInvitations.slice(0, 8).map((invite) => (
                     <tr key={invite.id}>
-                      <td className="py-3 pr-4 font-medium text-gray-900">
-                        {invite.email}
-                      </td>
-                      <td className="py-3 pr-4 text-gray-600">
-                        {organisationById.get(invite.organisationId)?.name ??
-                          labels.access.organisation}
-                      </td>
-                      <td className="py-3 pr-4 text-gray-600">
-                        {roleLabels[locale][invite.role]}
-                      </td>
+	                      <td className="py-3 pr-4 font-medium text-gray-900">
+	                        {invite.email}
+	                      </td>
+	                      {showOrganisationContext ? (
+	                        <td className="py-3 pr-4 text-gray-600">
+	                          {organisationById.get(invite.organisationId)?.name ??
+	                            labels.access.organisation}
+	                        </td>
+	                      ) : null}
+	                      <td className="py-3 pr-4 text-gray-600">
+	                        {roleLabels[locale][invite.role]}
+	                      </td>
                       <td className="py-3 pr-4 text-gray-600">
                         {formatGeneratedAt(invite.expiresAt, locale)}
                       </td>
@@ -1173,11 +1220,13 @@ export function AdminAccessView({
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead>
-                  <tr className="text-left text-xs font-semibold text-gray-500">
-                    <th className="py-2 pr-4">{labels.access.name}</th>
-                    <th className="py-2 pr-4">{labels.access.organisation}</th>
-                    <th className="py-2 pr-4">{labels.access.role}</th>
-                    <th className="py-2 pr-4">{labels.access.status}</th>
+	                  <tr className="text-left text-xs font-semibold text-gray-500">
+	                    <th className="py-2 pr-4">{labels.access.name}</th>
+	                    {showOrganisationContext ? (
+	                      <th className="py-2 pr-4">{labels.access.organisation}</th>
+	                    ) : null}
+	                    <th className="py-2 pr-4">{labels.access.role}</th>
+	                    <th className="py-2 pr-4">{labels.access.status}</th>
                     <th className="py-2">{labels.contentPages.actions}</th>
                   </tr>
                 </thead>
@@ -1208,13 +1257,15 @@ export function AdminAccessView({
                           <div className="font-medium text-gray-900">
                             {person?.displayName ?? labels.access.people}
                           </div>
-                          <div className="text-xs text-gray-500">{person?.email}</div>
-                        </td>
-                        <td className="py-3 pr-4 text-gray-600">
-                          {organisation?.name ?? labels.access.organisation}
-                        </td>
-                        <td className="py-3 pr-4">
-                          <select
+	                          <div className="text-xs text-gray-500">{person?.email}</div>
+	                        </td>
+	                        {showOrganisationContext ? (
+	                          <td className="py-3 pr-4 text-gray-600">
+	                            {organisation?.name ?? labels.access.organisation}
+	                          </td>
+	                        ) : null}
+	                        <td className="py-3 pr-4">
+	                          <select
                             className="rounded-md bg-white px-2 py-1 text-sm ring-1 ring-inset ring-gray-300"
                             defaultValue={membership.role}
                             disabled={!canWrite || busy || membershipProtected}
@@ -1310,11 +1361,13 @@ export function AdminAccessView({
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
                     <thead>
-                      <tr className="text-left text-xs font-semibold text-gray-500">
-                        <th className="py-2 pr-4">{labels.access.name}</th>
-                        <th className="py-2 pr-4">{labels.access.organisation}</th>
-                        <th className="py-2 pr-4">{labels.access.role}</th>
-                        <th className="py-2 pr-4">{labels.access.status}</th>
+	                      <tr className="text-left text-xs font-semibold text-gray-500">
+	                        <th className="py-2 pr-4">{labels.access.name}</th>
+	                        {showOrganisationContext ? (
+	                          <th className="py-2 pr-4">{labels.access.organisation}</th>
+	                        ) : null}
+	                        <th className="py-2 pr-4">{labels.access.role}</th>
+	                        <th className="py-2 pr-4">{labels.access.status}</th>
                         <th className="py-2 pr-4">{labels.agents.status}</th>
                         <th className="py-2 pr-4">{labels.access.credentials}</th>
                         <th className="py-2">{labels.contentPages.actions}</th>
@@ -1333,15 +1386,17 @@ export function AdminAccessView({
                                 {agent.name}
                               </div>
                               <div className="text-xs text-gray-500">
-                                {readableToken(agent.type)}
-                              </div>
-                            </td>
-                            <td className="py-3 pr-4 text-gray-600">
-                              {agentOrganisationRow?.name ?? labels.access.organisation}
-                            </td>
-                            <td className="py-3 pr-4 text-gray-600">
-                              {agentRoleLabels[locale][agent.role]}
-                            </td>
+	                                {readableToken(agent.type)}
+	                              </div>
+	                            </td>
+	                            {showOrganisationContext ? (
+	                              <td className="py-3 pr-4 text-gray-600">
+	                                {agentOrganisationRow?.name ?? labels.access.organisation}
+	                              </td>
+	                            ) : null}
+	                            <td className="py-3 pr-4 text-gray-600">
+	                              {agentRoleLabels[locale][agent.role]}
+	                            </td>
                             <td className="py-3 pr-4">
                               <span
                                 className={classNames(
@@ -1612,31 +1667,35 @@ export function AdminAccessView({
           }
           title={labels.access.agents}
         >
-          <label className="mb-4 block max-w-sm text-xs font-semibold text-gray-500">
-            {labels.access.filterByOrganisation}
-            <select
-              className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
-              onChange={(event) => setAgentFilterOrganisationId(event.target.value)}
-              value={agentFilterOrganisationId}
-            >
-              <option value="">{labels.access.allOrganisations}</option>
-              {accessData.organisations.map((organisation) => (
-                <option key={organisation.id} value={organisation.id}>
-                  {organisation.name}
-                </option>
-              ))}
-            </select>
-          </label>
+	          {showOrganisationContext ? (
+	            <label className="mb-4 block max-w-sm text-xs font-semibold text-gray-500">
+	              {labels.access.filterByOrganisation}
+	              <select
+	                className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+	                onChange={(event) => setAgentFilterOrganisationId(event.target.value)}
+	                value={agentFilterOrganisationId}
+	              >
+	                <option value="">{labels.access.allOrganisations}</option>
+	                {accessData.organisations.map((organisation) => (
+	                  <option key={organisation.id} value={organisation.id}>
+	                    {organisation.name}
+	                  </option>
+	                ))}
+	              </select>
+	            </label>
+	          ) : null}
 
           {filteredAgents.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead>
-                  <tr className="text-left text-xs font-semibold text-gray-500">
-                    <th className="py-2 pr-4">{labels.access.name}</th>
-                    <th className="py-2 pr-4">{labels.access.organisation}</th>
-                    <th className="py-2 pr-4">{labels.access.role}</th>
-                    <th className="py-2 pr-4">{labels.access.status}</th>
+	                  <tr className="text-left text-xs font-semibold text-gray-500">
+	                    <th className="py-2 pr-4">{labels.access.name}</th>
+	                    {showOrganisationContext ? (
+	                      <th className="py-2 pr-4">{labels.access.organisation}</th>
+	                    ) : null}
+	                    <th className="py-2 pr-4">{labels.access.role}</th>
+	                    <th className="py-2 pr-4">{labels.access.status}</th>
                     <th className="py-2 pr-4">{labels.agents.status}</th>
                     <th className="py-2 pr-4">{labels.access.grokModel}</th>
                     <th className="py-2 pr-4">{labels.access.credentials}</th>
@@ -1656,15 +1715,17 @@ export function AdminAccessView({
                             {agent.name}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {readableToken(agent.type)}
-                          </div>
-                        </td>
-                        <td className="py-3 pr-4 text-gray-600">
-                          {agentOrganisationRow?.name ?? labels.access.organisation}
-                        </td>
-                        <td className="py-3 pr-4 text-gray-600">
-                          {agentRoleLabels[locale][agent.role]}
-                        </td>
+	                            {readableToken(agent.type)}
+	                          </div>
+	                        </td>
+	                        {showOrganisationContext ? (
+	                          <td className="py-3 pr-4 text-gray-600">
+	                            {agentOrganisationRow?.name ?? labels.access.organisation}
+	                          </td>
+	                        ) : null}
+	                        <td className="py-3 pr-4 text-gray-600">
+	                          {agentRoleLabels[locale][agent.role]}
+	                        </td>
                         <td className="py-3 pr-4">
                           <span
                             className={classNames(

@@ -117,6 +117,13 @@ export type RecommendedProduct = {
     amount: number;
     currency: string;
   } | null;
+  retailer?: {
+    availabilityStatus?: string | null;
+    etaDate?: string | null;
+    organisationId?: string | null;
+    retailSellableProductId?: string | null;
+    unitPriceAmount?: number | null;
+  } | null;
   priority: number;
   productCoveragePercent?: number;
   productId?: string;
@@ -264,6 +271,18 @@ export type ProductRecommendationOption = {
   maxProducts?: number | null;
   productRecommendations: ProductRecommendationSummary;
   recommendations: RecommendedProduct[];
+  retailerOptions?: Array<{
+    backorderCount?: number;
+    currency?: string | null;
+    etaDate?: string | null;
+    organisationId?: string | null;
+    organisationName?: string | null;
+    productCount?: number;
+    subtotalAmount?: number;
+    supplementProductCoveragePercent?: number;
+    totalPlanCoveragePercent?: number;
+    unavailableReason?: string | null;
+  }>;
 };
 
 export type AssessmentSummary = {

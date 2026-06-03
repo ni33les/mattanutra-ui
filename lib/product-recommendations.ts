@@ -607,7 +607,7 @@ function productServingMultiplierAllowed(
     return true;
   }
 
-  if (!product.facts.some((fact) => fact.servingLabel?.trim())) {
+  if (!product.facts.some((fact) => factComparableAmount(fact) !== null)) {
     return false;
   }
 
@@ -2631,17 +2631,25 @@ function recommendationsFromV2Stack(
 
       return {
         affiliate: Boolean(entry.product.activeAffiliateUrl),
+        availabilityStatus: entry.product.retailAvailabilityStatus ?? null,
+        etaDate: entry.product.retailEtaDate ?? null,
         offerId: entry.product.activeOfferId ?? null,
         coveredNeeds,
+        priceSource: entry.product.priceSource ?? null,
         product: entry.product,
         productCoveragePercent: visibleCoveragePercent(
           entry.coverage.percent,
           coveredNeeds.length > 0
         ),
         rank: index + 1,
+        retailSellableProductId: entry.product.retailSellableProductId ?? null,
         score: roundScore(contribution),
+        selectedRetailerName: entry.product.selectedRetailerName ?? null,
+        selectedRetailerOrganisationId:
+          entry.product.selectedRetailerOrganisationId ?? null,
         servingMultiplier: entry.servingMultiplier,
         stackContributionPercent: visibleCoveragePercent(contribution, contribution > 0),
+        unitPriceAmount: entry.product.unitPriceAmount ?? entry.product.priceAmount ?? null,
         unknownAtRecommendation: false,
         url: entry.product.activeAffiliateUrl || entry.product.productUrl,
         why: whyProductMatches(

@@ -111,6 +111,12 @@ function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+function numberFromUnknown(value: unknown) {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function asProductStackPreference(value: unknown): ProductStackPreference | undefined {
   return value === "compact" || value === "balanced"
     ? value
@@ -1417,7 +1423,13 @@ export async function getStoredFormulationResult(
       from product_recommendation_runs
       where product_recommendation_runs.plan_id = assessments.plan_id
         and coalesce(diagnostics ->> 'stackPreference', 'balanced') in ('compact', 'balanced')
-      order by generated_at desc
+      order by
+        case coalesce(diagnostics ->> 'stackPreference', 'balanced')
+          when 'balanced' then 1
+          when 'compact' then 2
+          else 3
+        end,
+        generated_at desc
       limit 1
     ) product_recommendation_run on true
     left join lateral (
@@ -1473,6 +1485,8 @@ export async function getStoredFormulationResult(
                   )
                 else null
               end,
+            'retailer',
+              null,
             'priority',
               product_recommendation_items.rank,
             'productCoveragePercent',
@@ -1573,9 +1587,8 @@ export async function getStoredFormulationResult(
               latest_runs.diagnostics
           )
           order by case latest_runs.stack_preference
-            when 'compact' then 1
-            when 'balanced' then 2
-            when 'balanced' then 3
+            when 'balanced' then 1
+            when 'compact' then 2
             else 4
           end
         ),
@@ -1635,6 +1648,8 @@ export async function getStoredFormulationResult(
                     )
                   else null
                 end,
+              'retailer',
+                null,
               'priority',
                 product_recommendation_items.rank,
               'productCoveragePercent',
@@ -1852,6 +1867,9 @@ export async function getStoredFormulationResult(
         option.recommendations
       );
       const diagnostics = option.diagnostics;
+      const retailerOptions = asArray<Record<string, unknown>>(
+        asRecord(diagnostics).retailerOptions
+      );
       const optionRunStatus =
         typeof option.status === "string" ? option.status : "";
       const optionStatus =
@@ -1907,7 +1925,36 @@ export async function getStoredFormulationResult(
           stackPreference,
           status: optionStatus
         },
-        recommendations: coverage.recommendations
+        recommendations: coverage.recommendations,
+        retailerOptions: retailerOptions.map((retailerOption) => ({
+          backorderCount: numberFromUnknown(retailerOption.backorderCount),
+          currency:
+            typeof retailerOption.currency === "string"
+              ? retailerOption.currency
+              : null,
+          etaDate:
+            typeof retailerOption.etaDate === "string"
+              ? retailerOption.etaDate
+              : null,
+          organisationId:
+            typeof retailerOption.organisationId === "string"
+              ? retailerOption.organisationId
+              : null,
+          organisationName:
+            typeof retailerOption.organisationName === "string"
+              ? retailerOption.organisationName
+              : null,
+          productCount: numberFromUnknown(retailerOption.productCount),
+          subtotalAmount: numberFromUnknown(retailerOption.subtotalAmount),
+          supplementProductCoveragePercent:
+            numberFromUnknown(retailerOption.supplementProductCoveragePercent),
+          totalPlanCoveragePercent:
+            numberFromUnknown(retailerOption.totalPlanCoveragePercent),
+          unavailableReason:
+            typeof retailerOption.unavailableReason === "string"
+              ? retailerOption.unavailableReason
+              : null
+        }))
       }];
     });
   const nutritionReport =

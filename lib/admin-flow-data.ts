@@ -14,23 +14,30 @@ export type AdminFlowNodeId =
   | "dropoffAfterAssessment"
   | "dropoffAfterAssessmentStart"
   | "dropoffAfterFormulation"
-  | "dropoffAfterFreeEmailRequest"
   | "dropoffAfterHealthScore"
   | "dropoffAfterLanding"
   | "dropoffAfterPlanSelection"
+  | "dropoffAfterProductCheckout"
+  | "dropoffAfterDeliveryDetails"
+  | "dropoffAfterProductPayment"
   | "dropoffAfterPrecisionPayment"
   | "dropoffAfterProPayment"
+  | "dropoffAfterRetailOrder"
   | "dropoffAfterResults"
   | "dropoffAfterSubmission"
+  | "deliveryDetailsConfirmed"
   | "formulationReady"
-  | "freeEmailRequested"
-  | "freeEmailSent"
   | "healthscoreViewed"
   | "landingViewed"
   | "marketplaceClicked"
+  | "orderTrackingViewed"
   | "planSelected"
   | "precisionPaid"
+  | "productCheckoutStarted"
+  | "productCheckoutViewed"
+  | "productPaymentSucceeded"
   | "proPaid"
+  | "retailOrderCreated"
   | "resultsViewed";
 
 export type AdminFlowNode = Readonly<{
@@ -68,10 +75,10 @@ export type AdminFlowData = Readonly<{
 export type AdminConversionTargetId =
   | "assessmentCompletions"
   | "assessmentStarts"
-  | "freeRequests"
   | "healthScoreViews"
   | "landingVisitors"
   | "precisionConversions"
+  | "productOrders"
   | "proConversions";
 
 export type AdminConversionTargets = Record<AdminConversionTargetId, number>;
@@ -81,18 +88,18 @@ const conversionTargetIds: AdminConversionTargetId[] = [
   "assessmentStarts",
   "assessmentCompletions",
   "healthScoreViews",
-  "freeRequests",
   "precisionConversions",
+  "productOrders",
   "proConversions"
 ];
 
 export const defaultAdminConversionTargets = {
   assessmentCompletions: 65,
   assessmentStarts: 30,
-  freeRequests: 20,
   healthScoreViews: 95,
   landingVisitors: 100,
   precisionConversions: 5,
+  productOrders: 5,
   proConversions: 1
 } satisfies AdminConversionTargets;
 
@@ -113,15 +120,19 @@ const coreNodeIds: AdminFlowNodeId[] = [
   "assessmentStarted",
   "assessmentSubmitted",
   "healthscoreViewed",
-  "freeEmailRequested",
-  "freeEmailSent",
   "planSelected",
   "precisionPaid",
   "proPaid",
   "formulationReady",
   "resultsViewed",
   "chatClicked",
-  "marketplaceClicked"
+  "marketplaceClicked",
+  "productCheckoutViewed",
+  "deliveryDetailsConfirmed",
+  "productCheckoutStarted",
+  "productPaymentSucceeded",
+  "retailOrderCreated",
+  "orderTrackingViewed"
 ];
 
 const dropoffNodeIds: AdminFlowNodeId[] = [
@@ -130,10 +141,13 @@ const dropoffNodeIds: AdminFlowNodeId[] = [
   "dropoffAfterAssessmentStart",
   "dropoffAfterSubmission",
   "dropoffAfterHealthScore",
-  "dropoffAfterFreeEmailRequest",
   "dropoffAfterPlanSelection",
+  "dropoffAfterProductCheckout",
+  "dropoffAfterDeliveryDetails",
+  "dropoffAfterProductPayment",
   "dropoffAfterPrecisionPayment",
   "dropoffAfterProPayment",
+  "dropoffAfterRetailOrder",
   "dropoffAfterFormulation",
   "dropoffAfterResults"
 ];
@@ -147,8 +161,6 @@ const continueEdgeDefinitions: Array<
   { from: "assessmentViewed", to: "assessmentStarted" },
   { from: "assessmentStarted", to: "assessmentSubmitted" },
   { from: "assessmentSubmitted", to: "healthscoreViewed" },
-  { from: "healthscoreViewed", to: "freeEmailRequested" },
-  { from: "freeEmailRequested", to: "freeEmailSent" },
   { from: "healthscoreViewed", to: "planSelected" },
   { from: "planSelected", to: "precisionPaid" },
   { from: "planSelected", to: "proPaid" },
@@ -156,7 +168,13 @@ const continueEdgeDefinitions: Array<
   { from: "proPaid", to: "formulationReady" },
   { from: "formulationReady", to: "resultsViewed" },
   { from: "resultsViewed", to: "chatClicked" },
-  { from: "resultsViewed", to: "marketplaceClicked" }
+  { from: "resultsViewed", to: "marketplaceClicked" },
+  { from: "resultsViewed", to: "productCheckoutViewed" },
+  { from: "productCheckoutViewed", to: "deliveryDetailsConfirmed" },
+  { from: "deliveryDetailsConfirmed", to: "productCheckoutStarted" },
+  { from: "productCheckoutStarted", to: "productPaymentSucceeded" },
+  { from: "productPaymentSucceeded", to: "retailOrderCreated" },
+  { from: "retailOrderCreated", to: "orderTrackingViewed" }
 ];
 
 const dropoffNodeByStage = {
@@ -164,12 +182,15 @@ const dropoffNodeByStage = {
   assessmentSubmitted: "dropoffAfterSubmission",
   assessmentViewed: "dropoffAfterAssessment",
   formulationReady: "dropoffAfterFormulation",
-  freeEmailRequested: "dropoffAfterFreeEmailRequest",
   healthscoreViewed: "dropoffAfterHealthScore",
   landingViewed: "dropoffAfterLanding",
   planSelected: "dropoffAfterPlanSelection",
+  productCheckoutViewed: "dropoffAfterProductCheckout",
+  deliveryDetailsConfirmed: "dropoffAfterDeliveryDetails",
+  productPaymentSucceeded: "dropoffAfterProductPayment",
   precisionPaid: "dropoffAfterPrecisionPayment",
   proPaid: "dropoffAfterProPayment",
+  retailOrderCreated: "dropoffAfterRetailOrder",
   resultsViewed: "dropoffAfterResults"
 } satisfies Partial<Record<AdminFlowNodeId, AdminFlowNodeId>>;
 
@@ -469,14 +490,6 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
     return ["healthscoreViewed"];
   }
 
-  if (row.event_name === "free_email_requested") {
-    return ["freeEmailRequested"];
-  }
-
-  if (row.event_name === "free_email_sent") {
-    return ["freeEmailSent"];
-  }
-
   if (row.event_name === "plan_selected") {
     return ["planSelected"];
   }
@@ -503,6 +516,34 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
 
   if (row.event_name === "product_clicked") {
     return ["marketplaceClicked"];
+  }
+
+  if (row.event_name === "retail_product_checkout_viewed") {
+    return ["productCheckoutViewed"];
+  }
+
+  if (row.event_name === "retail_delivery_details_confirmed") {
+    return ["deliveryDetailsConfirmed"];
+  }
+
+  if (
+    row.event_name === "retail_product_checkout_requested" ||
+    row.event_name === "retail_product_checkout_session_created" ||
+    row.event_name === "retail_product_checkout_opened"
+  ) {
+    return ["productCheckoutStarted"];
+  }
+
+  if (row.event_name === "retail_product_payment_succeeded") {
+    return ["productPaymentSucceeded"];
+  }
+
+  if (row.event_name === "retail_customer_order_created") {
+    return ["retailOrderCreated"];
+  }
+
+  if (row.event_name === "order_tracking_viewed") {
+    return ["orderTrackingViewed"];
   }
 
   return [];
@@ -707,7 +748,15 @@ export async function getAdminFlowData(
                 'healthscore_viewed',
                 'home_viewed',
                 'product_clicked',
-                'plan_selected'
+                'plan_selected',
+                'order_tracking_viewed',
+                'retail_customer_order_created',
+                'retail_delivery_details_confirmed',
+                'retail_product_checkout_opened',
+                'retail_product_checkout_requested',
+                'retail_product_checkout_session_created',
+                'retail_product_checkout_viewed',
+                'retail_product_payment_succeeded'
               )
               or event_name in (
                 'checkout_completed',
@@ -750,7 +799,15 @@ export async function getAdminFlowData(
               'healthscore_viewed',
               'home_viewed',
               'product_clicked',
-              'plan_selected'
+              'plan_selected',
+              'order_tracking_viewed',
+              'retail_customer_order_created',
+              'retail_delivery_details_confirmed',
+              'retail_product_checkout_opened',
+              'retail_product_checkout_requested',
+              'retail_product_checkout_session_created',
+              'retail_product_checkout_viewed',
+              'retail_product_payment_succeeded'
             )
             or event_name in (
               'checkout_completed',
@@ -954,9 +1011,9 @@ export async function getAdminFlowData(
     const edges = [...continueEdges, ...dropoffEdges];
     const convertedSubjects = [...subjects.values()].filter(
       (steps) =>
-        steps.has("freeEmailRequested") ||
         steps.has("precisionPaid") ||
-        steps.has("proPaid")
+        steps.has("proPaid") ||
+        steps.has("retailOrderCreated")
     ).length;
     const reachedHealthScore = countByNode.get("healthscoreViewed") ?? 0;
 

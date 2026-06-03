@@ -17,8 +17,11 @@ import {
 } from "@/lib/nutrition-plan-advisor-analysis";
 import {
   PRODUCT_STACK_VARIANT_CONFIGS,
-  recommendProductStackFullBeam
+  recommendProductStackFullBeam,
+  type ProductRecommendationResult
 } from "@/lib/product-recommendations";
+import type { ProductRecommendationRetailerCandidateSet } from "@/lib/admin-products";
+import { refreshRetailStockReorderAdvice } from "@/lib/admin-retail-stock";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 import type { TaskWorkItem } from "@/lib/task-work-items";
 import type { SendTransactionalEmailResult } from "@/lib/smtp-email";
@@ -58,6 +61,103 @@ function localizedFallbackCard(
     body: localizedFallback(body),
     headline: localizedFallback(title)
   };
+}
+
+type RetailerRecommendationOption = Readonly<{
+  backorderCount: number;
+  currency: string;
+  etaDate: string | null;
+  organisationId: string;
+  organisationName: string;
+  productCount: number;
+  recommendations: ProductRecommendationResult;
+  subtotalAmount: number;
+  supplementProductCoveragePercent: number;
+  totalPlanCoveragePercent: number;
+  unavailableReason: string | null;
+}>;
+
+function latestEtaDate(values: readonly (string | null | undefined)[]) {
+  return values.filter((value): value is string => Boolean(value)).sort().at(-1) ?? null;
+}
+
+function compareNullableEta(left: string | null, right: string | null) {
+  if (left === right) {
+    return 0;
+  }
+
+  if (!left) {
+    return -1;
+  }
+
+  if (!right) {
+    return 1;
+  }
+
+  return left.localeCompare(right);
+}
+
+function retailerRecommendationSubtotal(result: ProductRecommendationResult) {
+  return result.recommendations.reduce(
+    (total, item) => total + (item.unitPriceAmount ?? item.product.priceAmount ?? 0),
+    0
+  );
+}
+
+function retailerRecommendationOption(input: Readonly<{
+  candidateSet: ProductRecommendationRetailerCandidateSet;
+  recommendations: ProductRecommendationResult;
+}>): RetailerRecommendationOption {
+  const selectedItems = input.recommendations.recommendations;
+  const etaDate = latestEtaDate(
+    selectedItems.map((item) => item.etaDate ?? item.product.retailEtaDate)
+  );
+
+  return {
+    backorderCount: selectedItems.filter((item) =>
+      (item.availabilityStatus ?? item.product.retailAvailabilityStatus) === "backorder"
+    ).length,
+    currency:
+      selectedItems.find((item) => item.product.currency)?.product.currency ??
+      input.candidateSet.currency,
+    etaDate,
+    organisationId: input.candidateSet.organisationId,
+    organisationName: input.candidateSet.organisationName,
+    productCount: selectedItems.length,
+    recommendations: input.recommendations,
+    subtotalAmount: retailerRecommendationSubtotal(input.recommendations),
+    supplementProductCoveragePercent:
+      input.recommendations.supplementProductCoveragePercent,
+    totalPlanCoveragePercent: input.recommendations.totalPlanCoveragePercent,
+    unavailableReason:
+      selectedItems.length > 0 ? null : "No retailer products matched the client needs."
+  };
+}
+
+function retailerOptionSummary(option: RetailerRecommendationOption) {
+  return {
+    backorderCount: option.backorderCount,
+    currency: option.currency,
+    etaDate: option.etaDate,
+    organisationId: option.organisationId,
+    organisationName: option.organisationName,
+    productCount: option.productCount,
+    subtotalAmount: option.subtotalAmount,
+    supplementProductCoveragePercent: option.supplementProductCoveragePercent,
+    totalPlanCoveragePercent: option.totalPlanCoveragePercent,
+    unavailableReason: option.unavailableReason
+  };
+}
+
+function selectRetailerRecommendationOption(
+  options: readonly RetailerRecommendationOption[]
+) {
+  return [...options].sort((left, right) =>
+    right.supplementProductCoveragePercent - left.supplementProductCoveragePercent ||
+    right.totalPlanCoveragePercent - left.totalPlanCoveragePercent ||
+    left.subtotalAmount - right.subtotalAmount ||
+    compareNullableEta(left.etaDate, right.etaDate)
+  )[0] ?? null;
 }
 
 function deterministicPaywallFeatures(
@@ -385,18 +485,37 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
 
   if (workItem.taskType === "generate_product_recommendations") {
     const matcherStartedAt = Date.now();
+    const retailerCandidateSets = workItem.retailerCandidateSets ?? [];
     const recommendationVariants = PRODUCT_STACK_VARIANT_CONFIGS.map((config) => {
       const variantStartedAt = Date.now();
-      const recommendations = recommendProductStackFullBeam({
-        candidates: workItem.candidates,
-        clientContext: workItem.clientContext,
-        clientSex: workItem.clientSex,
-        countryCode: workItem.countryCode,
-        maxProducts: config.maxProducts,
-        needs: workItem.needs,
-        stackPreference: config.stackPreference,
-        targetProducts: config.targetProducts
-      });
+      const retailerOptions = retailerCandidateSets.map((candidateSet) =>
+        retailerRecommendationOption({
+          candidateSet,
+          recommendations: recommendProductStackFullBeam({
+            candidates: candidateSet.candidates,
+            clientContext: workItem.clientContext,
+            clientSex: workItem.clientSex,
+            countryCode: workItem.countryCode,
+            maxProducts: config.maxProducts,
+            needs: workItem.needs,
+            stackPreference: config.stackPreference,
+            targetProducts: config.targetProducts
+          })
+        })
+      );
+      const selectedRetailerOption =
+        selectRetailerRecommendationOption(retailerOptions);
+      const recommendations = selectedRetailerOption?.recommendations ??
+        recommendProductStackFullBeam({
+          candidates: workItem.candidates,
+          clientContext: workItem.clientContext,
+          clientSex: workItem.clientSex,
+          countryCode: workItem.countryCode,
+          maxProducts: config.maxProducts,
+          needs: workItem.needs,
+          stackPreference: config.stackPreference,
+          targetProducts: config.targetProducts
+        });
       const variantMatcherMs = Date.now() - variantStartedAt;
 
       return {
@@ -405,10 +524,15 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
           ...recommendations,
           diagnostics: {
             ...recommendations.diagnostics,
+            retailerOptions: retailerOptions.map(retailerOptionSummary),
+            selectedRetailer: selectedRetailerOption
+              ? retailerOptionSummary(selectedRetailerOption)
+              : null,
             stackPreference: config.stackPreference,
             trace: {
               ...recommendations.diagnostics.trace,
               maxProducts: config.maxProducts,
+              retailerCandidateSetCount: retailerCandidateSets.length,
               targetProducts: config.targetProducts,
               timingMs: {
                 ...(recommendations.diagnostics.trace?.timingMs ?? {}),
@@ -474,6 +598,35 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
     return {
       digitalOcean,
       projectNames: workItem.projectNames
+    };
+  }
+
+  if (workItem.taskType === "retail_stock_forecast_refresh") {
+    return refreshRetailStockReorderAdvice({
+      generatedByTaskId: workItem.taskId,
+      organisationId: workItem.organisationId,
+      productId: workItem.productId,
+      stockId: workItem.stockId
+    });
+  }
+
+  if (workItem.taskType.startsWith("retail_")) {
+    const retailWorkItem = workItem as Extract<
+      TaskWorkItem,
+      { organisationId: string }
+    >;
+
+    return {
+      accepted: true,
+      humanApprovalRequired: true,
+      organisationId: retailWorkItem.organisationId,
+      sourceEntityId: "sourceEntityId" in retailWorkItem
+        ? retailWorkItem.sourceEntityId
+        : null,
+      sourceEntityType: "sourceEntityType" in retailWorkItem
+        ? retailWorkItem.sourceEntityType
+        : null,
+      taskType: retailWorkItem.taskType
     };
   }
 

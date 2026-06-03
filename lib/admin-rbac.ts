@@ -190,8 +190,16 @@ const adminViews = [
   "testimonials",
   "foods",
   "products",
-  "stock",
   "supplements",
+  "retail-task-queue",
+  "retail-audit",
+  "stock",
+  "retail-purchase-orders",
+  "retail-receiving",
+  "retail-movements",
+  "retail-customer-orders",
+  "retail-fulfillment",
+  "retail-reorder",
   "reviews",
   "agents",
   "alerts",
@@ -209,6 +217,28 @@ const adminViews = [
 ] as const satisfies readonly AdminDashboardView[];
 
 export const adminDashboardViews = adminViews;
+
+export const retailOperationViews = [
+  "retail-task-queue",
+  "retail-audit",
+  "stock",
+  "retail-purchase-orders",
+  "retail-receiving",
+  "retail-movements",
+  "retail-customer-orders",
+  "retail-fulfillment",
+  "retail-reorder"
+] as const satisfies readonly AdminDashboardView[];
+const retailOperationViewSet = new Set<AdminDashboardView>(retailOperationViews);
+
+function adminViewAvailableForOrganisation(
+  view: AdminDashboardView,
+  organisationType?: AdminOrganisationType
+) {
+  return organisationType === "platform"
+    ? !retailOperationViewSet.has(view)
+    : true;
+}
 
 export function isAdminDashboardView(value: unknown): value is AdminDashboardView {
   return typeof value === "string" && adminViews.includes(value as AdminDashboardView);
@@ -301,7 +331,17 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
     return "reviews.read";
   }
 
-  if (view === "stock") {
+  if (
+    view === "stock" ||
+    view === "retail-task-queue" ||
+    view === "retail-audit" ||
+    view === "retail-purchase-orders" ||
+    view === "retail-receiving" ||
+    view === "retail-movements" ||
+    view === "retail-customer-orders" ||
+    view === "retail-fulfillment" ||
+    view === "retail-reorder"
+  ) {
     return "stock.read";
   }
 
@@ -316,18 +356,23 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
   return "performance.read";
 }
 
-export function allowedAdminViews(principal: AdminSessionPrincipal) {
+export function allowedAdminViews(
+  principal: AdminSessionPrincipal,
+  organisationType?: AdminOrganisationType
+) {
   return adminDashboardViews.filter((view) =>
-    hasAdminPermission(principal, adminViewPermission(view))
+    hasAdminPermission(principal, adminViewPermission(view)) &&
+    adminViewAvailableForOrganisation(view, organisationType)
   );
 }
 
 export function firstAllowedAdminView(
   principal: AdminSessionPrincipal,
-  fallback: AdminDashboardView = "glance"
+  fallback: AdminDashboardView = "glance",
+  organisationType?: AdminOrganisationType
 ) {
   return (
-    allowedAdminViews(principal).find(
+    allowedAdminViews(principal, organisationType).find(
       (view) => view !== "access" && view !== "access-agents"
     ) ?? fallback
   );
@@ -335,9 +380,11 @@ export function firstAllowedAdminView(
 
 export function adminViewAllowed(
   principal: AdminSessionPrincipal,
-  view: AdminDashboardView
+  view: AdminDashboardView,
+  organisationType?: AdminOrganisationType
 ) {
-  return hasAdminPermission(principal, adminViewPermission(view));
+  return hasAdminPermission(principal, adminViewPermission(view)) &&
+    adminViewAvailableForOrganisation(view, organisationType);
 }
 
 export function permissionForAdminRequest(

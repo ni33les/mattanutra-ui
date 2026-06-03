@@ -10,8 +10,10 @@ import {
 import { siteLocaleRegistry, type Locale } from "@/lib/i18n";
 import {
   productCountryLabel,
-  productCountryOptions
+  productCountryOptions,
+  type ProductCountryPricing
 } from "@/lib/product-countries";
+import { supportedOrganisationCurrencies } from "@/lib/currencies";
 import {
   adminLocaleTextClass,
   classNames
@@ -64,18 +66,25 @@ export function ProductCountryManager({
   addCountryLabel,
   allowedCountryCodes,
   countryCodes,
+  countryPricing,
   disabledReason,
   label,
   onAdd,
+  onPricingChange,
   onRemove,
   removeLabel
 }: Readonly<{
   addCountryLabel: string;
   allowedCountryCodes?: readonly string[];
   countryCodes: readonly string[];
+  countryPricing?: readonly ProductCountryPricing[];
   disabledReason?: string | null;
   label: string;
   onAdd: (countryCode: string) => void;
+  onPricingChange?: (
+    countryCode: string,
+    patch: Partial<ProductCountryPricing>
+  ) => void;
   onRemove: (countryCode: string) => void;
   removeLabel: string;
 }>) {
@@ -111,25 +120,103 @@ export function ProductCountryManager({
           ))}
         </select>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {countryCodes.map((countryCode) => (
-          <span
-            className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700"
-            key={countryCode}
-          >
-            {productCountryLabel(countryCode)}
-            <button
-              aria-label={`${removeLabel}: ${productCountryLabel(countryCode)}`}
-              className="rounded-full px-1.5 py-0.5 text-[0.65rem] font-semibold text-emerald-600 ring-1 ring-emerald-100 hover:bg-emerald-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={countryCodes.length <= 1}
-              onClick={() => onRemove(countryCode)}
-              type="button"
+      {onPricingChange ? (
+        <div className="mt-3 grid gap-2">
+          {countryCodes.map((countryCode) => {
+            const pricing = countryPricing?.find(
+              (item) => item.countryCode === countryCode
+            );
+
+            return (
+              <div
+                className="grid gap-2 rounded-lg border border-emerald-100 bg-white p-2 sm:grid-cols-[minmax(0,1fr)_7rem_5.5rem_6.5rem_auto]"
+                key={countryCode}
+              >
+                <div className="flex min-h-9 items-center text-xs font-semibold text-emerald-800">
+                  {productCountryLabel(countryCode)}
+                </div>
+                <input
+                  className="rounded-md bg-white px-2 py-1.5 text-xs text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                  inputMode="decimal"
+                  min="0"
+                  onChange={(event) => {
+                    const parsed = Number(event.target.value);
+                    const validAmount =
+                      event.target.value.trim() &&
+                      Number.isFinite(parsed) &&
+                      parsed >= 0;
+
+                    onPricingChange(countryCode, {
+                      pricingStatus: validAmount ? "ready" : "missing",
+                      rrpPriceAmount: validAmount ? parsed : null
+                    });
+                  }}
+                  placeholder="RRP"
+                  step="0.01"
+                  type="number"
+                  value={pricing?.rrpPriceAmount ?? ""}
+                />
+                <select
+                  className="rounded-md bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                  onChange={(event) =>
+                    onPricingChange(countryCode, { currency: event.target.value })
+                  }
+                  value={pricing?.currency ?? "THB"}
+                >
+                  {supportedOrganisationCurrencies.map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="rounded-md bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                  onChange={(event) =>
+                    onPricingChange(countryCode, {
+                      pricingStatus:
+                        event.target.value as ProductCountryPricing["pricingStatus"]
+                    })
+                  }
+                  value={pricing?.pricingStatus ?? "missing"}
+                >
+                  <option value="missing">Missing</option>
+                  <option value="ready">Ready</option>
+                  <option value="review">Review</option>
+                </select>
+                <button
+                  aria-label={`${removeLabel}: ${productCountryLabel(countryCode)}`}
+                  className="rounded-md px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={countryCodes.length <= 1}
+                  onClick={() => onRemove(countryCode)}
+                  type="button"
+                >
+                  {removeLabel}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {countryCodes.map((countryCode) => (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700"
+              key={countryCode}
             >
-              {removeLabel}
-            </button>
-          </span>
-        ))}
-      </div>
+              {productCountryLabel(countryCode)}
+              <button
+                aria-label={`${removeLabel}: ${productCountryLabel(countryCode)}`}
+                className="rounded-full px-1.5 py-0.5 text-[0.65rem] font-semibold text-emerald-600 ring-1 ring-emerald-100 hover:bg-emerald-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={countryCodes.length <= 1}
+                onClick={() => onRemove(countryCode)}
+                type="button"
+              >
+                {removeLabel}
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       {disabledReason ? (
         <p className="mt-2 text-xs font-medium text-amber-700">
           {disabledReason}
@@ -156,6 +243,9 @@ export function ProductCard({
   const coveragePercent =
     row.decisionStats?.averageProductCoveragePercent ??
     row.recommendationHistory.averageProductCoveragePercent;
+  const readyCountryPrice = row.countryPricing.find((item) =>
+    item.rrpPriceAmount !== null
+  );
 
   return (
     <button
@@ -204,7 +294,10 @@ export function ProductCard({
                   row.availableCountryCodes.length > 0
                     ? `${viewLabels.markets} ${row.availableCountryCodes.join(", ")}`
                     : null,
-                  row.priceAmount ? `${row.priceAmount} ${row.currency}` : null
+                  readyCountryPrice?.rrpPriceAmount !== null &&
+                  readyCountryPrice?.rrpPriceAmount !== undefined
+                    ? `RRP ${readyCountryPrice.rrpPriceAmount} ${readyCountryPrice.currency}`
+                    : null
                 ]
                   .filter(Boolean)
                   .join(" · ")}

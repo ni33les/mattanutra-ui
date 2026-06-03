@@ -71,6 +71,18 @@ function normalSlug(value: unknown) {
     .slice(0, 80);
 }
 
+function currencyValue(value: unknown, fallback: string) {
+  const currency = text(value).toUpperCase() || fallback;
+
+  return /^[A-Z]{3}$/.test(currency) ? currency : null;
+}
+
+function countryValue(value: unknown, fallback: string) {
+  const countryCode = text(value).toUpperCase() || fallback;
+
+  return /^[A-Z]{2}$/.test(countryCode) ? countryCode : null;
+}
+
 async function accessPayload(context: AdminSessionContext) {
   return {
     data: await getAdminAccessData(context),
@@ -201,8 +213,21 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const currency = currencyValue(body.currency, "THB");
+      const countryCode = countryValue(body.countryCode, "TH");
+
+      if (!currency) {
+        return NextResponse.json({ error: "Invalid currency" }, { status: 400 });
+      }
+
+      if (!countryCode) {
+        return NextResponse.json({ error: "Invalid country" }, { status: 400 });
+      }
+
       await createOrganisation({
         actor: context,
+        countryCode,
+        currency,
         defaultLocale: localeValue(body.defaultLocale),
         name,
         slug,
@@ -224,6 +249,8 @@ export async function POST(request: NextRequest) {
       const slug = normalSlug(body.slug);
       const name = text(body.name);
       const status = text(body.status);
+      const currency = currencyValue(body.currency, "THB");
+      const countryCode = countryValue(body.countryCode, "TH");
 
       if (!slug || !name) {
         return NextResponse.json(
@@ -236,8 +263,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid status" }, { status: 400 });
       }
 
+      if (!currency) {
+        return NextResponse.json({ error: "Invalid currency" }, { status: 400 });
+      }
+
+      if (!countryCode) {
+        return NextResponse.json({ error: "Invalid country" }, { status: 400 });
+      }
+
       await updateOrganisation({
         actor: context,
+        countryCode,
+        currency,
         defaultLocale: localeValue(body.defaultLocale),
         id: text(body.organisationId),
         name,

@@ -25,6 +25,12 @@ function localeValue(value: unknown): Locale {
   return isLocale(value) ? value : "en";
 }
 
+function numberValue(value: unknown) {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 async function refreshSessionCookie(
   request: NextRequest,
   response: NextResponse
@@ -107,6 +113,7 @@ export async function POST(request: NextRequest) {
       const updatedContext = await updateEffectiveOrganisationSettings({
         context,
         currency: text(body.currency),
+        customerPriceMarginPercent: numberValue(body.customerPriceMarginPercent),
         defaultLocale: localeValue(body.defaultLocale),
         name
       });

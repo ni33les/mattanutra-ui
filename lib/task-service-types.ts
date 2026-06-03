@@ -138,6 +138,10 @@ export type TaskRecord = Readonly<{
   parentTaskId: string | null;
   payload: unknown;
   planId: string | null;
+  priorityReason: string | null;
+  priorityScore: number;
+  profitImpactAmount: number | null;
+  profitImpactCurrency: string | null;
   rayId: string | null;
   reasoningEffort: TaskReasoningEffort;
   requiredCapabilities: string[];
@@ -148,6 +152,9 @@ export type TaskRecord = Readonly<{
   retryPolicy: NormalizedTaskRetryPolicy | null;
   retryRootTaskId: string | null;
   scheduledFor: string;
+  dueAt: string | null;
+  sourceEntityId: string | null;
+  sourceEntityType: string | null;
   startedAt: string | null;
   status: TaskStatus;
   taskGroupId: string;
@@ -247,6 +254,10 @@ export type TaskRow = {
   parent_task_id: string | null;
   payload: unknown;
   plan_id: string | null;
+  priority_reason: string | null;
+  priority_score: number | string | null;
+  profit_impact_amount: number | string | null;
+  profit_impact_currency: string | null;
   ray_id: string | null;
   reasoning_effort: TaskReasoningEffort;
   required_capabilities: string[];
@@ -257,6 +268,9 @@ export type TaskRow = {
   retry_policy: unknown;
   retry_root_task_id: string | null;
   scheduled_for: Date | string;
+  due_at: Date | string | null;
+  source_entity_id: string | null;
+  source_entity_type: string | null;
   started_at: Date | string | null;
   status: TaskStatus;
   task_group_id: string;
@@ -324,6 +338,10 @@ export type CreateTaskInput = Readonly<{
   parentTaskId?: string | null;
   payload?: Record<string, unknown>;
   planId?: string | null;
+  priorityReason?: string | null;
+  priorityScore?: unknown;
+  profitImpactAmount?: unknown;
+  profitImpactCurrency?: string | null;
   rayId?: string | null;
   reasoningEffort?: TaskReasoningEffort;
   requiredCapabilities?: unknown;
@@ -332,6 +350,9 @@ export type CreateTaskInput = Readonly<{
   retryPolicy?: TaskRetryPolicyInput;
   retryRootTaskId?: string | null;
   scheduledFor?: Date | string | null;
+  dueAt?: Date | string | null;
+  sourceEntityId?: string | null;
+  sourceEntityType?: string | null;
   taskGroupId?: string | null;
   groupLabel?: string | null;
   taskType: string;

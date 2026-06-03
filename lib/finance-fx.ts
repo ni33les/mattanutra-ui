@@ -50,9 +50,15 @@ type FxRateRow = Readonly<{
 }>;
 
 const DEFAULT_FRESHNESS_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_PROVIDER = "exchangerate_host";
-const DEFAULT_SOURCE = "exchangerate.host";
-const DEFAULT_BASE_URL = "https://api.exchangerate.host";
+const EXCHANGE_RATE_API_OPEN_PROVIDER = "exchange_rate_api_open";
+const EXCHANGE_RATE_API_OPEN_SOURCE = "open.er-api.com";
+const EXCHANGE_RATE_API_OPEN_BASE_URL = "https://open.er-api.com";
+const EXCHANGERATE_HOST_PROVIDER = "exchangerate_host";
+const EXCHANGERATE_HOST_SOURCE = "exchangerate.host";
+const EXCHANGERATE_HOST_BASE_URL = "https://api.exchangerate.host";
+const DEFAULT_PROVIDER = EXCHANGE_RATE_API_OPEN_PROVIDER;
+const DEFAULT_SOURCE = EXCHANGE_RATE_API_OPEN_SOURCE;
+const DEFAULT_BASE_URL = EXCHANGE_RATE_API_OPEN_BASE_URL;
 const USD = "USD";
 
 function configured(value: string | undefined) {
@@ -142,13 +148,25 @@ async function latestFreshRate(
   return rows[0] ? rowToRate(rows[0]) : null;
 }
 
+function configuredProvider() {
+  return configured(process.env.FINANCE_FX_PROVIDER) || DEFAULT_PROVIDER;
+}
+
+function exchangeRateApiOpenConfig() {
+  return {
+    baseUrl: configured(process.env.FINANCE_FX_BASE_URL) || DEFAULT_BASE_URL,
+    provider: EXCHANGE_RATE_API_OPEN_PROVIDER,
+    source: configured(process.env.FINANCE_FX_SOURCE) || DEFAULT_SOURCE
+  };
+}
+
 function exchangerateHostConfig() {
   return {
     apiKey: configured(process.env.FINANCE_FX_API_KEY) ||
       configured(process.env.EXCHANGERATE_HOST_API_KEY),
-    baseUrl: configured(process.env.FINANCE_FX_BASE_URL) || DEFAULT_BASE_URL,
-    provider: configured(process.env.FINANCE_FX_PROVIDER) || DEFAULT_PROVIDER,
-    source: configured(process.env.FINANCE_FX_SOURCE) || DEFAULT_SOURCE
+    baseUrl: configured(process.env.FINANCE_FX_BASE_URL) || EXCHANGERATE_HOST_BASE_URL,
+    provider: EXCHANGERATE_HOST_PROVIDER,
+    source: configured(process.env.FINANCE_FX_SOURCE) || EXCHANGERATE_HOST_SOURCE
   };
 }
 
@@ -194,6 +212,147 @@ export function midpointUsdRateFromExchangerateHostPayload(
   return null;
 }
 
+export function midpointUsdRateFromExchangeRateApiOpenPayload(
+  currency: string,
+  payload: unknown
+) {
+  const requested = normalizeCurrencyCode(currency);
+  const record =
+    payload && typeof payload === "object" && !Array.isArray(payload)
+      ? payload as Record<string, unknown>
+      : {};
+
+  if (record.result !== "success") {
+    return null;
+  }
+
+  if (typeof record.base_code === "string" && record.base_code.toUpperCase() !== USD) {
+    return null;
+  }
+
+  const rates =
+    record.rates && typeof record.rates === "object" && !Array.isArray(record.rates)
+      ? record.rates as Record<string, unknown>
+      : {};
+  const usdToCurrency = quoteFromRecord(rates, requested);
+
+  return usdToCurrency ? 1 / usdToCurrency : null;
+}
+
+function validAtFromExchangeRateApiOpenPayload(payload: unknown, fallback: Date) {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "time_last_update_unix" in payload &&
+    Number.isFinite(Number((payload as { time_last_update_unix?: unknown }).time_last_update_unix))
+  ) {
+    return new Date(Number((payload as { time_last_update_unix?: unknown }).time_last_update_unix) * 1000);
+  }
+
+  return fallback;
+}
+
+async function recordFetchedRate(input: Readonly<{
+  currency: string;
+  freshnessMs: number;
+  mid: number;
+  now: Date;
+  payload: unknown;
+  provider: string;
+  source: string;
+  sql: FinanceDb;
+  validAt: Date;
+}>) {
+  const expiresAt = new Date(input.now.getTime() + input.freshnessMs);
+  const rows = await input.sql<FxRateRow[]>`
+    insert into public.finance_fx_rates (
+      id,
+      base_currency,
+      quote_currency,
+      provider,
+      source,
+      bid,
+      ask,
+      mid,
+      fetched_at,
+      valid_at,
+      expires_at,
+      raw_payload,
+      created_at,
+      updated_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${input.currency},
+      ${USD},
+      ${input.provider},
+      ${input.source},
+      null,
+      null,
+      ${input.mid},
+      ${input.now},
+      ${input.validAt},
+      ${expiresAt},
+      ${input.sql.json(toJsonValue(input.payload))},
+      now(),
+      now()
+    )
+    returning
+      id::text,
+      base_currency,
+      quote_currency,
+      provider,
+      source,
+      bid,
+      ask,
+      mid,
+      fetched_at,
+      valid_at,
+      expires_at
+  `;
+
+  if (!rows[0]) {
+    throw new Error("FX rate was not recorded");
+  }
+
+  return rowToRate(rows[0]);
+}
+
+async function fetchExchangeRateApiOpenRate(input: Readonly<{
+  currency: string;
+  fetcher: typeof fetch;
+  freshnessMs: number;
+  now: Date;
+  sql: FinanceDb;
+}>) {
+  const config = exchangeRateApiOpenConfig();
+  const url = new URL("/v6/latest/USD", config.baseUrl);
+  const response = await input.fetcher(url);
+
+  if (!response.ok) {
+    throw new Error(`FX provider returned ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const mid = midpointUsdRateFromExchangeRateApiOpenPayload(input.currency, payload);
+
+  if (!mid) {
+    throw new Error("FX provider response did not include the requested rate");
+  }
+
+  return recordFetchedRate({
+    currency: input.currency,
+    freshnessMs: input.freshnessMs,
+    mid,
+    now: input.now,
+    payload,
+    provider: config.provider,
+    source: config.source,
+    sql: input.sql,
+    validAt: validAtFromExchangeRateApiOpenPayload(payload, input.now)
+  });
+}
+
 async function fetchExchangerateHostRate(input: Readonly<{
   currency: string;
   fetcher: typeof fetch;
@@ -233,59 +392,38 @@ async function fetchExchangerateHostRate(input: Readonly<{
     Number.isFinite(Number((payload as { timestamp?: unknown }).timestamp))
       ? new Date(Number((payload as { timestamp?: unknown }).timestamp) * 1000)
       : input.now;
-  const expiresAt = new Date(input.now.getTime() + input.freshnessMs);
-  const rows = await input.sql<FxRateRow[]>`
-    insert into public.finance_fx_rates (
-      id,
-      base_currency,
-      quote_currency,
-      provider,
-      source,
-      bid,
-      ask,
-      mid,
-      fetched_at,
-      valid_at,
-      expires_at,
-      raw_payload,
-      created_at,
-      updated_at
-    )
-    values (
-      ${randomUUID()}::uuid,
-      ${input.currency},
-      ${USD},
-      ${config.provider},
-      ${config.source},
-      null,
-      null,
-      ${mid},
-      ${input.now},
-      ${validAt},
-      ${expiresAt},
-      ${input.sql.json(toJsonValue(payload))},
-      now(),
-      now()
-    )
-    returning
-      id::text,
-      base_currency,
-      quote_currency,
-      provider,
-      source,
-      bid,
-      ask,
-      mid,
-      fetched_at,
-      valid_at,
-      expires_at
-  `;
 
-  if (!rows[0]) {
-    throw new Error("FX rate was not recorded");
+  return recordFetchedRate({
+    currency: input.currency,
+    freshnessMs: input.freshnessMs,
+    mid,
+    now: input.now,
+    payload,
+    provider: config.provider,
+    source: config.source,
+    sql: input.sql,
+    validAt
+  });
+}
+
+async function fetchConfiguredFxRate(input: Readonly<{
+  currency: string;
+  fetcher: typeof fetch;
+  freshnessMs: number;
+  now: Date;
+  sql: FinanceDb;
+}>) {
+  const provider = configuredProvider();
+
+  if (provider === EXCHANGE_RATE_API_OPEN_PROVIDER) {
+    return fetchExchangeRateApiOpenRate(input);
   }
 
-  return rowToRate(rows[0]);
+  if (provider === EXCHANGERATE_HOST_PROVIDER) {
+    return fetchExchangerateHostRate(input);
+  }
+
+  throw new Error(`Unsupported FINANCE_FX_PROVIDER "${provider}"`);
 }
 
 export async function resolveUsdRateForCurrency(
@@ -327,7 +465,7 @@ export async function resolveUsdRateForCurrency(
   }
 
   try {
-    const fetched = await fetchExchangerateHostRate({
+    const fetched = await fetchConfiguredFxRate({
       currency,
       fetcher: options.fetcher ?? fetch,
       freshnessMs: maxAge,

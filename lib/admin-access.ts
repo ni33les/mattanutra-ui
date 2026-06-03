@@ -35,6 +35,14 @@ import { configuredGrokModel, configuredGrokValue } from "@/lib/grok-client";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 import { siteBaseUrl } from "@/lib/site-url";
 import { normalizeCapabilities } from "@/lib/task-service-utils";
+import {
+  defaultProductCountryCode,
+  normalizeProductCountryCode
+} from "@/lib/product-countries";
+import {
+  customerPriceMarginPercentFromMetadata,
+  normalizeCustomerPriceMarginPercent
+} from "@/lib/customer-pricing";
 import type {
   AdminAccessData,
   AdminAccessStatus,
@@ -358,6 +366,7 @@ function person(row: {
 }
 
 function organisation(row: {
+  country_code?: string | null;
   currency?: string | null;
   default_locale: string;
   id: string;
@@ -370,6 +379,8 @@ function organisation(row: {
   const currency = row.currency?.trim().toUpperCase() ?? "";
 
   return {
+    countryCode:
+      normalizeProductCountryCode(row.country_code) ?? defaultProductCountryCode,
     currency: /^[A-Z]{3}$/.test(currency)
       ? currency
       : organisationType === "platform"
@@ -385,6 +396,31 @@ function organisation(row: {
         : "disabled",
     type: organisationType
   };
+}
+
+function normalOrganisationCurrency(
+  value: string | null | undefined,
+  type: AdminOrganisationType
+) {
+  const fallback = type === "platform" ? "USD" : "THB";
+  const currency = value?.trim().toUpperCase() || fallback;
+
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    throw new Error("Currency must be a three-letter ISO-4217 code");
+  }
+
+  return currency;
+}
+
+function normalOrganisationCountry(value: string | null | undefined) {
+  const countryCode =
+    normalizeProductCountryCode(value) ?? defaultProductCountryCode;
+
+  if (!countryCode) {
+    throw new Error("Country must be a supported two-letter country code");
+  }
+
+  return countryCode;
 }
 
 function membership(row: {
@@ -530,6 +566,7 @@ async function personBelongsToOrganisation(
 
 async function platformOrganisation(sql: Db) {
   const rows = await sql<Array<{
+    country_code: string | null;
     currency: string | null;
     default_locale: string;
     id: string;
@@ -544,6 +581,7 @@ async function platformOrganisation(sql: Db) {
       organisation_type,
       status,
       default_locale,
+      country_code,
       currency
     )
     values (
@@ -552,10 +590,11 @@ async function platformOrganisation(sql: Db) {
       'platform',
       'active',
       'en',
+      ${defaultProductCountryCode},
       'USD'
     )
     on conflict do nothing
-    returning id::text, slug, name, organisation_type, status, default_locale, currency
+    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency
   `;
 
   if (rows[0]) {
@@ -563,6 +602,7 @@ async function platformOrganisation(sql: Db) {
   }
 
   const existing = await sql<Array<{
+    country_code: string | null;
     currency: string | null;
     default_locale: string;
     id: string;
@@ -571,7 +611,7 @@ async function platformOrganisation(sql: Db) {
     slug: string;
     status: string;
   }>>`
-    select id::text, slug, name, organisation_type, status, default_locale, currency
+    select id::text, slug, name, organisation_type, status, default_locale, country_code, currency
     from public.organisations
     where lower(slug) = ${defaultPlatformOrgSlug}
     limit 1
@@ -1697,6 +1737,8 @@ export async function getAdminAccessData(
   const [organisations, people, memberships, invitations, auditEvents, agents] =
     await Promise.all([
       sql<Array<{
+        country_code: string | null;
+        currency: string | null;
         default_locale: string;
         id: string;
         name: string;
@@ -1704,7 +1746,7 @@ export async function getAdminAccessData(
         slug: string;
         status: string;
       }>>`
-        select id::text, slug, name, organisation_type, status, default_locale
+        select id::text, slug, name, organisation_type, status, default_locale, country_code, currency
         from public.organisations
         ${organisationScope}
         order by organisation_type asc, lower(name) asc
@@ -1934,15 +1976,17 @@ export async function getAdminSettingsData(
   const sql = await sqlOrThrow();
   const [organisationRows, peopleRows] = await Promise.all([
     sql<Array<{
+      country_code: string | null;
       currency: string | null;
       default_locale: string;
       id: string;
+      metadata: unknown;
       name: string;
       organisation_type: string;
       slug: string;
       status: string;
     }>>`
-      select id::text, slug, name, organisation_type, status, default_locale, currency
+      select id::text, slug, name, organisation_type, status, default_locale, country_code, currency, metadata
       from public.organisations
       where id = ${context.effectiveOrganisation.id}::uuid
       limit 1
@@ -1990,6 +2034,9 @@ export async function getAdminSettingsData(
           context.effectiveMembership.role === "retail_admin"
         )
       ),
+    customerPriceMarginPercent: customerPriceMarginPercentFromMetadata(
+      organisationRows[0]?.metadata
+    ),
     organisation: currentOrganisation,
     people: peopleRows.map((row) => ({
       displayName: row.display_name,
@@ -2015,19 +2062,26 @@ export async function getAdminSettingsData(
 
 export async function createOrganisation({
   actor,
+  countryCode,
+  currency,
   defaultLocale,
   name,
   slug,
   type
 }: Readonly<{
   actor?: AdminSessionContext | null;
+  countryCode?: string | null;
+  currency?: string | null;
   defaultLocale: Locale;
   name: string;
   slug: string;
   type: AdminOrganisationType;
 }>) {
   const sql = await sqlOrThrow();
+  const normalizedCountryCode = normalOrganisationCountry(countryCode);
+  const normalizedCurrency = normalOrganisationCurrency(currency, type);
   const rows = await sql<Array<{
+    country_code: string | null;
     currency: string | null;
     default_locale: string;
     id: string;
@@ -2042,6 +2096,7 @@ export async function createOrganisation({
       organisation_type,
       status,
       default_locale,
+      country_code,
       currency
     )
     values (
@@ -2050,9 +2105,10 @@ export async function createOrganisation({
       ${type},
       'active',
       ${defaultLocale},
-      ${type === "platform" ? "USD" : "THB"}
+      ${normalizedCountryCode},
+      ${normalizedCurrency}
     )
-    returning id::text, slug, name, organisation_type, status, default_locale, currency
+    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency
   `;
 
   const savedOrganisation = rows[0] ? organisation(rows[0]) : null;
@@ -2080,6 +2136,8 @@ export async function createOrganisation({
 
 export async function updateOrganisation({
   actor,
+  countryCode,
+  currency,
   defaultLocale,
   id,
   name,
@@ -2087,6 +2145,8 @@ export async function updateOrganisation({
   status
 }: Readonly<{
   actor?: AdminSessionContext | null;
+  countryCode?: string | null;
+  currency?: string | null;
   defaultLocale: Locale;
   id: string;
   name: string;
@@ -2096,6 +2156,7 @@ export async function updateOrganisation({
   const sql = await sqlOrThrow();
   const beforeRows = actor
     ? await sql<Array<{
+        country_code: string | null;
         currency: string | null;
         default_locale: string;
         id: string;
@@ -2104,13 +2165,21 @@ export async function updateOrganisation({
         slug: string;
         status: string;
       }>>`
-        select id::text, slug, name, organisation_type, status, default_locale, currency
+        select id::text, slug, name, organisation_type, status, default_locale, country_code, currency
         from public.organisations
         where id = ${id}::uuid
         limit 1
       `
     : [];
+  const organisationType =
+    beforeRows[0]?.organisation_type === "platform" ? "platform" : "tenant";
+  const normalizedCurrency = normalOrganisationCurrency(
+    currency,
+    organisationType
+  );
+  const normalizedCountryCode = normalOrganisationCountry(countryCode);
   const rows = await sql<Array<{
+    country_code: string | null;
     currency: string | null;
     default_locale: string;
     id: string;
@@ -2125,9 +2194,11 @@ export async function updateOrganisation({
       name = ${name.trim()},
       status = ${status},
       default_locale = ${defaultLocale},
+      country_code = ${normalizedCountryCode},
+      currency = ${normalizedCurrency},
       updated_at = now()
     where id = ${id}::uuid
-    returning id::text, slug, name, organisation_type, status, default_locale, currency
+    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency
   `;
 
   const savedOrganisation = rows[0] ? organisation(rows[0]) : null;
@@ -2967,11 +3038,13 @@ export async function updateOwnPerson({
 export async function updateEffectiveOrganisationSettings({
   context,
   currency,
+  customerPriceMarginPercent,
   defaultLocale,
   name
 }: Readonly<{
   context: AdminSessionContext;
   currency?: string | null;
+  customerPriceMarginPercent?: number | null;
   defaultLocale: Locale;
   name: string;
 }>) {
@@ -2988,15 +3061,34 @@ export async function updateEffectiveOrganisationSettings({
     throw new Error("You can only update basic settings for your own organisation");
   }
 
+  const canEditCurrency =
+    context.actorMembership.role === "platform_owner" ||
+    context.actorMembership.role === "platform_admin";
+  const requestedCurrency = currency?.trim().toUpperCase() ?? "";
+
+  if (
+    requestedCurrency &&
+    requestedCurrency !== context.effectiveOrganisation.currency &&
+    !canEditCurrency
+  ) {
+    throw new Error("Only platform admins can update organisation currency");
+  }
+
   const normalizedCurrency =
-    currency?.trim().toUpperCase() || context.effectiveOrganisation.currency;
+    canEditCurrency && requestedCurrency
+      ? requestedCurrency
+      : context.effectiveOrganisation.currency;
 
   if (!/^[A-Z]{3}$/.test(normalizedCurrency)) {
     throw new Error("Currency must be a three-letter ISO-4217 code");
   }
 
   const sql = await sqlOrThrow();
+  const normalizedMarginPercent = normalizeCustomerPriceMarginPercent(
+    customerPriceMarginPercent
+  );
   const rows = await sql<Array<{
+    country_code: string | null;
     currency: string | null;
     default_locale: string;
     id: string;
@@ -3010,9 +3102,13 @@ export async function updateEffectiveOrganisationSettings({
       name = ${name.trim()},
       default_locale = ${defaultLocale},
       currency = ${normalizedCurrency},
+      metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
+        'customerPriceMarginPercent',
+        ${normalizedMarginPercent}
+      ),
       updated_at = now()
     where id = ${context.effectiveOrganisation.id}::uuid
-    returning id::text, slug, name, organisation_type, status, default_locale, currency
+    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency
   `;
   const savedOrganisation = rows[0] ? organisation(rows[0]) : null;
 

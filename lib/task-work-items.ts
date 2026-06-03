@@ -21,7 +21,9 @@ import {
 } from "@/lib/example-email";
 import { isLocale, publicLocales, type Locale } from "@/lib/i18n";
 import {
-  getProductRecommendationCandidates
+  getProductRecommendationCandidates,
+  getRetailerAwareProductRecommendationCandidateSets,
+  type ProductRecommendationRetailerCandidateSet
 } from "@/lib/admin-products";
 import {
   defaultProductCountryCode,
@@ -208,11 +210,42 @@ export type ProductRecommendationsWorkItem = Readonly<{
   clientSex: ProductClientSex | null;
   countryCode: string;
   needs: ProductRecommendationNeed[];
+  retailerCandidateSets: ProductRecommendationRetailerCandidateSet[];
   planId: string;
   searchQueries: string[];
   stackPreference: ProductStackPreference;
   taskId: string;
   taskType: "generate_product_recommendations";
+}>;
+
+export type RetailStockForecastWorkItem = Readonly<{
+  organisationId: string;
+  productId: string | null;
+  source: string | null;
+  stockId: string | null;
+  taskId: string;
+  taskType: "retail_stock_forecast_refresh";
+}>;
+
+export type RetailOperationsReviewWorkItem = Readonly<{
+  organisationId: string;
+  payload: Record<string, unknown>;
+  sourceEntityId: string | null;
+  sourceEntityType: string | null;
+  taskId: string;
+  taskType:
+    | "retail_customer_order_allocate"
+    | "retail_order_pack"
+    | "retail_order_pick"
+	    | "retail_order_return_review"
+	    | "retail_order_ship"
+	    | "retail_purchase_order_place_order"
+	    | "retail_purchase_order_receive"
+    | "retail_stock_expiry_review"
+    | "retail_stock_low_stock_digest"
+    | "retail_stock_low_stock_review"
+    | "retail_stock_movement_review"
+    | "retail_stock_reorder_review";
 }>;
 
 export type TaskWorkItem =
@@ -228,6 +261,8 @@ export type TaskWorkItem =
   | NutritionPlanRefinementWorkItem
   | NutritionReportWorkItem
   | ProductRecommendationsWorkItem
+  | RetailStockForecastWorkItem
+  | RetailOperationsReviewWorkItem
   | ReassessmentEmailWorkItem
   | Readonly<{
       originalTaskType: string;
@@ -1189,10 +1224,17 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
   }));
   const countryCode = productCountryCodeFromAnswers(context.answers);
   const candidateLoadStartedAt = Date.now();
-  const candidates = await getProductRecommendationCandidates({
+  const retailerCandidateSets =
+    await getRetailerAwareProductRecommendationCandidateSets({
+      countryCode,
+      includeIneligible: true
+    });
+  const candidates = retailerCandidateSets.length > 0
+    ? retailerCandidateSets.flatMap((set) => set.candidates)
+    : await getProductRecommendationCandidates({
     countryCode,
     includeIneligible: true
-  });
+      });
 
   return {
     candidates,
@@ -1206,6 +1248,7 @@ async function buildProductRecommendationsWorkItem(task: TaskRecord) {
     countryCode,
     needs,
     planId: task.planId,
+    retailerCandidateSets,
     searchQueries: buildProductSearchQueries(needs),
     stackPreference: normalizeProductStackPreference(
       payloadText(task.payload, "stackPreference")
@@ -1321,6 +1364,41 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
 
   if (task.taskType === "generate_product_recommendations") {
     return buildProductRecommendationsWorkItem(task);
+  }
+
+  if (task.taskType === "retail_stock_forecast_refresh") {
+    return {
+      organisationId: task.organisationId,
+      productId: textFromRecord(payloadRecord(task.payload), "productId"),
+      source: textFromRecord(payloadRecord(task.payload), "source"),
+      stockId: textFromRecord(payloadRecord(task.payload), "stockId"),
+      taskId: task.id,
+      taskType: "retail_stock_forecast_refresh"
+    } satisfies RetailStockForecastWorkItem;
+  }
+
+  if (
+    task.taskType === "retail_customer_order_allocate" ||
+    task.taskType === "retail_order_pack" ||
+    task.taskType === "retail_order_pick" ||
+	    task.taskType === "retail_order_return_review" ||
+	    task.taskType === "retail_order_ship" ||
+	    task.taskType === "retail_purchase_order_place_order" ||
+	    task.taskType === "retail_purchase_order_receive" ||
+    task.taskType === "retail_stock_expiry_review" ||
+    task.taskType === "retail_stock_low_stock_digest" ||
+    task.taskType === "retail_stock_low_stock_review" ||
+    task.taskType === "retail_stock_movement_review" ||
+    task.taskType === "retail_stock_reorder_review"
+  ) {
+    return {
+      organisationId: task.organisationId,
+      payload: payloadRecord(task.payload),
+      sourceEntityId: task.sourceEntityId,
+      sourceEntityType: task.sourceEntityType,
+      taskId: task.id,
+      taskType: task.taskType
+    } satisfies RetailOperationsReviewWorkItem;
   }
 
   if (task.taskType === "client_safety_followup") {

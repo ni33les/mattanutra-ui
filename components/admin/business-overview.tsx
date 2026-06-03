@@ -74,13 +74,6 @@ function businessFunnelStages(
       targetConversion: targets.healthScoreViews
     },
     {
-      count: flowNodeCount(flowData, "freeEmailRequested"),
-      denominator: healthScore,
-      id: "freeRequests",
-      label: labels.atAGlance.freeRequests,
-      targetConversion: targets.freeRequests
-    },
-    {
       count: flowNodeCount(flowData, "precisionPaid"),
       denominator: healthScore,
       id: "precisionConversions",
@@ -93,6 +86,13 @@ function businessFunnelStages(
       id: "proConversions",
       label: labels.atAGlance.proConversions,
       targetConversion: targets.proConversions
+    },
+    {
+      count: flowNodeCount(flowData, "retailOrderCreated"),
+      denominator: healthScore,
+      id: "productOrders",
+      label: labels.atAGlance.productOrders,
+      targetConversion: targets.productOrders
     }
   ];
 }
@@ -493,13 +493,6 @@ export function AdminAtAGlanceView({
       value: formatNumber(flowNodeCount(flowData, "healthscoreViewed"), locale)
     },
     {
-      color: businessMetricColors.freeRequests,
-      id: "freeRequests",
-      label: labels.atAGlance.freeRequests,
-      series: flowNodeSeries(flowData, "freeEmailRequested"),
-      value: formatNumber(flowNodeCount(flowData, "freeEmailRequested"), locale)
-    },
-    {
       color: businessMetricColors.precisionConversions,
       id: "precisionConversions",
       label: labels.atAGlance.precisionConversions,
@@ -512,6 +505,13 @@ export function AdminAtAGlanceView({
       label: labels.atAGlance.proConversions,
       series: flowNodeSeries(flowData, "proPaid"),
       value: formatNumber(flowNodeCount(flowData, "proPaid"), locale)
+    },
+    {
+      color: businessMetricColors.contentScheduled,
+      id: "productOrders",
+      label: labels.atAGlance.productOrders,
+      series: flowNodeSeries(flowData, "retailOrderCreated"),
+      value: formatNumber(flowNodeCount(flowData, "retailOrderCreated"), locale)
     },
     {
       color: businessMetricColors.pendingReviews,
@@ -577,4 +577,3 @@ export function AdminAtAGlanceView({
     </>
   );
 }
-

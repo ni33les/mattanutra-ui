@@ -21,6 +21,7 @@ type WorkerMode =
   | "healthscore"
   | "hosting"
   | "products"
+  | "stock"
   | "supplement";
 type WorkerProfileMode = Exclude<WorkerMode, "all" | "supplement">;
 
@@ -42,7 +43,8 @@ const WORKER_PROFILE_MODES: readonly WorkerProfileMode[] = [
   "formulation",
   "healthscore",
   "hosting",
-  "products"
+  "products",
+  "stock"
 ];
 
 type ActiveSession = Readonly<{
@@ -131,6 +133,7 @@ function workerMode(value: string | undefined): WorkerMode {
     value === "healthscore" ||
     value === "hosting" ||
     value === "products" ||
+    value === "stock" ||
     value === "advisor"
     ? value
     : "all";
@@ -189,6 +192,20 @@ const WORKER_PROFILES: Record<WorkerProfileMode, WorkerAgentConfig> = {
   hosting: agentProfile("scheduler", ["sync_digitalocean_billing"]),
   products: agentProfile("productMatcher", [
     "generate_product_recommendations"
+  ]),
+  stock: agentProfile("retailStockPlanner", [
+    "retail_stock_forecast_refresh",
+    "retail_stock_low_stock_digest",
+    "retail_stock_reorder_review",
+    "retail_stock_low_stock_review",
+    "retail_stock_expiry_review",
+    "retail_stock_movement_review",
+    "retail_purchase_order_receive",
+    "retail_customer_order_allocate",
+    "retail_order_pick",
+    "retail_order_pack",
+    "retail_order_ship",
+    "retail_order_return_review"
   ])
 };
 
@@ -211,25 +228,41 @@ function workerConcurrency(mode: WorkerProfileMode) {
   );
 }
 
-function workerAgentKey(mode: WorkerProfileMode) {
-  return envText(`WORKER_${mode.toUpperCase()}_AGENT_API_KEY`);
+function uniqueTexts(values: readonly string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
-function requireConfig(mode: WorkerProfileMode) {
+function workerAgentKeys(mode: WorkerProfileMode) {
+  const singular = envText(`WORKER_${mode.toUpperCase()}_AGENT_API_KEY`);
+  const plural =
+    mode === "stock"
+      ? uniqueTexts(
+          envText("WORKER_STOCK_AGENT_API_KEYS")
+            .split(",")
+            .map((value) => value.trim())
+        )
+      : [];
+
+  return uniqueTexts([singular, ...plural]);
+}
+
+function requireConfigs(mode: WorkerProfileMode) {
   const baseUrl =
     envText("WORKER_API_BASE_URL") ||
     envText("MATTANUTRA_API_BASE_URL") ||
     envText("APP_BASE_URL") ||
     "http://localhost:3000";
-  const token = workerAgentKey(mode);
+  const tokens = workerAgentKeys(mode);
 
-  if (!token) {
+  if (tokens.length < 1) {
     throw new Error(
-      `A DB-managed agent API key is required for the ${mode} worker. Set WORKER_${mode.toUpperCase()}_AGENT_API_KEY.`
+      `A DB-managed agent API key is required for the ${mode} worker. Set WORKER_${mode.toUpperCase()}_AGENT_API_KEY${
+        mode === "stock" ? " or WORKER_STOCK_AGENT_API_KEYS" : ""
+      }.`
     );
   }
 
-  return { baseUrl, token };
+  return tokens.map((token) => ({ baseUrl, token }));
 }
 
 async function executeWorkItem(
@@ -548,16 +581,22 @@ async function runWorker(mode: WorkerMode) {
   const modes =
     mode === "all" ? WORKER_PROFILE_MODES : ([mode] as readonly WorkerProfileMode[]);
   const loops = modes.flatMap((profileMode, profileIndex) => {
-    const config = requireConfig(profileMode);
+    const configs = requireConfigs(profileMode);
     const concurrency = workerConcurrency(profileMode);
+    const slotCount = configs.length * concurrency;
 
-    return Array.from({ length: concurrency }, (_, slotIndex) =>
-      runSupervisedAgentLoop(
-        profileMode,
-        config,
-        slotIndex,
-        concurrency,
-        (profileIndex + slotIndex) * WORKER_PROFILE_STARTUP_STAGGER_MS
+    return configs.flatMap((config, configIndex) =>
+      Array.from({ length: concurrency }, (_, concurrencyIndex) => {
+        const slotIndex = configIndex * concurrency + concurrencyIndex;
+
+        return runSupervisedAgentLoop(
+          profileMode,
+          config,
+          slotIndex,
+          slotCount,
+          (profileIndex + slotIndex) * WORKER_PROFILE_STARTUP_STAGGER_MS
+        );
+      }
       )
     );
   });

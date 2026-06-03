@@ -17,6 +17,12 @@ import {
 } from "@/lib/admin-supplements";
 import { isUuid } from "@/lib/assessment-store";
 import { normalizeSupplementSafetyFlags } from "@/lib/supplement-safety-flags";
+import {
+  normalizeCurrencyCode,
+  normalizeProductCountryCode,
+  normalizeProductCountryPricingStatus,
+  type ProductCountryPricing
+} from "@/lib/product-countries";
 
 export const runtime = "nodejs";
 
@@ -172,6 +178,40 @@ function countryCodesFromBody(value: unknown) {
     : [];
 }
 
+function countryPricingFromBody(value: unknown): ProductCountryPricing[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item): ProductCountryPricing[] => {
+    const record = item && typeof item === "object"
+      ? item as Record<string, unknown>
+      : null;
+    const countryCode = normalizeProductCountryCode(record?.countryCode);
+
+    if (!record || !countryCode) {
+      return [];
+    }
+
+    const rrpPriceAmount = amountValue(record.rrpPriceAmount);
+
+    return [{
+      countryCode,
+      currency: normalizeCurrencyCode(record.currency, "THB"),
+      priceUpdatedAt: null,
+      pricingStatus: normalizeProductCountryPricingStatus(
+        record.pricingStatus,
+        rrpPriceAmount
+      ),
+      rrpPriceAmount
+    }];
+  });
+}
+
 function errorDetails(error: unknown) {
   if (!(error instanceof Error)) {
     return error;
@@ -194,6 +234,23 @@ function errorDetails(error: unknown) {
     name: error.name,
     table: databaseError.table_name
   };
+}
+
+function reviewTaskErrorStatus(message: string) {
+  if (message === "Review task not found") {
+    return 404;
+  }
+
+  if (
+    message === "Associated supplement not found" ||
+    message === "Supplement name is required" ||
+    message === "Supplement could not be resolved" ||
+    message.startsWith("Product still needs review")
+  ) {
+    return 400;
+  }
+
+  return 500;
 }
 
 export async function PATCH(
@@ -295,6 +352,7 @@ export async function PATCH(
                   : "duplicate",
             actor: "admin_dashboard",
             availableCountryCodes: countryCodesFromBody(body.availableCountryCodes),
+            countryPricing: countryPricingFromBody(body.countryPricing),
             brandName: body.brandName === undefined
               ? undefined
               : textOrNull(body.brandName),
@@ -373,7 +431,7 @@ export async function PATCH(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unable to update review task";
-    const status = message.startsWith("Product still needs review") ? 400 : 500;
+    const status = reviewTaskErrorStatus(message);
 
     console.error("Unable to update review task", {
       error: errorDetails(error),

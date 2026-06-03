@@ -146,6 +146,7 @@ export default async function LocalizedAdminDashboardPage({
   const filters = normalizeAdminDashboardFilters(query);
   const selectedReviewTaskId = firstParam(query.review);
   const selectedTaskId = firstParam(query.task);
+  const selectedRetailCustomerOrderId = firstParam(query.order);
   const cookieStore = await cookies();
   const sessionContext = await resolveAdminSession({
     csrfToken: cookieStore.get(adminCsrfCookieName)?.value,
@@ -166,10 +167,18 @@ export default async function LocalizedAdminDashboardPage({
     redirect(`/${locale}/admin/login?${loginParams.toString()}`);
   }
 
-  if (!adminViewAllowed(adminContext, view)) {
+  if (!adminViewAllowed(
+    adminContext,
+    view,
+    adminContext.effectiveOrganisation.type
+  )) {
     redirect(
       dashboardUrl(locale, query, {
-        view: firstAllowedAdminView(adminContext)
+        view: firstAllowedAdminView(
+          adminContext,
+          "glance",
+          adminContext.effectiveOrganisation.type
+        )
       })
     );
   }
@@ -234,7 +243,17 @@ export default async function LocalizedAdminDashboardPage({
     leadsData = await getAdminLeadsData(range, filters);
   } else if (view === "products") {
     productsData = await getAdminProductsData(range);
-  } else if (view === "stock") {
+  } else if (
+    view === "stock" ||
+    view === "retail-task-queue" ||
+    view === "retail-audit" ||
+    view === "retail-purchase-orders" ||
+    view === "retail-receiving" ||
+    view === "retail-movements" ||
+    view === "retail-customer-orders" ||
+    view === "retail-fulfillment" ||
+    view === "retail-reorder"
+  ) {
     retailStockData = await getAdminRetailStockData(adminContext, locale);
   } else if (view === "product-insights" || view === "supplement-insights") {
     recommendationInsightsData = await getAdminRecommendationInsightsData(
@@ -275,6 +294,7 @@ export default async function LocalizedAdminDashboardPage({
       retailStockData={retailStockData}
       recommendationInsightsData={recommendationInsightsData}
       reviewQueueData={reviewQueueData}
+      selectedRetailCustomerOrderId={selectedRetailCustomerOrderId}
       selectedReviewTaskId={selectedReviewTaskId}
       selectedTaskId={selectedTaskId}
       settingsData={settingsData}

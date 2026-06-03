@@ -6,6 +6,7 @@ import type {
   AdminClientSessionContext,
   AdminSettingsData
 } from "@/lib/admin-access";
+import { supportedOrganisationCurrencies } from "@/lib/currencies";
 import type { AdminRole } from "@/lib/admin-rbac";
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 import type { AdminContent } from "@/components/admin/dashboard-content";
@@ -102,12 +103,21 @@ export function AdminSettingsView({
   const [organisationCurrency, setOrganisationCurrency] = useState(
     initialSettingsData?.organisation.currency ?? "THB"
   );
+  const [customerPriceMarginPercent, setCustomerPriceMarginPercent] = useState(
+    String(initialSettingsData?.customerPriceMarginPercent ?? 10)
+  );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const canSave = !session.isLegacy;
   const canEditOrganisation =
     canSave && Boolean(settingsData?.canEditOrganisation);
+  const canEditCurrency =
+    canEditOrganisation &&
+    (
+      session.actorMembership.role === "platform_owner" ||
+      session.actorMembership.role === "platform_admin"
+    );
   const showRetailPeople =
     session.effectiveOrganisation.type === "tenant" &&
     session.effectiveMembership.role === "retail_admin" &&
@@ -123,6 +133,9 @@ export function AdminSettingsView({
       setOrganisationName(result.settingsData.organisation.name);
       setOrganisationLocale(result.settingsData.organisation.defaultLocale);
       setOrganisationCurrency(result.settingsData.organisation.currency);
+      setCustomerPriceMarginPercent(
+        String(result.settingsData.customerPriceMarginPercent)
+      );
     }
   }
 
@@ -168,6 +181,7 @@ export function AdminSettingsView({
       const result = await saveSettings({
         action: "update_organisation",
         currency: organisationCurrency,
+        customerPriceMarginPercent,
         defaultLocale: organisationLocale,
         name: organisationName
       });
@@ -299,16 +313,36 @@ export function AdminSettingsView({
             </label>
             <label className="grid gap-1 text-xs font-semibold text-gray-500">
               {labels.settings.currency}
-              <input
-                className="rounded-md bg-white px-3 py-2 text-sm font-normal uppercase text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
-                disabled={!canEditOrganisation || busy}
-                maxLength={3}
-                onChange={(event) =>
-                  setOrganisationCurrency(event.target.value.toUpperCase())
-                }
-                pattern="[A-Z]{3}"
-                required={true}
+              <select
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
+                disabled={!canEditCurrency || busy}
+                onChange={(event) => setOrganisationCurrency(event.target.value)}
                 value={organisationCurrency}
+              >
+                {supportedOrganisationCurrencies.some(
+                  (currency) => currency === organisationCurrency
+                ) ? null : (
+                  <option value={organisationCurrency}>{organisationCurrency}</option>
+                )}
+                {supportedOrganisationCurrencies.map((currency) => (
+                  <option key={currency} value={currency}>
+                    {currency}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-gray-500">
+              {labels.settings.customerMargin}
+              <input
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
+                disabled={!canEditOrganisation || busy}
+                inputMode="decimal"
+                min="0"
+                max="100"
+                onChange={(event) => setCustomerPriceMarginPercent(event.target.value)}
+                step="0.01"
+                type="number"
+                value={customerPriceMarginPercent}
               />
             </label>
             <div className="grid gap-1 text-xs font-semibold text-gray-500">

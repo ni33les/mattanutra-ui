@@ -16,6 +16,7 @@ test("admin dashboard has a registry-driven locale switcher that preserves dashb
   assert.match(shared, /export function AdminLocaleSwitcher/);
   assert.match(shared, /publicLocales\.map/);
   assert.match(shared, /adminHref\(localeCode, accessToken, range, view, filters/);
+  assert.match(shared, /orderId/);
   assert.match(shared, /reviewTaskId/);
   assert.match(shared, /taskId/);
   assert.match(dashboard, /<AdminLocaleSwitcher/);
@@ -36,9 +37,34 @@ test("admin access management exposes people, organisations, memberships, agents
   assert.match(content, /name: "Agents", view: "access-agents"/);
   assert.match(content, /name: "Audit", view: "audit"/);
   assert.match(content, /name: "Settings", view: "settings"/);
+  assert.match(content, /retailTasksTitle: "Retail Tasks"/);
+  assert.match(content, /retailBuyingTitle: "Buying Stock"/);
+  assert.match(content, /retailInventoryTitle: "Stock"/);
+  assert.match(content, /retailSellingTitle: "Selling Stock"/);
+  assert.match(content, /name: "Task Queue", view: "retail-task-queue"/);
+  assert.match(content, /name: "Audit", view: "retail-audit"/);
+  assert.match(content, /name: "Shopping List", view: "retail-reorder"/);
+  assert.doesNotMatch(content, /name: "Purchase Orders", view: "retail-purchase-orders"/);
   assert.match(content, /name: "Stock", view: "stock"/);
+  assert.match(content, /name: "Stock Movements", view: "retail-movements"/);
+  assert.match(content, /retailTasksTitle: "งานค้าปลีก"/);
+  assert.match(content, /retailBuyingTitle: "ซื้อสต็อก"/);
+  assert.match(content, /retailInventoryTitle: "สต็อก"/);
+  assert.match(content, /retailSellingTitle: "ขายสต็อก"/);
+  assert.match(content, /name: "คิวงาน", view: "retail-task-queue"/);
+  assert.match(content, /name: "บันทึกเหตุการณ์", view: "retail-audit"/);
+  assert.match(content, /name: "รายการซื้อ", view: "retail-reorder"/);
   assert.match(content, /name: "สต็อก", view: "stock"/);
+  assert.match(content, /name: "การเคลื่อนไหวสต็อก", view: "retail-movements"/);
+  assert.match(zh, /"retailTasksTitle": "零售任务"/);
+  assert.match(zh, /"retailBuyingTitle": "采购库存"/);
+  assert.match(zh, /"retailInventoryTitle": "库存"/);
+  assert.match(zh, /"retailSellingTitle": "销售库存"/);
+  assert.match(zh, /"name": "任务队列",\s*"view": "retail-task-queue"/);
+  assert.match(zh, /"name": "审计",\s*"view": "retail-audit"/);
+  assert.match(zh, /"name": "购物清单",\s*"view": "retail-reorder"/);
   assert.match(zh, /"name": "库存",\s*"view": "stock"/);
+  assert.match(zh, /"name": "库存变动",\s*"view": "retail-movements"/);
   assert.match(
     content,
     /administration: \[\s*\{ icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" \},\s*\{ icon: UserGroupIcon, name: "Memberships", view: "memberships" \},\s*\{ icon: UserGroupIcon, name: "People", view: "people" \}/
@@ -51,6 +77,11 @@ test("admin access management exposes people, organisations, memberships, agents
   assert.match(dashboard, /view === "audit"/);
   assert.match(dashboard, /view === "memberships"/);
   assert.match(dashboard, /view === "settings"/);
+  assert.match(dashboard, /function AdminSessionBar/);
+  assert.match(dashboard, /context\.effectiveOrganisation\.name/);
+  assert.match(dashboard, /context\.effectiveOrganisation\.currency/);
+  assert.match(dashboard, /\/api\/admin\/impersonation\/stop/);
+  assert.doesNotMatch(accessView, /labels\.access\.session[\s\S]*context\.actorOrganisation\.name/);
   assert.match(accessView, /view === "access-agents"/);
   assert.match(accessView, /view === "audit"/);
   assert.match(accessView, /view === "memberships"/);
@@ -58,6 +89,9 @@ test("admin access management exposes people, organisations, memberships, agents
   assert.match(accessView, /labels\.access\.deleteInvitation/);
   assert.match(accessView, /labels\.access\.addMembership/);
   assert.match(accessView, /labels\.access\.addOrganisation/);
+  assert.match(accessView, /labels\.access\.country/);
+  assert.match(accessView, /productCountryOptions/);
+  assert.match(accessView, /name="countryCode"/);
   assert.match(accessView, /labels\.access\.deleted/);
   assert.match(accessView, /<option value="deleted">\{labels\.access\.deleted\}<\/option>/);
   assert.match(accessView, /labels\.contentPages\.deleteAction/);
@@ -86,6 +120,9 @@ test("admin access management exposes people, organisations, memberships, agents
   assert.match(accessView, /filteredMemberships/);
   assert.match(accessView, /canFilterMembershipOrganisations/);
   assert.match(accessView, /context\.effectiveOrganisation\.type === "platform"/);
+  assert.match(accessView, /const showOrganisationContext = context\.effectiveOrganisation\.type === "platform"/);
+  assert.match(accessView, /showOrganisationContext \? \([\s\S]*labels\.access\.organisation/);
+  assert.match(accessView, /showOrganisationContext \? \([\s\S]*labels\.access\.filterByOrganisation/);
   assert.match(accessView, /labels\.access\.filterByOrganisation/);
   assert.match(accessView, /setMembershipFilterOrganisationId/);
   assert.match(accessView, /setMembershipOrganisationId/);
@@ -93,6 +130,8 @@ test("admin access management exposes people, organisations, memberships, agents
   assert.match(accessView, /form=\{membershipFormId\}/);
   assert.match(accessView, /labels\.access\.filterByPerson/);
   assert.match(accessView, /setAuditPersonId/);
+  assert.match(content, /country: "Country"/);
+  assert.match(zh, /"country": "国家"/);
 });
 
 test("admin action buttons render as text buttons without decorative action icons", () => {
@@ -144,6 +183,41 @@ test("admin settings owns profile and logout controls", () => {
   assert.match(settingsView, /showRetailPeople/);
   assert.match(settingsView, /labels\.settings\.profile/);
   assert.match(settingsView, /labels\.settings\.account/);
+});
+
+test("platform task visibility shows organisation and assignee context", () => {
+  const service = source("lib/admin-execution.ts");
+  const view = source("components/admin/visibility-view.tsx");
+  const content = source("components/admin/dashboard-content.tsx");
+  const zh = source("components/admin/dashboard-content.zh-CN.json");
+
+  assert.match(service, /assignedToName: string \| null/);
+  assert.match(service, /assignedToType: "agent" \| "individual" \| "unassigned"/);
+  assert.match(service, /organisationName: string/);
+  assert.match(service, /organisations\.name as organisation_name/);
+  assert.match(service, /assigned_to_type/);
+  assert.match(view, /function taskAssigneeLabel/);
+  assert.match(view, /visibilityTaskGridClass/);
+  assert.match(view, /labels\.visibility\.priority/);
+  assert.match(view, /labels\.visibility\.age/);
+  assert.match(view, /row\.organisationName/);
+  assert.match(view, /labels\.visibility\.organisation/);
+  assert.match(view, /labels\.visibility\.assignee/);
+  assert.match(view, /const defaultVisibleTaskCount = data\.rows\.filter/);
+  assert.match(view, /return row\.status !== "completed"/);
+  assert.match(view, /value: formatNumber\(defaultVisibleTaskCount, locale\)/);
+  assert.match(content, /visibility: \{[\s\S]*total: "All"/);
+  assert.match(zh, /"visibility": \{[\s\S]*"total": "全部"/);
+  assert.match(content, /age: "Age"/);
+  assert.match(content, /assignee: "Assigned to"/);
+  assert.match(content, /organisation: "Organisation"/);
+  assert.match(content, /priority: "Priority"/);
+  assert.match(content, /unassigned: "Unassigned"/);
+  assert.match(zh, /"age": "时长"/);
+  assert.match(zh, /"assignee": "分配给"/);
+  assert.match(zh, /"organisation": "组织"/);
+  assert.match(zh, /"priority": "优先级"/);
+  assert.match(zh, /"unassigned": "未分配"/);
 });
 
 test("admin organisations hide type controls and expose only platform and retail roles", () => {
@@ -232,6 +306,11 @@ test("admin Chinese label overrides cover the expanded admin UI contract", () =>
     source("components/admin/dashboard-content.zh-CN.json")
   ) as {
     adminLanguage?: string;
+    governanceTitle?: string;
+    retailBuyingTitle?: string;
+    retailInventoryTitle?: string;
+    retailSellingTitle?: string;
+    retailTasksTitle?: string;
     settings?: Record<string, string>;
     communications?: Record<string, string>;
     stock?: Record<string, string>;
@@ -243,19 +322,67 @@ test("admin Chinese label overrides cover the expanded admin UI contract", () =>
   assert.equal(zh.settings?.profile, "个人资料");
   assert.equal(zh.settings?.account, "账户");
   assert.equal(zh.settings?.currency, "货币");
-  assert.equal(zh.stock?.title, "库存");
-  assert.equal(zh.stock?.addProduct, "添加产品");
+  assert.equal(zh.stock?.title, "可售产品");
+  assert.equal(zh.stock?.addProduct, "添加可售产品");
+  assert.equal(zh.stock?.addItem, "添加项目");
+  assert.equal(zh.stock?.backorderPolicy, "缺货预订策略");
+  assert.equal(zh.stock?.orderItems, "订购项目");
+  assert.equal(zh.stock?.exportCsv, "导出 CSV");
+  assert.equal(zh.stock?.inStock, "有库存");
+  assert.equal(zh.stock?.lowStock, "低库存");
+  assert.equal(zh.stock?.movementsTab, "变动");
+  assert.equal(zh.stock?.reorderTab, "补货");
+  assert.equal(zh.stock?.insightsTab, "洞察");
+  assert.equal(zh.stock?.taskQueue, "任务队列");
+  assert.equal(zh.stock?.claimedBy, "已领取");
+  assert.equal(zh.stock?.unclaimed, "未领取");
+  assert.equal(zh.stock?.review, "审核");
+  assert.equal(zh.stock?.purchaseOrderDetails, "采购单详情");
+  assert.equal(zh.stock?.purchaseOrderStatusPartial, "部分接收");
+  assert.equal(zh.stock?.purchaseOrderStatusVoid, "作废");
+  assert.equal(zh.stock?.voidPurchaseOrder, "作废采购单");
+  assert.equal(zh.stock?.taskDetails, "任务详情");
+  assert.equal(zh.stock?.addPurchaseOrder, "新建采购单");
+  assert.equal(zh.stock?.addCustomerOrder, "添加客户订单");
+  assert.equal(zh.stock?.customerOrderDetails, "客户订单详情");
+  assert.equal(zh.stock?.regionalCheckout, "区域结账");
+  assert.equal(zh.stock?.fastestDelivery, "最快配送");
+  assert.equal(zh.stock?.cheapestPrice, "最低价格");
+  assert.equal(zh.stock?.allocatedTo, "分配给");
+  assert.equal(zh.stock?.allocateAvailable, "分配可用库存");
+  assert.equal(zh.stock?.backToCustomerOrders, "返回客户订单");
+  assert.equal(zh.stock?.pipelineUnavailable, "库存管道不可用。请重新检查流程。");
+  assert.equal(zh.stock?.stockPipeline, "库存管道");
+  assert.equal(zh.stock?.customerDemand, "需求");
+  assert.equal(zh.stock?.availableNow, "当前可用");
+  assert.equal(zh.stock?.incomingPo, "在途采购单");
+  assert.equal(zh.stock?.draftPo, "采购单草稿");
+  assert.equal(zh.stock?.unorderedNeed, "未下单需求");
+  assert.equal(zh.stock?.buildDraftPo, "创建采购单草稿");
+  assert.equal(zh.stock?.recheckWorkflow, "重新检查流程");
+  assert.equal(zh.stock?.agentTasks, "代理任务");
+  assert.equal(zh.stock?.audit, "审计");
+  assert.equal(zh.stock?.event, "事件");
+  assert.equal(zh.stock?.receiveAll, "全部");
+  assert.equal(zh.governanceTitle, "目录");
+  assert.equal(zh.retailTasksTitle, "零售任务");
+  assert.equal(zh.retailBuyingTitle, "采购库存");
+  assert.equal(zh.retailInventoryTitle, "库存");
+  assert.equal(zh.retailSellingTitle, "销售库存");
 
   for (const key of [
     "agentSeen",
     "agentSession",
+    "assignee",
     "disconnected",
     "heartbeatStale",
     "leaseExpired",
     "liveUpdates",
     "noWorkerHeartbeat",
+    "organisation",
     "reservation",
-    "runtime"
+    "runtime",
+    "unassigned"
   ]) {
     assert.equal(typeof zh.visibility?.[key], "string", key);
     assert.notEqual(zh.visibility?.[key], "");
@@ -290,6 +417,8 @@ test("English admin performance navigation renders English labels", () => {
   assert.match(english, /name: "Financials", view: "financials"/);
   assert.match(english, /flowTitle: "Conversions"/);
   assert.match(english, /insightsTitle: "Insights"/);
+  assert.match(english, /governanceTitle: "Catalogue"/);
+  assert.doesNotMatch(english, /governanceTitle: "Safety"/);
   assert.doesNotMatch(english, /name: "(แดชบอร์ด|คอนเวอร์ชัน|การเงิน)"/);
   assert.doesNotMatch(english, /flowTitle: "คอนเวอร์ชัน"/);
   assert.doesNotMatch(english, /insightsTitle: "อินไซต์"/);
@@ -321,6 +450,8 @@ test("Thai admin navigation labels are localized for all top-level sections", ()
   assert.match(thai, /name: "เอเจนต์", view: "agents"/);
   assert.match(thai, /agents: "เอเจนต์"/);
   assert.match(thai, /visibility: "งาน"/);
+  assert.match(thai, /governanceTitle: "แค็ตตาล็อก"/);
+  assert.doesNotMatch(thai, /governanceTitle: "ความปลอดภัย"/);
   assert.doesNotMatch(thai, /name: "(Dashboard|Conversions|Financials|Tasks|Agents)"/);
   assert.doesNotMatch(thai, /insightsTitle: "Insights"/);
   assert.doesNotMatch(thai, /agents: "Agents"/);

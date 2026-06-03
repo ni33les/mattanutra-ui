@@ -9,6 +9,7 @@ import type {
 export type AdminAccessStatus = "active" | "deleted" | "disabled" | "invited";
 
 export type AdminOrganisation = Readonly<{
+  countryCode: string;
   currency: string;
   defaultLocale: Locale;
   id: string;
@@ -140,6 +141,7 @@ export type AdminSettingsPerson = Readonly<{
 
 export type AdminSettingsData = Readonly<{
   canEditOrganisation: boolean;
+  customerPriceMarginPercent: number;
   organisation: AdminOrganisation;
   people: AdminSettingsPerson[];
 }>;

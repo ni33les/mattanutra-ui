@@ -5,7 +5,8 @@ import { recordEmailCommunicationDelivery } from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
 import {
-  getProductRecommendationCandidates
+  getProductRecommendationCandidates,
+  getRetailerAwareProductRecommendationCandidateSets
 } from "@/lib/admin-products";
 import {
   defaultProductCountryCode,
@@ -2119,22 +2120,69 @@ async function applyProductRecommendationsResult(
   }
 
   if (variants.length < 1) {
-    const candidates = await getProductRecommendationCandidates({
+    const retailerCandidateSets =
+      await getRetailerAwareProductRecommendationCandidateSets({
+        countryCode,
+        includeIneligible: true,
+        sql
+      });
+    const candidates = retailerCandidateSets.length > 0
+      ? retailerCandidateSets.flatMap((set) => set.candidates)
+      : await getProductRecommendationCandidates({
       countryCode,
       includeIneligible: true
-    });
+        });
 
     variants = PRODUCT_STACK_VARIANT_CONFIGS.map((config) => ({
       maxProducts: config.maxProducts,
-      result: recommendProductStackFullBeam({
-        candidates,
-        countryCode,
-        clientSex,
-        maxProducts: config.maxProducts,
-        needs: initialResult.clientNeeds,
-        stackPreference: config.stackPreference,
-        targetProducts: config.targetProducts
-      }),
+      result: (() => {
+        const retailerResults = retailerCandidateSets.map((set) => {
+          const result = recommendProductStackFullBeam({
+            candidates: set.candidates,
+            countryCode,
+            clientSex,
+            maxProducts: config.maxProducts,
+            needs: initialResult.clientNeeds,
+            stackPreference: config.stackPreference,
+            targetProducts: config.targetProducts
+          });
+          const subtotalAmount = result.recommendations.reduce(
+            (total, item) =>
+              total + (item.unitPriceAmount ?? item.product.priceAmount ?? 0),
+            0
+          );
+          const etaDate = result.recommendations
+            .map((item) => item.etaDate ?? item.product.retailEtaDate ?? null)
+            .filter((value): value is string => Boolean(value))
+            .sort()
+            .at(-1) ?? null;
+
+          return {
+            etaDate,
+            result,
+            set,
+            subtotalAmount
+          };
+        });
+        const selected = [...retailerResults].sort((left, right) =>
+          right.result.supplementProductCoveragePercent -
+            left.result.supplementProductCoveragePercent ||
+          right.result.totalPlanCoveragePercent -
+            left.result.totalPlanCoveragePercent ||
+          left.subtotalAmount - right.subtotalAmount ||
+          (left.etaDate ?? "").localeCompare(right.etaDate ?? "")
+        )[0];
+
+        return selected?.result ?? recommendProductStackFullBeam({
+          candidates,
+          countryCode,
+          clientSex,
+          maxProducts: config.maxProducts,
+          needs: initialResult.clientNeeds,
+          stackPreference: config.stackPreference,
+          targetProducts: config.targetProducts
+        });
+      })(),
       stackPreference: config.stackPreference
     }));
   }

@@ -32,7 +32,9 @@
     "tasks:cleanup:legacy-plan-flow": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/cleanup-legacy-plan-flow-tasks.ts",
     "locales:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-locale-schema.ts",
     "payments:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-payment-schema.ts",
+    "retail-checkout:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-retail-checkout-schema.ts",
     "retail-stock:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-retail-stock-schema.ts",
+    "retail-stock:agent:seed": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/seed-retail-stock-planner-agent.ts",
     "admin-access:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-admin-access-schema.ts",
     "versions:core:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-core-versioned-model-schema.ts",
     "thai-tax:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-thai-tax-schema.ts",
@@ -62,6 +64,7 @@
     "worker:healthscore": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts healthscore",
     "worker:hosting": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts hosting",
     "worker:products": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts products",
+    "worker:stock": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts stock",
     "worker:supplement": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts supplement"
   },
   "dependencies": {
