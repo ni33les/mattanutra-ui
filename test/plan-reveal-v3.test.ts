@@ -22,6 +22,10 @@ const productClickTracking = readFileSync(
   new URL("../components/product-click-tracking.ts", import.meta.url),
   "utf8"
 );
+const productRecommendationsPanelCopy = readFileSync(
+  new URL("../components/product-recommendations-panel-copy.ts", import.meta.url),
+  "utf8"
+);
 const landingReveal = readFileSync(
   new URL("../components/landing-reveal.tsx", import.meta.url),
   "utf8"
@@ -35,6 +39,7 @@ const formulationRevealSources = [
 ].join("\n");
 const productRecommendationSources = [
   formulationResults,
+  productRecommendationsPanelCopy,
   productClickTracking
 ].join("\n");
 const assessmentFlow = readFileSync(
@@ -206,14 +211,16 @@ describe("plan reveal V3 migration", () => {
 
   it("keeps real product catalogue behavior and stack switching in the reveal design", () => {
     assert.match(formulationResults, /product\.imageUrl/);
-    assert.match(productRecommendationSources, /trackMarketplaceClick\(planId, product\)/);
-    assert.match(revealPage, /stack\?: string/);
+    assert.match(productRecommendationSources, /trackMarketplaceClick\(\s*planId:\s*string,\s*product:\s*RecommendedProduct\s*\)/);
+    assert.doesNotMatch(revealPage, /stack\?: string/);
     assert.match(revealPage, /initialStackPreference/);
     assert.match(formulationRevealSources, /planRevealStackHref/);
     assert.match(formulationResults, /replaceRevealStackUrl\(locale, planId, preference\)/);
     assert.doesNotMatch(formulationResults, /href=\{planRevealStackHref/);
     assert.match(formulationResults, /selectedProductStackPreference/);
-    assert.match(formulationResults, /useState<ProductStackPreference \| null>\(\(\) => initialStackPreference\)/);
+    assert.match(revealPage, /const initialStackPreference = "balanced"/);
+    assert.match(productRecommendationSources, /"balanced",\s*"compact"/);
+    assert.match(formulationResults, /defaultProductStackPreferenceForResult\(initialResult\)/);
     assert.match(formulationResults, /onProductStackPreferenceChange\(preference\)/);
     assert.match(formulationResults, /onProductStackPollingStart\(preference\)/);
     assert.match(formulationResults, /productStackLoading/);

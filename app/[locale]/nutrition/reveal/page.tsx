@@ -14,7 +14,6 @@ type NutritionRevealPageProps = Readonly<{
   }>;
   searchParams: Promise<{
     plan?: string;
-    stack?: string;
   }>;
 }>;
 
@@ -34,10 +33,9 @@ export default async function NutritionRevealPage({
 
   const locale: Locale = rawLocale;
   const dictionary = getDictionary(locale);
-  const { plan, stack } = await searchParams;
+  const { plan } = await searchParams;
   const planId = typeof plan === "string" && isUuid(plan) ? plan : "";
-  const initialStackPreference =
-    stack === "compact" || stack === "balanced" ? stack : null;
+  const initialStackPreference = "balanced";
 
   if (!planId) {
     redirect(nutritionQuizPath(locale));

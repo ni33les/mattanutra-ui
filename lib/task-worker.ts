@@ -1323,6 +1323,8 @@ export async function enqueueProductRecommendationsTask({
     product_catalog_updated_at: string | null;
     report_version: number;
     safety_review_state: unknown;
+    retail_catalogue_revision: unknown;
+    retail_catalogue_updated_at: string | null;
   }>>`
     select
       coalesce((
@@ -1361,6 +1363,56 @@ export async function enqueueProductRecommendationsTask({
           and availability_status <> 'unavailable'
       ) as product_catalog_updated_at,
       coalesce((
+        select jsonb_build_object(
+          'sellableCount', count(distinct retail_sellable_products.id),
+          'stockCount', count(distinct retail_product_stock.id),
+          'updatedAt', max(greatest(
+            retail_sellable_products.updated_at,
+            coalesce(retail_product_stock.updated_at, retail_sellable_products.updated_at),
+            coalesce(product_countries.updated_at, retail_sellable_products.updated_at),
+            coalesce(platform_organisation.updated_at, retail_sellable_products.updated_at)
+          ))
+        )
+        from public.retail_sellable_products
+        join public.organisations
+          on organisations.id = retail_sellable_products.organisation_id
+          and organisations.status = 'active'
+        left join public.retail_product_stock
+          on retail_product_stock.organisation_id = retail_sellable_products.organisation_id
+          and retail_product_stock.product_id = retail_sellable_products.product_id
+          and retail_product_stock.status <> 'deleted'
+        left join public.product_countries
+          on product_countries.product_id = retail_sellable_products.product_id
+          and product_countries.country_code = organisations.country_code
+        left join public.organisations platform_organisation
+          on lower(platform_organisation.slug) = 'mattanutra'
+          and platform_organisation.organisation_type = 'platform'
+        where retail_sellable_products.status <> 'deleted'
+      ), '{"sellableCount":0,"stockCount":0}'::jsonb) as retail_catalogue_revision,
+      (
+        select max(greatest(
+          retail_sellable_products.updated_at,
+          coalesce(retail_product_stock.updated_at, retail_sellable_products.updated_at),
+          coalesce(product_countries.updated_at, retail_sellable_products.updated_at),
+          coalesce(platform_organisation.updated_at, retail_sellable_products.updated_at)
+        ))::text
+        from public.retail_sellable_products
+        join public.organisations
+          on organisations.id = retail_sellable_products.organisation_id
+          and organisations.status = 'active'
+        left join public.retail_product_stock
+          on retail_product_stock.organisation_id = retail_sellable_products.organisation_id
+          and retail_product_stock.product_id = retail_sellable_products.product_id
+          and retail_product_stock.status <> 'deleted'
+        left join public.product_countries
+          on product_countries.product_id = retail_sellable_products.product_id
+          and product_countries.country_code = organisations.country_code
+        left join public.organisations platform_organisation
+          on lower(platform_organisation.slug) = 'mattanutra'
+          and platform_organisation.organisation_type = 'platform'
+        where retail_sellable_products.status <> 'deleted'
+      ) as retail_catalogue_updated_at,
+      coalesce((
         select jsonb_agg(
           jsonb_build_object(
             'closedAt', closed_at,
@@ -1395,7 +1447,8 @@ export async function enqueueProductRecommendationsTask({
         and coalesce(diagnostics ->> 'algorithmVersion', '') = ${matcherAlgorithmVersion}
         and generated_at >= greatest(
           coalesce(${row.formulation_generated_at}::timestamptz, '-infinity'::timestamptz),
-          coalesce(${row.product_catalog_updated_at}::timestamptz, '-infinity'::timestamptz)
+          coalesce(${row.product_catalog_updated_at}::timestamptz, '-infinity'::timestamptz),
+          coalesce(${row.retail_catalogue_updated_at}::timestamptz, '-infinity'::timestamptz)
         )
       order by generated_at desc
       limit 1
@@ -1662,9 +1715,18 @@ export async function enqueueMissingProductRecommendationsForReadyPlans({
   let queued = 0;
 
   for (const row of rows) {
-    const taskId = await enqueueProductRecommendationsTask({
-      planId: row.plan_id
-    });
+    let taskId: string | null = null;
+
+    try {
+      taskId = await enqueueProductRecommendationsTask({
+        planId: row.plan_id
+      });
+    } catch (error) {
+      console.warn("Unable to enqueue missing product recommendations task", {
+        error: error instanceof Error ? error.message : String(error),
+        planId: row.plan_id
+      });
+    }
 
     if (taskId) {
       queued += 1;

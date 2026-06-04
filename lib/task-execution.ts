@@ -17,8 +17,17 @@ import {
 } from "@/lib/nutrition-plan-advisor-analysis";
 import {
   PRODUCT_STACK_VARIANT_CONFIGS,
-  recommendProductStackFullBeam
+  recommendProductStackFullBeam,
+  type ProductRecommendationResult
 } from "@/lib/product-recommendations";
+import type { ProductRecommendationRetailerCandidateSet } from "@/lib/admin-products";
+import { executeRetailAgentCommand } from "@/lib/admin-retail-stock";
+import {
+  executeAdminCommunicationRouteTask,
+  executeCommunicationDispatchTask
+} from "@/lib/communications";
+import { getSql } from "@/lib/db";
+import { sendRetailOrderWorkflowEmailNow } from "@/lib/retail-order-workflow";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 import type { TaskWorkItem } from "@/lib/task-work-items";
 import type { SendTransactionalEmailResult } from "@/lib/smtp-email";
@@ -58,6 +67,103 @@ function localizedFallbackCard(
     body: localizedFallback(body),
     headline: localizedFallback(title)
   };
+}
+
+type RetailerRecommendationOption = Readonly<{
+  backorderCount: number;
+  currency: string;
+  etaDate: string | null;
+  organisationId: string;
+  organisationName: string;
+  productCount: number;
+  recommendations: ProductRecommendationResult;
+  subtotalAmount: number;
+  supplementProductCoveragePercent: number;
+  totalPlanCoveragePercent: number;
+  unavailableReason: string | null;
+}>;
+
+function latestEtaDate(values: readonly (string | null | undefined)[]) {
+  return values.filter((value): value is string => Boolean(value)).sort().at(-1) ?? null;
+}
+
+function compareNullableEta(left: string | null, right: string | null) {
+  if (left === right) {
+    return 0;
+  }
+
+  if (!left) {
+    return -1;
+  }
+
+  if (!right) {
+    return 1;
+  }
+
+  return left.localeCompare(right);
+}
+
+function retailerRecommendationSubtotal(result: ProductRecommendationResult) {
+  return result.recommendations.reduce(
+    (total, item) => total + (item.unitPriceAmount ?? item.product.priceAmount ?? 0),
+    0
+  );
+}
+
+function retailerRecommendationOption(input: Readonly<{
+  candidateSet: ProductRecommendationRetailerCandidateSet;
+  recommendations: ProductRecommendationResult;
+}>): RetailerRecommendationOption {
+  const selectedItems = input.recommendations.recommendations;
+  const etaDate = latestEtaDate(
+    selectedItems.map((item) => item.etaDate ?? item.product.retailEtaDate)
+  );
+
+  return {
+    backorderCount: selectedItems.filter((item) =>
+      (item.availabilityStatus ?? item.product.retailAvailabilityStatus) === "backorder"
+    ).length,
+    currency:
+      selectedItems.find((item) => item.product.currency)?.product.currency ??
+      input.candidateSet.currency,
+    etaDate,
+    organisationId: input.candidateSet.organisationId,
+    organisationName: input.candidateSet.organisationName,
+    productCount: selectedItems.length,
+    recommendations: input.recommendations,
+    subtotalAmount: retailerRecommendationSubtotal(input.recommendations),
+    supplementProductCoveragePercent:
+      input.recommendations.supplementProductCoveragePercent,
+    totalPlanCoveragePercent: input.recommendations.totalPlanCoveragePercent,
+    unavailableReason:
+      selectedItems.length > 0 ? null : "No retailer products matched the client needs."
+  };
+}
+
+function retailerOptionSummary(option: RetailerRecommendationOption) {
+  return {
+    backorderCount: option.backorderCount,
+    currency: option.currency,
+    etaDate: option.etaDate,
+    organisationId: option.organisationId,
+    organisationName: option.organisationName,
+    productCount: option.productCount,
+    subtotalAmount: option.subtotalAmount,
+    supplementProductCoveragePercent: option.supplementProductCoveragePercent,
+    totalPlanCoveragePercent: option.totalPlanCoveragePercent,
+    unavailableReason: option.unavailableReason
+  };
+}
+
+function selectRetailerRecommendationOption(
+  options: readonly RetailerRecommendationOption[]
+) {
+  return [...options].sort((left, right) =>
+    right.supplementProductCoveragePercent - left.supplementProductCoveragePercent ||
+    right.totalPlanCoveragePercent - left.totalPlanCoveragePercent ||
+    left.subtotalAmount - right.subtotalAmount ||
+    compareNullableEta(left.etaDate, right.etaDate)
+  )[0] ?? null;
 }
 
 function deterministicPaywallFeatures(
@@ -340,6 +446,72 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
     };
   }
 
+  if (workItem.taskType === "send_retail_order_workflow_email") {
+    const sql = getSql();
+
+    if (!sql) {
+      throw new Error("Retail order email task cannot run without a database");
+    }
+
+    const delivery = await sendRetailOrderWorkflowEmailNow({
+      event: workItem.event,
+      locale: workItem.locale,
+      orderId: workItem.orderId,
+      paymentId: workItem.paymentId,
+      planId: workItem.planId,
+      sql
+    });
+
+    return {
+      emailType: `retail_order_${workItem.event}`,
+      orderId: workItem.orderId,
+      paymentId: workItem.paymentId,
+      planId: workItem.planId,
+      reason: delivery.reason,
+      sent: delivery.sent,
+      taskId: workItem.taskId
+    };
+  }
+
+  if (workItem.taskType === "route_admin_communication") {
+    const routed = await executeAdminCommunicationRouteTask({
+      body: workItem.body,
+      channelType: workItem.channelType,
+      eventKey: workItem.eventKey,
+      metadata: workItem.metadata,
+      organisationId: workItem.organisationId,
+      resourceId: workItem.resourceId,
+      resourceType: workItem.resourceType,
+      subject: workItem.subject,
+      taskId: workItem.taskId
+    });
+
+    return {
+      dispatchTaskCount: routed.dispatchTasks.length,
+      messageCount: routed.messages.length,
+      messageIds: routed.messages.map((message) => message.id),
+      organisationId: workItem.organisationId
+    };
+  }
+
+  if (
+    workItem.taskType === "dispatch_chat_communication_message" ||
+    workItem.taskType === "dispatch_email_communication_message"
+  ) {
+    const dispatch = await executeCommunicationDispatchTask({
+      messageId: workItem.messageId
+    });
+
+    return {
+      attempted: dispatch.attempted,
+      messageId: dispatch.message.id,
+      organisationId: workItem.organisationId,
+      provider: dispatch.provider,
+      reason: dispatch.reason,
+      status: dispatch.message.status
+    };
+  }
+
   if (workItem.taskType === "client_safety_followup") {
     return { accepted: true };
   }
@@ -385,18 +557,37 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
 
   if (workItem.taskType === "generate_product_recommendations") {
     const matcherStartedAt = Date.now();
+    const retailerCandidateSets = workItem.retailerCandidateSets ?? [];
     const recommendationVariants = PRODUCT_STACK_VARIANT_CONFIGS.map((config) => {
       const variantStartedAt = Date.now();
-      const recommendations = recommendProductStackFullBeam({
-        candidates: workItem.candidates,
-        clientContext: workItem.clientContext,
-        clientSex: workItem.clientSex,
-        countryCode: workItem.countryCode,
-        maxProducts: config.maxProducts,
-        needs: workItem.needs,
-        stackPreference: config.stackPreference,
-        targetProducts: config.targetProducts
-      });
+      const retailerOptions = retailerCandidateSets.map((candidateSet) =>
+        retailerRecommendationOption({
+          candidateSet,
+          recommendations: recommendProductStackFullBeam({
+            candidates: candidateSet.candidates,
+            clientContext: workItem.clientContext,
+            clientSex: workItem.clientSex,
+            countryCode: workItem.countryCode,
+            maxProducts: config.maxProducts,
+            needs: workItem.needs,
+            stackPreference: config.stackPreference,
+            targetProducts: config.targetProducts
+          })
+        })
+      );
+      const selectedRetailerOption =
+        selectRetailerRecommendationOption(retailerOptions);
+      const recommendations = selectedRetailerOption?.recommendations ??
+        recommendProductStackFullBeam({
+          candidates: workItem.candidates,
+          clientContext: workItem.clientContext,
+          clientSex: workItem.clientSex,
+          countryCode: workItem.countryCode,
+          maxProducts: config.maxProducts,
+          needs: workItem.needs,
+          stackPreference: config.stackPreference,
+          targetProducts: config.targetProducts
+        });
       const variantMatcherMs = Date.now() - variantStartedAt;
 
       return {
@@ -405,10 +596,15 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
           ...recommendations,
           diagnostics: {
             ...recommendations.diagnostics,
+            retailerOptions: retailerOptions.map(retailerOptionSummary),
+            selectedRetailer: selectedRetailerOption
+              ? retailerOptionSummary(selectedRetailerOption)
+              : null,
             stackPreference: config.stackPreference,
             trace: {
               ...recommendations.diagnostics.trace,
               maxProducts: config.maxProducts,
+              retailerCandidateSetCount: retailerCandidateSets.length,
               targetProducts: config.targetProducts,
               timingMs: {
                 ...(recommendations.diagnostics.trace?.timingMs ?? {}),
@@ -475,6 +671,45 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
       digitalOcean,
       projectNames: workItem.projectNames
     };
+  }
+
+  if (workItem.taskType === "retail_stock_forecast_refresh") {
+    return executeRetailAgentCommand({
+      organisationId: workItem.organisationId,
+      payload: {
+        productId: workItem.productId,
+        source: workItem.source,
+        stockId: workItem.stockId
+      },
+      sourceEntityId: workItem.stockId,
+      sourceEntityType: "retail_product_stock",
+      taskId: workItem.taskId,
+      taskType: workItem.taskType
+    });
+  }
+
+  if (workItem.taskType.startsWith("retail_")) {
+    const retailWorkItem = workItem as Extract<
+      TaskWorkItem,
+      { organisationId: string }
+    >;
+
+    if (!("taskId" in retailWorkItem)) {
+      throw new Error(`Retail task ${workItem.taskType} is missing a task id`);
+    }
+
+    return executeRetailAgentCommand({
+      organisationId: retailWorkItem.organisationId,
+      payload: "payload" in retailWorkItem ? retailWorkItem.payload : {},
+      sourceEntityId: "sourceEntityId" in retailWorkItem
+        ? retailWorkItem.sourceEntityId
+        : null,
+      sourceEntityType: "sourceEntityType" in retailWorkItem
+        ? retailWorkItem.sourceEntityType
+        : null,
+      taskId: retailWorkItem.taskId,
+      taskType: retailWorkItem.taskType
+    });
   }
 
   throw new Error(`Unsupported task type: ${workItem.taskType}`);

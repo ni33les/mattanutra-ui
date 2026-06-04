@@ -39,6 +39,29 @@ export function toRecommendedProduct(
             currency: selection.product.currency || "THB"
           }
         : null,
+    retailer: selection.selectedRetailerOrganisationId ||
+      selection.product.selectedRetailerOrganisationId
+      ? {
+          availabilityStatus:
+            selection.availabilityStatus ??
+            selection.product.retailAvailabilityStatus ??
+            null,
+          etaDate: selection.etaDate ?? selection.product.retailEtaDate ?? null,
+          organisationId:
+            selection.selectedRetailerOrganisationId ??
+            selection.product.selectedRetailerOrganisationId ??
+            null,
+          retailSellableProductId:
+            selection.retailSellableProductId ??
+            selection.product.retailSellableProductId ??
+            null,
+          unitPriceAmount:
+            selection.unitPriceAmount ??
+            selection.product.unitPriceAmount ??
+            selection.product.priceAmount ??
+            null
+        }
+      : null,
     priority: selection.rank,
     productCoveragePercent: selection.productCoveragePercent,
     productId: selection.product.id,

@@ -170,26 +170,26 @@ export function AdminFinancialsView({
     {
       color: businessMetricColors.total,
       format: "currency",
-      id: "totalCost",
-      label: `${labels.financials.totalCost} (USD)`,
-      series: data.series.totalCost,
-      value: formatMoneyNumber(data.summary.totalCostUsd, locale)
+      id: "revenue",
+      label: "Revenue (USD)",
+      series: data.series.revenue,
+      value: formatMoneyNumber(data.summary.revenueUsd, locale)
     },
     {
-      color: businessMetricColors.healthScoreViews,
+      color: businessMetricColors.queued,
       format: "currency",
-      id: "aiCost",
-      label: `${labels.financials.aiCost} (USD)`,
-      series: data.series.aiCost,
-      value: formatMoneyNumber(data.summary.aiCostUsd, locale)
+      id: "payout",
+      label: "Payouts (USD)",
+      series: data.series.payout,
+      value: formatMoneyNumber(data.summary.payoutUsd, locale)
     },
     {
       color: businessMetricColors.contentScheduled,
       format: "currency",
-      id: "hostingCost",
-      label: `${labels.financials.hostingCost} (USD)`,
-      series: data.series.hostingCost,
-      value: formatMoneyNumber(data.summary.hostingCostUsd, locale)
+      id: "operatingCost",
+      label: "Operating costs (USD)",
+      series: data.series.operatingCost,
+      value: formatMoneyNumber(data.summary.operatingCostUsd, locale)
     },
     {
       color: businessMetricColors.queued,
@@ -200,7 +200,7 @@ export function AdminFinancialsView({
     }
   ];
   const [selectedMetricId, setSelectedMetricId] =
-    useState<AdminFinancialMetricId>("totalCost");
+    useState<AdminFinancialMetricId>("revenue");
   const [selectedRow, setSelectedRow] =
     useState<AdminFinancialTransactionRow | null>(null);
   const selectedMetric =
@@ -236,7 +236,7 @@ export function AdminFinancialsView({
               <thead>
                 <tr>
                   <th
-                    className="py-3.5 pr-3 text-left text-sm font-semibold text-gray-900"
+                    className="py-3.5 pl-5 pr-3 text-left text-sm font-semibold text-gray-900"
                     scope="col"
                   >
                     {labels.financials.time}
@@ -260,20 +260,29 @@ export function AdminFinancialsView({
                     {labels.financials.entryType}
                   </th>
                   <th
-                    className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
+                    className="py-3.5 pl-3 pr-5 text-right text-sm font-semibold text-gray-900"
                     scope="col"
                   >
                     {labels.financials.usd}
-                  </th>
-                  <th className="py-3.5 pl-3 text-right" scope="col">
-                    <span className="sr-only">{labels.financials.details}</span>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {data.rows.map((row) => (
-                  <tr key={row.id}>
-                    <td className="whitespace-nowrap py-4 pr-3 text-sm text-gray-500">
+                  <tr
+                    className="cursor-pointer hover:bg-emerald-50/40 focus:bg-emerald-50/60 focus:outline-none"
+                    key={row.id}
+                    onClick={() => setSelectedRow(row)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedRow(row);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <td className="whitespace-nowrap py-4 pl-5 pr-3 text-sm text-gray-500">
                       {formatGeneratedAt(row.occurredAt, locale)}
                     </td>
                     <td className="min-w-96 px-3 py-4 text-sm">
@@ -299,17 +308,8 @@ export function AdminFinancialsView({
                         {readableToken(row.entryType)}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-semibold text-gray-900">
+                    <td className="whitespace-nowrap py-4 pl-3 pr-5 text-right text-sm font-semibold text-gray-900">
                       {formatMoney(row.amountUsd, "USD", locale)}
-                    </td>
-                    <td className="whitespace-nowrap py-4 pl-3 text-right text-sm font-medium">
-                      <button
-                        className="text-[#1FA77A] hover:text-[#126B4F]"
-                        onClick={() => setSelectedRow(row)}
-                        type="button"
-                      >
-                        {labels.financials.details}
-                      </button>
                     </td>
                   </tr>
                 ))}

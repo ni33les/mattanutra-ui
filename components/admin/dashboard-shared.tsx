@@ -57,6 +57,7 @@ export function adminHref(
   view: AdminDashboardView,
   filters?: AdminDashboardFilters,
   state?: Readonly<{
+    orderId?: string | null;
     reviewTaskId?: string | null;
     taskId?: string | null;
   }>
@@ -82,6 +83,10 @@ export function adminHref(
 
   if (state?.taskId) {
     params.set("task", state.taskId);
+  }
+
+  if (state?.orderId) {
+    params.set("order", state.orderId);
   }
 
   return `/${locale}/admin/dashboard?${params.toString()}`;
@@ -352,6 +357,7 @@ export function AdminLocaleSwitcher({
   filters,
   labels,
   locale,
+  orderId,
   range,
   reviewTaskId,
   taskId,
@@ -361,6 +367,7 @@ export function AdminLocaleSwitcher({
   filters: AdminDashboardFilters;
   labels: AdminContent;
   locale: Locale;
+  orderId?: string | null;
   range: AdminDashboardRange;
   reviewTaskId?: string | null;
   taskId?: string | null;
@@ -376,6 +383,7 @@ export function AdminLocaleSwitcher({
             adminLocaleTextClass(localeCode, "label")
           )}
           href={adminHref(localeCode, accessToken, range, view, filters, {
+            orderId,
             reviewTaskId,
             taskId
           })}
@@ -555,6 +563,39 @@ export function SidebarContent({
             accessToken={accessToken}
             allowedViews={allowedViews}
             filters={filters}
+            items={labels.retailSellingNavigation}
+            locale={locale}
+            onNavigate={rememberSidebarScroll}
+            range={range}
+            title={labels.retailSellingTitle}
+            view={view}
+          />
+          <SidebarNavList
+            accessToken={accessToken}
+            allowedViews={allowedViews}
+            filters={filters}
+            items={labels.retailInventoryNavigation}
+            locale={locale}
+            onNavigate={rememberSidebarScroll}
+            range={range}
+            title={labels.retailInventoryTitle}
+            view={view}
+          />
+          <SidebarNavList
+            accessToken={accessToken}
+            allowedViews={allowedViews}
+            filters={filters}
+            items={labels.retailBuyingNavigation}
+            locale={locale}
+            onNavigate={rememberSidebarScroll}
+            range={range}
+            title={labels.retailBuyingTitle}
+            view={view}
+          />
+          <SidebarNavList
+            accessToken={accessToken}
+            allowedViews={allowedViews}
+            filters={filters}
             items={labels.insights}
             locale={locale}
             onNavigate={rememberSidebarScroll}
@@ -609,6 +650,7 @@ export type BusinessMetricColorId =
   | "contentScheduled"
   | "conversionRate"
   | "converted"
+  | "freeRequests"
   | "active"
   | "blocked"
   | "completed"
@@ -657,6 +699,7 @@ export const businessMetricColors = {
   paused: "#F59E0B",
   pendingReviews: "#F59E0B",
   precisionConversions: "#126B4F",
+  productOrders: "#0F766E",
   processing: "#3A7BD5",
   proConversions: "#111827",
   queued: "#0EA5E9",
@@ -913,6 +956,7 @@ export function readableToken(value: string) {
   }
 
   return value
+    .replaceAll(".", " ")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

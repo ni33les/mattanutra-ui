@@ -34,20 +34,26 @@ export type SupplementSelectionProjection = Readonly<{
 }>;
 
 export type ProductDecisionProjection = Readonly<{
+  availabilityStatus: string | null;
   coveredNeeds: unknown[];
   currency: string;
   dedupeKey: string;
+  etaDate: string | null;
   offerId: string | null;
   outcome: ProductDecisionOutcome;
   priceAmount: number | null;
+  priceSource: string | null;
   productCoveragePercent: number | null;
   productId: string;
   productTitle: string;
   rank: number | null;
   reason: string | null;
+  retailSellableProductId: string | null;
   score: number | null;
+  selectedRetailerOrganisationId: string | null;
   servingMultiplier: number;
   stackContributionPercent: number | null;
+  unitPriceAmount: number | null;
   unknownAtRecommendation: boolean;
   urlUsed: string | null;
 }>;
@@ -294,20 +300,32 @@ export function productDecisionRowsFromRecommendationResult(
   for (const item of result.recommendations) {
     chosenProductIds.add(item.product.id);
     rows.push({
+      availabilityStatus:
+        item.availabilityStatus ?? item.product.retailAvailabilityStatus ?? null,
       coveredNeeds: [...item.coveredNeeds],
       currency: item.product.currency || "THB",
       dedupeKey: productDecisionDedupeKey("chosen", item.product.id),
+      etaDate: item.etaDate ?? item.product.retailEtaDate ?? null,
       offerId: item.offerId,
       outcome: "chosen",
       priceAmount: item.product.priceAmount ?? null,
+      priceSource: item.priceSource ?? item.product.priceSource ?? null,
       productCoveragePercent: item.productCoveragePercent,
       productId: item.product.id,
       productTitle: item.product.title,
       rank: item.rank,
       reason: null,
+      retailSellableProductId:
+        item.retailSellableProductId ?? item.product.retailSellableProductId ?? null,
       score: item.score,
+      selectedRetailerOrganisationId:
+        item.selectedRetailerOrganisationId ??
+        item.product.selectedRetailerOrganisationId ??
+        null,
       servingMultiplier: Math.max(1, Math.round(item.servingMultiplier || 1)),
       stackContributionPercent: item.stackContributionPercent,
+      unitPriceAmount:
+        item.unitPriceAmount ?? item.product.unitPriceAmount ?? item.product.priceAmount ?? null,
       unknownAtRecommendation: item.unknownAtRecommendation,
       urlUsed: item.url
     });
@@ -321,20 +339,26 @@ export function productDecisionRowsFromRecommendationResult(
     }
 
     rows.push({
+      availabilityStatus: null,
       coveredNeeds: [],
       currency: "THB",
       dedupeKey: productDecisionDedupeKey("near_miss", item.productId),
+      etaDate: null,
       offerId: null,
       outcome: "near_miss",
       priceAmount: null,
+      priceSource: null,
       productCoveragePercent: item.coveragePercent,
       productId: item.productId,
       productTitle: item.title,
       rank: null,
       reason: item.reason,
+      retailSellableProductId: null,
       score: null,
+      selectedRetailerOrganisationId: null,
       servingMultiplier: 1,
       stackContributionPercent: null,
+      unitPriceAmount: null,
       unknownAtRecommendation: false,
       urlUsed: null
     });
@@ -364,20 +388,26 @@ function productDecisionRowFromExclusion(
   item: ProductRecommendationExclusion
 ): ProductDecisionProjection {
   return {
+    availabilityStatus: null,
     coveredNeeds: [],
     currency: "THB",
     dedupeKey: productDecisionDedupeKey("rejected", item.productId, item.reason),
+    etaDate: null,
     offerId: null,
     outcome: "rejected",
     priceAmount: null,
+    priceSource: null,
     productCoveragePercent: null,
     productId: item.productId,
     productTitle: item.title,
     rank: null,
     reason: item.reason,
+    retailSellableProductId: null,
     score: null,
+    selectedRetailerOrganisationId: null,
     servingMultiplier: 1,
     stackContributionPercent: null,
+    unitPriceAmount: null,
     unknownAtRecommendation: false,
     urlUsed: null
   };
@@ -421,17 +451,23 @@ export function productDecisionRowsFromStoredRun(input: Readonly<{
   diagnostics: unknown;
   exclusions: unknown;
   items: ReadonlyArray<{
+    availability_status?: string | null;
     covered_needs: unknown;
     currency: string | null;
+    eta_date?: string | null;
     offer_id: string | null;
     price_amount: number | string | null;
+    price_source?: string | null;
     product_coverage_percent: number | string | null;
     product_id: string;
     product_title: string;
     rank: number | string | null;
+    retail_sellable_product_id?: string | null;
     score: number | string | null;
+    selected_retailer_organisation_id?: string | null;
     serving_multiplier: number | string | null;
     stack_contribution_percent: number | string | null;
+    unit_price_amount?: number | string | null;
     unknown_at_recommendation: boolean | null;
     url_used: string | null;
   }>;
@@ -440,23 +476,30 @@ export function productDecisionRowsFromStoredRun(input: Readonly<{
     const productId = item.product_id;
 
     return {
+      availabilityStatus: item.availability_status ?? null,
       coveredNeeds: Array.isArray(item.covered_needs) ? item.covered_needs : [],
       currency: item.currency || "THB",
       dedupeKey: productDecisionDedupeKey("chosen", productId),
+      etaDate: item.eta_date ?? null,
       offerId: item.offer_id,
       outcome: "chosen" as const,
       priceAmount: numberOrNull(item.price_amount),
+      priceSource: item.price_source ?? null,
       productCoveragePercent: numberOrNull(item.product_coverage_percent),
       productId,
       productTitle: item.product_title,
       rank: numberOrNull(item.rank),
       reason: null,
+      retailSellableProductId: item.retail_sellable_product_id ?? null,
       score: numberOrNull(item.score),
+      selectedRetailerOrganisationId:
+        item.selected_retailer_organisation_id ?? null,
       servingMultiplier: Math.max(
         1,
         Math.round(numberOrNull(item.serving_multiplier) ?? 1)
       ),
       stackContributionPercent: numberOrNull(item.stack_contribution_percent),
+      unitPriceAmount: numberOrNull(item.unit_price_amount),
       unknownAtRecommendation: item.unknown_at_recommendation === true,
       urlUsed: item.url_used
     };

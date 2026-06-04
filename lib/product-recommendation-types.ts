@@ -73,9 +73,16 @@ export type ProductCandidate = Readonly<{
   productKind?: ProductKind | null;
   validation?: ValidationResult | null;
   priceAmount?: number | null;
+  priceSource?: "master_list_country_rrp_margin" | "retail_override" | null;
   productDataExpiresAt?: string | null;
   productUrl: string;
   region: string;
+  retailAvailabilityStatus?: "available_now" | "backorder" | "unavailable" | null;
+  retailEtaDate?: string | null;
+  retailSellableProductId?: string | null;
+  selectedRetailerName?: string | null;
+  selectedRetailerOrganisationId?: string | null;
+  unitPriceAmount?: number | null;
   title: string;
   translations?: Record<string, {
     description?: string | null;
@@ -131,12 +138,19 @@ export type ProductRecommendationSelection = Readonly<{
   affiliate: boolean;
   offerId: string | null;
   coveredNeeds: ProductRecommendationNeed[];
+  availabilityStatus?: "available_now" | "backorder" | "unavailable" | null;
+  etaDate?: string | null;
+  priceSource?: "master_list_country_rrp_margin" | "retail_override" | null;
   product: ProductCandidate;
   productCoveragePercent: number;
   rank: number;
+  retailSellableProductId?: string | null;
   score: number;
+  selectedRetailerName?: string | null;
+  selectedRetailerOrganisationId?: string | null;
   servingMultiplier: number;
   stackContributionPercent: number;
+  unitPriceAmount?: number | null;
   url: string;
   unknownAtRecommendation: boolean;
   why: string;

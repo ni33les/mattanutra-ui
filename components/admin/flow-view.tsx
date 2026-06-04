@@ -30,10 +30,14 @@ export function AdminFlowView({
   labels: AdminContent;
   locale: Locale;
 }>) {
-  const freeSeries = flowNodeSeries(flowData, "freeEmailRequested");
   const precisionSeries = flowNodeSeries(flowData, "precisionPaid");
   const proSeries = flowNodeSeries(flowData, "proPaid");
-  const convertedSeries = combinedSeries(freeSeries, precisionSeries, proSeries);
+  const productOrderSeries = flowNodeSeries(flowData, "retailOrderCreated");
+  const convertedSeries = combinedSeries(
+    precisionSeries,
+    proSeries,
+    productOrderSeries
+  );
   const healthScoreSeries = flowNodeSeries(flowData, "healthscoreViewed");
   const conversionRateSeries = percentageMetricSeries(
     convertedSeries,

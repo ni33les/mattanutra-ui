@@ -626,7 +626,7 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.match(result.recommendations[0]?.why ?? "", /Use 3 servings/i);
   });
 
-  it("does not multiply a label dose when serving metadata is missing", () => {
+  it("can multiply comparable curated facts when serving metadata is missing", () => {
     const result = recommendProductStackFullBeam({
       candidates: [
         product({
@@ -640,9 +640,9 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     });
 
     assert.equal(result.recommendations[0]?.product.id, "low-dose-no-serving");
-    assert.equal(result.recommendations[0]?.servingMultiplier, 1);
-    assert.equal(result.recommendations[0]?.productCoveragePercent, 25);
-    assert.doesNotMatch(result.recommendations[0]?.why ?? "", /Use 2|Use 3/i);
+    assert.equal(result.recommendations[0]?.servingMultiplier, 3);
+    assert.equal(result.recommendations[0]?.productCoveragePercent, 75);
+    assert.match(result.recommendations[0]?.why ?? "", /Use 3 servings/i);
   });
 
   it("does not treat an undosed ingredient name as coverage when the formula has a target dose", () => {

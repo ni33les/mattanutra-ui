@@ -35,6 +35,14 @@ import { configuredGrokModel, configuredGrokValue } from "@/lib/grok-client";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 import { siteBaseUrl } from "@/lib/site-url";
 import { normalizeCapabilities } from "@/lib/task-service-utils";
+import {
+  defaultProductCountryCode,
+  normalizeProductCountryCode
+} from "@/lib/product-countries";
+import {
+  getCustomerPriceMarginPercent,
+  normalizeCustomerPriceMarginPercent
+} from "@/lib/customer-pricing";
 import type {
   AdminAccessData,
   AdminAccessStatus,
@@ -358,6 +366,8 @@ function person(row: {
 }
 
 function organisation(row: {
+  country_code?: string | null;
+  currency?: string | null;
   default_locale: string;
   id: string;
   name: string;
@@ -365,7 +375,17 @@ function organisation(row: {
   slug: string;
   status: string;
 }): AdminOrganisation {
+  const organisationType = row.organisation_type === "platform" ? "platform" : "tenant";
+  const currency = row.currency?.trim().toUpperCase() ?? "";
+
   return {
+    countryCode:
+      normalizeProductCountryCode(row.country_code) ?? defaultProductCountryCode,
+    currency: /^[A-Z]{3}$/.test(currency)
+      ? currency
+      : organisationType === "platform"
+        ? "USD"
+        : "THB",
     defaultLocale: localeValue(row.default_locale),
     id: row.id,
     name: row.name,
@@ -374,8 +394,33 @@ function organisation(row: {
       row.status === "active" || row.status === "archived" || row.status === "disabled"
         ? row.status
         : "disabled",
-    type: row.organisation_type === "platform" ? "platform" : "tenant"
+    type: organisationType
   };
+}
+
+function normalOrganisationCurrency(
+  value: string | null | undefined,
+  type: AdminOrganisationType
+) {
+  const fallback = type === "platform" ? "USD" : "THB";
+  const currency = value?.trim().toUpperCase() || fallback;
+
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    throw new Error("Currency must be a three-letter ISO-4217 code");
+  }
+
+  return currency;
+}
+
+function normalOrganisationCountry(value: string | null | undefined) {
+  const countryCode =
+    normalizeProductCountryCode(value) ?? defaultProductCountryCode;
+
+  if (!countryCode) {
+    throw new Error("Country must be a supported two-letter country code");
+  }
+
+  return countryCode;
 }
 
 function membership(row: {
@@ -521,6 +566,8 @@ async function personBelongsToOrganisation(
 
 async function platformOrganisation(sql: Db) {
   const rows = await sql<Array<{
+    country_code: string | null;
+    currency: string | null;
     default_locale: string;
     id: string;
     name: string;
@@ -533,17 +580,21 @@ async function platformOrganisation(sql: Db) {
       name,
       organisation_type,
       status,
-      default_locale
+      default_locale,
+      country_code,
+      currency
     )
     values (
       ${defaultPlatformOrgSlug},
       'MattaNutra',
       'platform',
       'active',
-      'en'
+      'en',
+      ${defaultProductCountryCode},
+      'USD'
     )
     on conflict do nothing
-    returning id::text, slug, name, organisation_type, status, default_locale
+    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency
   `;
 
   if (rows[0]) {
@@ -551,6 +602,8 @@ async function platformOrganisation(sql: Db) {
   }
 
   const existing = await sql<Array<{
+    country_code: string | null;
+    currency: string | null;
     default_locale: string;
     id: string;
     name: string;
@@ -558,7 +611,7 @@ async function platformOrganisation(sql: Db) {
     slug: string;
     status: string;
   }>>`
-    select id::text, slug, name, organisation_type, status, default_locale
+    select id::text, slug, name, organisation_type, status, default_locale, country_code, currency
     from public.organisations
     where lower(slug) = ${defaultPlatformOrgSlug}
     limit 1
@@ -1684,6 +1737,8 @@ export async function getAdminAccessData(
   const [organisations, people, memberships, invitations, auditEvents, agents] =
     await Promise.all([
       sql<Array<{
+        country_code: string | null;
+        currency: string | null;
         default_locale: string;
         id: string;
         name: string;
@@ -1691,7 +1746,7 @@ export async function getAdminAccessData(
         slug: string;
         status: string;
       }>>`
-        select id::text, slug, name, organisation_type, status, default_locale
+        select id::text, slug, name, organisation_type, status, default_locale, country_code, currency
         from public.organisations
         ${organisationScope}
         order by organisation_type asc, lower(name) asc
@@ -1921,14 +1976,17 @@ export async function getAdminSettingsData(
   const sql = await sqlOrThrow();
   const [organisationRows, peopleRows] = await Promise.all([
     sql<Array<{
+      country_code: string | null;
+      currency: string | null;
       default_locale: string;
       id: string;
+      metadata: unknown;
       name: string;
       organisation_type: string;
       slug: string;
       status: string;
     }>>`
-      select id::text, slug, name, organisation_type, status, default_locale
+      select id::text, slug, name, organisation_type, status, default_locale, country_code, currency, metadata
       from public.organisations
       where id = ${context.effectiveOrganisation.id}::uuid
       limit 1
@@ -1964,11 +2022,27 @@ export async function getAdminSettingsData(
   const currentOrganisation = organisationRows[0]
     ? organisation(organisationRows[0])
     : context.effectiveOrganisation;
+  const canEditCustomerPriceMargin =
+    !context.isLegacy &&
+    currentOrganisation.type === "platform" &&
+    (
+      context.effectiveMembership.role === "platform_owner" ||
+      context.effectiveMembership.role === "platform_admin"
+    );
 
   return {
+    canEditCustomerPriceMargin,
     canEditOrganisation:
-      currentOrganisation.type === "tenant" &&
-      context.effectiveMembership.role === "retail_admin",
+      !context.isLegacy &&
+      (
+        context.effectiveMembership.role === "platform_owner" ||
+        context.effectiveMembership.role === "platform_admin" ||
+        (
+          currentOrganisation.type === "tenant" &&
+          context.effectiveMembership.role === "retail_admin"
+        )
+      ),
+    customerPriceMarginPercent: await getCustomerPriceMarginPercent({ sql }),
     organisation: currentOrganisation,
     people: peopleRows.map((row) => ({
       displayName: row.display_name,
@@ -1993,18 +2067,28 @@ export async function getAdminSettingsData(
 }
 
 export async function createOrganisation({
+  actor,
+  countryCode,
+  currency,
   defaultLocale,
   name,
   slug,
   type
 }: Readonly<{
+  actor?: AdminSessionContext | null;
+  countryCode?: string | null;
+  currency?: string | null;
   defaultLocale: Locale;
   name: string;
   slug: string;
   type: AdminOrganisationType;
 }>) {
   const sql = await sqlOrThrow();
+  const normalizedCountryCode = normalOrganisationCountry(countryCode);
+  const normalizedCurrency = normalOrganisationCurrency(currency, type);
   const rows = await sql<Array<{
+    country_code: string | null;
+    currency: string | null;
     default_locale: string;
     id: string;
     name: string;
@@ -2017,28 +2101,58 @@ export async function createOrganisation({
       name,
       organisation_type,
       status,
-      default_locale
+      default_locale,
+      country_code,
+      currency
     )
     values (
       ${slug.trim().toLowerCase()},
       ${name.trim()},
       ${type},
       'active',
-      ${defaultLocale}
+      ${defaultLocale},
+      ${normalizedCountryCode},
+      ${normalizedCurrency}
     )
-    returning id::text, slug, name, organisation_type, status, default_locale
+    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency
   `;
 
-  return rows[0] ? organisation(rows[0]) : null;
+  const savedOrganisation = rows[0] ? organisation(rows[0]) : null;
+
+  if (savedOrganisation && actor) {
+    await recordAdminAudit({
+      action: "admin.organisation_created",
+      actorPersonId: actor.actorPerson.id,
+      assumedPersonId: actor.assumedPerson?.id ?? null,
+      organisationId: savedOrganisation.id,
+      resourceId: savedOrganisation.id,
+      resourceType: "organisation",
+      metadata: {
+        currency: savedOrganisation.currency,
+        defaultLocale,
+        name: savedOrganisation.name,
+        slug: savedOrganisation.slug,
+        type: savedOrganisation.type
+      }
+    });
+  }
+
+  return savedOrganisation;
 }
 
 export async function updateOrganisation({
+  actor,
+  countryCode,
+  currency,
   defaultLocale,
   id,
   name,
   slug,
   status
 }: Readonly<{
+  actor?: AdminSessionContext | null;
+  countryCode?: string | null;
+  currency?: string | null;
   defaultLocale: Locale;
   id: string;
   name: string;
@@ -2046,7 +2160,33 @@ export async function updateOrganisation({
   status: "active" | "archived" | "disabled";
 }>) {
   const sql = await sqlOrThrow();
+  const beforeRows = actor
+    ? await sql<Array<{
+        country_code: string | null;
+        currency: string | null;
+        default_locale: string;
+        id: string;
+        name: string;
+        organisation_type: string;
+        slug: string;
+        status: string;
+      }>>`
+        select id::text, slug, name, organisation_type, status, default_locale, country_code, currency
+        from public.organisations
+        where id = ${id}::uuid
+        limit 1
+      `
+    : [];
+  const organisationType =
+    beforeRows[0]?.organisation_type === "platform" ? "platform" : "tenant";
+  const normalizedCurrency = normalOrganisationCurrency(
+    currency,
+    organisationType
+  );
+  const normalizedCountryCode = normalOrganisationCountry(countryCode);
   const rows = await sql<Array<{
+    country_code: string | null;
+    currency: string | null;
     default_locale: string;
     id: string;
     name: string;
@@ -2060,12 +2200,33 @@ export async function updateOrganisation({
       name = ${name.trim()},
       status = ${status},
       default_locale = ${defaultLocale},
+      country_code = ${normalizedCountryCode},
+      currency = ${normalizedCurrency},
       updated_at = now()
     where id = ${id}::uuid
-    returning id::text, slug, name, organisation_type, status, default_locale
+    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency
   `;
 
-  return rows[0] ? organisation(rows[0]) : null;
+  const savedOrganisation = rows[0] ? organisation(rows[0]) : null;
+
+  if (savedOrganisation && actor) {
+    const before = beforeRows[0] ? organisation(beforeRows[0]) : null;
+
+    await recordAdminAudit({
+      action: "admin.organisation_updated",
+      actorPersonId: actor.actorPerson.id,
+      assumedPersonId: actor.assumedPerson?.id ?? null,
+      organisationId: savedOrganisation.id,
+      resourceId: savedOrganisation.id,
+      resourceType: "organisation",
+      metadata: {
+        after: savedOrganisation,
+        before
+      }
+    });
+  }
+
+  return savedOrganisation;
 }
 
 function agentStatus(value: string): "active" | "offline" | "paused" | "retired" {
@@ -2811,7 +2972,25 @@ export async function updatePerson({
     returning id::text, email, display_name, preferred_locale, status
   `;
 
-  return rows[0] ? person(rows[0]) : null;
+  const savedPerson = rows[0] ? person(rows[0]) : null;
+
+  if (savedPerson) {
+    await recordAdminAudit({
+      action: "admin.person_updated",
+      actorPersonId: actor.actorPerson.id,
+      assumedPersonId: actor.assumedPerson?.id ?? null,
+      organisationId: actor.effectiveOrganisation.id,
+      resourceId: savedPerson.id,
+      resourceType: "person",
+      metadata: {
+        displayName: savedPerson.displayName,
+        preferredLocale: savedPerson.preferredLocale,
+        status: savedPerson.status
+      }
+    });
+  }
+
+  return savedPerson;
 }
 
 export async function updateOwnPerson({
@@ -2864,22 +3043,76 @@ export async function updateOwnPerson({
 
 export async function updateEffectiveOrganisationSettings({
   context,
+  currency,
+  customerPriceMarginPercent,
   defaultLocale,
   name
 }: Readonly<{
   context: AdminSessionContext;
+  currency?: string | null;
+  customerPriceMarginPercent?: number | null;
   defaultLocale: Locale;
   name: string;
 }>) {
   if (
-    context.effectiveOrganisation.type !== "tenant" ||
-    context.effectiveMembership.role !== "retail_admin"
+    !(
+      context.effectiveMembership.role === "platform_owner" ||
+      context.effectiveMembership.role === "platform_admin" ||
+      (
+        context.effectiveOrganisation.type === "tenant" &&
+        context.effectiveMembership.role === "retail_admin"
+      )
+    )
   ) {
-    throw new Error("Retail Admin can only update basic settings for their own organisation");
+    throw new Error("You can only update basic settings for your own organisation");
+  }
+
+  const canEditCurrency =
+    context.actorMembership.role === "platform_owner" ||
+    context.actorMembership.role === "platform_admin";
+  const canEditCustomerPriceMargin =
+    context.effectiveOrganisation.type === "platform" &&
+    (
+      context.effectiveMembership.role === "platform_owner" ||
+      context.effectiveMembership.role === "platform_admin"
+    );
+  const requestedCurrency = currency?.trim().toUpperCase() ?? "";
+
+  if (
+    requestedCurrency &&
+    requestedCurrency !== context.effectiveOrganisation.currency &&
+    !canEditCurrency
+  ) {
+    throw new Error("Only platform admins can update organisation currency");
+  }
+
+  const normalizedCurrency =
+    canEditCurrency && requestedCurrency
+      ? requestedCurrency
+      : context.effectiveOrganisation.currency;
+
+  if (!/^[A-Z]{3}$/.test(normalizedCurrency)) {
+    throw new Error("Currency must be a three-letter ISO-4217 code");
   }
 
   const sql = await sqlOrThrow();
+  const requestedCustomerPriceMargin = customerPriceMarginPercent !== undefined;
+
+  if (requestedCustomerPriceMargin && !canEditCustomerPriceMargin) {
+    throw new Error("Customer margin can only be updated at platform level");
+  }
+
+  const marginMetadataPatch =
+    requestedCustomerPriceMargin && canEditCustomerPriceMargin
+      ? {
+          customerPriceMarginPercent: normalizeCustomerPriceMarginPercent(
+            customerPriceMarginPercent
+          )
+        }
+      : {};
   const rows = await sql<Array<{
+    country_code: string | null;
+    currency: string | null;
     default_locale: string;
     id: string;
     name: string;
@@ -2891,10 +3124,14 @@ export async function updateEffectiveOrganisationSettings({
     set
       name = ${name.trim()},
       default_locale = ${defaultLocale},
+      currency = ${normalizedCurrency},
+      metadata = case
+        when organisation_type = 'platform' then coalesce(metadata, '{}'::jsonb) || ${sql.json(marginMetadataPatch)}::jsonb
+        else coalesce(metadata, '{}'::jsonb) - 'customerPriceMarginPercent'
+      end,
       updated_at = now()
     where id = ${context.effectiveOrganisation.id}::uuid
-      and organisation_type = 'tenant'
-    returning id::text, slug, name, organisation_type, status, default_locale
+    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency
   `;
   const savedOrganisation = rows[0] ? organisation(rows[0]) : null;
 
@@ -3697,11 +3934,13 @@ export async function updateMembershipRole({
     organisation_id: string;
     organisation_type: string;
     role: string;
+    status: string;
   }>>`
     select
       organisation_memberships.organisation_id::text,
       organisations.organisation_type,
-      organisation_memberships.role
+      organisation_memberships.role,
+      organisation_memberships.status
     from public.organisation_memberships
     join public.organisations
       on organisations.id = organisation_memberships.organisation_id
@@ -3756,7 +3995,31 @@ export async function updateMembershipRole({
     returning id::text, organisation_id::text, person_id::text, role, status, title
   `;
 
-  return rows[0] ? membership(rows[0]) : null;
+  const savedMembership = rows[0] ? membership(rows[0]) : null;
+
+  if (savedMembership) {
+    await recordAdminAudit({
+      action: "admin.membership_updated",
+      actorPersonId: actor.actorPerson.id,
+      assumedPersonId: actor.assumedPerson?.id ?? null,
+      organisationId: savedMembership.organisationId,
+      resourceId: savedMembership.id,
+      resourceType: "organisation_membership",
+      metadata: {
+        after: {
+          role: savedMembership.role,
+          status: savedMembership.status
+        },
+        before: {
+          role: organisationRow.role,
+          status: organisationRow.status
+        },
+        personId: savedMembership.personId
+      }
+    });
+  }
+
+  return savedMembership;
 }
 
 export async function assumeAdminIdentity({

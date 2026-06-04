@@ -115,6 +115,21 @@ function errorDetails(error: unknown) {
   };
 }
 
+function supplementErrorStatus(message: string) {
+  if (message === "Supplement not found") {
+    return 404;
+  }
+
+  if (
+    message === "Invalid supplement list status" ||
+    message === "Invalid supplement confidence"
+  ) {
+    return 400;
+  }
+
+  return 500;
+}
+
 export async function PATCH(
   request: Request,
   { params }: AdminSupplementRouteProps
@@ -201,18 +216,26 @@ export async function PATCH(
       }
     );
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to update supplement";
+    const status = supplementErrorStatus(message);
+
     console.error("Unable to update supplement", {
       error: errorDetails(error),
       supplementId: id
     });
 
     return NextResponse.json(
-      { message: "Unable to update supplement" },
+      {
+        details:
+          process.env.NODE_ENV === "production" ? undefined : errorDetails(error),
+        message
+      },
       {
         headers: {
           "Cache-Control": "no-store"
         },
-        status: 500
+        status
       }
     );
   }

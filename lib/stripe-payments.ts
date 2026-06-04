@@ -11,6 +11,10 @@ import {
   FINANCE_ACCOUNT_IDS,
   recordFinanceTransaction
 } from "@/lib/finance-ledger";
+import {
+  resolveUsdRateForCurrency,
+  type ResolvedUsdRate
+} from "@/lib/finance-fx";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath, nutritionRevealPath } from "@/lib/nutrition-paths";
 import { paymentReturnPath, type PaymentSourceSurface } from "@/lib/payment-paths";
@@ -27,7 +31,6 @@ import {
   stripeLineItemForPlan,
   stripeLocale,
   stripePaymentConfig,
-  thbUsdRate,
   type CheckoutSessionInput,
   type PaymentProviderMode,
   type StripePaymentConfig,
@@ -91,6 +94,7 @@ type PaymentStatePatch = Readonly<{
   action: string;
   actor?: string;
   customerEmail?: string | null;
+  expectedStatuses?: readonly PaymentStatus[];
   metadata?: Record<string, unknown>;
   paymentId: string;
   planId?: string | null;
@@ -137,6 +141,15 @@ async function recordPaymentVersion(
   }>
 ) {
   await sql`
+    with payment_version_lock as (
+      select pg_advisory_xact_lock(hashtextextended(${input.paymentId}, 0))
+    ),
+    payment_snapshot as (
+      select payments.*
+      from public.payments payments
+      cross join payment_version_lock
+      where payments.id = ${input.paymentId}::uuid
+    )
     insert into public.payment_versions (
       payment_id,
       version,
@@ -150,22 +163,21 @@ async function recordPaymentVersion(
       created_at
     )
     select
-      payments.id,
+      payment_snapshot.id,
       coalesce((
         select max(version)
         from public.payment_versions
-        where payment_id = payments.id
+        where payment_id = payment_snapshot.id
       ), 0) + 1,
       ${input.action},
       ${input.actor},
       ${input.reason},
       ${input.source},
-      payments.plan_id,
-      to_jsonb(payments.*),
+      payment_snapshot.plan_id,
+      to_jsonb(payment_snapshot.*),
       ${sql.json(toJsonValue(input.metadata ?? {}))}::jsonb,
       now()
-    from public.payments payments
-    where payments.id = ${input.paymentId}::uuid
+    from payment_snapshot
   `;
 }
 
@@ -266,6 +278,10 @@ async function updatePaymentState(
       end,
       updated_at = now()
     where id = ${input.paymentId}::uuid
+      and (
+        ${input.expectedStatuses ? input.expectedStatuses.length : 0}::int = 0
+        or status = any(${input.expectedStatuses ? [...input.expectedStatuses] : []}::text[])
+      )
     returning *
   `;
   const payment = rows[0] ?? null;
@@ -365,6 +381,8 @@ async function recordStripePaymentNominalRevenue(
   payment: PaymentRow,
   metadata: Record<string, unknown> = {}
 ) {
+  const fx = await resolveUsdRateForCurrency(payment.currency, { sql });
+
   return recordFinanceTransaction({
     amount: payment.amount,
     category: "revenue",
@@ -373,6 +391,7 @@ async function recordStripePaymentNominalRevenue(
     entryType: "nominal",
     from: paymentCustomerLedgerAccount(payment),
     metadata: {
+      ...fxMetadata(fx),
       paymentId: payment.id,
       paymentStatus: payment.status,
       planId: payment.plan_id,
@@ -389,8 +408,19 @@ async function recordStripePaymentNominalRevenue(
     sql,
     to: "mattanutra:revenue",
     toAccountId: FINANCE_ACCOUNT_IDS.mattanutraRevenue,
-    usdRate: thbUsdRate()
+    fxRateId: fx.fxRateId,
+    usdRate: fx.usdRate
   });
+}
+
+function fxMetadata(rate: ResolvedUsdRate) {
+  return {
+    fxFallbackUsed: rate.fallbackUsed,
+    fxProvider: rate.provider,
+    fxRateId: rate.fxRateId,
+    fxSource: rate.source,
+    usdRate: rate.usdRate
+  };
 }
 
 function stringId(value: unknown) {
@@ -470,6 +500,8 @@ async function recordStripePaymentAccounting(
     const feeMicros = amountMicrosFromStripeAmount(balanceTransaction?.fee);
 
     if (balanceTransaction?.id && feeMicros) {
+      const fx = await resolveUsdRateForCurrency(payment.currency, { sql });
+
       await recordFinanceTransaction({
         amount: feeMicros,
         category: "payment_fee",
@@ -479,6 +511,7 @@ async function recordStripePaymentAccounting(
         from: "mattanutra:stripe-clearing",
         fromAccountId: FINANCE_ACCOUNT_IDS.stripeClearing,
         metadata: {
+          ...fxMetadata(fx),
           accountingBasis: "cash_fee",
           paymentId: payment.id,
           selectedPlan: payment.selected_plan,
@@ -491,7 +524,8 @@ async function recordStripePaymentAccounting(
         sql,
         to: "stripe:fees",
         toAccountId: FINANCE_ACCOUNT_IDS.stripe,
-        usdRate: thbUsdRate()
+        fxRateId: fx.fxRateId,
+        usdRate: fx.usdRate
       });
     }
 
@@ -553,15 +587,18 @@ async function recordStripePayoutAccounting(
     throw new Error("Stripe payout amount or currency is invalid");
   }
 
+  const fx = await resolveUsdRateForCurrency(currency, { sql });
+
   await recordFinanceTransaction({
     amount: amountMicros,
-    category: "payout",
+    category: "revenue",
     currency,
-    description: `Stripe payout ${payout.id}`,
+    description: `Stripe transfer to MattaNutra bank ${payout.id}`,
     entryType: "actual",
     from: `stripe:payout:${payout.id}`,
     fromAccountId: FINANCE_ACCOUNT_IDS.stripeClearing,
     metadata: {
+      ...fxMetadata(fx),
       accountingBasis: "stripe_payout",
       arrivalDate: payout.arrival_date ?? null,
       balanceTransactionId: stringId(payout.balance_transaction),
@@ -579,7 +616,8 @@ async function recordStripePayoutAccounting(
     sql,
     to: "mattanutra:bank",
     toAccountId: FINANCE_ACCOUNT_IDS.mattanutraBank,
-    usdRate: thbUsdRate()
+    fxRateId: fx.fxRateId,
+    usdRate: fx.usdRate
   });
 
   await writePaymentBpmEvent({
@@ -1050,36 +1088,48 @@ export async function markPaymentCheckoutOpened(input: Readonly<{
   }
 
   let currentPayment = payment;
+  let checkoutOpenedByThisRequest = false;
 
   if (payment.status === "checkout_session_created") {
-    currentPayment = await updatePaymentState(sql, {
+    const openedPayment = await updatePaymentState(sql, {
       action: "checkout_opened",
       actor: "visitor",
+      expectedStatuses: ["checkout_session_created"],
       paymentId: input.paymentId,
       reason: "embedded_checkout_opened",
       status: "checkout_opened"
-    }) ?? payment;
+    });
+
+    if (openedPayment) {
+      currentPayment = openedPayment;
+      checkoutOpenedByThisRequest = true;
+    } else {
+      currentPayment = (await getPaymentRowById(sql, input.paymentId)) ?? payment;
+    }
   }
 
-  await writePaymentBpmEvent({
-    actorType: "visitor",
-    eventName: "payment_checkout_opened",
-    eventStatus: "checkout_opened",
-    locale: currentPayment.locale,
-    paymentId: currentPayment.id,
-    planId: currentPayment.plan_id,
-    properties: {
-      sourceSurface: currentPayment.source_surface
-    },
-    request: input.request,
-    selectedPlan: currentPayment.selected_plan,
-    sql,
-    stripeSessionId: currentPayment.stripe_checkout_session_id,
-    valueAmount: currentPayment.amount / AMOUNT_MICROS_PER_UNIT,
-    valueCurrency: currentPayment.currency
-  });
+  if (checkoutOpenedByThisRequest) {
+    await writePaymentBpmEvent({
+      actorType: "visitor",
+      eventName: "payment_checkout_opened",
+      eventStatus: "checkout_opened",
+      locale: currentPayment.locale,
+      paymentId: currentPayment.id,
+      planId: currentPayment.plan_id,
+      properties: {
+        sourceSurface: currentPayment.source_surface
+      },
+      request: input.request,
+      selectedPlan: currentPayment.selected_plan,
+      sql,
+      stripeSessionId: currentPayment.stripe_checkout_session_id,
+      valueAmount: currentPayment.amount / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: currentPayment.currency
+    });
+  }
 
   if (
+    checkoutOpenedByThisRequest &&
     currentPayment.plan_id &&
     !["paid", "bound", "cancelled", "expired", "failed", "fulfillment_failed"].includes(
       currentPayment.status

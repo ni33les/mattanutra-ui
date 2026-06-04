@@ -40,6 +40,10 @@ import {
   getAdminProductsData
 } from "@/lib/admin-products";
 import {
+  emptyAdminRetailStockData,
+  getAdminRetailStockData
+} from "@/lib/admin-retail-stock";
+import {
   emptyAdminRecommendationInsightsData,
   getAdminRecommendationInsightsData
 } from "@/lib/admin-recommendation-insights";
@@ -142,6 +146,7 @@ export default async function LocalizedAdminDashboardPage({
   const filters = normalizeAdminDashboardFilters(query);
   const selectedReviewTaskId = firstParam(query.review);
   const selectedTaskId = firstParam(query.task);
+  const selectedRetailCustomerOrderId = firstParam(query.order);
   const cookieStore = await cookies();
   const sessionContext = await resolveAdminSession({
     csrfToken: cookieStore.get(adminCsrfCookieName)?.value,
@@ -162,10 +167,18 @@ export default async function LocalizedAdminDashboardPage({
     redirect(`/${locale}/admin/login?${loginParams.toString()}`);
   }
 
-  if (!adminViewAllowed(adminContext, view)) {
+  if (!adminViewAllowed(
+    adminContext,
+    view,
+    adminContext.effectiveOrganisation.type
+  )) {
     redirect(
       dashboardUrl(locale, query, {
-        view: firstAllowedAdminView(adminContext)
+        view: firstAllowedAdminView(
+          adminContext,
+          "glance",
+          adminContext.effectiveOrganisation.type
+        )
       })
     );
   }
@@ -182,6 +195,7 @@ export default async function LocalizedAdminDashboardPage({
   let flowData = emptyFlow(range);
   let leadsData = emptyLeadsData();
   let productsData = emptyAdminProductsData();
+  let retailStockData = emptyAdminRetailStockData();
   let recommendationInsightsData = emptyAdminRecommendationInsightsData(range);
   let reviewQueueData = emptyAdminReviewQueueData();
   let settingsData: AdminSettingsData | null = null;
@@ -203,7 +217,7 @@ export default async function LocalizedAdminDashboardPage({
     data = await getAdminDashboardData(range, filters);
     flowData = await getAdminFlowData(range, filters);
     reviewQueueData = await getAdminReviewQueueData();
-    communicationsData = await getAdminCommunicationsData(range);
+    communicationsData = await getAdminCommunicationsData(range, adminContext);
     alertsData = await getAdminTechnicalAlertsData(range);
   } else if (view === "agents") {
     agentsData = await getAdminAgentsData(range);
@@ -218,7 +232,7 @@ export default async function LocalizedAdminDashboardPage({
   ) {
     contentData = await getAdminContentData(range, filters);
   } else if (view === "communications") {
-    communicationsData = await getAdminCommunicationsData(range);
+    communicationsData = await getAdminCommunicationsData(range, adminContext);
   } else if (view === "financials") {
     financialsData = await getAdminFinancialsData(range);
   } else if (view === "flow") {
@@ -229,6 +243,16 @@ export default async function LocalizedAdminDashboardPage({
     leadsData = await getAdminLeadsData(range, filters);
   } else if (view === "products") {
     productsData = await getAdminProductsData(range);
+  } else if (
+    view === "stock" ||
+    view === "retail-audit" ||
+    view === "retail-movements" ||
+    view === "retail-customer-orders" ||
+    view === "retail-fulfillment" ||
+    view === "retail-stock-advice" ||
+    view === "retail-reorder"
+  ) {
+    retailStockData = await getAdminRetailStockData(adminContext, locale);
   } else if (view === "product-insights" || view === "supplement-insights") {
     recommendationInsightsData = await getAdminRecommendationInsightsData(
       range,
@@ -265,8 +289,10 @@ export default async function LocalizedAdminDashboardPage({
       leadsData={leadsData}
       locale={locale}
       productsData={productsData}
+      retailStockData={retailStockData}
       recommendationInsightsData={recommendationInsightsData}
       reviewQueueData={reviewQueueData}
+      selectedRetailCustomerOrderId={selectedRetailCustomerOrderId}
       selectedReviewTaskId={selectedReviewTaskId}
       selectedTaskId={selectedTaskId}
       settingsData={settingsData}

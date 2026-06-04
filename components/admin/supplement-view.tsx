@@ -85,6 +85,7 @@ export function AdminSupplementsView({
   const [deletingAliasId, setDeletingAliasId] = useState<string | null>(null);
   const [draft, setDraft] = useState<AdminSupplementRow | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -137,6 +138,7 @@ export function AdminSupplementsView({
   async function saveRow(row: AdminSupplementRow): Promise<boolean> {
     setSavingId(row.id);
     setErrorId(null);
+    setErrorMessage(null);
 
     try {
       const response = await fetch(`/api/admin/supplements/${row.id}`, {
@@ -156,7 +158,11 @@ export function AdminSupplementsView({
       });
 
       if (!response.ok) {
-        throw new Error("Unable to save supplement");
+        const errorPayload = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+
+        throw new Error(errorPayload?.message ?? "Unable to save supplement");
       }
 
       const payload = (await response.json()) as { row?: AdminSupplementRow };
@@ -166,8 +172,13 @@ export function AdminSupplementsView({
 
       syncRow(nextRow);
       return true;
-    } catch {
+    } catch (saveError) {
       setErrorId(row.id);
+      setErrorMessage(
+        saveError instanceof Error
+          ? saveError.message
+          : labels.supplements.updateError
+      );
       return false;
     } finally {
       setSavingId(null);
@@ -474,6 +485,7 @@ export function AdminSupplementsView({
           accessToken={accessToken}
           draft={draft}
           error={errorId === draft.id}
+          errorMessage={errorId === draft.id ? errorMessage : null}
           labels={labels}
           locale={locale}
           onChange={(patch) =>
@@ -485,6 +497,7 @@ export function AdminSupplementsView({
             if (savingId !== draft.id) {
               setDraft(null);
               setErrorId(null);
+              setErrorMessage(null);
             }
           }}
           onAddAssociation={(alias) => addAssociation(draft, alias)}
@@ -596,6 +609,7 @@ export function SupplementDetailsModal({
   deletingAssociationId,
   draft,
   error,
+  errorMessage,
   headerNote,
   labels,
   locale,
@@ -614,6 +628,7 @@ export function SupplementDetailsModal({
   deletingAssociationId?: string | null;
   draft: AdminSupplementRow;
   error: boolean;
+  errorMessage?: string | null;
   headerNote?: string | null;
   labels: AdminContent;
   locale: Locale;
@@ -1115,7 +1130,7 @@ export function SupplementDetailsModal({
               ) : null}
               {error ? (
                 <p className="text-sm font-medium text-red-600">
-                  {labels.supplements.updateError}
+                  {errorMessage ?? labels.supplements.updateError}
                 </p>
               ) : null}
             </div>

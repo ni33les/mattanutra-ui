@@ -5,9 +5,9 @@ import {
 import { getSql } from "@/lib/db";
 
 export type AdminFinancialMetricId =
-  | "aiCost"
-  | "hostingCost"
-  | "totalCost"
+  | "operatingCost"
+  | "payout"
+  | "revenue"
   | "transactions";
 
 export type AdminFinancialEntryType = "actual" | "nominal";
@@ -47,9 +47,9 @@ export type AdminFinancialsData = Readonly<{
   rows: AdminFinancialTransactionRow[];
   series: Readonly<Record<AdminFinancialMetricId, number[]>>;
   summary: Readonly<{
-    aiCostUsd: number;
-    hostingCostUsd: number;
-    totalCostUsd: number;
+    operatingCostUsd: number;
+    payoutUsd: number;
+    revenueUsd: number;
     transactions: number;
   }>;
 }>;
@@ -260,6 +260,10 @@ function financeCategory(value: string | null | undefined): AdminFinancialCatego
   return "other";
 }
 
+function isOperatingCostCategory(category: AdminFinancialCategory) {
+  return category === "ai" || category === "hosting" || category === "payment_fee";
+}
+
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -277,15 +281,15 @@ export function emptyFinancials(range: AdminDashboardRange): AdminFinancialsData
     range,
     rows: [],
     series: {
-      aiCost: empty,
-      hostingCost: empty,
-      totalCost: empty,
+      operatingCost: empty,
+      payout: empty,
+      revenue: empty,
       transactions: empty
     },
     summary: {
-      aiCostUsd: 0,
-      hostingCostUsd: 0,
-      totalCostUsd: 0,
+      operatingCostUsd: 0,
+      payoutUsd: 0,
+      revenueUsd: 0,
       transactions: 0
     }
   };
@@ -375,39 +379,44 @@ export async function getAdminFinancialsData(
         `;
 
     const buckets = buildBuckets(range, rows);
-    const aiCost = buckets.map(() => 0);
-    const hostingCost = buckets.map(() => 0);
-    const totalCost = buckets.map(() => 0);
+    const operatingCost = buckets.map(() => 0);
+    const payout = buckets.map(() => 0);
+    const revenue = buckets.map(() => 0);
     const transactions = buckets.map(() => 0);
-    let aiCostUsd = 0;
-    let hostingCostUsd = 0;
-    let totalCostUsd = 0;
+    let operatingCostUsd = 0;
+    let payoutUsd = 0;
+    let revenueUsd = 0;
 
     for (const row of rows) {
       const amountUsd = usdAmount(row);
       const index = bucketIndex(buckets, new Date(row.occurred_at));
       const category = financeCategory(row.category);
 
-      if (category === "ai") {
-        aiCostUsd += amountUsd;
+      if (category === "revenue") {
+        revenueUsd += amountUsd;
       }
 
-      if (category === "hosting") {
-        hostingCostUsd += amountUsd;
+      if (category === "payout") {
+        payoutUsd += amountUsd;
       }
 
-      totalCostUsd += amountUsd;
+      if (isOperatingCostCategory(category)) {
+        operatingCostUsd += amountUsd;
+      }
 
       if (index >= 0) {
-        if (category === "ai") {
-          aiCost[index] += amountUsd;
+        if (category === "revenue") {
+          revenue[index] += amountUsd;
         }
 
-        if (category === "hosting") {
-          hostingCost[index] += amountUsd;
+        if (category === "payout") {
+          payout[index] += amountUsd;
         }
 
-        totalCost[index] += amountUsd;
+        if (isOperatingCostCategory(category)) {
+          operatingCost[index] += amountUsd;
+        }
+
         transactions[index] += 1;
       }
     }
@@ -419,15 +428,15 @@ export async function getAdminFinancialsData(
       range,
       rows: rows.slice(0, 100).map(mapRow),
       series: {
-        aiCost,
-        hostingCost,
-        totalCost,
+        operatingCost,
+        payout,
+        revenue,
         transactions
       },
       summary: {
-        aiCostUsd,
-        hostingCostUsd,
-        totalCostUsd,
+        operatingCostUsd,
+        payoutUsd,
+        revenueUsd,
         transactions: rows.length
       }
     };

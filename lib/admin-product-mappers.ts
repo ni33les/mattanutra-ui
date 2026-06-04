@@ -18,6 +18,12 @@ import {
   productAudienceFromText,
   aiCorrectionNotesFromSnapshot
 } from "./admin-product-helpers.ts";
+import {
+  normalizeCurrencyCode,
+  normalizeProductCountryCode,
+  normalizeProductCountryPricingStatus,
+  type ProductCountryPricing
+} from "@/lib/product-countries";
 const randomUUID = () => globalThis.crypto.randomUUID();
 
 import {
@@ -373,6 +379,28 @@ export function rowFromDb(
   const activeOfferPriceAmount = numberOrNull(row.active_offer_price_amount);
   const activeOfferCurrency = row.active_offer_currency || "THB";
   const activeOfferAvailability = row.active_offer_availability_status ?? "unknown";
+  const countryPricing = arrayPayload(row.country_pricing)
+    .map((item): ProductCountryPricing | null => {
+      const record = item && typeof item === "object"
+        ? item as Record<string, unknown>
+        : {};
+      const countryCode = normalizeProductCountryCode(record.countryCode);
+      const rrpPriceAmount = numberOrNull(record.rrpPriceAmount);
+
+      return countryCode
+        ? {
+            countryCode,
+            currency: normalizeCurrencyCode(record.currency, row.currency || "THB"),
+            priceUpdatedAt: isoOrNull(record.priceUpdatedAt),
+            pricingStatus: normalizeProductCountryPricingStatus(
+              record.pricingStatus,
+              rrpPriceAmount
+            ),
+            rrpPriceAmount
+          }
+        : null;
+    })
+    .filter((item): item is ProductCountryPricing => Boolean(item));
 
   return {
     affiliateStatus: activeAffiliateStatus,
@@ -423,6 +451,7 @@ export function rowFromDb(
       row.manufacturer_country_codes,
       [row.region]
     ),
+    countryPricing,
     offers,
     platform: row.platform,
     priceAmount: activeOfferPriceAmount,

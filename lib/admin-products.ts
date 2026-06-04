@@ -95,7 +95,10 @@ export {
 
 export { loadProductRows, loadAdminProductRow, loadAdminProductRowsForBrand, getAdminProductsData } from "./admin-product-read-model.ts";
 export {
-  getProductRecommendationCandidates
+  getProductRecommendationCandidates,
+  getRetailerAwareProductRecommendationCandidateSets,
+  type ProductRecommendationRetailerCandidateSet,
+  type ProductRecommendationRetailerOption
 } from "./admin-product-search.ts";
 export { clearProductRecommendationCandidateCache };
 export {

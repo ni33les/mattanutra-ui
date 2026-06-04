@@ -12,6 +12,7 @@ const ADMIN_AGENT_DISPLAY_ORDER = [
   SYSTEM_AGENTS.formulationWorker.id,
   SYSTEM_AGENTS.safetyScanner.id,
   SYSTEM_AGENTS.productMatcher.id,
+  SYSTEM_AGENTS.retailStockPlanner.id,
   SYSTEM_AGENTS.humanReviewer.id,
   SYSTEM_AGENTS.emailDispatcher.id,
   SYSTEM_AGENTS.communicationsCoordinator.id,
@@ -24,6 +25,8 @@ export type AdminTaskVisibilityRow = Readonly<{
   actorType: string;
   agentId: string | null;
   agentName: string | null;
+  assignedToName: string | null;
+  assignedToType: "agent" | "individual" | "unassigned";
   attempts: number;
   blockedDependencyCount: number;
   businessValue: number;
@@ -38,7 +41,14 @@ export type AdminTaskVisibilityRow = Readonly<{
   latestEventStatus: string | null;
   latestEventType: string | null;
   maxAttempts: number;
+  organisationId: string;
+  organisationName: string;
+  organisationType: string;
   planId: string | null;
+  priorityReason: string | null;
+  priorityScore: number;
+  profitImpactAmount: number | null;
+  profitImpactCurrency: string | null;
   rayId: string | null;
   reasoningEffort: string;
   reservationHeartbeatAt: string | null;
@@ -48,6 +58,9 @@ export type AdminTaskVisibilityRow = Readonly<{
   reservedAt: string | null;
   requiredCapabilities: string[];
   scheduledFor: string;
+  dueAt: string | null;
+  sourceEntityId: string | null;
+  sourceEntityType: string | null;
   status: string;
   taskGroupId: string;
   groupLabel: string | null;
@@ -113,6 +126,8 @@ type VisibilityDbRow = Readonly<{
   actor_type: string;
   agent_id: string | null;
   agent_name: string | null;
+  assigned_to_name: string | null;
+  assigned_to_type: "agent" | "individual" | "unassigned";
   attempts: number | string;
   blocked_dependency_count: number | string | null;
   business_value: number | string;
@@ -127,8 +142,15 @@ type VisibilityDbRow = Readonly<{
   latest_event_status: string | null;
   latest_event_type: string | null;
   max_attempts: number | string;
+  organisation_id: string;
+  organisation_name: string;
+  organisation_type: string;
   payload: Record<string, unknown> | null;
   plan_id: string | null;
+  priority_reason: string | null;
+  priority_score: number | string | null;
+  profit_impact_amount: number | string | null;
+  profit_impact_currency: string | null;
   ray_id: string | null;
   reasoning_effort: string;
   reservation_heartbeat_at: Date | string | null;
@@ -138,6 +160,9 @@ type VisibilityDbRow = Readonly<{
   reserved_at: Date | string | null;
   required_capabilities: string[] | null;
   scheduled_for: Date | string;
+  due_at: Date | string | null;
+  source_entity_id: string | null;
+  source_entity_type: string | null;
   status: string;
   task_group_id: string;
   group_label: string | null;
@@ -266,6 +291,8 @@ function visibilityRowFromDb(row: VisibilityDbRow): AdminTaskVisibilityRow {
     actorType: row.actor_type,
     agentId: row.agent_id,
     agentName: row.agent_name,
+    assignedToName: row.assigned_to_name,
+    assignedToType: row.assigned_to_type,
     attempts: numberValue(row.attempts),
     blockedDependencyCount: numberValue(row.blocked_dependency_count),
     businessValue: numberValue(row.business_value),
@@ -280,7 +307,15 @@ function visibilityRowFromDb(row: VisibilityDbRow): AdminTaskVisibilityRow {
     latestEventStatus: row.latest_event_status,
     latestEventType: row.latest_event_type,
     maxAttempts: numberValue(row.max_attempts),
+    organisationId: row.organisation_id,
+    organisationName: row.organisation_name,
+    organisationType: row.organisation_type,
     planId: row.plan_id,
+    priorityReason: row.priority_reason,
+    priorityScore: numberValue(row.priority_score ?? row.business_value),
+    profitImpactAmount:
+      row.profit_impact_amount === null ? null : numberValue(row.profit_impact_amount),
+    profitImpactCurrency: row.profit_impact_currency,
     rayId: row.ray_id,
     reasoningEffort: row.reasoning_effort,
     reservationHeartbeatAt: isoOrNull(row.reservation_heartbeat_at),
@@ -290,6 +325,9 @@ function visibilityRowFromDb(row: VisibilityDbRow): AdminTaskVisibilityRow {
     reservedAt: isoOrNull(row.reserved_at),
     requiredCapabilities: row.required_capabilities ?? [],
     scheduledFor: iso(row.scheduled_for),
+    dueAt: isoOrNull(row.due_at),
+    sourceEntityId: row.source_entity_id,
+    sourceEntityType: row.source_entity_type,
     status: row.status,
     taskGroupId: row.task_group_id,
     groupLabel: row.group_label,
@@ -431,13 +469,20 @@ export async function getAdminTaskVisibilityData(
         with ${taskFlagsCte}
         select
           tasks.id::text,
+          tasks.organisation_id::text,
+          organisations.name as organisation_name,
+          organisations.organisation_type,
           tasks.task_type,
           tasks.title,
           tasks.actor_type,
           tasks.status,
           tasks.business_value,
+          tasks.priority_score,
+          tasks.priority_reason,
+          tasks.profit_impact_amount,
+          tasks.profit_impact_currency,
           (
-            tasks.business_value
+            coalesce(tasks.priority_score, tasks.business_value)
             + least(
               200,
               floor(greatest(0, extract(epoch from now() - tasks.scheduled_for) - 300) / 900) * 10
@@ -449,6 +494,9 @@ export async function getAdminTaskVisibilityData(
           tasks.max_attempts,
           tasks.payload,
           tasks.scheduled_for,
+          tasks.due_at,
+          tasks.source_entity_type,
+          tasks.source_entity_id::text,
           tasks.lease_until,
           tasks.error_message,
           tasks.created_at,
@@ -472,8 +520,30 @@ export async function getAdminTaskVisibilityData(
           latest_event.occurred_at as latest_event_at,
           agents.id::text as agent_id,
           agents.name as agent_name,
+          case
+            when agents.id is not null then 'agent'
+            when tasks.context ? 'claimedByPersonId' then 'individual'
+            when tasks.actor_type = 'human' then 'individual'
+            else 'unassigned'
+          end as assigned_to_type,
+          case
+            when agents.id is not null then agents.name
+            when tasks.context ? 'claimedByPersonId' then coalesce(
+              claimed_people.display_name,
+              tasks.context->>'claimedByDisplayName',
+              tasks.context->>'claimedByEmail'
+            )
+            when tasks.actor_type = 'human' then coalesce(
+              claimed_people.display_name,
+              tasks.context->>'claimedByDisplayName',
+              tasks.context->>'claimedByEmail'
+            )
+            else null
+          end as assigned_to_name,
           tasks.blocked_dependency_count
         from task_flags as tasks
+        join public.organisations
+          on organisations.id = tasks.organisation_id
         left join lateral (
           select *
           from public.task_reservations
@@ -494,6 +564,8 @@ export async function getAdminTaskVisibilityData(
         ) latest_event on true
         left join public.agents
           on agents.id = coalesce(tasks.reserved_by_agent_id, latest_reservation.agent_id)
+        left join public.people claimed_people
+          on claimed_people.id::text = tasks.context->>'claimedByPersonId'
         where ${taskRowsWhereClause}
         order by
           case
@@ -518,7 +590,7 @@ export async function getAdminTaskVisibilityData(
               'needs_review',
               'waiting_approval'
             ) then (
-              tasks.business_value
+              coalesce(tasks.priority_score, tasks.business_value)
               + least(
                 200,
                 floor(greatest(0, extract(epoch from now() - tasks.scheduled_for) - 300) / 900) * 10
@@ -665,7 +737,7 @@ export async function getAdminAgentsData(
           )
         order by
           (
-            business_value
+            coalesce(priority_score, business_value)
             + least(
               200,
               floor(greatest(0, extract(epoch from now() - scheduled_for) - 300) / 900) * 10

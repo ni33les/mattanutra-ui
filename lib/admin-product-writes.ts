@@ -40,7 +40,10 @@ import {
 import { validationCacheMismatchReasons, productFactObservableIssueMessages } from "@/lib/product-validation";
 import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limit-versions";
 import { normalizeSupplementSafetyFlags } from "@/lib/supplement-safety-flags";
-import { defaultProductCountryCode, normalizeProductCountryCodes } from "@/lib/product-countries";
+import {
+  defaultProductCountryCode,
+  normalizeProductCountryCodes
+} from "@/lib/product-countries";
 import {
   doseAmountInLimitUnit,
   doseExceedsLimit,
@@ -1203,7 +1206,12 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
 	    throw new Error("Product was not created");
 	  }
 
-	  await replaceProductCountryCodes(sql, productId, productCountryCodes);
+	  await replaceProductCountryCodes(
+	    sql,
+	    productId,
+	    productCountryCodes,
+	    input.countryPricing ?? []
+	  );
 
   await replaceProductTranslations(sql, productId, {
     description,
@@ -1525,8 +1533,16 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	    });
 	  }
 
-	  if (input.availableCountryCodes !== undefined) {
-	    await replaceProductCountryCodes(sql, input.id, productCountryCodes);
+	  if (
+	    input.availableCountryCodes !== undefined ||
+	    input.countryPricing !== undefined
+	  ) {
+	    await replaceProductCountryCodes(
+	      sql,
+	      input.id,
+	      productCountryCodes,
+	      input.countryPricing ?? []
+	    );
 	  }
 
   if (

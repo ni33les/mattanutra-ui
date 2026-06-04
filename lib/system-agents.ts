@@ -27,6 +27,9 @@ export const AGENT_CAPABILITIES = {
   productRecommendationFullBeam: "product_recommendation_full_beam",
   productReview: "product_review",
   reassessmentEmailSend: "reassessment_email_send",
+  retailStockAutomationPropose: "retail_stock_automation_propose",
+  retailStockForecast: "retail_stock_forecast",
+  retailStockPolicyReview: "retail_stock_policy_review",
   safetyReview: "safety_review",
   salesCopy: "sales_copy",
   scheduler: "scheduler",
@@ -49,6 +52,7 @@ export type SystemAgentKey =
   | "humanReviewer"
   | "nutritionPlanAdvisor"
   | "productMatcher"
+  | "retailStockPlanner"
   | "safetyScanner"
   | "scheduler";
 
@@ -211,6 +215,21 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
     name: "Product Matcher",
     type: "deterministic"
   },
+  retailStockPlanner: {
+    capabilities: [
+      AGENT_CAPABILITIES.retailStockForecast,
+      AGENT_CAPABILITIES.retailStockPolicyReview,
+      AGENT_CAPABILITIES.retailStockAutomationPropose
+    ],
+    id: "cb4e0dd1-f181-4a06-8c18-2eb92a1ec1c2",
+    metadata: {
+      seeded: true,
+      stockAutomationMode: "proposal_ready"
+    },
+    model: null,
+    name: "Retail Stock Planner",
+    type: "deterministic"
+  },
   safetyScanner: {
     capabilities: [
       AGENT_CAPABILITIES.doseNormalization,
@@ -246,17 +265,34 @@ export const SYSTEM_AGENT_LIST = Object.values(SYSTEM_AGENTS);
 export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
   analyze_healthscore: "healthScoreEngine",
   client_safety_followup: "communicationsCoordinator",
+  dispatch_chat_communication_message: "chatDispatcher",
+  dispatch_email_communication_message: "emailDispatcher",
   generate_example_supplement_guidance: "formulationWorker",
   generate_food_gap_guidance: "foodGuidanceWorker",
   generate_food_guidance: "foodGuidanceWorker",
   generate_supplement_guidance: "formulationWorker",
   generate_nutrition_report: "nutritionPlanAdvisor",
   generate_product_recommendations: "productMatcher",
+  retail_stock_forecast_refresh: "retailStockPlanner",
+  retail_customer_order_allocate: "retailStockPlanner",
+  retail_order_cancel_review: "retailStockPlanner",
+  retail_order_delivery_confirm: "retailStockPlanner",
+  retail_order_pack: "retailStockPlanner",
+  retail_order_pick: "retailStockPlanner",
+  retail_order_return_review: "retailStockPlanner",
+  retail_order_ship: "retailStockPlanner",
+  retail_stock_expiry_review: "retailStockPlanner",
+  retail_stock_low_stock_digest: "retailStockPlanner",
+  retail_stock_low_stock_review: "retailStockPlanner",
+  retail_stock_movement_review: "retailStockPlanner",
+  retail_stock_reorder_review: "retailStockPlanner",
   nutrition_plan_chat_reply: "nutritionPlanAdvisor",
   refine_nutrition_plan: "nutritionPlanAdvisor",
   content_status_change: "contentPublisher",
+  route_admin_communication: "communicationsCoordinator",
   send_example_email: "emailDispatcher",
   send_reassessment_email: "emailDispatcher",
+  send_retail_order_workflow_email: "emailDispatcher",
   sync_digitalocean_billing: "scheduler"
 } as const;
 
@@ -272,6 +308,11 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
   const capabilitiesByTaskType: Record<string, readonly string[]> = {
     analyze_healthscore: [AGENT_CAPABILITIES.healthScoreAnalysis],
     client_safety_followup: [AGENT_CAPABILITIES.clientSafetyFollowup],
+    dispatch_chat_communication_message: [
+      AGENT_CAPABILITIES.communicationDispatch,
+      AGENT_CAPABILITIES.lineSend
+    ],
+    dispatch_email_communication_message: [AGENT_CAPABILITIES.emailSend],
     generate_example_supplement_guidance: [
       AGENT_CAPABILITIES.freeExampleFormulation
     ],
@@ -285,11 +326,43 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
       AGENT_CAPABILITIES.productRecommendationFullBeam,
       AGENT_CAPABILITIES.productRecommendation
     ],
+    retail_stock_forecast_refresh: [AGENT_CAPABILITIES.retailStockForecast],
+    retail_customer_order_allocate: [
+      AGENT_CAPABILITIES.retailStockPolicyReview
+    ],
+    retail_order_cancel_review: [
+      AGENT_CAPABILITIES.retailStockPolicyReview
+    ],
+    retail_order_delivery_confirm: [
+      AGENT_CAPABILITIES.retailStockPolicyReview
+    ],
+    retail_order_pack: [AGENT_CAPABILITIES.retailStockPolicyReview],
+    retail_order_pick: [AGENT_CAPABILITIES.retailStockPolicyReview],
+    retail_order_return_review: [
+      AGENT_CAPABILITIES.retailStockPolicyReview
+    ],
+    retail_order_ship: [AGENT_CAPABILITIES.retailStockPolicyReview],
+    retail_stock_expiry_review: [
+      AGENT_CAPABILITIES.retailStockPolicyReview
+    ],
+    retail_stock_low_stock_digest: [AGENT_CAPABILITIES.retailStockForecast],
+    retail_stock_low_stock_review: [
+      AGENT_CAPABILITIES.retailStockPolicyReview
+    ],
+    retail_stock_movement_review: [
+      AGENT_CAPABILITIES.retailStockPolicyReview
+    ],
+    retail_stock_reorder_review: [
+      AGENT_CAPABILITIES.retailStockForecast,
+      AGENT_CAPABILITIES.retailStockPolicyReview
+    ],
     nutrition_plan_chat_reply: [AGENT_CAPABILITIES.nutritionPlanChat],
     refine_nutrition_plan: [AGENT_CAPABILITIES.nutritionPlanRefinement],
     content_status_change: [AGENT_CAPABILITIES.contentPublish],
+    route_admin_communication: [AGENT_CAPABILITIES.communicationRoute],
     send_example_email: [AGENT_CAPABILITIES.freeEmailSend],
     send_reassessment_email: [AGENT_CAPABILITIES.reassessmentEmailSend],
+    send_retail_order_workflow_email: [AGENT_CAPABILITIES.emailSend],
     sync_digitalocean_billing: [AGENT_CAPABILITIES.hostingCostSync]
   };
 

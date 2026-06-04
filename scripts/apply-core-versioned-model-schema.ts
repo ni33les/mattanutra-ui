@@ -102,6 +102,14 @@ alter table public.product_versions
 alter table public.product_recommendation_items
   add column if not exists serving_multiplier integer default 1 not null;
 
+alter table public.product_recommendation_items
+  add column if not exists selected_retailer_organisation_id uuid,
+  add column if not exists retail_sellable_product_id uuid,
+  add column if not exists availability_status text,
+  add column if not exists unit_price_amount numeric,
+  add column if not exists price_source text,
+  add column if not exists eta_date date;
+
 insert into public.assessment_versions (
   plan_id,
   version,

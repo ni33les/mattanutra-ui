@@ -73,7 +73,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["localhost", "127.0.0.1"],
+  allowedDevOrigins: ["localhost", "127.0.0.1", "dev.mattanutra.com"],
   devIndicators: false,
   images: {
     unoptimized: true

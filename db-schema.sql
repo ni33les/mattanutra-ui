@@ -36,7 +36,9 @@ drop table if exists
   public.communication_identities,
   public.communication_messages,
   public.cron,
+  public.line_connect_tokens,
   public.finance_accounts,
+  public.finance_fx_rates,
   public.finance_transactions,
   public.food_admin_audit,
   public.food_aliases,
@@ -55,7 +57,9 @@ drop table if exists
   public.nutrients,
   public.nutrition_plan_versions,
   public.nutrition_reports,
+  public.organisation_communication_identities,
   public.organisation_memberships,
+  public.organisation_notification_preferences,
   public.organisations,
   public.payment_versions,
   public.payments,
@@ -84,6 +88,15 @@ drop table if exists
   public.products,
   public.rays,
   public.recommendations,
+  public.retail_order_allocations,
+  public.retail_customer_order_lines,
+  public.retail_customer_orders,
+  public.retail_stock_reorder_advice,
+  public.retail_stock_movements,
+  public.retail_stock_lots,
+  public.retail_product_stock_snapshots,
+  public.retail_product_stock,
+  public.retail_sellable_products,
   public.safety_reviews,
   public.site_locales,
   public.stripe_webhook_events,
@@ -319,9 +332,13 @@ CREATE TABLE public.organisations (
     organisation_type text DEFAULT 'tenant'::text NOT NULL,
     status text DEFAULT 'active'::text NOT NULL,
     default_locale text DEFAULT 'en'::text NOT NULL,
+    country_code text DEFAULT 'TH'::text NOT NULL,
+    currency text DEFAULT 'THB'::text NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organisations_country_code_check CHECK ((country_code ~ '^[A-Z]{2}$'::text)),
+    CONSTRAINT organisations_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
     CONSTRAINT organisations_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'archived'::text]))),
     CONSTRAINT organisations_type_check CHECK ((organisation_type = ANY (ARRAY['platform'::text, 'tenant'::text])))
 );
@@ -740,7 +757,7 @@ CREATE TABLE public.bpm (
     occurred_at timestamp with time zone DEFAULT now() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT bpm_actor_type_check CHECK ((actor_type = ANY (ARRAY['visitor'::text, 'system'::text, 'worker'::text, 'admin'::text, 'openclaw'::text]))),
-    CONSTRAINT bpm_event_type_check CHECK ((event_type = ANY (ARRAY['traffic'::text, 'content'::text, 'funnel'::text, 'plan'::text, 'payment'::text, 'email'::text, 'chat'::text, 'formulation'::text, 'reassessment'::text, 'affiliate'::text, 'safety'::text, 'error'::text, 'system'::text]))),
+    CONSTRAINT bpm_event_type_check CHECK ((event_type = ANY (ARRAY['traffic'::text, 'content'::text, 'funnel'::text, 'plan'::text, 'payment'::text, 'email'::text, 'chat'::text, 'formulation'::text, 'reassessment'::text, 'affiliate'::text, 'fulfillment'::text, 'safety'::text, 'error'::text, 'system'::text]))),
     CONSTRAINT bpm_health_score_check CHECK (((health_score IS NULL) OR ((health_score >= 0) AND (health_score <= 100)))),
     CONSTRAINT bpm_severity_check CHECK ((severity = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text, 'critical'::text])))
 );
@@ -869,6 +886,59 @@ COMMENT ON TABLE public.communication_messages IS 'Append-only-ish outbound and 
 
 
 --
+-- Name: line_connect_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.line_connect_tokens (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organisation_id uuid NOT NULL,
+    token_hash text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    consumed_at timestamp with time zone,
+    consumed_by_channel_id uuid,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT line_connect_tokens_status_check CHECK ((status = ANY (ARRAY['active'::text, 'consuming'::text, 'consumed'::text, 'expired'::text, 'revoked'::text])))
+);
+
+
+--
+-- Name: organisation_communication_identities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organisation_communication_identities (
+    organisation_id uuid NOT NULL,
+    identity_id uuid NOT NULL,
+    relationship text DEFAULT 'retailer'::text NOT NULL,
+    is_primary boolean DEFAULT true NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organisation_communication_identities_relationship_check CHECK ((relationship = ANY (ARRAY['retailer'::text, 'platform'::text, 'supplier'::text, 'other'::text])))
+);
+
+
+--
+-- Name: organisation_notification_preferences; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organisation_notification_preferences (
+    organisation_id uuid NOT NULL,
+    event_key text NOT NULL,
+    channel_type text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    preference_rank integer DEFAULT 100 NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organisation_notification_preferences_channel_check CHECK ((channel_type = ANY (ARRAY['email'::text, 'line'::text]))),
+    CONSTRAINT organisation_notification_preferences_event_check CHECK ((event_key = ANY (ARRAY['retail_order_created'::text, 'retail_order_awaiting_stock'::text, 'retail_order_ready_to_pack'::text, 'retail_order_ready_to_ship'::text, 'retail_order_cancelled'::text, 'retail_order_returned'::text, 'retail_order_shipped'::text, 'retail_order_delivered'::text]))),
+    CONSTRAINT organisation_notification_preferences_rank_check CHECK ((preference_rank >= 0))
+);
+
+
+--
 -- Name: cron; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -927,6 +997,7 @@ CREATE TABLE public.finance_transactions (
     source text NOT NULL,
     source_ref text,
     provider text,
+    fx_rate_id uuid,
     task_id uuid,
     from_account_id uuid,
     to_account_id uuid,
@@ -996,6 +1067,38 @@ COMMENT ON COLUMN public.finance_transactions.amount IS 'Positive integer amount
 --
 
 COMMENT ON COLUMN public.finance_transactions.usd_rate IS 'Conversion rate from one unit of transaction currency to USD at booking time.';
+
+
+--
+-- Name: finance_fx_rates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.finance_fx_rates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    base_currency text NOT NULL,
+    quote_currency text NOT NULL,
+    provider text NOT NULL,
+    source text NOT NULL,
+    bid numeric(20,10),
+    ask numeric(20,10),
+    mid numeric(20,10) NOT NULL,
+    fetched_at timestamp with time zone DEFAULT now() NOT NULL,
+    valid_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    raw_payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT finance_fx_rates_currency_check CHECK (((base_currency ~ '^[A-Z]{3}$'::text) AND (quote_currency ~ '^[A-Z]{3}$'::text))),
+    CONSTRAINT finance_fx_rates_mid_check CHECK ((mid > (0)::numeric)),
+    CONSTRAINT finance_fx_rates_spread_check CHECK ((((bid IS NULL) OR (bid > (0)::numeric)) AND ((ask IS NULL) OR (ask > (0)::numeric))))
+);
+
+
+--
+-- Name: TABLE finance_fx_rates; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.finance_fx_rates IS 'Reusable FX observations. finance_transactions.usd_rate keeps the immutable booked snapshot.';
 
 
 --
@@ -1442,9 +1545,16 @@ CREATE TABLE public.product_brands (
 CREATE TABLE public.product_countries (
     product_id uuid NOT NULL,
     country_code text NOT NULL,
+    rrp_price_amount numeric(20,6),
+    currency text DEFAULT 'THB'::text NOT NULL,
+    pricing_status text DEFAULT 'missing'::text NOT NULL,
+    price_updated_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT product_countries_code_check CHECK ((country_code ~ '^[A-Z]{2}$'::text))
+    CONSTRAINT product_countries_code_check CHECK ((country_code ~ '^[A-Z]{2}$'::text)),
+    CONSTRAINT product_countries_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT product_countries_pricing_status_check CHECK ((pricing_status = ANY (ARRAY['missing'::text, 'ready'::text, 'review'::text]))),
+    CONSTRAINT product_countries_rrp_price_check CHECK (((rrp_price_amount IS NULL) OR (rrp_price_amount >= (0)::numeric)))
 );
 
 
@@ -1610,6 +1720,12 @@ CREATE TABLE public.product_recommendation_items (
     url_used text NOT NULL,
     price_amount numeric,
     currency text DEFAULT 'THB'::text NOT NULL,
+    selected_retailer_organisation_id uuid,
+    retail_sellable_product_id uuid,
+    availability_status text,
+    unit_price_amount numeric,
+    price_source text,
+    eta_date date,
     image_url text,
     unknown_at_recommendation boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
@@ -1640,6 +1756,12 @@ CREATE TABLE public.product_recommendation_decisions (
     url_used text,
     price_amount numeric,
     currency text DEFAULT 'THB'::text NOT NULL,
+    selected_retailer_organisation_id uuid,
+    retail_sellable_product_id uuid,
+    availability_status text,
+    unit_price_amount numeric,
+    price_source text,
+    eta_date date,
     unknown_at_recommendation boolean DEFAULT false NOT NULL,
     is_current boolean DEFAULT false NOT NULL,
     generated_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -1802,6 +1924,340 @@ CREATE TABLE public.product_translations (
 --
 
 COMMENT ON TABLE public.product_translations IS 'Locale-scalable product title and description projection. Legacy title_en/title_th columns are compatibility fields.';
+
+
+--
+-- Name: retail_sellable_products; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_sellable_products (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organisation_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    rrp_price_amount numeric(20,6),
+    wholesale_price_amount numeric(20,6),
+    currency text NOT NULL,
+    lead_time_days integer DEFAULT 0 NOT NULL,
+    backorder_policy text DEFAULT 'allow'::text NOT NULL,
+    notes text,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_sellable_products_backorder_policy_check CHECK ((backorder_policy = ANY (ARRAY['allow'::text, 'deny'::text]))),
+    CONSTRAINT retail_sellable_products_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT retail_sellable_products_lead_time_check CHECK ((lead_time_days >= 0)),
+    CONSTRAINT retail_sellable_products_price_check CHECK ((((rrp_price_amount IS NULL) OR (rrp_price_amount >= (0)::numeric)) AND ((wholesale_price_amount IS NULL) OR (wholesale_price_amount >= (0)::numeric)))),
+    CONSTRAINT retail_sellable_products_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'deleted'::text])))
+);
+
+
+--
+-- Name: TABLE retail_sellable_products; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.retail_sellable_products IS 'Retailer sellable catalogue for approved master products. Price and backorder policy are checkout source of truth; physical quantity remains in retail_product_stock.';
+
+
+--
+-- Name: retail_product_stock; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_product_stock (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organisation_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    stock_quantity integer DEFAULT 0 NOT NULL,
+    lead_time_days integer DEFAULT 0 NOT NULL,
+    wholesale_price_amount numeric(20,6),
+    retail_price_amount numeric(20,6),
+    currency text NOT NULL,
+    notes text,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_product_stock_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT retail_product_stock_lead_time_check CHECK ((lead_time_days >= 0)),
+    CONSTRAINT retail_product_stock_price_check CHECK ((((wholesale_price_amount IS NULL) OR (wholesale_price_amount >= (0)::numeric)) AND ((retail_price_amount IS NULL) OR (retail_price_amount >= (0)::numeric)))),
+    CONSTRAINT retail_product_stock_quantity_check CHECK ((stock_quantity >= 0)),
+    CONSTRAINT retail_product_stock_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'deleted'::text])))
+);
+
+
+--
+-- Name: TABLE retail_product_stock; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.retail_product_stock IS 'Retailer-owned physical stock projection for approved master products. Sellable price and backorder policy live in retail_sellable_products.';
+
+
+--
+-- Name: retail_product_stock_snapshots; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_product_stock_snapshots (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    retail_product_stock_id uuid NOT NULL,
+    organisation_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    event_type text DEFAULT 'updated'::text NOT NULL,
+    status text NOT NULL,
+    stock_quantity integer NOT NULL,
+    lead_time_days integer NOT NULL,
+    wholesale_price_amount numeric(20,6),
+    retail_price_amount numeric(20,6),
+    currency text NOT NULL,
+    notes text,
+    actor_person_id uuid,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    recorded_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_product_stock_snapshots_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT retail_product_stock_snapshots_event_type_check CHECK ((event_type = ANY (ARRAY['created'::text, 'updated'::text, 'status_changed'::text, 'movement'::text]))),
+    CONSTRAINT retail_product_stock_snapshots_lead_time_check CHECK ((lead_time_days >= 0)),
+    CONSTRAINT retail_product_stock_snapshots_price_check CHECK ((((wholesale_price_amount IS NULL) OR (wholesale_price_amount >= (0)::numeric)) AND ((retail_price_amount IS NULL) OR (retail_price_amount >= (0)::numeric)))),
+    CONSTRAINT retail_product_stock_snapshots_quantity_check CHECK ((stock_quantity >= 0)),
+    CONSTRAINT retail_product_stock_snapshots_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'deleted'::text])))
+);
+
+
+--
+-- Name: TABLE retail_product_stock_snapshots; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.retail_product_stock_snapshots IS 'Append-only stock level snapshots for retailer stock forecasting and reorder analysis.';
+
+
+--
+-- Name: retail_stock_lots; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_stock_lots (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    retail_product_stock_id uuid NOT NULL,
+    organisation_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    received_quantity integer DEFAULT 0 NOT NULL,
+    remaining_quantity integer DEFAULT 0 NOT NULL,
+    wholesale_price_amount numeric(20,6),
+    currency text NOT NULL,
+    expires_at date,
+    received_at timestamp with time zone DEFAULT now() NOT NULL,
+    notes text,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_stock_lots_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT retail_stock_lots_quantity_check CHECK (((received_quantity >= 0) AND (remaining_quantity >= 0) AND (remaining_quantity <= received_quantity))),
+    CONSTRAINT retail_stock_lots_status_check CHECK ((status = ANY (ARRAY['active'::text, 'depleted'::text, 'disabled'::text, 'deleted'::text]))),
+    CONSTRAINT retail_stock_lots_wholesale_price_check CHECK (((wholesale_price_amount IS NULL) OR (wholesale_price_amount >= (0)::numeric)))
+);
+
+
+--
+-- Name: TABLE retail_stock_lots; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.retail_stock_lots IS 'Retailer stock batches. Quantities are sellable units, with optional expiry and cost context.';
+
+
+--
+-- Name: retail_stock_movements; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_stock_movements (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    retail_product_stock_id uuid NOT NULL,
+    lot_id uuid,
+    organisation_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    movement_type text NOT NULL,
+    quantity_delta integer NOT NULL,
+    unit_cost_amount numeric(20,6),
+    retail_price_amount numeric(20,6),
+    currency text NOT NULL,
+    reason text,
+    notes text,
+    voids_movement_id uuid,
+    actor_person_id uuid,
+    source text DEFAULT 'admin'::text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    occurred_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_stock_movements_amount_check CHECK ((((unit_cost_amount IS NULL) OR (unit_cost_amount >= (0)::numeric)) AND ((retail_price_amount IS NULL) OR (retail_price_amount >= (0)::numeric)))),
+    CONSTRAINT retail_stock_movements_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT retail_stock_movements_quantity_delta_check CHECK ((quantity_delta <> 0)),
+    CONSTRAINT retail_stock_movements_type_check CHECK ((movement_type = ANY (ARRAY['receive'::text, 'sale'::text, 'adjustment'::text, 'void'::text, 'return'::text, 'transfer_in'::text, 'transfer_out'::text, 'expiry_write_off'::text]))),
+    CONSTRAINT retail_stock_movements_void_check CHECK ((((movement_type = 'void'::text) AND (voids_movement_id IS NOT NULL)) OR ((movement_type <> 'void'::text) AND (voids_movement_id IS NULL))))
+);
+
+
+--
+-- Name: TABLE retail_stock_movements; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.retail_stock_movements IS 'Append-only retail stock movement ledger. Voids are compensating rows and never delete original movements.';
+
+
+--
+-- Name: retail_stock_reorder_advice; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_stock_reorder_advice (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    retail_product_stock_id uuid NOT NULL,
+    organisation_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    risk_level text DEFAULT 'ok'::text NOT NULL,
+    confidence text DEFAULT 'low'::text NOT NULL,
+    current_stock_quantity integer DEFAULT 0 NOT NULL,
+    outflow_units_30d integer DEFAULT 0 NOT NULL,
+    recommendation_pressure_count integer DEFAULT 0 NOT NULL,
+    lead_time_days integer DEFAULT 0 NOT NULL,
+    days_cover numeric(20,4),
+    reorder_by date,
+    suggested_order_quantity integer DEFAULT 0 NOT NULL,
+    generated_by_task_id uuid,
+    inputs jsonb DEFAULT '{}'::jsonb NOT NULL,
+    calculated_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_stock_reorder_advice_confidence_check CHECK ((confidence = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text]))),
+    CONSTRAINT retail_stock_reorder_advice_nonnegative_check CHECK (((current_stock_quantity >= 0) AND (outflow_units_30d >= 0) AND (recommendation_pressure_count >= 0) AND (lead_time_days >= 0) AND (suggested_order_quantity >= 0))),
+    CONSTRAINT retail_stock_reorder_advice_risk_check CHECK ((risk_level = ANY (ARRAY['ok'::text, 'watch'::text, 'reorder'::text, 'out_of_stock'::text])))
+);
+
+
+--
+-- Name: TABLE retail_stock_reorder_advice; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.retail_stock_reorder_advice IS 'Task-refreshable retailer reorder advice projection using stock movements and recommendation demand pressure.';
+
+
+--
+-- Name: retail_shopping_lists; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_shopping_lists (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organisation_id uuid NOT NULL,
+    list_number text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    currency text NOT NULL,
+    created_by_person_id uuid,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_shopping_lists_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT retail_shopping_lists_status_check CHECK ((status = ANY (ARRAY['active'::text, 'closed'::text])))
+);
+
+
+COMMENT ON TABLE public.retail_shopping_lists IS 'Saved retailer buying batches used as the lightweight Dream Pharmacy shopping-list workflow.';
+
+
+--
+-- Name: retail_shopping_list_lines; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_shopping_list_lines (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    shopping_list_id uuid NOT NULL,
+    organisation_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    required_quantity integer DEFAULT 0 NOT NULL,
+    current_stock_quantity integer DEFAULT 0 NOT NULL,
+    unordered_need_quantity integer DEFAULT 0 NOT NULL,
+    assigned_quantity integer DEFAULT 0 NOT NULL,
+    actual_quantity integer DEFAULT 0 NOT NULL,
+    stocked_quantity integer DEFAULT 0 NOT NULL,
+    wholesale_price_amount numeric(20,6),
+    retail_price_amount numeric(20,6),
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_shopping_list_lines_price_check CHECK ((((wholesale_price_amount IS NULL) OR (wholesale_price_amount >= (0)::numeric)) AND ((retail_price_amount IS NULL) OR (retail_price_amount >= (0)::numeric)))),
+    CONSTRAINT retail_shopping_list_lines_quantity_check CHECK (((required_quantity >= 0) AND (current_stock_quantity >= 0) AND (unordered_need_quantity >= 0) AND (assigned_quantity >= 0) AND (actual_quantity >= 0) AND (stocked_quantity >= 0)))
+);
+
+
+COMMENT ON TABLE public.retail_shopping_list_lines IS 'Simple retailer shopping-list rows; saving actual counts writes stock movement deltas and updates optional retailer prices.';
+
+
+--
+-- Name: retail_customer_orders; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_customer_orders (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organisation_id uuid NOT NULL,
+    order_number text NOT NULL,
+    source text DEFAULT 'manual'::text NOT NULL,
+    customer_name text,
+    customer_email text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    currency text NOT NULL,
+    due_at timestamp with time zone,
+    placed_at timestamp with time zone,
+    shipped_at timestamp with time zone,
+    delivered_at timestamp with time zone,
+    notes text,
+    created_by_person_id uuid,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_customer_orders_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT retail_customer_orders_source_check CHECK ((source = ANY (ARRAY['manual'::text, 'checkout'::text]))),
+    CONSTRAINT retail_customer_orders_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'placed'::text, 'awaiting_stock'::text, 'allocated'::text, 'picking'::text, 'packed'::text, 'shipped'::text, 'delivered'::text, 'cancelled'::text, 'returned'::text])))
+);
+
+
+COMMENT ON TABLE public.retail_customer_orders IS 'Checkout-ready retailer customer orders. Manual admin orders use the same lifecycle as future checkout orders.';
+
+
+--
+-- Name: retail_customer_order_lines; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_customer_order_lines (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    customer_order_id uuid NOT NULL,
+    organisation_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    quantity_ordered integer NOT NULL,
+    quantity_allocated integer DEFAULT 0 NOT NULL,
+    quantity_shipped integer DEFAULT 0 NOT NULL,
+    retail_price_amount numeric(20,6),
+    notes text,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_customer_order_lines_price_check CHECK (((retail_price_amount IS NULL) OR (retail_price_amount >= (0)::numeric))),
+    CONSTRAINT retail_customer_order_lines_quantity_check CHECK (((quantity_ordered > 0) AND (quantity_allocated >= 0) AND (quantity_allocated <= quantity_ordered) AND (quantity_shipped >= 0) AND (quantity_shipped <= quantity_ordered)))
+);
+
+
+--
+-- Name: retail_order_allocations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_order_allocations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    customer_order_id uuid NOT NULL,
+    customer_order_line_id uuid NOT NULL,
+    retail_product_stock_id uuid NOT NULL,
+    organisation_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    quantity_allocated integer NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_order_allocations_quantity_check CHECK ((quantity_allocated > 0)),
+    CONSTRAINT retail_order_allocations_status_check CHECK ((status = ANY (ARRAY['active'::text, 'picked'::text, 'shipped'::text, 'cancelled'::text, 'returned'::text])))
+);
 
 
 --
@@ -2224,6 +2680,13 @@ CREATE TABLE public.tasks (
     context jsonb DEFAULT '{}'::jsonb NOT NULL,
     payload jsonb DEFAULT '{}'::jsonb NOT NULL,
     result_payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    priority_score integer DEFAULT 200 NOT NULL,
+    priority_reason text,
+    profit_impact_amount numeric(20,6),
+    profit_impact_currency text,
+    due_at timestamp with time zone,
+    source_entity_type text,
+    source_entity_id uuid,
     error_message text,
     idempotency_key text,
     idempotency_scope_key text NOT NULL DEFAULT 'global'::text,
@@ -2246,6 +2709,9 @@ CREATE TABLE public.tasks (
     CONSTRAINT tasks_actor_type_check CHECK ((actor_type = ANY (ARRAY['human'::text, 'ai'::text, 'deterministic'::text, 'external'::text, 'system'::text, 'worker'::text]))),
     CONSTRAINT tasks_attempts_check CHECK ((attempts >= 0)),
     CONSTRAINT tasks_business_value_check CHECK ((business_value > 0)),
+    CONSTRAINT tasks_priority_score_check CHECK ((priority_score > 0)),
+    CONSTRAINT tasks_profit_impact_check CHECK (((profit_impact_amount IS NULL) OR (profit_impact_amount >= (0)::numeric))),
+    CONSTRAINT tasks_profit_impact_currency_check CHECK (((profit_impact_currency IS NULL) OR (profit_impact_currency ~ '^[A-Z]{3}$'::text))),
     CONSTRAINT tasks_max_attempts_check CHECK ((max_attempts > 0)),
     CONSTRAINT tasks_max_retries_check CHECK ((max_retries >= 0)),
     CONSTRAINT tasks_reasoning_effort_check CHECK ((reasoning_effort = ANY (ARRAY['none'::text, 'low'::text, 'medium'::text, 'high'::text, 'xhigh'::text]))),
@@ -2635,6 +3101,30 @@ ALTER TABLE ONLY public.communication_messages
 
 
 --
+-- Name: line_connect_tokens line_connect_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.line_connect_tokens
+    ADD CONSTRAINT line_connect_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organisation_communication_identities organisation_communication_identities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organisation_communication_identities
+    ADD CONSTRAINT organisation_communication_identities_pkey PRIMARY KEY (organisation_id, identity_id);
+
+
+--
+-- Name: organisation_notification_preferences organisation_notification_preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organisation_notification_preferences
+    ADD CONSTRAINT organisation_notification_preferences_pkey PRIMARY KEY (organisation_id, event_key, channel_type);
+
+
+--
 -- Name: cron cron_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2664,6 +3154,14 @@ ALTER TABLE ONLY public.finance_accounts
 
 ALTER TABLE ONLY public.finance_transactions
     ADD CONSTRAINT finance_transactions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: finance_fx_rates finance_fx_rates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.finance_fx_rates
+    ADD CONSTRAINT finance_fx_rates_pkey PRIMARY KEY (id);
 
 
 --
@@ -2976,6 +3474,142 @@ ALTER TABLE ONLY public.products
 
 ALTER TABLE ONLY public.products
     ADD CONSTRAINT products_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_product_stock retail_product_stock_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock
+    ADD CONSTRAINT retail_product_stock_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_sellable_products retail_sellable_products_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_sellable_products
+    ADD CONSTRAINT retail_sellable_products_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_product_stock_snapshots retail_product_stock_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock_snapshots
+    ADD CONSTRAINT retail_product_stock_snapshots_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_stock_lots retail_stock_lots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_lots
+    ADD CONSTRAINT retail_stock_lots_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_stock_movements retail_stock_movements_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_movements
+    ADD CONSTRAINT retail_stock_movements_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_stock_reorder_advice retail_stock_reorder_advice_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_reorder_advice
+    ADD CONSTRAINT retail_stock_reorder_advice_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_shopping_lists retail_shopping_lists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_shopping_lists
+    ADD CONSTRAINT retail_shopping_lists_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_shopping_list_lines retail_shopping_list_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_shopping_list_lines
+    ADD CONSTRAINT retail_shopping_list_lines_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_product_stock retail_product_stock_org_product_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock
+    ADD CONSTRAINT retail_product_stock_org_product_key UNIQUE (organisation_id, product_id);
+
+
+--
+-- Name: retail_sellable_products retail_sellable_products_org_product_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_sellable_products
+    ADD CONSTRAINT retail_sellable_products_org_product_key UNIQUE (organisation_id, product_id);
+
+
+--
+-- Name: retail_stock_reorder_advice retail_stock_reorder_advice_org_product_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_reorder_advice
+    ADD CONSTRAINT retail_stock_reorder_advice_org_product_key UNIQUE (organisation_id, product_id);
+
+
+--
+-- Name: retail_shopping_lists retail_shopping_lists_org_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_shopping_lists
+    ADD CONSTRAINT retail_shopping_lists_org_number_key UNIQUE (organisation_id, list_number);
+
+
+--
+
+--
+
+--
+
+--
+
+--
+-- Name: retail_customer_orders retail_customer_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_customer_orders
+    ADD CONSTRAINT retail_customer_orders_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_customer_orders retail_customer_orders_org_order_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_customer_orders
+    ADD CONSTRAINT retail_customer_orders_org_order_number_key UNIQUE (organisation_id, order_number);
+
+
+--
+-- Name: retail_customer_order_lines retail_customer_order_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_customer_order_lines
+    ADD CONSTRAINT retail_customer_order_lines_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retail_order_allocations retail_order_allocations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_order_allocations
+    ADD CONSTRAINT retail_order_allocations_pkey PRIMARY KEY (id);
 
 
 --
@@ -3530,6 +4164,41 @@ CREATE INDEX communication_messages_status_idx ON public.communication_messages 
 
 
 --
+-- Name: line_connect_tokens_active_hash_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX line_connect_tokens_active_hash_idx ON public.line_connect_tokens USING btree (token_hash) WHERE ((consumed_at IS NULL) AND (status = ANY (ARRAY['active'::text, 'consuming'::text])));
+
+
+--
+-- Name: line_connect_tokens_org_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX line_connect_tokens_org_status_idx ON public.line_connect_tokens USING btree (organisation_id, status, expires_at DESC);
+
+
+--
+-- Name: organisation_communication_identity_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organisation_communication_identity_idx ON public.organisation_communication_identities USING btree (identity_id);
+
+
+--
+-- Name: organisation_communication_primary_identity_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organisation_communication_primary_identity_idx ON public.organisation_communication_identities USING btree (organisation_id) WHERE is_primary;
+
+
+--
+-- Name: organisation_notification_preferences_enabled_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organisation_notification_preferences_enabled_idx ON public.organisation_notification_preferences USING btree (organisation_id, event_key, enabled, preference_rank);
+
+
+--
 -- Name: cron_due_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3586,10 +4255,24 @@ CREATE UNIQUE INDEX finance_transactions_source_ref_idx ON public.finance_transa
 
 
 --
+-- Name: finance_transactions_fx_rate_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX finance_transactions_fx_rate_idx ON public.finance_transactions USING btree (fx_rate_id) WHERE (fx_rate_id IS NOT NULL);
+
+
+--
 -- Name: finance_transactions_task_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX finance_transactions_task_idx ON public.finance_transactions USING btree (task_id, occurred_at DESC) WHERE (task_id IS NOT NULL);
+
+
+--
+-- Name: finance_fx_rates_pair_valid_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX finance_fx_rates_pair_valid_idx ON public.finance_fx_rates USING btree (base_currency, quote_currency, provider, valid_at DESC, expires_at DESC);
 
 
 --
@@ -3824,6 +4507,13 @@ CREATE INDEX product_countries_country_idx ON public.product_countries USING btr
 
 
 --
+-- Name: product_countries_pricing_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX product_countries_pricing_status_idx ON public.product_countries USING btree (country_code, pricing_status, updated_at DESC);
+
+
+--
 -- Name: product_facts_food_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3912,6 +4602,130 @@ CREATE INDEX product_offers_product_idx ON public.product_offers USING btree (pr
 --
 
 CREATE UNIQUE INDEX product_offers_product_url_idx ON public.product_offers USING btree (product_id, url);
+
+
+--
+-- Name: retail_product_stock_org_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_product_stock_org_status_idx ON public.retail_product_stock USING btree (organisation_id, status, updated_at DESC);
+
+
+--
+-- Name: retail_product_stock_product_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_product_stock_product_idx ON public.retail_product_stock USING btree (product_id);
+
+
+--
+-- Name: retail_sellable_products_org_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_sellable_products_org_status_idx ON public.retail_sellable_products USING btree (organisation_id, status, updated_at DESC);
+
+
+--
+-- Name: retail_sellable_products_product_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_sellable_products_product_idx ON public.retail_sellable_products USING btree (product_id);
+
+
+--
+-- Name: retail_product_stock_snapshots_org_product_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_product_stock_snapshots_org_product_idx ON public.retail_product_stock_snapshots USING btree (organisation_id, product_id, recorded_at DESC);
+
+
+--
+-- Name: retail_product_stock_snapshots_stock_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_product_stock_snapshots_stock_idx ON public.retail_product_stock_snapshots USING btree (retail_product_stock_id, recorded_at DESC);
+
+
+--
+-- Name: retail_stock_lots_stock_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_stock_lots_stock_idx ON public.retail_stock_lots USING btree (retail_product_stock_id, status, expires_at);
+
+
+--
+-- Name: retail_stock_lots_org_product_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_stock_lots_org_product_idx ON public.retail_stock_lots USING btree (organisation_id, product_id, status);
+
+
+--
+-- Name: retail_stock_movements_stock_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_stock_movements_stock_idx ON public.retail_stock_movements USING btree (retail_product_stock_id, occurred_at DESC);
+
+
+--
+-- Name: retail_stock_movements_org_product_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_stock_movements_org_product_idx ON public.retail_stock_movements USING btree (organisation_id, product_id, occurred_at DESC);
+
+
+--
+-- Name: retail_stock_movements_voids_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_stock_movements_voids_idx ON public.retail_stock_movements USING btree (voids_movement_id) WHERE (voids_movement_id IS NOT NULL);
+
+
+--
+-- Name: retail_stock_reorder_advice_risk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_stock_reorder_advice_risk_idx ON public.retail_stock_reorder_advice USING btree (organisation_id, risk_level, calculated_at DESC);
+
+
+--
+-- Name: retail_shopping_lists_org_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_shopping_lists_org_status_idx ON public.retail_shopping_lists USING btree (organisation_id, status, updated_at DESC);
+
+
+--
+-- Name: retail_shopping_list_lines_list_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_shopping_list_lines_list_idx ON public.retail_shopping_list_lines USING btree (shopping_list_id, created_at);
+
+
+--
+--
+--
+--
+--
+--
+-- Name: retail_customer_orders_org_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_customer_orders_org_status_idx ON public.retail_customer_orders USING btree (organisation_id, status, due_at, updated_at DESC);
+
+
+--
+-- Name: retail_customer_order_lines_order_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_customer_order_lines_order_idx ON public.retail_customer_order_lines USING btree (customer_order_id, product_id);
+
+
+--
+-- Name: retail_order_allocations_order_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_order_allocations_order_idx ON public.retail_order_allocations USING btree (customer_order_id, customer_order_line_id, status);
 
 
 --
@@ -4303,6 +5117,20 @@ CREATE INDEX tasks_queue_idx ON public.tasks USING btree (status, business_value
 
 
 --
+-- Name: tasks_priority_queue_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tasks_priority_queue_idx ON public.tasks USING btree (status, priority_score DESC, due_at, scheduled_for, created_at);
+
+
+--
+-- Name: tasks_source_entity_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tasks_source_entity_idx ON public.tasks USING btree (source_entity_type, source_entity_id) WHERE (source_entity_id IS NOT NULL);
+
+
+--
 -- Name: tasks_ray_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4522,6 +5350,46 @@ ALTER TABLE ONLY public.communication_messages
 
 
 --
+-- Name: line_connect_tokens line_connect_tokens_consumed_by_channel_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.line_connect_tokens
+    ADD CONSTRAINT line_connect_tokens_consumed_by_channel_id_fkey FOREIGN KEY (consumed_by_channel_id) REFERENCES public.communication_channels(id) ON DELETE SET NULL;
+
+
+--
+-- Name: line_connect_tokens line_connect_tokens_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.line_connect_tokens
+    ADD CONSTRAINT line_connect_tokens_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organisation_communication_identities organisation_communication_identities_identity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organisation_communication_identities
+    ADD CONSTRAINT organisation_communication_identities_identity_id_fkey FOREIGN KEY (identity_id) REFERENCES public.communication_identities(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organisation_communication_identities organisation_communication_identities_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organisation_communication_identities
+    ADD CONSTRAINT organisation_communication_identities_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organisation_notification_preferences organisation_notification_preferences_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organisation_notification_preferences
+    ADD CONSTRAINT organisation_notification_preferences_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: cron cron_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4535,6 +5403,14 @@ ALTER TABLE ONLY public.cron
 
 ALTER TABLE ONLY public.finance_transactions
     ADD CONSTRAINT finance_transactions_from_account_id_fkey FOREIGN KEY (from_account_id) REFERENCES public.finance_accounts(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: finance_transactions finance_transactions_fx_rate_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.finance_transactions
+    ADD CONSTRAINT finance_transactions_fx_rate_id_fkey FOREIGN KEY (fx_rate_id) REFERENCES public.finance_fx_rates(id) ON DELETE RESTRICT;
 
 
 --
@@ -4930,6 +5806,314 @@ ALTER TABLE ONLY public.product_translations
 
 
 --
+-- Name: retail_product_stock retail_product_stock_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock
+    ADD CONSTRAINT retail_product_stock_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_product_stock retail_product_stock_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock
+    ADD CONSTRAINT retail_product_stock_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_sellable_products retail_sellable_products_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_sellable_products
+    ADD CONSTRAINT retail_sellable_products_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_sellable_products retail_sellable_products_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_sellable_products
+    ADD CONSTRAINT retail_sellable_products_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_product_stock_snapshots retail_product_stock_snapshots_actor_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock_snapshots
+    ADD CONSTRAINT retail_product_stock_snapshots_actor_person_id_fkey FOREIGN KEY (actor_person_id) REFERENCES public.people(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retail_product_stock_snapshots retail_product_stock_snapshots_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock_snapshots
+    ADD CONSTRAINT retail_product_stock_snapshots_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_product_stock_snapshots retail_product_stock_snapshots_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock_snapshots
+    ADD CONSTRAINT retail_product_stock_snapshots_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_product_stock_snapshots retail_product_stock_snapshots_stock_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_stock_snapshots
+    ADD CONSTRAINT retail_product_stock_snapshots_stock_id_fkey FOREIGN KEY (retail_product_stock_id) REFERENCES public.retail_product_stock(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_stock_lots retail_stock_lots_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_lots
+    ADD CONSTRAINT retail_stock_lots_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_stock_lots retail_stock_lots_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_lots
+    ADD CONSTRAINT retail_stock_lots_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_stock_lots retail_stock_lots_stock_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_lots
+    ADD CONSTRAINT retail_stock_lots_stock_id_fkey FOREIGN KEY (retail_product_stock_id) REFERENCES public.retail_product_stock(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_stock_movements retail_stock_movements_actor_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_movements
+    ADD CONSTRAINT retail_stock_movements_actor_person_id_fkey FOREIGN KEY (actor_person_id) REFERENCES public.people(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retail_stock_movements retail_stock_movements_lot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_movements
+    ADD CONSTRAINT retail_stock_movements_lot_id_fkey FOREIGN KEY (lot_id) REFERENCES public.retail_stock_lots(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_stock_movements retail_stock_movements_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_movements
+    ADD CONSTRAINT retail_stock_movements_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_stock_movements retail_stock_movements_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_movements
+    ADD CONSTRAINT retail_stock_movements_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_stock_movements retail_stock_movements_stock_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_movements
+    ADD CONSTRAINT retail_stock_movements_stock_id_fkey FOREIGN KEY (retail_product_stock_id) REFERENCES public.retail_product_stock(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_stock_movements retail_stock_movements_voids_movement_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_movements
+    ADD CONSTRAINT retail_stock_movements_voids_movement_id_fkey FOREIGN KEY (voids_movement_id) REFERENCES public.retail_stock_movements(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_stock_reorder_advice retail_stock_reorder_advice_generated_by_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_reorder_advice
+    ADD CONSTRAINT retail_stock_reorder_advice_generated_by_task_id_fkey FOREIGN KEY (generated_by_task_id) REFERENCES public.tasks(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retail_stock_reorder_advice retail_stock_reorder_advice_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_reorder_advice
+    ADD CONSTRAINT retail_stock_reorder_advice_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_stock_reorder_advice retail_stock_reorder_advice_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_reorder_advice
+    ADD CONSTRAINT retail_stock_reorder_advice_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_stock_reorder_advice retail_stock_reorder_advice_stock_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_stock_reorder_advice
+    ADD CONSTRAINT retail_stock_reorder_advice_stock_id_fkey FOREIGN KEY (retail_product_stock_id) REFERENCES public.retail_product_stock(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_shopping_lists retail_shopping_lists_created_by_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_shopping_lists
+    ADD CONSTRAINT retail_shopping_lists_created_by_person_id_fkey FOREIGN KEY (created_by_person_id) REFERENCES public.people(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retail_shopping_lists retail_shopping_lists_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_shopping_lists
+    ADD CONSTRAINT retail_shopping_lists_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_shopping_list_lines retail_shopping_list_lines_shopping_list_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_shopping_list_lines
+    ADD CONSTRAINT retail_shopping_list_lines_shopping_list_id_fkey FOREIGN KEY (shopping_list_id) REFERENCES public.retail_shopping_lists(id) ON DELETE CASCADE;
+
+
+--
+-- Name: retail_shopping_list_lines retail_shopping_list_lines_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_shopping_list_lines
+    ADD CONSTRAINT retail_shopping_list_lines_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_shopping_list_lines retail_shopping_list_lines_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_shopping_list_lines
+    ADD CONSTRAINT retail_shopping_list_lines_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE RESTRICT;
+
+
+--
+
+--
+
+--
+
+--
+
+--
+
+--
+
+--
+
+--
+
+--
+
+--
+
+--
+-- Name: retail_customer_orders retail_customer_orders_created_by_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_customer_orders
+    ADD CONSTRAINT retail_customer_orders_created_by_person_id_fkey FOREIGN KEY (created_by_person_id) REFERENCES public.people(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retail_customer_orders retail_customer_orders_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_customer_orders
+    ADD CONSTRAINT retail_customer_orders_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_customer_order_lines retail_customer_order_lines_customer_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_customer_order_lines
+    ADD CONSTRAINT retail_customer_order_lines_customer_order_id_fkey FOREIGN KEY (customer_order_id) REFERENCES public.retail_customer_orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: retail_customer_order_lines retail_customer_order_lines_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_customer_order_lines
+    ADD CONSTRAINT retail_customer_order_lines_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_customer_order_lines retail_customer_order_lines_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_customer_order_lines
+    ADD CONSTRAINT retail_customer_order_lines_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_order_allocations retail_order_allocations_customer_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_order_allocations
+    ADD CONSTRAINT retail_order_allocations_customer_order_id_fkey FOREIGN KEY (customer_order_id) REFERENCES public.retail_customer_orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: retail_order_allocations retail_order_allocations_customer_order_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_order_allocations
+    ADD CONSTRAINT retail_order_allocations_customer_order_line_id_fkey FOREIGN KEY (customer_order_line_id) REFERENCES public.retail_customer_order_lines(id) ON DELETE CASCADE;
+
+
+--
+-- Name: retail_order_allocations retail_order_allocations_organisation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_order_allocations
+    ADD CONSTRAINT retail_order_allocations_organisation_id_fkey FOREIGN KEY (organisation_id) REFERENCES public.organisations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_order_allocations retail_order_allocations_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_order_allocations
+    ADD CONSTRAINT retail_order_allocations_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: retail_order_allocations retail_order_allocations_stock_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_order_allocations
+    ADD CONSTRAINT retail_order_allocations_stock_id_fkey FOREIGN KEY (retail_product_stock_id) REFERENCES public.retail_product_stock(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: products products_brand_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5214,14 +6398,16 @@ INSERT INTO public.organisations (
     name,
     organisation_type,
     status,
-    default_locale
+    default_locale,
+    currency
 )
 VALUES (
     'mattanutra',
     'MattaNutra',
     'platform',
     'active',
-    'en'
+    'en',
+    'USD'
 )
 ON CONFLICT DO NOTHING;
 

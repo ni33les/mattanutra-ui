@@ -1189,11 +1189,12 @@ export async function getAdminExternalQueryData(
         metrics: {
           assessmentCompletions: flowNodeCount(flow, "assessmentSubmitted"),
           assessmentStarts: flowNodeCount(flow, "assessmentStarted"),
-          freeRequests: flowNodeCount(flow, "freeEmailRequested"),
+          freeRequests: 0,
           healthScoreViews: flowNodeCount(flow, "healthscoreViewed"),
           landingVisitors: flowNodeCount(flow, "landingViewed"),
           pendingReviews: reviews.summary.total,
           precisionConversions: flowNodeCount(flow, "precisionPaid"),
+          productOrders: flowNodeCount(flow, "retailOrderCreated"),
           proConversions: flowNodeCount(flow, "proPaid")
         },
         trends: {
@@ -1201,13 +1202,14 @@ export async function getAdminExternalQueryData(
           metrics: {
             assessmentCompletions: nodeSeries("assessmentSubmitted"),
             assessmentStarts: nodeSeries("assessmentStarted"),
-            freeRequests: nodeSeries("freeEmailRequested"),
+            freeRequests: flow.series.bucketLabels.map(() => 0),
             healthScoreViews: nodeSeries("healthscoreViewed"),
             landingVisitors: nodeSeries("landingViewed"),
             pendingReviews: flow.series.bucketLabels.map(
               () => reviews.summary.total
             ),
             precisionConversions: nodeSeries("precisionPaid"),
+            productOrders: nodeSeries("retailOrderCreated"),
             proConversions: nodeSeries("proPaid")
           }
         },

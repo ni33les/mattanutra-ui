@@ -70,6 +70,9 @@ export function AdminReviewQueueView({
     generatedAt: data.generatedAt,
   });
   const [errorReviewId, setErrorReviewId] = useState<string | null>(null);
+  const [errorReviewMessage, setErrorReviewMessage] = useState<string | null>(
+    null,
+  );
   const [savingReviewId, setSavingReviewId] = useState<string | null>(null);
   const [selectedReview, setSelectedReview] = useState<{
     associatedSupplementId: string;
@@ -114,6 +117,7 @@ export function AdminReviewQueueView({
   ) {
     setSavingReviewId(row.id);
     setErrorReviewId(null);
+    setErrorReviewMessage(null);
 
     try {
       const response = await fetch(`/api/admin/review-tasks/${row.id}`, {
@@ -196,6 +200,11 @@ export function AdminReviewQueueView({
     } catch (saveError) {
       console.error("Unable to resolve review task", saveError);
       setErrorReviewId(row.id);
+      setErrorReviewMessage(
+        saveError instanceof Error
+          ? saveError.message
+          : labels.supplements.updateError,
+      );
     } finally {
       setSavingReviewId(null);
     }
@@ -211,6 +220,7 @@ export function AdminReviewQueueView({
   ) {
     setSavingReviewId(row.id);
     setErrorReviewId(null);
+    setErrorReviewMessage(null);
 
     try {
       const response = await fetch(`/api/admin/review-tasks/${row.id}`, {
@@ -290,6 +300,11 @@ export function AdminReviewQueueView({
     } catch (decisionError) {
       console.error("Unable to update plan review", decisionError);
       setErrorReviewId(row.id);
+      setErrorReviewMessage(
+        decisionError instanceof Error
+          ? decisionError.message
+          : labels.supplements.updateError,
+      );
     } finally {
       setSavingReviewId(null);
     }
@@ -661,6 +676,11 @@ export function AdminReviewQueueView({
           associationOptions={supplementsData.rows}
           draft={visibleReview.draft}
           error={errorReviewId === visibleReview.draft.id}
+          errorMessage={
+            errorReviewId === visibleReview.draft.id
+              ? errorReviewMessage
+              : null
+          }
           headerNote={visibleReview.queuedLabel}
           labels={labels}
           locale={locale}

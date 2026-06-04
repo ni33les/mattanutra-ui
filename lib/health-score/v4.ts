@@ -1174,36 +1174,6 @@ function subtractionCopy(
           ? "你的日常背景"
           : "your daily context";
 
-  if (subtraction.mode === "products") {
-    if (locale === "th") {
-      return {
-        body:
-          `รายการผลิตภัณฑ์ที่ดีไม่ได้เกิดจากการใส่ทุกอย่างที่อาจช่วย แต่เกิดจากการตัดสิ่งที่ไม่พอดีออก จนเหลือเฉพาะสิ่งที่ตรงกับคะแนน ${goalList} และ${constraint}`,
-        labelChosen: "เหมาะกับแผนของคุณ",
-        labelEvaluated: "ผลิตภัณฑ์ที่ประเมิน",
-        labelSetAside: "ตัดออกสำหรับคุณ"
-      };
-    }
-
-    if (locale === "zh-CN") {
-      return {
-        body:
-          `好的产品候选清单不是把所有可能有帮助的东西都加入，而是不断移除不适合的选项，直到只留下匹配你的分数、${goalList}和${constraint}的产品。`,
-        labelChosen: "适合你的计划",
-        labelEvaluated: "已评估产品",
-        labelSetAside: "已为你排除"
-      };
-    }
-
-    return {
-      body:
-        `A good product shortlist is built by removing what does not fit until only what matches your score, ${goalList}, and ${constraint} remains.`,
-      labelChosen: "right for your plan",
-      labelEvaluated: "products evaluated",
-      labelSetAside: "set aside for you"
-    };
-  }
-
   if (locale === "th") {
     return {
       body:
@@ -1458,68 +1428,5 @@ export function computeHealthScore(
     symptomMultiplier: engine.multiplier,
     verification: engine.verification,
     version: "healthscore:v4"
-  };
-}
-
-export function applyHealthScoreProductSubtraction(
-  healthScore: HealthScoreResult,
-  stats: Readonly<{
-    productsChosen: number;
-    productsEvaluated: number;
-  }>
-): HealthScoreResult {
-  const pageContent = healthScore.pageContent;
-
-  if (!pageContent || stats.productsEvaluated <= 0 || stats.productsChosen <= 0) {
-    return healthScore;
-  }
-
-  const subtraction = {
-    chosen: stats.productsChosen,
-    evaluated: stats.productsEvaluated,
-    mode: "products" as const,
-    setAside: Math.max(0, stats.productsEvaluated - stats.productsChosen)
-  };
-	  const goals = pageContent.copySeeds.goalMirror
-	    .replace(/^You came here for /, "")
-	    .replace(/^คุณมาที่นี่เพื่อ/, "")
-	    .replace(/^你来到这里，是为了/, "")
-	    .replace(/\.$/, "")
-	    .replace(/。$/, "")
-	    .split(/,\s+and\s+|,\s+|\s+and\s+/)
-	    .filter(Boolean);
-	  const locale: Locale = /[\u0E00-\u0E7F]/.test(pageContent.copySeeds.goalMirror)
-	    ? "th"
-	    : /[\u3400-\u9FFF]/.test(pageContent.copySeeds.goalMirror)
-	      ? "zh-CN"
-	      : "en";
-  const textBits = subtractionCopy(
-    subtraction,
-    goals,
-    pageContent.locked.flagCodes,
-    locale
-  );
-  const nextPageContent: HealthScorePageContent = {
-    copySeeds: {
-      ...pageContent.copySeeds,
-      subtraction: {
-        ...subtraction,
-        ...textBits
-      }
-    },
-    locked: {
-      ...pageContent.locked,
-      subtraction
-    },
-    meta: {
-      ...pageContent.meta,
-      subtractionKey:
-        `${subtraction.mode}:${subtraction.evaluated}:${subtraction.setAside}:${subtraction.chosen}`
-    }
-  };
-
-  return {
-    ...healthScore,
-    pageContent: nextPageContent
   };
 }

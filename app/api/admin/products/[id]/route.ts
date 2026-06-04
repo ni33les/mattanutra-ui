@@ -12,6 +12,12 @@ import type {
   ProductConfidence,
   ProductKind
 } from "@/lib/product-recommendations";
+import {
+  normalizeCurrencyCode,
+  normalizeProductCountryCode,
+  normalizeProductCountryPricingStatus,
+  type ProductCountryPricing
+} from "@/lib/product-countries";
 import { isUuid } from "@/lib/assessment-store";
 
 export const runtime = "nodejs";
@@ -60,6 +66,42 @@ function countryCodesFromBody(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+}
+
+function countryPricingFromBody(value: unknown): ProductCountryPricing[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .flatMap((item): ProductCountryPricing[] => {
+      const record = item && typeof item === "object"
+        ? item as Record<string, unknown>
+        : null;
+      if (!record) {
+        return [];
+      }
+      const countryCode = normalizeProductCountryCode(record.countryCode);
+      const parsedRrp = parseOptionalNumber(record.rrpPriceAmount);
+      const rrpPriceAmount = parsedRrp === undefined ? null : parsedRrp;
+
+      return countryCode
+        ? [{
+            countryCode,
+            currency: normalizeCurrencyCode(record.currency, "THB"),
+            priceUpdatedAt: null,
+            pricingStatus: normalizeProductCountryPricingStatus(
+              record.pricingStatus,
+              rrpPriceAmount
+            ),
+            rrpPriceAmount
+          }]
+        : [];
+    });
 }
 
 function translationsFromBody(value: unknown) {
@@ -213,6 +255,7 @@ export async function PATCH(
       brandName: body.brandName === undefined
         ? undefined
         : textOrNull(body.brandName, 200),
+      countryPricing: countryPricingFromBody(body.countryPricing),
       description: body.description === undefined
         ? undefined
         : textOrNull(body.description, 4000),

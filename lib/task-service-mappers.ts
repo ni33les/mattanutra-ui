@@ -101,6 +101,21 @@ export function nonNegativeInteger(value: unknown, fallback: number) {
   return Math.max(0, Math.round(numeric));
 }
 
+export function nullableNumber(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numeric =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim()
+        ? Number(value)
+        : Number.NaN;
+
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 export function payloadRecord(payload: unknown) {
   return payload && typeof payload === "object" && !Array.isArray(payload)
     ? (payload as Record<string, unknown>)
@@ -204,6 +219,10 @@ export function mapTask(row: TaskRow): TaskRecord {
     parentTaskId: row.parent_task_id,
     payload: row.payload,
     planId: row.plan_id,
+    priorityReason: row.priority_reason,
+    priorityScore: nonNegativeInteger(row.priority_score, row.business_value),
+    profitImpactAmount: nullableNumber(row.profit_impact_amount),
+    profitImpactCurrency: row.profit_impact_currency,
     rayId: row.ray_id,
     reasoningEffort: row.reasoning_effort,
     requiredCapabilities: normalizeCapabilities(row.required_capabilities),
@@ -214,6 +233,9 @@ export function mapTask(row: TaskRow): TaskRecord {
     retryPolicy,
     retryRootTaskId: row.retry_root_task_id,
     scheduledFor: isoDate(row.scheduled_for) ?? new Date().toISOString(),
+    dueAt: isoDate(row.due_at),
+    sourceEntityId: row.source_entity_id,
+    sourceEntityType: row.source_entity_type,
     startedAt: isoDate(row.started_at),
     status: row.status,
     taskGroupId: row.task_group_id,

@@ -28,6 +28,7 @@ import {
   mapTask,
   mapWorkerSession,
   nonNegativeInteger,
+  nullableNumber,
   normalizedRetryPolicyJson,
   optionalText,
   payloadRecord,
@@ -580,6 +581,12 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
   const retryRootTaskId = uuidOrNull(input.retryRootTaskId) ?? retryOfTaskId;
   const payload = input.payload ?? {};
   const businessValue = normalizeTaskBusinessValue(input.businessValue);
+  const priorityScore = normalizeTaskBusinessValue(
+    input.priorityScore ?? businessValue
+  );
+  const profitImpactAmount = nullableNumber(input.profitImpactAmount);
+  const profitImpactCurrency =
+    optionalText(input.profitImpactCurrency)?.toUpperCase() ?? null;
   const groupLabel =
     optionalText(input.groupLabel) ??
     inheritedGroupLabel ??
@@ -591,6 +598,7 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
   const intendedScheduledFor = input.scheduledFor
     ? new Date(input.scheduledFor)
     : new Date();
+  const dueAt = input.dueAt ? new Date(input.dueAt) : null;
   const initialScheduledFor = hasDependencyInputs
     ? new Date(Date.now() + DEPENDENCY_BOOTSTRAP_DELAY_MS)
     : intendedScheduledFor;
@@ -645,6 +653,13 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
       context,
       payload,
       result_payload,
+      priority_score,
+      priority_reason,
+      profit_impact_amount,
+      profit_impact_currency,
+      due_at,
+      source_entity_type,
+      source_entity_id,
       idempotency_key,
       idempotency_scope_key,
       scheduled_for,
@@ -679,6 +694,13 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
       ${sql.json(toJsonValue(input.context ?? {}))},
       ${sql.json(toJsonValue(payload))},
       '{}'::jsonb,
+      ${priorityScore},
+      ${optionalText(input.priorityReason)},
+      ${profitImpactAmount},
+      ${profitImpactCurrency},
+      ${dueAt},
+      ${optionalText(input.sourceEntityType)},
+      ${uuidOrNull(input.sourceEntityId)}::uuid,
       ${idempotencyKey},
       ${idempotencyScopeKey},
       ${initialScheduledFor},
@@ -751,9 +773,13 @@ async function createTaskRecord(sql: Db, input: CreateTaskInput) {
 
   await insertTaskEvent(sql, {
     agentId: input.createdByAgentId,
-    eventPayload: {
-      businessValue: task.businessValue,
-      idempotencyKey,
+      eventPayload: {
+        businessValue: task.businessValue,
+        priorityReason: task.priorityReason,
+        priorityScore: task.priorityScore,
+        profitImpactAmount: task.profitImpactAmount,
+        profitImpactCurrency: task.profitImpactCurrency,
+        idempotencyKey,
       idempotencyScopeKey,
       idempotencyScope,
       maxRetries,
@@ -1778,7 +1804,7 @@ export async function reserveNextTask(
         )
       order by
         (
-          tasks.business_value
+          coalesce(tasks.priority_score, tasks.business_value)
           + least(
             200,
             floor(greatest(0, extract(epoch from now() - tasks.scheduled_for) - 300) / 900) * 10

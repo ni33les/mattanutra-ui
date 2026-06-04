@@ -42,6 +42,7 @@ export async function loadProductRows(productId?: string | null) {
       products.status,
 	      products.label_status,
 	      coalesce(product_country_rows.country_codes, array[upper(coalesce(nullif(products.region, ''), 'TH'))]) as available_country_codes,
+	      coalesce(product_country_rows.country_pricing, '[]'::jsonb) as country_pricing,
 	      coalesce(active_offer.availability_status, 'unknown') as availability_status,
       case
         when active_offer.link_type = 'affiliate' then 'active'
@@ -82,7 +83,18 @@ export async function loadProductRows(productId?: string | null) {
 	    left join public.product_brands
 	      on product_brands.id = products.brand_id
 	    left join lateral (
-	      select array_agg(product_countries.country_code order by product_countries.country_code) as country_codes
+	      select
+	        array_agg(product_countries.country_code order by product_countries.country_code) as country_codes,
+	        jsonb_agg(
+	          jsonb_build_object(
+	            'countryCode', product_countries.country_code,
+	            'currency', products.currency,
+	            'priceUpdatedAt', product_countries.updated_at,
+	            'pricingStatus', 'missing',
+	            'rrpPriceAmount', null
+	          )
+	          order by product_countries.country_code
+	        ) as country_pricing
 	      from public.product_countries
 	      where product_countries.product_id = products.id
 	    ) product_country_rows on true

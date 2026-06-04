@@ -4,13 +4,14 @@ import {
   startTransition,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { ExclamationTriangleIcon } from "@heroicons/react/20/solid";
 import { LandingReveal } from "@/components/landing-reveal";
-import { trackMarketplaceClick } from "@/components/product-click-tracking";
 import { formulationResultsCopy } from "@/components/formulation-results-copy";
 import {
   NutritionGuidancePreparingPanel,
@@ -112,7 +113,12 @@ export function FormulationResults({
   );
   const [result, setResult] = useState<FormulationResult | null>(initialResult);
   const [selectedProductStackPreference, setSelectedProductStackPreference] =
-    useState<ProductStackPreference | null>(() => initialStackPreference);
+    useState<ProductStackPreference | null>(() =>
+      initialStackPreference ??
+      (initialResult
+        ? defaultProductStackPreferenceForResult(initialResult)
+        : "balanced"),
+    );
   const [productPollingPreference, setProductPollingPreference] =
     useState<ProductStackPreference | null>(() => initialStackPreference);
   const productPollAttemptsRef = useRef(0);
@@ -989,10 +995,129 @@ function RevealProductsSection({
   const productOptionsById = new Map(
     productOptions.map((option) => [option.id, option]),
   );
+  const selectedProductOption = selectedProductStackPreference
+    ? productOptionsById.get(selectedProductStackPreference)
+    : selectProductRecommendationOption(productOptions, null);
+  const retailerOptions = [...(selectedProductOption?.retailerOptions ?? [])]
+    .filter((option) => option.organisationId && option.organisationName)
+    .sort((left, right) =>
+      (right.supplementProductCoveragePercent ?? 0) -
+        (left.supplementProductCoveragePercent ?? 0) ||
+      (right.totalPlanCoveragePercent ?? 0) -
+        (left.totalPlanCoveragePercent ?? 0) ||
+      (left.subtotalAmount ?? Number.POSITIVE_INFINITY) -
+        (right.subtotalAmount ?? Number.POSITIVE_INFINITY) ||
+      (left.etaDate ?? "").localeCompare(right.etaDate ?? ""),
+    )
+    .slice(0, 3);
   const controlPreferences =
     productOptions.length > 0 || result.productRecommendations
       ? productStackPreferenceOrder
       : [];
+  const productIds = useMemo(
+    () => products.map((product) => product.productId ?? product.id),
+    [products],
+  );
+  const productIdsKey = productIds.join("|");
+  const [basketSelection, setBasketSelection] = useState<{
+    ids: Set<string>;
+    productIdsKey: string;
+  }>(() => ({
+    ids: new Set(productIds),
+    productIdsKey,
+  }));
+  const selectedBasketIds =
+    basketSelection.productIdsKey === productIdsKey
+      ? basketSelection.ids
+      : new Set(productIds);
+  const updateSelectedBasketIds = useCallback(
+    (update: (current: Set<string>) => Set<string>) => {
+      setBasketSelection((current) => {
+        const base =
+          current.productIdsKey === productIdsKey
+            ? current.ids
+            : new Set(productIds);
+
+        return {
+          ids: update(base),
+          productIdsKey,
+        };
+      });
+    },
+    [productIds, productIdsKey],
+  );
+  const selectedBasketProducts = products.filter((product) =>
+    selectedBasketIds.has(product.productId ?? product.id),
+  );
+  const removedBasketProducts = products.filter(
+    (product) => !selectedBasketIds.has(product.productId ?? product.id),
+  );
+  const selectedBasketSubtotal = selectedBasketProducts.reduce(
+    (total, product) => total + (product.price?.amount ?? product.retailer?.unitPriceAmount ?? 0),
+    0,
+  );
+  const selectedBasketCurrency =
+    selectedBasketProducts.find((product) => product.price?.currency)?.price
+      ?.currency ??
+    selectedBasketProducts[0]?.price?.currency ??
+    "THB";
+  const selectedBasketCoverage = Math.min(
+    100,
+    Math.max(
+      0,
+      selectedBasketProducts.length === products.length
+        ? selectedCoverage
+        : selectedBasketProducts.reduce(
+            (total, product) => total + (product.stackContributionPercent ?? 0),
+            0,
+          ) || (selectedBasketProducts.length > 0 ? selectedCoverage : 0),
+    ),
+  );
+  const selectedBasketIdList = selectedBasketProducts.map(
+    (product) => product.productId ?? product.id,
+  );
+  const removedBasketIdList = removedBasketProducts.map(
+    (product) => product.productId ?? product.id,
+  );
+  const basketCheckoutHref =
+    selectedBasketIdList.length > 0
+      ? `/${locale}/basket/checkout?plan=${encodeURIComponent(planId)}&selected=${encodeURIComponent(selectedBasketIdList.join(","))}&removed=${encodeURIComponent(removedBasketIdList.join(","))}`
+      : "";
+  const basketAmountText = new Intl.NumberFormat(locale, {
+    currency: selectedBasketCurrency,
+    maximumFractionDigits: 0,
+    style: "currency",
+  }).format(selectedBasketSubtotal);
+  const basketLabels =
+    locale === "th"
+      ? {
+          addBack: "เพิ่มกลับ",
+          checkout: "ชำระเงิน",
+          empty: "เลือกสินค้าอย่างน้อยหนึ่งรายการเพื่อดำเนินการต่อ",
+          removed: "นำออกแล้ว",
+          remove: "นำออก",
+          selected: "สินค้าในตะกร้า",
+          subtotal: "ยอดรวม",
+        }
+      : locale === "zh-CN"
+        ? {
+            addBack: "加回",
+            checkout: "结账",
+            empty: "请至少选择一件产品继续",
+            removed: "已移除",
+            remove: "移除",
+            selected: "购物篮商品",
+            subtotal: "小计",
+          }
+        : {
+            addBack: "Add back",
+            checkout: "Checkout basket",
+            empty: "Select at least one product to continue",
+            removed: "Removed",
+            remove: "Remove",
+            selected: "Basket items",
+            subtotal: "Subtotal",
+          };
 
   async function requestProductStackPreference(
     preference: ProductStackPreference,
@@ -1190,102 +1315,185 @@ function RevealProductsSection({
             </p>
           </div>
         ) : (
-          <div
-            className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4"
-            data-reveal
-          >
-            {products.map((product, index) => (
-              <article
-                className="group flex flex-col overflow-hidden rounded-[1.25rem] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] transition hover:-translate-y-1 hover:ring-[var(--mn-teal)] motion-reduce:transition-none"
-                key={`${product.recommendationRunId ?? "product"}:${product.id}`}
+          <>
+            {retailerOptions.length > 0 ? (
+              <div
+                className="mt-10 grid gap-3 rounded-xl bg-[var(--mn-paper)] p-4 ring-1 ring-[var(--mn-line)] md:grid-cols-3"
+                data-reveal
               >
-                <div className="relative flex h-60 items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#fff,var(--mn-mint))]">
-                  <span className="absolute left-4 top-4 z-10 font-serif text-3xl italic text-[var(--mn-gold)]">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className="absolute right-4 top-4 z-10 rounded-full bg-white/85 px-3 py-1 text-[0.65rem] font-bold text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]">
-                    {copy.productVerified}
-                  </span>
-                  <div
-                    aria-hidden={true}
-                    className="absolute bottom-5 h-5 w-28 rounded-full bg-[color-mix(in_srgb,var(--mn-ink)_14%,transparent)] blur-md transition group-hover:scale-110 motion-reduce:transition-none"
-                  />
-                  {product.imageUrl ? (
-                    <Image
-                      alt={product.name}
-                      className="relative z-[1] h-full w-full object-contain p-8 transition duration-500 group-hover:-translate-y-1 group-hover:scale-[1.03] motion-reduce:transition-none"
-                      height={240}
-                      loading="eager"
-                      unoptimized={true}
-                      src={product.imageUrl}
-                      width={320}
-                    />
-                  ) : (
-                    <div className="relative z-[1] grid size-32 place-items-center rounded-[1.5rem] bg-white font-serif text-4xl italic text-[var(--mn-teal-deep)] shadow-sm ring-1 ring-[var(--mn-line)]">
-                      MN
+                {retailerOptions.map((option, index) => {
+                  const subtotal = Number(option.subtotalAmount);
+                  const currency = option.currency || "THB";
+                  const amountText = Number.isFinite(subtotal)
+                    ? new Intl.NumberFormat(locale, {
+                        currency,
+                        maximumFractionDigits: 0,
+                        style: "currency",
+                      }).format(subtotal)
+                    : null;
+
+                  return (
+                    <div
+                      className={`rounded-lg p-3 ring-1 ${
+                        index === 0
+                          ? "bg-[var(--mn-mint)] ring-[var(--mn-teal)]"
+                          : "bg-[var(--mn-cream)] ring-[var(--mn-line)]"
+                      }`}
+                      key={option.organisationId ?? option.organisationName}
+                    >
+                      <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
+                        {index === 0 ? "Selected pharmacy" : "Alternative"}
+                      </p>
+                      <p className="mt-1 font-serif text-xl font-medium leading-tight text-[var(--mn-ink)]">
+                        {option.organisationName}
+                      </p>
+                      <p className="mt-2 text-xs leading-5 text-[var(--mn-ink-soft)]">
+                        {amountText ? `${amountText} · ` : ""}
+                        {option.productCount ?? 0} products
+                        {option.backorderCount
+                          ? ` · ${option.backorderCount} backorder`
+                          : ""}
+                        {option.etaDate ? ` · ETA ${option.etaDate}` : ""}
+                      </p>
                     </div>
-                  )}
-                </div>
-                <div className="flex flex-1 flex-col p-5">
-                  <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--mn-ash)]">
-                    {localizedMarketplaceName(product.marketplace, locale)}
-                  </p>
-                  <h3
-                    className={`mt-2 min-h-12 font-serif text-xl font-medium text-[var(--mn-ink)] ${
-                      locale === "th" ? "leading-8" : "leading-tight"
-                    }`}
-                  >
-                    {product.name}
-                  </h3>
-                  <div className="mt-4 flex flex-wrap gap-1.5">
-                    {product.covers.slice(0, 4).map((cover) => (
-                      <span
-                        className="rounded-full bg-[var(--mn-mint)] px-2.5 py-1 text-xs font-semibold text-[var(--mn-teal-deep)]"
-                        key={cover}
+                  );
+                })}
+              </div>
+            ) : null}
+            <div
+              className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4"
+              data-reveal
+            >
+              {products.map((product, index) => {
+                const productId = product.productId ?? product.id;
+                const selected = selectedBasketIds.has(productId);
+
+                if (!selected) {
+                  return (
+                    <article
+                      className="flex items-center gap-4 rounded-xl bg-[var(--mn-paper)] p-4 opacity-75 ring-1 ring-[var(--mn-line)]"
+                      key={`${product.recommendationRunId ?? "product"}:${product.id}`}
+                    >
+                      {product.imageUrl ? (
+                        <Image
+                          alt={product.name}
+                          className="size-16 rounded-lg object-contain"
+                          height={64}
+                          loading="eager"
+                          unoptimized={true}
+                          src={product.imageUrl}
+                          width={64}
+                        />
+                      ) : null}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-[var(--mn-ash)]">
+                          {basketLabels.removed}
+                        </p>
+                        <h3 className="mt-1 truncate font-serif text-lg font-medium text-[var(--mn-ink)]">
+                          {product.name}
+                        </h3>
+                      </div>
+                      <button
+                        className="rounded-full bg-[var(--mn-mint)] px-3 py-1 text-xs font-bold text-[var(--mn-teal-deep)]"
+                        onClick={() => {
+                          updateSelectedBasketIds((current) => {
+                            const next = new Set(current);
+                            next.add(productId);
+                            return next;
+                          });
+                        }}
+                        type="button"
                       >
-                        {localizedCoverLabel(
-                          cover,
-                          locale,
-                          supplementLabelById,
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="mt-4 flex-1 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                    {localizedProductDescription({
-                      copy,
-                      locale,
-                      product,
-                      supplementLabelById,
-                    })}
-                  </p>
-                  <div className="mt-5 rounded-lg bg-[var(--mn-cream)] p-3 text-sm text-[var(--mn-ink-soft)] ring-1 ring-[var(--mn-line)]">
-                    <strong className="text-[var(--mn-ink)]">
-                      {product.servingMultiplier &&
-                      product.servingMultiplier > 1
-                        ? `${product.servingMultiplier} ${copy.productServingUnit}`
-                        : copy.productDoseRecommended}
-                    </strong>
-                    <br />
-                    {product.stackContributionPercent ??
-                      product.productCoveragePercent ??
-                      0}
-                    % {copy.contributionLabel}
-                  </div>
-                  <a
-                    className="mt-4 inline-flex items-center justify-between rounded-full bg-[var(--mn-teal)] px-4 py-3 text-sm font-bold text-white hover:bg-[var(--mn-teal-deep)]"
-                    href={product.url}
-                    onClick={() => trackMarketplaceClick(planId, product)}
-                    rel="noreferrer"
-                    target="_blank"
+                        {basketLabels.addBack}
+                      </button>
+                    </article>
+                  );
+                }
+
+                return (
+                  <article
+                    className="group flex flex-col overflow-hidden rounded-[1.25rem] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] transition hover:-translate-y-1 hover:ring-[var(--mn-teal)] motion-reduce:transition-none"
+                    key={`${product.recommendationRunId ?? "product"}:${product.id}`}
                   >
-                    {copy.viewProduct}
-                    <span aria-hidden={true}>→</span>
-                  </a>
-                </div>
-              </article>
-            ))}
-          </div>
+                    <div className="relative flex h-60 items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#fff,var(--mn-mint))]">
+                      <span className="absolute left-4 top-4 z-10 font-serif text-3xl italic text-[var(--mn-gold)]">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <span className="absolute right-4 top-4 z-10 rounded-full bg-white/85 px-3 py-1 text-[0.65rem] font-bold text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]">
+                        {copy.productVerified}
+                      </span>
+                      <div
+                        aria-hidden={true}
+                        className="absolute bottom-5 h-5 w-28 rounded-full bg-[color-mix(in_srgb,var(--mn-ink)_14%,transparent)] blur-md transition group-hover:scale-110 motion-reduce:transition-none"
+                      />
+                      {product.imageUrl ? (
+                        <Image
+                          alt={product.name}
+                          className="relative z-[1] h-full w-full object-contain p-8 transition duration-500 group-hover:-translate-y-1 group-hover:scale-[1.03] motion-reduce:transition-none"
+                          height={240}
+                          loading="eager"
+                          unoptimized={true}
+                          src={product.imageUrl}
+                          width={320}
+                        />
+                      ) : (
+                        <div className="relative z-[1] grid size-32 place-items-center rounded-[1.5rem] bg-white font-serif text-4xl italic text-[var(--mn-teal-deep)] shadow-sm ring-1 ring-[var(--mn-line)]">
+                          MN
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-1 flex-col p-5">
+                      <p className="mn-mono-label text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--mn-ash)]">
+                        {localizedMarketplaceName(product.marketplace, locale)}
+                      </p>
+                      <h3
+                        className={`mt-2 min-h-12 font-serif text-xl font-medium text-[var(--mn-ink)] ${
+                          locale === "th" ? "leading-8" : "leading-tight"
+                        }`}
+                      >
+                        {product.name}
+                      </h3>
+                      <div className="mt-4 flex flex-wrap gap-1.5">
+                        {product.covers.slice(0, 4).map((cover) => (
+                          <span
+                            className="rounded-full bg-[var(--mn-mint)] px-2.5 py-1 text-xs font-semibold text-[var(--mn-teal-deep)]"
+                            key={cover}
+                          >
+                            {localizedCoverLabel(
+                              cover,
+                              locale,
+                              supplementLabelById,
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-4 flex-1 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                        {localizedProductDescription({
+                          copy,
+                          locale,
+                          product,
+                          supplementLabelById,
+                        })}
+                      </p>
+                      <button
+                        className="mt-5 w-fit rounded-full border border-[var(--mn-line)] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--mn-ash)] transition hover:border-[var(--mn-teal)] hover:text-[var(--mn-teal-deep)]"
+                        onClick={() => {
+                          updateSelectedBasketIds((current) => {
+                            const next = new Set(current);
+                            next.delete(productId);
+                            return next;
+                          });
+                        }}
+                        type="button"
+                      >
+                        {basketLabels.remove}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </>
         )}
 
         <div
@@ -1354,11 +1562,11 @@ function RevealProductsSection({
                       <CountUpNumber
                         active={true}
                         duration={900}
-                        value={products.length}
+                        value={selectedBasketProducts.length}
                       />
                     </p>
                     <p className="text-sm text-[var(--mn-ash)]">
-                      {copy.selectedProducts}
+                      {basketLabels.selected}
                     </p>
                   </div>
                   <div>
@@ -1379,7 +1587,7 @@ function RevealProductsSection({
                       <CountUpNumber
                         active={true}
                         duration={1100}
-                        value={selectedCoverage}
+                        value={selectedBasketCoverage}
                       />
                       %
                     </p>
@@ -1387,6 +1595,25 @@ function RevealProductsSection({
                       {copy.compactCoverageLabel}
                     </p>
                   </div>
+                </div>
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--mn-ash)]">
+                      {basketLabels.subtotal}
+                    </p>
+                    <p className="mt-1 font-serif text-3xl font-medium text-[var(--mn-ink)]">
+                      {basketAmountText}
+                    </p>
+                  </div>
+                  {selectedBasketIdList.length > 0 ? (
+                    <Link className="mn-primary-button w-fit" href={basketCheckoutHref}>
+                      {basketLabels.checkout}
+                    </Link>
+                  ) : (
+                    <button className="mn-primary-button w-fit opacity-50" disabled type="button">
+                      {basketLabels.empty}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

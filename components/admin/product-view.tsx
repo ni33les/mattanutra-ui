@@ -118,6 +118,7 @@ export function AdminProductsView({
           accessToken,
           brandName: row.brandName,
           availableCountryCodes: row.availableCountryCodes,
+          countryPricing: row.countryPricing,
           description: row.description,
           descriptionEn: row.descriptionEn,
           descriptionTh: row.descriptionTh,
@@ -328,6 +329,7 @@ export function AdminProductsView({
             accessToken,
             action,
             availableCountryCodes: row.availableCountryCodes,
+            countryPricing: row.countryPricing,
             brandName: row.brandName,
             description: row.description,
             descriptionEn: row.descriptionEn,
@@ -589,6 +591,13 @@ function ProductModal({
         nextProductCountryCodes.length > 0
           ? nextProductCountryCodes
           : [nextManufacturerCountryCodes[0] ?? defaultProductCountryCode],
+      countryPricing: draft.countryPricing.filter((item) =>
+        (
+          nextProductCountryCodes.length > 0
+            ? nextProductCountryCodes
+            : [nextManufacturerCountryCodes[0] ?? defaultProductCountryCode]
+        ).includes(item.countryCode)
+      ),
       manufacturerCountryCodes: nextManufacturerCountryCodes,
     });
   }
@@ -603,22 +612,86 @@ function ProductModal({
       return;
     }
 
+    const nextCountryCodes = addProductCountryCode(
+      safeProductCountryCodes,
+      normalizedCountryCode,
+    );
+
     setDraft({
       ...draft,
-      availableCountryCodes: addProductCountryCode(
-        safeProductCountryCodes,
-        normalizedCountryCode,
-      ),
+      availableCountryCodes: nextCountryCodes,
+      countryPricing: [
+        ...draft.countryPricing.filter((item) =>
+          nextCountryCodes.includes(item.countryCode)
+        ),
+        ...(draft.countryPricing.some((item) =>
+          item.countryCode === normalizedCountryCode
+        )
+          ? []
+          : [{
+              countryCode: normalizedCountryCode,
+              currency: "THB",
+              priceUpdatedAt: null,
+              pricingStatus: "missing" as const,
+              rrpPriceAmount: null
+            }])
+      ],
     });
   }
 
   function removeAvailableCountry(countryCode: string) {
+    const nextCountryCodes = removeProductCountryCode(
+      safeProductCountryCodes,
+      countryCode,
+    );
+
     setDraft({
       ...draft,
-      availableCountryCodes: removeProductCountryCode(
-        safeProductCountryCodes,
-        countryCode,
+      availableCountryCodes: nextCountryCodes,
+      countryPricing: draft.countryPricing.filter((item) =>
+        nextCountryCodes.includes(item.countryCode)
       ),
+    });
+  }
+
+  function updateCountryPricing(
+    countryCode: string,
+    patch: Partial<AdminProductRow["countryPricing"][number]>,
+  ) {
+    const normalizedCountryCode = normalizeProductCountryCode(countryCode);
+
+    if (!normalizedCountryCode) {
+      return;
+    }
+
+    setDraft({
+      ...draft,
+      countryPricing: safeProductCountryCodes.map((code) => {
+        const current = draft.countryPricing.find(
+          (item) => item.countryCode === code
+        ) ?? {
+          countryCode: code,
+          currency: "THB",
+          priceUpdatedAt: null,
+          pricingStatus: "missing" as const,
+          rrpPriceAmount: null
+        };
+
+        return code === normalizedCountryCode
+          ? {
+              ...current,
+              ...patch,
+              countryCode: code,
+              pricingStatus:
+                patch.pricingStatus ??
+                (patch.rrpPriceAmount !== undefined
+                  ? patch.rrpPriceAmount === null
+                    ? "missing"
+                    : "ready"
+                  : current.pricingStatus)
+            }
+          : current;
+      }),
     });
   }
 
@@ -771,6 +844,7 @@ function ProductModal({
           addCountryLabel={viewLabels.addCountry}
           allowedCountryCodes={manufacturerCountryCodes}
           countryCodes={safeProductCountryCodes}
+          countryPricing={draft.countryPricing}
           disabledReason={
             manufacturerCountryCodes.length < 1
               ? viewLabels.addManufacturerCountryFirst
@@ -778,6 +852,7 @@ function ProductModal({
           }
           label={viewLabels.productCountries}
           onAdd={addAvailableCountry}
+          onPricingChange={updateCountryPricing}
           onRemove={removeAvailableCountry}
           removeLabel={viewLabels.remove}
         />

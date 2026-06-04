@@ -73,7 +73,7 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       source,
-      /runSupervisedAgentLoop\(\s*profileMode,\s*config,\s*slotIndex,\s*concurrency,/,
+      /runSupervisedAgentLoop\(\s*profileMode,\s*config,\s*slotIndex,\s*slotCount,/,
       "worker:all must supervise each real agent profile independently"
     );
     assert.match(
@@ -440,12 +440,10 @@ describe("external worker boundaries", () => {
       /product_recommendation_runs[\s\S]*generated_at >= greatest/,
       "late product-matching enqueue points must not create duplicate runs when current recommendations already exist"
     );
-    assert.equal(
-      /refreshHealthScoreProductSubtraction[\s\S]*enqueueHealthScoreAnalysisTask/.test(
-        taskResultApplierSource
-      ),
-      false,
-      "product readiness must update locked HealthScore subtraction without queuing a second HealthScore AI task"
+    assert.doesNotMatch(
+      taskResultApplierSource,
+      /applyHealthScoreProductSubtraction|refreshHealthScoreProductSubtraction|healthscore_product_subtraction_ready/,
+      "product readiness must not rewrite the HealthScore ingredient subtraction card"
     );
   });
 
@@ -518,6 +516,14 @@ describe("external worker boundaries", () => {
       /formulation_completion[\s\S]*queueProductRecommendationsForReadyPlan/,
       "product recommendations should be queued immediately once paid supplement guidance is ready"
     );
+  });
+
+  it("keeps public healthscore subtraction in ingredient mode", async () => {
+    const source = await readFile("lib/task-result-applier.ts", "utf8");
+
+    assert.doesNotMatch(source, /productsConsidered[\s\S]*healthScore/);
+    assert.doesNotMatch(source, /eventType: "healthscore_subtraction_mode_updated"/);
+    assert.doesNotMatch(source, /changeReason: "healthscore_product_subtraction_ready"/);
   });
 
   it("keeps checkout pre-generation hidden until paid selection is adopted", async () => {

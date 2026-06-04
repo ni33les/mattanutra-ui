@@ -8,6 +8,7 @@ import {
   agentRoleLabels,
   agentRolePermissions,
   agentRoles,
+  allowedAdminViews,
   adminViewAllowed,
   firstAllowedAdminView,
   adminRoleAllowedForOrganisationType,
@@ -60,13 +61,32 @@ describe("admin RBAC", () => {
     }
   });
 
-  it("keeps retail assistants out of access, finance, catalogue and execution views", () => {
+  it("keeps retail operations out of the platform admin daily scope", () => {
+    const principal = {
+      permissions: permissionsForRole("platform_owner"),
+      role: "platform_owner" as const
+    };
+    const platformViews = allowedAdminViews(principal, "platform");
+
+    assert.equal(platformViews.includes("stock"), false);
+    assert.equal(adminViewAllowed(principal, "stock", "platform"), false);
+    assert.equal(firstAllowedAdminView(principal, "glance", "platform"), "glance");
+    assert.equal(adminViewAllowed(principal, "stock", "tenant"), true);
+    assert.equal(
+      allowedAdminViews(principal, "tenant").includes("retail-customer-orders"),
+      true
+    );
+  });
+
+  it("gives retail assistants read-only stock and basic settings only", () => {
     const principal = {
       permissions: permissionsForRole("retail_assistant"),
       role: "retail_assistant" as const
     };
 
     assert.equal(adminViewAllowed(principal, "settings"), true);
+    assert.equal(adminViewAllowed(principal, "retail-customer-orders"), true);
+    assert.equal(adminViewAllowed(principal, "stock"), true);
     assert.equal(adminViewAllowed(principal, "glance"), false);
     assert.equal(adminViewAllowed(principal, "flow"), false);
     assert.equal(adminViewAllowed(principal, "access"), false);
@@ -76,16 +96,22 @@ describe("admin RBAC", () => {
     assert.equal(adminViewAllowed(principal, "financials"), false);
     assert.equal(adminViewAllowed(principal, "products"), false);
     assert.equal(adminViewAllowed(principal, "visibility"), false);
-    assert.equal(firstAllowedAdminView(principal), "settings");
+    assert.equal(
+      (permissionsForRole("retail_assistant") as readonly string[]).includes("stock.write"),
+      false
+    );
+    assert.equal(firstAllowedAdminView(principal), "retail-customer-orders");
   });
 
-  it("limits retail admins to settings while keeping organisation people visible there", () => {
+  it("gives retail admins stock access while keeping platform access pages closed", () => {
     const principal = {
       permissions: permissionsForRole("retail_admin"),
       role: "retail_admin" as const
     };
 
     assert.equal(adminViewAllowed(principal, "settings"), true);
+    assert.equal(adminViewAllowed(principal, "retail-customer-orders"), true);
+    assert.equal(adminViewAllowed(principal, "stock"), true);
     assert.equal(adminViewAllowed(principal, "people"), false);
     assert.equal(adminViewAllowed(principal, "memberships"), false);
     assert.equal(adminViewAllowed(principal, "organisations"), false);
@@ -95,7 +121,11 @@ describe("admin RBAC", () => {
     assert.equal(adminViewAllowed(principal, "financials"), false);
     assert.equal(adminViewAllowed(principal, "products"), false);
     assert.equal(adminViewAllowed(principal, "visibility"), false);
-    assert.equal(firstAllowedAdminView(principal), "settings");
+    assert.equal(
+      (permissionsForRole("retail_admin") as readonly string[]).includes("stock.write"),
+      true
+    );
+    assert.equal(firstAllowedAdminView(principal), "retail-customer-orders");
   });
 
   it("limits assignable roles to platform owner/admin and retail org roles", () => {
@@ -189,6 +219,9 @@ describe("admin RBAC", () => {
 	    const access = readFileSync("lib/admin-access.ts", "utf8");
 	    const route = readFileSync("app/api/admin/access/route.ts", "utf8");
 	    const accessView = readFileSync("components/admin/access-view.tsx", "utf8");
+	    const stockPlanner = readFileSync("lib/retail-stock-planner-agent.ts", "utf8");
+	    const stockPlannerScript = readFileSync("scripts/seed-retail-stock-planner-agent.ts", "utf8");
+	    const taskService = readFileSync("lib/task-service.ts", "utf8");
 
 	    assert.match(resolver, /join public\.organisation_memberships/);
 	    assert.match(resolver, /organisation_memberships\.id = agent_credentials\.membership_id/);
@@ -207,12 +240,26 @@ describe("admin RBAC", () => {
 	    assert.match(accessView, /filteredMembershipAgents/);
 	    assert.match(accessView, /setAddAgentAssociationOpen\(true\)/);
 	    assert.match(accessView, /setSelectedAgentMembershipId\(agent\.membershipId\)/);
+	    assert.match(stockPlanner, /export async function seedRetailStockPlannerAgent/);
+	    assert.match(stockPlanner, /SYSTEM_AGENTS\.retailStockPlanner/);
+	    assert.match(stockPlanner, /role = 'retail_agent'/);
+	    assert.match(stockPlanner, /organisation_type = 'tenant'[\s\S]*status = 'active'/);
+	    assert.match(stockPlanner, /principal_type,[\s\S]*agent_id,[\s\S]*role,[\s\S]*status/);
+	    assert.match(stockPlanner, /credential_hash/);
+	    assert.match(stockPlanner, /hashAdminToken\(apiKey\)/);
+	    assert.match(stockPlanner, /generatedApiKey/);
+	    assert.match(stockPlanner, /system\.retail_stock_planner_credential_generated/);
+	    assert.match(stockPlannerScript, /seedRetailStockPlannerAgent\(sql\)/);
+	    assert.match(taskService, /task_organisations\.organisation_type = 'platform'/);
+	    assert.match(taskService, /tasks\.organisation_id = \$\{accessScope\.organisationId\}::uuid/);
 	  });
 
   it("maps admin access APIs to access permissions while leaving passkey auth public", () => {
     assert.equal(permissionForAdminRequest("GET", "/api/admin/auth/session"), null);
     assert.equal(permissionForAdminRequest("POST", "/api/admin/auth/logout"), null);
     assert.equal(permissionForAdminRequest("POST", "/api/admin/settings"), "settings.read");
+    assert.equal(permissionForAdminRequest("GET", "/api/admin/retail-stock"), "stock.read");
+    assert.equal(permissionForAdminRequest("POST", "/api/admin/retail-stock"), "stock.write");
     assert.equal(permissionForAdminRequest("GET", "/api/admin/access"), "access.read");
     assert.equal(permissionForAdminRequest("POST", "/api/admin/access"), "access.write");
     assert.equal(
@@ -260,19 +307,73 @@ describe("admin RBAC", () => {
   it("keeps retail organisation settings separate from platform-only invites", () => {
     const access = readFileSync("lib/admin-access.ts", "utf8");
     const accessRoute = readFileSync("app/api/admin/access/route.ts", "utf8");
+    const accessView = readFileSync("components/admin/access-view.tsx", "utf8");
     const settingsRoute = readFileSync("app/api/admin/settings/route.ts", "utf8");
     const settingsView = readFileSync("components/admin/settings-view.tsx", "utf8");
 
     assert.match(access, /export async function getAdminSettingsData/);
     assert.match(access, /export async function updateEffectiveOrganisationSettings/);
-    assert.match(access, /context\.effectiveMembership\.role !== "retail_admin"/);
+    assert.match(access, /function normalOrganisationCurrency/);
+    assert.match(access, /function normalOrganisationCountry/);
+	    assert.match(access, /currency = \$\{normalizedCurrency\}/);
+	    assert.match(access, /country_code = \$\{normalizedCountryCode\}/);
+	    assert.match(access, /Only platform admins can update organisation currency/);
+	    assert.match(access, /canEditCustomerPriceMargin/);
+	    assert.match(access, /Customer margin can only be updated at platform level/);
+	    assert.match(access, /metadata = case/);
+	    assert.match(access, /when organisation_type = 'platform' then coalesce\(metadata, '\{\}'::jsonb\) \|\| \$\{sql\.json\(marginMetadataPatch\)\}::jsonb/);
+	    assert.match(access, /else coalesce\(metadata, '\{\}'::jsonb\) - 'customerPriceMarginPercent'/);
+	    assert.match(access, /context\.effectiveMembership\.role === "retail_admin"/);
     assert.match(accessRoute, /context\.actorMembership\.role !== "platform_owner"/);
     assert.match(accessRoute, /context\.actorMembership\.role !== "platform_admin"/);
-    assert.match(settingsRoute, /hasAdminPermission\(context, "settings\.read"\)/);
-    assert.match(settingsRoute, /action === "update_organisation"/);
-    assert.match(settingsView, /showRetailPeople/);
+    assert.match(accessRoute, /function currencyValue/);
+    assert.match(accessRoute, /function countryValue/);
+    assert.match(accessRoute, /const currency = currencyValue\(body\.currency, "THB"\)/);
+    assert.match(accessRoute, /const countryCode = countryValue\(body\.countryCode, "TH"\)/);
+    assert.match(accessRoute, /currency,/);
+    assert.match(accessRoute, /countryCode,/);
+    assert.match(accessView, /supportedOrganisationCurrencies/);
+    assert.match(accessView, /productCountryOptions/);
+    assert.match(accessView, /currency: String\(form\.get\("currency"\) \?\? "THB"\)/);
+    assert.match(accessView, /countryCode: String\(form\.get\("countryCode"\) \?\? "TH"\)/);
+    assert.match(accessView, /name="currency"/);
+    assert.match(accessView, /name="countryCode"/);
+    assert.match(accessView, /defaultValue=\{organisation\.currency\}/);
+    assert.match(accessView, /defaultValue=\{organisation\.countryCode\}/);
+    assert.match(accessView, /labels\.settings\.currency/);
+	    assert.match(settingsRoute, /hasAdminPermission\(context, "settings\.read"\)/);
+	    assert.match(settingsRoute, /action === "update_organisation"/);
+	    assert.match(settingsRoute, /currency: text\(body\.currency\)/);
+	    assert.match(settingsRoute, /Object\.hasOwn\(body, "customerPriceMarginPercent"\)/);
+	    assert.match(settingsView, /labels\.settings\.currency/);
+	    assert.match(settingsView, /canEditCustomerPriceMargin/);
+	    assert.match(settingsView, /\.\.\.\(canEditCustomerPriceMargin \? \{ customerPriceMarginPercent \} : \{\}\)/);
+	    assert.match(settingsView, /showRetailPeople/);
     assert.match(settingsView, /settingsData\.people\.map/);
     assert.match(settingsView, /fetch\("\/api\/admin\/settings"/);
+  });
+
+  it("audits every successful RBAC mutation path with clear admin actions", () => {
+    const access = readFileSync("lib/admin-access.ts", "utf8");
+    const route = readFileSync("app/api/admin/access/route.ts", "utf8");
+    const shared = readFileSync("components/admin/dashboard-shared.tsx", "utf8");
+
+    assert.match(route, /await createOrganisation\(\{\s*actor: context/);
+    assert.match(route, /await updateOrganisation\(\{\s*actor: context/);
+    assert.match(access, /action: "admin\.organisation_created"/);
+    assert.match(access, /action: "admin\.organisation_updated"/);
+    assert.match(access, /action: "admin\.person_updated"/);
+    assert.match(access, /action: "admin\.membership_updated"/);
+    assert.match(access, /action: "admin\.membership_added"/);
+    assert.match(access, /action: "admin\.membership_deleted"/);
+    assert.match(access, /action: "admin\.invite_created"/);
+    assert.match(access, /action: "admin\.invite_deleted"/);
+    assert.match(access, /action: "admin\.agent_invited"/);
+    assert.match(access, /action: "admin\.agent_membership_added"/);
+    assert.match(access, /action: "admin\.agent_membership_updated"/);
+    assert.match(access, /action: "admin\.agent_credential_generated"/);
+    assert.match(access, /action: "admin\.agent_credential_revoked"/);
+    assert.match(shared, /replaceAll\("\.", " "\)/);
   });
 
   it("expires and deletes pending admin invitations before they can be accepted", () => {

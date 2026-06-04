@@ -2,7 +2,10 @@ import { getSql } from "@/lib/db";
 import { toJsonValue } from "@/lib/assessment-store";
 import {
   defaultProductCountryCode,
+  normalizeCurrencyCode,
   normalizeProductCountryCodes,
+  normalizeProductCountryPricingStatus,
+  type ProductCountryPricing,
   type ProductCountryCode
 } from "@/lib/product-countries";
 import {
@@ -108,11 +111,17 @@ export async function replaceBrandCountryCodes(
 export async function replaceProductCountryCodes(
   sql: NonNullable<ReturnType<typeof getSql>>,
   productId: string,
-  countryCodes: readonly string[]
+  countryCodes: readonly string[],
+  countryPricing: readonly ProductCountryPricing[] = []
 ): Promise<ProductCountryCode[]> {
   const codes = normalizeSubmittedProductCountryCodes(
     countryCodes,
     "Product countries"
+  );
+  const pricingByCountry = new Map(
+    countryPricing
+      .filter((item) => codes.includes(item.countryCode))
+      .map((item) => [item.countryCode, item])
   );
 
   await sql`
@@ -125,16 +134,43 @@ export async function replaceProductCountryCodes(
     insert into public.product_countries (
       product_id,
       country_code,
+      rrp_price_amount,
+      currency,
+      pricing_status,
+      price_updated_at,
       created_at,
       updated_at
     )
     select
       ${productId}::uuid,
       country_code,
+      rrp_price_amount,
+      currency,
+      pricing_status,
+      case when rrp_price_amount is null then null else now() end,
       now(),
       now()
-    from unnest(${codes}::text[]) as input(country_code)
+    from unnest(
+      ${codes}::text[],
+      ${codes.map((code) => pricingByCountry.get(code)?.rrpPriceAmount ?? null)}::numeric[],
+      ${codes.map((code) => normalizeCurrencyCode(pricingByCountry.get(code)?.currency, "THB"))}::text[],
+      ${codes.map((code) =>
+        normalizeProductCountryPricingStatus(
+          pricingByCountry.get(code)?.pricingStatus,
+          pricingByCountry.get(code)?.rrpPriceAmount ?? null
+        )
+      )}::text[]
+    ) as input(country_code, rrp_price_amount, currency, pricing_status)
     on conflict (product_id, country_code) do update set
+      rrp_price_amount = excluded.rrp_price_amount,
+      currency = excluded.currency,
+      pricing_status = excluded.pricing_status,
+      price_updated_at = case
+        when product_countries.rrp_price_amount is distinct from excluded.rrp_price_amount
+          or product_countries.currency is distinct from excluded.currency
+          then now()
+        else product_countries.price_updated_at
+      end,
       updated_at = excluded.updated_at
   `;
 

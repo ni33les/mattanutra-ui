@@ -84,19 +84,27 @@ function taskMatchesMetric(
     return row.status === "completed";
   }
 
-  return true;
-}
-
-function taskActorClass(actorType: string) {
-  if (actorType === "human") {
-    return "bg-violet-50 text-violet-700 ring-violet-100";
-  }
-
-  return "bg-cyan-50 text-cyan-700 ring-cyan-100";
+  return row.status !== "completed";
 }
 
 function taskActorLabel(actorType: string, labels: AdminContent) {
   return actorType === "human" ? labels.visibility.human : labels.visibility.agent;
+}
+
+function taskAssigneeLabel(row: AdminTaskVisibilityRow, labels: AdminContent) {
+  if (row.assignedToName) {
+    return row.assignedToName;
+  }
+
+  if (row.assignedToType === "agent") {
+    return labels.visibility.agent;
+  }
+
+  if (row.assignedToType === "individual") {
+    return labels.visibility.human;
+  }
+
+  return labels.visibility.unassigned;
 }
 
 function relativeDuration(
@@ -272,6 +280,9 @@ function taskGroupTint(taskGroupId: string) {
   return palette[hash % palette.length];
 }
 
+const visibilityTaskGridClass =
+  "grid gap-3 lg:grid-cols-[9rem_8rem_minmax(0,13rem)_minmax(0,12rem)_minmax(0,1fr)_7rem]";
+
 export function AdminVisibilityView({
   data,
   heartbeatAt,
@@ -304,6 +315,9 @@ export function AdminVisibilityView({
     counts[row.taskGroupId] = (counts[row.taskGroupId] ?? 0) + 1;
     return counts;
   }, {});
+  const defaultVisibleTaskCount = data.rows.filter(
+    (row) => row.status !== "completed",
+  ).length;
   const selectMetric = (metricId: BusinessMetric["id"]) => {
     setSelectedMetricId(metricId as TaskMetricId);
     setSelectedTaskOverrideId(null);
@@ -314,7 +328,7 @@ export function AdminVisibilityView({
       id: "tasksTotal",
       label: labels.visibility.total,
       series: [],
-      value: formatNumber(data.summary.total, locale),
+      value: formatNumber(defaultVisibleTaskCount, locale),
     },
     {
       color: businessMetricColors.queued,
@@ -372,6 +386,19 @@ export function AdminVisibilityView({
 
       {visibleRows.length > 0 ? (
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+          <div
+            className={classNames(
+              visibilityTaskGridClass,
+              "hidden border-b border-gray-100 bg-gray-50 px-5 py-2 text-xs font-semibold text-gray-500 lg:grid",
+            )}
+          >
+            <span>{labels.visibility.status}</span>
+            <span>{labels.visibility.priority}</span>
+            <span>{labels.visibility.organisation}</span>
+            <span>{labels.visibility.assignee}</span>
+            <span>{labels.visibility.task}</span>
+            <span className="text-right">{labels.visibility.age}</span>
+          </div>
           <div className="divide-y divide-gray-100">
             {visibleRows.map((row) => (
               <VisibilityTaskRow
@@ -434,7 +461,7 @@ function VisibilityTaskRow({
       onClick={onClick}
       type="button"
     >
-      <div className="grid gap-3 sm:grid-cols-[9rem_8rem_8rem_minmax(0,1fr)_7rem] sm:items-center">
+      <div className={classNames(visibilityTaskGridClass, "lg:items-center")}>
         <span
           className={classNames(
             taskStatusClass(row.status),
@@ -451,13 +478,17 @@ function VisibilityTaskRow({
         >
           {taskValueLabel(row.effectiveBusinessValue, locale)}
         </span>
-        <span
-          className={classNames(
-            taskActorClass(row.actorType),
-            "w-max rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
-          )}
-        >
-          {taskActorLabel(row.actorType, labels)}
+        <span className="min-w-0 truncate text-xs font-semibold text-gray-600">
+          <span className="text-gray-400 lg:hidden">
+            {labels.visibility.organisation}:{" "}
+          </span>
+          {row.organisationName}
+        </span>
+        <span className="min-w-0 truncate text-xs font-semibold text-gray-600">
+          <span className="text-gray-400 lg:hidden">
+            {labels.visibility.assignee}:{" "}
+          </span>
+          {taskAssigneeLabel(row, labels)}
         </span>
         <h2 className="min-w-0 truncate text-sm font-semibold text-gray-900 sm:text-base">
           {row.title}
@@ -532,6 +563,14 @@ function VisibilityTaskDetailsModal({
           <SupplementListMeta
             label={labels.visibility.group}
             value={row.groupLabel ?? compactId(row.taskGroupId)}
+          />
+          <SupplementListMeta
+            label={labels.visibility.organisation}
+            value={`${row.organisationName} · ${readableToken(row.organisationType)}`}
+          />
+          <SupplementListMeta
+            label={labels.visibility.assignee}
+            value={taskAssigneeLabel(row, labels)}
           />
           <SupplementListMeta
             label={labels.visibility.actor}

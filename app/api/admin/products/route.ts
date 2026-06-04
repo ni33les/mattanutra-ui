@@ -12,6 +12,12 @@ import type {
   ProductConfidence,
   ProductKind
 } from "@/lib/product-recommendations";
+import {
+  normalizeCurrencyCode,
+  normalizeProductCountryCode,
+  normalizeProductCountryPricingStatus,
+  type ProductCountryPricing
+} from "@/lib/product-countries";
 
 export const runtime = "nodejs";
 
@@ -49,6 +55,43 @@ function countryCodesFromBody(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+}
+
+function countryPricingFromBody(value: unknown): ProductCountryPricing[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .flatMap((item): ProductCountryPricing[] => {
+      const record = item && typeof item === "object"
+        ? item as Record<string, unknown>
+        : null;
+
+      if (!record) {
+        return [];
+      }
+
+      const countryCode = normalizeProductCountryCode(record.countryCode);
+      const rrpPriceAmount = numberOrNull(record.rrpPriceAmount);
+
+      return countryCode
+        ? [{
+            countryCode,
+            currency: normalizeCurrencyCode(record.currency, "THB"),
+            priceUpdatedAt: null,
+            pricingStatus: normalizeProductCountryPricingStatus(
+              record.pricingStatus,
+              rrpPriceAmount
+            ),
+            rrpPriceAmount
+          }]
+        : [];
+    });
 }
 
 function parseProductKind(value: unknown): ProductKind | undefined {
@@ -148,6 +191,7 @@ export async function POST(request: Request) {
       brandName: textOrNull(body.brandName),
 	      currency: textOrNull(body.currency) ?? "THB",
 	      availableCountryCodes: countryCodesFromBody(body.availableCountryCodes),
+	      countryPricing: countryPricingFromBody(body.countryPricing),
 	      facts: factsFromBody(body.facts),
 	      fdaApprovalNumber: textOrNull(body.fdaApprovalNumber),
 	      imageUrl: textOrNull(body.imageUrl),
