@@ -7,6 +7,7 @@ import {
   selectBestCommunicationChannel,
   type CommunicationChannelCandidate
 } from "../lib/communication-channel-utils.ts";
+import { formatOutboundLineMessage } from "../lib/line-message-format.ts";
 
 type TestChannel = CommunicationChannelCandidate & { id: string };
 
@@ -81,6 +82,28 @@ describe("communications channel selection", () => {
     assert.equal(normalizeLineUserId("richard"), null);
   });
 
+  it("stamps outbound LINE messages with the actual non-production environment", () => {
+    const originalEnvironment = process.env.MATTANUTRA_ENV;
+
+    try {
+      process.env.MATTANUTRA_ENV = "uat";
+      assert.equal(formatOutboundLineMessage("Order ready"), "UAT\n\nOrder ready");
+      assert.equal(formatOutboundLineMessage("DEV\n\nOrder ready"), "UAT\n\nOrder ready");
+
+      process.env.MATTANUTRA_ENV = "dev";
+      assert.equal(formatOutboundLineMessage("Order ready"), "DEV\n\nOrder ready");
+
+      process.env.MATTANUTRA_ENV = "prd";
+      assert.equal(formatOutboundLineMessage("Order ready"), "Order ready");
+    } finally {
+      if (originalEnvironment === undefined) {
+        delete process.env.MATTANUTRA_ENV;
+      } else {
+        process.env.MATTANUTRA_ENV = originalEnvironment;
+      }
+    }
+  });
+
   it("defines organisation admin communication schema and task routing", async () => {
     const [
       schema,
@@ -147,7 +170,8 @@ describe("communications channel selection", () => {
     assert.match(view, /Create LINE connect code/);
     assert.match(view, /https:\/\/line\.me\/R\/ti\/p\/@344enooi/);
     assert.match(view, /MattaNutra LINE QR code/);
-    assert.match(lineFormat, /DEV\\n\\n/);
+    assert.match(lineFormat, /environment\.toUpperCase\(\)/);
+    assert.match(lineFormat, /\^\(DEV\|UAT\)\\n\\n/);
     assert.match(lineFormat, /MATTANUTRA_ENV/);
   });
 });

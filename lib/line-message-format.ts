@@ -30,7 +30,10 @@ export function formatOutboundLineMessage(message: string) {
   const environment = configuredEnvironment();
 
   if (environment === "dev" || environment === "uat") {
-    return text.startsWith("DEV\n\n") ? text : `DEV\n\n${text}`;
+    const prefix = environment.toUpperCase();
+    const body = text.replace(/^(DEV|UAT)\n\n/i, "");
+
+    return `${prefix}\n\n${body}`;
   }
 
   return text;
