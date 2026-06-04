@@ -21,7 +21,13 @@ import {
   type ProductRecommendationResult
 } from "@/lib/product-recommendations";
 import type { ProductRecommendationRetailerCandidateSet } from "@/lib/admin-products";
-import { refreshRetailStockReorderAdvice } from "@/lib/admin-retail-stock";
+import { executeRetailAgentCommand } from "@/lib/admin-retail-stock";
+import {
+  executeAdminCommunicationRouteTask,
+  executeCommunicationDispatchTask
+} from "@/lib/communications";
+import { getSql } from "@/lib/db";
+import { sendRetailOrderWorkflowEmailNow } from "@/lib/retail-order-workflow";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 import type { TaskWorkItem } from "@/lib/task-work-items";
 import type { SendTransactionalEmailResult } from "@/lib/smtp-email";
@@ -440,6 +446,72 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
     };
   }
 
+  if (workItem.taskType === "send_retail_order_workflow_email") {
+    const sql = getSql();
+
+    if (!sql) {
+      throw new Error("Retail order email task cannot run without a database");
+    }
+
+    const delivery = await sendRetailOrderWorkflowEmailNow({
+      event: workItem.event,
+      locale: workItem.locale,
+      orderId: workItem.orderId,
+      paymentId: workItem.paymentId,
+      planId: workItem.planId,
+      sql
+    });
+
+    return {
+      emailType: `retail_order_${workItem.event}`,
+      orderId: workItem.orderId,
+      paymentId: workItem.paymentId,
+      planId: workItem.planId,
+      reason: delivery.reason,
+      sent: delivery.sent,
+      taskId: workItem.taskId
+    };
+  }
+
+  if (workItem.taskType === "route_admin_communication") {
+    const routed = await executeAdminCommunicationRouteTask({
+      body: workItem.body,
+      channelType: workItem.channelType,
+      eventKey: workItem.eventKey,
+      metadata: workItem.metadata,
+      organisationId: workItem.organisationId,
+      resourceId: workItem.resourceId,
+      resourceType: workItem.resourceType,
+      subject: workItem.subject,
+      taskId: workItem.taskId
+    });
+
+    return {
+      dispatchTaskCount: routed.dispatchTasks.length,
+      messageCount: routed.messages.length,
+      messageIds: routed.messages.map((message) => message.id),
+      organisationId: workItem.organisationId
+    };
+  }
+
+  if (
+    workItem.taskType === "dispatch_chat_communication_message" ||
+    workItem.taskType === "dispatch_email_communication_message"
+  ) {
+    const dispatch = await executeCommunicationDispatchTask({
+      messageId: workItem.messageId
+    });
+
+    return {
+      attempted: dispatch.attempted,
+      messageId: dispatch.message.id,
+      organisationId: workItem.organisationId,
+      provider: dispatch.provider,
+      reason: dispatch.reason,
+      status: dispatch.message.status
+    };
+  }
+
   if (workItem.taskType === "client_safety_followup") {
     return { accepted: true };
   }
@@ -602,11 +674,17 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
   }
 
   if (workItem.taskType === "retail_stock_forecast_refresh") {
-    return refreshRetailStockReorderAdvice({
-      generatedByTaskId: workItem.taskId,
+    return executeRetailAgentCommand({
       organisationId: workItem.organisationId,
-      productId: workItem.productId,
-      stockId: workItem.stockId
+      payload: {
+        productId: workItem.productId,
+        source: workItem.source,
+        stockId: workItem.stockId
+      },
+      sourceEntityId: workItem.stockId,
+      sourceEntityType: "retail_product_stock",
+      taskId: workItem.taskId,
+      taskType: workItem.taskType
     });
   }
 
@@ -616,18 +694,22 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
       { organisationId: string }
     >;
 
-    return {
-      accepted: true,
-      humanApprovalRequired: true,
+    if (!("taskId" in retailWorkItem)) {
+      throw new Error(`Retail task ${workItem.taskType} is missing a task id`);
+    }
+
+    return executeRetailAgentCommand({
       organisationId: retailWorkItem.organisationId,
+      payload: "payload" in retailWorkItem ? retailWorkItem.payload : {},
       sourceEntityId: "sourceEntityId" in retailWorkItem
         ? retailWorkItem.sourceEntityId
         : null,
       sourceEntityType: "sourceEntityType" in retailWorkItem
         ? retailWorkItem.sourceEntityType
         : null,
+      taskId: retailWorkItem.taskId,
       taskType: retailWorkItem.taskType
-    };
+    });
   }
 
   throw new Error(`Unsupported task type: ${workItem.taskType}`);

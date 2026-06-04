@@ -1,0 +1,58 @@
+import { NextResponse, type NextRequest } from "next/server";
+import {
+  adminCsrfCookieName,
+  adminSessionCookieName,
+  resolveAdminSession
+} from "@/lib/admin-access";
+import { requestOriginAllowed } from "@/lib/admin-session-cookie";
+import { hasAdminPermission } from "@/lib/admin-rbac";
+import { createOrganisationLineConnectToken } from "@/lib/communications";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+function text(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function canAccessOrganisation(
+  context: NonNullable<Awaited<ReturnType<typeof resolveAdminSession>>>,
+  organisationId: string
+) {
+  return context.effectiveOrganisation.type === "platform" ||
+    context.effectiveOrganisation.id === organisationId;
+}
+
+export async function POST(request: NextRequest) {
+  if (!requestOriginAllowed(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const context = await resolveAdminSession({
+    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
+    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
+  });
+
+  if (!context || !hasAdminPermission(context, "communications.write")) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+  const organisationId = text(body.organisationId) || context.effectiveOrganisation.id;
+  const displayName = text(body.displayName);
+
+  if (!canAccessOrganisation(context, organisationId)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (!displayName) {
+    return NextResponse.json({ error: "Enter a contact name" }, { status: 400 });
+  }
+
+  const token = await createOrganisationLineConnectToken({
+    displayName,
+    organisationId
+  });
+
+  return NextResponse.json({ token });
+}

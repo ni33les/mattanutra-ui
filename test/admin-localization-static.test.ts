@@ -38,33 +38,37 @@ test("admin access management exposes people, organisations, memberships, agents
   assert.match(content, /name: "Audit", view: "audit"/);
   assert.match(content, /name: "Settings", view: "settings"/);
   assert.match(content, /retailTasksTitle: "Retail Tasks"/);
-  assert.match(content, /retailBuyingTitle: "Buying Stock"/);
+  assert.match(content, /retailBuyingTitle: "Purchasing"/);
   assert.match(content, /retailInventoryTitle: "Stock"/);
-  assert.match(content, /retailSellingTitle: "Selling Stock"/);
-  assert.match(content, /name: "Task Queue", view: "retail-task-queue"/);
-  assert.match(content, /name: "Audit", view: "retail-audit"/);
+  assert.match(content, /retailSellingTitle: "Orders"/);
+  assert.doesNotMatch(content, /view: "retail-task-queue"/);
+  assert.doesNotMatch(content, /name: "Audit", view: "retail-audit"/);
+  assert.match(content, /name: "Reorder Advice", view: "retail-stock-advice"/);
   assert.match(content, /name: "Shopping List", view: "retail-reorder"/);
   assert.doesNotMatch(content, /name: "Purchase Orders", view: "retail-purchase-orders"/);
+  assert.doesNotMatch(content, /view: "retail-receiving"/);
   assert.match(content, /name: "Stock", view: "stock"/);
-  assert.match(content, /name: "Stock Movements", view: "retail-movements"/);
+  assert.doesNotMatch(content, /name: "Stock Movements", view: "retail-movements"/);
   assert.match(content, /retailTasksTitle: "งานค้าปลีก"/);
-  assert.match(content, /retailBuyingTitle: "ซื้อสต็อก"/);
+  assert.match(content, /retailBuyingTitle: "จัดซื้อ"/);
   assert.match(content, /retailInventoryTitle: "สต็อก"/);
-  assert.match(content, /retailSellingTitle: "ขายสต็อก"/);
-  assert.match(content, /name: "คิวงาน", view: "retail-task-queue"/);
-  assert.match(content, /name: "บันทึกเหตุการณ์", view: "retail-audit"/);
+  assert.match(content, /retailSellingTitle: "คำสั่งซื้อ"/);
+  assert.doesNotMatch(content, /name: "บันทึกเหตุการณ์", view: "retail-audit"/);
+  assert.match(content, /name: "คำแนะนำการสั่งซื้อ", view: "retail-stock-advice"/);
   assert.match(content, /name: "รายการซื้อ", view: "retail-reorder"/);
   assert.match(content, /name: "สต็อก", view: "stock"/);
-  assert.match(content, /name: "การเคลื่อนไหวสต็อก", view: "retail-movements"/);
+  assert.doesNotMatch(content, /name: "การเคลื่อนไหวสต็อก", view: "retail-movements"/);
   assert.match(zh, /"retailTasksTitle": "零售任务"/);
-  assert.match(zh, /"retailBuyingTitle": "采购库存"/);
+  assert.match(zh, /"retailBuyingTitle": "采购"/);
   assert.match(zh, /"retailInventoryTitle": "库存"/);
-  assert.match(zh, /"retailSellingTitle": "销售库存"/);
-  assert.match(zh, /"name": "任务队列",\s*"view": "retail-task-queue"/);
-  assert.match(zh, /"name": "审计",\s*"view": "retail-audit"/);
+  assert.match(zh, /"retailSellingTitle": "订单"/);
+  assert.doesNotMatch(zh, /"view": "retail-task-queue"/);
+  assert.doesNotMatch(zh, /"name": "审计",\s*"view": "retail-audit"/);
+  assert.match(zh, /"name": "补货建议",\s*"view": "retail-stock-advice"/);
   assert.match(zh, /"name": "购物清单",\s*"view": "retail-reorder"/);
+  assert.doesNotMatch(zh, /"view": "retail-receiving"/);
   assert.match(zh, /"name": "库存",\s*"view": "stock"/);
-  assert.match(zh, /"name": "库存变动",\s*"view": "retail-movements"/);
+  assert.doesNotMatch(zh, /"name": "库存变动",\s*"view": "retail-movements"/);
   assert.match(
     content,
     /administration: \[\s*\{ icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" \},\s*\{ icon: UserGroupIcon, name: "Memberships", view: "memberships" \},\s*\{ icon: UserGroupIcon, name: "People", view: "people" \}/
@@ -333,16 +337,10 @@ test("admin Chinese label overrides cover the expanded admin UI contract", () =>
   assert.equal(zh.stock?.movementsTab, "变动");
   assert.equal(zh.stock?.reorderTab, "补货");
   assert.equal(zh.stock?.insightsTab, "洞察");
-  assert.equal(zh.stock?.taskQueue, "任务队列");
   assert.equal(zh.stock?.claimedBy, "已领取");
   assert.equal(zh.stock?.unclaimed, "未领取");
   assert.equal(zh.stock?.review, "审核");
-  assert.equal(zh.stock?.purchaseOrderDetails, "采购单详情");
-  assert.equal(zh.stock?.purchaseOrderStatusPartial, "部分接收");
-  assert.equal(zh.stock?.purchaseOrderStatusVoid, "作废");
-  assert.equal(zh.stock?.voidPurchaseOrder, "作废采购单");
   assert.equal(zh.stock?.taskDetails, "任务详情");
-  assert.equal(zh.stock?.addPurchaseOrder, "新建采购单");
   assert.equal(zh.stock?.addCustomerOrder, "添加客户订单");
   assert.equal(zh.stock?.customerOrderDetails, "客户订单详情");
   assert.equal(zh.stock?.regionalCheckout, "区域结账");
@@ -355,20 +353,17 @@ test("admin Chinese label overrides cover the expanded admin UI contract", () =>
   assert.equal(zh.stock?.stockPipeline, "库存管道");
   assert.equal(zh.stock?.customerDemand, "需求");
   assert.equal(zh.stock?.availableNow, "当前可用");
-  assert.equal(zh.stock?.incomingPo, "在途采购单");
-  assert.equal(zh.stock?.draftPo, "采购单草稿");
   assert.equal(zh.stock?.unorderedNeed, "未下单需求");
-  assert.equal(zh.stock?.buildDraftPo, "创建采购单草稿");
   assert.equal(zh.stock?.recheckWorkflow, "重新检查流程");
   assert.equal(zh.stock?.agentTasks, "代理任务");
   assert.equal(zh.stock?.audit, "审计");
   assert.equal(zh.stock?.event, "事件");
-  assert.equal(zh.stock?.receiveAll, "全部");
+  assert.equal(zh.stock?.receiveAll, undefined);
   assert.equal(zh.governanceTitle, "目录");
   assert.equal(zh.retailTasksTitle, "零售任务");
-  assert.equal(zh.retailBuyingTitle, "采购库存");
+  assert.equal(zh.retailBuyingTitle, "采购");
   assert.equal(zh.retailInventoryTitle, "库存");
-  assert.equal(zh.retailSellingTitle, "销售库存");
+  assert.equal(zh.retailSellingTitle, "订单");
 
   for (const key of [
     "agentSeen",

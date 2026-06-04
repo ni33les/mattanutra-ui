@@ -46,7 +46,6 @@ export function customerPriceMarginPercentFromMetadata(metadata: unknown) {
 }
 
 export async function getCustomerPriceMarginPercent(input: Readonly<{
-  organisationId?: string | null;
   sql?: Db | null;
 }> = {}) {
   const sql = input.sql ?? getSql();
@@ -55,20 +54,13 @@ export async function getCustomerPriceMarginPercent(input: Readonly<{
     return DEFAULT_CUSTOMER_PRICE_MARGIN_PERCENT;
   }
 
-  const rows = input.organisationId
-    ? await sql<Array<{ metadata: unknown }>>`
-        select metadata
-        from public.organisations
-        where id = ${input.organisationId}::uuid
-        limit 1
-      `
-    : await sql<Array<{ metadata: unknown }>>`
-        select metadata
-        from public.organisations
-        where lower(slug) = 'mattanutra'
-          and organisation_type = 'platform'
-        limit 1
-      `;
+  const rows = await sql<Array<{ metadata: unknown }>>`
+    select metadata
+    from public.organisations
+    where lower(slug) = 'mattanutra'
+      and organisation_type = 'platform'
+    limit 1
+  `;
 
   return customerPriceMarginPercentFromMetadata(rows[0]?.metadata);
 }

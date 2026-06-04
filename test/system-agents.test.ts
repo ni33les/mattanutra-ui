@@ -39,6 +39,8 @@ describe("system agents", () => {
       "analyze_healthscore",
       "client_safety_followup",
       "content_status_change",
+      "dispatch_chat_communication_message",
+      "dispatch_email_communication_message",
       "generate_example_supplement_guidance",
       "generate_food_gap_guidance",
       "generate_food_guidance",
@@ -48,20 +50,22 @@ describe("system agents", () => {
       "nutrition_plan_chat_reply",
       "refine_nutrition_plan",
       "retail_customer_order_allocate",
+      "retail_order_cancel_review",
+      "retail_order_delivery_confirm",
       "retail_order_pack",
       "retail_order_pick",
 	      "retail_order_return_review",
 	      "retail_order_ship",
-	      "retail_purchase_order_place_order",
-	      "retail_purchase_order_receive",
       "retail_stock_expiry_review",
       "retail_stock_forecast_refresh",
       "retail_stock_low_stock_digest",
       "retail_stock_low_stock_review",
       "retail_stock_movement_review",
       "retail_stock_reorder_review",
+      "route_admin_communication",
       "send_example_email",
       "send_reassessment_email",
+      "send_retail_order_workflow_email",
       "sync_digitalocean_billing"
     ]) {
       const agent = systemAgentForWorkTaskType(taskType);
@@ -93,6 +97,8 @@ describe("system agents", () => {
     assert.match(runner, /WORKER_STOCK_AGENT_API_KEYS/);
     assert.match(runner, /function workerAgentKeys/);
     assert.match(runner, /configs\.flatMap/);
+    assert.match(runner, /chat: agentProfile\("chatDispatcher"/);
+    assert.match(runner, /"dispatch_chat_communication_message"/);
     assert.match(runner, /stock: agentProfile\("retailStockPlanner"/);
   });
 });

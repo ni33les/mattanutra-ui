@@ -13,6 +13,7 @@ nextEnv.loadEnvConfig(process.cwd());
 type WorkerMode =
   | "advisor"
   | "all"
+  | "chat"
   | "communications"
   | "content"
   | "email"
@@ -36,6 +37,7 @@ const WORKER_PROFILE_STARTUP_STAGGER_MS = 350;
 const WORKER_RUN_ID = randomUUID();
 const WORKER_PROFILE_MODES: readonly WorkerProfileMode[] = [
   "advisor",
+  "chat",
   "communications",
   "content",
   "email",
@@ -125,7 +127,8 @@ function workerMode(value: string | undefined): WorkerMode {
     return "formulation";
   }
 
-  return value === "communications" ||
+  return value === "chat" ||
+    value === "communications" ||
     value === "content" ||
     value === "email" ||
     value === "food" ||
@@ -175,13 +178,19 @@ const WORKER_PROFILES: Record<WorkerProfileMode, WorkerAgentConfig> = {
     "nutrition_plan_chat_reply",
     "refine_nutrition_plan"
   ]),
+  chat: agentProfile("chatDispatcher", [
+    "dispatch_chat_communication_message"
+  ]),
   communications: agentProfile("communicationsCoordinator", [
-    "client_safety_followup"
+    "client_safety_followup",
+    "route_admin_communication"
   ]),
   content: agentProfile("contentPublisher", ["content_status_change"]),
   email: agentProfile("emailDispatcher", [
+    "dispatch_email_communication_message",
     "send_example_email",
-    "send_reassessment_email"
+    "send_reassessment_email",
+    "send_retail_order_workflow_email"
   ]),
   food: agentProfile("foodGuidanceWorker", ["generate_food_gap_guidance"]),
   formulation: agentProfile("formulationWorker", [
@@ -263,6 +272,16 @@ function requireConfigs(mode: WorkerProfileMode) {
   }
 
   return tokens.map((token) => ({ baseUrl, token }));
+}
+
+function workerProfileModesForRun(mode: WorkerMode) {
+  if (mode !== "all") {
+    return [mode] as readonly WorkerProfileMode[];
+  }
+
+  return WORKER_PROFILE_MODES.filter(
+    (profileMode) => profileMode !== "chat" || workerAgentKeys("chat").length > 0
+  );
 }
 
 async function executeWorkItem(
@@ -578,8 +597,7 @@ async function shutdown() {
 }
 
 async function runWorker(mode: WorkerMode) {
-  const modes =
-    mode === "all" ? WORKER_PROFILE_MODES : ([mode] as readonly WorkerProfileMode[]);
+  const modes = workerProfileModesForRun(mode);
   const loops = modes.flatMap((profileMode, profileIndex) => {
     const configs = requireConfigs(profileMode);
     const concurrency = workerConcurrency(profileMode);

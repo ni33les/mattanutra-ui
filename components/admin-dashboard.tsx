@@ -299,13 +299,11 @@ function adminViewDatabaseAvailable({
 
   if (
     view === "stock" ||
-    view === "retail-task-queue" ||
     view === "retail-audit" ||
-    view === "retail-purchase-orders" ||
-    view === "retail-receiving" ||
     view === "retail-movements" ||
     view === "retail-customer-orders" ||
     view === "retail-fulfillment" ||
+    view === "retail-stock-advice" ||
     view === "retail-reorder"
   ) {
     return retailStockData.databaseAvailable;
@@ -726,13 +724,11 @@ export function AdminDashboard({
               locale={locale}
             />
           ) : view === "stock" ||
-            view === "retail-task-queue" ||
             view === "retail-audit" ||
-            view === "retail-purchase-orders" ||
-            view === "retail-receiving" ||
             view === "retail-movements" ||
             view === "retail-customer-orders" ||
             view === "retail-fulfillment" ||
+            view === "retail-stock-advice" ||
             view === "retail-reorder" ? (
             <AdminRetailStockView
               accessToken={accessToken}

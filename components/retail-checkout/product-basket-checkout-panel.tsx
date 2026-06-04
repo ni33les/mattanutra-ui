@@ -386,12 +386,22 @@ export function ProductBasketCheckoutPanel({
   );
   const shippingLabels = countryFieldLabels(checkout.address.country, labels);
   const billingLabels = countryFieldLabels(checkout.billingAddress.country, labels);
-  const shippingErrors = validateAddress(checkout.address, labels, {
-    includeContact: true
-  });
-  const billingErrors = checkout.billingSameAsShipping
-    ? {}
-    : validateAddress(checkout.billingAddress, labels, { includeContact: false });
+  const shippingErrors = useMemo(
+    () =>
+      validateAddress(checkout.address, labels, {
+        includeContact: true
+      }),
+    [checkout.address, labels]
+  );
+  const billingErrors = useMemo(
+    () =>
+      checkout.billingSameAsShipping
+        ? {}
+        : validateAddress(checkout.billingAddress, labels, {
+            includeContact: false
+          }),
+    [checkout.billingAddress, checkout.billingSameAsShipping, labels]
+  );
   const formIsValid =
     Object.keys(shippingErrors).length === 0 &&
     Object.keys(billingErrors).length === 0 &&
@@ -476,7 +486,7 @@ export function ProductBasketCheckoutPanel({
     errors: Partial<Record<keyof AddressState, string>>
   ) => (checkout.touched[fieldKey(scope, field)] ? errors[field] : "");
 
-  const touchInvalidFields = () => {
+  const touchInvalidFields = useCallback(() => {
     setCheckout((current) => {
       const touched = { ...current.touched };
 
@@ -490,7 +500,7 @@ export function ProductBasketCheckoutPanel({
 
       return { ...current, touched };
     });
-  };
+  }, [billingErrors, shippingErrors]);
 
   const loadQuotePreview = useCallback(async (options?: {
     confirmDelivery?: boolean;
@@ -554,7 +564,9 @@ export function ProductBasketCheckoutPanel({
       return;
     }
 
-    void loadQuotePreview();
+    queueMicrotask(() => {
+      void loadQuotePreview();
+    });
   }, [checkout.address.country, loadQuotePreview, selectedItemIds.length]);
 
   const previewQuote = useCallback(async (): Promise<ProductBasketQuotePreview | null> => {
@@ -565,7 +577,7 @@ export function ProductBasketCheckoutPanel({
     }
 
     return loadQuotePreview({ confirmDelivery: true });
-  }, [formIsValid, loadQuotePreview]);
+  }, [formIsValid, loadQuotePreview, touchInvalidFields]);
 
   const createSession = useCallback(async () => {
     setError("");
@@ -650,7 +662,8 @@ export function ProductBasketCheckoutPanel({
     previewQuote,
     quotePreview,
     removedItemIds,
-    selectedItemIds
+    selectedItemIds,
+    touchInvalidFields
   ]);
 
   const completeMock = useCallback(async () => {

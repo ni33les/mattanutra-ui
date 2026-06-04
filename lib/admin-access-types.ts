@@ -140,6 +140,7 @@ export type AdminSettingsPerson = Readonly<{
 }>;
 
 export type AdminSettingsData = Readonly<{
+  canEditCustomerPriceMargin: boolean;
   canEditOrganisation: boolean;
   customerPriceMarginPercent: number;
   organisation: AdminOrganisation;

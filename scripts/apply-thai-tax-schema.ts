@@ -18,6 +18,8 @@ async function main() {
 
   console.log("Applying Thai tax rate schema...");
 
+  await sql`CREATE EXTENSION IF NOT EXISTS btree_gist;`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS public.thai_tax_rates (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

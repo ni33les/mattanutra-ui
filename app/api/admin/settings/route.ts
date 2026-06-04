@@ -113,7 +113,9 @@ export async function POST(request: NextRequest) {
       const updatedContext = await updateEffectiveOrganisationSettings({
         context,
         currency: text(body.currency),
-        customerPriceMarginPercent: numberValue(body.customerPriceMarginPercent),
+        customerPriceMarginPercent: Object.hasOwn(body, "customerPriceMarginPercent")
+          ? numberValue(body.customerPriceMarginPercent)
+          : undefined,
         defaultLocale: localeValue(body.defaultLocale),
         name
       });

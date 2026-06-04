@@ -7,30 +7,17 @@ import {
 import { requestOriginAllowed } from "@/lib/admin-session-cookie";
 import {
   advanceRetailCustomerOrder,
-  applyRetailShoppingList,
   allocateRetailCustomerOrder,
-  buildPurchaseOrderDraftFromBackorderTask,
-  createPurchaseOrderFromReorderAdvice,
   createRetailCustomerOrder,
-  createRetailPurchaseOrder,
   createRetailShoppingList,
   getAdminRetailStockData,
-  markRetailPurchaseOrderOrdered,
-  markRetailPurchaseOrderLineMissing,
   recordRetailStockMovement,
-  receiveRetailPurchaseOrderLine,
-  reconcileRetailPurchaseOrderLineShortfall,
   reconcileRetailOrderLifecycle,
+  reopenRetailShoppingList,
   setRetailStockStatus,
   updateRetailShoppingList,
-  updateRetailOperationsTask,
-  voidRetailPurchaseOrder,
   type CreateRetailCustomerOrderInput,
-  type CreateRetailPurchaseOrderInput,
   type CreateRetailShoppingListInput,
-  type RetailOperationsTaskAction,
-  type RetailPurchaseOrderShortfallResolution,
-  type RetailShoppingListAvailabilityStatus,
   type RetailShoppingListStatus,
   type RetailStockStatus,
   type UpdateRetailShoppingListInput,
@@ -40,6 +27,11 @@ import {
 import { hasAdminPermission } from "@/lib/admin-rbac";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { normalizeProductCountryCode } from "@/lib/product-countries";
+import {
+  executeRetailCommand,
+  getRetailCommand,
+  type RetailCommandId
+} from "@/lib/retail-command-registry";
 import type { BackorderPolicy } from "@/lib/retail-cart-availability";
 
 export const dynamic = "force-dynamic";
@@ -67,16 +59,8 @@ function backorderPolicyValue(value: unknown): BackorderPolicy {
   return value === "deny" ? "deny" : "allow";
 }
 
-function shoppingAvailabilityValue(
-  value: unknown
-): RetailShoppingListAvailabilityStatus {
-  return value === "available" || value === "partial" || value === "not_available"
-    ? value
-    : "unknown";
-}
-
 function shoppingListStatusValue(value: unknown): RetailShoppingListStatus {
-  return value === "closed" || value === "cancelled" ? value : "draft";
+  return value === "closed" ? "closed" : "active";
 }
 
 function movementValue(value: unknown) {
@@ -88,40 +72,6 @@ function movementValue(value: unknown) {
     value === "expiry_write_off"
     ? value
     : "receive";
-}
-
-function taskActionValue(value: unknown): RetailOperationsTaskAction {
-  return value === "claim" ||
-    value === "complete" ||
-    value === "snooze" ||
-    value === "escalate" ||
-    value === "cancel" ||
-    value === "recalculate"
-    ? value
-    : "claim";
-}
-
-function shortfallResolutionValue(
-  value: unknown
-): RetailPurchaseOrderShortfallResolution {
-  return value === "replacement_shipment" ||
-    value === "supplier_credit" ||
-    value === "supplier_refund" ||
-    value === "close_short" ||
-    value === "damaged_rejected"
-    ? value
-    : "supplier_backorder";
-}
-
-function shortfallResolutionClosesUnits(
-  resolution: RetailPurchaseOrderShortfallResolution
-) {
-  return (
-    resolution === "supplier_credit" ||
-    resolution === "supplier_refund" ||
-    resolution === "close_short" ||
-    resolution === "damaged_rejected"
-  );
 }
 
 function linesValue(value: unknown) {
@@ -150,6 +100,188 @@ function actionFailureMessage(action: string) {
   return "Stock update failed";
 }
 
+type RetailStockRouteHandler = (
+  context: NonNullable<Awaited<ReturnType<typeof resolveAdminSession>>>,
+  body: Record<string, unknown>
+) => Promise<{
+  resourceId: string | null;
+  resourceType?: string | null;
+  result: null;
+}>;
+
+function routeCommandId(action: string): RetailCommandId | null {
+  const command = getRetailCommand(action);
+
+  return command?.routeAction ? command.id : null;
+}
+
+const retailStockRouteHandlers: Partial<Record<RetailCommandId, RetailStockRouteHandler>> = {
+  async upsert_stock_item(context, body) {
+    const productId = text(body.productId);
+
+    if (!productId) {
+      throw new Error("Product is required");
+    }
+
+    const resourceId = await upsertRetailStockItem(context, {
+      backorderPolicy: backorderPolicyValue(body.backorderPolicy),
+      leadTimeDays: numberOrNull(body.leadTimeDays),
+      notes: text(body.notes) || null,
+      organisationId: text(body.organisationId) || null,
+      productId,
+      retailPriceAmount: numberOrNull(body.retailPriceAmount),
+      status: statusValue(body.status),
+      stockQuantity: numberOrNull(body.stockQuantity),
+      wholesalePriceAmount: numberOrNull(body.wholesalePriceAmount)
+    });
+
+    return { resourceId, result: null };
+  },
+  async set_stock_status(context, body) {
+    const resourceId = await setRetailStockStatus(context, {
+      id: text(body.id),
+      status: statusValue(body.status)
+    });
+
+    return { resourceId, result: null };
+  },
+  async record_stock_movement(context, body) {
+    const resourceId = await recordRetailStockMovement(context, {
+      expiresAt: text(body.expiresAt) || null,
+      lotId: text(body.lotId) || null,
+      movementType: movementValue(body.movementType),
+      notes: text(body.notes) || null,
+      quantity: Number(body.quantity),
+      reason: text(body.reason) || null,
+      retailPriceAmount: numberOrNull(body.retailPriceAmount),
+      stockId: text(body.stockId),
+      unitCostAmount: numberOrNull(body.unitCostAmount)
+    });
+
+    return { resourceId, result: null };
+  },
+  async void_stock_movement(context, body) {
+    const resourceId = await voidRetailStockMovement(context, {
+      movementId: text(body.movementId),
+      notes: text(body.notes) || null,
+      reason: text(body.reason) || null
+    });
+
+    return { resourceId, result: null };
+  },
+  async create_shopping_list(context, body) {
+    const resourceId = await createRetailShoppingList(context, {
+      lines: linesValue(body.lines).map((line) => ({
+        actualQuantity: numberOrNull(line.actualQuantity),
+        assignedQuantity: numberOrNull(line.assignedQuantity),
+        currentStockQuantity: numberOrNull(line.currentStockQuantity),
+        productId: text(line.productId),
+        requiredQuantity: Number(line.requiredQuantity),
+        retailPriceAmount: numberOrNull(line.retailPriceAmount),
+        unorderedNeedQuantity: numberOrNull(line.unorderedNeedQuantity),
+        wholesalePriceAmount: numberOrNull(line.wholesalePriceAmount)
+      })),
+      organisationId: text(body.organisationId) || null
+    } satisfies CreateRetailShoppingListInput);
+
+    return { resourceId, result: null };
+  },
+  async update_shopping_list(context, body) {
+    const resourceId = await updateRetailShoppingList(context, {
+      lines: linesValue(body.lines).map((line) => ({
+        actualQuantity: numberOrNull(line.actualQuantity),
+        assignedQuantity: numberOrNull(line.assignedQuantity),
+        currentStockQuantity: numberOrNull(line.currentStockQuantity),
+        id: text(line.id) || null,
+        productId: text(line.productId),
+        requiredQuantity: Number(line.requiredQuantity),
+        retailPriceAmount: numberOrNull(line.retailPriceAmount),
+        unorderedNeedQuantity: numberOrNull(line.unorderedNeedQuantity),
+        wholesalePriceAmount: numberOrNull(line.wholesalePriceAmount)
+      })),
+      shoppingListId: text(body.shoppingListId),
+      status: shoppingListStatusValue(body.status)
+    } satisfies UpdateRetailShoppingListInput);
+
+    return { resourceId, result: null };
+  },
+  async reopen_shopping_list(context, body) {
+    const resourceId = await reopenRetailShoppingList(context, {
+      shoppingListId: text(body.shoppingListId)
+    });
+
+    return { resourceId, result: null };
+  },
+  async create_customer_order(context, body) {
+    const rawShippingCountry = text(body.shippingCountry);
+    const shippingCountry = countryValue(body.shippingCountry);
+
+    if (rawShippingCountry && !shippingCountry) {
+      throw new Error("Invalid shipping country");
+    }
+
+    const resourceId = await createRetailCustomerOrder(context, {
+      customerEmail: text(body.customerEmail) || null,
+      customerName: text(body.customerName) || null,
+      dueAt: text(body.dueAt) || null,
+      lines: linesValue(body.lines).map((line) => ({
+        notes: text(line.notes) || null,
+        productId: text(line.productId),
+        quantityOrdered: Number(line.quantityOrdered),
+        retailPriceAmount: numberOrNull(line.retailPriceAmount)
+      })),
+      notes: text(body.notes) || null,
+      orderNumber: text(body.orderNumber) || null,
+      organisationId: text(body.organisationId) || null,
+      routingPreference:
+        text(body.routingPreference) === "cheapest_price"
+          ? "cheapest_price"
+          : "fastest_delivery",
+      selectedRetailerOrganisationId:
+        text(body.selectedRetailerOrganisationId) || null,
+      shippingCountry,
+      source: text(body.source) === "checkout" ? "checkout" : "manual"
+    } satisfies CreateRetailCustomerOrderInput);
+
+    return { resourceId, result: null };
+  },
+  async allocate_customer_order(context, body) {
+    const resourceId = await allocateRetailCustomerOrder(context, {
+      customerOrderId: text(body.customerOrderId)
+    });
+
+    return { resourceId, result: null };
+  },
+  async advance_customer_order(context, body) {
+    const orderAction = text(body.orderAction);
+    const resourceId = await advanceRetailCustomerOrder(context, {
+      action:
+        orderAction === "mark_picking" ||
+        orderAction === "mark_packed" ||
+        orderAction === "mark_shipped" ||
+        orderAction === "mark_delivered" ||
+        orderAction === "return" ||
+        orderAction === "cancel"
+          ? orderAction
+          : "mark_picking",
+      carrierName: text(body.carrierName) || null,
+      customerOrderId: text(body.customerOrderId),
+      shipmentNotes: text(body.shipmentNotes) || null,
+      trackingNumber: text(body.trackingNumber) || null,
+      trackingUrl: text(body.trackingUrl) || null
+    });
+
+    return { resourceId, result: null };
+  },
+  async reconcile_customer_order_lifecycle(context, body) {
+    const resourceId = await reconcileRetailOrderLifecycle(context, {
+      customerOrderId: text(body.customerOrderId)
+    });
+
+    return { resourceId, result: null };
+  }
+};
+
 export async function POST(request: NextRequest) {
   if (!requestOriginAllowed(request)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -174,392 +306,26 @@ export async function POST(request: NextRequest) {
 
   const action = text(body.action);
   const locale = localeValue(body.locale);
+  const commandId = routeCommandId(action);
+  const handler = commandId ? retailStockRouteHandlers[commandId] : null;
 
   try {
-
-    if (action === "upsert_stock_item") {
-      const productId = text(body.productId);
-
-      if (!productId) {
-        return NextResponse.json({ error: "Product is required" }, { status: 400 });
-      }
-
-      await upsertRetailStockItem(context, {
-        backorderPolicy: backorderPolicyValue(body.backorderPolicy),
-        leadTimeDays: numberOrNull(body.leadTimeDays),
-        notes: text(body.notes) || null,
-        organisationId: text(body.organisationId) || null,
-        productId,
-        retailPriceAmount: numberOrNull(body.retailPriceAmount),
-        status: statusValue(body.status),
-        stockQuantity: numberOrNull(body.stockQuantity),
-        wholesalePriceAmount: numberOrNull(body.wholesalePriceAmount)
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
+    if (!commandId || !handler) {
+      return NextResponse.json({ error: "Unknown stock action" }, { status: 400 });
     }
 
-    if (action === "set_stock_status") {
-      await setRetailStockStatus(context, {
-        id: text(body.id),
-        status: statusValue(body.status)
-      });
+    await executeRetailCommand({
+      actorKind: "human",
+      commandId,
+      context,
+      handler: () => handler(context, body),
+      payload: body
+    });
 
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "record_stock_movement") {
-      await recordRetailStockMovement(context, {
-        expiresAt: text(body.expiresAt) || null,
-        lotId: text(body.lotId) || null,
-        movementType: movementValue(body.movementType),
-        notes: text(body.notes) || null,
-        quantity: Number(body.quantity),
-        reason: text(body.reason) || null,
-        retailPriceAmount: numberOrNull(body.retailPriceAmount),
-        stockId: text(body.stockId),
-        unitCostAmount: numberOrNull(body.unitCostAmount)
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "void_stock_movement") {
-      await voidRetailStockMovement(context, {
-        movementId: text(body.movementId),
-        notes: text(body.notes) || null,
-        reason: text(body.reason) || null
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "create_shopping_list") {
-      await createRetailShoppingList(context, {
-        lines: linesValue(body.lines).map((line) => ({
-          availabilityStatus: shoppingAvailabilityValue(line.availabilityStatus),
-          currentStockQuantity: numberOrNull(line.currentStockQuantity),
-          notes: text(line.notes) || null,
-          productId: text(line.productId),
-          purchasedQuantity: numberOrNull(line.purchasedQuantity),
-          requiredQuantity: Number(line.requiredQuantity),
-          retailPriceAmount: numberOrNull(line.retailPriceAmount),
-          suggestedQuantity: numberOrNull(line.suggestedQuantity),
-          unorderedNeedQuantity: numberOrNull(line.unorderedNeedQuantity),
-          wholesalePriceAmount: numberOrNull(line.wholesalePriceAmount),
-          wholesalerTried: text(line.wholesalerTried) || null
-        })),
-        notes: text(body.notes) || null,
-        organisationId: text(body.organisationId) || null
-      } satisfies CreateRetailShoppingListInput);
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "update_shopping_list") {
-      await updateRetailShoppingList(context, {
-        lines: linesValue(body.lines).map((line) => ({
-          availabilityStatus: shoppingAvailabilityValue(line.availabilityStatus),
-          currentStockQuantity: numberOrNull(line.currentStockQuantity),
-          id: text(line.id) || null,
-          notes: text(line.notes) || null,
-          productId: text(line.productId),
-          purchasedQuantity: numberOrNull(line.purchasedQuantity),
-          requiredQuantity: Number(line.requiredQuantity),
-          retailPriceAmount: numberOrNull(line.retailPriceAmount),
-          suggestedQuantity: numberOrNull(line.suggestedQuantity),
-          unorderedNeedQuantity: numberOrNull(line.unorderedNeedQuantity),
-          wholesalePriceAmount: numberOrNull(line.wholesalePriceAmount),
-          wholesalerTried: text(line.wholesalerTried) || null
-        })),
-        notes: text(body.notes) || null,
-        shoppingListId: text(body.shoppingListId),
-        status: shoppingListStatusValue(body.status)
-      } satisfies UpdateRetailShoppingListInput);
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "apply_shopping_list") {
-      await applyRetailShoppingList(context, {
-        shoppingListId: text(body.shoppingListId)
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "create_purchase_order") {
-      await createRetailPurchaseOrder(context, {
-        expectedAt: text(body.expectedAt) || null,
-        lines: linesValue(body.lines).map((line) => ({
-          expectedExpiresAt: text(line.expectedExpiresAt) || null,
-          notes: text(line.notes) || null,
-          productId: text(line.productId),
-          quantityOrdered: Number(line.quantityOrdered),
-          wholesalePriceAmount: numberOrNull(line.wholesalePriceAmount)
-        })),
-        notes: text(body.notes) || null,
-        organisationId: text(body.organisationId) || null,
-        poNumber: text(body.poNumber) || null,
-        supplierContact: text(body.supplierContact) || null,
-        supplierName: text(body.supplierName)
-      } satisfies CreateRetailPurchaseOrderInput);
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "create_purchase_order_from_reorder_advice") {
-      await createPurchaseOrderFromReorderAdvice(context, {
-        adviceId: text(body.adviceId),
-        notes: text(body.notes) || null,
-        supplierName: text(body.supplierName) || null
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "build_purchase_order_from_backorder_task") {
-      await buildPurchaseOrderDraftFromBackorderTask(context, {
-        expectedAt: text(body.expectedAt) || null,
-        lines: linesValue(body.lines).map((line) => ({
-          expectedExpiresAt: text(line.expectedExpiresAt) || null,
-          notes: text(line.notes) || null,
-          productId: text(line.productId),
-          quantityOrdered: Number(line.quantityOrdered),
-          wholesalePriceAmount: numberOrNull(line.wholesalePriceAmount)
-        })),
-        notes: text(body.notes) || null,
-        purchaseOrderId: text(body.purchaseOrderId) || null,
-        supplierContact: text(body.supplierContact) || null,
-        supplierName: text(body.supplierName) || null,
-        taskId: text(body.taskId)
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "mark_purchase_order_ordered") {
-      await markRetailPurchaseOrderOrdered(context, {
-        purchaseOrderId: text(body.purchaseOrderId)
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "void_purchase_order") {
-      await voidRetailPurchaseOrder(context, {
-        purchaseOrderId: text(body.purchaseOrderId)
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "receive_purchase_order_lines") {
-      for (const line of linesValue(body.lines)) {
-        const lineId = text(line.lineId);
-        const quantity = Number(line.quantityReceived ?? line.quantity ?? 0);
-        const shortfallResolution = shortfallResolutionValue(
-          line.shortfallResolution
-        );
-        const reconcileShortfall =
-          Boolean(line.reconcileShortfall) ||
-          Boolean(line.markMissing) ||
-          shortfallResolutionClosesUnits(shortfallResolution) ||
-          Boolean(text(line.shortfallReference)) ||
-          Boolean(text(line.shortfallExpectedAt));
-
-        if (quantity > 0) {
-          await receiveRetailPurchaseOrderLine(context, {
-            expiresAt: null,
-            lineId,
-            notes: text(body.notes) || null,
-            quantity,
-            reason: text(body.reason) || null
-          });
-        }
-
-        if (reconcileShortfall) {
-          await reconcileRetailPurchaseOrderLineShortfall(context, {
-            expectedAt: text(line.shortfallExpectedAt) || null,
-            lineId,
-            notes: text(body.notes) || null,
-            reason: text(body.reason) || null,
-            reference: text(line.shortfallReference) || null,
-            resolution: Boolean(line.markMissing)
-              ? "close_short"
-              : shortfallResolution
-          });
-        }
-      }
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "receive_purchase_order_line") {
-      await receiveRetailPurchaseOrderLine(context, {
-        expiresAt: null,
-        lineId: text(body.lineId),
-        notes: text(body.notes) || null,
-        quantity: Number(body.quantity),
-        reason: text(body.reason) || null
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "mark_purchase_order_line_missing") {
-      await markRetailPurchaseOrderLineMissing(context, {
-        lineId: text(body.lineId),
-        notes: text(body.notes) || null,
-        reason: text(body.reason) || null,
-        resolution: "close_short"
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "create_customer_order") {
-      const rawShippingCountry = text(body.shippingCountry);
-      const shippingCountry = countryValue(body.shippingCountry);
-
-      if (rawShippingCountry && !shippingCountry) {
-        return NextResponse.json(
-          { error: "Invalid shipping country" },
-          { status: 400 }
-        );
-      }
-
-      await createRetailCustomerOrder(context, {
-        customerEmail: text(body.customerEmail) || null,
-        customerName: text(body.customerName) || null,
-        dueAt: text(body.dueAt) || null,
-        lines: linesValue(body.lines).map((line) => ({
-          notes: text(line.notes) || null,
-          productId: text(line.productId),
-          quantityOrdered: Number(line.quantityOrdered),
-          retailPriceAmount: numberOrNull(line.retailPriceAmount)
-        })),
-        notes: text(body.notes) || null,
-        orderNumber: text(body.orderNumber) || null,
-        organisationId: text(body.organisationId) || null,
-        routingPreference:
-          text(body.routingPreference) === "cheapest_price"
-            ? "cheapest_price"
-            : "fastest_delivery",
-        selectedRetailerOrganisationId:
-          text(body.selectedRetailerOrganisationId) || null,
-        shippingCountry,
-        source: text(body.source) === "checkout" ? "checkout" : "manual"
-      } satisfies CreateRetailCustomerOrderInput);
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "allocate_customer_order") {
-      await allocateRetailCustomerOrder(context, {
-        customerOrderId: text(body.customerOrderId)
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "advance_customer_order") {
-      const orderAction = text(body.orderAction);
-
-      await advanceRetailCustomerOrder(context, {
-        action:
-          orderAction === "mark_picking" ||
-          orderAction === "mark_packed" ||
-          orderAction === "mark_shipped" ||
-          orderAction === "mark_delivered" ||
-          orderAction === "return" ||
-          orderAction === "cancel"
-            ? orderAction
-            : "mark_picking",
-        customerOrderId: text(body.customerOrderId)
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "reconcile_customer_order_lifecycle") {
-      await reconcileRetailOrderLifecycle(context, {
-        customerOrderId: text(body.customerOrderId)
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    if (action === "update_retail_task") {
-      await updateRetailOperationsTask(context, {
-        action: taskActionValue(body.taskAction),
-        taskId: text(body.taskId)
-      });
-
-      return NextResponse.json({
-        data: await getAdminRetailStockData(context, locale),
-        updated: true
-      });
-    }
-
-    return NextResponse.json({ error: "Unknown stock action" }, { status: 400 });
+    return NextResponse.json({
+      data: await getAdminRetailStockData(context, locale),
+      updated: true
+    });
   } catch (error) {
     return NextResponse.json(
       {

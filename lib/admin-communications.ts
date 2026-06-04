@@ -2,6 +2,15 @@ import {
   adminDashboardRangeStart,
   type AdminDashboardRange
 } from "@/lib/admin-dashboard-data";
+import type { AdminSessionContext } from "@/lib/admin-access-types";
+import {
+  adminCommunicationEventKeys,
+  listOrganisationCommunicationChannels,
+  listOrganisationNotificationPreferences,
+  type AdminCommunicationEventKey,
+  type CommunicationChannel,
+  type OrganisationNotificationPreference
+} from "@/lib/communications";
 import { getSql } from "@/lib/db";
 
 export type AdminCommunicationStatus =
@@ -35,6 +44,7 @@ export type AdminCommunicationRow = Readonly<{
 export type AdminCommunicationsData = Readonly<{
   databaseAvailable: boolean;
   generatedAt: string;
+  organisationSettings: AdminOrganisationCommunicationSettings | null;
   rows: AdminCommunicationRow[];
   summary: {
     delivered: number;
@@ -45,6 +55,21 @@ export type AdminCommunicationsData = Readonly<{
     skipped: number;
     total: number;
   };
+}>;
+
+export type AdminCommunicationOrganisation = Readonly<{
+  id: string;
+  name: string;
+  slug: string;
+}>;
+
+export type AdminOrganisationCommunicationSettings = Readonly<{
+  canManage: boolean;
+  channels: CommunicationChannel[];
+  eventKeys: AdminCommunicationEventKey[];
+  organisations: AdminCommunicationOrganisation[];
+  preferences: OrganisationNotificationPreference[];
+  selectedOrganisationId: string;
 }>;
 
 type CommunicationDbRow = Readonly<{
@@ -95,6 +120,7 @@ export function emptyCommunicationsData(): AdminCommunicationsData {
   return {
     databaseAvailable: false,
     generatedAt: new Date().toISOString(),
+    organisationSettings: null,
     rows: [],
     summary: {
       delivered: 0,
@@ -157,8 +183,72 @@ function buildSummary(rows: CommunicationSummaryRow[]) {
   return summary;
 }
 
+export async function getAdminOrganisationCommunicationSettings(
+  context: AdminSessionContext,
+  selectedOrganisationId?: string | null
+): Promise<AdminOrganisationCommunicationSettings | null> {
+  const sql = getSql();
+
+  if (!sql) {
+    return null;
+  }
+
+  const platformScope = context.effectiveOrganisation.type === "platform";
+  const organisationRows = platformScope
+    ? await sql<Array<{ id: string; name: string; slug: string }>>`
+        select id::text, name, slug
+        from public.organisations
+        where organisation_type = 'tenant'
+          and status = 'active'
+        order by lower(name) asc
+      `
+    : [{
+        id: context.effectiveOrganisation.id,
+        name: context.effectiveOrganisation.name,
+        slug: context.effectiveOrganisation.slug
+      }];
+  const selected =
+    organisationRows.find((row) => row.id === selectedOrganisationId) ??
+    organisationRows.find((row) => row.id === context.effectiveOrganisation.id) ??
+    organisationRows[0] ??
+    null;
+
+  if (!selected) {
+    return null;
+  }
+
+  const [channels, preferences] = await Promise.all([
+    listOrganisationCommunicationChannels({
+      organisationId: selected.id,
+      sql
+    }),
+    listOrganisationNotificationPreferences({
+      organisationId: selected.id,
+      sql
+    })
+  ]);
+
+  return {
+    canManage:
+      !context.isLegacy &&
+      (
+        context.effectiveMembership.role === "platform_owner" ||
+        context.effectiveMembership.role === "platform_admin" ||
+        context.effectiveMembership.role === "retail_admin" ||
+        context.effectiveMembership.role === "retail_agent"
+      ),
+    channels,
+    eventKeys: adminCommunicationEventKeys.filter((key) => key !== "admin_test_message"),
+    organisations: organisationRows,
+    preferences,
+    selectedOrganisationId: selected.id
+  };
+}
+
 export async function getAdminCommunicationsData(
-  range: AdminDashboardRange
+  range: AdminDashboardRange,
+  context?: AdminSessionContext | null,
+  selectedOrganisationId?: string | null
 ): Promise<AdminCommunicationsData> {
   const sql = getSql();
 
@@ -168,14 +258,27 @@ export async function getAdminCommunicationsData(
 
   try {
     const start = adminDashboardRangeStart(range);
-    const timeFilter = start
-      ? sql`where communication_messages.created_at >= ${start}`
-      : sql``;
-    const [summaryRows, rows] = await Promise.all([
+    const scopedOrganisationId =
+      context?.effectiveOrganisation.type === "tenant"
+        ? context.effectiveOrganisation.id
+        : null;
+    const whereFilter = sql`
+      where (${start ?? null}::timestamptz is null or communication_messages.created_at >= ${start ?? null})
+        and (
+          ${scopedOrganisationId}::uuid is null
+          or exists (
+            select 1
+            from public.organisation_communication_identities
+            where organisation_communication_identities.identity_id = communication_messages.identity_id
+              and organisation_communication_identities.organisation_id = ${scopedOrganisationId}::uuid
+          )
+        )
+    `;
+    const [summaryRows, rows, organisationSettings] = await Promise.all([
       sql<CommunicationSummaryRow[]>`
         select communication_messages.status, count(*)::int as total
         from public.communication_messages
-        ${timeFilter}
+        ${whereFilter}
         group by communication_messages.status
       `,
       sql<CommunicationDbRow[]>`
@@ -202,15 +305,19 @@ export async function getAdminCommunicationsData(
           on communication_channels.id = communication_messages.channel_id
         left join public.tasks
           on tasks.id = communication_messages.task_id
-        ${timeFilter}
+        ${whereFilter}
         order by communication_messages.created_at desc
         limit 200
-      `
+      `,
+      context
+        ? getAdminOrganisationCommunicationSettings(context, selectedOrganisationId)
+        : Promise.resolve(null)
     ]);
 
     return {
       databaseAvailable: true,
       generatedAt: new Date().toISOString(),
+      organisationSettings,
       rows: rows.map(mapCommunicationRow),
       summary: buildSummary(summaryRows)
     };

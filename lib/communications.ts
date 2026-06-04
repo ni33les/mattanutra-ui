@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import { isUuid, toJsonValue } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
@@ -9,9 +9,12 @@ import {
   type CommunicationChannelStatus,
   type CommunicationChannelType
 } from "@/lib/communication-channel-utils";
+import { formatOutboundLineMessage } from "@/lib/line-message-format";
 import { getSql } from "@/lib/db";
 import { validateLeadEmail } from "@/lib/email-validation";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
+import { AGENT_CAPABILITIES } from "@/lib/system-agents";
+import { createTask } from "@/lib/task-service";
 import type { ReservedTask } from "@/lib/task-service";
 
 export {
@@ -28,6 +31,30 @@ export type CommunicationMessageStatus =
   | "queued"
   | "sent"
   | "skipped";
+
+export type AdminCommunicationEventKey =
+  | "admin_test_message"
+  | "retail_order_awaiting_stock"
+  | "retail_order_cancelled"
+  | "retail_order_created"
+  | "retail_order_delivered"
+  | "retail_order_ready_to_pack"
+  | "retail_order_ready_to_ship"
+  | "retail_order_returned"
+  | "retail_order_shipped";
+
+export type AdminCommunicationChannelType = Extract<
+  CommunicationChannelType,
+  "email" | "line"
+>;
+
+export type OrganisationNotificationPreference = Readonly<{
+  channelType: AdminCommunicationChannelType;
+  enabled: boolean;
+  eventKey: AdminCommunicationEventKey;
+  preferenceRank: number;
+  updatedAt: string;
+}>;
 
 export type CommunicationChannel = Readonly<{
   actorType: "ai" | "human" | "system" | "unknown";
@@ -136,6 +163,23 @@ const MESSAGE_STATUSES = new Set<string>([
   "sent",
   "skipped"
 ]);
+export const ADMIN_COMMUNICATION_ROUTE_TASK_PRIORITY = 300;
+export const ADMIN_COMMUNICATION_DISPATCH_TASK_PRIORITY = 260;
+const ADMIN_COMMUNICATION_CHANNEL_TYPES = ["line", "email"] as const;
+const ADMIN_COMMUNICATION_EVENT_DEFAULTS = {
+  admin_test_message: false,
+  retail_order_awaiting_stock: true,
+  retail_order_cancelled: true,
+  retail_order_created: true,
+  retail_order_delivered: false,
+  retail_order_ready_to_pack: true,
+  retail_order_ready_to_ship: true,
+  retail_order_returned: true,
+  retail_order_shipped: false
+} satisfies Record<AdminCommunicationEventKey, boolean>;
+export const adminCommunicationEventKeys = Object.keys(
+  ADMIN_COMMUNICATION_EVENT_DEFAULTS
+) as AdminCommunicationEventKey[];
 
 const globalCommunications = globalThis as typeof globalThis & {
   mattanutraCommunicationSchemaReady?: Promise<void>;
@@ -163,6 +207,44 @@ function optionalText(value: unknown) {
   const trimmed = cleanText(value);
 
   return trimmed || null;
+}
+
+function booleanValue(value: unknown, fallback = false) {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function normalizeAdminCommunicationEventKey(
+  value: unknown
+): AdminCommunicationEventKey | null {
+  const key = cleanText(value);
+
+  return key in ADMIN_COMMUNICATION_EVENT_DEFAULTS
+    ? (key as AdminCommunicationEventKey)
+    : null;
+}
+
+function normalizeAdminCommunicationChannelType(
+  value: unknown
+): AdminCommunicationChannelType | null {
+  const channelType = normalizeCommunicationChannelType(value);
+
+  return channelType === "email" || channelType === "line"
+    ? channelType
+    : null;
+}
+
+function adminCommunicationChannelRank(channelType: AdminCommunicationChannelType) {
+  return channelType === "line" ? 10 : 80;
+}
+
+function hashLineConnectCode(code: string) {
+  return createHash("sha256")
+    .update(code.trim().toUpperCase())
+    .digest("hex");
+}
+
+function newLineConnectCode() {
+  return randomBytes(4).toString("hex").toUpperCase();
 }
 
 function objectValue(value: unknown) {
@@ -330,6 +412,36 @@ export async function ensureCommunicationSchema(sql: Db = sqlOrThrow()) {
         "scheduled_for",
         "sent_at",
         "delivered_at",
+        "created_at",
+        "updated_at"
+      ],
+      line_connect_tokens: [
+        "id",
+        "organisation_id",
+        "token_hash",
+        "status",
+        "expires_at",
+        "consumed_at",
+        "consumed_by_channel_id",
+        "metadata",
+        "created_at",
+        "updated_at"
+      ],
+      organisation_communication_identities: [
+        "organisation_id",
+        "identity_id",
+        "relationship",
+        "is_primary",
+        "metadata",
+        "created_at"
+      ],
+      organisation_notification_preferences: [
+        "organisation_id",
+        "event_key",
+        "channel_type",
+        "enabled",
+        "preference_rank",
+        "metadata",
         "created_at",
         "updated_at"
       ],
@@ -570,6 +682,1165 @@ async function seedKnownPlanChannels(
       });
     }
   }
+}
+
+async function organisationName(sql: Db, organisationId: string) {
+  const rows = await sql<Array<{ name: string }>>`
+    select name
+    from public.organisations
+    where id = ${organisationId}::uuid
+    limit 1
+  `;
+
+  return cleanText(rows[0]?.name, "Retail organisation");
+}
+
+async function ensureOrganisationIdentity(
+  sql: Db,
+  organisationId: string
+): Promise<string> {
+  const existing = await sql<{ identity_id: string }[]>`
+    select identity_id::text
+    from public.organisation_communication_identities
+    where organisation_id = ${organisationId}::uuid
+      and is_primary
+    order by created_at asc
+    limit 1
+  `;
+
+  if (existing[0]?.identity_id) {
+    return existing[0].identity_id;
+  }
+
+  const identityId = randomUUID();
+  const displayName = await organisationName(sql, organisationId);
+
+  await sql`
+    insert into public.communication_identities (
+      id,
+      display_name,
+      source,
+      metadata,
+      created_at,
+      updated_at
+    )
+    values (
+      ${identityId}::uuid,
+      ${displayName},
+      'organisation',
+      ${sql.json(toJsonValue({ organisationId }))},
+      now(),
+      now()
+    )
+    on conflict (id) do nothing
+  `;
+  await sql`
+    insert into public.organisation_communication_identities (
+      organisation_id,
+      identity_id,
+      relationship,
+      is_primary,
+      metadata,
+      created_at
+    )
+    values (
+      ${organisationId}::uuid,
+      ${identityId}::uuid,
+      'retailer',
+      true,
+      '{}'::jsonb,
+      now()
+    )
+    on conflict do nothing
+  `;
+
+  const rows = await sql<{ identity_id: string }[]>`
+    select identity_id::text
+    from public.organisation_communication_identities
+    where organisation_id = ${organisationId}::uuid
+      and is_primary
+    order by created_at asc
+    limit 1
+  `;
+
+  if (!rows[0]?.identity_id) {
+    throw new Error("Unable to create communication identity for organisation");
+  }
+
+  return rows[0].identity_id;
+}
+
+async function seedOrganisationNotificationPreferences(
+  sql: Db,
+  organisationId: string
+) {
+  for (const eventKey of adminCommunicationEventKeys) {
+    if (eventKey === "admin_test_message") {
+      continue;
+    }
+
+    for (const channelType of ADMIN_COMMUNICATION_CHANNEL_TYPES) {
+      await sql`
+        insert into public.organisation_notification_preferences (
+          organisation_id,
+          event_key,
+          channel_type,
+          enabled,
+          preference_rank,
+          metadata,
+          created_at,
+          updated_at
+        )
+        values (
+          ${organisationId}::uuid,
+          ${eventKey},
+          ${channelType},
+          ${ADMIN_COMMUNICATION_EVENT_DEFAULTS[eventKey]},
+          ${adminCommunicationChannelRank(channelType)},
+          ${sql.json(toJsonValue({ source: "default_seed" }))},
+          now(),
+          now()
+        )
+        on conflict (organisation_id, event_key, channel_type) do nothing
+      `;
+    }
+  }
+}
+
+export async function ensureOrganisationCommunicationIdentity(input: Readonly<{
+  organisationId: string;
+  sql?: Db;
+}>) {
+  if (!isUuid(input.organisationId)) {
+    throw new Error("Organisation communication identity requires an organisation");
+  }
+
+  const sql = input.sql ? sqlOrThrow(input.sql) : sqlOrThrow();
+
+  await ensureCommunicationSchema(sql);
+
+  const identityId = await ensureOrganisationIdentity(sql, input.organisationId);
+  await seedOrganisationNotificationPreferences(sql, input.organisationId);
+
+  return identityId;
+}
+
+export async function listOrganisationCommunicationChannels(input: Readonly<{
+  organisationId: string;
+  sql?: Db;
+}>) {
+  const sql = input.sql ? sqlOrThrow(input.sql) : sqlOrThrow();
+  const identityId = await ensureOrganisationCommunicationIdentity({
+    organisationId: input.organisationId,
+    sql
+  });
+  const rows = await sql<ChannelRow[]>`
+    select *
+    from public.communication_channels
+    where identity_id = ${identityId}::uuid
+    order by preference_rank asc, created_at asc
+  `;
+
+  return rows.map(mapChannel);
+}
+
+export async function listOrganisationNotificationPreferences(input: Readonly<{
+  organisationId: string;
+  sql?: Db;
+}>) {
+  const sql = input.sql ? sqlOrThrow(input.sql) : sqlOrThrow();
+
+  await ensureOrganisationCommunicationIdentity({
+    organisationId: input.organisationId,
+    sql
+  });
+
+  const rows = await sql<Array<{
+    channel_type: string;
+    enabled: boolean;
+    event_key: string;
+    preference_rank: number | string;
+    updated_at: Date | string;
+  }>>`
+    select event_key, channel_type, enabled, preference_rank, updated_at
+    from public.organisation_notification_preferences
+    where organisation_id = ${input.organisationId}::uuid
+    order by event_key asc, preference_rank asc, channel_type asc
+  `;
+
+  return rows
+    .map((row) => {
+      const eventKey = normalizeAdminCommunicationEventKey(row.event_key);
+      const channelType = normalizeAdminCommunicationChannelType(row.channel_type);
+
+      if (!eventKey || !channelType) {
+        return null;
+      }
+
+      return {
+        channelType,
+        enabled: Boolean(row.enabled),
+        eventKey,
+        preferenceRank: Number(row.preference_rank) || adminCommunicationChannelRank(channelType),
+        updatedAt: isoDate(row.updated_at) ?? new Date().toISOString()
+      } satisfies OrganisationNotificationPreference;
+    })
+    .filter((row): row is OrganisationNotificationPreference => Boolean(row));
+}
+
+export async function upsertOrganisationCommunicationChannel(input: Readonly<{
+  address: string;
+  channelType: AdminCommunicationChannelType;
+  displayName?: string | null;
+  metadata?: Record<string, unknown>;
+  organisationId: string;
+  preferenceRank?: number | null;
+  status?: CommunicationChannelStatus | null;
+}>) {
+  const sql = sqlOrThrow();
+  const identityId = await ensureOrganisationCommunicationIdentity({
+    organisationId: input.organisationId,
+    sql
+  });
+
+  return upsertChannel(sql, {
+    actorType: "human",
+    address: input.address,
+    channelType: input.channelType,
+    displayName: input.displayName,
+    identityId,
+    metadata: {
+      ...(input.metadata ?? {}),
+      organisationId: input.organisationId,
+      source: input.metadata?.source ?? "admin_organisation_channel"
+    },
+    preferenceRank:
+      input.preferenceRank ?? adminCommunicationChannelRank(input.channelType),
+    status: input.status ?? "active"
+  });
+}
+
+export async function updateOrganisationNotificationPreference(input: Readonly<{
+  channelType: AdminCommunicationChannelType;
+  enabled: boolean;
+  eventKey: AdminCommunicationEventKey;
+  organisationId: string;
+  preferenceRank?: number | null;
+}>) {
+  if (!isUuid(input.organisationId)) {
+    throw new Error("Notification preference requires an organisation");
+  }
+
+  if (input.eventKey === "admin_test_message") {
+    throw new Error("Test messages do not have notification preferences");
+  }
+
+  const sql = sqlOrThrow();
+
+  await ensureOrganisationCommunicationIdentity({
+    organisationId: input.organisationId,
+    sql
+  });
+
+  const rows = await sql<Array<{
+    channel_type: string;
+    enabled: boolean;
+    event_key: string;
+    preference_rank: number | string;
+    updated_at: Date | string;
+  }>>`
+    insert into public.organisation_notification_preferences (
+      organisation_id,
+      event_key,
+      channel_type,
+      enabled,
+      preference_rank,
+      metadata,
+      created_at,
+      updated_at
+    )
+    values (
+      ${input.organisationId}::uuid,
+      ${input.eventKey},
+      ${input.channelType},
+      ${input.enabled},
+      ${input.preferenceRank ?? adminCommunicationChannelRank(input.channelType)},
+      ${sql.json(toJsonValue({ source: "admin_update" }))},
+      now(),
+      now()
+    )
+    on conflict (organisation_id, event_key, channel_type)
+    do update set
+      enabled = excluded.enabled,
+      preference_rank = excluded.preference_rank,
+      metadata = organisation_notification_preferences.metadata || excluded.metadata,
+      updated_at = now()
+    returning event_key, channel_type, enabled, preference_rank, updated_at
+  `;
+  const row = rows[0];
+
+  return {
+    channelType: input.channelType,
+    enabled: Boolean(row?.enabled ?? input.enabled),
+    eventKey: input.eventKey,
+    preferenceRank:
+      Number(row?.preference_rank) ||
+      input.preferenceRank ||
+      adminCommunicationChannelRank(input.channelType),
+    updatedAt: isoDate(row?.updated_at ?? new Date()) ?? new Date().toISOString()
+  } satisfies OrganisationNotificationPreference;
+}
+
+async function assertChannelBelongsToOrganisation(
+  sql: Db,
+  input: Readonly<{
+    channelId: string;
+    organisationId: string;
+  }>
+) {
+  const rows = await sql<Array<{ id: string }>>`
+    select communication_channels.id::text
+    from public.communication_channels
+    join public.organisation_communication_identities
+      on organisation_communication_identities.identity_id = communication_channels.identity_id
+    where communication_channels.id = ${input.channelId}::uuid
+      and organisation_communication_identities.organisation_id = ${input.organisationId}::uuid
+    limit 1
+  `;
+
+  if (!rows[0]) {
+    throw new Error("Communication channel not found for this organisation");
+  }
+}
+
+export async function updateOrganisationCommunicationChannel(input: Readonly<{
+  address?: string | null;
+  channelId: string;
+  displayName?: string | null;
+  metadata?: Record<string, unknown>;
+  organisationId: string;
+  preferenceRank?: number | null;
+  status?: CommunicationChannelStatus | null;
+}>) {
+  const sql = sqlOrThrow();
+
+  await ensureCommunicationSchema(sql);
+  await assertChannelBelongsToOrganisation(sql, {
+    channelId: input.channelId,
+    organisationId: input.organisationId
+  });
+
+  return updateCommunicationChannel({
+    address: input.address,
+    channelId: input.channelId,
+    displayName: input.displayName,
+    metadata: input.metadata,
+    preferenceRank: input.preferenceRank,
+    status: input.status
+  });
+}
+
+export async function deleteDisabledOrganisationCommunicationChannel(input: Readonly<{
+  channelId: string;
+  organisationId: string;
+}>) {
+  if (!isUuid(input.channelId) || !isUuid(input.organisationId)) {
+    throw new Error("Communication channel not found for this organisation");
+  }
+
+  const sql = sqlOrThrow();
+
+  await ensureCommunicationSchema(sql);
+  await assertChannelBelongsToOrganisation(sql, {
+    channelId: input.channelId,
+    organisationId: input.organisationId
+  });
+
+  const rows = await sql<Array<{ id: string; status: CommunicationChannelStatus }>>`
+    select id::text, status
+    from public.communication_channels
+    where id = ${input.channelId}::uuid
+    limit 1
+  `;
+
+  if (!rows[0]) {
+    throw new Error("Communication channel not found");
+  }
+
+  if (rows[0].status !== "disabled") {
+    throw new Error("Only disabled communication channels can be deleted");
+  }
+
+  await sql`
+    delete from public.communication_channels
+    where id = ${input.channelId}::uuid
+      and status = 'disabled'
+  `;
+}
+
+export async function createOrganisationLineConnectToken(input: Readonly<{
+  displayName?: string | null;
+  organisationId: string;
+}>) {
+  if (!isUuid(input.organisationId)) {
+    throw new Error("LINE connection requires an organisation");
+  }
+
+  const sql = sqlOrThrow();
+  const code = newLineConnectCode();
+  const tokenHash = hashLineConnectCode(code);
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  const displayName = optionalText(input.displayName);
+
+  await ensureOrganisationCommunicationIdentity({
+    organisationId: input.organisationId,
+    sql
+  });
+
+  const rows = await sql<Array<{
+    id: string;
+    expires_at: Date | string;
+  }>>`
+    insert into public.line_connect_tokens (
+      id,
+      organisation_id,
+      token_hash,
+      status,
+      expires_at,
+      metadata,
+      created_at,
+      updated_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${input.organisationId}::uuid,
+      ${tokenHash},
+      'active',
+      ${expiresAt},
+      ${sql.json(toJsonValue({
+        contactName: displayName,
+        displayName,
+        source: "admin_connect"
+      }))},
+      now(),
+      now()
+    )
+    returning id::text, expires_at
+  `;
+
+  return {
+    code,
+    expiresAt: isoDate(rows[0]?.expires_at ?? expiresAt) ?? expiresAt.toISOString(),
+    id: rows[0]?.id ?? null
+  };
+}
+
+function lineSourceMetadata(
+  sourceType: "group" | "room" | "user",
+  recipientId: string
+) {
+  return {
+    lineSourceType: sourceType,
+    lineUserId: recipientId,
+    provider: "line",
+    requiresIdentityMapping: false,
+    source: "line_webhook_connect"
+  };
+}
+
+export async function consumeOrganisationLineConnectCode(input: Readonly<{
+  code: string;
+  providerEventId?: string | null;
+  rawEvent?: Record<string, unknown>;
+  recipientId: string;
+  sourceType: "group" | "room" | "user";
+}>) {
+  const code = cleanText(input.code).toUpperCase();
+  const recipientId = normalizeLineUserId(input.recipientId);
+
+  if (!code || !recipientId) {
+    return null;
+  }
+
+  const sql = sqlOrThrow();
+
+  await ensureCommunicationSchema(sql);
+
+  const tokenRows = await sql<Array<{
+    id: string;
+    metadata: unknown;
+    organisation_id: string;
+  }>>`
+    update public.line_connect_tokens
+    set
+      status = 'consuming',
+      updated_at = now()
+    where id = (
+      select id
+      from public.line_connect_tokens
+      where token_hash = ${hashLineConnectCode(code)}
+        and status = 'active'
+        and consumed_at is null
+        and expires_at > now()
+      order by created_at asc
+      limit 1
+      for update skip locked
+    )
+    returning id::text, organisation_id::text, metadata
+  `;
+  const token = tokenRows[0];
+
+  if (!token) {
+    return null;
+  }
+
+  const tokenMetadata = objectValue(token.metadata);
+  const contactName = optionalText(tokenMetadata.contactName) ??
+    optionalText(tokenMetadata.displayName);
+  const channel = await upsertOrganisationCommunicationChannel({
+    address: recipientId,
+    channelType: "line",
+    displayName:
+      contactName ??
+      (input.sourceType === "user" ? "LINE" : `LINE ${input.sourceType}`),
+    metadata: {
+      ...lineSourceMetadata(input.sourceType, recipientId),
+      contactName,
+      providerEventId: input.providerEventId ?? null
+    },
+    organisationId: token.organisation_id,
+    preferenceRank: adminCommunicationChannelRank("line"),
+    status: "active"
+  });
+
+  await sql`
+    update public.line_connect_tokens
+    set
+      consumed_at = now(),
+      consumed_by_channel_id = ${channel.id}::uuid,
+      metadata = metadata || ${sql.json(toJsonValue({
+        lineRecipientId: recipientId,
+        providerEventId: input.providerEventId ?? null,
+        rawEvent: input.rawEvent ?? null,
+        sourceType: input.sourceType
+      }))}::jsonb,
+      status = 'consumed',
+      updated_at = now()
+    where id = ${token.id}::uuid
+  `;
+
+  await writeBpmEvent({
+    actorType: "system",
+    emittedBy: "line_webhook",
+    eventName: "admin_line_channel_connected",
+    eventStatus: "succeeded",
+    eventType: "chat",
+    properties: {
+      channelId: channel.id,
+      organisationId: token.organisation_id,
+      sourceType: input.sourceType
+    },
+    severity: "low",
+    sql
+  });
+
+  return {
+    channel,
+    organisationId: token.organisation_id
+  };
+}
+
+export async function recordInboundLineCommunication(input: Readonly<{
+  body: string;
+  providerEventId?: string | null;
+  rawEvent?: Record<string, unknown>;
+  recipientId: string;
+  replyToken?: string | null;
+  sourceType: "group" | "room" | "user";
+}>) {
+  const recipientId = normalizeLineUserId(input.recipientId);
+
+  if (!recipientId) {
+    throw new Error("Inbound LINE message is missing a recipient id");
+  }
+
+  const sql = sqlOrThrow();
+
+  await ensureCommunicationSchema(sql);
+
+  const channelRows = await sql<Array<{
+    channel_id: string | null;
+    identity_id: string | null;
+    organisation_id: string | null;
+  }>>`
+    select
+      communication_channels.id::text as channel_id,
+      communication_channels.identity_id::text,
+      organisation_communication_identities.organisation_id::text
+    from public.communication_channels
+    left join public.organisation_communication_identities
+      on organisation_communication_identities.identity_id = communication_channels.identity_id
+    where communication_channels.channel_type = 'line'
+      and lower(communication_channels.address) = lower(${recipientId})
+    order by communication_channels.updated_at desc
+    limit 1
+  `;
+  const channel = channelRows[0];
+  const rows = await sql<MessageRow[]>`
+    insert into public.communication_messages (
+      id,
+      identity_id,
+      channel_id,
+      direction,
+      message_type,
+      status,
+      body,
+      provider,
+      provider_message_id,
+      metadata,
+      delivered_at,
+      created_at,
+      updated_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${channel?.identity_id ?? null}::uuid,
+      ${channel?.channel_id ?? null}::uuid,
+      'inbound',
+      'line_inbound',
+      'delivered',
+      ${cleanText(input.body, "LINE message")},
+      'line',
+      ${input.providerEventId ?? null},
+      ${sql.json(toJsonValue({
+        commandExecution: "disabled_v1",
+        lineRecipientId: recipientId,
+        organisationId: channel?.organisation_id ?? null,
+        rawEvent: input.rawEvent ?? null,
+        replyTokenPresent: Boolean(input.replyToken),
+        sourceType: input.sourceType
+      }))}::jsonb,
+      now(),
+      now(),
+      now()
+    )
+    returning *
+  `;
+
+  await writeBpmEvent({
+    actorType: "system",
+    emittedBy: "line_webhook",
+    eventName: "admin_line_message_captured",
+    eventStatus: "captured",
+    eventType: "chat",
+    properties: {
+      commandExecution: "disabled_v1",
+      hasOrganisation: Boolean(channel?.organisation_id),
+      messageId: rows[0]?.id,
+      organisationId: channel?.organisation_id ?? null,
+      sourceType: input.sourceType
+    },
+    severity: "low",
+    sql
+  });
+
+  return mapMessage(rows[0]);
+}
+
+function adminCommunicationDispatchTaskType(channelType: AdminCommunicationChannelType) {
+  return channelType === "email"
+    ? "dispatch_email_communication_message"
+    : "dispatch_chat_communication_message";
+}
+
+async function queueCommunicationMessageDispatchTask(input: Readonly<{
+  channelType: AdminCommunicationChannelType;
+  messageId: string;
+  organisationId: string;
+}>) {
+  const taskType = adminCommunicationDispatchTaskType(input.channelType);
+  const isEmail = input.channelType === "email";
+
+  return createTask({
+    actorType: "system",
+    businessValue: ADMIN_COMMUNICATION_DISPATCH_TASK_PRIORITY,
+    description: `Dispatch queued ${input.channelType.toUpperCase()} admin communication message.`,
+    groupLabel: "Admin communication dispatch",
+    idempotencyKey: `admin-communication-dispatch:${input.messageId}`,
+    idempotencyScope: "successful",
+    idempotencyScopeKey: `admin-communication-dispatch:${input.messageId}`,
+    maxAttempts: 3,
+    payload: {
+      channelType: input.channelType,
+      messageId: input.messageId,
+      targetOrganisationId: input.organisationId
+    },
+    priorityReason: "Admin communication dispatch is queued for the channel dispatcher.",
+    priorityScore: ADMIN_COMMUNICATION_DISPATCH_TASK_PRIORITY,
+    reasoningEffort: "none",
+    requiredCapabilities: isEmail
+      ? [AGENT_CAPABILITIES.emailSend]
+      : [AGENT_CAPABILITIES.communicationDispatch, AGENT_CAPABILITIES.lineSend],
+    sourceEntityId: input.messageId,
+    sourceEntityType: "communication_message",
+    taskType,
+    title: isEmail ? "Dispatch admin email" : "Dispatch admin LINE message"
+  });
+}
+
+function orderEventCopy(input: Readonly<{
+  customerName: string | null;
+  eventKey: AdminCommunicationEventKey;
+  lineCount: number;
+  orderNumber: string | null;
+  status: string | null;
+}>) {
+  const orderNumber = input.orderNumber ?? "customer order";
+  const customer = input.customerName ? ` for ${input.customerName}` : "";
+  const itemSummary = input.lineCount === 1 ? "1 item" : `${input.lineCount} items`;
+  const copies: Record<AdminCommunicationEventKey, { body: string; subject: string }> = {
+    admin_test_message: {
+      body: "This is a MattaNutra admin communication test message.",
+      subject: "MattaNutra admin communication test"
+    },
+    retail_order_awaiting_stock: {
+      body: `${orderNumber}${customer} is awaiting stock. Review reorder advice or the active shopping lists. Basket: ${itemSummary}.`,
+      subject: `${orderNumber} is awaiting stock`
+    },
+    retail_order_cancelled: {
+      body: `${orderNumber}${customer} has been cancelled. No further fulfilment action is required unless stock or refund handling is pending.`,
+      subject: `${orderNumber} was cancelled`
+    },
+    retail_order_created: {
+      body: `${orderNumber}${customer} has been paid and created. Allocate stock or review shortages. Basket: ${itemSummary}.`,
+      subject: `New paid order ${orderNumber}`
+    },
+    retail_order_delivered: {
+      body: `${orderNumber}${customer} has been marked delivered.`,
+      subject: `${orderNumber} delivered`
+    },
+    retail_order_ready_to_pack: {
+      body: `${orderNumber}${customer} has stock available and is ready to pack. Basket: ${itemSummary}.`,
+      subject: `${orderNumber} is ready to pack`
+    },
+    retail_order_ready_to_ship: {
+      body: `${orderNumber}${customer} is allocated and ready to ship. Pack it, add tracking if available, then mark it shipped.`,
+      subject: `${orderNumber} is ready to ship`
+    },
+    retail_order_returned: {
+      body: `${orderNumber}${customer} has been marked returned. Review stock and settlement handling if needed.`,
+      subject: `${orderNumber} was returned`
+    },
+    retail_order_shipped: {
+      body: `${orderNumber}${customer} has been marked shipped.`,
+      subject: `${orderNumber} shipped`
+    }
+  };
+
+  return copies[input.eventKey] ?? copies.admin_test_message;
+}
+
+async function adminCommunicationCopy(input: Readonly<{
+  body?: string | null;
+  eventKey: AdminCommunicationEventKey;
+  resourceId?: string | null;
+  resourceType?: string | null;
+  subject?: string | null;
+  sql: Db;
+}>) {
+  const subject = optionalText(input.subject);
+  const body = optionalText(input.body);
+
+  if (subject && body) {
+    return { body, subject };
+  }
+
+  const resourceId = input.resourceId ?? null;
+
+  if (
+    input.resourceType === "retail_customer_order" &&
+    resourceId &&
+    isUuid(resourceId)
+  ) {
+    const sql = input.sql;
+    const rows = await sql<Array<{
+      customer_name: string | null;
+      line_count: number | string;
+      order_number: string | null;
+      status: string | null;
+    }>>`
+      select
+        retail_customer_orders.order_number,
+        retail_customer_orders.customer_name,
+        retail_customer_orders.status,
+        count(retail_customer_order_lines.id)::int as line_count
+      from public.retail_customer_orders
+      left join public.retail_customer_order_lines
+        on retail_customer_order_lines.customer_order_id = retail_customer_orders.id
+      where retail_customer_orders.id = ${resourceId}::uuid
+      group by retail_customer_orders.id
+      limit 1
+    `;
+    const row = rows[0];
+    const copy = orderEventCopy({
+      customerName: row?.customer_name ?? null,
+      eventKey: input.eventKey,
+      lineCount: Number(row?.line_count) || 0,
+      orderNumber: row?.order_number ?? null,
+      status: row?.status ?? null
+    });
+
+    return {
+      body: body ?? copy.body,
+      subject: subject ?? copy.subject
+    };
+  }
+
+  const copy = orderEventCopy({
+    customerName: null,
+    eventKey: input.eventKey,
+    lineCount: 0,
+    orderNumber: null,
+    status: null
+  });
+
+  return {
+    body: body ?? copy.body,
+    subject: subject ?? copy.subject
+  };
+}
+
+export async function routeAdminCommunication(input: Readonly<{
+  body?: string | null;
+  channelType?: AdminCommunicationChannelType | null;
+  eventKey: AdminCommunicationEventKey;
+  metadata?: Record<string, unknown>;
+  organisationId: string;
+  resourceId?: string | null;
+  resourceType?: string | null;
+  subject?: string | null;
+  taskId?: string | null;
+}>) {
+  const sql = sqlOrThrow();
+  const identityId = await ensureOrganisationCommunicationIdentity({
+    organisationId: input.organisationId,
+    sql
+  });
+  const copy = await adminCommunicationCopy({
+    body: input.body,
+    eventKey: input.eventKey,
+    resourceId: input.resourceId,
+    resourceType: input.resourceType,
+    sql,
+    subject: input.subject
+  });
+  const forcedChannelType = input.channelType ?? null;
+  const preferences = input.eventKey === "admin_test_message"
+    ? ADMIN_COMMUNICATION_CHANNEL_TYPES.map((channelType) => ({
+        channelType,
+        enabled: true,
+        eventKey: input.eventKey,
+        preferenceRank: adminCommunicationChannelRank(channelType),
+        updatedAt: new Date().toISOString()
+      } satisfies OrganisationNotificationPreference))
+    : await listOrganisationNotificationPreferences({
+        organisationId: input.organisationId,
+        sql
+      });
+  const enabledTypes = new Set(
+    preferences
+      .filter((preference) => preference.eventKey === input.eventKey)
+      .filter((preference) => preference.enabled)
+      .filter((preference) => !forcedChannelType || preference.channelType === forcedChannelType)
+      .sort((left, right) => left.preferenceRank - right.preferenceRank)
+      .map((preference) => preference.channelType)
+  );
+
+  if (enabledTypes.size === 0) {
+    await writeBpmEvent({
+      actorType: "system",
+      emittedBy: "admin_communications",
+      eventName: "admin_communication_suppressed",
+      eventStatus: "preference_disabled",
+      eventType: "system",
+      properties: {
+        eventKey: input.eventKey,
+        organisationId: input.organisationId,
+        resourceId: input.resourceId ?? null,
+        resourceType: input.resourceType ?? null
+      },
+      severity: "low",
+      sql
+    });
+
+    return {
+      dispatchTasks: [],
+      messages: []
+    };
+  }
+
+  const broadcastChannels = (
+    await sql<ChannelRow[]>`
+      select *
+      from public.communication_channels
+      where identity_id = ${identityId}::uuid
+        and status = 'active'
+        and channel_type = any(${[...enabledTypes]}::text[])
+      order by preference_rank asc, created_at asc
+    `
+  )
+    .map(mapChannel)
+    .filter((channel): channel is CommunicationChannel & { channelType: AdminCommunicationChannelType } =>
+      channel.channelType === "email" || channel.channelType === "line"
+    );
+  const taskId = isUuid(input.taskId ?? "") ? input.taskId! : null;
+
+  if (broadcastChannels.length === 0) {
+    const rows = await sql<MessageRow[]>`
+      insert into public.communication_messages (
+        id,
+        identity_id,
+        channel_id,
+        task_id,
+        direction,
+        message_type,
+        status,
+        subject,
+        body,
+        provider,
+        error_message,
+        metadata,
+        created_at,
+        updated_at
+      )
+      values (
+        ${randomUUID()}::uuid,
+        ${identityId}::uuid,
+        null,
+        ${taskId}::uuid,
+        'outbound',
+        ${input.eventKey},
+        'no_channel',
+        ${copy.subject},
+        ${copy.body},
+        ${forcedChannelType},
+        'No active organisation communication channel is configured',
+        ${sql.json(toJsonValue({
+          ...(input.metadata ?? {}),
+          eventKey: input.eventKey,
+          organisationId: input.organisationId,
+          resourceId: input.resourceId ?? null,
+          resourceType: input.resourceType ?? null
+        }))}::jsonb,
+        now(),
+        now()
+      )
+      returning *
+    `;
+
+    await writeBpmEvent({
+      actorType: "system",
+      emittedBy: "admin_communications",
+      eventName: "admin_communication_no_channel",
+      eventStatus: "no_channel",
+      eventType: "chat",
+      properties: {
+        eventKey: input.eventKey,
+        messageId: rows[0]?.id,
+        organisationId: input.organisationId,
+        resourceId: input.resourceId ?? null,
+        resourceType: input.resourceType ?? null
+      },
+      severity: "medium",
+      sql
+    });
+
+    return {
+      dispatchTasks: [],
+      messages: rows.map(mapMessage)
+    };
+  }
+
+  const messages: CommunicationMessage[] = [];
+  const dispatchTasks: Array<{ created: boolean; taskId: string; taskType: string }> = [];
+
+  // Organisation notifications are broadcasts: every subscribed active channel
+  // gets its own immutable message and dispatch task.
+  for (const channel of broadcastChannels) {
+    const rows = await sql<MessageRow[]>`
+      insert into public.communication_messages (
+        id,
+        identity_id,
+        channel_id,
+        task_id,
+        direction,
+        message_type,
+        status,
+        subject,
+        body,
+        provider,
+        metadata,
+        created_at,
+        updated_at
+      )
+      values (
+        ${randomUUID()}::uuid,
+        ${identityId}::uuid,
+        ${channel.id}::uuid,
+        ${taskId}::uuid,
+        'outbound',
+        ${input.eventKey},
+        'queued',
+        ${copy.subject},
+        ${copy.body},
+        ${channel.channelType},
+        ${sql.json(toJsonValue({
+          ...(input.metadata ?? {}),
+          channelType: channel.channelType,
+          eventKey: input.eventKey,
+          organisationId: input.organisationId,
+          resourceId: input.resourceId ?? null,
+          resourceType: input.resourceType ?? null
+        }))}::jsonb,
+        now(),
+        now()
+      )
+      returning *
+    `;
+    const message = mapMessage(rows[0]);
+    const { created, task } = await queueCommunicationMessageDispatchTask({
+      channelType: channel.channelType,
+      messageId: message.id,
+      organisationId: input.organisationId
+    });
+
+    messages.push(message);
+    dispatchTasks.push({
+      created,
+      taskId: task.id,
+      taskType: task.taskType
+    });
+  }
+
+  await writeBpmEvent({
+    actorType: "system",
+    emittedBy: "admin_communications",
+    eventName: "admin_communication_routed",
+    eventStatus: "queued",
+    eventType: broadcastChannels.some((channel) => channel.channelType === "line") ? "chat" : "email",
+    properties: {
+      broadcastChannelCount: broadcastChannels.length,
+      broadcastChannelIds: broadcastChannels.map((channel) => channel.id),
+      channelTypes: broadcastChannels.map((channel) => channel.channelType),
+      eventKey: input.eventKey,
+      messageCount: messages.length,
+      organisationId: input.organisationId,
+      resourceId: input.resourceId ?? null,
+      resourceType: input.resourceType ?? null
+    },
+    severity: "low",
+    sql
+  });
+
+  return {
+    dispatchTasks,
+    messages
+  };
+}
+
+export async function queueAdminOrganisationCommunication(input: Readonly<{
+  body?: string | null;
+  channelType?: AdminCommunicationChannelType | null;
+  eventKey: AdminCommunicationEventKey;
+  metadata?: Record<string, unknown>;
+  organisationId: string;
+  resourceId?: string | null;
+  resourceType?: string | null;
+  subject?: string | null;
+}>) {
+  const resourceType = cleanText(input.resourceType, "none");
+  const resourceId = cleanText(input.resourceId, "none");
+  const channelType = input.channelType ?? "all";
+  const idempotencyKey =
+    `admin-communication:${input.organisationId}:${input.eventKey}:${resourceType}:${resourceId}:${channelType}`;
+  const { created, task } = await createTask({
+    actorType: "system",
+    businessValue: ADMIN_COMMUNICATION_ROUTE_TASK_PRIORITY,
+    description:
+      "Route an admin organisation communication through configured retailer channels.",
+    groupLabel: "Admin communication",
+    idempotencyKey,
+    idempotencyScope:
+      input.eventKey === "admin_test_message" ? "active" : "successful",
+    idempotencyScopeKey: `admin-communication:${input.organisationId}`,
+    maxAttempts: 3,
+    payload: {
+      body: input.body ?? null,
+      channelType: input.channelType ?? null,
+      eventKey: input.eventKey,
+      metadata: input.metadata ?? {},
+      organisationId: input.organisationId,
+      targetOrganisationId: input.organisationId,
+      resourceId: input.resourceId ?? null,
+      resourceType: input.resourceType ?? null,
+      subject: input.subject ?? null
+    },
+    priorityReason:
+      "Retail organisation notification is queued for the communications coordinator.",
+    priorityScore: ADMIN_COMMUNICATION_ROUTE_TASK_PRIORITY,
+    reasoningEffort: "none",
+    requiredCapabilities: [AGENT_CAPABILITIES.communicationRoute],
+    sourceEntityId: isUuid(input.resourceId ?? "") ? input.resourceId : null,
+    sourceEntityType: input.resourceType ?? "admin_communication",
+    taskType: "route_admin_communication",
+    title: `Route ${input.eventKey.replaceAll("_", " ")} notification`
+  });
+
+  await writeBpmEvent({
+    actorType: "system",
+    emittedBy: "admin_communications",
+    eventName: created
+      ? "admin_communication_task_queued"
+      : "admin_communication_task_reused",
+    eventStatus: created ? "queued" : "duplicate_reused",
+    eventType: "system",
+    properties: {
+      eventKey: input.eventKey,
+      idempotencyKey,
+      organisationId: input.organisationId,
+      priorityScore: ADMIN_COMMUNICATION_ROUTE_TASK_PRIORITY,
+      resourceId: input.resourceId ?? null,
+      resourceType: input.resourceType ?? null,
+      taskId: task.id,
+      taskType: task.taskType
+    },
+    severity: "low"
+  });
+
+  return {
+    created,
+    task
+  };
+}
+
+export async function executeAdminCommunicationRouteTask(input: Readonly<{
+  body?: string | null;
+  channelType?: AdminCommunicationChannelType | null;
+  eventKey: AdminCommunicationEventKey;
+  metadata?: Record<string, unknown>;
+  organisationId: string;
+  resourceId?: string | null;
+  resourceType?: string | null;
+  subject?: string | null;
+  taskId: string;
+}>) {
+  return routeAdminCommunication(input);
+}
+
+export async function executeCommunicationDispatchTask(input: Readonly<{
+  messageId: string;
+}>) {
+  return dispatchCommunicationMessage(input.messageId);
 }
 
 export async function ensurePlanCommunicationIdentity(input: Readonly<{
@@ -1373,7 +2644,7 @@ async function deliverLineMessage(row: DeliveryTargetRow) {
     body: JSON.stringify({
       messages: [
         {
-          text: row.body.slice(0, 4900),
+          text: formatOutboundLineMessage(row.body).slice(0, 4900),
           type: "text"
         }
       ],
@@ -1486,15 +2757,29 @@ export async function dispatchCommunicationMessage(messageId: string) {
   }
 
   const result =
-    row.delivery_channel_type === "line"
-      ? await deliverLineMessage(row)
-      : ({
-          attempted: false,
-          configured: false,
-          message: mapMessage(row),
-          provider: row.delivery_channel_type,
-          reason: `${row.delivery_channel_type} delivery is not configured`
-        } satisfies CommunicationDispatchResult);
+    row.delivery_channel_type === "email"
+      ? await sendPreparedEmailMessage(mapMessage(row), mapChannel({
+          actor_type: "human",
+          address: row.delivery_address ?? "",
+          channel_type: "email",
+          created_at: row.created_at,
+          display_name: null,
+          id: row.channel_id ?? randomUUID(),
+          identity_id: row.identity_id ?? randomUUID(),
+          metadata: row.delivery_channel_metadata ?? {},
+          preference_rank: 80,
+          status: "active",
+          updated_at: row.updated_at
+        }))
+      : row.delivery_channel_type === "line"
+        ? await deliverLineMessage(row)
+        : ({
+            attempted: false,
+            configured: false,
+            message: mapMessage(row),
+            provider: row.delivery_channel_type,
+            reason: `${row.delivery_channel_type} delivery is not configured`
+          } satisfies CommunicationDispatchResult);
 
   if (row.plan_id) {
     await writeBpmEvent({

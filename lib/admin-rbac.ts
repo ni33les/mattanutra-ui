@@ -85,8 +85,21 @@ const allPermissions = [
 export const adminRolePermissions = {
   platform_owner: allPermissions,
   platform_admin: allPermissions,
-  retail_admin: ["access.agents.read", "settings.read", "stock.read", "stock.write"],
-  retail_agent: ["settings.read", "stock.read", "stock.write"],
+  retail_admin: [
+    "access.agents.read",
+    "communications.read",
+    "communications.write",
+    "settings.read",
+    "stock.read",
+    "stock.write"
+  ],
+  retail_agent: [
+    "communications.read",
+    "communications.write",
+    "settings.read",
+    "stock.read",
+    "stock.write"
+  ],
   retail_assistant: ["settings.read", "stock.read"]
 } as const satisfies Record<AdminRole, readonly AdminPermission[]>;
 
@@ -191,15 +204,13 @@ const adminViews = [
   "foods",
   "products",
   "supplements",
-  "retail-task-queue",
-  "retail-audit",
-  "stock",
-  "retail-purchase-orders",
-  "retail-receiving",
-  "retail-movements",
   "retail-customer-orders",
-  "retail-fulfillment",
+  "stock",
+  "retail-stock-advice",
   "retail-reorder",
+  "retail-fulfillment",
+  "retail-movements",
+  "retail-audit",
   "reviews",
   "agents",
   "alerts",
@@ -219,15 +230,13 @@ const adminViews = [
 export const adminDashboardViews = adminViews;
 
 export const retailOperationViews = [
-  "retail-task-queue",
-  "retail-audit",
-  "stock",
-  "retail-purchase-orders",
-  "retail-receiving",
-  "retail-movements",
   "retail-customer-orders",
+  "stock",
+  "retail-stock-advice",
+  "retail-reorder",
   "retail-fulfillment",
-  "retail-reorder"
+  "retail-movements",
+  "retail-audit"
 ] as const satisfies readonly AdminDashboardView[];
 const retailOperationViewSet = new Set<AdminDashboardView>(retailOperationViews);
 
@@ -333,13 +342,11 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
 
   if (
     view === "stock" ||
-    view === "retail-task-queue" ||
     view === "retail-audit" ||
-    view === "retail-purchase-orders" ||
-    view === "retail-receiving" ||
     view === "retail-movements" ||
     view === "retail-customer-orders" ||
     view === "retail-fulfillment" ||
+    view === "retail-stock-advice" ||
     view === "retail-reorder"
   ) {
     return "stock.read";
@@ -371,6 +378,15 @@ export function firstAllowedAdminView(
   fallback: AdminDashboardView = "glance",
   organisationType?: AdminOrganisationType
 ) {
+  if (
+    (principal.role === "retail_admin" ||
+      principal.role === "retail_agent" ||
+      principal.role === "retail_assistant") &&
+    adminViewAllowed(principal, "retail-customer-orders", organisationType)
+  ) {
+    return "retail-customer-orders";
+  }
+
   return (
     allowedAdminViews(principal, organisationType).find(
       (view) => view !== "access" && view !== "access-agents"

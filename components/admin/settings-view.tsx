@@ -118,6 +118,8 @@ export function AdminSettingsView({
       session.actorMembership.role === "platform_owner" ||
       session.actorMembership.role === "platform_admin"
     );
+  const canEditCustomerPriceMargin =
+    canEditOrganisation && Boolean(settingsData?.canEditCustomerPriceMargin);
   const showRetailPeople =
     session.effectiveOrganisation.type === "tenant" &&
     session.effectiveMembership.role === "retail_admin" &&
@@ -181,7 +183,7 @@ export function AdminSettingsView({
       const result = await saveSettings({
         action: "update_organisation",
         currency: organisationCurrency,
-        customerPriceMarginPercent,
+        ...(canEditCustomerPriceMargin ? { customerPriceMarginPercent } : {}),
         defaultLocale: organisationLocale,
         name: organisationName
       });
@@ -331,20 +333,22 @@ export function AdminSettingsView({
                 ))}
               </select>
             </label>
-            <label className="grid gap-1 text-xs font-semibold text-gray-500">
-              {labels.settings.customerMargin}
-              <input
-                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
-                disabled={!canEditOrganisation || busy}
-                inputMode="decimal"
-                min="0"
-                max="100"
-                onChange={(event) => setCustomerPriceMarginPercent(event.target.value)}
-                step="0.01"
-                type="number"
-                value={customerPriceMarginPercent}
-              />
-            </label>
+            {canEditCustomerPriceMargin ? (
+              <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                {labels.settings.customerMargin}
+                <input
+                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
+                  disabled={busy}
+                  inputMode="decimal"
+                  min="0"
+                  max="100"
+                  onChange={(event) => setCustomerPriceMarginPercent(event.target.value)}
+                  step="0.01"
+                  type="number"
+                  value={customerPriceMarginPercent}
+                />
+              </label>
+            ) : null}
             <div className="grid gap-1 text-xs font-semibold text-gray-500">
               {labels.access.slug}
               <div className="rounded-md bg-gray-50 px-3 py-2 text-sm font-normal text-gray-600 ring-1 ring-inset ring-gray-200">

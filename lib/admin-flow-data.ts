@@ -37,7 +37,12 @@ export type AdminFlowNodeId =
   | "productCheckoutViewed"
   | "productPaymentSucceeded"
   | "proPaid"
+  | "retailOrderAwaitingStock"
+  | "retailOrderCancelled"
   | "retailOrderCreated"
+  | "retailOrderDelivered"
+  | "retailOrderReturned"
+  | "retailOrderShipped"
   | "resultsViewed";
 
 export type AdminFlowNode = Readonly<{
@@ -132,6 +137,11 @@ const coreNodeIds: AdminFlowNodeId[] = [
   "productCheckoutStarted",
   "productPaymentSucceeded",
   "retailOrderCreated",
+  "retailOrderAwaitingStock",
+  "retailOrderShipped",
+  "retailOrderDelivered",
+  "retailOrderCancelled",
+  "retailOrderReturned",
   "orderTrackingViewed"
 ];
 
@@ -174,6 +184,12 @@ const continueEdgeDefinitions: Array<
   { from: "deliveryDetailsConfirmed", to: "productCheckoutStarted" },
   { from: "productCheckoutStarted", to: "productPaymentSucceeded" },
   { from: "productPaymentSucceeded", to: "retailOrderCreated" },
+  { from: "retailOrderCreated", to: "retailOrderAwaitingStock" },
+  { from: "retailOrderCreated", to: "retailOrderShipped" },
+  { from: "retailOrderAwaitingStock", to: "retailOrderShipped" },
+  { from: "retailOrderShipped", to: "retailOrderDelivered" },
+  { from: "retailOrderCreated", to: "retailOrderCancelled" },
+  { from: "retailOrderShipped", to: "retailOrderReturned" },
   { from: "retailOrderCreated", to: "orderTrackingViewed" }
 ];
 
@@ -538,8 +554,31 @@ function nodesForRow(row: FlowRow): AdminFlowNodeId[] {
     return ["productPaymentSucceeded"];
   }
 
-  if (row.event_name === "retail_customer_order_created") {
+  if (
+    row.event_name === "retail_customer_order_created" ||
+    row.event_name === "retail_order_created"
+  ) {
     return ["retailOrderCreated"];
+  }
+
+  if (row.event_name === "retail_order_awaiting_stock") {
+    return ["retailOrderAwaitingStock"];
+  }
+
+  if (row.event_name === "retail_order_shipped") {
+    return ["retailOrderShipped"];
+  }
+
+  if (row.event_name === "retail_order_delivered") {
+    return ["retailOrderDelivered"];
+  }
+
+  if (row.event_name === "retail_order_cancelled") {
+    return ["retailOrderCancelled"];
+  }
+
+  if (row.event_name === "retail_order_returned") {
+    return ["retailOrderReturned"];
   }
 
   if (row.event_name === "order_tracking_viewed") {
@@ -752,6 +791,12 @@ export async function getAdminFlowData(
                 'order_tracking_viewed',
                 'retail_customer_order_created',
                 'retail_delivery_details_confirmed',
+                'retail_order_awaiting_stock',
+                'retail_order_cancelled',
+                'retail_order_created',
+                'retail_order_delivered',
+                'retail_order_returned',
+                'retail_order_shipped',
                 'retail_product_checkout_opened',
                 'retail_product_checkout_requested',
                 'retail_product_checkout_session_created',
@@ -803,6 +848,12 @@ export async function getAdminFlowData(
               'order_tracking_viewed',
               'retail_customer_order_created',
               'retail_delivery_details_confirmed',
+              'retail_order_awaiting_stock',
+              'retail_order_cancelled',
+              'retail_order_created',
+              'retail_order_delivered',
+              'retail_order_returned',
+              'retail_order_shipped',
               'retail_product_checkout_opened',
               'retail_product_checkout_requested',
               'retail_product_checkout_session_created',
@@ -1013,7 +1064,9 @@ export async function getAdminFlowData(
       (steps) =>
         steps.has("precisionPaid") ||
         steps.has("proPaid") ||
-        steps.has("retailOrderCreated")
+        (steps.has("retailOrderCreated") &&
+          !steps.has("retailOrderCancelled") &&
+          !steps.has("retailOrderReturned"))
     ).length;
     const reachedHealthScore = countByNode.get("healthscoreViewed") ?? 0;
 

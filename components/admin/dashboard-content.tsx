@@ -5,25 +5,19 @@ import {
   BuildingOffice2Icon,
   ChatBubbleLeftRightIcon,
   ArchiveBoxIcon,
-  ArrowPathRoundedSquareIcon,
-  ArrowsRightLeftIcon,
-  ClipboardDocumentCheckIcon,
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
   CpuChipIcon,
-  DocumentMagnifyingGlassIcon,
   DocumentTextIcon,
   EnvelopeIcon,
   ExclamationTriangleIcon,
   FunnelIcon,
   HomeIcon,
-  InboxArrowDownIcon,
   MegaphoneIcon,
   QueueListIcon,
   ShoppingBagIcon,
   ShoppingCartIcon,
   SparklesIcon,
-  TruckIcon,
   UserGroupIcon
 } from "@heroicons/react/24/outline";
 import type { AdminDashboardRange } from "@/lib/admin-dashboard-data";
@@ -60,10 +54,8 @@ export type AdminDashboardView =
   | "retail-audit"
   | "retail-fulfillment"
   | "retail-movements"
-  | "retail-purchase-orders"
-  | "retail-receiving"
+  | "retail-stock-advice"
   | "retail-reorder"
-  | "retail-task-queue"
   | "settings"
   | "stock"
   | "supplement-insights"
@@ -331,13 +323,15 @@ export type AdminContent = Readonly<{
     actions: string;
     addItem: string;
     addProduct: string;
-    addPurchaseOrder: string;
     addCustomerOrder: string;
     agentTasks: string;
     allocate: string;
-    allocatedTo: string;
-    audit: string;
-	    allOrganisations: string;
+    allocated: string;
+	    allocatedTo: string;
+	    audit: string;
+	    all: string;
+		    allOrganisations: string;
+	    awaitingStock: string;
 	    availability: string;
 	    allocateAvailable: string;
 	    availableNow: string;
@@ -358,12 +352,10 @@ export type AdminContent = Readonly<{
     customerOrderDetails: string;
     customerOrders: string;
     customerOrderSaveError: string;
-    createPo: string;
     createShoppingList: string;
     currency: string;
 	    daysCover: string;
 	    disabled: string;
-	    draftPo: string;
     dueAt: string;
     empty: string;
     escalateTask: string;
@@ -381,7 +373,6 @@ export type AdminContent = Readonly<{
     insightsTab: string;
     importCsv: string;
 	    inStock: string;
-	    incomingPo: string;
 	    chooseProduct: string;
     leadTimeDays: string;
     lowStock: string;
@@ -414,52 +405,46 @@ export type AdminContent = Readonly<{
     placedAt: string;
     product: string;
     priceOverride: string;
-    purchased: string;
     profitImpact: string;
-    purchaseOrders: string;
-    purchaseOrderNumber: string;
-    purchaseOrderStatusAll: string;
-    purchaseOrderStatusDraft: string;
-    purchaseOrderStatusOrdered: string;
-    purchaseOrderStatusPartial: string;
-    purchaseOrderStatusReceived: string;
-    purchaseOrderStatusClosed: string;
-    purchaseOrderStatusVoid: string;
     quantity: string;
     ordered: string;
     receivedNow: string;
 	    reason: string;
 	    receiveStock: string;
 	    receive: string;
-	    receiveAll: string;
-	    receiveQuantityError: string;
+		    receiveQuantityError: string;
       recheckWorkflow: string;
 	    recordMovement: string;
     remaining: string;
     removeItem: string;
     regionalCheckout: string;
-    reorderBy: string;
-    recommendedOrder: string;
-    reorderRisk: string;
     reorderTab: string;
     review: string;
-    purchaseOrderDetails: string;
     retailPrice: string;
     retailValue: string;
-    riskOk: string;
-    riskOutOfStock: string;
-    riskReorder: string;
-    riskWatch: string;
     save: string;
     saveError: string;
     ship: string;
     snoozeTask: string;
+    boxed: string;
     cheapestPrice: string;
-	    basketLines: string;
-	    buildDraftPo: string;
+    basketLines: string;
     deliver: string;
     directRetailer: string;
+    billingAddress: string;
+    billingSameAsDelivery: string;
+    deliveryAddress: string;
+    deliveryDetails: string;
+    deliveryNotes: string;
+    downloadPdf: string;
+    email: string;
+    invoice: string;
     lineTotal: string;
+    packingSheet: string;
+    phone: string;
+    printOrder: string;
+    sent: string;
+    shippingLabel: string;
     shortfall: string;
     shortfallHandling: string;
     shortfallReference: string;
@@ -502,24 +487,15 @@ export type AdminContent = Readonly<{
     unorderedNeed: string;
     unorderedNeedDescription: string;
     voidMovement: string;
-    voidPurchaseOrder: string;
 	    wholesalePrice: string;
-    wholesalerTried: string;
-	    waitingForPo: string;
+		    waitingForStock: string;
 	    workflow: string;
 	    routingPreference: string;
 	    selectedRetailer: string;
     shippingCountry: string;
     shoppingList: string;
-    restockingAdvice: string;
-    restockingAdviceDescription: string;
-    reorderAdviceDetails: string;
     reorderBackorders: string;
     reorderBackordersDescription: string;
-    reorderAdvise: string;
-    reorderAdviseDescription: string;
-    reorderRequired: string;
-    reorderAdvisory: string;
 	  };
   generated: string;
   financials: {
@@ -1010,7 +986,7 @@ const baseContent = {
     settings: {
       account: "Account",
       currency: "Currency",
-      customerMargin: "Customer margin %",
+      customerMargin: "MattaNutra margin %",
       displayName: "Name",
       email: "Email",
       language: "Language",
@@ -1024,13 +1000,15 @@ const baseContent = {
       actions: "Actions",
       addItem: "Add item",
       addProduct: "Add Sellable Product",
-      addPurchaseOrder: "New Purchase Order",
       addCustomerOrder: "Add Customer Order",
       agentTasks: "Agent tasks",
       allocate: "Allocate",
-      allocatedTo: "Allocated to",
-      audit: "Audit",
-      allOrganisations: "All organisations",
+	      allocated: "Allocated",
+	      allocatedTo: "Allocated to",
+	      audit: "Audit",
+	      all: "All",
+	      allOrganisations: "All organisations",
+      awaitingStock: "Awaiting Stock",
       availability: "Checking availability",
       allocateAvailable: "Allocate available",
       availableNow: "Available now",
@@ -1053,14 +1031,12 @@ const baseContent = {
       customerOrderDetails: "Customer order details",
       customerOrders: "Customer Orders",
       customerOrderSaveError: "Could not save customer order.",
-      createPo: "Create PO",
       createShoppingList: "Create shopping list",
       currency: "Currency",
       daysCover: "Days cover",
       deliver: "Deliver",
       disabled: "Disabled",
       directRetailer: "Direct retailer",
-      draftPo: "Draft PO",
       dueAt: "Due date",
       empty: "No stock rows yet.",
       escalateTask: "Escalate",
@@ -1078,7 +1054,6 @@ const baseContent = {
       insightsTab: "Insights",
       importCsv: "Import CSV",
       inStock: "In stock",
-      incomingPo: "Incoming PO",
       chooseProduct: "Choose product",
       leadTimeDays: "Lead time",
       lowStock: "Low stock",
@@ -1110,49 +1085,43 @@ const baseContent = {
       pipelineUnavailable: "Pipeline unavailable. Recheck workflow.",
       placedAt: "Placed",
       product: "Product",
-      priceOverride: "Price override",
-      purchased: "Purchased",
+      priceOverride: "Retail Price",
       profitImpact: "Profit impact",
-      purchaseOrders: "Purchase Orders",
-      purchaseOrderNumber: "PO number",
-      purchaseOrderStatusAll: "All",
-      purchaseOrderStatusDraft: "Draft",
-      purchaseOrderStatusOrdered: "Ordered",
-      purchaseOrderStatusPartial: "Partial",
-      purchaseOrderStatusReceived: "Received",
-      purchaseOrderStatusClosed: "Closed",
-      purchaseOrderStatusVoid: "Void",
       quantity: "Quantity",
       ordered: "Ordered",
       receivedNow: "Received",
 	      reason: "Reason",
 	      receive: "Receive",
-      receiveAll: "All",
-      receiveQuantityError: "Invalid quantity.",
+	      receiveQuantityError: "Invalid quantity.",
       receiveStock: "Receive stock",
       recheckWorkflow: "Recheck workflow",
       recordMovement: "Record movement",
       remaining: "Remaining",
       removeItem: "Remove",
       regionalCheckout: "Regional checkout",
-      reorderBy: "Reorder by",
-      recommendedOrder: "Recommended order",
-      reorderRisk: "Risk",
       reorderTab: "Reorder",
       review: "Review",
-      purchaseOrderDetails: "Purchase order details",
       retailPrice: "Retail",
       retailValue: "Retail value",
-      riskOk: "OK",
-      riskOutOfStock: "Out of stock",
-      riskReorder: "Reorder",
-      riskWatch: "Watch",
       save: "Save",
       saveError: "Could not save stock.",
       ship: "Ship",
       snoozeTask: "Snooze",
-      buildDraftPo: "Build draft PO",
+      boxed: "Boxed",
+      billingAddress: "Billing address",
+      billingSameAsDelivery: "Billing address same as delivery",
+      deliveryAddress: "Delivery address",
+      deliveryDetails: "Delivery details",
+      deliveryNotes: "Delivery notes",
+      downloadPdf: "Download PDF",
+      email: "Email",
+      invoice: "Invoice",
       lineTotal: "Line total",
+      packingSheet: "Packing sheet",
+      phone: "Phone",
+      printOrder: "Print order",
+      sent: "Sent",
+      shippingLabel: "Shipping label",
       shortfall: "Shortfall",
       shortfallHandling: "Shortfall handling",
       shortfallReference: "Reference",
@@ -1198,26 +1167,15 @@ const baseContent = {
       unclaimed: "Unclaimed",
       unorderedNeed: "Unordered demand",
       unorderedNeedDescription:
-        "These products have customer demand that is not covered by stock, incoming purchase orders, or draft purchase orders. Select the lines to turn into a supplier PO.",
+        "These products have customer demand that is not covered by stock. Select lines to add them to the shopping list.",
       voidMovement: "Void movement",
-      voidPurchaseOrder: "Void purchase order",
-	      waitingForPo: "Waiting for PO",
+	      waitingForStock: "Waiting for stock",
 	      wholesalePrice: "Wholesale",
-      wholesalerTried: "Wholesaler tried",
 	      workflow: "Workflow",
-      restockingAdvice: "Restocking advice",
-      restockingAdviceDescription:
-        "Required rows cover customer demand that is not yet supplied. Advisory rows are stock-planning suggestions. Select lines to create one supplier PO.",
-      reorderAdviceDetails: "Reorder advice details",
-      reorderBackorders: "Backorders",
-      reorderBackordersDescription:
-        "These items are required to cover active customer orders.",
-      reorderAdvise: "Advise",
-      reorderAdviseDescription:
-        "We suggest you order these items to satisfy future demand",
-      reorderRequired: "Required",
-      reorderAdvisory: "Advisory"
-	    },
+	      reorderBackorders: "Backorders",
+	      reorderBackordersDescription:
+	        "These items are required to cover active customer orders."
+		    },
     generated: "Generated",
     financials: {
       aiCost: "AI cost",
@@ -1301,7 +1259,12 @@ const baseContent = {
       productCheckoutViewed: "Product checkout",
       productPaymentSucceeded: "Product paid",
       proPaid: "Pro paid",
+      retailOrderAwaitingStock: "Awaiting stock",
+      retailOrderCancelled: "Order cancelled",
       retailOrderCreated: "Product order",
+      retailOrderDelivered: "Order delivered",
+      retailOrderReturned: "Order returned",
+      retailOrderShipped: "Order shipped",
       resultsViewed: "Results"
     },
     flowMetrics: {
@@ -1364,18 +1327,18 @@ const baseContent = {
     performanceTitle: "Performance",
     marketing: [
       { icon: MegaphoneIcon, name: "Campaigns", view: "campaigns" },
-      { icon: EnvelopeIcon, name: "Leads", view: "leads" },
-      {
-        icon: ChatBubbleLeftRightIcon,
-        name: "Communications",
-        view: "communications"
-      }
+      { icon: EnvelopeIcon, name: "Leads", view: "leads" }
     ],
     marketingTitle: "Marketing",
     administration: [
       { icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" },
       { icon: UserGroupIcon, name: "Memberships", view: "memberships" },
       { icon: UserGroupIcon, name: "People", view: "people" },
+      {
+        icon: ChatBubbleLeftRightIcon,
+        name: "Communications",
+        view: "communications"
+      },
       { icon: CpuChipIcon, name: "Agents", view: "access-agents" },
       { icon: ClipboardDocumentListIcon, name: "Audit", view: "audit" },
       { icon: Cog6ToothIcon, name: "Settings", view: "settings" }
@@ -1392,26 +1355,21 @@ const baseContent = {
       { icon: BeakerIcon, name: "Supplements", view: "supplements" }
     ],
     governanceTitle: "Catalogue",
-    retailTasksNavigation: [
-      { icon: ClipboardDocumentCheckIcon, name: "Task Queue", view: "retail-task-queue" },
-      { icon: DocumentMagnifyingGlassIcon, name: "Audit", view: "retail-audit" }
-    ],
+    retailTasksNavigation: [],
     retailTasksTitle: "Retail Tasks",
     retailBuyingNavigation: [
-      { icon: ClipboardDocumentListIcon, name: "Shopping List", view: "retail-reorder" },
-      { icon: InboxArrowDownIcon, name: "Receiving", view: "retail-receiving" }
+      { icon: ClipboardDocumentListIcon, name: "Reorder Advice", view: "retail-stock-advice" },
+      { icon: ClipboardDocumentListIcon, name: "Shopping List", view: "retail-reorder" }
     ],
-    retailBuyingTitle: "Buying Stock",
+    retailBuyingTitle: "Purchasing",
     retailInventoryNavigation: [
-      { icon: ArchiveBoxIcon, name: "Stock", view: "stock" },
-      { icon: ArrowsRightLeftIcon, name: "Stock Movements", view: "retail-movements" }
+      { icon: ArchiveBoxIcon, name: "Stock", view: "stock" }
     ],
     retailInventoryTitle: "Stock",
     retailSellingNavigation: [
-      { icon: ShoppingCartIcon, name: "Customer Orders", view: "retail-customer-orders" },
-      { icon: TruckIcon, name: "Fulfillment", view: "retail-fulfillment" }
+      { icon: ShoppingCartIcon, name: "Orders", view: "retail-customer-orders" }
     ],
-    retailSellingTitle: "Selling Stock",
+    retailSellingTitle: "Orders",
     insights: [
       { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" },
       { icon: ShoppingBagIcon, name: "Products", view: "product-insights" }
@@ -1449,10 +1407,8 @@ const baseContent = {
       "retail-audit": "Audit",
       "retail-fulfillment": "Fulfillment",
       "retail-movements": "Stock Movements",
-      "retail-purchase-orders": "Purchase Orders",
-      "retail-receiving": "Receiving",
+      "retail-stock-advice": "Reorder Advice",
       "retail-reorder": "Shopping List",
-      "retail-task-queue": "Task Queue",
       reviews: "Reviews",
       settings: "Settings",
       stock: "Stock",
@@ -1835,7 +1791,7 @@ const baseContent = {
     settings: {
       account: "บัญชี",
       currency: "สกุลเงิน",
-      customerMargin: "มาร์จินลูกค้า %",
+      customerMargin: "มาร์จิน MattaNutra %",
       displayName: "ชื่อ",
       email: "อีเมล",
       language: "ภาษา",
@@ -1849,13 +1805,15 @@ const baseContent = {
       actions: "การดำเนินการ",
       addItem: "เพิ่มรายการ",
       addProduct: "เพิ่มสินค้าที่ขายได้",
-      addPurchaseOrder: "สร้างใบสั่งซื้อใหม่",
       addCustomerOrder: "เพิ่มคำสั่งซื้อ",
       agentTasks: "งานของ Agent",
       allocate: "จัดสรร",
-      allocatedTo: "จัดสรรให้",
-      audit: "บันทึกเหตุการณ์",
-      allOrganisations: "ทุกองค์กร",
+	      allocated: "จัดสรรแล้ว",
+	      allocatedTo: "จัดสรรให้",
+	      audit: "บันทึกเหตุการณ์",
+	      all: "ทั้งหมด",
+	      allOrganisations: "ทุกองค์กร",
+      awaitingStock: "รอสต็อก",
       availability: "กำลังตรวจสอบความพร้อม",
       allocateAvailable: "จัดสรรที่มีอยู่",
       availableNow: "พร้อมจัดสรรตอนนี้",
@@ -1878,14 +1836,12 @@ const baseContent = {
       customerOrderDetails: "รายละเอียดคำสั่งซื้อลูกค้า",
       customerOrders: "คำสั่งซื้อลูกค้า",
       customerOrderSaveError: "ไม่สามารถบันทึกคำสั่งซื้อลูกค้าได้",
-      createPo: "สร้าง PO",
       createShoppingList: "สร้างรายการซื้อ",
       currency: "สกุลเงิน",
       daysCover: "วันที่ครอบคลุม",
       deliver: "ส่งมอบ",
       disabled: "ปิดใช้งาน",
       directRetailer: "เลือกร้านโดยตรง",
-      draftPo: "ร่าง PO",
       dueAt: "วันที่ครบกำหนด",
       empty: "ยังไม่มีรายการสต็อก",
       escalateTask: "ยกระดับ",
@@ -1903,7 +1859,6 @@ const baseContent = {
       insightsTab: "ข้อมูลเชิงลึก",
       importCsv: "นำเข้า CSV",
       inStock: "มีสินค้า",
-      incomingPo: "PO ที่กำลังมา",
       chooseProduct: "เลือกสินค้า",
       leadTimeDays: "ระยะเวลานำ",
       lowStock: "สต็อกต่ำ",
@@ -1935,24 +1890,13 @@ const baseContent = {
       pipelineUnavailable: "ไม่มีข้อมูลไปป์ไลน์ ตรวจสอบเวิร์กโฟลว์อีกครั้ง",
       placedAt: "เวลาสั่งซื้อ",
       product: "สินค้า",
-      priceOverride: "ปรับราคา",
-      purchased: "ซื้อแล้ว",
+      priceOverride: "ราคาขายปลีก",
       profitImpact: "ผลกระทบกำไร",
-      purchaseOrders: "ใบสั่งซื้อ",
-      purchaseOrderNumber: "เลข PO",
-      purchaseOrderStatusAll: "ทั้งหมด",
-      purchaseOrderStatusDraft: "ร่าง",
-      purchaseOrderStatusOrdered: "สั่งซื้อแล้ว",
-      purchaseOrderStatusPartial: "รับบางส่วน",
-      purchaseOrderStatusReceived: "รับครบแล้ว",
-      purchaseOrderStatusClosed: "ปิดแล้ว",
-      purchaseOrderStatusVoid: "ยกเลิก",
       quantity: "จำนวน",
       ordered: "สั่งซื้อ",
       receivedNow: "รับแล้ว",
 	      reason: "เหตุผล",
 	      receive: "รับเข้า",
-      receiveAll: "ทั้งหมด",
       receiveQuantityError: "จำนวนไม่ถูกต้อง",
       receiveStock: "รับสต็อก",
       recheckWorkflow: "ตรวจสอบเวิร์กโฟลว์อีกครั้ง",
@@ -1960,24 +1904,29 @@ const baseContent = {
       remaining: "คงเหลือ",
       removeItem: "ลบ",
       regionalCheckout: "จำลองเช็กเอาต์ตามภูมิภาค",
-      reorderBy: "สั่งซื้อภายใน",
-      recommendedOrder: "จำนวนแนะนำให้สั่ง",
-      reorderRisk: "ความเสี่ยง",
       reorderTab: "สั่งซื้อเพิ่ม",
       review: "ตรวจสอบ",
-      purchaseOrderDetails: "รายละเอียดใบสั่งซื้อ",
       retailPrice: "ราคาขายปลีก",
       retailValue: "มูลค่าขายปลีก",
-      riskOk: "ปกติ",
-      riskOutOfStock: "สินค้าหมด",
-      riskReorder: "ควรสั่งซื้อ",
-      riskWatch: "เฝ้าระวัง",
       save: "บันทึก",
       saveError: "ไม่สามารถบันทึกสต็อกได้",
       ship: "จัดส่ง",
       snoozeTask: "เลื่อน",
-      buildDraftPo: "สร้างร่าง PO",
+      boxed: "ใส่กล่องแล้ว",
+      billingAddress: "ที่อยู่สำหรับออกบิล",
+      billingSameAsDelivery: "ที่อยู่สำหรับออกบิลเหมือนที่อยู่จัดส่ง",
+      deliveryAddress: "ที่อยู่จัดส่ง",
+      deliveryDetails: "รายละเอียดการจัดส่ง",
+      deliveryNotes: "หมายเหตุการจัดส่ง",
+      downloadPdf: "ดาวน์โหลด PDF",
+      email: "อีเมล",
+      invoice: "ใบแจ้งหนี้",
       lineTotal: "รวมรายการ",
+      packingSheet: "ใบจัดสินค้า",
+      phone: "โทรศัพท์",
+      printOrder: "พิมพ์คำสั่งซื้อ",
+      sent: "ส่งแล้ว",
+      shippingLabel: "ป้ายจัดส่ง",
       shortfall: "ส่วนขาด",
       shortfallHandling: "การจัดการส่วนขาด",
       shortfallReference: "เลขอ้างอิง",
@@ -2023,26 +1972,15 @@ const baseContent = {
       unclaimed: "ยังไม่มีผู้รับงาน",
       unorderedNeed: "ความต้องการที่ยังไม่ได้สั่งซื้อ",
       unorderedNeedDescription:
-        "สินค้าเหล่านี้มีคำสั่งซื้อจากลูกค้าที่ยังไม่มีสต็อก PO ที่สั่งแล้ว หรือร่าง PO รองรับ เลือกรายการที่ต้องการนำไปสร้าง PO ให้ซัพพลายเออร์",
+        "สินค้าเหล่านี้มีคำสั่งซื้อจากลูกค้าที่ยังไม่มีสต็อกรองรับ เลือกรายการเพื่อเพิ่มลงในรายการซื้อ",
       voidMovement: "ยกเลิกรายการ",
-      voidPurchaseOrder: "ยกเลิกใบสั่งซื้อ",
-	      waitingForPo: "รอ PO",
+	      waitingForStock: "รอสต็อก",
 	      wholesalePrice: "ราคาส่ง",
-      wholesalerTried: "ร้านส่งที่ลองแล้ว",
 	      workflow: "เวิร์กโฟลว์",
-      restockingAdvice: "คำแนะนำเติมสต็อก",
-      restockingAdviceDescription:
-        "รายการจำเป็นมาจากความต้องการของลูกค้าที่ยังไม่มีสินค้าเติมให้ ส่วนรายการแนะนำมาจากการวางแผนสต็อก เลือกรายการเพื่อสร้าง PO เดียวให้ซัพพลายเออร์",
-      reorderAdviceDetails: "รายละเอียดคำแนะนำสั่งซื้อเพิ่ม",
-      reorderBackorders: "รายการค้างส่ง",
-      reorderBackordersDescription:
-        "รายการเหล่านี้จำเป็นเพื่อรองรับคำสั่งซื้อจากลูกค้าที่เปิดอยู่",
-      reorderAdvise: "คำแนะนำ",
-      reorderAdviseDescription:
-        "เราแนะนำให้สั่งซื้อรายการเหล่านี้เพื่อรองรับความต้องการในอนาคต",
-      reorderRequired: "จำเป็น",
-      reorderAdvisory: "แนะนำ"
-	    },
+	      reorderBackorders: "รายการค้างส่ง",
+	      reorderBackordersDescription:
+	        "รายการเหล่านี้จำเป็นเพื่อรองรับคำสั่งซื้อจากลูกค้าที่เปิดอยู่"
+		    },
     generated: "สร้างเมื่อ",
     financials: {
       aiCost: "ค่า AI",
@@ -2126,7 +2064,12 @@ const baseContent = {
       productCheckoutViewed: "เช็กเอาต์สินค้า",
       productPaymentSucceeded: "ชำระค่าสินค้าแล้ว",
       proPaid: "Pro ชำระแล้ว",
+      retailOrderAwaitingStock: "รอสต็อก",
+      retailOrderCancelled: "ยกเลิกคำสั่งซื้อ",
       retailOrderCreated: "คำสั่งซื้อสินค้า",
+      retailOrderDelivered: "จัดส่งสำเร็จ",
+      retailOrderReturned: "คืนสินค้า",
+      retailOrderShipped: "ส่งออกแล้ว",
       resultsViewed: "ผลลัพธ์"
     },
     flowMetrics: {
@@ -2189,18 +2132,18 @@ const baseContent = {
     performanceTitle: "ประสิทธิภาพ",
     marketing: [
       { icon: MegaphoneIcon, name: "แคมเปญ", view: "campaigns" },
-      { icon: EnvelopeIcon, name: "ลีด", view: "leads" },
-      {
-        icon: ChatBubbleLeftRightIcon,
-        name: "การสื่อสาร",
-        view: "communications"
-      }
+      { icon: EnvelopeIcon, name: "ลีด", view: "leads" }
     ],
     marketingTitle: "การตลาด",
     administration: [
       { icon: BuildingOffice2Icon, name: "องค์กร", view: "organisations" },
       { icon: UserGroupIcon, name: "สมาชิก", view: "memberships" },
       { icon: UserGroupIcon, name: "ผู้ใช้", view: "people" },
+      {
+        icon: ChatBubbleLeftRightIcon,
+        name: "การสื่อสาร",
+        view: "communications"
+      },
       { icon: CpuChipIcon, name: "เอเจนต์", view: "access-agents" },
       { icon: ClipboardDocumentListIcon, name: "ประวัติ", view: "audit" },
       { icon: Cog6ToothIcon, name: "การตั้งค่า", view: "settings" }
@@ -2217,26 +2160,21 @@ const baseContent = {
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplements" }
     ],
     governanceTitle: "แค็ตตาล็อก",
-    retailTasksNavigation: [
-      { icon: ClipboardDocumentCheckIcon, name: "คิวงาน", view: "retail-task-queue" },
-      { icon: DocumentMagnifyingGlassIcon, name: "บันทึกเหตุการณ์", view: "retail-audit" }
-    ],
+    retailTasksNavigation: [],
     retailTasksTitle: "งานค้าปลีก",
     retailBuyingNavigation: [
-      { icon: ClipboardDocumentListIcon, name: "รายการซื้อ", view: "retail-reorder" },
-      { icon: InboxArrowDownIcon, name: "รับเข้า", view: "retail-receiving" }
+      { icon: ClipboardDocumentListIcon, name: "คำแนะนำการสั่งซื้อ", view: "retail-stock-advice" },
+      { icon: ClipboardDocumentListIcon, name: "รายการซื้อ", view: "retail-reorder" }
     ],
-    retailBuyingTitle: "ซื้อสต็อก",
+    retailBuyingTitle: "จัดซื้อ",
     retailInventoryNavigation: [
-      { icon: ArchiveBoxIcon, name: "สต็อก", view: "stock" },
-      { icon: ArrowsRightLeftIcon, name: "การเคลื่อนไหวสต็อก", view: "retail-movements" }
+      { icon: ArchiveBoxIcon, name: "สต็อก", view: "stock" }
     ],
     retailInventoryTitle: "สต็อก",
     retailSellingNavigation: [
-      { icon: ShoppingCartIcon, name: "คำสั่งซื้อลูกค้า", view: "retail-customer-orders" },
-      { icon: TruckIcon, name: "จัดส่ง", view: "retail-fulfillment" }
+      { icon: ShoppingCartIcon, name: "คำสั่งซื้อ", view: "retail-customer-orders" }
     ],
-    retailSellingTitle: "ขายสต็อก",
+    retailSellingTitle: "คำสั่งซื้อ",
     insights: [
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplement-insights" },
       { icon: ShoppingBagIcon, name: "สินค้า", view: "product-insights" }
@@ -2274,10 +2212,8 @@ const baseContent = {
       "retail-audit": "บันทึกเหตุการณ์",
       "retail-fulfillment": "จัดส่ง",
       "retail-movements": "การเคลื่อนไหวสต็อก",
-      "retail-purchase-orders": "ใบสั่งซื้อ",
-      "retail-receiving": "รับเข้า",
+      "retail-stock-advice": "คำแนะนำการสั่งซื้อ",
       "retail-reorder": "รายการซื้อ",
-      "retail-task-queue": "คิวงาน",
       reviews: "รีวิว",
       settings: "การตั้งค่า",
       stock: "สต็อก",

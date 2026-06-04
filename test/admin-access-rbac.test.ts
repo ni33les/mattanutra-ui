@@ -68,14 +68,12 @@ describe("admin RBAC", () => {
     };
     const platformViews = allowedAdminViews(principal, "platform");
 
-    assert.equal(platformViews.includes("retail-task-queue"), false);
     assert.equal(platformViews.includes("stock"), false);
-    assert.equal(platformViews.includes("retail-purchase-orders"), false);
     assert.equal(adminViewAllowed(principal, "stock", "platform"), false);
     assert.equal(firstAllowedAdminView(principal, "glance", "platform"), "glance");
     assert.equal(adminViewAllowed(principal, "stock", "tenant"), true);
     assert.equal(
-      allowedAdminViews(principal, "tenant").includes("retail-task-queue"),
+      allowedAdminViews(principal, "tenant").includes("retail-customer-orders"),
       true
     );
   });
@@ -87,7 +85,7 @@ describe("admin RBAC", () => {
     };
 
     assert.equal(adminViewAllowed(principal, "settings"), true);
-    assert.equal(adminViewAllowed(principal, "retail-task-queue"), true);
+    assert.equal(adminViewAllowed(principal, "retail-customer-orders"), true);
     assert.equal(adminViewAllowed(principal, "stock"), true);
     assert.equal(adminViewAllowed(principal, "glance"), false);
     assert.equal(adminViewAllowed(principal, "flow"), false);
@@ -102,7 +100,7 @@ describe("admin RBAC", () => {
       (permissionsForRole("retail_assistant") as readonly string[]).includes("stock.write"),
       false
     );
-    assert.equal(firstAllowedAdminView(principal), "retail-task-queue");
+    assert.equal(firstAllowedAdminView(principal), "retail-customer-orders");
   });
 
   it("gives retail admins stock access while keeping platform access pages closed", () => {
@@ -112,7 +110,7 @@ describe("admin RBAC", () => {
     };
 
     assert.equal(adminViewAllowed(principal, "settings"), true);
-    assert.equal(adminViewAllowed(principal, "retail-task-queue"), true);
+    assert.equal(adminViewAllowed(principal, "retail-customer-orders"), true);
     assert.equal(adminViewAllowed(principal, "stock"), true);
     assert.equal(adminViewAllowed(principal, "people"), false);
     assert.equal(adminViewAllowed(principal, "memberships"), false);
@@ -127,7 +125,7 @@ describe("admin RBAC", () => {
       (permissionsForRole("retail_admin") as readonly string[]).includes("stock.write"),
       true
     );
-    assert.equal(firstAllowedAdminView(principal), "retail-task-queue");
+    assert.equal(firstAllowedAdminView(principal), "retail-customer-orders");
   });
 
   it("limits assignable roles to platform owner/admin and retail org roles", () => {
@@ -317,10 +315,15 @@ describe("admin RBAC", () => {
     assert.match(access, /export async function updateEffectiveOrganisationSettings/);
     assert.match(access, /function normalOrganisationCurrency/);
     assert.match(access, /function normalOrganisationCountry/);
-    assert.match(access, /currency = \$\{normalizedCurrency\}/);
-    assert.match(access, /country_code = \$\{normalizedCountryCode\}/);
-    assert.match(access, /Only platform admins can update organisation currency/);
-    assert.match(access, /context\.effectiveMembership\.role === "retail_admin"/);
+	    assert.match(access, /currency = \$\{normalizedCurrency\}/);
+	    assert.match(access, /country_code = \$\{normalizedCountryCode\}/);
+	    assert.match(access, /Only platform admins can update organisation currency/);
+	    assert.match(access, /canEditCustomerPriceMargin/);
+	    assert.match(access, /Customer margin can only be updated at platform level/);
+	    assert.match(access, /metadata = case/);
+	    assert.match(access, /when organisation_type = 'platform' then coalesce\(metadata, '\{\}'::jsonb\) \|\| \$\{sql\.json\(marginMetadataPatch\)\}::jsonb/);
+	    assert.match(access, /else coalesce\(metadata, '\{\}'::jsonb\) - 'customerPriceMarginPercent'/);
+	    assert.match(access, /context\.effectiveMembership\.role === "retail_admin"/);
     assert.match(accessRoute, /context\.actorMembership\.role !== "platform_owner"/);
     assert.match(accessRoute, /context\.actorMembership\.role !== "platform_admin"/);
     assert.match(accessRoute, /function currencyValue/);
@@ -338,11 +341,14 @@ describe("admin RBAC", () => {
     assert.match(accessView, /defaultValue=\{organisation\.currency\}/);
     assert.match(accessView, /defaultValue=\{organisation\.countryCode\}/);
     assert.match(accessView, /labels\.settings\.currency/);
-    assert.match(settingsRoute, /hasAdminPermission\(context, "settings\.read"\)/);
-    assert.match(settingsRoute, /action === "update_organisation"/);
-    assert.match(settingsRoute, /currency: text\(body\.currency\)/);
-    assert.match(settingsView, /labels\.settings\.currency/);
-    assert.match(settingsView, /showRetailPeople/);
+	    assert.match(settingsRoute, /hasAdminPermission\(context, "settings\.read"\)/);
+	    assert.match(settingsRoute, /action === "update_organisation"/);
+	    assert.match(settingsRoute, /currency: text\(body\.currency\)/);
+	    assert.match(settingsRoute, /Object\.hasOwn\(body, "customerPriceMarginPercent"\)/);
+	    assert.match(settingsView, /labels\.settings\.currency/);
+	    assert.match(settingsView, /canEditCustomerPriceMargin/);
+	    assert.match(settingsView, /\.\.\.\(canEditCustomerPriceMargin \? \{ customerPriceMarginPercent \} : \{\}\)/);
+	    assert.match(settingsView, /showRetailPeople/);
     assert.match(settingsView, /settingsData\.people\.map/);
     assert.match(settingsView, /fetch\("\/api\/admin\/settings"/);
   });

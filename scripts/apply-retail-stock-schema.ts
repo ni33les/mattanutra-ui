@@ -543,22 +543,41 @@ try {
   await sql`
     create table if not exists public.retail_shopping_lists (
       id uuid primary key default gen_random_uuid(),
-      organisation_id uuid not null references public.organisations(id) on delete restrict,
-      list_number text not null,
-      status text not null default 'draft',
-      currency text not null,
-      notes text,
-      applied_at timestamptz,
-      created_by_person_id uuid references public.people(id) on delete set null,
-      metadata jsonb not null default '{}'::jsonb,
-      created_at timestamptz not null default now(),
-      updated_at timestamptz not null default now(),
-      constraint retail_shopping_lists_org_number_key unique (organisation_id, list_number),
-      constraint retail_shopping_lists_status_check check (
-        status in ('draft', 'applied', 'closed', 'cancelled')
-      ),
-      constraint retail_shopping_lists_currency_check check (currency ~ '^[A-Z]{3}$')
-    )
+	      organisation_id uuid not null references public.organisations(id) on delete restrict,
+	      list_number text not null,
+	      status text not null default 'active',
+	      currency text not null,
+	      created_by_person_id uuid references public.people(id) on delete set null,
+	      metadata jsonb not null default '{}'::jsonb,
+	      created_at timestamptz not null default now(),
+	      updated_at timestamptz not null default now(),
+	      constraint retail_shopping_lists_org_number_key unique (organisation_id, list_number),
+	      constraint retail_shopping_lists_status_check check (
+	        status in ('active', 'closed')
+	      ),
+	      constraint retail_shopping_lists_currency_check check (currency ~ '^[A-Z]{3}$')
+	    )
+	  `;
+
+  await sql`
+    alter table public.retail_shopping_lists
+      drop constraint if exists retail_shopping_lists_status_check,
+      drop column if exists notes,
+      drop column if exists applied_at
+  `;
+
+  await sql`
+    update public.retail_shopping_lists
+    set status = case when status = 'draft' then 'active' else 'closed' end
+    where status not in ('active', 'closed')
+  `;
+
+  await sql`
+    alter table public.retail_shopping_lists
+      alter column status set default 'active',
+      add constraint retail_shopping_lists_status_check check (
+        status in ('active', 'closed')
+      )
   `;
 
   await sql`
@@ -572,34 +591,86 @@ try {
       shopping_list_id uuid not null references public.retail_shopping_lists(id) on delete cascade,
       organisation_id uuid not null references public.organisations(id) on delete restrict,
       product_id uuid not null references public.products(id) on delete restrict,
-      required_quantity integer not null default 0,
-      current_stock_quantity integer not null default 0,
-      unordered_need_quantity integer not null default 0,
-      suggested_quantity integer not null default 0,
-      wholesaler_tried text,
-      availability_status text not null default 'unknown',
-      purchased_quantity integer not null default 0,
-      wholesale_price_amount numeric(20,6),
-      retail_price_amount numeric(20,6),
-      notes text,
-      metadata jsonb not null default '{}'::jsonb,
-      created_at timestamptz not null default now(),
-      updated_at timestamptz not null default now(),
-      constraint retail_shopping_list_lines_quantity_check check (
-        required_quantity >= 0
-        and current_stock_quantity >= 0
-        and unordered_need_quantity >= 0
-        and suggested_quantity >= 0
-        and purchased_quantity >= 0
-      ),
-      constraint retail_shopping_list_lines_availability_check check (
-        availability_status in ('unknown', 'available', 'partial', 'not_available')
-      ),
-      constraint retail_shopping_list_lines_price_check check (
-        (wholesale_price_amount is null or wholesale_price_amount >= 0)
+	      required_quantity integer not null default 0,
+	      current_stock_quantity integer not null default 0,
+	      unordered_need_quantity integer not null default 0,
+	      assigned_quantity integer not null default 0,
+	      actual_quantity integer not null default 0,
+	      stocked_quantity integer not null default 0,
+	      wholesale_price_amount numeric(20,6),
+	      retail_price_amount numeric(20,6),
+	      metadata jsonb not null default '{}'::jsonb,
+	      created_at timestamptz not null default now(),
+	      updated_at timestamptz not null default now(),
+	      constraint retail_shopping_list_lines_quantity_check check (
+	        required_quantity >= 0
+	        and current_stock_quantity >= 0
+	        and unordered_need_quantity >= 0
+	        and assigned_quantity >= 0
+	        and actual_quantity >= 0
+	        and stocked_quantity >= 0
+	      ),
+	      constraint retail_shopping_list_lines_price_check check (
+	        (wholesale_price_amount is null or wholesale_price_amount >= 0)
         and (retail_price_amount is null or retail_price_amount >= 0)
       )
     )
+	  `;
+
+  await sql`
+    alter table public.retail_shopping_list_lines
+      drop constraint if exists retail_shopping_list_lines_quantity_check,
+      drop constraint if exists retail_shopping_list_lines_availability_check,
+      add column if not exists assigned_quantity integer not null default 0,
+      add column if not exists actual_quantity integer not null default 0,
+      add column if not exists stocked_quantity integer not null default 0,
+      add column if not exists suggested_quantity integer not null default 0,
+      add column if not exists purchased_quantity integer not null default 0
+  `;
+
+  await sql`
+    update public.retail_shopping_list_lines
+    set
+      assigned_quantity = greatest(
+        assigned_quantity,
+        coalesce(nullif(suggested_quantity, 0), required_quantity, unordered_need_quantity, 0)
+      ),
+      actual_quantity = greatest(
+        actual_quantity,
+        coalesce(nullif(purchased_quantity, 0), nullif(suggested_quantity, 0), required_quantity, unordered_need_quantity, 0)
+      ),
+      stocked_quantity = greatest(
+        stocked_quantity,
+        case
+          when exists (
+            select 1
+            from public.retail_shopping_lists
+            where retail_shopping_lists.id = retail_shopping_list_lines.shopping_list_id
+              and retail_shopping_lists.status = 'closed'
+          ) then coalesce(nullif(purchased_quantity, 0), 0)
+          else stocked_quantity
+        end
+      )
+    where assigned_quantity = 0
+      or actual_quantity = 0
+      or stocked_quantity = 0
+  `;
+
+  await sql`
+    alter table public.retail_shopping_list_lines
+      drop column if exists suggested_quantity,
+      drop column if exists wholesaler_tried,
+      drop column if exists availability_status,
+      drop column if exists purchased_quantity,
+      drop column if exists notes,
+      add constraint retail_shopping_list_lines_quantity_check check (
+        required_quantity >= 0
+        and current_stock_quantity >= 0
+        and unordered_need_quantity >= 0
+        and assigned_quantity >= 0
+        and actual_quantity >= 0
+        and stocked_quantity >= 0
+      )
   `;
 
   await sql`
@@ -654,108 +725,15 @@ try {
   `;
 
   await sql`
-    create table if not exists public.retail_purchase_orders (
-      id uuid primary key default gen_random_uuid(),
-      organisation_id uuid not null references public.organisations(id) on delete restrict,
-      po_number text not null,
-      supplier_name text not null,
-      supplier_contact text,
-      status text not null default 'draft',
-      currency text not null,
-      expected_at date,
-      ordered_at timestamptz,
-      received_at timestamptz,
-      notes text,
-      created_by_person_id uuid references public.people(id) on delete set null,
-      metadata jsonb not null default '{}'::jsonb,
-      created_at timestamptz not null default now(),
-      updated_at timestamptz not null default now(),
-      constraint retail_purchase_orders_org_po_number_key unique (organisation_id, po_number),
-      constraint retail_purchase_orders_status_check check (
-        status in ('draft', 'ordered', 'partially_received', 'received', 'closed', 'cancelled')
-      ),
-      constraint retail_purchase_orders_currency_check check (currency ~ '^[A-Z]{3}$')
-    )
+    drop table if exists public.retail_purchase_order_line_shortfalls cascade
   `;
 
   await sql`
-    alter table public.retail_purchase_orders
-      drop constraint if exists retail_purchase_orders_status_check,
-      add constraint retail_purchase_orders_status_check check (
-        status in ('draft', 'ordered', 'partially_received', 'received', 'closed', 'cancelled')
-      )
+    drop table if exists public.retail_purchase_order_lines cascade
   `;
 
   await sql`
-    create table if not exists public.retail_purchase_order_lines (
-      id uuid primary key default gen_random_uuid(),
-      purchase_order_id uuid not null references public.retail_purchase_orders(id) on delete cascade,
-      organisation_id uuid not null references public.organisations(id) on delete restrict,
-      product_id uuid not null references public.products(id) on delete restrict,
-      quantity_ordered integer not null,
-      quantity_received integer not null default 0,
-      quantity_cancelled integer not null default 0,
-      wholesale_price_amount numeric(20,6),
-      expected_expires_at date,
-      notes text,
-      metadata jsonb not null default '{}'::jsonb,
-      created_at timestamptz not null default now(),
-      updated_at timestamptz not null default now(),
-      constraint retail_purchase_order_lines_quantity_check check (
-        quantity_ordered > 0
-        and quantity_received >= 0
-        and quantity_cancelled >= 0
-        and quantity_received + quantity_cancelled <= quantity_ordered
-      ),
-      constraint retail_purchase_order_lines_price_check check (
-        wholesale_price_amount is null or wholesale_price_amount >= 0
-      )
-    )
-  `;
-
-  await sql`
-    alter table public.retail_purchase_order_lines
-      add column if not exists quantity_cancelled integer not null default 0
-  `;
-
-  await sql`
-    alter table public.retail_purchase_order_lines
-      drop constraint if exists retail_purchase_order_lines_quantity_check,
-      add constraint retail_purchase_order_lines_quantity_check check (
-        quantity_ordered > 0
-        and quantity_received >= 0
-        and quantity_cancelled >= 0
-        and quantity_received + quantity_cancelled <= quantity_ordered
-      )
-  `;
-
-  await sql`
-    create table if not exists public.retail_purchase_order_line_shortfalls (
-      id uuid primary key default gen_random_uuid(),
-      purchase_order_id uuid not null references public.retail_purchase_orders(id) on delete cascade,
-      purchase_order_line_id uuid not null references public.retail_purchase_order_lines(id) on delete cascade,
-      organisation_id uuid not null references public.organisations(id) on delete restrict,
-      product_id uuid not null references public.products(id) on delete restrict,
-      quantity integer not null,
-      resolution text not null,
-      reference text,
-      expected_at date,
-      notes text,
-      metadata jsonb not null default '{}'::jsonb,
-      created_by_person_id uuid references public.people(id) on delete set null,
-      created_at timestamptz not null default now(),
-      constraint retail_purchase_order_line_shortfalls_quantity_check check (quantity > 0),
-      constraint retail_purchase_order_line_shortfalls_resolution_check check (
-        resolution in (
-          'supplier_backorder',
-          'replacement_shipment',
-          'supplier_credit',
-          'supplier_refund',
-          'close_short',
-          'damaged_rejected'
-        )
-      )
-    )
+    drop table if exists public.retail_purchase_orders cascade
   `;
 
   await sql`
@@ -842,36 +820,6 @@ try {
         status in ('active', 'picked', 'shipped', 'cancelled', 'returned')
       )
     )
-  `;
-
-  await sql`
-    create index if not exists retail_purchase_orders_org_status_idx
-      on public.retail_purchase_orders (organisation_id, status, expected_at, updated_at desc)
-  `;
-
-  await sql`
-    create index if not exists retail_purchase_order_lines_po_idx
-      on public.retail_purchase_order_lines (purchase_order_id, product_id)
-  `;
-
-  await sql`
-    drop index if exists public.retail_purchase_order_lines_receiving_idx
-  `;
-
-  await sql`
-    create index if not exists retail_purchase_order_lines_receiving_idx
-      on public.retail_purchase_order_lines (organisation_id, product_id)
-      where quantity_received + quantity_cancelled < quantity_ordered
-  `;
-
-  await sql`
-    create index if not exists retail_purchase_order_line_shortfalls_line_idx
-      on public.retail_purchase_order_line_shortfalls (purchase_order_line_id, created_at desc)
-  `;
-
-  await sql`
-    create index if not exists retail_purchase_order_line_shortfalls_org_po_idx
-      on public.retail_purchase_order_line_shortfalls (organisation_id, purchase_order_id, created_at desc)
   `;
 
   await sql`

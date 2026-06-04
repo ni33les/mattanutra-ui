@@ -40,7 +40,7 @@ import {
   normalizeProductCountryCode
 } from "@/lib/product-countries";
 import {
-  customerPriceMarginPercentFromMetadata,
+  getCustomerPriceMarginPercent,
   normalizeCustomerPriceMarginPercent
 } from "@/lib/customer-pricing";
 import type {
@@ -2022,8 +2022,16 @@ export async function getAdminSettingsData(
   const currentOrganisation = organisationRows[0]
     ? organisation(organisationRows[0])
     : context.effectiveOrganisation;
+  const canEditCustomerPriceMargin =
+    !context.isLegacy &&
+    currentOrganisation.type === "platform" &&
+    (
+      context.effectiveMembership.role === "platform_owner" ||
+      context.effectiveMembership.role === "platform_admin"
+    );
 
   return {
+    canEditCustomerPriceMargin,
     canEditOrganisation:
       !context.isLegacy &&
       (
@@ -2034,9 +2042,7 @@ export async function getAdminSettingsData(
           context.effectiveMembership.role === "retail_admin"
         )
       ),
-    customerPriceMarginPercent: customerPriceMarginPercentFromMetadata(
-      organisationRows[0]?.metadata
-    ),
+    customerPriceMarginPercent: await getCustomerPriceMarginPercent({ sql }),
     organisation: currentOrganisation,
     people: peopleRows.map((row) => ({
       displayName: row.display_name,
@@ -3064,6 +3070,12 @@ export async function updateEffectiveOrganisationSettings({
   const canEditCurrency =
     context.actorMembership.role === "platform_owner" ||
     context.actorMembership.role === "platform_admin";
+  const canEditCustomerPriceMargin =
+    context.effectiveOrganisation.type === "platform" &&
+    (
+      context.effectiveMembership.role === "platform_owner" ||
+      context.effectiveMembership.role === "platform_admin"
+    );
   const requestedCurrency = currency?.trim().toUpperCase() ?? "";
 
   if (
@@ -3084,9 +3096,20 @@ export async function updateEffectiveOrganisationSettings({
   }
 
   const sql = await sqlOrThrow();
-  const normalizedMarginPercent = normalizeCustomerPriceMarginPercent(
-    customerPriceMarginPercent
-  );
+  const requestedCustomerPriceMargin = customerPriceMarginPercent !== undefined;
+
+  if (requestedCustomerPriceMargin && !canEditCustomerPriceMargin) {
+    throw new Error("Customer margin can only be updated at platform level");
+  }
+
+  const marginMetadataPatch =
+    requestedCustomerPriceMargin && canEditCustomerPriceMargin
+      ? {
+          customerPriceMarginPercent: normalizeCustomerPriceMarginPercent(
+            customerPriceMarginPercent
+          )
+        }
+      : {};
   const rows = await sql<Array<{
     country_code: string | null;
     currency: string | null;
@@ -3102,10 +3125,10 @@ export async function updateEffectiveOrganisationSettings({
       name = ${name.trim()},
       default_locale = ${defaultLocale},
       currency = ${normalizedCurrency},
-      metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
-        'customerPriceMarginPercent',
-        ${normalizedMarginPercent}
-      ),
+      metadata = case
+        when organisation_type = 'platform' then coalesce(metadata, '{}'::jsonb) || ${sql.json(marginMetadataPatch)}::jsonb
+        else coalesce(metadata, '{}'::jsonb) - 'customerPriceMarginPercent'
+      end,
       updated_at = now()
     where id = ${context.effectiveOrganisation.id}::uuid
     returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency

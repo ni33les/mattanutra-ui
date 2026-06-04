@@ -51,6 +51,11 @@ import {
   buildReassessmentEmailHtml,
   buildReassessmentEmailSubject
 } from "@/lib/reassessment-email";
+import {
+  adminCommunicationEventKeys,
+  type AdminCommunicationChannelType,
+  type AdminCommunicationEventKey
+} from "@/lib/communications";
 import type { TaskRecord } from "@/lib/task-service";
 import { isPregenerationSource } from "@/lib/task-worker";
 
@@ -135,6 +140,42 @@ export type ReassessmentEmailWorkItem = Readonly<{
   to: string;
   taskType: "send_reassessment_email";
   unsubscribeToken: string;
+}>;
+
+export type RetailOrderWorkflowEmailWorkItem = Readonly<{
+  event:
+    | "awaiting_stock"
+    | "cancelled"
+    | "confirmed"
+    | "delivered"
+    | "returned"
+    | "shipped";
+  locale: Locale;
+  orderId: string;
+  paymentId: string | null;
+  planId: string | null;
+  taskId: string;
+  taskType: "send_retail_order_workflow_email";
+}>;
+
+export type AdminCommunicationRouteWorkItem = Readonly<{
+  body: string | null;
+  channelType: AdminCommunicationChannelType | null;
+  eventKey: AdminCommunicationEventKey;
+  metadata: Record<string, unknown>;
+  organisationId: string;
+  resourceId: string | null;
+  resourceType: string | null;
+  subject: string | null;
+  taskId: string;
+  taskType: "route_admin_communication";
+}>;
+
+export type CommunicationDispatchWorkItem = Readonly<{
+  messageId: string;
+  organisationId: string;
+  taskId: string;
+  taskType: "dispatch_chat_communication_message" | "dispatch_email_communication_message";
 }>;
 
 export type CommunicationFollowupWorkItem = Readonly<{
@@ -235,12 +276,13 @@ export type RetailOperationsReviewWorkItem = Readonly<{
   taskId: string;
   taskType:
     | "retail_customer_order_allocate"
+    | "retail_order_cancel_review"
+    | "retail_order_delivery_confirm"
     | "retail_order_pack"
     | "retail_order_pick"
 	    | "retail_order_return_review"
 	    | "retail_order_ship"
-	    | "retail_purchase_order_place_order"
-	    | "retail_purchase_order_receive"
+    | "retail_shopping_list_review"
     | "retail_stock_expiry_review"
     | "retail_stock_low_stock_digest"
     | "retail_stock_low_stock_review"
@@ -261,6 +303,9 @@ export type TaskWorkItem =
   | NutritionPlanRefinementWorkItem
   | NutritionReportWorkItem
   | ProductRecommendationsWorkItem
+  | AdminCommunicationRouteWorkItem
+  | CommunicationDispatchWorkItem
+  | RetailOrderWorkflowEmailWorkItem
   | RetailStockForecastWorkItem
   | RetailOperationsReviewWorkItem
   | ReassessmentEmailWorkItem
@@ -936,6 +981,105 @@ async function buildReassessmentEmailWorkItem(task: TaskRecord) {
   } satisfies ReassessmentEmailWorkItem;
 }
 
+function buildRetailOrderWorkflowEmailWorkItem(
+  task: TaskRecord
+): RetailOrderWorkflowEmailWorkItem {
+  const event = payloadText(task.payload, "event");
+  const localePayload = payloadText(task.payload, "locale");
+  const orderId =
+    payloadText(task.payload, "orderId") || task.sourceEntityId || "";
+  const paymentId = payloadText(task.payload, "paymentId") || null;
+  const planId = payloadText(task.payload, "planId") || task.planId;
+
+  if (
+    event !== "awaiting_stock" &&
+    event !== "cancelled" &&
+    event !== "confirmed" &&
+    event !== "delivered" &&
+    event !== "returned" &&
+    event !== "shipped"
+  ) {
+    throw new Error("Retail order email task has an invalid event");
+  }
+
+  if (!isUuid(orderId)) {
+    throw new Error("Retail order email task is missing an order id");
+  }
+
+  return {
+    event,
+    locale: isLocale(localePayload) ? localePayload : "en",
+    orderId,
+    paymentId,
+    planId,
+    taskId: task.id,
+    taskType: "send_retail_order_workflow_email"
+  };
+}
+
+function adminCommunicationChannelType(
+  value: string
+): AdminCommunicationChannelType | null {
+  return value === "email" || value === "line" ? value : null;
+}
+
+function buildAdminCommunicationRouteWorkItem(
+  task: TaskRecord
+): AdminCommunicationRouteWorkItem {
+  const payload = payloadRecord(task.payload);
+  const eventKey = payloadText(payload, "eventKey");
+  const channelType = adminCommunicationChannelType(
+    payloadText(payload, "channelType")
+  );
+
+  if (!adminCommunicationEventKeys.includes(eventKey as AdminCommunicationEventKey)) {
+    throw new Error("Admin communication route task has an invalid event key");
+  }
+
+  const targetOrganisationId =
+    payloadText(payload, "targetOrganisationId") ||
+    payloadText(payload, "organisationId") ||
+    task.organisationId;
+
+  if (!isUuid(targetOrganisationId)) {
+    throw new Error("Admin communication route task is missing a target organisation");
+  }
+
+  return {
+    body: textFromRecord(payload, "body"),
+    channelType,
+    eventKey: eventKey as AdminCommunicationEventKey,
+    metadata: payloadRecord(payload.metadata),
+    organisationId: targetOrganisationId,
+    resourceId: textFromRecord(payload, "resourceId"),
+    resourceType: textFromRecord(payload, "resourceType"),
+    subject: textFromRecord(payload, "subject"),
+    taskId: task.id,
+    taskType: "route_admin_communication"
+  };
+}
+
+function buildCommunicationDispatchWorkItem(
+  task: TaskRecord
+): CommunicationDispatchWorkItem {
+  const messageId = payloadText(task.payload, "messageId") || task.sourceEntityId || "";
+
+  if (!isUuid(messageId)) {
+    throw new Error("Communication dispatch task is missing a message id");
+  }
+
+  if (!isUuid(task.organisationId)) {
+    throw new Error("Communication dispatch task is missing an organisation");
+  }
+
+  return {
+    messageId,
+    organisationId: task.organisationId,
+    taskId: task.id,
+    taskType: task.taskType as CommunicationDispatchWorkItem["taskType"]
+  };
+}
+
 function mapChatMessage(row: Record<string, unknown>) {
   return {
     body: typeof row.body === "string" ? row.body : "",
@@ -1350,6 +1494,21 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
     return buildReassessmentEmailWorkItem(task);
   }
 
+  if (task.taskType === "send_retail_order_workflow_email") {
+    return buildRetailOrderWorkflowEmailWorkItem(task);
+  }
+
+  if (task.taskType === "route_admin_communication") {
+    return buildAdminCommunicationRouteWorkItem(task);
+  }
+
+  if (
+    task.taskType === "dispatch_chat_communication_message" ||
+    task.taskType === "dispatch_email_communication_message"
+  ) {
+    return buildCommunicationDispatchWorkItem(task);
+  }
+
   if (task.taskType === "nutrition_plan_chat_reply") {
     return buildNutritionPlanChatWorkItem(task);
   }
@@ -1379,12 +1538,13 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
 
   if (
     task.taskType === "retail_customer_order_allocate" ||
+    task.taskType === "retail_order_cancel_review" ||
+    task.taskType === "retail_order_delivery_confirm" ||
     task.taskType === "retail_order_pack" ||
     task.taskType === "retail_order_pick" ||
 	    task.taskType === "retail_order_return_review" ||
 	    task.taskType === "retail_order_ship" ||
-	    task.taskType === "retail_purchase_order_place_order" ||
-	    task.taskType === "retail_purchase_order_receive" ||
+    task.taskType === "retail_shopping_list_review" ||
     task.taskType === "retail_stock_expiry_review" ||
     task.taskType === "retail_stock_low_stock_digest" ||
     task.taskType === "retail_stock_low_stock_review" ||

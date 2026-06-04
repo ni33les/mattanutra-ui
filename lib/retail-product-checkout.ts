@@ -2,7 +2,6 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import Stripe from "stripe";
 import type postgres from "postgres";
 import { isUuid } from "@/lib/assessment-store";
-import { formatCurrencyAmount } from "@/lib/currencies";
 import { getSql } from "@/lib/db";
 import { FINANCE_ACCOUNT_IDS, recordFinanceTransaction } from "@/lib/finance-ledger";
 import { resolveUsdRateForCurrency } from "@/lib/finance-fx";
@@ -20,9 +19,14 @@ import {
   STRIPE_MINOR_UNITS_PER_MAJOR,
   stripePaymentConfig
 } from "@/lib/stripe-payment-config";
-import { sendTransactionalEmail } from "@/lib/smtp-email";
 import { createTask } from "@/lib/task-service";
 import { writeBpmEvent } from "@/lib/bpm";
+import { queueAdminOrganisationCommunication } from "@/lib/communications";
+import {
+  recordRetailOrderWorkflowBpm,
+  retailOrderStatusBpmEventName,
+  sendRetailOrderWorkflowEmail
+} from "@/lib/retail-order-workflow";
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
 type RetailCheckoutDb = postgres.Sql | postgres.TransactionSql;
@@ -101,6 +105,12 @@ type TrackingOrder = Readonly<{
   orderId: string | null;
   orderNumber: string | null;
   retailerName: string | null;
+  shipment: Readonly<{
+    carrierName: string | null;
+    shipmentNotes: string | null;
+    trackingNumber: string | null;
+    trackingUrl: string | null;
+  }> | null;
   status: string;
   totalAmount: number;
   trackingUrl: string | null;
@@ -134,10 +144,6 @@ function stripeMinorAmountFromMicros(micros: number) {
   return Math.round((micros / AMOUNT_MICROS_PER_UNIT) * STRIPE_MINOR_UNITS_PER_MAJOR);
 }
 
-function formatEmailAmount(amount: number, currency: string) {
-  return formatCurrencyAmount("en", amount, currency);
-}
-
 function stripeLocale(locale: Locale) {
   return locale === "th" ? "th" : locale === "zh-CN" ? "zh" : "en";
 }
@@ -150,21 +156,24 @@ function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function escapeHtml(value: unknown) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
 function idempotencyHash(input: unknown) {
   return createHash("sha256").update(JSON.stringify(input)).digest("hex");
 }
 
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function shipmentFromMetadata(value: unknown): TrackingOrder["shipment"] {
+  const shipment = objectValue(objectValue(value).shipment);
+  const parsed = {
+    carrierName: cleanText(shipment.carrierName) || null,
+    shipmentNotes: cleanText(shipment.shipmentNotes) || null,
+    trackingNumber: cleanText(shipment.trackingNumber) || null,
+    trackingUrl: cleanText(shipment.trackingUrl) || null
+  };
+
+  return Object.values(parsed).some(Boolean) ? parsed : null;
 }
 
 function normalizeAddress(input: RetailCheckoutAddress): RetailCheckoutAddress {
@@ -669,8 +678,13 @@ async function createRetailCustomerOrderFromPayment(
   payment: CheckoutPaymentRow
 ) {
   if (payment.retail_customer_order_id) {
-    const existingRows = await sql<Array<{ id: string; order_number: string }>>`
-      select id::text, order_number
+    const existingRows = await sql<Array<{
+      id: string;
+      order_number: string;
+      organisation_id: string;
+      status: string;
+    }>>`
+      select id::text, order_number, organisation_id::text, status
       from public.retail_customer_orders
       where id = ${payment.retail_customer_order_id}::uuid
       limit 1
@@ -678,23 +692,34 @@ async function createRetailCustomerOrderFromPayment(
     const existing = existingRows[0];
 
     if (existing) {
-      return { orderId: existing.id, orderNumber: existing.order_number };
+      return {
+        orderId: existing.id,
+        orderNumber: existing.order_number,
+        orderStatus: existing.status,
+        organisationId: existing.organisation_id
+      };
     }
 
     return {
       orderId: payment.retail_customer_order_id,
-      orderNumber: payment.retail_customer_order_id
+      orderNumber: payment.retail_customer_order_id,
+      orderStatus: "placed",
+      organisationId: payment.selected_retailer_organisation_id
     };
   }
 
   const quoteLines = arrayValue<QuoteLine>(payment.quote_lines);
   const routing = objectValue(payment.routing_snapshot);
   const retailerId = payment.selected_retailer_organisation_id;
+  const paymentMetadata = objectValue(payment.metadata);
 
   if (!retailerId || quoteLines.length < 1) {
     throw new Error("Retail checkout quote is incomplete");
   }
 
+  const initialStatus = quoteLines.some((line) => line.etaDate)
+    ? "awaiting_stock"
+    : "placed";
   const rows = await sql<Array<{ id: string; order_number: string }>>`
     insert into public.retail_customer_orders (
       organisation_id,
@@ -717,13 +742,15 @@ async function createRetailCustomerOrderFromPayment(
       'checkout',
       ${payment.customer_name},
       ${payment.customer_email},
-      ${quoteLines.some((line) => line.etaDate) ? "awaiting_stock" : "placed"},
+      ${initialStatus},
       ${payment.currency},
       ${null}::timestamptz,
       now(),
       ${cleanText(objectValue(payment.shipping_address).notes) || null},
       ${sql.json(toJsonValue({
         checkoutPaymentId: payment.id,
+        billingAddress: paymentMetadata.billingAddress ?? null,
+        billingSameAsShipping: paymentMetadata.billingSameAsShipping !== false,
         freeShipping: true,
         removedItemIds: payment.removed_item_ids,
         shippingAddress: payment.shipping_address,
@@ -796,7 +823,58 @@ async function createRetailCustomerOrderFromPayment(
     taskType: "retail_customer_order_allocate"
   });
 
-  return { orderId: order.id, orderNumber: order.order_number };
+  await recordRetailOrderWorkflowBpm(sql, {
+    eventName: retailOrderStatusBpmEventName(initialStatus),
+    eventStatus: initialStatus,
+    locale: payment.locale,
+    metadata: {
+      checkoutPaymentId: payment.id,
+      lineCount: quoteLines.length,
+      orderNumber: order.order_number,
+      source: "retail_product_checkout"
+    },
+    orderId: order.id,
+    organisationId: retailerId,
+    paymentId: payment.id,
+    planId: payment.plan_id
+  });
+
+  try {
+    await queueAdminOrganisationCommunication({
+      eventKey: "retail_order_created",
+      metadata: {
+        checkoutPaymentId: payment.id,
+        orderNumber: order.order_number,
+        source: "retail_product_checkout"
+      },
+      organisationId: retailerId,
+      resourceId: order.id,
+      resourceType: "retail_customer_order"
+    });
+
+    if (initialStatus === "awaiting_stock") {
+      await queueAdminOrganisationCommunication({
+        eventKey: "retail_order_awaiting_stock",
+        metadata: {
+          checkoutPaymentId: payment.id,
+          orderNumber: order.order_number,
+          source: "retail_product_checkout"
+        },
+        organisationId: retailerId,
+        resourceId: order.id,
+        resourceType: "retail_customer_order"
+      });
+    }
+  } catch (error) {
+    console.warn("Unable to queue retail organisation order notification", error);
+  }
+
+  return {
+    orderId: order.id,
+    orderNumber: order.order_number,
+    orderStatus: initialStatus,
+    organisationId: retailerId
+  };
 }
 
 async function recordRetailCheckoutFinance(
@@ -863,159 +941,6 @@ async function recordRetailCheckoutFinance(
   }
 }
 
-function retailCheckoutTrackingUrl(locale: string, reference: string) {
-  return `${siteBaseUrl()}/${locale}/order/track/${encodeURIComponent(reference)}`;
-}
-
-function retailOrderConfirmationHtml(input: Readonly<{
-  orderId: string;
-  payment: CheckoutPaymentRow;
-  trackingUrl: string;
-}>) {
-  const quoteLines = arrayValue<QuoteLine>(input.payment.quote_lines);
-  const address = objectValue(input.payment.shipping_address);
-  const total = Number(input.payment.amount) / AMOUNT_MICROS_PER_UNIT;
-  const lineItems = quoteLines
-    .map((line) => {
-      const amount = formatEmailAmount(
-        line.unitPriceAmount * line.quantity,
-        line.currency
-      );
-
-      return `
-        <tr>
-          <td style="padding:12px 0;border-bottom:1px solid #e5e7eb;">
-            <strong>${escapeHtml(line.productTitle)}</strong><br>
-            <span style="color:#64748b;">Qty ${escapeHtml(line.quantity)}${
-              line.etaDate ? ` · ETA ${escapeHtml(line.etaDate)}` : ""
-            }</span>
-          </td>
-          <td style="padding:12px 0;border-bottom:1px solid #e5e7eb;text-align:right;">
-            ${escapeHtml(amount)}
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
-  const addressLines = [
-    input.payment.customer_name,
-    address.addressLine1,
-    address.addressLine2,
-    [address.city, address.province, address.postalCode]
-      .map(cleanText)
-      .filter(Boolean)
-      .join(", "),
-    address.country
-  ].filter(Boolean);
-
-  return `
-    <div style="margin:0 auto;max-width:640px;padding:32px 20px;font-family:Arial,sans-serif;color:#173532;">
-      <p style="margin:0 0 8px;color:#0f766e;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;">
-        Order confirmed
-      </p>
-      <h1 style="margin:0 0 12px;font-family:Georgia,serif;font-size:34px;font-weight:500;">
-        Your Dream Pharmacy order is confirmed
-      </h1>
-      <p style="margin:0 0 24px;color:#475569;line-height:1.6;">
-        Thank you for trusting MattaNutra. Your selected products have been sent to one pharmacy, and we will keep this tracking page updated as the order moves forward.
-      </p>
-      <p style="margin:0 0 28px;">
-        <a href="${escapeHtml(input.trackingUrl)}" style="display:inline-block;border-radius:999px;background:#0f766e;color:#fff;padding:13px 20px;text-decoration:none;font-weight:700;">
-          Track your order
-        </a>
-      </p>
-      <div style="border:1px solid #e5e7eb;border-radius:14px;padding:18px;margin-bottom:20px;">
-        <p style="margin:0 0 8px;color:#64748b;font-size:12px;font-weight:700;text-transform:uppercase;">Order</p>
-        <p style="margin:0;font-family:monospace;">${escapeHtml(input.orderId)}</p>
-      </div>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
-        <tbody>
-          ${lineItems}
-          <tr>
-            <td style="padding:16px 0;font-weight:700;">Paid total</td>
-            <td style="padding:16px 0;text-align:right;font-weight:700;">${escapeHtml(
-              formatEmailAmount(total, input.payment.currency)
-            )}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div style="border:1px solid #e5e7eb;border-radius:14px;padding:18px;margin-bottom:20px;">
-        <p style="margin:0 0 8px;color:#64748b;font-size:12px;font-weight:700;text-transform:uppercase;">Delivery address</p>
-        ${addressLines
-          .map((line) => `<p style="margin:2px 0;">${escapeHtml(line)}</p>`)
-          .join("")}
-      </div>
-      <p style="margin:0;color:#64748b;font-size:13px;line-height:1.6;">
-        Bookmark the tracking page so you can return to it quickly. If you have questions, reply to this email.
-      </p>
-    </div>
-  `;
-}
-
-async function sendRetailOrderConfirmationEmail(input: Readonly<{
-  orderId: string;
-  orderNumber: string;
-  payment: CheckoutPaymentRow;
-  sql: RetailCheckoutDb;
-}>) {
-  const email = cleanText(input.payment.customer_email);
-
-  if (!email) {
-    return;
-  }
-
-  const metadata = objectValue(input.payment.metadata);
-  const existing = objectValue(metadata.orderConfirmationEmail);
-
-  if (existing.sent === true) {
-    return;
-  }
-
-  const trackingUrl = retailCheckoutTrackingUrl(input.payment.locale, input.orderNumber);
-  const delivery = await sendTransactionalEmail({
-    html: retailOrderConfirmationHtml({
-      orderId: input.orderNumber,
-      payment: input.payment,
-      trackingUrl
-    }),
-    subject: "Your Dream Pharmacy order is confirmed",
-    to: email
-  });
-
-  await input.sql`
-    update public.retail_checkout_payments
-    set metadata = metadata || ${input.sql.json(toJsonValue({
-      orderConfirmationEmail: {
-        messageId: delivery.messageId ?? null,
-        reason: delivery.reason ?? null,
-        sent: delivery.sent,
-        sentAt: delivery.sent ? new Date().toISOString() : null,
-        trackingReference: input.orderNumber,
-        trackingUrl
-      }
-    }))}::jsonb,
-      updated_at = now()
-    where id = ${input.payment.id}::uuid
-  `;
-
-  void writeBpmEvent({
-    actorType: "system",
-    emittedBy: "retail_product_checkout",
-    eventName: delivery.sent
-      ? "retail_order_confirmation_email_sent"
-      : "retail_order_confirmation_email_skipped",
-    eventStatus: delivery.sent ? "sent" : "skipped",
-    eventType: "email",
-    locale: input.payment.locale,
-    properties: {
-      checkoutPaymentId: input.payment.id,
-      orderId: input.orderId,
-      orderNumber: input.orderNumber,
-      reason: delivery.reason ?? null
-    }
-  });
-}
-
 async function fulfillRetailCheckoutPayment(
   sql: RetailCheckoutDb,
   payment: CheckoutPaymentRow
@@ -1024,7 +949,8 @@ async function fulfillRetailCheckoutPayment(
     return payment;
   }
 
-  const { orderId, orderNumber } = await createRetailCustomerOrderFromPayment(sql, payment);
+  const { orderId, orderNumber, orderStatus } =
+    await createRetailCustomerOrderFromPayment(sql, payment);
   const trackingToken = randomBytes(32).toString("base64url");
   const trackingHash = hashToken(trackingToken);
 
@@ -1063,12 +989,25 @@ async function fulfillRetailCheckoutPayment(
     valueCurrency: updated.currency
   });
 
-  await sendRetailOrderConfirmationEmail({
+  await sendRetailOrderWorkflowEmail({
+    event: "confirmed",
+    locale: updated.locale,
     orderId,
-    orderNumber,
-    payment: updated,
+    paymentId: updated.id,
+    planId: updated.plan_id,
     sql
   });
+
+  if (orderStatus === "awaiting_stock") {
+    await sendRetailOrderWorkflowEmail({
+      event: "awaiting_stock",
+      locale: updated.locale,
+      orderId,
+      paymentId: updated.id,
+      planId: updated.plan_id,
+      sql
+    });
+  }
 
   return {
     ...updated,
@@ -1300,12 +1239,14 @@ export async function getTrackingOrderByReference(
 
   const isTokenReference = trackingReference.length >= 32;
   const rows = await sql<Array<CheckoutPaymentRow & {
+    order_metadata: unknown;
     order_number: string | null;
     order_status: string | null;
     retailer_name: string | null;
   }>>`
     select
       retail_checkout_payments.*,
+      retail_customer_orders.metadata as order_metadata,
       retail_customer_orders.order_number,
       retail_customer_orders.status as order_status,
       organisations.name as retailer_name
@@ -1352,6 +1293,7 @@ export async function getTrackingOrderByReference(
     orderId: row.retail_customer_order_id,
     orderNumber: row.order_number,
     retailerName: row.retailer_name,
+    shipment: shipmentFromMetadata(row.order_metadata),
     status: row.order_status ?? row.status,
     totalAmount: Number(row.amount) / AMOUNT_MICROS_PER_UNIT,
     trackingUrl: `/${locale}/order/track/${encodeURIComponent(row.order_number ?? trackingReference)}`

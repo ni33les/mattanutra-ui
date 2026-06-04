@@ -265,6 +265,8 @@ export const SYSTEM_AGENT_LIST = Object.values(SYSTEM_AGENTS);
 export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
   analyze_healthscore: "healthScoreEngine",
   client_safety_followup: "communicationsCoordinator",
+  dispatch_chat_communication_message: "chatDispatcher",
+  dispatch_email_communication_message: "emailDispatcher",
   generate_example_supplement_guidance: "formulationWorker",
   generate_food_gap_guidance: "foodGuidanceWorker",
   generate_food_guidance: "foodGuidanceWorker",
@@ -273,12 +275,12 @@ export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
   generate_product_recommendations: "productMatcher",
   retail_stock_forecast_refresh: "retailStockPlanner",
   retail_customer_order_allocate: "retailStockPlanner",
+  retail_order_cancel_review: "retailStockPlanner",
+  retail_order_delivery_confirm: "retailStockPlanner",
   retail_order_pack: "retailStockPlanner",
   retail_order_pick: "retailStockPlanner",
   retail_order_return_review: "retailStockPlanner",
   retail_order_ship: "retailStockPlanner",
-  retail_purchase_order_place_order: "retailStockPlanner",
-  retail_purchase_order_receive: "retailStockPlanner",
   retail_stock_expiry_review: "retailStockPlanner",
   retail_stock_low_stock_digest: "retailStockPlanner",
   retail_stock_low_stock_review: "retailStockPlanner",
@@ -287,8 +289,10 @@ export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
   nutrition_plan_chat_reply: "nutritionPlanAdvisor",
   refine_nutrition_plan: "nutritionPlanAdvisor",
   content_status_change: "contentPublisher",
+  route_admin_communication: "communicationsCoordinator",
   send_example_email: "emailDispatcher",
   send_reassessment_email: "emailDispatcher",
+  send_retail_order_workflow_email: "emailDispatcher",
   sync_digitalocean_billing: "scheduler"
 } as const;
 
@@ -304,6 +308,11 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
   const capabilitiesByTaskType: Record<string, readonly string[]> = {
     analyze_healthscore: [AGENT_CAPABILITIES.healthScoreAnalysis],
     client_safety_followup: [AGENT_CAPABILITIES.clientSafetyFollowup],
+    dispatch_chat_communication_message: [
+      AGENT_CAPABILITIES.communicationDispatch,
+      AGENT_CAPABILITIES.lineSend
+    ],
+    dispatch_email_communication_message: [AGENT_CAPABILITIES.emailSend],
     generate_example_supplement_guidance: [
       AGENT_CAPABILITIES.freeExampleFormulation
     ],
@@ -321,18 +330,18 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
     retail_customer_order_allocate: [
       AGENT_CAPABILITIES.retailStockPolicyReview
     ],
+    retail_order_cancel_review: [
+      AGENT_CAPABILITIES.retailStockPolicyReview
+    ],
+    retail_order_delivery_confirm: [
+      AGENT_CAPABILITIES.retailStockPolicyReview
+    ],
     retail_order_pack: [AGENT_CAPABILITIES.retailStockPolicyReview],
     retail_order_pick: [AGENT_CAPABILITIES.retailStockPolicyReview],
     retail_order_return_review: [
       AGENT_CAPABILITIES.retailStockPolicyReview
     ],
     retail_order_ship: [AGENT_CAPABILITIES.retailStockPolicyReview],
-    retail_purchase_order_place_order: [
-      AGENT_CAPABILITIES.retailStockPolicyReview
-    ],
-    retail_purchase_order_receive: [
-      AGENT_CAPABILITIES.retailStockPolicyReview
-    ],
     retail_stock_expiry_review: [
       AGENT_CAPABILITIES.retailStockPolicyReview
     ],
@@ -350,8 +359,10 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
     nutrition_plan_chat_reply: [AGENT_CAPABILITIES.nutritionPlanChat],
     refine_nutrition_plan: [AGENT_CAPABILITIES.nutritionPlanRefinement],
     content_status_change: [AGENT_CAPABILITIES.contentPublish],
+    route_admin_communication: [AGENT_CAPABILITIES.communicationRoute],
     send_example_email: [AGENT_CAPABILITIES.freeEmailSend],
     send_reassessment_email: [AGENT_CAPABILITIES.reassessmentEmailSend],
+    send_retail_order_workflow_email: [AGENT_CAPABILITIES.emailSend],
     sync_digitalocean_billing: [AGENT_CAPABILITIES.hostingCostSync]
   };
 

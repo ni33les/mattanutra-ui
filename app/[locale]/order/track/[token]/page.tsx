@@ -16,6 +16,7 @@ const orderTrackingCopy = {
     address: "Delivery address",
     bookmark: "Bookmark tracking page",
     bookmarkCopied: "Tracking link copied",
+    carrier: "Carrier",
     customer: "Customer",
     eta: "Estimated arrival",
     footer:
@@ -31,12 +32,17 @@ const orderTrackingCopy = {
       "This page is secure and unique to your order. Keep it bookmarked for updates.",
     retailer: "Pharmacy",
     shipped: "Out for delivery",
+    shipment: "Shipment",
+    shipmentPending:
+      "Your order is on the way. Dream Pharmacy will update this page if courier tracking becomes available.",
     status: "Status",
     subtotal: "Paid total",
     subtitle:
       "Your order is confirmed. Bookmark this page for pharmacy updates and delivery progress.",
     timeline: "Order timeline",
     title: "Your Order",
+    trackShipment: "Track shipment",
+    trackingNumber: "Tracking number",
     yourItems: "Your Items",
     metadataTitle: "Track Your Order | MattaNutra"
   },
@@ -44,6 +50,7 @@ const orderTrackingCopy = {
     address: "ที่อยู่จัดส่ง",
     bookmark: "บันทึกหน้าติดตาม",
     bookmarkCopied: "คัดลอกลิงก์ติดตามแล้ว",
+    carrier: "ผู้ให้บริการขนส่ง",
     customer: "ลูกค้า",
     eta: "เวลาถึงโดยประมาณ",
     footer:
@@ -59,12 +66,17 @@ const orderTrackingCopy = {
       "หน้านี้ปลอดภัยและผูกกับคำสั่งซื้อของคุณโดยเฉพาะ โปรดบันทึกหน้านี้ไว้เพื่อติดตามอัปเดต",
     retailer: "ร้านขายยา",
     shipped: "กำลังจัดส่ง",
+    shipment: "การจัดส่ง",
+    shipmentPending:
+      "คำสั่งซื้อของคุณกำลังจัดส่ง Dream Pharmacy จะอัปเดตหน้านี้หากมีลิงก์ติดตามพัสดุ",
     status: "สถานะ",
     subtotal: "ยอดชำระ",
     subtitle:
       "คำสั่งซื้อของคุณได้รับการยืนยันแล้ว โปรดบันทึกหน้านี้เพื่อติดตามอัปเดตจากร้านขายยาและการจัดส่ง",
     timeline: "ไทม์ไลน์คำสั่งซื้อ",
     title: "คำสั่งซื้อของคุณ",
+    trackShipment: "ติดตามพัสดุ",
+    trackingNumber: "หมายเลขติดตาม",
     yourItems: "รายการของคุณ",
     metadataTitle: "ติดตามคำสั่งซื้อ | MattaNutra"
   },
@@ -72,6 +84,7 @@ const orderTrackingCopy = {
     address: "配送地址",
     bookmark: "收藏追踪页面",
     bookmarkCopied: "追踪链接已复制",
+    carrier: "承运商",
     customer: "客户",
     eta: "预计送达",
     footer: "MattaNutra x Dream Pharmacy - 你的个性化营养方案，安心送达。",
@@ -85,11 +98,16 @@ const orderTrackingCopy = {
     questions: "此页面安全且仅对应你的订单。请收藏此页面以查看更新。",
     retailer: "药房",
     shipped: "你的订单正在配送中",
+    shipment: "配送",
+    shipmentPending:
+      "你的订单正在配送中。如果有快递追踪信息，Dream Pharmacy 会更新此页面。",
     status: "状态",
     subtotal: "支付总额",
     subtitle: "你的订单已确认。请收藏此页面，查看药房更新和配送进度。",
     timeline: "订单时间线",
     title: "你的订单",
+    trackShipment: "追踪配送",
+    trackingNumber: "追踪号",
     yourItems: "你的商品",
     metadataTitle: "追踪你的订单 | MattaNutra"
   }
@@ -308,6 +326,50 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
                 </div>
               </dl>
             </section>
+
+            {order.shipment || order.status === "shipped" ? (
+              <section className="rounded-xl bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]">
+                <h2 className={labelClass(locale)}>{copy.shipment}</h2>
+                {order.shipment ? (
+                  <div className="mt-3 space-y-3 text-sm">
+                    {order.shipment.carrierName ? (
+                      <div>
+                        <div className="text-xs font-bold text-[var(--mn-ash)]">
+                          {copy.carrier}
+                        </div>
+                        <div className="mt-1 font-semibold text-[var(--mn-ink)]">
+                          {order.shipment.carrierName}
+                        </div>
+                      </div>
+                    ) : null}
+                    {order.shipment.trackingNumber ? (
+                      <div>
+                        <div className="text-xs font-bold text-[var(--mn-ash)]">
+                          {copy.trackingNumber}
+                        </div>
+                        <div className="mt-1 font-mono text-sm text-[var(--mn-ink)]">
+                          {order.shipment.trackingNumber}
+                        </div>
+                      </div>
+                    ) : null}
+                    {order.shipment.trackingUrl ? (
+                      <a
+                        className="inline-flex rounded-full bg-[var(--mn-teal)] px-4 py-2 text-sm font-bold text-white"
+                        href={order.shipment.trackingUrl}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {copy.trackShipment}
+                      </a>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
+                    {copy.shipmentPending}
+                  </p>
+                )}
+              </section>
+            ) : null}
 
             <section className="rounded-xl bg-[var(--mn-mint)] p-5 ring-1 ring-[var(--mn-line)]">
               <p className="text-sm leading-6 text-[var(--mn-teal-deep)]">

@@ -217,7 +217,7 @@ export default async function LocalizedAdminDashboardPage({
     data = await getAdminDashboardData(range, filters);
     flowData = await getAdminFlowData(range, filters);
     reviewQueueData = await getAdminReviewQueueData();
-    communicationsData = await getAdminCommunicationsData(range);
+    communicationsData = await getAdminCommunicationsData(range, adminContext);
     alertsData = await getAdminTechnicalAlertsData(range);
   } else if (view === "agents") {
     agentsData = await getAdminAgentsData(range);
@@ -232,7 +232,7 @@ export default async function LocalizedAdminDashboardPage({
   ) {
     contentData = await getAdminContentData(range, filters);
   } else if (view === "communications") {
-    communicationsData = await getAdminCommunicationsData(range);
+    communicationsData = await getAdminCommunicationsData(range, adminContext);
   } else if (view === "financials") {
     financialsData = await getAdminFinancialsData(range);
   } else if (view === "flow") {
@@ -245,13 +245,11 @@ export default async function LocalizedAdminDashboardPage({
     productsData = await getAdminProductsData(range);
   } else if (
     view === "stock" ||
-    view === "retail-task-queue" ||
     view === "retail-audit" ||
-    view === "retail-purchase-orders" ||
-    view === "retail-receiving" ||
     view === "retail-movements" ||
     view === "retail-customer-orders" ||
     view === "retail-fulfillment" ||
+    view === "retail-stock-advice" ||
     view === "retail-reorder"
   ) {
     retailStockData = await getAdminRetailStockData(adminContext, locale);

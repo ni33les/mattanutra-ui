@@ -563,22 +563,11 @@ export function SidebarContent({
             accessToken={accessToken}
             allowedViews={allowedViews}
             filters={filters}
-            items={labels.retailTasksNavigation}
+            items={labels.retailSellingNavigation}
             locale={locale}
             onNavigate={rememberSidebarScroll}
             range={range}
-            title={labels.retailTasksTitle}
-            view={view}
-          />
-          <SidebarNavList
-            accessToken={accessToken}
-            allowedViews={allowedViews}
-            filters={filters}
-            items={labels.retailBuyingNavigation}
-            locale={locale}
-            onNavigate={rememberSidebarScroll}
-            range={range}
-            title={labels.retailBuyingTitle}
+            title={labels.retailSellingTitle}
             view={view}
           />
           <SidebarNavList
@@ -596,11 +585,11 @@ export function SidebarContent({
             accessToken={accessToken}
             allowedViews={allowedViews}
             filters={filters}
-            items={labels.retailSellingNavigation}
+            items={labels.retailBuyingNavigation}
             locale={locale}
             onNavigate={rememberSidebarScroll}
             range={range}
-            title={labels.retailSellingTitle}
+            title={labels.retailBuyingTitle}
             view={view}
           />
           <SidebarNavList

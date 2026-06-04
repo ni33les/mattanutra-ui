@@ -196,7 +196,7 @@
   "settings": {
     "account": "账户",
     "currency": "货币",
-    "customerMargin": "客户利润率 %",
+    "customerMargin": "MattaNutra 利润率 %",
     "displayName": "姓名",
     "email": "邮箱",
     "language": "语言",
@@ -210,13 +210,15 @@
     "actions": "操作",
     "addItem": "添加项目",
     "addProduct": "添加可售产品",
-    "addPurchaseOrder": "新建采购单",
     "addCustomerOrder": "添加客户订单",
     "agentTasks": "代理任务",
     "allocate": "分配",
+    "allocated": "已分配",
     "allocatedTo": "分配给",
     "audit": "审计",
+    "all": "全部",
     "allOrganisations": "所有组织",
+    "awaitingStock": "等待库存",
     "availability": "正在检查可用性",
     "allocateAvailable": "分配可用库存",
     "availableNow": "当前可用",
@@ -239,14 +241,12 @@
     "customerOrderDetails": "客户订单详情",
     "customerOrders": "客户订单",
     "customerOrderSaveError": "无法保存客户订单。",
-    "createPo": "创建采购单",
     "createShoppingList": "创建购物清单",
     "currency": "货币",
     "daysCover": "可覆盖天数",
     "deliver": "送达",
     "disabled": "已禁用",
     "directRetailer": "直接选择零售商",
-    "draftPo": "采购单草稿",
     "dueAt": "截止日期",
     "empty": "暂无库存记录。",
     "escalateTask": "升级",
@@ -264,7 +264,6 @@
     "insightsTab": "洞察",
     "importCsv": "导入 CSV",
     "inStock": "有库存",
-    "incomingPo": "在途采购单",
     "chooseProduct": "选择产品",
     "leadTimeDays": "交付天数",
     "lowStock": "低库存",
@@ -296,24 +295,13 @@
     "pipelineUnavailable": "库存管道不可用。请重新检查流程。",
     "placedAt": "下单时间",
     "product": "产品",
-    "priceOverride": "价格覆盖",
-    "purchased": "已购买",
+    "priceOverride": "零售价",
     "profitImpact": "利润影响",
-    "purchaseOrders": "采购单",
-    "purchaseOrderNumber": "采购单号",
-    "purchaseOrderStatusAll": "全部",
-    "purchaseOrderStatusDraft": "草稿",
-    "purchaseOrderStatusOrdered": "已下单",
-    "purchaseOrderStatusPartial": "部分接收",
-    "purchaseOrderStatusReceived": "已接收",
-    "purchaseOrderStatusClosed": "已关闭",
-    "purchaseOrderStatusVoid": "作废",
     "quantity": "数量",
     "ordered": "订购",
     "receivedNow": "已接收",
     "reason": "原因",
     "receive": "接收",
-    "receiveAll": "全部",
     "receiveQuantityError": "数量无效。",
     "receiveStock": "接收库存",
     "recheckWorkflow": "重新检查流程",
@@ -321,24 +309,29 @@
     "remaining": "剩余",
     "removeItem": "移除",
     "regionalCheckout": "区域结账",
-    "reorderBy": "补货日期",
-    "recommendedOrder": "建议订购",
-    "reorderRisk": "风险",
     "reorderTab": "补货",
     "review": "审核",
-    "purchaseOrderDetails": "采购单详情",
     "retailPrice": "零售",
     "retailValue": "零售价值",
-    "riskOk": "正常",
-    "riskOutOfStock": "缺货",
-    "riskReorder": "需要补货",
-    "riskWatch": "关注",
     "save": "保存",
     "saveError": "无法保存库存。",
     "ship": "发货",
     "snoozeTask": "稍后处理",
-    "buildDraftPo": "创建采购单草稿",
+    "boxed": "已装箱",
+    "billingAddress": "账单地址",
+    "billingSameAsDelivery": "账单地址与配送地址相同",
+    "deliveryAddress": "配送地址",
+    "deliveryDetails": "配送详情",
+    "deliveryNotes": "配送备注",
+    "downloadPdf": "下载 PDF",
+    "email": "邮箱",
+    "invoice": "发票",
     "lineTotal": "行总计",
+    "packingSheet": "装箱单",
+    "phone": "电话",
+    "printOrder": "打印订单",
+    "sent": "已发送",
+    "shippingLabel": "配送标签",
     "shortfall": "短缺",
     "shortfallHandling": "短缺处理",
     "shortfallReference": "参考号",
@@ -385,20 +378,11 @@
     "unorderedNeed": "未下单需求",
     "unorderedNeedDescription": "这些产品有客户需求，但尚未由现有库存、在途采购单或采购单草稿覆盖。请选择要生成供应商采购单的项目。",
     "voidMovement": "冲销变动",
-    "voidPurchaseOrder": "作废采购单",
-    "waitingForPo": "等待采购单",
+    "waitingForStock": "等待库存",
     "wholesalePrice": "批发",
-    "wholesalerTried": "已尝试批发商",
     "workflow": "流程",
-    "restockingAdvice": "补货建议",
-    "restockingAdviceDescription": "必需项来自尚未满足的客户需求；建议项来自库存计划。请选择要生成同一张供应商采购单的项目。",
-    "reorderAdviceDetails": "补货建议详情",
     "reorderBackorders": "欠货订单",
-    "reorderBackordersDescription": "这些项目用于满足当前有效客户订单。",
-    "reorderAdvise": "建议",
-    "reorderAdviseDescription": "建议订购这些项目以满足未来需求。",
-    "reorderRequired": "必需",
-    "reorderAdvisory": "建议"
+    "reorderBackordersDescription": "这些项目用于满足当前有效客户订单。"
   },
   "generated": "生成时间",
   "financials": {
@@ -483,7 +467,12 @@
     "productCheckoutViewed": "产品结账",
     "productPaymentSucceeded": "产品已付款",
     "proPaid": "Pro 已支付",
+    "retailOrderAwaitingStock": "等待库存",
+    "retailOrderCancelled": "订单已取消",
     "retailOrderCreated": "产品订单",
+    "retailOrderDelivered": "订单已送达",
+    "retailOrderReturned": "订单已退回",
+    "retailOrderShipped": "订单已发货",
     "resultsViewed": "结果"
   },
   "flowMetrics": {
@@ -561,10 +550,6 @@
     {
       "name": "线索",
       "view": "leads"
-    },
-    {
-      "name": "通信",
-      "view": "communications"
     }
   ],
   "marketingTitle": "营销",
@@ -580,6 +565,10 @@
     {
       "name": "人员",
       "view": "people"
+    },
+    {
+      "name": "通信",
+      "view": "communications"
     },
     {
       "name": "代理",
@@ -621,50 +610,33 @@
     }
   ],
   "governanceTitle": "目录",
-  "retailTasksNavigation": [
-    {
-      "name": "任务队列",
-      "view": "retail-task-queue"
-    },
-    {
-      "name": "审计",
-      "view": "retail-audit"
-    }
-  ],
+  "retailTasksNavigation": [],
   "retailTasksTitle": "零售任务",
   "retailBuyingNavigation": [
     {
-      "name": "购物清单",
-      "view": "retail-reorder"
+      "name": "补货建议",
+      "view": "retail-stock-advice"
     },
     {
-      "name": "接收",
-      "view": "retail-receiving"
+      "name": "购物清单",
+      "view": "retail-reorder"
     }
   ],
-  "retailBuyingTitle": "采购库存",
+  "retailBuyingTitle": "采购",
   "retailInventoryNavigation": [
     {
       "name": "库存",
       "view": "stock"
-    },
-    {
-      "name": "库存变动",
-      "view": "retail-movements"
     }
   ],
   "retailInventoryTitle": "库存",
   "retailSellingNavigation": [
     {
-      "name": "客户订单",
+      "name": "订单",
       "view": "retail-customer-orders"
-    },
-    {
-      "name": "履约",
-      "view": "retail-fulfillment"
     }
   ],
-  "retailSellingTitle": "销售库存",
+  "retailSellingTitle": "订单",
   "insights": [
     {
       "name": "补充剂",
@@ -720,10 +692,8 @@
     "retail-audit": "审计",
     "retail-fulfillment": "履约",
     "retail-movements": "库存变动",
-    "retail-purchase-orders": "采购单",
-    "retail-receiving": "接收",
+    "retail-stock-advice": "补货建议",
     "retail-reorder": "购物清单",
-    "retail-task-queue": "任务队列",
     "reviews": "审核",
     "settings": "设置",
     "stock": "库存",
