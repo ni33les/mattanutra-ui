@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
+import { queuePlatformAdminCommunication } from "@/lib/communications";
 import {
   createRetailCheckoutSession,
   isRetailCheckoutLocale,
@@ -56,6 +57,24 @@ export async function POST(request: Request) {
       headers: { "Cache-Control": "no-store" }
     });
   } catch (error) {
+    try {
+      await queuePlatformAdminCommunication({
+        eventKey: "platform_checkout_failed",
+        metadata: {
+          errorMessage:
+            error instanceof Error ? error.message : "Unable to create basket checkout",
+          locale,
+          planId,
+          selectedItemCount: selectedItemIds.length,
+          source: "retail_checkout_session_api"
+        },
+        resourceId: isUuid(planId) ? planId : null,
+        resourceType: isUuid(planId) ? "assessment_plan" : "retail_checkout_request"
+      });
+    } catch (notificationError) {
+      console.warn("Unable to queue platform retail checkout failure notification", notificationError);
+    }
+
     return NextResponse.json(
       {
         message:

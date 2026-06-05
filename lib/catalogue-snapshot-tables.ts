@@ -83,11 +83,6 @@ export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
     requiredForReload: true
   },
   {
-    description: "Direct and affiliate product links.",
-    name: "product_offers",
-    requiredForReload: true
-  },
-  {
     description: "Manufacturer import batch records.",
     name: "product_import_runs",
     requiredForReload: true
@@ -160,7 +155,6 @@ export const CATALOGUE_RELOAD_ORDER = [
   "product_translations",
   "product_facts",
   "product_versions",
-  "product_offers",
   "product_import_runs",
   "product_imports",
   "product_import_translations",
@@ -186,7 +180,6 @@ export const CATALOGUE_TRUNCATE_ORDER = [
   "product_import_translations",
   "product_imports",
   "product_import_runs",
-  "product_offers",
   "product_versions",
   "product_facts",
   "product_countries",

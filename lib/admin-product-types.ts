@@ -47,7 +47,6 @@ const productAvailabilityStatuses = new Set<ProductAvailabilityStatus>([
 ]);
 const productAudiences = new Set<ProductAudience>(["both", "female", "male"]);
 
-export type ProductAffiliateStatus = "active" | "flagged_stale" | "none";
 export type ProductLabelStatus = "failed" | "missing" | "parsed" | "stale";
 export type ProductValidationCacheStatus = "fresh" | "missing" | "stale";
 
@@ -64,20 +63,6 @@ export type AdminProductFact = ProductCandidateFact & Readonly<{
   supplementStatus: ProductFactSupplementStatus | null;
 }>;
 
-export type AdminProductOffer = Readonly<{
-  availabilityStatus: ProductAvailabilityStatus;
-  commissionRate: number | null;
-  currency: string;
-  id: string;
-  linkType: "affiliate" | "direct";
-  network: string | null;
-  platform: string | null;
-  priceAmount: number | null;
-  priority: number;
-  status: "active" | "flagged_stale" | "inactive";
-  url: string;
-}>;
-
 export type AdminProductTranslationStatus = "complete" | "draft" | "missing";
 
 export type AdminProductTranslation = Readonly<{
@@ -88,8 +73,19 @@ export type AdminProductTranslation = Readonly<{
   updatedAt: string | null;
 }>;
 
+export type AdminProductShopAvailability = Readonly<{
+  backorderPolicy: "allow" | "deny";
+  currency: string;
+  leadTimeDays: number | null;
+  organisationId: string;
+  organisationName: string;
+  retailPriceAmount: number | null;
+  status: string;
+  stockQuantity: number;
+  wholesalePriceAmount: number | null;
+}>;
+
 export type AdminProductRow = Readonly<{
-  affiliateStatus: ProductAffiliateStatus;
   aiCorrectionNotes: string | null;
   availabilityStatus: ProductAvailabilityStatus;
   availableCountryCodes: ProductCountryCode[];
@@ -133,8 +129,8 @@ export type AdminProductRow = Readonly<{
     lastRecommendedAt: string | null;
   };
   decisionStats?: AdminProductDecisionStats;
-  offers: AdminProductOffer[];
   region: string;
+  shopAvailability: AdminProductShopAvailability[];
   sourceEvidence: {
     importId: string | null;
     importReviewTaskId: string | null;
@@ -154,7 +150,6 @@ export type AdminProductsData = Readonly<{
   platforms: ProductPlatform[];
   rows: AdminProductRow[];
   summary: {
-    activeAffiliate: number;
     dirtyData: number;
     ignored: number;
     missingFacts: number;
@@ -268,7 +263,6 @@ export type ResolveProductImportReviewInput = Readonly<{
 
 export type CreateAdminProductInput = Readonly<{
   actor?: string | null;
-  affiliateUrl?: string | null;
   availabilityStatus?: ProductAvailabilityStatus;
   availableCountryCodes?: readonly string[];
   countryPricing?: readonly ProductCountryPricing[];
@@ -307,7 +301,6 @@ export type CreateAdminProductInput = Readonly<{
 export type UpdateAdminProductInput = Readonly<{
   actor?: string | null;
   adminNotes?: string | null;
-  affiliateStatus?: ProductAffiliateStatus;
   availabilityStatus?: ProductAvailabilityStatus;
   availableCountryCodes?: readonly string[];
   countryPricing?: readonly ProductCountryPricing[];
@@ -336,28 +329,6 @@ export type UpdateAdminProductInput = Readonly<{
   titleTh?: string | null;
   titleZhCn?: string | null;
   translations?: Record<string, ProductTranslationInput>;
-}>;
-
-export type UpsertProductOfferInput = Readonly<{
-  actor?: string | null;
-  availabilityStatus?: string;
-  commissionRate?: number | null;
-  currency?: string | null;
-  linkType?: "affiliate" | "direct";
-  network?: string | null;
-  platform?: string | null;
-  priceAmount?: number | null;
-  priority?: number;
-  productId: string;
-  status?: string;
-  trackingId?: string | null;
-  url: string;
-}>;
-
-export type RemoveProductOfferInput = Readonly<{
-  actor?: string | null;
-  offerId: string;
-  productId: string;
 }>;
 
 export function isProductStatus(value: string): value is ProductStatus {
@@ -389,7 +360,6 @@ export function emptyAdminProductsData(): AdminProductsData {
     platforms: [],
     rows: [],
     summary: {
-      activeAffiliate: 0,
       dirtyData: 0,
       ignored: 0,
       missingFacts: 0,
@@ -403,16 +373,6 @@ export function emptyAdminProductsData(): AdminProductsData {
 
 // Internal DB row shapes (moved from god file as part of the split)
 export type ProductDbRow = Readonly<{
-  active_offer_id: string | null;
-  active_offer_availability_status: ProductAvailabilityStatus | null;
-  active_affiliate_commission_rate: string | number | null;
-  active_offer_currency: string | null;
-  active_affiliate_priority: string | number | null;
-  active_offer_price_amount: string | number | null;
-  active_affiliate_type: "affiliate" | "direct" | null;
-  active_affiliate_url: string | null;
-  offers: unknown;
-  affiliate_status: ProductAffiliateStatus;
   availability_status: ProductAvailabilityStatus;
   available_country_codes: string[] | null;
   country_pricing: unknown;
@@ -455,6 +415,7 @@ export type ProductDbRow = Readonly<{
   region: string;
   source_snapshot: unknown;
   source_url: string | null;
+  shop_availability: unknown;
   title: string;
   title_en: string | null;
   title_th: string | null;
@@ -463,14 +424,6 @@ export type ProductDbRow = Readonly<{
 }>;
 
 export type ProductRecommendationDbRow = Readonly<{
-  active_offer_id: string | null;
-  active_offer_availability_status: ProductAvailabilityStatus | null;
-  active_affiliate_commission_rate: string | number | null;
-  active_offer_currency: string | null;
-  active_affiliate_priority: string | number | null;
-  active_offer_price_amount: string | number | null;
-  active_affiliate_type: "affiliate" | "direct" | null;
-  active_affiliate_url: string | null;
   available_country_codes: string[] | null;
   country_pricing: unknown;
   brand_name: string | null;

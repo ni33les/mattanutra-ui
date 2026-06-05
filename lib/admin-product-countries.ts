@@ -4,7 +4,6 @@ import {
   defaultProductCountryCode,
   normalizeCurrencyCode,
   normalizeProductCountryCodes,
-  normalizeProductCountryPricingStatus,
   type ProductCountryPricing,
   type ProductCountryCode
 } from "@/lib/product-countries";
@@ -136,7 +135,6 @@ export async function replaceProductCountryCodes(
       country_code,
       rrp_price_amount,
       currency,
-      pricing_status,
       price_updated_at,
       created_at,
       updated_at
@@ -146,25 +144,17 @@ export async function replaceProductCountryCodes(
       country_code,
       rrp_price_amount,
       currency,
-      pricing_status,
       case when rrp_price_amount is null then null else now() end,
       now(),
       now()
     from unnest(
       ${codes}::text[],
       ${codes.map((code) => pricingByCountry.get(code)?.rrpPriceAmount ?? null)}::numeric[],
-      ${codes.map((code) => normalizeCurrencyCode(pricingByCountry.get(code)?.currency, "THB"))}::text[],
-      ${codes.map((code) =>
-        normalizeProductCountryPricingStatus(
-          pricingByCountry.get(code)?.pricingStatus,
-          pricingByCountry.get(code)?.rrpPriceAmount ?? null
-        )
-      )}::text[]
-    ) as input(country_code, rrp_price_amount, currency, pricing_status)
+      ${codes.map((code) => normalizeCurrencyCode(pricingByCountry.get(code)?.currency, "THB"))}::text[]
+    ) as input(country_code, rrp_price_amount, currency)
     on conflict (product_id, country_code) do update set
       rrp_price_amount = excluded.rrp_price_amount,
       currency = excluded.currency,
-      pricing_status = excluded.pricing_status,
       price_updated_at = case
         when product_countries.rrp_price_amount is distinct from excluded.rrp_price_amount
           or product_countries.currency is distinct from excluded.currency

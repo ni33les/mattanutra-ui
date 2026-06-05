@@ -25,7 +25,7 @@ export function toRecommendedProduct(
     selection.product.title;
 
   return {
-    affiliate: selection.affiliate,
+    affiliate: false,
     covers: selection.coveredNeeds.map((need) => need.sourceId),
     description: selection.why,
     id: selection.product.id,
@@ -72,7 +72,7 @@ export function toRecommendedProduct(
       : undefined,
     stackContributionPercent: selection.stackContributionPercent,
     stackCoveragePercent,
-    tag: selection.affiliate ? "Best match + affiliate" : "Best match",
+    tag: "Best match",
     url: selection.url
   } satisfies RecommendedProduct;
 }

@@ -124,18 +124,46 @@ describe("communications channel selection", () => {
       readFile("app/api/line/webhook/route.ts", "utf8"),
       readFile("components/admin/communications-view.tsx", "utf8")
     ]);
+    const adminQueryData = await readFile("lib/admin-query-data.ts", "utf8");
+    const adminQueryRoute = await readFile("app/api/admin/query/[view]/route.ts", "utf8");
+    const organisationApi = await readFile(
+      "app/api/admin/communications/organisation/route.ts",
+      "utf8"
+    );
+    const lineConnectApi = await readFile(
+      "app/api/admin/communications/line-connect/route.ts",
+      "utf8"
+    );
+    const testApi = await readFile(
+      "app/api/admin/communications/test/route.ts",
+      "utf8"
+    );
+    const adminSettings = await readFile("lib/admin-communications.ts", "utf8");
     const lineFormat = await readFile("lib/line-message-format.ts", "utf8");
 
     assert.match(schema, /CREATE TABLE public\.organisation_communication_identities/);
     assert.match(schema, /CREATE TABLE public\.organisation_notification_preferences/);
     assert.match(schema, /CREATE TABLE public\.line_connect_tokens/);
+    assert.match(schema, /platform_revenue_received/);
+    assert.match(schema, /platform_checkout_failed/);
+    assert.match(schema, /platform_worker_unavailable/);
     assert.match(service, /ADMIN_COMMUNICATION_ROUTE_TASK_PRIORITY = 300/);
     assert.match(service, /ADMIN_COMMUNICATION_DISPATCH_TASK_PRIORITY = 260/);
+    assert.match(service, /retailAdminCommunicationEventKeys/);
+    assert.match(service, /platformAdminCommunicationEventKeys/);
+    assert.match(service, /adminCommunicationEventKeysForScope/);
+    assert.match(service, /organisationIdentityRelationship/);
+    assert.match(service, /relationship = \$\{relationship\}/);
+    assert.match(service, /platform_communication_failed/);
+    assert.match(service, /row\.message_type !== "platform_communication_failed"/);
+    assert.match(service, /queuePlatformAdminCommunication/);
     assert.match(service, /taskType: "route_admin_communication"/);
     assert.match(service, /adminCommunicationDispatchTaskType/);
     assert.match(service, /"dispatch_email_communication_message"/);
     assert.match(service, /"dispatch_chat_communication_message"/);
     assert.match(service, /targetOrganisationId: input\.organisationId/);
+    assert.match(service, /configured organisation channels/);
+    assert.doesNotMatch(service, /configured retailer channels/);
     assert.match(workItems, /buildAdminCommunicationRouteWorkItem/);
     assert.match(workItems, /payloadText\(payload, "targetOrganisationId"\)/);
     assert.match(workItems, /buildCommunicationDispatchWorkItem/);
@@ -164,7 +192,13 @@ describe("communications channel selection", () => {
     assert.match(service, /idempotencyKey: `admin-communication-dispatch:\$\{input\.messageId\}`/);
     assert.match(service, /formatOutboundLineMessage\(row\.body\)/);
     assert.match(view, /Retail communication channels/);
-    assert.match(view, /Connect with/);
+    assert.match(view, /Platform communication channels/);
+    assert.match(view, /Platform notification preferences/);
+    assert.doesNotMatch(view, /settings\.organisations\.length > 1/);
+    assert.match(view, /Add channel/);
+    assert.match(view, /Add communication channel/);
+    assert.match(view, /WhatsApp/);
+    assert.match(view, /Coming soon/);
     assert.match(view, /action: "delete_channel"/);
     assert.match(view, /Contact name/);
     assert.match(view, /Create LINE connect code/);
@@ -173,5 +207,18 @@ describe("communications channel selection", () => {
     assert.match(lineFormat, /environment\.toUpperCase\(\)/);
     assert.match(lineFormat, /\^\(DEV\|UAT\)\\n\\n/);
     assert.match(lineFormat, /MATTANUTRA_ENV/);
+    assert.match(adminSettings, /context\.effectiveOrganisation\.id/);
+    assert.match(adminSettings, /adminCommunicationEventKeysForScope\(scope\)/);
+    assert.doesNotMatch(adminSettings, /where organisation_type = 'tenant'[\s\S]*order by lower\(name\)/);
+    assert.match(adminSettings, /if \(!context\)/);
+    assert.match(adminSettings, /return \{\s*\.\.\.emptyCommunicationsData\(\)/);
+    assert.match(adminQueryData, /getAdminCommunicationsData\(params\.range, context\)/);
+    assert.match(adminQueryRoute, /resolveAdminSession/);
+    assert.match(adminQueryRoute, /getAdminExternalQueryData\([\s\S]*context/);
+    assert.match(organisationApi, /canAccessEffectiveOrganisation/);
+    assert.match(organisationApi, /requestedOrganisationId === context\.effectiveOrganisation\.id/);
+    assert.match(organisationApi, /adminCommunicationEventScope\(nextEventKey\)/);
+    assert.match(lineConnectApi, /requestedOrganisationId === context\.effectiveOrganisation\.id/);
+    assert.match(testApi, /requestedOrganisationId === context\.effectiveOrganisation\.id/);
   });
 });

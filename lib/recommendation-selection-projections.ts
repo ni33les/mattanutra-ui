@@ -39,7 +39,6 @@ export type ProductDecisionProjection = Readonly<{
   currency: string;
   dedupeKey: string;
   etaDate: string | null;
-  offerId: string | null;
   outcome: ProductDecisionOutcome;
   priceAmount: number | null;
   priceSource: string | null;
@@ -306,7 +305,6 @@ export function productDecisionRowsFromRecommendationResult(
       currency: item.product.currency || "THB",
       dedupeKey: productDecisionDedupeKey("chosen", item.product.id),
       etaDate: item.etaDate ?? item.product.retailEtaDate ?? null,
-      offerId: item.offerId,
       outcome: "chosen",
       priceAmount: item.product.priceAmount ?? null,
       priceSource: item.priceSource ?? item.product.priceSource ?? null,
@@ -344,7 +342,6 @@ export function productDecisionRowsFromRecommendationResult(
       currency: "THB",
       dedupeKey: productDecisionDedupeKey("near_miss", item.productId),
       etaDate: null,
-      offerId: null,
       outcome: "near_miss",
       priceAmount: null,
       priceSource: null,
@@ -393,7 +390,6 @@ function productDecisionRowFromExclusion(
     currency: "THB",
     dedupeKey: productDecisionDedupeKey("rejected", item.productId, item.reason),
     etaDate: null,
-    offerId: null,
     outcome: "rejected",
     priceAmount: null,
     priceSource: null,
@@ -455,7 +451,6 @@ export function productDecisionRowsFromStoredRun(input: Readonly<{
     covered_needs: unknown;
     currency: string | null;
     eta_date?: string | null;
-    offer_id: string | null;
     price_amount: number | string | null;
     price_source?: string | null;
     product_coverage_percent: number | string | null;
@@ -481,7 +476,6 @@ export function productDecisionRowsFromStoredRun(input: Readonly<{
       currency: item.currency || "THB",
       dedupeKey: productDecisionDedupeKey("chosen", productId),
       etaDate: item.eta_date ?? null,
-      offerId: item.offer_id,
       outcome: "chosen" as const,
       priceAmount: numberOrNull(item.price_amount),
       priceSource: item.price_source ?? null,
@@ -587,7 +581,6 @@ export async function writeProductRecommendationDecisionRows(
         serving_multiplier,
         covered_needs,
         reason,
-        offer_id,
         url_used,
         price_amount,
         currency,
@@ -611,7 +604,6 @@ export async function writeProductRecommendationDecisionRows(
         ${row.servingMultiplier},
         ${sql.json(toJsonValue(row.coveredNeeds))}::jsonb,
         ${row.reason},
-        ${row.offerId}::uuid,
         ${row.urlUsed},
         ${row.priceAmount},
         ${row.currency},
@@ -633,7 +625,6 @@ export async function writeProductRecommendationDecisionRows(
         serving_multiplier = excluded.serving_multiplier,
         covered_needs = excluded.covered_needs,
         reason = excluded.reason,
-        offer_id = excluded.offer_id,
         url_used = excluded.url_used,
         price_amount = excluded.price_amount,
         currency = excluded.currency,

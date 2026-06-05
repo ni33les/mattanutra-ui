@@ -81,12 +81,16 @@ describe("process runtime technical debt sweep", () => {
     );
   });
 
-  it("keeps no-stock allocation repairing reorder demand and shopping-list shortages", async () => {
+  it("keeps no-stock allocation repairing reorder advice without auto-creating shopping lists", async () => {
     const stock = await readFile("lib/admin-retail-stock.ts", "utf8");
     const allocate = functionBody(stock, "allocateRetailCustomerOrder");
+    const adviceRepair = functionBody(
+      stock,
+      "ensureRetailOrderShortagesInReorderAdvice"
+    );
 
     assert.match(allocate, /queueCustomerOrderStockGapTasks/);
-    assert.match(allocate, /ensureRetailOrderShortagesOnShoppingList/);
+    assert.match(allocate, /ensureRetailOrderShortagesInReorderAdvice/);
     assert.match(allocate, /set status = 'awaiting_stock'/);
     assert.match(allocate, /eventName: "retail_order_awaiting_stock"/);
     assert.match(allocate, /eventKey: "retail_order_awaiting_stock"/);
@@ -97,14 +101,14 @@ describe("process runtime technical debt sweep", () => {
       "no-stock allocation should block fulfillment while leaving shortage work visible"
     );
     assert.match(
-      stock,
-      /created_by_person_id[\s\S]*\$\{actorPersonId\}::uuid/,
-      "agent/system shortage sync must not write synthetic actor ids into person FKs"
+      adviceRepair,
+      /source: "retail_order_shortage_reorder_advice"[\s\S]*refreshRetailStockReorderAdvice/,
+      "shortage sync should create/refresh reorder advice for zero-stock order demand"
     );
-    assert.match(
-      stock,
-      /persistedActorPersonId\(context\)/,
-      "automated shortage sync must preserve actor metadata separately from persisted person FKs"
+    assert.doesNotMatch(
+      adviceRepair,
+      /insert into public\.retail_shopping_lists|insert into public\.retail_shopping_list_lines/,
+      "shortage sync must not create shopping lists until a human selects advice rows"
     );
   });
 

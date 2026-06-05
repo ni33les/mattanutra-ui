@@ -7,7 +7,6 @@ type ProductIdentifierDb = Db | postgres.TransactionSql;
 
 export const PRODUCT_IDENTIFIER_TYPES = [
   "ean13",
-  "internal_sku",
   "manufacturer_sku",
   "retailer_local_code",
   "supplier_code"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import type { AdminProductRow, AdminProductsData } from "@/lib/admin-products";
 import {
   adminLocalizedFallbackLabel,
@@ -18,7 +19,6 @@ import {
   readableToken,
   type BusinessMetric,
 } from "@/components/admin/dashboard-shared";
-import { AdminModal } from "@/components/admin/ui";
 import {
   addProductCountryCode,
   adminResponseErrorMessage,
@@ -50,7 +50,6 @@ import {
   ProductFactsEditor,
   ProductIdentifiersEditor,
   ProductInsightStat,
-  ProductOffersEditor,
   ProductTranslationEditor,
 } from "@/components/admin/product-view-ui";
 
@@ -63,9 +62,7 @@ export function AdminProductsView({
   data: AdminProductsData;
   locale: Locale;
 }>) {
-  const [rows, setRows] = useState(data.rows);
-  const [draft, setDraft] = useState<AdminProductRow | null>(null);
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const rows = data.rows;
   const [errorId, setErrorId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -108,6 +105,139 @@ export function AdminProductsView({
 
     return matchesSearch && matchesMetric && matchesManufacturer;
   });
+
+  async function sourceProductIdentifiersFromEvidence() {
+    setIdentifierSourcing(true);
+    setErrorId(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/admin/products/identifiers/source", {
+        body: JSON.stringify({ accessToken }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await adminResponseErrorMessage(
+            response,
+            "Unable to source identifiers",
+          ),
+        );
+      }
+
+      window.location.reload();
+    } catch (error) {
+      setErrorId("__identifier_sourcing__");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to source identifiers",
+      );
+    } finally {
+      setIdentifierSourcing(false);
+    }
+  }
+
+  return (
+    <section className="mt-8 space-y-6">
+      <BusinessStatsGrid
+        metrics={metrics}
+        onMetricSelect={handleMetricSelect}
+        selectedMetricId={
+          manufacturerFilter
+            ? productManufacturerMetricId(manufacturerFilter)
+            : metricFilter
+        }
+      />
+
+      <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_14rem_auto_auto]">
+          <input
+            aria-label={viewLabels.search}
+            className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={viewLabels.searchPlaceholder}
+            type="search"
+            value={search}
+          />
+          <select
+            aria-label={viewLabels.status}
+            className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+            onChange={(event) =>
+              handleStatusChange(
+                event.target.value as ProductBusinessState | "",
+              )
+            }
+            value={status}
+          >
+            <option value="">{viewLabels.allStates}</option>
+            {productBusinessStates.map((item) => (
+              <option key={item} value={item}>
+                {productBusinessStateLabel(item, locale)}
+              </option>
+            ))}
+          </select>
+          <button
+            className="rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={identifierSourcing}
+            onClick={() => void sourceProductIdentifiersFromEvidence()}
+            type="button"
+          >
+            {identifierSourcing
+              ? viewLabels.sourcingIdentifiers
+              : viewLabels.sourceProductIdentifiers}
+          </button>
+          <a
+            className="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50"
+            href={`/api/admin/products/hygeia/export?country=TH&access_token=${encodeURIComponent(accessToken)}`}
+          >
+            {viewLabels.hygeiaExport}
+          </a>
+        </div>
+        {errorId === "__identifier_sourcing__" ? (
+          <p className="mt-3 text-sm font-medium text-red-700">
+            {errorMessage}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        {filteredRows.map((row) => (
+          <ProductCard
+            href={`/${locale}/admin/products/${row.id}${accessToken ? `?access_token=${encodeURIComponent(accessToken)}` : ""}`}
+            key={row.id}
+            locale={locale}
+            row={row}
+            viewLabels={viewLabels}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function AdminProductDetailView({
+  accessToken,
+  data,
+  locale,
+  productId,
+}: Readonly<{
+  accessToken: string;
+  data: AdminProductsData;
+  locale: Locale;
+  productId: string;
+}>) {
+  const [rows, setRows] = useState(data.rows);
+  const [draft, setDraft] = useState<AdminProductRow | null>(
+    data.rows.find((row) => row.id === productId) ?? null,
+  );
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [errorId, setErrorId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const viewLabels = productViewLabels[locale];
+  const backHref = `/${locale}/admin/dashboard?view=products${accessToken ? `&access_token=${encodeURIComponent(accessToken)}` : ""}`;
 
   async function saveProduct(row: AdminProductRow) {
     setSavingId(row.id);
@@ -173,9 +303,7 @@ export function AdminProductsView({
       setRows((currentRows) =>
         currentRows.map((item) => updatedRows.get(item.id) ?? item),
       );
-      setDraft((currentDraft) =>
-        currentDraft?.id === row.id ? savedRow : currentDraft,
-      );
+      setDraft(savedRow);
       return true;
     } catch (error) {
       setErrorId(row.id);
@@ -416,142 +544,44 @@ export function AdminProductsView({
     }
   }
 
-  async function sourceProductIdentifiersFromEvidence() {
-    setIdentifierSourcing(true);
-    setErrorId(null);
-    setErrorMessage(null);
-
-    try {
-      const response = await fetch("/api/admin/products/identifiers/source", {
-        body: JSON.stringify({ accessToken }),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          await adminResponseErrorMessage(
-            response,
-            "Unable to source identifiers",
-          ),
-        );
-      }
-
-      window.location.reload();
-    } catch (error) {
-      setErrorId("__identifier_sourcing__");
-      setErrorMessage(
-        error instanceof Error ? error.message : "Unable to source identifiers",
-      );
-    } finally {
-      setIdentifierSourcing(false);
-    }
+  if (!draft) {
+    return (
+      <section className="mt-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+        <a
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#126B4F] hover:text-[#0F5C45]"
+          href={backHref}
+        >
+          <ArrowLeft aria-hidden={true} className="size-4" strokeWidth={2.25} />
+          {viewLabels.backToProducts}
+        </a>
+        <p className="mt-4 text-sm text-gray-600">Product not found.</p>
+      </section>
+    );
   }
 
   return (
-    <section className="mt-8 space-y-6">
-      <BusinessStatsGrid
-        metrics={metrics}
-        onMetricSelect={handleMetricSelect}
-        selectedMetricId={
-          manufacturerFilter
-            ? productManufacturerMetricId(manufacturerFilter)
-            : metricFilter
-        }
-      />
-
-      <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_14rem_auto_auto]">
-          <input
-            aria-label={viewLabels.search}
-            className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={viewLabels.searchPlaceholder}
-            type="search"
-            value={search}
-          />
-          <select
-            aria-label={viewLabels.status}
-            className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-            onChange={(event) =>
-              handleStatusChange(
-                event.target.value as ProductBusinessState | "",
-              )
-            }
-            value={status}
-          >
-            <option value="">{viewLabels.allStates}</option>
-            {productBusinessStates.map((item) => (
-              <option key={item} value={item}>
-                {productBusinessStateLabel(item, locale)}
-              </option>
-            ))}
-          </select>
-          <button
-            className="rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={identifierSourcing}
-            onClick={() => void sourceProductIdentifiersFromEvidence()}
-            type="button"
-          >
-            {identifierSourcing
-              ? viewLabels.sourcingIdentifiers
-              : viewLabels.sourceProductIdentifiers}
-          </button>
-          <a
-            className="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50"
-            href={`/api/admin/products/hygeia/export?country=TH&access_token=${encodeURIComponent(accessToken)}`}
-          >
-            {viewLabels.hygeiaExport}
-          </a>
-        </div>
-        {errorId === "__identifier_sourcing__" ? (
-          <p className="mt-3 text-sm font-medium text-red-700">
-            {errorMessage}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        {filteredRows.map((row) => (
-          <ProductCard
-            key={row.id}
-            locale={locale}
-            onSelect={() => setDraft(row)}
-            row={row}
-            viewLabels={viewLabels}
-          />
-        ))}
-      </div>
-
-      {draft ? (
-        <ProductModal
-          accessToken={accessToken}
-          draft={draft}
-          error={errorId === draft.id}
-          errorMessage={errorId === draft.id ? errorMessage : null}
-          locale={locale}
-          onImportDecision={decideProductImportFromProduct}
-          onCorrectFacts={correctProductFacts}
-          onIncreaseSafetyLimit={increaseProductSafetyLimit}
-          onClose={() => {
-            setDraft(null);
-            setErrorId(null);
-            setErrorMessage(null);
-          }}
-          onSave={saveProduct}
-          products={rows}
-          saving={savingId === draft.id}
-          setDraft={setDraft}
-        />
-      ) : null}
-    </section>
+    <ProductDetailPanel
+      backHref={backHref}
+      draft={draft}
+      error={errorId === draft.id}
+      errorMessage={errorId === draft.id ? errorMessage : null}
+      locale={locale}
+      onImportDecision={decideProductImportFromProduct}
+      onCorrectFacts={correctProductFacts}
+      onIncreaseSafetyLimit={increaseProductSafetyLimit}
+      onClose={() => {
+        window.location.href = backHref;
+      }}
+      onSave={saveProduct}
+      products={rows}
+      saving={savingId === draft.id}
+      setDraft={setDraft}
+    />
   );
 }
 
-function ProductModal({
-  accessToken,
+function ProductDetailPanel({
+  backHref,
   draft,
   error,
   errorMessage,
@@ -565,7 +595,7 @@ function ProductModal({
   saving,
   setDraft,
 }: Readonly<{
-  accessToken: string;
+  backHref: string;
   draft: AdminProductRow;
   error: boolean;
   errorMessage: string | null;
@@ -691,7 +721,6 @@ function ProductModal({
               countryCode: normalizedCountryCode,
               currency: "THB",
               priceUpdatedAt: null,
-              pricingStatus: "missing" as const,
               rrpPriceAmount: null
             }])
       ],
@@ -732,7 +761,6 @@ function ProductModal({
           countryCode: code,
           currency: "THB",
           priceUpdatedAt: null,
-          pricingStatus: "missing" as const,
           rrpPriceAmount: null
         };
 
@@ -740,14 +768,7 @@ function ProductModal({
           ? {
               ...current,
               ...patch,
-              countryCode: code,
-              pricingStatus:
-                patch.pricingStatus ??
-                (patch.rrpPriceAmount !== undefined
-                  ? patch.rrpPriceAmount === null
-                    ? "missing"
-                    : "ready"
-                  : current.pricingStatus)
+              countryCode: code
             }
           : current;
       }),
@@ -755,8 +776,16 @@ function ProductModal({
   }
 
   return (
-    <AdminModal onClose={onClose} panelClassName="max-w-3xl p-6 ring-gray-200">
-      <div className="flex items-start justify-between gap-4 pr-12">
+    <section className="mt-8 space-y-6">
+      <a
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#126B4F] hover:text-[#0F5C45]"
+        href={backHref}
+      >
+        <ArrowLeft aria-hidden={true} className="size-4" strokeWidth={2.25} />
+        {viewLabels.backToProducts}
+      </a>
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex flex-col gap-1">
@@ -890,15 +919,18 @@ function ProductModal({
         ) : null}
       </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <ProductCountryManager
-          addCountryLabel={viewLabels.addCountry}
-          countryCodes={manufacturerCountryCodes}
-          label={viewLabels.manufacturerCountries}
-          onAdd={addManufacturerCountry}
-          onRemove={removeManufacturerCountry}
-          removeLabel={viewLabels.remove}
-        />
+      <div className="mt-5 space-y-4">
+        <div className="max-w-xl">
+          <ProductCountryManager
+            addCountryLabel={viewLabels.addCountry}
+            countryCodes={manufacturerCountryCodes}
+            label={viewLabels.manufacturerCountries}
+            onAdd={addManufacturerCountry}
+            onRemove={removeManufacturerCountry}
+            removeLabel={viewLabels.remove}
+            variant="compact"
+          />
+        </div>
         <ProductCountryManager
           addCountryLabel={viewLabels.addCountry}
           allowedCountryCodes={manufacturerCountryCodes}
@@ -913,6 +945,12 @@ function ProductModal({
           onAdd={addAvailableCountry}
           onPricingChange={updateCountryPricing}
           onRemove={removeAvailableCountry}
+          pricingLabels={{
+            country: viewLabels.country,
+            currency: viewLabels.currency,
+            priceUpdated: viewLabels.priceUpdated,
+            rrp: viewLabels.rrp,
+          }}
           removeLabel={viewLabels.remove}
         />
       </div>
@@ -1051,13 +1089,62 @@ function ProductModal({
         viewLabels={viewLabels}
       />
 
-      <ProductOffersEditor
-        accessToken={accessToken}
-        draft={draft}
-        locale={locale}
-        setDraft={setDraft}
-        viewLabels={viewLabels}
-      />
+      <div className="mt-5">
+        <h3 className="text-sm font-semibold text-gray-900">
+          {viewLabels.shopAvailability}
+        </h3>
+        {draft.shopAvailability.length > 0 ? (
+          <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200 bg-white">
+            <table className="min-w-full divide-y divide-gray-100 text-left text-xs">
+              <thead className="bg-gray-50 text-gray-500">
+                <tr>
+                  <th className="px-3 py-2 font-semibold">Shop</th>
+                  <th className="px-3 py-2 font-semibold">{viewLabels.status}</th>
+                  <th className="px-3 py-2 font-semibold">{viewLabels.stock}</th>
+                  <th className="px-3 py-2 font-semibold">{viewLabels.retailPrice}</th>
+                  <th className="px-3 py-2 font-semibold">Wholesale</th>
+                  <th className="px-3 py-2 font-semibold">{viewLabels.backorderPolicy}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {draft.shopAvailability.map((shop) => (
+                  <tr key={shop.organisationId}>
+                    <td className="px-3 py-2 font-semibold text-gray-900">
+                      {shop.organisationName}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {productStatusLabel(shop.status, locale)}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {shop.stockQuantity}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {shop.retailPriceAmount !== null
+                        ? `${shop.retailPriceAmount} ${shop.currency}`
+                        : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {shop.wholesalePriceAmount !== null
+                        ? `${shop.wholesalePriceAmount} ${shop.currency}`
+                        : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {productStatusLabel(shop.backorderPolicy, locale)}
+                      {shop.leadTimeDays !== null
+                        ? ` · ${shop.leadTimeDays}d`
+                        : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-gray-500">
+            {viewLabels.noShopAvailability}
+          </p>
+        )}
+      </div>
 
       {hasOpenImportReview ? (
         <div className="mt-5 space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
@@ -1235,6 +1322,7 @@ function ProductModal({
           </span>
         </div>
       </div>
-    </AdminModal>
+      </div>
+    </section>
   );
 }

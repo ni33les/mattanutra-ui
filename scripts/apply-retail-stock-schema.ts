@@ -88,8 +88,15 @@ try {
     alter table public.product_countries
       add column if not exists rrp_price_amount numeric(20,6),
       add column if not exists currency text not null default 'THB',
-      add column if not exists pricing_status text not null default 'missing',
       add column if not exists price_updated_at timestamptz
+  `;
+
+  await sql`drop index if exists public.product_countries_pricing_status_idx`;
+
+  await sql`
+    alter table public.product_countries
+      drop constraint if exists product_countries_pricing_status_check,
+      drop column if exists pricing_status
   `;
 
   await sql`
@@ -104,10 +111,6 @@ try {
     set
       rrp_price_amount = products.price_amount,
       currency = coalesce(nullif(products.currency, ''), product_countries.currency, 'THB'),
-      pricing_status = case
-        when products.price_amount is not null and products.price_amount >= 0 then 'ready'
-        else pricing_status
-      end,
       price_updated_at = coalesce(product_countries.price_updated_at, now())
     from public.products
     where products.id = product_countries.product_id
@@ -117,31 +120,15 @@ try {
   `;
 
   await sql`
-    update public.product_countries
-    set pricing_status = case
-      when rrp_price_amount is null then 'missing'
-      when pricing_status not in ('missing', 'ready', 'review') then 'ready'
-      else pricing_status
-    end
-  `;
-
-  await sql`
     alter table public.product_countries
       drop constraint if exists product_countries_currency_check,
-      drop constraint if exists product_countries_rrp_price_check,
-      drop constraint if exists product_countries_pricing_status_check
+      drop constraint if exists product_countries_rrp_price_check
   `;
 
   await sql`
     alter table public.product_countries
       add constraint product_countries_currency_check check (currency ~ '^[A-Z]{3}$'),
-      add constraint product_countries_rrp_price_check check (rrp_price_amount is null or rrp_price_amount >= 0),
-      add constraint product_countries_pricing_status_check check (pricing_status in ('missing', 'ready', 'review'))
-  `;
-
-  await sql`
-    create index if not exists product_countries_pricing_status_idx
-      on public.product_countries (country_code, pricing_status, updated_at desc)
+      add constraint product_countries_rrp_price_check check (rrp_price_amount is null or rrp_price_amount >= 0)
   `;
 
   await sql`

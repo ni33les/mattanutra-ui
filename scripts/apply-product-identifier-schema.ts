@@ -22,7 +22,7 @@ try {
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now(),
       constraint product_identifiers_type_check check (
-        identifier_type in ('ean13', 'internal_sku', 'manufacturer_sku', 'retailer_local_code', 'supplier_code')
+        identifier_type in ('ean13', 'manufacturer_sku', 'retailer_local_code', 'supplier_code')
       ),
       constraint product_identifiers_confidence_check check (
         confidence in ('trusted', 'high', 'medium', 'low')
@@ -55,7 +55,7 @@ try {
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now(),
       constraint product_identifier_candidates_type_check check (
-        identifier_type in ('ean13', 'internal_sku', 'manufacturer_sku', 'retailer_local_code', 'supplier_code')
+        identifier_type in ('ean13', 'manufacturer_sku', 'retailer_local_code', 'supplier_code')
       ),
       constraint product_identifier_candidates_confidence_check check (
         confidence in ('trusted', 'high', 'medium', 'low')
@@ -69,6 +69,40 @@ try {
       constraint product_identifier_candidates_ean13_check check (
         identifier_type <> 'ean13' or normalized_value ~ '^[0-9]{13}$'
       )
+    )
+  `;
+
+  await sql`
+    delete from public.product_identifier_candidates
+    where identifier_type = 'internal_sku'
+  `;
+
+  await sql`
+    delete from public.product_identifiers
+    where identifier_type = 'internal_sku'
+  `;
+
+  await sql`
+    alter table public.product_identifiers
+    drop constraint if exists product_identifiers_type_check
+  `;
+
+  await sql`
+    alter table public.product_identifiers
+    add constraint product_identifiers_type_check check (
+      identifier_type in ('ean13', 'manufacturer_sku', 'retailer_local_code', 'supplier_code')
+    )
+  `;
+
+  await sql`
+    alter table public.product_identifier_candidates
+    drop constraint if exists product_identifier_candidates_type_check
+  `;
+
+  await sql`
+    alter table public.product_identifier_candidates
+    add constraint product_identifier_candidates_type_check check (
+      identifier_type in ('ean13', 'manufacturer_sku', 'retailer_local_code', 'supplier_code')
     )
   `;
 

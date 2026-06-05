@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
+import { queuePlatformAdminCommunication } from "@/lib/communications";
 import { isLocale } from "@/lib/i18n";
 import {
   createStripeCheckoutSession,
@@ -73,6 +74,24 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Unable to create Stripe checkout session", error);
+    try {
+      await queuePlatformAdminCommunication({
+        eventKey: "platform_checkout_failed",
+        metadata: {
+          errorMessage:
+            error instanceof Error ? error.message : "Unable to create checkout session",
+          hasPlanId: Boolean(planId),
+          locale,
+          selectedPlan,
+          source: "plan_checkout_session_api",
+          sourceSurface: normalizePaymentSourceSurface(body.sourceSurface)
+        },
+        resourceId: isUuid(planId) ? planId : null,
+        resourceType: isUuid(planId) ? "assessment_plan" : "checkout_session_request"
+      });
+    } catch (notificationError) {
+      console.warn("Unable to queue platform checkout failure notification", notificationError);
+    }
 
     return NextResponse.json(
       {

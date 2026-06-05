@@ -13,7 +13,7 @@ export type ShoppingListLineDraft = Readonly<{
   currentStockQuantity: string;
   ean13: string | null;
   id: string;
-  internalSku: string | null;
+  manufacturerSku: string | null;
   productId: string;
   productTitle: string;
   requiredQuantity: string;
@@ -66,29 +66,23 @@ function downloadShoppingListCsv(
 ) {
   const columns = [
     "productId",
+    "sku",
     "ean13",
-    "internalSku",
+    "manufacturerSku",
     "productTitle",
-    "requiredQuantity",
-    "currentStock",
-    "unorderedNeed",
-    "assignedQuantity",
-    "actualQuantity",
+    "amountToBuy",
     "wholesalePrice",
-    "retailPriceOverride"
+    "retailPrice"
   ];
   const csv = [
     columns.join(","),
     ...lines.map((line) =>
       [
         line.productId,
+        line.productId,
         line.ean13,
-        line.internalSku,
+        line.manufacturerSku,
         line.productTitle,
-        line.requiredQuantity,
-        line.currentStockQuantity,
-        line.unorderedNeedQuantity,
-        line.assignedQuantity,
         line.actualQuantity,
         line.wholesalePriceAmount,
         line.retailPriceAmount
@@ -170,9 +164,9 @@ export function RetailShoppingListModal({
 
         return {
           ...line,
-          actualQuantity: cell("actualQuantity") || line.actualQuantity,
-          assignedQuantity: cell("assignedQuantity") || line.assignedQuantity,
-          retailPriceAmount: cell("retailPriceOverride"),
+          actualQuantity:
+            cell("amountToBuy") || cell("actualQuantity") || line.actualQuantity,
+          retailPriceAmount: cell("retailPrice") || cell("retailPriceOverride"),
           wholesalePriceAmount: cell("wholesalePrice")
         };
       })
@@ -221,15 +215,14 @@ export function RetailShoppingListModal({
           </div>
         </div>
         <div className="overflow-x-auto rounded-md ring-1 ring-gray-200">
-          <table className="min-w-[920px] w-full text-left text-sm">
+          <table className="min-w-[760px] w-full text-left text-sm">
             <thead className="bg-gray-50 text-xs uppercase text-gray-500">
               <tr>
                 <th className="py-2 pl-3 pr-3">Brand</th>
                 <th className="py-2 pr-3">{labels.stock.product}</th>
-                <th className="py-2 pr-3">Demand</th>
-                <th className="py-2 pr-3">Actual bought quantity</th>
+                <th className="py-2 pr-3">Amount to buy</th>
                 <th className="py-2 pr-3">{labels.stock.wholesalePrice}</th>
-                <th className="py-2 pr-3">{labels.stock.priceOverride}</th>
+                <th className="py-2 pr-3">Retail Price</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
@@ -243,21 +236,20 @@ export function RetailShoppingListModal({
                       {line.productTitle}
                     </h4>
                     <div className="mt-1 text-xs font-medium text-gray-500">
-                      {line.productId}
+                      SKU {line.productId}
                     </div>
-                    {line.ean13 || line.internalSku ? (
+                    {line.ean13 || line.manufacturerSku ? (
                       <div className="mt-1 text-xs text-gray-500">
                         {[
                           line.ean13 ? `EAN ${line.ean13}` : null,
-                          line.internalSku ? `SKU ${line.internalSku}` : null
+                          line.manufacturerSku
+                            ? `Manufacturer SKU ${line.manufacturerSku}`
+                            : null
                         ]
                           .filter(Boolean)
                           .join(" · ")}
                       </div>
                     ) : null}
-                  </td>
-                  <td className="py-2 pr-3 font-semibold text-gray-900">
-                    {line.assignedQuantity}
                   </td>
                   <td className="py-2 pr-3">
                     <input

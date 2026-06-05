@@ -43,7 +43,7 @@ export type RetailCommandId =
   | "refresh_stock_reorder_advice"
   | "reopen_shopping_list"
   | "set_stock_status"
-  | "sync_order_shortages_to_shopping_list"
+  | "sync_order_shortages_to_reorder_advice"
   | "update_shopping_list"
   | "upsert_stock_item"
   | "void_stock_movement";
@@ -229,17 +229,17 @@ export const retailCommandRegistry = {
     taskPolicy: "admin_bypass",
     taskTypes: []
   },
-  sync_order_shortages_to_shopping_list: {
+  sync_order_shortages_to_reorder_advice: {
     agentExecution: "execute_low_risk",
     allowedActorKinds: ["agent", "human", "system"],
-    auditEvent: "admin.retail_command.sync_order_shortages_to_shopping_list",
-    bpmEvent: "retail_command_sync_order_shortages_to_shopping_list",
-    id: "sync_order_shortages_to_shopping_list",
+    auditEvent: "admin.retail_command.sync_order_shortages_to_reorder_advice",
+    bpmEvent: "retail_command_sync_order_shortages_to_reorder_advice",
+    id: "sync_order_shortages_to_reorder_advice",
     idempotencyStrategy: "task_resource",
     permission: "stock.write",
     requiredAgentCapability: AGENT_CAPABILITIES.retailStockPolicyReview,
-    resourceType: "retail_shopping_list",
-    riskClass: "purchasing",
+    resourceType: "retail_stock_reorder_advice",
+    riskClass: "maintenance",
     routeAction: false,
     taskPolicy: "silent_derived",
     taskTypes: ["retail_shopping_list_review"]

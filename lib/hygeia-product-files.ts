@@ -6,6 +6,7 @@ import {
   type ProductIdentifierInput
 } from "@/lib/product-identifiers";
 import { normalizeCurrencyCode } from "@/lib/product-countries";
+import { isUuidValue } from "@/lib/admin-product-helpers";
 
 export type HygeiaImportType = "identity" | "stock" | "cost";
 
@@ -13,7 +14,7 @@ export type HygeiaMatchedRow = Readonly<{
   brandName: string | null;
   currency: string;
   ean13: string | null;
-  internalSku: string | null;
+  manufacturerSku: string | null;
   productId: string;
   productTitle: string;
   retailPriceAmount: number | null;
@@ -165,7 +166,7 @@ async function approvedIdentifierMatches(sql: NonNullable<ReturnType<typeof getS
     left join public.product_identifiers
       on product_identifiers.product_id = products.id
       and product_identifiers.status = 'active'
-      and product_identifiers.identifier_type in ('ean13', 'internal_sku')
+      and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
     where products.status <> 'ignored'
   `;
   const byProductId = new Map<string, typeof rows[number]>();
@@ -189,13 +190,18 @@ function rowProductMatch(
   row: CsvRow,
   matches: Awaited<ReturnType<typeof approvedIdentifierMatches>>
 ) {
-  const productId = cleanText(column(row, [
+  const productIdCandidate = cleanText(column(row, [
     "product_id",
     "matta_nutra_product_id",
     "mattanutra_product_id",
+    "matta_nutra_sku",
+    "mattanutra_sku",
     "mattaNutraProductId",
+    "internal_sku",
+    "sku",
     "id"
   ]), 80);
+  const productId = isUuidValue(productIdCandidate) ? productIdCandidate : null;
   const ean13 = normalizeIdentifierValue("ean13", column(row, [
     "ean13",
     "ean_13",
@@ -205,17 +211,19 @@ function rowProductMatch(
     "gtin",
     "gtin13"
   ]));
-  const internalSku = normalizeIdentifierValue("internal_sku", column(row, [
-    "internal_sku",
-    "matta_nutra_sku",
-    "mattanutra_sku",
-    "sku"
+  const manufacturerSku = normalizeIdentifierValue("manufacturer_sku", column(row, [
+    "manufacturer_sku",
+    "manufacturer sku",
+    "manufacturer_code",
+    "manufacturer code",
+    "mpn",
+    "manufacturer_part_number"
   ]));
 
   if (productId && matches.byProductId.has(productId)) {
     return {
       ean13,
-      internalSku,
+      manufacturerSku,
       match: matches.byProductId.get(productId) ?? null
     };
   }
@@ -223,22 +231,22 @@ function rowProductMatch(
   if (ean13 && matches.byIdentifier.has(`ean13:${ean13}`)) {
     return {
       ean13,
-      internalSku,
+      manufacturerSku,
       match: matches.byIdentifier.get(`ean13:${ean13}`) ?? null
     };
   }
 
-  if (internalSku && matches.byIdentifier.has(`internal_sku:${internalSku}`)) {
+  if (manufacturerSku && matches.byIdentifier.has(`manufacturer_sku:${manufacturerSku}`)) {
     return {
       ean13,
-      internalSku,
-      match: matches.byIdentifier.get(`internal_sku:${internalSku}`) ?? null
+      manufacturerSku,
+      match: matches.byIdentifier.get(`manufacturer_sku:${manufacturerSku}`) ?? null
     };
   }
 
   return {
     ean13,
-    internalSku,
+    manufacturerSku,
     match: null
   };
 }
@@ -264,14 +272,14 @@ export async function previewHygeiaImport(input: Readonly<{
   const matchedRows: HygeiaMatchedRow[] = [];
 
   for (const row of rows) {
-    const { ean13, internalSku, match } = rowProductMatch(row, matches);
+    const { ean13, manufacturerSku, match } = rowProductMatch(row, matches);
 
     if (!match) {
       unmatchedCount += 1;
       continue;
     }
 
-    if (input.importType === "identity" && !ean13 && !internalSku) {
+    if (input.importType === "identity" && !ean13 && !manufacturerSku) {
       invalidCount += 1;
       continue;
     }
@@ -280,7 +288,7 @@ export async function previewHygeiaImport(input: Readonly<{
       brandName: match.brand_name,
       currency: normalizedHygeiaCurrency(row),
       ean13,
-      internalSku,
+      manufacturerSku,
       productId: match.id,
       productTitle: match.title,
       retailPriceAmount: numberFromColumn(row, [
@@ -350,13 +358,13 @@ export async function applyHygeiaImport(input: Readonly<{
         });
       }
 
-      if (row.internalSku) {
+      if (row.manufacturerSku) {
         identifiers.push({
           confidence: "trusted",
           evidenceUrl: null,
           source: "hygeia_import",
-          type: "internal_sku",
-          value: row.internalSku
+          type: "manufacturer_sku",
+          value: row.manufacturerSku
         });
       }
 
@@ -464,6 +472,52 @@ export async function applyHygeiaImport(input: Readonly<{
 
       stockRowsUpdated += 1;
 
+      await sql`
+        insert into public.retail_sellable_products (
+          organisation_id,
+          product_id,
+          status,
+          rrp_price_amount,
+          wholesale_price_amount,
+          currency,
+          lead_time_days,
+          backorder_policy,
+          metadata,
+          created_at,
+          updated_at
+        )
+        values (
+          ${input.organisationId}::uuid,
+          ${row.productId}::uuid,
+          'active',
+          ${row.retailPriceAmount},
+          ${row.wholesalePriceAmount},
+          ${row.currency},
+          0,
+          'allow',
+          ${sql.json(toJsonValue({
+            actor: input.actor ?? "hygeia_import",
+            source: "hygeia_import"
+          }))}::jsonb,
+          now(),
+          now()
+        )
+        on conflict (organisation_id, product_id)
+        do update set
+          status = 'active',
+          rrp_price_amount = coalesce(
+            excluded.rrp_price_amount,
+            public.retail_sellable_products.rrp_price_amount
+          ),
+          wholesale_price_amount = coalesce(
+            excluded.wholesale_price_amount,
+            public.retail_sellable_products.wholesale_price_amount
+          ),
+          currency = excluded.currency,
+          metadata = public.retail_sellable_products.metadata || excluded.metadata,
+          updated_at = now()
+      `;
+
       if (stockId && delta !== 0) {
         await sql`
           insert into public.retail_stock_movements (
@@ -530,7 +584,7 @@ export async function buildHygeiaProductExportCsv(input: Readonly<{
     brand_name: string | null;
     currency: string | null;
     ean13: string | null;
-    internal_sku: string | null;
+    manufacturer_sku: string | null;
     product_id: string;
     product_kind: string;
     rrp_price_amount: string | number | null;
@@ -553,8 +607,8 @@ export async function buildHygeiaProductExportCsv(input: Readonly<{
         where product_identifiers.identifier_type = 'ean13'
       ) as ean13,
       max(product_identifiers.identifier_value) filter (
-        where product_identifiers.identifier_type = 'internal_sku'
-      ) as internal_sku
+        where product_identifiers.identifier_type = 'manufacturer_sku'
+      ) as manufacturer_sku
     from public.products
     left join public.product_countries
       on product_countries.product_id = products.id
@@ -568,7 +622,7 @@ export async function buildHygeiaProductExportCsv(input: Readonly<{
     left join public.product_identifiers
       on product_identifiers.product_id = products.id
       and product_identifiers.status = 'active'
-      and product_identifiers.identifier_type in ('ean13', 'internal_sku')
+      and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
     where products.status = 'approved'
     group by
       products.id,
@@ -583,8 +637,8 @@ export async function buildHygeiaProductExportCsv(input: Readonly<{
     order by products.brand_name nulls last, products.title asc
   `;
   const header = [
-    "MattaNutra Product ID",
-    "MattaNutra SKU",
+    "Internal SKU",
+    "Manufacturer SKU",
     "EAN13 Barcode",
     "Thai Product Title",
     "English Product Title",
@@ -599,7 +653,7 @@ export async function buildHygeiaProductExportCsv(input: Readonly<{
     csvLine(header),
     ...rows.map((row) => csvLine([
       row.product_id,
-      row.internal_sku,
+      row.manufacturer_sku,
       row.ean13,
       row.title_th,
       row.title_en,
@@ -607,6 +661,145 @@ export async function buildHygeiaProductExportCsv(input: Readonly<{
       row.brand_name,
       row.product_kind,
       row.rrp_price_amount,
+      row.currency,
+      row.status
+    ]))
+  ];
+
+  return lines.join("\n") + "\n";
+}
+
+export async function buildRetailHygeiaStockExportCsv(input: Readonly<{
+  organisationId: string;
+}>) {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is not configured");
+  }
+
+  const organisationId = cleanText(input.organisationId, 80);
+
+  if (!isUuidValue(organisationId)) {
+    throw new Error("Retail organisation is required for Hygeia stock export");
+  }
+
+  const rows = await sql<Array<{
+    brand_name: string | null;
+    currency: string | null;
+    ean13: string | null;
+    manufacturer_sku: string | null;
+    product_id: string;
+    product_kind: string;
+    retail_price_amount: string | number | null;
+    status: string;
+    stock_quantity: string | number;
+    title: string;
+    title_en: string | null;
+    title_th: string | null;
+    wholesale_price_amount: string | number | null;
+  }>>`
+    select
+      products.id::text as product_id,
+      products.brand_name,
+      products.title,
+      products.product_kind,
+      coalesce(retail_sellable_products.status, retail_product_stock.status) as status,
+      retail_product_stock.stock_quantity,
+      title_en_translation.title as title_en,
+      title_th_translation.title as title_th,
+      coalesce(
+        retail_sellable_products.wholesale_price_amount,
+        retail_product_stock.wholesale_price_amount
+      ) as wholesale_price_amount,
+      coalesce(
+        retail_sellable_products.rrp_price_amount,
+        retail_product_stock.retail_price_amount
+      ) as retail_price_amount,
+      coalesce(
+        retail_sellable_products.currency,
+        retail_product_stock.currency,
+        organisations.currency,
+        'THB'
+      ) as currency,
+      max(product_identifiers.identifier_value) filter (
+        where product_identifiers.identifier_type = 'ean13'
+      ) as ean13,
+      max(product_identifiers.identifier_value) filter (
+        where product_identifiers.identifier_type = 'manufacturer_sku'
+      ) as manufacturer_sku
+    from public.retail_product_stock
+    join public.organisations
+      on organisations.id = retail_product_stock.organisation_id
+      and organisations.organisation_type = 'tenant'
+      and organisations.status = 'active'
+    join public.products
+      on products.id = retail_product_stock.product_id
+      and products.status = 'approved'
+    left join public.retail_sellable_products
+      on retail_sellable_products.organisation_id = retail_product_stock.organisation_id
+      and retail_sellable_products.product_id = retail_product_stock.product_id
+      and retail_sellable_products.status <> 'deleted'
+    left join public.product_translations title_en_translation
+      on title_en_translation.product_id = products.id
+      and title_en_translation.locale = 'en'
+    left join public.product_translations title_th_translation
+      on title_th_translation.product_id = products.id
+      and title_th_translation.locale = 'th'
+    left join public.product_identifiers
+      on product_identifiers.product_id = products.id
+      and product_identifiers.status = 'active'
+      and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
+    where retail_product_stock.organisation_id = ${organisationId}::uuid
+      and retail_product_stock.status <> 'deleted'
+    group by
+      products.id,
+      products.brand_name,
+      products.title,
+      products.product_kind,
+      retail_product_stock.stock_quantity,
+      retail_product_stock.status,
+      retail_product_stock.wholesale_price_amount,
+      retail_product_stock.retail_price_amount,
+      retail_product_stock.currency,
+      retail_sellable_products.status,
+      retail_sellable_products.wholesale_price_amount,
+      retail_sellable_products.rrp_price_amount,
+      retail_sellable_products.currency,
+      organisations.currency,
+      title_en_translation.title,
+      title_th_translation.title
+    order by products.brand_name nulls last, products.title asc
+  `;
+  const header = [
+    "Internal SKU",
+    "Manufacturer SKU",
+    "EAN13 Barcode",
+    "Thai Product Title",
+    "English Product Title",
+    "Canonical Product Title",
+    "Brand",
+    "Product Category",
+    "Stock Quantity",
+    "Wholesale Price",
+    "Retail Price",
+    "Currency",
+    "Status"
+  ];
+  const lines = [
+    csvLine(header),
+    ...rows.map((row) => csvLine([
+      row.product_id,
+      row.manufacturer_sku,
+      row.ean13,
+      row.title_th,
+      row.title_en,
+      row.title,
+      row.brand_name,
+      row.product_kind,
+      row.stock_quantity,
+      row.wholesale_price_amount,
+      row.retail_price_amount,
       row.currency,
       row.status
     ]))

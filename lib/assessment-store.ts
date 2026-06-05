@@ -1437,7 +1437,7 @@ export async function getStoredFormulationResult(
         jsonb_agg(
           jsonb_build_object(
             'affiliate',
-              product_recommendation_items.offer_id is not null,
+              false,
             'covers',
               coalesce(
                 (
@@ -1517,11 +1517,7 @@ export async function getStoredFormulationResult(
             'stackCoveragePercent',
               product_recommendation_run.stack_coverage_percent,
             'tag',
-              case
-                when product_recommendation_items.offer_id is not null
-                  then 'Best match + affiliate'
-                else 'Best match'
-              end,
+              'Best match',
             'url',
               product_recommendation_items.url_used
           )
@@ -1600,7 +1596,7 @@ export async function getStoredFormulationResult(
           jsonb_agg(
             jsonb_build_object(
               'affiliate',
-                product_recommendation_items.offer_id is not null,
+                false,
               'covers',
                 coalesce(
                   (
@@ -1680,11 +1676,7 @@ export async function getStoredFormulationResult(
               'stackCoveragePercent',
                 latest_runs.stack_coverage_percent,
               'tag',
-                case
-                  when product_recommendation_items.offer_id is not null
-                    then 'Best match + affiliate'
-                  else 'Best match'
-                end,
+                'Best match',
               'url',
                 product_recommendation_items.url_used
             )

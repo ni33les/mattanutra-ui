@@ -126,16 +126,11 @@ describe("recommendation selection projections", () => {
       foodCoveragePercent: 0,
       recommendations: [
         {
-          affiliate: true,
           coveredNeeds: [],
-          offerId: "offer",
           availabilityStatus: "backorder",
           etaDate: "2026-06-05",
           priceSource: "retail_override",
           product: {
-            activeAffiliateUrl: "https://example.com/chosen",
-            activeOfferId: "offer",
-            affiliateStatus: "active",
             automatedSafetyPassed: true,
             availabilityStatus: "in_stock",
             brandStatus: "approved",

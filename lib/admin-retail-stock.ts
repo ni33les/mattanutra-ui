@@ -363,7 +363,7 @@ export type AdminRetailShoppingListLine = Readonly<{
   currentStockQuantity: number;
   ean13: string | null;
   id: string;
-  internalSku: string | null;
+  manufacturerSku: string | null;
   organisationId: string;
   productId: string;
   productTitle: string;
@@ -419,9 +419,11 @@ export type AdminRetailCustomerOrderLine = Readonly<{
   availabilityStatus: RetailAvailabilityStatus | null;
   backorderQuantity: number | null;
   customerOrderId: string;
+  ean13: string | null;
   etaDate: string | null;
   fxRateId: string | null;
   id: string;
+  manufacturerSku: string | null;
   notes: string | null;
   pipeline: AdminRetailStockPipelineRow | null;
   priceSource: string | null;
@@ -516,12 +518,11 @@ export type ReopenRetailShoppingListInput = Readonly<{
   shoppingListId: string;
 }>;
 
-type RetailOrderShoppingListShortageResult = Readonly<{
-  addedUnits: number;
-  createdListId: string | null;
+type RetailOrderReorderAdviceShortageResult = Readonly<{
   lineCount: number;
-  listId: string | null;
   productIds: readonly string[];
+  refreshedStockRowIds: readonly string[];
+  shortageUnits: number;
 }>;
 
 type RetailCustomerOrderLineAvailability = Readonly<{
@@ -1043,7 +1044,7 @@ function retailCommandIdForTaskType(taskType: string): RetailCommandId | null {
   }
 
   if (taskType === "retail_shopping_list_review") {
-    return "sync_order_shortages_to_shopping_list";
+    return "sync_order_shortages_to_reorder_advice";
   }
 
   if (
@@ -1213,7 +1214,7 @@ function retailOrderWorkflowTaskDetails(taskType: string) {
 
   if (taskType === "retail_shopping_list_review") {
     return {
-      description: "Review the retailer shopping list for this waiting order.",
+      description: "Review reorder advice for this waiting order.",
       priorityReason: "Workflow repair restored stock-gap review work.",
       priorityScore: 780,
       title: "Review customer order stock gap"
@@ -1343,7 +1344,7 @@ function getRetailCustomerOrderWorkflowHealth(input: Readonly<{
     } else if (input.pipeline.unorderedNeedUnits > 0) {
       expectedTaskType = "retail_shopping_list_review";
       nextAction = "review_shopping_list";
-      reason = "Unallocated demand exists. Review the active shopping list.";
+      reason = "Unallocated demand exists. Review reorder advice.";
     }
   } else {
     expectedTaskType = expectedTaskTypeForStage(input.workflowStage);
@@ -1771,7 +1772,7 @@ async function loadRetailOrganisations(
   }));
 }
 
-async function productApproved(sql: Db, productId: string) {
+async function productApproved(sql: StockDb, productId: string) {
   const rows = await sql<Array<{ exists: boolean }>>`
     select exists (
       select 1
@@ -2351,7 +2352,7 @@ export async function executeRetailAgentCommand(input: RetailAgentCommandInput) 
           customerOrderId
         });
         resourceType = "retail_customer_order";
-      } else if (commandId === "sync_order_shortages_to_shopping_list") {
+      } else if (commandId === "sync_order_shortages_to_reorder_advice") {
         const customerOrderId =
           input.sourceEntityId || textFromPayload(input.payload, "customerOrderId");
 
@@ -2359,15 +2360,17 @@ export async function executeRetailAgentCommand(input: RetailAgentCommandInput) 
           throw new Error("Retail shortage sync task is missing a customer order");
         }
 
-        const result = await ensureRetailOrderShortagesOnShoppingList(context, {
+        const result = await ensureRetailOrderShortagesInReorderAdvice(context, {
           customerOrderId,
           orderNumber: textFromPayload(input.payload, "orderNumber") || null,
           organisationId: input.organisationId,
           sql
         });
 
-        resourceId = result.listId ?? customerOrderId;
-        resourceType = result.listId ? "retail_shopping_list" : "retail_customer_order";
+        resourceId = result.refreshedStockRowIds[0] ?? customerOrderId;
+        resourceType = result.refreshedStockRowIds.length > 0
+          ? "retail_stock_reorder_advice"
+          : "retail_customer_order";
       } else if (commandId === "reconcile_customer_order_lifecycle") {
         const customerOrderId =
           input.sourceEntityId || textFromPayload(input.payload, "customerOrderId");
@@ -3131,7 +3134,9 @@ export async function getAdminRetailStockData(
         `,
         sql<Array<{
           customer_order_id: string;
+          ean13: string | null;
           id: string;
+          manufacturer_sku: string | null;
           metadata: unknown;
           notes: string | null;
           product_id: string;
@@ -3146,6 +3151,8 @@ export async function getAdminRetailStockData(
             retail_customer_order_lines.customer_order_id::text,
             retail_customer_order_lines.product_id::text,
             ${productTitle} as product_title,
+            identifiers.ean13,
+            identifiers.manufacturer_sku,
             retail_customer_order_lines.quantity_ordered,
             retail_customer_order_lines.quantity_allocated,
             retail_customer_order_lines.quantity_shipped,
@@ -3159,6 +3166,19 @@ export async function getAdminRetailStockData(
             on product_translations.product_id = products.id
             and product_translations.locale = ${locale}
             and product_translations.status <> 'missing'
+          left join lateral (
+            select
+              max(product_identifiers.identifier_value) filter (
+                where product_identifiers.identifier_type = 'ean13'
+              ) as ean13,
+              max(product_identifiers.identifier_value) filter (
+                where product_identifiers.identifier_type = 'manufacturer_sku'
+              ) as manufacturer_sku
+            from public.product_identifiers
+            where product_identifiers.product_id = products.id
+              and product_identifiers.status = 'active'
+              and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
+          ) identifiers on true
           where retail_customer_order_lines.organisation_id = any(${organisationIds}::uuid[])
           order by retail_customer_order_lines.created_at desc
           limit 500
@@ -3212,10 +3232,10 @@ export async function getAdminRetailStockData(
           actual_quantity: number | string;
           assigned_quantity: number | string;
 	          brand_name: string | null;
-	          current_stock_quantity: number | string;
+          current_stock_quantity: number | string;
           ean13: string | null;
 	          id: string;
-          internal_sku: string | null;
+          manufacturer_sku: string | null;
           organisation_id: string;
           product_id: string;
           product_title: string;
@@ -3232,9 +3252,9 @@ export async function getAdminRetailStockData(
             retail_shopping_list_lines.organisation_id::text,
             retail_shopping_list_lines.product_id::text,
 	            ${productTitle} as product_title,
-	            products.brand_name,
+            products.brand_name,
             identifiers.ean13,
-            identifiers.internal_sku,
+            identifiers.manufacturer_sku,
 	            retail_shopping_list_lines.required_quantity,
             retail_shopping_list_lines.current_stock_quantity,
             retail_shopping_list_lines.unordered_need_quantity,
@@ -3256,12 +3276,12 @@ export async function getAdminRetailStockData(
                 where product_identifiers.identifier_type = 'ean13'
               ) as ean13,
               max(product_identifiers.identifier_value) filter (
-                where product_identifiers.identifier_type = 'internal_sku'
-              ) as internal_sku
+                where product_identifiers.identifier_type = 'manufacturer_sku'
+              ) as manufacturer_sku
             from public.product_identifiers
             where product_identifiers.product_id = products.id
               and product_identifiers.status = 'active'
-              and product_identifiers.identifier_type in ('ean13', 'internal_sku')
+              and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
           ) identifiers on true
 	          where retail_shopping_list_lines.organisation_id = any(${organisationIds}::uuid[])
           order by retail_shopping_list_lines.created_at asc
@@ -3472,7 +3492,9 @@ export async function getAdminRetailStockData(
     customerOrderLines: customerOrderLineRows.map((row) => ({
       ...lineAvailabilityFromMetadata(row.metadata),
       customerOrderId: row.customer_order_id,
+      ean13: row.ean13,
       id: row.id,
+      manufacturerSku: row.manufacturer_sku,
       notes: row.notes,
       pipeline:
         pipelineByLineKey.get(
@@ -3667,7 +3689,7 @@ export async function getAdminRetailStockData(
 		      currentStockQuantity: integerOrDefault(row.current_stock_quantity, 0),
           ean13: row.ean13,
 		      id: row.id,
-          internalSku: row.internal_sku,
+          manufacturerSku: row.manufacturer_sku,
 	      organisationId: row.organisation_id,
 	      productId: row.product_id,
 	      productTitle: row.product_title,
@@ -4500,10 +4522,13 @@ async function ensureRetailStockRow(
   input: Readonly<{
     organisationId: string;
     productId: string;
+    snapshotSource?: string | null;
+    source?: string | null;
+    sql?: StockDb;
     wholesalePriceAmount?: number | null;
   }>
 ) {
-  const sql = getSql();
+  const sql = input.sql ?? getSql();
 
   if (!sql) {
     throw new Error("Database is not configured");
@@ -4559,7 +4584,7 @@ async function ensureRetailStockRow(
       null,
       ${sql.json({
         createdByPersonId: context.actorPerson.id,
-        source: "admin_stock_receiving"
+        source: input.source ?? "admin_stock_receiving"
       })},
       now(),
       now()
@@ -4595,7 +4620,7 @@ async function ensureRetailStockRow(
   }
 
   await recordRetailStockSnapshot(sql, context, rows[0], "created", {
-    source: "shopping_list_receiving"
+    source: input.snapshotSource ?? "shopping_list_receiving"
   });
 
   return rows[0].id;
@@ -4729,7 +4754,7 @@ export async function createRetailShoppingList(
   return shoppingListId;
 }
 
-export async function ensureRetailOrderShortagesOnShoppingList(
+export async function ensureRetailOrderShortagesInReorderAdvice(
   context: AdminSessionContext,
   input: Readonly<{
     customerOrderId: string;
@@ -4737,7 +4762,7 @@ export async function ensureRetailOrderShortagesOnShoppingList(
     organisationId: string;
     sql?: StockDb;
   }>
-): Promise<RetailOrderShoppingListShortageResult> {
+): Promise<RetailOrderReorderAdviceShortageResult> {
   if (!canWriteRetailStock(context)) {
     throw new Error("Stock write permission is required");
   }
@@ -4747,8 +4772,6 @@ export async function ensureRetailOrderShortagesOnShoppingList(
   if (!sql) {
     throw new Error("Database is not configured");
   }
-
-  await ensureRetailShoppingListTablesAvailable(sql);
 
   const pipelineRows = await getRetailStockPipeline({
     customerOrderId: input.customerOrderId,
@@ -4782,296 +4805,63 @@ export async function ensureRetailOrderShortagesOnShoppingList(
 
   if (productIds.length === 0) {
     return {
-      addedUnits: 0,
-      createdListId: null,
       lineCount: 0,
-      listId: null,
-      productIds: []
+      productIds: [],
+      refreshedStockRowIds: [],
+      shortageUnits: 0
     };
   }
 
-  const [assignedRows, stockRows] = await Promise.all([
-    sql<Array<{
-      pending_units: number | string | null;
-      product_id: string;
-    }>>`
-      select
-        retail_shopping_list_lines.product_id::text,
-        coalesce(
-          sum(
-            greatest(
-              retail_shopping_list_lines.actual_quantity
-                - retail_shopping_list_lines.stocked_quantity,
-              0
-            )
-          ),
-          0
-        )::int as pending_units
-      from public.retail_shopping_list_lines
-      join public.retail_shopping_lists
-        on retail_shopping_lists.id = retail_shopping_list_lines.shopping_list_id
-      where retail_shopping_list_lines.organisation_id = ${input.organisationId}::uuid
-        and retail_shopping_lists.status = 'active'
-        and retail_shopping_list_lines.product_id = any(${productIds}::uuid[])
-      group by retail_shopping_list_lines.product_id
-    `,
-    sql<Array<{
-      id: string;
-      product_id: string;
-      stock_quantity: number | string | null;
-      wholesale_price_amount: number | string | null;
-    }>>`
-      select
-        id::text,
-        product_id::text,
-        stock_quantity,
-        wholesale_price_amount
-      from public.retail_product_stock
-      where organisation_id = ${input.organisationId}::uuid
-        and product_id = any(${productIds}::uuid[])
-        and status <> 'deleted'
-    `
-  ]);
-  const assignedByProductId = new Map(
-    assignedRows.map((row) => [
-      row.product_id,
-      integerOrDefault(row.pending_units, 0)
-    ])
-  );
-  const stockByProductId = new Map(stockRows.map((row) => [row.product_id, row]));
-  const missingRows = productIds
-    .map((productId) => {
-      const shortage = shortageByProduct.get(productId);
-      const unorderedNeedUnits = shortage?.unorderedNeedUnits ?? 0;
-      const missingUnits = Math.max(
-        0,
-        unorderedNeedUnits - (assignedByProductId.get(productId) ?? 0)
-      );
-
-      return {
-        missingUnits,
-        productId,
-        productTitle: shortage?.productTitle ?? productId,
-        unorderedNeedUnits
-      };
-    })
-    .filter((row) => row.missingUnits > 0);
-
-  if (missingRows.length === 0) {
-    return {
-      addedUnits: 0,
-      createdListId: null,
-      lineCount: 0,
-      listId: null,
-      productIds: []
-    };
-  }
-
-  const [organisationRows, listRows] = await Promise.all([
-    sql<Array<{ currency: string | null; organisation_type: string }>>`
-      select currency, organisation_type
-      from public.organisations
-      where id = ${input.organisationId}::uuid
-      limit 1
-    `,
-    sql<Array<{ currency: string; id: string }>>`
-    select id::text, currency
-    from public.retail_shopping_lists
+  const stockRows = await sql<Array<{
+    id: string;
+    product_id: string;
+    stock_quantity: number | string | null;
+    wholesale_price_amount: number | string | null;
+  }>>`
+    select
+      id::text,
+      product_id::text,
+      stock_quantity,
+      wholesale_price_amount
+    from public.retail_product_stock
     where organisation_id = ${input.organisationId}::uuid
-      and status = 'active'
-    order by updated_at desc, created_at desc
-    limit 1
-    `
-  ]);
-  let listId = listRows[0]?.id ?? null;
-  let createdListId: string | null = null;
-  const organisationCurrency = normalizeCurrency(
-    organisationRows[0]?.currency,
-    organisationRows[0]?.organisation_type ?? "tenant"
-  );
-  const listCurrency = listRows[0]?.currency ?? organisationCurrency;
+      and product_id = any(${productIds}::uuid[])
+      and status <> 'deleted'
+  `;
+  const stockByProductId = new Map(stockRows.map((row) => [row.product_id, row]));
   const actorPersonId = persistedActorPersonId(context);
   const actorMetadata = retailActorMetadata(context);
-
-  if (!listId) {
-    const createdRows = await sql<Array<{ id: string }>>`
-      insert into public.retail_shopping_lists (
-        organisation_id,
-        list_number,
-        status,
-        currency,
-        created_by_person_id,
-        metadata,
-        created_at,
-        updated_at
-      )
-      values (
-        ${input.organisationId}::uuid,
-        ${orderNumber("SL")},
-        'active',
-        ${listCurrency},
-        ${actorPersonId}::uuid,
-        ${sql.json({
-          ...actorMetadata,
-          createdByPersonId: actorPersonId,
-          customerOrderId: input.customerOrderId,
-          orderNumber: input.orderNumber ?? null,
-          source: "retail_order_shortage_reconciliation"
-        })},
-        now(),
-        now()
-      )
-      returning id::text
-    `;
-
-    listId = createdRows[0]?.id ?? null;
-    createdListId = listId;
-  }
-
-  if (!listId) {
-    throw new Error("Shopping list could not be created");
-  }
-
-  let addedUnits = 0;
+  let shortageUnits = 0;
   const touchedProductIds: string[] = [];
+  const refreshedStockRowIds: string[] = [];
 
-  for (const missing of missingRows) {
-    const stock = stockByProductId.get(missing.productId) ?? null;
-    const existingLineRows = await sql<Array<{
-      actual_quantity: number | string;
-      assigned_quantity: number | string;
-      id: string;
-      required_quantity: number | string;
-    }>>`
-      select
-        id::text,
-        required_quantity,
-        assigned_quantity,
-        actual_quantity
-      from public.retail_shopping_list_lines
-      where shopping_list_id = ${listId}::uuid
-        and organisation_id = ${input.organisationId}::uuid
-        and product_id = ${missing.productId}::uuid
-      order by created_at asc
-      limit 1
-    `;
-    const existing = existingLineRows[0] ?? null;
-    const stockQuantity = integerOrDefault(stock?.stock_quantity, 0);
-    const wholesalePriceAmount = numberOrNull(stock?.wholesale_price_amount);
+  for (const productId of productIds) {
+    const shortage = shortageByProduct.get(productId);
+    const unorderedNeedUnits = shortage?.unorderedNeedUnits ?? 0;
 
-    if (existing) {
-      const nextActualQuantity =
-        integerOrDefault(existing.actual_quantity, 0) + missing.missingUnits;
-      const nextAssignedQuantity = Math.max(
-        integerOrDefault(existing.assigned_quantity, 0),
-        nextActualQuantity
-      );
-      const nextRequiredQuantity = Math.max(
-        integerOrDefault(existing.required_quantity, 0),
-        nextAssignedQuantity
-      );
-
-      await sql`
-        update public.retail_shopping_list_lines
-        set
-          required_quantity = ${nextRequiredQuantity},
-          current_stock_quantity = ${stockQuantity},
-          unordered_need_quantity = greatest(
-            unordered_need_quantity,
-            ${missing.unorderedNeedUnits}
-          ),
-          assigned_quantity = ${nextAssignedQuantity},
-          actual_quantity = ${nextActualQuantity},
-          wholesale_price_amount = coalesce(
-            wholesale_price_amount,
-            ${wholesalePriceAmount}
-          ),
-          metadata = metadata || ${sql.json({
-            ...actorMetadata,
-            customerOrderId: input.customerOrderId,
-            orderNumber: input.orderNumber ?? null,
-            source: "retail_order_shortage_reconciliation",
-            updatedByPersonId: actorPersonId
-          })}::jsonb,
-          updated_at = now()
-        where id = ${existing.id}::uuid
-      `;
-    } else {
-      await sql`
-        insert into public.retail_shopping_list_lines (
-          shopping_list_id,
-          organisation_id,
-          product_id,
-          required_quantity,
-          current_stock_quantity,
-          unordered_need_quantity,
-          assigned_quantity,
-          actual_quantity,
-          stocked_quantity,
-          wholesale_price_amount,
-          retail_price_amount,
-          metadata,
-          created_at,
-          updated_at
-        )
-        values (
-          ${listId}::uuid,
-          ${input.organisationId}::uuid,
-          ${missing.productId}::uuid,
-          ${missing.missingUnits},
-          ${stockQuantity},
-          ${missing.unorderedNeedUnits},
-          ${missing.missingUnits},
-          ${missing.missingUnits},
-          0,
-          ${wholesalePriceAmount},
-          null,
-          ${sql.json({
-            ...actorMetadata,
-            customerOrderId: input.customerOrderId,
-            orderNumber: input.orderNumber ?? null,
-            productTitle: missing.productTitle,
-            source: "retail_order_shortage_reconciliation",
-            updatedByPersonId: actorPersonId
-          })},
-          now(),
-          now()
-        )
-      `;
-    }
-
-    addedUnits += missing.missingUnits;
-    touchedProductIds.push(missing.productId);
-  }
-
-  await sql`
-    update public.retail_shopping_lists
-    set updated_at = now()
-    where id = ${listId}::uuid
-  `;
-
-  await recordAdminAudit({
-    action: "admin.retail_shopping_list_shortages_reconciled",
-    actorPersonId,
-    assumedPersonId: context.assumedPerson?.id ?? null,
-    organisationId: input.organisationId,
-    resourceId: listId,
-    resourceType: "retail_shopping_list",
-    metadata: {
-      addedUnits,
-      createdListId,
-      customerOrderId: input.customerOrderId,
-      lineCount: touchedProductIds.length,
-      orderNumber: input.orderNumber ?? null,
-      productIds: touchedProductIds
-    }
-  });
-
-  for (const productId of touchedProductIds) {
-    const stock = stockByProductId.get(productId);
-
-    if (!stock?.id) {
+    if (unorderedNeedUnits < 1) {
       continue;
+    }
+
+    let stock = stockByProductId.get(productId) ?? null;
+
+    if (!stock) {
+      const stockId = await ensureRetailStockRow(context, {
+        organisationId: input.organisationId,
+        productId,
+        snapshotSource: "retail_order_shortage_reorder_advice",
+        source: "retail_order_shortage_reorder_advice",
+        sql,
+        wholesalePriceAmount: null
+      });
+
+      stock = {
+        id: stockId,
+        product_id: productId,
+        stock_quantity: 0,
+        wholesale_price_amount: null
+      };
+      stockByProductId.set(productId, stock);
     }
 
     await refreshRetailStockReorderAdvice({
@@ -5079,14 +4869,34 @@ export async function ensureRetailOrderShortagesOnShoppingList(
       productId,
       stockId: stock.id
     });
+
+    shortageUnits += unorderedNeedUnits;
+    touchedProductIds.push(productId);
+    refreshedStockRowIds.push(stock.id);
   }
 
+  await recordAdminAudit({
+    action: "admin.retail_reorder_advice_shortages_reconciled",
+    actorPersonId,
+    assumedPersonId: context.assumedPerson?.id ?? null,
+    organisationId: input.organisationId,
+    resourceId: input.customerOrderId,
+    resourceType: "retail_customer_order",
+    metadata: {
+      actorMetadata,
+      customerOrderId: input.customerOrderId,
+      lineCount: touchedProductIds.length,
+      orderNumber: input.orderNumber ?? null,
+      productIds: touchedProductIds,
+      shortageUnits
+    }
+  });
+
   return {
-    addedUnits,
-    createdListId,
     lineCount: touchedProductIds.length,
-    listId,
-    productIds: touchedProductIds
+    productIds: touchedProductIds,
+    refreshedStockRowIds,
+    shortageUnits
   };
 }
 
@@ -5521,8 +5331,8 @@ export async function updateRetailShoppingList(
         customerOrderId: order.id
       });
     } catch {
-      // Leave still-short orders on the retailer shopping list; the order
-      // workbench will show the remaining gap.
+      // Leave still-short orders in reorder advice; the order workbench will
+      // show the remaining gap.
     }
   }
 
@@ -5912,7 +5722,7 @@ export async function createRetailCustomerOrder(
   await queueRetailOperationTask({
     commandId: "allocate_customer_order",
     description: hasBackorder
-      ? "Allocate available stock and add the remaining quantity to the shopping list."
+      ? "Allocate available stock and keep the remaining quantity in reorder advice."
       : "Allocate stock to this customer order.",
     dueAt: input.dueAt ?? null,
     idempotencyKey: `${orderId}:allocate`,
@@ -5943,9 +5753,9 @@ export async function createRetailCustomerOrder(
     }
 
     await queueRetailOperationTask({
-      commandId: "sync_order_shortages_to_shopping_list",
+      commandId: "sync_order_shortages_to_reorder_advice",
       description:
-        "Review the active shopping list for this retailer and buy the missing stock.",
+        "Review reorder advice for this retailer and create a shopping list when ready to buy.",
       dueAt: preparedLine.etaDate,
       idempotencyKey: `${orderId}:${productId}:backorder-reorder-review`,
       organisationId: organisation.id,
@@ -5978,7 +5788,7 @@ export async function createRetailCustomerOrder(
 
   }
 
-  await ensureRetailOrderShortagesOnShoppingList(context, {
+  await ensureRetailOrderShortagesInReorderAdvice(context, {
     customerOrderId: orderId,
     orderNumber: orderNumberValue,
     organisationId: organisation.id,
@@ -6027,9 +5837,9 @@ async function queueCustomerOrderStockGapTasks(
     }
 
     await queueRetailOperationTask({
-      commandId: "sync_order_shortages_to_shopping_list",
+      commandId: "sync_order_shortages_to_reorder_advice",
       description:
-        "Review the retailer shopping list, buy the missing stock, or choose a substitution.",
+        "Review reorder advice, then create a shopping list when ready to buy.",
       idempotencyKey: `${input.order.id}:${gap.productId}:awaiting-stock`,
       organisationId: input.order.organisation_id,
       payload: {
@@ -6180,7 +5990,7 @@ export async function allocateRetailCustomerOrder(
       locale: context.effectivePerson.preferredLocale,
       order
     });
-    await ensureRetailOrderShortagesOnShoppingList(context, {
+    await ensureRetailOrderShortagesInReorderAdvice(context, {
       customerOrderId: order.id,
       orderNumber: order.order_number,
         organisationId: order.organisation_id,
@@ -6234,7 +6044,7 @@ export async function allocateRetailCustomerOrder(
     });
 
     throw new Error(
-      "No live stock is available to allocate. Review the retailer shopping list."
+      "No live stock is available to allocate. Review reorder advice."
     );
   }
 
@@ -6290,9 +6100,9 @@ export async function allocateRetailCustomerOrder(
     locale: context.effectivePerson.preferredLocale,
     order
   });
-  const shoppingListShortageRepair = fullyAllocated
+  const reorderAdviceShortageRepair = fullyAllocated
     ? null
-    : await ensureRetailOrderShortagesOnShoppingList(context, {
+    : await ensureRetailOrderShortagesInReorderAdvice(context, {
         customerOrderId: order.id,
         orderNumber: order.order_number,
         organisationId: order.organisation_id,
@@ -6321,9 +6131,9 @@ export async function allocateRetailCustomerOrder(
         0
       ),
       gapUnits: gapPlans.reduce((total, gap) => total + gap.remaining, 0),
-      shoppingListAddedUnits: shoppingListShortageRepair?.addedUnits ?? 0,
-      shoppingListLineCount: shoppingListShortageRepair?.lineCount ?? 0,
-      shoppingListId: shoppingListShortageRepair?.listId ?? null,
+      reorderAdviceLineCount: reorderAdviceShortageRepair?.lineCount ?? 0,
+      reorderAdviceShortageUnits:
+        reorderAdviceShortageRepair?.shortageUnits ?? 0,
       status: nextStatus
     }
   });
@@ -6893,9 +6703,9 @@ export async function reconcileRetailOrderLifecycle(
     return order.id;
   }
 
-  const shoppingListShortageRepair =
+  const reorderAdviceShortageRepair =
     expectedTaskType === "retail_shopping_list_review"
-      ? await ensureRetailOrderShortagesOnShoppingList(context, {
+      ? await ensureRetailOrderShortagesInReorderAdvice(context, {
           customerOrderId: order.id,
           orderNumber: order.order_number,
           organisationId: order.organisation_id,
@@ -6914,7 +6724,7 @@ export async function reconcileRetailOrderLifecycle(
     ) as exists
   `;
   const hasExpectedTask = Boolean(taskRows[0]?.exists);
-  let repaired = (shoppingListShortageRepair?.addedUnits ?? 0) > 0;
+  let repaired = (reorderAdviceShortageRepair?.shortageUnits ?? 0) > 0;
   repaired = repaired || staleCancelledCount > 0;
 
   if (!hasExpectedTask) {
@@ -6946,9 +6756,9 @@ export async function reconcileRetailOrderLifecycle(
     metadata: {
       expectedTaskType,
       repaired,
-      shoppingListAddedUnits: shoppingListShortageRepair?.addedUnits ?? 0,
-      shoppingListLineCount: shoppingListShortageRepair?.lineCount ?? 0,
-      shoppingListId: shoppingListShortageRepair?.listId ?? null,
+      reorderAdviceLineCount: reorderAdviceShortageRepair?.lineCount ?? 0,
+      reorderAdviceShortageUnits:
+        reorderAdviceShortageRepair?.shortageUnits ?? 0,
       stage,
       staleCancelledCount,
       status: order.status
@@ -6961,9 +6771,9 @@ export async function reconcileRetailOrderLifecycle(
     metadata: {
       expectedTaskType,
       repaired,
-      shoppingListAddedUnits: shoppingListShortageRepair?.addedUnits ?? 0,
-      shoppingListLineCount: shoppingListShortageRepair?.lineCount ?? 0,
-      shoppingListId: shoppingListShortageRepair?.listId ?? null,
+      reorderAdviceLineCount: reorderAdviceShortageRepair?.lineCount ?? 0,
+      reorderAdviceShortageUnits:
+        reorderAdviceShortageRepair?.shortageUnits ?? 0,
       stage,
       staleCancelledCount,
       status: order.status

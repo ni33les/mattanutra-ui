@@ -30,6 +30,7 @@ import { getAdminSupplementsData } from "@/lib/admin-supplements";
 import { getAdminTechnicalAlertsData } from "@/lib/admin-technical";
 import { getSql } from "@/lib/db";
 import type { BlogArticleBody } from "@/lib/blog";
+import type { AdminSessionContext } from "@/lib/admin-access-types";
 
 export type AdminExternalQueryView =
   | "agents"
@@ -1099,7 +1100,7 @@ async function getProductRecommendationHistory(params: QueryParams) {
       product_recommendation_items.stack_contribution_percent,
       product_recommendation_items.url_used,
       product_recommendation_items.unknown_at_recommendation,
-      product_recommendation_items.offer_id is not null as affiliate,
+      false as affiliate,
       product_recommendation_items.created_at
     from public.product_recommendation_items
     join public.product_recommendation_runs
@@ -1158,7 +1159,8 @@ async function getProductRecommendationHistory(params: QueryParams) {
 
 export async function getAdminExternalQueryData(
   view: AdminExternalQueryView,
-  searchParams: URLSearchParams
+  searchParams: URLSearchParams,
+  context?: AdminSessionContext | null
 ) {
   const params = normalizeAdminQueryParams(searchParams);
 
@@ -1170,7 +1172,7 @@ export async function getAdminExternalQueryData(
     const [flow, reviews, communications, alerts] = await Promise.all([
       getAdminFlowData(params.range, params.filters),
       getAdminReviewQueueData(),
-      getAdminCommunicationsData(params.range),
+      getAdminCommunicationsData(params.range, context),
       getAdminTechnicalAlertsData(params.range)
     ]);
     const emptySeries = flow.series.bucketLabels.map(() => 0);
@@ -1284,7 +1286,7 @@ export async function getAdminExternalQueryData(
   }
 
   if (view === "communications") {
-    const data = await getAdminCommunicationsData(params.range);
+    const data = await getAdminCommunicationsData(params.range, context);
     const rows = data.rows.filter(
       (row) => !params.status || row.status === params.status
     );

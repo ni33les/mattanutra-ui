@@ -43,12 +43,8 @@ export async function loadProductRows(productId?: string | null) {
 	      products.label_status,
 	      coalesce(product_country_rows.country_codes, array[upper(coalesce(nullif(products.region, ''), 'TH'))]) as available_country_codes,
 	      coalesce(product_country_rows.country_pricing, '[]'::jsonb) as country_pricing,
-	      coalesce(active_offer.availability_status, 'unknown') as availability_status,
-      case
-        when active_offer.link_type = 'affiliate' then 'active'
-        else 'none'
-      end as affiliate_status,
-      active_offer.price_amount,
+	      coalesce(products.availability_status, 'unknown') as availability_status,
+      products.price_amount,
       products.currency,
       products.current_version,
       products.product_data_expires_at,
@@ -64,19 +60,11 @@ export async function loadProductRows(productId?: string | null) {
 	      product_brands.id::text as brand_id,
 	      product_brands.status as brand_status,
 	      coalesce(brand_country_rows.country_codes, array[upper(coalesce(nullif(product_brands.country_code, ''), 'TH'))]) as manufacturer_country_codes,
-	      active_offer.id::text as active_offer_id,
-      active_offer.availability_status as active_offer_availability_status,
-      active_offer.currency as active_offer_currency,
-      active_offer.link_type as active_affiliate_type,
-      active_offer.price_amount as active_offer_price_amount,
-      active_offer.url as active_affiliate_url,
-      active_offer.commission_rate as active_affiliate_commission_rate,
-      active_offer.admin_priority as active_affiliate_priority,
       coalesce(fact_rows.facts, '[]'::jsonb) as facts,
-      coalesce(offer_rows.offers, '[]'::jsonb) as offers,
       coalesce(product_translation_rows.translations, '{}'::jsonb) as translations,
       coalesce(product_identifier_rows.identifiers, '[]'::jsonb) as identifiers,
       coalesce(product_identifier_candidate_rows.identifier_candidates, '[]'::jsonb) as identifier_candidates,
+      coalesce(shop_availability_rows.shop_availability, '[]'::jsonb) as shop_availability,
       coalesce(history.chosen_count, 0) as history_chosen_count,
       history.last_recommended_at as history_last_recommended_at,
       history.average_product_coverage_percent,
@@ -90,10 +78,9 @@ export async function loadProductRows(productId?: string | null) {
 	        jsonb_agg(
 	          jsonb_build_object(
 	            'countryCode', product_countries.country_code,
-	            'currency', products.currency,
-	            'priceUpdatedAt', product_countries.updated_at,
-	            'pricingStatus', 'missing',
-	            'rrpPriceAmount', null
+		            'currency', product_countries.currency,
+		            'priceUpdatedAt', coalesce(product_countries.price_updated_at, product_countries.updated_at),
+		            'rrpPriceAmount', product_countries.rrp_price_amount
 	          )
 	          order by product_countries.country_code
 	        ) as country_pricing
@@ -117,27 +104,6 @@ export async function loadProductRows(productId?: string | null) {
       order by product_imports.updated_at desc
       limit 1
     ) import_review on true
-    left join lateral (
-      select
-        id,
-        url,
-        link_type,
-        commission_rate,
-        admin_priority,
-        price_amount,
-        currency,
-        availability_status
-      from public.product_offers
-      where product_offers.product_id = products.id
-        and product_offers.status = 'active'
-        and product_offers.availability_status not in ('out_of_stock', 'unavailable')
-      order by
-        case when product_offers.link_type = 'affiliate' then 0 else 1 end,
-        product_offers.commission_rate desc nulls last,
-        product_offers.admin_priority desc,
-        product_offers.updated_at desc
-      limit 1
-    ) active_offer on true
     left join lateral (
       select coalesce(
         jsonb_object_agg(
@@ -273,30 +239,33 @@ export async function loadProductRows(productId?: string | null) {
       select coalesce(
         jsonb_agg(
           jsonb_build_object(
-            'id', product_offers.id,
-            'availabilityStatus', product_offers.availability_status,
-            'commissionRate', product_offers.commission_rate,
-            'currency', product_offers.currency,
-            'linkType', product_offers.link_type,
-            'network', product_offers.network,
-            'platform', product_offers.platform,
-            'priceAmount', product_offers.price_amount,
-            'priority', product_offers.admin_priority,
-            'status', product_offers.status,
-            'url', product_offers.url
+            'backorderPolicy', coalesce(retail_sellable_products.backorder_policy, 'allow'),
+            'currency', coalesce(retail_sellable_products.currency, organisations.currency, products.currency),
+            'leadTimeDays', retail_sellable_products.lead_time_days,
+            'organisationId', organisations.id::text,
+            'organisationName', organisations.name,
+            'retailPriceAmount', retail_sellable_products.rrp_price_amount,
+            'status', retail_sellable_products.status,
+            'stockQuantity', coalesce(retail_stock.stock_quantity, 0),
+            'wholesalePriceAmount', retail_sellable_products.wholesale_price_amount
           )
-          order by
-            case when product_offers.status = 'active' then 0 else 1 end,
-            case when product_offers.link_type = 'affiliate' then 0 else 1 end,
-            product_offers.commission_rate desc nulls last,
-            product_offers.admin_priority desc,
-            product_offers.updated_at desc
+          order by organisations.name
         ),
         '[]'::jsonb
-      ) as offers
-      from public.product_offers
-      where product_offers.product_id = products.id
-    ) offer_rows on true
+      ) as shop_availability
+      from public.retail_sellable_products
+      join public.organisations
+        on organisations.id = retail_sellable_products.organisation_id
+      left join lateral (
+        select coalesce(sum(retail_product_stock.stock_quantity), 0)::int as stock_quantity
+        from public.retail_product_stock
+        where retail_product_stock.organisation_id = retail_sellable_products.organisation_id
+          and retail_product_stock.product_id = retail_sellable_products.product_id
+          and retail_product_stock.status <> 'deleted'
+      ) retail_stock on true
+      where retail_sellable_products.product_id = products.id
+        and retail_sellable_products.status <> 'deleted'
+    ) shop_availability_rows on true
     left join lateral (
       select
         count(*)::int as chosen_count,
@@ -327,10 +296,6 @@ export function summaryFromRows(rows: AdminProductRow[]) {
         summary.approved += 1;
       }
 
-      if (row.affiliateStatus === "active") {
-        summary.activeAffiliate += 1;
-      }
-
       if (row.facts.length < 1 || row.labelStatus !== "parsed") {
         summary.missingFacts += 1;
       }
@@ -346,7 +311,6 @@ export function summaryFromRows(rows: AdminProductRow[]) {
       return summary;
     },
     {
-      activeAffiliate: 0,
       dirtyData: 0,
       ignored: 0,
       missingFacts: 0,

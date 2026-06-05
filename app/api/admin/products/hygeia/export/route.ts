@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
-import { buildHygeiaProductExportCsv } from "@/lib/hygeia-product-files";
+import {
+  buildHygeiaProductExportCsv,
+  buildRetailHygeiaStockExportCsv
+} from "@/lib/hygeia-product-files";
 
 export const runtime = "nodejs";
 
@@ -34,13 +37,22 @@ export async function GET(request: Request) {
 
   try {
     const countryCode = textOrNull(url.searchParams.get("country"), 8);
-    const csv = await buildHygeiaProductExportCsv({ countryCode });
+    const scope = textOrNull(url.searchParams.get("scope"), 40);
+    const organisationId = textOrNull(url.searchParams.get("organisationId"), 80);
+    const csv = scope === "retail"
+      ? await buildRetailHygeiaStockExportCsv({
+          organisationId: organisationId ?? ""
+        })
+      : await buildHygeiaProductExportCsv({ countryCode });
     const fileCountry = countryCode?.toUpperCase() ?? "TH";
+    const filename = scope === "retail"
+      ? `hygeia-retail-stock-${organisationId ?? "retailer"}.csv`
+      : `hygeia-products-${fileCountry}.csv`;
 
     return new Response(csv, {
       headers: {
         "Cache-Control": "no-store",
-        "Content-Disposition": `attachment; filename="hygeia-products-${fileCountry}.csv"`,
+        "Content-Disposition": `attachment; filename="${filename}"`,
         "Content-Type": "text/csv; charset=utf-8"
       }
     });

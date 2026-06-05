@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  Mail,
+  MessageCircle,
+  MessageSquare,
+  Plus,
+  type LucideIcon
+} from "lucide-react";
 import { useState } from "react";
 import type {
   AdminCommunicationRow,
@@ -65,6 +72,44 @@ const lineConnectUrl = "https://line.me/R/ti/p/@344enooi";
 const lineConnectQrUrl = `/api/qr?data=${encodeURIComponent(lineConnectUrl)}`;
 
 type ConnectMethod = "line" | "email";
+type ConnectProvider = ConnectMethod | "sms" | "whatsapp";
+
+type ConnectProviderOption = Readonly<{
+  description: string;
+  disabled?: boolean;
+  icon: LucideIcon;
+  id: ConnectProvider;
+  label: string;
+}>;
+
+const connectProviderOptions: ConnectProviderOption[] = [
+  {
+    description: "LINE bot or group chat",
+    icon: MessageCircle,
+    id: "line",
+    label: "LINE"
+  },
+  {
+    description: "Shared mailbox or named contact",
+    icon: Mail,
+    id: "email",
+    label: "Email"
+  },
+  {
+    description: "Coming soon",
+    disabled: true,
+    icon: MessageCircle,
+    id: "whatsapp",
+    label: "WhatsApp"
+  },
+  {
+    description: "Coming soon",
+    disabled: true,
+    icon: MessageSquare,
+    id: "sms",
+    label: "SMS"
+  }
+];
 
 export function AdminCommunicationsView({
   accessToken,
@@ -248,6 +293,15 @@ export function AdminCommunicationsView({
     setConnectModalOpen(true);
   }
 
+  function selectConnectMethod(provider: ConnectProviderOption) {
+    if (provider.disabled || provider.id === "sms" || provider.id === "whatsapp") {
+      return;
+    }
+
+    setConnectMethod(provider.id);
+    setLineCode(null);
+  }
+
   function closeConnectModal() {
     setConnectModalOpen(false);
 
@@ -328,6 +382,22 @@ export function AdminCommunicationsView({
       preference
     ]) ?? []
   );
+  const isPlatformScope = settings?.scope === "platform";
+  const channelHeading = isPlatformScope
+    ? "Platform communication channels"
+    : "Retail communication channels";
+  const channelDescription = isPlatformScope
+    ? "Configure where platform operational and revenue notifications are sent."
+    : "Configure where retailer order notifications are sent.";
+  const preferenceHeading = isPlatformScope
+    ? "Platform notification preferences"
+    : "Retail notification preferences";
+  const preferenceDescription = isPlatformScope
+    ? "Choose which platform events notify MattaNutra."
+    : "Choose which order events notify this retailer.";
+  const emptyChannelCopy = isPlatformScope
+    ? "No platform channels configured."
+    : "No retailer channels configured.";
 
   return (
     <section className="mt-8 space-y-6">
@@ -347,50 +417,22 @@ export function AdminCommunicationsView({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="text-base font-semibold text-gray-900">
-                  Retail communication channels
+                  {channelHeading}
                 </h2>
                 <p className="mt-1 text-sm text-gray-600">
-                  Configure where retailer order notifications are sent.
+                  {channelDescription}
                 </p>
               </div>
               <div className="flex flex-col gap-2 sm:items-end">
-                <div className="inline-flex overflow-hidden rounded-md bg-[#1FA77A] shadow-sm ring-1 ring-[#188865]">
-                  <button
-                    className="px-3 py-2 text-sm font-semibold text-white hover:bg-[#188865] disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={!settings.canManage || settingsBusy}
-                    onClick={openConnectModal}
-                    type="button"
-                  >
-                    Connect with
-                  </button>
-                  <select
-                    aria-label="Connection type"
-                    className="border-l border-[#188865] bg-[#1FA77A] py-2 pl-3 pr-9 text-sm font-semibold text-white focus:outline-none"
-                    disabled={!settings.canManage || settingsBusy}
-                    onChange={(event) => {
-                      setConnectMethod(event.target.value as ConnectMethod);
-                      setLineCode(null);
-                    }}
-                    value={connectMethod}
-                  >
-                    <option value="line">LINE</option>
-                    <option value="email">Email</option>
-                  </select>
-                </div>
-                {settings.organisations.length > 1 ? (
-                  <select
-                    className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300"
-                    disabled={settingsBusy}
-                    onChange={(event) => loadOrganisationSettings(event.target.value)}
-                    value={settings.selectedOrganisationId}
-                  >
-                    {settings.organisations.map((organisation) => (
-                      <option key={organisation.id} value={organisation.id}>
-                        {organisation.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : null}
+                <button
+                  className="inline-flex items-center gap-2 rounded-md bg-[#1FA77A] px-3.5 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-[#188865] transition hover:bg-[#188865] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={!settings.canManage || settingsBusy}
+                  onClick={openConnectModal}
+                  type="button"
+                >
+                  <Plus className="size-4" aria-hidden={true} />
+                  Add channel
+                </button>
               </div>
             </div>
 
@@ -484,7 +526,7 @@ export function AdminCommunicationsView({
                     {settings.channels.length === 0 ? (
                       <tr>
                         <td className="py-6 text-sm font-medium text-gray-500" colSpan={4}>
-                          No retailer channels configured.
+                          {emptyChannelCopy}
                         </td>
                       </tr>
                     ) : null}
@@ -496,10 +538,10 @@ export function AdminCommunicationsView({
 
           <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
             <h2 className="text-base font-semibold text-gray-900">
-              Retail notification preferences
+              {preferenceHeading}
             </h2>
             <p className="mt-1 text-sm text-gray-600">
-              Choose which order events notify this retailer.
+              {preferenceDescription}
             </p>
             <div className="mt-5 overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -552,20 +594,66 @@ export function AdminCommunicationsView({
       {settings && connectModalOpen ? (
         <AdminModal
           description={
-            connectMethod === "line"
-              ? "Scan the QR code, add the bot to the chat or group, then send the one-time connect code."
-              : "Add the person and email address that should receive retailer notifications."
+            isPlatformScope
+              ? "Add a platform notification destination."
+              : "Add a retailer notification destination."
           }
           onClose={closeConnectModal}
           open={connectModalOpen}
-          size="sm"
-          title={`Connect with ${connectMethod === "line" ? "LINE" : "email"}`}
+          size="md"
+          title="Add communication channel"
         >
           {settingsError ? (
             <p className="mx-6 mt-5 rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-100">
               {settingsError}
             </p>
           ) : null}
+
+          <div className="grid gap-2 border-b border-gray-100 px-6 py-5 sm:grid-cols-2">
+            {connectProviderOptions.map((provider) => {
+              const Icon = provider.icon;
+              const selected = provider.id === connectMethod;
+
+              return (
+                <button
+                  aria-pressed={!provider.disabled && selected}
+                  className={classNames(
+                    "flex min-h-20 items-start gap-3 rounded-md px-3 py-3 text-left ring-1 transition",
+                    provider.disabled
+                      ? "cursor-not-allowed bg-gray-50 text-gray-400 ring-gray-200"
+                      : selected
+                        ? "bg-[#ECFDF5] text-[#126B4F] ring-[#1FA77A]"
+                        : "bg-white text-gray-700 ring-gray-200 hover:bg-gray-50"
+                  )}
+                  disabled={provider.disabled}
+                  key={provider.id}
+                  onClick={() => selectConnectMethod(provider)}
+                  type="button"
+                >
+                  <span
+                    className={classNames(
+                      "inline-flex size-9 shrink-0 items-center justify-center rounded-md ring-1",
+                      provider.disabled
+                        ? "bg-white text-gray-400 ring-gray-200"
+                        : selected
+                          ? "bg-white text-[#126B4F] ring-[#A7F3D0]"
+                          : "bg-gray-50 text-gray-600 ring-gray-200"
+                    )}
+                  >
+                    <Icon className="size-4" aria-hidden={true} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">
+                      {provider.label}
+                    </span>
+                    <span className="mt-1 block text-xs leading-5">
+                      {provider.description}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
           {connectMethod === "email" ? (
             <div className="space-y-4 px-6 py-5">
@@ -634,7 +722,7 @@ export function AdminCommunicationsView({
                 </a>
                 <div className="text-sm leading-6 text-gray-600">
                   <p>
-                    Scan the QR code or open the LINE bot link, add it to the retail chat or group, then create a code below.
+                    Scan the QR code or open the LINE bot link, add it to the chat or group, then create a code below.
                   </p>
                   <a
                     className="mt-3 inline-flex text-sm font-semibold text-[#126B4F] hover:text-[#0F5D44]"

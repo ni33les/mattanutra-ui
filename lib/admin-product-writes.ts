@@ -3,7 +3,7 @@
 // Extracted as part of the Sprint 2 god-module split of lib/admin-products.ts.
 // Owns all create/update/revalidate paths and their supporting mutation helpers
 // so the core catalogue write model is isolated from read-model, import, country,
-// and offer concerns.
+// and governance concerns.
 //
 // Public surface re-exported via the barrel (lib/admin-products.ts) for
 // zero consumer breakage.
@@ -379,7 +379,6 @@ async function recordProductVersion(
         status,
         label_status,
         availability_status,
-        affiliate_status,
         price_amount,
         currency,
         validation_status,
@@ -416,7 +415,6 @@ async function recordProductVersion(
         next_product.status,
         next_product.label_status,
         next_product.availability_status,
-        next_product.affiliate_status,
         next_product.price_amount,
         next_product.currency,
         next_product.validation_status,
@@ -1146,7 +1144,6 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       status,
       label_status,
       availability_status,
-      affiliate_status,
       price_amount,
       currency,
       source,
@@ -1174,7 +1171,6 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       ${input.status ?? "pending_review"},
       ${input.labelStatus ?? (input.facts?.length ? "parsed" : "missing")},
       'unknown',
-      'none',
       null,
       ${input.currency?.trim() || "THB"},
       ${input.source ?? "admin"},
@@ -1198,7 +1194,6 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       status = excluded.status,
       label_status = excluded.label_status,
       availability_status = 'unknown',
-      affiliate_status = 'none',
       price_amount = null,
       currency = excluded.currency,
       updated_at = now()
@@ -1253,27 +1248,6 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       source: factSource,
       supplementMatchesByFactName
     });
-  }
-
-  if (input.affiliateUrl) {
-    await sql`
-      insert into public.product_offers (
-        product_id,
-        url,
-        link_type,
-        status,
-        created_at,
-        updated_at
-      )
-      values (
-        ${productId}::uuid,
-        ${input.affiliateUrl.trim()},
-        'affiliate',
-        'active',
-        now(),
-        now()
-      )
-    `;
   }
 
   const validation = await refreshAndPersistProductValidation(sql, productId);

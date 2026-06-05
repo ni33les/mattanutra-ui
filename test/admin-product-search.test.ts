@@ -27,14 +27,6 @@ function product(input: Readonly<{
     ],
     fdaApprovalNumber: "TEST-123",
     labelStatus: "parsed",
-    offers: [
-      {
-        linkType: "direct",
-        network: null,
-        platform: "website",
-        status: "active"
-      }
-    ],
     platform: "manual",
     productAudience: "both",
     productKind: "supplement",
@@ -101,7 +93,7 @@ describe("admin product search", () => {
     });
 
     assert.equal(productMatchesSearch(row, "swisse omega 3"), true);
-    assert.equal(productMatchesSearch(row, "approved website"), true);
+    assert.equal(productMatchesSearch(row, "approved manual"), true);
     assert.equal(productMatchesSearch(row, "centrum omega"), false);
   });
 });

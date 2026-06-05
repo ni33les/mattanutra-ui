@@ -136,11 +136,11 @@ export const retailOrderStatusBpmEventNames = {
 
 const emailCopy = {
   awaiting_stock: {
-    eyebrow: "Awaiting stock",
-    headline: "We are sourcing your products",
+    eyebrow: "Order processing",
+    headline: "Your order is being processed",
     intro:
-      "Your order is confirmed. Dream Pharmacy is sourcing the items that are not currently on the shelf, and your tracking page will update as stock is secured.",
-    subject: "We are sourcing items for your Dream Pharmacy order"
+      "Your order is confirmed. Dream Pharmacy is preparing and sourcing your selected products, and your tracking page will update as the order moves forward.",
+    subject: "Your Dream Pharmacy order is processing"
   },
   cancelled: {
     eyebrow: "Order cancelled",
@@ -189,6 +189,14 @@ const emailCopy = {
 
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function customerOrderStatusLabel(status: string) {
+  if (status === "awaiting_stock") {
+    return "Order processing";
+  }
+
+  return status.replace(/_/g, " ");
 }
 
 function objectValue(value: unknown) {
@@ -687,7 +695,7 @@ export async function sendRetailOrderWorkflowEmailNow(input: Readonly<{
         orderNumber: order.order_number,
         retailerName: order.organisation_name,
         shipment: input.event === "shipped" ? shipment : null,
-        status: order.status,
+        status: customerOrderStatusLabel(order.status),
         totalAmount,
         totalCurrency,
         trackingUrl: url

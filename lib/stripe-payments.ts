@@ -4,6 +4,7 @@ import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import { isUuid, toJsonValue } from "@/lib/assessment-store";
 import { writeBpmEvent } from "@/lib/bpm";
 import {
+  queuePlatformAdminCommunication,
   upsertCommunicationChannel
 } from "@/lib/communications";
 import { getSql } from "@/lib/db";
@@ -411,6 +412,36 @@ async function recordStripePaymentNominalRevenue(
     fxRateId: fx.fxRateId,
     usdRate: fx.usdRate
   });
+}
+
+async function queuePlatformPaymentNotification(input: Readonly<{
+  eventKey:
+    | "platform_payment_failed"
+    | "platform_revenue_received";
+  metadata?: Record<string, unknown>;
+  payment: PaymentRow;
+}>) {
+  try {
+    await queuePlatformAdminCommunication({
+      eventKey: input.eventKey,
+      metadata: {
+        amountMicros: input.payment.amount,
+        currency: input.payment.currency,
+        paymentId: input.payment.id,
+        paymentStatus: input.payment.status,
+        planId: input.payment.plan_id,
+        selectedPlan: input.payment.selected_plan,
+        sourceSurface: input.payment.source_surface,
+        stripeCheckoutSessionId: input.payment.stripe_checkout_session_id,
+        stripeMode: input.payment.stripe_mode,
+        ...input.metadata
+      },
+      resourceId: input.payment.id,
+      resourceType: "payment"
+    });
+  } catch (error) {
+    console.warn("Unable to queue platform payment notification", error);
+  }
 }
 
 function fxMetadata(rate: ResolvedUsdRate) {
@@ -1314,6 +1345,15 @@ export async function completeMockPayment(input: Readonly<{
     valueCurrency: currentPayment.currency
   });
 
+  await queuePlatformPaymentNotification({
+    eventKey: "platform_revenue_received",
+    metadata: {
+      mock: true,
+      source: "mock_payment_completion"
+    },
+    payment: currentPayment
+  });
+
   if (currentPayment.plan_id) {
     await startPaidAssessmentPlan({
       locale: currentPayment.locale,
@@ -1977,6 +2017,16 @@ export async function fulfillCheckoutSession(
       valueCurrency: payment.currency
     });
 
+    await queuePlatformPaymentNotification({
+      eventKey: "platform_revenue_received",
+      metadata: {
+        source: input.source,
+        stripeEventId: input.stripeEventId,
+        stripeSessionId: session.id
+      },
+      payment: currentPayment
+    });
+
     if (currentPayment.plan_id && currentPayment.status !== "bound") {
       await startPaidAssessmentPlan({
         locale: currentPayment.locale,
@@ -2214,6 +2264,16 @@ export async function markStripePaymentFailure(input: Readonly<{
     stripeSessionId: sessionId,
     valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
     valueCurrency: payment.currency
+  });
+
+  await queuePlatformPaymentNotification({
+    eventKey: "platform_payment_failed",
+    metadata: {
+      failureReason: input.reason,
+      stripeEventId: input.stripeEventId,
+      stripeSessionId: sessionId
+    },
+    payment: updated ?? payment
   });
 
   return updated ? mapPayment(updated) : mapPayment(payment);
@@ -2466,6 +2526,24 @@ export async function handleStripeWebhookPayload(input: Readonly<{
         sql,
         stripeEventId: event.id
       });
+
+      try {
+        await queuePlatformAdminCommunication({
+          eventKey: "platform_payout_failed",
+          metadata: {
+            eventType: event.type,
+            mattanutraEnv: config.env,
+            stripeEventId: event.id,
+            stripeMode: config.mode,
+            stripePayoutId: payout.id,
+            stripePayoutStatus: payout.status
+          },
+          resourceId: payout.id,
+          resourceType: "stripe_payout"
+        });
+      } catch (error) {
+        console.warn("Unable to queue platform payout notification", error);
+      }
 
       await markWebhookEventStatus(sql, {
         errorMessage: `Stripe payout ${payout.status || "failed"}`,

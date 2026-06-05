@@ -72,6 +72,8 @@ export function ProductCountryManager({
   onAdd,
   onPricingChange,
   onRemove,
+  pricingLabels,
+  variant = "default",
   removeLabel
 }: Readonly<{
   addCountryLabel: string;
@@ -86,6 +88,13 @@ export function ProductCountryManager({
     patch: Partial<ProductCountryPricing>
   ) => void;
   onRemove: (countryCode: string) => void;
+  pricingLabels?: Readonly<{
+    country: string;
+    currency: string;
+    priceUpdated: string;
+    rrp: string;
+  }>;
+  variant?: "compact" | "default";
   removeLabel: string;
 }>) {
   const allowedSet = allowedCountryCodes
@@ -97,7 +106,12 @@ export function ProductCountryManager({
   );
 
   return (
-    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+    <div
+      className={classNames(
+        "rounded-xl border border-gray-100 bg-gray-50",
+        variant === "compact" ? "p-3" : "p-4"
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-gray-900">{label}</h3>
         <select
@@ -121,86 +135,102 @@ export function ProductCountryManager({
         </select>
       </div>
       {onPricingChange ? (
-        <div className="mt-3 grid gap-2">
-          {countryCodes.map((countryCode) => {
-            const pricing = countryPricing?.find(
-              (item) => item.countryCode === countryCode
-            );
-
-            return (
-              <div
-                className="grid gap-2 rounded-lg border border-emerald-100 bg-white p-2 sm:grid-cols-[minmax(0,1fr)_7rem_5.5rem_6.5rem_auto]"
-                key={countryCode}
-              >
-                <div className="flex min-h-9 items-center text-xs font-semibold text-emerald-800">
-                  {productCountryLabel(countryCode)}
-                </div>
-                <input
-                  className="rounded-md bg-white px-2 py-1.5 text-xs text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-                  inputMode="decimal"
-                  min="0"
-                  onChange={(event) => {
-                    const parsed = Number(event.target.value);
-                    const validAmount =
-                      event.target.value.trim() &&
-                      Number.isFinite(parsed) &&
-                      parsed >= 0;
-
-                    onPricingChange(countryCode, {
-                      pricingStatus: validAmount ? "ready" : "missing",
-                      rrpPriceAmount: validAmount ? parsed : null
-                    });
-                  }}
-                  placeholder="RRP"
-                  step="0.01"
-                  type="number"
-                  value={pricing?.rrpPriceAmount ?? ""}
-                />
-                <select
-                  className="rounded-md bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-                  onChange={(event) =>
-                    onPricingChange(countryCode, { currency: event.target.value })
-                  }
-                  value={pricing?.currency ?? "THB"}
-                >
-                  {supportedOrganisationCurrencies.map((currency) => (
-                    <option key={currency} value={currency}>
-                      {currency}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="rounded-md bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-                  onChange={(event) =>
-                    onPricingChange(countryCode, {
-                      pricingStatus:
-                        event.target.value as ProductCountryPricing["pricingStatus"]
-                    })
-                  }
-                  value={pricing?.pricingStatus ?? "missing"}
-                >
-                  <option value="missing">Missing</option>
-                  <option value="ready">Ready</option>
-                  <option value="review">Review</option>
-                </select>
-                <button
-                  aria-label={`${removeLabel}: ${productCountryLabel(countryCode)}`}
-                  className="rounded-md px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={countryCodes.length <= 1}
-                  onClick={() => onRemove(countryCode)}
-                  type="button"
-                >
+        <div className="mt-3 overflow-x-auto rounded-lg border border-gray-200 bg-white">
+          <table className="min-w-full divide-y divide-gray-100 text-left text-xs">
+            <thead className="bg-gray-50 text-gray-500">
+              <tr>
+                <th className="px-3 py-2 font-semibold">
+                  {pricingLabels?.country ?? "Country"}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {pricingLabels?.rrp ?? "RRP"}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {pricingLabels?.currency ?? "Currency"}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {pricingLabels?.priceUpdated ?? "Updated"}
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">
                   {removeLabel}
-                </button>
-              </div>
-            );
-          })}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {countryCodes.map((countryCode) => {
+                const pricing = countryPricing?.find(
+                  (item) => item.countryCode === countryCode
+                );
+
+                return (
+                  <tr key={countryCode}>
+                    <td className="px-3 py-2 font-semibold text-emerald-800">
+                      {productCountryLabel(countryCode)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="w-28 rounded-md bg-white px-2 py-1.5 text-xs text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                        inputMode="decimal"
+                        min="0"
+                        onChange={(event) => {
+                          const parsed = Number(event.target.value);
+                          const validAmount =
+                            event.target.value.trim() &&
+                            Number.isFinite(parsed) &&
+                            parsed >= 0;
+
+                          onPricingChange(countryCode, {
+                            rrpPriceAmount: validAmount ? parsed : null
+                          });
+                        }}
+                        placeholder="RRP"
+                        step="0.01"
+                        type="number"
+                        value={pricing?.rrpPriceAmount ?? ""}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <select
+                        className="w-24 rounded-md bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                        onChange={(event) =>
+                          onPricingChange(countryCode, { currency: event.target.value })
+                        }
+                        value={pricing?.currency ?? "THB"}
+                      >
+                        {supportedOrganisationCurrencies.map((currency) => (
+                          <option key={currency} value={currency}>
+                            {currency}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-3 py-2 text-gray-500">
+                      {pricing?.priceUpdatedAt
+                        ? new Date(pricing.priceUpdatedAt).toLocaleDateString()
+                        : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        aria-label={`${removeLabel}: ${productCountryLabel(countryCode)}`}
+                        className="rounded-md px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                        disabled={countryCodes.length <= 1}
+                        onClick={() => onRemove(countryCode)}
+                        type="button"
+                      >
+                        {removeLabel}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       ) : (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-1.5">
           {countryCodes.map((countryCode) => (
             <span
-              className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700"
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-0.5 text-xs font-semibold text-emerald-700"
               key={countryCode}
             >
               {productCountryLabel(countryCode)}
@@ -320,15 +350,10 @@ export function ProductIdentifiersEditor({
           />
         </label>
         <label className="text-xs font-semibold text-gray-700">
-          {viewLabels.internalSku}
-          <input
-            className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-            onChange={(event) =>
-              updateIdentifier("internal_sku", event.target.value)
-            }
-            type="text"
-            value={identifierValue(draft, "internal_sku")}
-          />
+          {viewLabels.mattaNutraSku}
+          <div className="mt-1 block w-full rounded-md bg-white px-3 py-2 font-mono text-xs text-gray-700 ring-1 ring-gray-200">
+            {draft.id}
+          </div>
         </label>
         <label className="text-xs font-semibold text-gray-700">
           {viewLabels.manufacturerSku}
@@ -402,13 +427,15 @@ export function ProductIdentifiersEditor({
 }
 
 export function ProductCard({
+  href,
   locale,
   onSelect,
   row,
   viewLabels
 }: Readonly<{
+  href?: string;
   locale: Locale;
-  onSelect: () => void;
+  onSelect?: () => void;
   row: AdminProductRow;
   viewLabels: Readonly<Record<string, string>>;
 }>) {
@@ -422,12 +449,8 @@ export function ProductCard({
     item.rrpPriceAmount !== null
   );
 
-  return (
-    <button
-      className="self-start rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-gray-200 transition hover:-translate-y-0.5 hover:shadow-md"
-      onClick={onSelect}
-      type="button"
-    >
+  const content = (
+    <>
       <div className="flex gap-4">
         {row.imageUrl ? (
           <Image
@@ -541,6 +564,19 @@ export function ProductCard({
           </p>
         </div>
       </div>
+    </>
+  );
+
+  const className =
+    "self-start rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-gray-200 transition hover:-translate-y-0.5 hover:shadow-md";
+
+  return href ? (
+    <a className={className} href={href}>
+      {content}
+    </a>
+  ) : (
+    <button className={className} onClick={onSelect} type="button">
+      {content}
     </button>
   );
 }
@@ -749,174 +785,6 @@ export function ProductFactsEditor({
             {viewLabels.noParsedFacts}
           </span>
         )}
-      </div>
-    </div>
-  );
-}
-
-export function ProductOffersEditor({
-  accessToken,
-  draft,
-  locale,
-  setDraft,
-  viewLabels
-}: Readonly<{
-  accessToken: string;
-  draft: AdminProductRow;
-  locale: Locale;
-  setDraft: (row: AdminProductRow) => void;
-  viewLabels: Readonly<Record<string, string>>;
-}>) {
-  const [newOfferUrl, setNewOfferUrl] = useState("");
-  const [newOfferCommissionRate, setNewOfferCommissionRate] = useState("");
-  const [offerBusy, setOfferBusy] = useState(false);
-
-  async function addOffer() {
-    const url = newOfferUrl.trim();
-
-    if (!url) {
-      return;
-    }
-
-    setOfferBusy(true);
-
-    try {
-      const response = await fetch(`/api/admin/products/${draft.id}/offers`, {
-        body: JSON.stringify({
-          accessToken,
-          commissionRate: newOfferCommissionRate
-            ? Number(newOfferCommissionRate) / 100
-            : null,
-          linkType: "affiliate",
-          url
-        }),
-        headers: {
-          "Content-Type": "application/json"
-        },
-        method: "POST"
-      });
-
-      if (!response.ok) {
-        throw new Error("Unable to add offer");
-      }
-
-      const payload = (await response.json()) as { row?: AdminProductRow };
-
-      if (payload.row) {
-        setDraft({ ...payload.row, decisionStats: draft.decisionStats });
-        setNewOfferUrl("");
-        setNewOfferCommissionRate("");
-      }
-    } finally {
-      setOfferBusy(false);
-    }
-  }
-
-  async function removeOffer(offerId: string) {
-    setOfferBusy(true);
-
-    try {
-      const response = await fetch(
-        `/api/admin/products/${draft.id}/offers/${offerId}`,
-        {
-          body: JSON.stringify({ accessToken }),
-          headers: {
-            "Content-Type": "application/json"
-          },
-          method: "DELETE"
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Unable to remove offer");
-      }
-
-      const payload = (await response.json()) as { row?: AdminProductRow };
-
-      if (payload.row) {
-        setDraft({ ...payload.row, decisionStats: draft.decisionStats });
-      }
-    } finally {
-      setOfferBusy(false);
-    }
-  }
-
-  return (
-    <div className="mt-5">
-      <h3 className="text-sm font-semibold text-gray-900">
-        {viewLabels.offers}
-      </h3>
-      {draft.offers.length > 0 ? (
-        <div className="mt-2 space-y-2">
-          {draft.offers.map((offer) => (
-            <div
-              className="flex items-start justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2"
-              key={offer.id}
-            >
-              <div className="min-w-0">
-                <a
-                  className="block truncate text-sm font-medium text-[#2563EB] hover:text-[#1D4ED8]"
-                  href={offer.url}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  {offer.url}
-                </a>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  {[
-                    productStatusLabel(offer.linkType, locale),
-                    offer.platform,
-                    offer.commissionRate !== null
-                      ? `${(offer.commissionRate * 100).toFixed(1)}% commission`
-                      : null,
-                    offer.priceAmount !== null
-                      ? `${offer.priceAmount} ${offer.currency}`
-                      : null,
-                    productStatusLabel(offer.availabilityStatus, locale)
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </div>
-              <button
-                className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={offerBusy}
-                onClick={() => void removeOffer(offer.id)}
-                type="button"
-              >
-                {viewLabels.remove}
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-2 text-sm text-gray-500">{viewLabels.noOffers}</p>
-      )}
-      <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto]">
-        <input
-          className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
-          onChange={(event) => setNewOfferUrl(event.target.value)}
-          placeholder={viewLabels.offerUrl}
-          type="url"
-          value={newOfferUrl}
-        />
-        <input
-          className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
-          min="0"
-          onChange={(event) => setNewOfferCommissionRate(event.target.value)}
-          placeholder="%"
-          step="0.01"
-          type="number"
-          value={newOfferCommissionRate}
-        />
-        <button
-          className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={offerBusy || !newOfferUrl.trim()}
-          onClick={() => void addOffer()}
-          type="button"
-        >
-          {viewLabels.add}
-        </button>
       </div>
     </div>
   );

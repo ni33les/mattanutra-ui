@@ -36,7 +36,6 @@ function need(
 }
 
 function product(input: Readonly<{
-  affiliate?: boolean;
   amount: number;
   audience?: ProductCandidate["productAudience"];
   factAudience?: NonNullable<ProductCandidate["facts"][number]["supplementAudience"]>;
@@ -49,9 +48,6 @@ function product(input: Readonly<{
   servingLabel?: string | null;
 }>): ProductCandidate {
   return {
-    activeOfferId: input.affiliate ? `${input.id}-affiliate` : null,
-    activeAffiliateUrl: input.affiliate ? `https://affiliate.example/${input.id}` : null,
-    affiliateStatus: input.affiliate ? "active" : "none",
     automatedSafetyPassed: true,
     availabilityStatus: "in_stock",
     brandStatus: "approved",
@@ -149,10 +145,10 @@ describe("product recommendation scoring", () => {
     );
   });
 
-  it("selects nutritional coverage over affiliate-only matches", () => {
+  it("selects nutritional coverage over weaker matches", () => {
     const result = recommendProductStack({
       candidates: [
-        product({ affiliate: true, amount: 0.2, id: "affiliate", name: "Magnesium" }),
+        product({ amount: 0.2, id: "weaker", name: "Magnesium" }),
         product({ amount: 1, id: "best", name: "Magnesium" })
       ],
       needs: [need("magnesium", "Magnesium", 5)]
@@ -162,16 +158,16 @@ describe("product recommendation scoring", () => {
     assert.equal(result.stackCoveragePercent, 100);
   });
 
-  it("uses affiliate links as a tie-breaker for equivalent safe products", () => {
+  it("uses deterministic ordering for equivalent safe products", () => {
     const result = recommendProductStack({
       candidates: [
-        product({ amount: 1, id: "plain", name: "Vitamin D" }),
-        product({ affiliate: true, amount: 1, id: "affiliate", name: "Vitamin D" })
+        product({ amount: 1, id: "plain-b", name: "Vitamin D" }),
+        product({ amount: 1, id: "plain-a", name: "Vitamin D" })
       ],
       needs: [need("vitamin_d", "Vitamin D", 5)]
     });
 
-    assert.equal(result.recommendations[0]?.product.id, "affiliate");
+    assert.equal(result.recommendations[0]?.product.id, "plain-a");
   });
 
   it("does not recommend women-only products to male clients", () => {
@@ -1370,24 +1366,24 @@ describe("product recommendation scoring v2 exact shortlist", () => {
     assert.equal(recommendedIds.has("curcumin"), true);
   });
 
-  it("uses affiliate links only as a near-equivalent tie-breaker", () => {
+  it("uses price and deterministic ordering for near-equivalent products", () => {
     const betterNutrition = recommendProductStackV2({
       candidates: [
-        product({ affiliate: true, amount: 0.4, id: "affiliate", name: "CoQ10" }),
+        product({ amount: 0.4, id: "weaker", name: "CoQ10" }),
         product({ amount: 1, id: "best", name: "CoQ10" })
       ],
       needs: [need("coq10", "CoQ10", 5)]
     });
     const equivalent = recommendProductStackV2({
       candidates: [
-        product({ amount: 1, id: "plain", name: "CoQ10" }),
-        product({ affiliate: true, amount: 1, id: "affiliate", name: "CoQ10" })
+        product({ amount: 1, id: "expensive", name: "CoQ10", priceAmount: 200 }),
+        product({ amount: 1, id: "cheap", name: "CoQ10", priceAmount: 100 })
       ],
       needs: [need("coq10", "CoQ10", 5)]
     });
 
     assert.equal(betterNutrition.recommendations[0]?.product.id, "best");
-    assert.equal(equivalent.recommendations[0]?.product.id, "affiliate");
+    assert.equal(equivalent.recommendations[0]?.product.id, "cheap");
   });
 
   it("modulates utility from budget and pill-limit context", () => {

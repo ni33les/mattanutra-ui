@@ -102,7 +102,7 @@ describe("retail command registry", () => {
     assert.match(service, /assertRetailAgentCommandTask/);
     assert.match(service, /Retail task \$\{input\.taskType\} is not agent-executable/);
     assert.match(service, /commandId === "allocate_customer_order"/);
-    assert.match(service, /commandId === "sync_order_shortages_to_shopping_list"/);
+    assert.match(service, /commandId === "sync_order_shortages_to_reorder_advice"/);
     assert.match(service, /commandId === "refresh_stock_reorder_advice"/);
     assert.match(
       readFileSync("lib/retail-command-registry.ts", "utf8"),

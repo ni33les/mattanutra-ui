@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   CATALOGUE_SNAPSHOT_TABLES,
@@ -54,10 +54,19 @@ const adminProductView = readFileSync(
   new URL("../components/admin/product-view.tsx", import.meta.url),
   "utf8"
 );
+const adminProductUi = readFileSync(
+  new URL("../components/admin/product-view-ui.tsx", import.meta.url),
+  "utf8"
+);
+const adminProductDetailRoute = readFileSync(
+  new URL("../app/[locale]/admin/products/[productId]/page.tsx", import.meta.url),
+  "utf8"
+);
 const adminProductsService = readFileSync(
   new URL("../lib/admin-products.ts", import.meta.url),
   "utf8"
 );
+const dbSchema = readFileSync(new URL("../db-schema.sql", import.meta.url), "utf8");
 const adminReviewQueueView = readFileSync(
   new URL("../components/admin/review-queue-view.tsx", import.meta.url),
   "utf8"
@@ -192,7 +201,6 @@ describe("codebase cleanup guardrails", () => {
       "product_import_runs",
       "product_imports",
       "product_import_translations",
-      "product_offers",
       "product_translations",
       "product_versions",
       "products",
@@ -283,6 +291,69 @@ describe("codebase cleanup guardrails", () => {
     assert.doesNotMatch(adminProductsService, /\bimportDiscoveredMarketplaceProducts\b/);
     assert.doesNotMatch(adminProductsService, /\bfactsFromMarketplaceSnapshot\b/);
     assert.doesNotMatch(adminProductsService, /\bmarketplace_discovery\b/);
+  });
+
+  it("keeps product admin editing on a detail page instead of the old modal", () => {
+    assert.match(adminProductDetailRoute, /AdminDashboard/);
+    assert.match(adminProductDetailRoute, /productDetailId=\{productId\}/);
+    assert.match(adminProductView, /\/admin\/products\/\$\{row\.id\}/);
+    assert.match(adminProductUi, /\bfunction ProductCountryManager\b/);
+    assert.match(adminProductUi, /<table className=/);
+    assert.doesNotMatch(adminProductView, /\bProductOffersEditor\b/);
+    assert.doesNotMatch(adminProductView, /\bAdminModal\b/);
+  });
+
+  it("keeps product offer runtime objects removed", () => {
+    for (const route of [
+      "../app/api/admin/products/[id]/offers/route.ts",
+      "../app/api/admin/products/[id]/offers/[offerId]/route.ts",
+      "../app/api/admin/products/[id]/affiliate-links/route.ts",
+      "../app/api/admin/products/[id]/affiliate-links/[linkId]/route.ts"
+    ]) {
+      assert.equal(existsSync(new URL(route, import.meta.url)), false, `${route} must stay removed`);
+    }
+
+    for (const [name, root] of [
+      ["app", "../app/"],
+      ["components", "../components/"],
+      ["lib", "../lib/"],
+      ["workers", "../workers/"]
+    ] as const) {
+      for (const file of trackedSourceFiles(new URL(root, import.meta.url))) {
+        const path = file.pathname;
+        const source = readFileSync(file, "utf8");
+
+        for (const term of [
+          "product_offers",
+          "product_affiliate_links",
+          "offer_id",
+          "affiliate_status",
+          "affiliate_checked_at",
+          "ProductOffersEditor",
+          "AdminProductOffer",
+          "activeAffiliate",
+          "activeOffer",
+          "affiliateStatus"
+        ]) {
+          assert.equal(source.includes(term), false, `${name}:${path} contains ${term}`);
+        }
+      }
+    }
+
+    for (const term of [
+      "create table public.product_offers",
+      "create table public.product_affiliate_links",
+      "offer_id",
+      "affiliate_status",
+      "affiliate_checked_at"
+    ]) {
+      assert.equal(dbSchema.includes(term), false, `db-schema.sql contains ${term}`);
+    }
+
+    assert.ok(
+      packageJson.scripts?.["product-offers:schema:remove"],
+      "product offer schema cleanup must be repeatable"
+    );
   });
 
   it("keeps admin overlays behind shared primitives", () => {

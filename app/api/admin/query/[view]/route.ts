@@ -1,8 +1,14 @@
+import type { NextRequest } from "next/server";
 import {
   getAdminExternalQueryData,
   normalizeAdminExternalQueryView
 } from "@/lib/admin-query-data";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
+import {
+  adminCsrfCookieName,
+  adminSessionCookieName,
+  resolveAdminSession
+} from "@/lib/admin-access";
 import {
   openClawJson,
   openClawUnauthorized,
@@ -18,7 +24,7 @@ type AdminQueryRouteProps = Readonly<{
   }>;
 }>;
 
-export async function GET(request: Request, { params }: AdminQueryRouteProps) {
+export async function GET(request: NextRequest, { params }: AdminQueryRouteProps) {
   const url = new URL(request.url);
   const unauthorized = adminDashboardOrClawRequestAllowed(
     request,
@@ -39,7 +45,16 @@ export async function GET(request: Request, { params }: AdminQueryRouteProps) {
   }
 
   try {
-    return openClawJson(await getAdminExternalQueryData(view, url.searchParams));
+    const context = await resolveAdminSession({
+      csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
+      sessionCookie: request.cookies.get(adminSessionCookieName)?.value
+    });
+
+    return openClawJson(await getAdminExternalQueryData(
+      view,
+      url.searchParams,
+      context
+    ));
   } catch (error) {
     return taskApiError(error, "Unable to load admin query");
   }

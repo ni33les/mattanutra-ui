@@ -67,12 +67,6 @@ function productSearchIndex(row: AdminProductRow) {
       fact.source,
       fact.sourceText,
       ...(fact.aliasKeys ?? [])
-    ]),
-    ...row.offers.flatMap((offer) => [
-      offer.linkType,
-      offer.network,
-      offer.platform,
-      offer.status
     ])
   ];
   const normalizedFields = fields

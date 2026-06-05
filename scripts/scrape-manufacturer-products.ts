@@ -29,7 +29,6 @@ import {
   stageProductImport,
   startProductImportRun,
   updateAdminProduct,
-  upsertProductOffer,
   validateProductImportForApproval,
   type ProductImportFactInput
 } from "@/lib/admin-products";
@@ -1005,67 +1004,6 @@ async function importCleanApprovedProduct(product: ScrapedManufacturerProduct) {
     productId: approvedRow.id,
     reason: approvedRow.validation.summary
   };
-}
-
-function productOfferSnapshots(product: ScrapedManufacturerProduct) {
-  const value = product.rawSnapshot.productOffers ?? product.rawSnapshot.whereToBuyLinks;
-
-  return Array.isArray(value)
-    ? value
-      .filter((item): item is Record<string, unknown> => isRecord(item))
-      .flatMap((item) => {
-        const url = typeof item.url === "string" ? item.url.trim() : "";
-
-        if (!url) {
-          return [];
-        }
-
-        return [{
-          availabilityStatus: "unknown" as const,
-          commissionRate: null,
-          currency: "THB",
-          linkType: item.linkType === "affiliate" ? "affiliate" as const : "direct" as const,
-          network: typeof item.network === "string" ? item.network : "manufacturer_where_to_buy",
-          platform: typeof item.platform === "string" ? item.platform : null,
-          priceAmount: typeof item.priceAmount === "number" ? item.priceAmount : null,
-          priority: typeof item.priority === "number" ? item.priority : 0,
-          status: (
-            item.status === "inactive" || item.status === "flagged_stale"
-              ? item.status
-              : "active"
-          ) as "active" | "flagged_stale" | "inactive",
-          url
-        }];
-      })
-    : [];
-}
-
-async function upsertProductOffersForImport(product: ScrapedManufacturerProduct, productId: string | null | undefined) {
-  if (!productId) {
-    return 0;
-  }
-
-  let upserted = 0;
-
-  for (const offer of productOfferSnapshots(product)) {
-    await upsertProductOffer({
-      actor: "manufacturer_scraper_offer_import",
-      availabilityStatus: offer.availabilityStatus,
-      commissionRate: offer.commissionRate,
-      currency: offer.currency,
-      linkType: offer.linkType,
-      network: offer.network,
-      platform: offer.platform,
-      priceAmount: offer.priceAmount,
-      priority: offer.priority,
-      productId,
-      status: offer.status,
-      url: offer.url
-    });
-    upserted += 1;
-  }
-
-  return upserted;
 }
 
 async function correctProductWithAi(
@@ -2145,7 +2083,6 @@ async function main() {
   let autoApprovedImportCount = 0;
   let pendingReviewImportCount = 0;
   let skippedInvalidImportCount = 0;
-  let productOffersUpserted = 0;
   let importNewProductCount = 0;
   let importUpdatedProductCount = 0;
   let importMarkedIgnoredCount = 0;
@@ -2176,7 +2113,6 @@ async function main() {
     let appliedCount = Math.max(0, startAt - 1);
     let autoApprovedCount = 0;
     let failedCount = 0;
-    let offersUpserted = 0;
     let stagedCount = 0;
     let skippedInvalidCount = 0;
     const skippedProducts = products.filter(isSkippedProduct).length;
@@ -2214,7 +2150,6 @@ async function main() {
             recordAppliedProduct(product);
             autoApprovedCount += 1;
             autoApprovedImportCount = autoApprovedCount;
-            offersUpserted += await upsertProductOffersForImport(product, result.productId);
             return;
           }
 
@@ -2253,8 +2188,6 @@ async function main() {
         });
         stagedCount += 1;
         recordAppliedProduct(product);
-        offersUpserted += await upsertProductOffersForImport(product, staged.productId);
-
         if (autoApprove && cleanAutoApproval) {
           try {
             await resolveProductImportReview({
@@ -2372,8 +2305,7 @@ async function main() {
     autoApprovedImportCount = autoApprovedCount;
     pendingReviewImportCount = Math.max(0, stagedCount - autoApprovedCount);
     skippedInvalidImportCount = skippedInvalidCount;
-    productOffersUpserted = offersUpserted;
-    console.log(`[apply] staged=${stagedCount} autoApproved=${autoApprovedCount} pendingReview=${pendingReviewImportCount} skippedInvalid=${skippedInvalidCount} skippedNonSupplement=${skippedProducts} new=${importNewProductCount} updated=${importUpdatedProductCount} markedIgnored=${importMarkedIgnoredCount} offers=${offersUpserted}`);
+    console.log(`[apply] staged=${stagedCount} autoApproved=${autoApprovedCount} pendingReview=${pendingReviewImportCount} skippedInvalid=${skippedInvalidCount} skippedNonSupplement=${skippedProducts} new=${importNewProductCount} updated=${importUpdatedProductCount} markedIgnored=${importMarkedIgnoredCount}`);
   }
 
   console.log(JSON.stringify({
@@ -2408,7 +2340,6 @@ async function main() {
     newlyAdded: importNewProductCount,
     updated: importUpdatedProductCount,
     markedIgnored: importMarkedIgnoredCount,
-    productOffersUpserted,
     wroteFile
   }, null, 2));
 }

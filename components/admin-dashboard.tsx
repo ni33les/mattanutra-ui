@@ -83,10 +83,13 @@ import { AdminRetailStockView } from "@/components/admin/retail-stock-view";
 import { AdminContentView, contentTypeForView } from "@/components/admin/content-view";
 import {
   AdminFoodsView,
-  AdminProductsView,
   AdminReviewQueueView,
   AdminSupplementsView
 } from "@/components/admin/safety-views";
+import {
+  AdminProductDetailView,
+  AdminProductsView
+} from "@/components/admin/product-view";
 import { AdminVisibilityView } from "@/components/admin/visibility-view";
 import { AdminRecommendationInsightsView } from "@/components/admin/recommendation-insights-view";
 import { AdminDrawer } from "@/components/admin/ui";
@@ -206,6 +209,7 @@ function adminViewDatabaseAvailable({
   flowData,
   leadsData,
   productsData,
+  productDetailId,
   retailStockData,
   recommendationInsightsData,
   reviewQueueData,
@@ -225,6 +229,7 @@ function adminViewDatabaseAvailable({
   flowData: AdminFlowData;
   leadsData: AdminLeadsData;
   productsData: AdminProductsData;
+  productDetailId?: string | null;
   retailStockData: AdminRetailStockData;
   recommendationInsightsData: AdminRecommendationInsightsData;
   reviewQueueData: AdminReviewQueueData;
@@ -344,6 +349,7 @@ export function AdminDashboard({
   flowData,
   leadsData,
   locale,
+  productDetailId,
   productsData,
   retailStockData,
   recommendationInsightsData,
@@ -371,6 +377,7 @@ export function AdminDashboard({
   flowData: AdminFlowData;
   leadsData: AdminLeadsData;
   locale: Locale;
+  productDetailId?: string | null;
   productsData: AdminProductsData;
   retailStockData: AdminRetailStockData;
   recommendationInsightsData: AdminRecommendationInsightsData;
@@ -718,11 +725,20 @@ export function AdminDashboard({
               locale={locale}
             />
           ) : view === "products" ? (
-            <AdminProductsView
-              accessToken={accessToken}
-              data={productsData}
-              locale={locale}
-            />
+            productDetailId ? (
+              <AdminProductDetailView
+                accessToken={accessToken}
+                data={productsData}
+                locale={locale}
+                productId={productDetailId}
+              />
+            ) : (
+              <AdminProductsView
+                accessToken={accessToken}
+                data={productsData}
+                locale={locale}
+              />
+            )
           ) : view === "stock" ||
             view === "retail-audit" ||
             view === "retail-movements" ||

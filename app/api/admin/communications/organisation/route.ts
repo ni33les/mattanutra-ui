@@ -9,6 +9,7 @@ import { requestOriginAllowed } from "@/lib/admin-session-cookie";
 import { hasAdminPermission } from "@/lib/admin-rbac";
 import {
   adminCommunicationEventKeys,
+  adminCommunicationEventScope,
   deleteDisabledOrganisationCommunicationChannel,
   updateOrganisationCommunicationChannel,
   updateOrganisationNotificationPreference,
@@ -42,12 +43,11 @@ function eventKey(value: unknown): AdminCommunicationEventKey | null {
     : null;
 }
 
-function canAccessOrganisation(
+function canAccessEffectiveOrganisation(
   context: NonNullable<Awaited<ReturnType<typeof resolveAdminSession>>>,
-  organisationId: string
+  requestedOrganisationId: string
 ) {
-  return context.effectiveOrganisation.type === "platform" ||
-    context.effectiveOrganisation.id === organisationId;
+  return requestedOrganisationId === context.effectiveOrganisation.id;
 }
 
 async function requireCommunicationSession(request: NextRequest, write: boolean) {
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
   const organisationId = text(new URL(request.url).searchParams.get("organisationId")) ||
     context.effectiveOrganisation.id;
 
-  if (!canAccessOrganisation(context, organisationId)) {
+  if (!canAccessEffectiveOrganisation(context, organisationId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
   const action = text(body.action);
   const organisationId = text(body.organisationId) || context.effectiveOrganisation.id;
 
-  if (!canAccessOrganisation(context, organisationId)) {
+  if (!canAccessEffectiveOrganisation(context, organisationId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -180,6 +180,14 @@ export async function POST(request: NextRequest) {
 
     if (!nextEventKey || !nextChannelType || nextEventKey === "admin_test_message") {
       return NextResponse.json({ error: "Preference is invalid" }, { status: 400 });
+    }
+
+    const expectedScope =
+      context.effectiveOrganisation.type === "platform" ? "platform" : "retail";
+    const nextEventScope = adminCommunicationEventScope(nextEventKey);
+
+    if (nextEventScope !== expectedScope) {
+      return NextResponse.json({ error: "Preference is invalid for this organisation" }, { status: 400 });
     }
 
     await updateOrganisationNotificationPreference({

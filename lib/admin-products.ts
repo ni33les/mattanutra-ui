@@ -13,11 +13,9 @@ import {
   type ProductImportFactInput,
   type ProductImportRunRow,
   type ProductTranslationInput,
-  type RemoveProductOfferInput,
   type ResolveProductImportReviewInput,
   type StageProductImportInput,
-  type StartProductImportRunInput,
-  type UpsertProductOfferInput
+  type StartProductImportRunInput
 } from "./admin-product-types.ts";
 import {
   isoOrNull,
@@ -55,15 +53,14 @@ export {
 } from "./admin-product-types.ts";
 export type {
   AdminProductFact,
-  AdminProductOffer,
   AdminProductRow,
+  AdminProductShopAvailability,
   AdminProductsData,
   AdminProductTranslation,
   AdminProductTranslationStatus,
   CreateAdminProductInput,
   FactDbPayload,
   FinishProductImportRunInput,
-  ProductAffiliateStatus,
   ProductDbRow,
   ProductFactSupplementStatus,
   ProductImportFactInput,
@@ -71,12 +68,10 @@ export type {
   ProductLabelStatus,
   ProductTranslationInput,
   ProductValidationCacheStatus,
-  RemoveProductOfferInput,
   ResolveProductImportReviewInput,
   StageProductImportInput,
   StartProductImportRunInput,
-  UpdateAdminProductInput,
-  UpsertProductOfferInput
+  UpdateAdminProductInput
 } from "./admin-product-types.ts";
 export { createAdminProduct, updateAdminProduct } from "./admin-product-writes.ts";
 import {
@@ -518,7 +513,6 @@ export async function recordProductVersion(
         status,
         label_status,
         availability_status,
-        affiliate_status,
         price_amount,
         currency,
         validation_status,
@@ -555,7 +549,6 @@ export async function recordProductVersion(
         next_product.status,
         next_product.label_status,
         next_product.availability_status,
-        next_product.affiliate_status,
         next_product.price_amount,
         next_product.currency,
         next_product.validation_status,
@@ -1405,138 +1398,6 @@ export async function resolveProductImportReview(
   };
 }
 
-export async function upsertProductOffer(
-  input: UpsertProductOfferInput
-) {
-  const sql = getSql();
-  const productId = isUuidValue(input.productId) ? input.productId : null;
-  const url = input.url.trim();
-
-  if (!sql || !productId) {
-    throw new Error("Product link requires a valid product");
-  }
-
-  if (!url) {
-    throw new Error("Product link URL is required");
-  }
-
-  const rows = await sql<Array<{ id: string }>>`
-    insert into public.product_offers (
-      product_id,
-      network,
-      url,
-      link_type,
-      platform,
-      commission_rate,
-      admin_priority,
-      price_amount,
-      currency,
-      availability_status,
-      tracking_id,
-      status,
-      created_at,
-      updated_at
-    )
-    values (
-      ${productId}::uuid,
-      ${cleanNullableText(input.network, 100)},
-      ${url},
-      ${input.linkType ?? "affiliate"},
-      ${cleanNullableText(input.platform, 100)},
-      ${input.commissionRate ?? null},
-      ${Math.round(input.priority ?? 0)},
-      ${input.priceAmount ?? null},
-      ${cleanNullableText(input.currency, 20) ?? "THB"},
-      ${input.availabilityStatus ?? "unknown"},
-      ${cleanNullableText(input.trackingId, 500)},
-      ${input.status ?? "active"},
-      now(),
-      now()
-    )
-    on conflict (product_id, url)
-    do update set
-      network = excluded.network,
-      link_type = excluded.link_type,
-      platform = excluded.platform,
-      commission_rate = excluded.commission_rate,
-      admin_priority = excluded.admin_priority,
-      price_amount = excluded.price_amount,
-      currency = excluded.currency,
-      availability_status = excluded.availability_status,
-      tracking_id = excluded.tracking_id,
-      status = excluded.status,
-      updated_at = now()
-    returning id::text
-  `;
-  const offerId = rows[0]?.id;
-
-  await sql`
-    insert into public.product_admin_audit (
-      product_id,
-      action,
-      actor,
-      after_payload
-    )
-    values (
-      ${productId}::uuid,
-      'product_offer_upserted',
-      ${input.actor ?? "admin_dashboard"},
-      ${sql.json(toJsonValue({
-        commissionRate: input.commissionRate ?? null,
-        offerId,
-        linkType: input.linkType ?? "affiliate",
-        platform: input.platform ?? null,
-        priority: input.priority ?? 0,
-        url
-      }))}::jsonb
-    )
-  `;
-
-  clearProductRecommendationCandidateCache();
-
-  return loadAdminProductRow(productId);
-}
-
-export async function removeProductOffer(
-  input: RemoveProductOfferInput
-) {
-  const sql = getSql();
-  const productId = isUuidValue(input.productId) ? input.productId : null;
-  const offerId = isUuidValue(input.offerId) ? input.offerId : null;
-
-  if (!sql || !productId || !offerId) {
-    throw new Error("Product link removal requires valid ids");
-  }
-
-  await sql`
-    update public.product_offers
-    set
-      status = 'inactive',
-      updated_at = now()
-    where id = ${offerId}::uuid
-      and product_id = ${productId}::uuid
-  `;
-
-  await sql`
-    insert into public.product_admin_audit (
-      product_id,
-      action,
-      actor,
-      after_payload
-    )
-    values (
-      ${productId}::uuid,
-      'product_offer_removed',
-      ${input.actor ?? "admin_dashboard"},
-      ${sql.json(toJsonValue({ offerId }))}::jsonb
-    )
-  `;
-
-  clearProductRecommendationCandidateCache();
-
-	  return loadAdminProductRow(productId);
-	}
-	
 export async function updateProductBrandCountries(input: Readonly<{
   actor?: string | null;
   brandId: string;

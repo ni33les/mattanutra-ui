@@ -31,7 +31,6 @@ export const V2_SHORTLIST_LIMIT = 32;
 export const V2_PER_NEED_SHORTLIST = 4;
 export const V2_TOP_OVERALL_SHORTLIST = 16;
 export const V2_TOP_BROAD_SHORTLIST = 8;
-export const V2_TOP_AFFILIATE_SHORTLIST = 8;
 export const V2_MAX_SERVING_MULTIPLIER = 3;
 export const V2_SCORE_EPSILON = 0.000001;
 export const V2_STACK_DOSE_LIMIT_SLACK_MULTIPLIER = 1;

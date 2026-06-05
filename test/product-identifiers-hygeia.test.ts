@@ -24,6 +24,11 @@ describe("product identifiers and Hygeia files", () => {
         source: "admin",
         type: "ean13",
         value: "not-a-barcode"
+      },
+      {
+        source: "admin",
+        type: "internal_sku",
+        value: "MN-OLD"
       }
     ]), [
       {
@@ -61,14 +66,15 @@ describe("product identifiers and Hygeia files", () => {
   it("parses Hygeia CSV rows without retaining unmatched raw row payloads", () => {
     const rows = parseHygeiaCsv(
       [
-        "MattaNutra Product ID,EAN13 Barcode,MattaNutra SKU,Thai Product Title,Stock Quantity,Wholesale Price,Retail Price",
-        "00000000-0000-0000-0000-000000000001,4006381333931,MN-ABC,\"สินค้า, ทดสอบ\",7,120.50,180"
+        "Internal SKU,Manufacturer SKU,EAN13 Barcode,Thai Product Title,Stock Quantity,Wholesale Price,Retail Price",
+        "00000000-0000-0000-0000-000000000001,MN-ABC,4006381333931,\"สินค้า, ทดสอบ\",7,120.50,180"
       ].join("\n")
     );
 
     assert.equal(rows.length, 1);
     assert.equal(rows[0]?.rowNumber, 2);
-    assert.equal(rows[0]?.columns.mattanutra_product_id, "00000000-0000-0000-0000-000000000001");
+    assert.equal(rows[0]?.columns.internal_sku, "00000000-0000-0000-0000-000000000001");
+    assert.equal(rows[0]?.columns.manufacturer_sku, "MN-ABC");
     assert.equal(rows[0]?.columns.ean13_barcode, "4006381333931");
     assert.equal(rows[0]?.columns.thai_product_title, "สินค้า, ทดสอบ");
   });
@@ -82,7 +88,11 @@ describe("product identifiers and Hygeia files", () => {
       assert.match(source, /product_identifier_candidates/);
       assert.match(source, /retail_product_cost_observations/);
       assert.match(source, /product_identifiers_active_type_value_key/);
+      assert.doesNotMatch(source, /identifier_type in \([^)]*internal_sku/);
+      assert.doesNotMatch(source, /ARRAY\[[^\]]*internal_sku[^\]]*\]/);
     }
+
+    assert.match(apply, /where identifier_type = 'internal_sku'/);
   });
 
   it("keeps Hygeia import as preview-first and matched-row only", async () => {
@@ -93,6 +103,14 @@ describe("product identifiers and Hygeia files", () => {
     assert.match(route, /previewHygeiaImport/);
     assert.match(service, /unmatchedCount \+= 1/);
     assert.match(service, /matchedRows\.push/);
+    assert.match(service, /\"Internal SKU\"/);
+    assert.match(service, /\"Manufacturer SKU\"/);
+    assert.doesNotMatch(service, /\"MattaNutra Product ID\"/);
+    assert.match(service, /row\.product_id,\s*row\.manufacturer_sku,\s*row\.ean13/);
+    assert.match(service, /buildRetailHygeiaStockExportCsv/);
+    assert.match(service, /public\.retail_sellable_products/);
+    assert.doesNotMatch(service, /type: "internal_sku"/);
+    assert.doesNotMatch(service, /internalSku/);
     assert.doesNotMatch(service, /unmatchedRows/);
   });
 });

@@ -51,12 +51,6 @@ export type ProductCandidateFact = Readonly<{
 }>;
 
 export type ProductCandidate = Readonly<{
-  activeOfferId?: string | null;
-  activeAffiliateUrl?: string | null;
-  activeAffiliateCommissionRate?: number | null;
-  activeAffiliatePriority?: number | null;
-  activeAffiliateType?: "affiliate" | "direct" | null;
-  affiliateStatus: "active" | "flagged_stale" | "none";
   automatedSafetyPassed: boolean;
   availabilityStatus: ProductAvailabilityStatus;
   availableCountryCodes?: readonly string[];
@@ -135,8 +129,6 @@ export type ProductRecommendationDiagnostics = Readonly<{
 }>;
 
 export type ProductRecommendationSelection = Readonly<{
-  affiliate: boolean;
-  offerId: string | null;
   coveredNeeds: ProductRecommendationNeed[];
   availabilityStatus?: "available_now" | "backorder" | "unavailable" | null;
   etaDate?: string | null;

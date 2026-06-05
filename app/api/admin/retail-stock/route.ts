@@ -282,6 +282,35 @@ const retailStockRouteHandlers: Partial<Record<RetailCommandId, RetailStockRoute
   }
 };
 
+export async function GET(request: NextRequest) {
+  const context = await resolveAdminSession({
+    csrfToken: request.cookies.get(adminCsrfCookieName)?.value,
+    sessionCookie: request.cookies.get(adminSessionCookieName)?.value
+  });
+
+  if (!context || !hasAdminPermission(context, "stock.read")) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const locale = localeValue(new URL(request.url).searchParams.get("locale"));
+
+  try {
+    return NextResponse.json({
+      data: await getAdminRetailStockData(context, locale)
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error && error.message
+            ? error.message
+            : "Unable to load retail stock"
+      },
+      { status: 400 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!requestOriginAllowed(request)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

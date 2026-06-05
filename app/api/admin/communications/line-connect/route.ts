@@ -15,12 +15,11 @@ function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function canAccessOrganisation(
+function canAccessEffectiveOrganisation(
   context: NonNullable<Awaited<ReturnType<typeof resolveAdminSession>>>,
-  organisationId: string
+  requestedOrganisationId: string
 ) {
-  return context.effectiveOrganisation.type === "platform" ||
-    context.effectiveOrganisation.id === organisationId;
+  return requestedOrganisationId === context.effectiveOrganisation.id;
 }
 
 export async function POST(request: NextRequest) {
@@ -41,7 +40,7 @@ export async function POST(request: NextRequest) {
   const organisationId = text(body.organisationId) || context.effectiveOrganisation.id;
   const displayName = text(body.displayName);
 
-  if (!canAccessOrganisation(context, organisationId)) {
+  if (!canAccessEffectiveOrganisation(context, organisationId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

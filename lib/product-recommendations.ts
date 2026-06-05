@@ -67,7 +67,6 @@ import {
   V2_SHORTLIST_LIMIT,
   V2_STACK_DOSE_LIMIT_SLACK_MULTIPLIER,
   V2_TINY_PARTIAL_PRODUCT_COVERAGE_CEILING,
-  V2_TOP_AFFILIATE_SHORTLIST,
   V2_TOP_BROAD_SHORTLIST,
   V2_TOP_OVERALL_SHORTLIST,
   budgetAmountFromContext,
@@ -663,13 +662,6 @@ function compareProductEntries(
     return coverageDelta;
   }
 
-  const firstAffiliate = first.product.activeAffiliateUrl ? 1 : 0;
-  const secondAffiliate = second.product.activeAffiliateUrl ? 1 : 0;
-
-  if (firstAffiliate !== secondAffiliate) {
-    return secondAffiliate - firstAffiliate;
-  }
-
   const priceDelta =
     (first.product.priceAmount ?? Number.MAX_SAFE_INTEGER) -
     (second.product.priceAmount ?? Number.MAX_SAFE_INTEGER);
@@ -773,12 +765,6 @@ function shortlistEntries(
     .sort(compareProductEntries)
     .slice(0, V2_TOP_BROAD_SHORTLIST)
     .forEach((entry, index) => addEntry(entry, 200 + index));
-
-  [...entries]
-    .filter((entry) => Boolean(entry.product.activeAffiliateUrl))
-    .sort(compareProductEntries)
-    .slice(0, V2_TOP_AFFILIATE_SHORTLIST)
-    .forEach((entry, index) => addEntry(entry, 300 + index));
 
   return [...selected.values()]
     .sort((first, second) =>
@@ -1005,13 +991,6 @@ function compareStackScores(first: V2StackScore, second: V2StackScore) {
 
   if (Math.abs(scoreDelta) > V2_DIVERSITY_SCORE_EPSILON) {
     return scoreDelta;
-  }
-
-  const firstAffiliate = first.entries.some((entry) => entry.product.activeAffiliateUrl) ? 1 : 0;
-  const secondAffiliate = second.entries.some((entry) => entry.product.activeAffiliateUrl) ? 1 : 0;
-
-  if (firstAffiliate !== secondAffiliate) {
-    return secondAffiliate - firstAffiliate;
   }
 
   if (first.entries.length !== second.entries.length) {
@@ -1289,13 +1268,6 @@ function compareBeamStates(first: V2BeamState, second: V2BeamState) {
 
   if (Math.abs(scoreDelta) > V2_DIVERSITY_SCORE_EPSILON) {
     return scoreDelta;
-  }
-
-  const firstAffiliate = first.entries.some((entry) => entry.product.activeAffiliateUrl) ? 1 : 0;
-  const secondAffiliate = second.entries.some((entry) => entry.product.activeAffiliateUrl) ? 1 : 0;
-
-  if (firstAffiliate !== secondAffiliate) {
-    return secondAffiliate - firstAffiliate;
   }
 
   if (first.entries.length !== second.entries.length) {
@@ -2630,10 +2602,8 @@ function recommendationsFromV2Stack(
       );
 
       return {
-        affiliate: Boolean(entry.product.activeAffiliateUrl),
         availabilityStatus: entry.product.retailAvailabilityStatus ?? null,
         etaDate: entry.product.retailEtaDate ?? null,
-        offerId: entry.product.activeOfferId ?? null,
         coveredNeeds,
         priceSource: entry.product.priceSource ?? null,
         product: entry.product,
@@ -2651,7 +2621,7 @@ function recommendationsFromV2Stack(
         stackContributionPercent: visibleCoveragePercent(contribution, contribution > 0),
         unitPriceAmount: entry.product.unitPriceAmount ?? entry.product.priceAmount ?? null,
         unknownAtRecommendation: false,
-        url: entry.product.activeAffiliateUrl || entry.product.productUrl,
+        url: entry.product.productUrl,
         why: whyProductMatches(
           entry.product,
           coveredNeeds,

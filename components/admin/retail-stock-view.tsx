@@ -116,14 +116,20 @@ const customerOrderStatusFilters: RetailCustomerOrderStatus[] = [
   "placed",
   "awaiting_stock",
   "allocated",
-  "picking",
   "packed",
+  "shipped"
+];
+
+const customerOrderAllExcludedStatuses = new Set<RetailCustomerOrderStatus>([
   "shipped",
   "delivered",
   "cancelled",
-  "returned",
-  "draft"
-];
+  "returned"
+]);
+
+const customerOrderVisibleStatusSet = new Set<RetailCustomerOrderStatus>(
+  customerOrderStatusFilters
+);
 
 type RetailStockAvailabilityStatus =
   | "in_stock"
@@ -314,6 +320,38 @@ function orgProductKey(organisationId: string, productId: string | null | undefi
   return `${organisationId}:${productId ?? "unknown"}`;
 }
 
+function activeShoppingListCoverageUnits(
+  line: AdminRetailStockData["shoppingListLines"][number]
+) {
+  const assignedDemand = Math.max(
+    line.assignedQuantity,
+    line.requiredQuantity,
+    line.unorderedNeedQuantity
+  );
+
+  if (assignedDemand < 1) {
+    return Math.max(0, line.actualQuantity - line.stockedQuantity);
+  }
+
+  if (line.actualQuantity < assignedDemand) {
+    return Math.max(0, line.actualQuantity - line.stockedQuantity);
+  }
+
+  return assignedDemand;
+}
+
+function activeShoppingListReturnedDemandUnits(
+  line: AdminRetailStockData["shoppingListLines"][number]
+) {
+  const assignedDemand = Math.max(
+    line.assignedQuantity,
+    line.requiredQuantity,
+    line.unorderedNeedQuantity
+  );
+
+  return Math.max(0, assignedDemand - line.actualQuantity);
+}
+
 function customerOrderRetailValue(order: AdminRetailCustomerOrder) {
   return order.pricingSnapshot?.totalAmount ?? order.totalRetailAmount;
 }
@@ -323,7 +361,34 @@ function customerOrderStatusFilterLabel(status: RetailCustomerOrderStatus) {
     return "Ready to pack";
   }
 
+  if (status === "packed") {
+    return "Ready to ship";
+  }
+
   return readableToken(status);
+}
+
+function customerOrderStatusMetricKey(status: RetailCustomerOrderStatus) {
+  if (status === "picking") {
+    return "packed";
+  }
+
+  return customerOrderVisibleStatusSet.has(status) ? status : null;
+}
+
+function customerOrderIncludedInAllMetric(order: AdminRetailCustomerOrder) {
+  return !customerOrderAllExcludedStatuses.has(order.status);
+}
+
+function customerOrderMatchesFilter(
+  order: AdminRetailCustomerOrder,
+  filter: CustomerOrderFilter
+) {
+  if (filter === "all") {
+    return customerOrderIncludedInAllMetric(order);
+  }
+
+  return customerOrderStatusMetricKey(order.status) === filter;
 }
 
 function customerOrderStatusDisplay(order: AdminRetailCustomerOrder) {
@@ -613,6 +678,18 @@ function retailOrderDocumentTitle(
   return titles[kind];
 }
 
+function orderLineIdentifierParts(line: AdminRetailCustomerOrderLine) {
+  return [
+    `SKU: ${line.productId}`,
+    line.manufacturerSku ? `Manufacturer SKU: ${line.manufacturerSku}` : null,
+    line.ean13 ? `EAN-13: ${line.ean13}` : null
+  ].filter((value): value is string => Boolean(value));
+}
+
+function orderLineAwaitingStockUnits(line: AdminRetailCustomerOrderLine) {
+  return Math.max(0, line.pipeline?.unorderedNeedUnits ?? 0);
+}
+
 function printRetailOrderDocument({
   kind,
   labels,
@@ -691,6 +768,7 @@ function printRetailOrderDocument({
       : "";
     const itemRows = lines
       .map((line) => {
+        const identifiers = orderLineIdentifierParts(line);
         const unitPrice =
           line.retailPriceAmount === null
             ? labels.stock.notSet
@@ -707,10 +785,15 @@ function printRetailOrderDocument({
 
         return `
           <tr>
-            <td>${escapeHtml(line.productTitle)}</td>
+            <td>
+              <div class="product-title">${escapeHtml(line.productTitle)}</div>
+              ${
+                identifiers.length
+                  ? `<div class="identifiers">${identifiers.map(escapeHtml).join(" · ")}</div>`
+                  : ""
+              }
+            </td>
             <td>${escapeHtml(line.quantityOrdered)}</td>
-            <td>${escapeHtml(line.quantityAllocated)}</td>
-            <td>${escapeHtml(line.quantityShipped)}</td>
             ${showPrices ? `<td>${escapeHtml(unitPrice)}</td><td>${escapeHtml(lineTotal)}</td>` : ""}
           </tr>
         `;
@@ -723,13 +806,11 @@ function printRetailOrderDocument({
           <tr>
             <th>${escapeHtml(labels.stock.product)}</th>
             <th>${escapeHtml(labels.stock.quantity)}</th>
-            <th>${escapeHtml(labels.stock.allocate)}</th>
-            <th>${escapeHtml(labels.stock.ship)}</th>
             ${priceHeadings}
           </tr>
         </thead>
         <tbody>
-          ${itemRows || `<tr><td colspan="${showPrices ? 6 : 4}">${escapeHtml(labels.stock.noItemsSelected)}</td></tr>`}
+          ${itemRows || `<tr><td colspan="${showPrices ? 4 : 2}">${escapeHtml(labels.stock.noItemsSelected)}</td></tr>`}
         </tbody>
       </table>
     `;
@@ -817,6 +898,8 @@ function printRetailOrderDocument({
           dt { color: #6b7280; font-weight: 700; }
           dd { margin: 0; }
           .address { line-height: 1.45; }
+          .identifiers { color: #6b7280; font-size: 11px; margin-top: 4px; }
+          .product-title { font-weight: 700; }
           .eyebrow, .generated, .muted { color: #6b7280; font-size: 12px; }
           .grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
           .panel { border: 1px solid #d1d5db; border-radius: 8px; margin-bottom: 12px; padding: 14px; }
@@ -1098,6 +1181,17 @@ export function AdminRetailStockView({
     selectedOrganisationId === "all"
       ? data.organisations[0]?.id ?? ""
       : selectedOrganisationId;
+  const hygeiaOrganisationId =
+    selectedOrganisationId !== "all"
+      ? selectedOrganisationId
+      : data.organisations.length === 1
+        ? data.organisations[0]?.id ?? ""
+        : "";
+  const hygeiaExportHref = hygeiaOrganisationId
+    ? `/api/admin/products/hygeia/export?scope=retail&organisationId=${encodeURIComponent(
+        hygeiaOrganisationId
+      )}&access_token=${encodeURIComponent(accessToken)}`
+    : "";
   const stockPriceCurrency =
     selectedOrganisationId === "all"
       ? Array.from(new Set(rows.map((row) => row.currency))).length === 1
@@ -1137,6 +1231,24 @@ export function AdminRetailStockView({
 
     return linesByOrderId;
   }, [data.customerOrderLines]);
+  const customerOrderAwaitingStockUnitsByOrderId = useMemo(() => {
+    const unitsByOrderId = new Map<string, number>();
+
+    for (const line of data.customerOrderLines) {
+      const awaitingStockUnits = orderLineAwaitingStockUnits(line);
+
+      if (awaitingStockUnits < 1) {
+        continue;
+      }
+
+      unitsByOrderId.set(
+        line.customerOrderId,
+        (unitsByOrderId.get(line.customerOrderId) ?? 0) + awaitingStockUnits
+      );
+    }
+
+    return unitsByOrderId;
+  }, [data.customerOrderLines]);
 
   const organisationCustomerOrders = useMemo(
     () =>
@@ -1152,9 +1264,7 @@ export function AdminRetailStockView({
     () =>
       organisationCustomerOrders
         .filter((order) =>
-          selectedCustomerOrderFilter === "all"
-            ? order.status !== "shipped"
-            : order.status === selectedCustomerOrderFilter
+          customerOrderMatchesFilter(order, selectedCustomerOrderFilter)
         )
         .filter((order) => {
           const orderLines = customerOrderLinesByOrderId.get(order.id) ?? [];
@@ -1259,7 +1369,11 @@ export function AdminRetailStockView({
     ) as Record<RetailCustomerOrderStatus, number>;
 
     for (const order of organisationCustomerOrders) {
-      summary[order.status] += 1;
+      const metricKey = customerOrderStatusMetricKey(order.status);
+
+      if (metricKey) {
+        summary[metricKey] += 1;
+      }
     }
 
     return summary;
@@ -1271,8 +1385,7 @@ export function AdminRetailStockView({
       label: labels.stock.all,
       series: [],
       value: formatNumber(
-        organisationCustomerOrders.filter((order) => order.status !== "shipped")
-          .length,
+        organisationCustomerOrders.filter(customerOrderIncludedInAllMetric).length,
         locale
       )
     },
@@ -1357,18 +1470,12 @@ export function AdminRetailStockView({
       }
 
       const key = orgProductKey(line.organisationId, line.productId);
-      const pendingShoppingListUnits = Math.max(
-        0,
-        line.actualQuantity - line.stockedQuantity
-      );
-      const returnedDemandUnits = Math.max(
-        0,
-        line.assignedQuantity - line.actualQuantity
-      );
+      const coveredByActiveListUnits = activeShoppingListCoverageUnits(line);
+      const returnedDemandUnits = activeShoppingListReturnedDemandUnits(line);
 
       assignedByOrgProduct.set(
         key,
-        (assignedByOrgProduct.get(key) ?? 0) + pendingShoppingListUnits
+        (assignedByOrgProduct.get(key) ?? 0) + coveredByActiveListUnits
       );
       returnedDemandByOrgProduct.set(
         key,
@@ -1421,7 +1528,9 @@ export function AdminRetailStockView({
     return [...groups.values()]
       .filter((item) => item.unassignedDemandUnits > 0)
       .sort(
-        (left, right) => right.unassignedDemandUnits - left.unassignedDemandUnits
+        (left, right) =>
+          right.unassignedDemandUnits - left.unassignedDemandUnits ||
+          right.unorderedNeedUnits - left.unorderedNeedUnits
       );
   }, [
     data.pipeline,
@@ -1432,7 +1541,8 @@ export function AdminRetailStockView({
     stockRowByOrgProduct
   ]);
   const reorderPurchaseItems = useMemo(
-    () => outstandingPurchaseItems,
+    () =>
+      outstandingPurchaseItems.filter((item) => item.unassignedDemandUnits > 0),
     [outstandingPurchaseItems]
   );
   const defaultOutstandingPurchaseKeys = useMemo(() => {
@@ -1449,14 +1559,35 @@ export function AdminRetailStockView({
       .filter((item) => item.organisationId === targetOrganisationId)
       .map((item) => orgProductKey(item.organisationId, item.productId));
   }, [reorderPurchaseItems, selectedOrganisationId]);
+  const defaultOutstandingPurchaseKeySignature =
+    defaultOutstandingPurchaseKeys.join("|");
+
+  useEffect(() => {
+    setSelectedOutstandingPurchaseKeys((current) => {
+      if (current === null) {
+        return current;
+      }
+
+      const defaultKeySet = new Set(defaultOutstandingPurchaseKeys);
+      const retained = current.filter((key) => defaultKeySet.has(key));
+
+      if (retained.length === 0 && defaultOutstandingPurchaseKeys.length > 0) {
+        return null;
+      }
+
+      return retained.length === current.length ? current : retained;
+    });
+  }, [defaultOutstandingPurchaseKeySignature]);
+
   const outstandingPurchaseSelectionKeys =
     selectedOutstandingPurchaseKeys ?? defaultOutstandingPurchaseKeys;
   const selectedOutstandingPurchaseItems = useMemo(
     () =>
-      reorderPurchaseItems.filter((item) =>
-        outstandingPurchaseSelectionKeys.includes(
-          orgProductKey(item.organisationId, item.productId)
-        )
+      reorderPurchaseItems.filter(
+        (item) =>
+          outstandingPurchaseSelectionKeys.includes(
+            orgProductKey(item.organisationId, item.productId)
+          )
       ),
     [reorderPurchaseItems, outstandingPurchaseSelectionKeys]
   );
@@ -1536,7 +1667,7 @@ export function AdminRetailStockView({
         currentStockQuantity: String(line.currentStockQuantity),
         ean13: line.ean13,
         id: line.id,
-        internalSku: line.internalSku,
+        manufacturerSku: line.manufacturerSku,
         productId: line.productId,
         productTitle: line.productTitle,
         requiredQuantity: String(line.requiredQuantity),
@@ -1649,11 +1780,75 @@ export function AdminRetailStockView({
     });
   }
 
+  async function refreshRetailStockData() {
+    const params = new URLSearchParams({ locale });
+    const response = await fetch(`/api/admin/retail-stock?${params.toString()}`, {
+      credentials: "same-origin",
+      headers: {
+        "cache-control": "no-store"
+      }
+    });
+    const result = (await response.json().catch(() => ({}))) as StockResponse;
+
+    if (!response.ok) {
+      throw new Error(result.error);
+    }
+
+    if (result.data) {
+      setData(result.data);
+    }
+  }
+
+  async function importRetailHygeiaFile(file: File | null) {
+    if (!file || !hygeiaOrganisationId) {
+      return;
+    }
+
+    setBusyId("hygeia-import");
+    setError("");
+
+    try {
+      const csvText = await file.text();
+      const response = await fetch("/api/admin/products/hygeia/import", {
+        body: JSON.stringify({
+          accessToken,
+          apply: true,
+          csvText,
+          importType: "stock",
+          organisationId: hygeiaOrganisationId
+        }),
+        credentials: "same-origin",
+        headers: {
+          "content-type": "application/json"
+        },
+        method: "POST"
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        message?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(result.message);
+      }
+
+      await refreshRetailStockData();
+    } catch (error) {
+      setError(actionErrorMessage(error, labels.stock.hygeiaImportError));
+    } finally {
+      setBusyId("");
+    }
+  }
+
 
   function toggleOutstandingPurchaseItem(item: {
     organisationId: string;
     productId: string;
+    unassignedDemandUnits: number;
   }) {
+    if (item.unassignedDemandUnits < 1) {
+      return;
+    }
+
     const key = orgProductKey(item.organisationId, item.productId);
 
     setSelectedOutstandingPurchaseKeys((current) =>
@@ -1678,7 +1873,7 @@ export function AdminRetailStockView({
       return;
     }
 
-    await runRetailAction(
+    const created = await runRetailAction(
       {
         action: "create_shopping_list",
         lines: selectedOutstandingPurchaseItems.map((item) => {
@@ -1702,6 +1897,10 @@ export function AdminRetailStockView({
       },
       `shopping-list:${organisationId}`
     );
+
+    if (created) {
+      setSelectedOutstandingPurchaseKeys(null);
+    }
   }
 
   async function saveShoppingListDraft(status: "active" | "closed" = "active") {
@@ -2329,14 +2528,55 @@ export function AdminRetailStockView({
 	              value={stockSearch}
 	            />
 	          </label>
-	          {data.canWrite ? (
-	            <AdminButton
-	              disabled={Boolean(busyId) || !defaultOrganisationId}
-	              onClick={openAddStockEditor}
-	            >
-	              {labels.stock.addProduct}
-	            </AdminButton>
-	          ) : null}
+	          <div className="flex flex-wrap justify-end gap-2">
+	            {hygeiaExportHref ? (
+	              <a
+	                className="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50"
+	                href={hygeiaExportHref}
+	              >
+	                {labels.stock.hygeiaExport}
+	              </a>
+	            ) : (
+	              <AdminButton disabled variant="secondary">
+	                {labels.stock.hygeiaExport}
+	              </AdminButton>
+	            )}
+	            {data.canWrite ? (
+	              <label
+	                className={classNames(
+	                  Boolean(busyId) || !hygeiaOrganisationId
+	                    ? "cursor-not-allowed opacity-60"
+	                    : "cursor-pointer hover:bg-emerald-50",
+	                  "inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200"
+	                )}
+	                title={
+	                  hygeiaOrganisationId
+	                    ? undefined
+	                    : labels.stock.hygeiaRetailerRequired
+	                }
+	              >
+	                {labels.stock.hygeiaImport}
+	                <input
+	                  accept=".csv,text/csv"
+	                  className="sr-only"
+	                  disabled={Boolean(busyId) || !hygeiaOrganisationId}
+	                  onChange={(event) => {
+	                    void importRetailHygeiaFile(event.target.files?.[0] ?? null);
+	                    event.target.value = "";
+	                  }}
+	                  type="file"
+	                />
+	              </label>
+	            ) : null}
+	            {data.canWrite ? (
+	              <AdminButton
+	                disabled={Boolean(busyId) || !defaultOrganisationId}
+	                onClick={openAddStockEditor}
+	              >
+	                {labels.stock.addProduct}
+	              </AdminButton>
+	            ) : null}
+	          </div>
 	        </div>
 	        <div className="mt-4 overflow-x-auto">
 	          <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -2642,9 +2882,9 @@ export function AdminRetailStockView({
                         className={classNames(
                           "relative rounded-md px-3 py-3 ring-1",
                           step.active
-                            ? "bg-[#F0FDF7] text-[#126B4F] ring-[#B7F2D8]"
+                            ? "bg-amber-50 text-amber-900 ring-amber-200"
                             : step.complete
-                              ? "bg-white text-gray-900 ring-gray-200"
+                              ? "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]"
                               : "bg-gray-50 text-gray-500 ring-gray-200"
                         )}
                         key={step.key}
@@ -2799,6 +3039,9 @@ export function AdminRetailStockView({
                           customerOrderBillingAddressLines.map((line) => (
                             <div key={line}>{line}</div>
                           ))
+                        ) : customerOrderDetail.deliveryDetails
+                            ?.billingSameAsShipping ? (
+                          null
                         ) : (
                           <div className="text-gray-500">
                             {labels.stock.notSet}
@@ -2898,6 +3141,8 @@ export function AdminRetailStockView({
                   <div className="space-y-2">
                     {customerOrderDetailLines.map((line) => {
                       const product = productOptionById.get(line.productId);
+                      const identifiers = orderLineIdentifierParts(line);
+                      const awaitingStockUnits = orderLineAwaitingStockUnits(line);
 
                       return (
                         <div
@@ -2913,7 +3158,19 @@ export function AdminRetailStockView({
                               <div className="truncate text-sm font-semibold text-gray-900">
                                 {line.productTitle}
                               </div>
+                              {identifiers.length > 0 ? (
+                                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-gray-500">
+                                  {identifiers.map((identifier) => (
+                                    <span key={identifier}>{identifier}</span>
+                                  ))}
+                                </div>
+                              ) : null}
                               <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                                {awaitingStockUnits > 0 ? (
+                                  <span className="inline-flex rounded-md bg-red-50 px-2 py-1 font-semibold text-red-700 ring-1 ring-red-100">
+                                    Awaiting stock · {awaitingStockUnits}
+                                  </span>
+                                ) : null}
                                 {line.availabilityStatus ? (
                                   <span className="inline-flex rounded-md bg-gray-100 px-2 py-1 font-semibold text-gray-700 ring-1 ring-gray-200">
                                     {readableToken(line.availabilityStatus)}
@@ -2931,7 +3188,7 @@ export function AdminRetailStockView({
                                 ) : null}
                               </div>
                             </div>
-                            <div className="grid shrink-0 grid-cols-2 gap-8 text-right sm:gap-10">
+                            <div className="grid shrink-0 grid-cols-3 gap-5 text-right sm:gap-8">
                               <div className="min-w-16">
                                 <div className="text-[11px] font-semibold uppercase text-gray-500">
                                   {labels.stock.quantity}
@@ -2942,13 +3199,28 @@ export function AdminRetailStockView({
                               </div>
                               <div className="min-w-20">
                                 <div className="text-[11px] font-semibold uppercase text-gray-500">
-                                  {customerOrderDetail.currency}
+                                  {labels.stock.retailPrice}
                                 </div>
-                                <div className="mt-1 text-3xl font-semibold leading-none text-gray-900">
-                                  {formatWholeAmount(
+                                <div className="mt-1 text-lg font-semibold leading-tight text-gray-900">
+                                  {formatPrice(
                                     locale,
+                                    customerOrderDetail.currency,
                                     line.retailPriceAmount
                                   ) ?? labels.stock.notSet}
+                                </div>
+                              </div>
+                              <div className="min-w-20">
+                                <div className="text-[11px] font-semibold uppercase text-gray-500">
+                                  {labels.stock.lineTotal}
+                                </div>
+                                <div className="mt-1 text-lg font-semibold leading-tight text-gray-900">
+                                  {line.retailPriceAmount === null
+                                    ? labels.stock.notSet
+                                    : (formatPrice(
+                                        locale,
+                                        customerOrderDetail.currency,
+                                        line.retailPriceAmount * line.quantityOrdered
+                                      ) ?? labels.stock.notSet)}
                                 </div>
                               </div>
                             </div>
@@ -3111,6 +3383,13 @@ export function AdminRetailStockView({
                       >
                           {customerOrderStatusDisplay(order)}
                       </span>
+                      {(customerOrderAwaitingStockUnitsByOrderId.get(order.id) ?? 0) >
+                      0 ? (
+                        <div className="mt-1 inline-flex rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-100">
+                          Awaiting stock ·{" "}
+                          {customerOrderAwaitingStockUnitsByOrderId.get(order.id)}
+                        </div>
+                      ) : null}
                       {order.nextExpectedAction ? (
                         <div className="mt-1 text-xs text-gray-500">
                           {labels.stock.nextAction}:{" "}
@@ -3230,7 +3509,7 @@ export function AdminRetailStockView({
                     {labels.stock.reorderBackorders}
                   </h3>
                   <p className="mt-1 text-xs text-gray-500">
-                    Unassigned order demand for the selected retailer.
+                    Products Dream needs to buy for awaiting-stock orders.
                   </p>
                 </div>
                 {data.canWrite ? (
@@ -3246,16 +3525,13 @@ export function AdminRetailStockView({
                 ) : null}
               </div>
               <div className="overflow-x-auto rounded-md ring-1 ring-gray-200">
-                <table className="min-w-[880px] w-full text-left text-sm">
+                <table className="min-w-[560px] w-full text-left text-sm">
                   <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
                       <th className="py-2 pl-3 pr-3">{labels.stock.selectProduct}</th>
                       <th className="py-2 pr-3">{labels.stock.product}</th>
                       <th className="py-2 pr-3">Brand</th>
-                      <th className="py-2 pr-3">Backorder demand</th>
-                      <th className="py-2 pr-3">{labels.stock.stockQuantity}</th>
-                      <th className="py-2 pr-3">Assigned to active lists</th>
-                      <th className="py-2 pr-3">Unassigned demand</th>
+                      <th className="py-2 pr-3">Amount to buy</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
@@ -3266,15 +3542,30 @@ export function AdminRetailStockView({
                       );
                       const selected =
                         outstandingPurchaseSelectionKeys.includes(itemKey);
+                      const canSelectItem =
+                        data.canWrite &&
+                        !busyId &&
+                        item.unassignedDemandUnits > 0;
 
                       return (
-                        <tr key={itemKey}>
+                        <tr
+                          className={classNames(
+                            canSelectItem
+                              ? "cursor-pointer hover:bg-[#F8FAFC]"
+                              : "bg-gray-50 text-gray-500"
+                          )}
+                          key={itemKey}
+                          onClick={() =>
+                            canSelectItem ? toggleOutstandingPurchaseItem(item) : undefined
+                          }
+                        >
                           <td className="py-2 pl-3 pr-3">
                             <input
                               aria-label={`${labels.stock.selectProduct}: ${item.productTitle}`}
                               checked={selected}
                               className="size-4 rounded border-gray-300 text-[#1FA77A] focus:ring-[#1FA77A]"
-                              disabled={Boolean(busyId) || !data.canWrite}
+                              disabled={!canSelectItem}
+                              onClick={(event) => event.stopPropagation()}
                               onChange={() => toggleOutstandingPurchaseItem(item)}
                               type="checkbox"
                             />
@@ -3295,9 +3586,6 @@ export function AdminRetailStockView({
                           <td className="py-2 pr-3 text-gray-600">
                             {item.brandName ?? "-"}
                           </td>
-                          <td className="py-2 pr-3">{item.unorderedNeedUnits}</td>
-                          <td className="py-2 pr-3">{item.currentStockQuantity}</td>
-                          <td className="py-2 pr-3">{item.assignedActiveUnits}</td>
                           <td className="py-2 pr-3 font-semibold text-gray-900">
                             {item.unassignedDemandUnits}
                           </td>
@@ -3308,7 +3596,7 @@ export function AdminRetailStockView({
                       <tr>
                         <td
                           className="px-3 py-8 text-center text-sm text-gray-500"
-                          colSpan={7}
+                          colSpan={4}
                         >
                           {labels.stock.empty}
                         </td>
@@ -3519,7 +3807,10 @@ export function AdminRetailStockView({
                         {labels.stock.quantity}
                       </th>
                       <th className="px-3 py-2 text-right">
-                        {shipmentEditor.order.currency}
+                        {labels.stock.retailPrice}
+                      </th>
+                      <th className="px-3 py-2 text-right">
+                        {labels.stock.lineTotal}
                       </th>
                     </tr>
                   </thead>
@@ -3538,6 +3829,15 @@ export function AdminRetailStockView({
                             : (formatPrice(
                                 locale,
                                 shipmentEditor.order.currency,
+                                line.retailPriceAmount
+                              ) ?? labels.stock.notSet)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold text-gray-900">
+                          {line.retailPriceAmount === null
+                            ? labels.stock.notSet
+                            : (formatPrice(
+                                locale,
+                                shipmentEditor.order.currency,
                                 line.retailPriceAmount * line.quantityOrdered
                               ) ?? labels.stock.notSet)}
                         </td>
@@ -3547,7 +3847,7 @@ export function AdminRetailStockView({
                       <tr>
                         <td
                           className="px-3 py-8 text-center text-sm text-gray-500"
-                          colSpan={3}
+                          colSpan={4}
                         >
                           {labels.stock.noItemsSelected}
                         </td>

@@ -4,9 +4,10 @@ import {
 } from "@/lib/admin-dashboard-data";
 import type { AdminSessionContext } from "@/lib/admin-access-types";
 import {
-  adminCommunicationEventKeys,
+  adminCommunicationEventKeysForScope,
   listOrganisationCommunicationChannels,
   listOrganisationNotificationPreferences,
+  type AdminCommunicationScope,
   type AdminCommunicationEventKey,
   type CommunicationChannel,
   type OrganisationNotificationPreference
@@ -70,6 +71,8 @@ export type AdminOrganisationCommunicationSettings = Readonly<{
   organisations: AdminCommunicationOrganisation[];
   preferences: OrganisationNotificationPreference[];
   selectedOrganisationId: string;
+  selectedOrganisationName: string;
+  scope: AdminCommunicationScope;
 }>;
 
 type CommunicationDbRow = Readonly<{
@@ -193,29 +196,21 @@ export async function getAdminOrganisationCommunicationSettings(
     return null;
   }
 
-  const platformScope = context.effectiveOrganisation.type === "platform";
-  const organisationRows = platformScope
-    ? await sql<Array<{ id: string; name: string; slug: string }>>`
-        select id::text, name, slug
-        from public.organisations
-        where organisation_type = 'tenant'
-          and status = 'active'
-        order by lower(name) asc
-      `
-    : [{
-        id: context.effectiveOrganisation.id,
-        name: context.effectiveOrganisation.name,
-        slug: context.effectiveOrganisation.slug
-      }];
-  const selected =
-    organisationRows.find((row) => row.id === selectedOrganisationId) ??
-    organisationRows.find((row) => row.id === context.effectiveOrganisation.id) ??
-    organisationRows[0] ??
-    null;
-
-  if (!selected) {
+  if (
+    selectedOrganisationId &&
+    selectedOrganisationId !== context.effectiveOrganisation.id
+  ) {
     return null;
   }
+
+  const scope: AdminCommunicationScope =
+    context.effectiveOrganisation.type === "platform" ? "platform" : "retail";
+  const selected = {
+    id: context.effectiveOrganisation.id,
+    name: context.effectiveOrganisation.name,
+    slug: context.effectiveOrganisation.slug
+  };
+  const organisationRows = [selected];
 
   const [channels, preferences] = await Promise.all([
     listOrganisationCommunicationChannels({
@@ -238,10 +233,12 @@ export async function getAdminOrganisationCommunicationSettings(
         context.effectiveMembership.role === "retail_agent"
       ),
     channels,
-    eventKeys: adminCommunicationEventKeys.filter((key) => key !== "admin_test_message"),
+    eventKeys: adminCommunicationEventKeysForScope(scope),
     organisations: organisationRows,
     preferences,
-    selectedOrganisationId: selected.id
+    selectedOrganisationId: selected.id,
+    selectedOrganisationName: selected.name,
+    scope
   };
 }
 
@@ -256,17 +253,21 @@ export async function getAdminCommunicationsData(
     return emptyCommunicationsData();
   }
 
+  if (!context) {
+    return {
+      ...emptyCommunicationsData(),
+      databaseAvailable: true,
+      generatedAt: new Date().toISOString()
+    };
+  }
+
   try {
     const start = adminDashboardRangeStart(range);
-    const scopedOrganisationId =
-      context?.effectiveOrganisation.type === "tenant"
-        ? context.effectiveOrganisation.id
-        : null;
+    const scopedOrganisationId = context.effectiveOrganisation.id;
     const whereFilter = sql`
       where (${start ?? null}::timestamptz is null or communication_messages.created_at >= ${start ?? null})
         and (
-          ${scopedOrganisationId}::uuid is null
-          or exists (
+          exists (
             select 1
             from public.organisation_communication_identities
             where organisation_communication_identities.identity_id = communication_messages.identity_id

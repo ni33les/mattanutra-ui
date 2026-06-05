@@ -30,7 +30,6 @@ export const productBusinessStates = [
 
 export type ProductBusinessState = (typeof productBusinessStates)[number];
 export type ProductMetricFilter =
-  | "productsAffiliates"
   | "productsApproved"
   | "productsIgnored"
   | "productsMissingFacts"
@@ -76,7 +75,6 @@ export function productBusinessStateForMetric(
 
 export const productViewLabels = {
   en: {
-    activeAffiliates: "Active affiliates",
     allStates: "All states",
     approved: "Approved",
     both: "Both",
@@ -99,6 +97,8 @@ export const productViewLabels = {
     translationStatus: "Translation status",
     noParsedFacts: "No parsed label facts yet.",
     averageClientFit: "avg client fit",
+    backToProducts: "Back to products",
+    backorderPolicy: "Backorder",
     add: "Add",
     addCountry: "Add country",
     addFact: "Add fact",
@@ -113,7 +113,9 @@ export const productViewLabels = {
     confidenceHigh: "High",
     confidenceLow: "Low",
     confidenceModerate: "Moderate",
+    country: "Country",
     correctFactsWithAi: "Correct facts with AI",
+    currency: "Currency",
     description: "Description",
     fdaApprovalNumber: "FDA approval number",
     ean13: "EAN-13 barcode",
@@ -127,18 +129,16 @@ export const productViewLabels = {
       "This draft has an open review task. Use these actions to finish the review and update the catalogue.",
     increaseLimit: "Increase limit",
     ingredient: "Ingredient",
-    internalSku: "Internal SKU",
+    mattaNutraSku: "MattaNutra SKU",
     imageUrl: "Image URL",
     manufacturerCountries: "Manufacturer countries",
     manufacturerSku: "Manufacturer SKU",
     markDuplicate: "Mark duplicate",
     nearMisses: "Near misses",
     translations: "Translations",
-    noOffers:
-      "No offers yet. The product can still be recommended if it is the best match.",
-    offerUrl: "Offer URL",
-    offers: "Offers",
+    noShopAvailability: "No retail shop currently sells this product.",
     parsedFacts: "Parsed facts",
+    priceUpdated: "Updated",
     productCountries: "Product countries",
     productName: "Product name",
     productIdentifiers: "Product identifiers",
@@ -150,6 +150,8 @@ export const productViewLabels = {
     rejected: "Rejected",
     remove: "Remove",
     reviewerNote: "Reviewer note",
+    retailPrice: "Retail price",
+    rrp: "RRP",
     save: "Save",
     saving: "Saving",
     source: "Source",
@@ -158,6 +160,8 @@ export const productViewLabels = {
     staleValidationHint:
       "Saved validation cache differs from current facts and limits.",
     sourcingIdentifiers: "Sourcing...",
+    shopAvailability: "Shop availability",
+    stock: "Stock",
     title: "Title",
     unit: "Unit",
     useCandidate: "Use",
@@ -165,7 +169,6 @@ export const productViewLabels = {
     updateError: "Unable to update product review",
   },
   th: {
-    activeAffiliates: "Affiliate ที่ใช้งาน",
     allStates: "ทุกสถานะ",
     approved: "อนุมัติแล้ว",
     both: "ทั้งหมด",
@@ -188,6 +191,8 @@ export const productViewLabels = {
     translationStatus: "สถานะคำแปล",
     noParsedFacts: "ยังไม่มีข้อมูลฉลากที่อ่านได้",
     averageClientFit: "ความเหมาะสมเฉลี่ย",
+    backToProducts: "กลับไปที่สินค้า",
+    backorderPolicy: "สั่งย้อนหลัง",
     add: "เพิ่ม",
     addCountry: "เพิ่มประเทศ",
     addFact: "เพิ่มข้อมูล",
@@ -202,7 +207,9 @@ export const productViewLabels = {
     confidenceHigh: "สูง",
     confidenceLow: "ต่ำ",
     confidenceModerate: "ปานกลาง",
+    country: "ประเทศ",
     correctFactsWithAi: "แก้ข้อมูลด้วย AI",
+    currency: "สกุลเงิน",
     description: "คำอธิบาย",
     fdaApprovalNumber: "เลข อย.",
     ean13: "บาร์โค้ด EAN-13",
@@ -216,18 +223,16 @@ export const productViewLabels = {
       "ร่างนี้มีงานรีวิวที่เปิดอยู่ ใช้ปุ่มเหล่านี้เพื่อจบการรีวิวและอัปเดตแคตตาล็อก",
     increaseLimit: "เพิ่มขีดจำกัด",
     ingredient: "ส่วนผสม",
-    internalSku: "รหัส SKU ภายใน",
+    mattaNutraSku: "MattaNutra SKU",
     imageUrl: "URL รูปภาพ",
     manufacturerCountries: "ประเทศผู้ผลิต",
     manufacturerSku: "SKU ผู้ผลิต",
     markDuplicate: "ทำเครื่องหมายว่าซ้ำ",
     nearMisses: "เกือบถูกเลือก",
     translations: "คำแปล",
-    noOffers:
-      "ยังไม่มีข้อเสนอ สินค้านี้ยังแนะนำได้ถ้าเป็นตัวเลือกที่เหมาะที่สุด",
-    offerUrl: "URL ข้อเสนอ",
-    offers: "ข้อเสนอ",
+    noShopAvailability: "ยังไม่มีร้านค้าปลีกขายสินค้านี้",
     parsedFacts: "ข้อมูลที่อ่านจากฉลาก",
+    priceUpdated: "อัปเดต",
     productCountries: "ประเทศที่ขายสินค้า",
     productName: "ชื่อสินค้า",
     productIdentifiers: "รหัสสินค้า",
@@ -239,6 +244,8 @@ export const productViewLabels = {
     rejected: "ไม่ผ่าน",
     remove: "ลบ",
     reviewerNote: "หมายเหตุผู้รีวิว",
+    retailPrice: "ราคาขายปลีก",
+    rrp: "RRP",
     save: "บันทึก",
     saving: "กำลังบันทึก",
     source: "แหล่งข้อมูล",
@@ -247,6 +254,8 @@ export const productViewLabels = {
     staleValidationHint:
       "แคชการตรวจสอบที่บันทึกไว้ต่างจากข้อมูลและขีดจำกัดปัจจุบัน",
     sourcingIdentifiers: "กำลังดึง...",
+    shopAvailability: "สถานะร้านค้า",
+    stock: "สต็อก",
     title: "ชื่อ",
     unit: "หน่วย",
     useCandidate: "ใช้",
@@ -254,7 +263,6 @@ export const productViewLabels = {
     updateError: "ไม่สามารถอัปเดตรีวิวสินค้าได้",
   },
   "zh-CN": {
-    activeAffiliates: "活跃联盟",
     allStates: "所有状态",
     approved: "已批准",
     both: "全部",
@@ -277,6 +285,8 @@ export const productViewLabels = {
     translationStatus: "翻译状态",
     noParsedFacts: "尚无已解析标签资料。",
     averageClientFit: "平均客户匹配度",
+    backToProducts: "返回产品列表",
+    backorderPolicy: "缺货预订",
     add: "添加",
     addCountry: "添加国家",
     addFact: "添加资料",
@@ -291,7 +301,9 @@ export const productViewLabels = {
     confidenceHigh: "高",
     confidenceLow: "低",
     confidenceModerate: "中",
+    country: "国家",
     correctFactsWithAi: "使用 AI 修正资料",
+    currency: "货币",
     description: "描述",
     fdaApprovalNumber: "FDA 批准编号",
     ean13: "EAN-13 条码",
@@ -305,17 +317,16 @@ export const productViewLabels = {
       "此草稿有待处理审核任务。使用这些操作完成审核并更新目录。",
     increaseLimit: "提高上限",
     ingredient: "成分",
-    internalSku: "内部 SKU",
+    mattaNutraSku: "MattaNutra SKU",
     imageUrl: "图片 URL",
     manufacturerCountries: "制造商国家",
     manufacturerSku: "制造商 SKU",
     markDuplicate: "标记为重复",
     nearMisses: "接近入选",
     translations: "翻译",
-    noOffers: "暂无报价。如果这是最佳匹配，该产品仍可被推荐。",
-    offerUrl: "报价 URL",
-    offers: "报价",
+    noShopAvailability: "暂无零售店销售此产品。",
     parsedFacts: "已解析资料",
+    priceUpdated: "已更新",
     productCountries: "产品销售国家",
     productName: "产品名称",
     productIdentifiers: "产品标识",
@@ -327,6 +338,8 @@ export const productViewLabels = {
     rejected: "已排除",
     remove: "移除",
     reviewerNote: "审核备注",
+    retailPrice: "零售价",
+    rrp: "RRP",
     save: "保存",
     saving: "保存中",
     source: "来源",
@@ -334,6 +347,8 @@ export const productViewLabels = {
     staleValidation: "验证已过期",
     staleValidationHint: "已保存的验证缓存与当前资料和限制不同。",
     sourcingIdentifiers: "获取中...",
+    shopAvailability: "门店可售状态",
+    stock: "库存",
     title: "标题",
     unit: "单位",
     useCandidate: "使用",
@@ -472,10 +487,6 @@ export function productMatchesMetricFilter(
     return row.validationLabel === "Missing Image";
   }
 
-  if (metric === "productsAffiliates") {
-    return row.affiliateStatus === "active";
-  }
-
   return true;
 }
 
@@ -493,7 +504,6 @@ type ProductManufacturerStat = {
 };
 
 type ProductSummaryCounts = {
-  activeAffiliate: number;
   approved: number;
   dirtyData: number;
   ignored: number;
@@ -567,7 +577,6 @@ export function productSummaryCounts(
       const state = productBusinessState(row);
 
       counts.total += 1;
-      counts.activeAffiliate += row.affiliateStatus === "active" ? 1 : 0;
       counts.dirtyData += row.validationLabel === "Dirty Data" ? 1 : 0;
       counts.missingFacts += row.validationLabel === "Missing Facts" ? 1 : 0;
       counts.missingImage += row.validationLabel === "Missing Image" ? 1 : 0;
@@ -578,7 +587,6 @@ export function productSummaryCounts(
       return counts;
     },
     {
-      activeAffiliate: 0,
       approved: 0,
       dirtyData: 0,
       ignored: 0,
@@ -643,13 +651,6 @@ export function productMetricCards({
       label: viewLabels.missingImages,
       locale,
       value: summary.missingImage,
-    }),
-    safetyMetric({
-      color: businessMetricColors.active,
-      id: "productsAffiliates",
-      label: viewLabels.activeAffiliates,
-      locale,
-      value: summary.activeAffiliate,
     }),
     ...productManufacturerStats(rows).map((manufacturer) =>
       safetyMetric({

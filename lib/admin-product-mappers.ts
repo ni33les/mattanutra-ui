@@ -3,7 +3,6 @@ import type {
   AdminProductTranslation,
   AdminProductTranslationStatus,
   AdminProductRow,
-  AdminProductOffer,
   ProductValidationCacheStatus
 } from "./admin-product-types.ts";
 import type { ProductDbRow, FactDbPayload } from "./admin-product-types.ts";
@@ -21,7 +20,6 @@ import {
 import {
   normalizeCurrencyCode,
   normalizeProductCountryCode,
-  normalizeProductCountryPricingStatus,
   type ProductCountryPricing
 } from "@/lib/product-countries";
 import {
@@ -349,40 +347,29 @@ export function rowFromDb(
     row.status === "approved" && validation.status !== "pass"
       ? "pending_review"
       : row.status;
-  const offers = arrayPayload(row.offers).map((item) => {
+  const shopAvailability = arrayPayload(row.shop_availability).map((item) => {
     const record = item && typeof item === "object"
       ? item as Record<string, unknown>
       : {};
+    const backorderPolicy: "allow" | "deny" =
+      record.backorderPolicy === "deny" ? "deny" : "allow";
 
     return {
-      availabilityStatus:
-        record.availabilityStatus === "in_stock" ||
-        record.availabilityStatus === "out_of_stock" ||
-        record.availabilityStatus === "unavailable"
-          ? record.availabilityStatus
-          : "unknown",
-      commissionRate: numberOrNull(record.commissionRate),
-      currency: typeof record.currency === "string" ? record.currency : "THB",
-      id: typeof record.id === "string" ? record.id : randomUUID(),
-      linkType: record.linkType === "direct" ? "direct" : "affiliate",
-      network: typeof record.network === "string" ? record.network : null,
-      platform: typeof record.platform === "string" ? record.platform : null,
-      priceAmount: numberOrNull(record.priceAmount),
-      priority: numberOrNull(record.priority) ?? 0,
-      status:
-        record.status === "flagged_stale" || record.status === "inactive"
-          ? record.status
-          : "active",
-      url: typeof record.url === "string" ? record.url : ""
-    } satisfies AdminProductOffer;
-  });
-  const activeAffiliateStatus =
-    offers.some((offer) => offer.status === "active" && offer.linkType === "affiliate")
-      ? "active"
-      : "none";
-  const activeOfferPriceAmount = numberOrNull(row.active_offer_price_amount);
-  const activeOfferCurrency = row.active_offer_currency || "THB";
-  const activeOfferAvailability = row.active_offer_availability_status ?? "unknown";
+      backorderPolicy,
+      currency: normalizeCurrencyCode(record.currency, row.currency || "THB"),
+      leadTimeDays: numberOrNull(record.leadTimeDays),
+      organisationId: typeof record.organisationId === "string"
+        ? record.organisationId
+        : "",
+      organisationName: typeof record.organisationName === "string"
+        ? record.organisationName
+        : "Retail shop",
+      retailPriceAmount: numberOrNull(record.retailPriceAmount),
+      status: typeof record.status === "string" ? record.status : "active",
+      stockQuantity: Math.max(0, Math.round(numberOrNull(record.stockQuantity) ?? 0)),
+      wholesalePriceAmount: numberOrNull(record.wholesalePriceAmount)
+    };
+  }).filter((item) => item.organisationId);
   const countryPricing = arrayPayload(row.country_pricing)
     .map((item): ProductCountryPricing | null => {
       const record = item && typeof item === "object"
@@ -396,10 +383,6 @@ export function rowFromDb(
             countryCode,
             currency: normalizeCurrencyCode(record.currency, row.currency || "THB"),
             priceUpdatedAt: isoOrNull(record.priceUpdatedAt),
-            pricingStatus: normalizeProductCountryPricingStatus(
-              record.pricingStatus,
-              rrpPriceAmount
-            ),
             rrpPriceAmount
           }
         : null;
@@ -407,9 +390,8 @@ export function rowFromDb(
     .filter((item): item is ProductCountryPricing => Boolean(item));
 
   return {
-    affiliateStatus: activeAffiliateStatus,
     aiCorrectionNotes: aiCorrectionNotesFromSnapshot(row.source_snapshot),
-    availabilityStatus: activeOfferAvailability,
+    availabilityStatus: row.availability_status ?? "unknown",
     availableCountryCodes: productCountryCodesFromDb(
       row.available_country_codes,
       [row.region]
@@ -418,7 +400,7 @@ export function rowFromDb(
     brandName: row.brand_name,
     brandStatus: row.brand_status,
     category: row.category,
-    currency: activeOfferCurrency,
+    currency: row.currency || "THB",
     description: row.description,
     descriptionEn: row.description_en,
     descriptionTh: row.description_th,
@@ -460,9 +442,8 @@ export function rowFromDb(
       [row.region]
     ),
     countryPricing,
-    offers,
     platform: row.platform,
-    priceAmount: activeOfferPriceAmount,
+    priceAmount: numberOrNull(row.price_amount),
     productImportDuplicateProductIds: row.import_duplicate_product_ids ?? [],
     productImportId: row.import_id,
     productKind: row.product_kind ?? "supplement",
@@ -479,6 +460,7 @@ export function rowFromDb(
     },
     ...(decisionStats ? { decisionStats } : {}),
     region: row.region,
+    shopAvailability,
     sourceEvidence: {
       importId: row.import_id,
       importReviewTaskId: row.import_review_task_id,

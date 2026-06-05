@@ -49,6 +49,14 @@ try {
       ),
       constraint organisation_notification_preferences_event_check check (
         event_key in (
+          'platform_revenue_received',
+          'platform_checkout_failed',
+          'platform_payment_failed',
+          'platform_payout_failed',
+          'platform_worker_unavailable',
+          'platform_task_stuck',
+          'platform_communication_failed',
+          'platform_technical_alert',
           'retail_order_created',
           'retail_order_awaiting_stock',
           'retail_order_ready_to_pack',
@@ -63,6 +71,35 @@ try {
         preference_rank >= 0
       )
     )
+  `;
+
+  await sql`
+    alter table public.organisation_notification_preferences
+      drop constraint if exists organisation_notification_preferences_event_check
+  `;
+
+  await sql`
+    alter table public.organisation_notification_preferences
+      add constraint organisation_notification_preferences_event_check check (
+        event_key in (
+          'platform_revenue_received',
+          'platform_checkout_failed',
+          'platform_payment_failed',
+          'platform_payout_failed',
+          'platform_worker_unavailable',
+          'platform_task_stuck',
+          'platform_communication_failed',
+          'platform_technical_alert',
+          'retail_order_created',
+          'retail_order_awaiting_stock',
+          'retail_order_ready_to_pack',
+          'retail_order_ready_to_ship',
+          'retail_order_cancelled',
+          'retail_order_returned',
+          'retail_order_shipped',
+          'retail_order_delivered'
+        )
+      )
   `;
 
   await sql`

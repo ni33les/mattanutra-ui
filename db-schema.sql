@@ -70,7 +70,6 @@ drop table if exists
   public.plan_guidance_adjustments,
   public.plan_runs,
   public.product_admin_audit,
-  public.product_affiliate_links,
   public.product_brand_countries,
   public.product_brands,
   public.product_countries,
@@ -81,7 +80,6 @@ drop table if exists
   public.product_facts,
   public.product_import_runs,
   public.product_imports,
-  public.product_offers,
   public.product_recommendation_decisions,
   public.product_recommendation_items,
   public.product_recommendation_runs,
@@ -936,7 +934,7 @@ CREATE TABLE public.organisation_notification_preferences (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT organisation_notification_preferences_channel_check CHECK ((channel_type = ANY (ARRAY['email'::text, 'line'::text]))),
-    CONSTRAINT organisation_notification_preferences_event_check CHECK ((event_key = ANY (ARRAY['retail_order_created'::text, 'retail_order_awaiting_stock'::text, 'retail_order_ready_to_pack'::text, 'retail_order_ready_to_ship'::text, 'retail_order_cancelled'::text, 'retail_order_returned'::text, 'retail_order_shipped'::text, 'retail_order_delivered'::text]))),
+    CONSTRAINT organisation_notification_preferences_event_check CHECK ((event_key = ANY (ARRAY['platform_revenue_received'::text, 'platform_checkout_failed'::text, 'platform_payment_failed'::text, 'platform_payout_failed'::text, 'platform_worker_unavailable'::text, 'platform_task_stuck'::text, 'platform_communication_failed'::text, 'platform_technical_alert'::text, 'retail_order_created'::text, 'retail_order_awaiting_stock'::text, 'retail_order_ready_to_pack'::text, 'retail_order_ready_to_ship'::text, 'retail_order_cancelled'::text, 'retail_order_returned'::text, 'retail_order_shipped'::text, 'retail_order_delivered'::text]))),
     CONSTRAINT organisation_notification_preferences_rank_check CHECK ((preference_rank >= 0))
 );
 
@@ -1550,13 +1548,11 @@ CREATE TABLE public.product_countries (
     country_code text NOT NULL,
     rrp_price_amount numeric(20,6),
     currency text DEFAULT 'THB'::text NOT NULL,
-    pricing_status text DEFAULT 'missing'::text NOT NULL,
     price_updated_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT product_countries_code_check CHECK ((country_code ~ '^[A-Z]{2}$'::text)),
     CONSTRAINT product_countries_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
-    CONSTRAINT product_countries_pricing_status_check CHECK ((pricing_status = ANY (ARRAY['missing'::text, 'ready'::text, 'review'::text]))),
     CONSTRAINT product_countries_rrp_price_check CHECK (((rrp_price_amount IS NULL) OR (rrp_price_amount >= (0)::numeric)))
 );
 
@@ -1675,39 +1671,6 @@ CREATE TABLE public.product_import_translations (
 COMMENT ON TABLE public.product_import_translations IS 'Locale-scalable translated copy projection for staged product import evidence.';
 
 
---
--- Name: product_offers; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.product_offers (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    product_id uuid NOT NULL,
-    network text,
-    url text NOT NULL,
-    link_type text DEFAULT 'affiliate'::text NOT NULL,
-    platform text,
-    commission_rate numeric,
-    admin_priority integer DEFAULT 0 NOT NULL,
-    price_amount numeric,
-    currency text DEFAULT 'THB'::text NOT NULL,
-    availability_status text DEFAULT 'unknown'::text NOT NULL,
-    tracking_id text,
-    status text DEFAULT 'active'::text NOT NULL,
-    starts_at timestamp with time zone,
-    expires_at timestamp with time zone,
-    last_checked_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT product_offers_availability_status_check CHECK ((availability_status = ANY (ARRAY['in_stock'::text, 'out_of_stock'::text, 'unavailable'::text, 'unknown'::text]))),
-    CONSTRAINT product_offers_link_type_check CHECK ((link_type = ANY (ARRAY['affiliate'::text, 'direct'::text]))),
-    CONSTRAINT product_offers_status_check CHECK ((status = ANY (ARRAY['active'::text, 'flagged_stale'::text, 'inactive'::text])))
-);
-
-
---
--- Name: product_recommendation_items; Type: TABLE; Schema: public; Owner: -
---
-
 CREATE TABLE public.product_recommendation_items (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     run_id uuid NOT NULL,
@@ -1719,7 +1682,6 @@ CREATE TABLE public.product_recommendation_items (
     serving_multiplier integer DEFAULT 1 NOT NULL,
     covered_needs jsonb DEFAULT '[]'::jsonb NOT NULL,
     why text,
-    offer_id uuid,
     url_used text NOT NULL,
     price_amount numeric,
     currency text DEFAULT 'THB'::text NOT NULL,
@@ -1755,7 +1717,6 @@ CREATE TABLE public.product_recommendation_decisions (
     serving_multiplier integer DEFAULT 1 NOT NULL,
     covered_needs jsonb DEFAULT '[]'::jsonb NOT NULL,
     reason text,
-    offer_id uuid,
     url_used text,
     price_amount numeric,
     currency text DEFAULT 'THB'::text NOT NULL,
@@ -1829,7 +1790,6 @@ CREATE TABLE public.product_versions (
     status text DEFAULT 'pending_review'::text NOT NULL,
     label_status text DEFAULT 'missing'::text NOT NULL,
     availability_status text DEFAULT 'unknown'::text NOT NULL,
-    affiliate_status text DEFAULT 'none'::text NOT NULL,
     price_amount numeric,
     currency text DEFAULT 'THB'::text NOT NULL,
     validation_status text DEFAULT 'needs_review'::text NOT NULL,
@@ -1876,12 +1836,10 @@ CREATE TABLE public.products (
     status text DEFAULT 'pending_review'::text NOT NULL,
     label_status text DEFAULT 'missing'::text NOT NULL,
     availability_status text DEFAULT 'unknown'::text NOT NULL,
-    affiliate_status text DEFAULT 'none'::text NOT NULL,
     price_amount numeric,
     currency text DEFAULT 'THB'::text NOT NULL,
     price_cached_at timestamp with time zone,
     availability_cached_at timestamp with time zone,
-    affiliate_checked_at timestamp with time zone,
     product_data_expires_at timestamp with time zone,
     source text DEFAULT 'admin'::text NOT NULL,
     admin_notes text,
@@ -1892,7 +1850,6 @@ CREATE TABLE public.products (
     current_version integer DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT products_affiliate_status_check CHECK ((affiliate_status = ANY (ARRAY['active'::text, 'flagged_stale'::text, 'none'::text]))),
     CONSTRAINT products_availability_status_check CHECK ((availability_status = ANY (ARRAY['in_stock'::text, 'out_of_stock'::text, 'unavailable'::text, 'unknown'::text]))),
     CONSTRAINT products_label_status_check CHECK ((label_status = ANY (ARRAY['failed'::text, 'missing'::text, 'parsed'::text, 'stale'::text]))),
     CONSTRAINT products_platform_check CHECK ((platform = ANY (ARRAY['lazada'::text, 'manual'::text, 'shopee'::text]))),
@@ -1923,12 +1880,12 @@ CREATE TABLE public.product_identifiers (
     CONSTRAINT product_identifiers_confidence_check CHECK ((confidence = ANY (ARRAY['trusted'::text, 'high'::text, 'medium'::text, 'low'::text]))),
     CONSTRAINT product_identifiers_ean13_check CHECK (((identifier_type <> 'ean13'::text) OR (normalized_value ~ '^[0-9]{13}$'::text))),
     CONSTRAINT product_identifiers_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'deleted'::text]))),
-    CONSTRAINT product_identifiers_type_check CHECK ((identifier_type = ANY (ARRAY['ean13'::text, 'internal_sku'::text, 'manufacturer_sku'::text, 'retailer_local_code'::text, 'supplier_code'::text]))),
+    CONSTRAINT product_identifiers_type_check CHECK ((identifier_type = ANY (ARRAY['ean13'::text, 'manufacturer_sku'::text, 'retailer_local_code'::text, 'supplier_code'::text]))),
     CONSTRAINT product_identifiers_value_check CHECK (((length(TRIM(BOTH FROM identifier_value)) > 0) AND (length(TRIM(BOTH FROM normalized_value)) > 0)))
 );
 
 
-COMMENT ON TABLE public.product_identifiers IS 'Approved product identifiers such as EAN-13 barcodes, internal SKUs, manufacturer SKUs, retailer codes, and supplier codes.';
+COMMENT ON TABLE public.product_identifiers IS 'Approved product identifiers such as EAN-13 barcodes, manufacturer SKUs, retailer codes, and supplier codes.';
 
 
 --
@@ -1952,7 +1909,7 @@ CREATE TABLE public.product_identifier_candidates (
     CONSTRAINT product_identifier_candidates_confidence_check CHECK ((confidence = ANY (ARRAY['trusted'::text, 'high'::text, 'medium'::text, 'low'::text]))),
     CONSTRAINT product_identifier_candidates_ean13_check CHECK (((identifier_type <> 'ean13'::text) OR (normalized_value ~ '^[0-9]{13}$'::text))),
     CONSTRAINT product_identifier_candidates_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'conflict'::text]))),
-    CONSTRAINT product_identifier_candidates_type_check CHECK ((identifier_type = ANY (ARRAY['ean13'::text, 'internal_sku'::text, 'manufacturer_sku'::text, 'retailer_local_code'::text, 'supplier_code'::text]))),
+    CONSTRAINT product_identifier_candidates_type_check CHECK ((identifier_type = ANY (ARRAY['ean13'::text, 'manufacturer_sku'::text, 'retailer_local_code'::text, 'supplier_code'::text]))),
     CONSTRAINT product_identifier_candidates_value_check CHECK (((length(TRIM(BOTH FROM identifier_value)) > 0) AND (length(TRIM(BOTH FROM normalized_value)) > 0)))
 );
 
@@ -3006,7 +2963,6 @@ INSERT INTO public.product_versions (
     status,
     label_status,
     availability_status,
-    affiliate_status,
     price_amount,
     currency,
     validation_status,
@@ -3042,7 +2998,6 @@ SELECT
     products.status,
     products.label_status,
     products.availability_status,
-    products.affiliate_status,
     products.price_amount,
     products.currency,
     products.validation_status,
@@ -3479,14 +3434,6 @@ ALTER TABLE ONLY public.product_imports
 
 ALTER TABLE ONLY public.product_imports
     ADD CONSTRAINT product_imports_pkey PRIMARY KEY (id);
-
-
---
--- Name: product_offers product_offers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.product_offers
-    ADD CONSTRAINT product_offers_pkey PRIMARY KEY (id);
 
 
 --
@@ -4592,13 +4539,6 @@ CREATE INDEX product_countries_country_idx ON public.product_countries USING btr
 
 
 --
--- Name: product_countries_pricing_status_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX product_countries_pricing_status_idx ON public.product_countries USING btree (country_code, pricing_status, updated_at DESC);
-
-
---
 -- Name: product_facts_food_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4701,27 +4641,6 @@ CREATE UNIQUE INDEX product_identifier_candidates_product_source_key ON public.p
 --
 
 CREATE INDEX product_identifier_candidates_status_idx ON public.product_identifier_candidates USING btree (status, identifier_type, updated_at DESC);
-
-
---
--- Name: product_offers_priority_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX product_offers_priority_idx ON public.product_offers USING btree (product_id, status, link_type, commission_rate DESC NULLS LAST, admin_priority DESC, updated_at DESC);
-
-
---
--- Name: product_offers_product_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX product_offers_product_idx ON public.product_offers USING btree (product_id, status, updated_at DESC);
-
-
---
--- Name: product_offers_product_url_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX product_offers_product_url_idx ON public.product_offers USING btree (product_id, url);
 
 
 --
@@ -5844,22 +5763,6 @@ ALTER TABLE ONLY public.product_import_translations
 
 
 --
--- Name: product_offers product_offers_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.product_offers
-    ADD CONSTRAINT product_offers_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
-
-
---
--- Name: product_recommendation_items product_recommendation_items_offer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.product_recommendation_items
-    ADD CONSTRAINT product_recommendation_items_offer_id_fkey FOREIGN KEY (offer_id) REFERENCES public.product_offers(id) ON DELETE SET NULL;
-
-
---
 -- Name: product_recommendation_items product_recommendation_items_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5873,14 +5776,6 @@ ALTER TABLE ONLY public.product_recommendation_items
 
 ALTER TABLE ONLY public.product_recommendation_items
     ADD CONSTRAINT product_recommendation_items_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.product_recommendation_runs(id) ON DELETE CASCADE;
-
-
---
--- Name: product_recommendation_decisions product_recommendation_decisions_offer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.product_recommendation_decisions
-    ADD CONSTRAINT product_recommendation_decisions_offer_id_fkey FOREIGN KEY (offer_id) REFERENCES public.product_offers(id) ON DELETE SET NULL;
 
 
 --

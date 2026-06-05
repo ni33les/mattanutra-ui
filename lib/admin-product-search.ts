@@ -95,12 +95,6 @@ function productSearchIndex(row: AdminProductRow) {
       fact.source,
       fact.sourceText,
       ...(fact.aliasKeys ?? [])
-    ]),
-    ...row.offers.flatMap((offer) => [
-      offer.linkType,
-      offer.network,
-      offer.platform,
-      offer.status
     ])
   ];
   const normalizedFields = fields
@@ -190,31 +184,8 @@ function candidateFromProductRow(input: Readonly<{
       countryPricing?.rrpPriceAmount ?? null,
       input.customerPriceMarginPercent
     );
-  const activeOffer =
-    row.offers.find((offer) =>
-      offer.status === "active" &&
-      offer.availabilityStatus !== "out_of_stock" &&
-      offer.availabilityStatus !== "unavailable" &&
-      offer.linkType === "affiliate"
-    ) ??
-    row.offers.find((offer) =>
-      offer.status === "active" &&
-      offer.availabilityStatus !== "out_of_stock" &&
-      offer.availabilityStatus !== "unavailable"
-    ) ??
-    null;
-
   return {
     ...row,
-    activeOfferId: activeOffer?.id ?? null,
-    activeAffiliateUrl:
-      activeOffer?.linkType === "affiliate" ? activeOffer.url : null,
-    activeAffiliateCommissionRate:
-      activeOffer?.linkType === "affiliate"
-        ? activeOffer.commissionRate
-        : null,
-    activeAffiliatePriority: activeOffer?.priority ?? null,
-    activeAffiliateType: activeOffer?.linkType ?? null,
     automatedSafetyPassed:
       row.validation.status === "pass" &&
       productSafetyPasses(row.facts, input.sourceRow.facts),

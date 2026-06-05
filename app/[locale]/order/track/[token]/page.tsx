@@ -113,6 +113,18 @@ const orderTrackingCopy = {
   }
 } satisfies Record<Locale, Record<string, string>>;
 
+const customerOrderStatusLabels: Record<Locale, Partial<Record<string, string>>> = {
+  en: {
+    awaiting_stock: "Order processing"
+  },
+  th: {
+    awaiting_stock: "กำลังดำเนินการคำสั่งซื้อ"
+  },
+  "zh-CN": {
+    awaiting_stock: "订单处理中"
+  }
+};
+
 function labelClass(locale: Locale) {
   return locale === "zh-CN"
     ? "text-xs font-bold tracking-normal text-[var(--mn-ash)]"
@@ -138,8 +150,8 @@ function formatAmount(locale: Locale, amount: number, currency: string) {
   return formatCurrencyAmount(locale, amount, currency);
 }
 
-function statusLabel(status: string) {
-  return status.replace(/_/g, " ");
+function statusLabel(locale: Locale, status: string) {
+  return customerOrderStatusLabels[locale][status] ?? status.replace(/_/g, " ");
 }
 
 function latestEta(lines: readonly { etaDate: string | null }[]) {
@@ -195,7 +207,7 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
   const timeline = [
     { active: true, label: copy.paid, meta: formatAmount(locale, order.totalAmount, order.currency) },
     { active: true, label: copy.preparing, meta: order.retailerName ?? "Dream Pharmacy" },
-    { active: true, label: copy.status, meta: statusLabel(order.status) },
+    { active: true, label: copy.status, meta: statusLabel(locale, order.status) },
     { active: Boolean(eta), label: copy.eta, meta: eta ?? "-" }
   ];
 
@@ -233,7 +245,7 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
                 </div>
               </div>
               <div className="rounded-full bg-[var(--mn-mint)] px-4 py-1 text-sm font-bold capitalize text-[var(--mn-teal-deep)]">
-                {statusLabel(order.status)}
+                {statusLabel(locale, order.status)}
               </div>
             </div>
 

@@ -20,7 +20,6 @@ import { normalizeSupplementSafetyFlags } from "@/lib/supplement-safety-flags";
 import {
   normalizeCurrencyCode,
   normalizeProductCountryCode,
-  normalizeProductCountryPricingStatus,
   type ProductCountryPricing
 } from "@/lib/product-countries";
 import { productIdentifiersFromBody } from "@/lib/product-identifiers";
@@ -204,10 +203,6 @@ function countryPricingFromBody(value: unknown): ProductCountryPricing[] | undef
       countryCode,
       currency: normalizeCurrencyCode(record.currency, "THB"),
       priceUpdatedAt: null,
-      pricingStatus: normalizeProductCountryPricingStatus(
-        record.pricingStatus,
-        rrpPriceAmount
-      ),
       rrpPriceAmount
     }];
   });

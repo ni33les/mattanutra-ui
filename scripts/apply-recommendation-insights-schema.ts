@@ -56,7 +56,6 @@ await sql`
     serving_multiplier integer default 1 not null check (serving_multiplier >= 1),
     covered_needs jsonb default '[]'::jsonb not null,
     reason text,
-    offer_id uuid references public.product_offers(id) on delete set null,
     url_used text,
     price_amount numeric,
     currency text default 'THB' not null,
@@ -155,7 +154,6 @@ for (const run of runRows) {
   const itemRows = await sql<Array<{
     covered_needs: unknown;
     currency: string | null;
-    offer_id: string | null;
     price_amount: number | string | null;
     product_coverage_percent: number | string | null;
     product_id: string;
@@ -176,7 +174,6 @@ for (const run of runRows) {
       product_recommendation_items.stack_contribution_percent,
       product_recommendation_items.serving_multiplier,
       product_recommendation_items.covered_needs,
-      product_recommendation_items.offer_id::text,
       product_recommendation_items.url_used,
       product_recommendation_items.price_amount,
       product_recommendation_items.currency,

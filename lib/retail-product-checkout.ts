@@ -21,7 +21,10 @@ import {
 } from "@/lib/stripe-payment-config";
 import { createTask } from "@/lib/task-service";
 import { writeBpmEvent } from "@/lib/bpm";
-import { queueAdminOrganisationCommunication } from "@/lib/communications";
+import {
+  queueAdminOrganisationCommunication,
+  queuePlatformAdminCommunication
+} from "@/lib/communications";
 import {
   recordRetailOrderWorkflowBpm,
   retailOrderStatusBpmEventName,
@@ -126,6 +129,31 @@ function objectValue(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
+}
+
+async function queuePlatformRetailRevenueNotification(
+  payment: CheckoutPaymentRow,
+  metadata: Record<string, unknown> = {}
+) {
+  try {
+    await queuePlatformAdminCommunication({
+      eventKey: "platform_revenue_received",
+      metadata: {
+        amountMicros: Number(payment.amount) || 0,
+        checkoutPaymentId: payment.id,
+        currency: payment.currency,
+        paymentStatus: payment.status,
+        planId: payment.plan_id,
+        source: "retail_product_checkout",
+        stripeMode: payment.stripe_mode,
+        ...metadata
+      },
+      resourceId: payment.id,
+      resourceType: "retail_checkout_payment"
+    });
+  } catch (error) {
+    console.warn("Unable to queue platform retail revenue notification", error);
+  }
 }
 
 function arrayValue<T = unknown>(value: unknown): T[] {
@@ -1079,6 +1107,11 @@ export async function completeMockRetailCheckout(input: Readonly<{
     valueCurrency: payment.currency
   });
 
+  await queuePlatformRetailRevenueNotification(payment, {
+    mock: true,
+    source: "mock_product_payment"
+  });
+
   const fulfilled = await fulfillRetailCheckoutPayment(sql, payment);
   const metadata = objectValue(fulfilled.metadata);
   const trackingReference =
@@ -1153,6 +1186,11 @@ export async function fulfillRetailCheckoutSession(input: Readonly<{
       },
       valueAmount: Number(payment.amount) / AMOUNT_MICROS_PER_UNIT,
       valueCurrency: payment.currency
+    });
+
+    await queuePlatformRetailRevenueNotification(payment, {
+      source: "retail_checkout_session_fulfillment",
+      stripeSessionId: payment.stripe_checkout_session_id
     });
 
     const fulfilled = await fulfillRetailCheckoutPayment(sql, payment);

@@ -371,6 +371,10 @@ export type AdminContent = Readonly<{
     insightRecommendationPressure: string;
     insightRetailValue: string;
     insightsTab: string;
+    hygeiaExport: string;
+    hygeiaImport: string;
+    hygeiaImportError: string;
+    hygeiaRetailerRequired: string;
     importCsv: string;
 	    inStock: string;
 	    chooseProduct: string;
@@ -1052,6 +1056,10 @@ const baseContent = {
       insightRecommendationPressure: "Recommendation pressure",
       insightRetailValue: "Retail stock value",
       insightsTab: "Insights",
+      hygeiaExport: "Export Hygeia",
+      hygeiaImport: "Import Hygeia",
+      hygeiaImportError: "Could not import Hygeia stock file.",
+      hygeiaRetailerRequired: "Assume or select one retailer to use Hygeia stock files.",
       importCsv: "Import CSV",
       inStock: "In stock",
       chooseProduct: "Choose product",
@@ -1120,7 +1128,7 @@ const baseContent = {
       packingSheet: "Packing sheet",
       phone: "Phone",
       printOrder: "Print order",
-      sent: "Sent",
+      sent: "Shipped",
       shippingLabel: "Shipping label",
       shortfall: "Shortfall",
       shortfallHandling: "Shortfall handling",
@@ -1857,6 +1865,10 @@ const baseContent = {
       insightRecommendationPressure: "แรงกดดันจากคำแนะนำ",
       insightRetailValue: "มูลค่าสต็อกขายปลีก",
       insightsTab: "ข้อมูลเชิงลึก",
+      hygeiaExport: "ส่งออก Hygeia",
+      hygeiaImport: "นำเข้า Hygeia",
+      hygeiaImportError: "ไม่สามารถนำเข้าไฟล์สต็อก Hygeia ได้",
+      hygeiaRetailerRequired: "เลือกหรือสวมสิทธิ์ร้านค้าหนึ่งแห่งเพื่อใช้ไฟล์สต็อก Hygeia",
       importCsv: "นำเข้า CSV",
       inStock: "มีสินค้า",
       chooseProduct: "เลือกสินค้า",
@@ -1925,7 +1937,7 @@ const baseContent = {
       packingSheet: "ใบจัดสินค้า",
       phone: "โทรศัพท์",
       printOrder: "พิมพ์คำสั่งซื้อ",
-      sent: "ส่งแล้ว",
+      sent: "จัดส่งแล้ว",
       shippingLabel: "ป้ายจัดส่ง",
       shortfall: "ส่วนขาด",
       shortfallHandling: "การจัดการส่วนขาด",

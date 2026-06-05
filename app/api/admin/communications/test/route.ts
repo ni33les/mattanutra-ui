@@ -22,12 +22,11 @@ function channelType(value: unknown): AdminCommunicationChannelType | null {
   return value === "email" || value === "line" ? value : null;
 }
 
-function canAccessOrganisation(
+function canAccessEffectiveOrganisation(
   context: NonNullable<Awaited<ReturnType<typeof resolveAdminSession>>>,
-  organisationId: string
+  requestedOrganisationId: string
 ) {
-  return context.effectiveOrganisation.type === "platform" ||
-    context.effectiveOrganisation.id === organisationId;
+  return requestedOrganisationId === context.effectiveOrganisation.id;
 }
 
 export async function POST(request: NextRequest) {
@@ -47,7 +46,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
   const organisationId = text(body.organisationId) || context.effectiveOrganisation.id;
 
-  if (!canAccessOrganisation(context, organisationId)) {
+  if (!canAccessEffectiveOrganisation(context, organisationId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

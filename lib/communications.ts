@@ -34,6 +34,14 @@ export type CommunicationMessageStatus =
 
 export type AdminCommunicationEventKey =
   | "admin_test_message"
+  | "platform_checkout_failed"
+  | "platform_communication_failed"
+  | "platform_payment_failed"
+  | "platform_payout_failed"
+  | "platform_revenue_received"
+  | "platform_task_stuck"
+  | "platform_technical_alert"
+  | "platform_worker_unavailable"
   | "retail_order_awaiting_stock"
   | "retail_order_cancelled"
   | "retail_order_created"
@@ -42,6 +50,8 @@ export type AdminCommunicationEventKey =
   | "retail_order_ready_to_ship"
   | "retail_order_returned"
   | "retail_order_shipped";
+
+export type AdminCommunicationScope = "platform" | "retail";
 
 export type AdminCommunicationChannelType = Extract<
   CommunicationChannelType,
@@ -166,8 +176,7 @@ const MESSAGE_STATUSES = new Set<string>([
 export const ADMIN_COMMUNICATION_ROUTE_TASK_PRIORITY = 300;
 export const ADMIN_COMMUNICATION_DISPATCH_TASK_PRIORITY = 260;
 const ADMIN_COMMUNICATION_CHANNEL_TYPES = ["line", "email"] as const;
-const ADMIN_COMMUNICATION_EVENT_DEFAULTS = {
-  admin_test_message: false,
+const RETAIL_ADMIN_COMMUNICATION_EVENT_DEFAULTS = {
   retail_order_awaiting_stock: true,
   retail_order_cancelled: true,
   retail_order_created: true,
@@ -176,7 +185,35 @@ const ADMIN_COMMUNICATION_EVENT_DEFAULTS = {
   retail_order_ready_to_ship: true,
   retail_order_returned: true,
   retail_order_shipped: false
+} satisfies Record<Extract<AdminCommunicationEventKey, `retail_${string}`>, boolean>;
+const PLATFORM_ADMIN_COMMUNICATION_EVENT_KEYS = [
+  "platform_revenue_received",
+  "platform_checkout_failed",
+  "platform_payment_failed",
+  "platform_payout_failed",
+  "platform_worker_unavailable",
+  "platform_task_stuck",
+  "platform_communication_failed",
+  "platform_technical_alert"
+] as const satisfies readonly Extract<AdminCommunicationEventKey, `platform_${string}`>[];
+const ADMIN_COMMUNICATION_EVENT_DEFAULTS = {
+  admin_test_message: false,
+  ...RETAIL_ADMIN_COMMUNICATION_EVENT_DEFAULTS,
+  platform_checkout_failed: true,
+  platform_communication_failed: true,
+  platform_payment_failed: true,
+  platform_payout_failed: true,
+  platform_revenue_received: true,
+  platform_task_stuck: true,
+  platform_technical_alert: true,
+  platform_worker_unavailable: true
 } satisfies Record<AdminCommunicationEventKey, boolean>;
+export const retailAdminCommunicationEventKeys = Object.keys(
+  RETAIL_ADMIN_COMMUNICATION_EVENT_DEFAULTS
+) as Array<Extract<AdminCommunicationEventKey, `retail_${string}`>>;
+export const platformAdminCommunicationEventKeys = [
+  ...PLATFORM_ADMIN_COMMUNICATION_EVENT_KEYS
+];
 export const adminCommunicationEventKeys = Object.keys(
   ADMIN_COMMUNICATION_EVENT_DEFAULTS
 ) as AdminCommunicationEventKey[];
@@ -221,6 +258,33 @@ function normalizeAdminCommunicationEventKey(
   return key in ADMIN_COMMUNICATION_EVENT_DEFAULTS
     ? (key as AdminCommunicationEventKey)
     : null;
+}
+
+export function adminCommunicationEventScope(
+  eventKey: AdminCommunicationEventKey
+): AdminCommunicationScope | "system" {
+  if (eventKey === "admin_test_message") {
+    return "system";
+  }
+
+  return eventKey.startsWith("platform_") ? "platform" : "retail";
+}
+
+export function adminCommunicationEventKeysForScope(
+  scope: AdminCommunicationScope
+) {
+  return scope === "platform"
+    ? [...platformAdminCommunicationEventKeys]
+    : [...retailAdminCommunicationEventKeys];
+}
+
+function eventKeyAllowedForScope(
+  eventKey: AdminCommunicationEventKey,
+  scope: AdminCommunicationScope
+) {
+  const eventScope = adminCommunicationEventScope(eventKey);
+
+  return eventScope === "system" || eventScope === scope;
 }
 
 function normalizeAdminCommunicationChannelType(
@@ -695,10 +759,72 @@ async function organisationName(sql: Db, organisationId: string) {
   return cleanText(rows[0]?.name, "Retail organisation");
 }
 
+async function organisationCommunicationScope(
+  sql: Db,
+  organisationId: string
+): Promise<AdminCommunicationScope> {
+  const rows = await sql<Array<{ organisation_type: string }>>`
+    select organisation_type
+    from public.organisations
+    where id = ${organisationId}::uuid
+    limit 1
+  `;
+
+  if (!rows[0]) {
+    throw new Error("Organisation is required for communications");
+  }
+
+  return rows[0].organisation_type === "platform" ? "platform" : "retail";
+}
+
+async function platformOrganisationId(sql: Db) {
+  const rows = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.organisations
+    where slug = 'mattanutra'
+      and organisation_type = 'platform'
+      and status = 'active'
+    limit 1
+  `;
+
+  if (!rows[0]?.id) {
+    throw new Error("Platform organisation is required for communications");
+  }
+
+  return rows[0].id;
+}
+
+function organisationIdentityRelationship(scope: AdminCommunicationScope) {
+  return scope === "platform" ? "platform" : "retailer";
+}
+
+function adminCommunicationPreferenceDefault(
+  eventKey: AdminCommunicationEventKey,
+  channelType: AdminCommunicationChannelType
+) {
+  if (eventKey === "admin_test_message") {
+    return false;
+  }
+
+  if (eventKey.startsWith("platform_")) {
+    if (channelType === "email") {
+      return true;
+    }
+
+    return eventKey !== "platform_revenue_received";
+  }
+
+  return RETAIL_ADMIN_COMMUNICATION_EVENT_DEFAULTS[
+    eventKey as keyof typeof RETAIL_ADMIN_COMMUNICATION_EVENT_DEFAULTS
+  ] ?? false;
+}
+
 async function ensureOrganisationIdentity(
   sql: Db,
   organisationId: string
 ): Promise<string> {
+  const scope = await organisationCommunicationScope(sql, organisationId);
+  const relationship = organisationIdentityRelationship(scope);
   const existing = await sql<{ identity_id: string }[]>`
     select identity_id::text
     from public.organisation_communication_identities
@@ -709,6 +835,14 @@ async function ensureOrganisationIdentity(
   `;
 
   if (existing[0]?.identity_id) {
+    await sql`
+      update public.organisation_communication_identities
+      set relationship = ${relationship}
+      where organisation_id = ${organisationId}::uuid
+        and identity_id = ${existing[0].identity_id}::uuid
+        and relationship <> ${relationship}
+    `;
+
     return existing[0].identity_id;
   }
 
@@ -746,7 +880,7 @@ async function ensureOrganisationIdentity(
     values (
       ${organisationId}::uuid,
       ${identityId}::uuid,
-      'retailer',
+      ${relationship},
       true,
       '{}'::jsonb,
       now()
@@ -774,11 +908,9 @@ async function seedOrganisationNotificationPreferences(
   sql: Db,
   organisationId: string
 ) {
-  for (const eventKey of adminCommunicationEventKeys) {
-    if (eventKey === "admin_test_message") {
-      continue;
-    }
+  const scope = await organisationCommunicationScope(sql, organisationId);
 
+  for (const eventKey of adminCommunicationEventKeysForScope(scope)) {
     for (const channelType of ADMIN_COMMUNICATION_CHANNEL_TYPES) {
       await sql`
         insert into public.organisation_notification_preferences (
@@ -795,7 +927,7 @@ async function seedOrganisationNotificationPreferences(
           ${organisationId}::uuid,
           ${eventKey},
           ${channelType},
-          ${ADMIN_COMMUNICATION_EVENT_DEFAULTS[eventKey]},
+          ${adminCommunicationPreferenceDefault(eventKey, channelType)},
           ${adminCommunicationChannelRank(channelType)},
           ${sql.json(toJsonValue({ source: "default_seed" }))},
           now(),
@@ -849,6 +981,10 @@ export async function listOrganisationNotificationPreferences(input: Readonly<{
   sql?: Db;
 }>) {
   const sql = input.sql ? sqlOrThrow(input.sql) : sqlOrThrow();
+  const scope = await organisationCommunicationScope(sql, input.organisationId);
+  const allowedEventKeys = new Set<AdminCommunicationEventKey>(
+    adminCommunicationEventKeysForScope(scope)
+  );
 
   await ensureOrganisationCommunicationIdentity({
     organisationId: input.organisationId,
@@ -874,6 +1010,10 @@ export async function listOrganisationNotificationPreferences(input: Readonly<{
       const channelType = normalizeAdminCommunicationChannelType(row.channel_type);
 
       if (!eventKey || !channelType) {
+        return null;
+      }
+
+      if (!allowedEventKeys.has(eventKey)) {
         return null;
       }
 
@@ -936,6 +1076,11 @@ export async function updateOrganisationNotificationPreference(input: Readonly<{
   }
 
   const sql = sqlOrThrow();
+  const scope = await organisationCommunicationScope(sql, input.organisationId);
+
+  if (!eventKeyAllowedForScope(input.eventKey, scope)) {
+    throw new Error("Notification preference does not belong to this organisation scope");
+  }
 
   await ensureOrganisationCommunicationIdentity({
     organisationId: input.organisationId,
@@ -1391,11 +1536,12 @@ function orderEventCopy(input: Readonly<{
   const orderNumber = input.orderNumber ?? "customer order";
   const customer = input.customerName ? ` for ${input.customerName}` : "";
   const itemSummary = input.lineCount === 1 ? "1 item" : `${input.lineCount} items`;
-  const copies: Record<AdminCommunicationEventKey, { body: string; subject: string }> = {
-    admin_test_message: {
-      body: "This is a MattaNutra admin communication test message.",
-      subject: "MattaNutra admin communication test"
-    },
+  const testMessageCopy = {
+    body: "This is a MattaNutra admin communication test message.",
+    subject: "MattaNutra admin communication test"
+  };
+  const copies: Partial<Record<AdminCommunicationEventKey, { body: string; subject: string }>> = {
+    admin_test_message: testMessageCopy,
     retail_order_awaiting_stock: {
       body: `${orderNumber}${customer} is awaiting stock. Review reorder advice or the active shopping lists. Basket: ${itemSummary}.`,
       subject: `${orderNumber} is awaiting stock`
@@ -1430,7 +1576,49 @@ function orderEventCopy(input: Readonly<{
     }
   };
 
-  return copies[input.eventKey] ?? copies.admin_test_message;
+  return copies[input.eventKey] ?? testMessageCopy;
+}
+
+function platformEventCopy(eventKey: AdminCommunicationEventKey) {
+  const copies: Partial<Record<AdminCommunicationEventKey, { body: string; subject: string }>> = {
+    platform_checkout_failed: {
+      body: "A customer checkout failed before payment could be completed. Review the checkout logs and payment configuration.",
+      subject: "Platform checkout failure"
+    },
+    platform_communication_failed: {
+      body: "A platform communication failed or had no usable channel. Review the Communications log and dispatch tasks.",
+      subject: "Platform communication failure"
+    },
+    platform_payment_failed: {
+      body: "A customer payment failed or expired. Review Stripe/mock payment records and the customer checkout state.",
+      subject: "Platform payment failure"
+    },
+    platform_payout_failed: {
+      body: "A Stripe payout failed or was cancelled. Review payout reconciliation and finance ledger state.",
+      subject: "Platform payout failure"
+    },
+    platform_revenue_received: {
+      body: "A customer payment was received. Review the finance ledger for the recorded revenue and payment details.",
+      subject: "Platform revenue received"
+    },
+    platform_task_stuck: {
+      body: "A platform task appears stuck or overdue. Review task health and worker availability.",
+      subject: "Platform task needs attention"
+    },
+    platform_technical_alert: {
+      body: "A platform technical alert was raised. Review admin alerts and recent runtime errors.",
+      subject: "Platform technical alert"
+    },
+    platform_worker_unavailable: {
+      body: "A worker or required agent capability is unavailable. Review worker registration and capability health.",
+      subject: "Platform worker unavailable"
+    }
+  };
+
+  return copies[eventKey] ?? {
+    body: "A MattaNutra platform notification was raised.",
+    subject: "MattaNutra platform notification"
+  };
 }
 
 async function adminCommunicationCopy(input: Readonly<{
@@ -1489,6 +1677,15 @@ async function adminCommunicationCopy(input: Readonly<{
     };
   }
 
+  if (input.eventKey.startsWith("platform_")) {
+    const copy = platformEventCopy(input.eventKey);
+
+    return {
+      body: body ?? copy.body,
+      subject: subject ?? copy.subject
+    };
+  }
+
   const copy = orderEventCopy({
     customerName: null,
     eventKey: input.eventKey,
@@ -1515,6 +1712,12 @@ export async function routeAdminCommunication(input: Readonly<{
   taskId?: string | null;
 }>) {
   const sql = sqlOrThrow();
+  const scope = await organisationCommunicationScope(sql, input.organisationId);
+
+  if (!eventKeyAllowedForScope(input.eventKey, scope)) {
+    throw new Error("Admin communication event does not belong to this organisation scope");
+  }
+
   const identityId = await ensureOrganisationCommunicationIdentity({
     organisationId: input.organisationId,
     sql
@@ -1751,6 +1954,13 @@ export async function queueAdminOrganisationCommunication(input: Readonly<{
   resourceType?: string | null;
   subject?: string | null;
 }>) {
+  const sql = sqlOrThrow();
+  const scope = await organisationCommunicationScope(sql, input.organisationId);
+
+  if (!eventKeyAllowedForScope(input.eventKey, scope)) {
+    throw new Error("Admin communication event does not belong to this organisation scope");
+  }
+
   const resourceType = cleanText(input.resourceType, "none");
   const resourceId = cleanText(input.resourceId, "none");
   const channelType = input.channelType ?? "all";
@@ -1760,7 +1970,7 @@ export async function queueAdminOrganisationCommunication(input: Readonly<{
     actorType: "system",
     businessValue: ADMIN_COMMUNICATION_ROUTE_TASK_PRIORITY,
     description:
-      "Route an admin organisation communication through configured retailer channels.",
+      "Route an admin organisation communication through configured organisation channels.",
     groupLabel: "Admin communication",
     idempotencyKey,
     idempotencyScope:
@@ -1779,7 +1989,7 @@ export async function queueAdminOrganisationCommunication(input: Readonly<{
       subject: input.subject ?? null
     },
     priorityReason:
-      "Retail organisation notification is queued for the communications coordinator.",
+      "Organisation notification is queued for the communications coordinator.",
     priorityScore: ADMIN_COMMUNICATION_ROUTE_TASK_PRIORITY,
     reasoningEffort: "none",
     requiredCapabilities: [AGENT_CAPABILITIES.communicationRoute],
@@ -1814,6 +2024,30 @@ export async function queueAdminOrganisationCommunication(input: Readonly<{
     created,
     task
   };
+}
+
+export async function queuePlatformAdminCommunication(input: Readonly<{
+  body?: string | null;
+  channelType?: AdminCommunicationChannelType | null;
+  eventKey: Extract<AdminCommunicationEventKey, `platform_${string}`>;
+  metadata?: Record<string, unknown>;
+  resourceId?: string | null;
+  resourceType?: string | null;
+  subject?: string | null;
+}>) {
+  const sql = sqlOrThrow();
+  const organisationId = await platformOrganisationId(sql);
+
+  return queueAdminOrganisationCommunication({
+    body: input.body,
+    channelType: input.channelType,
+    eventKey: input.eventKey,
+    metadata: input.metadata,
+    organisationId,
+    resourceId: input.resourceId,
+    resourceType: input.resourceType,
+    subject: input.subject
+  });
 }
 
 export async function executeAdminCommunicationRouteTask(input: Readonly<{
@@ -2803,6 +3037,29 @@ export async function dispatchCommunicationMessage(messageId: string) {
       },
       severity: result.message.status === "failed" ? "medium" : "low"
     });
+  }
+
+  if (
+    result.message.status === "failed" &&
+    row.message_type !== "platform_communication_failed"
+  ) {
+    try {
+      await queuePlatformAdminCommunication({
+        eventKey: "platform_communication_failed",
+        metadata: {
+          channelType: row.delivery_channel_type,
+          messageId: row.id,
+          messageType: row.message_type,
+          provider: result.provider,
+          reason: result.reason,
+          source: "communication_dispatch"
+        },
+        resourceId: row.id,
+        resourceType: "communication_message"
+      });
+    } catch (error) {
+      console.warn("Unable to queue platform communication failure notification", error);
+    }
   }
 
   return result;
