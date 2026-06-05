@@ -75,6 +75,8 @@ export async function loadProductRows(productId?: string | null) {
       coalesce(fact_rows.facts, '[]'::jsonb) as facts,
       coalesce(offer_rows.offers, '[]'::jsonb) as offers,
       coalesce(product_translation_rows.translations, '{}'::jsonb) as translations,
+      coalesce(product_identifier_rows.identifiers, '[]'::jsonb) as identifiers,
+      coalesce(product_identifier_candidate_rows.identifier_candidates, '[]'::jsonb) as identifier_candidates,
       coalesce(history.chosen_count, 0) as history_chosen_count,
       history.last_recommended_at as history_last_recommended_at,
       history.average_product_coverage_percent,
@@ -154,6 +156,51 @@ export async function loadProductRows(productId?: string | null) {
       from public.product_translations
       where product_translations.product_id = products.id
     ) product_translation_rows on true
+    left join lateral (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', product_identifiers.id,
+            'type', product_identifiers.identifier_type,
+            'value', product_identifiers.identifier_value,
+            'normalizedValue', product_identifiers.normalized_value,
+            'source', product_identifiers.source,
+            'confidence', product_identifiers.confidence,
+            'evidenceUrl', product_identifiers.evidence_url,
+            'status', product_identifiers.status,
+            'updatedAt', product_identifiers.updated_at
+          )
+          order by product_identifiers.identifier_type, product_identifiers.source, product_identifiers.updated_at desc
+        ),
+        '[]'::jsonb
+      ) as identifiers
+      from public.product_identifiers
+      where product_identifiers.product_id = products.id
+        and product_identifiers.status = 'active'
+    ) product_identifier_rows on true
+    left join lateral (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', product_identifier_candidates.id,
+            'type', product_identifier_candidates.identifier_type,
+            'value', product_identifier_candidates.identifier_value,
+            'normalizedValue', product_identifier_candidates.normalized_value,
+            'source', product_identifier_candidates.source,
+            'confidence', product_identifier_candidates.confidence,
+            'evidenceUrl', product_identifier_candidates.evidence_url,
+            'status', product_identifier_candidates.status,
+            'conflictProductIds', product_identifier_candidates.conflict_product_ids,
+            'updatedAt', product_identifier_candidates.updated_at
+          )
+          order by product_identifier_candidates.status, product_identifier_candidates.updated_at desc
+        ),
+        '[]'::jsonb
+      ) as identifier_candidates
+      from public.product_identifier_candidates
+      where product_identifier_candidates.product_id = products.id
+        and product_identifier_candidates.status in ('pending', 'conflict', 'approved')
+    ) product_identifier_candidate_rows on true
     left join lateral (
       select coalesce(
         jsonb_agg(

@@ -37,6 +37,7 @@ import {
   supplementIdsForFacts
 } from "./admin-product-facts.ts";
 import { clearProductRecommendationCandidateCache } from "./admin-product-search.ts";
+import { productIdentifiersFromBody } from "@/lib/product-identifiers";
 
 // Re-exports needed by the new module structure (temporary during stabilization)
 export { defaultProductCountryCode } from "@/lib/product-countries";
@@ -105,6 +106,19 @@ export {
   normalizedFactsForStorage,
   supplementIdsForFacts
 } from "./admin-product-facts.ts";
+export {
+  primaryIdentifierValue,
+  productIdentifierCandidatesFromPayload,
+  productIdentifiersFromBody,
+  productIdentifiersFromPayload,
+  sourceProductIdentifiers
+} from "@/lib/product-identifiers";
+export type {
+  ProductIdentifier,
+  ProductIdentifierCandidate,
+  ProductIdentifierInput,
+  ProductIdentifierType
+} from "@/lib/product-identifiers";
 
 export async function startProductImportRun(input: StartProductImportRunInput) {
   const sql = getSql();
@@ -748,6 +762,7 @@ export async function stageProductImport(input: StageProductImportInput) {
   const imageUrls = [...new Set((input.imageUrls ?? [])
     .map((url) => url.trim())
     .filter(Boolean))].slice(0, 12);
+  const importedIdentifiers = input.identifiers ?? [];
 
   if (!brandName || !productTitle || !sourceUrl) {
     throw new Error("Product import requires brand, product title, and source URL");
@@ -809,7 +824,8 @@ export async function stageProductImport(input: StageProductImportInput) {
         ...(description ? { description } : {}),
         ...(descriptionEn ? { descriptionEn } : {}),
         ...(descriptionTh ? { descriptionTh } : {}),
-        ...(descriptionZhCn ? { descriptionZhCn } : {})
+        ...(descriptionZhCn ? { descriptionZhCn } : {}),
+        ...(importedIdentifiers.length > 0 ? { identifiers: importedIdentifiers } : {})
       }))}::jsonb,
       ${duplicateProductIds}::uuid[],
       ${input.parseConfidence ?? "moderate"},
@@ -856,6 +872,7 @@ export async function stageProductImport(input: StageProductImportInput) {
       facts: parsedFacts,
       fdaApprovalNumber: cleanNullableText(input.fdaApprovalNumber, 100),
       imageUrl: imageUrls[0] ?? null,
+      identifiers: importedIdentifiers,
       labelStatus: parsedFacts.length > 0 ? "parsed" : "missing",
       manufacturerCountryCodes: [defaultProductCountryCode],
       status: "pending_review",
@@ -876,6 +893,7 @@ export async function stageProductImport(input: StageProductImportInput) {
         ...(descriptionEn ? { descriptionEn } : {}),
         ...(descriptionTh ? { descriptionTh } : {}),
         ...(descriptionZhCn ? { descriptionZhCn } : {}),
+        ...(importedIdentifiers.length > 0 ? { identifiers: importedIdentifiers } : {}),
         productImportId: importId
       },
       sourceUrl,
@@ -1220,6 +1238,13 @@ export async function resolveProductImportReview(
     null;
   const reviewProductUrl = cleanNullableText(input.productUrl) ??
     productImport.source_url;
+  const reviewSnapshot = productImport.raw_snapshot &&
+    typeof productImport.raw_snapshot === "object" &&
+    !Array.isArray(productImport.raw_snapshot)
+    ? productImport.raw_snapshot as Record<string, unknown>
+    : {};
+  const reviewIdentifiers =
+    input.identifiers ?? productIdentifiersFromBody(reviewSnapshot.identifiers) ?? [];
 
   if (input.action === "approve") {
     const row = await createAdminProduct({
@@ -1235,6 +1260,7 @@ export async function resolveProductImportReview(
       facts: reviewFacts,
       fdaApprovalNumber: reviewFdaApprovalNumber,
       imageUrl: reviewImageUrl,
+      identifiers: reviewIdentifiers,
       labelStatus: reviewFacts.length > 0 ? "parsed" : "missing",
       manufacturerCountryCodes: input.manufacturerCountryCodes,
       status: "approved",
@@ -1246,10 +1272,11 @@ export async function resolveProductImportReview(
       replaceFacts: true,
       source: "manufacturer_import",
       sourceSnapshot: {
-        ...productImport.raw_snapshot,
+        ...reviewSnapshot,
         ...(reviewDescription ? { description: reviewDescription } : {}),
         ...(reviewDescriptionEn ? { descriptionEn: reviewDescriptionEn } : {}),
         ...(reviewDescriptionTh ? { descriptionTh: reviewDescriptionTh } : {}),
+        ...(reviewIdentifiers.length > 0 ? { identifiers: reviewIdentifiers } : {}),
         ...(reviewDescriptionZhCn ? { descriptionZhCn: reviewDescriptionZhCn } : {})
       },
       sourceUrl: productImport.source_url,

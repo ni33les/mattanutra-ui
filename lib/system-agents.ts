@@ -1,4 +1,5 @@
 import type { AgentType } from "./task-service.ts";
+import { RETAIL_AGENT_EXECUTABLE_TASK_TYPES } from "./retail-task-policy.ts";
 import { normalizeCapabilities } from "./task-service-utils.ts";
 
 export const AGENT_CAPABILITIES = {
@@ -275,17 +276,7 @@ export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
   generate_product_recommendations: "productMatcher",
   retail_stock_forecast_refresh: "retailStockPlanner",
   retail_customer_order_allocate: "retailStockPlanner",
-  retail_order_cancel_review: "retailStockPlanner",
-  retail_order_delivery_confirm: "retailStockPlanner",
-  retail_order_pack: "retailStockPlanner",
-  retail_order_pick: "retailStockPlanner",
-  retail_order_return_review: "retailStockPlanner",
-  retail_order_ship: "retailStockPlanner",
-  retail_stock_expiry_review: "retailStockPlanner",
-  retail_stock_low_stock_digest: "retailStockPlanner",
-  retail_stock_low_stock_review: "retailStockPlanner",
-  retail_stock_movement_review: "retailStockPlanner",
-  retail_stock_reorder_review: "retailStockPlanner",
+  retail_shopping_list_review: "retailStockPlanner",
   nutrition_plan_chat_reply: "nutritionPlanAdvisor",
   refine_nutrition_plan: "nutritionPlanAdvisor",
   content_status_change: "contentPublisher",
@@ -330,30 +321,7 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
     retail_customer_order_allocate: [
       AGENT_CAPABILITIES.retailStockPolicyReview
     ],
-    retail_order_cancel_review: [
-      AGENT_CAPABILITIES.retailStockPolicyReview
-    ],
-    retail_order_delivery_confirm: [
-      AGENT_CAPABILITIES.retailStockPolicyReview
-    ],
-    retail_order_pack: [AGENT_CAPABILITIES.retailStockPolicyReview],
-    retail_order_pick: [AGENT_CAPABILITIES.retailStockPolicyReview],
-    retail_order_return_review: [
-      AGENT_CAPABILITIES.retailStockPolicyReview
-    ],
-    retail_order_ship: [AGENT_CAPABILITIES.retailStockPolicyReview],
-    retail_stock_expiry_review: [
-      AGENT_CAPABILITIES.retailStockPolicyReview
-    ],
-    retail_stock_low_stock_digest: [AGENT_CAPABILITIES.retailStockForecast],
-    retail_stock_low_stock_review: [
-      AGENT_CAPABILITIES.retailStockPolicyReview
-    ],
-    retail_stock_movement_review: [
-      AGENT_CAPABILITIES.retailStockPolicyReview
-    ],
-    retail_stock_reorder_review: [
-      AGENT_CAPABILITIES.retailStockForecast,
+    retail_shopping_list_review: [
       AGENT_CAPABILITIES.retailStockPolicyReview
     ],
     nutrition_plan_chat_reply: [AGENT_CAPABILITIES.nutritionPlanChat],

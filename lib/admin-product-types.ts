@@ -13,8 +13,18 @@ import type {
   ProductCountryPricing
 } from "@/lib/product-countries";
 import type { AdminProductDecisionStats } from "@/lib/admin-recommendation-insights";
+import type {
+  ProductIdentifier,
+  ProductIdentifierCandidate,
+  ProductIdentifierInput
+} from "@/lib/product-identifiers";
 
 export type { ProductCountryCode } from "@/lib/product-countries";
+export type {
+  ProductIdentifier,
+  ProductIdentifierCandidate,
+  ProductIdentifierInput
+} from "@/lib/product-identifiers";
 
 // Status / label / platform guards and sets (pure, no side effects)
 const productStatuses = new Set<ProductStatus>([
@@ -99,6 +109,8 @@ export type AdminProductRow = Readonly<{
   imageUrl: string | null;
   importReviewTaskId: string | null;
   importStatus: string | null;
+  identifierCandidates: ProductIdentifierCandidate[];
+  identifiers: ProductIdentifier[];
   labelStatus: ProductLabelStatus;
   manufacturerCountryCodes: ProductCountryCode[];
   countryPricing: ProductCountryPricing[];
@@ -211,6 +223,7 @@ export type StageProductImportInput = Readonly<{
   descriptionZhCn?: string | null;
   duplicateProductIds?: readonly string[];
   fdaApprovalNumber?: string | null;
+  identifiers?: readonly ProductIdentifierInput[];
   imageUrls?: readonly string[];
   importRunId?: string | null;
   parsedFacts?: readonly ProductImportFactInput[];
@@ -237,6 +250,7 @@ export type ResolveProductImportReviewInput = Readonly<{
   descriptionZhCn?: string | null;
   fdaApprovalNumber?: string | null;
   imageUrl?: string | null;
+  identifiers?: readonly ProductIdentifierInput[];
   manufacturerCountryCodes?: readonly string[];
   mergeProductId?: string | null;
   parsedFacts?: readonly ProductImportFactInput[];
@@ -269,6 +283,7 @@ export type CreateAdminProductInput = Readonly<{
   facts?: readonly ProductImportFactInput[];
   imageUrl?: string | null;
   fdaApprovalNumber?: string | null;
+  identifiers?: readonly ProductIdentifierInput[];
   labelStatus?: ProductLabelStatus;
   status?: ProductStatus;
   externalProductId?: string | null;
@@ -308,6 +323,7 @@ export type UpdateAdminProductInput = Readonly<{
   fdaApprovalNumber?: string | null;
   id: string;
   imageUrl?: string | null;
+  identifiers?: readonly ProductIdentifierInput[];
   labelStatus?: ProductLabelStatus;
   status?: ProductStatus;
   priceAmount?: number | null;
@@ -417,6 +433,8 @@ export type ProductDbRow = Readonly<{
   history_last_recommended_at: Date | string | null;
   id: string;
   image_url: string | null;
+  identifier_candidates: unknown;
+  identifiers: unknown;
   import_duplicate_product_ids: string[] | null;
   import_id: string | null;
   import_review_task_id: string | null;

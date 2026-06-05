@@ -24,6 +24,10 @@ import {
   normalizeProductCountryPricingStatus,
   type ProductCountryPricing
 } from "@/lib/product-countries";
+import {
+  productIdentifierCandidatesFromPayload,
+  productIdentifiersFromPayload
+} from "@/lib/product-identifiers";
 const randomUUID = () => globalThis.crypto.randomUUID();
 
 import {
@@ -424,6 +428,10 @@ export function rowFromDb(
     fdaApprovalNumber: row.fda_approval_number,
     id: row.id,
     imageUrl: row.image_url,
+    identifierCandidates: productIdentifierCandidatesFromPayload(
+      row.identifier_candidates
+    ),
+    identifiers: productIdentifiersFromPayload(row.identifiers),
     labelStatus: row.label_status,
     status: effectiveListStatus,
     validation,

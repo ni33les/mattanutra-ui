@@ -110,7 +110,7 @@ export const retailOrderWorkflowTransitions = {
       taskType: "retail_order_delivery_confirm",
       title: "Confirm customer delivery"
     },
-    requiredTaskTypes: ["retail_order_pick", "retail_order_pack", "retail_order_ship"]
+    requiredTaskTypes: ["retail_order_ship"]
   },
   return: {
     bpmEventName: "retail_order_returned",

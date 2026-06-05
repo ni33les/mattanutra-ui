@@ -1175,17 +1175,10 @@ export async function consumeOrganisationLineConnectCode(input: Readonly<{
     set
       status = 'consuming',
       updated_at = now()
-    where id = (
-      select id
-      from public.line_connect_tokens
-      where token_hash = ${hashLineConnectCode(code)}
-        and status = 'active'
-        and consumed_at is null
-        and expires_at > now()
-      order by created_at asc
-      limit 1
-      for update skip locked
-    )
+    where token_hash = ${hashLineConnectCode(code)}
+      and status = 'active'
+      and consumed_at is null
+      and expires_at > now()
     returning id::text, organisation_id::text, metadata
   `;
   const token = tokenRows[0];

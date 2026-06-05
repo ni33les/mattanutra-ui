@@ -74,6 +74,8 @@ drop table if exists
   public.product_brand_countries,
   public.product_brands,
   public.product_countries,
+  public.product_identifier_candidates,
+  public.product_identifiers,
   public.product_import_translations,
   public.product_fact_versions,
   public.product_facts,
@@ -94,6 +96,7 @@ drop table if exists
   public.retail_stock_reorder_advice,
   public.retail_stock_movements,
   public.retail_stock_lots,
+  public.retail_product_cost_observations,
   public.retail_product_stock_snapshots,
   public.retail_product_stock,
   public.retail_sellable_products,
@@ -1901,6 +1904,63 @@ CREATE TABLE public.products (
 
 
 --
+-- Name: product_identifiers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_identifiers (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    product_id uuid NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    identifier_type text NOT NULL,
+    identifier_value text NOT NULL,
+    normalized_value text NOT NULL,
+    source text DEFAULT 'admin'::text NOT NULL,
+    confidence text DEFAULT 'medium'::text NOT NULL,
+    evidence_url text,
+    status text DEFAULT 'active'::text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_identifiers_confidence_check CHECK ((confidence = ANY (ARRAY['trusted'::text, 'high'::text, 'medium'::text, 'low'::text]))),
+    CONSTRAINT product_identifiers_ean13_check CHECK (((identifier_type <> 'ean13'::text) OR (normalized_value ~ '^[0-9]{13}$'::text))),
+    CONSTRAINT product_identifiers_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'deleted'::text]))),
+    CONSTRAINT product_identifiers_type_check CHECK ((identifier_type = ANY (ARRAY['ean13'::text, 'internal_sku'::text, 'manufacturer_sku'::text, 'retailer_local_code'::text, 'supplier_code'::text]))),
+    CONSTRAINT product_identifiers_value_check CHECK (((length(TRIM(BOTH FROM identifier_value)) > 0) AND (length(TRIM(BOTH FROM normalized_value)) > 0)))
+);
+
+
+COMMENT ON TABLE public.product_identifiers IS 'Approved product identifiers such as EAN-13 barcodes, internal SKUs, manufacturer SKUs, retailer codes, and supplier codes.';
+
+
+--
+-- Name: product_identifier_candidates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_identifier_candidates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    product_id uuid NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    identifier_type text NOT NULL,
+    identifier_value text NOT NULL,
+    normalized_value text NOT NULL,
+    source text DEFAULT 'unknown'::text NOT NULL,
+    confidence text DEFAULT 'medium'::text NOT NULL,
+    evidence_url text,
+    status text DEFAULT 'pending'::text NOT NULL,
+    conflict_product_ids uuid[] DEFAULT '{}'::uuid[] NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_identifier_candidates_confidence_check CHECK ((confidence = ANY (ARRAY['trusted'::text, 'high'::text, 'medium'::text, 'low'::text]))),
+    CONSTRAINT product_identifier_candidates_ean13_check CHECK (((identifier_type <> 'ean13'::text) OR (normalized_value ~ '^[0-9]{13}$'::text))),
+    CONSTRAINT product_identifier_candidates_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'conflict'::text]))),
+    CONSTRAINT product_identifier_candidates_type_check CHECK ((identifier_type = ANY (ARRAY['ean13'::text, 'internal_sku'::text, 'manufacturer_sku'::text, 'retailer_local_code'::text, 'supplier_code'::text]))),
+    CONSTRAINT product_identifier_candidates_value_check CHECK (((length(TRIM(BOTH FROM identifier_value)) > 0) AND (length(TRIM(BOTH FROM normalized_value)) > 0)))
+);
+
+
+COMMENT ON TABLE public.product_identifier_candidates IS 'Trusted or review-needed identifier observations sourced from manufacturer/import/retailer evidence.';
+
+
+--
 -- Name: product_translations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1990,6 +2050,31 @@ CREATE TABLE public.retail_product_stock (
 --
 
 COMMENT ON TABLE public.retail_product_stock IS 'Retailer-owned physical stock projection for approved master products. Sellable price and backorder policy live in retail_sellable_products.';
+
+
+--
+-- Name: retail_product_cost_observations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_product_cost_observations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    organisation_id uuid REFERENCES public.organisations(id) ON DELETE SET NULL,
+    product_id uuid NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    source text DEFAULT 'hygeia_import'::text NOT NULL,
+    ean13 text,
+    wholesale_price_amount numeric(20,6),
+    retail_price_amount numeric(20,6),
+    currency text DEFAULT 'THB'::text NOT NULL,
+    observed_at timestamp with time zone DEFAULT now() NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_product_cost_observations_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT retail_product_cost_observations_ean13_check CHECK (((ean13 IS NULL) OR (ean13 ~ '^[0-9]{13}$'::text))),
+    CONSTRAINT retail_product_cost_observations_price_check CHECK ((((wholesale_price_amount IS NULL) OR (wholesale_price_amount >= (0)::numeric)) AND ((retail_price_amount IS NULL) OR (retail_price_amount >= (0)::numeric))))
+);
+
+
+COMMENT ON TABLE public.retail_product_cost_observations IS 'Imported retailer/supplier cost and retail price observations. Observations do not change product truth until separately approved or applied.';
 
 
 --
@@ -4584,6 +4669,41 @@ CREATE INDEX product_import_translations_locale_idx ON public.product_import_tra
 
 
 --
+-- Name: product_identifiers_product_type_value_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX product_identifiers_product_type_value_key ON public.product_identifiers USING btree (product_id, identifier_type, normalized_value);
+
+
+--
+-- Name: product_identifiers_active_type_value_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX product_identifiers_active_type_value_key ON public.product_identifiers USING btree (identifier_type, normalized_value) WHERE (status = 'active'::text);
+
+
+--
+-- Name: product_identifiers_product_type_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX product_identifiers_product_type_idx ON public.product_identifiers USING btree (product_id, identifier_type, status, updated_at DESC);
+
+
+--
+-- Name: product_identifier_candidates_product_source_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX product_identifier_candidates_product_source_key ON public.product_identifier_candidates USING btree (product_id, identifier_type, normalized_value, source);
+
+
+--
+-- Name: product_identifier_candidates_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX product_identifier_candidates_status_idx ON public.product_identifier_candidates USING btree (status, identifier_type, updated_at DESC);
+
+
+--
 -- Name: product_offers_priority_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4616,6 +4736,20 @@ CREATE INDEX retail_product_stock_org_status_idx ON public.retail_product_stock 
 --
 
 CREATE INDEX retail_product_stock_product_idx ON public.retail_product_stock USING btree (product_id);
+
+
+--
+-- Name: retail_product_cost_observations_product_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_product_cost_observations_product_idx ON public.retail_product_cost_observations USING btree (product_id, observed_at DESC);
+
+
+--
+-- Name: retail_product_cost_observations_org_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_product_cost_observations_org_idx ON public.retail_product_cost_observations USING btree (organisation_id, observed_at DESC) WHERE (organisation_id IS NOT NULL);
 
 
 --

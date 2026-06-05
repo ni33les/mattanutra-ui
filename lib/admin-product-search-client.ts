@@ -48,6 +48,17 @@ function productSearchIndex(row: AdminProductRow) {
     row.status,
     row.labelStatus,
     row.validationLabel,
+    ...row.identifiers.flatMap((identifier) => [
+      identifier.type,
+      identifier.value,
+      identifier.normalizedValue
+    ]),
+    ...row.identifierCandidates.flatMap((identifier) => [
+      identifier.type,
+      identifier.value,
+      identifier.normalizedValue,
+      identifier.status
+    ]),
     ...row.facts.flatMap((fact) => [
       fact.name,
       fact.normalizedName,

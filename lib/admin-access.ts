@@ -4128,6 +4128,15 @@ export async function recordAdminAudit({
     return;
   }
 
+  const persistedActorPersonId =
+    actorPersonId?.startsWith("00000000-0000-4000-8000-")
+      ? null
+      : actorPersonId ?? null;
+  const persistedAssumedPersonId =
+    assumedPersonId?.startsWith("00000000-0000-4000-8000-")
+      ? null
+      : assumedPersonId ?? null;
+
   await sql`
     insert into public.admin_audit_events (
       organisation_id,
@@ -4140,8 +4149,8 @@ export async function recordAdminAudit({
     )
     values (
       ${organisationId ?? null}::uuid,
-      ${actorPersonId ?? null}::uuid,
-      ${assumedPersonId ?? null}::uuid,
+      ${persistedActorPersonId}::uuid,
+      ${persistedAssumedPersonId}::uuid,
       ${action},
       ${resourceType},
       ${resourceId},

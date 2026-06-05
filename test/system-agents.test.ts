@@ -50,18 +50,8 @@ describe("system agents", () => {
       "nutrition_plan_chat_reply",
       "refine_nutrition_plan",
       "retail_customer_order_allocate",
-      "retail_order_cancel_review",
-      "retail_order_delivery_confirm",
-      "retail_order_pack",
-      "retail_order_pick",
-	      "retail_order_return_review",
-	      "retail_order_ship",
-      "retail_stock_expiry_review",
       "retail_stock_forecast_refresh",
-      "retail_stock_low_stock_digest",
-      "retail_stock_low_stock_review",
-      "retail_stock_movement_review",
-      "retail_stock_reorder_review",
+      "retail_shopping_list_review",
       "route_admin_communication",
       "send_example_email",
       "send_reassessment_email",
@@ -76,6 +66,24 @@ describe("system agents", () => {
         true,
         `${agent.name} should satisfy ${taskType}`
       );
+    }
+  });
+
+  it("keeps human retail workflow tasks out of worker capability routing", () => {
+    for (const taskType of [
+      "retail_order_cancel_review",
+      "retail_order_delivery_confirm",
+      "retail_order_pack",
+      "retail_order_pick",
+      "retail_order_return_review",
+      "retail_order_ship",
+      "retail_stock_expiry_review",
+      "retail_stock_low_stock_digest",
+      "retail_stock_low_stock_review",
+      "retail_stock_movement_review",
+      "retail_stock_reorder_review"
+    ]) {
+      assert.deepEqual(requiredCapabilitiesForWorkTaskType(taskType), []);
     }
   });
 
@@ -99,6 +107,8 @@ describe("system agents", () => {
     assert.match(runner, /configs\.flatMap/);
     assert.match(runner, /chat: agentProfile\("chatDispatcher"/);
     assert.match(runner, /"dispatch_chat_communication_message"/);
-    assert.match(runner, /stock: agentProfile\("retailStockPlanner"/);
+    assert.match(runner, /stock: agentProfile\("retailStockPlanner", RETAIL_AGENT_EXECUTABLE_TASK_TYPES\)/);
+    assert.doesNotMatch(runner, /"retail_order_ship"/);
+    assert.doesNotMatch(runner, /"retail_purchase_order_receive"/);
   });
 });

@@ -42,6 +42,7 @@ import {
   retailCommandRegistry,
   type RetailCommandId
 } from "@/lib/retail-command-registry";
+import { RETAIL_ORDER_WORKFLOW_TASK_TYPES } from "@/lib/retail-task-policy";
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
 type StockDb = postgres.Sql | postgres.TransactionSql;
@@ -360,7 +361,9 @@ export type AdminRetailShoppingListLine = Readonly<{
   assignedQuantity: number;
   brandName: string | null;
   currentStockQuantity: number;
+  ean13: string | null;
   id: string;
+  internalSku: string | null;
   organisationId: string;
   productId: string;
   productTitle: string;
@@ -738,138 +741,7 @@ async function retailShoppingListTablesAvailable(sql: StockDb) {
   return Boolean(rows[0]?.available);
 }
 
-async function ensureRetailShoppingListTables(sql: StockDb) {
-  await sql`
-    create table if not exists public.retail_shopping_lists (
-      id uuid primary key default gen_random_uuid(),
-      organisation_id uuid not null references public.organisations(id) on delete restrict,
-      list_number text not null,
-      status text not null default 'active',
-      currency text not null default 'USD',
-      created_by_person_id uuid references public.people(id) on delete set null,
-      metadata jsonb not null default '{}'::jsonb,
-      created_at timestamptz not null default now(),
-      updated_at timestamptz not null default now(),
-      constraint retail_shopping_lists_org_number_key unique (organisation_id, list_number),
-      constraint retail_shopping_lists_status_check check (
-        status in ('active', 'closed')
-      ),
-      constraint retail_shopping_lists_currency_check check (currency ~ '^[A-Z]{3}$')
-    )
-  `;
-  await sql`alter table public.retail_shopping_lists drop constraint if exists retail_shopping_lists_status_check`;
-  await sql`
-    update public.retail_shopping_lists
-    set status = case when status = 'draft' then 'active' else 'closed' end
-    where status <> all(array['active', 'closed'])
-  `;
-  await sql`
-    alter table public.retail_shopping_lists
-      alter column status set default 'active',
-      drop column if exists notes,
-      drop column if exists applied_at,
-      add constraint retail_shopping_lists_status_check check (
-        status in ('active', 'closed')
-      )
-  `;
-  await sql`
-    create index if not exists retail_shopping_lists_org_status_idx
-      on public.retail_shopping_lists (organisation_id, status, updated_at desc)
-  `;
-  await sql`
-    create table if not exists public.retail_shopping_list_lines (
-      id uuid primary key default gen_random_uuid(),
-      shopping_list_id uuid not null references public.retail_shopping_lists(id) on delete cascade,
-      organisation_id uuid not null references public.organisations(id) on delete restrict,
-      product_id uuid not null references public.products(id) on delete restrict,
-      required_quantity integer not null default 0,
-      current_stock_quantity integer not null default 0,
-      unordered_need_quantity integer not null default 0,
-      assigned_quantity integer not null default 0,
-      actual_quantity integer not null default 0,
-      stocked_quantity integer not null default 0,
-      wholesale_price_amount numeric(12,2),
-      retail_price_amount numeric(12,2),
-      metadata jsonb not null default '{}'::jsonb,
-      created_at timestamptz not null default now(),
-      updated_at timestamptz not null default now(),
-      constraint retail_shopping_list_lines_quantity_check check (
-        required_quantity >= 0
-        and current_stock_quantity >= 0
-        and unordered_need_quantity >= 0
-        and assigned_quantity >= 0
-        and actual_quantity >= 0
-        and stocked_quantity >= 0
-      ),
-      constraint retail_shopping_list_lines_price_check check (
-        (wholesale_price_amount is null or wholesale_price_amount >= 0)
-        and (retail_price_amount is null or retail_price_amount >= 0)
-      )
-    )
-  `;
-  await sql`alter table public.retail_shopping_list_lines drop constraint if exists retail_shopping_list_lines_quantity_check`;
-  await sql`alter table public.retail_shopping_list_lines drop constraint if exists retail_shopping_list_lines_availability_check`;
-	  await sql`
-	    alter table public.retail_shopping_list_lines
-	      add column if not exists assigned_quantity integer not null default 0,
-	      add column if not exists actual_quantity integer not null default 0,
-	      add column if not exists stocked_quantity integer not null default 0,
-	      add column if not exists suggested_quantity integer not null default 0,
-	      add column if not exists purchased_quantity integer not null default 0
-	  `;
-  await sql`
-    update public.retail_shopping_list_lines
-    set
-      assigned_quantity = greatest(
-        assigned_quantity,
-        coalesce(nullif(suggested_quantity, 0), required_quantity, unordered_need_quantity, 0)
-      ),
-      actual_quantity = greatest(
-        actual_quantity,
-        coalesce(nullif(purchased_quantity, 0), nullif(suggested_quantity, 0), required_quantity, unordered_need_quantity, 0)
-      ),
-      stocked_quantity = greatest(
-        stocked_quantity,
-        case
-          when exists (
-            select 1
-            from public.retail_shopping_lists
-            where retail_shopping_lists.id = retail_shopping_list_lines.shopping_list_id
-              and retail_shopping_lists.status in ('applied', 'closed')
-          ) then coalesce(nullif(purchased_quantity, 0), 0)
-          else 0
-        end
-      )
-  `;
-  await sql`
-    alter table public.retail_shopping_list_lines
-      drop column if exists suggested_quantity,
-      drop column if exists wholesaler_tried,
-      drop column if exists availability_status,
-      drop column if exists purchased_quantity,
-      drop column if exists notes,
-      add constraint retail_shopping_list_lines_quantity_check check (
-        required_quantity >= 0
-        and current_stock_quantity >= 0
-        and unordered_need_quantity >= 0
-        and assigned_quantity >= 0
-        and actual_quantity >= 0
-        and stocked_quantity >= 0
-      )
-  `;
-  await sql`
-    create index if not exists retail_shopping_list_lines_list_idx
-      on public.retail_shopping_list_lines (shopping_list_id, created_at)
-  `;
-}
-
 async function ensureRetailShoppingListTablesAvailable(sql: StockDb) {
-  if (await retailShoppingListTablesAvailable(sql)) {
-    return;
-  }
-
-  await ensureRetailShoppingListTables(sql);
-
   if (!(await retailShoppingListTablesAvailable(sql))) {
     throw new Error("Retail shopping list tables are not available");
   }
@@ -893,6 +765,22 @@ function canAccessRetailOrganisation(
 ) {
   return canReadAllRetailStock(context) ||
     organisationId === context.effectiveOrganisation.id;
+}
+
+function persistedActorPersonId(context: AdminSessionContext) {
+  return context.actorPerson.id.startsWith("00000000-0000-4000-8000-")
+    ? null
+    : context.actorPerson.id;
+}
+
+function retailActorMetadata(context: AdminSessionContext) {
+  return {
+    actorDisplayName: context.actorPerson.displayName,
+    actorEmail: context.actorPerson.email,
+    actorKind: context.sessionId?.startsWith("task:") ? "agent" : "human",
+    actorPersonId: context.actorPerson.id,
+    persistedActorPersonId: persistedActorPersonId(context)
+  };
 }
 
 function numberMetadata(value: unknown, fallback = 0) {
@@ -2347,6 +2235,60 @@ export async function ensureOrderWorkflowTask(
   return taskId;
 }
 
+async function cancelStaleOrderWorkflowTasks(
+  sql: StockDb,
+  context: AdminSessionContext,
+  input: Readonly<{
+    expectedTaskTypes: readonly string[];
+    orderId: string;
+    organisationId: string;
+    reason: string;
+    status: string;
+  }>
+) {
+  const rows = await sql<Array<{ id: string; task_type: string }>>`
+    update public.tasks
+    set
+      status = 'cancelled',
+      result_payload = coalesce(result_payload, '{}'::jsonb) || ${sql.json({
+        actorPersonId: context.actorPerson.id,
+        expectedTaskTypes: [...input.expectedTaskTypes],
+        reason: input.reason,
+        source: "retail_order_lifecycle_reconciliation",
+        status: input.status
+      })}::jsonb,
+      lease_until = null,
+      reserved_by_agent_id = null,
+      completed_at = coalesce(completed_at, now()),
+      updated_at = now()
+    where organisation_id = ${input.organisationId}::uuid
+      and source_entity_type = 'retail_customer_order'
+      and source_entity_id = ${input.orderId}::uuid
+      and task_type = any(${[...RETAIL_ORDER_WORKFLOW_TASK_TYPES]}::text[])
+      and not (task_type = any(${[...input.expectedTaskTypes]}::text[]))
+      and status not in ('completed', 'cancelled', 'skipped')
+    returning id::text, task_type
+  `;
+
+  for (const task of rows) {
+    await addTaskEvent({
+      eventPayload: {
+        actorPersonId: context.actorPerson.id,
+        expectedTaskTypes: [...input.expectedTaskTypes],
+        source: "retail_order_lifecycle_reconciliation",
+        status: input.status,
+        taskType: task.task_type
+      },
+      eventStatus: "succeeded",
+      eventType: "retail_order_stale_workflow_task_cancelled",
+      severity: "low",
+      taskId: task.id
+    });
+  }
+
+  return rows.length;
+}
+
 export async function executeRetailAgentCommand(input: RetailAgentCommandInput) {
   const commandId = retailCommandIdForTaskType(input.taskType);
 
@@ -3269,9 +3211,11 @@ export async function getAdminRetailStockData(
         sql<Array<{
           actual_quantity: number | string;
           assigned_quantity: number | string;
-          brand_name: string | null;
-          current_stock_quantity: number | string;
-          id: string;
+	          brand_name: string | null;
+	          current_stock_quantity: number | string;
+          ean13: string | null;
+	          id: string;
+          internal_sku: string | null;
           organisation_id: string;
           product_id: string;
           product_title: string;
@@ -3287,9 +3231,11 @@ export async function getAdminRetailStockData(
             retail_shopping_list_lines.shopping_list_id::text,
             retail_shopping_list_lines.organisation_id::text,
             retail_shopping_list_lines.product_id::text,
-            ${productTitle} as product_title,
-            products.brand_name,
-            retail_shopping_list_lines.required_quantity,
+	            ${productTitle} as product_title,
+	            products.brand_name,
+            identifiers.ean13,
+            identifiers.internal_sku,
+	            retail_shopping_list_lines.required_quantity,
             retail_shopping_list_lines.current_stock_quantity,
             retail_shopping_list_lines.unordered_need_quantity,
             retail_shopping_list_lines.assigned_quantity,
@@ -3300,11 +3246,24 @@ export async function getAdminRetailStockData(
           from public.retail_shopping_list_lines
           join public.products
             on products.id = retail_shopping_list_lines.product_id
-          left join public.product_translations
-            on product_translations.product_id = products.id
-            and product_translations.locale = ${locale}
-            and product_translations.status <> 'missing'
-          where retail_shopping_list_lines.organisation_id = any(${organisationIds}::uuid[])
+	          left join public.product_translations
+	            on product_translations.product_id = products.id
+	            and product_translations.locale = ${locale}
+	            and product_translations.status <> 'missing'
+          left join lateral (
+            select
+              max(product_identifiers.identifier_value) filter (
+                where product_identifiers.identifier_type = 'ean13'
+              ) as ean13,
+              max(product_identifiers.identifier_value) filter (
+                where product_identifiers.identifier_type = 'internal_sku'
+              ) as internal_sku
+            from public.product_identifiers
+            where product_identifiers.product_id = products.id
+              and product_identifiers.status = 'active'
+              and product_identifiers.identifier_type in ('ean13', 'internal_sku')
+          ) identifiers on true
+	          where retail_shopping_list_lines.organisation_id = any(${organisationIds}::uuid[])
           order by retail_shopping_list_lines.created_at asc
           limit 500
         `
@@ -3704,9 +3663,11 @@ export async function getAdminRetailStockData(
 	    shoppingListLines: shoppingListLineRows.map((row) => ({
 	      actualQuantity: integerOrDefault(row.actual_quantity, 0),
 	      assignedQuantity: integerOrDefault(row.assigned_quantity, 0),
-	      brandName: row.brand_name,
-	      currentStockQuantity: integerOrDefault(row.current_stock_quantity, 0),
-	      id: row.id,
+		      brandName: row.brand_name,
+		      currentStockQuantity: integerOrDefault(row.current_stock_quantity, 0),
+          ean13: row.ean13,
+		      id: row.id,
+          internalSku: row.internal_sku,
 	      organisationId: row.organisation_id,
 	      productId: row.product_id,
 	      productTitle: row.product_title,
@@ -4929,6 +4890,8 @@ export async function ensureRetailOrderShortagesOnShoppingList(
     organisationRows[0]?.organisation_type ?? "tenant"
   );
   const listCurrency = listRows[0]?.currency ?? organisationCurrency;
+  const actorPersonId = persistedActorPersonId(context);
+  const actorMetadata = retailActorMetadata(context);
 
   if (!listId) {
     const createdRows = await sql<Array<{ id: string }>>`
@@ -4947,9 +4910,10 @@ export async function ensureRetailOrderShortagesOnShoppingList(
         ${orderNumber("SL")},
         'active',
         ${listCurrency},
-        ${context.actorPerson.id}::uuid,
+        ${actorPersonId}::uuid,
         ${sql.json({
-          createdByPersonId: context.actorPerson.id,
+          ...actorMetadata,
+          createdByPersonId: actorPersonId,
           customerOrderId: input.customerOrderId,
           orderNumber: input.orderNumber ?? null,
           source: "retail_order_shortage_reconciliation"
@@ -5023,10 +4987,11 @@ export async function ensureRetailOrderShortagesOnShoppingList(
             ${wholesalePriceAmount}
           ),
           metadata = metadata || ${sql.json({
+            ...actorMetadata,
             customerOrderId: input.customerOrderId,
             orderNumber: input.orderNumber ?? null,
             source: "retail_order_shortage_reconciliation",
-            updatedByPersonId: context.actorPerson.id
+            updatedByPersonId: actorPersonId
           })}::jsonb,
           updated_at = now()
         where id = ${existing.id}::uuid
@@ -5062,11 +5027,12 @@ export async function ensureRetailOrderShortagesOnShoppingList(
           ${wholesalePriceAmount},
           null,
           ${sql.json({
+            ...actorMetadata,
             customerOrderId: input.customerOrderId,
             orderNumber: input.orderNumber ?? null,
             productTitle: missing.productTitle,
             source: "retail_order_shortage_reconciliation",
-            updatedByPersonId: context.actorPerson.id
+            updatedByPersonId: actorPersonId
           })},
           now(),
           now()
@@ -5086,7 +5052,7 @@ export async function ensureRetailOrderShortagesOnShoppingList(
 
   await recordAdminAudit({
     action: "admin.retail_shopping_list_shortages_reconciled",
-    actorPersonId: context.actorPerson.id,
+    actorPersonId,
     assumedPersonId: context.assumedPerson?.id ?? null,
     organisationId: input.organisationId,
     resourceId: listId,
@@ -6733,12 +6699,17 @@ export async function advanceRetailCustomerOrder(
     }
   });
 
-  if (requiredTaskTypes.length > 0) {
+  const completionTaskTypes =
+    input.action === "mark_shipped"
+      ? ["retail_order_pick", "retail_order_pack", "retail_order_ship"]
+      : requiredTaskTypes;
+
+  if (completionTaskTypes.length > 0) {
     await completeOrderWorkflowTask(sql, context, {
       action: input.action,
       orderId: order.id,
       organisationId: order.organisation_id,
-      taskTypes: requiredTaskTypes
+      taskTypes: completionTaskTypes
     });
   }
 
@@ -6881,6 +6852,14 @@ export async function reconcileRetailOrderLifecycle(
             ? "retail_shopping_list_review"
             : null
       : expectedTaskTypeForStage(stage);
+  const expectedTaskTypes = expectedTaskType ? [expectedTaskType] : [];
+  const staleCancelledCount = await cancelStaleOrderWorkflowTasks(sql, context, {
+    expectedTaskTypes,
+    orderId: order.id,
+    organisationId: order.organisation_id,
+    reason: "order_stage_changed",
+    status: order.status
+  });
 
   if (!expectedTaskType) {
     await recordAdminAudit({
@@ -6891,18 +6870,20 @@ export async function reconcileRetailOrderLifecycle(
       resourceId: order.id,
       resourceType: "retail_customer_order",
       metadata: {
-        repaired: false,
+        repaired: staleCancelledCount > 0,
         stage,
+        staleCancelledCount,
         status: order.status
       }
     });
 
     await recordRetailOrderBpmEvent(sql, context, {
       eventName: "retail_order_lifecycle_reconciled",
-      eventStatus: "on_track",
+      eventStatus: staleCancelledCount > 0 ? "repaired" : "on_track",
       metadata: {
-        repaired: false,
+        repaired: staleCancelledCount > 0,
         stage,
+        staleCancelledCount,
         status: order.status
       },
       orderId: order.id,
@@ -6912,7 +6893,6 @@ export async function reconcileRetailOrderLifecycle(
     return order.id;
   }
 
-  const expectedTaskTypes = [expectedTaskType];
   const shoppingListShortageRepair =
     expectedTaskType === "retail_shopping_list_review"
       ? await ensureRetailOrderShortagesOnShoppingList(context, {
@@ -6935,6 +6915,7 @@ export async function reconcileRetailOrderLifecycle(
   `;
   const hasExpectedTask = Boolean(taskRows[0]?.exists);
   let repaired = (shoppingListShortageRepair?.addedUnits ?? 0) > 0;
+  repaired = repaired || staleCancelledCount > 0;
 
   if (!hasExpectedTask) {
     const taskDetails = retailOrderWorkflowTaskDetails(expectedTaskType);
@@ -6969,6 +6950,7 @@ export async function reconcileRetailOrderLifecycle(
       shoppingListLineCount: shoppingListShortageRepair?.lineCount ?? 0,
       shoppingListId: shoppingListShortageRepair?.listId ?? null,
       stage,
+      staleCancelledCount,
       status: order.status
     }
   });
@@ -6983,6 +6965,7 @@ export async function reconcileRetailOrderLifecycle(
       shoppingListLineCount: shoppingListShortageRepair?.lineCount ?? 0,
       shoppingListId: shoppingListShortageRepair?.listId ?? null,
       stage,
+      staleCancelledCount,
       status: order.status
     },
     orderId: order.id,

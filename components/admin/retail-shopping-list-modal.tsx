@@ -11,7 +11,9 @@ export type ShoppingListLineDraft = Readonly<{
   assignedQuantity: string;
   brandName: string | null;
   currentStockQuantity: string;
+  ean13: string | null;
   id: string;
+  internalSku: string | null;
   productId: string;
   productTitle: string;
   requiredQuantity: string;
@@ -64,6 +66,8 @@ function downloadShoppingListCsv(
 ) {
   const columns = [
     "productId",
+    "ean13",
+    "internalSku",
     "productTitle",
     "requiredQuantity",
     "currentStock",
@@ -78,6 +82,8 @@ function downloadShoppingListCsv(
     ...lines.map((line) =>
       [
         line.productId,
+        line.ean13,
+        line.internalSku,
         line.productTitle,
         line.requiredQuantity,
         line.currentStockQuantity,
@@ -239,6 +245,16 @@ export function RetailShoppingListModal({
                     <div className="mt-1 text-xs font-medium text-gray-500">
                       {line.productId}
                     </div>
+                    {line.ean13 || line.internalSku ? (
+                      <div className="mt-1 text-xs text-gray-500">
+                        {[
+                          line.ean13 ? `EAN ${line.ean13}` : null,
+                          line.internalSku ? `SKU ${line.internalSku}` : null
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    ) : null}
                   </td>
                   <td className="py-2 pr-3 font-semibold text-gray-900">
                     {line.assignedQuantity}

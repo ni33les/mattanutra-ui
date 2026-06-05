@@ -1745,6 +1745,7 @@ export async function reserveNextTask(
       join public.organisations task_organisations
         on task_organisations.id = tasks.organisation_id
       where tasks.status = 'queued'
+        and coalesce(tasks.actor_type, 'system') <> 'human'
         and tasks.scheduled_for <= now()
         and tasks.attempts < tasks.max_attempts
         and not exists (

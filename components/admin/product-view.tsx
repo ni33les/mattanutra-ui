@@ -48,6 +48,7 @@ import {
   ProductCard,
   ProductCountryManager,
   ProductFactsEditor,
+  ProductIdentifiersEditor,
   ProductInsightStat,
   ProductOffersEditor,
   ProductTranslationEditor,
@@ -72,6 +73,7 @@ export function AdminProductsView({
   const [metricFilter, setMetricFilter] =
     useState<ProductMetricFilter>("productsTotal");
   const [manufacturerFilter, setManufacturerFilter] = useState("");
+  const [identifierSourcing, setIdentifierSourcing] = useState(false);
   const viewLabels = productViewLabels[locale];
   const normalizedSearch = search.trim().toLowerCase();
   const metrics = productMetricCards({ locale, rows, viewLabels });
@@ -125,6 +127,7 @@ export function AdminProductsView({
           facts: productFactPayloads(row),
           fdaApprovalNumber: row.fdaApprovalNumber,
           imageUrl: row.imageUrl,
+          identifiers: row.identifiers,
           labelStatus: row.labelStatus,
           manufacturerCountryCodes: row.manufacturerCountryCodes,
           status: row.status,
@@ -336,6 +339,7 @@ export function AdminProductsView({
             descriptionTh: row.descriptionTh,
             fdaApprovalNumber: row.fdaApprovalNumber,
             imageUrl: row.imageUrl,
+            identifiers: row.identifiers,
             manufacturerCountryCodes: row.manufacturerCountryCodes,
             mergeProductId,
             parsedFacts: productFactPayloads(row),
@@ -412,6 +416,40 @@ export function AdminProductsView({
     }
   }
 
+  async function sourceProductIdentifiersFromEvidence() {
+    setIdentifierSourcing(true);
+    setErrorId(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/admin/products/identifiers/source", {
+        body: JSON.stringify({ accessToken }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await adminResponseErrorMessage(
+            response,
+            "Unable to source identifiers",
+          ),
+        );
+      }
+
+      window.location.reload();
+    } catch (error) {
+      setErrorId("__identifier_sourcing__");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to source identifiers",
+      );
+    } finally {
+      setIdentifierSourcing(false);
+    }
+  }
+
   return (
     <section className="mt-8 space-y-6">
       <BusinessStatsGrid
@@ -425,7 +463,7 @@ export function AdminProductsView({
       />
 
       <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_14rem]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_14rem_auto_auto]">
           <input
             aria-label={viewLabels.search}
             className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
@@ -451,7 +489,28 @@ export function AdminProductsView({
               </option>
             ))}
           </select>
+          <button
+            className="rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={identifierSourcing}
+            onClick={() => void sourceProductIdentifiersFromEvidence()}
+            type="button"
+          >
+            {identifierSourcing
+              ? viewLabels.sourcingIdentifiers
+              : viewLabels.sourceProductIdentifiers}
+          </button>
+          <a
+            className="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50"
+            href={`/api/admin/products/hygeia/export?country=TH&access_token=${encodeURIComponent(accessToken)}`}
+          >
+            {viewLabels.hygeiaExport}
+          </a>
         </div>
+        {errorId === "__identifier_sourcing__" ? (
+          <p className="mt-3 text-sm font-medium text-red-700">
+            {errorMessage}
+          </p>
+        ) : null}
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -857,6 +916,12 @@ function ProductModal({
           removeLabel={viewLabels.remove}
         />
       </div>
+
+      <ProductIdentifiersEditor
+        draft={draft}
+        setDraft={setDraft}
+        viewLabels={viewLabels}
+      />
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-medium text-gray-700">

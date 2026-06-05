@@ -27,6 +27,7 @@ import {
   retailOrderStatusBpmEventName,
   sendRetailOrderWorkflowEmail
 } from "@/lib/retail-order-workflow";
+import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
 type RetailCheckoutDb = postgres.Sql | postgres.TransactionSql;
@@ -817,6 +818,7 @@ async function createRetailCustomerOrderFromPayment(
     organisationId: retailerId,
     priorityReason: "Paid customer checkout needs stock allocation.",
     priorityScore: 620,
+    requiredCapabilities: [AGENT_CAPABILITIES.retailStockPolicyReview],
     sourceEntityId: order.id,
     sourceEntityType: "retail_customer_order",
     title: "Allocate customer order",

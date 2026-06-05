@@ -226,6 +226,181 @@ export function ProductCountryManager({
   );
 }
 
+type ProductIdentifierType = AdminProductRow["identifiers"][number]["type"];
+
+function identifierValue(row: AdminProductRow, type: ProductIdentifierType) {
+  return row.identifiers.find((identifier) =>
+    identifier.type === type && identifier.status === "active"
+  )?.value ?? "";
+}
+
+function normalizedDraftIdentifierValue(
+  type: ProductIdentifierType,
+  value: string
+) {
+  const trimmed = value.trim();
+
+  if (type === "ean13") {
+    return trimmed.replace(/[\s-]/g, "");
+  }
+
+  return trimmed.replace(/\s+/g, " ").toUpperCase();
+}
+
+export function ProductIdentifiersEditor({
+  draft,
+  setDraft,
+  viewLabels
+}: Readonly<{
+  draft: AdminProductRow;
+  setDraft: (row: AdminProductRow) => void;
+  viewLabels: Readonly<Record<string, string>>;
+}>) {
+  function updateIdentifier(type: ProductIdentifierType, value: string) {
+    const trimmed = value.trim();
+    const nextIdentifiers = draft.identifiers.filter(
+      (identifier) => identifier.type !== type
+    );
+
+    setDraft({
+      ...draft,
+      identifiers: trimmed
+        ? [
+            ...nextIdentifiers,
+            {
+              confidence: "high",
+              evidenceUrl: null,
+              id: `draft:${type}`,
+              normalizedValue: normalizedDraftIdentifierValue(type, trimmed),
+              source: "admin",
+              status: "active",
+              type,
+              updatedAt: null,
+              value: type === "ean13"
+                ? normalizedDraftIdentifierValue(type, trimmed)
+                : trimmed
+            }
+          ]
+        : nextIdentifiers
+    });
+  }
+
+  const candidateRows = draft.identifierCandidates.filter((candidate) =>
+    candidate.status === "pending" || candidate.status === "conflict"
+  );
+
+  return (
+    <div className="mt-5 rounded-xl border border-gray-100 bg-gray-50 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">
+            {viewLabels.productIdentifiers}
+          </h3>
+          <p className="mt-1 text-xs text-gray-500">
+            {viewLabels.productIdentifiersHint}
+          </p>
+        </div>
+        {candidateRows.length > 0 ? (
+          <span className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-semibold text-amber-800">
+            {candidateRows.length} {viewLabels.identifierCandidates}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <label className="text-xs font-semibold text-gray-700">
+          {viewLabels.ean13}
+          <input
+            className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+            inputMode="numeric"
+            maxLength={17}
+            onChange={(event) => updateIdentifier("ean13", event.target.value)}
+            placeholder="8851234567890"
+            type="text"
+            value={identifierValue(draft, "ean13")}
+          />
+        </label>
+        <label className="text-xs font-semibold text-gray-700">
+          {viewLabels.internalSku}
+          <input
+            className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+            onChange={(event) =>
+              updateIdentifier("internal_sku", event.target.value)
+            }
+            type="text"
+            value={identifierValue(draft, "internal_sku")}
+          />
+        </label>
+        <label className="text-xs font-semibold text-gray-700">
+          {viewLabels.manufacturerSku}
+          <input
+            className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+            onChange={(event) =>
+              updateIdentifier("manufacturer_sku", event.target.value)
+            }
+            type="text"
+            value={identifierValue(draft, "manufacturer_sku")}
+          />
+        </label>
+      </div>
+      {candidateRows.length > 0 ? (
+        <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <table className="min-w-full divide-y divide-gray-100 text-left text-xs">
+            <thead className="bg-gray-50 text-gray-500">
+              <tr>
+                <th className="px-3 py-2 font-semibold">
+                  {viewLabels.identifierType}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {viewLabels.identifierValue}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {viewLabels.source}
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  {viewLabels.status}
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">
+                  {viewLabels.approve}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {candidateRows.map((candidate) => (
+                <tr key={candidate.id}>
+                  <td className="px-3 py-2 font-medium text-gray-800">
+                    {candidate.type}
+                  </td>
+                  <td className="px-3 py-2 text-gray-700">
+                    {candidate.value}
+                  </td>
+                  <td className="px-3 py-2 text-gray-500">
+                    {candidate.source}
+                  </td>
+                  <td className="px-3 py-2 text-gray-500">
+                    {candidate.status}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button
+                      className="rounded-md px-2.5 py-1 text-xs font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={candidate.status === "conflict"}
+                      onClick={() =>
+                        updateIdentifier(candidate.type, candidate.value)
+                      }
+                      type="button"
+                    >
+                      {viewLabels.useCandidate}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function ProductCard({
   locale,
   onSelect,

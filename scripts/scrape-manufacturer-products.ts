@@ -33,6 +33,10 @@ import {
   validateProductImportForApproval,
   type ProductImportFactInput
 } from "@/lib/admin-products";
+import {
+  extractTrustedIdentifierEvidence,
+  type ProductIdentifierInput
+} from "@/lib/product-identifiers";
 import { translateDraftProductCopyWithAi } from "@/lib/product-copy-translation";
 import {
   correctDraftProductFactsWithAi,
@@ -125,6 +129,37 @@ type ScrapedManufacturerProduct = Readonly<{
   rawSnapshot: Record<string, unknown>;
   sourceUrl: string;
 }>;
+
+function trustedIdentifiersForScrapedProduct(
+  product: ScrapedManufacturerProduct
+): ProductIdentifierInput[] {
+  const html = [
+    product.rawSnapshot.extractedText,
+    product.rawSnapshot.renderedText,
+    product.rawSnapshot.renderedHtml
+  ]
+    .filter((value): value is string => typeof value === "string")
+    .join("\n");
+  const evidence = extractTrustedIdentifierEvidence({
+    evidenceUrl: product.sourceUrl,
+    html,
+    snapshot: product.rawSnapshot
+  }) as Array<ProductIdentifierInput & { autoApprove?: boolean }>;
+
+  return evidence
+    .filter((item) =>
+      item.autoApprove ||
+      item.confidence === "trusted" ||
+      item.source?.includes("manufacturer_snapshot")
+    )
+    .map((item) => ({
+      confidence: item.confidence ?? "high",
+      evidenceUrl: item.evidenceUrl,
+      source: item.source,
+      type: item.type,
+      value: item.value
+    }));
+}
 
 async function megaWeCareProductRecordFromUrl(sourceUrl: string) {
   const slug = new URL(sourceUrl).pathname.split("/").filter(Boolean).at(-1);
@@ -927,6 +962,7 @@ async function importCleanApprovedProduct(product: ScrapedManufacturerProduct) {
     facts: product.parsedFacts,
     fdaApprovalNumber: product.fdaApprovalNumber,
     imageUrl: product.imageUrls[0] ?? null,
+    identifiers: trustedIdentifiersForScrapedProduct(product),
     labelStatus: product.parsedFacts.length > 0 ? "parsed" : "missing",
     manufacturerCountryCodes: ["TH"],
     status: "pending_review",
@@ -2190,7 +2226,8 @@ async function main() {
         continue;
       }
 
-      await withApplyRetries(product.productTitle, async () => {
+  await withApplyRetries(product.productTitle, async () => {
+        const identifiers = trustedIdentifiersForScrapedProduct(product);
         const staged = await stageProductImport({
           actor: "manufacturer_scraper",
           brandName: product.brandName,
@@ -2198,12 +2235,16 @@ async function main() {
           descriptionEn: product.descriptionEn,
           descriptionTh: product.descriptionTh,
           fdaApprovalNumber: product.fdaApprovalNumber,
+          identifiers,
           imageUrls: product.imageUrls,
           importRunId,
           parsedFacts: product.parsedFacts,
           parseConfidence: product.parsedFacts.length > 0 ? "moderate" : "low",
           productTitle: product.productTitle,
-          rawSnapshot: product.rawSnapshot,
+          rawSnapshot: {
+            ...product.rawSnapshot,
+            ...(identifiers.length > 0 ? { identifiers } : {})
+          },
           source: "manufacturer_scrape",
           sourceUrl: product.sourceUrl,
           titleEn: product.titleEn,

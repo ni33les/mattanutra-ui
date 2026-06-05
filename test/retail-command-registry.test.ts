@@ -97,7 +97,8 @@ describe("retail command registry", () => {
   it("routes agent retail tasks through the command executor instead of passive acceptance", () => {
     assert.match(taskExecution, /executeRetailAgentCommand/);
     assert.doesNotMatch(taskExecution, /humanApprovalRequired: true/);
-    assert.match(taskWorkItems, /"retail_shopping_list_review"/);
+    assert.match(taskWorkItems, /isRetailAgentExecutableTaskType/);
+    assert.match(taskWorkItems, /human-only or not agent-executable/);
     assert.match(service, /assertRetailAgentCommandTask/);
     assert.match(service, /Retail task \$\{input\.taskType\} is not agent-executable/);
     assert.match(service, /commandId === "allocate_customer_order"/);

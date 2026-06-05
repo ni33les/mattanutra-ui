@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import nextEnv from "@next/env";
 import { executeTaskWorkItem } from "../lib/task-execution.ts";
+import { RETAIL_AGENT_EXECUTABLE_TASK_TYPES } from "../lib/retail-task-policy.ts";
 import {
   SYSTEM_AGENTS,
   type SystemAgentKey
@@ -202,20 +203,7 @@ const WORKER_PROFILES: Record<WorkerProfileMode, WorkerAgentConfig> = {
   products: agentProfile("productMatcher", [
     "generate_product_recommendations"
   ]),
-  stock: agentProfile("retailStockPlanner", [
-    "retail_stock_forecast_refresh",
-    "retail_stock_low_stock_digest",
-    "retail_stock_reorder_review",
-    "retail_stock_low_stock_review",
-    "retail_stock_expiry_review",
-    "retail_stock_movement_review",
-    "retail_purchase_order_receive",
-    "retail_customer_order_allocate",
-    "retail_order_pick",
-    "retail_order_pack",
-    "retail_order_ship",
-    "retail_order_return_review"
-  ])
+  stock: agentProfile("retailStockPlanner", RETAIL_AGENT_EXECUTABLE_TASK_TYPES)
 };
 
 function profileForMode(mode: WorkerProfileMode) {

@@ -56,6 +56,10 @@ import {
   type AdminCommunicationChannelType,
   type AdminCommunicationEventKey
 } from "@/lib/communications";
+import {
+  isRetailAgentExecutableTaskType,
+  type RetailAgentExecutableTaskType
+} from "@/lib/retail-task-policy";
 import type { TaskRecord } from "@/lib/task-service";
 import { isPregenerationSource } from "@/lib/task-worker";
 
@@ -274,20 +278,10 @@ export type RetailOperationsReviewWorkItem = Readonly<{
   sourceEntityId: string | null;
   sourceEntityType: string | null;
   taskId: string;
-  taskType:
-    | "retail_customer_order_allocate"
-    | "retail_order_cancel_review"
-    | "retail_order_delivery_confirm"
-    | "retail_order_pack"
-    | "retail_order_pick"
-	    | "retail_order_return_review"
-	    | "retail_order_ship"
-    | "retail_shopping_list_review"
-    | "retail_stock_expiry_review"
-    | "retail_stock_low_stock_digest"
-    | "retail_stock_low_stock_review"
-    | "retail_stock_movement_review"
-    | "retail_stock_reorder_review";
+  taskType: Exclude<
+    RetailAgentExecutableTaskType,
+    "retail_stock_forecast_refresh"
+  >;
 }>;
 
 export type TaskWorkItem =
@@ -1536,28 +1530,25 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
     } satisfies RetailStockForecastWorkItem;
   }
 
-  if (
-    task.taskType === "retail_customer_order_allocate" ||
-    task.taskType === "retail_order_cancel_review" ||
-    task.taskType === "retail_order_delivery_confirm" ||
-    task.taskType === "retail_order_pack" ||
-    task.taskType === "retail_order_pick" ||
-	    task.taskType === "retail_order_return_review" ||
-	    task.taskType === "retail_order_ship" ||
-    task.taskType === "retail_shopping_list_review" ||
-    task.taskType === "retail_stock_expiry_review" ||
-    task.taskType === "retail_stock_low_stock_digest" ||
-    task.taskType === "retail_stock_low_stock_review" ||
-    task.taskType === "retail_stock_movement_review" ||
-    task.taskType === "retail_stock_reorder_review"
-  ) {
+  if (task.taskType.startsWith("retail_")) {
+    if (!isRetailAgentExecutableTaskType(task.taskType)) {
+      throw new Error(
+        `Retail task ${task.taskType} is human-only or not agent-executable`
+      );
+    }
+
+    const taskType = task.taskType as Exclude<
+      RetailAgentExecutableTaskType,
+      "retail_stock_forecast_refresh"
+    >;
+
     return {
       organisationId: task.organisationId,
       payload: payloadRecord(task.payload),
       sourceEntityId: task.sourceEntityId,
       sourceEntityType: task.sourceEntityType,
       taskId: task.id,
-      taskType: task.taskType
+      taskType
     } satisfies RetailOperationsReviewWorkItem;
   }
 

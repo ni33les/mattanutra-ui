@@ -529,9 +529,10 @@ export async function ensureRetailCommandTask(input: Readonly<{
   title: string;
 }>) {
   const command = retailCommandRegistry[input.commandId];
+  const workerExecutable = command.agentExecution === "execute_low_risk";
 
   return createTask({
-    actorType: "system",
+    actorType: workerExecutable ? "system" : "human",
     businessValue: input.priorityScore,
     description: input.description,
     idempotencyKey: input.idempotencyKey,
@@ -547,7 +548,7 @@ export async function ensureRetailCommandTask(input: Readonly<{
     },
     priorityReason: input.priorityReason,
     priorityScore: input.priorityScore,
-    requiredCapabilities: command.requiredAgentCapability
+    requiredCapabilities: workerExecutable && command.requiredAgentCapability
       ? [command.requiredAgentCapability]
       : [],
     sourceEntityId: input.sourceEntityId ?? null,

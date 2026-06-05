@@ -45,6 +45,10 @@ import {
   normalizeProductCountryCodes
 } from "@/lib/product-countries";
 import {
+  PRODUCT_IDENTIFIER_TYPES,
+  replaceApprovedProductIdentifiers
+} from "@/lib/product-identifiers";
+import {
   doseAmountInLimitUnit,
   doseExceedsLimit,
   normalizeDoseUnit,
@@ -1213,6 +1217,15 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
 	    input.countryPricing ?? []
 	  );
 
+  if (input.identifiers !== undefined) {
+    await replaceApprovedProductIdentifiers(sql, {
+      actor: input.actor ?? "admin_dashboard",
+      identifiers: input.identifiers,
+      productId,
+      replaceTypes: PRODUCT_IDENTIFIER_TYPES
+    });
+  }
+
   await replaceProductTranslations(sql, productId, {
     description,
     descriptionEn,
@@ -1285,6 +1298,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
 	        availableCountryCodes: productCountryCodes,
 	        manufacturerCountryCodes,
 	        platform: input.platform,
+        identifiers: input.identifiers,
         productUrl,
         validation: validation.validation,
         title,
@@ -1545,6 +1559,15 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	    );
 	  }
 
+  if (input.identifiers !== undefined) {
+    await replaceApprovedProductIdentifiers(sql, {
+      actor: input.actor ?? "admin_dashboard",
+      identifiers: input.identifiers,
+      productId: input.id,
+      replaceTypes: PRODUCT_IDENTIFIER_TYPES
+    });
+  }
+
   if (
     input.translations !== undefined ||
     input.titleEn !== undefined ||
@@ -1619,6 +1642,7 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
 	        factsSource: input.factsSource,
 	        fdaApprovalNumber: input.fdaApprovalNumber,
 	        imageUrl: input.imageUrl,
+        identifiers: input.identifiers,
 	        labelStatus: input.labelStatus,
 	        manufacturerCountryCodes: input.manufacturerCountryCodes === undefined
 	          ? undefined

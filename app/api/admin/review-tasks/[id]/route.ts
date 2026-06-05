@@ -23,6 +23,7 @@ import {
   normalizeProductCountryPricingStatus,
   type ProductCountryPricing
 } from "@/lib/product-countries";
+import { productIdentifiersFromBody } from "@/lib/product-identifiers";
 
 export const runtime = "nodejs";
 
@@ -374,6 +375,7 @@ export async function PATCH(
             imageUrl: body.imageUrl === undefined
               ? undefined
               : textOrNull(body.imageUrl),
+            identifiers: productIdentifiersFromBody(body.identifiers),
             manufacturerCountryCodes: countryCodesFromBody(body.manufacturerCountryCodes),
             mergeProductId: textOrNull(body.mergeProductId),
             parsedFacts: productImportFactsFromBody(body.parsedFacts),

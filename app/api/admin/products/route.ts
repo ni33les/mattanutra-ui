@@ -18,6 +18,7 @@ import {
   normalizeProductCountryPricingStatus,
   type ProductCountryPricing
 } from "@/lib/product-countries";
+import { productIdentifiersFromBody } from "@/lib/product-identifiers";
 
 export const runtime = "nodejs";
 
@@ -195,6 +196,7 @@ export async function POST(request: Request) {
 	      facts: factsFromBody(body.facts),
 	      fdaApprovalNumber: textOrNull(body.fdaApprovalNumber),
 	      imageUrl: textOrNull(body.imageUrl),
+      identifiers: productIdentifiersFromBody(body.identifiers),
 	      labelStatus: isProductLabelStatus(labelStatus) ? labelStatus : undefined,
 	      manufacturerCountryCodes: countryCodesFromBody(body.manufacturerCountryCodes),
 	      status: isProductStatus(status) ? status : undefined,

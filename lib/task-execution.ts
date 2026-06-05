@@ -21,13 +21,7 @@ import {
   type ProductRecommendationResult
 } from "@/lib/product-recommendations";
 import type { ProductRecommendationRetailerCandidateSet } from "@/lib/admin-products";
-import { executeRetailAgentCommand } from "@/lib/admin-retail-stock";
-import {
-  executeAdminCommunicationRouteTask,
-  executeCommunicationDispatchTask
-} from "@/lib/communications";
-import { getSql } from "@/lib/db";
-import { sendRetailOrderWorkflowEmailNow } from "@/lib/retail-order-workflow";
+import { isRetailAgentExecutableTaskType } from "@/lib/retail-task-policy";
 import { sendTransactionalEmail } from "@/lib/smtp-email";
 import type { TaskWorkItem } from "@/lib/task-work-items";
 import type { SendTransactionalEmailResult } from "@/lib/smtp-email";
@@ -67,6 +61,20 @@ function localizedFallbackCard(
     body: localizedFallback(body),
     headline: localizedFallback(title)
   };
+}
+
+async function configuredSql() {
+  const { getSql } = await import("@/lib/db");
+
+  return getSql();
+}
+
+async function executeRetailAgentCommandForTask(input: Parameters<
+  typeof import("@/lib/admin-retail-stock")["executeRetailAgentCommand"]
+>[0]) {
+  const { executeRetailAgentCommand } = await import("@/lib/admin-retail-stock");
+
+  return executeRetailAgentCommand(input);
 }
 
 type RetailerRecommendationOption = Readonly<{
@@ -447,12 +455,15 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
   }
 
   if (workItem.taskType === "send_retail_order_workflow_email") {
-    const sql = getSql();
+    const sql = await configuredSql();
 
     if (!sql) {
       throw new Error("Retail order email task cannot run without a database");
     }
 
+    const { sendRetailOrderWorkflowEmailNow } = await import(
+      "@/lib/retail-order-workflow"
+    );
     const delivery = await sendRetailOrderWorkflowEmailNow({
       event: workItem.event,
       locale: workItem.locale,
@@ -474,6 +485,9 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
   }
 
   if (workItem.taskType === "route_admin_communication") {
+    const { executeAdminCommunicationRouteTask } = await import(
+      "@/lib/communications"
+    );
     const routed = await executeAdminCommunicationRouteTask({
       body: workItem.body,
       channelType: workItem.channelType,
@@ -498,6 +512,9 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
     workItem.taskType === "dispatch_chat_communication_message" ||
     workItem.taskType === "dispatch_email_communication_message"
   ) {
+    const { executeCommunicationDispatchTask } = await import(
+      "@/lib/communications"
+    );
     const dispatch = await executeCommunicationDispatchTask({
       messageId: workItem.messageId
     });
@@ -674,7 +691,7 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
   }
 
   if (workItem.taskType === "retail_stock_forecast_refresh") {
-    return executeRetailAgentCommand({
+    return executeRetailAgentCommandForTask({
       organisationId: workItem.organisationId,
       payload: {
         productId: workItem.productId,
@@ -689,6 +706,12 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
   }
 
   if (workItem.taskType.startsWith("retail_")) {
+    if (!isRetailAgentExecutableTaskType(workItem.taskType)) {
+      throw new Error(
+        `Retail task ${workItem.taskType} is human-only or not agent-executable`
+      );
+    }
+
     const retailWorkItem = workItem as Extract<
       TaskWorkItem,
       { organisationId: string }
@@ -698,7 +721,7 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
       throw new Error(`Retail task ${workItem.taskType} is missing a task id`);
     }
 
-    return executeRetailAgentCommand({
+    return executeRetailAgentCommandForTask({
       organisationId: retailWorkItem.organisationId,
       payload: "payload" in retailWorkItem ? retailWorkItem.payload : {},
       sourceEntityId: "sourceEntityId" in retailWorkItem
