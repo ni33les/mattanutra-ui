@@ -8,7 +8,7 @@ import {
 const sql = getSql();
 
 if (!sql) {
-  throw new Error("DATABASE_URL is required to apply recommendation insights schema");
+  throw new Error("DB_URL is required to apply recommendation insights schema");
 }
 
 await sql`

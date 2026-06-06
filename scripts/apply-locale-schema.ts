@@ -393,7 +393,7 @@ async function main() {
   const sql = getSql();
 
   if (!sql) {
-    throw new Error("DATABASE_URL is not configured");
+    throw new Error("DB_URL is not configured");
   }
 
   await sql.unsafe(schemaSql);

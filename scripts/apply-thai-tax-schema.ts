@@ -12,7 +12,7 @@ import { getSql } from "@/lib/db";
 async function main() {
   const sql = getSql();
   if (!sql) {
-    console.error("Database connection unavailable. Set DATABASE_URL or equivalent.");
+    console.error("Database connection unavailable. Set DB_URL or equivalent.");
     process.exit(1);
   }
 

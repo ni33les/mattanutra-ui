@@ -30,10 +30,10 @@ function fail(message: string): never {
 }
 
 function assertDevTarget() {
-  const connection = process.env.DATABASE_URL;
+  const connection = process.env.DB_URL;
 
   if (!connection) {
-    fail("DATABASE_URL is required.");
+    fail("DB_URL is required.");
   }
 
   let url: URL;
@@ -41,7 +41,7 @@ function assertDevTarget() {
   try {
     url = new URL(connection);
   } catch {
-    fail("DATABASE_URL is not a valid PostgreSQL URL.");
+    fail("DB_URL is not a valid PostgreSQL URL.");
   }
 
   const target = `${url.hostname}${url.pathname}`.toLowerCase();

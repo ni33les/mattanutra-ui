@@ -4,10 +4,10 @@ import postgres from "postgres";
 import { managedFoodSeeds } from "@/lib/managed-foods";
 import { publicLocales } from "@/lib/i18n";
 
-const connection = process.env.DATABASE_URL;
+const connection = process.env.DB_URL;
 
 if (!connection) {
-  throw new Error("DATABASE_URL is not configured");
+  throw new Error("DB_URL is not configured");
 }
 
 const sql = postgres(connection, { max: 1 });

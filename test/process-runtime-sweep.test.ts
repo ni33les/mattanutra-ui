@@ -241,22 +241,51 @@ describe("process runtime technical debt sweep", () => {
     const script = await readFile("scripts/uat-smoke.mjs", "utf8");
 
     assert.match(packageJson, /"uat:smoke": "node --env-file-if-exists=\.env\.local scripts\/uat-smoke\.mjs"/);
-    assert.match(script, /UAT_DATABASE_URL/);
+    assert.match(script, /UAT_DB_URL/);
     assert.match(script, /retail_shopping_lists/);
     assert.match(script, /worker_sessions/);
     assert.match(script, /https:\/\/uat\.mattanutra\.com\/api\/line\/webhook/);
     assert.match(script, /No destructive database writes are performed/);
   });
 
-  it("uses DATABASE_URL as the only runtime database connection variable", async () => {
+  it("uses DB_URL as the only runtime database connection variable", async () => {
     const db = await readFile("lib/db.ts", "utf8");
     const getSqlBody = functionBody(db, "getSql");
 
-    assert.match(getSqlBody, /process\.env\.DATABASE_URL/);
+    assert.match(getSqlBody, /process\.env\.DB_URL/);
     assert.doesNotMatch(
       getSqlBody,
       new RegExp(String.raw`process\.env\.DB_` + String.raw`CONNECTION`)
     );
+  });
+
+  it("keeps retired database connection env names out of committed runtime and operator code", async () => {
+    const retiredNames = [
+      ["DATA", "BASE_URL"].join(""),
+      ["UAT_DATA", "BASE_URL"].join(""),
+      ["DEV_DATA", "BASE_URL"].join(""),
+      ["DB", "CONNECTION"].join("_")
+    ];
+    const files = [
+      ".env.example",
+      "package.json",
+      ...(await filesUnder("app")),
+      ...(await filesUnder("lib")),
+      ...(await filesUnder("scripts")),
+      ...(await filesUnder("test")),
+      ...(await filesUnder("workers"))
+    ];
+
+    for (const file of files) {
+      const source = await readFile(file, "utf8");
+
+      for (const retiredName of retiredNames) {
+        assert.ok(
+          !source.includes(retiredName),
+          `${file} contains retired database connection env name ${retiredName}`
+        );
+      }
+    }
   });
 
   it("keeps DDL out of runtime app, lib, and worker code", async () => {

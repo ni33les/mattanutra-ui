@@ -638,15 +638,15 @@ async function seedNotificationPreferences(
 }
 
 async function main() {
-  const targetConnection = envText("DATABASE_URL");
-  const sourceConnection = envText("DEV_DATABASE_URL");
+  const targetConnection = envText("DB_URL");
+  const sourceConnection = envText("DEV_DB_URL");
 
   if (!targetConnection) {
-    fail("DATABASE_URL is required for target UAT");
+    fail("DB_URL is required for target UAT");
   }
 
   if (!sourceConnection) {
-    fail("DEV_DATABASE_URL is required for source DEV");
+    fail("DEV_DB_URL is required for source DEV");
   }
 
   if (process.env.MATTANUTRA_ENV !== "uat") {
@@ -658,11 +658,11 @@ async function main() {
   }
 
   if (!connectionLooksLike(targetConnection, /uat|mattanutra-uat/i)) {
-    fail("DATABASE_URL does not look like UAT");
+    fail("DB_URL does not look like UAT");
   }
 
   if (!connectionLooksLike(sourceConnection, /dev|mn-dev|mattanutra-dev/i)) {
-    fail("DEV_DATABASE_URL does not look like DEV");
+    fail("DEV_DB_URL does not look like DEV");
   }
 
   const source = makeSql(sourceConnection);

@@ -4,7 +4,7 @@ import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
 const sql = getSql();
 
 if (!sql) {
-  throw new Error("DATABASE_URL is required to apply the assessment schema");
+  throw new Error("DB_URL is required to apply the assessment schema");
 }
 
 await sql`

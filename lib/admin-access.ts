@@ -476,7 +476,7 @@ async function sqlOrThrow() {
   const sql = getSql();
 
   if (!sql) {
-    throw new Error("DATABASE_URL is required for admin access");
+    throw new Error("DB_URL is required for admin access");
   }
 
   return sql;

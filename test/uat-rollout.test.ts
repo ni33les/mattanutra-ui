@@ -132,7 +132,7 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.match(uatRebuildScript, /locales:schema:apply/);
     assert.match(uatRebuildScript, /versions:core:check/);
     assert.match(uatRebuildScript, /products:validation-consistency/);
-    assert.match(uatMinimalSeedScript, /DEV_DATABASE_URL/);
+    assert.match(uatMinimalSeedScript, /DEV_DB_URL/);
     assert.match(uatMinimalSeedScript, /delight-pharmacy/);
     assert.match(uatMinimalSeedScript, /stock_quantity = 0/);
     assert.match(uatMinimalSeedScript, /stockQuantityResetToZero/);
