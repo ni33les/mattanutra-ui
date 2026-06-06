@@ -92,6 +92,8 @@ drop table if exists
   public.retail_order_allocations,
   public.retail_customer_order_lines,
   public.retail_customer_orders,
+  public.retail_shopping_list_lines,
+  public.retail_shopping_lists,
   public.retail_stock_reorder_advice,
   public.retail_stock_movements,
   public.retail_stock_lots,
