@@ -4,7 +4,7 @@
 **Date**: 2026-06  
 **Status**: Architecture-first plan – ready for implementation  
 **Related Documents**:
-- `docs/dream-pharmacy-fulfillment-plan.md` (previous Dream Pharmacy-specific version)
+- `docs/delight-pharmacy-fulfillment-plan.md` (previous Delight Pharmacy-specific version)
 - `docs/production-readiness-plan.md`
 - `docs/business_blueprint.md`
 

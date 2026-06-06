@@ -285,7 +285,7 @@ async function checkDatabase() {
         : `missing ${missingTables.join(", ")}`
     );
 
-    const dreamRows = await sql`
+    const delightRows = await sql`
       select
         organisations.id::text,
         count(distinct retail_sellable_products.id)::int as sellable_count,
@@ -297,16 +297,16 @@ async function checkDatabase() {
       left join public.retail_product_stock
         on retail_product_stock.organisation_id = organisations.id
         and retail_product_stock.status = 'active'
-      where organisations.slug = 'dream-pharmacy'
+      where organisations.slug = 'delight-pharmacy'
       group by organisations.id
       limit 1
     `;
-    const dream = dreamRows[0];
+    const delight = delightRows[0];
 
     record(
-      "Dream sellable catalogue",
-      Number(dream?.sellable_count ?? 0) > 0,
-      `sellable=${dream?.sellable_count ?? 0} stock_rows=${dream?.stock_count ?? 0}`
+      "Delight sellable catalogue",
+      Number(delight?.sellable_count ?? 0) > 0,
+      `sellable=${delight?.sellable_count ?? 0} stock_rows=${delight?.stock_count ?? 0}`
     );
 
     const workerRows = await sql`
@@ -349,13 +349,13 @@ async function checkDatabase() {
         on organisation_communication_identities.organisation_id = organisations.id
       join public.communication_channels
         on communication_channels.identity_id = organisation_communication_identities.identity_id
-      where organisations.slug = 'dream-pharmacy'
+      where organisations.slug = 'delight-pharmacy'
         and communication_channels.status = 'active'
     `;
     const channels = channelRows[0];
 
     record(
-      "Dream communication channels",
+      "Delight communication channels",
       Number(channels?.line_channels ?? 0) + Number(channels?.email_channels ?? 0) > 0,
       `line=${channels?.line_channels ?? 0} email=${channels?.email_channels ?? 0}`,
       "warn"

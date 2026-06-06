@@ -1,7 +1,7 @@
 #!/usr/bin/env node --env-file-if-exists=.env.local --experimental-strip-types --import ./register-ts-path-loader.mjs
 
 /**
- * Applies the Thai Tax Rate configuration table required for Dream Pharmacy invoices and compliance.
+ * Applies the Thai Tax Rate configuration table required for Delight Pharmacy invoices and compliance.
  *
  * Run with:
  *   npm run thai-tax:schema:apply
@@ -57,7 +57,7 @@ async function main() {
   `;
 
   console.log("Thai tax rate schema applied successfully.");
-  console.log("You can now manage rates via the Dream Pharmacy admin section (to be built).");
+  console.log("You can now manage rates via the Delight Pharmacy admin section (to be built).");
 }
 
 main().catch((err) => {

@@ -2228,7 +2228,7 @@ CREATE TABLE public.retail_shopping_lists (
 );
 
 
-COMMENT ON TABLE public.retail_shopping_lists IS 'Saved retailer buying batches used as the lightweight Dream Pharmacy shopping-list workflow.';
+COMMENT ON TABLE public.retail_shopping_lists IS 'Saved retailer buying batches used as the lightweight Delight Pharmacy shopping-list workflow.';
 
 
 --

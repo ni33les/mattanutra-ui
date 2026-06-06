@@ -139,43 +139,43 @@ const emailCopy = {
     eyebrow: "Order processing",
     headline: "Your order is being processed",
     intro:
-      "Your order is confirmed. Dream Pharmacy is preparing and sourcing your selected products, and your tracking page will update as the order moves forward.",
-    subject: "Your Dream Pharmacy order is processing"
+      "Your order is confirmed. Delight Pharmacy is preparing and sourcing your selected products, and your tracking page will update as the order moves forward.",
+    subject: "Your Delight Pharmacy order is processing"
   },
   cancelled: {
     eyebrow: "Order cancelled",
     headline: "Your order has been cancelled",
     intro:
-      "Your Dream Pharmacy order has been cancelled. The tracking page will show the latest status and any follow-up notes as they are added.",
-    subject: "Your Dream Pharmacy order has been cancelled"
+      "Your Delight Pharmacy order has been cancelled. The tracking page will show the latest status and any follow-up notes as they are added.",
+    subject: "Your Delight Pharmacy order has been cancelled"
   },
   confirmed: {
     eyebrow: "Order confirmed",
-    headline: "Your Dream Pharmacy order is confirmed",
+    headline: "Your Delight Pharmacy order is confirmed",
     intro:
       "Thank you for trusting MattaNutra. Your selected products have been sent to one pharmacy, and we will keep this tracking page updated as the order moves forward.",
-    subject: "Your Dream Pharmacy order is confirmed"
+    subject: "Your Delight Pharmacy order is confirmed"
   },
   delivered: {
     eyebrow: "Delivered",
     headline: "Your order has been delivered",
     intro:
-      "Your Dream Pharmacy order is marked as delivered. Thank you for choosing MattaNutra.",
-    subject: "Your Dream Pharmacy order has been delivered"
+      "Your Delight Pharmacy order is marked as delivered. Thank you for choosing MattaNutra.",
+    subject: "Your Delight Pharmacy order has been delivered"
   },
   returned: {
     eyebrow: "Returned",
     headline: "Your order has been marked returned",
     intro:
-      "Your Dream Pharmacy order has been marked as returned. The tracking page will show the latest status and any follow-up notes as they are added.",
-    subject: "Your Dream Pharmacy order has been returned"
+      "Your Delight Pharmacy order has been marked as returned. The tracking page will show the latest status and any follow-up notes as they are added.",
+    subject: "Your Delight Pharmacy order has been returned"
   },
   shipped: {
     eyebrow: "Shipped",
     headline: "Your order is on the way",
     intro:
-      "Dream Pharmacy has shipped your products. Keep the tracking page handy for delivery updates.",
-    subject: "Your Dream Pharmacy order has shipped"
+      "Delight Pharmacy has shipped your products. Keep the tracking page handy for delivery updates.",
+    subject: "Your Delight Pharmacy order has shipped"
   }
 } satisfies Record<
   RetailOrderWorkflowEmailEvent,

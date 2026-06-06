@@ -35,7 +35,7 @@ import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 type Db = NonNullable<ReturnType<typeof getSql>>;
 type RetailCheckoutDb = postgres.Sql | postgres.TransactionSql;
 
-const DREAM_FINANCE_ACCOUNT_ID = "77777777-7777-4777-8777-777777777777";
+const DELIGHT_FINANCE_ACCOUNT_ID = "77777777-7777-4777-8777-777777777777";
 
 export type RetailCheckoutAddress = Readonly<{
   addressLine1: string;
@@ -90,7 +90,7 @@ type CheckoutPaymentRow = Readonly<{
 
 type QuoteLine = Readonly<{
   currency: string;
-  dreamSettlementAmount: number;
+  delightSettlementAmount: number;
   etaDate: string | null;
   imageUrl: string | null;
   productId: string;
@@ -367,7 +367,7 @@ async function latestRecommendations(
   return rows;
 }
 
-async function dreamSettlementAmounts(
+async function delightSettlementAmounts(
   sql: RetailCheckoutDb,
   organisationId: string,
   productIds: readonly string[]
@@ -444,7 +444,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
   }
 
   const retailerId = availability.selectedRetailer.organisationId;
-  const settlementByProductId = await dreamSettlementAmounts(
+  const settlementByProductId = await delightSettlementAmounts(
     sql,
     retailerId,
     selectedProductIds
@@ -462,7 +462,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
 
     return {
       currency: line.currency ?? availability.currency ?? "THB",
-      dreamSettlementAmount:
+      delightSettlementAmount:
         settlementByProductId.get(line.productId) ?? unitPriceAmount,
       etaDate: line.etaDate,
       imageUrl: recommendation.image_url,
@@ -823,7 +823,7 @@ async function createRetailCustomerOrderFromPayment(
         ${sql.json(toJsonValue({
           checkoutPaymentId: payment.id,
           currency: line.currency,
-          dreamSettlementAmount: line.dreamSettlementAmount,
+          delightSettlementAmount: line.delightSettlementAmount,
           etaDate: line.etaDate,
           lineSubtotalAmount: line.unitPriceAmount * line.quantity,
           retailSellableProductId: line.retailSellableProductId,
@@ -940,15 +940,15 @@ async function recordRetailCheckoutFinance(
   });
 
   for (const line of quoteLines) {
-    if (line.dreamSettlementAmount <= 0) {
+    if (line.delightSettlementAmount <= 0) {
       continue;
     }
 
     await recordFinanceTransaction({
-      amount: amountMicros(line.dreamSettlementAmount * line.quantity),
+      amount: amountMicros(line.delightSettlementAmount * line.quantity),
       category: "payout",
       currency: line.currency,
-      description: `Nominal Dream Pharmacy settlement for ${line.productTitle}`,
+      description: `Nominal Delight Pharmacy settlement for ${line.productTitle}`,
       entryType: "nominal",
       from: "mattanutra:retail-payable",
       fromAccountId: FINANCE_ACCOUNT_IDS.mattanutraRevenue,
@@ -959,12 +959,12 @@ async function recordRetailCheckoutFinance(
         quantity: line.quantity,
         retailSellableProductId: line.retailSellableProductId
       },
-      provider: "dream-pharmacy",
+      provider: "delight-pharmacy",
       source: "retail_product_checkout",
-      sourceRef: `retail-checkout:${payment.id}:dream:${line.productId}`,
+      sourceRef: `retail-checkout:${payment.id}:delight:${line.productId}`,
       sql,
-      to: "dream-pharmacy:retail",
-      toAccountId: DREAM_FINANCE_ACCOUNT_ID,
+      to: "delight-pharmacy:retail",
+      toAccountId: DELIGHT_FINANCE_ACCOUNT_ID,
       fxRateId: fx.fxRateId,
       usdRate: fx.usdRate
     });

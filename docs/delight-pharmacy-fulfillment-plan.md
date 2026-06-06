@@ -1,11 +1,11 @@
-# Dream Pharmacy Fulfillment System – Implementation Plan
+# Delight Pharmacy Fulfillment System – Implementation Plan
 
 > **Note**: This document has been superseded by the generic version:  
 > **[docs/multi-agent-fulfillment-platform-plan.md](./multi-agent-fulfillment-platform-plan.md)**  
 > The new plan treats all pharmacies and retail partners as configurable "Fulfillment Agents" and supports multiple agents across countries with flexible commercial models.  
 > This file is kept for historical reference only.
 **Project**: Healthspan / MattaNutra – Shift to Pharmacist-Led Physical Fulfillment  
-**Partner**: Dream Pharmacy (local pharmacist who receives orders, sources stock, packs, and ships)  
+**Partner**: Delight Pharmacy (local pharmacist who receives orders, sources stock, packs, and ships)  
 **Date**: 2026-06  
 **Status**: Ready for implementation agent execution  
 **Related Documents**:
@@ -19,7 +19,7 @@
 ## 1. Executive Summary & Business Context Change
 
 **The Shift**:
-MattaNutra has moved from a pure digital + affiliate/product-recommendation model to a **hybrid model** where a trusted local pharmacist (Dream Pharmacy) handles the physical last mile:
+MattaNutra has moved from a pure digital + affiliate/product-recommendation model to a **hybrid model** where a trusted local pharmacist (Delight Pharmacy) handles the physical last mile:
 - Receives paid customer orders (tied to a completed nutrition plan + product recommendations)
 - Orders from suppliers / maintains stock
 - Picks, packs, and mails the exact products to the customer
@@ -27,11 +27,11 @@ MattaNutra has moved from a pure digital + affiliate/product-recommendation mode
 
 **Core Deliverables Requested**:
 1. **Full Order Management System** for the pharmacist with complete lifecycle state tracking + **nominal vs actual cash flow accounting** across the entire process.
-2. **Actionable Task List** for Dream Pharmacy generated automatically from paid orders.
+2. **Actionable Task List** for Delight Pharmacy generated automatically from paid orders.
 3. **Stock & Inventory Intelligence**:
    - "Perfect Fantasy Multivitamin" (ideal aggregate base product derived from real demand).
    - Predictive stock / reorder recommendations that minimise capital tied up in inventory while maximising availability.
-4. **Manufacturer / Offer Profitability Ranking**: For near-equivalent products (±2% fit), rank by margin/profit to MattaNutra + Dream Pharmacy partnership.
+4. **Manufacturer / Offer Profitability Ranking**: For near-equivalent products (±2% fit), rank by margin/profit to MattaNutra + Delight Pharmacy partnership.
 
 **Why This Plan is Necessary**:
 The existing system already has strong primitives (finance ledger with nominal/actual, task engine, product recommendations with coverage + price awareness, payment status machine with `fulfillment_failed`, admin "Insights" + "Financials" sections). We must **extend** these rather than build parallel systems.
@@ -54,7 +54,7 @@ The existing system already has strong primitives (finance ledger with nominal/a
 **Tasks & Workers** (very mature):
 - Generic task engine with reservation, comments, events, dependencies, human review.
 - Existing worker profiles and task types (`generate_product_recommendations`, `generate_nutrition_report`, etc.).
-- Perfect vehicle for "Dream Pharmacy" actionable tasks (`pharmacist_pack_order`, `pharmacist_update_stock`, etc.).
+- Perfect vehicle for "Delight Pharmacy" actionable tasks (`pharmacist_pack_order`, `pharmacist_update_stock`, etc.).
 
 **Product & Recommendation System**:
 - `products`, `product_offers`, `product_facts`, `product_versions`, `product_recommendation_runs` / `items` / `decisions`.
@@ -83,17 +83,17 @@ The existing system already has strong primitives (finance ledger with nominal/a
 - Queryable, filterable order list for the pharmacist + internal ops.
 
 **Important Items That May Have Been Missed** (Strongly Recommended to Include):
-- **Pharmacist Access Model**: Dedicated limited "Dream Pharmacy" role / dashboard view (or separate lightweight portal) so she only sees what she needs. Do **not** give full admin access.
-- **Customer Communication Loop**: Automatic "Your order has been received by Dream Pharmacy", "Packed & shipped with tracking #", "Delivered" emails / LINE messages (extend existing communications system).
+- **Pharmacist Access Model**: Dedicated limited "Delight Pharmacy" role / dashboard view (or separate lightweight portal) so she only sees what she needs. Do **not** give full admin access.
+- **Customer Communication Loop**: Automatic "Your order has been received by Delight Pharmacy", "Packed & shipped with tracking #", "Delivered" emails / LINE messages (extend existing communications system).
 - **Returns, Refunds & Adjustments**: Full integration back into finance ledger (actual money movement + inventory credit).
 - **Regulatory / Traceability**: Lot numbers, expiry dates, pharmacist sign-off notes, import docs (Thailand supplement rules are strict).
 - **Cash Flow Timing Reality**: Supplier payment terms (30/60 days?), pharmacist payout timing, when MattaNutra actually receives net margin.
-- **Transfer Pricing / P&L Split**: Clear accounting between MattaNutra platform revenue vs Dream Pharmacy operational costs/profit (important for future investment or tax).
+- **Transfer Pricing / P&L Split**: Clear accounting between MattaNutra platform revenue vs Delight Pharmacy operational costs/profit (important for future investment or tax).
 - **Lead Time & MOQ Data**: Per manufacturer/supplier (critical for the prediction engine).
 - **Safety Stock + Service Level** targets in the forecasting model.
 - **Multi-currency & FX** if any suppliers are outside Thailand.
 - **Physical Shipping Integration**: At minimum manual tracking number entry + carrier selection; later API (Thailand Post, Kerry, etc.).
-- **Order Confirmation PDF / Packing Slip** generation (branded for Dream Pharmacy + MattaNutra).
+- **Order Confirmation PDF / Packing Slip** generation (branded for Delight Pharmacy + MattaNutra).
 - **Exception Handling**: What happens when a recommended product is out of stock at fulfillment time? (substitution workflow with customer approval?).
 - **Inventory Valuation Method**: FIFO recommended for supplements.
 - **Audit Trail**: Every stock movement, every order state change, every financial entry must be traceable to a task or human actor.
@@ -110,7 +110,7 @@ The existing system already has strong primitives (finance ledger with nominal/a
 These were added after the initial plan and are **non-negotiable cross-cutting concerns**.
 
 ### A. Complete BPM Observability for Every Fulfillment Step
-Every meaningful state change and action in the Dream Pharmacy flow **must** emit BPM events (using the existing `writeBpmEvent` / `writePaymentBpmEvent` pattern).
+Every meaningful state change and action in the Delight Pharmacy flow **must** emit BPM events (using the existing `writeBpmEvent` / `writePaymentBpmEvent` pattern).
 
 **Required Event Coverage (minimum)**:
 - `fulfillment_order_created`
@@ -136,7 +136,7 @@ BPM is the single source of truth for operational visibility and future dashboar
 - Default language: **English**.
 - Localized versions: **Thai** (and future other locales).
 - Invoice must include:
-  - MattaNutra + Dream Pharmacy co-branding
+  - MattaNutra + Delight Pharmacy co-branding
   - Order details + chosen items with unit prices
   - Thai tax breakdown (see below)
   - Payment reference
@@ -153,7 +153,7 @@ Thailand specifics for supplement/pharmacy sales (as of 2026):
 
 **Requirements**:
 - Centralized, versioned tax rate configuration (effective dates, rate, type: VAT, WHT, etc.).
-- Admin management page (new section under Dream Pharmacy or Finance) to view/edit tax rates with audit.
+- Admin management page (new section under Delight Pharmacy or Finance) to view/edit tax rates with audit.
 - Automatic tax calculation on order creation and invoice generation.
 - Proper recording of tax in the finance ledger (new categories or metadata).
 - Support for tax-exempt or 0% items if applicable.
@@ -163,8 +163,8 @@ Customers must be able to see that "their vitamins are on the way" without loggi
 
 **Requirements**:
 - Public (or semi-public) tracking page, e.g. `/track/[secureToken]` or `/:locale/order/[orderId]/track?token=...`
-- Shows current status, history of key events (received by Dream Pharmacy, packed, shipped with carrier + tracking #, estimated delivery).
-- Branded nicely (MattaNutra + Dream Pharmacy).
+- Shows current status, history of key events (received by Delight Pharmacy, packed, shipped with carrier + tracking #, estimated delivery).
+- Branded nicely (MattaNutra + Delight Pharmacy).
 - Option to show "Your personalized formulation is being prepared by our partner pharmacist".
 - Secure token (not guessable UUID only; time-limited or signed).
 - Should also work for the pharmacist to share a link with the customer.
@@ -185,13 +185,13 @@ This is critical for trust and reducing support load.
 
 **Task 0.1: Extend Finance Ledger for Fulfillment**
 - Add new `FinanceCategory` values: `cogs`, `inventory`, `supplier_payable`, `pharmacist_payout`, `shipping`, `returns`.
-- Add new well-known accounts in `FINANCE_ACCOUNT_IDS` (Dream Pharmacy clearing, inventory asset, specific supplier accounts as needed).
+- Add new well-known accounts in `FINANCE_ACCOUNT_IDS` (Delight Pharmacy clearing, inventory asset, specific supplier accounts as needed).
 - Add helper functions: `recordFulfillmentNominalRevenue`, `recordCOGS`, `recordPharmacistPayout`, etc. that follow the exact existing patterns (idempotency on `source_ref`, micros, etc.).
 
 **Task 0.2: New Core Tables (via migration script or schema update)**
 - `fulfillment_orders` (id, payment_id, plan_id, pharmacist_id, status, total_revenue_nominal, cogs_nominal, pharmacist_fee_nominal, shipping_cost, created_at, etc.)
 - `fulfillment_order_items` (links to specific product_offers chosen for this customer, quantity, unit_cost, unit_price, lot_number, expiry, etc.)
-- `stock_levels` (product_offer_id, current_qty, reserved_qty, reorder_point, safety_stock, last_counted_at, location = 'dream_pharmacy')
+- `stock_levels` (product_offer_id, current_qty, reserved_qty, reorder_point, safety_stock, last_counted_at, location = 'delight_pharmacy')
 - `stock_movements` (append-only: type = purchase|sale|adjustment|return, qty_delta, source_ref, lot, etc.)
 - `purchase_orders` (to suppliers) + `purchase_order_items`
 - Extend `payments` or add `fulfillment_order` link if needed.
@@ -209,7 +209,7 @@ This is critical for trust and reducing support load.
 ```bash
 npm run typecheck
 # Apply schema
-node --env-file-if-exists=.env.local ... scripts/apply-dream-pharmacy-schema.ts
+node --env-file-if-exists=.env.local ... scripts/apply-delight-pharmacy-schema.ts
 psql ... -c "\d fulfillment_orders"
 ```
 
@@ -221,7 +221,7 @@ Suggested states (refine with pharmacist):
 
 Add `fulfillment_order_status` enum + transition rules + audit via versions table.
 
-**Task 1.2: Create `lib/dream-pharmacy-orders.ts` (or `lib/fulfillment-orders.ts`)**
+**Task 1.2: Create `lib/delight-pharmacy-orders.ts` (or `lib/fulfillment-orders.ts`)**
 - Functions: `createFulfillmentOrderFromPaidPlan(paymentId, planId)`, `transitionOrderState`, `listOrdersForPharmacist(filters)`, `getOrderDetailsWithItemsAndFinance`.
 - On creation: automatically record nominal revenue recognition, nominal COGS estimate (from chosen offers), nominal pharmacist fee.
 - Link chosen `product_recommendation_items` (or the final selected stack) into `fulfillment_order_items`.
@@ -229,7 +229,7 @@ Add `fulfillment_order_status` enum + transition rules + audit via versions tabl
 **Task 1.3: Integrate with Existing Payment Flow**
 - In `fulfillCheckoutSession` (or a new post-payment hook), if the plan contains physical products, auto-create the `fulfillment_order` and emit tasks.
 
-**Task 1.4: Task Generation for Dream Pharmacy**
+**Task 1.4: Task Generation for Delight Pharmacy**
 - New task types in `task-work-items.ts` and `task-execution.ts`:
   - `pharmacist_receive_order`
   - `pharmacist_source_and_confirm_stock`
@@ -240,9 +240,9 @@ Add `fulfillment_order_status` enum + transition rules + audit via versions tabl
 - Each task completion triggers order state transition + actual financial entries where appropriate.
 
 **Task 1.5: Basic Query + List API + Admin View Stub**
-- Add query endpoints under `/api/admin/dream-pharmacy/...` protected by existing admin auth.
-- Add new `AdminDashboardView` value `"dream-pharmacy-orders"`.
-- Create minimal data layer `lib/admin-dream-pharmacy-orders.ts` following the pattern of `admin-query-data.ts` / `admin-financials.ts`.
+- Add query endpoints under `/api/admin/delight-pharmacy/...` protected by existing admin auth.
+- Add new `AdminDashboardView` value `"delight-pharmacy-orders"`.
+- Create minimal data layer `lib/admin-delight-pharmacy-orders.ts` following the pattern of `admin-query-data.ts` / `admin-financials.ts`.
 
 **Acceptance Criteria**:
 - When a paid plan with product recommendations is fulfilled, a `fulfillment_order` + 1–N pharmacist tasks are created automatically.
@@ -270,9 +270,9 @@ Use `source_ref` like `fulfillment_order:uuid:stage:cogs` for perfect traceabili
 - New finance recording helpers.
 - Simple "Mark supplier paid" and "Mark pharmacist paid" actions that create actual ledger rows + update order metadata.
 
-**Task 2.3: Financial Reporting for Dream Pharmacy**
+**Task 2.3: Financial Reporting for Delight Pharmacy**
 - Extend `admin-financials.ts` and the Financials dashboard view with new filters/series for `cogs`, `pharmacist_payout`, `inventory`.
-- New "Dream Pharmacy P&L" summary card (Revenue – COGS – Fees – Shipping = Contribution).
+- New "Delight Pharmacy P&L" summary card (Revenue – COGS – Fees – Shipping = Contribution).
 
 **Acceptance Criteria**:
 - For any `fulfillment_order`, you can run a query that returns the complete nominal → actual journey with running balance.
@@ -303,7 +303,7 @@ Use `source_ref` like `fulfillment_order:uuid:stage:cogs` for perfect traceabili
 - Rank them by:
   - Gross margin to the partnership (retail price – landed cost – pharmacist handling).
   - Reliability (historical fulfillment success rate, lead time consistency).
-  - Availability at Dream Pharmacy.
+  - Availability at Delight Pharmacy.
 - Expose in admin + feed into the stock prediction "preferred supplier" logic.
 
 **Task 3.4: Inventory-Aware Recommendation Adjustment (Future-Proofing)**
@@ -315,16 +315,16 @@ Use `source_ref` like `fulfillment_order:uuid:stage:cogs` for perfect traceabili
 - For any supplement, you can see the ranked list of near-equivalent offers by profitability.
 - All calculations are deterministic and reproducible from the versioned recommendation runs + actual fulfillment data.
 
-### Phase 4: Full Dream Pharmacy Admin Section (UI)
+### Phase 4: Full Delight Pharmacy Admin Section (UI)
 
 **Task 4.1: Add New Navigation Section**
-- New top-level nav group "Dream Pharmacy" (or "Fulfillment") in both EN/TH dictionaries in `dashboard-content.tsx`.
+- New top-level nav group "Delight Pharmacy" (or "Fulfillment") in both EN/TH dictionaries in `dashboard-content.tsx`.
 - Views inside it:
   - Orders (list + detail + state machine UI + task links)
   - My Tasks (pharmacist-focused filtered task list)
   - Inventory & Predictions
   - Procurement (margin ranking + purchase order creation)
-  - Financials (Dream-Pharmacy-specific slice)
+  - Financials (Delight-Pharmacy-specific slice)
 
 **Task 4.2: Build the Main Components**
 - Follow existing patterns (`components/admin/product-view.tsx`, review queue, etc.).
@@ -333,7 +333,7 @@ Use `source_ref` like `fulfillment_order:uuid:stage:cogs` for perfect traceabili
 - Simple forms for "Record stock count", "Create purchase order", "Enter tracking number", "Mark pharmacist payout".
 
 **Task 4.3: Pharmacist-Specific Limited Access**
-- Extend `admin-auth.ts` or create a new lightweight auth layer / dashboard token type that only grants access to the Dream Pharmacy section.
+- Extend `admin-auth.ts` or create a new lightweight auth layer / dashboard token type that only grants access to the Delight Pharmacy section.
 - Or implement a completely separate (but same codebase) "pharmacist" login flow that only mounts the relevant views.
 
 **Acceptance Criteria**:
@@ -344,7 +344,7 @@ Use `source_ref` like `fulfillment_order:uuid:stage:cogs` for perfect traceabili
 
 ### Phase 5: Advanced / Hardening (After Phase 1–4 are Solid)
 
-- Packing slip / shipping label PDF generation (Dream Pharmacy + MattaNutra co-branded).
+- Packing slip / shipping label PDF generation (Delight Pharmacy + MattaNutra co-branded).
 - Returns & refund workflow with full financial reversal.
 - Expiry/lot tracking + automated alerts for short-dated stock.
 - Supplier lead time + MOQ master data + purchase order management UI.
@@ -357,7 +357,7 @@ Use `source_ref` like `fulfillment_order:uuid:stage:cogs` for perfect traceabili
 
 ## 5. Cross-Cutting Concerns & Non-Functional Requirements
 
-- **Auth & Least Privilege**: Dream Pharmacy must never have broad admin rights.
+- **Auth & Least Privilege**: Delight Pharmacy must never have broad admin rights.
 - **Audit Everything**: Every state change, stock movement, and financial entry must be traceable.
 - **Idempotency**: Use the existing `source_ref` pattern religiously.
 - **i18n**: All new UI and customer communications must support EN/TH.
@@ -371,13 +371,13 @@ Use `source_ref` like `fulfillment_order:uuid:stage:cogs` for perfect traceabili
 ## 6. Suggested File & Module Structure (Follow Existing Patterns)
 
 New or heavily modified files (illustrative):
-- `lib/dream-pharmacy-orders.ts`
+- `lib/delight-pharmacy-orders.ts`
 - `lib/stock-prediction.ts`
-- `lib/admin-dream-pharmacy.ts` (or split into several)
+- `lib/admin-delight-pharmacy.ts` (or split into several)
 - `lib/finance-ledger.ts` (extend)
-- `scripts/apply-dream-pharmacy-schema.ts`
-- `app/api/admin/dream-pharmacy/**/*`
-- `components/admin/dream-pharmacy/*` (new folder)
+- `scripts/apply-delight-pharmacy-schema.ts`
+- `app/api/admin/delight-pharmacy/**/*`
+- `components/admin/delight-pharmacy/*` (new folder)
 - `components/admin/dashboard-content.tsx` (add nav + types)
 - `lib/task-work-items.ts` + `lib/task-execution.ts` + `lib/task-result-applier.ts` (new task types)
 - `db-schema.sql` (or dedicated delta file)
@@ -402,11 +402,11 @@ New or heavily modified files (illustrative):
 - Margin ranking demonstrably surfaces better procurement choices.
 
 **End of Phase 4**:
-- Dream Pharmacy team can run their entire daily operation inside the new admin section.
+- Delight Pharmacy team can run their entire daily operation inside the new admin section.
 - Build, typecheck, tests, and lint are all green.
 
 **Overall Business Outcome**:
-MattaNutra + Dream Pharmacy can confidently scale physical product delivery while maintaining perfect visibility into profitability, cash position, and inventory risk.
+MattaNutra + Delight Pharmacy can confidently scale physical product delivery while maintaining perfect visibility into profitability, cash position, and inventory risk.
 
 ---
 

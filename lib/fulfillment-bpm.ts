@@ -2,7 +2,7 @@ import { writeBpmEvent, type BpmEventInput, type BpmEventType } from "@/lib/bpm"
 
 /**
  * Fulfillment-specific BPM event types.
- * These provide complete observability for the Dream Pharmacy order lifecycle.
+ * These provide complete observability for the Delight Pharmacy order lifecycle.
  */
 export type FulfillmentBpmEventName =
   | "fulfillment_order_created"
@@ -80,7 +80,7 @@ export async function writeFulfillmentBpmEvent({
   await writeBpmEvent({
     ...rest,
     actorType: pharmacistId ? "worker" : "system",
-    emittedBy: "dream_pharmacy_fulfillment",
+    emittedBy: "delight_pharmacy_fulfillment",
     eventName,
     eventStatus,
     eventType: "fulfillment" as BpmEventType,

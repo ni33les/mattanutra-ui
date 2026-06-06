@@ -5,7 +5,7 @@ import { SYSTEM_AGENTS, type SystemAgentKey } from "@/lib/system-agents";
 
 type Db = postgres.Sql;
 
-type SourceDreamOrganisation = Readonly<{
+type SourceDelightOrganisation = Readonly<{
   country_code: string;
   currency: string;
   default_locale: string;
@@ -16,7 +16,7 @@ type SourceDreamOrganisation = Readonly<{
   status: string;
 }>;
 
-type SourceDreamSellable = Readonly<{
+type SourceDelightSellable = Readonly<{
   backorder_policy: string;
   currency: string;
   id: string;
@@ -126,8 +126,8 @@ function apiKeyFor(seed: WorkerCredentialSeed) {
   return token;
 }
 
-async function fetchSourceDreamData(source: Db) {
-  const organisations = await source<SourceDreamOrganisation[]>`
+async function fetchSourceDelightData(source: Db) {
+  const organisations = await source<SourceDelightOrganisation[]>`
     select
       id::text,
       slug,
@@ -138,17 +138,17 @@ async function fetchSourceDreamData(source: Db) {
       currency,
       metadata
     from public.organisations
-    where slug = 'dream-pharmacy'
+    where slug = 'delight-pharmacy'
       and organisation_type = 'tenant'
     limit 1
   `;
   const organisation = organisations[0];
 
   if (!organisation) {
-    fail("DEV source does not contain dream-pharmacy organisation");
+    fail("DEV source does not contain delight-pharmacy organisation");
   }
 
-  const sellables = await source<SourceDreamSellable[]>`
+  const sellables = await source<SourceDelightSellable[]>`
     select
       sellable.id::text,
       sellable.product_id::text,
@@ -178,15 +178,15 @@ async function fetchSourceDreamData(source: Db) {
   `;
 
   if (sellables.length < 1) {
-    fail("DEV source has no active Dream sellable products");
+    fail("DEV source has no active Delight sellable products");
   }
 
   return { organisation, sellables };
 }
 
-async function ensureDreamOrganisation(
+async function ensureDelightOrganisation(
   target: Db,
-  organisation: SourceDreamOrganisation
+  organisation: SourceDelightOrganisation
 ) {
   await target`
     insert into public.organisations (
@@ -235,11 +235,11 @@ async function ensureDreamOrganisation(
   `;
 }
 
-async function seedDreamSellables(
+async function seedDelightSellables(
   target: Db,
   input: Readonly<{
     organisationId: string;
-    sellables: readonly SourceDreamSellable[];
+    sellables: readonly SourceDelightSellable[];
   }>
 ) {
   let sellableCount = 0;
@@ -521,7 +521,7 @@ async function ensureAgentCredential(
 async function seedWorkerCredentials(
   target: Db,
   input: Readonly<{
-    dreamOrganisationId: string;
+    delightOrganisationId: string;
     platformOrganisationId: string;
   }>
 ) {
@@ -541,7 +541,7 @@ async function seedWorkerCredentials(
     await ensureAgentCredential(target, {
       apiKey: item.token,
       membershipOrganisationId: item.seed.role === "retail_agent"
-        ? input.dreamOrganisationId
+        ? input.delightOrganisationId
         : input.platformOrganisationId,
       role: item.seed.role,
       seed: item.seed
@@ -554,7 +554,7 @@ async function seedWorkerCredentials(
 async function seedNotificationPreferences(
   target: Db,
   input: Readonly<{
-    dreamOrganisationId: string;
+    delightOrganisationId: string;
     platformOrganisationId: string;
   }>
 ) {
@@ -574,7 +574,7 @@ async function seedNotificationPreferences(
           updated_at
         )
         values (
-          ${input.dreamOrganisationId}::uuid,
+          ${input.delightOrganisationId}::uuid,
           ${eventKey},
           ${channelType},
           true,
@@ -665,20 +665,20 @@ async function main() {
   const target = makeSql(targetConnection);
 
   try {
-    const { organisation, sellables } = await fetchSourceDreamData(source);
+    const { organisation, sellables } = await fetchSourceDelightData(source);
     const platformId = await platformOrganisationId(target);
 
-    await ensureDreamOrganisation(target, organisation);
-    const sellableResult = await seedDreamSellables(target, {
+    await ensureDelightOrganisation(target, organisation);
+    const sellableResult = await seedDelightSellables(target, {
       organisationId: organisation.id,
       sellables
     });
     const credentialResult = await seedWorkerCredentials(target, {
-      dreamOrganisationId: organisation.id,
+      delightOrganisationId: organisation.id,
       platformOrganisationId: platformId
     });
     const preferenceResult = await seedNotificationPreferences(target, {
-      dreamOrganisationId: organisation.id,
+      delightOrganisationId: organisation.id,
       platformOrganisationId: platformId
     });
     const stockRows = await target<Array<{ stock_sum: string }>>`
@@ -689,8 +689,8 @@ async function main() {
     `;
 
     console.log(JSON.stringify({
-      dreamOrganisationId: organisation.id,
-      dreamOrganisationName: organisation.name,
+      delightOrganisationId: organisation.id,
+      delightOrganisationName: organisation.name,
       sourceSellables: sellables.length,
       stockQuantitySum: Number(stockRows[0]?.stock_sum ?? 0),
       ...sellableResult,

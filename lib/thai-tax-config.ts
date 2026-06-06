@@ -1,7 +1,7 @@
 import { getSql } from "@/lib/db";
 
 /**
- * Thai Tax Configuration for Dream Pharmacy / MattaNutra fulfillment.
+ * Thai Tax Configuration for Delight Pharmacy / MattaNutra fulfillment.
  *
  * As of 2026, the main relevant rates for supplement sales in Thailand are:
  * - VAT: 7% (standard)

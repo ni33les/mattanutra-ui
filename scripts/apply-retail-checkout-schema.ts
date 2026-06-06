@@ -94,8 +94,8 @@ begin
     )
     values (
       '77777777-7777-4777-8777-777777777777'::uuid,
-      'Dream Pharmacy settlement payable',
-      'Nominal and actual retail settlement payable to Dream Pharmacy.',
+      'Delight Pharmacy settlement payable',
+      'Nominal and actual retail settlement payable to Delight Pharmacy.',
       now(),
       now()
     )
