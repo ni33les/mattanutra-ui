@@ -26,6 +26,10 @@ import {
   productIdentifierCandidatesFromPayload,
   productIdentifiersFromPayload
 } from "@/lib/product-identifiers";
+import {
+  effectiveRegulatoryApprovalsForCountry,
+  productRegulatoryApprovalsFromPayload
+} from "@/lib/product-regulatory-approvals";
 const randomUUID = () => globalThis.crypto.randomUUID();
 
 import {
@@ -370,6 +374,9 @@ export function rowFromDb(
       wholesalePriceAmount: numberOrNull(record.wholesalePriceAmount)
     };
   }).filter((item) => item.organisationId);
+  const regulatoryApprovals = productRegulatoryApprovalsFromPayload(
+    row.regulatory_approvals
+  );
   const countryPricing = arrayPayload(row.country_pricing)
     .map((item): ProductCountryPricing | null => {
       const record = item && typeof item === "object"
@@ -382,6 +389,10 @@ export function rowFromDb(
         ? {
             countryCode,
             currency: normalizeCurrencyCode(record.currency, row.currency || "THB"),
+            effectiveRegulatoryApprovals: effectiveRegulatoryApprovalsForCountry(
+              regulatoryApprovals,
+              countryCode
+            ),
             priceUpdatedAt: isoOrNull(record.priceUpdatedAt),
             rrpPriceAmount
           }
@@ -407,7 +418,6 @@ export function rowFromDb(
     displayDescription,
     displayTitle,
     facts,
-    fdaApprovalNumber: row.fda_approval_number,
     id: row.id,
     imageUrl: row.image_url,
     identifierCandidates: productIdentifierCandidatesFromPayload(
@@ -460,6 +470,7 @@ export function rowFromDb(
     },
     ...(decisionStats ? { decisionStats } : {}),
     region: row.region,
+    regulatoryApprovals,
     shopAvailability,
     sourceEvidence: {
       importId: row.import_id,

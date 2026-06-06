@@ -263,6 +263,22 @@ export type ProductRecommendationsWorkItem = Readonly<{
   taskType: "generate_product_recommendations";
 }>;
 
+export type ProductFdaApprovalSourcingWorkItem = Readonly<{
+  includeManufacturerEvidence: boolean;
+  limit: number;
+  maxRunMs: number;
+  productId: string | null;
+  taskId: string;
+  taskType: "source_product_fda_approvals";
+}>;
+
+export type ProductIdentifierSourcingWorkItem = Readonly<{
+  limit: number;
+  productId: string | null;
+  taskId: string;
+  taskType: "source_product_identifiers";
+}>;
+
 export type RetailStockForecastWorkItem = Readonly<{
   organisationId: string;
   productId: string | null;
@@ -296,6 +312,8 @@ export type TaskWorkItem =
   | NutritionPlanChatWorkItem
   | NutritionPlanRefinementWorkItem
   | NutritionReportWorkItem
+  | ProductFdaApprovalSourcingWorkItem
+  | ProductIdentifierSourcingWorkItem
   | ProductRecommendationsWorkItem
   | AdminCommunicationRouteWorkItem
   | CommunicationDispatchWorkItem
@@ -388,6 +406,26 @@ function payloadText(payload: unknown, key: string) {
   const value = payloadRecord(payload)[key];
 
   return typeof value === "string" ? value : "";
+}
+
+function payloadBoolean(payload: unknown, key: string, fallback = false) {
+  const value = payloadRecord(payload)[key];
+
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function payloadNumber(
+  payload: unknown,
+  key: string,
+  fallback: number,
+  min: number,
+  max: number
+) {
+  const value = Number(payloadRecord(payload)[key]);
+
+  return Number.isFinite(value)
+    ? Math.min(max, Math.max(min, Math.round(value)))
+    : fallback;
 }
 
 function payloadTextArray(payload: unknown, key: string) {
@@ -1517,6 +1555,30 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
 
   if (task.taskType === "generate_product_recommendations") {
     return buildProductRecommendationsWorkItem(task);
+  }
+
+  if (task.taskType === "source_product_fda_approvals") {
+    return {
+      includeManufacturerEvidence: payloadBoolean(
+        task.payload,
+        "includeManufacturerEvidence",
+        false
+      ),
+      limit: payloadNumber(task.payload, "limit", 120, 1, 500),
+      maxRunMs: payloadNumber(task.payload, "maxRunMs", 180_000, 10_000, 600_000),
+      productId: textFromRecord(payloadRecord(task.payload), "productId"),
+      taskId: task.id,
+      taskType: "source_product_fda_approvals"
+    } satisfies ProductFdaApprovalSourcingWorkItem;
+  }
+
+  if (task.taskType === "source_product_identifiers") {
+    return {
+      limit: payloadNumber(task.payload, "limit", 2000, 1, 2000),
+      productId: textFromRecord(payloadRecord(task.payload), "productId"),
+      taskId: task.id,
+      taskType: "source_product_identifiers"
+    } satisfies ProductIdentifierSourcingWorkItem;
   }
 
   if (task.taskType === "retail_stock_forecast_refresh") {

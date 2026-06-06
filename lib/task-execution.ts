@@ -77,6 +77,24 @@ async function executeRetailAgentCommandForTask(input: Parameters<
   return executeRetailAgentCommand(input);
 }
 
+async function sourceProductFdaApprovalNumbersForTask(input: Parameters<
+  typeof import("@/lib/product-fda-sourcing")["sourceProductFdaApprovalNumbers"]
+>[0]) {
+  const { sourceProductFdaApprovalNumbers } = await import(
+    "@/lib/product-fda-sourcing"
+  );
+
+  return sourceProductFdaApprovalNumbers(input);
+}
+
+async function sourceProductIdentifiersForTask(input: Parameters<
+  typeof import("@/lib/product-identifiers")["sourceProductIdentifiers"]
+>[0]) {
+  const { sourceProductIdentifiers } = await import("@/lib/product-identifiers");
+
+  return sourceProductIdentifiers(input);
+}
+
 type RetailerRecommendationOption = Readonly<{
   backorderCount: number;
   currency: string;
@@ -662,6 +680,22 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
         }
       }
     };
+  }
+
+  if (workItem.taskType === "source_product_fda_approvals") {
+    return sourceProductFdaApprovalNumbersForTask({
+      includeManufacturerEvidence: workItem.includeManufacturerEvidence,
+      limit: workItem.limit,
+      maxRunMs: workItem.maxRunMs,
+      productId: workItem.productId
+    });
+  }
+
+  if (workItem.taskType === "source_product_identifiers") {
+    return sourceProductIdentifiersForTask({
+      limit: workItem.limit,
+      productId: workItem.productId
+    });
   }
 
   if (workItem.taskType === "refine_nutrition_plan") {

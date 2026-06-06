@@ -274,6 +274,8 @@ export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
   generate_supplement_guidance: "formulationWorker",
   generate_nutrition_report: "nutritionPlanAdvisor",
   generate_product_recommendations: "productMatcher",
+  source_product_fda_approvals: "productMatcher",
+  source_product_identifiers: "productMatcher",
   retail_stock_forecast_refresh: "retailStockPlanner",
   retail_customer_order_allocate: "retailStockPlanner",
   retail_shopping_list_review: "retailStockPlanner",
@@ -315,6 +317,12 @@ export function requiredCapabilitiesForWorkTaskType(taskType: string) {
     ],
     generate_product_recommendations: [
       AGENT_CAPABILITIES.productRecommendationFullBeam,
+      AGENT_CAPABILITIES.productRecommendation
+    ],
+    source_product_fda_approvals: [
+      AGENT_CAPABILITIES.productRecommendation
+    ],
+    source_product_identifiers: [
       AGENT_CAPABILITIES.productRecommendation
     ],
     retail_stock_forecast_refresh: [AGENT_CAPABILITIES.retailStockForecast],

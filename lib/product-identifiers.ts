@@ -59,6 +59,8 @@ type IdentifierEvidence = ProductIdentifierInput & Readonly<{
   metadata?: Record<string, unknown>;
 }>;
 
+const sourceableProductIdentifierTypes = ["ean13", "manufacturer_sku"] as const;
+
 function cleanText(value: unknown, max = 2000) {
   if (typeof value !== "string") {
     return null;
@@ -543,7 +545,12 @@ function extractIdentifierEvidenceFromRecord(
         });
       } else if (["sku", "productsku"].includes(normalizedKey)) {
         pushIdentifierEvidence(output, {
-          confidence: "medium",
+          autoApprove: source.includes("structured") || source.includes("snapshot"),
+          confidence: source.includes("structured")
+            ? "trusted"
+            : source.includes("snapshot")
+              ? "high"
+              : "medium",
           evidenceUrl,
           source,
           type: "manufacturer_sku",
@@ -551,7 +558,12 @@ function extractIdentifierEvidenceFromRecord(
         });
       } else if (["mpn", "manufacturerpartnumber"].includes(normalizedKey)) {
         pushIdentifierEvidence(output, {
-          confidence: "medium",
+          autoApprove: source.includes("structured") || source.includes("snapshot"),
+          confidence: source.includes("structured")
+            ? "trusted"
+            : source.includes("snapshot")
+              ? "high"
+              : "medium",
           evidenceUrl,
           source,
           type: "manufacturer_sku",
@@ -666,19 +678,42 @@ export async function sourceProductIdentifiers(input: Readonly<{
 
   const limit = Math.max(1, Math.min(2000, Math.round(input.limit ?? 2000)));
   const rows = await sql<Array<{
+    active_identifier_types: string[] | null;
     id: string;
     product_url: string;
     source_snapshot: unknown;
     source_url: string | null;
   }>>`
     select
-      id::text,
-      product_url,
-      source_url,
-      source_snapshot
+      products.id::text,
+      products.product_url,
+      products.source_url,
+      products.source_snapshot,
+      coalesce(
+        array_agg(distinct product_identifiers.identifier_type) filter (
+          where product_identifiers.status = 'active'
+            and product_identifiers.identifier_type = any(${sourceableProductIdentifierTypes}::text[])
+        ),
+        array[]::text[]
+      ) as active_identifier_types
     from public.products
-    where ${input.productId ? sql`id = ${input.productId}::uuid` : sql`true`}
-    order by updated_at desc
+    left join public.product_identifiers
+      on product_identifiers.product_id = products.id
+    where ${input.productId ? sql`products.id = ${input.productId}::uuid` : sql`
+      exists (
+        select 1
+        from unnest(${sourceableProductIdentifierTypes}::text[]) as missing(identifier_type)
+        where not exists (
+          select 1
+          from public.product_identifiers
+          where product_identifiers.product_id = products.id
+            and product_identifiers.identifier_type = missing.identifier_type
+            and product_identifiers.status = 'active'
+        )
+      )
+    `}
+    group by products.id
+    order by products.updated_at desc
     limit ${limit}
   `;
   let approved = 0;
@@ -688,13 +723,34 @@ export async function sourceProductIdentifiers(input: Readonly<{
   let missing = 0;
 
   for (const row of rows) {
+    const activeTypes = new Set(row.active_identifier_types ?? []);
+    const missingIdentifierTypes = new Set<ProductIdentifierType>(
+      sourceableProductIdentifierTypes.filter((type) => !activeTypes.has(type))
+    );
+
+    if (missingIdentifierTypes.size === 0) {
+      continue;
+    }
+
     const evidenceUrl = row.source_url ?? row.product_url;
-    const html = evidenceUrl ? await fetchTrustedHtml(evidenceUrl) : null;
-    const evidence = extractTrustedIdentifierEvidence({
+    const snapshotEvidence = extractTrustedIdentifierEvidence({
       evidenceUrl,
-      html,
       snapshot: row.source_snapshot
-    });
+    }).filter((item) => missingIdentifierTypes.has(item.type));
+    const snapshotTypes = new Set(snapshotEvidence.map((item) => item.type));
+    const missingAfterSnapshot = new Set<ProductIdentifierType>(
+      [...missingIdentifierTypes].filter((type) => !snapshotTypes.has(type))
+    );
+    const html = missingAfterSnapshot.size > 0 && evidenceUrl
+      ? await fetchTrustedHtml(evidenceUrl)
+      : null;
+    const htmlEvidence = html
+      ? extractTrustedIdentifierEvidence({
+          evidenceUrl,
+          html
+        }).filter((item) => missingAfterSnapshot.has(item.type))
+      : [];
+    const evidence = [...snapshotEvidence, ...htmlEvidence];
 
     if (evidence.length === 0) {
       missing += 1;

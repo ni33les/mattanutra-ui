@@ -23,6 +23,7 @@ import {
   type ProductCountryPricing
 } from "@/lib/product-countries";
 import { productIdentifiersFromBody } from "@/lib/product-identifiers";
+import { productRegulatoryApprovalsFromPayload } from "@/lib/product-regulatory-approvals";
 
 export const runtime = "nodejs";
 
@@ -378,6 +379,9 @@ export async function PATCH(
             productUrl: body.productUrl === undefined
               ? undefined
               : textOrNull(body.productUrl),
+            regulatoryApprovals: body.regulatoryApprovals === undefined
+              ? undefined
+              : productRegulatoryApprovalsFromPayload(body.regulatoryApprovals),
             reviewerNote: textOrNull(body.reviewerNote),
             taskId: id,
             title: body.title === undefined ? undefined : textOrNull(body.title),

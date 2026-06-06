@@ -18,6 +18,7 @@ import {
   type ProductCountryPricing
 } from "@/lib/product-countries";
 import { productIdentifiersFromBody } from "@/lib/product-identifiers";
+import { productRegulatoryApprovalsFromPayload } from "@/lib/product-regulatory-approvals";
 
 export const runtime = "nodejs";
 
@@ -199,6 +200,9 @@ export async function POST(request: Request) {
       productAudience,
       productKind,
       productUrl,
+      regulatoryApprovals: body.regulatoryApprovals === undefined
+        ? undefined
+        : productRegulatoryApprovalsFromPayload(body.regulatoryApprovals),
       region: textOrNull(body.region) ?? "TH",
       title
     });

@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Check,
   FileDown,
   PackageCheck,
   ReceiptText,
@@ -28,6 +29,7 @@ import type { Locale } from "@/lib/i18n";
 import type {
   BackorderPolicy,
   RegionalBasketAvailability,
+  RetailAvailabilityStatus,
   RetailRoutingPreference
 } from "@/lib/retail-cart-availability";
 import {
@@ -63,6 +65,11 @@ import { AdminButton, AdminModal } from "@/components/admin/ui";
 type StockResponse = Readonly<{
   data?: AdminRetailStockData;
   error?: string;
+  result?: unknown;
+  timingsMs?: Readonly<{
+    mutation?: number;
+    readModel?: number;
+  }>;
   updated?: boolean;
 }>;
 
@@ -101,8 +108,7 @@ type RetailStockPanel =
   | "insights"
   | "list"
   | "movements"
-  | "stock-advice"
-  | "reorder";
+  | "stock-advice";
 
 type RetailStockFilter =
   | "all"
@@ -173,11 +179,15 @@ type MovementEditor =
 
 type ReorderPurchaseItem = Readonly<{
   assignedActiveUnits: number;
+  amountToBuyUnits: number;
   brandName: string | null;
   currentStockQuantity: number;
   organisationId: string;
   productId: string;
   productTitle: string;
+  recommendationPressureCount: number;
+  riskLevel: AdminRetailStockData["reorderAdvice"][number]["riskLevel"] | null;
+  source: "backorder" | "recommendation";
   unassignedDemandUnits: number;
   unorderedNeedUnits: number;
   wholesalePriceAmount: number | null;
@@ -316,6 +326,47 @@ function stockAvailabilityStatus(
   return "in_stock";
 }
 
+function stockAvailabilityLabel(
+  labels: AdminContent,
+  status: RetailStockAvailabilityStatus
+) {
+  const labelsByStatus: Record<RetailStockAvailabilityStatus, string> = {
+    in_stock: labels.stock.inStock,
+    low_stock: labels.stock.lowStock,
+    out_of_stock: labels.stock.outOfStock
+  };
+
+  return labelsByStatus[status];
+}
+
+function retailAvailabilityLabel(status: RetailAvailabilityStatus) {
+  const labelsByStatus: Record<RetailAvailabilityStatus, string> = {
+    available_now: "Available now",
+    backorder: "Backorder",
+    unavailable: "Unavailable"
+  };
+
+  return labelsByStatus[status];
+}
+
+function reorderRiskRank(
+  riskLevel: AdminRetailStockData["reorderAdvice"][number]["riskLevel"] | null
+) {
+  if (riskLevel === "out_of_stock") {
+    return 0;
+  }
+
+  if (riskLevel === "reorder") {
+    return 1;
+  }
+
+  if (riskLevel === "watch") {
+    return 2;
+  }
+
+  return 3;
+}
+
 function orgProductKey(organisationId: string, productId: string | null | undefined) {
   return `${organisationId}:${productId ?? "unknown"}`;
 }
@@ -392,6 +443,10 @@ function customerOrderMatchesFilter(
 }
 
 function customerOrderStatusDisplay(order: AdminRetailCustomerOrder) {
+  if (order.status === "awaiting_stock") {
+    return "Awaiting stock";
+  }
+
   if (order.status === "allocated") {
     return "Ready to pack";
   }
@@ -401,6 +456,14 @@ function customerOrderStatusDisplay(order: AdminRetailCustomerOrder) {
   }
 
   return readableToken(order.status);
+}
+
+function customerOrderStatusPillClass(order: AdminRetailCustomerOrder) {
+  if (order.status === "awaiting_stock" || order.isStuck) {
+    return "bg-amber-50 text-amber-800 ring-amber-100";
+  }
+
+  return "bg-gray-100 text-gray-700 ring-gray-200";
 }
 
 function customerOrderMetricColor(status: RetailCustomerOrderStatus) {
@@ -507,7 +570,10 @@ function buildCustomerOrderWorkflowSteps(
       at: order.workflowTimeline.awaitingStockAt,
       complete:
         Boolean(order.workflowTimeline.awaitingStockAt) ||
-        current === "awaiting_stock",
+        current === "awaiting_stock" ||
+        current === "ready_to_pack" ||
+        current === "ready_to_ship" ||
+        current === "sent",
       key: "awaiting_stock",
       label: labels.stock.awaitingStock
     },
@@ -690,6 +756,8 @@ function orderLineAwaitingStockUnits(line: AdminRetailCustomerOrderLine) {
   return Math.max(0, line.pipeline?.unorderedNeedUnits ?? 0);
 }
 
+const emptyRetailField = "";
+
 function printRetailOrderDocument({
   kind,
   labels,
@@ -721,18 +789,18 @@ function printRetailOrderDocument({
         order.routingSnapshot?.etaDate ??
         order.dueAt,
       locale
-    ) ?? labels.stock.notSet;
-  const placedAt = formatDateTime(order.placedAt, locale) ?? labels.stock.notSet;
+    ) ?? emptyRetailField;
+  const placedAt = formatDateTime(order.placedAt, locale) ?? emptyRetailField;
   const generatedAt =
     formatDateTime(new Date().toISOString(), locale) ?? new Date().toISOString();
   const orderTotal =
     formatPrice(locale, order.currency, customerOrderRetailValue(order)) ??
-    labels.stock.notSet;
+    emptyRetailField;
   const deliverySection = addressBlockHtml(
     labels.stock.deliveryAddress,
     shippingLines,
     shippingContactLines,
-    labels.stock.notSet
+    emptyRetailField
   );
   const billingSection = addressBlockHtml(
     labels.stock.billingAddress,
@@ -740,7 +808,7 @@ function printRetailOrderDocument({
     billingContactLines,
     order.deliveryDetails?.billingSameAsShipping
       ? labels.stock.billingSameAsDelivery
-      : labels.stock.notSet
+      : emptyRetailField
   );
   const summarySection = `
     <section class="panel">
@@ -771,17 +839,17 @@ function printRetailOrderDocument({
         const identifiers = orderLineIdentifierParts(line);
         const unitPrice =
           line.retailPriceAmount === null
-            ? labels.stock.notSet
+            ? emptyRetailField
             : (formatPrice(locale, order.currency, line.retailPriceAmount) ??
-              labels.stock.notSet);
+              emptyRetailField);
         const lineTotal =
           line.retailPriceAmount === null
-            ? labels.stock.notSet
+            ? emptyRetailField
             : (formatPrice(
                 locale,
                 order.currency,
                 line.retailPriceAmount * line.quantityOrdered
-              ) ?? labels.stock.notSet);
+              ) ?? emptyRetailField);
 
         return `
           <tr>
@@ -823,7 +891,7 @@ function printRetailOrderDocument({
       <div class="label-address">
         ${[...shippingLines, ...shippingContactLines]
           .map((line) => `<div>${escapeHtml(line)}</div>`)
-          .join("") || `<div>${escapeHtml(labels.stock.notSet)}</div>`}
+          .join("") || `<div>${escapeHtml(emptyRetailField)}</div>`}
       </div>
       <div class="label-footer">
         <div><strong>${escapeHtml(labels.stock.customerOrders)}:</strong> ${escapeHtml(order.orderNumber)}</div>
@@ -959,12 +1027,8 @@ function panelFromView(view: AdminDashboardView): RetailStockPanel {
     return "fulfillment";
   }
 
-  if (view === "retail-stock-advice") {
+  if (view === "retail-stock-advice" || view === "retail-reorder") {
     return "stock-advice";
-  }
-
-  if (view === "retail-reorder") {
-    return "reorder";
   }
 
   return "list";
@@ -1231,24 +1295,6 @@ export function AdminRetailStockView({
 
     return linesByOrderId;
   }, [data.customerOrderLines]);
-  const customerOrderAwaitingStockUnitsByOrderId = useMemo(() => {
-    const unitsByOrderId = new Map<string, number>();
-
-    for (const line of data.customerOrderLines) {
-      const awaitingStockUnits = orderLineAwaitingStockUnits(line);
-
-      if (awaitingStockUnits < 1) {
-        continue;
-      }
-
-      unitsByOrderId.set(
-        line.customerOrderId,
-        (unitsByOrderId.get(line.customerOrderId) ?? 0) + awaitingStockUnits
-      );
-    }
-
-    return unitsByOrderId;
-  }, [data.customerOrderLines]);
 
   const organisationCustomerOrders = useMemo(
     () =>
@@ -1500,11 +1546,15 @@ export function AdminRetailStockView({
         groups.get(key) ??
         {
           assignedActiveUnits: assignedByOrgProduct.get(key) ?? 0,
+          amountToBuyUnits: 0,
           brandName: product?.brandName ?? null,
           currentStockQuantity: row?.stockQuantity ?? 0,
           organisationId: pipeline.organisationId,
           productId: pipeline.productId,
           productTitle: pipeline.productTitle ?? product?.title ?? pipeline.productId,
+          recommendationPressureCount: 0,
+          riskLevel: null,
+          source: "backorder" as const,
           unassignedDemandUnits: 0,
           unorderedNeedUnits: 0,
           wholesalePriceAmount: row?.wholesalePriceAmount ?? null
@@ -1520,6 +1570,7 @@ export function AdminRetailStockView({
 
       groups.set(key, {
         ...current,
+        amountToBuyUnits: unassignedDemandUnits,
         unassignedDemandUnits,
         unorderedNeedUnits
       });
@@ -1545,20 +1596,73 @@ export function AdminRetailStockView({
       outstandingPurchaseItems.filter((item) => item.unassignedDemandUnits > 0),
     [outstandingPurchaseItems]
   );
+  const reorderPurchaseItemKeys = useMemo(
+    () =>
+      new Set(
+        reorderPurchaseItems.map((item) =>
+          orgProductKey(item.organisationId, item.productId)
+        )
+      ),
+    [reorderPurchaseItems]
+  );
+  const reorderRecommendationItems = useMemo<ReorderPurchaseItem[]>(
+    () =>
+      adviceRows
+        .filter(
+          (advice) =>
+            advice.suggestedOrderQuantity > 0 &&
+            advice.riskLevel !== "ok" &&
+            !reorderPurchaseItemKeys.has(
+              orgProductKey(advice.organisationId, advice.productId)
+            )
+        )
+        .map((advice) => {
+          const key = orgProductKey(advice.organisationId, advice.productId);
+          const row = stockRowByOrgProduct.get(key);
+          const product = productOptionById.get(advice.productId);
+
+          return {
+            assignedActiveUnits: 0,
+            amountToBuyUnits: advice.suggestedOrderQuantity,
+            brandName: product?.brandName ?? null,
+            currentStockQuantity: row?.stockQuantity ?? advice.currentStockQuantity,
+            organisationId: advice.organisationId,
+            productId: advice.productId,
+            productTitle: advice.productTitle,
+            recommendationPressureCount: advice.recommendationPressureCount,
+            riskLevel: advice.riskLevel,
+            source: "recommendation" as const,
+            unassignedDemandUnits: advice.suggestedOrderQuantity,
+            unorderedNeedUnits: 0,
+            wholesalePriceAmount: row?.wholesalePriceAmount ?? null
+          };
+        })
+        .sort(
+          (left, right) =>
+            reorderRiskRank(left.riskLevel) - reorderRiskRank(right.riskLevel) ||
+            right.amountToBuyUnits - left.amountToBuyUnits ||
+            left.productTitle.localeCompare(right.productTitle)
+        ),
+    [adviceRows, productOptionById, reorderPurchaseItemKeys, stockRowByOrgProduct]
+  );
+  const shoppingListCandidateItems = useMemo(
+    () => [...reorderPurchaseItems, ...reorderRecommendationItems],
+    [reorderPurchaseItems, reorderRecommendationItems]
+  );
   const defaultOutstandingPurchaseKeys = useMemo(() => {
     const targetOrganisationId =
       selectedOrganisationId === "all"
-        ? reorderPurchaseItems[0]?.organisationId
+        ? shoppingListCandidateItems[0]?.organisationId
         : selectedOrganisationId;
 
     if (!targetOrganisationId) {
       return [];
     }
 
-    return reorderPurchaseItems
+    return shoppingListCandidateItems
       .filter((item) => item.organisationId === targetOrganisationId)
       .map((item) => orgProductKey(item.organisationId, item.productId));
-  }, [reorderPurchaseItems, selectedOrganisationId]);
+  }, [selectedOrganisationId, shoppingListCandidateItems]);
   const defaultOutstandingPurchaseKeySignature =
     defaultOutstandingPurchaseKeys.join("|");
 
@@ -1583,13 +1687,13 @@ export function AdminRetailStockView({
     selectedOutstandingPurchaseKeys ?? defaultOutstandingPurchaseKeys;
   const selectedOutstandingPurchaseItems = useMemo(
     () =>
-      reorderPurchaseItems.filter(
+      shoppingListCandidateItems.filter(
         (item) =>
           outstandingPurchaseSelectionKeys.includes(
             orgProductKey(item.organisationId, item.productId)
           )
       ),
-    [reorderPurchaseItems, outstandingPurchaseSelectionKeys]
+    [shoppingListCandidateItems, outstandingPurchaseSelectionKeys]
   );
   const visibleShoppingLists = useMemo(
     () =>
@@ -1841,11 +1945,11 @@ export function AdminRetailStockView({
 
 
   function toggleOutstandingPurchaseItem(item: {
+    amountToBuyUnits: number;
     organisationId: string;
     productId: string;
-    unassignedDemandUnits: number;
   }) {
-    if (item.unassignedDemandUnits < 1) {
+    if (item.amountToBuyUnits < 1) {
       return;
     }
 
@@ -1880,16 +1984,22 @@ export function AdminRetailStockView({
           const row = stockRowByOrgProduct.get(
             orgProductKey(item.organisationId, item.productId)
           );
-          const assignedQuantity = Math.max(1, Math.ceil(item.unassignedDemandUnits));
+          const assignedQuantity = Math.max(1, Math.ceil(item.amountToBuyUnits));
+          const requiredQuantity =
+            item.source === "backorder"
+              ? item.unorderedNeedUnits
+              : item.amountToBuyUnits;
+          const unorderedNeedQuantity =
+            item.source === "backorder" ? item.unorderedNeedUnits : 0;
 
           return {
             currentStockQuantity: row?.stockQuantity ?? 0,
             actualQuantity: assignedQuantity,
             assignedQuantity,
             productId: item.productId,
-            requiredQuantity: item.unorderedNeedUnits,
+            requiredQuantity,
             retailPriceAmount: null,
-            unorderedNeedQuantity: item.unorderedNeedUnits,
+            unorderedNeedQuantity,
             wholesalePriceAmount: item.wholesalePriceAmount
           };
         }),
@@ -1903,7 +2013,7 @@ export function AdminRetailStockView({
     }
   }
 
-  async function saveShoppingListDraft(status: "active" | "closed" = "active") {
+  async function saveShoppingListDraft() {
     if (!activeShoppingList) {
       return;
     }
@@ -1922,14 +2032,18 @@ export function AdminRetailStockView({
           unorderedNeedQuantity: numberOrNull(line.unorderedNeedQuantity),
           wholesalePriceAmount: numberOrNull(line.wholesalePriceAmount)
         })),
+        responseMode: "minimal",
         shoppingListId: activeShoppingList.id,
-        status
+        status: "closed"
       },
       `shopping-list:${activeShoppingList.id}`
     );
 
     if (saved) {
       setSelectedShoppingListId("");
+      void refreshRetailStockData().catch((error) => {
+        setError(actionErrorMessage(error, labels.stock.saveError));
+      });
     }
   }
 
@@ -2163,12 +2277,12 @@ export function AdminRetailStockView({
         setCustomerOrderDraft(null);
       }
 
-      return true;
+      return result;
     } catch (error) {
       setError(
         actionErrorMessage(error, options.errorFallback ?? labels.stock.saveError)
       );
-      return false;
+      return null;
     } finally {
       setBusyId("");
     }
@@ -2665,10 +2779,10 @@ export function AdminRetailStockView({
 	                      ) : null}
 		                    </td>
 	                    <td className="whitespace-nowrap py-3 pr-4 text-gray-700">
-	                      <div>{wholesalePrice ?? labels.stock.notSet}</div>
+	                      <div>{wholesalePrice ?? emptyRetailField}</div>
 	                    </td>
 	                    <td className="whitespace-nowrap py-3 pr-4 text-gray-700">
-	                      <div>{retailPrice ?? labels.stock.notSet}</div>
+	                      <div>{retailPrice ?? emptyRetailField}</div>
 	                    </td>
                     <td className="whitespace-nowrap py-3 pr-4 text-gray-600">
                       {row.leadTimeDays}
@@ -2689,7 +2803,7 @@ export function AdminRetailStockView({
                       </span>
                     </td>
                     <td className="whitespace-nowrap py-3 pr-4 text-gray-500">
-                      {updated ?? labels.stock.notSet}
+                      {updated ?? emptyRetailField}
                     </td>
                     <td className="py-3 pr-4">
                       {data.canWrite ? (
@@ -2744,7 +2858,7 @@ export function AdminRetailStockView({
                 <div className="mt-1 text-sm text-gray-600">
                   {customerOrderDetail.customerName ||
                     customerOrderDetail.customerEmail ||
-                    labels.stock.notSet}
+                    emptyRetailField}
                 </div>
                 <div className="mt-2 text-xs font-semibold text-gray-600">
                   {labels.stock.allocatedTo}:{" "}
@@ -2759,26 +2873,19 @@ export function AdminRetailStockView({
                       locale,
                       customerOrderDetail.currency,
                       customerOrderRetailValue(customerOrderDetail)
-                    ) ?? labels.stock.notSet}
+                    ) ?? emptyRetailField}
                   </span>
                 </div>
               </div>
               <div className="flex flex-col gap-3 lg:items-end">
                 <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                  <span className="inline-flex rounded-md bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                    {customerOrderStatusDisplay(customerOrderDetail)}
-                  </span>
                   <span
                     className={classNames(
-                      customerOrderDetail.workflowHealth.isStuck
-                        ? "bg-amber-50 text-amber-800 ring-amber-100"
-                        : "bg-emerald-50 text-emerald-700 ring-emerald-100",
+                      customerOrderStatusPillClass(customerOrderDetail),
                       "inline-flex rounded-md px-2 py-1 text-xs font-semibold ring-1"
                     )}
                   >
-                    {customerOrderDetail.workflowHealth.isStuck
-                      ? labels.stock.stuck
-                      : labels.stock.onTrack}
+                    {customerOrderStatusDisplay(customerOrderDetail)}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 lg:justify-end">
@@ -2877,35 +2984,61 @@ export function AdminRetailStockView({
               <section className="space-y-4">
                 <div className="rounded-md bg-white p-4 ring-1 ring-gray-200">
                   <div className="grid gap-3 md:grid-cols-5">
-                    {customerOrderWorkflowSteps.map((step, index) => (
-                      <div
-                        className={classNames(
-                          "relative rounded-md px-3 py-3 ring-1",
-                          step.active
-                            ? "bg-amber-50 text-amber-900 ring-amber-200"
-                            : step.complete
-                              ? "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]"
-                              : "bg-gray-50 text-gray-500 ring-gray-200"
-                        )}
-                        key={step.key}
-                      >
-                        {index > 0 ? (
-                          <span
-                            aria-hidden="true"
-                            className={classNames(
-                              "absolute -left-3 top-1/2 hidden h-px w-3 md:block",
-                              step.complete ? "bg-[#1FA77A]" : "bg-gray-200"
-                            )}
-                          />
-                        ) : null}
-                        <div className="text-xs font-semibold uppercase">
-                          {step.label}
+                    {customerOrderWorkflowSteps.map((step, index) => {
+                      const isCurrent = step.active;
+                      const isCompleted = step.complete && !isCurrent;
+                      const previousStep = customerOrderWorkflowSteps[index - 1];
+                      const connectorComplete = Boolean(
+                        previousStep?.complete && !previousStep.active
+                      );
+
+                      return (
+                        <div
+                          className={classNames(
+                            "relative rounded-md px-3 py-3 ring-1",
+                            isCurrent
+                              ? "bg-amber-50 text-amber-900 ring-amber-200"
+                              : isCompleted
+                                ? "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]"
+                                : "bg-gray-50 text-gray-500 ring-gray-200"
+                          )}
+                          key={step.key}
+                        >
+                          {index > 0 ? (
+                            <span
+                              aria-hidden="true"
+                              className={classNames(
+                                "absolute -left-3 top-1/2 hidden h-px w-3 md:block",
+                                connectorComplete ? "bg-[#1FA77A]" : "bg-gray-200"
+                              )}
+                            />
+                          ) : null}
+                          <div className="flex items-center gap-2 text-xs font-semibold uppercase">
+                            <span
+                              aria-hidden="true"
+                              className={classNames(
+                                "grid size-5 shrink-0 place-items-center rounded-full text-[11px] ring-1",
+                                isCompleted
+                                  ? "bg-[#1FA77A] text-white ring-[#1FA77A]"
+                                  : isCurrent
+                                    ? "bg-amber-100 text-amber-900 ring-amber-300"
+                                    : "bg-white text-gray-400 ring-gray-200"
+                              )}
+                            >
+                              {isCompleted ? (
+                                <Check className="size-3.5" strokeWidth={3} />
+                              ) : (
+                                index + 1
+                              )}
+                            </span>
+                            <span>{step.label}</span>
+                          </div>
+                          <div className="mt-2 text-sm font-semibold">
+                            {formatDate(step.at, locale) ?? emptyRetailField}
+                          </div>
                         </div>
-                        <div className="mt-2 text-sm font-semibold">
-                          {formatDate(step.at, locale) ?? labels.stock.notSet}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -2927,7 +3060,7 @@ export function AdminRetailStockView({
                             customerOrderDetail.routingSnapshot?.etaDate ??
                             customerOrderDetail.dueAt,
                           locale
-                        ) ?? labels.stock.notSet}
+                        ) ?? emptyRetailField}
                       </div>
                     </div>
                     <div>
@@ -2936,7 +3069,7 @@ export function AdminRetailStockView({
                       </div>
                       <div className="mt-1">
                         {formatDateTime(customerOrderDetail.placedAt, locale) ??
-                          labels.stock.notSet}
+                          emptyRetailField}
                       </div>
                     </div>
                     <div>
@@ -2947,7 +3080,7 @@ export function AdminRetailStockView({
                         {formatDateTime(
                           customerOrderDetail.lastWorkflowEventAt,
                           locale
-                        ) ?? labels.stock.notSet}
+                        ) ?? emptyRetailField}
                       </div>
                     </div>
                     <div>
@@ -2973,7 +3106,7 @@ export function AdminRetailStockView({
                           ? productCountryLabel(
                               customerOrderDetail.routingSnapshot.shippingCountry
                             )
-                          : labels.stock.notSet}
+                          : emptyRetailField}
                       </div>
                     </div>
                     <div>
@@ -2985,7 +3118,7 @@ export function AdminRetailStockView({
                           ? readableToken(
                               customerOrderDetail.workflowHealth.nextAction
                             )
-                          : labels.stock.notSet}
+                          : emptyRetailField}
                       </div>
                     </div>
                   </div>
@@ -3011,9 +3144,7 @@ export function AdminRetailStockView({
                             <div key={line}>{line}</div>
                           ))
                         ) : (
-                          <div className="text-gray-500">
-                            {labels.stock.notSet}
-                          </div>
+                          <div className="text-gray-500">{emptyRetailField}</div>
                         )}
                       </div>
                       {customerOrderDeliveryNoteLines.length > 0 ? (
@@ -3043,9 +3174,7 @@ export function AdminRetailStockView({
                             ?.billingSameAsShipping ? (
                           null
                         ) : (
-                          <div className="text-gray-500">
-                            {labels.stock.notSet}
-                          </div>
+                          <div className="text-gray-500">{emptyRetailField}</div>
                         )}
                       </div>
                       {customerOrderBillingNoteLines.length > 0 ? (
@@ -3076,7 +3205,7 @@ export function AdminRetailStockView({
                         </div>
                         <div className="mt-1 text-gray-900">
                           {customerOrderDetail.shipment.carrierName ??
-                            labels.stock.notSet}
+                            emptyRetailField}
                         </div>
                       </div>
                       <div>
@@ -3085,7 +3214,7 @@ export function AdminRetailStockView({
                         </div>
                         <div className="mt-1 text-gray-900">
                           {customerOrderDetail.shipment.trackingNumber ??
-                            labels.stock.notSet}
+                            emptyRetailField}
                         </div>
                       </div>
                       <div>
@@ -3103,9 +3232,7 @@ export function AdminRetailStockView({
                               Track shipment
                             </a>
                           ) : (
-                            <span className="text-gray-900">
-                              {labels.stock.notSet}
-                            </span>
+                            <span className="text-gray-900">{emptyRetailField}</span>
                           )}
                         </div>
                       </div>
@@ -3117,7 +3244,7 @@ export function AdminRetailStockView({
                           {formatDateTime(
                             customerOrderDetail.shipment.shippedAt,
                             locale
-                          ) ?? labels.stock.notSet}
+                          ) ?? emptyRetailField}
                         </div>
                       </div>
                     </div>
@@ -3166,19 +3293,21 @@ export function AdminRetailStockView({
                                 </div>
                               ) : null}
                               <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                                {line.etaDate ? (
+                                  <span className="inline-flex rounded-md bg-gray-100 px-2 py-1 font-semibold text-gray-700 ring-1 ring-gray-200">
+                                    {formatDate(line.etaDate, locale)}
+                                  </span>
+                                ) : null}
                                 {awaitingStockUnits > 0 ? (
-                                  <span className="inline-flex rounded-md bg-red-50 px-2 py-1 font-semibold text-red-700 ring-1 ring-red-100">
-                                    Awaiting stock · {awaitingStockUnits}
+                                  <span className="inline-flex rounded-md bg-amber-50 px-2 py-1 font-semibold text-amber-800 ring-1 ring-amber-100">
+                                    Awaiting stock
                                   </span>
                                 ) : null}
                                 {line.availabilityStatus ? (
                                   <span className="inline-flex rounded-md bg-gray-100 px-2 py-1 font-semibold text-gray-700 ring-1 ring-gray-200">
-                                    {readableToken(line.availabilityStatus)}
-                                  </span>
-                                ) : null}
-                                {line.etaDate ? (
-                                  <span className="inline-flex rounded-md bg-gray-100 px-2 py-1 font-semibold text-gray-700 ring-1 ring-gray-200">
-                                    {formatDate(line.etaDate, locale)}
+                                    {retailAvailabilityLabel(
+                                      line.availabilityStatus
+                                    )}
                                   </span>
                                 ) : null}
                                 {line.reason ? (
@@ -3206,7 +3335,7 @@ export function AdminRetailStockView({
                                     locale,
                                     customerOrderDetail.currency,
                                     line.retailPriceAmount
-                                  ) ?? labels.stock.notSet}
+                                  ) ?? emptyRetailField}
                                 </div>
                               </div>
                               <div className="min-w-20">
@@ -3215,12 +3344,12 @@ export function AdminRetailStockView({
                                 </div>
                                 <div className="mt-1 text-lg font-semibold leading-tight text-gray-900">
                                   {line.retailPriceAmount === null
-                                    ? labels.stock.notSet
+                                    ? emptyRetailField
                                     : (formatPrice(
                                         locale,
                                         customerOrderDetail.currency,
                                         line.retailPriceAmount * line.quantityOrdered
-                                      ) ?? labels.stock.notSet)}
+                                      ) ?? emptyRetailField)}
                                 </div>
                               </div>
                             </div>
@@ -3353,7 +3482,7 @@ export function AdminRetailStockView({
                       ) : null}
                     </td>
                     <td className="py-3 pr-4 text-gray-700">
-                      {order.customerName || order.customerEmail || labels.stock.notSet}
+                      {order.customerName || order.customerEmail || emptyRetailField}
                     </td>
                     {showOrganisationContext ? (
                       <td className="py-3 pr-4 text-gray-600">
@@ -3367,29 +3496,20 @@ export function AdminRetailStockView({
                       {formatWholeAmount(
                         locale,
                         customerOrderRetailValue(order)
-                      ) ?? labels.stock.notSet}
+                      ) ?? emptyRetailField}
                     </td>
                     <td className="py-3 pr-4 text-gray-600">
-                      {formatDate(order.dueAt, locale) ?? labels.stock.notSet}
+                      {formatDate(order.dueAt, locale) ?? emptyRetailField}
                     </td>
                     <td className="py-3 pr-4">
                       <span
                         className={classNames(
-                          order.isStuck
-                            ? "bg-amber-50 text-amber-800 ring-amber-100"
-                            : "bg-gray-100 text-gray-700 ring-gray-200",
+                          customerOrderStatusPillClass(order),
                           "inline-flex rounded-md px-2 py-1 text-xs font-semibold ring-1"
                         )}
                       >
-                          {customerOrderStatusDisplay(order)}
+                        {customerOrderStatusDisplay(order)}
                       </span>
-                      {(customerOrderAwaitingStockUnitsByOrderId.get(order.id) ?? 0) >
-                      0 ? (
-                        <div className="mt-1 inline-flex rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-100">
-                          Awaiting stock ·{" "}
-                          {customerOrderAwaitingStockUnitsByOrderId.get(order.id)}
-                        </div>
-                      ) : null}
                       {order.nextExpectedAction ? (
                         <div className="mt-1 text-xs text-gray-500">
                           {labels.stock.nextAction}:{" "}
@@ -3435,7 +3555,7 @@ export function AdminRetailStockView({
                 {movementRows.map((movement) => (
                   <tr className="align-middle" key={movement.id}>
                     <td className="py-3 pr-4 text-gray-500">
-                      {formatDate(movement.occurredAt, locale) ?? labels.stock.notSet}
+                      {formatDate(movement.occurredAt, locale) ?? emptyRetailField}
                     </td>
 	                    <td className="py-3 pr-4 font-medium text-gray-900">
 	                      {movement.productTitle}
@@ -3463,7 +3583,7 @@ export function AdminRetailStockView({
                       {movement.quantityDelta}
                     </td>
                     <td className="max-w-sm py-3 pr-4 text-gray-600">
-                      {movement.reason || movement.notes || labels.stock.notSet}
+                      {movement.reason || movement.notes || emptyRetailField}
                     </td>
                     <td className="py-3 pr-4">
                       {data.canWrite &&
@@ -3497,44 +3617,28 @@ export function AdminRetailStockView({
 
         {panel === "stock-advice" ? (
           <div className="mt-5 space-y-6">
-            <section>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3
-                    className={classNames(
-                      "text-sm font-semibold text-gray-900",
-                      adminLocaleTextClass(locale, "heading")
-                    )}
-                  >
-                    {labels.stock.reorderBackorders}
-                  </h3>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Products Dream needs to buy for awaiting-stock orders.
-                  </p>
-                </div>
-                {data.canWrite ? (
-                  <AdminButton
-                    disabled={
-                      Boolean(busyId) ||
-                      selectedOutstandingPurchaseItems.length === 0
-                    }
-                    onClick={createShoppingListFromSelection}
-                  >
-                    {labels.stock.createShoppingList}
-                  </AdminButton>
-                ) : null}
-              </div>
+            <section className="rounded-md bg-white p-4 ring-1 ring-gray-200">
               <div className="overflow-x-auto rounded-md ring-1 ring-gray-200">
-                <table className="min-w-[560px] w-full text-left text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                    <tr>
-                      <th className="py-2 pl-3 pr-3">{labels.stock.selectProduct}</th>
-                      <th className="py-2 pr-3">{labels.stock.product}</th>
-                      <th className="py-2 pr-3">Brand</th>
-                      <th className="py-2 pr-3">Amount to buy</th>
-                    </tr>
-                  </thead>
+                <table className="min-w-[640px] w-full table-fixed text-left text-sm">
+                  <colgroup>
+                    <col className="w-16" />
+                    <col />
+                    <col className="w-48" />
+                    <col className="w-28" />
+                  </colgroup>
                   <tbody className="divide-y divide-gray-200 bg-white">
+                    <tr>
+                      <td className="px-3 pb-3 pt-5" colSpan={4}>
+                        <h3
+                          className={classNames(
+                            "text-lg font-semibold text-gray-900",
+                            adminLocaleTextClass(locale, "heading")
+                          )}
+                        >
+                          {labels.stock.reorderBackorders}
+                        </h3>
+                      </td>
+                    </tr>
                     {reorderPurchaseItems.map((item) => {
                       const itemKey = orgProductKey(
                         item.organisationId,
@@ -3584,10 +3688,10 @@ export function AdminRetailStockView({
                             ) : null}
                           </td>
                           <td className="py-2 pr-3 text-gray-600">
-                            {item.brandName ?? "-"}
+                            {item.brandName ?? emptyRetailField}
                           </td>
                           <td className="py-2 pr-3 font-semibold text-gray-900">
-                            {item.unassignedDemandUnits}
+                            {item.amountToBuyUnits}
                           </td>
                         </tr>
                       );
@@ -3602,31 +3706,114 @@ export function AdminRetailStockView({
                         </td>
                       </tr>
                     ) : null}
+                    {reorderRecommendationItems.length > 0 ? (
+                      <>
+                        <tr className="border-t border-gray-200">
+                          <td className="px-3 pb-3 pt-5" colSpan={4}>
+                            <h3
+                              className={classNames(
+                                "text-lg font-semibold text-gray-900",
+                                adminLocaleTextClass(locale, "heading")
+                              )}
+                            >
+                              {labels.stock.reorderRecommendations}
+                            </h3>
+                          </td>
+                        </tr>
+                        {reorderRecommendationItems.map((item) => {
+                          const itemKey = orgProductKey(
+                            item.organisationId,
+                            item.productId
+                          );
+                          const selected =
+                            outstandingPurchaseSelectionKeys.includes(itemKey);
+                          const canSelectItem =
+                            data.canWrite && !busyId && item.amountToBuyUnits > 0;
+
+                          return (
+                            <tr
+                              className={classNames(
+                                canSelectItem
+                                  ? "cursor-pointer hover:bg-[#F8FAFC]"
+                                  : "bg-gray-50 text-gray-500"
+                              )}
+                              key={itemKey}
+                              onClick={() =>
+                                canSelectItem
+                                  ? toggleOutstandingPurchaseItem(item)
+                                  : undefined
+                              }
+                            >
+                              <td className="py-2 pl-3 pr-3">
+                                <input
+                                  aria-label={`${labels.stock.selectProduct}: ${item.productTitle}`}
+                                  checked={selected}
+                                  className="size-4 rounded border-gray-300 text-[#1FA77A] focus:ring-[#1FA77A]"
+                                  disabled={!canSelectItem}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={() => toggleOutstandingPurchaseItem(item)}
+                                  type="checkbox"
+                                />
+                              </td>
+                              <td className="py-2 pr-3 font-semibold text-gray-900">
+                                {item.productTitle}
+                                {showOrganisationContext ? (
+                                  <div className="mt-0.5 text-xs font-normal text-gray-500">
+                                    {
+                                      data.organisations.find(
+                                        (organisation) =>
+                                          organisation.id === item.organisationId
+                                      )?.name
+                                    }
+                                  </div>
+                                ) : null}
+                              </td>
+                              <td className="py-2 pr-3 text-gray-600">
+                                {item.brandName ?? emptyRetailField}
+                              </td>
+                              <td className="py-2 pr-3 font-semibold text-gray-900">
+                                {item.amountToBuyUnits}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </>
+                    ) : null}
                   </tbody>
                 </table>
               </div>
             </section>
-          </div>
-        ) : null}
-
-        {panel === "reorder" ? (
-          <div className="mt-5">
-            <section>
-              <h3
-                className={classNames(
-                  "mb-3 text-sm font-semibold text-gray-900",
-                  adminLocaleTextClass(locale, "heading")
-                )}
-              >
-                Shopping Lists
-              </h3>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {data.canWrite ? (
+                <AdminButton
+                  disabled={
+                    Boolean(busyId) ||
+                    selectedOutstandingPurchaseItems.length === 0
+                  }
+                  onClick={createShoppingListFromSelection}
+                >
+                  {labels.stock.createShoppingList}
+                </AdminButton>
+              ) : null}
+            </div>
+            <section className="rounded-md bg-white p-4 ring-1 ring-gray-200">
+              <div className="mb-3">
+                <h3
+                  className={classNames(
+                    "text-lg font-semibold text-gray-900",
+                    adminLocaleTextClass(locale, "heading")
+                  )}
+                >
+                  {labels.stock.shoppingLists}
+                </h3>
+              </div>
               <div className="overflow-x-auto rounded-md ring-1 ring-gray-200">
 	                <table className="min-w-[560px] w-full text-left text-sm">
                   <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
 	                      <th className="py-2 pl-3 pr-3">List number</th>
 	                      <th className="py-2 pr-3">{labels.stock.status}</th>
-	                      <th className="py-2 pr-3">Item count</th>
+	                      <th className="py-2 pr-3">{labels.stock.quantity}</th>
 	                      <th className="py-2 pr-3">Created</th>
 	                    </tr>
                   </thead>
@@ -3727,7 +3914,7 @@ export function AdminRetailStockView({
           onClose={() => setSelectedShoppingListId("")}
           onLinesChange={setShoppingListDraftLines}
           onReopen={() => void reopenShoppingList()}
-          onSave={(status) => void saveShoppingListDraft(status)}
+          onSave={() => void saveShoppingListDraft()}
         />
       ) : null}
       {shipmentEditor ? (
@@ -3756,7 +3943,7 @@ export function AdminRetailStockView({
                 <div className="mt-1 text-sm text-gray-600">
                   {shipmentEditor.order.customerName ||
                     shipmentEditor.order.customerEmail ||
-                    labels.stock.notSet}
+                    emptyRetailField}
                 </div>
                 <div className="mt-4 text-xs font-semibold uppercase text-gray-500">
                   {labels.stock.deliveryAddress}
@@ -3767,7 +3954,7 @@ export function AdminRetailStockView({
                       <div key={line}>{line}</div>
                     ))
                   ) : (
-                    <div className="text-gray-500">{labels.stock.notSet}</div>
+                    <div className="text-gray-500">{emptyRetailField}</div>
                   )}
                 </div>
               </section>
@@ -3778,12 +3965,12 @@ export function AdminRetailStockView({
                 </div>
                 <div className="mt-2 text-3xl font-semibold text-gray-900">
                   {shipmentEditorTotal === null
-                    ? labels.stock.notSet
+                    ? emptyRetailField
                     : (formatPrice(
                         locale,
                         shipmentEditor.order.currency,
                         shipmentEditorTotal
-                      ) ?? labels.stock.notSet)}
+                      ) ?? emptyRetailField)}
                 </div>
                 <div className="mt-4 text-xs font-semibold uppercase text-gray-500">
                   {labels.stock.organisation}
@@ -3825,21 +4012,21 @@ export function AdminRetailStockView({
                         </td>
                         <td className="px-3 py-2 text-right font-semibold text-gray-900">
                           {line.retailPriceAmount === null
-                            ? labels.stock.notSet
+                            ? emptyRetailField
                             : (formatPrice(
                                 locale,
                                 shipmentEditor.order.currency,
                                 line.retailPriceAmount
-                              ) ?? labels.stock.notSet)}
+                              ) ?? emptyRetailField)}
                         </td>
                         <td className="px-3 py-2 text-right font-semibold text-gray-900">
                           {line.retailPriceAmount === null
-                            ? labels.stock.notSet
+                            ? emptyRetailField
                             : (formatPrice(
                                 locale,
                                 shipmentEditor.order.currency,
                                 line.retailPriceAmount * line.quantityOrdered
-                              ) ?? labels.stock.notSet)}
+                              ) ?? emptyRetailField)}
                         </td>
                       </tr>
                     ))}
@@ -4315,11 +4502,11 @@ export function AdminRetailStockView({
                           locale,
                           customerOrderAvailability.currency ?? "THB",
                           customerOrderAvailability.subtotalAmount
-                        ) ?? labels.stock.notSet}
+                        ) ?? emptyRetailField}
                         {" · "}
                         {customerOrderAvailability.etaDate
                           ? formatDate(customerOrderAvailability.etaDate, locale)
-                          : labels.stock.notSet}
+                          : emptyRetailField}
                       </div>
                     </div>
                   ) : (

@@ -25,12 +25,29 @@ function product(input: Readonly<{
         sourceText: input.sourceText ?? null
       }
     ],
-    fdaApprovalNumber: "TEST-123",
     labelStatus: "parsed",
     platform: "manual",
     productAudience: "both",
     productKind: "supplement",
     region: "TH",
+    regulatoryApprovals: [
+      {
+        agencyCode: "TH_FDA",
+        agencyName: "Thai FDA",
+        approvalNumber: "TEST-123",
+        approvalType: "product_registration",
+        createdAt: null,
+        evidenceUrl: null,
+        id: "approval-1",
+        metadata: {},
+        productId: null,
+        scopeCode: "TH",
+        scopeType: "country",
+        source: "test",
+        status: "verified",
+        updatedAt: null
+      }
+    ],
     status: "approved",
     title: input.title ?? "Test Product",
     titleEn: null,
@@ -94,6 +111,7 @@ describe("admin product search", () => {
 
     assert.equal(productMatchesSearch(row, "swisse omega 3"), true);
     assert.equal(productMatchesSearch(row, "approved manual"), true);
+    assert.equal(productMatchesSearch(row, "Thai FDA TEST-123"), true);
     assert.equal(productMatchesSearch(row, "centrum omega"), false);
   });
 });

@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
-import {
-  buildHygeiaProductExportCsv,
-  buildRetailHygeiaStockExportCsv
-} from "@/lib/hygeia-product-files";
+import { buildRetailHygeiaStockExportCsv } from "@/lib/hygeia-product-files";
 
 export const runtime = "nodejs";
 
@@ -36,18 +33,23 @@ export async function GET(request: Request) {
   }
 
   try {
-    const countryCode = textOrNull(url.searchParams.get("country"), 8);
     const scope = textOrNull(url.searchParams.get("scope"), 40);
     const organisationId = textOrNull(url.searchParams.get("organisationId"), 80);
-    const csv = scope === "retail"
-      ? await buildRetailHygeiaStockExportCsv({
-          organisationId: organisationId ?? ""
-        })
-      : await buildHygeiaProductExportCsv({ countryCode });
-    const fileCountry = countryCode?.toUpperCase() ?? "TH";
-    const filename = scope === "retail"
-      ? `hygeia-retail-stock-${organisationId ?? "retailer"}.csv`
-      : `hygeia-products-${fileCountry}.csv`;
+
+    if (scope !== "retail" || !organisationId) {
+      return NextResponse.json(
+        { message: "Hygeia export is available from Retail Stock only" },
+        {
+          headers: {
+            "Cache-Control": "no-store"
+          },
+          status: 400
+        }
+      );
+    }
+
+    const csv = await buildRetailHygeiaStockExportCsv({ organisationId });
+    const filename = `hygeia-retail-stock-${organisationId}.csv`;
 
     return new Response(csv, {
       headers: {

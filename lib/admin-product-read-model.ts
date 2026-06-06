@@ -36,7 +36,6 @@ export async function loadProductRows(productId?: string | null) {
       coalesce(to_jsonb(products) ->> 'description_en', products.source_snapshot ->> 'descriptionEn') as description_en,
       coalesce(to_jsonb(products) ->> 'description_th', products.source_snapshot ->> 'descriptionTh') as description_th,
       products.category,
-      products.fda_approval_number,
       coalesce(to_jsonb(products) ->> 'product_audience', 'both') as product_audience,
       products.product_kind,
       products.status,
@@ -64,6 +63,7 @@ export async function loadProductRows(productId?: string | null) {
       coalesce(product_translation_rows.translations, '{}'::jsonb) as translations,
       coalesce(product_identifier_rows.identifiers, '[]'::jsonb) as identifiers,
       coalesce(product_identifier_candidate_rows.identifier_candidates, '[]'::jsonb) as identifier_candidates,
+      coalesce(product_regulatory_rows.regulatory_approvals, '[]'::jsonb) as regulatory_approvals,
       coalesce(shop_availability_rows.shop_availability, '[]'::jsonb) as shop_availability,
       coalesce(history.chosen_count, 0) as history_chosen_count,
       history.last_recommended_at as history_last_recommended_at,
@@ -167,6 +167,36 @@ export async function loadProductRows(productId?: string | null) {
       where product_identifier_candidates.product_id = products.id
         and product_identifier_candidates.status in ('pending', 'conflict', 'approved')
     ) product_identifier_candidate_rows on true
+    left join lateral (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', product_regulatory_approvals.id,
+            'productId', product_regulatory_approvals.product_id,
+            'scopeType', product_regulatory_approvals.scope_type,
+            'scopeCode', product_regulatory_approvals.scope_code,
+            'agencyCode', product_regulatory_approvals.agency_code,
+            'agencyName', product_regulatory_approvals.agency_name,
+            'approvalType', product_regulatory_approvals.approval_type,
+            'approvalNumber', product_regulatory_approvals.approval_number,
+            'status', product_regulatory_approvals.status,
+            'source', product_regulatory_approvals.source,
+            'evidenceUrl', product_regulatory_approvals.evidence_url,
+            'metadata', product_regulatory_approvals.metadata,
+            'createdAt', product_regulatory_approvals.created_at,
+            'updatedAt', product_regulatory_approvals.updated_at
+          )
+          order by
+            product_regulatory_approvals.scope_type,
+            product_regulatory_approvals.scope_code,
+            product_regulatory_approvals.agency_code,
+            product_regulatory_approvals.updated_at desc
+        ),
+        '[]'::jsonb
+      ) as regulatory_approvals
+      from public.product_regulatory_approvals
+      where product_regulatory_approvals.product_id = products.id
+    ) product_regulatory_rows on true
     left join lateral (
       select coalesce(
         jsonb_agg(

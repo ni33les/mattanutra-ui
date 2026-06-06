@@ -473,6 +473,7 @@ export type UpsertRetailStockItemInput = Readonly<{
 }>;
 
 export type RecordRetailStockMovementInput = Readonly<{
+  deferReorderSideEffects?: boolean;
   expiresAt?: string | null;
   lotId?: string | null;
   movementType: Exclude<RetailStockMovementType, "void">;
@@ -512,6 +513,26 @@ export type UpdateRetailShoppingListInput = Readonly<{
   lines: ReadonlyArray<RetailShoppingListLineInput & { id?: string | null }>;
   shoppingListId: string;
   status?: RetailShoppingListStatus | null;
+}>;
+
+export type UpdateRetailShoppingListResult = Readonly<{
+  affectedOrderIds: readonly string[];
+  affectedProductIds: readonly string[];
+  movementCount: number;
+  movementDeltaUnits: number;
+  refreshPending: boolean;
+  refreshedReorderAdviceCount: number;
+  reorderAdviceUpdated: boolean;
+  shoppingListId: string;
+  status: RetailShoppingListStatus;
+  timingsMs: Readonly<{
+    allocationRetry: number;
+    lineFetch: number;
+    lineUpdates: number;
+    movementCreation: number;
+    reorderAdviceRefresh: number;
+    total: number;
+  }>;
 }>;
 
 export type ReopenRetailShoppingListInput = Readonly<{
@@ -2473,13 +2494,27 @@ export async function refreshRetailStockReorderAdvice(input: Readonly<{
   generatedByTaskId?: string | null;
   organisationId: string;
   productId?: string | null;
+  productIds?: readonly string[] | null;
   stockId?: string | null;
+  stockIds?: readonly string[] | null;
 }>) {
   const sql = getSql();
 
   if (!sql || !(await operationalStockTablesAvailable(sql))) {
     return { refreshed: 0 };
   }
+  const productIds = [
+    ...new Set([
+      ...(input.productId ? [input.productId] : []),
+      ...((input.productIds ?? []).filter((id) => id.trim()).map((id) => id.trim()))
+    ])
+  ];
+  const stockIds = [
+    ...new Set([
+      ...(input.stockId ? [input.stockId] : []),
+      ...((input.stockIds ?? []).filter((id) => id.trim()).map((id) => id.trim()))
+    ])
+  ];
 
   const stockRows = await sql<Array<{
     id: string;
@@ -2525,8 +2560,8 @@ export async function refreshRetailStockReorderAdvice(input: Readonly<{
     ) pressure on true
     where retail_product_stock.organisation_id = ${input.organisationId}::uuid
       and retail_product_stock.status <> 'deleted'
-      and (${input.stockId ?? null}::uuid is null or retail_product_stock.id = ${input.stockId ?? null}::uuid)
-      and (${input.productId ?? null}::uuid is null or retail_product_stock.product_id = ${input.productId ?? null}::uuid)
+      and (${stockIds.length === 0}::boolean or retail_product_stock.id = any(${stockIds}::uuid[]))
+      and (${productIds.length === 0}::boolean or retail_product_stock.product_id = any(${productIds}::uuid[]))
   `;
 
   for (const row of stockRows) {
@@ -4166,19 +4201,21 @@ export async function recordRetailStockMovement(
     }
   });
 
-  try {
-    await refreshRetailStockReorderAdvice({
-      organisationId: recordedStockRow.organisation_id,
-      productId: recordedStockRow.product_id,
-      stockId: recordedStockRow.id
-    });
-    await queueRetailStockIntelligenceRefresh(
-      recordedStockRow,
-      "stock_movement_recorded"
-    );
-    await queueStockReviewTasks(recordedStockRow, "stock_movement_recorded");
-  } catch (error) {
-    console.warn("Unable to refresh retail stock advice after movement", error);
+  if (!input.deferReorderSideEffects) {
+    try {
+      await refreshRetailStockReorderAdvice({
+        organisationId: recordedStockRow.organisation_id,
+        productId: recordedStockRow.product_id,
+        stockId: recordedStockRow.id
+      });
+      await queueRetailStockIntelligenceRefresh(
+        recordedStockRow,
+        "stock_movement_recorded"
+      );
+      await queueStockReviewTasks(recordedStockRow, "stock_movement_recorded");
+    } catch (error) {
+      console.warn("Unable to refresh retail stock advice after movement", error);
+    }
   }
 
   if (
@@ -4944,7 +4981,7 @@ export async function reopenRetailShoppingList(
 
   await sql`
     update public.retail_shopping_lists
-    set status = 'active'
+    set status = 'active', updated_at = now()
     where id = ${list.id}::uuid
   `;
 
@@ -5114,7 +5151,17 @@ async function releaseRetailStockOverAllocationsAfterStockCount(
 export async function updateRetailShoppingList(
   context: AdminSessionContext,
   input: UpdateRetailShoppingListInput
-) {
+): Promise<UpdateRetailShoppingListResult> {
+  const startedAt = Date.now();
+  const timingsMs = {
+    allocationRetry: 0,
+    lineFetch: 0,
+    lineUpdates: 0,
+    movementCreation: 0,
+    reorderAdviceRefresh: 0,
+    total: 0
+  };
+
   if (!canWriteRetailStock(context)) {
     throw new Error("Stock write permission is required");
   }
@@ -5155,59 +5202,104 @@ export async function updateRetailShoppingList(
   let movementCount = 0;
   let movementDeltaUnits = 0;
   let releasedAllocationUnits = 0;
+  let refreshedReorderAdviceCount = 0;
+  const savedStatus: RetailShoppingListStatus = "closed";
+  const affectedProductIds = new Set<string>();
+  const affectedStockIds = new Set<string>();
+  const affectedOrderIds = new Set<string>();
+  const lineIds = [
+    ...new Set(
+      input.lines
+        .map((line) => line.id?.trim() ?? "")
+        .filter((lineId) => lineId)
+    )
+  ];
+  const inputLineById = new Map(
+    input.lines
+      .filter((line): line is RetailShoppingListLineInput & { id: string } =>
+        Boolean(line.id?.trim())
+      )
+      .map((line) => [line.id.trim(), line])
+  );
+  const lineFetchStartedAt = Date.now();
+  const existingRows = lineIds.length > 0
+    ? await sql<Array<{
+        actual_quantity: number | string;
+        assigned_quantity: number | string;
+        current_stock_quantity: number | string;
+        id: string;
+        product_id: string;
+        required_quantity: number | string;
+        retail_price_amount: number | string | null;
+        stocked_quantity: number | string;
+        unordered_need_quantity: number | string;
+        wholesale_price_amount: number | string | null;
+      }>>`
+        select
+          id::text,
+          product_id::text,
+          required_quantity,
+          current_stock_quantity,
+          unordered_need_quantity,
+          assigned_quantity,
+          actual_quantity,
+          stocked_quantity,
+          wholesale_price_amount,
+          retail_price_amount
+        from public.retail_shopping_list_lines
+        where id = any(${lineIds}::uuid[])
+          and shopping_list_id = ${list.id}::uuid
+          and organisation_id = ${list.organisation_id}::uuid
+      `
+    : [];
+  timingsMs.lineFetch = Date.now() - lineFetchStartedAt;
 
-  for (const line of input.lines) {
-    if (!line.id) {
+  for (const existing of existingRows) {
+    const line = inputLineById.get(existing.id);
+
+    if (!line) {
       continue;
     }
 
-    const existingRows = await sql<Array<{
-      actual_quantity: number | string;
-      id: string;
-      product_id: string;
-      stocked_quantity: number | string;
-      wholesale_price_amount: number | string | null;
-      retail_price_amount: number | string | null;
-    }>>`
-      select
-        id::text,
-        product_id::text,
-        actual_quantity,
-        stocked_quantity,
-        wholesale_price_amount,
-        retail_price_amount
-      from public.retail_shopping_list_lines
-      where id = ${line.id}::uuid
-        and shopping_list_id = ${list.id}::uuid
-        and organisation_id = ${list.organisation_id}::uuid
-      limit 1
-    `;
-    const existing = existingRows[0];
-
-    if (!existing) {
-      continue;
-    }
-
-    const requiredQuantity = integerOrDefault(line.requiredQuantity, 0);
-    const unorderedNeedQuantity = integerOrDefault(line.unorderedNeedQuantity, 0);
+    const requiredQuantity = integerOrDefault(
+      line.requiredQuantity,
+      integerOrDefault(existing.required_quantity, 0)
+    );
+    const unorderedNeedQuantity = integerOrDefault(
+      line.unorderedNeedQuantity,
+      integerOrDefault(existing.unordered_need_quantity, 0)
+    );
     const assignedQuantity = Math.max(
       0,
-      integerOrDefault(line.assignedQuantity, 0)
+      integerOrDefault(
+        line.assignedQuantity,
+        integerOrDefault(existing.assigned_quantity, 0)
+      )
     );
-    const actualQuantity = Math.max(0, integerOrDefault(line.actualQuantity, 0));
+    const actualQuantity = Math.max(
+      0,
+      integerOrDefault(
+        line.actualQuantity,
+        integerOrDefault(existing.actual_quantity, 0)
+      )
+    );
     const stockedQuantity = integerOrDefault(existing.stocked_quantity, 0);
     const delta = actualQuantity - stockedQuantity;
     const wholesalePriceAmount = numberOrNull(line.wholesalePriceAmount);
     const retailPriceAmount = numberOrNull(line.retailPriceAmount);
 
     if (delta !== 0) {
+      const movementStartedAt = Date.now();
       const stockId = await ensureRetailStockRow(context, {
         organisationId: list.organisation_id,
         productId: existing.product_id,
         wholesalePriceAmount
       });
+      affectedProductIds.add(existing.product_id);
+      affectedStockIds.add(stockId);
 
       await recordRetailStockMovement(context, {
+        deferReorderSideEffects: true,
         movementType: delta > 0 ? "receive" : "adjustment",
         notes: null,
         quantity: delta,
@@ -5227,14 +5319,22 @@ export async function updateRetailShoppingList(
           { sql, stockId }
         );
         releasedAllocationUnits += release.releasedUnits;
+        for (const orderId of release.affectedOrderIds) {
+          affectedOrderIds.add(orderId);
+        }
       }
+      timingsMs.movementCreation += Date.now() - movementStartedAt;
     }
 
+    const lineUpdateStartedAt = Date.now();
     await sql`
       update public.retail_shopping_list_lines
       set
         required_quantity = ${requiredQuantity},
-        current_stock_quantity = ${integerOrDefault(line.currentStockQuantity, 0)},
+        current_stock_quantity = ${integerOrDefault(
+          line.currentStockQuantity,
+          integerOrDefault(existing.current_stock_quantity, 0)
+        )},
         unordered_need_quantity = ${unorderedNeedQuantity},
         assigned_quantity = ${assignedQuantity},
         actual_quantity = ${actualQuantity},
@@ -5242,7 +5342,7 @@ export async function updateRetailShoppingList(
         wholesale_price_amount = ${wholesalePriceAmount},
         retail_price_amount = ${retailPriceAmount},
         updated_at = now()
-      where id = ${line.id}::uuid
+      where id = ${existing.id}::uuid
         and shopping_list_id = ${list.id}::uuid
         and organisation_id = ${list.organisation_id}::uuid
     `;
@@ -5275,7 +5375,7 @@ export async function updateRetailShoppingList(
           null,
           ${sql.json({
             shoppingListId: list.id,
-            shoppingListLineId: line.id,
+            shoppingListLineId: existing.id,
             updatedByPersonId: context.actorPerson.id,
             updatedVia: "shopping_list_stock_counts"
           })},
@@ -5290,15 +5390,99 @@ export async function updateRetailShoppingList(
           updated_at = now()
       `;
     }
+    timingsMs.lineUpdates += Date.now() - lineUpdateStartedAt;
   }
 
+  const listUpdateStartedAt = Date.now();
   await sql`
     update public.retail_shopping_lists
     set
-      status = ${shoppingListStatus(input.status)},
+      status = ${savedStatus},
       updated_at = now()
     where id = ${list.id}::uuid
   `;
+  timingsMs.lineUpdates += Date.now() - listUpdateStartedAt;
+
+  const changedProductIds = [...affectedProductIds];
+  const allocationStartedAt = Date.now();
+  const awaitingOrderRows = changedProductIds.length > 0
+    ? await sql<Array<{ id: string }>>`
+        select retail_customer_orders.id::text
+        from public.retail_customer_orders
+        join public.retail_customer_order_lines
+          on retail_customer_order_lines.customer_order_id = retail_customer_orders.id
+        where retail_customer_orders.organisation_id = ${list.organisation_id}::uuid
+          and retail_customer_orders.status in ('placed', 'awaiting_stock')
+          and retail_customer_order_lines.product_id = any(${changedProductIds}::uuid[])
+        group by
+          retail_customer_orders.id,
+          retail_customer_orders.due_at,
+          retail_customer_orders.placed_at,
+          retail_customer_orders.created_at
+        order by
+          coalesce(
+            retail_customer_orders.due_at,
+            retail_customer_orders.placed_at,
+            retail_customer_orders.created_at
+          ),
+          retail_customer_orders.created_at
+        limit 50
+      `
+    : [];
+
+  for (const order of awaitingOrderRows) {
+    try {
+      await allocateRetailCustomerOrder(context, {
+        customerOrderId: order.id
+      });
+      affectedOrderIds.add(order.id);
+    } catch {
+      // Leave still-short orders in reorder advice; the order workbench will
+      // show the remaining gap.
+    }
+  }
+  timingsMs.allocationRetry = Date.now() - allocationStartedAt;
+
+  if (changedProductIds.length > 0) {
+    const adviceStartedAt = Date.now();
+    const adviceRefresh = await refreshRetailStockReorderAdvice({
+      organisationId: list.organisation_id,
+      productIds: changedProductIds
+    });
+    refreshedReorderAdviceCount = adviceRefresh.refreshed;
+
+    const stockIds = [...affectedStockIds];
+
+    if (stockIds.length > 0) {
+      const stockRows = await sql<RetailStockSnapshotRow[]>`
+        select
+          id::text,
+          organisation_id::text,
+          product_id::text,
+          status,
+          stock_quantity,
+          lead_time_days,
+          wholesale_price_amount,
+          retail_price_amount,
+          currency,
+          notes
+        from public.retail_product_stock
+        where id = any(${stockIds}::uuid[])
+          and organisation_id = ${list.organisation_id}::uuid
+          and status <> 'deleted'
+      `;
+
+      for (const row of stockRows) {
+        await queueRetailStockIntelligenceRefresh(
+          row,
+          "shopping_list_stock_counts_saved"
+        );
+      }
+    }
+    timingsMs.reorderAdviceRefresh = Date.now() - adviceStartedAt;
+  }
+
+  timingsMs.total = Date.now() - startedAt;
 
   await recordAdminAudit({
     action: "admin.retail_shopping_list_updated",
@@ -5311,32 +5495,28 @@ export async function updateRetailShoppingList(
       lineCount: input.lines.length,
       movementCount,
       movementDeltaUnits,
+      refreshedReorderAdviceCount,
       releasedAllocationUnits,
-      status: shoppingListStatus(input.status)
+      affectedOrderIds: [...affectedOrderIds],
+      affectedProductIds: changedProductIds,
+      requestedStatus: input.status ? shoppingListStatus(input.status) : null,
+      status: savedStatus,
+      timingsMs
     }
   });
 
-  const awaitingOrderRows = await sql<Array<{ id: string }>>`
-    select id::text
-    from public.retail_customer_orders
-    where organisation_id = ${list.organisation_id}::uuid
-      and status in ('placed', 'awaiting_stock')
-    order by coalesce(due_at, placed_at, created_at), created_at
-    limit 50
-  `;
-
-  for (const order of awaitingOrderRows) {
-    try {
-      await allocateRetailCustomerOrder(context, {
-        customerOrderId: order.id
-      });
-    } catch {
-      // Leave still-short orders in reorder advice; the order workbench will
-      // show the remaining gap.
-    }
-  }
-
-  return list.id;
+  return {
+    affectedOrderIds: [...affectedOrderIds],
+    affectedProductIds: changedProductIds,
+    movementCount,
+    movementDeltaUnits,
+    refreshPending: true,
+    refreshedReorderAdviceCount,
+    reorderAdviceUpdated: refreshedReorderAdviceCount > 0,
+    shoppingListId: list.id,
+    status: savedStatus,
+    timingsMs
+  };
 }
 
 export async function createRetailCustomerOrder(

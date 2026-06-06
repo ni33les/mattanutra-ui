@@ -21,6 +21,7 @@ import {
   type RetailShoppingListStatus,
   type RetailStockStatus,
   type UpdateRetailShoppingListInput,
+  type UpdateRetailShoppingListResult,
   upsertRetailStockItem,
   voidRetailStockMovement
 } from "@/lib/admin-retail-stock";
@@ -60,7 +61,11 @@ function backorderPolicyValue(value: unknown): BackorderPolicy {
 }
 
 function shoppingListStatusValue(value: unknown): RetailShoppingListStatus {
-  return value === "closed" ? "closed" : "active";
+  return value === "active" ? "active" : "closed";
+}
+
+function responseModeValue(value: unknown) {
+  return value === "minimal" ? "minimal" : "full";
 }
 
 function movementValue(value: unknown) {
@@ -106,7 +111,7 @@ type RetailStockRouteHandler = (
 ) => Promise<{
   resourceId: string | null;
   resourceType?: string | null;
-  result: null;
+  result: unknown;
 }>;
 
 function routeCommandId(action: string): RetailCommandId | null {
@@ -187,7 +192,7 @@ const retailStockRouteHandlers: Partial<Record<RetailCommandId, RetailStockRoute
     return { resourceId, result: null };
   },
   async update_shopping_list(context, body) {
-    const resourceId = await updateRetailShoppingList(context, {
+    const result: UpdateRetailShoppingListResult = await updateRetailShoppingList(context, {
       lines: linesValue(body.lines).map((line) => ({
         actualQuantity: numberOrNull(line.actualQuantity),
         assignedQuantity: numberOrNull(line.assignedQuantity),
@@ -203,7 +208,10 @@ const retailStockRouteHandlers: Partial<Record<RetailCommandId, RetailStockRoute
       status: shoppingListStatusValue(body.status)
     } satisfies UpdateRetailShoppingListInput);
 
-    return { resourceId, result: null };
+    return {
+      resourceId: result.shoppingListId,
+      result
+    };
   },
   async reopen_shopping_list(context, body) {
     const resourceId = await reopenRetailShoppingList(context, {
@@ -335,6 +343,7 @@ export async function POST(request: NextRequest) {
 
   const action = text(body.action);
   const locale = localeValue(body.locale);
+  const responseMode = responseModeValue(body.responseMode);
   const commandId = routeCommandId(action);
   const handler = commandId ? retailStockRouteHandlers[commandId] : null;
 
@@ -343,16 +352,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unknown stock action" }, { status: 400 });
     }
 
-    await executeRetailCommand({
+    const mutationStartedAt = Date.now();
+    const result = await executeRetailCommand({
       actorKind: "human",
       commandId,
       context,
       handler: () => handler(context, body),
       payload: body
     });
+    const mutationMs = Date.now() - mutationStartedAt;
+
+    if (responseMode === "minimal") {
+      return NextResponse.json({
+        result,
+        timingsMs: {
+          mutation: mutationMs,
+          readModel: 0
+        },
+        updated: true
+      });
+    }
+
+    const readModelStartedAt = Date.now();
+    const data = await getAdminRetailStockData(context, locale);
 
     return NextResponse.json({
-      data: await getAdminRetailStockData(context, locale),
+      data,
+      timingsMs: {
+        mutation: mutationMs,
+        readModel: Date.now() - readModelStartedAt
+      },
       updated: true
     });
   } catch (error) {

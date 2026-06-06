@@ -18,6 +18,10 @@ import type {
   ProductIdentifierCandidate,
   ProductIdentifierInput
 } from "@/lib/product-identifiers";
+import type {
+  ProductRegulatoryApproval,
+  ProductRegulatoryApprovalInput
+} from "@/lib/product-regulatory-approvals";
 
 export type { ProductCountryCode } from "@/lib/product-countries";
 export type {
@@ -25,6 +29,10 @@ export type {
   ProductIdentifierCandidate,
   ProductIdentifierInput
 } from "@/lib/product-identifiers";
+export type {
+  ProductRegulatoryApproval,
+  ProductRegulatoryApprovalInput
+} from "@/lib/product-regulatory-approvals";
 
 // Status / label / platform guards and sets (pure, no side effects)
 const productStatuses = new Set<ProductStatus>([
@@ -100,7 +108,6 @@ export type AdminProductRow = Readonly<{
   displayDescription: string | null;
   displayTitle: string;
   facts: AdminProductFact[];
-  fdaApprovalNumber: string | null;
   id: string;
   imageUrl: string | null;
   importReviewTaskId: string | null;
@@ -130,6 +137,7 @@ export type AdminProductRow = Readonly<{
   };
   decisionStats?: AdminProductDecisionStats;
   region: string;
+  regulatoryApprovals: ProductRegulatoryApproval[];
   shopAvailability: AdminProductShopAvailability[];
   sourceEvidence: {
     importId: string | null;
@@ -251,6 +259,7 @@ export type ResolveProductImportReviewInput = Readonly<{
   parsedFacts?: readonly ProductImportFactInput[];
   productAudience?: ProductAudience;
   productUrl?: string | null;
+  regulatoryApprovals?: readonly ProductRegulatoryApprovalInput[];
   reviewerNote?: string | null;
   returnRow?: boolean;
   taskId: string;
@@ -266,6 +275,7 @@ export type CreateAdminProductInput = Readonly<{
   availabilityStatus?: ProductAvailabilityStatus;
   availableCountryCodes?: readonly string[];
   countryPricing?: readonly ProductCountryPricing[];
+  regulatoryApprovals?: readonly ProductRegulatoryApprovalInput[];
   brandStatus?: ProductStatus;
   brandName?: string | null;
   manufacturerCountryCodes?: readonly string[];
@@ -323,6 +333,7 @@ export type UpdateAdminProductInput = Readonly<{
   productAudience?: ProductAudience;
   productKind?: ProductKind;
   productUrl?: string | null;
+  regulatoryApprovals?: readonly ProductRegulatoryApprovalInput[];
   sourceSnapshotPatch?: Record<string, unknown> | null;
   title?: string | null;
   titleEn?: string | null;
@@ -386,7 +397,6 @@ export type ProductDbRow = Readonly<{
   description_en: string | null;
   description_th: string | null;
   facts: unknown;
-  fda_approval_number: string | null;
   history_average_product_coverage_percent: string | number | null;
   history_average_stack_coverage_percent: string | number | null;
   history_chosen_count: string | number | null;
@@ -408,6 +418,7 @@ export type ProductDbRow = Readonly<{
   product_kind: ProductKind;
   product_data_expires_at: Date | string | null;
   product_url: string;
+  regulatory_approvals: unknown;
   validation_checked_at: Date | string | null;
   validation_reasons: string[] | null;
   validation_status: ValidationResult["status"] | null;

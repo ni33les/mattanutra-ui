@@ -7,6 +7,12 @@ import {
   normalizeIdentifierValue,
   productIdentifiersFromBody
 } from "@/lib/product-identifiers";
+import {
+  extractTrustedFdaApprovalEvidence,
+  fdaApprovalNumberFromText,
+  selectThaiFdaOryorEvidence,
+  thaiFdaOryorSearchTermsForProduct
+} from "@/lib/product-fda-sourcing";
 import { parseHygeiaCsv } from "@/lib/hygeia-product-files";
 
 describe("product identifiers and Hygeia files", () => {
@@ -49,7 +55,13 @@ describe("product identifiers and Hygeia files", () => {
           {"@type":"Product","name":"Example","gtin13":"4006381333931","sku":"MN-ABC"}
         </script>
       `
-    }) as Array<{ autoApprove?: boolean; source: string; type: string; value: string }>;
+    }) as Array<{
+      autoApprove?: boolean;
+      confidence?: string;
+      source: string;
+      type: string;
+      value: string;
+    }>;
 
     assert.ok(evidence.some((item) =>
       item.type === "ean13" &&
@@ -59,8 +71,125 @@ describe("product identifiers and Hygeia files", () => {
     ));
     assert.ok(evidence.some((item) =>
       item.type === "manufacturer_sku" &&
-      item.value === "MN-ABC"
+      item.value === "MN-ABC" &&
+      item.autoApprove === true &&
+      item.confidence === "trusted" &&
+      item.source === "manufacturer_structured_data"
     ));
+  });
+
+  it("extracts Thai FDA approval numbers from manufacturer evidence", () => {
+    assert.equal(
+      fdaApprovalNumberFromText("ชื่อผลิตภัณฑ์ เลขอ.ย. : 11-1-32732-1-0167 เลขที่ ฆอ : 2254/2564"),
+      "11-1-32732-1-0167"
+    );
+
+    const evidence = extractTrustedFdaApprovalEvidence({
+      evidenceUrl: "https://manufacturer.example/product",
+      snapshot: {
+        extractedText: "Product Description เลขอ.ย. : 11-1-32732-1-0167"
+      }
+    });
+
+    assert.deepEqual(evidence, [{
+      evidenceUrl: "https://manufacturer.example/product",
+      source: "manufacturer_snapshot",
+      value: "11-1-32732-1-0167"
+    }]);
+  });
+
+  it("builds bounded Thai FDA Oryor API search terms from missing product identifiers", () => {
+    assert.deepEqual(
+      thaiFdaOryorSearchTermsForProduct({
+        brand_name: "Blackmores",
+        ean13_identifiers: [],
+        id: "product-1",
+        manufacturer_sku_identifiers: [],
+        product_url: "https://example.test/product",
+        source_snapshot: {},
+        source_url: null,
+        title: "Blackmores Bio C 1000 150 Tablets",
+        title_en: "BLACKMORES BIO C 1000",
+        title_th: null
+      }),
+      [
+        "Blackmores Bio C 1000",
+        "Bio C 1000"
+      ]
+    );
+  });
+
+  it("includes active EAN and manufacturer SKU terms before product-name FDA searches", () => {
+    assert.deepEqual(
+      thaiFdaOryorSearchTermsForProduct({
+        brand_name: "Blackmores",
+        ean13_identifiers: ["9300807325698"],
+        id: "product-1",
+        manufacturer_sku_identifiers: ["BIO-C-1000"],
+        product_url: "https://example.test/product",
+        source_snapshot: {},
+        source_url: null,
+        title: "Blackmores Bio C 1000 150 Tablets",
+        title_en: "BLACKMORES BIO C 1000",
+        title_th: null
+      }),
+      [
+        "9300807325698",
+        "BIO-C-1000",
+        "Blackmores Bio C 1000"
+      ]
+    );
+  });
+
+  it("selects a clear current Oryor API product match and keeps variants ambiguous", () => {
+    const row = {
+      brand_name: "Vistra",
+      ean13_identifiers: [],
+      id: "product-2",
+      manufacturer_sku_identifiers: [],
+      product_url: "https://example.test/vistra",
+      source_snapshot: {},
+      source_url: null,
+      title: "VISTRA GLUTA COMPLEX 600",
+      title_en: null,
+      title_th: null
+    };
+
+    assert.deepEqual(
+      selectThaiFdaOryorEvidence(row, [
+        {
+          cncnm: "สถานะผลิตภัณฑ์(ยกเลิกเนื่องจากย้ายใบอนุญาต)",
+          lcnno: "10-1-12650-1-0046",
+          produceng:
+            "VISTRA GLUTA COMPLEX 600 POMEGRANATE AND LIME FLAVOUR (DIETARY SUPPLEMENT PRODUCT)"
+        },
+        {
+          cncnm: "สถานะผลิตภัณฑ์(คงอยู่)\\ สถานะสถานที่ (คงอยู่)",
+          lcnno: "13-1-00449-1-0104",
+          produceng:
+            "VISTRA GLUTA COMPLEX 600 (L-GLUTATHIONE, L-CYSTEINE, ALPHA LIPOIC ACID)(DIETARY SUPPLEMENT PRODUCT)"
+        }
+      ])?.value,
+      "13-1-00449-1-0104"
+    );
+
+    assert.equal(
+      selectThaiFdaOryorEvidence(row, [
+        {
+          cncnm: "สถานะผลิตภัณฑ์(คงอยู่)\\ สถานะสถานที่ (คงอยู่)",
+          lcnno: "13-1-00449-1-0104",
+          produceng:
+            "VISTRA GLUTA COMPLEX 600 (L-GLUTATHIONE)(DIETARY SUPPLEMENT PRODUCT)"
+        },
+        {
+          cncnm: "สถานะผลิตภัณฑ์(คงอยู่)\\ สถานะสถานที่ (คงอยู่)",
+          lcnno: "13-1-00449-1-0138",
+          produceng:
+            "VISTRA GLUTA COMPLEX 600 PLUS LYCOPENE (DIETARY SUPPLEMENT PRODUCT)"
+        }
+      ]),
+      null
+    );
   });
 
   it("parses Hygeia CSV rows without retaining unmatched raw row payloads", () => {
@@ -93,6 +222,46 @@ describe("product identifiers and Hygeia files", () => {
     }
 
     assert.match(apply, /where identifier_type = 'internal_sku'/);
+  });
+
+  it("keeps bulk identifier sourcing focused on missing active EAN/SKU values", async () => {
+    const service = await readFile("lib/product-identifiers.ts", "utf8");
+
+    assert.match(service, /sourceableProductIdentifierTypes = \["ean13", "manufacturer_sku"\]/);
+    assert.match(service, /active_identifier_types/);
+    assert.match(service, /missingIdentifierTypes/);
+    assert.match(service, /snapshotEvidence/);
+    assert.match(service, /missingAfterSnapshot/);
+    assert.match(service, /\.filter\(\(item\) => missingIdentifierTypes\.has\(item\.type\)\)/);
+    assert.match(service, /\.filter\(\(item\) => missingAfterSnapshot\.has\(item\.type\)\)/);
+    assert.match(service, /not exists \(\s*select 1\s*from public\.product_identifiers/);
+    assert.match(service, /product_identifiers\.status = 'active'/);
+  });
+
+  it("keeps FDA sourcing separate and focused on missing Thailand approval rows", async () => {
+    const route = await readFile("app/api/admin/products/fda/source/route.ts", "utf8");
+    const identifierRoute = await readFile("app/api/admin/products/identifiers/source/route.ts", "utf8");
+    const service = await readFile("lib/product-fda-sourcing.ts", "utf8");
+    const productView = await readFile("components/admin/product-view.tsx", "utf8");
+
+    assert.match(route, /sourceProductFdaApprovalNumbers/);
+    assert.match(route, /createTask/);
+    assert.match(route, /source_product_fda_approvals/);
+    assert.match(identifierRoute, /createTask/);
+    assert.match(identifierRoute, /source_product_identifiers/);
+    assert.match(service, /product_regulatory_approvals/);
+    assert.match(service, /agency_code = 'TH_FDA'/);
+    assert.match(service, /apiMatches/);
+    assert.match(service, /productSerial\/search\?keyword/);
+    assert.match(service, /selectThaiFdaOryorEvidence/);
+    assert.match(service, /thai_fda_oryor_api/);
+    assert.match(service, /upsertProductRegulatoryApproval/);
+    assert.doesNotMatch(service, /fda_approval_number\s*=/);
+    assert.doesNotMatch(service, /products\.fda_approval_number/);
+    assert.doesNotMatch(productView, /productSourceFeedbackKey/);
+    assert.doesNotMatch(productView, /sourceProductFdaNumbersFromEvidence/);
+    assert.doesNotMatch(productView, /sourceProductIdentifiersFromEvidence/);
+    assert.doesNotMatch(route, /sourceProductIdentifiers/);
   });
 
   it("keeps Hygeia import as preview-first and matched-row only", async () => {

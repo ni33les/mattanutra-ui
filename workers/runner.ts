@@ -201,7 +201,9 @@ const WORKER_PROFILES: Record<WorkerProfileMode, WorkerAgentConfig> = {
   healthscore: agentProfile("healthScoreEngine", ["analyze_healthscore"]),
   hosting: agentProfile("scheduler", ["sync_digitalocean_billing"]),
   products: agentProfile("productMatcher", [
-    "generate_product_recommendations"
+    "generate_product_recommendations",
+    "source_product_fda_approvals",
+    "source_product_identifiers"
   ]),
   stock: agentProfile("retailStockPlanner", RETAIL_AGENT_EXECUTABLE_TASK_TYPES)
 };

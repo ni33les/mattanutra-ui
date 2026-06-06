@@ -1,3 +1,5 @@
+import type { ProductRegulatoryApproval } from "@/lib/product-regulatory-approvals";
+
 export const defaultProductCountryCode = "TH";
 
 export const productCountryOptions = [
@@ -28,6 +30,7 @@ export type ProductCountryCode = (typeof productCountryOptions)[number]["code"];
 export type ProductCountryPricing = Readonly<{
   countryCode: ProductCountryCode;
   currency: string;
+  effectiveRegulatoryApprovals?: ProductRegulatoryApproval[];
   priceUpdatedAt: string | null;
   rrpPriceAmount: number | null;
 }>;

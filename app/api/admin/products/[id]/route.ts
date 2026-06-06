@@ -18,6 +18,7 @@ import {
   type ProductCountryPricing
 } from "@/lib/product-countries";
 import { productIdentifiersFromBody } from "@/lib/product-identifiers";
+import { productRegulatoryApprovalsFromPayload } from "@/lib/product-regulatory-approvals";
 import { isUuid } from "@/lib/assessment-store";
 
 export const runtime = "nodejs";
@@ -252,6 +253,9 @@ export async function PATCH(
         ? undefined
         : textOrNull(body.brandName, 200),
       countryPricing: countryPricingFromBody(body.countryPricing),
+      changeNote: body.changeNote === undefined
+        ? undefined
+        : textOrNull(body.changeNote, 200),
       description: body.description === undefined
         ? undefined
         : textOrNull(body.description, 4000),
@@ -264,9 +268,6 @@ export async function PATCH(
       descriptionZhCn: body.descriptionZhCn === undefined
         ? undefined
         : textOrNull(body.descriptionZhCn, 4000),
-      fdaApprovalNumber: body.fdaApprovalNumber === undefined
-        ? undefined
-        : textOrNull(body.fdaApprovalNumber),
       facts: factsFromBody(body.facts),
       id,
       imageUrl: body.imageUrl === undefined
@@ -280,6 +281,9 @@ export async function PATCH(
       productAudience,
       productKind,
       productUrl,
+      regulatoryApprovals: body.regulatoryApprovals === undefined
+        ? undefined
+        : productRegulatoryApprovalsFromPayload(body.regulatoryApprovals),
       title,
       titleEn: body.titleEn === undefined ? undefined : textOrNull(body.titleEn, 500),
       titleTh: body.titleTh === undefined ? undefined : textOrNull(body.titleTh, 500),

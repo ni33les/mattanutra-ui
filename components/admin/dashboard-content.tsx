@@ -330,7 +330,7 @@ export type AdminContent = Readonly<{
 	    allocatedTo: string;
 	    audit: string;
 	    all: string;
-		    allOrganisations: string;
+	    allOrganisations: string;
 	    awaitingStock: string;
 	    availability: string;
 	    allocateAvailable: string;
@@ -352,6 +352,7 @@ export type AdminContent = Readonly<{
     customerOrderDetails: string;
     customerOrders: string;
     customerOrderSaveError: string;
+    created: string;
     createShoppingList: string;
     currency: string;
 	    daysCover: string;
@@ -362,6 +363,7 @@ export type AdminContent = Readonly<{
     expiresAt: string;
     editStock: string;
     exportCsv: string;
+    exportPdf: string;
     expectedAt: string;
     event: string;
     fastestDelivery: string;
@@ -410,6 +412,7 @@ export type AdminContent = Readonly<{
     product: string;
     priceOverride: string;
     profitImpact: string;
+    actualQuantity: string;
     quantity: string;
     ordered: string;
     receivedNow: string;
@@ -418,8 +421,9 @@ export type AdminContent = Readonly<{
 	    receive: string;
 		    receiveQuantityError: string;
       recheckWorkflow: string;
-	    recordMovement: string;
+    recordMovement: string;
     remaining: string;
+    requiredQuantity: string;
     removeItem: string;
     regionalCheckout: string;
     reorderTab: string;
@@ -486,6 +490,8 @@ export type AdminContent = Readonly<{
     unitCost: string;
     units: string;
     updated: string;
+    updateStockCounts: string;
+    updatingStockCounts: string;
     unavailable: string;
     unclaimed: string;
     unorderedNeed: string;
@@ -495,11 +501,14 @@ export type AdminContent = Readonly<{
 		    waitingForStock: string;
 	    workflow: string;
 	    routingPreference: string;
-	    selectedRetailer: string;
+    selectedRetailer: string;
     shippingCountry: string;
     shoppingList: string;
+    shoppingLists: string;
     reorderBackorders: string;
     reorderBackordersDescription: string;
+    reorderRecommendations: string;
+    reorderRecommendationsDescription: string;
 	  };
   generated: string;
   financials: {
@@ -1035,7 +1044,8 @@ const baseContent = {
       customerOrderDetails: "Customer order details",
       customerOrders: "Customer Orders",
       customerOrderSaveError: "Could not save customer order.",
-      createShoppingList: "Create shopping list",
+      created: "Created",
+      createShoppingList: "Create Shopping List",
       currency: "Currency",
       daysCover: "Days cover",
       deliver: "Deliver",
@@ -1047,6 +1057,7 @@ const baseContent = {
       expiresAt: "Expiry",
       editStock: "Edit sellable product",
       exportCsv: "Export CSV",
+      exportPdf: "Export PDF",
       expectedAt: "Expected",
       event: "Event",
       fastestDelivery: "Fastest delivery",
@@ -1061,7 +1072,7 @@ const baseContent = {
       hygeiaImportError: "Could not import Hygeia stock file.",
       hygeiaRetailerRequired: "Assume or select one retailer to use Hygeia stock files.",
       importCsv: "Import CSV",
-      inStock: "In stock",
+      inStock: "Stock OK",
       chooseProduct: "Choose product",
       leadTimeDays: "Lead time",
       lowStock: "Low stock",
@@ -1095,6 +1106,7 @@ const baseContent = {
       product: "Product",
       priceOverride: "Retail Price",
       profitImpact: "Profit impact",
+      actualQuantity: "Actual quantity",
       quantity: "Quantity",
       ordered: "Ordered",
       receivedNow: "Received",
@@ -1105,6 +1117,7 @@ const baseContent = {
       recheckWorkflow: "Recheck workflow",
       recordMovement: "Record movement",
       remaining: "Remaining",
+      requiredQuantity: "Required quantity",
       removeItem: "Remove",
       regionalCheckout: "Regional checkout",
       reorderTab: "Reorder",
@@ -1149,6 +1162,7 @@ const baseContent = {
       selectedRetailer: "Selected retailer",
       shippingCountry: "Shipping country",
       shoppingList: "Shopping list",
+      shoppingLists: "Shopping Lists",
       supplier: "Supplier",
 	      supplierContact: "Supplier contact",
 	      selectProduct: "Select product",
@@ -1171,6 +1185,8 @@ const baseContent = {
       unitCost: "Unit cost",
       units: "Units",
       updated: "Updated",
+      updateStockCounts: "Update stock counts",
+      updatingStockCounts: "Updating stock counts...",
       unavailable: "Unavailable",
       unclaimed: "Unclaimed",
       unorderedNeed: "Unordered demand",
@@ -1182,7 +1198,10 @@ const baseContent = {
 	      workflow: "Workflow",
 	      reorderBackorders: "Backorders",
 	      reorderBackordersDescription:
-	        "These items are required to cover active customer orders."
+	        "These items are required to cover active customer orders.",
+      reorderRecommendations: "Recommendations",
+      reorderRecommendationsDescription:
+        "Optional stock buys suggested from recent demand and reorder risk."
 		    },
     generated: "Generated",
     financials: {
@@ -1365,12 +1384,10 @@ const baseContent = {
     governanceTitle: "Catalogue",
     retailTasksNavigation: [],
     retailTasksTitle: "Retail Tasks",
-    retailBuyingNavigation: [
-      { icon: ClipboardDocumentListIcon, name: "Reorder Advice", view: "retail-stock-advice" },
-      { icon: ClipboardDocumentListIcon, name: "Shopping List", view: "retail-reorder" }
-    ],
-    retailBuyingTitle: "Purchasing",
+    retailBuyingNavigation: [],
+    retailBuyingTitle: "",
     retailInventoryNavigation: [
+      { icon: ClipboardDocumentListIcon, name: "Reorders", view: "retail-stock-advice" },
       { icon: ArchiveBoxIcon, name: "Stock", view: "stock" }
     ],
     retailInventoryTitle: "Stock",
@@ -1415,8 +1432,8 @@ const baseContent = {
       "retail-audit": "Audit",
       "retail-fulfillment": "Fulfillment",
       "retail-movements": "Stock Movements",
-      "retail-stock-advice": "Reorder Advice",
-      "retail-reorder": "Shopping List",
+      "retail-stock-advice": "Reorders",
+      "retail-reorder": "Reorders",
       reviews: "Reviews",
       settings: "Settings",
       stock: "Stock",
@@ -1844,6 +1861,7 @@ const baseContent = {
       customerOrderDetails: "รายละเอียดคำสั่งซื้อลูกค้า",
       customerOrders: "คำสั่งซื้อลูกค้า",
       customerOrderSaveError: "ไม่สามารถบันทึกคำสั่งซื้อลูกค้าได้",
+      created: "สร้างเมื่อ",
       createShoppingList: "สร้างรายการซื้อ",
       currency: "สกุลเงิน",
       daysCover: "วันที่ครอบคลุม",
@@ -1856,6 +1874,7 @@ const baseContent = {
       expiresAt: "วันหมดอายุ",
       editStock: "แก้ไขสินค้าที่ขายได้",
       exportCsv: "ส่งออก CSV",
+      exportPdf: "ส่งออก PDF",
       expectedAt: "วันที่คาดว่าจะถึง",
       event: "เหตุการณ์",
       fastestDelivery: "ส่งเร็วที่สุด",
@@ -1870,7 +1889,7 @@ const baseContent = {
       hygeiaImportError: "ไม่สามารถนำเข้าไฟล์สต็อก Hygeia ได้",
       hygeiaRetailerRequired: "เลือกหรือสวมสิทธิ์ร้านค้าหนึ่งแห่งเพื่อใช้ไฟล์สต็อก Hygeia",
       importCsv: "นำเข้า CSV",
-      inStock: "มีสินค้า",
+      inStock: "สต็อกปกติ",
       chooseProduct: "เลือกสินค้า",
       leadTimeDays: "ระยะเวลานำ",
       lowStock: "สต็อกต่ำ",
@@ -1904,6 +1923,7 @@ const baseContent = {
       product: "สินค้า",
       priceOverride: "ราคาขายปลีก",
       profitImpact: "ผลกระทบกำไร",
+      actualQuantity: "จำนวนจริง",
       quantity: "จำนวน",
       ordered: "สั่งซื้อ",
       receivedNow: "รับแล้ว",
@@ -1914,6 +1934,7 @@ const baseContent = {
       recheckWorkflow: "ตรวจสอบเวิร์กโฟลว์อีกครั้ง",
       recordMovement: "บันทึกการเคลื่อนไหว",
       remaining: "คงเหลือ",
+      requiredQuantity: "จำนวนที่ต้องใช้",
       removeItem: "ลบ",
       regionalCheckout: "จำลองเช็กเอาต์ตามภูมิภาค",
       reorderTab: "สั่งซื้อเพิ่ม",
@@ -1958,6 +1979,7 @@ const baseContent = {
       selectedRetailer: "ร้านที่เลือก",
       shippingCountry: "ประเทศจัดส่ง",
       shoppingList: "รายการซื้อ",
+      shoppingLists: "รายการซื้อ",
       supplier: "ซัพพลายเออร์",
 	      supplierContact: "ข้อมูลติดต่อซัพพลายเออร์",
 	      selectProduct: "เลือกสินค้า",
@@ -1980,6 +2002,8 @@ const baseContent = {
       unitCost: "ต้นทุนต่อหน่วย",
       units: "หน่วย",
       updated: "อัปเดต",
+      updateStockCounts: "อัปเดตจำนวนสต็อก",
+      updatingStockCounts: "กำลังอัปเดตจำนวนสต็อก...",
       unavailable: "ไม่พร้อมขาย",
       unclaimed: "ยังไม่มีผู้รับงาน",
       unorderedNeed: "ความต้องการที่ยังไม่ได้สั่งซื้อ",
@@ -1991,7 +2015,10 @@ const baseContent = {
 	      workflow: "เวิร์กโฟลว์",
 	      reorderBackorders: "รายการค้างส่ง",
 	      reorderBackordersDescription:
-	        "รายการเหล่านี้จำเป็นเพื่อรองรับคำสั่งซื้อจากลูกค้าที่เปิดอยู่"
+	        "รายการเหล่านี้จำเป็นเพื่อรองรับคำสั่งซื้อจากลูกค้าที่เปิดอยู่",
+      reorderRecommendations: "คำแนะนำ",
+      reorderRecommendationsDescription:
+        "รายการซื้อสต็อกเพิ่มเติมที่แนะนำจากความต้องการล่าสุดและความเสี่ยงในการสั่งซื้อเพิ่ม"
 		    },
     generated: "สร้างเมื่อ",
     financials: {
@@ -2174,12 +2201,10 @@ const baseContent = {
     governanceTitle: "แค็ตตาล็อก",
     retailTasksNavigation: [],
     retailTasksTitle: "งานค้าปลีก",
-    retailBuyingNavigation: [
-      { icon: ClipboardDocumentListIcon, name: "คำแนะนำการสั่งซื้อ", view: "retail-stock-advice" },
-      { icon: ClipboardDocumentListIcon, name: "รายการซื้อ", view: "retail-reorder" }
-    ],
-    retailBuyingTitle: "จัดซื้อ",
+    retailBuyingNavigation: [],
+    retailBuyingTitle: "",
     retailInventoryNavigation: [
+      { icon: ClipboardDocumentListIcon, name: "สั่งซื้อเพิ่ม", view: "retail-stock-advice" },
       { icon: ArchiveBoxIcon, name: "สต็อก", view: "stock" }
     ],
     retailInventoryTitle: "สต็อก",
@@ -2224,8 +2249,8 @@ const baseContent = {
       "retail-audit": "บันทึกเหตุการณ์",
       "retail-fulfillment": "จัดส่ง",
       "retail-movements": "การเคลื่อนไหวสต็อก",
-      "retail-stock-advice": "คำแนะนำการสั่งซื้อ",
-      "retail-reorder": "รายการซื้อ",
+      "retail-stock-advice": "สั่งซื้อเพิ่ม",
+      "retail-reorder": "สั่งซื้อเพิ่ม",
       reviews: "รีวิว",
       settings: "การตั้งค่า",
       stock: "สต็อก",

@@ -13,6 +13,11 @@ import {
   productCountryOptions,
   type ProductCountryPricing
 } from "@/lib/product-countries";
+import {
+  defaultRegulatoryAgencyForCountry,
+  regulatoryAgencyByCode,
+  regulatoryAgencyOptionsForCountry
+} from "@/lib/product-regulatory-agencies";
 import { supportedOrganisationCurrencies } from "@/lib/currencies";
 import {
   adminLocaleTextClass,
@@ -34,6 +39,59 @@ import {
   productTranslationStatusClass,
   productTranslationStatusLabel
 } from "@/components/admin/product-view-helpers";
+
+function regulatoryApprovalSummary(
+  approvals: readonly AdminProductRow["regulatoryApprovals"][number][] = []
+) {
+  const active = approvals.filter((approval) =>
+    (approval.status === "verified" || approval.status === "sourced") &&
+    approval.approvalNumber.trim()
+  );
+
+  if (active.length < 1) {
+    return "-";
+  }
+
+  const summary = active.slice(0, 2).map((approval) =>
+    `${approval.agencyCode} ${approval.approvalNumber}`
+  ).join(", ");
+
+  return active.length > 2 ? `${summary} +${active.length - 2}` : summary;
+}
+
+type ProductCountryApprovalPatch = Readonly<{
+  agencyCode?: string;
+  agencyName?: string;
+  approvalNumber?: string;
+  evidenceUrl?: string | null;
+}>;
+
+function directCountryApproval(
+  approvals: readonly AdminProductRow["regulatoryApprovals"][number][] = [],
+  countryCode: string
+) {
+  return approvals.find((approval) =>
+    approval.scopeType === "country" &&
+    approval.scopeCode.toUpperCase() === countryCode.toUpperCase()
+  ) ?? null;
+}
+
+function inheritedApprovalSummary(
+  approvals: readonly AdminProductRow["regulatoryApprovals"][number][] = []
+) {
+  return regulatoryApprovalSummary(
+    approvals.filter((approval) => approval.scopeType === "region")
+  );
+}
+
+function approvalDisplayLabel(
+  approval: AdminProductRow["regulatoryApprovals"][number] | null,
+  fallback: string
+) {
+  return approval
+    ? `${approval.agencyName}: ${approval.approvalNumber}`
+    : fallback;
+}
 
 export function ProductInsightStat({
   label,
@@ -71,8 +129,10 @@ export function ProductCountryManager({
   label,
   onAdd,
   onPricingChange,
+  onRegulatoryApprovalChange,
   onRemove,
   pricingLabels,
+  regulatoryApprovals,
   variant = "default",
   removeLabel
 }: Readonly<{
@@ -87,23 +147,94 @@ export function ProductCountryManager({
     countryCode: string,
     patch: Partial<ProductCountryPricing>
   ) => void;
+  onRegulatoryApprovalChange?: (
+    countryCode: string,
+    patch: ProductCountryApprovalPatch
+  ) => boolean | void | Promise<boolean | void>;
   onRemove: (countryCode: string) => void;
   pricingLabels?: Readonly<{
+    agency: string;
+    approvalNumber: string;
+    associateApproval: string;
+    authority: string;
+    cancel: string;
     country: string;
     currency: string;
+    evidenceUrl: string;
+    inheritedApproval: string;
+    notAvailable: string;
     priceUpdated: string;
     rrp: string;
+    saveAssociation: string;
   }>;
+  regulatoryApprovals?: readonly AdminProductRow["regulatoryApprovals"][number][];
   variant?: "compact" | "default";
   removeLabel: string;
 }>) {
+  const safeCountryCodes = Array.isArray(countryCodes) ? [...countryCodes] : [];
   const allowedSet = allowedCountryCodes
     ? new Set(allowedCountryCodes)
     : null;
   const availableOptions = productCountryOptions.filter((country) =>
-    !countryCodes.includes(country.code) &&
+    !safeCountryCodes.includes(country.code) &&
     (!allowedSet || allowedSet.has(country.code))
   );
+  const [approvalDialog, setApprovalDialog] = useState<Readonly<{
+    agencyCode: string;
+    approvalNumber: string;
+    countryCode: string;
+    evidenceUrl: string;
+    saving: boolean;
+  }> | null>(null);
+
+  function openApprovalDialog(countryCode: string) {
+    const approval = directCountryApproval(regulatoryApprovals, countryCode);
+    const agency = approval
+      ? regulatoryAgencyByCode(countryCode, approval.agencyCode)
+      : defaultRegulatoryAgencyForCountry(countryCode);
+
+    setApprovalDialog({
+      agencyCode: agency.agencyCode,
+      approvalNumber: approval?.approvalNumber ?? "",
+      countryCode,
+      evidenceUrl: approval?.evidenceUrl ?? "",
+      saving: false
+    });
+  }
+
+  async function saveApprovalDialog() {
+    if (!approvalDialog || !onRegulatoryApprovalChange) {
+      return;
+    }
+
+    setApprovalDialog({
+      ...approvalDialog,
+      saving: true
+    });
+    const agency = regulatoryAgencyByCode(
+      approvalDialog.countryCode,
+      approvalDialog.agencyCode
+    );
+    const result = await onRegulatoryApprovalChange(
+      approvalDialog.countryCode,
+      {
+        agencyCode: agency.agencyCode,
+        agencyName: agency.agencyName,
+        approvalNumber: approvalDialog.approvalNumber,
+        evidenceUrl: approvalDialog.evidenceUrl.trim() || null
+      }
+    );
+
+    if (result !== false) {
+      setApprovalDialog(null);
+      return;
+    }
+
+    setApprovalDialog({
+      ...approvalDialog,
+      saving: false
+    });
+  }
 
   return (
     <div
@@ -149,6 +280,9 @@ export function ProductCountryManager({
                   {pricingLabels?.currency ?? "Currency"}
                 </th>
                 <th className="px-3 py-2 font-semibold">
+                  {pricingLabels?.approvalNumber ?? "Approval number"}
+                </th>
+                <th className="px-3 py-2 font-semibold">
                   {pricingLabels?.priceUpdated ?? "Updated"}
                 </th>
                 <th className="px-3 py-2 text-right font-semibold">
@@ -157,9 +291,16 @@ export function ProductCountryManager({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {countryCodes.map((countryCode) => {
+              {safeCountryCodes.map((countryCode) => {
                 const pricing = countryPricing?.find(
                   (item) => item.countryCode === countryCode
+                );
+                const approval = directCountryApproval(
+                  regulatoryApprovals,
+                  countryCode
+                );
+                const inherited = inheritedApprovalSummary(
+                  pricing?.effectiveRegulatoryApprovals
                 );
 
                 return (
@@ -204,6 +345,30 @@ export function ProductCountryManager({
                         ))}
                       </select>
                     </td>
+                    <td className="px-3 py-2">
+                      <button
+                        className={classNames(
+                          "text-left text-xs font-semibold underline-offset-2 hover:underline",
+                          approval
+                            ? "text-[#126B4F]"
+                            : "text-amber-700"
+                        )}
+                        disabled={!onRegulatoryApprovalChange}
+                        onClick={() => openApprovalDialog(countryCode)}
+                        type="button"
+                      >
+                        {approvalDisplayLabel(
+                          approval,
+                          pricingLabels?.notAvailable ?? "Not available"
+                        )}
+                      </button>
+                      {inherited !== "-" ? (
+                        <p className="mt-1 text-[11px] font-medium text-gray-500">
+                          {pricingLabels?.inheritedApproval ?? "Inherited"}:{" "}
+                          {inherited}
+                        </p>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-2 text-gray-500">
                       {pricing?.priceUpdatedAt
                         ? new Date(pricing.priceUpdatedAt).toLocaleDateString()
@@ -213,7 +378,7 @@ export function ProductCountryManager({
                       <button
                         aria-label={`${removeLabel}: ${productCountryLabel(countryCode)}`}
                         className="rounded-md px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                        disabled={countryCodes.length <= 1}
+                        disabled={safeCountryCodes.length <= 1}
                         onClick={() => onRemove(countryCode)}
                         type="button"
                       >
@@ -228,7 +393,7 @@ export function ProductCountryManager({
         </div>
       ) : (
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {countryCodes.map((countryCode) => (
+          {safeCountryCodes.map((countryCode) => (
             <span
               className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-0.5 text-xs font-semibold text-emerald-700"
               key={countryCode}
@@ -237,7 +402,7 @@ export function ProductCountryManager({
               <button
                 aria-label={`${removeLabel}: ${productCountryLabel(countryCode)}`}
                 className="rounded-full px-1.5 py-0.5 text-[0.65rem] font-semibold text-emerald-600 ring-1 ring-emerald-100 hover:bg-emerald-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                disabled={countryCodes.length <= 1}
+                disabled={safeCountryCodes.length <= 1}
                 onClick={() => onRemove(countryCode)}
                 type="button"
               >
@@ -247,6 +412,97 @@ export function ProductCountryManager({
           ))}
         </div>
       )}
+      {approvalDialog ? (
+        <div
+          aria-modal={true}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 px-4 py-6"
+          role="dialog"
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl ring-1 ring-gray-200">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">
+                {pricingLabels?.associateApproval ?? "Associate approval number"}
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {productCountryLabel(approvalDialog.countryCode)}
+              </p>
+            </div>
+            <div className="mt-4 grid gap-3">
+              <label className="text-sm font-semibold text-gray-700">
+                {pricingLabels?.authority ?? "Authority"}
+                <select
+                  className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                  disabled={approvalDialog.saving}
+                  onChange={(event) =>
+                    setApprovalDialog({
+                      ...approvalDialog,
+                      agencyCode: event.target.value
+                    })
+                  }
+                  value={approvalDialog.agencyCode}
+                >
+                  {regulatoryAgencyOptionsForCountry(
+                    approvalDialog.countryCode
+                  ).map((agency) => (
+                    <option key={agency.agencyCode} value={agency.agencyCode}>
+                      {agency.agencyName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-semibold text-gray-700">
+                {pricingLabels?.approvalNumber ?? "Approval number"}
+                <input
+                  className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                  disabled={approvalDialog.saving}
+                  onChange={(event) =>
+                    setApprovalDialog({
+                      ...approvalDialog,
+                      approvalNumber: event.target.value
+                    })
+                  }
+                  value={approvalDialog.approvalNumber}
+                />
+              </label>
+              <label className="text-sm font-semibold text-gray-700">
+                {pricingLabels?.evidenceUrl ?? "Evidence URL"}
+                <input
+                  className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                  disabled={approvalDialog.saving}
+                  onChange={(event) =>
+                    setApprovalDialog({
+                      ...approvalDialog,
+                      evidenceUrl: event.target.value
+                    })
+                  }
+                  type="url"
+                  value={approvalDialog.evidenceUrl}
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={approvalDialog.saving}
+                onClick={() => setApprovalDialog(null)}
+                type="button"
+              >
+                {pricingLabels?.cancel ?? "Cancel"}
+              </button>
+              <button
+                className="rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={approvalDialog.saving}
+                onClick={() => void saveApprovalDialog()}
+                type="button"
+              >
+                {approvalDialog.saving
+                  ? pricingLabels?.saveAssociation ?? "Save association"
+                  : pricingLabels?.saveAssociation ?? "Save association"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {disabledReason ? (
         <p className="mt-2 text-xs font-medium text-amber-700">
           {disabledReason}
@@ -259,7 +515,9 @@ export function ProductCountryManager({
 type ProductIdentifierType = AdminProductRow["identifiers"][number]["type"];
 
 function identifierValue(row: AdminProductRow, type: ProductIdentifierType) {
-  return row.identifiers.find((identifier) =>
+  const identifiers = Array.isArray(row.identifiers) ? row.identifiers : [];
+
+  return identifiers.find((identifier) =>
     identifier.type === type && identifier.status === "active"
   )?.value ?? "";
 }
@@ -286,9 +544,14 @@ export function ProductIdentifiersEditor({
   setDraft: (row: AdminProductRow) => void;
   viewLabels: Readonly<Record<string, string>>;
 }>) {
+  const identifiers = Array.isArray(draft.identifiers) ? draft.identifiers : [];
+  const identifierCandidates = Array.isArray(draft.identifierCandidates)
+    ? draft.identifierCandidates
+    : [];
+
   function updateIdentifier(type: ProductIdentifierType, value: string) {
     const trimmed = value.trim();
-    const nextIdentifiers = draft.identifiers.filter(
+    const nextIdentifiers = identifiers.filter(
       (identifier) => identifier.type !== type
     );
 
@@ -315,7 +578,7 @@ export function ProductIdentifiersEditor({
     });
   }
 
-  const candidateRows = draft.identifierCandidates.filter((candidate) =>
+  const candidateRows = identifierCandidates.filter((candidate) =>
     candidate.status === "pending" || candidate.status === "conflict"
   );
 
@@ -344,7 +607,6 @@ export function ProductIdentifiersEditor({
             inputMode="numeric"
             maxLength={17}
             onChange={(event) => updateIdentifier("ean13", event.target.value)}
-            placeholder="8851234567890"
             type="text"
             value={identifierValue(draft, "ean13")}
           />
@@ -488,7 +750,9 @@ export function ProductCard({
                   row.productAudience === "both"
                     ? null
                     : productStatusLabel(row.productAudience, locale),
-                  row.fdaApprovalNumber ? `FDA ${row.fdaApprovalNumber}` : null,
+                  regulatoryApprovalSummary(row.regulatoryApprovals) !== "-"
+                    ? regulatoryApprovalSummary(row.regulatoryApprovals)
+                    : null,
                   row.availableCountryCodes.length > 0
                     ? `${viewLabels.markets} ${row.availableCountryCodes.join(", ")}`
                     : null,

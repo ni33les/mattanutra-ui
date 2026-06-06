@@ -143,8 +143,19 @@ await runNode([
 ], rebuildEnv);
 
 for (const scriptName of [
+  "admin-access:schema:apply",
+  "communications:schema:apply",
+  "payments:schema:apply",
+  "retail-checkout:schema:apply",
+  "retail-stock:schema:apply",
+  "product-identifiers:schema:apply",
+  "product-regulatory:schema:apply",
+  "product-offers:schema:remove",
+  "recommendation-insights:schema:apply",
+  "thai-tax:schema:apply",
   "foods:schema:apply",
   "locales:schema:apply",
+  "versions:core:apply",
   "versions:core:check",
   "products:validation-consistency"
 ]) {

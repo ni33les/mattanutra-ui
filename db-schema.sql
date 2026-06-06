@@ -80,6 +80,7 @@ drop table if exists
   public.product_facts,
   public.product_import_runs,
   public.product_imports,
+  public.product_regulatory_approvals,
   public.product_recommendation_decisions,
   public.product_recommendation_items,
   public.product_recommendation_runs,
@@ -1554,6 +1555,34 @@ CREATE TABLE public.product_countries (
     CONSTRAINT product_countries_code_check CHECK ((country_code ~ '^[A-Z]{2}$'::text)),
     CONSTRAINT product_countries_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
     CONSTRAINT product_countries_rrp_price_check CHECK (((rrp_price_amount IS NULL) OR (rrp_price_amount >= (0)::numeric)))
+);
+
+
+--
+-- Name: product_regulatory_approvals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_regulatory_approvals (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    product_id uuid NOT NULL,
+    scope_type text NOT NULL,
+    scope_code text NOT NULL,
+    agency_code text NOT NULL,
+    agency_name text NOT NULL,
+    approval_type text DEFAULT 'product_registration'::text NOT NULL,
+    approval_number text NOT NULL,
+    status text DEFAULT 'verified'::text NOT NULL,
+    source text,
+    evidence_url text,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_regulatory_approvals_agency_code_check CHECK ((agency_code ~ '^[A-Z0-9_]{2,40}$'::text)),
+    CONSTRAINT product_regulatory_approvals_approval_number_check CHECK ((btrim(approval_number) <> ''::text)),
+    CONSTRAINT product_regulatory_approvals_approval_type_check CHECK ((approval_type = ANY (ARRAY['product_registration'::text]))),
+    CONSTRAINT product_regulatory_approvals_scope_check CHECK ((((scope_type = 'country'::text) AND (scope_code ~ '^[A-Z]{2}$'::text)) OR ((scope_type = 'region'::text) AND (scope_code ~ '^[A-Z0-9_]{2,20}$'::text)))),
+    CONSTRAINT product_regulatory_approvals_scope_type_check CHECK ((scope_type = ANY (ARRAY['country'::text, 'region'::text]))),
+    CONSTRAINT product_regulatory_approvals_status_check CHECK ((status = ANY (ARRAY['sourced'::text, 'verified'::text, 'rejected'::text, 'expired'::text])))
 );
 
 
@@ -3405,6 +3434,22 @@ ALTER TABLE ONLY public.product_countries
 
 
 --
+-- Name: product_regulatory_approvals product_regulatory_approvals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_regulatory_approvals
+    ADD CONSTRAINT product_regulatory_approvals_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: product_regulatory_approvals product_regulatory_approvals_unique_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_regulatory_approvals
+    ADD CONSTRAINT product_regulatory_approvals_unique_key UNIQUE (product_id, scope_type, scope_code, agency_code, approval_type, approval_number);
+
+
+--
 -- Name: product_facts product_facts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4536,6 +4581,27 @@ CREATE INDEX product_brand_countries_country_idx ON public.product_brand_countri
 --
 
 CREATE INDEX product_countries_country_idx ON public.product_countries USING btree (country_code, product_id);
+
+
+--
+-- Name: product_regulatory_approvals_product_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX product_regulatory_approvals_product_idx ON public.product_regulatory_approvals USING btree (product_id, status, updated_at DESC);
+
+
+--
+-- Name: product_regulatory_approvals_scope_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX product_regulatory_approvals_scope_idx ON public.product_regulatory_approvals USING btree (scope_type, scope_code, agency_code, status);
+
+
+--
+-- Name: product_regulatory_approvals_number_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX product_regulatory_approvals_number_idx ON public.product_regulatory_approvals USING btree (approval_number);
 
 
 --
@@ -5696,6 +5762,14 @@ ALTER TABLE ONLY public.product_admin_audit
 
 ALTER TABLE ONLY public.product_admin_audit
     ADD CONSTRAINT product_admin_audit_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE SET NULL;
+
+
+--
+-- Name: product_regulatory_approvals product_regulatory_approvals_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_regulatory_approvals
+    ADD CONSTRAINT product_regulatory_approvals_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
 
 
 --

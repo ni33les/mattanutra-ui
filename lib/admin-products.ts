@@ -1261,6 +1261,7 @@ export async function resolveProductImportReview(
       productAudience: input.productAudience ?? productAudienceFromSnapshot(productImport.raw_snapshot),
       productKind: reviewFacts.length >= 6 ? "multi" : "supplement",
       productUrl: reviewProductUrl,
+      regulatoryApprovals: input.regulatoryApprovals,
       region: "TH",
       replaceFacts: true,
       source: "manufacturer_import",

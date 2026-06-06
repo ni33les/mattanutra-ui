@@ -56,6 +56,8 @@ describe("system agents", () => {
       "send_example_email",
       "send_reassessment_email",
       "send_retail_order_workflow_email",
+      "source_product_fda_approvals",
+      "source_product_identifiers",
       "sync_digitalocean_billing"
     ]) {
       const agent = systemAgentForWorkTaskType(taskType);

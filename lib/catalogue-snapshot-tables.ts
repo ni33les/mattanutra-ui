@@ -68,6 +68,11 @@ export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
     requiredForReload: true
   },
   {
+    description: "Country and region regulatory approval rows for products.",
+    name: "product_regulatory_approvals",
+    requiredForReload: true
+  },
+  {
     description: "Locale-scalable product title and description rows.",
     name: "product_translations",
     requiredForReload: true
@@ -152,6 +157,7 @@ export const CATALOGUE_RELOAD_ORDER = [
   "product_brand_countries",
   "products",
   "product_countries",
+  "product_regulatory_approvals",
   "product_translations",
   "product_facts",
   "product_versions",
@@ -182,6 +188,7 @@ export const CATALOGUE_TRUNCATE_ORDER = [
   "product_import_runs",
   "product_versions",
   "product_facts",
+  "product_regulatory_approvals",
   "product_countries",
   "product_translations",
   "products",

@@ -114,7 +114,15 @@ describe("process runtime technical debt sweep", () => {
 
   it("keeps shopping-list saves as stock movement deltas and retries retailer allocation", async () => {
     const stock = await readFile("lib/admin-retail-stock.ts", "utf8");
+    const route = await readFile("app/api/admin/retail-stock/route.ts", "utf8");
+    const view = await readFile("components/admin/retail-stock-view.tsx", "utf8");
+    const modal = await readFile(
+      "components/admin/retail-shopping-list-modal.tsx",
+      "utf8"
+    );
     const updateList = functionBody(stock, "updateRetailShoppingList");
+    const movementRecorder = functionBody(stock, "recordRetailStockMovement");
+    const allocate = functionBody(stock, "allocateRetailCustomerOrder");
 
     assert.match(updateList, /const delta = actualQuantity - stockedQuantity/);
     assert.match(updateList, /movementType: delta > 0 \? "receive" : "adjustment"/);
@@ -122,7 +130,36 @@ describe("process runtime technical debt sweep", () => {
     assert.match(updateList, /Shopping list stock count reduced/);
     assert.match(updateList, /releaseRetailStockOverAllocationsAfterStockCount/);
     assert.match(updateList, /stocked_quantity = \$\{actualQuantity\}/);
+    assert.match(updateList, /const savedStatus: RetailShoppingListStatus = "closed"/);
+    assert.match(updateList, /status = \$\{savedStatus\}/);
+    assert.match(updateList, /requestedStatus: input\.status \? shoppingListStatus\(input\.status\) : null/);
+    assert.match(route, /return value === "active" \? "active" : "closed"/);
+    assert.match(route, /responseModeValue/);
+    assert.match(view, /async function saveShoppingListDraft\(\)/);
+    assert.match(view, /responseMode: "minimal"/);
+    assert.match(view, /refreshRetailStockData\(\)\.catch/);
+    assert.match(view, /status: "closed"/);
+    assert.doesNotMatch(modal, /Close list/);
+    assert.match(updateList, /where id = any\(\$\{lineIds\}::uuid\[\]\)/);
+    assert.match(updateList, /deferReorderSideEffects: true/);
     assert.match(updateList, /awaitingOrderRows[\s\S]*allocateRetailCustomerOrder/);
+    assert.match(
+      updateList,
+      /retail_customer_order_lines\.product_id = any\(\$\{changedProductIds\}::uuid\[\]\)[\s\S]*allocateRetailCustomerOrder/,
+      "shopping-list save should retry allocation only for orders containing changed products"
+    );
+    assert.match(updateList, /productIds: changedProductIds/);
+    assert.match(updateList, /refreshedReorderAdviceCount/);
+    assert.match(
+      allocate,
+      /fullyAllocated[\s\S]*ensureRetailOrderShortagesInReorderAdvice/,
+      "partial allocations after short-bought lists must repair reorder advice"
+    );
+    assert.match(
+      movementRecorder,
+      /if \(!input\.deferReorderSideEffects\)[\s\S]*refreshRetailStockReorderAdvice\(\{[\s\S]*stockId: recordedStockRow\.id/,
+      "standalone movements should still recalculate advice, while shopping-list batches can defer it"
+    );
   });
 
   it("keeps shipping one-click while preserving legacy pick-pack cleanup", async () => {

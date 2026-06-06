@@ -62,6 +62,10 @@ const adminProductDetailRoute = readFileSync(
   new URL("../app/[locale]/admin/products/[productId]/page.tsx", import.meta.url),
   "utf8"
 );
+const adminProductUpdateRoute = readFileSync(
+  new URL("../app/api/admin/products/[id]/route.ts", import.meta.url),
+  "utf8"
+);
 const adminProductsService = readFileSync(
   new URL("../lib/admin-products.ts", import.meta.url),
   "utf8"
@@ -201,6 +205,7 @@ describe("codebase cleanup guardrails", () => {
       "product_import_runs",
       "product_imports",
       "product_import_translations",
+      "product_regulatory_approvals",
       "product_translations",
       "product_versions",
       "products",
@@ -297,8 +302,33 @@ describe("codebase cleanup guardrails", () => {
     assert.match(adminProductDetailRoute, /AdminDashboard/);
     assert.match(adminProductDetailRoute, /productDetailId=\{productId\}/);
     assert.match(adminProductView, /\/admin\/products\/\$\{row\.id\}/);
+    assert.match(adminProductView, /\bfunction normalizeProductDetailRow\b/);
+    assert.match(adminProductView, /validationCacheStaleReasons: safeArray/);
+    assert.doesNotMatch(adminProductView, /sourceProductFdaNumbersFromEvidence/);
+    assert.doesNotMatch(adminProductView, /sourceProductIdentifiersFromEvidence/);
+    assert.match(adminProductView, /manufacturerOptions\.map/);
+    assert.match(adminProductView, /selectedMetricId=\{metricFilter\}/);
+    assert.doesNotMatch(adminProductView, /api\/admin\/products\/hygeia\/export/);
     assert.match(adminProductUi, /\bfunction ProductCountryManager\b/);
+    assert.match(adminProductUi, /\bconst safeCountryCodes\b/);
+    assert.match(adminProductUi, /\bconst identifiers = Array\.isArray\(draft\.identifiers\)/);
+    assert.doesNotMatch(adminProductUi, /placeholder="8851234567890"/);
     assert.match(adminProductUi, /<table className=/);
+    assert.doesNotMatch(adminProductView, /\bfunction ProductRegulatoryApprovalsEditor\b/);
+    assert.doesNotMatch(adminProductView, /\bregulatoryScopeOptions\b/);
+    assert.doesNotMatch(adminProductView, /\bregulatoryStatusOptions\b/);
+    assert.doesNotMatch(adminProductView, /\bregulatoryRegionOptions\b/);
+    assert.match(adminProductView, /\bfunction updateCountryRegulatoryApproval\b/);
+    assert.match(adminProductView, /regulatoryApprovals: regulatoryApprovalsForSave\(row\)/);
+    assert.match(adminProductView, /product_regulatory_approval_associated/);
+    assert.match(adminProductUpdateRoute, /changeNote: body\.changeNote === undefined/);
+    assert.match(adminProductUi, /onRegulatoryApprovalChange/);
+    assert.match(adminProductUi, /regulatoryAgencyOptionsForCountry/);
+    assert.match(adminProductUi, /approvalDisplayLabel/);
+    assert.match(adminProductUi, /pricingLabels\?\.notAvailable/);
+    assert.match(adminProductUi, /role="dialog"/);
+    assert.match(adminProductUi, /saveApprovalDialog/);
+    assert.doesNotMatch(adminProductView, /draft\.fdaApprovalNumber/);
     assert.doesNotMatch(adminProductView, /\bProductOffersEditor\b/);
     assert.doesNotMatch(adminProductView, /\bAdminModal\b/);
   });

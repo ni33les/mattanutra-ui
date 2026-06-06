@@ -49,6 +49,10 @@ import {
   replaceApprovedProductIdentifiers
 } from "@/lib/product-identifiers";
 import {
+  replaceProductRegulatoryApprovals,
+  thaiFdaApprovalInput
+} from "@/lib/product-regulatory-approvals";
+import {
   doseAmountInLimitUnit,
   doseExceedsLimit,
   normalizeDoseUnit,
@@ -1136,7 +1140,6 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       product_url,
       normalized_url,
       description,
-      fda_approval_number,
       source_url,
       source_snapshot,
       product_kind,
@@ -1163,7 +1166,6 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       ${productUrl},
       ${normalizedUrl(productUrl)},
       ${description},
-      ${cleanNullableText(input.fdaApprovalNumber, 100)},
       ${cleanNullableText(input.sourceUrl) ?? productUrl},
       ${sql.json(toJsonValue(sourceSnapshot))}::jsonb,
       ${input.productKind ?? "supplement"},
@@ -1186,7 +1188,6 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
       normalized_brand_name = excluded.normalized_brand_name,
       image_url = coalesce(excluded.image_url, products.image_url),
       description = coalesce(excluded.description, products.description),
-      fda_approval_number = coalesce(excluded.fda_approval_number, products.fda_approval_number),
       source_url = coalesce(excluded.source_url, products.source_url),
       source_snapshot = products.source_snapshot || excluded.source_snapshot,
       product_kind = excluded.product_kind,
@@ -1211,6 +1212,24 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
 	    productCountryCodes,
 	    input.countryPricing ?? []
 	  );
+
+  const legacyThaiFdaApproval = thaiFdaApprovalInput(input.fdaApprovalNumber, {
+    evidenceUrl: input.sourceUrl ?? productUrl,
+    metadata: { createdFrom: "legacy_fdaApprovalNumber_input" },
+    source: input.source ?? "admin",
+    status: "verified"
+  });
+  const regulatoryApprovals = [
+    ...(input.regulatoryApprovals ?? []),
+    ...(legacyThaiFdaApproval ? [legacyThaiFdaApproval] : [])
+  ];
+
+  if (input.regulatoryApprovals !== undefined || legacyThaiFdaApproval) {
+    await replaceProductRegulatoryApprovals(sql, {
+      approvals: regulatoryApprovals,
+      productId
+    });
+  }
 
   if (input.identifiers !== undefined) {
     await replaceApprovedProductIdentifiers(sql, {
@@ -1273,6 +1292,7 @@ export async function createAdminProduct(input: CreateAdminProductInput) {
 	        manufacturerCountryCodes,
 	        platform: input.platform,
         identifiers: input.identifiers,
+        regulatoryApprovals: toJsonValue(regulatoryApprovals),
         productUrl,
         validation: validation.validation,
         title,
@@ -1494,10 +1514,6 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
         else ${cleanNullableText(input.description, 4000)}
       end,
       source_snapshot = source_snapshot || ${sql.json(toJsonValue(localizedSnapshot))}::jsonb,
-      fda_approval_number = case
-        when ${input.fdaApprovalNumber === undefined} then fda_approval_number
-        else ${input.fdaApprovalNumber ?? null}
-      end,
       product_kind = coalesce(${input.productKind ?? null}, product_kind),
       product_audience = coalesce(${input.productAudience ?? null}, product_audience),
       admin_notes = coalesce(${input.adminNotes ?? null}, admin_notes),
@@ -1539,6 +1555,13 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
       identifiers: input.identifiers,
       productId: input.id,
       replaceTypes: PRODUCT_IDENTIFIER_TYPES
+    });
+  }
+
+  if (input.regulatoryApprovals !== undefined) {
+    await replaceProductRegulatoryApprovals(sql, {
+      approvals: input.regulatoryApprovals,
+      productId: input.id
     });
   }
 
@@ -1614,9 +1637,9 @@ export async function updateAdminProduct(input: UpdateAdminProductInput) {
         descriptionZhCn: input.descriptionZhCn,
         facts: input.facts,
 	        factsSource: input.factsSource,
-	        fdaApprovalNumber: input.fdaApprovalNumber,
 	        imageUrl: input.imageUrl,
         identifiers: input.identifiers,
+        regulatoryApprovals: toJsonValue(input.regulatoryApprovals ?? null),
 	        labelStatus: input.labelStatus,
 	        manufacturerCountryCodes: input.manufacturerCountryCodes === undefined
 	          ? undefined

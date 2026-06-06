@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDashboardOrClawRequestAllowed } from "@/lib/admin-auth";
+import { sourceProductFdaApprovalNumbers } from "@/lib/product-fda-sourcing";
 import {
   createTask,
   getTaskBundle
@@ -26,6 +27,30 @@ function numberOrNull(value: unknown) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function booleanOrNull(value: unknown) {
+  return typeof value === "boolean" ? value : null;
+}
+
+function fdaSourcePayload(body: Record<string, unknown>) {
+  return {
+    includeManufacturerEvidence:
+      booleanOrNull(body.includeManufacturerEvidence) ?? false,
+    limit: numberOrNull(body.limit) ?? 120,
+    maxRunMs: numberOrNull(body.maxRunMs) ?? 180_000,
+    productId: textOrNull(body.productId, 80)
+  };
+}
+
+function backgroundFdaSourcePayload(body: Record<string, unknown>) {
+  const payload = fdaSourcePayload(body);
+
+  return {
+    ...payload,
+    limit: Math.max(payload.limit, 500),
+    maxRunMs: Math.max(payload.maxRunMs, 600_000)
+  };
 }
 
 function taskResponse(task: Awaited<ReturnType<typeof getTaskBundle>>["task"]) {
@@ -88,7 +113,7 @@ export async function GET(request: Request) {
       {
         message: error instanceof Error
           ? error.message
-          : "Unable to load identifier sourcing task"
+          : "Unable to load FDA sourcing task"
       },
       {
         headers: {
@@ -118,39 +143,50 @@ export async function POST(request: Request) {
   }
 
   try {
-    const productId = textOrNull(body.productId, 80);
-    const limit = Math.max(1, Math.min(2000, Math.round(
-      numberOrNull(body.limit) ?? 2000
-    )));
+    const mode = textOrNull(body.mode, 40);
+    const payload = mode === "sync"
+      ? fdaSourcePayload(body)
+      : backgroundFdaSourcePayload(body);
+
+    if (mode === "sync") {
+      const result = await sourceProductFdaApprovalNumbers(payload);
+
+      return NextResponse.json(
+        { result },
+        {
+          headers: {
+            "Cache-Control": "no-store"
+          }
+        }
+      );
+    }
+
     const created = await createTask({
       actorType: "system",
       context: {
-        source: "admin_product_identifier_source_task"
+        source: "admin_product_fda_source_button"
       },
       description:
-        "Source missing EAN and manufacturer SKU identifiers from trusted product evidence.",
-      idempotencyKey: `source-product-identifiers:${productId ?? "all"}`,
+        "Source missing FDA approval numbers from product identifiers and product names.",
+      idempotencyKey: `source-product-fda-approvals:${payload.productId ?? "all"}`,
       idempotencyScope: "active",
-      idempotencyScopeKey: "product-identifier-sourcing",
+      idempotencyScopeKey: "product-regulatory-sourcing",
       maxAttempts: 1,
       organisationId: null,
-      payload: {
-        limit,
-        productId
-      },
-      priorityReason: "Admin requested missing product identifier sourcing.",
+      payload,
+      priorityReason: "Admin requested missing FDA sourcing.",
       priorityScore: 420,
       requiredCapabilities:
-        requiredCapabilitiesForWorkTaskType("source_product_identifiers"),
+        requiredCapabilitiesForWorkTaskType("generate_product_recommendations"),
       retryPolicy: {
         maxRetries: 0
       },
-      sourceEntityId: productId,
-      sourceEntityType: productId ? "product" : null,
-      taskType: "source_product_identifiers",
-      title: productId
-        ? "Source missing identifiers for product"
-        : "Source missing product identifiers"
+      sourceEntityId: payload.productId,
+      sourceEntityType: payload.productId ? "product" : null,
+      taskType: "source_product_fda_approvals",
+      title: payload.productId
+        ? "Source missing FDA for product"
+        : "Source missing FDA approvals"
     });
 
     return NextResponse.json(
@@ -166,13 +202,13 @@ export async function POST(request: Request) {
       }
     );
   } catch (error) {
-    console.error("Unable to source product identifiers", error);
+    console.error("Unable to source product FDA approval numbers", error);
 
     return NextResponse.json(
       {
         message: error instanceof Error
           ? error.message
-          : "Unable to source product identifiers"
+          : "Unable to source product FDA approval numbers"
       },
       {
         headers: {

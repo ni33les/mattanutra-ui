@@ -241,6 +241,7 @@
     "customerOrderDetails": "客户订单详情",
     "customerOrders": "客户订单",
     "customerOrderSaveError": "无法保存客户订单。",
+    "created": "创建时间",
     "createShoppingList": "创建购物清单",
     "currency": "货币",
     "daysCover": "可覆盖天数",
@@ -253,6 +254,7 @@
     "expiresAt": "有效期",
     "editStock": "编辑可售产品",
     "exportCsv": "导出 CSV",
+    "exportPdf": "导出 PDF",
     "expectedAt": "预计日期",
     "event": "事件",
     "fastestDelivery": "最快配送",
@@ -267,7 +269,7 @@
     "hygeiaImportError": "无法导入 Hygeia 库存文件。",
     "hygeiaRetailerRequired": "请先选择或切换到一个零售商再使用 Hygeia 库存文件。",
     "importCsv": "导入 CSV",
-    "inStock": "有库存",
+    "inStock": "库存正常",
     "chooseProduct": "选择产品",
     "leadTimeDays": "交付天数",
     "lowStock": "低库存",
@@ -301,6 +303,7 @@
     "product": "产品",
     "priceOverride": "零售价",
     "profitImpact": "利润影响",
+    "actualQuantity": "实际数量",
     "quantity": "数量",
     "ordered": "订购",
     "receivedNow": "已接收",
@@ -311,6 +314,7 @@
     "recheckWorkflow": "重新检查流程",
     "recordMovement": "记录变动",
     "remaining": "剩余",
+    "requiredQuantity": "所需数量",
     "removeItem": "移除",
     "regionalCheckout": "区域结账",
     "reorderTab": "补货",
@@ -355,6 +359,7 @@
     "selectedRetailer": "已选零售商",
     "shippingCountry": "配送国家",
     "shoppingList": "购物清单",
+    "shoppingLists": "购物清单",
     "supplier": "供应商",
     "supplierContact": "供应商联系方式",
     "selectProduct": "选择产品",
@@ -377,6 +382,8 @@
     "unitCost": "单位成本",
     "units": "单位",
     "updated": "已更新",
+    "updateStockCounts": "更新库存数量",
+    "updatingStockCounts": "正在更新库存数量...",
     "unavailable": "不可用",
     "unclaimed": "未领取",
     "unorderedNeed": "未下单需求",
@@ -386,7 +393,9 @@
     "wholesalePrice": "批发",
     "workflow": "流程",
     "reorderBackorders": "欠货订单",
-    "reorderBackordersDescription": "这些项目用于满足当前有效客户订单。"
+    "reorderBackordersDescription": "这些项目用于满足当前有效客户订单。",
+    "reorderRecommendations": "建议",
+    "reorderRecommendationsDescription": "根据近期需求和补货风险建议的可选采购。"
   },
   "generated": "生成时间",
   "financials": {
@@ -616,18 +625,13 @@
   "governanceTitle": "目录",
   "retailTasksNavigation": [],
   "retailTasksTitle": "零售任务",
-  "retailBuyingNavigation": [
+  "retailBuyingNavigation": [],
+  "retailBuyingTitle": "",
+  "retailInventoryNavigation": [
     {
-      "name": "补货建议",
+      "name": "补货",
       "view": "retail-stock-advice"
     },
-    {
-      "name": "购物清单",
-      "view": "retail-reorder"
-    }
-  ],
-  "retailBuyingTitle": "采购",
-  "retailInventoryNavigation": [
     {
       "name": "库存",
       "view": "stock"
@@ -696,8 +700,8 @@
     "retail-audit": "审计",
     "retail-fulfillment": "履约",
     "retail-movements": "库存变动",
-    "retail-stock-advice": "补货建议",
-    "retail-reorder": "购物清单",
+    "retail-stock-advice": "补货",
+    "retail-reorder": "补货",
     "reviews": "审核",
     "settings": "设置",
     "stock": "库存",

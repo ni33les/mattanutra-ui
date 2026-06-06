@@ -60,17 +60,68 @@ function parseCsvLine(line: string) {
   return cells;
 }
 
+function csvHeaderKey(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function csvCellByHeader(
+  row: readonly string[],
+  indexByName: ReadonlyMap<string, number>,
+  names: readonly string[]
+) {
+  for (const name of names) {
+    const index = indexByName.get(csvHeaderKey(name));
+
+    if (index !== undefined) {
+      return row[index] ?? "";
+    }
+  }
+
+  return "";
+}
+
+function matchShoppingListImportRow(
+  row: readonly string[],
+  indexByName: ReadonlyMap<string, number>,
+  line: ShoppingListLineDraft
+) {
+  const sku = csvCellByHeader(row, indexByName, [
+    "sku",
+    "mattaNutraSku",
+    "MattaNutra SKU",
+    "internalSku"
+  ]).trim();
+  const ean13 = csvCellByHeader(row, indexByName, ["ean13", "ean13Barcode"]).trim();
+  const manufacturerSku = csvCellByHeader(row, indexByName, [
+    "manufacturerSku"
+  ]).trim();
+  const productTitle = csvCellByHeader(row, indexByName, ["productTitle"]).trim();
+
+  return (
+    (sku.length > 0 && sku === line.productId) ||
+    (ean13.length > 0 && ean13 === line.ean13) ||
+    (manufacturerSku.length > 0 && manufacturerSku === line.manufacturerSku) ||
+    (productTitle.length > 0 && productTitle === line.productTitle)
+  );
+}
+
+function priceHeader(label: string, currency: string) {
+  const normalizedCurrency = currency.trim().toUpperCase() || "CCY";
+
+  return `${label} (${normalizedCurrency})`;
+}
+
 function downloadShoppingListCsv(
   listNumber: string,
   lines: readonly ShoppingListLineDraft[]
 ) {
   const columns = [
-    "productId",
     "sku",
     "ean13",
     "manufacturerSku",
     "productTitle",
-    "amountToBuy",
+    "requiredQuantity",
+    "actualQuantity",
     "wholesalePrice",
     "retailPrice"
   ];
@@ -79,10 +130,10 @@ function downloadShoppingListCsv(
     ...lines.map((line) =>
       [
         line.productId,
-        line.productId,
         line.ean13,
         line.manufacturerSku,
         line.productTitle,
+        line.requiredQuantity,
         line.actualQuantity,
         line.wholesalePriceAmount,
         line.retailPriceAmount
@@ -100,6 +151,150 @@ function downloadShoppingListCsv(
   URL.revokeObjectURL(url);
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function displayDateTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
+}
+
+function printShoppingListPdf(
+  labels: AdminContent,
+  list: AdminRetailShoppingList,
+  lines: readonly ShoppingListLineDraft[]
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const generatedAt = displayDateTime(new Date().toISOString());
+  const sortedLines = [...lines].sort((left, right) => {
+    const brandCompare = (left.brandName ?? "").localeCompare(right.brandName ?? "");
+
+    return brandCompare === 0
+      ? left.productTitle.localeCompare(right.productTitle)
+      : brandCompare;
+  });
+  const itemRows = sortedLines
+    .map((line) => {
+      const identifiers = [
+        `SKU: ${line.productId}`,
+        line.manufacturerSku ? `Manufacturer SKU: ${line.manufacturerSku}` : null,
+        line.ean13 ? `EAN-13: ${line.ean13}` : null
+      ].filter(Boolean);
+
+      return `
+        <tr>
+          <td>${escapeHtml(line.brandName ?? "")}</td>
+          <td>
+            <div class="product-title">${escapeHtml(line.productTitle)}</div>
+            <div class="identifiers">${identifiers.map(escapeHtml).join(" · ")}</div>
+          </td>
+          <td>${escapeHtml(line.requiredQuantity)}</td>
+          <td>${escapeHtml(line.actualQuantity)}</td>
+          <td>${escapeHtml(line.wholesalePriceAmount)}</td>
+          <td>${escapeHtml(line.retailPriceAmount)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+  const html = `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(labels.stock.shoppingList)} ${escapeHtml(list.listNumber)}</title>
+        <style>
+          @page { margin: 16mm; }
+          * { box-sizing: border-box; }
+          body { color: #111827; font-family: Arial, sans-serif; margin: 0; }
+          main { padding: 24px; }
+          header { align-items: flex-start; border-bottom: 1px solid #d1d5db; display: flex; justify-content: space-between; margin-bottom: 18px; padding-bottom: 14px; }
+          h1 { font-size: 26px; margin: 4px 0 0; }
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border-bottom: 1px solid #e5e7eb; padding: 9px 8px; text-align: left; vertical-align: top; }
+          th { color: #4b5563; font-size: 11px; text-transform: uppercase; }
+          dl { display: grid; grid-template-columns: 140px 1fr; margin: 0 0 16px; row-gap: 6px; }
+          dt { color: #6b7280; font-weight: 700; }
+          dd { margin: 0; }
+          .eyebrow, .generated, .identifiers { color: #6b7280; font-size: 12px; }
+          .identifiers { margin-top: 4px; }
+          .product-title { font-weight: 700; }
+          @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            main { padding: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <main>
+          <header>
+            <div>
+              <div class="eyebrow">${escapeHtml(labels.stock.shoppingList)}</div>
+              <h1>${escapeHtml(list.listNumber)}</h1>
+            </div>
+            <div class="generated">${escapeHtml(generatedAt)}</div>
+          </header>
+          <dl>
+            <dt>${escapeHtml(labels.stock.organisation)}</dt>
+            <dd>${escapeHtml(list.organisationName)}</dd>
+            <dt>${escapeHtml(labels.stock.status)}</dt>
+            <dd>${escapeHtml(readableToken(list.status))}</dd>
+            <dt>${escapeHtml(labels.stock.created)}</dt>
+            <dd>${escapeHtml(displayDateTime(list.createdAt))}</dd>
+            <dt>${escapeHtml(labels.stock.currency)}</dt>
+            <dd>${escapeHtml(list.currency)}</dd>
+          </dl>
+          <table>
+            <thead>
+              <tr>
+                <th>Brand</th>
+                <th>${escapeHtml(labels.stock.product)}</th>
+                <th>${escapeHtml(labels.stock.requiredQuantity)}</th>
+                <th>${escapeHtml(labels.stock.actualQuantity)}</th>
+                <th>${escapeHtml(priceHeader("Wholesale Price", list.currency))}</th>
+                <th>${escapeHtml(priceHeader(labels.stock.priceOverride, list.currency))}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemRows || `<tr><td colspan="6">${escapeHtml(labels.stock.noItemsSelected)}</td></tr>`}
+            </tbody>
+          </table>
+        </main>
+      </body>
+    </html>
+  `;
+  const popup = window.open("", "_blank", "width=900,height=1200");
+
+  if (!popup) {
+    window.print();
+    return;
+  }
+
+  popup.document.open();
+  popup.document.write(html);
+  popup.document.close();
+  popup.focus();
+  window.setTimeout(() => {
+    popup.print();
+  }, 150);
+}
+
 type RetailShoppingListModalProps = Readonly<{
   busy: boolean;
   labels: AdminContent;
@@ -108,7 +303,7 @@ type RetailShoppingListModalProps = Readonly<{
   onClose: () => void;
   onLinesChange: Dispatch<SetStateAction<ShoppingListLineDraft[]>>;
   onReopen: () => void;
-  onSave: (status?: "active" | "closed") => void;
+  onSave: () => void;
 }>;
 
 export function RetailShoppingListModal({
@@ -147,27 +342,30 @@ export function RetailShoppingListModal({
       .split(/\r?\n/)
       .filter((line) => line.trim());
     const header = parseCsvLine(rows[0] ?? "");
-    const indexByName = new Map(header.map((name, index) => [name, index]));
+    const indexByName = new Map(
+      header.map((name, index) => [csvHeaderKey(name), index])
+    );
     const imported = rows.slice(1).map(parseCsvLine);
 
     onLinesChange((current) =>
       current.map((line) => {
-        const row = imported.find(
-          (cells) => cells[indexByName.get("productId") ?? -1] === line.productId
+        const row = imported.find((cells) =>
+          matchShoppingListImportRow(cells, indexByName, line)
         );
 
         if (!row) {
           return line;
         }
 
-        const cell = (name: string) => row[indexByName.get(name) ?? -1] ?? "";
+        const cell = (...names: string[]) => csvCellByHeader(row, indexByName, names);
 
         return {
           ...line,
           actualQuantity:
-            cell("amountToBuy") || cell("actualQuantity") || line.actualQuantity,
-          retailPriceAmount: cell("retailPrice") || cell("retailPriceOverride"),
-          wholesalePriceAmount: cell("wholesalePrice")
+            cell("actualQuantity", "Actual Quantity", "amountToBuy") ||
+            line.actualQuantity,
+          retailPriceAmount: cell("retailPrice", "Retail Price", "retailPriceOverride"),
+          wholesalePriceAmount: cell("wholesalePrice", "Wholesale Price")
         };
       })
     );
@@ -199,6 +397,13 @@ export function RetailShoppingListModal({
             >
               {labels.stock.exportCsv}
             </AdminButton>
+            <AdminButton
+              disabled={lines.length === 0}
+              onClick={() => printShoppingListPdf(labels, list, lines)}
+              variant="secondary"
+            >
+              {labels.stock.exportPdf}
+            </AdminButton>
             <label className="inline-flex cursor-pointer items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50">
               {labels.stock.importCsv}
               <input
@@ -215,14 +420,19 @@ export function RetailShoppingListModal({
           </div>
         </div>
         <div className="overflow-x-auto rounded-md ring-1 ring-gray-200">
-          <table className="min-w-[760px] w-full text-left text-sm">
+          <table className="min-w-[840px] w-full text-left text-sm">
             <thead className="bg-gray-50 text-xs uppercase text-gray-500">
               <tr>
                 <th className="py-2 pl-3 pr-3">Brand</th>
                 <th className="py-2 pr-3">{labels.stock.product}</th>
-                <th className="py-2 pr-3">Amount to buy</th>
-                <th className="py-2 pr-3">{labels.stock.wholesalePrice}</th>
-                <th className="py-2 pr-3">Retail Price</th>
+                <th className="py-2 pr-3">{labels.stock.requiredQuantity}</th>
+                <th className="py-2 pr-3">{labels.stock.actualQuantity}</th>
+                <th className="py-2 pr-3">
+                  {priceHeader("Wholesale Price", list.currency)}
+                </th>
+                <th className="py-2 pr-3">
+                  {priceHeader(labels.stock.priceOverride, list.currency)}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
@@ -251,6 +461,9 @@ export function RetailShoppingListModal({
                       </div>
                     ) : null}
                   </td>
+                  <td className="py-2 pr-3 text-sm font-semibold tabular-nums text-gray-900">
+                    {line.requiredQuantity}
+                  </td>
                   <td className="py-2 pr-3">
                     <input
                       className="w-28 rounded-md bg-white px-2 py-1 text-sm text-gray-900 ring-1 ring-gray-200 disabled:bg-gray-50 disabled:text-gray-500"
@@ -275,7 +488,6 @@ export function RetailShoppingListModal({
                           wholesalePriceAmount: event.target.value
                         })
                       }
-                      placeholder="Optional"
                       value={line.wholesalePriceAmount}
                     />
                   </td>
@@ -287,7 +499,6 @@ export function RetailShoppingListModal({
                       onChange={(event) =>
                         updateLine(line.id, { retailPriceAmount: event.target.value })
                       }
-                      placeholder="Optional"
                       value={line.retailPriceAmount}
                     />
                   </td>
@@ -302,18 +513,9 @@ export function RetailShoppingListModal({
               Reopen
             </AdminButton>
           ) : (
-            <>
-              <AdminButton
-                disabled={editorDisabled}
-                onClick={() => onSave("closed")}
-                variant="secondary"
-              >
-                Close list
-              </AdminButton>
-              <AdminButton disabled={editorDisabled} onClick={() => onSave()}>
-                Save
-              </AdminButton>
-            </>
+            <AdminButton disabled={editorDisabled} onClick={() => onSave()}>
+              {busy ? labels.stock.updatingStockCounts : labels.stock.updateStockCounts}
+            </AdminButton>
           )}
         </div>
       </div>

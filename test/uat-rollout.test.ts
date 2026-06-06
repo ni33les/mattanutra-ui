@@ -18,6 +18,10 @@ const uatRebuildScript = readFileSync(
   new URL("../scripts/rebuild-uat-db.mjs", import.meta.url),
   "utf8"
 );
+const uatMinimalSeedScript = readFileSync(
+  new URL("../scripts/seed-uat-minimal-runtime.ts", import.meta.url),
+  "utf8"
+);
 
 function indexOf(tableName: string, order: readonly string[]) {
   const index = order.indexOf(tableName);
@@ -112,14 +116,28 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.match(packageJson.scripts?.["uat:master:snapshot"] ?? "", /catalogue-snapshot\.ts/);
     assert.match(packageJson.scripts?.["uat:master:snapshot"] ?? "", /--strict-master-data/);
     assert.match(packageJson.scripts?.["uat:rebuild"] ?? "", /rebuild-uat-db\.mjs/);
+    assert.match(packageJson.scripts?.["uat:seed:minimal-runtime"] ?? "", /seed-uat-minimal-runtime\.ts/);
     assert.match(uatRebuildScript, /scripts\/reset-dev-db\.mjs/);
     assert.match(uatRebuildScript, /scripts\/catalogue-reload\.ts/);
     assert.match(uatRebuildScript, /DB_ALLOW_DIRECT_CONNECTION/);
     assert.match(uatRebuildScript, /DB_POOL_MAX/);
+    assert.match(uatRebuildScript, /admin-access:schema:apply/);
+    assert.match(uatRebuildScript, /communications:schema:apply/);
+    assert.match(uatRebuildScript, /retail-checkout:schema:apply/);
+    assert.match(uatRebuildScript, /retail-stock:schema:apply/);
+    assert.match(uatRebuildScript, /product-identifiers:schema:apply/);
+    assert.match(uatRebuildScript, /product-regulatory:schema:apply/);
+    assert.match(uatRebuildScript, /product-offers:schema:remove/);
     assert.match(uatRebuildScript, /foods:schema:apply/);
     assert.match(uatRebuildScript, /locales:schema:apply/);
     assert.match(uatRebuildScript, /versions:core:check/);
     assert.match(uatRebuildScript, /products:validation-consistency/);
+    assert.match(uatMinimalSeedScript, /DEV_DB_CONNECTION/);
+    assert.match(uatMinimalSeedScript, /dream-pharmacy/);
+    assert.match(uatMinimalSeedScript, /stock_quantity = 0/);
+    assert.match(uatMinimalSeedScript, /stockQuantityResetToZero/);
+    assert.match(uatMinimalSeedScript, /WORKER_PRODUCTS_AGENT_API_KEY/);
+    assert.match(uatMinimalSeedScript, /source_product_fda_approvals|source_product_identifiers|productMatcher/);
   });
 
   it("keeps runtime and admin audit tables out of the curated master snapshot", () => {

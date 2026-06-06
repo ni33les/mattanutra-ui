@@ -38,7 +38,15 @@ function productSearchIndex(row: AdminProductRow) {
     ]),
     row.brandName,
     row.category,
-    row.fdaApprovalNumber,
+    ...(row.regulatoryApprovals ?? []).flatMap((approval) => [
+      approval.agencyCode,
+      approval.agencyName,
+      approval.approvalNumber,
+      approval.approvalType,
+      approval.scopeCode,
+      approval.scopeType,
+      approval.status
+    ]),
     row.productKind,
     row.productAudience,
     row.platform,

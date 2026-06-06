@@ -12,6 +12,10 @@ import {
   defaultProductCountryCode,
   normalizeProductCountryCode,
 } from "@/lib/product-countries";
+import {
+  defaultRegulatoryAgencyForCountry,
+  regulatoryAgencyByCode
+} from "@/lib/product-regulatory-agencies";
 import { type Locale } from "@/lib/i18n";
 import {
   BusinessStatsGrid,
@@ -26,21 +30,16 @@ import {
   productAudiences,
   productBusinessState,
   productBusinessStateClass,
-  productBusinessStateForMetric,
   productBusinessStateLabel,
-  productBusinessStates,
   productFactPayloads,
   productKinds,
   productManufacturerKey,
-  productManufacturerKeyFromMetricId,
-  productManufacturerMetricId,
+  productManufacturerStats,
   productMatchesMetricFilter,
   productMetricCards,
-  productMetricForBusinessState,
   productStatusLabel,
   productViewLabels,
   removeProductCountryCode,
-  type ProductBusinessState,
   type ProductMetricFilter,
 } from "@/components/admin/product-view-helpers";
 import {
@@ -53,6 +52,88 @@ import {
   ProductTranslationEditor,
 } from "@/components/admin/product-view-ui";
 
+function safeArray<T>(value: readonly T[] | null | undefined) {
+  return Array.isArray(value) ? [...value] : [];
+}
+
+function normalizeProductDetailRow(row: AdminProductRow): AdminProductRow {
+  return {
+    ...row,
+    availableCountryCodes: safeArray(row.availableCountryCodes),
+    countryPricing: safeArray(row.countryPricing).map((item) => ({
+      ...item,
+      effectiveRegulatoryApprovals: safeArray(
+        item.effectiveRegulatoryApprovals
+      )
+    })),
+    decisionStats: row.decisionStats
+      ? {
+          ...row.decisionStats,
+          topRejectionReasons: safeArray(row.decisionStats.topRejectionReasons),
+          topServingMultipliers: safeArray(
+            row.decisionStats.topServingMultipliers,
+          ),
+        }
+      : undefined,
+    facts: safeArray(row.facts),
+    identifierCandidates: safeArray(row.identifierCandidates),
+    identifiers: safeArray(row.identifiers),
+    manufacturerCountryCodes: safeArray(row.manufacturerCountryCodes),
+    productImportDuplicateProductIds: safeArray(
+      row.productImportDuplicateProductIds,
+    ),
+    recommendationHistory: row.recommendationHistory ?? {
+      averageProductCoveragePercent: null,
+      averageStackCoveragePercent: null,
+      chosenCount: 0,
+      lastRecommendedAt: null,
+    },
+    regulatoryApprovals: safeArray(row.regulatoryApprovals),
+    shopAvailability: safeArray(row.shopAvailability),
+    sourceEvidence: row.sourceEvidence ?? {
+      importId: null,
+      importReviewTaskId: null,
+      importStatus: null,
+      sourceUrl: null,
+    },
+    translations:
+      row.translations && typeof row.translations === "object"
+        ? row.translations
+        : {},
+    validation:
+      row.validation && Array.isArray(row.validation.reasons)
+        ? {
+            ...row.validation,
+            reasons: safeArray(row.validation.reasons),
+          }
+        : {
+            checkedAt: new Date(0).toISOString(),
+            matchableFactCount: 0,
+            reasons: ["no_dosed_facts"],
+            status: "failed",
+            summary: "Product validation data is unavailable.",
+          },
+    validationCacheStaleReasons: safeArray(row.validationCacheStaleReasons),
+  };
+}
+
+function normalizeProductDetailRows(rows: readonly AdminProductRow[]) {
+  return rows.map(normalizeProductDetailRow);
+}
+
+function regulatoryApprovalsForSave(row: AdminProductRow) {
+  return row.regulatoryApprovals
+    .filter((approval) => approval.approvalNumber.trim())
+    .map((approval) =>
+      approval.scopeType === "country"
+        ? {
+            ...approval,
+            status: "verified" as const,
+          }
+        : approval
+    );
+}
+
 export function AdminProductsView({
   accessToken,
   data,
@@ -63,38 +144,16 @@ export function AdminProductsView({
   locale: Locale;
 }>) {
   const rows = data.rows;
-  const [errorId, setErrorId] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<ProductBusinessState | "">("");
   const [metricFilter, setMetricFilter] =
     useState<ProductMetricFilter>("productsTotal");
   const [manufacturerFilter, setManufacturerFilter] = useState("");
-  const [identifierSourcing, setIdentifierSourcing] = useState(false);
   const viewLabels = productViewLabels[locale];
   const normalizedSearch = search.trim().toLowerCase();
   const metrics = productMetricCards({ locale, rows, viewLabels });
+  const manufacturerOptions = productManufacturerStats(rows);
   function handleMetricSelect(metricId: BusinessMetric["id"]) {
-    const manufacturerKey = productManufacturerKeyFromMetricId(metricId);
-
-    if (manufacturerKey) {
-      setManufacturerFilter(manufacturerKey);
-      setMetricFilter("productsTotal");
-      setStatus("");
-      return;
-    }
-
-    const nextMetric = metricId as ProductMetricFilter;
-
-    setManufacturerFilter("");
-    setMetricFilter(nextMetric);
-    setStatus(productBusinessStateForMetric(nextMetric));
-  }
-
-  function handleStatusChange(nextStatus: ProductBusinessState | "") {
-    setManufacturerFilter("");
-    setStatus(nextStatus);
-    setMetricFilter(productMetricForBusinessState(nextStatus));
+    setMetricFilter(metricId as ProductMetricFilter);
   }
 
   const filteredRows = rows.filter((row) => {
@@ -106,54 +165,16 @@ export function AdminProductsView({
     return matchesSearch && matchesMetric && matchesManufacturer;
   });
 
-  async function sourceProductIdentifiersFromEvidence() {
-    setIdentifierSourcing(true);
-    setErrorId(null);
-    setErrorMessage(null);
-
-    try {
-      const response = await fetch("/api/admin/products/identifiers/source", {
-        body: JSON.stringify({ accessToken }),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          await adminResponseErrorMessage(
-            response,
-            "Unable to source identifiers",
-          ),
-        );
-      }
-
-      window.location.reload();
-    } catch (error) {
-      setErrorId("__identifier_sourcing__");
-      setErrorMessage(
-        error instanceof Error ? error.message : "Unable to source identifiers",
-      );
-    } finally {
-      setIdentifierSourcing(false);
-    }
-  }
-
   return (
     <section className="mt-8 space-y-6">
       <BusinessStatsGrid
         metrics={metrics}
         onMetricSelect={handleMetricSelect}
-        selectedMetricId={
-          manufacturerFilter
-            ? productManufacturerMetricId(manufacturerFilter)
-            : metricFilter
-        }
+        selectedMetricId={metricFilter}
       />
 
       <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_14rem_auto_auto]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_16rem]">
           <input
             aria-label={viewLabels.search}
             className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#1FA77A]"
@@ -163,44 +184,19 @@ export function AdminProductsView({
             value={search}
           />
           <select
-            aria-label={viewLabels.status}
+            aria-label={viewLabels.brand}
             className="rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-            onChange={(event) =>
-              handleStatusChange(
-                event.target.value as ProductBusinessState | "",
-              )
-            }
-            value={status}
+            onChange={(event) => setManufacturerFilter(event.target.value)}
+            value={manufacturerFilter}
           >
-            <option value="">{viewLabels.allStates}</option>
-            {productBusinessStates.map((item) => (
-              <option key={item} value={item}>
-                {productBusinessStateLabel(item, locale)}
+            <option value="">{viewLabels.allBrands}</option>
+            {manufacturerOptions.map((manufacturer) => (
+              <option key={manufacturer.key} value={manufacturer.key}>
+                {manufacturer.label}
               </option>
             ))}
           </select>
-          <button
-            className="rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white ring-1 ring-[#1FA77A] hover:bg-[#168763] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={identifierSourcing}
-            onClick={() => void sourceProductIdentifiersFromEvidence()}
-            type="button"
-          >
-            {identifierSourcing
-              ? viewLabels.sourcingIdentifiers
-              : viewLabels.sourceProductIdentifiers}
-          </button>
-          <a
-            className="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50"
-            href={`/api/admin/products/hygeia/export?country=TH&access_token=${encodeURIComponent(accessToken)}`}
-          >
-            {viewLabels.hygeiaExport}
-          </a>
         </div>
-        {errorId === "__identifier_sourcing__" ? (
-          <p className="mt-3 text-sm font-medium text-red-700">
-            {errorMessage}
-          </p>
-        ) : null}
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -229,9 +225,10 @@ export function AdminProductDetailView({
   locale: Locale;
   productId: string;
 }>) {
-  const [rows, setRows] = useState(data.rows);
-  const [draft, setDraft] = useState<AdminProductRow | null>(
-    data.rows.find((row) => row.id === productId) ?? null,
+  const initialRows = normalizeProductDetailRows(data.rows);
+  const [rows, setRows] = useState(initialRows);
+  const [draft, setDraftState] = useState<AdminProductRow | null>(
+    initialRows.find((row) => row.id === productId) ?? null,
   );
   const [savingId, setSavingId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
@@ -239,7 +236,14 @@ export function AdminProductDetailView({
   const viewLabels = productViewLabels[locale];
   const backHref = `/${locale}/admin/dashboard?view=products${accessToken ? `&access_token=${encodeURIComponent(accessToken)}` : ""}`;
 
-  async function saveProduct(row: AdminProductRow) {
+  function setDraft(row: AdminProductRow | null) {
+    setDraftState(row ? normalizeProductDetailRow(row) : null);
+  }
+
+  async function saveProduct(
+    row: AdminProductRow,
+    options: Readonly<{ changeNote?: string | null }> = {}
+  ) {
     setSavingId(row.id);
     setErrorId(null);
     setErrorMessage(null);
@@ -250,12 +254,12 @@ export function AdminProductDetailView({
           accessToken,
           brandName: row.brandName,
           availableCountryCodes: row.availableCountryCodes,
+          changeNote: options.changeNote,
           countryPricing: row.countryPricing,
           description: row.description,
           descriptionEn: row.descriptionEn,
           descriptionTh: row.descriptionTh,
           facts: productFactPayloads(row),
-          fdaApprovalNumber: row.fdaApprovalNumber,
           imageUrl: row.imageUrl,
           identifiers: row.identifiers,
           labelStatus: row.labelStatus,
@@ -264,6 +268,7 @@ export function AdminProductDetailView({
           productAudience: row.productAudience,
           productKind: row.productKind,
           productUrl: row.productUrl,
+          regulatoryApprovals: regulatoryApprovalsForSave(row),
           title: row.title,
           titleEn: row.titleEn,
           titleTh: row.titleTh,
@@ -285,12 +290,14 @@ export function AdminProductDetailView({
         row?: AdminProductRow;
         rows?: AdminProductRow[];
       };
-      const savedRow = payload.row
-        ? { ...payload.row, decisionStats: row.decisionStats }
-        : row;
+      const savedRow = normalizeProductDetailRow(
+        payload.row
+          ? { ...payload.row, decisionStats: row.decisionStats }
+          : row,
+      );
       const updatedRows = new Map(
         (payload.rows && payload.rows.length > 0
-          ? payload.rows
+          ? normalizeProductDetailRows(payload.rows)
           : [savedRow]
         ).map((item) => [
           item.id,
@@ -343,7 +350,9 @@ export function AdminProductDetailView({
       }
 
       const payload = (await response.json()) as { row?: AdminProductRow };
-      const correctedRow = payload.row;
+      const correctedRow = payload.row
+        ? normalizeProductDetailRow(payload.row)
+        : null;
 
       if (!correctedRow) {
         throw new Error("AI correction did not return a product row");
@@ -406,7 +415,9 @@ export function AdminProductDetailView({
         row?: AdminProductRow;
         rows?: AdminProductRow[];
       };
-      const savedRow = payload.row;
+      const savedRow = payload.row
+        ? normalizeProductDetailRow(payload.row)
+        : null;
 
       if (!savedRow) {
         throw new Error("Safety limit update did not return a product row");
@@ -414,7 +425,7 @@ export function AdminProductDetailView({
 
       const updatedRows = new Map(
         (payload.rows && payload.rows.length > 0
-          ? payload.rows
+          ? normalizeProductDetailRows(payload.rows)
           : [savedRow]
         ).map((item) => [item.id, item]),
       );
@@ -465,7 +476,6 @@ export function AdminProductDetailView({
             description: row.description,
             descriptionEn: row.descriptionEn,
             descriptionTh: row.descriptionTh,
-            fdaApprovalNumber: row.fdaApprovalNumber,
             imageUrl: row.imageUrl,
             identifiers: row.identifiers,
             manufacturerCountryCodes: row.manufacturerCountryCodes,
@@ -473,6 +483,7 @@ export function AdminProductDetailView({
             parsedFacts: productFactPayloads(row),
             productAudience: row.productAudience,
             productUrl: row.productUrl,
+            regulatoryApprovals: regulatoryApprovalsForSave(row),
             reviewerNote,
             title: row.title,
             titleEn: row.titleEn,
@@ -513,7 +524,9 @@ export function AdminProductDetailView({
               ? "ignored"
               : row.status,
       };
-      const savedRow = payload.result?.row ?? fallbackRow;
+      const savedRow = normalizeProductDetailRow(
+        payload.result?.row ?? fallbackRow,
+      );
 
       setRows((currentRows) => {
         const nextRows = currentRows.map((item) =>
@@ -612,7 +625,10 @@ function ProductDetailPanel({
     factId: string,
   ) => Promise<boolean>;
   onClose: () => void;
-  onSave: (row: AdminProductRow) => Promise<boolean>;
+  onSave: (
+    row: AdminProductRow,
+    options?: Readonly<{ changeNote?: string | null }>
+  ) => Promise<boolean>;
   products: AdminProductRow[];
   saving: boolean;
   setDraft: (row: AdminProductRow) => void;
@@ -673,21 +689,27 @@ function ProductDetailPanel({
     const nextProductCountryCodes = safeProductCountryCodes.filter((code) =>
       nextManufacturerCountryCodes.includes(code),
     );
+    const retainedProductCountryCodes =
+      nextProductCountryCodes.length > 0
+        ? nextProductCountryCodes
+        : [nextManufacturerCountryCodes[0] ?? defaultProductCountryCode];
 
     setDraft({
       ...draft,
-      availableCountryCodes:
-        nextProductCountryCodes.length > 0
-          ? nextProductCountryCodes
-          : [nextManufacturerCountryCodes[0] ?? defaultProductCountryCode],
+      availableCountryCodes: retainedProductCountryCodes,
       countryPricing: draft.countryPricing.filter((item) =>
-        (
-          nextProductCountryCodes.length > 0
-            ? nextProductCountryCodes
-            : [nextManufacturerCountryCodes[0] ?? defaultProductCountryCode]
-        ).includes(item.countryCode)
+        retainedProductCountryCodes.includes(item.countryCode)
       ),
       manufacturerCountryCodes: nextManufacturerCountryCodes,
+      regulatoryApprovals: draft.regulatoryApprovals.filter((approval) => {
+        const approvalCountryCode = normalizeProductCountryCode(approval.scopeCode);
+
+        return approval.scopeType !== "country" ||
+          Boolean(
+            approvalCountryCode &&
+            retainedProductCountryCodes.includes(approvalCountryCode)
+          );
+      }),
     });
   }
 
@@ -728,6 +750,7 @@ function ProductDetailPanel({
   }
 
   function removeAvailableCountry(countryCode: string) {
+    const normalizedCountryCode = normalizeProductCountryCode(countryCode);
     const nextCountryCodes = removeProductCountryCode(
       safeProductCountryCodes,
       countryCode,
@@ -739,6 +762,82 @@ function ProductDetailPanel({
       countryPricing: draft.countryPricing.filter((item) =>
         nextCountryCodes.includes(item.countryCode)
       ),
+      regulatoryApprovals: draft.regulatoryApprovals.filter((approval) =>
+        approval.scopeType !== "country" ||
+        approval.scopeCode !== normalizedCountryCode
+      ),
+    });
+  }
+
+  function updateCountryRegulatoryApproval(
+    countryCode: string,
+    patch: Readonly<{
+      agencyCode?: string;
+      agencyName?: string;
+      approvalNumber?: string;
+      evidenceUrl?: string | null;
+    }>,
+  ) {
+    const normalizedCountryCode = normalizeProductCountryCode(countryCode);
+
+    if (!normalizedCountryCode) {
+      return;
+    }
+
+    const existing = draft.regulatoryApprovals.find((approval) =>
+      approval.scopeType === "country" &&
+      approval.scopeCode === normalizedCountryCode
+    );
+    const selectedAgency = patch.agencyCode
+      ? regulatoryAgencyByCode(normalizedCountryCode, patch.agencyCode)
+      : existing
+        ? regulatoryAgencyByCode(normalizedCountryCode, existing.agencyCode)
+        : defaultRegulatoryAgencyForCountry(normalizedCountryCode);
+    const approvalNumber =
+      patch.approvalNumber !== undefined
+        ? patch.approvalNumber
+        : existing?.approvalNumber ?? "";
+    const evidenceUrl =
+      patch.evidenceUrl !== undefined
+        ? patch.evidenceUrl
+        : existing?.evidenceUrl ?? null;
+    const keepDraftRow = Boolean(approvalNumber.trim());
+    const remainingApprovals = draft.regulatoryApprovals.filter((approval) =>
+      !(
+        approval.scopeType === "country" &&
+        approval.scopeCode === normalizedCountryCode
+      )
+    );
+
+    const nextDraft: AdminProductRow = {
+      ...draft,
+      regulatoryApprovals: keepDraftRow
+        ? [
+            ...remainingApprovals,
+            {
+              agencyCode: selectedAgency.agencyCode,
+              agencyName: selectedAgency.agencyName,
+              approvalNumber,
+              approvalType: "product_registration",
+              createdAt: existing?.createdAt ?? null,
+              evidenceUrl,
+              id: existing?.id ?? null,
+              metadata: existing?.metadata ?? {},
+              productId: draft.id,
+              scopeCode: normalizedCountryCode,
+              scopeType: "country",
+              source: existing?.source ?? "admin",
+              status: "verified",
+              updatedAt: existing?.updatedAt ?? null,
+            },
+          ]
+        : remainingApprovals
+    };
+
+    setDraft(nextDraft);
+
+    return onSave(nextDraft, {
+      changeNote: "product_regulatory_approval_associated"
     });
   }
 
@@ -944,13 +1043,24 @@ function ProductDetailPanel({
           label={viewLabels.productCountries}
           onAdd={addAvailableCountry}
           onPricingChange={updateCountryPricing}
+          onRegulatoryApprovalChange={updateCountryRegulatoryApproval}
           onRemove={removeAvailableCountry}
           pricingLabels={{
+            agency: viewLabels.agency,
+            approvalNumber: viewLabels.approvalNumber,
+            associateApproval: viewLabels.associateApproval,
+            authority: viewLabels.authority,
+            cancel: viewLabels.close,
             country: viewLabels.country,
             currency: viewLabels.currency,
+            evidenceUrl: viewLabels.evidenceUrl,
+            inheritedApproval: viewLabels.inheritedApproval ?? "Inherited",
+            notAvailable: viewLabels.notAvailable,
             priceUpdated: viewLabels.priceUpdated,
             rrp: viewLabels.rrp,
+            saveAssociation: viewLabels.saveAssociation,
           }}
+          regulatoryApprovals={draft.regulatoryApprovals}
           removeLabel={viewLabels.remove}
         />
       </div>
@@ -1057,20 +1167,6 @@ function ProductDetailPanel({
               </option>
             ))}
           </select>
-        </label>
-        <label className="text-sm font-medium text-gray-700">
-          {viewLabels.fdaApprovalNumber}
-          <input
-            className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
-            onChange={(event) =>
-              setDraft({
-                ...draft,
-                fdaApprovalNumber: event.target.value.trim() || null,
-              })
-            }
-            type="text"
-            value={draft.fdaApprovalNumber ?? ""}
-          />
         </label>
       </div>
 

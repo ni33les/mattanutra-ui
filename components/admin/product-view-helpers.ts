@@ -31,6 +31,7 @@ export const productBusinessStates = [
 export type ProductBusinessState = (typeof productBusinessStates)[number];
 export type ProductMetricFilter =
   | "productsApproved"
+  | "productsRegulatoryApproved"
   | "productsIgnored"
   | "productsMissingFacts"
   | "productsMissingImages"
@@ -75,6 +76,7 @@ export function productBusinessStateForMetric(
 
 export const productViewLabels = {
   en: {
+    allBrands: "All brands",
     allStates: "All states",
     approved: "Approved",
     both: "Both",
@@ -117,13 +119,27 @@ export const productViewLabels = {
     correctFactsWithAi: "Correct facts with AI",
     currency: "Currency",
     description: "Description",
+    approvalNumber: "Approval number",
+    addApproval: "Add approval",
+    agency: "Agency",
+    associateApproval: "Associate approval number",
+    authority: "Authority",
+    evidenceUrl: "Evidence URL",
     fdaApprovalNumber: "FDA approval number",
+    regulatoryApproval: "Regulatory approval",
+    regulatoryApprovals: "Regulatory approvals",
+    regulatoryApprovalsHint:
+      "Country and regional product registration numbers used for catalogue governance.",
+    regulatoryApproved: "Regulatory approvals",
+    noRegulatoryApprovals: "No regulatory approvals recorded yet.",
+    notAvailable: "Not available",
     ean13: "EAN-13 barcode",
     hygeiaExport: "Hygeia export",
     ignoredAction: "Ignore",
     identifierCandidates: "identifier candidates",
     identifierType: "Type",
     identifierValue: "Value",
+    inheritedApproval: "Inherited",
     importReview: "Import review",
     importReviewHint:
       "This draft has an open review task. Use these actions to finish the review and update the catalogue.",
@@ -153,13 +169,13 @@ export const productViewLabels = {
     retailPrice: "Retail price",
     rrp: "RRP",
     save: "Save",
+    saveAssociation: "Save association",
     saving: "Saving",
+    scope: "Scope",
     source: "Source",
-    sourceProductIdentifiers: "Source EAN/SKU",
     staleValidation: "Validation stale",
     staleValidationHint:
       "Saved validation cache differs from current facts and limits.",
-    sourcingIdentifiers: "Sourcing...",
     shopAvailability: "Shop availability",
     stock: "Stock",
     title: "Title",
@@ -169,6 +185,7 @@ export const productViewLabels = {
     updateError: "Unable to update product review",
   },
   th: {
+    allBrands: "ทุกแบรนด์",
     allStates: "ทุกสถานะ",
     approved: "อนุมัติแล้ว",
     both: "ทั้งหมด",
@@ -211,13 +228,27 @@ export const productViewLabels = {
     correctFactsWithAi: "แก้ข้อมูลด้วย AI",
     currency: "สกุลเงิน",
     description: "คำอธิบาย",
+    approvalNumber: "เลขอนุมัติ",
+    addApproval: "เพิ่มการอนุมัติ",
+    agency: "หน่วยงาน",
+    associateApproval: "เชื่อมเลขอนุมัติ",
+    authority: "หน่วยงาน",
+    evidenceUrl: "URL หลักฐาน",
     fdaApprovalNumber: "เลข อย.",
+    regulatoryApproval: "การอนุมัติตามประเทศ",
+    regulatoryApprovals: "การอนุมัติตามประเทศ/ภูมิภาค",
+    regulatoryApprovalsHint:
+      "เลขทะเบียนสินค้าแยกตามประเทศหรือภูมิภาคสำหรับการกำกับดูแลแคตตาล็อก",
+    regulatoryApproved: "มีข้อมูลอนุมัติ",
+    noRegulatoryApprovals: "ยังไม่มีข้อมูลการอนุมัติ",
+    notAvailable: "ไม่มีข้อมูล",
     ean13: "บาร์โค้ด EAN-13",
     hygeiaExport: "ส่งออก Hygeia",
     ignoredAction: "ไม่ใช้",
     identifierCandidates: "รายการรอตรวจสอบ",
     identifierType: "ประเภท",
     identifierValue: "ค่า",
+    inheritedApproval: "สืบทอด",
     importReview: "รีวิวนำเข้า",
     importReviewHint:
       "ร่างนี้มีงานรีวิวที่เปิดอยู่ ใช้ปุ่มเหล่านี้เพื่อจบการรีวิวและอัปเดตแคตตาล็อก",
@@ -247,13 +278,13 @@ export const productViewLabels = {
     retailPrice: "ราคาขายปลีก",
     rrp: "RRP",
     save: "บันทึก",
+    saveAssociation: "บันทึกการเชื่อมโยง",
     saving: "กำลังบันทึก",
+    scope: "ขอบเขต",
     source: "แหล่งข้อมูล",
-    sourceProductIdentifiers: "ดึง EAN/SKU",
     staleValidation: "ข้อมูลตรวจสอบเก่า",
     staleValidationHint:
       "แคชการตรวจสอบที่บันทึกไว้ต่างจากข้อมูลและขีดจำกัดปัจจุบัน",
-    sourcingIdentifiers: "กำลังดึง...",
     shopAvailability: "สถานะร้านค้า",
     stock: "สต็อก",
     title: "ชื่อ",
@@ -263,6 +294,7 @@ export const productViewLabels = {
     updateError: "ไม่สามารถอัปเดตรีวิวสินค้าได้",
   },
   "zh-CN": {
+    allBrands: "所有品牌",
     allStates: "所有状态",
     approved: "已批准",
     both: "全部",
@@ -305,13 +337,26 @@ export const productViewLabels = {
     correctFactsWithAi: "使用 AI 修正资料",
     currency: "货币",
     description: "描述",
+    approvalNumber: "批准编号",
+    addApproval: "添加批准",
+    agency: "机构",
+    associateApproval: "关联批准编号",
+    authority: "监管机构",
+    evidenceUrl: "证据 URL",
     fdaApprovalNumber: "FDA 批准编号",
+    regulatoryApproval: "监管批准",
+    regulatoryApprovals: "国家/地区监管批准",
+    regulatoryApprovalsHint: "按国家或区域记录的产品注册编号，用于目录治理。",
+    regulatoryApproved: "监管批准",
+    noRegulatoryApprovals: "尚未记录监管批准。",
+    notAvailable: "不可用",
     ean13: "EAN-13 条码",
     hygeiaExport: "Hygeia 导出",
     ignoredAction: "忽略",
     identifierCandidates: "待审核标识",
     identifierType: "类型",
     identifierValue: "值",
+    inheritedApproval: "继承",
     importReview: "导入审核",
     importReviewHint:
       "此草稿有待处理审核任务。使用这些操作完成审核并更新目录。",
@@ -341,12 +386,12 @@ export const productViewLabels = {
     retailPrice: "零售价",
     rrp: "RRP",
     save: "保存",
+    saveAssociation: "保存关联",
     saving: "保存中",
+    scope: "范围",
     source: "来源",
-    sourceProductIdentifiers: "获取 EAN/SKU",
     staleValidation: "验证已过期",
     staleValidationHint: "已保存的验证缓存与当前资料和限制不同。",
-    sourcingIdentifiers: "获取中...",
     shopAvailability: "门店可售状态",
     stock: "库存",
     title: "标题",
@@ -487,6 +532,10 @@ export function productMatchesMetricFilter(
     return row.validationLabel === "Missing Image";
   }
 
+  if (metric === "productsRegulatoryApproved") {
+    return hasEffectiveRegulatoryApproval(row);
+  }
+
   return true;
 }
 
@@ -510,8 +559,15 @@ type ProductSummaryCounts = {
   missingFacts: number;
   missingImage: number;
   pendingReview: number;
+  regulatoryApproved: number;
   total: number;
 };
+
+function hasEffectiveRegulatoryApproval(row: AdminProductRow) {
+  return (row.regulatoryApprovals ?? []).some((approval) =>
+    approval.status === "verified" || approval.status === "sourced"
+  );
+}
 
 export function productManufacturerLabel(row: AdminProductRow) {
   return row.brandName?.trim() || unknownProductManufacturerLabel;
@@ -583,6 +639,7 @@ export function productSummaryCounts(
       counts.approved += state === "approved" ? 1 : 0;
       counts.ignored += state === "ignored" ? 1 : 0;
       counts.pendingReview += state === "pending_review" ? 1 : 0;
+      counts.regulatoryApproved += hasEffectiveRegulatoryApproval(row) ? 1 : 0;
 
       return counts;
     },
@@ -593,6 +650,7 @@ export function productSummaryCounts(
       missingFacts: 0,
       missingImage: 0,
       pendingReview: 0,
+      regulatoryApproved: 0,
       total: 0,
     },
   );
@@ -652,15 +710,13 @@ export function productMetricCards({
       locale,
       value: summary.missingImage,
     }),
-    ...productManufacturerStats(rows).map((manufacturer) =>
-      safetyMetric({
-        color: businessMetricColors.active,
-        id: productManufacturerMetricId(manufacturer.key),
-        label: manufacturer.label,
-        locale,
-        value: manufacturer.total,
-      }),
-    ),
+    safetyMetric({
+      color: businessMetricColors.active,
+      id: "productsRegulatoryApproved",
+      label: viewLabels.regulatoryApproved,
+      locale,
+      value: summary.regulatoryApproved,
+    }),
   ];
 }
 
