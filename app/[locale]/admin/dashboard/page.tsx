@@ -34,6 +34,10 @@ import {
   emptyFinancials,
   getAdminFinancialsData
 } from "@/lib/admin-financials";
+import {
+  emptyAdminRetailFinancialsData,
+  getAdminRetailFinancialsData
+} from "@/lib/admin-retail-financials";
 import { emptyAdminFoodsData, getAdminFoodsData } from "@/lib/admin-foods";
 import {
   emptyAdminProductsData,
@@ -191,6 +195,7 @@ export default async function LocalizedAdminDashboardPage({
   let communicationsData = emptyCommunicationsData();
   let data = emptyAdminDashboardData(range);
   let financialsData = emptyFinancials(range);
+  let retailFinancialsData = emptyAdminRetailFinancialsData(range);
   let foodsData = emptyAdminFoodsData();
   let flowData = emptyFlow(range);
   let leadsData = emptyLeadsData();
@@ -235,6 +240,8 @@ export default async function LocalizedAdminDashboardPage({
     communicationsData = await getAdminCommunicationsData(range, adminContext);
   } else if (view === "financials") {
     financialsData = await getAdminFinancialsData(range);
+  } else if (view === "settlements") {
+    retailFinancialsData = await getAdminRetailFinancialsData(adminContext, range);
   } else if (view === "flow") {
     flowData = await getAdminFlowData(range, filters);
   } else if (view === "foods") {
@@ -246,13 +253,18 @@ export default async function LocalizedAdminDashboardPage({
   } else if (
     view === "stock" ||
     view === "retail-audit" ||
+    view === "retail-financials" ||
     view === "retail-movements" ||
     view === "retail-customer-orders" ||
     view === "retail-fulfillment" ||
     view === "retail-stock-advice" ||
     view === "retail-reorder"
   ) {
-    retailStockData = await getAdminRetailStockData(adminContext, locale);
+    if (view === "retail-financials") {
+      retailFinancialsData = await getAdminRetailFinancialsData(adminContext, range);
+    } else {
+      retailStockData = await getAdminRetailStockData(adminContext, locale);
+    }
   } else if (view === "product-insights" || view === "supplement-insights") {
     recommendationInsightsData = await getAdminRecommendationInsightsData(
       range,
@@ -289,6 +301,7 @@ export default async function LocalizedAdminDashboardPage({
       leadsData={leadsData}
       locale={locale}
       productsData={productsData}
+      retailFinancialsData={retailFinancialsData}
       retailStockData={retailStockData}
       recommendationInsightsData={recommendationInsightsData}
       reviewQueueData={reviewQueueData}

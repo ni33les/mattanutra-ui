@@ -62,7 +62,9 @@ const retailPreferenceEvents = [
   "retail_order_ready_to_pack",
   "retail_order_ready_to_ship",
   "retail_order_cancelled",
-  "retail_order_returned"
+  "retail_order_returned",
+  "retail_settlement_needs_review",
+  "retail_settlement_payout_paid"
 ] as const;
 
 const platformPreferenceEvents = [
@@ -70,6 +72,8 @@ const platformPreferenceEvents = [
   "platform_checkout_failed",
   "platform_payment_failed",
   "platform_payout_failed",
+  "platform_retailer_payout_due",
+  "platform_retailer_settlement_needs_review",
   "platform_worker_unavailable",
   "platform_task_stuck",
   "platform_communication_failed",

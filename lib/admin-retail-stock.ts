@@ -14,6 +14,11 @@ import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import { addTaskEvent, createTask } from "@/lib/task-service";
 import { resolveUsdRateForCurrency } from "@/lib/finance-fx";
 import {
+  markRetailOrderSettlementDue,
+  markRetailOrderSettlementNeedsReview,
+  voidPendingRetailOrderSettlement
+} from "@/lib/admin-retail-financials";
+import {
   getRetailCartLineAvailability,
   normalizeRetailRoutingPreference,
   resolveRegionalBasketAvailability,
@@ -6635,6 +6640,33 @@ export async function advanceRetailCustomerOrder(
       updated_at = now()
     where id = ${order.id}::uuid
   `;
+
+  if (input.action === "mark_shipped") {
+    await markRetailOrderSettlementDue(sql, {
+      actorPersonId: context.actorPerson.id,
+      orderId: order.id
+    });
+  } else if (input.action === "cancel") {
+    if (order.status === "shipped" || order.status === "delivered" || order.status === "returned") {
+      await markRetailOrderSettlementNeedsReview(sql, {
+        actorPersonId: context.actorPerson.id,
+        orderId: order.id,
+        reason: "Order cancelled after shipment"
+      });
+    } else {
+      await voidPendingRetailOrderSettlement(sql, {
+        actorPersonId: context.actorPerson.id,
+        orderId: order.id,
+        reason: "Order cancelled before shipment"
+      });
+    }
+  } else if (input.action === "return") {
+    await markRetailOrderSettlementNeedsReview(sql, {
+      actorPersonId: context.actorPerson.id,
+      orderId: order.id,
+      reason: "Order returned after shipment"
+    });
+  }
 
   if (input.action === "mark_shipped") {
     if (order.status === "allocated") {

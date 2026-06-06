@@ -146,6 +146,10 @@ describe("communications channel selection", () => {
     assert.match(schema, /CREATE TABLE public\.line_connect_tokens/);
     assert.match(schema, /platform_revenue_received/);
     assert.match(schema, /platform_checkout_failed/);
+    assert.match(schema, /platform_retailer_payout_due/);
+    assert.match(schema, /platform_retailer_settlement_needs_review/);
+    assert.match(schema, /retail_settlement_payout_paid/);
+    assert.match(schema, /retail_settlement_needs_review/);
     assert.match(schema, /platform_worker_unavailable/);
     assert.match(service, /ADMIN_COMMUNICATION_ROUTE_TASK_PRIORITY = 300/);
     assert.match(service, /ADMIN_COMMUNICATION_DISPATCH_TASK_PRIORITY = 260/);
@@ -155,6 +159,8 @@ describe("communications channel selection", () => {
     assert.match(service, /organisationIdentityRelationship/);
     assert.match(service, /relationship = \$\{relationship\}/);
     assert.match(service, /platform_communication_failed/);
+    assert.match(service, /platform_retailer_payout_due/);
+    assert.match(service, /retail_settlement_payout_paid/);
     assert.match(service, /row\.message_type !== "platform_communication_failed"/);
     assert.match(service, /queuePlatformAdminCommunication/);
     assert.match(service, /taskType: "route_admin_communication"/);

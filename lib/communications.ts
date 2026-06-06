@@ -39,6 +39,8 @@ export type AdminCommunicationEventKey =
   | "platform_payment_failed"
   | "platform_payout_failed"
   | "platform_revenue_received"
+  | "platform_retailer_payout_due"
+  | "platform_retailer_settlement_needs_review"
   | "platform_task_stuck"
   | "platform_technical_alert"
   | "platform_worker_unavailable"
@@ -49,7 +51,9 @@ export type AdminCommunicationEventKey =
   | "retail_order_ready_to_pack"
   | "retail_order_ready_to_ship"
   | "retail_order_returned"
-  | "retail_order_shipped";
+  | "retail_order_shipped"
+  | "retail_settlement_needs_review"
+  | "retail_settlement_payout_paid";
 
 export type AdminCommunicationScope = "platform" | "retail";
 
@@ -184,13 +188,17 @@ const RETAIL_ADMIN_COMMUNICATION_EVENT_DEFAULTS = {
   retail_order_ready_to_pack: true,
   retail_order_ready_to_ship: true,
   retail_order_returned: true,
-  retail_order_shipped: false
+  retail_order_shipped: false,
+  retail_settlement_needs_review: true,
+  retail_settlement_payout_paid: true
 } satisfies Record<Extract<AdminCommunicationEventKey, `retail_${string}`>, boolean>;
 const PLATFORM_ADMIN_COMMUNICATION_EVENT_KEYS = [
   "platform_revenue_received",
   "platform_checkout_failed",
   "platform_payment_failed",
   "platform_payout_failed",
+  "platform_retailer_payout_due",
+  "platform_retailer_settlement_needs_review",
   "platform_worker_unavailable",
   "platform_task_stuck",
   "platform_communication_failed",
@@ -204,6 +212,8 @@ const ADMIN_COMMUNICATION_EVENT_DEFAULTS = {
   platform_payment_failed: true,
   platform_payout_failed: true,
   platform_revenue_received: true,
+  platform_retailer_payout_due: true,
+  platform_retailer_settlement_needs_review: true,
   platform_task_stuck: true,
   platform_technical_alert: true,
   platform_worker_unavailable: true
@@ -1573,6 +1583,14 @@ function orderEventCopy(input: Readonly<{
     retail_order_shipped: {
       body: `${orderNumber}${customer} has been marked shipped.`,
       subject: `${orderNumber} shipped`
+    },
+    retail_settlement_needs_review: {
+      body: "A retailer settlement needs review because the related order was cancelled, returned, or adjusted after shipment. Review the Retail Financials page before reconciling.",
+      subject: "Retail settlement needs review"
+    },
+    retail_settlement_payout_paid: {
+      body: "A retailer payout has been marked paid by MattaNutra. Review Retail Financials and confirm receipt when the funds arrive.",
+      subject: "Retail payout sent"
     }
   };
 
@@ -1600,6 +1618,14 @@ function platformEventCopy(eventKey: AdminCommunicationEventKey) {
     platform_revenue_received: {
       body: "A customer payment was received. Review the finance ledger for the recorded revenue and payment details.",
       subject: "Platform revenue received"
+    },
+    platform_retailer_payout_due: {
+      body: "A retailer settlement is now due because an order has shipped. Review platform Financials and pay the retailer when ready.",
+      subject: "Retailer payout due"
+    },
+    platform_retailer_settlement_needs_review: {
+      body: "A retailer settlement needs platform review because the related order was cancelled, returned, or adjusted after shipment.",
+      subject: "Retailer settlement needs review"
     },
     platform_task_stuck: {
       body: "A platform task appears stuck or overdue. Review task health and worker availability.",

@@ -53,6 +53,8 @@ try {
           'platform_checkout_failed',
           'platform_payment_failed',
           'platform_payout_failed',
+          'platform_retailer_payout_due',
+          'platform_retailer_settlement_needs_review',
           'platform_worker_unavailable',
           'platform_task_stuck',
           'platform_communication_failed',
@@ -64,7 +66,9 @@ try {
           'retail_order_cancelled',
           'retail_order_returned',
           'retail_order_shipped',
-          'retail_order_delivered'
+          'retail_order_delivered',
+          'retail_settlement_needs_review',
+          'retail_settlement_payout_paid'
         )
       ),
       constraint organisation_notification_preferences_rank_check check (
@@ -86,6 +90,8 @@ try {
           'platform_checkout_failed',
           'platform_payment_failed',
           'platform_payout_failed',
+          'platform_retailer_payout_due',
+          'platform_retailer_settlement_needs_review',
           'platform_worker_unavailable',
           'platform_task_stuck',
           'platform_communication_failed',
@@ -97,7 +103,9 @@ try {
           'retail_order_cancelled',
           'retail_order_returned',
           'retail_order_shipped',
-          'retail_order_delivered'
+          'retail_order_delivered',
+          'retail_settlement_needs_review',
+          'retail_settlement_payout_paid'
         )
       )
   `;

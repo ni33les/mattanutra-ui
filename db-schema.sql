@@ -40,6 +40,7 @@ drop table if exists
   public.finance_accounts,
   public.finance_fx_rates,
   public.finance_transactions,
+  public.organisation_finance_accounts,
   public.food_admin_audit,
   public.food_aliases,
   public.food_guidance,
@@ -92,6 +93,7 @@ drop table if exists
   public.retail_order_allocations,
   public.retail_customer_order_lines,
   public.retail_customer_orders,
+  public.retail_order_settlements,
   public.retail_shopping_list_lines,
   public.retail_shopping_lists,
   public.retail_stock_reorder_advice,
@@ -937,7 +939,7 @@ CREATE TABLE public.organisation_notification_preferences (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT organisation_notification_preferences_channel_check CHECK ((channel_type = ANY (ARRAY['email'::text, 'line'::text]))),
-    CONSTRAINT organisation_notification_preferences_event_check CHECK ((event_key = ANY (ARRAY['platform_revenue_received'::text, 'platform_checkout_failed'::text, 'platform_payment_failed'::text, 'platform_payout_failed'::text, 'platform_worker_unavailable'::text, 'platform_task_stuck'::text, 'platform_communication_failed'::text, 'platform_technical_alert'::text, 'retail_order_created'::text, 'retail_order_awaiting_stock'::text, 'retail_order_ready_to_pack'::text, 'retail_order_ready_to_ship'::text, 'retail_order_cancelled'::text, 'retail_order_returned'::text, 'retail_order_shipped'::text, 'retail_order_delivered'::text]))),
+    CONSTRAINT organisation_notification_preferences_event_check CHECK ((event_key = ANY (ARRAY['platform_revenue_received'::text, 'platform_checkout_failed'::text, 'platform_payment_failed'::text, 'platform_payout_failed'::text, 'platform_retailer_payout_due'::text, 'platform_retailer_settlement_needs_review'::text, 'platform_worker_unavailable'::text, 'platform_task_stuck'::text, 'platform_communication_failed'::text, 'platform_technical_alert'::text, 'retail_order_created'::text, 'retail_order_awaiting_stock'::text, 'retail_order_ready_to_pack'::text, 'retail_order_ready_to_ship'::text, 'retail_order_cancelled'::text, 'retail_order_returned'::text, 'retail_order_shipped'::text, 'retail_order_delivered'::text, 'retail_settlement_needs_review'::text, 'retail_settlement_payout_paid'::text]))),
     CONSTRAINT organisation_notification_preferences_rank_check CHECK ((preference_rank >= 0))
 );
 
@@ -1071,6 +1073,25 @@ COMMENT ON COLUMN public.finance_transactions.amount IS 'Positive integer amount
 --
 
 COMMENT ON COLUMN public.finance_transactions.usd_rate IS 'Conversion rate from one unit of transaction currency to USD at booking time.';
+
+
+--
+-- Name: organisation_finance_accounts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organisation_finance_accounts (
+    organisation_id uuid NOT NULL REFERENCES public.organisations(id) ON DELETE CASCADE,
+    account_role text NOT NULL,
+    finance_account_id uuid NOT NULL REFERENCES public.finance_accounts(id) ON DELETE RESTRICT,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organisation_finance_accounts_role_check CHECK ((account_role = ANY (ARRAY['retailer_settlement'::text]))),
+    PRIMARY KEY (organisation_id, account_role)
+);
+
+
+COMMENT ON TABLE public.organisation_finance_accounts IS 'Links organisations to first-class finance accounts used for settlement and reconciliation.';
 
 
 --
@@ -2310,6 +2331,47 @@ CREATE TABLE public.retail_customer_order_lines (
     CONSTRAINT retail_customer_order_lines_price_check CHECK (((retail_price_amount IS NULL) OR (retail_price_amount >= (0)::numeric))),
     CONSTRAINT retail_customer_order_lines_quantity_check CHECK (((quantity_ordered > 0) AND (quantity_allocated >= 0) AND (quantity_allocated <= quantity_ordered) AND (quantity_shipped >= 0) AND (quantity_shipped <= quantity_ordered)))
 );
+
+
+--
+-- Name: retail_order_settlements; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_order_settlements (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    organisation_id uuid NOT NULL REFERENCES public.organisations(id) ON DELETE RESTRICT,
+    retail_customer_order_id uuid NOT NULL REFERENCES public.retail_customer_orders(id) ON DELETE CASCADE,
+    retail_checkout_payment_id uuid,
+    finance_account_id uuid REFERENCES public.finance_accounts(id) ON DELETE RESTRICT,
+    status text DEFAULT 'pending'::text NOT NULL,
+    gross_customer_amount bigint DEFAULT 0 NOT NULL,
+    retailer_payable_amount bigint DEFAULT 0 NOT NULL,
+    mattanutra_margin_amount bigint DEFAULT 0 NOT NULL,
+    paid_amount bigint,
+    amount_unit text DEFAULT 'micros'::text NOT NULL,
+    currency text NOT NULL,
+    paid_at timestamp with time zone,
+    paid_method text,
+    paid_reference text,
+    paid_by_person_id uuid REFERENCES public.people(id) ON DELETE SET NULL,
+    confirmed_at timestamp with time zone,
+    confirmed_reference text,
+    confirmed_by_person_id uuid REFERENCES public.people(id) ON DELETE SET NULL,
+    nominal_finance_transaction_id uuid REFERENCES public.finance_transactions(id) ON DELETE SET NULL,
+    actual_finance_transaction_id uuid REFERENCES public.finance_transactions(id) ON DELETE SET NULL,
+    refund_finance_transaction_id uuid REFERENCES public.finance_transactions(id) ON DELETE SET NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_order_settlements_amount_check CHECK (((gross_customer_amount >= 0) AND (retailer_payable_amount >= 0) AND (mattanutra_margin_amount >= 0) AND ((paid_amount IS NULL) OR (paid_amount >= 0)))),
+    CONSTRAINT retail_order_settlements_amount_unit_check CHECK ((amount_unit = 'micros'::text)),
+    CONSTRAINT retail_order_settlements_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT retail_order_settlements_order_key UNIQUE (retail_customer_order_id),
+    CONSTRAINT retail_order_settlements_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'due'::text, 'paid'::text, 'confirmed'::text, 'needs_review'::text, 'voided'::text])))
+);
+
+
+COMMENT ON TABLE public.retail_order_settlements IS 'Retailer settlement projection for paid customer orders. Pending at payment, due on shipment, paid by platform, confirmed by retailer.';
 
 
 --
@@ -4306,6 +4368,13 @@ CREATE UNIQUE INDEX finance_accounts_name_idx ON public.finance_accounts USING b
 
 
 --
+-- Name: organisation_finance_accounts_account_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organisation_finance_accounts_account_idx ON public.organisation_finance_accounts USING btree (finance_account_id);
+
+
+--
 -- Name: finance_transactions_category_occurred_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4840,6 +4909,20 @@ CREATE INDEX retail_customer_orders_org_status_idx ON public.retail_customer_ord
 --
 
 CREATE INDEX retail_customer_order_lines_order_idx ON public.retail_customer_order_lines USING btree (customer_order_id, product_id);
+
+
+--
+-- Name: retail_order_settlements_org_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_order_settlements_org_status_idx ON public.retail_order_settlements USING btree (organisation_id, status, updated_at DESC);
+
+
+--
+-- Name: retail_order_settlements_checkout_payment_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_order_settlements_checkout_payment_idx ON public.retail_order_settlements USING btree (retail_checkout_payment_id) WHERE (retail_checkout_payment_id IS NOT NULL);
 
 
 --

@@ -405,7 +405,7 @@
     "category": "类别",
     "description": "描述",
     "details": "详情",
-    "empty": "此时间段内无成本条目。",
+    "empty": "此时间段内无账务条目。",
     "entryType": "依据",
     "from": "成本中心",
     "hostingCost": "托管成本",
@@ -421,7 +421,7 @@
     "time": "时间",
     "to": "提供商",
     "totalCost": "总成本",
-    "transactions": "成本条目",
+    "transactions": "账务条目",
     "usd": "USD"
   },
   "atAGlance": {
@@ -552,6 +552,10 @@
     {
       "name": "财务",
       "view": "financials"
+    },
+    {
+      "name": "结算",
+      "view": "settlements"
     }
   ],
   "performanceTitle": "性能",
@@ -642,6 +646,10 @@
     {
       "name": "订单",
       "view": "retail-customer-orders"
+    },
+    {
+      "name": "财务",
+      "view": "retail-financials"
     }
   ],
   "retailSellingTitle": "订单",
@@ -698,11 +706,13 @@
     "products": "产品",
     "retail-customer-orders": "客户订单",
     "retail-audit": "审计",
+    "retail-financials": "零售财务",
     "retail-fulfillment": "履约",
     "retail-movements": "库存变动",
     "retail-stock-advice": "补货",
     "retail-reorder": "补货",
     "reviews": "审核",
+    "settlements": "结算",
     "settings": "设置",
     "stock": "库存",
     "supplement-insights": "补充剂洞察",

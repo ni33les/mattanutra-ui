@@ -147,6 +147,7 @@ for (const scriptName of [
   "communications:schema:apply",
   "payments:schema:apply",
   "retail-checkout:schema:apply",
+  "retail-financials:schema:apply",
   "retail-stock:schema:apply",
   "product-identifiers:schema:apply",
   "product-regulatory:schema:apply",

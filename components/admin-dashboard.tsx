@@ -27,6 +27,9 @@ import type {
   AdminFinancialsData
 } from "@/lib/admin-financials";
 import type {
+  AdminRetailFinancialsData
+} from "@/lib/admin-retail-financials";
+import type {
   AdminFoodsData
 } from "@/lib/admin-foods";
 import type {
@@ -77,6 +80,7 @@ import { AdminLeadsView } from "@/components/admin/marketing-leads";
 import { AdminCommunicationsView } from "@/components/admin/communications-view";
 import { AdminTechnicalAlertsView } from "@/components/admin/technical-alerts-view";
 import { AdminFinancialsView } from "@/components/admin/financials-view";
+import { AdminRetailFinancialsView } from "@/components/admin/retail-financials-view";
 import { AdminAccessView } from "@/components/admin/access-view";
 import { AdminSettingsView } from "@/components/admin/settings-view";
 import { AdminRetailStockView } from "@/components/admin/retail-stock-view";
@@ -210,6 +214,7 @@ function adminViewDatabaseAvailable({
   leadsData,
   productsData,
   productDetailId,
+  retailFinancialsData,
   retailStockData,
   recommendationInsightsData,
   reviewQueueData,
@@ -230,6 +235,7 @@ function adminViewDatabaseAvailable({
   leadsData: AdminLeadsData;
   productsData: AdminProductsData;
   productDetailId?: string | null;
+  retailFinancialsData: AdminRetailFinancialsData;
   retailStockData: AdminRetailStockData;
   recommendationInsightsData: AdminRecommendationInsightsData;
   reviewQueueData: AdminReviewQueueData;
@@ -288,6 +294,10 @@ function adminViewDatabaseAvailable({
 
   if (view === "financials") {
     return financialsData.databaseAvailable;
+  }
+
+  if (view === "retail-financials" || view === "settlements") {
+    return retailFinancialsData.databaseAvailable;
   }
 
   if (view === "foods") {
@@ -351,6 +361,7 @@ export function AdminDashboard({
   locale,
   productDetailId,
   productsData,
+  retailFinancialsData,
   retailStockData,
   recommendationInsightsData,
   reviewQueueData,
@@ -379,6 +390,7 @@ export function AdminDashboard({
   locale: Locale;
   productDetailId?: string | null;
   productsData: AdminProductsData;
+  retailFinancialsData: AdminRetailFinancialsData;
   retailStockData: AdminRetailStockData;
   recommendationInsightsData: AdminRecommendationInsightsData;
   reviewQueueData: AdminReviewQueueData;
@@ -448,6 +460,7 @@ export function AdminDashboard({
     flowData,
     leadsData,
     productsData,
+    retailFinancialsData,
     retailStockData,
     recommendationInsightsData,
     reviewQueueData,
@@ -576,6 +589,8 @@ export function AdminDashboard({
           view === "glance" ||
           view === "leads" ||
           view === "product-insights" ||
+          view === "retail-financials" ||
+          view === "settlements" ||
           view === "supplement-insights" ||
           view === "visibility") ? (
             <>
@@ -669,6 +684,15 @@ export function AdminDashboard({
               data={financialsData}
               labels={labels}
               locale={locale}
+            />
+          ) : view === "retail-financials" || view === "settlements" ? (
+            <AdminRetailFinancialsView
+              accessToken={accessToken}
+              data={retailFinancialsData}
+              labels={labels}
+              locale={locale}
+              range={data.range}
+              scope={view === "settlements" ? "platform" : "retail"}
             />
           ) : view === "glance" ? (
             <AdminAtAGlanceView

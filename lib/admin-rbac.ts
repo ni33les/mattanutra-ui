@@ -89,6 +89,7 @@ export const adminRolePermissions = {
     "access.agents.read",
     "communications.read",
     "communications.write",
+    "finance.read",
     "settings.read",
     "stock.read",
     "stock.write"
@@ -205,6 +206,7 @@ const adminViews = [
   "products",
   "supplements",
   "retail-customer-orders",
+  "retail-financials",
   "stock",
   "retail-stock-advice",
   "retail-reorder",
@@ -224,13 +226,15 @@ const adminViews = [
   "access-agents",
   "audit",
   "access",
-  "settings"
+  "settings",
+  "settlements"
 ] as const satisfies readonly AdminDashboardView[];
 
 export const adminDashboardViews = adminViews;
 
 export const retailOperationViews = [
   "retail-customer-orders",
+  "retail-financials",
   "stock",
   "retail-stock-advice",
   "retail-reorder",
@@ -244,8 +248,12 @@ function adminViewAvailableForOrganisation(
   view: AdminDashboardView,
   organisationType?: AdminOrganisationType
 ) {
-  return organisationType === "platform"
-    ? !retailOperationViewSet.has(view)
+  if (organisationType === "platform") {
+    return !retailOperationViewSet.has(view);
+  }
+
+  return organisationType === "tenant"
+    ? view !== "financials" && view !== "settlements"
     : true;
 }
 
@@ -322,7 +330,11 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
     return "communications.read";
   }
 
-  if (view === "financials") {
+  if (
+    view === "financials" ||
+    view === "retail-financials" ||
+    view === "settlements"
+  ) {
     return "finance.read";
   }
 

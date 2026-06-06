@@ -257,7 +257,7 @@ describe("retail stock and FX infrastructure", () => {
     assert.match(rbac, /"stock\.write"/);
     assert.match(
       rbac,
-      /retail_admin:\s*\[[\s\S]*"access\.agents\.read"[\s\S]*"communications\.read"[\s\S]*"communications\.write"[\s\S]*"settings\.read"[\s\S]*"stock\.read"[\s\S]*"stock\.write"[\s\S]*\]/
+      /retail_admin:\s*\[[\s\S]*"access\.agents\.read"[\s\S]*"communications\.read"[\s\S]*"communications\.write"[\s\S]*"finance\.read"[\s\S]*"settings\.read"[\s\S]*"stock\.read"[\s\S]*"stock\.write"[\s\S]*\]/
     );
     assert.match(rbac, /retail_assistant: \["settings\.read", "stock\.read"\]/);
     assert.match(page, /getAdminRetailStockData\(adminContext, locale\)/);
@@ -379,6 +379,9 @@ describe("retail stock and FX infrastructure", () => {
 				    assert.match(devLive, /await npmRun\("build:dev-fast"\)/);
 				    assert.match(devLive, /start:platform/);
 				    assert.match(devLive, /curl/);
+				    assert.match(devLive, /verifyStaticAssets/);
+				    assert.match(devLive, /\\\/_next\\\/static\\\//);
+				    assert.match(devLive, /Static asset smoke passed/);
 				    assert.match(devLive, /workers\/runner\.ts/);
 	    assert.match(view, /const stockPriceCurrency =/);
 	    assert.match(view, /const wholesaleHeader = stockPriceCurrency/);

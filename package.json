@@ -37,6 +37,8 @@
     "payments:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-payment-schema.ts",
     "communications:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-communications-schema.ts",
     "retail-checkout:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-retail-checkout-schema.ts",
+    "retail-financials:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-retail-financials-schema.ts",
+    "retail-financials:backfill": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/backfill-retail-order-settlements.ts",
     "retail-stock:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-retail-stock-schema.ts",
     "product-identifiers:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-product-identifier-schema.ts",
     "product-regulatory:schema:apply": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/apply-product-regulatory-approvals-schema.ts",

@@ -52,11 +52,13 @@ export type AdminDashboardView =
   | "reviews"
   | "retail-customer-orders"
   | "retail-audit"
+  | "retail-financials"
   | "retail-fulfillment"
   | "retail-movements"
   | "retail-stock-advice"
   | "retail-reorder"
   | "settings"
+  | "settlements"
   | "stock"
   | "supplement-insights"
   | "supplements"
@@ -1211,7 +1213,7 @@ const baseContent = {
       category: "Category",
       description: "Description",
       details: "Details",
-      empty: "No cost entries in this timeframe.",
+      empty: "No ledger entries in this timeframe.",
       entryType: "Basis",
       from: "Cost center",
       hostingCost: "Hosting cost",
@@ -1227,7 +1229,7 @@ const baseContent = {
       time: "Time",
       to: "Provider",
       totalCost: "Total cost",
-      transactions: "Cost entries",
+      transactions: "Ledger entries",
       usd: "USD"
     },
     atAGlance: {
@@ -1349,7 +1351,8 @@ const baseContent = {
     performance: [
       { icon: HomeIcon, name: "Dashboard", view: "glance" },
       { icon: FunnelIcon, name: "Conversions", view: "flow" },
-      { icon: BanknotesIcon, name: "Financials", view: "financials" }
+      { icon: BanknotesIcon, name: "Financials", view: "financials" },
+      { icon: DocumentTextIcon, name: "Settlements", view: "settlements" }
     ],
     performanceTitle: "Performance",
     marketing: [
@@ -1392,7 +1395,8 @@ const baseContent = {
     ],
     retailInventoryTitle: "Stock",
     retailSellingNavigation: [
-      { icon: ShoppingCartIcon, name: "Orders", view: "retail-customer-orders" }
+      { icon: ShoppingCartIcon, name: "Orders", view: "retail-customer-orders" },
+      { icon: BanknotesIcon, name: "Financials", view: "retail-financials" }
     ],
     retailSellingTitle: "Orders",
     insights: [
@@ -1430,12 +1434,14 @@ const baseContent = {
       products: "Products",
       "retail-customer-orders": "Customer Orders",
       "retail-audit": "Audit",
+      "retail-financials": "Retail Financials",
       "retail-fulfillment": "Fulfillment",
       "retail-movements": "Stock Movements",
       "retail-stock-advice": "Reorders",
       "retail-reorder": "Reorders",
       reviews: "Reviews",
       settings: "Settings",
+      settlements: "Settlements",
       stock: "Stock",
       "supplement-insights": "Supplement Insights",
       supplements: "Supplements",
@@ -2028,7 +2034,7 @@ const baseContent = {
       category: "หมวดหมู่",
       description: "รายละเอียด",
       details: "รายละเอียด",
-      empty: "ไม่มีรายการต้นทุนในช่วงเวลานี้",
+      empty: "ไม่มีรายการบัญชีในช่วงเวลานี้",
       entryType: "ฐานรายการ",
       from: "ศูนย์ต้นทุน",
       hostingCost: "ค่าโฮสติ้ง",
@@ -2044,7 +2050,7 @@ const baseContent = {
       time: "เวลา",
       to: "ผู้ให้บริการ",
       totalCost: "ต้นทุนรวม",
-      transactions: "รายการต้นทุน",
+      transactions: "รายการบัญชี",
       usd: "USD"
     },
     atAGlance: {
@@ -2166,7 +2172,8 @@ const baseContent = {
     performance: [
       { icon: HomeIcon, name: "แดชบอร์ด", view: "glance" },
       { icon: FunnelIcon, name: "คอนเวอร์ชัน", view: "flow" },
-      { icon: BanknotesIcon, name: "การเงิน", view: "financials" }
+      { icon: BanknotesIcon, name: "การเงิน", view: "financials" },
+      { icon: DocumentTextIcon, name: "การชำระร้านค้า", view: "settlements" }
     ],
     performanceTitle: "ประสิทธิภาพ",
     marketing: [
@@ -2209,7 +2216,8 @@ const baseContent = {
     ],
     retailInventoryTitle: "สต็อก",
     retailSellingNavigation: [
-      { icon: ShoppingCartIcon, name: "คำสั่งซื้อ", view: "retail-customer-orders" }
+      { icon: ShoppingCartIcon, name: "คำสั่งซื้อ", view: "retail-customer-orders" },
+      { icon: BanknotesIcon, name: "การเงิน", view: "retail-financials" }
     ],
     retailSellingTitle: "คำสั่งซื้อ",
     insights: [
@@ -2247,12 +2255,14 @@ const baseContent = {
       products: "สินค้า",
       "retail-customer-orders": "คำสั่งซื้อลูกค้า",
       "retail-audit": "บันทึกเหตุการณ์",
+      "retail-financials": "การเงินร้านค้า",
       "retail-fulfillment": "จัดส่ง",
       "retail-movements": "การเคลื่อนไหวสต็อก",
       "retail-stock-advice": "สั่งซื้อเพิ่ม",
       "retail-reorder": "สั่งซื้อเพิ่ม",
       reviews: "รีวิว",
       settings: "การตั้งค่า",
+      settlements: "การชำระร้านค้า",
       stock: "สต็อก",
       "supplement-insights": "ข้อมูลอาหารเสริม",
       supplements: "อาหารเสริม",

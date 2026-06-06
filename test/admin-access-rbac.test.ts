@@ -69,9 +69,15 @@ describe("admin RBAC", () => {
     const platformViews = allowedAdminViews(principal, "platform");
 
     assert.equal(platformViews.includes("stock"), false);
+    assert.equal(platformViews.includes("retail-financials"), false);
+    assert.equal(platformViews.includes("settlements"), true);
     assert.equal(adminViewAllowed(principal, "stock", "platform"), false);
+    assert.equal(adminViewAllowed(principal, "retail-financials", "platform"), false);
+    assert.equal(adminViewAllowed(principal, "settlements", "platform"), true);
     assert.equal(firstAllowedAdminView(principal, "glance", "platform"), "glance");
     assert.equal(adminViewAllowed(principal, "stock", "tenant"), true);
+    assert.equal(adminViewAllowed(principal, "retail-financials", "tenant"), true);
+    assert.equal(adminViewAllowed(principal, "settlements", "tenant"), false);
     assert.equal(
       allowedAdminViews(principal, "tenant").includes("retail-customer-orders"),
       true
@@ -79,11 +85,22 @@ describe("admin RBAC", () => {
   });
 
   it("gives retail assistants read-only stock and basic settings only", () => {
+    const agent = {
+      permissions: permissionsForRole("retail_agent"),
+      role: "retail_agent" as const
+    };
     const principal = {
       permissions: permissionsForRole("retail_assistant"),
       role: "retail_assistant" as const
     };
 
+    assert.equal(adminViewAllowed(agent, "financials"), false);
+    assert.equal(adminViewAllowed(agent, "retail-financials"), false);
+    assert.equal(adminViewAllowed(agent, "settlements"), false);
+    assert.equal(
+      (permissionsForRole("retail_agent") as readonly string[]).includes("finance.read"),
+      false
+    );
     assert.equal(adminViewAllowed(principal, "settings"), true);
     assert.equal(adminViewAllowed(principal, "retail-customer-orders"), true);
     assert.equal(adminViewAllowed(principal, "stock"), true);
@@ -94,6 +111,8 @@ describe("admin RBAC", () => {
     assert.equal(adminViewAllowed(principal, "audit"), false);
     assert.equal(adminViewAllowed(principal, "memberships"), false);
     assert.equal(adminViewAllowed(principal, "financials"), false);
+    assert.equal(adminViewAllowed(principal, "retail-financials"), false);
+    assert.equal(adminViewAllowed(principal, "settlements"), false);
     assert.equal(adminViewAllowed(principal, "products"), false);
     assert.equal(adminViewAllowed(principal, "visibility"), false);
     assert.equal(
@@ -103,7 +122,7 @@ describe("admin RBAC", () => {
     assert.equal(firstAllowedAdminView(principal), "retail-customer-orders");
   });
 
-  it("gives retail admins stock access while keeping platform access pages closed", () => {
+  it("gives retail admins stock and retailer finance access while keeping platform access pages closed", () => {
     const principal = {
       permissions: permissionsForRole("retail_admin"),
       role: "retail_admin" as const
@@ -118,9 +137,15 @@ describe("admin RBAC", () => {
     assert.equal(adminViewAllowed(principal, "access"), false);
     assert.equal(adminViewAllowed(principal, "access-agents"), true);
     assert.equal(adminViewAllowed(principal, "audit"), false);
-    assert.equal(adminViewAllowed(principal, "financials"), false);
+    assert.equal(adminViewAllowed(principal, "financials", "tenant"), false);
+    assert.equal(adminViewAllowed(principal, "retail-financials", "tenant"), true);
+    assert.equal(adminViewAllowed(principal, "settlements", "tenant"), false);
     assert.equal(adminViewAllowed(principal, "products"), false);
     assert.equal(adminViewAllowed(principal, "visibility"), false);
+    assert.equal(
+      (permissionsForRole("retail_admin") as readonly string[]).includes("finance.read"),
+      true
+    );
     assert.equal(
       (permissionsForRole("retail_admin") as readonly string[]).includes("stock.write"),
       true

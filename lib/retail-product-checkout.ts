@@ -4,6 +4,10 @@ import type postgres from "postgres";
 import { isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
 import { FINANCE_ACCOUNT_IDS, recordFinanceTransaction } from "@/lib/finance-ledger";
+import {
+  createPendingRetailOrderSettlement,
+  type RetailSettlementQuoteLineInput
+} from "@/lib/admin-retail-financials";
 import { resolveUsdRateForCurrency } from "@/lib/finance-fx";
 import { isLocale, type Locale } from "@/lib/i18n";
 import {
@@ -34,8 +38,6 @@ import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
 type RetailCheckoutDb = postgres.Sql | postgres.TransactionSql;
-
-const DELIGHT_FINANCE_ACCOUNT_ID = "77777777-7777-4777-8777-777777777777";
 
 export type RetailCheckoutAddress = Readonly<{
   addressLine1: string;
@@ -90,12 +92,14 @@ type CheckoutPaymentRow = Readonly<{
 
 type QuoteLine = Readonly<{
   currency: string;
-  delightSettlementAmount: number;
   etaDate: string | null;
   imageUrl: string | null;
   productId: string;
   productTitle: string;
   quantity: number;
+  retailerPayableAmount: number | null;
+  retailerPayableNeedsReviewReason?: string | null;
+  retailerPayableSource: "missing" | "wholesale_price";
   retailSellableProductId: string | null;
   unitPriceAmount: number;
 }>;
@@ -161,6 +165,10 @@ function arrayValue<T = unknown>(value: unknown): T[] {
 }
 
 function money(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
 }
@@ -367,27 +375,27 @@ async function latestRecommendations(
   return rows;
 }
 
-async function delightSettlementAmounts(
+async function retailerPayableAmounts(
   sql: RetailCheckoutDb,
   organisationId: string,
   productIds: readonly string[]
 ) {
   const rows = await sql<Array<{
     product_id: string;
-    rrp_price_amount: number | string | null;
+    wholesale_price_amount: number | string | null;
   }>>`
-    select product_id::text, rrp_price_amount
+    select product_id::text, wholesale_price_amount
     from public.retail_sellable_products
     where organisation_id = ${organisationId}::uuid
       and product_id = any(${[...productIds]}::uuid[])
       and status <> 'deleted'
     order by updated_at desc
   `;
-  const amounts = new Map<string, number>();
+  const amounts = new Map<string, number | null>();
 
   for (const row of rows) {
     if (!amounts.has(row.product_id)) {
-      amounts.set(row.product_id, money(row.rrp_price_amount) ?? 0);
+      amounts.set(row.product_id, money(row.wholesale_price_amount));
     }
   }
 
@@ -444,7 +452,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
   }
 
   const retailerId = availability.selectedRetailer.organisationId;
-  const settlementByProductId = await delightSettlementAmounts(
+  const payableByProductId = await retailerPayableAmounts(
     sql,
     retailerId,
     selectedProductIds
@@ -460,15 +468,22 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
       throw new Error("Selected product is missing checkout pricing");
     }
 
+    const retailerPayableAmount = payableByProductId.get(line.productId) ?? null;
+
     return {
       currency: line.currency ?? availability.currency ?? "THB",
-      delightSettlementAmount:
-        settlementByProductId.get(line.productId) ?? unitPriceAmount,
       etaDate: line.etaDate,
       imageUrl: recommendation.image_url,
       productId: line.productId,
       productTitle: recommendation.title,
       quantity: 1,
+      retailerPayableAmount,
+      retailerPayableNeedsReviewReason: retailerPayableAmount === null
+        ? "missing_retailer_payable_price"
+        : null,
+      retailerPayableSource: retailerPayableAmount === null
+        ? "missing"
+        : "wholesale_price",
       retailSellableProductId: line.retailSellableProductId,
       unitPriceAmount
     };
@@ -823,9 +838,11 @@ async function createRetailCustomerOrderFromPayment(
         ${sql.json(toJsonValue({
           checkoutPaymentId: payment.id,
           currency: line.currency,
-          delightSettlementAmount: line.delightSettlementAmount,
           etaDate: line.etaDate,
           lineSubtotalAmount: line.unitPriceAmount * line.quantity,
+          retailerPayableAmount: line.retailerPayableAmount,
+          retailerPayableNeedsReviewReason: line.retailerPayableNeedsReviewReason ?? null,
+          retailerPayableSource: line.retailerPayableSource,
           retailSellableProductId: line.retailSellableProductId,
           source: "retail_product_checkout"
         }))}::jsonb,
@@ -939,34 +956,26 @@ async function recordRetailCheckoutFinance(
     usdRate: fx.usdRate
   });
 
-  for (const line of quoteLines) {
-    if (line.delightSettlementAmount <= 0) {
-      continue;
-    }
-
-    await recordFinanceTransaction({
-      amount: amountMicros(line.delightSettlementAmount * line.quantity),
-      category: "payout",
-      currency: line.currency,
-      description: `Nominal Delight Pharmacy settlement for ${line.productTitle}`,
-      entryType: "nominal",
-      from: "mattanutra:retail-payable",
-      fromAccountId: FINANCE_ACCOUNT_IDS.mattanutraRevenue,
+  if (payment.selected_retailer_organisation_id) {
+    await createPendingRetailOrderSettlement(sql, {
+      checkoutPaymentId: payment.id,
+      currency: payment.currency,
+      grossCustomerAmountMicros: amount,
       metadata: {
-        checkoutPaymentId: payment.id,
-        orderId,
-        productId: line.productId,
-        quantity: line.quantity,
-        retailSellableProductId: line.retailSellableProductId
+        planId: payment.plan_id,
+        source: "retail_product_checkout"
       },
-      provider: "delight-pharmacy",
-      source: "retail_product_checkout",
-      sourceRef: `retail-checkout:${payment.id}:delight:${line.productId}`,
-      sql,
-      to: "delight-pharmacy:retail",
-      toAccountId: DELIGHT_FINANCE_ACCOUNT_ID,
-      fxRateId: fx.fxRateId,
-      usdRate: fx.usdRate
+      orderId,
+      organisationId: payment.selected_retailer_organisation_id,
+      quoteLines: quoteLines.map((line) => ({
+        productId: line.productId,
+        productTitle: line.productTitle,
+        quantity: line.quantity,
+        retailerPayableAmount: line.retailerPayableAmount,
+        retailerPayableNeedsReviewReason: line.retailerPayableNeedsReviewReason,
+        retailerPayableSource: line.retailerPayableSource,
+        unitPriceAmount: line.unitPriceAmount
+      }))
     });
   }
 }

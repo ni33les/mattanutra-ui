@@ -10,6 +10,9 @@ const host = "127.0.0.1";
 const adminRoute =
   process.env.DEV_LIVE_ADMIN_ROUTE ||
   `http://${host}:${port}/en/admin/dashboard?view=retail-reorder`;
+const assetSmokeRoute =
+  process.env.DEV_LIVE_ASSET_ROUTE ||
+  `http://${host}:${port}/en/admin/login`;
 const logPath = process.env.DEV_LIVE_LOG || "/tmp/mattanutra-platform.log";
 const workerMode = process.env.PLATFORM_WORKER_MODE || "all";
 const platformScriptName = "start:platform";
@@ -209,6 +212,62 @@ async function curlStatus(url) {
   return Number.isInteger(status) ? status : 0;
 }
 
+async function curlBody(url) {
+  return runCapture("curl", ["-sS", "-L", url]);
+}
+
+function assetUrlFor(ref) {
+  const url = new URL(ref, assetSmokeRoute);
+
+  return url.toString();
+}
+
+function staticAssetRefs(html) {
+  const refs = new Set();
+  const matches = html.matchAll(/(?:src|href)=["']([^"']*\/_next\/static\/[^"']+)["']/g);
+
+  for (const match of matches) {
+    const ref = match[1];
+
+    if (!ref || !/\.(?:css|js)(?:\?|$)/.test(ref)) {
+      continue;
+    }
+
+    refs.add(assetUrlFor(ref));
+  }
+
+  return [...refs].sort();
+}
+
+async function verifyStaticAssets() {
+  const html = await curlBody(assetSmokeRoute);
+  const assets = staticAssetRefs(html);
+
+  if (assets.length === 0) {
+    throw new Error(`No Next static JS/CSS assets found in ${assetSmokeRoute}`);
+  }
+
+  const failures = [];
+
+  for (const asset of assets) {
+    const status = await curlStatus(asset);
+
+    if (status < 200 || status >= 400) {
+      failures.push(`${status} ${asset}`);
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(
+      `Next static asset smoke failed for ${assetSmokeRoute}:\n${failures.join("\n")}`
+    );
+  }
+
+  console.log(
+    `[dev:live] Static asset smoke passed for ${assets.length} JS/CSS assets: ${assetSmokeRoute}`
+  );
+}
+
 async function waitForAdminRoute(platformPid) {
   let activePlatformPid = platformPid;
   let lastStatus = 0;
@@ -298,6 +357,7 @@ async function main() {
   await stopExistingPlatform();
   const platformPid = await startPlatform();
   await waitForAdminRoute(platformPid);
+  await verifyStaticAssets();
   await verifyWorkers(platformPid);
   console.log("[dev:live] Rebuilt, restarted, and verified.");
 }

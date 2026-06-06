@@ -84,30 +84,6 @@ create index if not exists retail_checkout_payment_versions_latest_idx
 
 do $$
 begin
-  if to_regclass('public.finance_accounts') is not null then
-    insert into public.finance_accounts (
-      id,
-      name,
-      description,
-      created_at,
-      updated_at
-    )
-    values (
-      '77777777-7777-4777-8777-777777777777'::uuid,
-      'Delight Pharmacy settlement payable',
-      'Nominal and actual retail settlement payable to Delight Pharmacy.',
-      now(),
-      now()
-    )
-    on conflict (id) do update set
-      name = excluded.name,
-      description = excluded.description,
-      updated_at = now();
-  end if;
-end $$;
-
-do $$
-begin
   if exists (select 1 from pg_roles where rolname = 'mn') then
     grant usage on schema public to mn;
     grant select, insert, update, delete on table

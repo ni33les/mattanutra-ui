@@ -25,6 +25,7 @@ import {
 } from "@/lib/admin-execution";
 import { emptyFlow } from "@/lib/admin-flow-data";
 import { emptyFinancials } from "@/lib/admin-financials";
+import { emptyAdminRetailFinancialsData } from "@/lib/admin-retail-financials";
 import { emptyAdminFoodsData } from "@/lib/admin-foods";
 import {
   emptyAdminProductsData,
@@ -164,6 +165,7 @@ export default async function ProductDetailPage({
       locale={locale}
       productsData={productsData}
       productDetailId={productId}
+      retailFinancialsData={emptyAdminRetailFinancialsData(range)}
       retailStockData={emptyAdminRetailStockData()}
       recommendationInsightsData={emptyAdminRecommendationInsightsData(range)}
       reviewQueueData={emptyAdminReviewQueueData()}
