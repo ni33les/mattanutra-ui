@@ -95,7 +95,7 @@ function handleDatabaseNotice(notice: { code?: string }) {
 }
 
 export function getSql() {
-  const connection = process.env.DB_CONNECTION;
+  const connection = process.env.DB_CONNECTION ?? process.env.DATABASE_URL;
 
   if (!connection) {
     return null;

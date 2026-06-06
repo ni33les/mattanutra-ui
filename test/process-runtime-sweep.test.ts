@@ -248,6 +248,13 @@ describe("process runtime technical debt sweep", () => {
     assert.match(script, /No destructive database writes are performed/);
   });
 
+  it("accepts DATABASE_URL as the runtime database connection fallback", async () => {
+    const db = await readFile("lib/db.ts", "utf8");
+    const getSqlBody = functionBody(db, "getSql");
+
+    assert.match(getSqlBody, /process\.env\.DB_CONNECTION \?\? process\.env\.DATABASE_URL/);
+  });
+
   it("keeps DDL out of runtime app, lib, and worker code", async () => {
     const runtimeFiles = [
       ...(await filesUnder("app")),
