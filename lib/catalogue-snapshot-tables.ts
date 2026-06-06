@@ -68,6 +68,16 @@ export const CATALOGUE_SNAPSHOT_TABLES: readonly CatalogueSnapshotTable[] = [
     requiredForReload: true
   },
   {
+    description: "Approved product identifiers such as EAN-13 and manufacturer SKU rows.",
+    name: "product_identifiers",
+    requiredForReload: true
+  },
+  {
+    description: "Product identifier sourcing evidence and approval candidates.",
+    name: "product_identifier_candidates",
+    requiredForReload: true
+  },
+  {
     description: "Country and region regulatory approval rows for products.",
     name: "product_regulatory_approvals",
     requiredForReload: true
@@ -157,6 +167,8 @@ export const CATALOGUE_RELOAD_ORDER = [
   "product_brand_countries",
   "products",
   "product_countries",
+  "product_identifiers",
+  "product_identifier_candidates",
   "product_regulatory_approvals",
   "product_translations",
   "product_facts",
@@ -189,6 +201,8 @@ export const CATALOGUE_TRUNCATE_ORDER = [
   "product_versions",
   "product_facts",
   "product_regulatory_approvals",
+  "product_identifier_candidates",
+  "product_identifiers",
   "product_countries",
   "product_translations",
   "products",

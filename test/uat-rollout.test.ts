@@ -166,10 +166,14 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.ok(indexOf("nutrients", CATALOGUE_RELOAD_ORDER) < indexOf("food_nutrient_profiles", CATALOGUE_RELOAD_ORDER));
     assert.ok(indexOf("foods", CATALOGUE_RELOAD_ORDER) < indexOf("food_translations", CATALOGUE_RELOAD_ORDER));
     assert.ok(indexOf("products", CATALOGUE_RELOAD_ORDER) < indexOf("product_facts", CATALOGUE_RELOAD_ORDER));
+    assert.ok(indexOf("products", CATALOGUE_RELOAD_ORDER) < indexOf("product_identifiers", CATALOGUE_RELOAD_ORDER));
+    assert.ok(indexOf("products", CATALOGUE_RELOAD_ORDER) < indexOf("product_identifier_candidates", CATALOGUE_RELOAD_ORDER));
     assert.ok(indexOf("supplements", CATALOGUE_RELOAD_ORDER) < indexOf("product_facts", CATALOGUE_RELOAD_ORDER));
     assert.ok(indexOf("blog_posts", CATALOGUE_TRUNCATE_ORDER) < indexOf("testimonials", CATALOGUE_TRUNCATE_ORDER));
     assert.ok(indexOf("food_translations", CATALOGUE_TRUNCATE_ORDER) < indexOf("foods", CATALOGUE_TRUNCATE_ORDER));
     assert.ok(indexOf("product_facts", CATALOGUE_TRUNCATE_ORDER) < indexOf("products", CATALOGUE_TRUNCATE_ORDER));
+    assert.ok(indexOf("product_identifiers", CATALOGUE_TRUNCATE_ORDER) < indexOf("products", CATALOGUE_TRUNCATE_ORDER));
+    assert.ok(indexOf("product_identifier_candidates", CATALOGUE_TRUNCATE_ORDER) < indexOf("products", CATALOGUE_TRUNCATE_ORDER));
     assert.ok(indexOf("supplement_translations", CATALOGUE_TRUNCATE_ORDER) < indexOf("supplements", CATALOGUE_TRUNCATE_ORDER));
   });
 

@@ -202,6 +202,8 @@ describe("codebase cleanup guardrails", () => {
       "product_brands",
       "product_countries",
       "product_facts",
+      "product_identifier_candidates",
+      "product_identifiers",
       "product_import_runs",
       "product_imports",
       "product_import_translations",
