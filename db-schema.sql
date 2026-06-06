@@ -1895,7 +1895,7 @@ CREATE TABLE public.products (
 
 CREATE TABLE public.product_identifiers (
     id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
-    product_id uuid NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    product_id uuid NOT NULL,
     identifier_type text NOT NULL,
     identifier_value text NOT NULL,
     normalized_value text NOT NULL,
@@ -1923,7 +1923,7 @@ COMMENT ON TABLE public.product_identifiers IS 'Approved product identifiers suc
 
 CREATE TABLE public.product_identifier_candidates (
     id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
-    product_id uuid NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    product_id uuid NOT NULL,
     identifier_type text NOT NULL,
     identifier_value text NOT NULL,
     normalized_value text NOT NULL,
@@ -2045,7 +2045,7 @@ COMMENT ON TABLE public.retail_product_stock IS 'Retailer-owned physical stock p
 CREATE TABLE public.retail_product_cost_observations (
     id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
     organisation_id uuid REFERENCES public.organisations(id) ON DELETE SET NULL,
-    product_id uuid NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    product_id uuid NOT NULL,
     source text DEFAULT 'hygeia_import'::text NOT NULL,
     ean13 text,
     wholesale_price_amount numeric(20,6),
@@ -5765,6 +5765,22 @@ ALTER TABLE ONLY public.product_admin_audit
 
 
 --
+-- Name: product_identifier_candidates product_identifier_candidates_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_identifier_candidates
+    ADD CONSTRAINT product_identifier_candidates_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_identifiers product_identifiers_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_identifiers
+    ADD CONSTRAINT product_identifiers_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+
+
+--
 -- Name: product_regulatory_approvals product_regulatory_approvals_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6222,6 +6238,14 @@ ALTER TABLE ONLY public.retail_order_allocations
 
 ALTER TABLE ONLY public.products
     ADD CONSTRAINT products_brand_id_fkey FOREIGN KEY (brand_id) REFERENCES public.product_brands(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retail_product_cost_observations retail_product_cost_observations_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retail_product_cost_observations
+    ADD CONSTRAINT retail_product_cost_observations_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
 
 
 --

@@ -10,7 +10,7 @@ try {
   await sql`
     create table if not exists public.product_regulatory_approvals (
       id uuid primary key default gen_random_uuid(),
-      product_id uuid not null references public.products(id) on delete cascade,
+      product_id uuid not null,
       scope_type text not null,
       scope_code text not null,
       agency_code text not null,
@@ -66,6 +66,17 @@ try {
       add column if not exists metadata jsonb not null default '{}'::jsonb,
       add column if not exists created_at timestamptz not null default now(),
       add column if not exists updated_at timestamptz not null default now()
+  `;
+
+  await sql`
+    alter table public.product_regulatory_approvals
+      drop constraint if exists product_regulatory_approvals_product_id_fkey
+  `;
+
+  await sql`
+    alter table public.product_regulatory_approvals
+      add constraint product_regulatory_approvals_product_id_fkey
+      foreign key (product_id) references public.products(id) on delete cascade
   `;
 
   await sql`
