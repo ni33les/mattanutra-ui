@@ -241,18 +241,22 @@ describe("process runtime technical debt sweep", () => {
     const script = await readFile("scripts/uat-smoke.mjs", "utf8");
 
     assert.match(packageJson, /"uat:smoke": "node --env-file-if-exists=\.env\.local scripts\/uat-smoke\.mjs"/);
-    assert.match(script, /UAT_DB_CONNECTION/);
+    assert.match(script, /UAT_DATABASE_URL/);
     assert.match(script, /retail_shopping_lists/);
     assert.match(script, /worker_sessions/);
     assert.match(script, /https:\/\/uat\.mattanutra\.com\/api\/line\/webhook/);
     assert.match(script, /No destructive database writes are performed/);
   });
 
-  it("accepts DATABASE_URL as the runtime database connection fallback", async () => {
+  it("uses DATABASE_URL as the only runtime database connection variable", async () => {
     const db = await readFile("lib/db.ts", "utf8");
     const getSqlBody = functionBody(db, "getSql");
 
-    assert.match(getSqlBody, /process\.env\.DB_CONNECTION \?\? process\.env\.DATABASE_URL/);
+    assert.match(getSqlBody, /process\.env\.DATABASE_URL/);
+    assert.doesNotMatch(
+      getSqlBody,
+      new RegExp(String.raw`process\.env\.DB_` + String.raw`CONNECTION`)
+    );
   });
 
   it("keeps DDL out of runtime app, lib, and worker code", async () => {

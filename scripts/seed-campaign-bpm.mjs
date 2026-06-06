@@ -341,7 +341,7 @@ async function main() {
   const sql = getSql();
 
   if (!sql) {
-    throw new Error("DB_CONNECTION is required.");
+    throw new Error("DATABASE_URL is required.");
   }
 
   const rows = createRows();

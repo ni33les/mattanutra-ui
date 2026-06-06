@@ -7,7 +7,7 @@ import postgres from "postgres";
 
 const args = new Set(process.argv.slice(2));
 const confirmation = process.env.MATTANUTRA_CONFIRM_DB_RESET;
-const connection = process.env.DB_CONNECTION;
+const connection = process.env.DATABASE_URL;
 
 function fail(message) {
   console.error(`[reset-dev-db] ${message}`);
@@ -26,7 +26,7 @@ function assertDevTarget(connectionString) {
   try {
     url = new URL(connectionString);
   } catch {
-    fail("DB_CONNECTION is not a valid PostgreSQL URL.");
+    fail("DATABASE_URL is not a valid PostgreSQL URL.");
   }
 
   const target = `${url.hostname}${url.pathname}`.toLowerCase();
@@ -69,7 +69,7 @@ function shouldUseSsl(connectionString) {
 assertConfirmation();
 
 if (!connection) {
-  fail("DB_CONNECTION is required.");
+  fail("DATABASE_URL is required.");
 }
 
 assertDevTarget(connection);

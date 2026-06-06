@@ -4,7 +4,7 @@ import { seedRetailStockPlannerAgent } from "@/lib/retail-stock-planner-agent";
 const sql = getSql();
 
 if (!sql) {
-  throw new Error("DB_CONNECTION is required to seed the Retail Stock Planner agent");
+  throw new Error("DATABASE_URL is required to seed the Retail Stock Planner agent");
 }
 
 try {

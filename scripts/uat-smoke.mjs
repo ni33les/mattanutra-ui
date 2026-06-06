@@ -61,13 +61,13 @@ function record(name, ok, details = "", severity = "error") {
 }
 
 function uatDbConnection() {
-  const explicit = process.env.UAT_DB_CONNECTION?.trim();
+  const explicit = process.env.UAT_DATABASE_URL?.trim();
 
   if (explicit) {
     return explicit;
   }
 
-  const fallback = process.env.DB_CONNECTION?.trim();
+  const fallback = process.env.DATABASE_URL?.trim();
 
   return fallback && /(?:uat|mattanutra-uat)/i.test(fallback)
     ? fallback
@@ -245,7 +245,7 @@ async function checkDatabase() {
     record(
       "UAT database",
       false,
-      "Set UAT_DB_CONNECTION, or DB_CONNECTION containing uat, to run DB checks",
+      "Set UAT_DATABASE_URL, or DATABASE_URL containing uat, to run DB checks",
       "warn"
     );
     return;

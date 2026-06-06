@@ -79,7 +79,7 @@ const payload = {
   formatVersion: 1,
   requiredTables: catalogueSnapshotTableNames(),
   source: {
-    database: "DB_CONNECTION",
+    database: "DATABASE_URL",
     script: "catalogue:snapshot"
   },
   tableDescriptions: Object.fromEntries(

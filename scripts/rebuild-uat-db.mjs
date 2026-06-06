@@ -62,16 +62,16 @@ function shouldUseSsl(connectionString) {
 }
 
 async function terminateTargetSessions(env) {
-  if (!env.DB_CONNECTION) {
-    fail("DB_CONNECTION is required.");
+  if (!env.DATABASE_URL) {
+    fail("DATABASE_URL is required.");
   }
 
-  const sql = postgres(env.DB_CONNECTION, {
+  const sql = postgres(env.DATABASE_URL, {
     connect_timeout: Number(env.DB_CONNECT_TIMEOUT_SECONDS ?? 10),
     idle_timeout: 5,
     max: 1,
     prepare: false,
-    ...(shouldUseSsl(env.DB_CONNECTION) ? { ssl: "require" } : {})
+    ...(shouldUseSsl(env.DATABASE_URL) ? { ssl: "require" } : {})
   });
 
   try {

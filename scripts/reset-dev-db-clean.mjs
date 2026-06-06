@@ -90,13 +90,13 @@ async function readSnapshotSummary(snapshotPath) {
 }
 
 async function printResetSummary(snapshotPath) {
-  const connection = process.env.DB_CONNECTION;
+  const connection = process.env.DATABASE_URL;
   const snapshot = await readSnapshotSummary(snapshotPath);
   const catalogueTables = new Set(snapshot.tableNames);
   const snapshotCounts = snapshot.counts;
 
   if (!connection) {
-    fail("DB_CONNECTION is required.");
+    fail("DATABASE_URL is required.");
   }
 
   const counts = await tableCounts(connection);

@@ -151,7 +151,7 @@ function repairedLine(line: LineRow): RepairedLine {
 const sql = getSql();
 
 if (!sql) {
-  throw new Error("DB_CONNECTION is required to repair retail settlements");
+  throw new Error("DATABASE_URL is required to repair retail settlements");
 }
 
 try {

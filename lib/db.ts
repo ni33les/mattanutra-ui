@@ -22,7 +22,7 @@ function assertManagedDatabaseEndpoint(connection: string) {
       process.env.DB_ALLOW_DIRECT_CONNECTION !== "true"
     ) {
       throw new Error(
-        "DigitalOcean direct database endpoint detected. Use the database-side pool endpoint for DB_CONNECTION."
+        "DigitalOcean direct database endpoint detected. Use the database-side pool endpoint for DATABASE_URL."
       );
     }
   } catch (error) {
@@ -95,7 +95,7 @@ function handleDatabaseNotice(notice: { code?: string }) {
 }
 
 export function getSql() {
-  const connection = process.env.DB_CONNECTION ?? process.env.DATABASE_URL;
+  const connection = process.env.DATABASE_URL;
 
   if (!connection) {
     return null;

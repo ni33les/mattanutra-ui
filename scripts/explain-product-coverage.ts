@@ -159,7 +159,7 @@ if (!planId) {
 const sql = getSql();
 
 if (!sql) {
-  throw new Error("DB_CONNECTION is not configured");
+  throw new Error("DATABASE_URL is not configured");
 }
 
 try {

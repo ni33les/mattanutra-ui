@@ -3,7 +3,7 @@ import { closeSqlPool, getSql } from "@/lib/db";
 const sql = getSql();
 
 if (!sql) {
-  throw new Error("DB_CONNECTION is required to apply the retail stock schema");
+  throw new Error("DATABASE_URL is required to apply the retail stock schema");
 }
 
 try {

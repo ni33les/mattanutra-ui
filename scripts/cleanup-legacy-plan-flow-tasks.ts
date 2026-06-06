@@ -1,9 +1,9 @@
 import postgres from "postgres";
 
-const connection = process.env.DB_CONNECTION;
+const connection = process.env.DATABASE_URL;
 
 if (!connection) {
-  throw new Error("DB_CONNECTION is not configured");
+  throw new Error("DATABASE_URL is not configured");
 }
 
 const sql = postgres(connection, { max: 1 });
