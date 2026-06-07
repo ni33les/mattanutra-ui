@@ -242,6 +242,7 @@ describe("retail stock and FX infrastructure", () => {
     const flowData = readFileSync("lib/admin-flow-data.ts", "utf8");
     const agents = readFileSync("lib/system-agents.ts", "utf8");
     const worker = readFileSync("workers/runner.ts", "utf8");
+    const workerProfiles = readFileSync("lib/worker-agent-credentials.ts", "utf8");
     const workItems = readFileSync("lib/task-work-items.ts", "utf8");
     const execution = readFileSync("lib/task-execution.ts", "utf8");
     const settingsView = readFileSync("components/admin/settings-view.tsx", "utf8");
@@ -1015,8 +1016,9 @@ describe("retail stock and FX infrastructure", () => {
     assert.match(agents, /retailStockPlanner/);
     assert.match(agents, /retail_stock_forecast_refresh: "retailStockPlanner"/);
     assert.match(agents, /send_retail_order_workflow_email: "emailDispatcher"/);
-    assert.match(worker, /"send_retail_order_workflow_email"/);
-    assert.match(worker, /stock: agentProfile\("retailStockPlanner"/);
+    assert.match(worker, /runtimeWorkerProfileForMode\(mode\)/);
+    assert.match(workerProfiles, /"send_retail_order_workflow_email"/);
+    assert.match(workerProfiles, /"stock", "retailStockPlanner"/);
     assert.match(workItems, /RetailStockForecastWorkItem/);
     assert.match(execution, /executeRetailAgentCommand/);
     assert.doesNotMatch(execution, /humanApprovalRequired: true/);

@@ -22,6 +22,10 @@ const uatMinimalSeedScript = readFileSync(
   new URL("../scripts/seed-uat-minimal-runtime.ts", import.meta.url),
   "utf8"
 );
+const uatDeployScript = readFileSync(
+  new URL("../scripts/deploy-uat.mjs", import.meta.url),
+  "utf8"
+);
 const workerCredentialProfiles = readFileSync(
   new URL("../lib/worker-agent-credentials.ts", import.meta.url),
   "utf8"
@@ -121,6 +125,7 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.match(packageJson.scripts?.["uat:master:snapshot"] ?? "", /--strict-master-data/);
     assert.match(packageJson.scripts?.["uat:rebuild"] ?? "", /rebuild-uat-db\.mjs/);
     assert.match(packageJson.scripts?.["uat:seed:minimal-runtime"] ?? "", /seed-uat-minimal-runtime\.ts/);
+    assert.match(packageJson.scripts?.["deploy:uat"] ?? "", /deploy-uat\.mjs/);
     assert.match(uatRebuildScript, /scripts\/reset-dev-db\.mjs/);
     assert.match(uatRebuildScript, /scripts\/catalogue-reload\.ts/);
     assert.match(uatRebuildScript, /DB_ALLOW_DIRECT_CONNECTION/);
@@ -142,6 +147,8 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.match(uatMinimalSeedScript, /stockQuantityResetToZero/);
     assert.match(workerCredentialProfiles, /WORKER_PRODUCTS_AGENT_API_KEY/);
     assert.match(workerCredentialProfiles, /productMatcher/);
+    assert.match(uatDeployScript, /git", \["push", "origin", `HEAD:uat`\]/);
+    assert.match(uatDeployScript, /npmCommand, \["run", "uat:smoke"\]/);
   });
 
   it("keeps runtime and admin audit tables out of the curated master snapshot", () => {

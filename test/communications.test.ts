@@ -112,6 +112,7 @@ describe("communications channel selection", () => {
       execution,
       agents,
       runner,
+      workerProfiles,
       webhook,
       view
     ] = await Promise.all([
@@ -121,6 +122,7 @@ describe("communications channel selection", () => {
       readFile("lib/task-execution.ts", "utf8"),
       readFile("lib/system-agents.ts", "utf8"),
       readFile("workers/runner.ts", "utf8"),
+      readFile("lib/worker-agent-credentials.ts", "utf8"),
       readFile("app/api/line/webhook/route.ts", "utf8"),
       readFile("components/admin/communications-view.tsx", "utf8")
     ]);
@@ -178,8 +180,9 @@ describe("communications channel selection", () => {
     assert.match(agents, /route_admin_communication: "communicationsCoordinator"/);
     assert.match(agents, /dispatch_email_communication_message: "emailDispatcher"/);
     assert.match(agents, /dispatch_chat_communication_message: "chatDispatcher"/);
-    assert.match(runner, /chat: agentProfile\("chatDispatcher"/);
-    assert.match(runner, /"route_admin_communication"/);
+    assert.match(runner, /runtimeWorkerProfileForMode\(mode\)/);
+    assert.match(workerProfiles, /"chat", "chatDispatcher"[\s\S]*"dispatch_chat_communication_message"/);
+    assert.match(workerProfiles, /"route_admin_communication"/);
     assert.match(webhook, /x-line-signature/i);
     assert.match(webhook, /timingSafeEqual/);
     assert.match(webhook, /MN\\s\+CONNECT/);

@@ -14,6 +14,7 @@ const workerApiBaseUrl =
   process.env.PLATFORM_WORKER_API_BASE_URL || `http://127.0.0.1:${port}`;
 const startupTimeoutMs = Number(process.env.PLATFORM_STARTUP_TIMEOUT_MS || 120_000);
 const shutdownTimeoutMs = Number(process.env.PLATFORM_SHUTDOWN_TIMEOUT_MS || 25_000);
+const workerAuthConfigurationExitCode = 78;
 
 const children = new Map();
 let shuttingDown = false;
@@ -50,6 +51,13 @@ function startProcess(name, command, args, env = process.env) {
     }
 
     if (name === "worker") {
+      if (code === workerAuthConfigurationExitCode) {
+        console.error(
+          "[platform] worker stopped because one or more DB-managed credentials are not authorized. Run npm run workers:doctor -- --require-all, repair the credentials, then redeploy."
+        );
+        return;
+      }
+
       console.error(
         `[platform] worker exited code=${code ?? "null"} signal=${signal ?? "null"}; restarting in ${workerRestartDelayMs}ms`
       );
@@ -206,24 +214,32 @@ function startWorker() {
   );
 }
 
-async function syncWorkerCredentials() {
+async function checkWorkerCredentials() {
   try {
     await runOneShotProcess(
-      "worker credential sync",
+      "worker auth preflight",
       process.execPath,
       [
         "--env-file-if-exists=.env.local",
         "--experimental-strip-types",
         "--import",
         "./scripts/register-ts-path-loader.mjs",
-        "scripts/sync-runtime-worker-credentials.ts"
+        "scripts/workers-doctor.ts",
+        "--require-all"
       ],
       process.env
     );
+
+    return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
-    console.error(`[platform] worker credential sync failed: ${message}`);
+    console.error(`[platform] worker auth preflight failed: ${message}`);
+    console.error(
+      "[platform] web is running without platform workers. Run npm run workers:doctor -- --repair --require-all with the same DB_URL and worker env, then redeploy."
+    );
+
+    return false;
   }
 }
 
@@ -254,7 +270,12 @@ async function main() {
   }
 
   console.log(`[platform] worker API base URL: ${workerApiBaseUrl}`);
-  await syncWorkerCredentials();
+  const credentialsOk = await checkWorkerCredentials();
+
+  if (!credentialsOk) {
+    return;
+  }
+
   startWorker();
 }
 

@@ -7,7 +7,10 @@ import {
   systemAgentForWorkTaskType
 } from "../lib/system-agents.ts";
 import { hasRequiredCapabilities } from "../lib/task-service-utils.ts";
-import { RUNTIME_WORKER_CREDENTIAL_PROFILES } from "../lib/worker-agent-credentials.ts";
+import {
+  RUNTIME_WORKER_CREDENTIAL_PROFILES,
+  RUNTIME_WORKER_PROFILES
+} from "../lib/worker-agent-credentials.ts";
 
 describe("system agents", () => {
   it("defines a unique operational roster without OpenClaw", () => {
@@ -103,14 +106,17 @@ describe("system agents", () => {
 
   it("starts the stock planner from the default worker roster with membership-scoped keys", () => {
     const runner = readFileSync("workers/runner.ts", "utf8");
+    const profiles = readFileSync("lib/worker-agent-credentials.ts", "utf8");
 
-    assert.match(runner, /const WORKER_PROFILE_MODES:[\s\S]*"stock"/);
+    assert.match(runner, /const WORKER_PROFILE_MODES = RUNTIME_WORKER_PROFILE_MODES/);
+    assert.match(profiles, /RUNTIME_WORKER_PROFILES[\s\S]*"stock"/);
     assert.match(runner, /WORKER_STOCK_AGENT_API_KEYS/);
     assert.match(runner, /function workerAgentKeys/);
     assert.match(runner, /configs\.flatMap/);
-    assert.match(runner, /chat: agentProfile\("chatDispatcher"/);
-    assert.match(runner, /"dispatch_chat_communication_message"/);
-    assert.match(runner, /stock: agentProfile\("retailStockPlanner", RETAIL_AGENT_EXECUTABLE_TASK_TYPES\)/);
+    assert.match(runner, /runtimeWorkerProfileForMode\(mode\)/);
+    assert.match(runner, /agentProfile\(runtimeProfile\.agentKey, runtimeProfile\.taskTypes\)/);
+    assert.match(profiles, /"chat", "chatDispatcher"[\s\S]*"dispatch_chat_communication_message"/);
+    assert.match(profiles, /"stock", "retailStockPlanner"[\s\S]*RETAIL_AGENT_EXECUTABLE_TASK_TYPES/);
     assert.doesNotMatch(runner, /"retail_order_ship"/);
     assert.doesNotMatch(runner, /"retail_purchase_order_receive"/);
   });
@@ -137,5 +143,21 @@ describe("system agents", () => {
       )?.role,
       "retail_agent"
     );
+
+    for (const profile of RUNTIME_WORKER_PROFILES) {
+      const agent = SYSTEM_AGENT_LIST.find(
+        (candidate) => candidate.id === systemAgentForWorkTaskType(profile.taskTypes[0] ?? "").id
+      );
+      const required = profile.taskTypes.flatMap((taskType) =>
+        requiredCapabilitiesForWorkTaskType(taskType)
+      );
+
+      assert.equal(Boolean(agent), true, `${profile.mode} must map to a system agent`);
+      assert.equal(
+        hasRequiredCapabilities(required, agent?.capabilities ?? []),
+        true,
+        `${profile.mode} must advertise every capability it claims`
+      );
+    }
   });
 });

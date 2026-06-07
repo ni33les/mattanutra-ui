@@ -18,11 +18,6 @@ import {
   normalizeProductCountryCode
 } from "@/lib/product-countries";
 import { normalizeCapabilities } from "@/lib/task-service-utils";
-import { SYSTEM_AGENTS } from "@/lib/system-agents";
-import {
-  runtimeWorkerCredentialProfileForToken,
-  type RuntimeWorkerCredentialProfile
-} from "@/lib/worker-agent-credentials";
 import type {
   AccessPrincipal,
   AgentPrincipal,
@@ -264,39 +259,103 @@ function agentPrincipalFromRow(
 
 async function markAgentCredentialUsed(
   sql: NonNullable<ReturnType<typeof getSql>>,
-  input: Readonly<{
-    credentialHash?: string | null;
-    credentialId: string;
-    runtimeProfile?: RuntimeWorkerCredentialProfile | null;
-  }>
+  credentialId: string
 ) {
-  if (input.credentialHash && input.runtimeProfile) {
-    try {
-      await sql`
-        update public.agent_credentials
-        set
-          credential_hash = ${input.credentialHash},
-          last_used_at = now(),
-          metadata = metadata || ${sql.json({
-            runtimeEnvKey: input.runtimeProfile.envKey,
-            runtimeProfileSyncedAt: new Date().toISOString(),
-            runtimeProfileSource: "worker_auth_env_profile"
-          })}::jsonb,
-          updated_at = now()
-        where id = ${input.credentialId}::uuid
-      `;
-
-      return;
-    } catch (error) {
-      console.warn("Unable to resync runtime worker credential hash", error);
-    }
-  }
-
   await sql`
     update public.agent_credentials
     set last_used_at = now(), updated_at = now()
-    where id = ${input.credentialId}::uuid
+    where id = ${credentialId}::uuid
   `;
+}
+
+type AgentAuthFailureRow = Readonly<{
+  agent_status: string | null;
+  credential_expires_at: string | null;
+  credential_id: string | null;
+  credential_revoked_at: string | null;
+  credential_status: string | null;
+  membership_role: string | null;
+  membership_status: string | null;
+  organisation_status: string | null;
+}>;
+
+function authFailureReason(row: AgentAuthFailureRow | null | undefined) {
+  if (!row?.credential_id) {
+    return "credential_hash_not_found";
+  }
+
+  if (row.credential_status !== "active") {
+    return "credential_inactive";
+  }
+
+  if (row.credential_revoked_at) {
+    return "credential_revoked";
+  }
+
+  if (
+    row.credential_expires_at &&
+    new Date(row.credential_expires_at).getTime() <= Date.now()
+  ) {
+    return "credential_expired";
+  }
+
+  if (row.agent_status !== "active") {
+    return "agent_inactive";
+  }
+
+  if (row.membership_status !== "active") {
+    return "membership_inactive";
+  }
+
+  if (
+    row.membership_role !== "platform_agent" &&
+    row.membership_role !== "retail_agent"
+  ) {
+    return "membership_role_invalid";
+  }
+
+  if (row.organisation_status !== "active") {
+    return "organisation_inactive";
+  }
+
+  return "permission_or_capability_denied";
+}
+
+async function logAgentAuthFailure(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  credentialHash: string
+) {
+  try {
+    const rows = await sql<AgentAuthFailureRow[]>`
+      select
+        agent_credentials.id::text as credential_id,
+        agent_credentials.status as credential_status,
+        agent_credentials.revoked_at::text as credential_revoked_at,
+        agent_credentials.expires_at::text as credential_expires_at,
+        agents.status as agent_status,
+        organisation_memberships.role as membership_role,
+        organisation_memberships.status as membership_status,
+        organisations.status as organisation_status
+      from public.agent_credentials
+      left join public.organisation_memberships
+        on organisation_memberships.id = agent_credentials.membership_id
+        and organisation_memberships.agent_id = agent_credentials.agent_id
+        and organisation_memberships.principal_type = 'agent'
+      left join public.agents
+        on agents.id = agent_credentials.agent_id
+      left join public.organisations
+        on organisations.id = organisation_memberships.organisation_id
+      where agent_credentials.credential_hash = ${credentialHash}
+      order by agent_credentials.created_at desc
+      limit 1
+    `;
+
+    console.warn(
+      `[worker-auth] agent credential rejected reason=${authFailureReason(rows[0])}`
+    );
+  } catch (error) {
+    console.warn("[worker-auth] agent credential rejected reason=diagnostic_failed");
+  }
 }
 
 async function agentPrincipalFromToken(
@@ -365,86 +424,14 @@ async function agentPrincipalFromToken(
   const principal = agentPrincipalFromRow(rows[0], options);
 
   if (principal) {
-    await markAgentCredentialUsed(sql, {
-      credentialId: principal.credentialId
-    });
+    await markAgentCredentialUsed(sql, principal.credentialId);
 
     return principal;
   }
 
-  return agentPrincipalFromRuntimeProfileToken(sql, token, credentialHash, options);
-}
+  await logAgentAuthFailure(sql, credentialHash);
 
-async function agentPrincipalFromRuntimeProfileToken(
-  sql: NonNullable<ReturnType<typeof getSql>>,
-  token: string,
-  credentialHash: string,
-  options: ResolveOptions
-): Promise<AgentPrincipal | null> {
-  const profile = runtimeWorkerCredentialProfileForToken(token);
-
-  if (!profile) {
-    return null;
-  }
-
-  const definition = SYSTEM_AGENTS[profile.agentKey];
-  const rows = await sql<AgentPrincipalRow[]>`
-    select
-      agent_credentials.id::text as credential_id,
-      organisation_memberships.id::text as membership_id,
-      agents.id::text as agent_id,
-      agents.name as agent_name,
-      agents.agent_type,
-      organisation_memberships.role,
-      agents.capabilities,
-      organisations.id::text as organisation_id,
-      organisations.slug as organisation_slug,
-      organisations.name as organisation_name,
-      organisations.organisation_type,
-      organisations.status as organisation_status,
-      organisations.default_locale as organisation_default_locale,
-      organisations.country_code as organisation_country_code,
-      organisations.currency as organisation_currency,
-      people.id::text as person_id,
-      people.email as person_email,
-      people.display_name as person_display_name,
-      people.preferred_locale as person_preferred_locale,
-      people.status as person_status
-    from public.agent_credentials
-    join public.organisation_memberships
-      on organisation_memberships.id = agent_credentials.membership_id
-      and organisation_memberships.agent_id = agent_credentials.agent_id
-      and organisation_memberships.principal_type = 'agent'
-    join public.agents
-      on agents.id = agent_credentials.agent_id
-    join public.organisations
-      on organisations.id = organisation_memberships.organisation_id
-    left join public.people
-      on people.id = agents.person_id
-    where agents.id = ${definition.id}::uuid
-      and agent_credentials.metadata->>'envKey' = ${profile.envKey}
-      and organisation_memberships.role = ${profile.role}
-      and agent_credentials.status = 'active'
-      and agent_credentials.revoked_at is null
-      and (agent_credentials.expires_at is null or agent_credentials.expires_at > now())
-      and agents.status = 'active'
-      and organisation_memberships.status = 'active'
-      and organisations.status = 'active'
-    limit 1
-  `;
-  const principal = agentPrincipalFromRow(rows[0], options);
-
-  if (!principal) {
-    return null;
-  }
-
-  await markAgentCredentialUsed(sql, {
-    credentialHash,
-    credentialId: principal.credentialId,
-    runtimeProfile: profile
-  });
-
-  return principal;
+  return null;
 }
 
 function sessionPrincipalFromRequest(

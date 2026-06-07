@@ -33,6 +33,46 @@ export type WorkerRegistration = Readonly<{
   }>;
 }>;
 
+export class WorkerApiError extends Error {
+  readonly bodyText: string;
+  readonly path: string;
+  readonly status: number;
+  readonly url: string;
+
+  constructor(input: Readonly<{
+    bodyText: string;
+    path: string;
+    status: number;
+    url: string;
+  }>) {
+    super(
+      `${input.path} failed with ${input.status}: ${input.bodyText.slice(0, 500)}`
+    );
+    this.bodyText = input.bodyText;
+    this.name = "WorkerApiError";
+    this.path = input.path;
+    this.status = input.status;
+    this.url = input.url;
+  }
+}
+
+export function isWorkerAuthConfigurationError(error: unknown) {
+  if (error instanceof WorkerApiError) {
+    return (
+      error.status === 401 &&
+      /worker api access is not authorized/i.test(error.bodyText)
+    );
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return /\/api\/workers\/register failed with 401: .*worker api access is not authorized/i.test(
+    error.message
+  );
+}
+
 export class WorkerApiClient {
   readonly baseUrl: string;
   readonly token: string;
@@ -69,11 +109,20 @@ export class WorkerApiClient {
       if (!response.ok) {
         const text = await response.text().catch(() => "");
 
-        throw new Error(`${path} failed with ${response.status}: ${text.slice(0, 500)}`);
+        throw new WorkerApiError({
+          bodyText: text,
+          path,
+          status: response.status,
+          url
+        });
       }
 
       return (await response.json()) as T;
     } catch (error) {
+      if (error instanceof WorkerApiError) {
+        throw error;
+      }
+
       const message = error instanceof Error ? error.message : "Unknown error";
       const cause =
         error instanceof Error &&

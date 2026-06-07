@@ -60,6 +60,7 @@ describe("external worker boundaries", () => {
 
   it("keeps worker:all registered as real agents, not an aggregate runtime", async () => {
     const source = await readFile("workers/runner.ts", "utf8");
+    const profileSource = await readFile("lib/worker-agent-credentials.ts", "utf8");
 
     assert.equal(
       source.includes("MattaNutra External Worker"),
@@ -97,24 +98,24 @@ describe("external worker boundaries", () => {
       "worker registration must send profile metadata for freshness reconciliation"
     );
     assert.match(
-      source,
-      /WORKER_PROFILE_MODES[\s\S]*"advisor"[\s\S]*"food"[\s\S]*"formulation"[\s\S]*"healthscore"[\s\S]*"products"/,
+      profileSource,
+      /RUNTIME_WORKER_PROFILES[\s\S]*"advisor"[\s\S]*"food"[\s\S]*"formulation"[\s\S]*"healthscore"[\s\S]*"products"/,
       "worker:all must include every active customer task profile"
     );
     assert.match(
-      source,
-      /food:\s*agentProfile\("foodGuidanceWorker",\s*\[\s*"generate_food_gap_guidance"\s*\]\)/,
-      "food workers must explicitly claim the post-product food gap task"
+      profileSource,
+      /"food", "foodGuidanceWorker"[\s\S]*"generate_food_gap_guidance"/,
+      "food workers must explicitly claim the post-product food gap task from the shared profile registry"
     );
     assert.match(
-      source,
-      /formulation:\s*agentProfile\("formulationWorker",\s*\[[\s\S]*"generate_supplement_guidance"[\s\S]*\]\)/,
-      "formulation workers must explicitly claim formulation tasks"
+      profileSource,
+      /"formulation",[\s\S]*"formulationWorker"[\s\S]*"generate_supplement_guidance"/,
+      "formulation workers must explicitly claim formulation tasks from the shared profile registry"
     );
     assert.match(
-      source,
-      /healthscore:\s*agentProfile\("healthScoreEngine",\s*\[\s*"analyze_healthscore"\s*\]\)/,
-      "healthscore workers must explicitly claim healthscore tasks"
+      profileSource,
+      /"healthscore", "healthScoreEngine"[\s\S]*"analyze_healthscore"/,
+      "healthscore workers must explicitly claim healthscore tasks from the shared profile registry"
     );
     assert.match(
       source,
@@ -130,6 +131,16 @@ describe("external worker boundaries", () => {
       source,
       /task lease renewal/,
       "agent task lease renewals must be retried and logged"
+    );
+    assert.match(
+      source,
+      /isWorkerAuthConfigurationError/,
+      "worker auth 401s must be classified as configuration failures"
+    );
+    assert.match(
+      source,
+      /stopped: worker API credential is not authorized/,
+      "worker auth configuration failures must stop the affected profile instead of retrying forever"
     );
   });
 
@@ -161,6 +172,16 @@ describe("external worker boundaries", () => {
       platformSource,
       /web is running without platform workers/,
       "missing worker credentials must not prevent the web service from booting"
+    );
+    assert.match(
+      platformSource,
+      /scripts\/workers-doctor\.ts[\s\S]*--require-all/,
+      "start:platform must run the deterministic worker auth doctor before launching workers"
+    );
+    assert.doesNotMatch(
+      platformSource,
+      /sync-runtime-worker-credentials/,
+      "start:platform must not repair worker credentials implicitly at runtime"
     );
     assert.match(
       platformSource,

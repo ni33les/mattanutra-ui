@@ -2,12 +2,20 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import nextEnv from "@next/env";
 import { executeTaskWorkItem } from "../lib/task-execution.ts";
-import { RETAIL_AGENT_EXECUTABLE_TASK_TYPES } from "../lib/retail-task-policy.ts";
 import {
   SYSTEM_AGENTS,
   type SystemAgentKey
 } from "../lib/system-agents.ts";
-import { WorkerApiClient, type WorkerAgentConfig } from "./api-client.ts";
+import {
+  RUNTIME_WORKER_PROFILE_MODES,
+  runtimeWorkerProfileForMode,
+  type WorkerProfileMode
+} from "../lib/worker-agent-credentials.ts";
+import {
+  isWorkerAuthConfigurationError,
+  WorkerApiClient,
+  type WorkerAgentConfig
+} from "./api-client.ts";
 
 nextEnv.loadEnvConfig(process.cwd());
 
@@ -25,7 +33,6 @@ type WorkerMode =
   | "products"
   | "stock"
   | "supplement";
-type WorkerProfileMode = Exclude<WorkerMode, "all" | "supplement">;
 
 const DEFAULT_POLL_WAIT_SECONDS = 20;
 const DEFAULT_LEASE_SECONDS = 900;
@@ -34,21 +41,10 @@ const INITIAL_AGENT_RESTART_BACKOFF_MS = 1_000;
 const MAX_AGENT_RESTART_BACKOFF_MS = 30_000;
 const MAX_POLLING_BACKOFF_MS = 30_000;
 const MAX_WORKER_PROFILE_CONCURRENCY = 8;
+const WORKER_AUTH_CONFIGURATION_EXIT_CODE = 78;
 const WORKER_PROFILE_STARTUP_STAGGER_MS = 350;
 const WORKER_RUN_ID = randomUUID();
-const WORKER_PROFILE_MODES: readonly WorkerProfileMode[] = [
-  "advisor",
-  "chat",
-  "communications",
-  "content",
-  "email",
-  "food",
-  "formulation",
-  "healthscore",
-  "hosting",
-  "products",
-  "stock"
-];
+const WORKER_PROFILE_MODES = RUNTIME_WORKER_PROFILE_MODES;
 
 type ActiveSession = Readonly<{
   agentId: string;
@@ -59,6 +55,7 @@ type ActiveSession = Readonly<{
 type WorkerHeartbeatStatus = "idle" | "working";
 
 const activeSessions = new Map<string, ActiveSession>();
+let fatalAuthProfileFailure = false;
 let shuttingDown = false;
 
 function envText(name: string, fallback = "") {
@@ -113,6 +110,10 @@ async function retryApiCall<T>(
       return await operation();
     } catch (error) {
       lastError = error;
+
+      if (isWorkerAuthConfigurationError(error)) {
+        throw error;
+      }
 
       if (attempt < attempts) {
         await sleep(jitter(750 * attempt));
@@ -174,42 +175,14 @@ function agentProfile(
   };
 }
 
-const WORKER_PROFILES: Record<WorkerProfileMode, WorkerAgentConfig> = {
-  advisor: agentProfile("nutritionPlanAdvisor", [
-    "nutrition_plan_chat_reply",
-    "refine_nutrition_plan"
-  ]),
-  chat: agentProfile("chatDispatcher", [
-    "dispatch_chat_communication_message"
-  ]),
-  communications: agentProfile("communicationsCoordinator", [
-    "client_safety_followup",
-    "route_admin_communication"
-  ]),
-  content: agentProfile("contentPublisher", ["content_status_change"]),
-  email: agentProfile("emailDispatcher", [
-    "dispatch_email_communication_message",
-    "send_example_email",
-    "send_reassessment_email",
-    "send_retail_order_workflow_email"
-  ]),
-  food: agentProfile("foodGuidanceWorker", ["generate_food_gap_guidance"]),
-  formulation: agentProfile("formulationWorker", [
-    "generate_example_supplement_guidance",
-    "generate_supplement_guidance"
-  ]),
-  healthscore: agentProfile("healthScoreEngine", ["analyze_healthscore"]),
-  hosting: agentProfile("scheduler", ["sync_digitalocean_billing"]),
-  products: agentProfile("productMatcher", [
-    "generate_product_recommendations",
-    "source_product_fda_approvals",
-    "source_product_identifiers"
-  ]),
-  stock: agentProfile("retailStockPlanner", RETAIL_AGENT_EXECUTABLE_TASK_TYPES)
-};
-
 function profileForMode(mode: WorkerProfileMode) {
-  return WORKER_PROFILES[mode];
+  const runtimeProfile = runtimeWorkerProfileForMode(mode);
+
+  if (!runtimeProfile) {
+    throw new Error(`Worker profile ${mode} is not configured`);
+  }
+
+  return agentProfile(runtimeProfile.agentKey, runtimeProfile.taskTypes);
 }
 
 function workerConcurrency(mode: WorkerProfileMode) {
@@ -561,6 +534,14 @@ async function runSupervisedAgentLoop(
       await runAgentLoop(mode, config, slotIndex, slotCount);
       restartBackoffMs = INITIAL_AGENT_RESTART_BACKOFF_MS;
     } catch (error) {
+      if (isWorkerAuthConfigurationError(error)) {
+        fatalAuthProfileFailure = true;
+        console.error(
+          `[agent] ${agentName}${slotLabel} stopped: worker API credential is not authorized. Run workers:doctor --require-all and repair this profile before restarting workers.`
+        );
+        return;
+      }
+
       console.error(
         `[agent] ${agentName}${slotLabel} loop failed: ${errorMessage(error)}`
       );
@@ -617,6 +598,10 @@ async function runWorker(mode: WorkerMode) {
   });
 
   await Promise.all(loops);
+
+  if (fatalAuthProfileFailure) {
+    process.exitCode = WORKER_AUTH_CONFIGURATION_EXIT_CODE;
+  }
 }
 
 const mode = workerMode(process.argv[2] ?? process.env.WORKER_MODE);

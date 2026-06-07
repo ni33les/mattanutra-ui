@@ -186,9 +186,11 @@ describe("process runtime technical debt sweep", () => {
     const taskService = await readFile("lib/task-service.ts", "utf8");
     const registry = await readFile("lib/retail-command-registry.ts", "utf8");
     const policy = await readFile("lib/retail-task-policy.ts", "utf8");
+    const workerProfiles = await readFile("lib/worker-agent-credentials.ts", "utf8");
 
     assert.match(policy, /RETAIL_AGENT_EXECUTABLE_TASK_TYPES[\s\S]*retail_customer_order_allocate[\s\S]*retail_shopping_list_review[\s\S]*retail_stock_forecast_refresh/);
-    assert.match(runner, /stock: agentProfile\("retailStockPlanner", RETAIL_AGENT_EXECUTABLE_TASK_TYPES\)/);
+    assert.match(runner, /runtimeWorkerProfileForMode\(mode\)/);
+    assert.match(workerProfiles, /"stock", "retailStockPlanner"[\s\S]*RETAIL_AGENT_EXECUTABLE_TASK_TYPES/);
     for (const humanTask of [
       "retail_order_cancel_review",
       "retail_order_delivery_confirm",

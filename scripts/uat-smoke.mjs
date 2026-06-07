@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { spawn } from "node:child_process";
 import postgres from "postgres";
 
 const targetBaseUrl = (
@@ -32,20 +33,23 @@ const criticalTaskTypes = [
   "route_admin_communication",
   "send_retail_order_workflow_email"
 ];
-const requiredUatAppEnvKeys = [
-  "WORKER_ADVISOR_AGENT_API_KEY",
-  "WORKER_CHAT_AGENT_API_KEY",
-  "WORKER_COMMUNICATIONS_AGENT_API_KEY",
-  "WORKER_CONTENT_AGENT_API_KEY",
-  "WORKER_EMAIL_AGENT_API_KEY",
-  "WORKER_FOOD_AGENT_API_KEY",
-  "WORKER_FORMULATION_AGENT_API_KEY",
-  "WORKER_HEALTHSCORE_AGENT_API_KEY",
-  "WORKER_HOSTING_AGENT_API_KEY",
-  "WORKER_PRODUCTS_AGENT_API_KEY",
-  "WORKER_STOCK_AGENT_API_KEY"
+const requiredWorkerProfiles = [
+  { envKey: "WORKER_ADVISOR_AGENT_API_KEY", mode: "advisor" },
+  { envKey: "WORKER_CHAT_AGENT_API_KEY", mode: "chat" },
+  { envKey: "WORKER_COMMUNICATIONS_AGENT_API_KEY", mode: "communications" },
+  { envKey: "WORKER_CONTENT_AGENT_API_KEY", mode: "content" },
+  { envKey: "WORKER_EMAIL_AGENT_API_KEY", mode: "email" },
+  { envKey: "WORKER_FOOD_AGENT_API_KEY", mode: "food" },
+  { envKey: "WORKER_FORMULATION_AGENT_API_KEY", mode: "formulation" },
+  { envKey: "WORKER_HEALTHSCORE_AGENT_API_KEY", mode: "healthscore" },
+  { envKey: "WORKER_HOSTING_AGENT_API_KEY", mode: "hosting" },
+  { envKey: "WORKER_PRODUCTS_AGENT_API_KEY", mode: "products" },
+  { envKey: "WORKER_STOCK_AGENT_API_KEY", mode: "stock" }
 ];
+const requiredUatAppEnvKeys = requiredWorkerProfiles.map((profile) => profile.envKey);
 const checks = [];
+let digitalOceanAppId = null;
+let digitalOceanDeploymentId = null;
 
 // No destructive database writes are performed by this script.
 
@@ -119,6 +123,8 @@ async function checkDigitalOceanDeployment() {
       return;
     }
 
+    digitalOceanAppId = appId;
+
     const appResponse = await fetch(`https://api.digitalocean.com/v2/apps/${appId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -141,6 +147,7 @@ async function checkDigitalOceanDeployment() {
     const data = await response.json();
     const active = data.deployments?.[0];
     const ok = active?.phase === "ACTIVE";
+    digitalOceanDeploymentId = active?.id ?? null;
 
     record(
       "DigitalOcean deployment",
@@ -154,6 +161,119 @@ async function checkDigitalOceanDeployment() {
       error instanceof Error ? error.message : "deployment check failed"
     );
   }
+}
+
+async function checkRecentRuntimeLogs() {
+  const token = process.env.DIGITALOCEAN_ACCESS_TOKEN?.trim();
+
+  if (!token || !digitalOceanAppId || !digitalOceanDeploymentId) {
+    record("worker auth runtime logs", false, "DigitalOcean deployment log context unavailable", "warn");
+    return;
+  }
+
+  const componentName =
+    process.env.UAT_DIGITALOCEAN_COMPONENT_NAME?.trim() ||
+    process.env.UAT_DIGITALOCEAN_SERVICE_NAME?.trim() ||
+    "mattanutra-ui";
+
+  try {
+    const response = await fetch(
+      `https://api.digitalocean.com/v2/apps/${digitalOceanAppId}/deployments/${digitalOceanDeploymentId}/components/${componentName}/logs?type=RUN`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    if (!response.ok) {
+      record(
+        "worker auth runtime logs",
+        false,
+        `log endpoint status=${response.status}`,
+        "warn"
+      );
+      return;
+    }
+
+    const data = await response.json();
+    const urls = [
+      ...(Array.isArray(data.historic_urls) ? data.historic_urls : []),
+      data.live_url
+    ].filter(Boolean);
+
+    if (urls.length < 1) {
+      record("worker auth runtime logs", false, "no runtime log URLs returned", "warn");
+      return;
+    }
+
+    const textParts = await Promise.all(
+      urls.slice(0, 3).map(async (url) => {
+        const logResponse = await fetch(url);
+
+        return logResponse.ok ? logResponse.text() : "";
+      })
+    );
+    const logs = textParts.join("\n");
+    const hasWorker401 = /\/api\/workers\/register failed with 401|Worker API access is not authorized/i.test(logs);
+
+    record(
+      "worker auth runtime logs",
+      !hasWorker401,
+      hasWorker401 ? "worker registration 401 found in active deployment logs" : "no worker registration 401 found"
+    );
+  } catch (error) {
+    record(
+      "worker auth runtime logs",
+      false,
+      error instanceof Error ? error.message : "runtime log check failed",
+      "warn"
+    );
+  }
+}
+
+function runWorkerDoctor(connection) {
+  return new Promise((resolve) => {
+    const child = spawn(
+      process.execPath,
+      [
+        "--env-file-if-exists=.env.local",
+        "--experimental-strip-types",
+        "--import",
+        "./scripts/register-ts-path-loader.mjs",
+        "scripts/workers-doctor.ts",
+        "--require-all",
+        "--json"
+      ],
+      {
+        env: {
+          ...process.env,
+          DB_URL: connection
+        },
+        stdio: ["ignore", "pipe", "pipe"]
+      }
+    );
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    child.on("error", (error) => {
+      resolve({
+        code: 1,
+        error: error instanceof Error ? error.message : String(error),
+        stdout,
+        stderr
+      });
+    });
+    child.on("exit", (code) => {
+      resolve({
+        code: code ?? 1,
+        stdout,
+        stderr
+      });
+    });
+  });
 }
 
 function configuredEnvKeysFromAppSpec(spec) {
@@ -311,20 +431,58 @@ async function checkDatabase() {
 
     const workerRows = await sql`
       select
-        count(*) filter (
-          where status <> 'offline'
-            and last_seen_at >= now() - interval '10 minutes'
-        )::int as recent_workers,
-        count(*) filter (where status <> 'offline')::int as active_workers
-      from public.worker_sessions
+        expected.env_key,
+        expected.mode,
+        agents.name as agent_name,
+        count(worker_sessions.id) filter (
+          where worker_sessions.status <> 'offline'
+            and worker_sessions.last_seen_at >= now() - interval '2 minutes'
+        )::int as fresh_sessions,
+        max(worker_sessions.last_seen_at)::text as last_seen_at
+      from unnest(
+        ${requiredWorkerProfiles.map((profile) => profile.envKey)}::text[],
+        ${requiredWorkerProfiles.map((profile) => profile.mode)}::text[]
+      ) as expected(env_key, mode)
+      left join public.agent_credentials
+        on agent_credentials.metadata->>'envKey' = expected.env_key
+        and agent_credentials.status = 'active'
+        and agent_credentials.revoked_at is null
+        and (agent_credentials.expires_at is null or agent_credentials.expires_at > now())
+      left join public.agents
+        on agents.id = agent_credentials.agent_id
+      left join public.worker_sessions
+        on worker_sessions.agent_id = agent_credentials.agent_id
+        and worker_sessions.membership_id = agent_credentials.membership_id
+      group by expected.env_key, expected.mode, agents.name
+      order by expected.mode
     `;
-    const worker = workerRows[0];
+    const staleWorkerProfiles = workerRows.filter(
+      (row) => Number(row.fresh_sessions ?? 0) < 1
+    );
 
     record(
       "workers registered",
-      Number(worker?.recent_workers ?? 0) > 0,
-      `recent=${worker?.recent_workers ?? 0} active=${worker?.active_workers ?? 0}`
+      staleWorkerProfiles.length === 0,
+      staleWorkerProfiles.length === 0
+        ? `${requiredWorkerProfiles.length} required profiles fresh`
+        : `stale=${staleWorkerProfiles.map((row) => row.mode).join(", ")}`
     );
+
+    const doctor = await runWorkerDoctor(connection);
+    let doctorDetails = `exit=${doctor.code}`;
+
+    try {
+      const payload = JSON.parse(doctor.stdout || "{}");
+      doctorDetails += ` failures=${payload.failureCount ?? "unknown"}`;
+    } catch {
+      if (doctor.error) {
+        doctorDetails += ` ${doctor.error}`;
+      } else if (doctor.stderr) {
+        doctorDetails += ` ${doctor.stderr.trim().slice(0, 180)}`;
+      }
+    }
+
+    record("worker auth doctor", doctor.code === 0, doctorDetails);
 
     const stuckRows = await sql`
       select count(*)::int as stuck_count
@@ -375,6 +533,7 @@ async function main() {
   await checkDigitalOceanDeployment();
   await checkLineWebhook();
   await checkDatabase();
+  await checkRecentRuntimeLogs();
 
   const failures = checks.filter((check) => !check.ok && check.severity !== "warn");
   const warnings = checks.filter((check) => !check.ok && check.severity === "warn");
