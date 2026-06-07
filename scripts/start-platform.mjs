@@ -71,6 +71,31 @@ function startProcess(name, command, args, env = process.env) {
   return child;
 }
 
+function runOneShotProcess(name, command, args, env = process.env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      env,
+      stdio: "inherit"
+    });
+
+    console.log(`[platform] started ${name} pid=${child.pid}`);
+
+    child.on("error", reject);
+    child.on("exit", (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      reject(
+        new Error(
+          `${name} exited code=${code ?? "null"} signal=${signal ?? "null"}`
+        )
+      );
+    });
+  });
+}
+
 function connectToPort() {
   return new Promise((resolve, reject) => {
     const socket = net.connect({ host: probeHost, port }, () => {
@@ -181,6 +206,27 @@ function startWorker() {
   );
 }
 
+async function syncWorkerCredentials() {
+  try {
+    await runOneShotProcess(
+      "worker credential sync",
+      process.execPath,
+      [
+        "--env-file-if-exists=.env.local",
+        "--experimental-strip-types",
+        "--import",
+        "./scripts/register-ts-path-loader.mjs",
+        "scripts/sync-runtime-worker-credentials.ts"
+      ],
+      process.env
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    console.error(`[platform] worker credential sync failed: ${message}`);
+  }
+}
+
 async function main() {
   if (!Number.isInteger(port) || port <= 0) {
     throw new Error(`Invalid PORT/NEXT_PORT value: ${process.env.PORT}`);
@@ -208,6 +254,7 @@ async function main() {
   }
 
   console.log(`[platform] worker API base URL: ${workerApiBaseUrl}`);
+  await syncWorkerCredentials();
   startWorker();
 }
 
