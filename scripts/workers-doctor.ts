@@ -15,6 +15,7 @@ import {
 } from "@/lib/task-service-utils";
 
 type Db = postgres.Sql;
+const retiredDatabaseUrlKey = ["DATABASE", "URL"].join("_");
 
 type DoctorArgs = Readonly<{
   json: boolean;
@@ -64,6 +65,65 @@ function parseArgs(argv: readonly string[]): DoctorArgs {
 
 function envText(name: string) {
   return process.env[name]?.trim() || "";
+}
+
+function envValueState(value: string | undefined) {
+  if (value === undefined) {
+    return "missing";
+  }
+
+  return value.trim() ? "present" : "blank";
+}
+
+function normalizeEnvKeyForShape(key: string) {
+  return key.replace(/[^a-z0-9]/gi, "").toUpperCase();
+}
+
+function describeRuntimeEnv(env: NodeJS.ProcessEnv = process.env) {
+  const keys = Object.keys(env);
+  const dbLikeKeys = keys
+    .filter((key) => {
+      const normalized = normalizeEnvKeyForShape(key);
+
+      return normalized.includes("DB") && normalized.includes("URL");
+    })
+    .sort();
+  const dbUrlVariantKeys = keys
+    .filter(
+      (key) =>
+        key !== "DB_URL" &&
+        key.trim().toUpperCase() === "DB_URL"
+    )
+    .sort();
+  const workerAgentKeyCount = Object.entries(env).filter(
+    ([key, value]) =>
+      key.startsWith("WORKER_") &&
+      key.endsWith("_AGENT_API_KEY") &&
+      value?.trim()
+  ).length;
+  const hasDbUrlKey = Object.prototype.hasOwnProperty.call(env, "DB_URL");
+
+  return {
+    dbLikeKeys,
+    dbUrlKeyExists: hasDbUrlKey,
+    dbUrlState: hasDbUrlKey ? envValueState(env.DB_URL) : "missing",
+    dbUrlVariantKeys,
+    retiredDatabaseUrlPresent: Object.prototype.hasOwnProperty.call(
+      env,
+      retiredDatabaseUrlKey
+    ),
+    workerAgentKeyCount
+  };
+}
+
+function logRuntimeEnvDiagnostic(label: string, options: { force?: boolean } = {}) {
+  if (!options.force && process.env.PLATFORM_ENV_DIAGNOSTICS !== "1") {
+    return;
+  }
+
+  console.error(
+    `[workers:doctor-env] ${label} ${JSON.stringify(describeRuntimeEnv())}`
+  );
 }
 
 function connectionString() {
@@ -322,6 +382,7 @@ function printTextReport(checks: readonly WorkerProfileCheck[]) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  logRuntimeEnvDiagnostic("startup");
   const connection = connectionString();
 
   if (!connection) {
@@ -336,6 +397,7 @@ async function main() {
       console.error("[workers:doctor] DB_URL is required");
     }
 
+    logRuntimeEnvDiagnostic("missing-db-url", { force: true });
     process.exitCode = 1;
     return;
   }

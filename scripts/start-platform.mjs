@@ -2,7 +2,33 @@ import { spawn } from "node:child_process";
 import net from "node:net";
 import nextEnv from "@next/env";
 
+const retiredDatabaseUrlKey = ["DATABASE", "URL"].join("_");
+const runtimeEnvBeforeLoad = describeRuntimeEnv(process.env);
+const dbUrlBeforeLoad = process.env.DB_URL;
+
+logRuntimeEnvDiagnostic("before-loadEnvConfig", runtimeEnvBeforeLoad);
 nextEnv.loadEnvConfig(process.cwd());
+
+const runtimeEnvAfterLoad = describeRuntimeEnv(process.env);
+let restoredDbUrlAfterEnvLoad = false;
+
+if (dbUrlBeforeLoad?.trim() && !process.env.DB_URL?.trim()) {
+  process.env.DB_URL = dbUrlBeforeLoad;
+  restoredDbUrlAfterEnvLoad = true;
+}
+
+const runtimeEnvAfterRestore = describeRuntimeEnv(process.env);
+
+logRuntimeEnvDiagnostic("after-loadEnvConfig", runtimeEnvAfterLoad);
+
+if (restoredDbUrlAfterEnvLoad) {
+  console.error(
+    "[platform] DB_URL was restored after local env loading removed or blanked it."
+  );
+  logRuntimeEnvDiagnostic("after-db-url-restore", runtimeEnvAfterRestore, {
+    force: true
+  });
+}
 
 const port = Number(process.env.PORT || process.env.NEXT_PORT || 3000);
 const bindHost = process.env.PLATFORM_BIND_HOST || "0.0.0.0";
@@ -20,17 +46,79 @@ const children = new Map();
 let shuttingDown = false;
 let workerRestartDelayMs = 1_000;
 
+function envValueState(value) {
+  if (value === undefined) {
+    return "missing";
+  }
+
+  return String(value).trim() ? "present" : "blank";
+}
+
+function normalizeEnvKeyForShape(key) {
+  return key.replace(/[^a-z0-9]/gi, "").toUpperCase();
+}
+
+function visibleWorkerAgentKeys(env = process.env) {
+  return Object.entries(env)
+    .filter(
+      ([key, value]) =>
+        key.startsWith("WORKER_") &&
+        key.endsWith("_AGENT_API_KEY") &&
+        value?.trim()
+    )
+    .map(([key]) => key)
+    .sort();
+}
+
+function describeRuntimeEnv(env = process.env) {
+  const keys = Object.keys(env);
+  const hasDbUrlKey = Object.prototype.hasOwnProperty.call(env, "DB_URL");
+  const dbLikeKeys = keys
+    .filter((key) => {
+      const normalized = normalizeEnvKeyForShape(key);
+
+      return normalized.includes("DB") && normalized.includes("URL");
+    })
+    .sort();
+  const dbUrlVariantKeys = keys
+    .filter(
+      (key) =>
+        key !== "DB_URL" &&
+        key.trim().toUpperCase() === "DB_URL"
+    )
+    .sort();
+  const workerAgentKeys = visibleWorkerAgentKeys(env);
+
+  return {
+    dbLikeKeys,
+    dbUrlKeyExists: hasDbUrlKey,
+    dbUrlState: hasDbUrlKey ? envValueState(env.DB_URL) : "missing",
+    dbUrlVariantKeys,
+    retiredDatabaseUrlPresent: Object.prototype.hasOwnProperty.call(
+      env,
+      retiredDatabaseUrlKey
+    ),
+    workerAgentKeyCount: workerAgentKeys.length,
+    workerAgentKeys
+  };
+}
+
+function logRuntimeEnvDiagnostic(label, summary, options = {}) {
+  if (!options.force && process.env.PLATFORM_ENV_DIAGNOSTICS !== "1") {
+    return;
+  }
+
+  console.error(
+    `[platform-env] ${label} ${JSON.stringify(summary)}`
+  );
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function workerAgentKeyConfigured() {
-  return Object.entries(process.env).some(
-    ([key, value]) =>
-      key.startsWith("WORKER_") &&
-      key.endsWith("_AGENT_API_KEY") &&
-      value?.trim()
-  );
+  return visibleWorkerAgentKeys().length > 0;
 }
 
 function startProcess(name, command, args, env = process.env) {
@@ -215,9 +303,27 @@ function startWorker() {
 }
 
 async function checkWorkerCredentials() {
+  const runtimeEnvBeforePreflight = describeRuntimeEnv(process.env);
+
+  logRuntimeEnvDiagnostic(
+    "before-worker-preflight",
+    runtimeEnvBeforePreflight
+  );
+
   if (!process.env.DB_URL?.trim()) {
     console.error(
       "[platform] DB_URL is not visible in the runtime process; web is running without platform workers. Confirm DB_URL is RUN_TIME/RUN_AND_BUILD_TIME for the mattanutra-ui runtime and redeploy after changing env."
+    );
+    logRuntimeEnvDiagnostic(
+      "worker-preflight-missing-db-url",
+      {
+        afterLoadEnvConfig: runtimeEnvAfterLoad,
+        afterRestore: runtimeEnvAfterRestore,
+        beforeLoadEnvConfig: runtimeEnvBeforeLoad,
+        beforeWorkerPreflight: runtimeEnvBeforePreflight,
+        restoredDbUrlAfterEnvLoad
+      },
+      { force: true }
     );
     return false;
   }

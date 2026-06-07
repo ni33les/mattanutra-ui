@@ -154,6 +154,36 @@ describe("external worker boundaries", () => {
       "start:platform must load .env.local before checking profile agent keys and spawning workers"
     );
     assert.match(
+      platformSource,
+      /runtimeEnvBeforeLoad = describeRuntimeEnv\(process\.env\)/,
+      "start:platform must capture the runtime env before local env loading"
+    );
+    assert.match(
+      platformSource,
+      /runtimeEnvAfterLoad = describeRuntimeEnv\(process\.env\)/,
+      "start:platform must capture the runtime env after local env loading"
+    );
+    assert.match(
+      platformSource,
+      /dbUrlBeforeLoad\?\.trim\(\) && !process\.env\.DB_URL\?\.trim\(\)/,
+      "start:platform must restore a pre-existing DB_URL if local env loading blanks it"
+    );
+    assert.match(
+      platformSource,
+      /worker-preflight-missing-db-url/,
+      "start:platform must emit safe diagnostics when DB_URL is absent before worker preflight"
+    );
+    assert.match(
+      platformSource,
+      /workerAgentKeyCount/,
+      "runtime env diagnostics must include visible worker key counts"
+    );
+    assert.match(
+      platformSource,
+      /dbUrlVariantKeys/,
+      "runtime env diagnostics must include malformed DB_URL key variants"
+    );
+    assert.match(
       runnerSource,
       /nextEnv\.loadEnvConfig\(process\.cwd\(\)\)/,
       "direct worker commands must load .env.local before registering with the worker API"

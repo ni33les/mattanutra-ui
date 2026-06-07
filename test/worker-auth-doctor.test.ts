@@ -21,6 +21,10 @@ describe("worker auth doctor", () => {
     assert.match(doctorSource, /credential_hash_mismatch/);
     assert.match(doctorSource, /missing_tasks_write_permission/);
     assert.match(doctorSource, /missing_required_capability/);
+    assert.match(doctorSource, /workers:doctor-env/);
+    assert.match(doctorSource, /missing-db-url/);
+    assert.match(doctorSource, /workerAgentKeyCount/);
+    assert.match(doctorSource, /dbUrlVariantKeys/);
   });
 
   it("keeps worker credential repair out of request-time auth", () => {
