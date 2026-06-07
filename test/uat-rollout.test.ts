@@ -22,6 +22,10 @@ const uatMinimalSeedScript = readFileSync(
   new URL("../scripts/seed-uat-minimal-runtime.ts", import.meta.url),
   "utf8"
 );
+const workerCredentialProfiles = readFileSync(
+  new URL("../lib/worker-agent-credentials.ts", import.meta.url),
+  "utf8"
+);
 
 function indexOf(tableName: string, order: readonly string[]) {
   const index = order.indexOf(tableName);
@@ -136,8 +140,8 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.match(uatMinimalSeedScript, /delight-pharmacy/);
     assert.match(uatMinimalSeedScript, /stock_quantity = 0/);
     assert.match(uatMinimalSeedScript, /stockQuantityResetToZero/);
-    assert.match(uatMinimalSeedScript, /WORKER_PRODUCTS_AGENT_API_KEY/);
-    assert.match(uatMinimalSeedScript, /source_product_fda_approvals|source_product_identifiers|productMatcher/);
+    assert.match(workerCredentialProfiles, /WORKER_PRODUCTS_AGENT_API_KEY/);
+    assert.match(workerCredentialProfiles, /productMatcher/);
   });
 
   it("keeps runtime and admin audit tables out of the curated master snapshot", () => {

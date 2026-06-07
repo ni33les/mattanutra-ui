@@ -2,6 +2,7 @@ import postgres from "postgres";
 import { hashAdminToken } from "@/lib/admin-session-cookie";
 import { toJsonValue } from "@/lib/assessment-store";
 import { SYSTEM_AGENTS, type SystemAgentKey } from "@/lib/system-agents";
+import { RUNTIME_WORKER_CREDENTIAL_PROFILES } from "@/lib/worker-agent-credentials";
 
 type Db = postgres.Sql;
 
@@ -42,19 +43,8 @@ type WorkerCredentialSeed = Readonly<{
   role: "platform_agent" | "retail_agent";
 }>;
 
-const workerCredentialSeeds: readonly WorkerCredentialSeed[] = [
-  { agentKey: "nutritionPlanAdvisor", envKey: "WORKER_ADVISOR_AGENT_API_KEY", role: "platform_agent" },
-  { agentKey: "chatDispatcher", envKey: "WORKER_CHAT_AGENT_API_KEY", role: "platform_agent" },
-  { agentKey: "communicationsCoordinator", envKey: "WORKER_COMMUNICATIONS_AGENT_API_KEY", role: "platform_agent" },
-  { agentKey: "contentPublisher", envKey: "WORKER_CONTENT_AGENT_API_KEY", role: "platform_agent" },
-  { agentKey: "emailDispatcher", envKey: "WORKER_EMAIL_AGENT_API_KEY", role: "platform_agent" },
-  { agentKey: "foodGuidanceWorker", envKey: "WORKER_FOOD_AGENT_API_KEY", role: "platform_agent" },
-  { agentKey: "formulationWorker", envKey: "WORKER_FORMULATION_AGENT_API_KEY", role: "platform_agent" },
-  { agentKey: "healthScoreEngine", envKey: "WORKER_HEALTHSCORE_AGENT_API_KEY", role: "platform_agent" },
-  { agentKey: "scheduler", envKey: "WORKER_HOSTING_AGENT_API_KEY", role: "platform_agent" },
-  { agentKey: "productMatcher", envKey: "WORKER_PRODUCTS_AGENT_API_KEY", role: "platform_agent" },
-  { agentKey: "retailStockPlanner", envKey: "WORKER_STOCK_AGENT_API_KEY", role: "retail_agent" }
-];
+const workerCredentialSeeds: readonly WorkerCredentialSeed[] =
+  RUNTIME_WORKER_CREDENTIAL_PROFILES;
 
 const retailPreferenceEvents = [
   "retail_order_created",

@@ -18,6 +18,11 @@ import {
   normalizeProductCountryCode
 } from "@/lib/product-countries";
 import { normalizeCapabilities } from "@/lib/task-service-utils";
+import { SYSTEM_AGENTS } from "@/lib/system-agents";
+import {
+  runtimeWorkerCredentialProfileForToken,
+  type RuntimeWorkerCredentialProfile
+} from "@/lib/worker-agent-credentials";
 import type {
   AccessPrincipal,
   AgentPrincipal,
@@ -159,6 +164,141 @@ function hasCapabilities(
   return requiredCapabilities.every((capability) => agentCapabilities.has(capability));
 }
 
+type AgentPrincipalRow = Readonly<{
+  agent_id: string;
+  agent_name: string;
+  agent_type: string;
+  capabilities: string[] | null;
+  credential_id: string;
+  membership_id: string;
+  organisation_country_code: string | null;
+  organisation_id: string;
+  organisation_currency: string | null;
+  organisation_default_locale: string;
+  organisation_name: string;
+  organisation_slug: string;
+  organisation_status: string;
+  organisation_type: string;
+  person_display_name: string | null;
+  person_email: string | null;
+  person_id: string | null;
+  person_preferred_locale: string | null;
+  person_status: string | null;
+  role: string;
+}>;
+
+function agentPrincipalFromRow(
+  row: AgentPrincipalRow | null | undefined,
+  options: ResolveOptions
+): AgentPrincipal | null {
+  const role =
+    row?.role === "platform_agent" || row?.role === "retail_agent"
+      ? row.role
+      : null;
+
+  if (!row || !role) {
+    return null;
+  }
+
+  const principal: AgentPrincipal = {
+    agentId: row.agent_id,
+    agentName: row.agent_name,
+    capabilities: normalizeCapabilities(row.capabilities),
+    credentialId: row.credential_id,
+    membershipId: row.membership_id,
+    organisation: {
+      countryCode:
+        normalizeProductCountryCode(row.organisation_country_code) ??
+        defaultProductCountryCode,
+      currency:
+        typeof row.organisation_currency === "string" &&
+        /^[A-Z]{3}$/.test(row.organisation_currency)
+          ? row.organisation_currency
+          : row.organisation_type === "platform"
+            ? "USD"
+            : "THB",
+      defaultLocale:
+        row.organisation_default_locale === "th" ||
+        row.organisation_default_locale === "zh-CN"
+          ? row.organisation_default_locale
+          : "en",
+      id: row.organisation_id,
+      name: row.organisation_name,
+      slug: row.organisation_slug,
+      status:
+        row.organisation_status === "archived" ||
+        row.organisation_status === "disabled"
+          ? row.organisation_status
+          : "active",
+      type: row.organisation_type === "tenant" ? "tenant" : "platform"
+    },
+    permissions: [...permissionsForAgentRole(role)],
+    person: row.person_id
+      ? {
+          displayName: row.person_display_name ?? row.person_email ?? row.agent_name,
+          email: row.person_email ?? "",
+          id: row.person_id,
+          preferredLocale:
+            row.person_preferred_locale === "th" ||
+            row.person_preferred_locale === "zh-CN"
+              ? row.person_preferred_locale
+              : "en",
+          status:
+            row.person_status === "disabled" || row.person_status === "invited"
+              ? row.person_status
+              : "active"
+        }
+      : null,
+    role,
+    type: "agent"
+  };
+
+  const permissionAllowed = options.requiredPermission
+    ? principal.permissions.includes(options.requiredPermission)
+    : true;
+
+  return permissionAllowed && hasCapabilities(principal, options.requiredCapabilities)
+    ? principal
+    : null;
+}
+
+async function markAgentCredentialUsed(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  input: Readonly<{
+    credentialHash?: string | null;
+    credentialId: string;
+    runtimeProfile?: RuntimeWorkerCredentialProfile | null;
+  }>
+) {
+  if (input.credentialHash && input.runtimeProfile) {
+    try {
+      await sql`
+        update public.agent_credentials
+        set
+          credential_hash = ${input.credentialHash},
+          last_used_at = now(),
+          metadata = metadata || ${sql.json({
+            runtimeEnvKey: input.runtimeProfile.envKey,
+            runtimeProfileSyncedAt: new Date().toISOString(),
+            runtimeProfileSource: "worker_auth_env_profile"
+          })}::jsonb,
+          updated_at = now()
+        where id = ${input.credentialId}::uuid
+      `;
+
+      return;
+    } catch (error) {
+      console.warn("Unable to resync runtime worker credential hash", error);
+    }
+  }
+
+  await sql`
+    update public.agent_credentials
+    set last_used_at = now(), updated_at = now()
+    where id = ${input.credentialId}::uuid
+  `;
+}
+
 async function agentPrincipalFromToken(
   request: Request,
   options: ResolveOptions
@@ -180,28 +320,7 @@ async function agentPrincipalFromToken(
   }
 
   const credentialHash = hashAdminToken(token);
-  const rows = await sql<Array<{
-    agent_id: string;
-    agent_name: string;
-    agent_type: string;
-    capabilities: string[] | null;
-    credential_id: string;
-    membership_id: string;
-    organisation_country_code: string | null;
-    organisation_id: string;
-    organisation_currency: string | null;
-    organisation_default_locale: string;
-    organisation_name: string;
-    organisation_slug: string;
-    organisation_status: string;
-    organisation_type: string;
-    person_display_name: string | null;
-    person_email: string | null;
-    person_id: string | null;
-    person_preferred_locale: string | null;
-    person_status: string | null;
-    role: string;
-  }>>`
+  const rows = await sql<AgentPrincipalRow[]>`
     select
       agent_credentials.id::text as credential_id,
       organisation_memberships.id::text as membership_id,
@@ -243,78 +362,87 @@ async function agentPrincipalFromToken(
       and organisations.status = 'active'
     limit 1
   `;
-  const row = rows[0];
+  const principal = agentPrincipalFromRow(rows[0], options);
 
-  if (!row || (row.role !== "platform_agent" && row.role !== "retail_agent")) {
+  if (principal) {
+    await markAgentCredentialUsed(sql, {
+      credentialId: principal.credentialId
+    });
+
+    return principal;
+  }
+
+  return agentPrincipalFromRuntimeProfileToken(sql, token, credentialHash, options);
+}
+
+async function agentPrincipalFromRuntimeProfileToken(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  token: string,
+  credentialHash: string,
+  options: ResolveOptions
+): Promise<AgentPrincipal | null> {
+  const profile = runtimeWorkerCredentialProfileForToken(token);
+
+  if (!profile) {
     return null;
   }
 
-  const principal: AgentPrincipal = {
-    agentId: row.agent_id,
-    agentName: row.agent_name,
-    capabilities: normalizeCapabilities(row.capabilities),
-    credentialId: row.credential_id,
-    membershipId: row.membership_id,
-    organisation: {
-      countryCode:
-        normalizeProductCountryCode(row.organisation_country_code) ??
-        defaultProductCountryCode,
-      currency:
-        typeof row.organisation_currency === "string" &&
-        /^[A-Z]{3}$/.test(row.organisation_currency)
-          ? row.organisation_currency
-          : row.organisation_type === "platform"
-            ? "USD"
-            : "THB",
-      defaultLocale:
-        row.organisation_default_locale === "th" ||
-        row.organisation_default_locale === "zh-CN"
-          ? row.organisation_default_locale
-          : "en",
-      id: row.organisation_id,
-      name: row.organisation_name,
-      slug: row.organisation_slug,
-      status:
-        row.organisation_status === "archived" ||
-        row.organisation_status === "disabled"
-          ? row.organisation_status
-          : "active",
-      type: row.organisation_type === "tenant" ? "tenant" : "platform"
-    },
-    permissions: [...permissionsForAgentRole(row.role)],
-    person: row.person_id
-      ? {
-          displayName: row.person_display_name ?? row.person_email ?? row.agent_name,
-          email: row.person_email ?? "",
-          id: row.person_id,
-          preferredLocale:
-            row.person_preferred_locale === "th" ||
-            row.person_preferred_locale === "zh-CN"
-              ? row.person_preferred_locale
-              : "en",
-          status:
-            row.person_status === "disabled" || row.person_status === "invited"
-              ? row.person_status
-              : "active"
-        }
-      : null,
-    role: row.role,
-    type: "agent"
-  };
-
-  const permissionAllowed = options.requiredPermission
-    ? principal.permissions.includes(options.requiredPermission)
-    : true;
-
-  if (!permissionAllowed || !hasCapabilities(principal, options.requiredCapabilities)) {
-    return null;
-  }
-
-  await sql`
-    update public.agent_credentials
-    set last_used_at = now(), updated_at = now()
-    where id = ${principal.credentialId}::uuid
+  const definition = SYSTEM_AGENTS[profile.agentKey];
+  const rows = await sql<AgentPrincipalRow[]>`
+    select
+      agent_credentials.id::text as credential_id,
+      organisation_memberships.id::text as membership_id,
+      agents.id::text as agent_id,
+      agents.name as agent_name,
+      agents.agent_type,
+      organisation_memberships.role,
+      agents.capabilities,
+      organisations.id::text as organisation_id,
+      organisations.slug as organisation_slug,
+      organisations.name as organisation_name,
+      organisations.organisation_type,
+      organisations.status as organisation_status,
+      organisations.default_locale as organisation_default_locale,
+      organisations.country_code as organisation_country_code,
+      organisations.currency as organisation_currency,
+      people.id::text as person_id,
+      people.email as person_email,
+      people.display_name as person_display_name,
+      people.preferred_locale as person_preferred_locale,
+      people.status as person_status
+    from public.agent_credentials
+    join public.organisation_memberships
+      on organisation_memberships.id = agent_credentials.membership_id
+      and organisation_memberships.agent_id = agent_credentials.agent_id
+      and organisation_memberships.principal_type = 'agent'
+    join public.agents
+      on agents.id = agent_credentials.agent_id
+    join public.organisations
+      on organisations.id = organisation_memberships.organisation_id
+    left join public.people
+      on people.id = agents.person_id
+    where agents.id = ${definition.id}::uuid
+      and agent_credentials.metadata->>'envKey' = ${profile.envKey}
+      and organisation_memberships.role = ${profile.role}
+      and agent_credentials.status = 'active'
+      and agent_credentials.revoked_at is null
+      and (agent_credentials.expires_at is null or agent_credentials.expires_at > now())
+      and agents.status = 'active'
+      and organisation_memberships.status = 'active'
+      and organisations.status = 'active'
+    limit 1
   `;
+  const principal = agentPrincipalFromRow(rows[0], options);
+
+  if (!principal) {
+    return null;
+  }
+
+  await markAgentCredentialUsed(sql, {
+    credentialHash,
+    credentialId: principal.credentialId,
+    runtimeProfile: profile
+  });
 
   return principal;
 }

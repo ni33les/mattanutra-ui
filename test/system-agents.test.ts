@@ -7,6 +7,7 @@ import {
   systemAgentForWorkTaskType
 } from "../lib/system-agents.ts";
 import { hasRequiredCapabilities } from "../lib/task-service-utils.ts";
+import { RUNTIME_WORKER_CREDENTIAL_PROFILES } from "../lib/worker-agent-credentials.ts";
 
 describe("system agents", () => {
   it("defines a unique operational roster without OpenClaw", () => {
@@ -112,5 +113,29 @@ describe("system agents", () => {
     assert.match(runner, /stock: agentProfile\("retailStockPlanner", RETAIL_AGENT_EXECUTABLE_TASK_TYPES\)/);
     assert.doesNotMatch(runner, /"retail_order_ship"/);
     assert.doesNotMatch(runner, /"retail_purchase_order_receive"/);
+  });
+
+  it("keeps worker runtime env profiles centralized for auth and UAT seeding", () => {
+    const envKeys = RUNTIME_WORKER_CREDENTIAL_PROFILES.map((profile) => profile.envKey);
+
+    assert.deepEqual(envKeys.sort(), [
+      "WORKER_ADVISOR_AGENT_API_KEY",
+      "WORKER_CHAT_AGENT_API_KEY",
+      "WORKER_COMMUNICATIONS_AGENT_API_KEY",
+      "WORKER_CONTENT_AGENT_API_KEY",
+      "WORKER_EMAIL_AGENT_API_KEY",
+      "WORKER_FOOD_AGENT_API_KEY",
+      "WORKER_FORMULATION_AGENT_API_KEY",
+      "WORKER_HEALTHSCORE_AGENT_API_KEY",
+      "WORKER_HOSTING_AGENT_API_KEY",
+      "WORKER_PRODUCTS_AGENT_API_KEY",
+      "WORKER_STOCK_AGENT_API_KEY"
+    ].sort());
+    assert.equal(
+      RUNTIME_WORKER_CREDENTIAL_PROFILES.find(
+        (profile) => profile.envKey === "WORKER_STOCK_AGENT_API_KEY"
+      )?.role,
+      "retail_agent"
+    );
   });
 });
