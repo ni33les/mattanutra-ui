@@ -147,14 +147,22 @@ async function checkDigitalOceanDeployment() {
         : `missing ${missingEnvKeys.join(", ")}`
     );
     record(
-      "DigitalOcean service DB env",
-      serviceEnvKeys.has("DB_URL") && !serviceEnvKeys.has(retiredDatabaseUrlKey),
-      serviceEnvKeys.has("DB_URL")
-        ? serviceEnvKeys.has(retiredDatabaseUrlKey)
-          ? `remove stale service ${retiredDatabaseUrlKey}`
-          : "service DB_URL configured"
-        : "mattanutra-ui service is missing DB_URL"
+      "DigitalOcean DB env",
+      envKeys.has("DB_URL"),
+      envKeys.has("DB_URL")
+        ? serviceEnvKeys.has("DB_URL")
+          ? "DB_URL configured on app and service"
+          : "DB_URL configured at app level"
+        : "DB_URL missing from app spec"
     );
+    if (serviceEnvKeys.has(retiredDatabaseUrlKey)) {
+      record(
+        "DigitalOcean retired DB env",
+        false,
+        `service still has ${retiredDatabaseUrlKey}; ignored by runtime code but should be removed`,
+        "warn"
+      );
+    }
 
     const response = await fetch(
       `https://api.digitalocean.com/v2/apps/${appId}/deployments`,
@@ -194,7 +202,7 @@ async function checkRecentRuntimeLogs() {
 
   try {
     const response = await fetch(
-      `https://api.digitalocean.com/v2/apps/${digitalOceanAppId}/deployments/${digitalOceanDeploymentId}/components/${componentName}/logs?type=RUN`,
+      `https://api.digitalocean.com/v2/apps/${digitalOceanAppId}/components/${componentName}/logs?type=RUN`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
@@ -228,11 +236,16 @@ async function checkRecentRuntimeLogs() {
     );
     const logs = textParts.join("\n");
     const hasWorker401 = /\/api\/workers\/register failed with 401|Worker API access is not authorized/i.test(logs);
+    const hasRuntimeDbUrlMissing = /DB_URL is not visible in the runtime process|DB_URL is not configured in the service runtime environment|\[workers:doctor\] DB_URL is required/i.test(logs);
 
     record(
       "worker auth runtime logs",
-      !hasWorker401,
-      hasWorker401 ? "worker registration 401 found in active deployment logs" : "no worker registration 401 found"
+      !hasWorker401 && !hasRuntimeDbUrlMissing,
+      hasWorker401
+        ? "worker registration 401 found in active runtime logs"
+        : hasRuntimeDbUrlMissing
+          ? "runtime logs show DB_URL is not visible to start:platform"
+          : "no worker auth or DB_URL runtime failures found"
     );
   } catch (error) {
     record(

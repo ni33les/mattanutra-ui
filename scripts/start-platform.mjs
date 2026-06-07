@@ -217,7 +217,7 @@ function startWorker() {
 async function checkWorkerCredentials() {
   if (!process.env.DB_URL?.trim()) {
     console.error(
-      "[platform] DB_URL is not configured in the service runtime environment; web is running without platform workers. Add DB_URL to the mattanutra-ui service env, not only the app-level env."
+      "[platform] DB_URL is not visible in the runtime process; web is running without platform workers. Confirm DB_URL is RUN_TIME/RUN_AND_BUILD_TIME for the mattanutra-ui runtime and redeploy after changing env."
     );
     return false;
   }

@@ -175,8 +175,8 @@ describe("external worker boundaries", () => {
     );
     assert.match(
       platformSource,
-      /DB_URL is not configured in the service runtime environment/,
-      "start:platform must report missing service-level DB_URL before worker preflight"
+      /DB_URL is not visible in the runtime process/,
+      "start:platform must report missing runtime DB_URL before worker preflight"
     );
     assert.match(
       platformSource,
