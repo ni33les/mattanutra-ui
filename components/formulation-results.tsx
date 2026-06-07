@@ -127,6 +127,26 @@ function formatRevealEta(locale: Locale, etaDate: string | null | undefined) {
   return `ETA ${formatted}`;
 }
 
+type RevealRetailerOption = NonNullable<
+  ProductRecommendationOption["retailerOptions"]
+>[number];
+
+function optionSubtotal(option: RevealRetailerOption) {
+  const subtotal = Number(option.subtotalAmount);
+
+  return Number.isFinite(subtotal) ? subtotal : null;
+}
+
+function optionEtaTime(option: RevealRetailerOption) {
+  if (!option.etaDate) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const time = new Date(`${option.etaDate}T00:00:00.000Z`).getTime();
+
+  return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
+}
+
 export function FormulationResults({
   initialStackPreference = null,
   initialResult = null,
@@ -1055,6 +1075,24 @@ function RevealProductsSection({
     retailerOptions.find(
       (option) => option.organisationId === selectedRetailerOrganisationId,
     ) ?? retailerOptions[0] ?? null;
+  const bestValueRetailerOrganisationId =
+    [...retailerOptions]
+      .filter((option) => optionSubtotal(option) !== null)
+      .sort(
+        (left, right) =>
+          (optionSubtotal(left) ?? Number.POSITIVE_INFINITY) -
+            (optionSubtotal(right) ?? Number.POSITIVE_INFINITY) ||
+          optionEtaTime(left) - optionEtaTime(right),
+      )[0]?.organisationId ?? null;
+  const fastestRetailerOrganisationId =
+    [...retailerOptions]
+      .filter((option) => optionEtaTime(option) !== Number.POSITIVE_INFINITY)
+      .sort(
+        (left, right) =>
+          optionEtaTime(left) - optionEtaTime(right) ||
+          (optionSubtotal(left) ?? Number.POSITIVE_INFINITY) -
+            (optionSubtotal(right) ?? Number.POSITIVE_INFINITY),
+      )[0]?.organisationId ?? null;
   const controlPreferences =
     productOptions.length > 0 || result.productRecommendations
       ? productStackPreferenceOrder
@@ -1392,6 +1430,10 @@ function RevealProductsSection({
                   const currency = option.currency || "THB";
                   const selected =
                     option.organisationId === selectedRetailerOrganisationId;
+                  const isBestValue =
+                    option.organisationId === bestValueRetailerOrganisationId;
+                  const isFastest =
+                    option.organisationId === fastestRetailerOrganisationId;
                   const amountText = Number.isFinite(subtotal)
                     ? new Intl.NumberFormat(locale, {
                         currency,
@@ -1421,6 +1463,20 @@ function RevealProductsSection({
                       <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
                         {selected ? "Selected pharmacy" : "Alternative"}
                       </p>
+                      {isBestValue || isFastest ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {isBestValue ? (
+                            <span className="rounded-full bg-[var(--mn-teal)] px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-[0.1em] text-white">
+                              Best Value
+                            </span>
+                          ) : null}
+                          {isFastest ? (
+                            <span className="rounded-full bg-[var(--mn-gold)] px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-[0.1em] text-[var(--mn-ink)]">
+                              Fastest
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
                       <p className="mt-1 font-serif text-xl font-medium leading-tight text-[var(--mn-ink)]">
                         {option.organisationName}
                       </p>

@@ -59,6 +59,10 @@ describe("retail product checkout static contracts", () => {
     assert.match(revealPage, /setRetailerSelection/);
     assert.match(revealPage, /params\.set\("retailer", selectedRetailerOrganisationId\)/);
     assert.match(revealPage, /formatRevealEta\(locale, option\.etaDate\)/);
+    assert.match(revealPage, /bestValueRetailerOrganisationId/);
+    assert.match(revealPage, /fastestRetailerOrganisationId/);
+    assert.match(revealPage, /Best Value/);
+    assert.match(revealPage, /Fastest/);
     assert.doesNotMatch(revealPage, /\{option\.productCount \?\? 0\} products/);
     assert.match(checkoutPage, /query\.retailer/);
     assert.match(checkoutPage, /selectedRetailerOrganisationId=\{selectedRetailerOrganisationId\}/);
