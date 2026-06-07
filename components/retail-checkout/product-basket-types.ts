@@ -22,6 +22,7 @@ export type ProductBasketQuotePreview = Readonly<{
   etaDate: string | null;
   lines: ProductBasketQuoteLine[];
   selectedRetailer: {
+    organisationId: string;
     organisationName: string;
   } | null;
   subtotalAmount: number;

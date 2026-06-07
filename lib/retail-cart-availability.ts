@@ -365,6 +365,7 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
   marginPercent?: number;
   now?: Date;
   preference?: RetailRoutingPreference;
+  preferredRetailerOrganisationId?: string | null;
   rows: readonly RegionalRetailCartAvailabilityRow[];
   shippingCountry: string;
 }>): RegionalBasketAvailability {
@@ -458,28 +459,40 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
     }
   );
   const fullBasketCandidates = candidates.filter((candidate) => candidate.fullBasket);
-  const selectedRetailer = (fullBasketCandidates.length > 0
-    ? fullBasketCandidates
-    : candidates.filter((candidate) => candidate.canCheckout))
-    .sort((left, right) => {
-      if (fullBasketCandidates.length === 0) {
-        return (
-          right.payableLineCount - left.payableLineCount ||
-          right.fulfillableUnits - left.fulfillableUnits ||
-          left.subtotalAmount - right.subtotalAmount ||
-          compareNullableEta(left.etaDate, right.etaDate)
-        );
-      }
+  const preferredRetailerOrganisationId =
+    input.preferredRetailerOrganisationId?.trim() || null;
+  const preferredRetailer = preferredRetailerOrganisationId
+    ? candidates.find(
+        (candidate) =>
+          candidate.organisationId === preferredRetailerOrganisationId
+      ) ?? null
+    : null;
+  const selectedRetailer = preferredRetailerOrganisationId
+    ? preferredRetailer
+    : (fullBasketCandidates.length > 0
+        ? fullBasketCandidates
+        : candidates.filter((candidate) => candidate.canCheckout))
+        .sort((left, right) => {
+          if (fullBasketCandidates.length === 0) {
+            return (
+              right.payableLineCount - left.payableLineCount ||
+              right.fulfillableUnits - left.fulfillableUnits ||
+              left.subtotalAmount - right.subtotalAmount ||
+              compareNullableEta(left.etaDate, right.etaDate)
+            );
+          }
 
-      return (
-        left.subtotalAmount - right.subtotalAmount ||
-        compareNullableEta(left.etaDate, right.etaDate)
-      );
-    })[0] ?? null;
+          return (
+            left.subtotalAmount - right.subtotalAmount ||
+            compareNullableEta(left.etaDate, right.etaDate)
+          );
+        })[0] ?? null;
   // Preserve preference on the response, but always route one basket to one retailer.
   const selectedLines =
     selectedRetailer?.lines ??
-    candidates[0]?.lines ??
+    (preferredRetailerOrganisationId
+      ? null
+      : candidates[0]?.lines) ??
     lines.map((line) =>
       resolveRetailCartLineAvailabilityFromRow({
         marginPercent: input.marginPercent,
@@ -516,7 +529,7 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
           : line.reason,
       selectedRetailerName: selectedRetailer ? selectedRetailer.organisationName : null,
       selectedRetailerOrganisationId: payable
-        ? selectedRetailer.organisationId
+        ? selectedRetailer?.organisationId ?? null
         : null
     } satisfies RegionalBasketLineAvailability;
   });
@@ -541,6 +554,7 @@ export async function resolveRegionalBasketAvailability(input: Readonly<{
   lines: readonly RegionalBasketLineInput[];
   now?: Date;
   preference?: RetailRoutingPreference;
+  preferredRetailerOrganisationId?: string | null;
   shippingCountry: string;
   sql?: RetailCartDb;
 }>): Promise<RegionalBasketAvailability> {
@@ -561,6 +575,7 @@ export async function resolveRegionalBasketAvailability(input: Readonly<{
       lines: [],
       now: input.now,
       preference: input.preference,
+      preferredRetailerOrganisationId: input.preferredRetailerOrganisationId,
       rows: [],
       shippingCountry
     });
@@ -614,6 +629,7 @@ export async function resolveRegionalBasketAvailability(input: Readonly<{
     marginPercent: await getCustomerPriceMarginPercent({ sql }),
     now: input.now,
     preference: input.preference,
+    preferredRetailerOrganisationId: input.preferredRetailerOrganisationId,
     rows,
     shippingCountry
   });

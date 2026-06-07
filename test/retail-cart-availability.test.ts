@@ -173,6 +173,75 @@ describe("retail cart availability", () => {
     assert.equal(cheapest.etaDate, "2026-06-05");
   });
 
+  it("honours an explicit full-basket retailer choice instead of falling back to cheapest", () => {
+    const availability = resolveRegionalBasketAvailabilityFromRows({
+      lines: [{ productId: "product-1", quantity: 1 }],
+      now,
+      preference: "cheapest_price",
+      preferredRetailerOrganisationId: "chosen-retailer",
+      rows: [
+        regionalRow({
+          organisation_id: "cheap-retailer",
+          organisation_name: "Cheap Retailer",
+          rrp_price_amount: 90,
+          stock_quantity: 0
+        }),
+        regionalRow({
+          lead_time_days: 1,
+          organisation_id: "chosen-retailer",
+          organisation_name: "Chosen Retailer",
+          rrp_price_amount: 150,
+          stock_quantity: 4
+        })
+      ],
+      shippingCountry: "TH"
+    });
+
+    assert.equal(availability.canCheckout, true);
+    assert.equal(availability.selectedRetailer?.organisationId, "chosen-retailer");
+    assert.equal(availability.subtotalAmount, 165);
+    assert.equal(availability.lines[0]?.selectedRetailerOrganisationId, "chosen-retailer");
+  });
+
+  it("blocks checkout when the explicitly chosen retailer no longer fulfils the full basket", () => {
+    const availability = resolveRegionalBasketAvailabilityFromRows({
+      lines: [
+        { productId: "product-1", quantity: 1 },
+        { productId: "product-2", quantity: 1 }
+      ],
+      now,
+      preference: "cheapest_price",
+      preferredRetailerOrganisationId: "chosen-retailer",
+      rows: [
+        regionalRow({
+          organisation_id: "chosen-retailer",
+          organisation_name: "Chosen Retailer",
+          product_id: "product-1",
+          stock_quantity: 4
+        }),
+        regionalRow({
+          organisation_id: "fallback-retailer",
+          organisation_name: "Fallback Retailer",
+          product_id: "product-1",
+          stock_quantity: 4
+        }),
+        regionalRow({
+          id: "sellable-2",
+          organisation_id: "fallback-retailer",
+          organisation_name: "Fallback Retailer",
+          product_id: "product-2",
+          stock_quantity: 4
+        })
+      ],
+      shippingCountry: "TH"
+    });
+
+    assert.equal(availability.canCheckout, false);
+    assert.equal(availability.selectedRetailer?.organisationId, "chosen-retailer");
+    assert.equal(availability.payableLines.length, 0);
+    assert.equal(availability.unavailableLines.length, 2);
+  });
+
   it("keeps locally unavailable lines visible but out of the payable basket", () => {
     const availability = resolveRegionalBasketAvailabilityFromRows({
       lines: [

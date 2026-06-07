@@ -15,6 +15,7 @@ type BasketCheckoutPageProps = Readonly<{
   searchParams: Promise<{
     plan?: string;
     removed?: string;
+    retailer?: string;
     selected?: string;
   }>;
 }>;
@@ -121,6 +122,10 @@ export default async function BasketCheckoutPage({
     typeof query.plan === "string" && isUuid(query.plan) ? query.plan : null;
   const selectedItemIds = parseIds(query.selected);
   const removedItemIds = parseIds(query.removed);
+  const selectedRetailerOrganisationId =
+    typeof query.retailer === "string" && isUuid(query.retailer)
+      ? query.retailer
+      : null;
 
   if (!planId) {
     redirect(`/${locale}/nutrition`);
@@ -166,6 +171,7 @@ export default async function BasketCheckoutPage({
             planId={planId}
             publishableKey={stripePublishableKey()}
             removedItemIds={removedItemIds}
+            selectedRetailerOrganisationId={selectedRetailerOrganisationId}
             selectedItemIds={selectedItemIds}
             selectedProducts={selectedProducts}
           />

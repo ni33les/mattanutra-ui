@@ -51,6 +51,11 @@ export async function POST(request: Request) {
   const planId = typeof body.planId === "string" && isUuid(body.planId)
     ? body.planId
     : null;
+  const preferredRetailerOrganisationId =
+    typeof body.selectedRetailerOrganisationId === "string" &&
+    isUuid(body.selectedRetailerOrganisationId)
+      ? body.selectedRetailerOrganisationId
+      : null;
   const previewOnly = body.previewOnly === true;
 
   if (!shippingCountry || lines.length === 0) {
@@ -63,6 +68,7 @@ export async function POST(request: Request) {
   const availability = await resolveRegionalBasketAvailability({
     lines,
     preference: normalizeRetailRoutingPreference(body.routingPreference),
+    preferredRetailerOrganisationId,
     shippingCountry
   });
 

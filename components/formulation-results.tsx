@@ -100,6 +100,33 @@ const MAX_PRODUCT_MATCHING_POLLS = 240;
 const PENDING_SECTION_POLL_INTERVAL_MS = 1_000;
 const PENDING_PRODUCT_MATCHING_POLL_INTERVAL_MS = 1_000;
 
+function formatRevealEta(locale: Locale, etaDate: string | null | undefined) {
+  if (!etaDate) {
+    return null;
+  }
+
+  const date = new Date(`${etaDate}T00:00:00.000Z`);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const formatted = new Intl.DateTimeFormat(localeHtmlLang(locale), {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(date);
+
+  if (locale === "th") {
+    return `คาดว่า ${formatted}`;
+  }
+
+  if (locale === "zh-CN") {
+    return `预计 ${formatted}`;
+  }
+
+  return `ETA ${formatted}`;
+}
+
 export function FormulationResults({
   initialStackPreference = null,
   initialResult = null,
@@ -940,6 +967,10 @@ function RevealProductsSection({
       : "text-[0.7rem] font-bold tracking-normal text-[var(--mn-ash)]";
   const [pendingStackPreference, setPendingStackPreference] =
     useState<ProductStackPreference | null>(null);
+  const [retailerSelection, setRetailerSelection] = useState<{
+    organisationId: string | null;
+    optionsKey: string;
+  }>({ organisationId: null, optionsKey: "" });
   const supplementSelectedCount = result.supplementBreakdown.filter(
     (ingredient) => ingredient.safety?.visibility !== "hidden",
   ).length;
@@ -1010,6 +1041,20 @@ function RevealProductsSection({
       (left.etaDate ?? "").localeCompare(right.etaDate ?? ""),
     )
     .slice(0, 3);
+  const retailerOptionsKey = retailerOptions
+    .map((option) => option.organisationId)
+    .join("|");
+  const selectedRetailerOrganisationId =
+    retailerSelection.optionsKey === retailerOptionsKey &&
+    retailerOptions.some(
+      (option) => option.organisationId === retailerSelection.organisationId,
+    )
+      ? retailerSelection.organisationId
+      : retailerOptions[0]?.organisationId ?? null;
+  const selectedRetailerOption =
+    retailerOptions.find(
+      (option) => option.organisationId === selectedRetailerOrganisationId,
+    ) ?? retailerOptions[0] ?? null;
   const controlPreferences =
     productOptions.length > 0 || result.productRecommendations
       ? productStackPreferenceOrder
@@ -1052,11 +1097,20 @@ function RevealProductsSection({
   const removedBasketProducts = products.filter(
     (product) => !selectedBasketIds.has(product.productId ?? product.id),
   );
-  const selectedBasketSubtotal = selectedBasketProducts.reduce(
-    (total, product) => total + (product.price?.amount ?? product.retailer?.unitPriceAmount ?? 0),
-    0,
-  );
+  const selectedRetailerSubtotal = Number(selectedRetailerOption?.subtotalAmount);
+  const selectedBasketSubtotal =
+    selectedRetailerOption &&
+    removedBasketProducts.length === 0 &&
+    selectedBasketProducts.length === products.length &&
+    Number.isFinite(selectedRetailerSubtotal)
+      ? selectedRetailerSubtotal
+      : selectedBasketProducts.reduce(
+          (total, product) =>
+            total + (product.price?.amount ?? product.retailer?.unitPriceAmount ?? 0),
+          0,
+        );
   const selectedBasketCurrency =
+    selectedRetailerOption?.currency ??
     selectedBasketProducts.find((product) => product.price?.currency)?.price
       ?.currency ??
     selectedBasketProducts[0]?.price?.currency ??
@@ -1081,7 +1135,19 @@ function RevealProductsSection({
   );
   const basketCheckoutHref =
     selectedBasketIdList.length > 0
-      ? `/${locale}/basket/checkout?plan=${encodeURIComponent(planId)}&selected=${encodeURIComponent(selectedBasketIdList.join(","))}&removed=${encodeURIComponent(removedBasketIdList.join(","))}`
+      ? (() => {
+          const params = new URLSearchParams({
+            plan: planId,
+            selected: selectedBasketIdList.join(","),
+            removed: removedBasketIdList.join(","),
+          });
+
+          if (selectedRetailerOrganisationId) {
+            params.set("retailer", selectedRetailerOrganisationId);
+          }
+
+          return `/${locale}/basket/checkout?${params.toString()}`;
+        })()
       : "";
   const basketAmountText = new Intl.NumberFormat(locale, {
     currency: selectedBasketCurrency,
@@ -1316,14 +1382,16 @@ function RevealProductsSection({
           </div>
         ) : (
           <>
-            {retailerOptions.length > 0 ? (
+            {retailerOptions.length > 1 ? (
               <div
                 className="mt-10 grid gap-3 rounded-xl bg-[var(--mn-paper)] p-4 ring-1 ring-[var(--mn-line)] md:grid-cols-3"
                 data-reveal
               >
-                {retailerOptions.map((option, index) => {
+                {retailerOptions.map((option) => {
                   const subtotal = Number(option.subtotalAmount);
                   const currency = option.currency || "THB";
+                  const selected =
+                    option.organisationId === selectedRetailerOrganisationId;
                   const amountText = Number.isFinite(subtotal)
                     ? new Intl.NumberFormat(locale, {
                         currency,
@@ -1331,31 +1399,37 @@ function RevealProductsSection({
                         style: "currency",
                       }).format(subtotal)
                     : null;
+                  const etaText = formatRevealEta(locale, option.etaDate);
 
                   return (
-                    <div
-                      className={`rounded-lg p-3 ring-1 ${
-                        index === 0
+                    <button
+                      aria-pressed={selected}
+                      className={`rounded-lg p-3 text-left ring-1 transition hover:-translate-y-0.5 hover:ring-[var(--mn-teal)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mn-teal)] motion-reduce:transition-none ${
+                        selected
                           ? "bg-[var(--mn-mint)] ring-[var(--mn-teal)]"
                           : "bg-[var(--mn-cream)] ring-[var(--mn-line)]"
                       }`}
                       key={option.organisationId ?? option.organisationName}
+                      onClick={() => {
+                        setRetailerSelection({
+                          organisationId: option.organisationId ?? null,
+                          optionsKey: retailerOptionsKey,
+                        });
+                      }}
+                      type="button"
                     >
                       <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
-                        {index === 0 ? "Selected pharmacy" : "Alternative"}
+                        {selected ? "Selected pharmacy" : "Alternative"}
                       </p>
                       <p className="mt-1 font-serif text-xl font-medium leading-tight text-[var(--mn-ink)]">
                         {option.organisationName}
                       </p>
-                      <p className="mt-2 text-xs leading-5 text-[var(--mn-ink-soft)]">
-                        {amountText ? `${amountText} · ` : ""}
-                        {option.productCount ?? 0} products
-                        {option.backorderCount
-                          ? ` · ${option.backorderCount} backorder`
-                          : ""}
-                        {option.etaDate ? ` · ETA ${option.etaDate}` : ""}
-                      </p>
-                    </div>
+                      {amountText || etaText ? (
+                        <p className="mt-2 text-xs leading-5 text-[var(--mn-ink-soft)]">
+                          {[amountText, etaText].filter(Boolean).join(" · ")}
+                        </p>
+                      ) : null}
+                    </button>
                   );
                 })}
               </div>

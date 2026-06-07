@@ -33,6 +33,11 @@ export async function POST(request: Request) {
   const locale = isRetailCheckoutLocale(body.locale) ? body.locale : null;
   const planId = typeof body.planId === "string" ? body.planId : "";
   const selectedItemIds = stringArray(body.selectedItemIds);
+  const selectedRetailerOrganisationId =
+    typeof body.selectedRetailerOrganisationId === "string" &&
+    isUuid(body.selectedRetailerOrganisationId)
+      ? body.selectedRetailerOrganisationId
+      : null;
 
   if (!locale || !isUuid(planId) || selectedItemIds.length < 1) {
     return NextResponse.json(
@@ -50,6 +55,7 @@ export async function POST(request: Request) {
       planId,
       removedItemIds: stringArray(body.removedItemIds),
       request,
+      selectedRetailerOrganisationId,
       selectedItemIds
     });
 

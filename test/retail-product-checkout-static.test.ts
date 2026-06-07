@@ -18,6 +18,14 @@ const checkoutPanel = readFileSync(
   new URL("../components/retail-checkout/product-basket-checkout-panel.tsx", import.meta.url),
   "utf8"
 );
+const checkoutPage = readFileSync(
+  new URL("../app/[locale]/basket/checkout/page.tsx", import.meta.url),
+  "utf8"
+);
+const revealPage = readFileSync(
+  new URL("../components/formulation-results.tsx", import.meta.url),
+  "utf8"
+);
 
 describe("retail product checkout static contracts", () => {
   it("keeps order-number and legacy token tracking compatibility", () => {
@@ -45,6 +53,17 @@ describe("retail product checkout static contracts", () => {
     assert.match(checkoutPanel, /<OrderSummary/);
     assert.match(checkoutPanel, /quotePreview=\{quotePreview\}/);
     assert.match(checkoutPanel, /previewOnly: !options\?\.confirmDelivery/);
+  });
+
+  it("carries a clicked reveal pharmacy option into checkout routing", () => {
+    assert.match(revealPage, /setRetailerSelection/);
+    assert.match(revealPage, /params\.set\("retailer", selectedRetailerOrganisationId\)/);
+    assert.match(revealPage, /formatRevealEta\(locale, option\.etaDate\)/);
+    assert.doesNotMatch(revealPage, /\{option\.productCount \?\? 0\} products/);
+    assert.match(checkoutPage, /query\.retailer/);
+    assert.match(checkoutPage, /selectedRetailerOrganisationId=\{selectedRetailerOrganisationId\}/);
+    assert.match(checkoutPanel, /selectedRetailerOrganisationId/);
+    assert.match(checkoutPanel, /body\.availability\.selectedRetailer\?\.organisationId/);
   });
 
   it("uses the shared order workflow email service for checkout fulfilment", () => {

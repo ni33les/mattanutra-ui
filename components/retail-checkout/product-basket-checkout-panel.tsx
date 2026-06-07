@@ -42,6 +42,7 @@ type ProductBasketCheckoutPanelProps = Readonly<{
   planId: string;
   publishableKey: string;
   removedItemIds: readonly string[];
+  selectedRetailerOrganisationId?: string | null;
   selectedItemIds: readonly string[];
   selectedProducts: readonly ProductBasketProduct[];
 }>;
@@ -345,6 +346,7 @@ export function ProductBasketCheckoutPanel({
   planId,
   publishableKey,
   removedItemIds,
+  selectedRetailerOrganisationId = null,
   selectedItemIds,
   selectedProducts
 }: ProductBasketCheckoutPanelProps) {
@@ -518,6 +520,7 @@ export function ProductBasketCheckoutPanel({
           planId,
           previewOnly: !options?.confirmDelivery,
           routingPreference: "cheapest_price",
+          selectedRetailerOrganisationId,
           shippingCountry: checkout.address.country
         }),
         cache: "no-store",
@@ -542,7 +545,7 @@ export function ProductBasketCheckoutPanel({
           properties: {
             method: "free_pharmacy_delivery",
             selectedRetailerOrganisationId:
-              body.availability.selectedRetailer?.organisationName ?? null
+              body.availability.selectedRetailer?.organisationId ?? null
           }
         });
       }
@@ -556,6 +559,7 @@ export function ProductBasketCheckoutPanel({
     labels.error,
     locale,
     planId,
+    selectedRetailerOrganisationId,
     selectedItemIds
   ]);
 
@@ -614,6 +618,7 @@ export function ProductBasketCheckoutPanel({
           locale,
           planId,
           removedItemIds,
+          selectedRetailerOrganisationId,
           selectedItemIds
         }),
         cache: "no-store",
@@ -662,6 +667,7 @@ export function ProductBasketCheckoutPanel({
     previewQuote,
     quotePreview,
     removedItemIds,
+    selectedRetailerOrganisationId,
     selectedItemIds,
     touchInvalidFields
   ]);

@@ -60,6 +60,7 @@ export type RetailCheckoutQuoteInput = Readonly<{
   planId: string;
   removedItemIds?: readonly string[];
   request?: Request;
+  selectedRetailerOrganisationId?: string | null;
   selectedItemIds: readonly string[];
 }>;
 
@@ -443,6 +444,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
   const availability = await resolveRegionalBasketAvailability({
     lines: selectedProductIds.map((productId) => ({ productId, quantity: 1 })),
     preference: "cheapest_price",
+    preferredRetailerOrganisationId: input.selectedRetailerOrganisationId,
     shippingCountry: address.country,
     sql
   });
@@ -499,6 +501,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
     billingSameAsShipping,
     planId: input.planId,
     runId,
+    selectedRetailerOrganisationId: input.selectedRetailerOrganisationId ?? null,
     selectedProductIds
   });
   const config = stripePaymentConfig(input.request);
