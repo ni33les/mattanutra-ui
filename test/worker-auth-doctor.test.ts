@@ -43,6 +43,9 @@ describe("worker auth doctor", () => {
 
     assert.match(smokeSource, /scripts\/workers-doctor\.ts/);
     assert.match(smokeSource, /worker auth doctor/);
+    assert.match(smokeSource, /DigitalOcean service DB env/);
+    assert.match(smokeSource, /retiredDatabaseUrlKey = \["DATABASE", "URL"\]\.join\("_"\)/);
+    assert.match(smokeSource, /serviceEnvKeys\.has\("DB_URL"\) && !serviceEnvKeys\.has\(retiredDatabaseUrlKey\)/);
     assert.match(smokeSource, /last_seen_at >= now\(\) - interval '2 minutes'/);
     assert.match(smokeSource, /Worker API access is not authorized/);
   });

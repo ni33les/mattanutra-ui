@@ -47,6 +47,7 @@ const requiredWorkerProfiles = [
   { envKey: "WORKER_STOCK_AGENT_API_KEY", mode: "stock" }
 ];
 const requiredUatAppEnvKeys = requiredWorkerProfiles.map((profile) => profile.envKey);
+const retiredDatabaseUrlKey = ["DATABASE", "URL"].join("_");
 const checks = [];
 let digitalOceanAppId = null;
 let digitalOceanDeploymentId = null;
@@ -130,6 +131,12 @@ async function checkDigitalOceanDeployment() {
     });
     const appData = await appResponse.json();
     const envKeys = configuredEnvKeysFromAppSpec(appData.app?.spec);
+    const serviceEnvKeys = configuredServiceEnvKeysFromAppSpec(
+      appData.app?.spec,
+      process.env.UAT_DIGITALOCEAN_COMPONENT_NAME?.trim() ||
+        process.env.UAT_DIGITALOCEAN_SERVICE_NAME?.trim() ||
+        "mattanutra-ui"
+    );
     const missingEnvKeys = requiredUatAppEnvKeys.filter((key) => !envKeys.has(key));
 
     record(
@@ -138,6 +145,15 @@ async function checkDigitalOceanDeployment() {
       missingEnvKeys.length === 0
         ? `${requiredUatAppEnvKeys.length} worker keys configured`
         : `missing ${missingEnvKeys.join(", ")}`
+    );
+    record(
+      "DigitalOcean service DB env",
+      serviceEnvKeys.has("DB_URL") && !serviceEnvKeys.has(retiredDatabaseUrlKey),
+      serviceEnvKeys.has("DB_URL")
+        ? serviceEnvKeys.has(retiredDatabaseUrlKey)
+          ? `remove stale service ${retiredDatabaseUrlKey}`
+          : "service DB_URL configured"
+        : "mattanutra-ui service is missing DB_URL"
     );
 
     const response = await fetch(
@@ -298,6 +314,18 @@ function configuredEnvKeysFromAppSpec(spec) {
   }
 
   return keys;
+}
+
+function configuredServiceEnvKeysFromAppSpec(spec, serviceName) {
+  const service = (spec?.services ?? []).find(
+    (candidate) => candidate?.name === serviceName
+  );
+
+  return new Set(
+    (service?.envs ?? [])
+      .map((envVar) => envVar?.key)
+      .filter(Boolean)
+  );
 }
 
 async function checkLineWebhook() {

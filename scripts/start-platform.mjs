@@ -215,6 +215,13 @@ function startWorker() {
 }
 
 async function checkWorkerCredentials() {
+  if (!process.env.DB_URL?.trim()) {
+    console.error(
+      "[platform] DB_URL is not configured in the service runtime environment; web is running without platform workers. Add DB_URL to the mattanutra-ui service env, not only the app-level env."
+    );
+    return false;
+  }
+
   try {
     await runOneShotProcess(
       "worker auth preflight",
