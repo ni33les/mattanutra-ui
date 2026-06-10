@@ -5,9 +5,12 @@ import {
   BadgeCheck,
   CheckCircle2,
   Clock,
+  Heart,
   Leaf,
+  Search,
   ShieldCheck,
   Sun,
+  UserRound,
 } from "lucide-react";
 import { LandingReveal } from "@/components/landing-reveal";
 import { assets, content } from "@/components/landing-page-copy";
@@ -77,6 +80,8 @@ function CheckItem({
   );
 }
 
+const promiseIconComponents = [Search, Leaf, UserRound, Heart] as const;
+
 export function LandingPage({
   assessmentPath,
   blogPosts,
@@ -104,7 +109,7 @@ export function LandingPage({
       ? blogPosts.map((post) => ({
           body: post.excerpt,
           href: post.href,
-          tag: copy.journal.tag,
+          tag: post.primaryTag || copy.journal.tag,
           title: post.title,
         }))
       : copy.journal.fallback.map(([tag, title, body]) => ({
@@ -241,7 +246,7 @@ export function LandingPage({
         </div>
       </div>
 
-      <section className="border-b border-[var(--mn-line)] bg-[var(--mn-paper)]" id="promises">
+      <section className="border-b border-[var(--mn-line)] bg-[var(--mn-paper)]">
         <div className="mn-v14-container py-20 lg:py-24">
           <SectionIntro
             accent={copy.clarity.accent}
@@ -250,7 +255,7 @@ export function LandingPage({
             title={copy.clarity.title}
           />
           <div className="mt-12 grid gap-6 md:grid-cols-4">
-            {copy.clarity.cards.map((card, index) => (
+            {copy.clarity.cards.map((card) => (
               <article
                 className="overflow-hidden rounded-[22px] border border-[var(--mn-line)] bg-[var(--mn-cream)] shadow-[var(--mn-shadow-soft)]"
                 data-reveal
@@ -265,9 +270,6 @@ export function LandingPage({
                   width={1000}
                 />
                 <div className="p-5">
-                  <div className="mb-3 inline-flex size-8 items-center justify-center rounded-full bg-[var(--mn-mint)] font-[family:var(--mn-font-display)] text-sm font-semibold text-[var(--mn-teal-deep)]">
-                    {index + 1}
-                  </div>
                   <h3 className="font-[family:var(--mn-font-display)] text-xl font-medium text-[var(--mn-ink)]">
                     {card.title}
                   </h3>
@@ -277,6 +279,35 @@ export function LandingPage({
                 </div>
               </article>
             ))}
+          </div>
+          <div className="mx-auto mt-16 max-w-[900px] border-t border-[var(--mn-line)] pt-10" data-reveal id="promises">
+            <p className="mb-7 text-center font-[family:var(--mn-font-display)] text-[20px] text-[var(--mn-ink)]">
+              {copy.promises.title}{" "}
+              <em className="italic text-[var(--mn-teal-deep)]">
+                {copy.promises.accent}
+              </em>
+            </p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-7 lg:grid-cols-4">
+              {copy.promises.cards.map(([title, body], index) => {
+                const PromiseIcon = promiseIconComponents[index] ?? BadgeCheck;
+
+                return (
+                  <div className="flex items-center justify-center gap-3" key={title}>
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--mn-mint)] text-[var(--mn-teal-deep)]">
+                      <PromiseIcon aria-hidden className="size-[18px]" strokeWidth={1.8} />
+                    </span>
+                    <span className="text-left">
+                      <span className="block font-[family:var(--mn-font-display)] text-[16px] leading-tight text-[var(--mn-ink)]">
+                        {title}
+                      </span>
+                      <span className="block text-[12.5px] text-[var(--mn-ash)]">
+                        {body}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
@@ -375,8 +406,8 @@ export function LandingPage({
                     </div>
                   </details>
                 </div>
-                <p className="mn-v14-chat">
-                  {copy.protocol.foodNudge}
+                <div className="mn-v14-chat">
+                  <p>{copy.protocol.foodNudge}</p>
                   <span className="mt-2 flex flex-wrap gap-1.5">
                     {copy.protocol.foodTags.map((tag) => (
                       <span className="mn-v14-food-tag" key={tag}>
@@ -384,7 +415,7 @@ export function LandingPage({
                       </span>
                     ))}
                   </span>
-                </p>
+                </div>
                 <p className="mn-v14-chat mn-v14-chat--user">
                   {copy.protocol.vitaminQuestion}
                 </p>
@@ -516,6 +547,7 @@ export function LandingPage({
               {copy.bridge.cta}
               <ArrowRight aria-hidden className="size-4" />
             </Link>
+            <small>{copy.bridge.note}</small>
           </div>
         </div>
       </section>
@@ -850,10 +882,6 @@ export function LandingPage({
                   <p>{post.tag}</p>
                   <h3>{post.title}</h3>
                   <p>{post.body}</p>
-                  <strong>
-                    {copy.journal.readMore}
-                    <ArrowRight aria-hidden className="size-4" />
-                  </strong>
                 </div>
               </Link>
             ))}

@@ -81,9 +81,9 @@ export const localeLabels = Object.fromEntries(
 
 const en = {
   meta: {
-    title: "MattaNutra | Stop guessing. Start knowing.",
+    title: "MattaNutra — Stop guessing. Start knowing.",
     description:
-      "AI-powered supplement and wellness plans for your body, goals, lifestyle, and changing routine."
+      "AI-powered personalised supplement and wellness plans, designed in Chiang Mai for Southeast Asian lives. Stop guessing. Start knowing."
   },
   hero: {
     eyebrow: "MattaNutra",

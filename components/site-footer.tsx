@@ -85,7 +85,6 @@ const footerCopy = {
       {
         title: "Company",
         links: [
-          ["About", "/#origin"],
           ["Contact", "mailto:hello@mattanutra.com"],
           ["Terms of Service", "/terms"],
           ["Privacy Policy", "/privacy"]
@@ -93,7 +92,7 @@ const footerCopy = {
       }
     ],
     disclaimer:
-      "MattaNutra is a wellness guidance platform and is not a medical diagnosis or treatment plan. Users who are pregnant, nursing, taking medication, or managing a medical condition should consult a qualified healthcare professional before beginning any supplement programme.",
+      "MattaNutra supports your supplement and everyday-nutrition decisions — it is a wellness guidance platform, not a medical diagnosis, treatment plan, or personalised dietary therapy. Food guidance is general nutrition education. All recommendations are organised around your goals, routine and current stack, and flagged against your medications and labs for safety. Users who are pregnant, nursing, taking medication, or managing a medical condition should consult a qualified healthcare professional before beginning any supplement programme.",
     copyright:
       "© 2026 MattaNutra · AI-powered personalised wellness plans · Chiang Mai, Thailand"
   },
@@ -121,7 +120,6 @@ const footerCopy = {
       {
         title: "บริษัท",
         links: [
-          ["เกี่ยวกับเรา", "/#origin"],
           ["ติดต่อ", "mailto:hello@mattanutra.com"],
           ["เงื่อนไขการใช้บริการ", "/terms"],
           ["นโยบายความเป็นส่วนตัว", "/privacy"]
@@ -157,7 +155,6 @@ const footerCopy = {
       {
         title: "公司",
         links: [
-          ["关于", "/#origin"],
           ["联系", "mailto:hello@mattanutra.com"],
           ["服务条款", "/terms"],
           ["隐私政策", "/privacy"]

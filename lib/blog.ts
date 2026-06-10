@@ -43,6 +43,7 @@ export type BlogPostSummary = Readonly<{
   id: string;
   imageAlt: string;
   imageUrl: string;
+  primaryTag: string;
   slug: string;
   title: string;
   translationGroupId: string;
@@ -346,6 +347,7 @@ function mapPost(row: BlogPostRow, localeOverride?: Locale): BlogPost {
     imageAlt: row.image_alt ?? "",
     imageUrl: row.image_url ?? "",
     locale,
+    primaryTag: row.tags?.[0] ?? "",
     seoDescription: localizeThaiPublishedText(
       row.seo_description ?? row.excerpt ?? "",
       locale

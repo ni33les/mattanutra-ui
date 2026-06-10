@@ -208,6 +208,72 @@ async function paymentBpmEventExists(
   return rows[0]?.exists === true;
 }
 
+async function fulfillMockCheckoutSession(
+  sql: Db,
+  sessionId: string,
+  input: Readonly<{
+    request?: Request;
+    source: "return_page" | "webhook";
+    stripeEventId?: string | null;
+  }>
+) {
+  const payment = await getPaymentRowBySessionId(sql, sessionId);
+
+  if (!payment || payment.stripe_mode !== "mock") {
+    throw new Error("Payment record not found for mock checkout session");
+  }
+
+  if (
+    input.source === "return_page" &&
+    !(await paymentBpmEventExists(sql, {
+      eventName: "payment_checkout_returned",
+      paymentId: payment.id,
+      stripeSessionId: sessionId
+    }))
+  ) {
+    await writePaymentBpmEvent({
+      actorType: "visitor",
+      eventName: "payment_checkout_returned",
+      eventStatus: "received",
+      locale: payment.locale,
+      paymentId: payment.id,
+      planId: payment.plan_id,
+      properties: {
+        mock: true,
+        sourceSurface: payment.source_surface
+      },
+      request: input.request,
+      selectedPlan: payment.selected_plan,
+      sql,
+      stripeEventId: input.stripeEventId,
+      stripeSessionId: sessionId,
+      valueAmount: payment.amount / AMOUNT_MICROS_PER_UNIT,
+      valueCurrency: payment.currency
+    });
+  }
+
+  if (payment.status === "expired") {
+    return {
+      payment: mapPayment(payment),
+      status: "expired" as const
+    };
+  }
+
+  if (payment.status !== "paid" && payment.status !== "bound") {
+    return {
+      payment: mapPayment(payment),
+      status: "processing" as const
+    };
+  }
+
+  return {
+    payment: mapPayment(payment),
+    status: payment.plan_id
+      ? ("paid_with_plan" as const)
+      : ("paid_reservation" as const)
+  };
+}
+
 async function updatePaymentState(
   sql: Db,
   input: PaymentStatePatch
@@ -1037,7 +1103,7 @@ export async function createStripeCheckoutSession(input: CheckoutSessionInput) {
       mock: true,
       paymentId,
       publishableKey: "",
-      returnUrl: paymentReturnDestination(input.locale, mapPayment(payment))
+      returnUrl: paymentReturnPath(input.locale, mockSessionId)
     };
   }
 
@@ -1410,9 +1476,9 @@ export async function completeMockPayment(input: Readonly<{
   });
 
   return {
-    destination: paymentReturnDestination(
+    destination: paymentReturnPath(
       currentPayment.locale,
-      mapPayment(currentPayment)
+      currentPayment.stripe_checkout_session_id ?? `mock_cs_${currentPayment.id}`
     ),
     payment: mapPayment(currentPayment)
   };
@@ -1819,6 +1885,10 @@ export async function fulfillCheckoutSession(
   await assertPaymentSchema(sql);
 
   const config = stripePaymentConfig(input.request);
+  if (sessionId.startsWith("mock_cs_")) {
+    return fulfillMockCheckoutSession(sql, sessionId, input);
+  }
+
   const stripe = stripeClientForConfig(config);
   const session = await stripe.checkout.sessions.retrieve(sessionId, {
     expand: [

@@ -1,0 +1,82 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { describe, it } from "node:test";
+
+const assessmentReturnPage = readFileSync(
+  new URL(
+    "../app/[locale]/nutrition/payment/return/page.tsx",
+    import.meta.url
+  ),
+  "utf8"
+);
+const basketReturnPage = readFileSync(
+  new URL("../app/[locale]/basket/return/page.tsx", import.meta.url),
+  "utf8"
+);
+
+describe("assessment payment confirmation page", () => {
+  it("uses the redesigned dynamic confirmation stack", () => {
+    assert.match(assessmentReturnPage, /Your formula is being built/);
+    assert.match(assessmentReturnPage, /What happens next/);
+    assert.match(assessmentReturnPage, /Your plan is ready now/);
+    assert.match(assessmentReturnPage, /Review your formula/);
+    assert.match(assessmentReturnPage, /Start your Right Amount Formula/);
+    assert.match(assessmentReturnPage, /See my formula/);
+    assert.match(assessmentReturnPage, /Catalogue matching/);
+    assert.match(assessmentReturnPage, /A copy was sent to your email/);
+    assert.match(assessmentReturnPage, /data-bpm-event="payment_confirmation_cta_clicked"/);
+  });
+
+  it("implements the mockup as first-class Tailwind JSX inside the platform customer shell", () => {
+    assert.match(assessmentReturnPage, /rounded-\[18px\] bg-white px-8 py-10/);
+    assert.match(assessmentReturnPage, /bg-\[#1a3c34\] px-8 py-5/);
+    assert.match(assessmentReturnPage, /mn-customer-shell/);
+    assert.match(assessmentReturnPage, /<TitleBar/);
+    assert.match(assessmentReturnPage, /variant="landing"/);
+    assert.match(assessmentReturnPage, /Playfair_Display/);
+    assert.match(assessmentReturnPage, /--mn-payment-font-display/);
+    assert.match(assessmentReturnPage, /--mn-font-display:var\(--mn-payment-font-display\)/);
+    assert.match(assessmentReturnPage, /font-serif text-\[30px\]/);
+    assert.doesNotMatch(assessmentReturnPage, /<style>|<\/style>|class="hero-card"|class="steps-card"|class="cta-btn"/i);
+    assert.doesNotMatch(assessmentReturnPage, /function PaymentConfirmationHeader|logoSubtitle|Free Assessment|Pricing/);
+    assert.doesNotMatch(assessmentReturnPage, /SiteFooter|getDictionary/);
+    assert.doesNotMatch(assessmentReturnPage, /font-\[family:var\(--mn-font-display\),serif\]/);
+  });
+
+  it("loads real payment and formula data for the receipt", () => {
+    assert.match(assessmentReturnPage, /fulfillCheckoutSession/);
+    assert.match(assessmentReturnPage, /getStoredAssessmentPrefill/);
+    assert.match(assessmentReturnPage, /getStoredFormulationResult/);
+    assert.match(assessmentReturnPage, /computeHealthScore/);
+    assert.match(assessmentReturnPage, /productRecommendations\?\.stackCoveragePercent/);
+    assert.match(assessmentReturnPage, /AMOUNT_MICROS_PER_UNIT/);
+    assert.match(assessmentReturnPage, /formatCurrencyAmount/);
+  });
+
+  it("keeps reservation, pending, expired, and error states explicit", () => {
+    assert.match(assessmentReturnPage, /paid_reservation/);
+    assert.match(assessmentReturnPage, /Payment processing/);
+    assert.match(assessmentReturnPage, /Payment expired/);
+    assert.match(assessmentReturnPage, /Payment needs attention/);
+    assert.match(assessmentReturnPage, /Return to checkout/);
+  });
+
+  it("localizes the new confirmation copy", () => {
+    assert.match(assessmentReturnPage, /ดูสูตรของฉัน/);
+    assert.match(assessmentReturnPage, /ขั้นตอนถัดไป/);
+    assert.match(assessmentReturnPage, /แผนของคุณพร้อมแล้ว/);
+    assert.match(assessmentReturnPage, /查看我的配方/);
+    assert.match(assessmentReturnPage, /接下来会发生什么/);
+    assert.match(assessmentReturnPage, /你的计划已准备好/);
+  });
+
+  it("does not introduce standalone mockup assets or retired homepage language", () => {
+    assert.doesNotMatch(assessmentReturnPage, /FontAwesome|font-awesome|cdnjs/i);
+    assert.doesNotMatch(assessmentReturnPage, /design annotations?/i);
+  });
+
+  it("does not change the product basket payment return page", () => {
+    assert.doesNotMatch(basketReturnPage, /Your formula is being built/);
+    assert.doesNotMatch(basketReturnPage, /payment_confirmation_cta_clicked/);
+  });
+});

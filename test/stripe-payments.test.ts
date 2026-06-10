@@ -257,6 +257,19 @@ describe("Stripe payment schema and lifecycle", () => {
     }
   });
 
+  it("routes mock assessment payments through the confirmation return page", () => {
+    assert.match(paymentService, /sessionId\.startsWith\("mock_cs_"\)/);
+    assert.match(paymentService, /fulfillMockCheckoutSession/);
+    assert.match(
+      paymentService,
+      /destination:\s*paymentReturnPath\(\s*currentPayment\.locale/
+    );
+    assert.match(
+      paymentService,
+      /returnUrl:\s*paymentReturnPath\(\s*input\.locale,\s*mockSessionId\s*\)/
+    );
+  });
+
   it("keeps local Stripe webhook forwarding narrow and explicit", () => {
     const packageJson = readFileSync(
       new URL("../package.json", import.meta.url),

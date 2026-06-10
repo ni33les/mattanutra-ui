@@ -7,9 +7,20 @@ import type { Locale } from "@/lib/i18n";
 type LivingProtocolLineCtaProps = Readonly<{
   className?: string;
   locale: Locale;
+  mode?: "general" | "living_protocol" | "nutrition_plan";
+  presentation?: "button" | "section";
   planId: string;
   retailCustomerOrderId?: string | null;
+  showBody?: boolean;
   source: string;
+}>;
+
+type LineCtaModeCopy = Readonly<{
+  body: string;
+  button: string;
+  dialogTitle: string;
+  eyebrow: string;
+  heading: string;
 }>;
 
 type ConnectState = Readonly<{
@@ -21,47 +32,131 @@ type ConnectState = Readonly<{
 
 const copy = {
   en: {
-    body:
-      "Connect with Panya for order help and protocol questions. Living Protocol coaching unlocks with the full service.",
     close: "Close",
     copied: "Copied",
     copy: "Copy code",
     error: "Could not create a LINE code. Please try again.",
     expires: "Code expires soon",
     instructions:
-      "Open LINE, add MattaNutra, then send this message exactly as shown.",
+      "Scan the QR code or open LINE, then send the code below. It links this chat to your plan without putting private details in the message.",
+    lineNote: "Opens LINE. The code expires shortly.",
     loading: "Creating code...",
+    modes: {
+      general: {
+        body:
+          "Ask about your order, your plan, or what to do next. Panya can help you navigate MattaNutra and bring in a human when needed.",
+        button: "Connect with Panya",
+        dialogTitle: "Connect with Panya on LINE",
+        eyebrow: "LINE support",
+        heading: "Connect with Panya"
+      },
+      living_protocol: {
+        body:
+          "Use LINE to keep the conversation going as sleep, stress, travel, food, or symptoms change. Panya keeps support connected to your MattaNutra plan.",
+        button: "Connect with Panya",
+        dialogTitle: "Connect with Panya on LINE",
+        eyebrow: "Living Protocol",
+        heading: "Connect with Panya for ongoing nutrition support"
+      },
+      nutrition_plan: {
+        body:
+          "Ask why nutrients were selected, how to read your plan, and what to do next. Ongoing refinement is available with Living Protocol.",
+        button: "Connect with Panya",
+        dialogTitle: "Connect with Panya on LINE",
+        eyebrow: "Plan support",
+        heading: "Connect with Panya to discuss your nutrition plan"
+      }
+    },
     openLine: "Open LINE",
-    title: "Connect on LINE"
   },
   th: {
-    body:
-      "เชื่อมต่อกับ Panya เพื่อขอความช่วยเหลือเรื่องคำสั่งซื้อและคำถามเกี่ยวกับโปรโตคอล บริการโค้ช Living Protocol จะเปิดใช้เมื่อซื้อบริการเต็มรูปแบบ",
     close: "ปิด",
     copied: "คัดลอกแล้ว",
     copy: "คัดลอกรหัส",
     error: "ไม่สามารถสร้างรหัส LINE ได้ โปรดลองอีกครั้ง",
     expires: "รหัสจะหมดอายุเร็ว ๆ นี้",
     instructions:
-      "เปิด LINE เพิ่ม MattaNutra แล้วส่งข้อความนี้ตามที่แสดง",
+      "สแกน QR หรือเปิด LINE แล้วส่งรหัสด้านล่าง ระบบจะเชื่อมแชทนี้กับแผนของคุณโดยไม่ใส่ข้อมูลส่วนตัวในข้อความ",
+    lineNote: "เปิด LINE รหัสจะหมดอายุในไม่ช้า",
     loading: "กำลังสร้างรหัส...",
+    modes: {
+      general: {
+        body:
+          "ถามเรื่องคำสั่งซื้อ แผนโภชนาการ หรือขั้นตอนถัดไปได้ Panya จะช่วยพาคุณใช้งาน MattaNutra และส่งต่อให้ทีมงานเมื่อจำเป็น",
+        button: "เชื่อมต่อกับ Panya",
+        dialogTitle: "เชื่อมต่อกับ Panya บน LINE",
+        eyebrow: "ช่วยเหลือผ่าน LINE",
+        heading: "เชื่อมต่อกับ Panya"
+      },
+      living_protocol: {
+        body:
+          "ใช้ LINE เพื่อคุยต่อเมื่อการนอน ความเครียด การเดินทาง อาหาร หรืออาการเปลี่ยนไป Panya จะอ้างอิงการช่วยเหลือกับแผน MattaNutra ของคุณ",
+        button: "เชื่อมต่อกับ Panya",
+        dialogTitle: "เชื่อมต่อกับ Panya บน LINE",
+        eyebrow: "Living Protocol",
+        heading: "เชื่อมต่อกับ Panya เพื่อดูแลโภชนาการอย่างต่อเนื่อง"
+      },
+      nutrition_plan: {
+        body:
+          "ถามได้ว่าทำไมจึงเลือกสารอาหารเหล่านี้ ควรอ่านแผนอย่างไร และควรทำอะไรต่อ การปรับแผนต่อเนื่องจะอยู่ในบริการ Living Protocol",
+        button: "เชื่อมต่อกับ Panya",
+        dialogTitle: "เชื่อมต่อกับ Panya บน LINE",
+        eyebrow: "ช่วยเหลือเรื่องแผน",
+        heading: "เชื่อมต่อกับ Panya เพื่อคุยเรื่องแผนโภชนาการของคุณ"
+      }
+    },
     openLine: "เปิด LINE",
-    title: "เชื่อมต่อผ่าน LINE"
   },
   "zh-CN": {
-    body:
-      "连接 Panya，获取订单帮助并询问方案相关问题。完整 Living Protocol 服务开通后，可获得持续指导。",
     close: "关闭",
     copied: "已复制",
     copy: "复制代码",
     error: "无法创建 LINE 代码，请重试。",
     expires: "代码即将过期",
-    instructions: "打开 LINE，添加 MattaNutra，然后准确发送以下消息。",
+    instructions:
+      "扫描二维码或打开 LINE，然后发送下方代码。它会把聊天连接到你的方案，但不会在消息中包含隐私信息。",
+    lineNote: "打开 LINE。代码会在短时间后过期。",
     loading: "正在创建代码...",
+    modes: {
+      general: {
+        body:
+          "你可以询问订单、方案或下一步怎么做。Panya 会帮助你使用 MattaNutra，并在需要时转给人工团队。",
+        button: "连接 Panya",
+        dialogTitle: "在 LINE 上连接 Panya",
+        eyebrow: "LINE 支持",
+        heading: "连接 Panya"
+      },
+      living_protocol: {
+        body:
+          "当睡眠、压力、旅行、饮食或症状发生变化时，可通过 LINE 持续沟通。Panya 会把支持与你的 MattaNutra 方案保持关联。",
+        button: "连接 Panya",
+        dialogTitle: "在 LINE 上连接 Panya",
+        eyebrow: "Living Protocol",
+        heading: "连接 Panya，获得持续营养支持"
+      },
+      nutrition_plan: {
+        body:
+          "你可以询问为什么选择这些营养素、如何理解方案以及下一步怎么做。持续调整服务包含在 Living Protocol 中。",
+        button: "连接 Panya",
+        dialogTitle: "在 LINE 上连接 Panya",
+        eyebrow: "方案支持",
+        heading: "连接 Panya，讨论你的营养方案"
+      }
+    },
     openLine: "打开 LINE",
-    title: "连接 LINE"
   }
-} satisfies Record<Locale, Record<string, string>>;
+} satisfies Record<Locale, {
+  close: string;
+  copied: string;
+  copy: string;
+  error: string;
+  expires: string;
+  instructions: string;
+  lineNote: string;
+  loading: string;
+  modes: Record<NonNullable<LivingProtocolLineCtaProps["mode"]>, LineCtaModeCopy>;
+  openLine: string;
+}>;
 
 function postBpm(input: Readonly<{
   eventName: string;
@@ -90,11 +185,15 @@ function postBpm(input: Readonly<{
 export function LivingProtocolLineCta({
   className = "",
   locale,
+  mode = "general",
+  presentation = "button",
   planId,
   retailCustomerOrderId,
+  showBody = true,
   source
 }: LivingProtocolLineCtaProps) {
   const labels = copy[locale];
+  const modeLabels = labels.modes[mode];
   const [connect, setConnect] = useState<ConnectState>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -173,19 +272,51 @@ export function LivingProtocolLineCta({
     window.setTimeout(() => setCopied(false), 1600);
   }
 
+  const trigger = (
+    <button
+      className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-[#06C755] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#05B34D] focus:outline-none focus:ring-2 focus:ring-[#06C755]/40 focus:ring-offset-2"
+      onClick={openConnect}
+      type="button"
+    >
+      <MessageCircle aria-hidden className="size-4" />
+      {modeLabels.button}
+    </button>
+  );
+
   return (
     <div className={className}>
-      <button
-        className="inline-flex items-center gap-2 rounded-full bg-[#06C755] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#05B34D]"
-        onClick={openConnect}
-        type="button"
-      >
-        <MessageCircle aria-hidden className="size-4" />
-        {labels.title}
-      </button>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--mn-ink-soft)]">
-        {labels.body}
-      </p>
+      {presentation === "section" ? (
+        <div className="overflow-hidden rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-soft)] sm:p-6">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div className="max-w-3xl">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mn-teal-deep)]">
+                {modeLabels.eyebrow}
+              </p>
+              <h3 className="mt-2 font-serif text-2xl font-medium leading-tight text-[var(--mn-ink)] sm:text-3xl">
+                {modeLabels.heading}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)] sm:text-base">
+                {modeLabels.body}
+              </p>
+            </div>
+            <div className="flex flex-col items-start gap-2 lg:items-end">
+              {trigger}
+              <p className="max-w-xs text-xs leading-5 text-[var(--mn-ash)] lg:text-right">
+                {labels.lineNote}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {trigger}
+          {showBody ? (
+            <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--mn-ink-soft)]">
+              {modeLabels.body}
+            </p>
+          ) : null}
+        </>
+      )}
 
       {open ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4 py-6">
@@ -193,7 +324,7 @@ export function LivingProtocolLineCta({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="font-serif text-3xl font-medium text-[var(--mn-ink)]">
-                  {labels.title}
+                  {modeLabels.dialogTitle}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
                   {labels.instructions}

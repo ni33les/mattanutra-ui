@@ -11,6 +11,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { ExclamationTriangleIcon } from "@heroicons/react/20/solid";
+import { Check, Copy, ExternalLink, MessageCircle } from "lucide-react";
 import { LandingReveal } from "@/components/landing-reveal";
 import { formulationResultsCopy } from "@/components/formulation-results-copy";
 import {
@@ -72,7 +73,6 @@ import {
   PreviewPaywallPanel,
   RevealClosingSection,
 } from "@/components/formulation-results-panels";
-import { LivingProtocolLineCta } from "@/components/living-protocol-line-cta";
 import { NutritionProgress } from "@/components/nutrition-progress";
 import {
   productRecommendationCopy,
@@ -96,6 +96,13 @@ type FormulationResultsProps = Readonly<{
 }>;
 
 type LoadState = "loading" | "ready" | "error";
+
+type PanyaLineConnectState = Readonly<{
+  code: string;
+  command: string;
+  expiresAt: string;
+  lineUrl: string;
+}> | null;
 
 const MAX_PRODUCT_MATCHING_POLLS = 240;
 const PENDING_SECTION_POLL_INTERVAL_MS = 1_000;
@@ -126,6 +133,119 @@ function formatRevealEta(locale: Locale, etaDate: string | null | undefined) {
   }
 
   return `ETA ${formatted}`;
+}
+
+function panyaLineModeForPlan(plan: string) {
+  const normalized = plan.trim().toLowerCase();
+
+  return normalized === "pro" ||
+    normalized === "โปร" ||
+    normalized === "专业" ||
+    normalized.includes("living protocol")
+    ? "living_protocol"
+    : "nutrition_plan";
+}
+
+const panyaRevealSectionCopy = {
+  en: {
+    buttonLead:
+      "Connect on LINE with a one-time code. Panya will recognise this plan when you start the chat.",
+    copied: "Copied",
+    copyCode: "Copy code",
+    createCode: "Create LINE code",
+    eyebrow: "Panya support",
+    error: "Could not create a LINE code. Please try again.",
+    expires: "Code expires soon",
+    livingBody:
+      "Your plan is not meant to sit still. Use LINE to keep the conversation going as sleep, stress, travel, food, or symptoms change.",
+    livingHeading: "Ongoing nutrition support, connected to this plan.",
+    loading: "Creating code...",
+    openLine: "Open LINE",
+    planBody:
+      "Use LINE to ask about your formula, why each nutrient was selected, and how to move from this plan into your daily routine.",
+    planHeading: "Talk through your nutrition plan with Panya.",
+    qrAlt: "MattaNutra LINE QR code",
+    qrPlaceholder: "Create a code to show your LINE QR.",
+  },
+  th: {
+    buttonLead:
+      "เชื่อมต่อผ่าน LINE ด้วยรหัสครั้งเดียว Panya จะรู้ว่าแชทนี้เกี่ยวข้องกับแผนนี้",
+    copied: "คัดลอกแล้ว",
+    copyCode: "คัดลอกรหัส",
+    createCode: "สร้างรหัส LINE",
+    eyebrow: "Panya support",
+    error: "ไม่สามารถสร้างรหัส LINE ได้ โปรดลองอีกครั้ง",
+    expires: "รหัสจะหมดอายุเร็ว ๆ นี้",
+    livingBody:
+      "แผนของคุณไม่ควรหยุดนิ่ง ใช้ LINE เพื่อคุยต่อเมื่อการนอน ความเครียด การเดินทาง อาหาร หรืออาการเปลี่ยนไป",
+    livingHeading: "การดูแลโภชนาการต่อเนื่อง ที่เชื่อมกับแผนนี้",
+    loading: "กำลังสร้างรหัส...",
+    openLine: "เปิด LINE",
+    planBody:
+      "ใช้ LINE เพื่อถามเรื่องสูตรของคุณ เหตุผลที่เลือกสารอาหารแต่ละตัว และวิธีนำแผนนี้ไปใช้ในชีวิตประจำวัน",
+    planHeading: "คุยเรื่องแผนโภชนาการของคุณกับ Panya",
+    qrAlt: "คิวอาร์โค้ด LINE ของ MattaNutra",
+    qrPlaceholder: "สร้างรหัสเพื่อแสดงคิวอาร์ LINE ของคุณ",
+  },
+  "zh-CN": {
+    buttonLead:
+      "使用一次性代码在 LINE 上连接。开始聊天后，Panya 会识别这份方案。",
+    copied: "已复制",
+    copyCode: "复制代码",
+    createCode: "创建 LINE 代码",
+    eyebrow: "Panya 支持",
+    error: "无法创建 LINE 代码，请重试。",
+    expires: "代码即将过期",
+    livingBody:
+      "你的方案不应该停在页面上。当睡眠、压力、旅行、饮食或症状变化时，可通过 LINE 持续沟通。",
+    livingHeading: "与这份方案相连的持续营养支持。",
+    loading: "正在创建代码...",
+    openLine: "打开 LINE",
+    planBody:
+      "通过 LINE 询问你的配方、每种营养素被选择的原因，以及如何把这份方案融入日常生活。",
+    planHeading: "和 Panya 一起讨论你的营养方案。",
+    qrAlt: "MattaNutra LINE 二维码",
+    qrPlaceholder: "创建代码后显示你的 LINE 二维码。",
+  },
+} satisfies Record<Locale, {
+  buttonLead: string;
+  copied: string;
+  copyCode: string;
+  createCode: string;
+  eyebrow: string;
+  error: string;
+  expires: string;
+  livingBody: string;
+  livingHeading: string;
+  loading: string;
+  openLine: string;
+  planBody: string;
+  planHeading: string;
+  qrAlt: string;
+  qrPlaceholder: string;
+}>;
+
+function postRevealPanyaLineBpm(input: Readonly<{
+  eventName: string;
+  locale: Locale;
+  planId: string;
+}>) {
+  void fetch("/api/bpm", {
+    body: JSON.stringify({
+      eventName: input.eventName,
+      eventStatus: "observed",
+      eventType: "chat",
+      locale: input.locale,
+      planId: input.planId,
+      properties: {
+        source: "reveal_panya_support",
+      },
+    }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  }).catch(() => undefined);
 }
 
 type RevealRetailerOption = NonNullable<
@@ -718,6 +838,12 @@ function RevealResultsPage({
         selectedCoverage={selectedCoverage}
         selectedProductStackPreference={selectedProductStackPreference}
         supplementLabelById={supplementLabelById}
+      />
+
+      <RevealPanyaLineSupportSection
+        locale={locale}
+        planId={planId}
+        result={result}
       />
 
       <RevealFoodSupportSection
@@ -1746,15 +1872,212 @@ function RevealProductsSection({
                     </button>
                   )}
                 </div>
-                <LivingProtocolLineCta
-                  className="mt-4"
-                  locale={locale}
-                  planId={planId}
-                  source="reveal_products"
-                />
               </div>
             </div>
           )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RevealPanyaLineSupportSection({
+  locale,
+  planId,
+  result,
+}: Readonly<{
+  locale: Locale;
+  planId: string;
+  result: FormulationResult;
+}>) {
+  const panyaLineMode = panyaLineModeForPlan(result.assessmentSummary.plan);
+  const labels = panyaRevealSectionCopy[locale];
+  const isLivingProtocol = panyaLineMode === "living_protocol";
+  const heading = isLivingProtocol ? labels.livingHeading : labels.planHeading;
+  const body = isLivingProtocol ? labels.livingBody : labels.planBody;
+  const [connect, setConnect] = useState<PanyaLineConnectState>(null);
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [connectError, setConnectError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const qrUrl = useMemo(
+    () =>
+      connect?.lineUrl
+        ? `/api/qr?data=${encodeURIComponent(connect.lineUrl)}`
+        : "",
+    [connect?.lineUrl],
+  );
+
+  useEffect(() => {
+    postRevealPanyaLineBpm({
+      eventName: "customer_line_cta_viewed",
+      locale,
+      planId,
+    });
+  }, [locale, planId]);
+
+  async function createConnectCode() {
+    setConnectError("");
+    postRevealPanyaLineBpm({
+      eventName: "customer_line_cta_clicked",
+      locale,
+      planId,
+    });
+
+    if (connect || connectLoading) {
+      return;
+    }
+
+    setConnectLoading(true);
+
+    try {
+      const response = await fetch(
+        `/api/assessment/${encodeURIComponent(planId)}/line-connect`,
+        {
+          body: JSON.stringify({
+            source: "reveal_panya_support",
+          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || !payload?.command || !payload?.lineUrl) {
+        throw new Error("LINE connect failed");
+      }
+
+      setConnect({
+        code: String(payload.code ?? ""),
+        command: String(payload.command),
+        expiresAt: String(payload.expiresAt ?? ""),
+        lineUrl: String(payload.lineUrl),
+      });
+    } catch {
+      setConnectError(labels.error);
+    } finally {
+      setConnectLoading(false);
+    }
+  }
+
+  async function copyConnectCode() {
+    if (!connect?.command) {
+      return;
+    }
+
+    await navigator.clipboard?.writeText(connect.command).catch(() => undefined);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  return (
+    <section
+      className="border-t border-[var(--mn-line)] bg-[var(--mn-cream)] py-20"
+      data-reveal
+      id="panya-support"
+    >
+      <div className="mx-auto w-full max-w-6xl px-6 sm:px-8">
+        <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
+          <div data-reveal>
+            <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
+              05 · {labels.eyebrow}
+            </p>
+            <h2
+              className={`mt-4 font-serif text-4xl font-medium text-[var(--mn-ink)] sm:text-5xl ${
+                locale === "th" || locale === "zh-CN"
+                  ? "leading-[1.38] break-words [overflow-wrap:anywhere]"
+                  : "leading-tight text-balance"
+              }`}
+            >
+              {heading}
+            </h2>
+          </div>
+          <div className="space-y-5" data-reveal>
+            <p className="text-base leading-8 text-[var(--mn-ink-soft)]">
+              {body}
+            </p>
+            <div className="rounded-xl bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]">
+              <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
+                <a
+                  className={`grid size-40 place-items-center rounded-xl bg-white p-2 ring-1 ring-[var(--mn-line)] ${
+                    connect?.lineUrl ? "" : "pointer-events-none"
+                  }`}
+                  href={connect?.lineUrl ?? "#"}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {qrUrl ? (
+                    <img
+                      alt={labels.qrAlt}
+                      className="size-36"
+                      height={144}
+                      src={qrUrl}
+                      width={144}
+                    />
+                  ) : (
+                    <span className="px-3 text-center text-xs leading-5 text-[var(--mn-ash)]">
+                      {connectLoading ? labels.loading : labels.qrPlaceholder}
+                    </span>
+                  )}
+                </a>
+                <div className="min-w-0">
+                  <p className="text-sm leading-6 text-[var(--mn-ink-soft)]">
+                    {labels.buttonLead}
+                  </p>
+                  <div className="mt-3 rounded-xl bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
+                    <p className="break-all font-mono text-lg font-bold text-[var(--mn-ink)]">
+                      {connect?.command ?? (connectLoading ? labels.loading : "MN PLAN")}
+                    </p>
+                    <p className="mt-2 text-xs text-[var(--mn-ash)]">
+                      {connect ? labels.expires : labels.qrPlaceholder}
+                    </p>
+                  </div>
+                  {connectError ? (
+                    <p className="mt-3 text-sm font-semibold text-[var(--mn-error)]">
+                      {connectError}
+                    </p>
+                  ) : null}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {connect?.lineUrl ? (
+                      <a
+                        className="inline-flex items-center gap-2 rounded-full bg-[#06C755] px-4 py-2 text-sm font-bold text-white hover:bg-[#05B34D]"
+                        href={connect.lineUrl}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {labels.openLine}
+                        <ExternalLink aria-hidden className="size-4" />
+                      </a>
+                    ) : (
+                      <button
+                        className="inline-flex items-center gap-2 rounded-full bg-[#06C755] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#05B34D] disabled:opacity-60"
+                        disabled={connectLoading}
+                        onClick={createConnectCode}
+                        type="button"
+                      >
+                        <MessageCircle aria-hidden className="size-4" />
+                        {connectLoading ? labels.loading : labels.createCode}
+                      </button>
+                    )}
+                    <button
+                      className="inline-flex items-center gap-2 rounded-full border border-[var(--mn-line)] px-4 py-2 text-sm font-bold text-[var(--mn-ink)] hover:bg-[var(--mn-cream)] disabled:opacity-50"
+                      disabled={!connect?.command}
+                      onClick={copyConnectCode}
+                      type="button"
+                    >
+                      {copied ? (
+                        <Check aria-hidden className="size-4" />
+                      ) : (
+                        <Copy aria-hidden className="size-4" />
+                      )}
+                      {copied ? labels.copied : labels.copyCode}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1843,12 +2166,12 @@ function RevealFoodSupportSection({
       : variantBody;
 
   return (
-    <section className="border-t border-[var(--mn-line)] bg-[var(--mn-cream)] py-20">
+    <section className="border-t border-[var(--mn-line)] bg-[var(--mn-cream-deep)] py-20">
       <div className="mx-auto w-full max-w-6xl px-6 sm:px-8">
         <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
           <div data-reveal>
             <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
-              05 · {copy.foodSupportEyebrow}
+              06 · {copy.foodSupportEyebrow}
             </p>
             <h2
               className={`mt-4 font-serif text-4xl font-medium text-[var(--mn-ink)] sm:text-5xl ${
@@ -1875,7 +2198,7 @@ function RevealFoodSupportSection({
             data-reveal
           >
             <div className="grid gap-0 md:grid-cols-[0.8fr_1.2fr]">
-              <div className="bg-[var(--mn-mint)] p-6">
+              <div className="bg-[var(--mn-cream)] p-6">
                 <p
                   className={`text-xs font-bold text-[var(--mn-teal-deep)] ${
                     locale === "en" ? "uppercase tracking-[0.14em]" : ""

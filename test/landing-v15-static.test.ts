@@ -39,10 +39,42 @@ describe("landing page v15 rebuild", () => {
     assert.match(homepage, /variant="landing"/);
     assert.match(titleBar, /mn-titlebar--landing/);
     assert.match(titleBar, /\/v15\/logo\.png/);
-    assert.match(titleBar, /#start-free/);
+    assert.match(titleBar, /#living-protocol/);
+    assert.match(titleBar, /#how-it-works/);
+    assert.match(titleBar, /#promises/);
+    assert.match(titleBar, /#journal/);
+    assert.doesNotMatch(titleBar, /Free questionnaire/);
     assert.match(footer, /#start-free/);
     assert.doesNotMatch(titleBar, /#pricing/);
     assert.doesNotMatch(footer, /#pricing/);
+  });
+
+  it("keeps the English visible copy faithful to the uploaded v15 page", () => {
+    const en = content.en;
+
+    assert.equal(en.clarity.eyebrow, "From overwhelm to clarity");
+    assert.deepEqual(
+      en.clarity.cards.map((card) => card.body),
+      [
+        "Hundreds of options, no clear answer.",
+        "Guidance built around you.",
+        "Only what your body actually needs.",
+        "The Right Amount — in hand."
+      ]
+    );
+    assert.deepEqual(
+      en.how.steps.map(([, label]) => label),
+      [
+        "Detailed, not tedious",
+        "120+ ingredients",
+        "Dispensed by pharmacists",
+        "Part of Living Protocol"
+      ]
+    );
+    assert.match(landingPage, /copy\.promises\.cards/);
+    assert.equal(en.results.eyebrow, "Stories like these");
+    assert.equal(en.questionnaire.eyebrow, "The free questionnaire");
+    assert.equal(en.bridge.note, "Free to start — no credit card required.");
   });
 
   it("has complete localized v15 copy for every public locale", () => {

@@ -18,13 +18,18 @@ const titleBarCopy = {
   en: {
     assessment: "Design your Right Amount",
     availability: "Now available in",
-    countries: ["Thailand", "Singapore", "Malaysia", "Philippines"],
+    availableCountries: [["🇹🇭", "Thailand"]],
+    comingSoon: "Coming soon",
+    comingSoonCountries: [
+      ["🇸🇬", "Singapore"],
+      ["🇲🇾", "Malaysia"],
+      ["🇵🇭", "Philippines"]
+    ],
     homeAria: (title: string) => `${title} home`,
     links: [
       ["#living-protocol", "Living Protocol"],
       ["#how-it-works", "How it works"],
       ["#promises", "Promises"],
-      ["#start-free", "Free questionnaire"],
       ["#journal", "Journal"]
     ],
     menu: "Open menu",
@@ -33,13 +38,18 @@ const titleBarCopy = {
   th: {
     assessment: "ออกแบบปริมาณที่พอดีของคุณ",
     availability: "พร้อมให้บริการใน",
-    countries: ["ไทย", "สิงคโปร์", "มาเลเซีย", "ฟิลิปปินส์"],
+    availableCountries: [["🇹🇭", "ไทย"]],
+    comingSoon: "เร็ว ๆ นี้",
+    comingSoonCountries: [
+      ["🇸🇬", "สิงคโปร์"],
+      ["🇲🇾", "มาเลเซีย"],
+      ["🇵🇭", "ฟิลิปปินส์"]
+    ],
     homeAria: (title: string) => `${title} หน้าแรก`,
     links: [
       ["#living-protocol", "โปรโตคอลชีวิต"],
       ["#how-it-works", "วิธีทำงาน"],
       ["#promises", "คำมั่น"],
-      ["#start-free", "แบบสอบถามฟรี"],
       ["#journal", "บทความ"]
     ],
     menu: "เปิดเมนู",
@@ -48,13 +58,18 @@ const titleBarCopy = {
   "zh-CN": {
     assessment: "设计您的适量",
     availability: "现已覆盖",
-    countries: ["泰国", "新加坡", "马来西亚", "菲律宾"],
+    availableCountries: [["🇹🇭", "泰国"]],
+    comingSoon: "即将推出",
+    comingSoonCountries: [
+      ["🇸🇬", "新加坡"],
+      ["🇲🇾", "马来西亚"],
+      ["🇵🇭", "菲律宾"]
+    ],
     homeAria: (title: string) => `${title} 首页`,
     links: [
       ["#living-protocol", "生活协议"],
       ["#how-it-works", "如何运作"],
       ["#promises", "承诺"],
-      ["#start-free", "免费问卷"],
       ["#journal", "文章"]
     ],
     menu: "打开菜单",
@@ -92,18 +107,31 @@ export function TitleBar({
 
   return (
     <header className={isLanding ? "mn-titlebar mn-titlebar--landing" : "mn-titlebar"}>
-      {isLanding ? null : (
-        <div className="mn-availability-bar" aria-label={copy.availability}>
-          <span>{copy.availability}</span>
+      <div className="mn-availability-bar" aria-label={copy.availability}>
+        <span className="mn-availability-label">{copy.availability}</span>
+        <span className="mn-availability-pills">
+          {copy.availableCountries.map(([flag, country]) => (
+            <span key={country} className="mn-availability-pill">
+              <span aria-hidden>{flag}</span>
+              <span>{country}</span>
+            </span>
+          ))}
+        </span>
+        <span className="hidden h-3.5 w-px bg-white/15 sm:inline-block" />
+        <span className="mn-availability-coming">
+          <span className="mn-availability-label mn-availability-label--muted">
+            {copy.comingSoon}
+          </span>
           <span className="mn-availability-pills">
-            {copy.countries.map((country) => (
-              <span key={country} className="mn-availability-pill">
-                {country}
+            {copy.comingSoonCountries.map(([flag, country]) => (
+              <span key={country} className="mn-availability-pill mn-availability-pill--soon">
+                <span aria-hidden>{flag}</span>
+                <span>{country}</span>
               </span>
             ))}
           </span>
-        </div>
-      )}
+        </span>
+      </div>
       <div className="mn-titlebar-main">
         <Link
           href={`/${currentLocale}`}

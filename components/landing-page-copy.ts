@@ -67,7 +67,7 @@ const baseContent = {
       },
     ],
     clarity: {
-      eyebrow: "The problem",
+      eyebrow: "From overwhelm to clarity",
       title: "Too many choices.",
       accent: "Let MattaNutra give you clarity.",
       body:
@@ -81,19 +81,19 @@ const baseContent = {
         },
         {
           title: "A clear path appears",
-          body: "Your answers start narrowing the field.",
+          body: "Guidance built around you.",
           image: assets.clarity[1],
           imageAlt: "A clear path appears",
         },
         {
           title: "Narrowed down",
-          body: "Only what fits your body and goals remains.",
+          body: "Only what your body actually needs.",
           image: assets.clarity[2],
           imageAlt: "Narrowing down to what matters",
         },
         {
           title: "Exactly enough",
-          body: "A plan designed around your right amount.",
+          body: "The Right Amount — in hand.",
           image: assets.clarity[3],
           imageAlt: "Exactly what you need, in hand",
         },
@@ -129,23 +129,23 @@ const baseContent = {
       steps: [
         [
           "Answer",
-          "Thorough enough to personalise",
+          "Detailed, not tedious",
           "A genuinely detailed set of questions — your goals & health priorities, lifestyle & activity, current medications, budget, and what you truly care about. Thorough enough to personalise your formula, with no jargon and no fluff.",
         ],
         [
           "Analyse",
-          "Research-grounded algorithm",
+          "120+ ingredients",
           "A proprietary algorithm — grounded in published clinical research — designed to closely match the supplement priorities a blood panel would surface, with dosage ranges and safety checks.",
         ],
         [
           "Match",
-          "Partner pharmacy",
+          "Dispensed by pharmacists",
           "Your formula is dispensed through a partner pharmacy with registered pharmacists — real people you can ask, not a guess in the aisle.",
         ],
         [
           "Refine",
-          "Living Protocol",
-          "Optional check-ins update your plan as goals, symptoms and lifestyle change over time.",
+          "Part of Living Protocol",
+          "With Living Protocol, your plan keeps adjusting as your goals, symptoms and lifestyle change over time.",
         ],
       ],
     },
@@ -182,7 +182,7 @@ const baseContent = {
       reasoning: [
         "Magnesium earlier — helps move your wind-down forward as you adjust to the timezone.",
         "Electrolytes added — supports hydration through the flight and your higher walking load in the city.",
-        "Adaptogen held steady — your stress is rising, but your sleep has been unsettled lately, so we're holding the dose rather than stacking changes.",
+        "Adaptogen held steady — your stress is rising, but your sleep's been unsettled lately, so we're holding the dose rather than stacking changes.",
       ],
       foodNudge:
         "One more thing — your last check showed your magnesium sitting a little low. I've got it in your plan, but you can top it up naturally too:",
@@ -215,7 +215,7 @@ const baseContent = {
         ],
         [
           "Your protocol adapts around you",
-          "Working from your current stack, goals and safety flags, MattaNutra turns that update into a few precise adjustments — timing, dosage, or a temporary addition — and points you to everyday foods that support what your body needs.",
+          "Working from your current stack, your goals and your safety flags, MattaNutra turns that update into a few precise adjustments — timing, dosage, or a temporary addition — and points you to the everyday foods that support what your body needs.",
           [
             "Move magnesium slightly earlier this week.",
             "Pumpkin seeds are a great natural source of magnesium.",
@@ -266,18 +266,18 @@ const baseContent = {
       accent: "A protocol that knows you.",
       paragraphs: [
         "Anyone can look up whether travel affects magnesium. The hard part is knowing how it affects your plan — your stack, your medications, the weeks you've just had — and what to actually do about it. That's the part Living Protocol handles for you.",
-        "It already knows everything you take, so there's nothing to re-explain each time something changes. Every adjustment it suggests is checked against your medications and lab flags — the kind of safety net that only works when the guidance is built around you. Over 90 days it comes to recognise your patterns, so its advice reflects not just this week but the trend behind it.",
+        "It already knows everything you take, so there's nothing to re-explain each time something changes. Every adjustment it suggests is checked against your medications and lab flags — the kind of safety net that only works when the guidance is built around you. Over 90 days it comes to recognise your patterns, so its advice reflects not just this week but the trend behind it. And you never have to know the right question to ask — you simply say what's going on, and Living Protocol does the thinking.",
         "You don't need to become your own pharmacist. You just tell MattaNutra what's changed, and it keeps your protocol right.",
       ],
     },
     bridge: {
       title: "Ready to design your Right Amount?",
-      body: "Start with a few focused questions and your free Health Score. Your personalised plan — and the option to add Living Protocol — is one step away.",
+      body: "Start with a short, detailed questionnaire and your free Health Score. Your personalised plan — and the option to add Living Protocol — is one step away.",
       cta: "Start designing your Right Amount",
-      note: "See full plans and pricing below.",
+      note: "Free to start — no credit card required.",
     },
     questionnaire: {
-      eyebrow: "Start free",
+      eyebrow: "The free questionnaire",
       title: "A glimpse inside the questionnaire.",
       body:
         "Here’s how the questionnaire estimates just your vitamin D — one of 120+ ingredients the algorithm weighs — drawing on several answers at once. The full version spans six short sections.",
@@ -305,7 +305,7 @@ const baseContent = {
       reassurance: "✓ Free to start ✓ No credit card ✓ About 3 minutes",
     },
     results: {
-      eyebrow: "Real people. Real stories.",
+      eyebrow: "Stories like these",
       title: "Different lives. The same first step.",
       intro:
         "Different lifestyles. Same goal: better health, more clarity, and a routine that feels possible.",
@@ -363,8 +363,8 @@ const baseContent = {
         "Founded by physicians, scientists, and innovative AI thinkers.",
       founderParagraphs: [
         "What goes into your body should be designed by people who understand what's actually in it.",
-        "MattaNutra was founded by an international group with an unusually broad foundation: two physicians with MD–PhD training from leading research institutions (including Mahidol, Princeton, Stanford and Harvard Universities), a software engineer whose career began at CERN and now spans AI and decentralised systems, a PhD economist with global enterprise experience across public markets and frontier ventures, and a younger founder whose perspective keeps the work grounded in how people actually live.",
-        "Between us, more than a hundred years of professional practice — in medicine, in science, in technology, and in building things that last.",
+        "MattaNutra was founded by an international group with an unusually broad foundation: two physicians with MD–PhD training from leading research institutions (including Mahidol, Princeton, Stanford and Harvard Universities), a software engineer whose career began at CERN and now spans AI and decentralised systems for institutions including Goldman Sachs and UBS, a PhD economist with global enterprise experience across public markets and frontier ventures, and a younger founder whose perspective keeps us close to the generation we're building for.",
+        "Between us, more than a hundred years of professional practice — in medicine, in science, in technology, and in the rewarding work of building things that last.",
       ],
       signoff: "From Chiang Mai, with care.",
       tagline: "Ancient wisdom · Modern science",
@@ -479,7 +479,7 @@ const baseContent = {
         ],
         [
           "I'm on medication — is this safe for me?",
-          "MattaNutra screens for the most common medication-supplement considerations and flags them in your plan. It is wellness guidance, not medical advice. If you are taking prescription medication, pregnant, nursing, or managing a medical condition, please consult a qualified healthcare professional before beginning any supplement programme.",
+          "MattaNutra screens for the most common medication–supplement considerations and flags them in your plan. It is wellness guidance, not medical advice. If you are taking prescription medication, pregnant, nursing, or managing a medical condition, please consult a qualified healthcare professional before beginning any supplement programme.",
         ],
         [
           "Where do the recommended products come from?",
@@ -487,7 +487,7 @@ const baseContent = {
         ],
         [
           "Is the free assessment really free?",
-          "Yes. The questionnaire and your Health Score are free, and no credit card is required. After you complete it, you'll see where you stand and a starting direction. The full personalised Right Amount Formula and optional Living Protocol support are available if you choose to go further.",
+          "Yes. The questionnaire and your Health Score are free, and no credit card is required. After you complete it, you'll see where you stand and a starting direction. The full personalised Right Amount Formula — and optional Living Protocol support — are available if you choose to go further.",
         ],
         [
           "Why the Pāli name?",
@@ -498,7 +498,7 @@ const baseContent = {
     final: {
       title: "Stop guessing.",
       accent: "Start knowing.",
-      body: "Answer a few focused questions, get your free Health Score, and receive your personalised starting plan — built around your body, your goals, and your day.",
+      body: "Answer a focused set of questions, get your free Health Score, and receive your personalised starting plan — built around your body, your goals, and your day.",
       primary: "Start designing your Right Amount",
       secondary: "How it works",
       quote: "Mattaññutā — knowing the right amount.",
@@ -545,7 +545,7 @@ const baseContent = {
       },
     ],
     clarity: {
-      eyebrow: "ปัญหา",
+      eyebrow: "จากความสับสนสู่ความชัดเจน",
       title: "ตัวเลือกมากเกินไป.",
       accent: "ให้ MattaNutra ช่วยทำให้ชัดเจน.",
       body:
@@ -559,19 +559,19 @@ const baseContent = {
         },
         {
           title: "ทางที่ชัดเริ่มปรากฏ",
-          body: "คำตอบของคุณช่วยคัดสิ่งที่ไม่เกี่ยวออก",
+          body: "คำแนะนำที่สร้างรอบตัวคุณ",
           image: assets.clarity[1],
           imageAlt: "ทางเลือกที่ชัดเจนเริ่มปรากฏ",
         },
         {
           title: "เหลือสิ่งที่สำคัญ",
-          body: "คงไว้เฉพาะสิ่งที่เหมาะกับร่างกายและเป้าหมาย",
+          body: "เหลือเฉพาะสิ่งที่ร่างกายคุณต้องการจริง ๆ",
           image: assets.clarity[2],
           imageAlt: "คัดให้เหลือสิ่งที่สำคัญ",
         },
         {
           title: "พอดีอย่างแม่นยำ",
-          body: "แผนที่ออกแบบรอบปริมาณที่พอดีของคุณ",
+          body: "ปริมาณที่พอดีอยู่ในมือ",
           image: assets.clarity[3],
           imageAlt: "สิ่งที่ต้องการอย่างพอดี",
         },
@@ -606,7 +606,7 @@ const baseContent = {
       steps: [
         [
           "ตอบ",
-          "สั้นแต่ครบ",
+          "ละเอียดแต่ไม่น่าเบื่อ",
           "ตอบคำถามที่จำเป็นเกี่ยวกับเป้าหมาย สุขภาพ ไลฟ์สไตล์ ยาที่ใช้อยู่ งบประมาณ และสิ่งที่คุณให้ความสำคัญ",
         ],
         [
@@ -616,13 +616,13 @@ const baseContent = {
         ],
         [
           "จับคู่",
-          "พร้อมใช้ในเอเชีย",
-          "รับคำแนะนำผลิตภัณฑ์เพื่อไม่ต้องเดาในร้านหรือบน Lazada",
+          "จัดจ่ายโดยเภสัชกร",
+          "สูตรของคุณจัดจ่ายผ่านร้านขายยาพาร์ทเนอร์ที่มีเภสัชกรขึ้นทะเบียน — คนจริงที่คุณถามได้ ไม่ใช่การเดาในร้าน",
         ],
         [
           "ปรับ",
-          "เตือนทบทวน 60 วัน",
-          "เช็กอินเพิ่มเติมเพื่อปรับแผนเมื่อเป้าหมาย อาการ และไลฟ์สไตล์เปลี่ยน",
+          "ส่วนหนึ่งของโปรโตคอลชีวิต",
+          "ด้วยโปรโตคอลชีวิต แผนของคุณจะปรับต่อเนื่องเมื่อเป้าหมาย อาการ และไลฟ์สไตล์เปลี่ยนไป",
         ],
       ],
     },
@@ -687,7 +687,7 @@ const baseContent = {
         ],
         [
           "โปรโตคอลปรับรอบตัวคุณ",
-          "จากชุดที่ใช้อยู่ เป้าหมาย และข้อควรระวัง MattaNutra แปลงข้อมูลนั้นเป็นการปรับที่ชัดเจน เช่น เวลา ปริมาณ หรืออาหารที่ช่วยสนับสนุน",
+          "จากชุดที่ใช้อยู่ เป้าหมาย และข้อควรระวังของคุณ MattaNutra แปลงข้อมูลนั้นเป็นการปรับที่ชัดเจน เช่น เวลา ปริมาณ หรือการเสริมชั่วคราว และแนะนำอาหารประจำวันที่ช่วยสนับสนุนสิ่งที่ร่างกายต้องการ",
           [
             "เลื่อนแมกนีเซียมให้เร็วขึ้นเล็กน้อย",
             "เมล็ดฟักทองเป็นแหล่งแมกนีเซียมที่ดี",
@@ -738,18 +738,18 @@ const baseContent = {
       accent: "คือโปรโตคอลที่รู้จักคุณ.",
       paragraphs: [
         "ใครก็ค้นได้ว่าการเดินทางส่งผลต่อแมกนีเซียมหรือไม่ แต่ส่วนที่ยากคือมันส่งผลต่อแผนของคุณอย่างไร ทั้งชุดที่คุณใช้อยู่ ยาของคุณ และสัปดาห์ที่ผ่านมา",
-        "ระบบรู้สิ่งที่คุณใช้อยู่แล้ว จึงไม่ต้องอธิบายใหม่ทุกครั้ง ทุกการปรับตรวจเทียบกับยาและข้อมูลแล็บของคุณ และตลอด 90 วัน ระบบเริ่มเห็นรูปแบบของคุณ ไม่ใช่แค่สัปดาห์นี้",
+        "ระบบรู้สิ่งที่คุณใช้อยู่แล้ว จึงไม่ต้องอธิบายใหม่ทุกครั้ง ทุกการปรับตรวจเทียบกับยาและข้อมูลแล็บของคุณ และตลอด 90 วัน ระบบเริ่มเห็นรูปแบบของคุณ ไม่ใช่แค่สัปดาห์นี้ และคุณไม่จำเป็นต้องรู้ว่าควรถามคำถามอะไร แค่บอกว่าเกิดอะไรขึ้น แล้วโปรโตคอลชีวิตจะคิดต่อให้",
         "คุณไม่ต้องเป็นเภสัชกรของตัวเอง แค่บอก MattaNutra ว่าอะไรเปลี่ยน แล้วระบบช่วยรักษาแผนให้พอดี",
       ],
     },
     bridge: {
       title: "พร้อมออกแบบปริมาณที่พอดีของคุณไหม?",
-      body: "เริ่มด้วยคำถามที่จำเป็นไม่กี่ข้อและ Health Score ฟรี แผนเฉพาะบุคคลของคุณ รวมถึงตัวเลือกโปรโตคอลชีวิต อยู่ห่างออกไปอีกขั้นเดียว",
+      body: "เริ่มด้วยแบบสอบถามสั้น ๆ ที่ละเอียดและ Health Score ฟรี แผนเฉพาะบุคคลของคุณ รวมถึงตัวเลือกโปรโตคอลชีวิต อยู่ห่างออกไปอีกขั้นเดียว",
       cta: "ออกแบบปริมาณที่พอดีของคุณ",
-      note: "ดูแผนและราคาทั้งหมดด้านล่าง",
+      note: "เริ่มฟรี — ไม่ต้องใช้บัตรเครดิต",
     },
     questionnaire: {
-      eyebrow: "เริ่มฟรี",
+      eyebrow: "แบบสอบถามฟรี",
       title: "ตัวอย่างภายในแบบสอบถาม.",
       body:
         "นี่คือตัวอย่างว่าแบบสอบถามประเมินวิตามิน D เพียงตัวเดียวอย่างไร ซึ่งเป็นหนึ่งในส่วนผสมกว่า 120 รายการที่อัลกอริทึมชั่งน้ำหนัก โดยใช้คำตอบหลายข้อร่วมกัน เวอร์ชันเต็มมีหกส่วนสั้น ๆ",
@@ -777,7 +777,7 @@ const baseContent = {
       reassurance: "✓ เริ่มฟรี ✓ ไม่ต้องใช้บัตรเครดิต ✓ ประมาณ 3 นาที",
     },
     results: {
-      eyebrow: "คนจริง เรื่องจริง",
+      eyebrow: "เรื่องราวแบบนี้",
       title: "ชีวิตต่างกัน. จุดเริ่มต้นเดียวกัน.",
       intro:
         "เป้าหมายเดียวกันคือสุขภาพที่ดีขึ้น ความชัดเจนมากขึ้น และกิจวัตรที่ทำได้จริง",
@@ -1017,7 +1017,7 @@ export const content = {
       },
     ],
     clarity: {
-      eyebrow: "问题所在",
+      eyebrow: "从不知所措到清晰",
       title: "选择太多。",
       accent: "让 MattaNutra 带来清晰。",
       body:
@@ -1031,19 +1031,19 @@ export const content = {
         },
         {
           title: "清晰路径出现",
-          body: "您的回答开始缩小范围。",
+          body: "围绕您建立的指导。",
           image: assets.clarity[1],
           imageAlt: "清晰路径出现",
         },
         {
           title: "范围缩小",
-          body: "只保留适合身体和目标的内容。",
+          body: "只留下身体真正需要的内容。",
           image: assets.clarity[2],
           imageAlt: "缩小到真正重要的选择",
         },
         {
           title: "刚刚好",
-          body: "围绕您的适量设计的计划。",
+          body: "Right Amount 已在手中。",
           image: assets.clarity[3],
           imageAlt: "手中恰好需要的选择",
         },
@@ -1078,7 +1078,7 @@ export const content = {
       steps: [
         [
           "回答",
-          "简短而详细",
+          "详细，而不繁琐",
           "几个聚焦问题，涵盖您的目标、健康优先事项、生活方式、用药、预算以及您真正关心的事。没有术语，没有冗余。",
         ],
         [
@@ -1086,11 +1086,15 @@ export const content = {
           "120+ 种成分",
           "您的回答将被映射到补充剂优先级、剂量范围和安全考量。",
         ],
-        ["匹配", "东南亚适用", "获得产品指导，不再在店内或 Lazada 上猜测。"],
+        [
+          "匹配",
+          "由药师调配",
+          "您的配方通过合作药房和注册药师调配——是真实可以询问的人，而不是在货架前猜测。",
+        ],
         [
           "优化",
-          "60 天提示",
-          "可选的定期检查会随目标、症状和生活方式变化更新您的计划。",
+          "Living Protocol 的一部分",
+          "借助 Living Protocol，您的计划会随着目标、症状和生活方式变化持续调整。",
         ],
       ],
     },
@@ -1154,7 +1158,7 @@ export const content = {
         ],
         [
           "您的方案随您调整",
-          "基于您当前的补充剂、目标和安全标记，MattaNutra 将更新转化为几处精准调整——时间、剂量或临时添加——并推荐支持身体需求的日常食物。",
+          "基于您当前的补充剂组合、您的目标和您的安全标记，MattaNutra 将更新转化为几处精准调整——时间、剂量或临时添加——并推荐支持身体需求的日常食物。",
           [
             "本周将镁稍早服用。",
             "南瓜子是镁的优质天然来源。",
@@ -1205,18 +1209,18 @@ export const content = {
       accent: "一个了解您的方案。",
       paragraphs: [
         "任何人都能查到旅行如何影响镁。难点在于了解它如何影响您的计划——您的补充剂组合、用药、过去几周的情况——以及实际该怎么做。这正是 Living Protocol 为您处理的。",
-        "它已经知道您服用的一切，因此无需每次变化时重复解释。每次建议的调整都会对照您的用药和化验标记——这种安全保障只有当指导完全围绕您构建时才有效。90 天内，它会逐渐识别您的模式，因此建议不仅反映本周，还反映背后的趋势。",
+        "它已经知道您服用的一切，因此无需每次变化时重复解释。每次建议的调整都会对照您的用药和化验标记——这种安全保障只有当指导完全围绕您构建时才有效。90 天内，它会逐渐识别您的模式，因此建议不仅反映本周，还反映背后的趋势。您也无需知道该问什么问题——只要说出正在发生什么，Living Protocol 会替您思考。",
         "您无需成为自己的药剂师。只需告诉 MattaNutra 发生了什么变化，它就会让您的方案保持正确。",
       ],
     },
     bridge: {
       title: "准备好设计您的 Right Amount 了吗？",
-      body: "回答几个聚焦问题，获取免费 Health Score。您的个性化计划——以及添加 Living Protocol 的选项——仅一步之遥。",
+      body: "从一份简短而详细的问卷和免费的 Health Score 开始。您的个性化计划——以及添加 Living Protocol 的选项——仅一步之遥。",
       cta: "开始设计您的 Right Amount",
-      note: "查看完整计划和定价。",
+      note: "免费开始——无需信用卡。",
     },
     questionnaire: {
-      eyebrow: "免费开始",
+      eyebrow: "免费问卷",
       title: "问卷内部的一瞥。",
       body:
         "以下展示问卷如何仅估算您的维生素 D——这是算法权衡的 120+ 种成分之一——它会同时参考多项回答。完整版本包含六个简短部分。",
@@ -1244,7 +1248,7 @@ export const content = {
       reassurance: "✓ 免费开始 ✓ 无需信用卡 ✓ 大约 3 分钟",
     },
     results: {
-      eyebrow: "真实的人。真实的故事。",
+      eyebrow: "这样的故事",
       title: "不同生活。同一个第一步。",
       intro:
         "不同的生活方式。同一个目标：更好的健康、更清晰的方向，以及可行的日常。",
