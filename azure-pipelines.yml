@@ -1,0 +1,140 @@
+trigger:
+  branches:
+    include:
+      - dev
+      - uat
+      - main
+
+pr:
+  branches:
+    include:
+      - dev
+      - uat
+      - main
+
+variables:
+  NODE_VERSION: "22.x"
+  NEXT_TELEMETRY_DISABLED: "1"
+  NPM_CONFIG_AUDIT: "false"
+  NPM_CONFIG_FUND: "false"
+
+stages:
+  - stage: Validate
+    displayName: Validate app
+    jobs:
+      - job: Typecheck_Test_Build
+        displayName: Typecheck, test, and build
+        timeoutInMinutes: 60
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - task: NodeTool@0
+            displayName: Use Node $(NODE_VERSION)
+            inputs:
+              versionSpec: $(NODE_VERSION)
+
+          - task: Cache@2
+            displayName: Cache npm
+            inputs:
+              key: 'npm | "$(Agent.OS)" | package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: $(Pipeline.Workspace)/.npm
+
+          - script: |
+              node --version
+              npm --version
+            displayName: Show runtime versions
+
+          - script: npm ci --cache "$(Pipeline.Workspace)/.npm" --prefer-offline
+            displayName: Install dependencies
+
+          - script: npm run typecheck
+            displayName: Typecheck
+            env:
+              NEXT_TELEMETRY_DISABLED: $(NEXT_TELEMETRY_DISABLED)
+
+          - script: npm run lint
+            displayName: Lint
+            env:
+              NEXT_TELEMETRY_DISABLED: $(NEXT_TELEMETRY_DISABLED)
+
+          - script: npm run test
+            displayName: Test
+            env:
+              NEXT_TELEMETRY_DISABLED: $(NEXT_TELEMETRY_DISABLED)
+
+          - script: npm run build:dev-fast
+            displayName: Build
+            env:
+              NEXT_TELEMETRY_DISABLED: $(NEXT_TELEMETRY_DISABLED)
+
+  - stage: UATSmoke
+    displayName: UAT smoke
+    dependsOn: Validate
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/uat'))
+    jobs:
+      - job: Smoke
+        displayName: Smoke UAT deployment
+        timeoutInMinutes: 20
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - task: NodeTool@0
+            displayName: Use Node $(NODE_VERSION)
+            inputs:
+              versionSpec: $(NODE_VERSION)
+
+          - task: Cache@2
+            displayName: Cache npm
+            inputs:
+              key: 'npm | "$(Agent.OS)" | package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: $(Pipeline.Workspace)/.npm
+
+          - script: npm ci --cache "$(Pipeline.Workspace)/.npm" --prefer-offline
+            displayName: Install dependencies
+
+          - bash: |
+              set -euo pipefail
+
+              for name in \
+                UAT_DB_URL \
+                DIGITALOCEAN_ACCESS_TOKEN \
+                UAT_DIGITALOCEAN_APP_ID \
+                UAT_DIGITALOCEAN_APP_NAME \
+                UAT_DIGITALOCEAN_COMPONENT_NAME \
+                UAT_DIGITALOCEAN_SERVICE_NAME \
+                LINE_CHANNEL_ACCESS_TOKEN \
+                LINE_CHANNEL_SECRET
+              do
+                value="${!name:-}"
+                if [[ "$value" == \$\(* ]]; then
+                  export "$name="
+                fi
+              done
+
+              if [[ -z "${UAT_DB_URL:-}" ]]; then
+                echo "Skipping UAT smoke: UAT_DB_URL is not configured as an Azure pipeline variable."
+                exit 0
+              fi
+
+              npm run uat:smoke
+            displayName: Run UAT smoke when configured
+            env:
+              NEXT_TELEMETRY_DISABLED: $(NEXT_TELEMETRY_DISABLED)
+              UAT_DB_URL: $(UAT_DB_URL)
+              DIGITALOCEAN_ACCESS_TOKEN: $(DIGITALOCEAN_ACCESS_TOKEN)
+              UAT_DIGITALOCEAN_APP_ID: $(UAT_DIGITALOCEAN_APP_ID)
+              UAT_DIGITALOCEAN_APP_NAME: $(UAT_DIGITALOCEAN_APP_NAME)
+              UAT_DIGITALOCEAN_COMPONENT_NAME: $(UAT_DIGITALOCEAN_COMPONENT_NAME)
+              UAT_DIGITALOCEAN_SERVICE_NAME: $(UAT_DIGITALOCEAN_SERVICE_NAME)
+              LINE_CHANNEL_ACCESS_TOKEN: $(LINE_CHANNEL_ACCESS_TOKEN)
+              LINE_CHANNEL_SECRET: $(LINE_CHANNEL_SECRET)
