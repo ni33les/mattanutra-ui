@@ -1,8 +1,12 @@
-import { RETAIL_AGENT_EXECUTABLE_TASK_TYPES } from "@/lib/retail-task-policy";
+import {
+  RETAIL_AGENT_EXECUTABLE_TASK_TYPES,
+  RETAIL_CARRIER_AGENT_EXECUTABLE_TASK_TYPES
+} from "@/lib/retail-task-policy";
 import type { SystemAgentKey } from "@/lib/system-agents";
 
 export type WorkerProfileMode =
   | "advisor"
+  | "carrier"
   | "chat"
   | "communications"
   | "content"
@@ -11,6 +15,7 @@ export type WorkerProfileMode =
   | "formulation"
   | "healthscore"
   | "hosting"
+  | "panya"
   | "products"
   | "stock";
 
@@ -37,6 +42,7 @@ export const RUNTIME_WORKER_PROFILES: readonly RuntimeWorkerCredentialProfile[] 
     "nutrition_plan_chat_reply",
     "refine_nutrition_plan"
   ]),
+  profile("carrier", "carrierCoordinator", "WORKER_CARRIER_AGENT_API_KEY", "retail_agent", RETAIL_CARRIER_AGENT_EXECUTABLE_TASK_TYPES),
   profile("chat", "chatDispatcher", "WORKER_CHAT_AGENT_API_KEY", "platform_agent", [
     "dispatch_chat_communication_message"
   ]),
@@ -71,6 +77,9 @@ export const RUNTIME_WORKER_PROFILES: readonly RuntimeWorkerCredentialProfile[] 
   ]),
   profile("hosting", "scheduler", "WORKER_HOSTING_AGENT_API_KEY", "platform_agent", [
     "sync_digitalocean_billing"
+  ]),
+  profile("panya", "panya", "WORKER_PANYA_AGENT_API_KEY", "platform_agent", [
+    "customer_chat_reply"
   ]),
   profile("products", "productMatcher", "WORKER_PRODUCTS_AGENT_API_KEY", "platform_agent", [
     "generate_product_recommendations",

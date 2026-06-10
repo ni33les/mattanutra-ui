@@ -1,7 +1,15 @@
 import {
   openClawJson,
-  requireOpenClawAccess
+  requireOpenClawAccess,
+  taskApiError
 } from "@/lib/openclaw-api";
+import { isUuid } from "@/lib/assessment-store";
+import { getSql } from "@/lib/db";
+import {
+  appendPlanChatMessage,
+  loadPlanChatMessages
+} from "@/lib/plan-concierge";
+import { enqueueNutritionPlanChatReplyTask } from "@/lib/task-worker";
 
 export const runtime = "nodejs";
 
@@ -11,44 +19,92 @@ type OpenClawPlanRouteProps = Readonly<{
   }>;
 }>;
 
-/**
- * OpenClaw chat message endpoint for a plan (GET list / POST append).
- *
- * This surface exists so OpenClaw (and future external concierges) can store
- * and retrieve chat turns against a MattaNutra nutrition plan.
- *
- * Currently a minimal stub that satisfies the OpenClaw auth boundary
- * test while the full bidirectional chat + advisor handoff is completed.
- *
- * TODO: Implement using loadPlanChatMessages + appendPlanChatMessage from
- *       lib/plan-concierge.ts + enqueue appropriate follow-up tasks.
- */
+function objectValue(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function text(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export async function GET(request: Request, { params }: OpenClawPlanRouteProps) {
   const { unauthorized } = await requireOpenClawAccess(request);
+
   if (unauthorized) {
     return unauthorized;
   }
 
   const { planId } = await params;
-  // Placeholder response — real implementation will return chat history
-  return openClawJson({
-    planId,
-    messages: [],
-    note: "Messages endpoint is not yet fully implemented. See TODO in source."
-  });
+
+  try {
+    const sql = getSql();
+
+    if (!sql || !isUuid(planId)) {
+      return openClawJson({ message: "Plan not found" }, { status: 404 });
+    }
+
+    return openClawJson({
+      messages: await loadPlanChatMessages(sql, planId),
+      planId
+    });
+  } catch (error) {
+    return taskApiError(error, "Unable to load OpenClaw plan messages");
+  }
 }
 
 export async function POST(request: Request, { params }: OpenClawPlanRouteProps) {
   const { unauthorized } = await requireOpenClawAccess(request);
+
   if (unauthorized) {
     return unauthorized;
   }
 
   const { planId } = await params;
-  // Placeholder — real impl will validate + persist via plan-concierge
-  return openClawJson({
-    planId,
-    ok: true,
-    note: "Message accepted (stub). Full persistence + reply dispatch pending."
-  }, { status: 202 });
+
+  try {
+    const sql = getSql();
+    const body = objectValue(await request.json().catch(() => ({})));
+    const role = body.role === "assistant" ? "assistant" : "user";
+
+    if (!sql || !isUuid(planId)) {
+      return openClawJson({ message: "Plan not found" }, { status: 404 });
+    }
+
+    const message = await appendPlanChatMessage(sql, {
+      body: text(body.body),
+      channel: "unknown",
+      externalMessageId: text(body.externalMessageId) || null,
+      feedback: body.feedback,
+      metadata: {
+        source: "openclaw"
+      },
+      planId,
+      replyToMessageId: isUuid(text(body.replyToMessageId))
+        ? text(body.replyToMessageId)
+        : null,
+      role,
+      source: "openclaw",
+      status: role === "user" ? "queued" : "ready"
+    });
+    const taskId =
+      role === "user"
+        ? await enqueueNutritionPlanChatReplyTask({
+            messageId: message.messageId,
+            planId
+          })
+        : null;
+
+    return openClawJson(
+      {
+        messageId: message.messageId,
+        planId,
+        taskId
+      },
+      { status: 202 }
+    );
+  } catch (error) {
+    return taskApiError(error, "Unable to append OpenClaw plan message");
+  }
 }

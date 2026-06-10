@@ -390,6 +390,19 @@ export function RetailShoppingListModal({
             </div>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
+            <label className="inline-flex cursor-pointer items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50">
+              {labels.stock.importCsv}
+              <input
+                accept=".csv,text/csv"
+                className="sr-only"
+                disabled={editorDisabled}
+                onChange={(event) => {
+                  void importCsv(event.target.files?.[0] ?? null);
+                  event.target.value = "";
+                }}
+                type="file"
+              />
+            </label>
             <AdminButton
               disabled={lines.length === 0}
               onClick={() => downloadShoppingListCsv(list.listNumber, lines)}
@@ -404,19 +417,6 @@ export function RetailShoppingListModal({
             >
               {labels.stock.exportPdf}
             </AdminButton>
-            <label className="inline-flex cursor-pointer items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50">
-              {labels.stock.importCsv}
-              <input
-                accept=".csv,text/csv"
-                className="sr-only"
-                disabled={editorDisabled}
-                onChange={(event) => {
-                  void importCsv(event.target.files?.[0] ?? null);
-                  event.target.value = "";
-                }}
-                type="file"
-              />
-            </label>
           </div>
         </div>
         <div className="overflow-x-auto rounded-md ring-1 ring-gray-200">

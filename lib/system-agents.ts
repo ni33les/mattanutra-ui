@@ -8,6 +8,12 @@ export const AGENT_CAPABILITIES = {
   communicationDispatch: "communication_dispatch",
   contentPublish: "content_publish",
   communicationRoute: "communication_route",
+  carrierEventProcess: "carrier.event.process",
+  carrierLabelGenerate: "carrier.label.generate",
+  carrierPickupBook: "carrier.pickup.book",
+  carrierShipmentCreate: "carrier.shipment.create",
+  carrierTrackingSync: "carrier.tracking.sync",
+  customerChatReply: "customer_chat_reply",
   doseNormalization: "dose_normalization",
   emailSend: "email_send",
   foodGuidanceGeneration: "food_guidance_generation",
@@ -44,6 +50,7 @@ export const AGENT_CAPABILITIES = {
 
 export type SystemAgentKey =
   | "chatDispatcher"
+  | "carrierCoordinator"
   | "communicationsCoordinator"
   | "contentPublisher"
   | "emailDispatcher"
@@ -52,6 +59,7 @@ export type SystemAgentKey =
   | "healthScoreEngine"
   | "humanReviewer"
   | "nutritionPlanAdvisor"
+  | "panya"
   | "productMatcher"
   | "retailStockPlanner"
   | "safetyScanner"
@@ -83,6 +91,23 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
     model: null,
     name: "Chat Dispatcher",
     type: "external"
+  },
+  carrierCoordinator: {
+    capabilities: [
+      AGENT_CAPABILITIES.carrierEventProcess,
+      AGENT_CAPABILITIES.carrierLabelGenerate,
+      AGENT_CAPABILITIES.carrierPickupBook,
+      AGENT_CAPABILITIES.carrierShipmentCreate,
+      AGENT_CAPABILITIES.carrierTrackingSync
+    ],
+    id: "8d56b3b2-7445-40c9-97cd-ac6bdbe92058",
+    metadata: {
+      carrierFamily: "retail_fulfillment",
+      seeded: true
+    },
+    model: null,
+    name: "Carrier Coordinator",
+    type: "deterministic"
   },
   communicationsCoordinator: {
     capabilities: [
@@ -200,6 +225,22 @@ export const SYSTEM_AGENTS: Readonly<Record<SystemAgentKey, SystemAgentDefinitio
     name: "Nutrition Plan Advisor",
     type: "ai"
   },
+  panya: {
+    capabilities: [
+      AGENT_CAPABILITIES.customerChatReply,
+      AGENT_CAPABILITIES.nutritionPlanChat,
+      AGENT_CAPABILITIES.nutritionPlanRefinement
+    ],
+    id: "af28eaef-13f1-48bf-87d6-a3c85c8a33ee",
+    metadata: {
+      customerFacing: true,
+      seeded: true,
+      usesModel: true
+    },
+    model: "grok:panya",
+    name: "Panya",
+    type: "ai"
+  },
   productMatcher: {
     capabilities: [
       AGENT_CAPABILITIES.doseNormalization,
@@ -265,7 +306,13 @@ export const SYSTEM_AGENT_LIST = Object.values(SYSTEM_AGENTS);
 
 export const WORK_TASK_AGENT_KEYS: Readonly<Record<string, SystemAgentKey>> = {
   analyze_healthscore: "healthScoreEngine",
+  carrier_event_process: "carrierCoordinator",
+  carrier_label_generate: "carrierCoordinator",
+  carrier_pickup_book: "carrierCoordinator",
+  carrier_shipment_create: "carrierCoordinator",
+  carrier_tracking_sync: "carrierCoordinator",
   client_safety_followup: "communicationsCoordinator",
+  customer_chat_reply: "panya",
   dispatch_chat_communication_message: "chatDispatcher",
   dispatch_email_communication_message: "emailDispatcher",
   generate_example_supplement_guidance: "formulationWorker",
@@ -300,7 +347,13 @@ export function systemAgentForWorkTaskType(taskType: string) {
 export function requiredCapabilitiesForWorkTaskType(taskType: string) {
   const capabilitiesByTaskType: Record<string, readonly string[]> = {
     analyze_healthscore: [AGENT_CAPABILITIES.healthScoreAnalysis],
+    carrier_event_process: [AGENT_CAPABILITIES.carrierEventProcess],
+    carrier_label_generate: [AGENT_CAPABILITIES.carrierLabelGenerate],
+    carrier_pickup_book: [AGENT_CAPABILITIES.carrierPickupBook],
+    carrier_shipment_create: [AGENT_CAPABILITIES.carrierShipmentCreate],
+    carrier_tracking_sync: [AGENT_CAPABILITIES.carrierTrackingSync],
     client_safety_followup: [AGENT_CAPABILITIES.clientSafetyFollowup],
+    customer_chat_reply: [AGENT_CAPABILITIES.customerChatReply],
     dispatch_chat_communication_message: [
       AGENT_CAPABILITIES.communicationDispatch,
       AGENT_CAPABILITIES.lineSend

@@ -22,6 +22,9 @@ export type AdminPermission =
   | "reviews.read"
   | "reviews.write"
   | "settings.read"
+  | "shipments.configure"
+  | "shipments.read"
+  | "shipments.write"
   | "stock.read"
   | "stock.write"
   | "tasks.read"
@@ -76,6 +79,9 @@ const allPermissions = [
   "reviews.read",
   "reviews.write",
   "settings.read",
+  "shipments.configure",
+  "shipments.read",
+  "shipments.write",
   "stock.read",
   "stock.write",
   "tasks.read",
@@ -91,6 +97,9 @@ export const adminRolePermissions = {
     "communications.write",
     "finance.read",
     "settings.read",
+    "shipments.configure",
+    "shipments.read",
+    "shipments.write",
     "stock.read",
     "stock.write"
   ],
@@ -98,10 +107,12 @@ export const adminRolePermissions = {
     "communications.read",
     "communications.write",
     "settings.read",
+    "shipments.read",
+    "shipments.write",
     "stock.read",
     "stock.write"
   ],
-  retail_assistant: ["settings.read", "stock.read"]
+  retail_assistant: ["settings.read", "shipments.read", "stock.read"]
 } as const satisfies Record<AdminRole, readonly AdminPermission[]>;
 
 export const adminRoleLabels = {
@@ -145,6 +156,9 @@ export const agentRolePermissions = {
     "performance.write",
     "reviews.read",
     "reviews.write",
+    "shipments.configure",
+    "shipments.read",
+    "shipments.write",
     "tasks.read",
     "tasks.write"
   ],
@@ -152,6 +166,8 @@ export const agentRolePermissions = {
     "communications.read",
     "communications.write",
     "settings.read",
+    "shipments.read",
+    "shipments.write",
     "stock.read",
     "stock.write",
     "tasks.read",

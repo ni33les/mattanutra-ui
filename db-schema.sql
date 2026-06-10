@@ -35,6 +35,7 @@ drop table if exists
   public.communication_channels,
   public.communication_identities,
   public.communication_messages,
+  public.customer_line_connect_tokens,
   public.cron,
   public.line_connect_tokens,
   public.finance_accounts,
@@ -93,6 +94,9 @@ drop table if exists
   public.retail_order_allocations,
   public.retail_customer_order_lines,
   public.retail_customer_orders,
+  public.retail_order_shipment_events,
+  public.retail_order_shipments,
+  public.retail_carrier_accounts,
   public.retail_order_settlements,
   public.retail_shopping_list_lines,
   public.retail_shopping_lists,
@@ -892,6 +896,26 @@ COMMENT ON TABLE public.communication_messages IS 'Append-only-ish outbound and 
 
 
 --
+-- Name: customer_line_connect_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.customer_line_connect_tokens (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    plan_id uuid NOT NULL,
+    retail_customer_order_id uuid,
+    token_hash text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    consumed_at timestamp with time zone,
+    consumed_by_channel_id uuid,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT customer_line_connect_tokens_status_check CHECK ((status = ANY (ARRAY['active'::text, 'consuming'::text, 'consumed'::text, 'expired'::text, 'revoked'::text])))
+);
+
+
+--
 -- Name: line_connect_tokens; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -939,7 +963,7 @@ CREATE TABLE public.organisation_notification_preferences (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT organisation_notification_preferences_channel_check CHECK ((channel_type = ANY (ARRAY['email'::text, 'line'::text]))),
-    CONSTRAINT organisation_notification_preferences_event_check CHECK ((event_key = ANY (ARRAY['platform_revenue_received'::text, 'platform_checkout_failed'::text, 'platform_payment_failed'::text, 'platform_payout_failed'::text, 'platform_retailer_payout_due'::text, 'platform_retailer_settlement_needs_review'::text, 'platform_worker_unavailable'::text, 'platform_task_stuck'::text, 'platform_communication_failed'::text, 'platform_technical_alert'::text, 'retail_order_created'::text, 'retail_order_awaiting_stock'::text, 'retail_order_ready_to_pack'::text, 'retail_order_ready_to_ship'::text, 'retail_order_cancelled'::text, 'retail_order_returned'::text, 'retail_order_shipped'::text, 'retail_order_delivered'::text, 'retail_settlement_needs_review'::text, 'retail_settlement_payout_paid'::text]))),
+    CONSTRAINT organisation_notification_preferences_event_check CHECK ((event_key = ANY (ARRAY['platform_revenue_received'::text, 'platform_checkout_failed'::text, 'platform_carrier_integration_failed'::text, 'platform_payment_failed'::text, 'platform_payout_failed'::text, 'platform_retailer_payout_due'::text, 'platform_retailer_settlement_needs_review'::text, 'platform_worker_unavailable'::text, 'platform_task_stuck'::text, 'platform_communication_failed'::text, 'platform_technical_alert'::text, 'retail_order_created'::text, 'retail_order_awaiting_stock'::text, 'retail_order_ready_to_pack'::text, 'retail_order_ready_to_ship'::text, 'retail_order_pickup_booked'::text, 'retail_order_cancelled'::text, 'retail_order_returned'::text, 'retail_order_shipment_exception'::text, 'retail_order_shipped'::text, 'retail_order_delivered'::text, 'retail_settlement_needs_review'::text, 'retail_settlement_payout_paid'::text]))),
     CONSTRAINT organisation_notification_preferences_rank_check CHECK ((preference_rank >= 0))
 );
 
@@ -2396,6 +2420,97 @@ CREATE TABLE public.retail_order_allocations (
 
 
 --
+-- Name: retail_carrier_accounts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_carrier_accounts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organisation_id uuid NOT NULL REFERENCES public.organisations(id) ON DELETE RESTRICT,
+    carrier_id text NOT NULL,
+    display_name text,
+    status text DEFAULT 'active'::text NOT NULL,
+    capabilities text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    credential_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    encrypted_credentials jsonb DEFAULT '{}'::jsonb NOT NULL,
+    last_tested_at timestamp with time zone,
+    last_test_status text,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_carrier_accounts_carrier_check CHECK ((carrier_id ~ '^[a-z0-9_:-]+$'::text)),
+    CONSTRAINT retail_carrier_accounts_last_test_status_check CHECK (((last_test_status IS NULL) OR (last_test_status = ANY (ARRAY['passed'::text, 'failed'::text, 'not_tested'::text])))),
+    CONSTRAINT retail_carrier_accounts_org_carrier_key UNIQUE (organisation_id, carrier_id),
+    CONSTRAINT retail_carrier_accounts_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text, 'deleted'::text])))
+);
+
+
+--
+-- Name: retail_order_shipments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_order_shipments (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    retail_customer_order_id uuid NOT NULL REFERENCES public.retail_customer_orders(id) ON DELETE CASCADE,
+    organisation_id uuid NOT NULL REFERENCES public.organisations(id) ON DELETE RESTRICT,
+    carrier_account_id uuid REFERENCES public.retail_carrier_accounts(id) ON DELETE SET NULL,
+    carrier_id text NOT NULL,
+    carrier_name text NOT NULL,
+    provider_shipment_id text,
+    provider_pickup_request_id text,
+    tracking_number text,
+    tracking_url text,
+    status text DEFAULT 'draft'::text NOT NULL,
+    label_status text DEFAULT 'not_requested'::text NOT NULL,
+    label_url text,
+    label_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    pickup_booked_at timestamp with time zone,
+    pickup_window_start timestamp with time zone,
+    pickup_window_end timestamp with time zone,
+    pickup_provider_status text,
+    exception_code text,
+    exception_message text,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_by_person_id uuid REFERENCES public.people(id) ON DELETE SET NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retail_order_shipments_carrier_check CHECK ((carrier_id ~ '^[a-z0-9_:-]+$'::text)),
+    CONSTRAINT retail_order_shipments_label_status_check CHECK ((label_status = ANY (ARRAY['not_requested'::text, 'requested'::text, 'generated'::text, 'failed'::text, 'manual_required'::text]))),
+    CONSTRAINT retail_order_shipments_order_key UNIQUE (retail_customer_order_id),
+    CONSTRAINT retail_order_shipments_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'shipment_created'::text, 'label_generated'::text, 'pickup_booked'::text, 'picked_up'::text, 'in_transit'::text, 'out_for_delivery'::text, 'delivered'::text, 'delivery_failed'::text, 'returned'::text, 'lost'::text, 'damaged'::text, 'cancelled'::text, 'exception'::text])))
+);
+
+
+--
+-- Name: retail_order_shipment_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retail_order_shipment_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    shipment_id uuid REFERENCES public.retail_order_shipments(id) ON DELETE CASCADE,
+    retail_customer_order_id uuid REFERENCES public.retail_customer_orders(id) ON DELETE CASCADE,
+    organisation_id uuid NOT NULL REFERENCES public.organisations(id) ON DELETE RESTRICT,
+    carrier_id text NOT NULL,
+    provider_event_id text,
+    provider_shipment_id text,
+    provider_status_code text,
+    provider_status_text text,
+    normalized_status text NOT NULL,
+    event_dedupe_key text NOT NULL,
+    event_occurred_at timestamp with time zone,
+    received_at timestamp with time zone DEFAULT now() NOT NULL,
+    processed_at timestamp with time zone,
+    processing_status text DEFAULT 'received'::text NOT NULL,
+    processing_error text,
+    raw_payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT retail_order_shipment_events_carrier_check CHECK ((carrier_id ~ '^[a-z0-9_:-]+$'::text)),
+    CONSTRAINT retail_order_shipment_events_normalized_status_check CHECK ((normalized_status = ANY (ARRAY['shipment_created'::text, 'label_generated'::text, 'pickup_booked'::text, 'picked_up'::text, 'drop_off'::text, 'in_transit'::text, 'out_for_delivery'::text, 'delivered'::text, 'delivery_failed'::text, 'returned'::text, 'lost'::text, 'damaged'::text, 'cancelled'::text, 'exception'::text, 'unknown'::text]))),
+    CONSTRAINT retail_order_shipment_events_processing_status_check CHECK ((processing_status = ANY (ARRAY['received'::text, 'queued'::text, 'processed'::text, 'ignored'::text, 'failed'::text]))),
+    CONSTRAINT retail_order_shipment_events_dedupe_key UNIQUE (carrier_id, event_dedupe_key)
+);
+
+
+--
 -- Name: recommendations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3231,6 +3346,14 @@ ALTER TABLE ONLY public.communication_identities
 
 ALTER TABLE ONLY public.communication_messages
     ADD CONSTRAINT communication_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: customer_line_connect_tokens customer_line_connect_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_line_connect_tokens
+    ADD CONSTRAINT customer_line_connect_tokens_pkey PRIMARY KEY (id);
 
 
 --
@@ -4305,6 +4428,20 @@ CREATE INDEX communication_messages_status_idx ON public.communication_messages 
 
 
 --
+-- Name: customer_line_connect_tokens_active_hash_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX customer_line_connect_tokens_active_hash_idx ON public.customer_line_connect_tokens USING btree (token_hash) WHERE ((consumed_at IS NULL) AND (status = ANY (ARRAY['active'::text, 'consuming'::text])));
+
+
+--
+-- Name: customer_line_connect_tokens_plan_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX customer_line_connect_tokens_plan_status_idx ON public.customer_line_connect_tokens USING btree (plan_id, status, expires_at DESC);
+
+
+--
 -- Name: line_connect_tokens_active_hash_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4414,6 +4551,55 @@ CREATE INDEX finance_transactions_fx_rate_idx ON public.finance_transactions USI
 --
 
 CREATE INDEX finance_transactions_task_idx ON public.finance_transactions USING btree (task_id, occurred_at DESC) WHERE (task_id IS NOT NULL);
+
+
+--
+-- Name: retail_carrier_accounts_org_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_carrier_accounts_org_status_idx ON public.retail_carrier_accounts USING btree (organisation_id, status, carrier_id);
+
+
+--
+-- Name: retail_order_shipments_order_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_order_shipments_order_idx ON public.retail_order_shipments USING btree (retail_customer_order_id, status, updated_at DESC);
+
+
+--
+-- Name: retail_order_shipments_org_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_order_shipments_org_status_idx ON public.retail_order_shipments USING btree (organisation_id, status, updated_at DESC);
+
+
+--
+-- Name: retail_order_shipments_provider_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_order_shipments_provider_idx ON public.retail_order_shipments USING btree (carrier_id, provider_shipment_id) WHERE (provider_shipment_id IS NOT NULL);
+
+
+--
+-- Name: retail_order_shipment_events_shipment_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_order_shipment_events_shipment_idx ON public.retail_order_shipment_events USING btree (shipment_id, received_at DESC) WHERE (shipment_id IS NOT NULL);
+
+
+--
+-- Name: retail_order_shipment_events_order_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_order_shipment_events_order_idx ON public.retail_order_shipment_events USING btree (retail_customer_order_id, received_at DESC) WHERE (retail_customer_order_id IS NOT NULL);
+
+
+--
+-- Name: retail_order_shipment_events_processing_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retail_order_shipment_events_processing_idx ON public.retail_order_shipment_events USING btree (processing_status, received_at);
 
 
 --
@@ -5551,6 +5737,30 @@ ALTER TABLE ONLY public.communication_messages
 
 ALTER TABLE ONLY public.communication_messages
     ADD CONSTRAINT communication_messages_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.tasks(id) ON DELETE SET NULL;
+
+
+--
+-- Name: customer_line_connect_tokens customer_line_connect_tokens_consumed_by_channel_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_line_connect_tokens
+    ADD CONSTRAINT customer_line_connect_tokens_consumed_by_channel_id_fkey FOREIGN KEY (consumed_by_channel_id) REFERENCES public.communication_channels(id) ON DELETE SET NULL;
+
+
+--
+-- Name: customer_line_connect_tokens customer_line_connect_tokens_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_line_connect_tokens
+    ADD CONSTRAINT customer_line_connect_tokens_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.assessments(plan_id) ON DELETE CASCADE;
+
+
+--
+-- Name: customer_line_connect_tokens customer_line_connect_tokens_retail_customer_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_line_connect_tokens
+    ADD CONSTRAINT customer_line_connect_tokens_retail_customer_order_id_fkey FOREIGN KEY (retail_customer_order_id) REFERENCES public.retail_customer_orders(id) ON DELETE SET NULL;
 
 
 --

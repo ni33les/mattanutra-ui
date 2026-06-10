@@ -113,9 +113,11 @@ type TrackingOrder = Readonly<{
   lines: QuoteLine[];
   orderId: string | null;
   orderNumber: string | null;
+  planId: string;
   retailerName: string | null;
   shipment: Readonly<{
     carrierName: string | null;
+    pickupBookedAt: string | null;
     shipmentNotes: string | null;
     trackingNumber: string | null;
     trackingUrl: string | null;
@@ -204,8 +206,13 @@ function cleanText(value: unknown) {
 
 function shipmentFromMetadata(value: unknown): TrackingOrder["shipment"] {
   const shipment = objectValue(objectValue(value).shipment);
+  const pickup = objectValue(shipment.pickup);
   const parsed = {
     carrierName: cleanText(shipment.carrierName) || null,
+    pickupBookedAt:
+      cleanText(pickup.bookedAt) ||
+      cleanText(shipment.pickupBookedAt) ||
+      null,
     shipmentNotes: cleanText(shipment.shipmentNotes) || null,
     trackingNumber: cleanText(shipment.trackingNumber) || null,
     trackingUrl: cleanText(shipment.trackingUrl) || null
@@ -1215,14 +1222,18 @@ export async function fulfillRetailCheckoutSession(input: Readonly<{
       destination: trackingReference
         ? `/${payment.locale}/order/track/${encodeURIComponent(trackingReference)}`
         : `/${payment.locale}`,
+      orderId: fulfilled.retail_customer_order_id,
       paymentId: payment.id,
+      planId: payment.plan_id,
       status: "fulfilled" as const
     };
   }
 
   return {
     destination: `/${payment.locale}/basket/return?payment=${payment.id}`,
+    orderId: payment.retail_customer_order_id,
     paymentId: payment.id,
+    planId: payment.plan_id,
     status: "processing" as const
   };
 }
@@ -1344,6 +1355,7 @@ export async function getTrackingOrderByReference(
     lines: arrayValue<QuoteLine>(row.quote_lines),
     orderId: row.retail_customer_order_id,
     orderNumber: row.order_number,
+    planId: row.plan_id,
     retailerName: row.retailer_name,
     shipment: shipmentFromMetadata(row.order_metadata),
     status: row.order_status ?? row.status,

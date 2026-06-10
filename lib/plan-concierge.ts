@@ -57,6 +57,7 @@ export type PlanChatChannel =
   | "whatsapp";
 
 export type AppendPlanChatMessageInput = Readonly<{
+  allowUnpaidSupport?: boolean;
   body: string;
   channel?: PlanChatChannel | null;
   externalMessageId?: string | null;
@@ -66,7 +67,7 @@ export type AppendPlanChatMessageInput = Readonly<{
   planId: string;
   replyToMessageId?: string | null;
   role: "assistant" | "user";
-  source: "openclaw" | "results_page";
+  source: "line" | "openclaw" | "results_page";
   status?: "failed" | "queued" | "ready";
 }>;
 
@@ -312,7 +313,13 @@ export async function appendPlanChatMessage(
   sql: Db,
   input: AppendPlanChatMessageInput
 ) {
-  if (!isUuid(input.planId) || !(await paidPlanExists(sql, input.planId))) {
+  if (!isUuid(input.planId)) {
+    throw new Error("Plan not found");
+  }
+
+  const paidPlan = await paidPlanExists(sql, input.planId);
+
+  if (!paidPlan && !input.allowUnpaidSupport) {
     throw new Error("Plan not found");
   }
 
@@ -327,7 +334,9 @@ export async function appendPlanChatMessage(
   }
 
   if (input.role === "user") {
-    await ensurePlanChatWelcomeMessage(sql, input.planId);
+    if (paidPlan) {
+      await ensurePlanChatWelcomeMessage(sql, input.planId);
+    }
 
     if (
       (await planChatUserMessageCount(sql, input.planId)) >=
@@ -384,12 +393,14 @@ export async function appendPlanChatMessage(
       ...inferPlanFeedbackFromMessage({ message: body })
     ];
 
-    await savePlanFeedback(sql, {
-      feedback,
-      messageId,
-      metadata,
-      planId: input.planId
-    });
+    if (paidPlan) {
+      await savePlanFeedback(sql, {
+        feedback,
+        messageId,
+        metadata,
+        planId: input.planId
+      });
+    }
   }
 
   return { messageId };

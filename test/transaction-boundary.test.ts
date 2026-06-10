@@ -239,6 +239,22 @@ describe("database transaction boundaries", () => {
       /create or replace function public\.prevent_task_dependency_cycle\(\)[\s\S]*pg_advisory_xact_lock/,
       "the only advisory lock should guard task dependency cycle checks"
     );
+
+    const runtimeFiles = [
+      ...(await filesUnder("app")),
+      ...(await filesUnder("lib")),
+      ...(await filesUnder("workers"))
+    ];
+
+    for (const file of runtimeFiles) {
+      const runtimeSource = await readFile(file, "utf8");
+
+      assert.equal(
+        /\bpg_advisory(?:_xact)?_lock\s*\(/i.test(runtimeSource),
+        false,
+        `${file} must not use runtime advisory locks; use statement-atomic writes`
+      );
+    }
   });
 
   it("keeps runtime code from mutating database schema", async () => {
@@ -334,6 +350,33 @@ describe("database transaction boundaries", () => {
       helper,
       /with\s+next_product\s+as\s*\([\s\S]*update\s+public\.products[\s\S]*current_version\s*=\s*coalesce\(current_version,\s*0\)\s*\+\s*1[\s\S]*insert\s+into\s+public\.product_versions/i,
       "product version writes should increment the current projection and append the version in one SQL statement"
+    );
+  });
+
+  it("keeps payment state and version writes statement-atomic", async () => {
+    const source = await readFile("lib/stripe-payments.ts", "utf8");
+    const updateHelper = functionBody(source, "updatePaymentState");
+    const insertHelper = functionBody(source, "insertPayment");
+
+    assert.equal(
+      /pg_advisory(?:_xact)?_lock\s*\(/i.test(source),
+      false,
+      "payment versioning must not use runtime advisory locks"
+    );
+    assert.equal(
+      updateHelper.includes("recordPaymentVersion"),
+      false,
+      "payment updates must not append versions in a separate helper call"
+    );
+    assert.match(
+      updateHelper,
+      /with\s+updated_payment\s+as\s*\([\s\S]*update\s+public\.payments[\s\S]*appended_version\s+as\s*\([\s\S]*insert\s+into\s+public\.payment_versions[\s\S]*select\s+updated_payment\.\*/i,
+      "payment updates should update the projection and append the version in one SQL statement"
+    );
+    assert.match(
+      insertHelper,
+      /with\s+inserted_payment\s+as\s*\([\s\S]*insert\s+into\s+public\.payments[\s\S]*appended_version\s+as\s*\([\s\S]*insert\s+into\s+public\.payment_versions[\s\S]*select\s+inserted_payment\.\*/i,
+      "payment creation should insert the projection and initial version in one SQL statement"
     );
   });
 

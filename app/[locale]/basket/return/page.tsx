@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock3
 } from "lucide-react";
+import { LivingProtocolLineCta } from "@/components/living-protocol-line-cta";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
@@ -120,6 +121,15 @@ export default async function BasketReturnPage({
               {labels.action}
               <ArrowRight aria-hidden className="size-4" />
             </Link>
+          ) : null}
+          {result?.planId ? (
+            <LivingProtocolLineCta
+              className="mx-auto mt-8 max-w-xl"
+              locale={locale}
+              planId={result.planId}
+              retailCustomerOrderId={result.orderId}
+              source="basket_return"
+            />
           ) : null}
         </article>
       </section>

@@ -93,13 +93,9 @@ const emptyStockDraft: StockDraft = {
   wholesalePriceAmount: ""
 };
 
-const shipmentCarrierOptions = [
-  "Thailand Post",
-  "Kerry Express",
-  "Flash Express",
-  "DHL",
-  "Grab"
-] as const;
+const kexCarrierName = "KEX Express (Thailand)";
+const grabCarrierName = "Grab";
+const shipmentCarrierOptions = [kexCarrierName, grabCarrierName] as const;
 
 type RetailStockPanel =
   | "audit"
@@ -116,13 +112,22 @@ type RetailStockFilter =
   | "low_stock"
   | "out_of_stock";
 
-type CustomerOrderFilter = "all" | RetailCustomerOrderStatus;
+type CustomerOrderMetricKey =
+  | "allocated"
+  | "awaiting_stock"
+  | "packed"
+  | "pickup_booked"
+  | "placed"
+  | "shipped";
 
-const customerOrderStatusFilters: RetailCustomerOrderStatus[] = [
+type CustomerOrderFilter = "all" | CustomerOrderMetricKey;
+
+const customerOrderStatusFilters: CustomerOrderMetricKey[] = [
   "placed",
   "awaiting_stock",
   "allocated",
   "packed",
+  "pickup_booked",
   "shipped"
 ];
 
@@ -133,7 +138,7 @@ const customerOrderAllExcludedStatuses = new Set<RetailCustomerOrderStatus>([
   "returned"
 ]);
 
-const customerOrderVisibleStatusSet = new Set<RetailCustomerOrderStatus>(
+const customerOrderVisibleStatusSet = new Set<CustomerOrderMetricKey>(
   customerOrderStatusFilters
 );
 
@@ -226,6 +231,30 @@ type ShipmentEditor = Readonly<{
   draft: ShipmentDraft;
   order: AdminRetailCustomerOrder;
 }>;
+
+type KexSettingsDraft = Readonly<{
+  accountNumber: string;
+  apiKey: string;
+  baseUrl: string;
+  createShipmentEndpoint: string;
+  labelEndpoint: string;
+  mode: "live" | "mock" | "sandbox";
+  pickupEndpoint: string;
+  testEndpoint: string;
+  trackingEndpoint: string;
+}>;
+
+const emptyKexSettingsDraft: KexSettingsDraft = {
+  accountNumber: "",
+  apiKey: "",
+  baseUrl: "",
+  createShipmentEndpoint: "",
+  labelEndpoint: "",
+  mode: "mock",
+  pickupEndpoint: "",
+  testEndpoint: "",
+  trackingEndpoint: ""
+};
 
 const emptyMovementDraft: MovementDraft = {
   expiresAt: "",
@@ -407,7 +436,15 @@ function customerOrderRetailValue(order: AdminRetailCustomerOrder) {
   return order.pricingSnapshot?.totalAmount ?? order.totalRetailAmount;
 }
 
-function customerOrderStatusFilterLabel(status: RetailCustomerOrderStatus) {
+function customerOrderHasPickupBooked(order: AdminRetailCustomerOrder) {
+  return Boolean(order.shipment?.pickupBookedAt) &&
+    order.status !== "shipped" &&
+    order.status !== "delivered" &&
+    order.status !== "cancelled" &&
+    order.status !== "returned";
+}
+
+function customerOrderStatusFilterLabel(status: CustomerOrderMetricKey) {
   if (status === "allocated") {
     return "Ready to pack";
   }
@@ -416,15 +453,40 @@ function customerOrderStatusFilterLabel(status: RetailCustomerOrderStatus) {
     return "Ready to ship";
   }
 
+  if (status === "pickup_booked") {
+    return "Pickup booked";
+  }
+
   return readableToken(status);
 }
 
-function customerOrderStatusMetricKey(status: RetailCustomerOrderStatus) {
+function customerOrderStatusMetricKey(
+  orderOrStatus: AdminRetailCustomerOrder | RetailCustomerOrderStatus
+): CustomerOrderMetricKey | null {
+  const status =
+    typeof orderOrStatus === "string" ? orderOrStatus : orderOrStatus.status;
+
+  if (
+    typeof orderOrStatus !== "string" &&
+    customerOrderHasPickupBooked(orderOrStatus)
+  ) {
+    return "pickup_booked";
+  }
+
+  if (
+    typeof orderOrStatus !== "string" &&
+    orderOrStatus.workflowStage === "awaiting_stock"
+  ) {
+    return "awaiting_stock";
+  }
+
   if (status === "picking") {
     return "packed";
   }
 
-  return customerOrderVisibleStatusSet.has(status) ? status : null;
+  return customerOrderVisibleStatusSet.has(status as CustomerOrderMetricKey)
+    ? status as CustomerOrderMetricKey
+    : null;
 }
 
 function customerOrderIncludedInAllMetric(order: AdminRetailCustomerOrder) {
@@ -439,11 +501,15 @@ function customerOrderMatchesFilter(
     return customerOrderIncludedInAllMetric(order);
   }
 
-  return customerOrderStatusMetricKey(order.status) === filter;
+  return customerOrderStatusMetricKey(order) === filter;
 }
 
 function customerOrderStatusDisplay(order: AdminRetailCustomerOrder) {
-  if (order.status === "awaiting_stock") {
+  if (customerOrderHasPickupBooked(order)) {
+    return "Pickup booked";
+  }
+
+  if (order.status === "awaiting_stock" || order.workflowStage === "awaiting_stock") {
     return "Awaiting stock";
   }
 
@@ -459,15 +525,19 @@ function customerOrderStatusDisplay(order: AdminRetailCustomerOrder) {
 }
 
 function customerOrderStatusPillClass(order: AdminRetailCustomerOrder) {
-  if (order.status === "awaiting_stock" || order.isStuck) {
+  if (
+    order.status === "awaiting_stock" ||
+    order.workflowStage === "awaiting_stock" ||
+    customerOrderHasPickupBooked(order)
+  ) {
     return "bg-amber-50 text-amber-800 ring-amber-100";
   }
 
   return "bg-gray-100 text-gray-700 ring-gray-200";
 }
 
-function customerOrderMetricColor(status: RetailCustomerOrderStatus) {
-  if (status === "awaiting_stock") {
+function customerOrderMetricColor(status: CustomerOrderMetricKey) {
+  if (status === "awaiting_stock" || status === "pickup_booked") {
     return businessMetricColors.medium;
   }
 
@@ -475,20 +545,12 @@ function customerOrderMetricColor(status: RetailCustomerOrderStatus) {
     return businessMetricColors.active;
   }
 
-  if (status === "picking" || status === "packed") {
+  if (status === "packed") {
     return businessMetricColors.processing;
   }
 
-  if (status === "shipped" || status === "delivered") {
+  if (status === "shipped") {
     return businessMetricColors.succeeded;
-  }
-
-  if (status === "cancelled") {
-    return businessMetricColors.failed;
-  }
-
-  if (status === "returned" || status === "draft") {
-    return businessMetricColors.offline;
   }
 
   return businessMetricColors.queued;
@@ -496,12 +558,71 @@ function customerOrderMetricColor(status: RetailCustomerOrderStatus) {
 
 function shipmentCarrierSelectValue(carrierName: string) {
   if (!carrierName) {
-    return "";
+    return kexCarrierName;
   }
 
   return shipmentCarrierOptions.some((option) => option === carrierName)
     ? carrierName
-    : "custom";
+    : kexCarrierName;
+}
+
+function shipmentLabelStatusText(
+  shipment: AdminRetailCustomerOrder["shipment"]
+) {
+  const status = shipment?.labelStatus;
+
+  if (status === "generated") {
+    return shipment?.labelUrl ? "Official KEX label ready" : "Carrier label generated";
+  }
+
+  if (status === "requested") {
+    return "Official KEX label requested";
+  }
+
+  if (status === "failed") {
+    return "Official KEX label failed; use fallback only if needed";
+  }
+
+  if (status === "manual_required") {
+    return "Manual carrier label required";
+  }
+
+  return "Official carrier label not requested";
+}
+
+function printShipmentLabel(input: Readonly<{
+  labels: AdminContent;
+  lines: readonly AdminRetailCustomerOrderLine[];
+  locale: Locale;
+  order: AdminRetailCustomerOrder;
+}>) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (input.order.shipment?.labelUrl) {
+    window.open(input.order.shipment.labelUrl, "_blank", "noopener,noreferrer");
+    return;
+  }
+
+  if (input.order.shipment?.labelContentBase64) {
+    const contentType =
+      input.order.shipment.labelContentType || "application/pdf";
+    window.open(
+      `data:${contentType};base64,${input.order.shipment.labelContentBase64}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+    return;
+  }
+
+  printRetailOrderDocument({
+    kind: "shipping-label",
+    labels: input.labels,
+    lines: input.lines,
+    locale: input.locale,
+    order: input.order
+  });
 }
 
 function formatDate(value: string | null, locale: Locale) {
@@ -547,15 +668,18 @@ function buildCustomerOrderWorkflowSteps(
   order: AdminRetailCustomerOrder
 ) {
   const current =
-    order.status === "awaiting_stock"
+    order.status === "shipped" || order.status === "delivered"
+      ? "sent"
+      : customerOrderHasPickupBooked(order)
+        ? "pickup_booked"
+        : order.status === "awaiting_stock" ||
+            order.workflowStage === "awaiting_stock"
       ? "awaiting_stock"
       : order.status === "allocated"
         ? "ready_to_pack"
         : order.status === "picking" || order.status === "packed"
           ? "ready_to_ship"
-          : order.status === "shipped" || order.status === "delivered"
-            ? "sent"
-            : "ordered";
+          : "ordered";
 
   return [
     {
@@ -573,6 +697,7 @@ function buildCustomerOrderWorkflowSteps(
         current === "awaiting_stock" ||
         current === "ready_to_pack" ||
         current === "ready_to_ship" ||
+        current === "pickup_booked" ||
         current === "sent",
       key: "awaiting_stock",
       label: labels.stock.awaitingStock
@@ -584,9 +709,10 @@ function buildCustomerOrderWorkflowSteps(
         Boolean(order.workflowTimeline.allocatedAt) ||
         current === "ready_to_pack" ||
         current === "ready_to_ship" ||
+        current === "pickup_booked" ||
         current === "sent",
       key: "ready_to_pack",
-      label: "Ready to pack"
+      label: labels.stock.readyToPack
     },
     {
       active: current === "ready_to_ship",
@@ -594,9 +720,20 @@ function buildCustomerOrderWorkflowSteps(
       complete:
         Boolean(order.workflowTimeline.boxedAt) ||
         current === "ready_to_ship" ||
+        current === "pickup_booked" ||
         current === "sent",
       key: "ready_to_ship",
-      label: "Ready to ship"
+      label: labels.stock.readyToShip
+    },
+    {
+      active: current === "pickup_booked",
+      at: order.workflowTimeline.pickupBookedAt,
+      complete:
+        Boolean(order.workflowTimeline.pickupBookedAt) ||
+        current === "pickup_booked" ||
+        current === "sent",
+      key: "pickup_booked",
+      label: labels.stock.pickupBooked
     },
     {
       active: current === "sent",
@@ -884,8 +1021,12 @@ function printRetailOrderDocument({
     `;
   };
 
-  const shippingLabelSheetHtml = () => `
-    <main class="label">
+  const shippingLabelSheetHtml = () => {
+    const carrierName = order.shipment?.carrierName ?? "";
+    const isKexCarrier = /(?:\bkex\b|kerry)/i.test(carrierName);
+
+    return `
+    <main class="label ${isKexCarrier ? "label-kex" : ""}">
       <div class="muted">${escapeHtml(labels.stock.shippingLabel)}</div>
       <h1>${escapeHtml(labels.stock.deliveryAddress)}</h1>
       <div class="label-address">
@@ -896,10 +1037,28 @@ function printRetailOrderDocument({
       <div class="label-footer">
         <div><strong>${escapeHtml(labels.stock.customerOrders)}:</strong> ${escapeHtml(order.orderNumber)}</div>
         <div><strong>${escapeHtml(labels.stock.organisation)}:</strong> ${escapeHtml(order.organisationName)}</div>
+        ${
+          carrierName
+            ? `<div><strong>Carrier:</strong> ${escapeHtml(carrierName)}</div>`
+            : ""
+        }
+        ${
+          order.shipment?.trackingNumber
+            ? `<div><strong>Tracking:</strong> ${escapeHtml(order.shipment.trackingNumber)}</div>`
+            : ""
+        }
         <div><strong>${escapeHtml(labels.stock.expectedAt)}:</strong> ${escapeHtml(expectedDate)}</div>
       </div>
+      ${
+        isKexCarrier
+          ? `<section class="kex-note">
+              <strong>KEX QR/AWB:</strong> print the official KEX label or scan the KEX QR from the carrier system before handover. This sheet is not a carrier-issued AWB.
+            </section>`
+          : ""
+      }
     </main>
-  `;
+    `;
+  };
 
   const standardSheetHtml = (
     sheetTitle: string,
@@ -977,6 +1136,7 @@ function printRetailOrderDocument({
           .label h1 { border-bottom: 2px solid #111827; font-size: 22px; padding-bottom: 10px; }
           .label-address { font-size: 28px; font-weight: 700; line-height: 1.35; margin-top: 28px; }
           .label-footer { border-top: 1px solid #d1d5db; bottom: 32px; display: grid; gap: 8px; left: 32px; position: absolute; right: 32px; padding-top: 16px; }
+          .kex-note { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 10px; color: #92400e; font-size: 14px; line-height: 1.45; margin-top: 28px; padding: 12px; }
           @media print {
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             main { padding: 0; }
@@ -1070,6 +1230,16 @@ async function saveStockAction(body: Record<string, unknown>) {
 
 function actionErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function shoppingListIdFromResult(result: unknown) {
+  if (!result || typeof result !== "object" || Array.isArray(result)) {
+    return "";
+  }
+
+  const shoppingListId = (result as Record<string, unknown>).shoppingListId;
+
+  return typeof shoppingListId === "string" ? shoppingListId : "";
 }
 
 function ProductThumbnail({
@@ -1174,6 +1344,8 @@ export function AdminRetailStockView({
   const [customerOrderDraft, setCustomerOrderDraft] =
     useState<CustomerOrderDraft | null>(null);
   const [shipmentEditor, setShipmentEditor] = useState<ShipmentEditor | null>(null);
+  const [kexSettingsDraft, setKexSettingsDraft] =
+    useState<KexSettingsDraft>(emptyKexSettingsDraft);
   const [customerOrderAvailability, setCustomerOrderAvailability] =
     useState<RegionalBasketAvailability | null>(null);
   const [customerOrderAvailabilityLoading, setCustomerOrderAvailabilityLoading] =
@@ -1182,6 +1354,16 @@ export function AdminRetailStockView({
   const [error, setError] = useState("");
   const panel = panelFromView(view);
   const showOrganisationContext = data.canFilterOrganisation;
+  const carrierSettingsOrganisation =
+    data.organisations.length === 1 ? data.organisations[0] : null;
+  const kexCarrierAccount =
+    carrierSettingsOrganisation
+      ? data.carrierAccounts.find(
+          (account) =>
+            account.organisationId === carrierSettingsOrganisation.id &&
+            account.carrierId === "kex_th"
+        ) ?? null
+      : null;
 
   const organisationStockRows = useMemo(
     () =>
@@ -1412,10 +1594,10 @@ export function AdminRetailStockView({
   const customerOrderSummary = useMemo(() => {
     const summary = Object.fromEntries(
       customerOrderStatusFilters.map((status) => [status, 0])
-    ) as Record<RetailCustomerOrderStatus, number>;
+    ) as Record<CustomerOrderMetricKey, number>;
 
     for (const order of organisationCustomerOrders) {
-      const metricKey = customerOrderStatusMetricKey(order.status);
+      const metricKey = customerOrderStatusMetricKey(order);
 
       if (metricKey) {
         summary[metricKey] += 1;
@@ -2009,7 +2191,13 @@ export function AdminRetailStockView({
     );
 
     if (created) {
+      const createdShoppingListId = shoppingListIdFromResult(created.result);
+
       setSelectedOutstandingPurchaseKeys(null);
+
+      if (createdShoppingListId) {
+        setSelectedShoppingListId(createdShoppingListId);
+      }
     }
   }
 
@@ -2472,9 +2660,15 @@ export function AdminRetailStockView({
   }
 
   function openShipmentEditor(order: AdminRetailCustomerOrder) {
+    const existingCarrierName = order.shipment?.carrierName ?? "";
+
     setShipmentEditor({
       draft: {
-        carrierName: order.shipment?.carrierName ?? "",
+        carrierName: shipmentCarrierOptions.some(
+          (carrier) => carrier === existingCarrierName
+        )
+          ? existingCarrierName
+          : kexCarrierName,
         confirmedPacked: false,
         shipmentNotes: order.shipment?.shipmentNotes ?? "",
         trackingNumber: order.shipment?.trackingNumber ?? "",
@@ -2525,6 +2719,127 @@ export function AdminRetailStockView({
     if (saved) {
       setShipmentEditor(null);
     }
+  }
+
+  async function bookPickupForCustomerOrder() {
+    if (!shipmentEditor) {
+      return;
+    }
+
+    if (!shipmentEditor.draft.confirmedPacked) {
+      setError("Confirm the products are packed before booking pickup.");
+      return;
+    }
+
+    const saved = await runRetailAction(
+      {
+        action: "book_order_pickup",
+        carrierName: shipmentEditor.draft.carrierName || null,
+        customerOrderId: shipmentEditor.order.id,
+        shipmentNotes: shipmentEditor.draft.shipmentNotes || null,
+        trackingNumber: shipmentEditor.draft.trackingNumber || null,
+        trackingUrl: shipmentEditor.draft.trackingUrl || null
+      },
+      `order:${shipmentEditor.order.id}:book_pickup`,
+      { closeWorkflows: false }
+    );
+
+    if (saved) {
+      setShipmentEditor(null);
+    }
+  }
+
+  async function printOrRequestShipmentLabel() {
+    if (!shipmentEditor) {
+      return;
+    }
+
+    const selectedCarrier = shipmentCarrierSelectValue(
+      shipmentEditor.draft.carrierName
+    );
+
+    if (shipmentEditor.order.shipment?.labelUrl || selectedCarrier !== kexCarrierName) {
+      printShipmentLabel({
+        labels,
+        lines: shipmentEditorLines,
+        locale,
+        order: shipmentEditor.order
+      });
+      return;
+    }
+
+    await runRetailAction(
+      {
+        action: "generate_order_shipping_label",
+        carrierName: shipmentEditor.draft.carrierName || kexCarrierName,
+        customerOrderId: shipmentEditor.order.id
+      },
+      `order:${shipmentEditor.order.id}:generate_shipping_label`,
+      { closeWorkflows: false }
+    );
+  }
+
+  function updateKexSettingsDraft(patch: Partial<KexSettingsDraft>) {
+    setKexSettingsDraft((current) => ({
+      ...current,
+      ...patch
+    }));
+  }
+
+  async function saveKexSettings() {
+    if (!carrierSettingsOrganisation) {
+      setError("Open one retailer before configuring KEX.");
+      return;
+    }
+
+    await runRetailAction(
+      {
+        action: "configure_carrier_account",
+        capabilities: [
+          "create_shipment",
+          "print_label",
+          "receive_events",
+          "request_pickup",
+          "track"
+        ],
+        carrierId: "kex_th",
+        credentialMetadata: {
+          mode: kexSettingsDraft.mode
+        },
+        encryptedCredentials: {
+          accountNumber: kexSettingsDraft.accountNumber || null,
+          apiKey: kexSettingsDraft.apiKey || null,
+          baseUrl: kexSettingsDraft.baseUrl || null,
+          createShipmentEndpoint: kexSettingsDraft.createShipmentEndpoint || null,
+          labelEndpoint: kexSettingsDraft.labelEndpoint || null,
+          mode: kexSettingsDraft.mode,
+          pickupEndpoint: kexSettingsDraft.pickupEndpoint || null,
+          testEndpoint: kexSettingsDraft.testEndpoint || null,
+          trackingEndpoint: kexSettingsDraft.trackingEndpoint || null
+        },
+        organisationId: carrierSettingsOrganisation.id,
+        status: "active"
+      },
+      `carrier:kex:${carrierSettingsOrganisation.id}:configure`,
+      { closeWorkflows: false }
+    );
+  }
+
+  async function testKexSettings() {
+    if (!carrierSettingsOrganisation) {
+      setError("Open one retailer before testing KEX.");
+      return;
+    }
+
+    await runRetailAction(
+      {
+        action: "test_carrier_account",
+        carrierId: "kex_th",
+        organisationId: carrierSettingsOrganisation.id
+      },
+      `carrier:kex:${carrierSettingsOrganisation.id}:test`,
+      { closeWorkflows: false }
+    );
   }
 
 
@@ -2692,6 +3007,123 @@ export function AdminRetailStockView({
 	            ) : null}
 	          </div>
 	        </div>
+	        <section className="mt-4 rounded-md bg-white p-4 shadow-sm ring-1 ring-gray-200">
+	          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+	            <div>
+	              <h3 className="text-sm font-semibold text-gray-900">
+	                KEX connection
+	              </h3>
+	              <p className="mt-1 text-sm text-gray-600">
+	                Configure KEX shipment creation, official labels, pickup booking, tracking sync, and webhooks for this retailer.
+	              </p>
+	            </div>
+	            <div className="text-sm font-semibold text-gray-700">
+	              {kexCarrierAccount
+	                ? `${readableToken(kexCarrierAccount.status)} · test ${
+	                    kexCarrierAccount.lastTestStatus ?? "not run"
+	                  }`
+	                : carrierSettingsOrganisation
+	                  ? "Not connected"
+	                  : "Select one retailer"}
+	            </div>
+	          </div>
+	          {carrierSettingsOrganisation ? (
+	            <div className="mt-4 grid gap-3 md:grid-cols-3">
+	              <label className="grid gap-1 text-xs font-semibold text-gray-500">
+	                Mode
+	                <select
+	                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+	                  disabled={!data.canWrite || Boolean(busyId)}
+	                  onChange={(event) =>
+	                    updateKexSettingsDraft({
+	                      mode: event.target.value as KexSettingsDraft["mode"]
+	                    })
+	                  }
+	                  value={kexSettingsDraft.mode}
+	                >
+	                  <option value="mock">Mock</option>
+	                  <option value="sandbox">Sandbox</option>
+	                  <option value="live">Live</option>
+	                </select>
+	              </label>
+	              <label className="grid gap-1 text-xs font-semibold text-gray-500">
+	                Account number
+	                <input
+	                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+	                  disabled={!data.canWrite || Boolean(busyId)}
+	                  onChange={(event) =>
+	                    updateKexSettingsDraft({ accountNumber: event.target.value })
+	                  }
+	                  value={kexSettingsDraft.accountNumber}
+	                />
+	              </label>
+	              <label className="grid gap-1 text-xs font-semibold text-gray-500">
+	                API key
+	                <input
+	                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+	                  disabled={!data.canWrite || Boolean(busyId)}
+	                  onChange={(event) =>
+	                    updateKexSettingsDraft({ apiKey: event.target.value })
+	                  }
+	                  type="password"
+	                  value={kexSettingsDraft.apiKey}
+	                />
+	              </label>
+	              <label className="grid gap-1 text-xs font-semibold text-gray-500 md:col-span-3">
+	                Base URL
+	                <input
+	                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+	                  disabled={!data.canWrite || Boolean(busyId)}
+	                  onChange={(event) =>
+	                    updateKexSettingsDraft({ baseUrl: event.target.value })
+	                  }
+	                  value={kexSettingsDraft.baseUrl}
+	                />
+	              </label>
+	              {([
+	                ["testEndpoint", "Test endpoint"],
+	                ["createShipmentEndpoint", "Create shipment endpoint"],
+	                ["labelEndpoint", "Label endpoint"],
+	                ["pickupEndpoint", "Pickup endpoint"],
+	                ["trackingEndpoint", "Tracking endpoint"]
+	              ] as const).map(([field, label]) => (
+	                <label
+	                  className="grid gap-1 text-xs font-semibold text-gray-500"
+	                  key={field}
+	                >
+	                  {label}
+	                  <input
+	                    className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+	                    disabled={!data.canWrite || Boolean(busyId)}
+	                    onChange={(event) =>
+	                      updateKexSettingsDraft({ [field]: event.target.value })
+	                    }
+	                    value={kexSettingsDraft[field]}
+	                  />
+	                </label>
+	              ))}
+	              <div className="flex flex-wrap items-end gap-2 md:col-span-3">
+	                <AdminButton
+	                  disabled={!data.canWrite || Boolean(busyId)}
+	                  onClick={() => void saveKexSettings()}
+	                >
+	                  Save KEX
+	                </AdminButton>
+	                <AdminButton
+	                  disabled={!data.canWrite || Boolean(busyId) || !kexCarrierAccount}
+	                  onClick={() => void testKexSettings()}
+	                  variant="secondary"
+	                >
+	                  Test KEX
+	                </AdminButton>
+	              </div>
+	            </div>
+	          ) : (
+	            <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 ring-1 ring-amber-100">
+	              Assume or select a single retailer before configuring KEX.
+	            </div>
+	          )}
+	        </section>
 	        <div className="mt-4 overflow-x-auto">
 	          <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead>
@@ -2925,22 +3357,6 @@ export function AdminRetailStockView({
                     className="gap-2"
                     onClick={() =>
                       printRetailOrderDocument({
-                        kind: "shipping-label",
-                        labels,
-                        lines: customerOrderDetailLines,
-                        locale,
-                        order: customerOrderDetail
-                      })
-                    }
-                    variant="secondary"
-                  >
-                    <Truck aria-hidden="true" className="size-4" />
-                    {labels.stock.shippingLabel}
-                  </AdminButton>
-                  <AdminButton
-                    className="gap-2"
-                    onClick={() =>
-                      printRetailOrderDocument({
                         kind: "invoice",
                         labels,
                         lines: customerOrderDetailLines,
@@ -2983,7 +3399,7 @@ export function AdminRetailStockView({
             <div className="space-y-4">
               <section className="space-y-4">
                 <div className="rounded-md bg-white p-4 ring-1 ring-gray-200">
-                  <div className="grid gap-3 md:grid-cols-5">
+                  <div className="grid gap-3 md:grid-cols-6">
                     {customerOrderWorkflowSteps.map((step, index) => {
                       const isCurrent = step.active;
                       const isCompleted = step.complete && !isCurrent;
@@ -3238,6 +3654,35 @@ export function AdminRetailStockView({
                       </div>
                       <div>
                         <div className="text-xs font-semibold text-gray-500">
+                          Carrier label
+                        </div>
+                        <div className="mt-1 text-gray-900">
+                          {shipmentLabelStatusText(customerOrderDetail.shipment)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500">
+                          {labels.stock.pickupBooked}
+                        </div>
+                        <div className="mt-1 text-gray-900">
+                          {formatDateTime(
+                            customerOrderDetail.shipment.pickupBookedAt,
+                            locale
+                          ) ?? emptyRetailField}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500">
+                          Carrier status
+                        </div>
+                        <div className="mt-1 text-gray-900">
+                          {customerOrderDetail.shipment.pickupProviderStatus ??
+                            customerOrderDetail.shipment.status ??
+                            emptyRetailField}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500">
                           Shipped
                         </div>
                         <div className="mt-1 text-gray-900">
@@ -3248,6 +3693,15 @@ export function AdminRetailStockView({
                         </div>
                       </div>
                     </div>
+                    {customerOrderDetail.shipment.exceptionMessage ||
+                    customerOrderDetail.shipment.exceptionCode ? (
+                      <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-amber-100">
+                        {[
+                          customerOrderDetail.shipment.exceptionCode,
+                          customerOrderDetail.shipment.exceptionMessage
+                        ].filter(Boolean).join(": ")}
+                      </div>
+                    ) : null}
                     {customerOrderDetail.shipment.shipmentNotes ? (
                       <div className="mt-3 border-t border-gray-100 pt-3 text-sm text-gray-600">
                         {customerOrderDetail.shipment.shipmentNotes}
@@ -3391,7 +3845,7 @@ export function AdminRetailStockView({
                   disabled={Boolean(busyId)}
                   onClick={() => openShipmentEditor(customerOrderDetail)}
                 >
-                  Ship order
+                  Mark Shipped
                 </AdminButton>
               ) : null}
               {data.canWrite &&
@@ -3923,13 +4377,13 @@ export function AdminRetailStockView({
           closeLabel={labels.stock.cancel}
           description={
             <span>
-              Confirm the order is packed, then add courier details if they are
-              available.
+              Confirm the order is packed, then add courier details, book pickup
+              or ship when ready.
             </span>
           }
           onClose={() => setShipmentEditor(null)}
           size="xl"
-          title="Ship order"
+          title="Mark Shipped"
         >
           <div className="space-y-5 px-6 py-5">
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.45fr)]">
@@ -4067,35 +4521,24 @@ export function AdminRetailStockView({
                 <select
                   className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1FA77A]"
                   onChange={(event) => {
-                    const next = event.target.value;
                     updateShipmentDraft({
-                      carrierName: next === "custom" ? "" : next
+                      carrierName: event.target.value || kexCarrierName
                     });
                   }}
                   value={shipmentCarrierSelectValue(
                     shipmentEditor.draft.carrierName
                   )}
                 >
-                  <option value="">Select carrier</option>
                   {shipmentCarrierOptions.map((carrier) => (
                     <option key={carrier} value={carrier}>
                       {carrier}
                     </option>
                   ))}
-                  <option value="custom">Custom carrier</option>
                 </select>
               </label>
-              <label className="grid gap-1 text-xs font-semibold text-gray-500">
-                Carrier name
-                <input
-                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1FA77A]"
-                  onChange={(event) =>
-                    updateShipmentDraft({ carrierName: event.target.value })
-                  }
-                  placeholder="Courier or pickup method"
-                  value={shipmentEditor.draft.carrierName}
-                />
-              </label>
+              <div className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-amber-100 sm:col-span-2">
+                {shipmentLabelStatusText(shipmentEditor.order.shipment)}
+              </div>
               <label className="grid gap-1 text-xs font-semibold text-gray-500">
                 Tracking number
                 <input
@@ -4147,10 +4590,26 @@ export function AdminRetailStockView({
               {labels.stock.cancel}
             </AdminButton>
             <AdminButton
+              className="gap-2"
+              disabled={Boolean(busyId)}
+              onClick={() => void printOrRequestShipmentLabel()}
+              variant="secondary"
+            >
+              <Truck aria-hidden="true" className="size-4" />
+              {labels.stock.shippingLabel}
+            </AdminButton>
+            <AdminButton
+              disabled={!canConfirmShipment}
+              onClick={() => void bookPickupForCustomerOrder()}
+              variant="secondary"
+            >
+              {labels.stock.bookPickup}
+            </AdminButton>
+            <AdminButton
               disabled={!canConfirmShipment}
               onClick={() => void shipCustomerOrder()}
             >
-              Ship order
+              Mark Shipped
             </AdminButton>
           </div>
         </AdminModal>

@@ -162,6 +162,51 @@ describe("process runtime technical debt sweep", () => {
     );
   });
 
+  it("repairs stale allocations before orders can be packed or shipped", async () => {
+    const stock = await readFile("lib/admin-retail-stock.ts", "utf8");
+    const carrier = await readFile("lib/retail-carrier-shipments.ts", "utf8");
+    const view = await readFile("components/admin/retail-stock-view.tsx", "utf8");
+    const pipeline = functionBody(stock, "getRetailStockPipeline");
+    const actionStates = functionBody(stock, "getRetailCustomerOrderActionStates");
+    const stockRepair = functionBody(stock, "repairRetailStockAllocationIntegrity");
+    const orderRepair = functionBody(stock, "repairCustomerOrderAllocationIntegrity");
+    const movementRecorder = functionBody(stock, "recordRetailStockMovement");
+    const upsertStock = functionBody(stock, "upsertRetailStockItem");
+    const setStatus = functionBody(stock, "setRetailStockStatus");
+    const reconcile = functionBody(stock, "reconcileRetailOrderLifecycle");
+    const advance = functionBody(stock, "advanceRetailCustomerOrder");
+    const carrierShip = functionBody(carrier, "markOrderShippedFromCarrierEvent");
+
+    assert.match(stock, /backedAllocatedUnits: number/);
+    assert.match(pipeline, /const otherActiveAllocatedUnits = Math\.max/);
+    assert.match(pipeline, /const stockPotentiallyBackingThisLine = Math\.max/);
+    assert.match(pipeline, /const backedAllocatedUnits = Math\.min\(/);
+    assert.match(
+      pipeline,
+      /customerDemandUnits - backedAllocatedUnits - availableNowUnits/,
+      "stale allocated quantities must become unordered demand when stock is gone"
+    );
+    assert.match(actionStates, /pipeline\.backedAllocatedUnits >= pipeline\.customerDemandUnits/);
+    assert.match(actionStates, /Allocated stock is no longer available\. Recheck workflow\./);
+    assert.match(stock, /!orderPipelineFullyBacked\(pipeline\)[\s\S]*\? "awaiting_stock"/);
+    assert.match(view, /order\.workflowStage === "awaiting_stock"/);
+    assert.match(stockRepair, /retail_customer_orders\.status in \('placed', 'awaiting_stock', 'allocated', 'picking', 'packed'\)/);
+    assert.match(stockRepair, /status = 'awaiting_stock'/);
+    assert.match(stockRepair, /admin\.retail_stock_allocations_released/);
+    assert.match(orderRepair, /ensureRetailOrderShortagesInReorderAdvice/);
+    assert.match(orderRepair, /cancelStaleOrderWorkflowTasks/);
+    assert.match(orderRepair, /taskType: "retail_shopping_list_review"/);
+    assert.match(upsertStock, /repairRetailStockAllocationIntegrity[\s\S]*source: "admin_stock_update"/);
+    assert.match(setStatus, /repairRetailStockAllocationIntegrity[\s\S]*source: "stock_status_changed"/);
+    assert.match(movementRecorder, /delta < 0 && !input\.deferAllocationIntegrityRepair/);
+    assert.match(reconcile, /source: "order_lifecycle_recheck"/);
+    assert.match(advance, /source: "ship_order_preflight"/);
+    assert.match(advance, /Stock changed after allocation\. The order has been moved back to Awaiting Stock\./);
+    assert.match(advance, /deferAllocationIntegrityRepair: true/);
+    assert.match(carrier, /repairRetailCustomerOrderAllocationIntegrityForSystem/);
+    assert.match(carrierShip, /source: "carrier_event_ship_preflight"/);
+  });
+
   it("keeps shipping one-click while preserving legacy pick-pack cleanup", async () => {
     const workflow = await readFile("lib/retail-order-workflow.ts", "utf8");
     const stock = await readFile("lib/admin-retail-stock.ts", "utf8");

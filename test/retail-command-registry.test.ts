@@ -15,12 +15,19 @@ const service = readFileSync("lib/admin-retail-stock.ts", "utf8");
 const routeActions = [
   "advance_customer_order",
   "allocate_customer_order",
+  "book_order_pickup",
+  "configure_carrier_account",
   "create_customer_order",
+  "create_order_shipment",
   "create_shopping_list",
+  "generate_order_shipping_label",
   "record_stock_movement",
   "reconcile_customer_order_lifecycle",
+  "replay_carrier_shipment_event",
   "reopen_shopping_list",
   "set_stock_status",
+  "sync_order_tracking",
+  "test_carrier_account",
   "update_shopping_list",
   "upsert_stock_item",
   "void_stock_movement"
@@ -49,7 +56,12 @@ describe("retail command registry", () => {
       assert.match(command.auditEvent, /^admin\.retail_command\./);
       assert.match(command.bpmEvent, /^retail_command_/);
       assert.ok(command.idempotencyStrategy, `${commandId} idempotency`);
-      assert.equal(command.permission, "stock.write");
+      assert.ok(
+        command.permission === "stock.write" ||
+          command.permission === "shipments.write" ||
+          command.permission === "shipments.configure",
+        `${commandId} permission`
+      );
       assert.ok(command.resourceType, `${commandId} resource type`);
       assert.ok(command.riskClass, `${commandId} risk class`);
       assert.ok(command.taskPolicy, `${commandId} task policy`);
@@ -78,10 +90,13 @@ describe("retail command registry", () => {
 
     for (const commandId of [
       "advance_customer_order",
+      "configure_carrier_account",
       "create_shopping_list",
       "record_stock_movement",
+      "replay_carrier_shipment_event",
       "reopen_shopping_list",
       "set_stock_status",
+      "test_carrier_account",
       "update_shopping_list",
       "upsert_stock_item",
       "void_stock_movement"
@@ -96,8 +111,10 @@ describe("retail command registry", () => {
 
   it("routes agent retail tasks through the command executor instead of passive acceptance", () => {
     assert.match(taskExecution, /executeRetailAgentCommand/);
+    assert.match(taskExecution, /executeCarrierShipmentTask/);
     assert.doesNotMatch(taskExecution, /humanApprovalRequired: true/);
     assert.match(taskWorkItems, /isRetailAgentExecutableTaskType/);
+    assert.match(taskWorkItems, /buildCarrierShipmentWorkItem/);
     assert.match(taskWorkItems, /human-only or not agent-executable/);
     assert.match(service, /assertRetailAgentCommandTask/);
     assert.match(service, /Retail task \$\{input\.taskType\} is not agent-executable/);

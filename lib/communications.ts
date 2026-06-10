@@ -36,6 +36,7 @@ export type AdminCommunicationEventKey =
   | "admin_test_message"
   | "platform_checkout_failed"
   | "platform_communication_failed"
+  | "platform_carrier_integration_failed"
   | "platform_payment_failed"
   | "platform_payout_failed"
   | "platform_revenue_received"
@@ -50,7 +51,9 @@ export type AdminCommunicationEventKey =
   | "retail_order_delivered"
   | "retail_order_ready_to_pack"
   | "retail_order_ready_to_ship"
+  | "retail_order_pickup_booked"
   | "retail_order_returned"
+  | "retail_order_shipment_exception"
   | "retail_order_shipped"
   | "retail_settlement_needs_review"
   | "retail_settlement_payout_paid";
@@ -185,9 +188,11 @@ const RETAIL_ADMIN_COMMUNICATION_EVENT_DEFAULTS = {
   retail_order_cancelled: true,
   retail_order_created: true,
   retail_order_delivered: false,
+  retail_order_pickup_booked: true,
   retail_order_ready_to_pack: true,
   retail_order_ready_to_ship: true,
   retail_order_returned: true,
+  retail_order_shipment_exception: true,
   retail_order_shipped: false,
   retail_settlement_needs_review: true,
   retail_settlement_payout_paid: true
@@ -195,6 +200,7 @@ const RETAIL_ADMIN_COMMUNICATION_EVENT_DEFAULTS = {
 const PLATFORM_ADMIN_COMMUNICATION_EVENT_KEYS = [
   "platform_revenue_received",
   "platform_checkout_failed",
+  "platform_carrier_integration_failed",
   "platform_payment_failed",
   "platform_payout_failed",
   "platform_retailer_payout_due",
@@ -208,6 +214,7 @@ const ADMIN_COMMUNICATION_EVENT_DEFAULTS = {
   admin_test_message: false,
   ...RETAIL_ADMIN_COMMUNICATION_EVENT_DEFAULTS,
   platform_checkout_failed: true,
+  platform_carrier_integration_failed: true,
   platform_communication_failed: true,
   platform_payment_failed: true,
   platform_payout_failed: true,
@@ -486,6 +493,19 @@ export async function ensureCommunicationSchema(sql: Db = sqlOrThrow()) {
         "scheduled_for",
         "sent_at",
         "delivered_at",
+        "created_at",
+        "updated_at"
+      ],
+      customer_line_connect_tokens: [
+        "id",
+        "plan_id",
+        "retail_customer_order_id",
+        "token_hash",
+        "status",
+        "expires_at",
+        "consumed_at",
+        "consumed_by_channel_id",
+        "metadata",
         "created_at",
         "updated_at"
       ],
@@ -1398,6 +1418,204 @@ export async function consumeOrganisationLineConnectCode(input: Readonly<{
   };
 }
 
+export async function createCustomerLineConnectToken(input: Readonly<{
+  planId: string;
+  retailCustomerOrderId?: string | null;
+  source?: string | null;
+}>) {
+  if (!isUuid(input.planId)) {
+    throw new Error("LINE connection requires a valid plan");
+  }
+
+  const sql = sqlOrThrow();
+  const source = optionalText(input.source) ?? "customer_line_cta";
+  const orderId = isUuid(input.retailCustomerOrderId ?? "")
+    ? input.retailCustomerOrderId!
+    : null;
+
+  await ensureCommunicationSchema(sql);
+
+  const assessmentRows = await sql<Array<{ plan_id: string }>>`
+    select plan_id::text
+    from public.assessments
+    where plan_id = ${input.planId}::uuid
+    limit 1
+  `;
+
+  if (!assessmentRows[0]) {
+    throw new Error("Plan not found");
+  }
+
+  const orderRows = orderId
+    ? await sql<Array<{ id: string }>>`
+        select id::text
+        from public.retail_customer_orders
+        where id = ${orderId}::uuid
+        limit 1
+      `
+    : [];
+  const retailCustomerOrderId = orderRows[0]?.id ?? null;
+  const code = newLineConnectCode();
+  const tokenHash = hashLineConnectCode(code);
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+  await ensurePlanIdentity(sql, input.planId);
+
+  const rows = await sql<Array<{
+    id: string;
+    expires_at: Date | string;
+  }>>`
+    insert into public.customer_line_connect_tokens (
+      id,
+      plan_id,
+      retail_customer_order_id,
+      token_hash,
+      status,
+      expires_at,
+      metadata,
+      created_at,
+      updated_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${input.planId}::uuid,
+      ${retailCustomerOrderId}::uuid,
+      ${tokenHash},
+      'active',
+      ${expiresAt},
+      ${sql.json(toJsonValue({
+        retailCustomerOrderId,
+        source
+      }))},
+      now(),
+      now()
+    )
+    returning id::text, expires_at
+  `;
+
+  await writeBpmEvent({
+    actorType: "visitor",
+    emittedBy: "customer_line_connect",
+    eventName: "customer_line_connect_code_created",
+    eventStatus: "created",
+    eventType: "chat",
+    planId: input.planId,
+    properties: {
+      retailCustomerOrderId,
+      source,
+      tokenId: rows[0]?.id ?? null
+    },
+    severity: "low",
+    sql
+  });
+
+  return {
+    code,
+    expiresAt: isoDate(rows[0]?.expires_at ?? expiresAt) ?? expiresAt.toISOString(),
+    id: rows[0]?.id ?? null,
+    retailCustomerOrderId
+  };
+}
+
+export async function consumeCustomerLineConnectCode(input: Readonly<{
+  code: string;
+  providerEventId?: string | null;
+  rawEvent?: Record<string, unknown>;
+  recipientId: string;
+  sourceType: "group" | "room" | "user";
+}>) {
+  const code = cleanText(input.code).toUpperCase();
+  const recipientId = normalizeLineUserId(input.recipientId);
+
+  if (!code || !recipientId) {
+    return null;
+  }
+
+  const sql = sqlOrThrow();
+
+  await ensureCommunicationSchema(sql);
+
+  const tokenRows = await sql<Array<{
+    id: string;
+    metadata: unknown;
+    plan_id: string;
+    retail_customer_order_id: string | null;
+  }>>`
+    update public.customer_line_connect_tokens
+    set
+      status = 'consuming',
+      updated_at = now()
+    where token_hash = ${hashLineConnectCode(code)}
+      and status = 'active'
+      and consumed_at is null
+      and expires_at > now()
+    returning id::text, plan_id::text, retail_customer_order_id::text, metadata
+  `;
+  const token = tokenRows[0];
+
+  if (!token) {
+    return null;
+  }
+
+  const identityId = await ensurePlanIdentity(sql, token.plan_id);
+  const tokenMetadata = objectValue(token.metadata);
+  const channel = await upsertChannel(sql, {
+    actorType: "human",
+    address: recipientId,
+    channelType: "line",
+    displayName: optionalText(tokenMetadata.displayName) ?? "LINE",
+    identityId,
+    metadata: {
+      ...lineSourceMetadata(input.sourceType, recipientId),
+      lineRecipientId: recipientId,
+      planId: token.plan_id,
+      providerEventId: input.providerEventId ?? null,
+      retailCustomerOrderId: token.retail_customer_order_id,
+      source: "line_webhook_customer_connect"
+    },
+    preferenceRank: 10,
+    status: "active"
+  });
+
+  await sql`
+    update public.customer_line_connect_tokens
+    set
+      consumed_at = now(),
+      consumed_by_channel_id = ${channel.id}::uuid,
+      metadata = metadata || ${sql.json(toJsonValue({
+        lineRecipientId: recipientId,
+        providerEventId: input.providerEventId ?? null,
+        rawEvent: input.rawEvent ?? null,
+        sourceType: input.sourceType
+      }))}::jsonb,
+      status = 'consumed',
+      updated_at = now()
+    where id = ${token.id}::uuid
+  `;
+
+  await writeBpmEvent({
+    actorType: "system",
+    emittedBy: "line_webhook",
+    eventName: "customer_line_channel_connected",
+    eventStatus: "succeeded",
+    eventType: "chat",
+    planId: token.plan_id,
+    properties: {
+      channelId: channel.id,
+      retailCustomerOrderId: token.retail_customer_order_id,
+      sourceType: input.sourceType
+    },
+    severity: "low",
+    sql
+  });
+
+  return {
+    channel,
+    planId: token.plan_id,
+    retailCustomerOrderId: token.retail_customer_order_id
+  };
+}
+
 export async function recordInboundLineCommunication(input: Readonly<{
   body: string;
   providerEventId?: string | null;
@@ -1420,14 +1638,18 @@ export async function recordInboundLineCommunication(input: Readonly<{
     channel_id: string | null;
     identity_id: string | null;
     organisation_id: string | null;
+    plan_id: string | null;
   }>>`
     select
       communication_channels.id::text as channel_id,
       communication_channels.identity_id::text,
-      organisation_communication_identities.organisation_id::text
+      organisation_communication_identities.organisation_id::text,
+      plan_communication_identities.plan_id::text
     from public.communication_channels
     left join public.organisation_communication_identities
       on organisation_communication_identities.identity_id = communication_channels.identity_id
+    left join public.plan_communication_identities
+      on plan_communication_identities.identity_id = communication_channels.identity_id
     where communication_channels.channel_type = 'line'
       and lower(communication_channels.address) = lower(${recipientId})
     order by communication_channels.updated_at desc
@@ -1439,6 +1661,7 @@ export async function recordInboundLineCommunication(input: Readonly<{
       id,
       identity_id,
       channel_id,
+      plan_id,
       direction,
       message_type,
       status,
@@ -1454,6 +1677,7 @@ export async function recordInboundLineCommunication(input: Readonly<{
       ${randomUUID()}::uuid,
       ${channel?.identity_id ?? null}::uuid,
       ${channel?.channel_id ?? null}::uuid,
+      ${channel?.plan_id ?? null}::uuid,
       'inbound',
       'line_inbound',
       'delivered',
@@ -1464,6 +1688,7 @@ export async function recordInboundLineCommunication(input: Readonly<{
         commandExecution: "disabled_v1",
         lineRecipientId: recipientId,
         organisationId: channel?.organisation_id ?? null,
+        planId: channel?.plan_id ?? null,
         rawEvent: input.rawEvent ?? null,
         replyTokenPresent: Boolean(input.replyToken),
         sourceType: input.sourceType
@@ -1478,14 +1703,19 @@ export async function recordInboundLineCommunication(input: Readonly<{
   await writeBpmEvent({
     actorType: "system",
     emittedBy: "line_webhook",
-    eventName: "admin_line_message_captured",
+    eventName: channel?.plan_id
+      ? "customer_line_message_captured"
+      : "admin_line_message_captured",
     eventStatus: "captured",
     eventType: "chat",
+    planId: channel?.plan_id ?? undefined,
     properties: {
       commandExecution: "disabled_v1",
       hasOrganisation: Boolean(channel?.organisation_id),
+      hasPlan: Boolean(channel?.plan_id),
       messageId: rows[0]?.id,
       organisationId: channel?.organisation_id ?? null,
+      planId: channel?.plan_id ?? null,
       sourceType: input.sourceType
     },
     severity: "low",
@@ -1536,6 +1766,44 @@ async function queueCommunicationMessageDispatchTask(input: Readonly<{
   });
 }
 
+export async function queueCustomerChatCommunicationDispatchTask(input: Readonly<{
+  createdByTaskId?: string | null;
+  messageId: string;
+  planId?: string | null;
+}>) {
+  if (!isUuid(input.messageId)) {
+    throw new Error("Customer chat dispatch requires a message");
+  }
+
+  return createTask({
+    actorType: "system",
+    businessValue: ADMIN_COMMUNICATION_DISPATCH_TASK_PRIORITY,
+    createdByTaskId: input.createdByTaskId ?? null,
+    description: "Dispatch a queued customer chat reply through LINE.",
+    groupLabel: "Customer chat dispatch",
+    idempotencyKey: `customer-chat-dispatch:${input.messageId}`,
+    idempotencyScope: "successful",
+    idempotencyScopeKey: `customer-chat-dispatch:${input.messageId}`,
+    maxAttempts: 3,
+    payload: {
+      channelType: "line",
+      messageId: input.messageId
+    },
+    planId: input.planId ?? null,
+    priorityReason: "Panya reply is queued for the chat dispatcher.",
+    priorityScore: ADMIN_COMMUNICATION_DISPATCH_TASK_PRIORITY,
+    reasoningEffort: "none",
+    requiredCapabilities: [
+      AGENT_CAPABILITIES.communicationDispatch,
+      AGENT_CAPABILITIES.lineSend
+    ],
+    sourceEntityId: input.messageId,
+    sourceEntityType: "communication_message",
+    taskType: "dispatch_chat_communication_message",
+    title: "Dispatch Panya LINE reply"
+  });
+}
+
 function orderEventCopy(input: Readonly<{
   customerName: string | null;
   eventKey: AdminCommunicationEventKey;
@@ -1568,6 +1836,10 @@ function orderEventCopy(input: Readonly<{
       body: `${orderNumber}${customer} has been marked delivered.`,
       subject: `${orderNumber} delivered`
     },
+    retail_order_pickup_booked: {
+      body: `${orderNumber}${customer} has a courier pickup booked. Review the pickup window and keep the parcel ready for handover. Basket: ${itemSummary}.`,
+      subject: `${orderNumber} pickup booked`
+    },
     retail_order_ready_to_pack: {
       body: `${orderNumber}${customer} has stock available and is ready to pack. Basket: ${itemSummary}.`,
       subject: `${orderNumber} is ready to pack`
@@ -1579,6 +1851,10 @@ function orderEventCopy(input: Readonly<{
     retail_order_returned: {
       body: `${orderNumber}${customer} has been marked returned. Review stock and settlement handling if needed.`,
       subject: `${orderNumber} was returned`
+    },
+    retail_order_shipment_exception: {
+      body: `${orderNumber}${customer} has a shipment exception. Review the carrier timeline and decide the next action.`,
+      subject: `${orderNumber} shipment exception`
     },
     retail_order_shipped: {
       body: `${orderNumber}${customer} has been marked shipped.`,
@@ -1602,6 +1878,10 @@ function platformEventCopy(eventKey: AdminCommunicationEventKey) {
     platform_checkout_failed: {
       body: "A customer checkout failed before payment could be completed. Review the checkout logs and payment configuration.",
       subject: "Platform checkout failure"
+    },
+    platform_carrier_integration_failed: {
+      body: "A carrier integration failed while creating a shipment, generating a label, booking pickup, or processing a provider event. Review carrier tasks and shipment events.",
+      subject: "Carrier integration failure"
     },
     platform_communication_failed: {
       body: "A platform communication failed or had no usable channel. Review the Communications log and dispatch tasks.",

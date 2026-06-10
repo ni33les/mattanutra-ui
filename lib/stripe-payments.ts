@@ -130,56 +130,11 @@ async function sqlOrThrow() {
   return sql;
 }
 
-async function recordPaymentVersion(
-  sql: Db,
-  input: Readonly<{
-    action: string;
-    actor: string;
-    metadata?: Record<string, unknown>;
-    paymentId: string;
-    reason: string;
-    source: string;
-  }>
-) {
-  await sql`
-    with payment_version_lock as (
-      select pg_advisory_xact_lock(hashtextextended(${input.paymentId}, 0))
-    ),
-    payment_snapshot as (
-      select payments.*
-      from public.payments payments
-      cross join payment_version_lock
-      where payments.id = ${input.paymentId}::uuid
-    )
-    insert into public.payment_versions (
-      payment_id,
-      version,
-      action,
-      actor,
-      reason,
-      source,
-      plan_id,
-      snapshot,
-      metadata,
-      created_at
-    )
-    select
-      payment_snapshot.id,
-      coalesce((
-        select max(version)
-        from public.payment_versions
-        where payment_id = payment_snapshot.id
-      ), 0) + 1,
-      ${input.action},
-      ${input.actor},
-      ${input.reason},
-      ${input.source},
-      payment_snapshot.plan_id,
-      to_jsonb(payment_snapshot.*),
-      ${sql.json(toJsonValue(input.metadata ?? {}))}::jsonb,
-      now()
-    from payment_snapshot
-  `;
+function isPaymentVersionRace(error: unknown) {
+  return typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "23505";
 }
 
 function mapPayment(row: PaymentRow) {
@@ -258,47 +213,82 @@ async function updatePaymentState(
   input: PaymentStatePatch
 ) {
   const metadata = input.metadata ?? {};
-  const rows = await sql<PaymentRow[]>`
-    update public.payments
-    set
-      plan_id = coalesce(${input.planId ?? null}::uuid, plan_id),
-      status = coalesce(${input.status ?? null}, status),
-      stripe_checkout_session_id = coalesce(${input.stripeCheckoutSessionId ?? null}, stripe_checkout_session_id),
-      stripe_payment_intent_id = coalesce(${input.stripePaymentIntentId ?? null}, stripe_payment_intent_id),
-      stripe_customer_id = coalesce(${input.stripeCustomerId ?? null}, stripe_customer_id),
-      stripe_price_id = coalesce(${input.stripePriceId ?? null}, stripe_price_id),
-      customer_email = coalesce(${input.customerEmail ?? null}, customer_email),
-      metadata = metadata || ${sql.json(toJsonValue(metadata))}::jsonb,
-      paid_at = case
-        when ${input.status ?? null} = 'paid' then coalesce(paid_at, now())
-        else paid_at
-      end,
-      bound_at = case
-        when ${input.status ?? null} = 'bound' then coalesce(bound_at, now())
-        else bound_at
-      end,
-      updated_at = now()
-    where id = ${input.paymentId}::uuid
-      and (
-        ${input.expectedStatuses ? input.expectedStatuses.length : 0}::int = 0
-        or status = any(${input.expectedStatuses ? [...input.expectedStatuses] : []}::text[])
-      )
-    returning *
-  `;
-  const payment = rows[0] ?? null;
 
-  if (payment) {
-    await recordPaymentVersion(sql, {
-      action: input.action,
-      actor: input.actor ?? "system",
-      metadata,
-      paymentId: input.paymentId,
-      reason: input.reason,
-      source: "stripe_payments"
-    });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const rows = await sql<PaymentRow[]>`
+        with updated_payment as (
+          update public.payments
+          set
+            plan_id = coalesce(${input.planId ?? null}::uuid, plan_id),
+            status = coalesce(${input.status ?? null}, status),
+            stripe_checkout_session_id = coalesce(${input.stripeCheckoutSessionId ?? null}, stripe_checkout_session_id),
+            stripe_payment_intent_id = coalesce(${input.stripePaymentIntentId ?? null}, stripe_payment_intent_id),
+            stripe_customer_id = coalesce(${input.stripeCustomerId ?? null}, stripe_customer_id),
+            stripe_price_id = coalesce(${input.stripePriceId ?? null}, stripe_price_id),
+            customer_email = coalesce(${input.customerEmail ?? null}, customer_email),
+            metadata = metadata || ${sql.json(toJsonValue(metadata))}::jsonb,
+            paid_at = case
+              when ${input.status ?? null} = 'paid' then coalesce(paid_at, now())
+              else paid_at
+            end,
+            bound_at = case
+              when ${input.status ?? null} = 'bound' then coalesce(bound_at, now())
+              else bound_at
+            end,
+            updated_at = now()
+          where id = ${input.paymentId}::uuid
+            and (
+              ${input.expectedStatuses ? input.expectedStatuses.length : 0}::int = 0
+              or status = any(${input.expectedStatuses ? [...input.expectedStatuses] : []}::text[])
+            )
+          returning *
+        ),
+        appended_version as (
+          insert into public.payment_versions (
+            payment_id,
+            version,
+            action,
+            actor,
+            reason,
+            source,
+            plan_id,
+            snapshot,
+            metadata,
+            created_at
+          )
+          select
+            updated_payment.id,
+            coalesce((
+              select max(payment_versions.version)
+              from public.payment_versions
+              where payment_versions.payment_id = updated_payment.id
+            ), 0) + 1,
+            ${input.action},
+            ${input.actor ?? "system"},
+            ${input.reason},
+            'stripe_payments',
+            updated_payment.plan_id,
+            to_jsonb(updated_payment.*),
+            ${sql.json(toJsonValue(metadata))}::jsonb,
+            now()
+          from updated_payment
+          returning payment_id
+        )
+        select updated_payment.*
+        from updated_payment
+        join appended_version on appended_version.payment_id = updated_payment.id
+      `;
+
+      return rows[0] ?? null;
+    } catch (error) {
+      if (!isPaymentVersionRace(error) || attempt > 0) {
+        throw error;
+      }
+    }
   }
 
-  return payment;
+  return null;
 }
 
 async function insertPayment(
@@ -313,51 +303,75 @@ async function insertPayment(
   }>
 ) {
   const plan = paymentPlan(input.selectedPlan);
+  const metadata = {
+    mattanutraEnv: input.config.env,
+    sourceSurface: input.sourceSurface
+  };
   const rows = await sql<PaymentRow[]>`
-    insert into public.payments (
-      id,
-      plan_id,
-      selected_plan,
-      locale,
-      source_surface,
-      status,
-      amount,
-      amount_unit,
-      currency,
-      stripe_mode,
-      metadata,
-      created_at,
-      updated_at
+    with inserted_payment as (
+      insert into public.payments (
+        id,
+        plan_id,
+        selected_plan,
+        locale,
+        source_surface,
+        status,
+        amount,
+        amount_unit,
+        currency,
+        stripe_mode,
+        metadata,
+        created_at,
+        updated_at
+      )
+      values (
+        ${input.paymentId}::uuid,
+        ${input.planId ?? null}::uuid,
+        ${input.selectedPlan}::public.assessment_plan,
+        ${input.locale},
+        ${input.sourceSurface},
+        'created',
+        ${plan.amountMicros},
+        'micros',
+        'THB',
+        ${input.config.mode},
+        ${sql.json(toJsonValue({ mattanutraEnv: input.config.env }))}::jsonb,
+        now(),
+        now()
+      )
+      returning *
+    ),
+    appended_version as (
+      insert into public.payment_versions (
+        payment_id,
+        version,
+        action,
+        actor,
+        reason,
+        source,
+        plan_id,
+        snapshot,
+        metadata,
+        created_at
+      )
+      select
+        inserted_payment.id,
+        1,
+        'payment_created',
+        'visitor',
+        'checkout_requested',
+        'stripe_payments',
+        inserted_payment.plan_id,
+        to_jsonb(inserted_payment.*),
+        ${sql.json(toJsonValue(metadata))}::jsonb,
+        now()
+      from inserted_payment
+      returning payment_id
     )
-    values (
-      ${input.paymentId}::uuid,
-      ${input.planId ?? null}::uuid,
-      ${input.selectedPlan}::public.assessment_plan,
-      ${input.locale},
-      ${input.sourceSurface},
-      'created',
-      ${plan.amountMicros},
-      'micros',
-      'THB',
-      ${input.config.mode},
-      ${sql.json(toJsonValue({ mattanutraEnv: input.config.env }))}::jsonb,
-      now(),
-      now()
-    )
-    returning *
+    select inserted_payment.*
+    from inserted_payment
+    join appended_version on appended_version.payment_id = inserted_payment.id
   `;
-
-  await recordPaymentVersion(sql, {
-    action: "payment_created",
-    actor: "visitor",
-    metadata: {
-      mattanutraEnv: input.config.env,
-      sourceSurface: input.sourceSurface
-    },
-    paymentId: input.paymentId,
-    reason: "checkout_requested",
-    source: "stripe_payments"
-  });
 
   if (rows[0]) {
     await recordStripePaymentNominalRevenue(sql, rows[0], {
@@ -1273,7 +1287,7 @@ export async function markPaymentCancelled(input: Readonly<{
     valueCurrency: payment.currency
   });
 
-  return mapPayment(updated);
+  return mapPayment(updated ?? payment);
 }
 
 export async function completeMockPayment(input: Readonly<{

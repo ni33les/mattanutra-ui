@@ -4,6 +4,14 @@ export const RETAIL_AGENT_EXECUTABLE_TASK_TYPES = [
   "retail_stock_forecast_refresh"
 ] as const;
 
+export const RETAIL_CARRIER_AGENT_EXECUTABLE_TASK_TYPES = [
+  "carrier_event_process",
+  "carrier_label_generate",
+  "carrier_pickup_book",
+  "carrier_shipment_create",
+  "carrier_tracking_sync"
+] as const;
+
 export const RETAIL_HUMAN_WORKFLOW_TASK_TYPES = [
   "retail_order_cancel_review",
   "retail_order_delivery_confirm",
@@ -21,6 +29,9 @@ export const RETAIL_ORDER_WORKFLOW_TASK_TYPES = [
 
 export type RetailAgentExecutableTaskType =
   (typeof RETAIL_AGENT_EXECUTABLE_TASK_TYPES)[number];
+
+export type RetailCarrierAgentExecutableTaskType =
+  (typeof RETAIL_CARRIER_AGENT_EXECUTABLE_TASK_TYPES)[number];
 
 const agentExecutableTaskTypes = new Set<string>(
   RETAIL_AGENT_EXECUTABLE_TASK_TYPES

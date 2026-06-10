@@ -437,6 +437,7 @@ export type AdminContent = Readonly<{
     ship: string;
     snoozeTask: string;
     boxed: string;
+    bookPickup: string;
     cheapestPrice: string;
     basketLines: string;
     deliver: string;
@@ -452,7 +453,10 @@ export type AdminContent = Readonly<{
     lineTotal: string;
     packingSheet: string;
     phone: string;
+    pickupBooked: string;
     printOrder: string;
+    readyToPack: string;
+    readyToShip: string;
     sent: string;
     shippingLabel: string;
     shortfall: string;
@@ -1131,6 +1135,7 @@ const baseContent = {
       ship: "Ship",
       snoozeTask: "Snooze",
       boxed: "Boxed",
+      bookPickup: "Book pickup",
       billingAddress: "Billing address",
       billingSameAsDelivery: "Billing address same as delivery",
       deliveryAddress: "Delivery address",
@@ -1142,7 +1147,10 @@ const baseContent = {
       lineTotal: "Line total",
       packingSheet: "Packing sheet",
       phone: "Phone",
+      pickupBooked: "Pickup booked",
       printOrder: "Print order",
+      readyToPack: "Ready to pack",
+      readyToShip: "Ready to ship",
       sent: "Shipped",
       shippingLabel: "Shipping label",
       shortfall: "Shortfall",
@@ -1952,6 +1960,7 @@ const baseContent = {
       ship: "จัดส่ง",
       snoozeTask: "เลื่อน",
       boxed: "ใส่กล่องแล้ว",
+      bookPickup: "จองรับพัสดุ",
       billingAddress: "ที่อยู่สำหรับออกบิล",
       billingSameAsDelivery: "ที่อยู่สำหรับออกบิลเหมือนที่อยู่จัดส่ง",
       deliveryAddress: "ที่อยู่จัดส่ง",
@@ -1963,7 +1972,10 @@ const baseContent = {
       lineTotal: "รวมรายการ",
       packingSheet: "ใบจัดสินค้า",
       phone: "โทรศัพท์",
+      pickupBooked: "จองรับพัสดุแล้ว",
       printOrder: "พิมพ์คำสั่งซื้อ",
+      readyToPack: "พร้อมแพ็ก",
+      readyToShip: "พร้อมจัดส่ง",
       sent: "จัดส่งแล้ว",
       shippingLabel: "ป้ายจัดส่ง",
       shortfall: "ส่วนขาด",

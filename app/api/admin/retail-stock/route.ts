@@ -26,6 +26,15 @@ import {
   voidRetailStockMovement
 } from "@/lib/admin-retail-stock";
 import { hasAdminPermission } from "@/lib/admin-rbac";
+import {
+  bookRetailOrderPickup,
+  createRetailOrderShipment,
+  generateRetailOrderShippingLabel,
+  replayCarrierShipmentEvent,
+  syncRetailOrderTracking,
+  testRetailCarrierAccount,
+  upsertRetailCarrierAccount
+} from "@/lib/retail-carrier-shipments";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { normalizeProductCountryCode } from "@/lib/product-countries";
 import {
@@ -87,6 +96,12 @@ function linesValue(value: unknown) {
     : [];
 }
 
+function objectValue(value: unknown) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 function localeValue(value: unknown): Locale {
   return isLocale(value) ? value : "en";
 }
@@ -140,7 +155,7 @@ const retailStockRouteHandlers: Partial<Record<RetailCommandId, RetailStockRoute
       wholesalePriceAmount: numberOrNull(body.wholesalePriceAmount)
     });
 
-    return { resourceId, result: null };
+    return { resourceId, result: { shoppingListId: resourceId } };
   },
   async set_stock_status(context, body) {
     const resourceId = await setRetailStockStatus(context, {
@@ -281,6 +296,99 @@ const retailStockRouteHandlers: Partial<Record<RetailCommandId, RetailStockRoute
 
     return { resourceId, result: null };
   },
+  async configure_carrier_account(context, body) {
+    const resourceId = await upsertRetailCarrierAccount(context, {
+      capabilities: Array.isArray(body.capabilities)
+        ? body.capabilities.map((capability) => text(capability)).filter(Boolean)
+        : null,
+      carrierId: text(body.carrierId) || null,
+      carrierName: text(body.carrierName) || null,
+      credentialMetadata: objectValue(body.credentialMetadata),
+      encryptedCredentials: objectValue(body.encryptedCredentials),
+      organisationId: text(body.organisationId) || null,
+      status:
+        text(body.status) === "disabled" || text(body.status) === "deleted"
+          ? text(body.status) as "deleted" | "disabled"
+          : "active"
+    });
+
+    return { resourceId, resourceType: "retail_carrier_account", result: null };
+  },
+  async create_order_shipment(context, body) {
+    const resourceId = await createRetailOrderShipment(context, {
+      carrierAccountId: text(body.carrierAccountId) || null,
+      carrierId: text(body.carrierId) || null,
+      carrierName: text(body.carrierName) || null,
+      customerOrderId: text(body.customerOrderId),
+      providerShipmentId: text(body.providerShipmentId) || null,
+      trackingNumber: text(body.trackingNumber) || null,
+      trackingUrl: text(body.trackingUrl) || null
+    });
+
+    return { resourceId, resourceType: "retail_order_shipment", result: null };
+  },
+  async test_carrier_account(context, body) {
+    const result = await testRetailCarrierAccount(context, {
+      carrierAccountId: text(body.carrierAccountId) || null,
+      carrierId: text(body.carrierId) || null,
+      organisationId: text(body.organisationId) || null
+    });
+
+    return {
+      resourceId: result.accountId,
+      resourceType: "retail_carrier_account",
+      result
+    };
+  },
+  async replay_carrier_shipment_event(context, body) {
+    const resourceId = await replayCarrierShipmentEvent(context, {
+      eventId: text(body.eventId)
+    });
+
+    return {
+      resourceId,
+      resourceType: "retail_order_shipment_event",
+      result: null
+    };
+  },
+  async generate_order_shipping_label(context, body) {
+    const resourceId = await generateRetailOrderShippingLabel(context, {
+      carrierId: text(body.carrierId) || null,
+      carrierName: text(body.carrierName) || null,
+      customerOrderId: text(body.customerOrderId),
+      labelUrl: text(body.labelUrl) || null
+    });
+
+    return { resourceId, resourceType: "retail_order_shipment", result: null };
+  },
+  async book_order_pickup(context, body) {
+    const resourceId = await bookRetailOrderPickup(context, {
+      carrierId: text(body.carrierId) || null,
+      carrierName: text(body.carrierName) || null,
+      customerOrderId: text(body.customerOrderId),
+      pickupProviderStatus: text(body.pickupProviderStatus) || null,
+      pickupRequestId: text(body.pickupRequestId) || null,
+      pickupWindowEnd: text(body.pickupWindowEnd) || null,
+      pickupWindowStart: text(body.pickupWindowStart) || null,
+      shipmentNotes: text(body.shipmentNotes) || null,
+      trackingNumber: text(body.trackingNumber) || null,
+      trackingUrl: text(body.trackingUrl) || null
+    });
+
+    return { resourceId, resourceType: "retail_order_shipment", result: null };
+  },
+  async sync_order_tracking(context, body) {
+    const result = await syncRetailOrderTracking(context, {
+      customerOrderId: text(body.customerOrderId) || null,
+      shipmentId: text(body.shipmentId) || null
+    });
+
+    return {
+      resourceId: text(body.shipmentId) || text(body.customerOrderId) || null,
+      resourceType: "retail_order_shipment",
+      result
+    };
+  },
   async reconcile_customer_order_lifecycle(context, body) {
     const resourceId = await reconcileRetailOrderLifecycle(context, {
       customerOrderId: text(body.customerOrderId)
@@ -337,7 +445,14 @@ export async function POST(request: NextRequest) {
     sessionCookie: request.cookies.get(adminSessionCookieName)?.value
   });
 
-  if (!context || !hasAdminPermission(context, "stock.write")) {
+  if (
+    !context ||
+    (
+      !hasAdminPermission(context, "stock.write") &&
+      !hasAdminPermission(context, "shipments.write") &&
+      !hasAdminPermission(context, "shipments.configure")
+    )
+  ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

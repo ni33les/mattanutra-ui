@@ -260,7 +260,7 @@ describe("retail stock and FX infrastructure", () => {
       rbac,
       /retail_admin:\s*\[[\s\S]*"access\.agents\.read"[\s\S]*"communications\.read"[\s\S]*"communications\.write"[\s\S]*"finance\.read"[\s\S]*"settings\.read"[\s\S]*"stock\.read"[\s\S]*"stock\.write"[\s\S]*\]/
     );
-    assert.match(rbac, /retail_assistant: \["settings\.read", "stock\.read"\]/);
+	    assert.match(rbac, /retail_assistant: \["settings\.read", "shipments\.read", "stock\.read"\]/);
     assert.match(page, /getAdminRetailStockData\(adminContext, locale\)/);
     assert.match(dashboard, /AdminRetailStockView/);
 	    assert.match(
@@ -293,6 +293,9 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /labels\.stock\.downloadPdf/);
 	    assert.match(view, /labels\.stock\.packingSheet/);
 	    assert.match(view, /labels\.stock\.shippingLabel/);
+	    assert.doesNotMatch(view, /labels\.stock\.kexHandlingSheet/);
+	    assert.doesNotMatch(view, /downloadKexMygeiaLabelCsv/);
+	    assert.doesNotMatch(view, /labels\.stock\.kexMygeiaExport/);
 	    assert.match(view, /labels\.stock\.invoice/);
 	    assert.match(view, /<th>\$\{escapeHtml\(labels\.stock\.product\)\}<\/th>[\s\S]*<th>\$\{escapeHtml\(labels\.stock\.quantity\)\}<\/th>[\s\S]*\$\{priceHeadings\}/);
 	    assert.doesNotMatch(view, /<th>\$\{escapeHtml\(labels\.stock\.allocate\)\}<\/th>/);
@@ -319,6 +322,8 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /<Truck aria-hidden="true"/);
 	    assert.match(view, /<ReceiptText aria-hidden="true"/);
 	    assert.match(view, /title="Ship order"/);
+	    assert.match(view, /labels\.stock\.bookPickup/);
+	    assert.match(view, /book_order_pickup/);
 	    assert.match(view, /openShipmentEditor\(customerOrderDetail\)/);
 	    assert.match(view, /Products are packed and ready to hand to the courier\/customer\./);
 	    assert.match(view, /confirmedPacked/);
@@ -351,8 +356,13 @@ describe("retail stock and FX infrastructure", () => {
     assert.doesNotMatch(view, /purchaseOrderDraft\.lines\.map/);
 			    assert.doesNotMatch(view, /AdminIconButton/);
 			    assert.doesNotMatch(view, /<Download/);
-				    assert.match(shoppingListModal, /\{labels\.stock\.exportCsv\}/);
+				    assert.match(
+				      shoppingListModal,
+				      /\{labels\.stock\.importCsv\}[\s\S]*\{labels\.stock\.exportCsv\}[\s\S]*\{labels\.stock\.exportPdf\}/
+				    );
 				    assert.match(view, /createShoppingListFromSelection/);
+				    assert.match(view, /shoppingListIdFromResult\(created\.result\)/);
+				    assert.match(view, /setSelectedShoppingListId\(createdShoppingListId\)/);
 				    assert.doesNotMatch(view, /applyShoppingListDraft/);
 				    assert.doesNotMatch(view, /apply_shopping_list/);
 				    assert.match(shoppingListModal, /downloadShoppingListCsv/);
@@ -363,6 +373,7 @@ describe("retail stock and FX infrastructure", () => {
 				    assert.match(view, /onReopen=\{\(\) => void reopenShoppingList\(\)\}/);
 				    assert.match(view, /if \(saved\) \{[\s\S]*setSelectedShoppingListId\(""\)/);
 					    assert.match(route, /async reopen_shopping_list\(context, body\)/);
+					    assert.match(route, /result: \{ shoppingListId: resourceId \}/);
 					    assert.match(route, /executeRetailCommand/);
 				    assert.match(route, /reopenRetailShoppingList/);
 				    assert.match(service, /export async function reopenRetailShoppingList/);
@@ -430,7 +441,8 @@ describe("retail stock and FX infrastructure", () => {
 			    assert.doesNotMatch(view, /panel === "tasks" \? \([\s\S]*<BusinessStatsGrid[\s\S]*metrics=\{retailTaskMetrics\}/);
 		    assert.doesNotMatch(view, /panel === "purchase-orders" \? \([\s\S]*<BusinessStatsGrid[\s\S]*metrics=\{purchaseOrderMetrics\}/);
 	    assert.match(view, /selectedStockFilter/);
-	    assert.match(view, /type CustomerOrderFilter = "all" \| RetailCustomerOrderStatus/);
+	    assert.match(view, /type CustomerOrderMetricKey =/);
+	    assert.match(view, /type CustomerOrderFilter = "all" \| CustomerOrderMetricKey/);
 	    assert.match(view, /selectedCustomerOrderFilter/);
 	    assert.match(view, /customerOrderStatusFilters/);
 	    assert.match(view, /customerOrderMetrics/);
@@ -438,9 +450,12 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /"shipped",\s*"delivered",\s*"cancelled",\s*"returned"/);
 	    assert.match(view, /function customerOrderIncludedInAllMetric/);
 	    assert.match(view, /!customerOrderAllExcludedStatuses\.has\(order\.status\)/);
+	    assert.match(view, /function customerOrderHasPickupBooked/);
 	    assert.match(view, /function customerOrderStatusMetricKey/);
+	    assert.match(view, /return "pickup_booked";/);
 	    assert.match(view, /if \(status === "picking"\) \{\s*return "packed";\s*\}/);
 	    assert.match(view, /if \(status === "packed"\) \{\s*return "Ready to ship";\s*\}/);
+	    assert.match(view, /if \(status === "pickup_booked"\) \{\s*return "Pickup booked";\s*\}/);
 	    assert.match(view, /metrics=\{customerOrderMetrics\}/);
 	    assert.match(view, /current === metricId \? "all" : \(metricId as CustomerOrderFilter\)/);
 	    assert.match(view, /type RetailStockAvailabilityStatus/);
@@ -542,23 +557,24 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /buildCustomerOrderWorkflowSteps/);
 	    assert.match(view, /order\.workflowTimeline\.orderedAt/);
 	    assert.match(view, /labels\.stock\.awaitingStock/);
-	    assert.match(view, /current === "ready_to_pack"[\s\S]*current === "ready_to_ship"[\s\S]*current === "sent"[\s\S]*key: "awaiting_stock"/);
-	    assert.match(view, /label: "Ready to pack"/);
-	    assert.match(view, /label: "Ready to ship"/);
+	    assert.match(view, /current === "ready_to_pack"[\s\S]*current === "ready_to_ship"[\s\S]*current === "pickup_booked"[\s\S]*current === "sent"[\s\S]*key: "awaiting_stock"/);
+	    assert.match(view, /label: labels\.stock\.readyToPack/);
+	    assert.match(view, /label: labels\.stock\.readyToShip/);
+	    assert.match(view, /label: labels\.stock\.pickupBooked/);
 	    assert.match(view, /order\.workflowTimeline\.boxedAt \?\? order\.workflowTimeline\.allocatedAt/);
-	    assert.match(view, /grid gap-3 md:grid-cols-5/);
+	    assert.match(view, /grid gap-3 md:grid-cols-6/);
 		    assert.match(view, /isCurrent[\s\S]*bg-amber-50 text-amber-900 ring-amber-200/);
 		    assert.match(view, /isCompleted[\s\S]*bg-\[#ECFDF5\] text-\[#126B4F\] ring-\[#A7F3D0\]/);
 		    assert.match(view, /<Check className="size-3\.5" strokeWidth=\{3\} \/>/);
 		    assert.match(view, /function customerOrderStatusPillClass/);
-		    assert.match(view, /if \(order\.status === "awaiting_stock"\) \{\s*return "Awaiting stock";\s*\}/);
-		    assert.match(view, /order\.status === "awaiting_stock" \|\| order\.isStuck[\s\S]*bg-amber-50 text-amber-800 ring-amber-100/);
+			    assert.match(view, /order\.status === "awaiting_stock" \|\| order\.workflowStage === "awaiting_stock"[\s\S]*return "Awaiting stock";/);
+			    assert.match(view, /order\.status === "awaiting_stock" \|\|[\s\S]*order\.workflowStage === "awaiting_stock" \|\|[\s\S]*customerOrderHasPickupBooked\(order\)[\s\S]*bg-amber-50 text-amber-800 ring-amber-100/);
 		    assert.doesNotMatch(view, /labels\.stock\.stuck/);
 		    assert.doesNotMatch(view, /labels\.stock\.onTrack/);
 		    assert.match(view, /const emptyRetailField = "";/);
 		    assert.match(view, /formatDate\(step\.at, locale\) \?\? emptyRetailField/);
 	    assert.doesNotMatch(view, /labels\.stock\.boxed/);
-	    assert.match(view, /labels\.stock\.sent/);
+	    assert.match(view, /label: labels\.stock\.sent/);
 	    assert.match(view, /grid shrink-0 grid-cols-3 gap-5 text-right sm:gap-8/);
 	    assert.match(view, /const identifiers = orderLineIdentifierParts\(line\)/);
 	    assert.match(view, /identifiers\.map\(\(identifier\)/);
@@ -616,6 +632,8 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(content, /downloadPdf: "Download PDF"/);
 	    assert.match(content, /deliveryDetails: "Delivery details"/);
 	    assert.match(content, /shippingLabel: "Shipping label"/);
+	    assert.doesNotMatch(content, /kexHandlingSheet/);
+	    assert.doesNotMatch(content, /kexMygeiaExport/);
 	    assert.match(content, /awaitingStock: "Awaiting Stock"/);
 	    assert.match(content, /boxed: "Boxed"/);
 			    assert.doesNotMatch(view, /openPurchaseOrderDetail/);
@@ -960,6 +978,31 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(service, /title: "Review customer order return"/);
 	    assert.match(service, /source: "one_click_ship"/);
 	    assert.match(service, /shipmentMetadata/);
+	    assert.match(view, /const grabCarrierName = "Grab"/);
+	    assert.match(view, /const shipmentCarrierOptions = \[kexCarrierName, grabCarrierName\] as const/);
+	    const carrierService = readFileSync("lib/retail-carrier-shipments.ts", "utf8");
+	    const kexAdapter = readFileSync("lib/kex-carrier-adapter.ts", "utf8");
+	    const kexWebhookRoute = readFileSync("app/api/kex/webhook/route.ts", "utf8");
+	    assert.match(kexAdapter, /export type KexCarrierCredentials/);
+	    assert.match(kexAdapter, /export async function createKexShipment/);
+	    assert.match(kexAdapter, /export async function generateKexLabel/);
+	    assert.match(kexAdapter, /export async function bookKexPickup/);
+	    assert.match(kexAdapter, /export async function syncKexTracking/);
+	    assert.match(kexAdapter, /export function parseKexWebhookPayload/);
+	    assert.match(kexWebhookRoute, /parseKexWebhookPayload/);
+	    assert.match(carrierService, /createKexShipment/);
+	    assert.match(carrierService, /generateKexLabel/);
+	    assert.match(carrierService, /bookKexPickup/);
+	    assert.match(carrierService, /syncKexTracking/);
+	    assert.match(carrierService, /carrier_shipment_create/);
+	    assert.match(carrierService, /carrier_label_generate/);
+	    assert.match(carrierService, /carrier_pickup_book/);
+	    assert.match(carrierService, /carrier_tracking_sync/);
+	    assert.doesNotMatch(carrierService, /carrier_adapter_not_configured/);
+	    assert.doesNotMatch(retailStockRoute, /carrier_tracking_adapter_not_configured/);
+	    assert.match(view, /KEX connection/);
+	    assert.match(view, /generate_order_shipping_label/);
+	    assert.match(view, /shipmentLabelStatusText/);
 	    assert.doesNotMatch(service, /retail_order_status_transition/);
 	    assert.match(workflowService, /writeFulfillmentBpmEvent/);
 	    assert.match(workflowService, /retail_order_awaiting_stock/);

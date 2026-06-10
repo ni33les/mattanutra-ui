@@ -34,6 +34,7 @@ type StepState = "active" | "complete" | "failed" | "pending";
 type WorkTaskType =
   | "analyze_healthscore"
   | "client_safety_followup"
+  | "customer_chat_reply"
   | "generate_example_supplement_guidance"
   | "generate_food_gap_guidance"
   | "generate_food_guidance"
@@ -57,6 +58,7 @@ const TASK_BUSINESS_VALUES = {
   foodGapSupport: 440,
   foodGuidance: 450,
   healthScoreAnalysis: 500,
+  customerChatReply: 430,
   nutritionPlanChatReply: 430,
   nutritionPlanRefinement: 520,
   nutritionReport: 500,
@@ -209,6 +211,7 @@ async function latestNutritionTaskGroupId(sql: postgres.Sql, planId: string) {
         'generate_food_gap_guidance',
         'generate_food_guidance',
         'generate_supplement_guidance',
+        'customer_chat_reply',
         'nutrition_plan_chat_reply',
         'refine_nutrition_plan',
         'generate_nutrition_report'
@@ -907,6 +910,73 @@ export async function enqueueNutritionPlanChatReplyTask({
     taskGroupId,
     taskTitle: "Reply to nutrition plan chat",
     taskType: "nutrition_plan_chat_reply"
+  });
+
+  if (taskId) {
+    await sql`
+      update public.plan_chat_messages set
+        status = 'queued',
+        task_id = ${taskId}::uuid,
+        updated_at = now()
+      where id = ${messageId}::uuid
+    `;
+  }
+
+  return taskId;
+}
+
+export async function enqueuePanyaCustomerChatReplyTask({
+  communicationMessageId,
+  messageId,
+  planId
+}: Readonly<{
+  communicationMessageId?: string | null;
+  messageId: string;
+  planId: string;
+}>) {
+  const sql = getSql();
+
+  if (!sql || !isUuid(planId) || !isUuid(messageId)) {
+    return null;
+  }
+
+  const messageRows = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.plan_chat_messages
+    where id = ${messageId}::uuid
+      and plan_id = ${planId}::uuid
+      and role = 'user'
+    limit 1
+  `;
+
+  if (!messageRows[0]) {
+    return null;
+  }
+
+  const taskGroupId =
+    (await latestNutritionTaskGroupId(sql, planId)) ??
+    deterministicUuid(`mattanutra:task-group:customer-chat:${planId}`);
+  const taskId = await createWorkTask({
+    actorType: "ai",
+    businessValue: TASK_BUSINESS_VALUES.customerChatReply,
+    groupLabel: "Panya customer chat",
+    id: deterministicUuid(`mattanutra:task:panya-chat:${messageId}`),
+    idempotencyKey: `panya-chat:${messageId}`,
+    idempotencyScope: "active",
+    idempotencyScopeKey: `panya-chat:${planId}`,
+    maxAttempts: 2,
+    payload: {
+      communicationMessageId: isUuid(communicationMessageId ?? "")
+        ? communicationMessageId
+        : null,
+      messageId
+    },
+    planId,
+    reasoningEffort: "low",
+    source: "line_customer_chat",
+    taskGroupId,
+    taskTitle: "Panya reply to customer chat",
+    taskType: "customer_chat_reply"
   });
 
   if (taskId) {

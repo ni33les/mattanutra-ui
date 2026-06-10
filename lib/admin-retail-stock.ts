@@ -107,6 +107,7 @@ export type RetailAgentCommandInput = Readonly<{
 export type AdminRetailStockPipelineRow = Readonly<{
   allocatedUnits: number;
   availableNowUnits: number;
+  backedAllocatedUnits: number;
   customerDemandUnits: number;
   customerOrderId: string | null;
   customerOrderLineId: string | null;
@@ -309,10 +310,22 @@ export type AdminRetailCustomerOrderDeliveryDetails = Readonly<{
 }>;
 
 export type AdminRetailCustomerOrderShipment = Readonly<{
+  carrierId: string | null;
   carrierName: string | null;
+  exceptionCode: string | null;
+  exceptionMessage: string | null;
+  labelContentBase64: string | null;
+  labelContentType: string | null;
+  labelStatus: string | null;
+  labelUrl: string | null;
+  pickupBookedAt: string | null;
+  pickupProviderStatus: string | null;
+  pickupWindowEnd: string | null;
+  pickupWindowStart: string | null;
   shippedAt: string | null;
   shippedByPersonId: string | null;
   shipmentNotes: string | null;
+  status: string | null;
   trackingNumber: string | null;
   trackingUrl: string | null;
 }>;
@@ -343,7 +356,20 @@ export type AdminRetailCustomerOrderWorkflowTimeline = Readonly<{
   awaitingStockAt: string | null;
   boxedAt: string | null;
   orderedAt: string | null;
+  pickupBookedAt: string | null;
   sentAt: string | null;
+}>;
+
+export type AdminRetailCarrierAccount = Readonly<{
+  capabilities: string[];
+  carrierId: string;
+  displayName: string | null;
+  id: string;
+  lastTestStatus: string | null;
+  lastTestedAt: string | null;
+  organisationId: string;
+  status: string;
+  updatedAt: string;
 }>;
 
 export type AdminRetailShoppingList = Readonly<{
@@ -449,6 +475,7 @@ export type AdminRetailStockData = Readonly<{
   canRouteRegionalCheckout: boolean;
   canWrite: boolean;
   auditEvents: AdminRetailAuditEvent[];
+  carrierAccounts: AdminRetailCarrierAccount[];
   customerOrderLines: AdminRetailCustomerOrderLine[];
   customerOrders: AdminRetailCustomerOrder[];
   databaseAvailable: boolean;
@@ -478,6 +505,7 @@ export type UpsertRetailStockItemInput = Readonly<{
 }>;
 
 export type RecordRetailStockMovementInput = Readonly<{
+  deferAllocationIntegrityRepair?: boolean;
   deferReorderSideEffects?: boolean;
   expiresAt?: string | null;
   lotId?: string | null;
@@ -948,16 +976,37 @@ function shipmentFromMetadata(
   value: unknown
 ): AdminRetailCustomerOrderShipment | null {
   const shipment = objectRecord(objectRecord(value).shipment);
+  const pickup = objectRecord(shipment.pickup);
 
   if (Object.keys(shipment).length === 0) {
     return null;
   }
 
   const parsed = {
+    carrierId: stringMetadata(shipment.carrierId),
     carrierName: stringMetadata(shipment.carrierName),
+    exceptionCode: stringMetadata(shipment.exceptionCode),
+    exceptionMessage: stringMetadata(shipment.exceptionMessage),
+    labelContentBase64: stringMetadata(shipment.labelContentBase64),
+    labelContentType: stringMetadata(shipment.labelContentType),
+    labelStatus: stringMetadata(shipment.labelStatus),
+    labelUrl: stringMetadata(shipment.labelUrl),
+    pickupBookedAt:
+      stringMetadata(pickup.bookedAt) ??
+      stringMetadata(shipment.pickupBookedAt),
+    pickupProviderStatus:
+      stringMetadata(pickup.providerStatus) ??
+      stringMetadata(shipment.pickupProviderStatus),
+    pickupWindowEnd:
+      stringMetadata(pickup.windowEnd) ??
+      stringMetadata(shipment.pickupWindowEnd),
+    pickupWindowStart:
+      stringMetadata(pickup.windowStart) ??
+      stringMetadata(shipment.pickupWindowStart),
     shippedAt: stringMetadata(shipment.shippedAt),
     shippedByPersonId: stringMetadata(shipment.shippedByPersonId),
     shipmentNotes: stringMetadata(shipment.shipmentNotes),
+    status: stringMetadata(shipment.status),
     trackingNumber: stringMetadata(shipment.trackingNumber),
     trackingUrl: stringMetadata(shipment.trackingUrl)
   };
@@ -1312,8 +1361,17 @@ export function getRetailCustomerOrderActionStates(
       : !pipeline
         ? "Pipeline unavailable. Recheck workflow."
         : !allocationRemaining
-          ? "No unallocated order quantity remains."
-          : "No live stock is available to allocate.";
+        ? "No unallocated order quantity remains."
+        : "No live stock is available to allocate.";
+  const canConsiderShipping =
+    status === "allocated" || status === "picking" || status === "packed";
+  const allocationsBacked = Boolean(
+    pipeline &&
+      pipeline.customerDemandUnits > 0 &&
+      pipeline.backedAllocatedUnits >= pipeline.customerDemandUnits &&
+      pipeline.unorderedNeedUnits < 1
+  );
+  const shipEnabled = canConsiderShipping && allocationsBacked;
 
   return {
     allocateAvailable: {
@@ -1337,11 +1395,15 @@ export function getRetailCustomerOrderActionStates(
       reason: null
     },
     ship: {
-      enabled: status === "allocated" || status === "picking" || status === "packed",
+      enabled: shipEnabled,
       reason:
-        status === "allocated" || status === "picking" || status === "packed"
+        shipEnabled
           ? null
-          : "Order must be allocated first."
+          : !canConsiderShipping
+            ? "Order must be allocated first."
+            : !pipeline
+              ? "Pipeline unavailable. Recheck workflow."
+              : "Allocated stock is no longer available. Recheck workflow."
     }
   };
 }
@@ -1372,6 +1434,14 @@ function getRetailCustomerOrderWorkflowHealth(input: Readonly<{
       nextAction = "review_shopping_list";
       reason = "Unallocated demand exists. Review reorder advice.";
     }
+  } else if (
+    input.workflowStage === "ship" &&
+    input.pipeline &&
+    input.pipeline.backedAllocatedUnits < input.pipeline.customerDemandUnits
+  ) {
+    expectedTaskType = "retail_shopping_list_review";
+    nextAction = "review_shopping_list";
+    reason = "Allocated stock is no longer available. Recheck workflow.";
   } else {
     expectedTaskType = expectedTaskTypeForStage(input.workflowStage);
     nextAction = workflowActionForStage(input.workflowStage);
@@ -1430,6 +1500,7 @@ function customerOrderWorkflowTimeline(input: Readonly<{
   deliveredAt: string | null;
   events: readonly AdminRetailAuditEvent[];
   placedAt: string | null;
+  pickupBookedAt: string | null;
   shippedAt: string | null;
   status: RetailCustomerOrderStatus;
   updatedAt: string;
@@ -1482,6 +1553,7 @@ function customerOrderWorkflowTimeline(input: Readonly<{
     awaitingStockAt,
     boxedAt,
     orderedAt: input.placedAt,
+    pickupBookedAt: input.pickupBookedAt,
     sentAt
   };
 }
@@ -1536,6 +1608,8 @@ function aggregatePipelineRows(
     (total, row) => ({
       allocatedUnits: total.allocatedUnits + row.allocatedUnits,
       availableNowUnits: total.availableNowUnits + row.availableNowUnits,
+      backedAllocatedUnits:
+        total.backedAllocatedUnits + row.backedAllocatedUnits,
       customerDemandUnits: total.customerDemandUnits + row.customerDemandUnits,
       shippedUnits: total.shippedUnits + row.shippedUnits,
       unorderedNeedUnits: total.unorderedNeedUnits + row.unorderedNeedUnits
@@ -1543,6 +1617,7 @@ function aggregatePipelineRows(
     {
       allocatedUnits: 0,
       availableNowUnits: 0,
+      backedAllocatedUnits: 0,
       customerDemandUnits: 0,
       shippedUnits: 0,
       unorderedNeedUnits: 0
@@ -1557,7 +1632,10 @@ function aggregatePipelineRows(
     orderNumber: orderRows[0]?.orderNumber ?? null,
     productId: null,
     productTitle: null,
-    status: pipelineStatus(totals)
+    status: pipelineStatus({
+      ...totals,
+      allocatedUnits: totals.backedAllocatedUnits
+    })
   };
 }
 
@@ -1679,14 +1757,26 @@ export async function getRetailStockPipeline(input: Readonly<{
     );
     const activeAllocatedUnits = integerOrDefault(row.active_allocated_units, 0);
     const physicalStockUnits = integerOrDefault(row.physical_stock_units, 0);
+    const otherActiveAllocatedUnits = Math.max(
+      0,
+      activeAllocatedUnits - allocatedUnits
+    );
+    const stockPotentiallyBackingThisLine = Math.max(
+      0,
+      physicalStockUnits - otherActiveAllocatedUnits
+    );
+    const backedAllocatedUnits = Math.min(
+      allocatedUnits,
+      stockPotentiallyBackingThisLine
+    );
     const availableNowUnits = Math.max(0, physicalStockUnits - activeAllocatedUnits);
     const shippedUnits = integerOrDefault(row.shipped_units, 0);
     const unorderedNeedUnits = Math.max(
       0,
-      customerDemandUnits - allocatedUnits - availableNowUnits
+      customerDemandUnits - backedAllocatedUnits - availableNowUnits
     );
     const statusInput = {
-      allocatedUnits,
+      allocatedUnits: backedAllocatedUnits,
       availableNowUnits,
       customerDemandUnits,
       unorderedNeedUnits
@@ -1695,6 +1785,7 @@ export async function getRetailStockPipeline(input: Readonly<{
     return {
       allocatedUnits,
       availableNowUnits,
+      backedAllocatedUnits,
       customerDemandUnits,
       customerOrderId: row.customer_order_id,
       customerOrderLineId: row.customer_order_line_id,
@@ -2730,6 +2821,7 @@ export function emptyAdminRetailStockData(): AdminRetailStockData {
     canFilterOrganisation: false,
     canRouteRegionalCheckout: false,
     canWrite: false,
+    carrierAccounts: [],
     customerOrderLines: [],
     customerOrders: [],
     databaseAvailable: false,
@@ -3041,6 +3133,39 @@ export async function getAdminRetailStockData(
   const operationsTablesAvailable = organisationIds.length > 0
     ? await retailOperationsTablesAvailable(sql)
     : false;
+  const carrierTablesReady = organisationIds.length > 0
+    ? (await sql<Array<{ ready: boolean }>>`
+        select to_regclass('public.retail_carrier_accounts') is not null as ready
+      `)[0]?.ready === true
+    : false;
+  const carrierAccountRows = carrierTablesReady
+    ? await sql<Array<{
+        capabilities: string[];
+        carrier_id: string;
+        display_name: string | null;
+        id: string;
+        last_test_status: string | null;
+        last_tested_at: Date | string | null;
+        organisation_id: string;
+        status: string;
+        updated_at: Date | string;
+      }>>`
+        select
+          id::text,
+          organisation_id::text,
+          carrier_id,
+          display_name,
+          status,
+          capabilities,
+          last_tested_at,
+          last_test_status,
+          updated_at
+        from public.retail_carrier_accounts
+        where organisation_id = any(${organisationIds}::uuid[])
+          and status <> 'deleted'
+        order by carrier_id, updated_at desc
+      `
+    : [];
   const [
     taskRows,
     customerOrderRows,
@@ -3111,7 +3236,7 @@ export async function getAdminRetailStockData(
           left join public.agents reserved_agents
             on reserved_agents.id = tasks.reserved_by_agent_id
           where tasks.organisation_id = any(${organisationIds}::uuid[])
-            and tasks.task_type like 'retail_%'
+            and (tasks.task_type like 'retail_%' or tasks.task_type like 'carrier_%')
           order by
             case when tasks.status in ('completed', 'cancelled', 'skipped') then 1 else 0 end,
             coalesce(tasks.priority_score, tasks.business_value) desc,
@@ -3529,6 +3654,17 @@ export async function getAdminRetailStockData(
     canFilterOrganisation: canReadAllRetailStock(context),
     canRouteRegionalCheckout: canRouteRegionalCheckout(context),
     canWrite: canWriteRetailStock(context),
+    carrierAccounts: carrierAccountRows.map((row) => ({
+      capabilities: Array.isArray(row.capabilities) ? row.capabilities : [],
+      carrierId: row.carrier_id,
+      displayName: row.display_name,
+      id: row.id,
+      lastTestStatus: row.last_test_status,
+      lastTestedAt: isoDateTimeOrNull(row.last_tested_at),
+      organisationId: row.organisation_id,
+      status: row.status,
+      updatedAt: isoDateTime(row.updated_at)
+    })),
     customerOrderLines: customerOrderLineRows.map((row) => ({
       ...lineAvailabilityFromMetadata(row.metadata),
       customerOrderId: row.customer_order_id,
@@ -3549,8 +3685,13 @@ export async function getAdminRetailStockData(
     })),
     customerOrders: customerOrderRows.map((row) => {
       const status = customerOrderStatus(row.status);
-      const workflowStage = workflowStageForStatus(status);
       const pipeline = pipelineByOrderId.get(row.id) ?? null;
+      const workflowStage =
+        (status === "allocated" || status === "picking" || status === "packed") &&
+        pipeline &&
+        !orderPipelineFullyBacked(pipeline)
+          ? "awaiting_stock"
+          : workflowStageForStatus(status);
       const relatedTasks = tasksByCustomerOrderId.get(row.id) ?? [];
       const openTasks = relatedTasks.filter(
         (task) => !isTerminalTaskStatus(task.status)
@@ -3577,6 +3718,7 @@ export async function getAdminRetailStockData(
       const deliveredAt = isoDateTimeOrNull(row.delivered_at);
       const placedAt = isoDateTimeOrNull(row.placed_at);
       const shippedAt = isoDateTimeOrNull(row.shipped_at);
+      const shipment = shipmentFromMetadata(row.metadata);
       const updatedAt = isoDateTime(row.updated_at);
 
       return {
@@ -3606,7 +3748,7 @@ export async function getAdminRetailStockData(
         routingSnapshot: routingSnapshotFromMetadata(row.metadata),
         shippedAt,
         shippedUnits: integerOrDefault(row.shipped_units, 0),
-        shipment: shipmentFromMetadata(row.metadata),
+        shipment,
         source: customerOrderSource(row.source),
         status,
         stuckReason: workflowHealth.reason,
@@ -3619,6 +3761,7 @@ export async function getAdminRetailStockData(
           deliveredAt,
           events: relatedAuditEvents,
           placedAt,
+          pickupBookedAt: shipment?.pickupBookedAt ?? null,
           shippedAt,
           status,
           updatedAt
@@ -3938,6 +4081,11 @@ export async function upsertRetailStockItem(
       productId,
       stockId: id
     });
+    await repairRetailStockAllocationIntegrity(context, {
+      source: "admin_stock_update",
+      sql,
+      stockId: id
+    });
     await queueRetailStockIntelligenceRefresh(
       stockRow,
       existingRows[0] ? "stock_updated" : "stock_created"
@@ -4223,6 +4371,14 @@ export async function recordRetailStockMovement(
     }
   }
 
+  if (delta < 0 && !input.deferAllocationIntegrityRepair) {
+    await repairRetailStockAllocationIntegrity(context, {
+      source: "stock_movement_reduced_stock",
+      sql,
+      stockId: recordedStockRow.id
+    });
+  }
+
   if (
     type === "adjustment" ||
     type === "expiry_write_off" ||
@@ -4459,6 +4615,13 @@ export async function voidRetailStockMovement(
     productId: voidedStockRow.product_id,
     stockId: voidedStockRow.id
   });
+  if (voidDelta < 0) {
+    await repairRetailStockAllocationIntegrity(context, {
+      source: "stock_movement_void_reduced_stock",
+      sql,
+      stockId: voidedStockRow.id
+    });
+  }
   await queueRetailStockIntelligenceRefresh(voidedStockRow, "stock_movement_voided");
   await queueStockReviewTasks(voidedStockRow, "stock_movement_voided");
 
@@ -4551,6 +4714,11 @@ export async function setRetailStockStatus(
   await refreshRetailStockReorderAdvice({
     organisationId: rows[0].organisation_id,
     productId: rows[0].product_id,
+    stockId: rows[0].id
+  });
+  await repairRetailStockAllocationIntegrity(context, {
+    source: "stock_status_changed",
+    sql,
     stockId: rows[0].id
   });
   await queueRetailStockIntelligenceRefresh(rows[0], "stock_status_updated");
@@ -5006,9 +5174,93 @@ export async function reopenRetailShoppingList(
   return list.id;
 }
 
-async function releaseRetailStockOverAllocationsAfterStockCount(
+function orderPipelineFullyBacked(pipeline: AdminRetailStockPipelineRow | null) {
+  return Boolean(
+    pipeline &&
+      pipeline.customerDemandUnits > 0 &&
+      pipeline.backedAllocatedUnits >= pipeline.customerDemandUnits &&
+      pipeline.unorderedNeedUnits < 1
+  );
+}
+
+async function repairRetailOrdersAwaitingStockAfterAllocationRelease(
   context: AdminSessionContext,
   input: Readonly<{
+    orderIds: readonly string[];
+    organisationId: string;
+    source: string;
+    sql: StockDb;
+  }>
+) {
+  const orderIds = [...new Set(input.orderIds.filter(Boolean))];
+
+  if (orderIds.length === 0) {
+    return { repairedOrderCount: 0, shortageUnits: 0 };
+  }
+
+  const orderRows = await input.sql<Array<{
+    due_at: Date | string | null;
+    id: string;
+    order_number: string;
+    status: string;
+  }>>`
+    select id::text, order_number, due_at, status
+    from public.retail_customer_orders
+    where organisation_id = ${input.organisationId}::uuid
+      and id = any(${orderIds}::uuid[])
+      and status in ('placed', 'awaiting_stock', 'allocated', 'picking', 'packed')
+  `;
+  let shortageUnits = 0;
+
+  for (const order of orderRows) {
+    const shortageRepair = await ensureRetailOrderShortagesInReorderAdvice(context, {
+      customerOrderId: order.id,
+      orderNumber: order.order_number,
+      organisationId: input.organisationId,
+      sql: input.sql
+    });
+
+    shortageUnits += shortageRepair.shortageUnits;
+
+    await cancelStaleOrderWorkflowTasks(input.sql, context, {
+      expectedTaskTypes: ["retail_shopping_list_review"],
+      orderId: order.id,
+      organisationId: input.organisationId,
+      reason: "allocation_no_longer_backed_by_stock",
+      status: "awaiting_stock"
+    });
+
+    await ensureOrderWorkflowTask(input.sql, context, {
+      dueAt: order.due_at,
+      orderId: order.id,
+      organisationId: input.organisationId,
+      taskType: "retail_shopping_list_review"
+    });
+
+    await recordRetailOrderBpmEvent(input.sql, context, {
+      eventName: "retail_order_allocation_integrity_repaired",
+      eventStatus: "awaiting_stock",
+      metadata: {
+        previousStatus: order.status,
+        reorderAdviceLineCount: shortageRepair.lineCount,
+        reorderAdviceShortageUnits: shortageRepair.shortageUnits,
+        source: input.source
+      },
+      orderId: order.id,
+      organisationId: input.organisationId
+    });
+  }
+
+  return {
+    repairedOrderCount: orderRows.length,
+    shortageUnits
+  };
+}
+
+async function repairRetailStockAllocationIntegrity(
+  context: AdminSessionContext,
+  input: Readonly<{
+    source: string;
     sql: StockDb;
     stockId: string;
   }>
@@ -5016,18 +5268,24 @@ async function releaseRetailStockOverAllocationsAfterStockCount(
   const stockRows = await input.sql<Array<{
     organisation_id: string;
     product_id: string;
+    status: string;
     stock_quantity: number | string;
   }>>`
-    select organisation_id::text, product_id::text, stock_quantity
+    select organisation_id::text, product_id::text, status, stock_quantity
     from public.retail_product_stock
     where id = ${input.stockId}::uuid
-      and status = 'active'
+      and status <> 'deleted'
     limit 1
   `;
   const stock = stockRows[0];
 
   if (!stock) {
-    return { affectedOrderIds: [] as string[], releasedUnits: 0 };
+    return {
+      affectedOrderIds: [] as string[],
+      releasedUnits: 0,
+      repairedOrderCount: 0,
+      shortageUnits: 0
+    };
   }
 
   const allocationRows = await input.sql<Array<{
@@ -5045,8 +5303,8 @@ async function releaseRetailStockOverAllocationsAfterStockCount(
     join public.retail_customer_orders
       on retail_customer_orders.id = retail_order_allocations.customer_order_id
     where retail_order_allocations.retail_product_stock_id = ${input.stockId}::uuid
-      and retail_order_allocations.status = 'active'
-      and retail_customer_orders.status in ('placed', 'awaiting_stock', 'allocated')
+      and retail_order_allocations.status in ('active', 'picked')
+      and retail_customer_orders.status in ('placed', 'awaiting_stock', 'allocated', 'picking', 'packed')
     order by
       coalesce(
         retail_customer_orders.due_at,
@@ -5055,17 +5313,24 @@ async function releaseRetailStockOverAllocationsAfterStockCount(
       ) desc,
       retail_order_allocations.created_at desc
   `;
+  const availableStockUnits =
+    stock.status === "active" ? integerOrDefault(stock.stock_quantity, 0) : 0;
   let excessUnits = Math.max(
     0,
     allocationRows.reduce(
       (total, allocation) =>
         total + integerOrDefault(allocation.quantity_allocated, 0),
       0
-    ) - integerOrDefault(stock.stock_quantity, 0)
+    ) - availableStockUnits
   );
 
   if (excessUnits < 1) {
-    return { affectedOrderIds: [] as string[], releasedUnits: 0 };
+    return {
+      affectedOrderIds: [] as string[],
+      releasedUnits: 0,
+      repairedOrderCount: 0,
+      shortageUnits: 0
+    };
   }
 
   const affectedOrderIds = new Set<string>();
@@ -5091,7 +5356,7 @@ async function releaseRetailStockOverAllocationsAfterStockCount(
           metadata = metadata || ${input.sql.json({
             releasedByPersonId: context.actorPerson.id,
             releasedUnits: releaseUnits,
-            source: "shopping_list_stock_count_reduced"
+            source: input.source
           })},
           updated_at = now()
         where id = ${allocation.allocation_id}::uuid
@@ -5104,7 +5369,7 @@ async function releaseRetailStockOverAllocationsAfterStockCount(
           metadata = metadata || ${input.sql.json({
             releasedByPersonId: context.actorPerson.id,
             releasedUnits: releaseUnits,
-            source: "shopping_list_stock_count_reduced"
+            source: input.source
           })},
           updated_at = now()
         where id = ${allocation.allocation_id}::uuid
@@ -5131,7 +5396,7 @@ async function releaseRetailStockOverAllocationsAfterStockCount(
       update public.retail_customer_orders
       set status = 'awaiting_stock', updated_at = now()
       where id = any(${orderIds}::uuid[])
-        and status in ('placed', 'awaiting_stock', 'allocated')
+        and status in ('placed', 'awaiting_stock', 'allocated', 'picking', 'packed')
     `;
 
     await recordAdminAudit({
@@ -5145,12 +5410,198 @@ async function releaseRetailStockOverAllocationsAfterStockCount(
         affectedOrderIds: orderIds,
         productId: stock.product_id,
         releasedUnits,
-        source: "shopping_list_stock_count_reduced"
+        source: input.source
       }
     });
   }
 
-  return { affectedOrderIds: orderIds, releasedUnits };
+  const orderRepair = await repairRetailOrdersAwaitingStockAfterAllocationRelease(
+    context,
+    {
+      orderIds,
+      organisationId: stock.organisation_id,
+      source: input.source,
+      sql: input.sql
+    }
+  );
+
+  return {
+    affectedOrderIds: orderIds,
+    releasedUnits,
+    repairedOrderCount: orderRepair.repairedOrderCount,
+    shortageUnits: orderRepair.shortageUnits
+  };
+}
+
+async function releaseRetailStockOverAllocationsAfterStockCount(
+  context: AdminSessionContext,
+  input: Readonly<{
+    sql: StockDb;
+    stockId: string;
+  }>
+) {
+  return repairRetailStockAllocationIntegrity(context, {
+    ...input,
+    source: "shopping_list_stock_count_reduced"
+  });
+}
+
+async function repairCustomerOrderAllocationIntegrity(
+  context: AdminSessionContext,
+  input: Readonly<{
+    customerOrderId: string;
+    dueAt?: Date | string | null;
+    orderNumber: string;
+    organisationId: string;
+    source: string;
+    sql: StockDb;
+  }>
+) {
+  const stockRows = await input.sql<Array<{ stock_id: string }>>`
+    select distinct retail_product_stock_id::text as stock_id
+    from public.retail_order_allocations
+    where customer_order_id = ${input.customerOrderId}::uuid
+      and organisation_id = ${input.organisationId}::uuid
+      and status in ('active', 'picked')
+  `;
+  let releasedUnits = 0;
+
+  for (const row of stockRows) {
+    const repair = await repairRetailStockAllocationIntegrity(context, {
+      source: input.source,
+      sql: input.sql,
+      stockId: row.stock_id
+    });
+
+    releasedUnits += repair.releasedUnits;
+  }
+
+  const pipeline = aggregatePipelineRows(
+    await getRetailStockPipeline({
+      customerOrderId: input.customerOrderId,
+      locale: context.effectivePerson.preferredLocale,
+      organisationIds: [input.organisationId],
+      sql: input.sql
+    }),
+    input.customerOrderId
+  );
+
+  if (orderPipelineFullyBacked(pipeline)) {
+    return { fullyBacked: true, releasedUnits };
+  }
+
+  await input.sql`
+    update public.retail_customer_orders
+    set status = 'awaiting_stock', updated_at = now()
+    where id = ${input.customerOrderId}::uuid
+      and organisation_id = ${input.organisationId}::uuid
+      and status in ('allocated', 'picking', 'packed')
+  `;
+
+  const shortageRepair = await ensureRetailOrderShortagesInReorderAdvice(context, {
+    customerOrderId: input.customerOrderId,
+    orderNumber: input.orderNumber,
+    organisationId: input.organisationId,
+    sql: input.sql
+  });
+
+  await cancelStaleOrderWorkflowTasks(input.sql, context, {
+    expectedTaskTypes: ["retail_shopping_list_review"],
+    orderId: input.customerOrderId,
+    organisationId: input.organisationId,
+    reason: "allocation_no_longer_backed_by_stock",
+    status: "awaiting_stock"
+  });
+
+  await ensureOrderWorkflowTask(input.sql, context, {
+    dueAt: input.dueAt ?? null,
+    orderId: input.customerOrderId,
+    organisationId: input.organisationId,
+    taskType: "retail_shopping_list_review"
+  });
+
+  await recordAdminAudit({
+    action: "admin.retail_order_allocation_integrity_repaired",
+    actorPersonId: context.actorPerson.id,
+    assumedPersonId: context.assumedPerson?.id ?? null,
+    organisationId: input.organisationId,
+    resourceId: input.customerOrderId,
+    resourceType: "retail_customer_order",
+    metadata: {
+      backedAllocatedUnits: pipeline?.backedAllocatedUnits ?? 0,
+      customerDemandUnits: pipeline?.customerDemandUnits ?? 0,
+      releasedUnits,
+      reorderAdviceLineCount: shortageRepair.lineCount,
+      reorderAdviceShortageUnits: shortageRepair.shortageUnits,
+      source: input.source,
+      unorderedNeedUnits: pipeline?.unorderedNeedUnits ?? 0
+    }
+  });
+
+  await recordRetailOrderBpmEvent(input.sql, context, {
+    eventName: "retail_order_allocation_integrity_repaired",
+    eventStatus: "awaiting_stock",
+    metadata: {
+      backedAllocatedUnits: pipeline?.backedAllocatedUnits ?? 0,
+      customerDemandUnits: pipeline?.customerDemandUnits ?? 0,
+      releasedUnits,
+      reorderAdviceLineCount: shortageRepair.lineCount,
+      reorderAdviceShortageUnits: shortageRepair.shortageUnits,
+      source: input.source,
+      unorderedNeedUnits: pipeline?.unorderedNeedUnits ?? 0
+    },
+    orderId: input.customerOrderId,
+    organisationId: input.organisationId
+  });
+
+  return { fullyBacked: false, releasedUnits };
+}
+
+export async function repairRetailCustomerOrderAllocationIntegrityForSystem(
+  input: Readonly<{
+    customerOrderId: string;
+    organisationId: string;
+    source: string;
+    sql?: StockDb;
+    taskId?: string | null;
+  }>
+) {
+  const sql = input.sql ?? getSql();
+
+  if (!sql || !(await retailOperationsTablesAvailable(sql))) {
+    throw new Error("Retail operations tables are not available");
+  }
+
+  const orderRows = await sql<Array<{
+    due_at: Date | string | null;
+    id: string;
+    order_number: string;
+  }>>`
+    select id::text, order_number, due_at
+    from public.retail_customer_orders
+    where id = ${input.customerOrderId}::uuid
+      and organisation_id = ${input.organisationId}::uuid
+    limit 1
+  `;
+  const order = orderRows[0];
+
+  if (!order) {
+    throw new Error("Customer order not found");
+  }
+
+  const context = await retailAgentSessionContext(sql, {
+    organisationId: input.organisationId,
+    taskId: input.taskId ?? `allocation-integrity:${input.customerOrderId}`
+  });
+
+  return repairCustomerOrderAllocationIntegrity(context, {
+    customerOrderId: order.id,
+    dueAt: order.due_at,
+    orderNumber: order.order_number,
+    organisationId: input.organisationId,
+    source: input.source,
+    sql
+  });
 }
 
 export async function updateRetailShoppingList(
@@ -5304,6 +5755,7 @@ export async function updateRetailShoppingList(
       affectedStockIds.add(stockId);
 
       await recordRetailStockMovement(context, {
+        deferAllocationIntegrityRepair: true,
         deferReorderSideEffects: true,
         movementType: delta > 0 ? "receive" : "adjustment",
         notes: null,
@@ -6539,6 +6991,21 @@ export async function advanceRetailCustomerOrder(
   });
 
   if (input.action === "mark_shipped") {
+    const integrity = await repairCustomerOrderAllocationIntegrity(context, {
+      customerOrderId: order.id,
+      dueAt: order.due_at,
+      orderNumber: order.order_number,
+      organisationId: order.organisation_id,
+      source: "ship_order_preflight",
+      sql
+    });
+
+    if (!integrity.fullyBacked) {
+      throw new Error(
+        "Stock changed after allocation. The order has been moved back to Awaiting Stock."
+      );
+    }
+
     const allocationRows = await sql<Array<{
       customer_order_line_id: string;
       id: string;
@@ -6565,6 +7032,7 @@ export async function advanceRetailCustomerOrder(
       }
 
       await recordRetailStockMovement(context, {
+        deferAllocationIntegrityRepair: true,
         movementType: "sale",
         quantity,
         reason: "Customer order shipped",
@@ -6853,6 +7321,22 @@ export async function reconcileRetailOrderLifecycle(
   }
 
   const status = customerOrderStatus(order.status);
+
+  if (status === "allocated" || status === "picking" || status === "packed") {
+    const integrity = await repairCustomerOrderAllocationIntegrity(context, {
+      customerOrderId: order.id,
+      dueAt: order.due_at,
+      orderNumber: order.order_number,
+      organisationId: order.organisation_id,
+      source: "order_lifecycle_recheck",
+      sql
+    });
+
+    if (!integrity.fullyBacked) {
+      return order.id;
+    }
+  }
+
   const stage = workflowStageForStatus(status);
   const pipeline = aggregatePipelineRows(
     await getRetailStockPipeline({

@@ -21,6 +21,7 @@ describe("system agents", () => {
     assert.deepEqual(
       names.sort(),
       [
+        "Carrier Coordinator",
         "Chat Dispatcher",
         "Communications Coordinator",
         "Content Publisher",
@@ -30,6 +31,7 @@ describe("system agents", () => {
         "Human Reviewer",
         "Nutrition Plan Advisor",
         "Nutrition Plan Formulator",
+        "Panya",
         "Product Matcher",
         "Retail Stock Planner",
         "Safety Scanner",
@@ -43,6 +45,7 @@ describe("system agents", () => {
       "analyze_healthscore",
       "client_safety_followup",
       "content_status_change",
+      "customer_chat_reply",
       "dispatch_chat_communication_message",
       "dispatch_email_communication_message",
       "generate_example_supplement_guidance",
@@ -126,6 +129,7 @@ describe("system agents", () => {
 
     assert.deepEqual(envKeys.sort(), [
       "WORKER_ADVISOR_AGENT_API_KEY",
+      "WORKER_CARRIER_AGENT_API_KEY",
       "WORKER_CHAT_AGENT_API_KEY",
       "WORKER_COMMUNICATIONS_AGENT_API_KEY",
       "WORKER_CONTENT_AGENT_API_KEY",
@@ -134,12 +138,19 @@ describe("system agents", () => {
       "WORKER_FORMULATION_AGENT_API_KEY",
       "WORKER_HEALTHSCORE_AGENT_API_KEY",
       "WORKER_HOSTING_AGENT_API_KEY",
+      "WORKER_PANYA_AGENT_API_KEY",
       "WORKER_PRODUCTS_AGENT_API_KEY",
       "WORKER_STOCK_AGENT_API_KEY"
     ].sort());
     assert.equal(
       RUNTIME_WORKER_CREDENTIAL_PROFILES.find(
         (profile) => profile.envKey === "WORKER_STOCK_AGENT_API_KEY"
+      )?.role,
+      "retail_agent"
+    );
+    assert.equal(
+      RUNTIME_WORKER_CREDENTIAL_PROFILES.find(
+        (profile) => profile.envKey === "WORKER_CARRIER_AGENT_API_KEY"
       )?.role,
       "retail_agent"
     );

@@ -146,7 +146,9 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.match(uatMinimalSeedScript, /stock_quantity = 0/);
     assert.match(uatMinimalSeedScript, /stockQuantityResetToZero/);
     assert.match(workerCredentialProfiles, /WORKER_PRODUCTS_AGENT_API_KEY/);
+    assert.match(workerCredentialProfiles, /WORKER_CARRIER_AGENT_API_KEY/);
     assert.match(workerCredentialProfiles, /productMatcher/);
+    assert.match(workerCredentialProfiles, /carrierCoordinator/);
     assert.match(uatDeployScript, /git", \["push", "origin", `HEAD:uat`\]/);
     assert.match(uatDeployScript, /npmCommand, \["run", "uat:smoke"\]/);
   });

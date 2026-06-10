@@ -30,6 +30,7 @@ type WorkerMode =
   | "formulation"
   | "healthscore"
   | "hosting"
+  | "panya"
   | "products"
   | "stock"
   | "supplement";
@@ -137,6 +138,7 @@ function workerMode(value: string | undefined): WorkerMode {
     value === "formulation" ||
     value === "healthscore" ||
     value === "hosting" ||
+    value === "panya" ||
     value === "products" ||
     value === "stock" ||
     value === "advisor"

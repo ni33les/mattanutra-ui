@@ -36,14 +36,22 @@ export type RetailCommandIdempotencyStrategy =
 export type RetailCommandId =
   | "advance_customer_order"
   | "allocate_customer_order"
+  | "book_order_pickup"
+  | "configure_carrier_account"
   | "create_customer_order"
+  | "create_order_shipment"
   | "create_shopping_list"
+  | "generate_order_shipping_label"
+  | "process_carrier_shipment_event"
   | "record_stock_movement"
   | "reconcile_customer_order_lifecycle"
+  | "replay_carrier_shipment_event"
   | "refresh_stock_reorder_advice"
   | "reopen_shopping_list"
   | "set_stock_status"
+  | "sync_order_tracking"
   | "sync_order_shortages_to_reorder_advice"
+  | "test_carrier_account"
   | "update_shopping_list"
   | "upsert_stock_item"
   | "void_stock_movement";
@@ -104,6 +112,21 @@ export const retailCommandRegistry = {
       "retail_order_ship"
     ]
   },
+  book_order_pickup: {
+    agentExecution: "execute_low_risk",
+    allowedActorKinds: ["agent", "human"],
+    auditEvent: "admin.retail_command.book_order_pickup",
+    bpmEvent: "retail_command_book_order_pickup",
+    id: "book_order_pickup",
+    idempotencyStrategy: "resource_action",
+    permission: "shipments.write",
+    requiredAgentCapability: AGENT_CAPABILITIES.carrierPickupBook,
+    resourceType: "retail_order_shipment",
+    riskClass: "order_workflow",
+    routeAction: true,
+    taskPolicy: "silent_derived",
+    taskTypes: ["carrier_pickup_book"]
+  },
   allocate_customer_order: {
     agentExecution: "execute_low_risk",
     allowedActorKinds: ["human", "agent"],
@@ -134,6 +157,36 @@ export const retailCommandRegistry = {
     taskPolicy: "admin_bypass",
     taskTypes: []
   },
+  configure_carrier_account: {
+    agentExecution: "disabled",
+    allowedActorKinds: ["human"],
+    auditEvent: "admin.retail_command.configure_carrier_account",
+    bpmEvent: "retail_command_configure_carrier_account",
+    id: "configure_carrier_account",
+    idempotencyStrategy: "payload_hash",
+    permission: "shipments.configure",
+    requiredAgentCapability: null,
+    resourceType: "retail_carrier_account",
+    riskClass: "maintenance",
+    routeAction: true,
+    taskPolicy: "admin_bypass",
+    taskTypes: []
+  },
+  create_order_shipment: {
+    agentExecution: "execute_low_risk",
+    allowedActorKinds: ["agent", "human"],
+    auditEvent: "admin.retail_command.create_order_shipment",
+    bpmEvent: "retail_command_create_order_shipment",
+    id: "create_order_shipment",
+    idempotencyStrategy: "resource_action",
+    permission: "shipments.write",
+    requiredAgentCapability: AGENT_CAPABILITIES.carrierShipmentCreate,
+    resourceType: "retail_order_shipment",
+    riskClass: "order_workflow",
+    routeAction: true,
+    taskPolicy: "silent_derived",
+    taskTypes: ["carrier_shipment_create"]
+  },
   create_shopping_list: {
     agentExecution: "propose_only",
     allowedActorKinds: ["human"],
@@ -148,6 +201,36 @@ export const retailCommandRegistry = {
     routeAction: true,
     taskPolicy: "silent_derived",
     taskTypes: ["retail_shopping_list_review"]
+  },
+  generate_order_shipping_label: {
+    agentExecution: "execute_low_risk",
+    allowedActorKinds: ["agent", "human"],
+    auditEvent: "admin.retail_command.generate_order_shipping_label",
+    bpmEvent: "retail_command_generate_order_shipping_label",
+    id: "generate_order_shipping_label",
+    idempotencyStrategy: "resource_action",
+    permission: "shipments.write",
+    requiredAgentCapability: AGENT_CAPABILITIES.carrierLabelGenerate,
+    resourceType: "retail_order_shipment",
+    riskClass: "order_workflow",
+    routeAction: true,
+    taskPolicy: "silent_derived",
+    taskTypes: ["carrier_label_generate"]
+  },
+  process_carrier_shipment_event: {
+    agentExecution: "execute_low_risk",
+    allowedActorKinds: ["agent", "system"],
+    auditEvent: "admin.retail_command.process_carrier_shipment_event",
+    bpmEvent: "retail_command_process_carrier_shipment_event",
+    id: "process_carrier_shipment_event",
+    idempotencyStrategy: "task_resource",
+    permission: "shipments.write",
+    requiredAgentCapability: AGENT_CAPABILITIES.carrierEventProcess,
+    resourceType: "retail_order_shipment_event",
+    riskClass: "order_workflow",
+    routeAction: false,
+    taskPolicy: "requires_task",
+    taskTypes: ["carrier_event_process"]
   },
   record_stock_movement: {
     agentExecution: "propose_only",
@@ -183,6 +266,21 @@ export const retailCommandRegistry = {
       "retail_order_ship",
       "retail_shopping_list_review"
     ]
+  },
+  replay_carrier_shipment_event: {
+    agentExecution: "disabled",
+    allowedActorKinds: ["human"],
+    auditEvent: "admin.retail_command.replay_carrier_shipment_event",
+    bpmEvent: "retail_command_replay_carrier_shipment_event",
+    id: "replay_carrier_shipment_event",
+    idempotencyStrategy: "resource_action",
+    permission: "shipments.write",
+    requiredAgentCapability: null,
+    resourceType: "retail_order_shipment_event",
+    riskClass: "maintenance",
+    routeAction: true,
+    taskPolicy: "silent_derived",
+    taskTypes: ["carrier_event_process"]
   },
   refresh_stock_reorder_advice: {
     agentExecution: "execute_low_risk",
@@ -229,6 +327,21 @@ export const retailCommandRegistry = {
     taskPolicy: "admin_bypass",
     taskTypes: []
   },
+  sync_order_tracking: {
+    agentExecution: "execute_low_risk",
+    allowedActorKinds: ["agent", "human", "system"],
+    auditEvent: "admin.retail_command.sync_order_tracking",
+    bpmEvent: "retail_command_sync_order_tracking",
+    id: "sync_order_tracking",
+    idempotencyStrategy: "resource_action",
+    permission: "shipments.write",
+    requiredAgentCapability: AGENT_CAPABILITIES.carrierTrackingSync,
+    resourceType: "retail_order_shipment",
+    riskClass: "maintenance",
+    routeAction: true,
+    taskPolicy: "silent_derived",
+    taskTypes: ["carrier_tracking_sync"]
+  },
   sync_order_shortages_to_reorder_advice: {
     agentExecution: "execute_low_risk",
     allowedActorKinds: ["agent", "human", "system"],
@@ -243,6 +356,21 @@ export const retailCommandRegistry = {
     routeAction: false,
     taskPolicy: "silent_derived",
     taskTypes: ["retail_shopping_list_review"]
+  },
+  test_carrier_account: {
+    agentExecution: "disabled",
+    allowedActorKinds: ["human"],
+    auditEvent: "admin.retail_command.test_carrier_account",
+    bpmEvent: "retail_command_test_carrier_account",
+    id: "test_carrier_account",
+    idempotencyStrategy: "resource_action",
+    permission: "shipments.configure",
+    requiredAgentCapability: null,
+    resourceType: "retail_carrier_account",
+    riskClass: "maintenance",
+    routeAction: true,
+    taskPolicy: "admin_bypass",
+    taskTypes: []
   },
   update_shopping_list: {
     agentExecution: "propose_only",
@@ -326,7 +454,9 @@ function sourceEntityIdFromPayload(payload: unknown) {
       : {};
 
   return text(record.customerOrderId) ||
+    text(record.eventId) ||
     text(record.shoppingListId) ||
+    text(record.shipmentId) ||
     text(record.stockId) ||
     text(record.movementId) ||
     text(record.productId) ||

@@ -1,7 +1,11 @@
 import { isUuid, toJsonValue } from "@/lib/assessment-store";
 import { updateBlogPost, updateTestimonial } from "@/lib/blog";
 import { writeBpmEvent } from "@/lib/bpm";
-import { recordEmailCommunicationDelivery } from "@/lib/communications";
+import {
+  queueCustomerChatCommunicationDispatchTask,
+  recordEmailCommunicationDelivery,
+  sendCommunication
+} from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import { appendAssessmentVersion } from "@/lib/domain-versions";
 import {
@@ -1508,6 +1512,205 @@ async function applyNutritionPlanChatResult(
   return resultPayload;
 }
 
+async function applyCustomerChatReplyResult(
+  task: TaskRecord,
+  resultPayload: unknown,
+  sqlOverride?: TaskServiceDb,
+  afterCommit?: AfterCommitScheduler
+) {
+  const sql = sqlOverride ?? getSql();
+  const payload = objectValue(resultPayload);
+  const analysis = objectValue(payload.analysis);
+  const messageId = payloadText(task.payload, "messageId");
+  const communicationMessageId = payloadText(task.payload, "communicationMessageId");
+  const reply = textValue(analysis.reply);
+  const escalate = analysis.escalate === true;
+  const escalationReason = textValue(analysis.escalationReason);
+
+  if (!sql || !task.planId || !isUuid(messageId) || !reply) {
+    throw new Error("Panya chat result is missing identifiers or reply");
+  }
+
+  const refinementRequested =
+    textValue(analysis.entitlement) === "living_protocol" &&
+    analysis.refinementRequested === true;
+  const refinementQueued = refinementRequested
+    ? await enqueueNutritionPlanRefinementTask({
+        planId: task.planId,
+        requestedBy: "panya"
+      })
+    : null;
+  const assistantReply = refinementQueued?.taskId
+    ? refinementQueuedReply(reply, textValue(analysis.locale))
+    : reply;
+
+  await sql`
+    update public.plan_chat_messages set
+      status = 'ready',
+      task_id = ${task.id}::uuid,
+      updated_at = now()
+    where id = ${messageId}::uuid
+      and plan_id = ${task.planId}::uuid
+  `;
+
+  const assistantRows = await sql<Array<{ id: string }>>`
+    insert into public.plan_chat_messages (
+      id,
+      plan_id,
+      task_id,
+      reply_to_message_id,
+      role,
+      body,
+      status,
+      metadata,
+      created_at,
+      updated_at
+    )
+    values (
+      gen_random_uuid(),
+      ${task.planId}::uuid,
+      ${task.id}::uuid,
+      ${messageId}::uuid,
+      'assistant',
+      ${assistantReply},
+      'ready',
+      ${sql.json(toJsonValue({
+        communicationMessageId: isUuid(communicationMessageId)
+          ? communicationMessageId
+          : null,
+        escalationReason: escalationReason || null,
+        escalate,
+        model: textValue(analysis.model),
+        promptVersion: textValue(analysis.promptVersion),
+        refinementRequested,
+        refinementTaskId: refinementQueued?.taskId ?? null,
+        refinementTaskReason: refinementQueued?.reason ?? null,
+        responseId: textValue(analysis.responseId),
+        source: "panya_customer_chat_reply",
+        taskId: task.id
+      }))}::jsonb,
+      now(),
+      now()
+    )
+    on conflict (reply_to_message_id)
+    where role = 'assistant'
+      and reply_to_message_id is not null
+    do update set
+      body = excluded.body,
+      status = excluded.status,
+      metadata = excluded.metadata,
+      task_id = excluded.task_id,
+      updated_at = now()
+    returning id::text
+  `;
+
+  const prepared = await sendCommunication({
+    body: assistantReply,
+    channelType: "line",
+    messageType: "panya_customer_chat_reply",
+    metadata: {
+      assistantMessageId: assistantRows[0]?.id ?? null,
+      communicationMessageId: isUuid(communicationMessageId)
+        ? communicationMessageId
+        : null,
+      escalationReason: escalationReason || null,
+      escalate,
+      refinementRequested,
+      refinementTaskId: refinementQueued?.taskId ?? null,
+      replyToMessageId: messageId,
+      source: "panya_customer_chat_reply"
+    },
+    planId: task.planId,
+    subject: "Panya reply",
+    taskId: task.id
+  });
+
+  const dispatch =
+    prepared.channel?.channelType === "line" && prepared.message.status === "queued"
+      ? await queueCustomerChatCommunicationDispatchTask({
+          createdByTaskId: task.id,
+          messageId: prepared.message.id,
+          planId: task.planId
+        })
+      : null;
+
+  const escalationTask = escalate
+    ? await createTask({
+        actorType: "human",
+        businessValue: 420,
+        createdByTaskId: task.id,
+        description:
+          "Review a customer LINE conversation that Panya marked for human follow-up.",
+        groupLabel: "Customer chat escalation",
+        idempotencyKey: `panya-escalation:${messageId}`,
+        idempotencyScope: "active",
+        idempotencyScopeKey: `panya-escalation:${task.planId}`,
+        maxAttempts: 1,
+        payload: {
+          assistantMessageId: assistantRows[0]?.id ?? null,
+          escalationReason: escalationReason || null,
+          messageId
+        },
+        planId: task.planId,
+        priorityReason: "Panya marked this customer message for human review.",
+        priorityScore: 420,
+        reasoningEffort: "none",
+        requiredCapabilities: [AGENT_CAPABILITIES.humanReview],
+        sourceEntityId: messageId,
+        sourceEntityType: "plan_chat_message",
+        taskType: "customer_chat_escalation",
+        title: "Review Panya customer chat escalation"
+      })
+    : null;
+
+  await recordTaskXaiUsageCost({
+    analysis,
+    metadata: {
+      escalated: escalate,
+      outputLocaleMode: "single_display_locale",
+      refinementRequested,
+      refinementTaskId: refinementQueued?.taskId ?? null
+    },
+    purpose: "panya_customer_chat_reply",
+    sql,
+    task
+  });
+
+  await writeBpmEvent({
+    actorType: "worker",
+    emittedBy: "panya",
+    eventName: "panya_customer_chat_reply_generated",
+    eventStatus: "succeeded",
+    eventType: "chat",
+    planId: task.planId,
+    properties: {
+      assistantMessageId: assistantRows[0]?.id ?? null,
+      dispatchTaskId: dispatch?.task.id ?? null,
+      escalated: escalate,
+      escalationTaskId: escalationTask?.task.id ?? null,
+      outboundMessageId: prepared.message.id,
+      refinementRequested,
+      refinementTaskId: refinementQueued?.taskId ?? null,
+      replyToMessageId: messageId
+    },
+    severity: escalate ? "medium" : "low",
+    sql
+  });
+
+  await eventually(afterCommit, async () => {
+    await addWorkEvent(task, "panya_customer_chat_reply_completed", "low", {
+      dispatchTaskId: dispatch?.task.id ?? null,
+      escalated: escalate,
+      escalationTaskId: escalationTask?.task.id ?? null,
+      messageId,
+      refinementRequested,
+      refinementTaskId: refinementQueued?.taskId ?? null
+    });
+  });
+
+  return resultPayload;
+}
+
 async function applyNutritionPlanRefinementResult(
   task: TaskRecord,
   resultPayload: unknown,
@@ -2291,6 +2494,10 @@ export async function applyTaskCompletionResult({
     return applyNutritionPlanChatResult(task, resultPayload, sql, afterCommit);
   }
 
+  if (task.taskType === "customer_chat_reply") {
+    return applyCustomerChatReplyResult(task, resultPayload, sql, afterCommit);
+  }
+
   if (task.taskType === "refine_nutrition_plan") {
     return applyNutritionPlanRefinementResult(task, resultPayload, sql, afterCommit);
   }
@@ -2419,6 +2626,21 @@ export async function applyTaskFailureResult({
   }
 
   if (task.taskType === "nutrition_plan_chat_reply") {
+    const messageId = payloadText(task.payload, "messageId");
+
+    if (task.planId && isUuid(messageId)) {
+      await sql`
+        update public.plan_chat_messages set
+          status = ${retryWillBeScheduled ? "queued" : "failed"},
+          metadata = metadata || ${sql.json(toJsonValue({ errorMessage }))}::jsonb,
+          updated_at = now()
+        where id = ${messageId}::uuid
+          and plan_id = ${task.planId}::uuid
+      `;
+    }
+  }
+
+  if (task.taskType === "customer_chat_reply") {
     const messageId = payloadText(task.payload, "messageId");
 
     if (task.planId && isUuid(messageId)) {

@@ -51,6 +51,7 @@ try {
         event_key in (
           'platform_revenue_received',
           'platform_checkout_failed',
+          'platform_carrier_integration_failed',
           'platform_payment_failed',
           'platform_payout_failed',
           'platform_retailer_payout_due',
@@ -63,8 +64,10 @@ try {
           'retail_order_awaiting_stock',
           'retail_order_ready_to_pack',
           'retail_order_ready_to_ship',
+          'retail_order_pickup_booked',
           'retail_order_cancelled',
           'retail_order_returned',
+          'retail_order_shipment_exception',
           'retail_order_shipped',
           'retail_order_delivered',
           'retail_settlement_needs_review',
@@ -88,6 +91,7 @@ try {
         event_key in (
           'platform_revenue_received',
           'platform_checkout_failed',
+          'platform_carrier_integration_failed',
           'platform_payment_failed',
           'platform_payout_failed',
           'platform_retailer_payout_due',
@@ -100,8 +104,10 @@ try {
           'retail_order_awaiting_stock',
           'retail_order_ready_to_pack',
           'retail_order_ready_to_ship',
+          'retail_order_pickup_booked',
           'retail_order_cancelled',
           'retail_order_returned',
+          'retail_order_shipment_exception',
           'retail_order_shipped',
           'retail_order_delivered',
           'retail_settlement_needs_review',
@@ -147,6 +153,67 @@ try {
   await sql`
     create index if not exists line_connect_tokens_org_status_idx
       on public.line_connect_tokens (organisation_id, status, expires_at desc)
+  `;
+
+  await sql`
+    create table if not exists public.customer_line_connect_tokens (
+      id uuid primary key default gen_random_uuid(),
+      plan_id uuid not null references public.assessments(plan_id) on delete cascade,
+      retail_customer_order_id uuid,
+      token_hash text not null,
+      status text not null default 'active',
+      expires_at timestamptz not null,
+      consumed_at timestamptz,
+      consumed_by_channel_id uuid references public.communication_channels(id) on delete set null,
+      metadata jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      constraint customer_line_connect_tokens_status_check check (
+        status in ('active', 'consuming', 'consumed', 'expired', 'revoked')
+      )
+    )
+  `;
+
+  await sql`
+    create unique index if not exists customer_line_connect_tokens_active_hash_idx
+      on public.customer_line_connect_tokens (token_hash)
+      where consumed_at is null and status in ('active', 'consuming')
+  `;
+
+  await sql`
+    create index if not exists customer_line_connect_tokens_plan_status_idx
+      on public.customer_line_connect_tokens (plan_id, status, expires_at desc)
+  `;
+
+  await sql`
+    do $$
+    begin
+      if to_regclass('public.retail_customer_orders') is not null then
+        alter table public.customer_line_connect_tokens
+          add constraint customer_line_connect_tokens_retail_customer_order_id_fkey
+          foreign key (retail_customer_order_id)
+          references public.retail_customer_orders(id)
+          on delete set null;
+      end if;
+    exception
+      when duplicate_object then null;
+    end $$;
+  `;
+
+  await sql`
+    do $$
+    begin
+      if exists (select 1 from pg_roles where rolname = 'mn') then
+        grant usage on schema public to mn;
+        grant select, insert, update, delete on table
+          public.organisation_communication_identities,
+          public.organisation_notification_preferences,
+          public.line_connect_tokens,
+          public.customer_line_connect_tokens
+        to mn;
+      end if;
+    end
+    $$;
   `;
 
   console.log(JSON.stringify({ communicationsSchema: "applied" }));

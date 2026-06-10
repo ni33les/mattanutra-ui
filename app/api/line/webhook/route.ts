@@ -1,10 +1,14 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import {
+  consumeCustomerLineConnectCode,
   consumeOrganisationLineConnectCode,
   recordInboundLineCommunication
 } from "@/lib/communications";
+import { getSql } from "@/lib/db";
 import { formatOutboundLineMessage } from "@/lib/line-message-format";
+import { appendPlanChatMessage } from "@/lib/plan-concierge";
+import { enqueuePanyaCustomerChatReplyTask } from "@/lib/task-worker";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -62,6 +66,12 @@ function lineTextMessage(event: Record<string, unknown>) {
 
 function connectCodeFromMessage(message: string) {
   const match = /^MN\s+CONNECT\s+([A-Z0-9]{6,16})$/i.exec(message.trim());
+
+  return match?.[1]?.toUpperCase() ?? null;
+}
+
+function customerPlanCodeFromMessage(message: string) {
+  const match = /^MN\s+PLAN\s+([A-Z0-9]{6,16})$/i.exec(message.trim());
 
   return match?.[1]?.toUpperCase() ?? null;
 }
@@ -126,6 +136,7 @@ export async function POST(request: Request) {
     }
 
     const connectCode = connectCodeFromMessage(message);
+    const customerPlanCode = customerPlanCodeFromMessage(message);
 
     if (connectCode) {
       const connected = await consumeOrganisationLineConnectCode({
@@ -150,6 +161,29 @@ export async function POST(request: Request) {
       continue;
     }
 
+    if (customerPlanCode) {
+      const connected = await consumeCustomerLineConnectCode({
+        code: customerPlanCode,
+        providerEventId,
+        rawEvent: event,
+        recipientId,
+        sourceType
+      });
+      const replySent = await replyToLine({
+        replyToken,
+        text: connected
+          ? "You are connected to Panya on LINE. Send a message here whenever you need help with your order or protocol questions."
+          : "That MattaNutra plan code is invalid or expired. Open your MattaNutra page and create a fresh LINE code, then send MN PLAN <code> again."
+      });
+
+      results.push({
+        connected: Boolean(connected),
+        planId: connected?.planId ?? null,
+        replySent
+      });
+      continue;
+    }
+
     const inbound = await recordInboundLineCommunication({
       body: message,
       providerEventId,
@@ -158,10 +192,42 @@ export async function POST(request: Request) {
       replyToken,
       sourceType
     });
+    let panyaTaskId: string | null = null;
+
+    if (inbound.planId) {
+      const sql = getSql();
+
+      if (sql) {
+        const chatMessage = await appendPlanChatMessage(sql, {
+          allowUnpaidSupport: true,
+          body: message,
+          channel: "line",
+          externalMessageId: inbound.id,
+          identityId: inbound.identityId,
+          metadata: {
+            communicationMessageId: inbound.id,
+            providerEventId,
+            replyTokenPresent: Boolean(replyToken),
+            sourceType
+          },
+          planId: inbound.planId,
+          role: "user",
+          source: "line",
+          status: "queued"
+        });
+        panyaTaskId = await enqueuePanyaCustomerChatReplyTask({
+          communicationMessageId: inbound.id,
+          messageId: chatMessage.messageId,
+          planId: inbound.planId
+        });
+      }
+    }
 
     results.push({
       captured: true,
-      messageId: inbound.id
+      messageId: inbound.id,
+      panyaTaskId,
+      planId: inbound.planId
     });
   }
 

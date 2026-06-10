@@ -83,10 +83,11 @@ describe("retail product checkout static contracts", () => {
     assert.match(workflowService, /customer_email_missing/);
   });
 
-  it("uses customer-facing wording for awaiting-stock order updates", () => {
-    assert.match(trackingPage, /awaiting_stock: "Order processing"/);
-    assert.match(trackingPage, /statusLabel\(locale, order\.status\)/);
-    assert.match(workflowService, /eyebrow: "Order processing"/);
+	it("uses customer-facing wording for awaiting-stock order updates", () => {
+	    assert.match(trackingPage, /awaiting_stock: "Order processing"/);
+	    assert.match(trackingPage, /const displayStatus = displayOrderStatus\(order\)/);
+	    assert.match(trackingPage, /statusLabel\(locale, displayStatus\)/);
+	    assert.match(workflowService, /eyebrow: "Order processing"/);
     assert.match(workflowService, /customerOrderStatusLabel\(order\.status\)/);
     assert.doesNotMatch(workflowService, /eyebrow: "Awaiting stock"/);
     assert.doesNotMatch(workflowService, /We are sourcing your products/);

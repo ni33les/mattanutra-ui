@@ -72,6 +72,7 @@ import {
   PreviewPaywallPanel,
   RevealClosingSection,
 } from "@/components/formulation-results-panels";
+import { LivingProtocolLineCta } from "@/components/living-protocol-line-cta";
 import { NutritionProgress } from "@/components/nutrition-progress";
 import {
   productRecommendationCopy,
@@ -1745,6 +1746,12 @@ function RevealProductsSection({
                     </button>
                   )}
                 </div>
+                <LivingProtocolLineCta
+                  className="mt-4"
+                  locale={locale}
+                  planId={planId}
+                  source="reveal_products"
+                />
               </div>
             </div>
           )}

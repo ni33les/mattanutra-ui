@@ -11,12 +11,16 @@ const expectedLineWebhookUrl = "https://uat.mattanutra.com/api/line/webhook";
 const requiredTables = [
   "communication_channels",
   "communication_messages",
+  "customer_line_connect_tokens",
   "line_connect_tokens",
   "organisation_communication_identities",
   "organisation_notification_preferences",
   "retail_customer_order_lines",
   "retail_customer_orders",
+  "retail_carrier_accounts",
   "retail_order_allocations",
+  "retail_order_shipment_events",
+  "retail_order_shipments",
   "retail_product_stock",
   "retail_sellable_products",
   "retail_shopping_list_lines",
@@ -25,6 +29,8 @@ const requiredTables = [
   "worker_sessions"
 ];
 const criticalTaskTypes = [
+  "customer_chat_reply",
+  "carrier_event_process",
   "dispatch_chat_communication_message",
   "dispatch_email_communication_message",
   "retail_customer_order_allocate",
@@ -35,6 +41,7 @@ const criticalTaskTypes = [
 ];
 const requiredWorkerProfiles = [
   { envKey: "WORKER_ADVISOR_AGENT_API_KEY", mode: "advisor" },
+  { envKey: "WORKER_CARRIER_AGENT_API_KEY", mode: "carrier" },
   { envKey: "WORKER_CHAT_AGENT_API_KEY", mode: "chat" },
   { envKey: "WORKER_COMMUNICATIONS_AGENT_API_KEY", mode: "communications" },
   { envKey: "WORKER_CONTENT_AGENT_API_KEY", mode: "content" },
@@ -43,6 +50,7 @@ const requiredWorkerProfiles = [
   { envKey: "WORKER_FORMULATION_AGENT_API_KEY", mode: "formulation" },
   { envKey: "WORKER_HEALTHSCORE_AGENT_API_KEY", mode: "healthscore" },
   { envKey: "WORKER_HOSTING_AGENT_API_KEY", mode: "hosting" },
+  { envKey: "WORKER_PANYA_AGENT_API_KEY", mode: "panya" },
   { envKey: "WORKER_PRODUCTS_AGENT_API_KEY", mode: "products" },
   { envKey: "WORKER_STOCK_AGENT_API_KEY", mode: "stock" }
 ];

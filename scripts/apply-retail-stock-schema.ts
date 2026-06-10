@@ -825,6 +825,175 @@ try {
   `;
 
   await sql`
+    create table if not exists public.retail_carrier_accounts (
+      id uuid primary key default gen_random_uuid(),
+      organisation_id uuid not null references public.organisations(id) on delete restrict,
+      carrier_id text not null,
+      display_name text,
+      status text not null default 'active',
+      capabilities text[] not null default array[]::text[],
+      credential_metadata jsonb not null default '{}'::jsonb,
+      encrypted_credentials jsonb not null default '{}'::jsonb,
+      last_tested_at timestamptz,
+      last_test_status text,
+      metadata jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      constraint retail_carrier_accounts_org_carrier_key unique (organisation_id, carrier_id),
+      constraint retail_carrier_accounts_carrier_check check (carrier_id ~ '^[a-z0-9_:-]+$'),
+      constraint retail_carrier_accounts_status_check check (
+        status in ('active', 'disabled', 'deleted')
+      ),
+      constraint retail_carrier_accounts_last_test_status_check check (
+        last_test_status is null or last_test_status in ('passed', 'failed', 'not_tested')
+      )
+    )
+  `;
+
+  await sql`
+    create index if not exists retail_carrier_accounts_org_status_idx
+      on public.retail_carrier_accounts (organisation_id, status, carrier_id)
+  `;
+
+  await sql`
+    create table if not exists public.retail_order_shipments (
+      id uuid primary key default gen_random_uuid(),
+      retail_customer_order_id uuid not null references public.retail_customer_orders(id) on delete cascade,
+      organisation_id uuid not null references public.organisations(id) on delete restrict,
+      carrier_account_id uuid references public.retail_carrier_accounts(id) on delete set null,
+      carrier_id text not null,
+      carrier_name text not null,
+      provider_shipment_id text,
+      provider_pickup_request_id text,
+      tracking_number text,
+      tracking_url text,
+      status text not null default 'draft',
+      label_status text not null default 'not_requested',
+      label_url text,
+      label_metadata jsonb not null default '{}'::jsonb,
+      pickup_booked_at timestamptz,
+      pickup_window_start timestamptz,
+      pickup_window_end timestamptz,
+      pickup_provider_status text,
+      exception_code text,
+      exception_message text,
+      metadata jsonb not null default '{}'::jsonb,
+      created_by_person_id uuid references public.people(id) on delete set null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      constraint retail_order_shipments_order_key unique (retail_customer_order_id),
+      constraint retail_order_shipments_carrier_check check (carrier_id ~ '^[a-z0-9_:-]+$'),
+      constraint retail_order_shipments_status_check check (
+        status in (
+          'draft',
+          'shipment_created',
+          'label_generated',
+          'pickup_booked',
+          'picked_up',
+          'in_transit',
+          'out_for_delivery',
+          'delivered',
+          'delivery_failed',
+          'returned',
+          'lost',
+          'damaged',
+          'cancelled',
+          'exception'
+        )
+      ),
+      constraint retail_order_shipments_label_status_check check (
+        label_status in (
+          'not_requested',
+          'requested',
+          'generated',
+          'failed',
+          'manual_required'
+        )
+      )
+    )
+  `;
+
+  await sql`
+    create index if not exists retail_order_shipments_order_idx
+      on public.retail_order_shipments (retail_customer_order_id, status, updated_at desc)
+  `;
+
+  await sql`
+    create index if not exists retail_order_shipments_org_status_idx
+      on public.retail_order_shipments (organisation_id, status, updated_at desc)
+  `;
+
+  await sql`
+    create index if not exists retail_order_shipments_provider_idx
+      on public.retail_order_shipments (carrier_id, provider_shipment_id)
+      where provider_shipment_id is not null
+  `;
+
+  await sql`
+    create table if not exists public.retail_order_shipment_events (
+      id uuid primary key default gen_random_uuid(),
+      shipment_id uuid references public.retail_order_shipments(id) on delete cascade,
+      retail_customer_order_id uuid references public.retail_customer_orders(id) on delete cascade,
+      organisation_id uuid not null references public.organisations(id) on delete restrict,
+      carrier_id text not null,
+      provider_event_id text,
+      provider_shipment_id text,
+      provider_status_code text,
+      provider_status_text text,
+      normalized_status text not null,
+      event_dedupe_key text not null,
+      event_occurred_at timestamptz,
+      received_at timestamptz not null default now(),
+      processed_at timestamptz,
+      processing_status text not null default 'received',
+      processing_error text,
+      raw_payload jsonb not null default '{}'::jsonb,
+      metadata jsonb not null default '{}'::jsonb,
+      constraint retail_order_shipment_events_dedupe_key unique (carrier_id, event_dedupe_key),
+      constraint retail_order_shipment_events_carrier_check check (carrier_id ~ '^[a-z0-9_:-]+$'),
+      constraint retail_order_shipment_events_normalized_status_check check (
+        normalized_status in (
+          'shipment_created',
+          'label_generated',
+          'pickup_booked',
+          'picked_up',
+          'drop_off',
+          'in_transit',
+          'out_for_delivery',
+          'delivered',
+          'delivery_failed',
+          'returned',
+          'lost',
+          'damaged',
+          'cancelled',
+          'exception',
+          'unknown'
+        )
+      ),
+      constraint retail_order_shipment_events_processing_status_check check (
+        processing_status in ('received', 'queued', 'processed', 'ignored', 'failed')
+      )
+    )
+  `;
+
+  await sql`
+    create index if not exists retail_order_shipment_events_shipment_idx
+      on public.retail_order_shipment_events (shipment_id, received_at desc)
+      where shipment_id is not null
+  `;
+
+  await sql`
+    create index if not exists retail_order_shipment_events_order_idx
+      on public.retail_order_shipment_events (retail_customer_order_id, received_at desc)
+      where retail_customer_order_id is not null
+  `;
+
+  await sql`
+    create index if not exists retail_order_shipment_events_processing_idx
+      on public.retail_order_shipment_events (processing_status, received_at)
+  `;
+
+  await sql`
     do $$
     begin
       if exists (

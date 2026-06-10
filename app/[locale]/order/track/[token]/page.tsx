@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { LivingProtocolLineCta } from "@/components/living-protocol-line-cta";
 import { BookmarkTrackingButton } from "@/components/retail-checkout/bookmark-tracking-button";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
@@ -115,13 +116,40 @@ const orderTrackingCopy = {
 
 const customerOrderStatusLabels: Record<Locale, Partial<Record<string, string>>> = {
   en: {
-    awaiting_stock: "Order processing"
+    allocated: "Preparing",
+    awaiting_stock: "Order processing",
+    cancelled: "Cancelled",
+    delivered: "Delivered",
+    packed: "Ready to ship",
+    picking: "Preparing",
+    pickup_booked: "Pickup booked",
+    placed: "Confirmed",
+    returned: "Returned",
+    shipped: "Out for delivery"
   },
   th: {
-    awaiting_stock: "กำลังดำเนินการคำสั่งซื้อ"
+    allocated: "กำลังเตรียมสินค้า",
+    awaiting_stock: "กำลังดำเนินการคำสั่งซื้อ",
+    cancelled: "ยกเลิกแล้ว",
+    delivered: "จัดส่งสำเร็จ",
+    packed: "พร้อมจัดส่ง",
+    picking: "กำลังเตรียมสินค้า",
+    pickup_booked: "จองรับพัสดุแล้ว",
+    placed: "ยืนยันแล้ว",
+    returned: "คืนสินค้าแล้ว",
+    shipped: "กำลังจัดส่ง"
   },
   "zh-CN": {
-    awaiting_stock: "订单处理中"
+    allocated: "准备中",
+    awaiting_stock: "订单处理中",
+    cancelled: "已取消",
+    delivered: "已送达",
+    packed: "准备发货",
+    picking: "准备中",
+    pickup_booked: "已预约取件",
+    placed: "已确认",
+    returned: "已退回",
+    shipped: "配送中"
   }
 };
 
@@ -152,6 +180,24 @@ function formatAmount(locale: Locale, amount: number, currency: string) {
 
 function statusLabel(locale: Locale, status: string) {
   return customerOrderStatusLabels[locale][status] ?? status.replace(/_/g, " ");
+}
+
+function displayOrderStatus(order: Awaited<ReturnType<typeof getTrackingOrderByReference>>) {
+  if (!order) {
+    return "";
+  }
+
+  if (
+    order.shipment?.pickupBookedAt &&
+    order.status !== "shipped" &&
+    order.status !== "delivered" &&
+    order.status !== "cancelled" &&
+    order.status !== "returned"
+  ) {
+    return "pickup_booked";
+  }
+
+  return order.status;
 }
 
 function latestEta(lines: readonly { etaDate: string | null }[]) {
@@ -204,10 +250,11 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
   }
 
   const eta = latestEta(order.lines);
+  const displayStatus = displayOrderStatus(order);
   const timeline = [
     { active: true, label: copy.paid, meta: formatAmount(locale, order.totalAmount, order.currency) },
     { active: true, label: copy.preparing, meta: order.retailerName ?? "Delight Pharmacy" },
-    { active: true, label: copy.status, meta: statusLabel(locale, order.status) },
+    { active: true, label: copy.status, meta: statusLabel(locale, displayStatus) },
     { active: Boolean(eta), label: copy.eta, meta: eta ?? "-" }
   ];
 
@@ -245,7 +292,7 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
                 </div>
               </div>
               <div className="rounded-full bg-[var(--mn-mint)] px-4 py-1 text-sm font-bold capitalize text-[var(--mn-teal-deep)]">
-                {statusLabel(locale, order.status)}
+                {statusLabel(locale, displayStatus)}
               </div>
             </div>
 
@@ -337,6 +384,15 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
                   </dd>
                 </div>
               </dl>
+            </section>
+
+            <section className="rounded-xl bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]">
+              <LivingProtocolLineCta
+                locale={locale}
+                planId={order.planId}
+                retailCustomerOrderId={order.orderId}
+                source="order_tracking"
+              />
             </section>
 
             {order.shipment || order.status === "shipped" ? (

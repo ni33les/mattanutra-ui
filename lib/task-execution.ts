@@ -15,6 +15,7 @@ import {
   analyzeNutritionPlanChatWithGrok,
   analyzeNutritionReportWithGrok
 } from "@/lib/nutrition-plan-advisor-analysis";
+import { analyzePanyaCustomerChatWithGrok } from "@/lib/panya-chat-agent";
 import {
   PRODUCT_STACK_VARIANT_CONFIGS,
   recommendProductStackFullBeam,
@@ -551,6 +552,12 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
     return { accepted: true };
   }
 
+  if (workItem.taskType === "customer_chat_reply") {
+    const analysis = await analyzePanyaCustomerChatWithGrok(workItem);
+
+    return { analysis };
+  }
+
   if (workItem.taskType === "nutrition_plan_chat_reply") {
     const analysis = await analyzeNutritionPlanChatWithGrok({
       answers: workItem.answers,
@@ -737,6 +744,20 @@ export async function executeTaskWorkItem(workItem: TaskWorkItem) {
       taskId: workItem.taskId,
       taskType: workItem.taskType
     });
+  }
+
+  if (
+    workItem.taskType === "carrier_event_process" ||
+    workItem.taskType === "carrier_label_generate" ||
+    workItem.taskType === "carrier_pickup_book" ||
+    workItem.taskType === "carrier_shipment_create" ||
+    workItem.taskType === "carrier_tracking_sync"
+  ) {
+    const { executeCarrierShipmentTask } = await import(
+      "@/lib/retail-carrier-shipments"
+    );
+
+    return executeCarrierShipmentTask(workItem);
   }
 
   if (workItem.taskType.startsWith("retail_")) {

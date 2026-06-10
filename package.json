@@ -68,6 +68,7 @@
     "deploy:uat": "node --env-file-if-exists=.env.local scripts/deploy-uat.mjs",
     "worker:all": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts all",
     "worker:advisor": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts advisor",
+    "worker:carrier": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts carrier",
     "worker:chat": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts chat",
     "worker:communications": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts communications",
     "worker:content": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts content",
@@ -76,6 +77,7 @@
     "worker:formulation": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts formulation",
     "worker:healthscore": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts healthscore",
     "worker:hosting": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts hosting",
+    "worker:panya": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts panya",
     "worker:products": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts products",
     "worker:stock": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts stock",
     "worker:supplement": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs workers/runner.ts supplement"

@@ -35,7 +35,7 @@ function getLineUrl(planId: string) {
   }
 
   const officialId =
-    getConfiguredUrl(process.env.NEXT_PUBLIC_LINE_OFFICIAL_ID) || "@healthspan";
+    getConfiguredUrl(process.env.NEXT_PUBLIC_LINE_OFFICIAL_ID) || "@344enooi";
   const normalizedId = officialId.startsWith("@")
     ? officialId
     : `@${officialId}`;

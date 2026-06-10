@@ -182,6 +182,20 @@ export type CommunicationDispatchWorkItem = Readonly<{
   taskType: "dispatch_chat_communication_message" | "dispatch_email_communication_message";
 }>;
 
+export type CarrierShipmentWorkItem = Readonly<{
+  carrierId: string | null;
+  eventId: string | null;
+  orderId: string | null;
+  shipmentId: string | null;
+  taskId: string;
+  taskType:
+    | "carrier_event_process"
+    | "carrier_label_generate"
+    | "carrier_pickup_book"
+    | "carrier_shipment_create"
+    | "carrier_tracking_sync";
+}>;
+
 export type CommunicationFollowupWorkItem = Readonly<{
   body: string;
   metadata: Record<string, unknown>;
@@ -191,6 +205,34 @@ export type CommunicationFollowupWorkItem = Readonly<{
   subject: string;
   taskId: string;
   taskType: "client_safety_followup";
+}>;
+
+export type CustomerChatReplyWorkItem = Readonly<{
+  chatMessages: PlanChatMessage[];
+  communicationMessageId: string | null;
+  customer: Readonly<{
+    firstName: string | null;
+    locale: Locale;
+  }>;
+  entitlement: "living_protocol" | "paid_plan" | "unpaid";
+  order: Readonly<{
+    currency: string | null;
+    orderId: string | null;
+    orderNumber: string | null;
+    status: string | null;
+    totalAmount: number | null;
+    trackingUrl: string | null;
+  }> | null;
+  plan: Readonly<{
+    answerSummary: unknown;
+    healthScore: unknown;
+    selectedPlan: string | null;
+    status: string | null;
+  }>;
+  planId: string;
+  taskId: string;
+  taskType: "customer_chat_reply";
+  userMessage: string;
 }>;
 
 export type ContentStatusChangeWorkItem = Readonly<{
@@ -301,8 +343,10 @@ export type RetailOperationsReviewWorkItem = Readonly<{
 }>;
 
 export type TaskWorkItem =
+  | CarrierShipmentWorkItem
   | CommunicationFollowupWorkItem
   | ContentStatusChangeWorkItem
+  | CustomerChatReplyWorkItem
   | DigitalOceanBillingSyncWorkItem
   | ExampleEmailWorkItem
   | FoodGapSupportWorkItem
@@ -1112,6 +1156,168 @@ function buildCommunicationDispatchWorkItem(
   };
 }
 
+function buildCarrierShipmentWorkItem(task: TaskRecord): CarrierShipmentWorkItem {
+  const payload = payloadRecord(task.payload);
+  const taskType = task.taskType as CarrierShipmentWorkItem["taskType"];
+
+  return {
+    carrierId: textFromRecord(payload, "carrierId"),
+    eventId: textFromRecord(payload, "eventId"),
+    orderId:
+      textFromRecord(payload, "orderId") ||
+      (task.sourceEntityType === "retail_customer_order" ? task.sourceEntityId : null),
+    shipmentId:
+      textFromRecord(payload, "shipmentId") ||
+      (task.sourceEntityType === "retail_order_shipment" ? task.sourceEntityId : null),
+    taskId: task.id,
+    taskType
+  };
+}
+
+function customerEntitlement(selectedPlan: string | null) {
+  if (selectedPlan === "pro") {
+    return "living_protocol" as const;
+  }
+
+  return selectedPlan ? "paid_plan" as const : "unpaid" as const;
+}
+
+async function latestCustomerOrderSummary(
+  sql: NonNullable<ReturnType<typeof getSql>>,
+  planId: string,
+  locale: Locale
+): Promise<CustomerChatReplyWorkItem["order"]> {
+  const readyRows = await sql<Array<{ ready: boolean }>>`
+    select to_regclass('public.retail_checkout_payments') is not null as ready
+  `;
+
+  if (readyRows[0]?.ready !== true) {
+    return null;
+  }
+
+  const rows = await sql<Array<{
+    amount: number | string | null;
+    currency: string | null;
+    order_id: string | null;
+    order_number: string | null;
+    status: string | null;
+  }>>`
+    select
+      retail_checkout_payments.amount,
+      retail_checkout_payments.currency,
+      retail_customer_orders.id::text as order_id,
+      retail_customer_orders.order_number,
+      coalesce(retail_customer_orders.status, retail_checkout_payments.status) as status
+    from public.retail_checkout_payments
+    left join public.retail_customer_orders
+      on retail_customer_orders.id = retail_checkout_payments.retail_customer_order_id
+    where retail_checkout_payments.plan_id = ${planId}::uuid
+    order by retail_checkout_payments.created_at desc
+    limit 1
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    return null;
+  }
+
+  const amount = Number(row.amount);
+  const totalAmount = Number.isFinite(amount) ? amount / 1_000_000 : null;
+
+  return {
+    currency: row.currency,
+    orderId: row.order_id,
+    orderNumber: row.order_number,
+    status: row.status,
+    totalAmount,
+    trackingUrl: row.order_number
+      ? `/${locale}/order/track/${encodeURIComponent(row.order_number)}`
+      : null
+  };
+}
+
+async function buildCustomerChatReplyWorkItem(
+  task: TaskRecord
+): Promise<CustomerChatReplyWorkItem> {
+  const sql = getSql();
+  const messageId = payloadText(task.payload, "messageId");
+  const communicationMessageId = payloadText(task.payload, "communicationMessageId");
+
+  if (!sql || !task.planId || !isUuid(messageId)) {
+    throw new Error("Panya chat task is missing identifiers");
+  }
+
+  const rows = await sql<Array<{
+    answer_summary: unknown;
+    body: string | null;
+    first_name: string | null;
+    health_score: unknown;
+    locale: string | null;
+    selected_plan: string | null;
+    status: string | null;
+  }>>`
+    select
+      plan_chat_messages.body,
+      assessments.answer_summary,
+      assessments.first_name,
+      assessments.health_score,
+      assessments.locale,
+      assessments.selected_plan::text,
+      assessments.status::text
+    from public.plan_chat_messages
+    join public.assessments
+      on assessments.plan_id = plan_chat_messages.plan_id
+    where plan_chat_messages.id = ${messageId}::uuid
+      and plan_chat_messages.plan_id = ${task.planId}::uuid
+      and plan_chat_messages.role = 'user'
+    limit 1
+  `;
+  const row = rows[0];
+  const userMessage = row?.body?.trim();
+
+  if (!row || !userMessage) {
+    throw new Error("Panya chat message was not found");
+  }
+
+  const locale: Locale = isLocale(row.locale) ? row.locale : "en";
+  const chatRows = await sql<Array<{
+    body: string;
+    created_at: Date | string;
+    id: string;
+    role: "assistant" | "user";
+    status: "failed" | "queued" | "ready";
+  }>>`
+    select id::text, role, body, status, created_at
+    from public.plan_chat_messages
+    where plan_id = ${task.planId}::uuid
+    order by created_at asc
+    limit 30
+  `;
+
+  return {
+    chatMessages: chatRows.map(mapChatMessage),
+    communicationMessageId: isUuid(communicationMessageId)
+      ? communicationMessageId
+      : null,
+    customer: {
+      firstName: row.first_name,
+      locale
+    },
+    entitlement: customerEntitlement(row.selected_plan),
+    order: await latestCustomerOrderSummary(sql, task.planId, locale),
+    plan: {
+      answerSummary: row.answer_summary ?? null,
+      healthScore: row.health_score ?? null,
+      selectedPlan: row.selected_plan,
+      status: row.status
+    },
+    planId: task.planId,
+    taskId: task.id,
+    taskType: "customer_chat_reply",
+    userMessage
+  };
+}
+
 function mapChatMessage(row: Record<string, unknown>) {
   return {
     body: typeof row.body === "string" ? row.body : "",
@@ -1499,6 +1705,16 @@ async function buildNutritionPlanRefinementWorkItem(task: TaskRecord) {
 }
 
 export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem> {
+  if (
+    task.taskType === "carrier_event_process" ||
+    task.taskType === "carrier_label_generate" ||
+    task.taskType === "carrier_pickup_book" ||
+    task.taskType === "carrier_shipment_create" ||
+    task.taskType === "carrier_tracking_sync"
+  ) {
+    return buildCarrierShipmentWorkItem(task);
+  }
+
   if (task.taskType === "analyze_healthscore") {
     return buildHealthScoreWorkItem(task);
   }
@@ -1532,6 +1748,10 @@ export async function buildTaskWorkItem(task: TaskRecord): Promise<TaskWorkItem>
 
   if (task.taskType === "route_admin_communication") {
     return buildAdminCommunicationRouteWorkItem(task);
+  }
+
+  if (task.taskType === "customer_chat_reply") {
+    return buildCustomerChatReplyWorkItem(task);
   }
 
   if (
