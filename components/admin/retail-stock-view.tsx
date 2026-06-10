@@ -1845,25 +1845,28 @@ export function AdminRetailStockView({
       .filter((item) => item.organisationId === targetOrganisationId)
       .map((item) => orgProductKey(item.organisationId, item.productId));
   }, [selectedOrganisationId, shoppingListCandidateItems]);
-  const defaultOutstandingPurchaseKeySignature =
-    defaultOutstandingPurchaseKeys.join("|");
-
+  const defaultOutstandingPurchaseKeySignature = useMemo(
+    () => defaultOutstandingPurchaseKeys.join("\u0000"),
+    [defaultOutstandingPurchaseKeys]
+  );
   useEffect(() => {
-    setSelectedOutstandingPurchaseKeys((current) => {
-      if (current === null) {
-        return current;
-      }
+    queueMicrotask(() => {
+      setSelectedOutstandingPurchaseKeys((current) => {
+        if (current === null) {
+          return current;
+        }
 
-      const defaultKeySet = new Set(defaultOutstandingPurchaseKeys);
-      const retained = current.filter((key) => defaultKeySet.has(key));
+        const defaultKeySet = new Set(defaultOutstandingPurchaseKeys);
+        const retained = current.filter((key) => defaultKeySet.has(key));
 
-      if (retained.length === 0 && defaultOutstandingPurchaseKeys.length > 0) {
-        return null;
-      }
+        if (retained.length === 0 && defaultOutstandingPurchaseKeys.length > 0) {
+          return null;
+        }
 
-      return retained.length === current.length ? current : retained;
+        return retained.length === current.length ? current : retained;
+      });
     });
-  }, [defaultOutstandingPurchaseKeySignature]);
+  }, [defaultOutstandingPurchaseKeys, defaultOutstandingPurchaseKeySignature]);
 
   const outstandingPurchaseSelectionKeys =
     selectedOutstandingPurchaseKeys ?? defaultOutstandingPurchaseKeys;

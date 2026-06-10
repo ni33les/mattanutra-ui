@@ -321,7 +321,7 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /<PackageCheck aria-hidden="true"/);
 	    assert.match(view, /<Truck aria-hidden="true"/);
 	    assert.match(view, /<ReceiptText aria-hidden="true"/);
-	    assert.match(view, /title="Ship order"/);
+    assert.match(view, /title="Mark Shipped"/);
 	    assert.match(view, /labels\.stock\.bookPickup/);
 	    assert.match(view, /book_order_pickup/);
 	    assert.match(view, /openShipmentEditor\(customerOrderDetail\)/);

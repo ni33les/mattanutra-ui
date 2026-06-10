@@ -1,0 +1,107 @@
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { describe, it } from "node:test";
+import { content } from "../components/landing-page-copy.ts";
+import { publicLocales } from "../lib/i18n.ts";
+
+function source(path: string) {
+  return readFileSync(new URL(path, import.meta.url), "utf8");
+}
+
+const landingPage = source("../components/landing-page.tsx");
+const landingCopy = source("../components/landing-page-copy.ts");
+const titleBar = source("../components/title-bar.tsx");
+const footer = source("../components/site-footer.tsx");
+const homepage = source("../app/[locale]/page.tsx");
+const blog = source("../lib/blog.ts");
+const seedScript = source("../scripts/seed-landing-v15-content.ts");
+
+describe("landing page v15 rebuild", () => {
+  it("renders the v15 homepage sections without the old pricing section", () => {
+    for (const marker of [
+      "copy.proof",
+      "copy.clarity.cards",
+      'id="how-it-works"',
+      'id="living-protocol"',
+      'id="start-free"',
+      'id="journal"',
+      'id="faq"',
+      'id="assessment"'
+    ]) {
+      assert.match(landingPage, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    }
+
+    assert.doesNotMatch(landingPage, /PricingCard/);
+    assert.doesNotMatch(landingPage, /id="pricing"/);
+  });
+
+  it("keeps homepage navigation and footer off old pricing anchors", () => {
+    assert.match(homepage, /variant="landing"/);
+    assert.match(titleBar, /mn-titlebar--landing/);
+    assert.match(titleBar, /\/v15\/logo\.png/);
+    assert.match(titleBar, /#start-free/);
+    assert.match(footer, /#start-free/);
+    assert.doesNotMatch(titleBar, /#pricing/);
+    assert.doesNotMatch(footer, /#pricing/);
+  });
+
+  it("has complete localized v15 copy for every public locale", () => {
+    for (const locale of publicLocales) {
+      const copy = content[locale];
+
+      assert.equal(copy.proof.length, 3, `${locale} proof strip`);
+      assert.equal(copy.clarity.cards.length, 4, `${locale} clarity cards`);
+      assert.equal(copy.how.steps.length, 4, `${locale} flow steps`);
+      assert.equal(copy.results.fallback.length, 4, `${locale} testimonials`);
+      assert.equal(copy.journal.fallback.length, 3, `${locale} journal cards`);
+      assert.equal(copy.questionnaire.sections.length, 6, `${locale} questionnaire sections`);
+      assert.ok(copy.food.imageAlt, `${locale} food image alt`);
+    }
+
+    assert.doesNotMatch(landingCopy, /"zh-CN"\s*:\s*baseContent\.en/);
+  });
+
+  it("commits all extracted v15 image assets", () => {
+    for (const asset of [
+      "logo.png",
+      "hero-emblem.png",
+      "clarity-overwhelmed.jpg",
+      "clarity-path.jpg",
+      "clarity-narrowed.jpg",
+      "clarity-enough.jpg",
+      "food-bowl.jpg",
+      "testimonial-daniel.jpg",
+      "testimonial-meilin.jpg",
+      "testimonial-wanida.jpg",
+      "testimonial-malee.jpg",
+      "origin-stage-1.png",
+      "origin-stage-2.png",
+      "origin-stage-3.png",
+      "origin-stage-4.png",
+      "origin-stage-5.png"
+    ]) {
+      assert.equal(
+        existsSync(new URL(`../public/v15/${asset}`, import.meta.url)),
+        true,
+        `missing ${asset}`
+      );
+    }
+  });
+
+  it("loads homepage blog posts and testimonials deterministically by v15 metadata", () => {
+    assert.match(blog, /export async function getHomepageBlogPosts/);
+    assert.match(blog, /export async function getHomepageTestimonials/);
+    assert.match(blog, /metadata->>'homepageVersion' = 'v15'/);
+    assert.match(blog, /metadata->>'homepageSortOrder'/);
+    assert.match(blog, /order by[\s\S]*sort_order/);
+  });
+
+  it("seeds v15 homepage content idempotently for all locales", () => {
+    assert.match(seedScript, /homepageVersion:\s*"v15"/);
+    assert.match(seedScript, /source_agent[\s\S]*'landing_v15_seed'/);
+    assert.match(seedScript, /on conflict \(translation_group_id, locale\) do update/);
+    assert.match(seedScript, /public\.testimonials/);
+    assert.match(seedScript, /public\.blog_posts/);
+    assert.match(seedScript, /for \(const locale of publicLocales\)/);
+  });
+});

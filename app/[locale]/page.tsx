@@ -5,8 +5,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { ServiceIssue } from "@/components/service-issue";
 import { TitleBar } from "@/components/title-bar";
 import {
-  getPublishedBlogPosts,
-  getRandomPublishedTestimonials
+  getHomepageBlogPosts,
+  getHomepageTestimonials
 } from "@/lib/blog";
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
@@ -63,6 +63,7 @@ export default async function Home({ params }: HomeProps) {
           currentLocale={locale}
           currentPath={`/${locale}`}
           title={dictionary.hero.eyebrow}
+          variant="landing"
         />
         <LandingPage
           assessmentPath={assessmentPath}
@@ -84,6 +85,7 @@ export default async function Home({ params }: HomeProps) {
           currentLocale={locale}
           currentPath={`/${locale}`}
           title={dictionary.hero.eyebrow}
+          variant="landing"
         />
         <ServiceIssue href={`/${locale}`} locale={locale} />
         <SiteFooter content={dictionary.footer} locale={locale} />
@@ -92,8 +94,8 @@ export default async function Home({ params }: HomeProps) {
   }
 
   const [blogPosts, testimonials] = await Promise.all([
-    getPublishedBlogPosts(locale, 3),
-    getRandomPublishedTestimonials(locale, 4)
+    getHomepageBlogPosts(locale, 3),
+    getHomepageTestimonials(locale, 4)
   ]);
   const baseUrl = siteBaseUrl();
   const jsonLd = {
@@ -128,6 +130,7 @@ export default async function Home({ params }: HomeProps) {
         currentLocale={locale}
         currentPath={`/${locale}`}
         title={dictionary.hero.eyebrow}
+        variant="landing"
       />
       <script
         type="application/ld+json"

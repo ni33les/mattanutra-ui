@@ -5,23 +5,14 @@ import {
   BadgeCheck,
   CheckCircle2,
   Clock,
-  Heart,
   Leaf,
-  Lock,
-  RefreshCw,
-  Search,
   ShieldCheck,
-  UserRound,
+  Sun,
 } from "lucide-react";
 import { LandingReveal } from "@/components/landing-reveal";
-import {
-  assets,
-  content,
-  type LandingPricingPlan,
-} from "@/components/landing-page-copy";
+import { assets, content } from "@/components/landing-page-copy";
 import type { BlogPostSummary, BlogTestimonial } from "@/lib/blog";
 import type { Locale } from "@/lib/i18n";
-import { paymentCheckoutPath } from "@/lib/payment-paths";
 
 type LandingPageProps = Readonly<{
   assessmentPath: string;
@@ -83,108 +74,6 @@ function CheckItem({
       <CheckCircle2 aria-hidden className="mt-0.5 size-5 shrink-0" />
       <span>{children}</span>
     </li>
-  );
-}
-
-function PricingCard({
-  featured = false,
-  locale,
-  plan,
-}: Readonly<{
-  featured?: boolean;
-  locale: Locale;
-  plan: LandingPricingPlan;
-}>) {
-  const bestForLabel =
-    locale === "th"
-      ? "เหมาะสำหรับ:"
-      : locale === "zh-CN"
-        ? "最适合："
-        : "Best for:";
-
-  return (
-    <article
-      className={
-        featured
-          ? "mn-v14-price-card mn-v14-price-card--featured"
-          : "mn-v14-price-card"
-      }
-      data-reveal
-    >
-      {"popular" in plan && typeof plan.popular === "string" ? (
-        <span className="mn-v14-popular">{plan.popular}</span>
-      ) : null}
-      <p
-        className={
-          featured ? "mn-v14-eyebrow mn-v14-eyebrow--light" : "mn-v14-eyebrow"
-        }
-      >
-        {plan.badge}
-      </p>
-      <h3>{plan.name}</h3>
-      <p className="mn-v14-price-desc">{plan.desc}</p>
-      <div className="mt-6 flex flex-wrap items-center gap-2.5">
-        <span
-          className={
-            featured
-              ? "text-[var(--mn-ash-soft)] line-through"
-              : "text-[var(--mn-ash-soft)] line-through"
-          }
-        >
-          {plan.originalPrice}
-        </span>
-        <span
-          className={
-            featured
-              ? "mn-v14-save-badge mn-v14-save-badge--dark"
-              : "mn-v14-save-badge"
-          }
-        >
-          {plan.saving}
-        </span>
-      </div>
-      <div className="mn-v14-price">
-        <span>{plan.currency}</span>
-        <strong>{plan.price}</strong>
-        <em>{plan.termLabel}</em>
-      </div>
-      <p className="mn-v14-price-term">{plan.term}</p>
-      <Link
-        className={
-          featured
-            ? "mn-v14-button mn-v14-button--bright w-full"
-            : "mn-v14-button mn-v14-button--outline w-full"
-        }
-        href={paymentCheckoutPath(locale, {
-          plan: plan.plan,
-          sourceSurface: "landing",
-        })}
-      >
-        {plan.cta}
-      </Link>
-      <ul className="mt-7 grid gap-3">
-        {plan.features.map((feature, index) => (
-          <CheckItem key={feature} light={featured && index > 0}>
-            {feature}
-          </CheckItem>
-        ))}
-      </ul>
-      <p className={featured ? "mn-v14-best mn-v14-best--dark" : "mn-v14-best"}>
-        <strong>{bestForLabel}</strong> {plan.best}
-      </p>
-      <p
-        className={
-          featured
-            ? "mn-v14-guarantee mn-v14-guarantee--dark"
-            : "mn-v14-guarantee"
-        }
-      >
-        <ShieldCheck aria-hidden className="mt-0.5 size-5 shrink-0" />
-        <span>
-          <strong>{plan.guaranteeTitle}</strong> {plan.guarantee}
-        </span>
-      </p>
-    </article>
   );
 }
 
@@ -324,62 +213,70 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="border-b border-[var(--mn-line)] bg-[var(--mn-paper)]">
-        <div className="mn-v14-container grid items-center gap-12 py-20 lg:grid-cols-2 lg:py-24">
-          <div className="relative" data-reveal>
-            <span className="absolute -inset-3 -z-10 rounded-[28px] bg-linear-to-br from-[var(--mn-mint)] to-[var(--mn-sand-soft)]" />
-            <Image
-              alt={copy.problem.imageAlt}
-              className="aspect-[4/3] w-full rounded-[22px] object-cover shadow-[0_20px_60px_-38px_rgba(10,37,64,0.45)]"
-              height={666}
-              priority
-              sizes="(min-width: 1024px) 50vw, 100vw"
-              src={assets.problem}
-              width={1000}
-            />
-          </div>
-          <div data-reveal>
-            <p className="mn-v14-eyebrow">{copy.problem.eyebrow}</p>
-            <h2 className="mn-v14-heading mt-4 text-left">
-              {copy.problem.title}
-              <br />
-              <span>{copy.problem.accent}</span>
-            </h2>
-            <p className="mt-6 text-lg leading-8 text-[var(--mn-ink-soft)]">
-              {copy.problem.body}
-            </p>
-            <p className="mt-4 text-lg leading-8 text-[var(--mn-ink-soft)]">
-              {copy.problem.body2}
-            </p>
+      <div className="border-b border-[var(--mn-line)] bg-[var(--mn-cream)]">
+        <div className="mn-v14-container py-8">
+          <div className="mx-auto grid max-w-5xl gap-4 rounded-2xl border border-[color-mix(in_srgb,var(--mn-gold-soft)_40%,transparent)] bg-[radial-gradient(circle_at_85%_0%,rgba(45,143,114,0.28),transparent_55%),linear-gradient(160deg,#1F6E58_0%,#0E2D4D_100%)] p-5 text-[var(--mn-cream)] shadow-[0_34px_70px_-34px_rgba(10,37,64,0.6)] md:grid-cols-3 md:p-6" data-reveal>
+            {copy.proof.map((item, index) => (
+              <div className="flex items-start gap-3" key={item.title}>
+                <span className="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-white/10 text-[var(--mn-teal-light)] ring-1 ring-white/15">
+                  {index === 0 ? (
+                    <Clock aria-hidden className="size-4" />
+                  ) : index === 1 ? (
+                    <BadgeCheck aria-hidden className="size-4" />
+                  ) : (
+                    <ShieldCheck aria-hidden className="size-4" />
+                  )}
+                </span>
+                <span className="leading-snug">
+                  <strong className="block text-[13.5px] text-white">
+                    {item.title}
+                  </strong>
+                  <span className="mt-1 block text-[12.5px] text-[color-mix(in_srgb,var(--mn-cream)_90%,transparent)]">
+                    {item.body}
+                  </span>
+                </span>
+              </div>
+            ))}
           </div>
         </div>
-      </section>
+      </div>
 
-      <section className="mn-v14-section" id="promises">
-        <div className="mn-v14-container">
+      <section className="border-b border-[var(--mn-line)] bg-[var(--mn-paper)]" id="promises">
+        <div className="mn-v14-container py-20 lg:py-24">
           <SectionIntro
-            accent={copy.promises.accent}
-            body={copy.promises.intro}
-            eyebrow={copy.promises.eyebrow}
-            title={copy.promises.title}
+            accent={copy.clarity.accent}
+            body={copy.clarity.body}
+            eyebrow={copy.clarity.eyebrow}
+            title={copy.clarity.title}
           />
-          <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {[Search, Leaf, UserRound, Heart].map((Icon, index) => {
-              const [title, subtitle] = copy.promises.cards[index];
-              return (
-                <article className="text-center" data-reveal key={title}>
-                  <span className="mx-auto grid size-12 place-items-center rounded-full bg-[var(--mn-mint)] text-[var(--mn-teal-deep)]">
-                    <Icon aria-hidden className="size-6" />
-                  </span>
-                  <h3 className="mt-4 font-[family:var(--mn-font-display)] text-2xl font-medium text-[var(--mn-ink)]">
-                    {title}
+          <div className="mt-12 grid gap-6 md:grid-cols-4">
+            {copy.clarity.cards.map((card, index) => (
+              <article
+                className="overflow-hidden rounded-[22px] border border-[var(--mn-line)] bg-[var(--mn-cream)] shadow-[var(--mn-shadow-soft)]"
+                data-reveal
+                key={card.title}
+              >
+                <Image
+                  alt={card.imageAlt}
+                  className="aspect-[4/3] w-full object-cover"
+                  height={666}
+                  sizes="(min-width: 768px) 25vw, 100vw"
+                  src={card.image}
+                  width={1000}
+                />
+                <div className="p-5">
+                  <div className="mb-3 inline-flex size-8 items-center justify-center rounded-full bg-[var(--mn-mint)] font-[family:var(--mn-font-display)] text-sm font-semibold text-[var(--mn-teal-deep)]">
+                    {index + 1}
+                  </div>
+                  <h3 className="font-[family:var(--mn-font-display)] text-xl font-medium text-[var(--mn-ink)]">
+                    {card.title}
                   </h3>
-                  <p className="mt-1 text-sm text-[var(--mn-ash)]">
-                    {subtitle}
+                  <p className="mt-2 text-sm leading-6 text-[var(--mn-ash)]">
+                    {card.body}
                   </p>
-                </article>
-              );
-            })}
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       </section>
@@ -423,7 +320,7 @@ export function LandingPage({
                 {copy.protocol.intro}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link className="mn-v14-button" href="#pricing">
+                <Link className="mn-v14-button" href="#start-free">
                   {copy.protocol.primary}
                   <ArrowRight aria-hidden className="size-4" />
                 </Link>
@@ -545,26 +442,39 @@ export function LandingPage({
               eyebrow={copy.food.eyebrow}
               title={copy.food.title}
             />
-            <div className="mt-12 grid gap-6 md:grid-cols-3">
-              {copy.food.cards.map(([title, body, tags], index) => (
-                <article
-                  className={
-                    index === 2
-                      ? "mn-v14-food-card mn-v14-food-card--mint"
-                      : "mn-v14-food-card"
-                  }
-                  data-reveal
-                  key={title}
-                >
-                  <h3>{title}</h3>
-                  <p>{body}</p>
-                  <div>
-                    {tags.map((tag) => (
-                      <span key={tag}>{tag}</span>
-                    ))}
-                  </div>
-                </article>
-              ))}
+            <div className="mt-12 grid items-center gap-10 lg:grid-cols-[0.92fr_1.08fr]">
+              <div className="relative" data-reveal>
+                <span className="absolute -inset-3 -z-10 rounded-[28px] bg-linear-to-br from-[var(--mn-mint)] to-[color-mix(in_srgb,var(--mn-sand-soft)_60%,transparent)]" />
+                <Image
+                  alt={copy.food.imageAlt}
+                  className="w-full rounded-[22px] object-cover shadow-[var(--mn-shadow-soft)]"
+                  height={768}
+                  sizes="(min-width: 1024px) 45vw, 100vw"
+                  src={assets.foodBowl}
+                  width={1024}
+                />
+              </div>
+              <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-1">
+                {copy.food.cards.map(([title, body, tags], index) => (
+                  <article
+                    className={
+                      index === 2
+                        ? "mn-v14-food-card mn-v14-food-card--mint"
+                        : "mn-v14-food-card"
+                    }
+                    data-reveal
+                    key={title}
+                  >
+                    <h3>{title}</h3>
+                    <p>{body}</p>
+                    <div>
+                      {tags.map((tag) => (
+                        <span key={tag}>{tag}</span>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
             </div>
             <p
               className="mx-auto mt-12 max-w-2xl text-center font-[family:var(--mn-font-display)] text-xl italic leading-8 text-[var(--mn-ink-soft)]"
@@ -606,7 +516,6 @@ export function LandingPage({
               {copy.bridge.cta}
               <ArrowRight aria-hidden className="size-4" />
             </Link>
-            <small>{copy.bridge.note}</small>
           </div>
         </div>
       </section>
@@ -737,36 +646,170 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="mn-v14-section" id="pricing">
+      <section className="mn-v14-section" id="start-free">
         <div className="mn-v14-container">
           <SectionIntro
-            accent={copy.pricing.accent}
-            body={copy.pricing.intro}
-            eyebrow={copy.pricing.eyebrow}
-            title={copy.pricing.title}
+            body={copy.questionnaire.body}
+            eyebrow={copy.questionnaire.eyebrow}
+            title={copy.questionnaire.title}
           />
-          <div className="mx-auto mt-12 grid max-w-5xl items-start gap-8 lg:grid-cols-[1fr_1.08fr]">
-            <PricingCard locale={locale} plan={copy.pricing.plans[0]} />
-            <PricingCard
-              featured
-              locale={locale}
-              plan={copy.pricing.plans[1]}
-            />
-          </div>
-          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {[Lock, BadgeCheck, RefreshCw, ShieldCheck].map((Icon, index) => {
-              const [title, body] = copy.pricing.trust[index];
-              return (
-                <article className="mn-v14-trust-card" data-reveal key={title}>
-                  <Icon
-                    aria-hidden
-                    className="mx-auto size-5 text-[var(--mn-teal-deep)]"
+          <div className="mx-auto mt-12 max-w-[680px] overflow-hidden rounded-[24px] bg-[var(--mn-paper)] shadow-[0_40px_80px_-44px_rgba(10,37,64,0.55)] ring-1 ring-[var(--mn-line)]" data-reveal>
+            <div className="flex items-center gap-2.5 border-b border-[var(--mn-line)] bg-[var(--mn-cream)] px-5 py-3.5">
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-linear-to-br from-[var(--mn-teal-light)] to-[var(--mn-teal-deep)] font-[family:var(--mn-font-display)] text-xs text-white">
+                M
+              </span>
+              <span className="font-[family:var(--mn-font-mono)] text-[10px] uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]">
+                {copy.questionnaire.cardLabel}
+              </span>
+              <span className="ml-auto inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-[var(--mn-ash)]">
+                <ShieldCheck
+                  aria-hidden
+                  className="size-3.5 text-[var(--mn-teal-deep)]"
+                />
+                {copy.questionnaire.privateLabel}
+              </span>
+            </div>
+            <div className="px-5 pt-4">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center rounded-full border border-[var(--mn-sand-deep)] bg-[var(--mn-gold-tint)] px-2.5 py-1 font-[family:var(--mn-font-mono)] text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--mn-gold)]">
+                  {copy.questionnaire.sampleLabel}
+                </span>
+                <span className="text-xs text-[var(--mn-ash)]">
+                  {copy.questionnaire.sampleBody}
+                </span>
+              </div>
+              <div className="mt-4 flex items-center justify-between">
+                <span className="font-[family:var(--mn-font-mono)] text-[10px] uppercase tracking-[0.16em] text-[var(--mn-ash)]">
+                  {copy.questionnaire.progressPath}
+                </span>
+                <span className="font-[family:var(--mn-font-display)] text-[15px] text-[var(--mn-teal-deep)]">
+                  {copy.questionnaire.progress}
+                </span>
+              </div>
+              <div className="mt-1.5 h-[9px] overflow-hidden rounded-full bg-[var(--mn-cream-deep)] ring-1 ring-[var(--mn-line)]">
+                <div className="h-full w-[8%] rounded-full bg-linear-to-r from-[var(--mn-gold-soft)] via-[var(--mn-teal-light)] to-[var(--mn-teal)]" />
+              </div>
+              <p className="mt-1.5 text-[12.5px] text-[var(--mn-ash-soft)]">
+                {copy.questionnaire.progressNote}
+              </p>
+            </div>
+            <div className="mx-5 mt-4 rounded-2xl border border-[var(--mn-mint-deep)] border-l-4 border-l-[var(--mn-teal)] bg-linear-to-br from-[var(--mn-mint)] to-[var(--mn-cream)] px-5 py-4">
+              <p className="font-[family:var(--mn-font-display)] text-[15px] italic leading-[1.5] text-[var(--mn-ink-soft)]">
+                “{copy.questionnaire.quote}”
+              </p>
+            </div>
+            <div className="px-5 pt-5">
+              <div className="flex items-baseline justify-between">
+                <span className="font-[family:var(--mn-font-display)] text-base text-[var(--mn-ink)]">
+                  {copy.questionnaire.skinTone}
+                </span>
+                <span className="font-[family:var(--mn-font-mono)] text-[10px] uppercase tracking-[0.14em] text-[var(--mn-ash)]">
+                  {copy.questionnaire.foundation}
+                </span>
+              </div>
+              <p className="mb-3 mt-0.5 text-[13px] text-[var(--mn-ash)]">
+                {copy.questionnaire.skinBody}
+              </p>
+              <div className="grid grid-cols-6 gap-2">
+                {["#F3E0CE", "#EBC9A6", "#DDB892", "#C49A6C", "#A87B52", "#7E5A3A"].map((tone) => (
+                  <span
+                    className="h-10 rounded-lg ring-1 ring-black/5"
+                    key={tone}
+                    style={{ background: tone }}
                   />
-                  <h3>{title}</h3>
-                  <p>{body}</p>
-                </article>
-              );
-            })}
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-4 px-5 pt-4 sm:grid-cols-2">
+              <div>
+                <div className="mb-2 text-[13px] font-semibold text-[var(--mn-ink)]">
+                  {copy.questionnaire.sunExposure}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {copy.questionnaire.sunOptions.map((option, index) => (
+                    <button
+                      className={
+                        index === 1
+                          ? "rounded-full border border-[var(--mn-teal-deep)] bg-[var(--mn-teal-deep)] px-3.5 py-1.5 text-[13px] font-semibold text-white"
+                          : "rounded-full border border-[var(--mn-line)] bg-[var(--mn-paper)] px-3.5 py-1.5 text-[13px] font-semibold text-[var(--mn-ink-soft)]"
+                      }
+                      key={option}
+                      type="button"
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="mb-2 text-[13px] font-semibold text-[var(--mn-ink)]">
+                  {copy.questionnaire.sunscreen}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {copy.questionnaire.sunscreenOptions.map((option, index) => (
+                    <button
+                      className={
+                        index === 2
+                          ? "rounded-full border border-[var(--mn-teal-deep)] bg-[var(--mn-teal-deep)] px-3.5 py-1.5 text-[13px] font-semibold text-white"
+                          : "rounded-full border border-[var(--mn-line)] bg-[var(--mn-paper)] px-3.5 py-1.5 text-[13px] font-semibold text-[var(--mn-ink-soft)]"
+                      }
+                      key={option}
+                      type="button"
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mx-5 mt-4 flex items-start gap-2.5 rounded-xl bg-[color-mix(in_srgb,var(--mn-sand-soft)_70%,transparent)] px-4 py-3">
+              <Sun aria-hidden className="mt-0.5 size-4 shrink-0 text-[var(--mn-gold)]" />
+              <p className="text-[12.5px] leading-[1.5] text-[var(--mn-ink-soft)]">
+                {copy.questionnaire.insight}
+              </p>
+            </div>
+            <div className="px-5 pb-1 pt-4">
+              <p className="mb-2 text-[11px] text-[var(--mn-ash)]">
+                {copy.questionnaire.sectionsLabel}
+              </p>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {copy.questionnaire.sections.map((section, index) => (
+                  <span
+                    className={
+                      index === 0
+                        ? "inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-[var(--mn-ink)]"
+                        : "inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-[var(--mn-ash)]"
+                    }
+                    key={section}
+                  >
+                    <span
+                      className={
+                        index === 0
+                          ? "grid size-[15px] place-items-center rounded-full bg-[var(--mn-ink)] text-[8.5px] text-[var(--mn-cream)]"
+                          : "grid size-[15px] place-items-center rounded-full bg-[var(--mn-cream-deep)] text-[8.5px] text-[var(--mn-ash)]"
+                      }
+                    >
+                      {index + 1}
+                    </span>
+                    {section}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 border-t border-[var(--mn-line)] bg-[var(--mn-cream)] px-5 py-3.5 text-center">
+              <span className="text-[12.5px] text-[var(--mn-ink-soft)]">
+                {copy.questionnaire.bottom}
+              </span>
+            </div>
+          </div>
+          <div className="mt-9 text-center" data-reveal>
+            <Link className="mn-v14-button" href={assessmentPath}>
+              {copy.hero.primary}
+              <ArrowRight aria-hidden className="size-4" />
+            </Link>
+            <p className="mt-4 text-sm text-[var(--mn-ash)]">
+              {copy.questionnaire.reassurance}
+            </p>
           </div>
         </div>
       </section>

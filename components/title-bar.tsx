@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Menu } from "lucide-react";
 import { HealthspanLogo } from "@/components/healthspan-logo";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -10,11 +11,12 @@ type TitleBarProps = Readonly<{
   currentPath?: string;
   localizedPaths?: Partial<Record<LocaleCode, string>>;
   title: string;
+  variant?: "default" | "landing";
 }>;
 
 const titleBarCopy = {
   en: {
-    assessment: "Free Assessment",
+    assessment: "Design your Right Amount",
     availability: "Now available in",
     countries: ["Thailand", "Singapore", "Malaysia", "Philippines"],
     homeAria: (title: string) => `${title} home`,
@@ -22,14 +24,14 @@ const titleBarCopy = {
       ["#living-protocol", "Living Protocol"],
       ["#how-it-works", "How it works"],
       ["#promises", "Promises"],
-      ["#pricing", "Pricing"],
+      ["#start-free", "Free questionnaire"],
       ["#journal", "Journal"]
     ],
     menu: "Open menu",
     navAria: "Primary"
   },
   th: {
-    assessment: "เริ่มประเมินฟรี",
+    assessment: "ออกแบบปริมาณที่พอดีของคุณ",
     availability: "พร้อมให้บริการใน",
     countries: ["ไทย", "สิงคโปร์", "มาเลเซีย", "ฟิลิปปินส์"],
     homeAria: (title: string) => `${title} หน้าแรก`,
@@ -37,14 +39,14 @@ const titleBarCopy = {
       ["#living-protocol", "โปรโตคอลชีวิต"],
       ["#how-it-works", "วิธีทำงาน"],
       ["#promises", "คำมั่น"],
-      ["#pricing", "ราคา"],
+      ["#start-free", "แบบสอบถามฟรี"],
       ["#journal", "บทความ"]
     ],
     menu: "เปิดเมนู",
     navAria: "เมนูหลัก"
   },
   "zh-CN": {
-    assessment: "免费评估",
+    assessment: "设计您的适量",
     availability: "现已覆盖",
     countries: ["泰国", "新加坡", "马来西亚", "菲律宾"],
     homeAria: (title: string) => `${title} 首页`,
@@ -52,7 +54,7 @@ const titleBarCopy = {
       ["#living-protocol", "生活协议"],
       ["#how-it-works", "如何运作"],
       ["#promises", "承诺"],
-      ["#pricing", "价格"],
+      ["#start-free", "免费问卷"],
       ["#journal", "文章"]
     ],
     menu: "打开菜单",
@@ -80,24 +82,28 @@ export function TitleBar({
   currentLocale,
   currentPath = `/${currentLocale}`,
   localizedPaths,
-  title
+  title,
+  variant = "default"
 }: TitleBarProps) {
   const copy = titleBarCopy[currentLocale];
   const assessmentPath = nutritionQuizPath(currentLocale);
   const showAssessmentCta = !isAssessmentStartedPath(currentPath, currentLocale);
+  const isLanding = variant === "landing";
 
   return (
-    <header className="mn-titlebar">
-      <div className="mn-availability-bar" aria-label={copy.availability}>
-        <span>{copy.availability}</span>
-        <span className="mn-availability-pills">
-          {copy.countries.map((country) => (
-            <span key={country} className="mn-availability-pill">
-              {country}
-            </span>
-          ))}
-        </span>
-      </div>
+    <header className={isLanding ? "mn-titlebar mn-titlebar--landing" : "mn-titlebar"}>
+      {isLanding ? null : (
+        <div className="mn-availability-bar" aria-label={copy.availability}>
+          <span>{copy.availability}</span>
+          <span className="mn-availability-pills">
+            {copy.countries.map((country) => (
+              <span key={country} className="mn-availability-pill">
+                {country}
+              </span>
+            ))}
+          </span>
+        </div>
+      )}
       <div className="mn-titlebar-main">
         <Link
           href={`/${currentLocale}`}
@@ -108,7 +114,40 @@ export function TitleBar({
           aria-label={copy.homeAria(title)}
           className="flex min-w-0 items-center text-foreground transition hover:text-[var(--mn-teal-deep)]"
         >
-          <HealthspanLogo className="shrink-0" locale={currentLocale} variant="v14" />
+          {isLanding ? (
+            <span className="inline-flex w-max items-center gap-3">
+              <Image
+                src="/v15/logo.png"
+                alt=""
+                width={96}
+                height={150}
+                priority
+                className="h-9 w-9 object-contain"
+                aria-hidden="true"
+              />
+              <span className="inline-grid leading-none">
+                <span className="mn-logo-wordmark inline-flex items-baseline whitespace-nowrap text-[22px] font-medium tracking-normal">
+                  <span className="text-[var(--mn-logo-ink,var(--mn-ink))]">Matta</span>
+                  <span className="text-[var(--mn-teal)]">Nutra</span>
+                </span>
+                <span
+                  className={
+                    currentLocale === "zh-CN"
+                      ? "mn-logo-tagline mt-1 text-[10px] font-medium normal-case tracking-normal text-[var(--mn-logo-tagline,var(--muted-foreground))]"
+                      : "mn-logo-tagline mt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--mn-logo-tagline,var(--muted-foreground))]"
+                  }
+                >
+                  {currentLocale === "th"
+                    ? "รู้ปริมาณที่พอดี"
+                    : currentLocale === "zh-CN"
+                      ? "了解合适的剂量"
+                      : "Knowing the right amount"}
+                </span>
+              </span>
+            </span>
+          ) : (
+            <HealthspanLogo className="shrink-0" locale={currentLocale} variant="v14" />
+          )}
         </Link>
         <nav
           aria-label={copy.navAria}

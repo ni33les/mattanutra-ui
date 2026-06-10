@@ -63,24 +63,23 @@ const socialLinks = [
 const footerCopy = {
   en: {
     body:
-      "Advanced AI-powered personalised wellness plans, designed in Chiang Mai for Southeast Asian lives. Ancient wisdom · modern science.",
+      "AI-powered personalised wellness plans, designed in Chiang Mai for Southeast Asian lives. Ancient wisdom · modern science.",
     columns: [
       {
         title: "Product",
         links: [
-          ["Free assessment", "/nutrition/quiz"],
+          ["Living Protocol", "/#living-protocol"],
           ["How it works", "/#how-it-works"],
-          ["Four promises", "/#promises"],
-          ["Pricing", "/#pricing"]
+          ["The free questionnaire", "/#start-free"],
+          ["Design your Right Amount", "/nutrition/quiz"]
         ]
       },
       {
         title: "Learn",
         links: [
           ["Journal", "/#journal"],
-          ["Mattaññutā", "/#origin"],
-          ["Ingredient library", "/#journal"],
-          ["For advisors", "/#pricing"]
+          ["Our promises", "/#promises"],
+          ["Our origin", "/#origin"]
         ]
       },
       {
@@ -105,19 +104,18 @@ const footerCopy = {
       {
         title: "ผลิตภัณฑ์",
         links: [
-          ["แบบประเมินฟรี", "/nutrition/quiz"],
+          ["โปรโตคอลชีวิต", "/#living-protocol"],
           ["วิธีทำงาน", "/#how-it-works"],
-          ["สี่คำมั่น", "/#promises"],
-          ["ราคา", "/#pricing"]
+          ["แบบสอบถามฟรี", "/#start-free"],
+          ["ออกแบบปริมาณที่พอดี", "/nutrition/quiz"]
         ]
       },
       {
         title: "เรียนรู้",
         links: [
           ["บทความ", "/#journal"],
-          ["Mattaññutā", "/#origin"],
-          ["คลังส่วนผสม", "/#journal"],
-          ["สำหรับผู้ให้คำปรึกษา", "/#pricing"]
+          ["คำมั่นของเรา", "/#promises"],
+          ["จุดเริ่มต้นของเรา", "/#origin"]
         ]
       },
       {
@@ -142,19 +140,18 @@ const footerCopy = {
       {
         title: "产品",
         links: [
-          ["免费评估", "/nutrition/quiz"],
+          ["Living Protocol", "/#living-protocol"],
           ["如何运作", "/#how-it-works"],
-          ["四项承诺", "/#promises"],
-          ["价格", "/#pricing"]
+          ["免费问卷", "/#start-free"],
+          ["设计您的适量", "/nutrition/quiz"]
         ]
       },
       {
         title: "了解",
         links: [
           ["文章", "/#journal"],
-          ["Mattaññutā", "/#origin"],
-          ["成分库", "/#journal"],
-          ["顾问服务", "/#pricing"]
+          ["我们的承诺", "/#promises"],
+          ["我们的起源", "/#origin"]
         ]
       },
       {

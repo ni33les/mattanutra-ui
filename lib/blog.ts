@@ -414,6 +414,43 @@ export async function getPublishedBlogPosts(locale: Locale, limit = 3) {
   }
 }
 
+export async function getHomepageBlogPosts(locale: Locale, limit = 3) {
+  const sql = getSql();
+
+  if (!sql) {
+    return [] as BlogPostSummary[];
+  }
+
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 12);
+  const localeOrder = locale === defaultLocale ? [locale] : [locale, defaultLocale];
+
+  try {
+    for (const selectedLocale of localeOrder) {
+      const rows = await sql.unsafe<BlogPostRow[]>(
+        `${blogSelectSql()}
+         where p.status = 'published'
+           and p.locale = $1
+           and p.metadata->>'homepageVersion' = 'v15'
+         order by
+           nullif(p.metadata->>'homepageSortOrder', '')::int asc nulls last,
+           p.published_at desc nulls last,
+           p.created_at desc
+         limit $2`,
+        [selectedLocale, safeLimit]
+      );
+
+      if (rows.length > 0) {
+        return rows.map((row) => mapPost(row, selectedLocale));
+      }
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Unable to load homepage blog posts", error);
+    return [];
+  }
+}
+
 export async function getPublishedBlogPost(locale: Locale, slug: string) {
   const sql = getSql();
 
@@ -992,6 +1029,45 @@ export async function getRandomPublishedTestimonials(locale: Locale, limit = 4) 
         );
 
       if (testimonials.length > 0 || !homepageOnly) {
+        return testimonials;
+      }
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Unable to load homepage testimonials", error);
+    return [];
+  }
+}
+
+export async function getHomepageTestimonials(locale: Locale, limit = 4) {
+  const sql = getSql();
+
+  if (!sql) {
+    return [];
+  }
+
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 12);
+  const localeOrder = locale === defaultLocale ? [locale] : [locale, defaultLocale];
+
+  try {
+    for (const selectedLocale of localeOrder) {
+      const rows = await sql<TestimonialRow[]>`
+        select *
+        from public.testimonials
+        where status = 'published'
+          and locale = ${selectedLocale}
+          and metadata->>'homepageVersion' = 'v15'
+        order by sort_order asc, created_at asc
+        limit ${safeLimit}
+      `;
+      const testimonials = rows
+        .map((row) => mapTestimonial(row))
+        .filter((testimonial): testimonial is BlogTestimonial =>
+          Boolean(testimonial)
+        );
+
+      if (testimonials.length > 0) {
         return testimonials;
       }
     }

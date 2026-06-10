@@ -1,21 +1,27 @@
-import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import type { Locale } from "@/lib/i18n";
 
 export const assets = {
-  heroFigure: "/v14/hero-figure.png",
-  origin: [
-    "/v14/origin-stage-1.png",
-    "/v14/origin-stage-2.png",
-    "/v14/origin-stage-3.png",
-    "/v14/origin-stage-4.png",
-    "/v14/origin-stage-5.png",
+  heroFigure: "/v15/hero-emblem.png",
+  logo: "/v15/logo.png",
+  clarity: [
+    "/v15/clarity-overwhelmed.jpg",
+    "/v15/clarity-path.jpg",
+    "/v15/clarity-narrowed.jpg",
+    "/v15/clarity-enough.jpg",
   ],
-  problem: "/v14/problem-shopper.jpg",
+  foodBowl: "/v15/food-bowl.jpg",
+  origin: [
+    "/v15/origin-stage-1.png",
+    "/v15/origin-stage-2.png",
+    "/v15/origin-stage-3.png",
+    "/v15/origin-stage-4.png",
+    "/v15/origin-stage-5.png",
+  ],
   testimonials: [
-    "/v14/testimonial-daniel.jpg",
-    "/v14/testimonial-meilin.jpg",
-    "/v14/testimonial-wanida.jpg",
-    "/v14/testimonial-malee.jpg",
+    "/v15/testimonial-daniel.jpg",
+    "/v15/testimonial-meilin.jpg",
+    "/v15/testimonial-wanida.jpg",
+    "/v15/testimonial-malee.jpg",
   ],
 } as const;
 
@@ -44,6 +50,53 @@ const baseContent = {
         "Omega-3",
         "Ashwagandha",
         "Zinc",
+      ],
+    },
+    proof: [
+      {
+        title: "Founders with 100+ years’ combined experience",
+        body: "Medicine · Science · Technology",
+      },
+      {
+        title: "Formal education & training",
+        body: "Mahidol · Princeton · Stanford · Harvard",
+      },
+      {
+        title: "Dispensed by local pharmacists",
+        body: "Through licensed Thai pharmacy partners",
+      },
+    ],
+    clarity: {
+      eyebrow: "The problem",
+      title: "Too many choices.",
+      accent: "Let MattaNutra give you clarity.",
+      body:
+        "Walk into a drugstore or look online and it’s overwhelming. MattaNutra guides you from hundreds of options down to the few that are right and personalised for you. Knowing the Right Amount.",
+      cards: [
+        {
+          title: "Overwhelmed",
+          body: "Hundreds of options, no clear answer.",
+          image: assets.clarity[0],
+          imageAlt: "Overwhelmed at the supplement shelves",
+        },
+        {
+          title: "A clear path appears",
+          body: "Your answers start narrowing the field.",
+          image: assets.clarity[1],
+          imageAlt: "A clear path appears",
+        },
+        {
+          title: "Narrowed down",
+          body: "Only what fits your body and goals remains.",
+          image: assets.clarity[2],
+          imageAlt: "Narrowing down to what matters",
+        },
+        {
+          title: "Exactly enough",
+          body: "A plan designed around your right amount.",
+          image: assets.clarity[3],
+          imageAlt: "Exactly what you need, in hand",
+        },
       ],
     },
     problem: {
@@ -76,22 +129,22 @@ const baseContent = {
       steps: [
         [
           "Answer",
-          "Short but detailed",
-          "A few focused questions about your goals, health priorities, lifestyle, medications, budget, and what you genuinely care about. No jargon, no fluff.",
+          "Thorough enough to personalise",
+          "A genuinely detailed set of questions — your goals & health priorities, lifestyle & activity, current medications, budget, and what you truly care about. Thorough enough to personalise your formula, with no jargon and no fluff.",
         ],
         [
           "Analyse",
-          "120+ ingredients",
-          "Your answers are mapped to supplement priorities, dosage ranges and safety considerations.",
+          "Research-grounded algorithm",
+          "A proprietary algorithm — grounded in published clinical research — designed to closely match the supplement priorities a blood panel would surface, with dosage ranges and safety checks.",
         ],
         [
           "Match",
-          "SE Asia ready",
-          "Receive product guidance so you're not guessing in-store or on Lazada.",
+          "Partner pharmacy",
+          "Your formula is dispensed through a partner pharmacy with registered pharmacists — real people you can ask, not a guess in the aisle.",
         ],
         [
           "Refine",
-          "60-day prompts",
+          "Living Protocol",
           "Optional check-ins update your plan as goals, symptoms and lifestyle change over time.",
         ],
       ],
@@ -184,6 +237,8 @@ const baseContent = {
       eyebrow: "Food & supplements, together",
       title: "The best source is sometimes",
       accent: "on your plate.",
+      imageAlt:
+        "A nourishing bowl with fish, greens, broccoli, black beans, brown rice and pumpkin seeds",
       intro:
         "Supplements fill the gaps — but food fills them first. When Living Protocol spots something your body needs, it doesn't just reach for a capsule. It tells you which everyday foods are naturally rich in it, so you can choose: top up at dinner, or top up from the bottle. Either way, you're finally knowing, not guessing.",
       cards: [
@@ -221,13 +276,41 @@ const baseContent = {
       cta: "Start designing your Right Amount",
       note: "See full plans and pricing below.",
     },
+    questionnaire: {
+      eyebrow: "Start free",
+      title: "A glimpse inside the questionnaire.",
+      body:
+        "Here’s how the questionnaire estimates just your vitamin D — one of 120+ ingredients the algorithm weighs — drawing on several answers at once. The full version spans six short sections.",
+      cardLabel: "Formula Precision",
+      privateLabel: "Private & encrypted",
+      sampleLabel: "A sample",
+      sampleBody: "estimating just one ingredient",
+      progressPath: "Start → Essentials → Precision",
+      progress: "8%",
+      progressNote: "You’re at 8% — keep going to complete the essentials.",
+      quote:
+        "There are no right or wrong answers here, only true ones. The more honestly you answer, the more exactly your formula fits — and the safer it is alongside anything you already take.",
+      skinTone: "Skin tone",
+      foundation: "Foundation",
+      skinBody: "Helps model your vitamin D synthesis alongside sun exposure.",
+      sunExposure: "Daily sun exposure",
+      sunOptions: ["Under 15m", "15–30", "30–60", "60m+"],
+      sunscreen: "Sunscreen use",
+      sunscreenOptions: ["Rarely", "Sometimes", "Daily"],
+      insight:
+        "Skin tone, sun and sunscreen are weighed together — so your vitamin D isn’t a guess, it’s an estimate built for your life.",
+      sectionsLabel: "One question, from six sections:",
+      sections: ["Foundation", "Goals", "Daily life", "Food", "Safety", "Precision"],
+      bottom: "Vitamin D is one of 120+ ingredients our algorithm evaluates.",
+      reassurance: "✓ Free to start ✓ No credit card ✓ About 3 minutes",
+    },
     results: {
       eyebrow: "Real people. Real stories.",
-      title: "Real people, real starting points.",
+      title: "Different lives. The same first step.",
       intro:
         "Different lifestyles. Same goal: better health, more clarity, and a routine that feels possible.",
       cta: "Start designing your Right Amount",
-      join: "Join thousands of people who are making smarter, more confident choices for their health.",
+      join: "Make smarter, more confident choices for your health.",
       fallback: [
         {
           id: "daniel",
@@ -280,7 +363,7 @@ const baseContent = {
         "Founded by physicians, scientists, and innovative AI thinkers.",
       founderParagraphs: [
         "What goes into your body should be designed by people who understand what's actually in it.",
-        "MattaNutra was founded by an international group with an unusually broad foundation across medicine, science, technology, economics and the rewarding work of building things that last.",
+        "MattaNutra was founded by an international group with an unusually broad foundation: two physicians with MD–PhD training from leading research institutions (including Mahidol, Princeton, Stanford and Harvard Universities), a software engineer whose career began at CERN and now spans AI and decentralised systems, a PhD economist with global enterprise experience across public markets and frontier ventures, and a younger founder whose perspective keeps the work grounded in how people actually live.",
         "Between us, more than a hundred years of professional practice — in medicine, in science, in technology, and in building things that last.",
       ],
       signoff: "From Chiang Mai, with care.",
@@ -400,7 +483,7 @@ const baseContent = {
         ],
         [
           "Where do the recommended products come from?",
-          "We point to products available on platforms Southeast Asian shoppers actually use, selected to match your formulation. The goal is to help you buy with confidence in the marketplaces you already trust.",
+          "Your formula is dispensed through a partner pharmacy network with registered pharmacists, so you collect exactly what your plan calls for — with no guessing in the aisle. We don't manufacture supplements ourselves; we match you to trusted products and a pharmacist who can answer your questions.",
         ],
         [
           "Is the free assessment really free?",
@@ -408,7 +491,7 @@ const baseContent = {
         ],
         [
           "Why the Pāli name?",
-          "Mattaññutā means knowing the right amount. It comes from a tradition of practical wisdom about moderation and balance — the idea that flourishing comes not from more, but from exactly enough.",
+          "“Mattaññutā” means knowing the right amount. It comes from a 2,500-year-old tradition of practical wisdom about moderation and balance — the idea that flourishing comes not from more, but from exactly enough. The name is our promise: we'll help you find your right amount, not sell you more of what you don't need.",
         ],
       ],
     },
@@ -445,6 +528,53 @@ const baseContent = {
         "โอเมก้า-3",
         "อัชวกันธา",
         "สังกะสี",
+      ],
+    },
+    proof: [
+      {
+        title: "ผู้ก่อตั้งมีประสบการณ์รวมกว่า 100 ปี",
+        body: "การแพทย์ · วิทยาศาสตร์ · เทคโนโลยี",
+      },
+      {
+        title: "การศึกษาและการฝึกอบรมอย่างเป็นทางการ",
+        body: "Mahidol · Princeton · Stanford · Harvard",
+      },
+      {
+        title: "จัดจ่ายโดยเภสัชกรท้องถิ่น",
+        body: "ผ่านพาร์ทเนอร์ร้านขายยาที่ได้รับอนุญาตในไทย",
+      },
+    ],
+    clarity: {
+      eyebrow: "ปัญหา",
+      title: "ตัวเลือกมากเกินไป.",
+      accent: "ให้ MattaNutra ช่วยทำให้ชัดเจน.",
+      body:
+        "เดินเข้าร้านขายยาหรือดูออนไลน์แล้วมักสับสน MattaNutra ช่วยพาคุณจากตัวเลือกนับร้อย เหลือเพียงไม่กี่ตัวที่เหมาะและเฉพาะกับคุณ นี่คือการรู้ปริมาณที่พอดี",
+      cards: [
+        {
+          title: "สับสน",
+          body: "ตัวเลือกมากมาย แต่ไม่มีคำตอบชัดเจน",
+          image: assets.clarity[0],
+          imageAlt: "สับสนกับชั้นวางอาหารเสริม",
+        },
+        {
+          title: "ทางที่ชัดเริ่มปรากฏ",
+          body: "คำตอบของคุณช่วยคัดสิ่งที่ไม่เกี่ยวออก",
+          image: assets.clarity[1],
+          imageAlt: "ทางเลือกที่ชัดเจนเริ่มปรากฏ",
+        },
+        {
+          title: "เหลือสิ่งที่สำคัญ",
+          body: "คงไว้เฉพาะสิ่งที่เหมาะกับร่างกายและเป้าหมาย",
+          image: assets.clarity[2],
+          imageAlt: "คัดให้เหลือสิ่งที่สำคัญ",
+        },
+        {
+          title: "พอดีอย่างแม่นยำ",
+          body: "แผนที่ออกแบบรอบปริมาณที่พอดีของคุณ",
+          image: assets.clarity[3],
+          imageAlt: "สิ่งที่ต้องการอย่างพอดี",
+        },
       ],
     },
     problem: {
@@ -579,6 +709,8 @@ const baseContent = {
       eyebrow: "อาหารและอาหารเสริมไปด้วยกัน",
       title: "บางครั้งแหล่งที่ดีที่สุดอยู่",
       accent: "บนจานของคุณ",
+      imageAlt:
+        "ชามอาหารที่มีปลา ผักใบเขียว บรอกโคลี ถั่วดำ ข้าวกล้อง และเมล็ดฟักทอง",
       intro:
         "อาหารเสริมเติมช่องว่าง แต่อาหารควรมาก่อน เมื่อโปรโตคอลชีวิตเห็นสิ่งที่ร่างกายต้องการ ระบบไม่ได้มองหาแคปซูลทันที แต่บอกอาหารประจำวันที่มีสารนั้นตามธรรมชาติ เพื่อให้คุณเลือกได้ว่าจะเติมจากมื้ออาหารหรือจากขวด",
       cards: [
@@ -616,13 +748,41 @@ const baseContent = {
       cta: "ออกแบบปริมาณที่พอดีของคุณ",
       note: "ดูแผนและราคาทั้งหมดด้านล่าง",
     },
+    questionnaire: {
+      eyebrow: "เริ่มฟรี",
+      title: "ตัวอย่างภายในแบบสอบถาม.",
+      body:
+        "นี่คือตัวอย่างว่าแบบสอบถามประเมินวิตามิน D เพียงตัวเดียวอย่างไร ซึ่งเป็นหนึ่งในส่วนผสมกว่า 120 รายการที่อัลกอริทึมชั่งน้ำหนัก โดยใช้คำตอบหลายข้อร่วมกัน เวอร์ชันเต็มมีหกส่วนสั้น ๆ",
+      cardLabel: "Formula Precision",
+      privateLabel: "เป็นส่วนตัวและเข้ารหัส",
+      sampleLabel: "ตัวอย่าง",
+      sampleBody: "ประเมินเพียงหนึ่งส่วนผสม",
+      progressPath: "เริ่ม → พื้นฐาน → ความแม่นยำ",
+      progress: "8%",
+      progressNote: "คุณอยู่ที่ 8% — ทำต่อเพื่อจบส่วนสำคัญ",
+      quote:
+        "ไม่มีคำตอบถูกหรือผิด มีแต่คำตอบที่เป็นจริง ยิ่งคุณตอบอย่างตรงไปตรงมา สูตรของคุณก็ยิ่งพอดี และปลอดภัยขึ้นเมื่อเทียบกับสิ่งที่คุณใช้อยู่",
+      skinTone: "สีผิว",
+      foundation: "พื้นฐาน",
+      skinBody: "ช่วยประเมินการสร้างวิตามิน D ร่วมกับการโดนแดด",
+      sunExposure: "เวลาโดนแดดต่อวัน",
+      sunOptions: ["น้อยกว่า 15 นาที", "15–30", "30–60", "60 นาที+"],
+      sunscreen: "การใช้กันแดด",
+      sunscreenOptions: ["แทบไม่ใช้", "บางครั้ง", "ทุกวัน"],
+      insight:
+        "สีผิว แสงแดด และกันแดดถูกชั่งน้ำหนักร่วมกัน วิตามิน D ของคุณจึงไม่ใช่การเดา แต่เป็นการประเมินจากชีวิตจริง",
+      sectionsLabel: "หนึ่งคำถาม จากหกส่วน:",
+      sections: ["พื้นฐาน", "เป้าหมาย", "ชีวิตประจำวัน", "อาหาร", "ความปลอดภัย", "ความแม่นยำ"],
+      bottom: "วิตามิน D เป็นหนึ่งในส่วนผสมกว่า 120 รายการที่อัลกอริทึมประเมิน",
+      reassurance: "✓ เริ่มฟรี ✓ ไม่ต้องใช้บัตรเครดิต ✓ ประมาณ 3 นาที",
+    },
     results: {
       eyebrow: "คนจริง เรื่องจริง",
-      title: "คนต่างชีวิต จุดเริ่มต้นต่างกัน.",
+      title: "ชีวิตต่างกัน. จุดเริ่มต้นเดียวกัน.",
       intro:
         "เป้าหมายเดียวกันคือสุขภาพที่ดีขึ้น ความชัดเจนมากขึ้น และกิจวัตรที่ทำได้จริง",
       cta: "ออกแบบปริมาณที่พอดีของคุณ",
-      join: "ร่วมกับผู้คนที่กำลังเลือกดูแลสุขภาพอย่างมั่นใจและฉลาดขึ้น",
+      join: "เลือกดูแลสุขภาพอย่างฉลาดและมั่นใจมากขึ้น",
       fallback: [
         {
           id: "daniel",
@@ -823,12 +983,6 @@ type WidenLandingContent<T> = T extends string
           : T;
 
 type LandingContent = WidenLandingContent<typeof baseContent.en>;
-export type LandingPricingPlan = Omit<
-  LandingContent["pricing"]["plans"][number],
-  "plan"
-> & {
-  readonly plan: AssessmentPlan;
-};
 
 export const content = {
   ...baseContent,
@@ -847,6 +1001,53 @@ export const content = {
         "从免费的 Health Score 开始，了解您的状态。您的个性化 Right Amount Formula 会在您准备好时呈现。",
       checks: ["无需信用卡", "评估 120+ 种成分", "包含安全检查"],
       ingredientPills: ["镁", "维生素 D3", "Omega-3", "南非醉茄", "锌"],
+    },
+    proof: [
+      {
+        title: "创始团队拥有 100+ 年综合经验",
+        body: "医学 · 科学 · 技术",
+      },
+      {
+        title: "正规教育与训练",
+        body: "Mahidol · Princeton · Stanford · Harvard",
+      },
+      {
+        title: "由本地药师调配",
+        body: "通过持牌泰国药房合作伙伴",
+      },
+    ],
+    clarity: {
+      eyebrow: "问题所在",
+      title: "选择太多。",
+      accent: "让 MattaNutra 带来清晰。",
+      body:
+        "走进药房或在线浏览都会令人不知所措。MattaNutra 帮您从数百个选择缩小到真正适合、且为您个性化的少数选择。知道适量。",
+      cards: [
+        {
+          title: "不知所措",
+          body: "选择太多，没有清晰答案。",
+          image: assets.clarity[0],
+          imageAlt: "面对补充剂货架感到不知所措",
+        },
+        {
+          title: "清晰路径出现",
+          body: "您的回答开始缩小范围。",
+          image: assets.clarity[1],
+          imageAlt: "清晰路径出现",
+        },
+        {
+          title: "范围缩小",
+          body: "只保留适合身体和目标的内容。",
+          image: assets.clarity[2],
+          imageAlt: "缩小到真正重要的选择",
+        },
+        {
+          title: "刚刚好",
+          body: "围绕您的适量设计的计划。",
+          image: assets.clarity[3],
+          imageAlt: "手中恰好需要的选择",
+        },
+      ],
     },
     problem: {
       eyebrow: "问题所在",
@@ -975,6 +1176,8 @@ export const content = {
       eyebrow: "食物与补充剂，相辅相成",
       title: "最佳来源有时",
       accent: "就在您的餐盘上。",
+      imageAlt:
+        "一碗含鱼、绿叶菜、西兰花、黑豆、糙米和南瓜子的营养餐",
       intro:
         "补充剂填补缺口——但食物优先填补。当 Living Protocol 发现身体需要某物时，它不会只推荐胶囊。它会告诉您哪些日常食物天然富含该成分，让您选择：在晚餐中补充，还是从瓶中补充。无论哪种方式，您都在真正了解，而非猜测。",
       cards: [
@@ -1012,17 +1215,45 @@ export const content = {
       cta: "开始设计您的 Right Amount",
       note: "查看完整计划和定价。",
     },
+    questionnaire: {
+      eyebrow: "免费开始",
+      title: "问卷内部的一瞥。",
+      body:
+        "以下展示问卷如何仅估算您的维生素 D——这是算法权衡的 120+ 种成分之一——它会同时参考多项回答。完整版本包含六个简短部分。",
+      cardLabel: "Formula Precision",
+      privateLabel: "私密且加密",
+      sampleLabel: "示例",
+      sampleBody: "仅估算一种成分",
+      progressPath: "开始 → 基础 → 精准",
+      progress: "8%",
+      progressNote: "您已完成 8%——继续完成基础部分。",
+      quote:
+        "这里没有对错答案，只有真实答案。您回答得越诚实，配方就越精准，也越能安全地配合您已经在使用的东西。",
+      skinTone: "肤色",
+      foundation: "基础",
+      skinBody: "帮助结合日晒情况估算您的维生素 D 合成。",
+      sunExposure: "每日日晒时间",
+      sunOptions: ["少于 15 分钟", "15–30", "30–60", "60 分钟+"],
+      sunscreen: "防晒使用",
+      sunscreenOptions: ["很少", "有时", "每天"],
+      insight:
+        "肤色、日晒和防晒会一起权衡——因此您的维生素 D 不是猜测，而是为您的生活建立的估算。",
+      sectionsLabel: "一个问题，来自六个部分：",
+      sections: ["基础", "目标", "日常生活", "食物", "安全", "精准"],
+      bottom: "维生素 D 是算法评估的 120+ 种成分之一。",
+      reassurance: "✓ 免费开始 ✓ 无需信用卡 ✓ 大约 3 分钟",
+    },
     results: {
       eyebrow: "真实的人。真实的故事。",
-      title: "真实的人，真实的起点。",
+      title: "不同生活。同一个第一步。",
       intro:
         "不同的生活方式。同一个目标：更好的健康、更清晰的方向，以及可行的日常。",
       cta: "开始设计您的 Right Amount",
-      join: "加入数千名正在为健康做出更明智、更自信选择的人。",
+      join: "为您的健康做出更明智、更自信的选择。",
       fallback: [
         {
           id: "daniel",
-          image: "/v14/testimonial-daniel.jpg",
+          image: assets.testimonials[0],
           name: "Daniel L.",
           place: "40, 曼谷",
           role: "项目经理",
@@ -1031,7 +1262,7 @@ export const content = {
         },
         {
           id: "meilin",
-          image: "/v14/testimonial-meilin.jpg",
+          image: assets.testimonials[1],
           name: "Mei Lin T.",
           place: "45, 新加坡",
           role: "运营负责人",
@@ -1040,7 +1271,7 @@ export const content = {
         },
         {
           id: "wanida",
-          image: "/v14/testimonial-wanida.jpg",
+          image: assets.testimonials[2],
           name: "Wanida P.",
           place: "43, 孔敬",
           role: "店主",
@@ -1049,7 +1280,7 @@ export const content = {
         },
         {
           id: "malee",
-          image: "/v14/testimonial-malee.jpg",
+          image: assets.testimonials[3],
           name: "Malee S.",
           place: "41, 普吉",
           role: "护理助理",
@@ -1183,7 +1414,7 @@ export const content = {
         ],
         [
           "推荐产品来自哪里？",
-          "我们指向东南亚购物者实际使用的平台上的产品，选择与您的配方匹配。目标是帮助您在已信任的市场中自信购买。",
+          "您的配方通过合作药房网络由注册药师调配，因此您拿到的正是计划所需的内容——无需在货架前猜测。我们不生产补充剂；我们会把您匹配到可信产品和能回答问题的药师。",
         ],
         [
           "免费评估真的免费吗？",
@@ -1191,7 +1422,7 @@ export const content = {
         ],
         [
           "为什么用 Pāli 名称？",
-          "Mattaññutā 意为知道适量。它来自关于节制与平衡的实用智慧传统——繁荣并非来自更多，而是来自恰到好处。",
+          "“Mattaññutā” 意为知道适量。它来自 2,500 年关于节制与平衡的实用智慧传统——健康兴盛并非来自更多，而是来自恰到好处。这个名字是我们的承诺：帮助您找到自己的适量，而不是卖给您不需要的更多东西。",
         ],
       ],
     },
