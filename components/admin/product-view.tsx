@@ -148,12 +148,59 @@ export function AdminProductsView({
   const [metricFilter, setMetricFilter] =
     useState<ProductMetricFilter>("productsTotal");
   const [manufacturerFilter, setManufacturerFilter] = useState("");
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState("");
   const viewLabels = productViewLabels[locale];
   const normalizedSearch = search.trim().toLowerCase();
   const metrics = productMetricCards({ locale, rows, viewLabels });
   const manufacturerOptions = productManufacturerStats(rows);
+  const exportHref = `/api/admin/products/catalogue/export?scope=platform${
+    accessToken ? `&access_token=${encodeURIComponent(accessToken)}` : ""
+  }`;
   function handleMetricSelect(metricId: BusinessMetric["id"]) {
     setMetricFilter(metricId as ProductMetricFilter);
+  }
+
+  async function importProductCsv(file: File | null) {
+    if (!file || importBusy) {
+      return;
+    }
+
+    setImportBusy(true);
+    setImportError("");
+
+    try {
+      const csvText = await file.text();
+      const response = await fetch("/api/admin/products/catalogue/import", {
+        body: JSON.stringify({
+          accessToken,
+          csvText,
+          scope: "platform"
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const json = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(json.message || viewLabels.importCsvError);
+      }
+
+      window.alert(
+        `Imported ${json.result?.rowCount ?? 0} rows. Created ${
+          json.result?.createdProducts ?? 0
+        }, updated ${json.result?.updatedProducts ?? 0}.`
+      );
+      window.location.reload();
+    } catch (error) {
+      setImportError(
+        error instanceof Error ? error.message : viewLabels.importCsvError
+      );
+    } finally {
+      setImportBusy(false);
+    }
   }
 
   const filteredRows = rows.filter((row) => {
@@ -197,6 +244,39 @@ export function AdminProductsView({
             ))}
           </select>
         </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a
+            className="inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1FA77A] focus-visible:ring-offset-2"
+            href={exportHref}
+          >
+            {viewLabels.exportCsv}
+          </a>
+          <label
+            className={classNames(
+              importBusy
+                ? "cursor-not-allowed opacity-60"
+                : "cursor-pointer hover:bg-[#188865]",
+              "inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition focus-within:ring-2 focus-within:ring-[#1FA77A] focus-within:ring-offset-2"
+            )}
+          >
+            {importBusy ? viewLabels.saving : viewLabels.importCsv}
+            <input
+              accept=".csv,text/csv"
+              className="sr-only"
+              disabled={importBusy}
+              onChange={(event) => {
+                void importProductCsv(event.target.files?.[0] ?? null);
+                event.target.value = "";
+              }}
+              type="file"
+            />
+          </label>
+        </div>
+        {importError ? (
+          <p className="mt-3 text-sm font-semibold text-rose-700">
+            {importError}
+          </p>
+        ) : null}
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-2">

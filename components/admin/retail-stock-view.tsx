@@ -1438,6 +1438,11 @@ export function AdminRetailStockView({
         hygeiaOrganisationId
       )}&access_token=${encodeURIComponent(accessToken)}`
     : "";
+  const productCatalogueExportHref = hygeiaOrganisationId
+    ? `/api/admin/products/catalogue/export?scope=retail&organisationId=${encodeURIComponent(
+        hygeiaOrganisationId
+      )}&access_token=${encodeURIComponent(accessToken)}`
+    : "";
   const stockPriceCurrency =
     selectedOrganisationId === "all"
       ? Array.from(new Set(rows.map((row) => row.currency))).length === 1
@@ -2123,6 +2128,45 @@ export function AdminRetailStockView({
       await refreshRetailStockData();
     } catch (error) {
       setError(actionErrorMessage(error, labels.stock.hygeiaImportError));
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function importRetailProductCatalogueFile(file: File | null) {
+    if (!file || !hygeiaOrganisationId) {
+      return;
+    }
+
+    setBusyId("product-catalogue-import");
+    setError("");
+
+    try {
+      const csvText = await file.text();
+      const response = await fetch("/api/admin/products/catalogue/import", {
+        body: JSON.stringify({
+          accessToken,
+          csvText,
+          organisationId: hygeiaOrganisationId,
+          scope: "retail"
+        }),
+        credentials: "same-origin",
+        headers: {
+          "content-type": "application/json"
+        },
+        method: "POST"
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        message?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(result.message);
+      }
+
+      await refreshRetailStockData();
+    } catch (error) {
+      setError(actionErrorMessage(error, labels.stock.saveError));
     } finally {
       setBusyId("");
     }
@@ -2961,6 +3005,45 @@ export function AdminRetailStockView({
 	            />
 	          </label>
 	          <div className="flex flex-wrap justify-end gap-2">
+	            {productCatalogueExportHref ? (
+	              <a
+	                className="inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865]"
+	                href={productCatalogueExportHref}
+	              >
+	                {labels.stock.exportCsv}
+	              </a>
+	            ) : (
+	              <AdminButton disabled>
+	                {labels.stock.exportCsv}
+	              </AdminButton>
+	            )}
+	            {data.canWrite ? (
+	              <label
+	                className={classNames(
+	                  Boolean(busyId) || !hygeiaOrganisationId
+	                    ? "cursor-not-allowed opacity-60"
+	                    : "cursor-pointer hover:bg-[#188865]",
+	                  "inline-flex items-center justify-center rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition"
+	                )}
+	                title={
+	                  hygeiaOrganisationId
+	                    ? undefined
+	                    : labels.stock.hygeiaRetailerRequired
+	                }
+	              >
+	                {labels.stock.importCsv}
+	                <input
+	                  accept=".csv,text/csv"
+	                  className="sr-only"
+	                  disabled={Boolean(busyId) || !hygeiaOrganisationId}
+	                  onChange={(event) => {
+	                    void importRetailProductCatalogueFile(event.target.files?.[0] ?? null);
+	                    event.target.value = "";
+	                  }}
+	                  type="file"
+	                />
+	              </label>
+	            ) : null}
 	            {hygeiaExportHref ? (
 	              <a
 	                className="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-emerald-200 hover:bg-emerald-50"

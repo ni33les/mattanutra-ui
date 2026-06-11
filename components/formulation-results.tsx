@@ -149,10 +149,10 @@ function panyaLineModeForPlan(plan: string) {
 const panyaRevealSectionCopy = {
   en: {
     buttonLead:
-      "Connect on LINE with a one-time code. Panya will recognise this plan when you start the chat.",
+      "Scan the QR or open LINE. The connect message is prefilled; tap send in LINE and Panya will recognise this plan.",
     copied: "Copied",
     copyCode: "Copy code",
-    createCode: "Create LINE code",
+    createCode: "Create new code",
     eyebrow: "Panya support",
     error: "Could not create a LINE code. Please try again.",
     expires: "Code expires soon",
@@ -164,15 +164,15 @@ const panyaRevealSectionCopy = {
     planBody:
       "Use LINE to ask about your formula, why each nutrient was selected, and how to move from this plan into your daily routine.",
     planHeading: "Talk through your nutrition plan with Panya.",
-    qrAlt: "MattaNutra LINE QR code",
-    qrPlaceholder: "Create a code to show your LINE QR.",
+    qrAlt: "MattaNutra LINE connect QR code",
+    qrPlaceholder: "Preparing your LINE QR...",
   },
   th: {
     buttonLead:
-      "เชื่อมต่อผ่าน LINE ด้วยรหัสครั้งเดียว Panya จะรู้ว่าแชทนี้เกี่ยวข้องกับแผนนี้",
+      "สแกน QR หรือเปิด LINE ข้อความเชื่อมต่อจะถูกใส่ไว้ให้แล้ว กดส่งใน LINE แล้ว Panya จะรู้ว่าเป็นแผนนี้",
     copied: "คัดลอกแล้ว",
     copyCode: "คัดลอกรหัส",
-    createCode: "สร้างรหัส LINE",
+    createCode: "สร้างรหัสใหม่",
     eyebrow: "Panya support",
     error: "ไม่สามารถสร้างรหัส LINE ได้ โปรดลองอีกครั้ง",
     expires: "รหัสจะหมดอายุเร็ว ๆ นี้",
@@ -184,15 +184,15 @@ const panyaRevealSectionCopy = {
     planBody:
       "ใช้ LINE เพื่อถามเรื่องสูตรของคุณ เหตุผลที่เลือกสารอาหารแต่ละตัว และวิธีนำแผนนี้ไปใช้ในชีวิตประจำวัน",
     planHeading: "คุยเรื่องแผนโภชนาการของคุณกับ Panya",
-    qrAlt: "คิวอาร์โค้ด LINE ของ MattaNutra",
-    qrPlaceholder: "สร้างรหัสเพื่อแสดงคิวอาร์ LINE ของคุณ",
+    qrAlt: "คิวอาร์โค้ดเชื่อมต่อ LINE ของ MattaNutra",
+    qrPlaceholder: "กำลังเตรียมคิวอาร์ LINE ของคุณ...",
   },
   "zh-CN": {
     buttonLead:
-      "使用一次性代码在 LINE 上连接。开始聊天后，Panya 会识别这份方案。",
+      "扫描二维码或打开 LINE。连接消息会自动填好；在 LINE 中点发送后，Panya 会识别这份方案。",
     copied: "已复制",
     copyCode: "复制代码",
-    createCode: "创建 LINE 代码",
+    createCode: "创建新代码",
     eyebrow: "Panya 支持",
     error: "无法创建 LINE 代码，请重试。",
     expires: "代码即将过期",
@@ -204,8 +204,8 @@ const panyaRevealSectionCopy = {
     planBody:
       "通过 LINE 询问你的配方、每种营养素被选择的原因，以及如何把这份方案融入日常生活。",
     planHeading: "和 Panya 一起讨论你的营养方案。",
-    qrAlt: "MattaNutra LINE 二维码",
-    qrPlaceholder: "创建代码后显示你的 LINE 二维码。",
+    qrAlt: "MattaNutra LINE 连接二维码",
+    qrPlaceholder: "正在准备你的 LINE 二维码...",
   },
 } satisfies Record<Locale, {
   buttonLead: string;
@@ -1899,6 +1899,7 @@ function RevealPanyaLineSupportSection({
   const [connectLoading, setConnectLoading] = useState(false);
   const [connectError, setConnectError] = useState("");
   const [copied, setCopied] = useState(false);
+  const connectRequestStartedRef = useRef(false);
   const qrUrl = useMemo(
     () =>
       connect?.lineUrl
@@ -1908,25 +1909,38 @@ function RevealPanyaLineSupportSection({
   );
 
   useEffect(() => {
+    connectRequestStartedRef.current = false;
+    setConnect(null);
+    setConnectError("");
+    setCopied(false);
     postRevealPanyaLineBpm({
       eventName: "customer_line_cta_viewed",
       locale,
       planId,
     });
+    void createConnectCode(false, true);
   }, [locale, planId]);
 
-  async function createConnectCode() {
+  async function createConnectCode(trackClick = true, ignoreExisting = false) {
     setConnectError("");
-    postRevealPanyaLineBpm({
-      eventName: "customer_line_cta_clicked",
-      locale,
-      planId,
-    });
 
-    if (connect || connectLoading) {
+    if (trackClick) {
+      postRevealPanyaLineBpm({
+        eventName: "customer_line_cta_clicked",
+        locale,
+        planId,
+      });
+    }
+
+    if (
+      connectRequestStartedRef.current ||
+      (!ignoreExisting && connect) ||
+      connectLoading
+    ) {
       return;
     }
 
+    connectRequestStartedRef.current = true;
     setConnectLoading(true);
 
     try {
@@ -1955,6 +1969,7 @@ function RevealPanyaLineSupportSection({
         lineUrl: String(payload.lineUrl),
       });
     } catch {
+      connectRequestStartedRef.current = false;
       setConnectError(labels.error);
     } finally {
       setConnectLoading(false);
@@ -1992,11 +2007,11 @@ function RevealPanyaLineSupportSection({
             >
               {heading}
             </h2>
-          </div>
-          <div className="space-y-5" data-reveal>
-            <p className="text-base leading-8 text-[var(--mn-ink-soft)]">
+            <p className="mt-5 text-base leading-8 text-[var(--mn-ink-soft)]">
               {body}
             </p>
+          </div>
+          <div className="space-y-5" data-reveal>
             <div className="rounded-xl bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]">
               <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
                 <a
@@ -2027,7 +2042,7 @@ function RevealPanyaLineSupportSection({
                   </p>
                   <div className="mt-3 rounded-xl bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
                     <p className="break-all font-mono text-lg font-bold text-[var(--mn-ink)]">
-                      {connect?.command ?? (connectLoading ? labels.loading : "MN PLAN")}
+                      {connect?.command ?? (connectLoading ? labels.loading : "MN")}
                     </p>
                     <p className="mt-2 text-xs text-[var(--mn-ash)]">
                       {connect ? labels.expires : labels.qrPlaceholder}
@@ -2053,7 +2068,9 @@ function RevealPanyaLineSupportSection({
                       <button
                         className="inline-flex items-center gap-2 rounded-full bg-[#06C755] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#05B34D] disabled:opacity-60"
                         disabled={connectLoading}
-                        onClick={createConnectCode}
+                        onClick={() => {
+                          void createConnectCode();
+                        }}
                         type="button"
                       >
                         <MessageCircle aria-hidden className="size-4" />
@@ -2227,16 +2244,7 @@ function RevealFoodSupportSection({
               </div>
             </div>
           </div>
-        ) : items.length < 1 ? (
-          <div
-            className="mt-10 rounded-xl bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:p-8"
-            data-reveal
-          >
-            <p className="max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]">
-              {copy.foodSupportEmpty}
-            </p>
-          </div>
-        ) : (
+        ) : items.length > 0 ? (
           <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {items.map((item) => {
               const seed = managedSeedForFoodSupportItem(item);
@@ -2419,7 +2427,7 @@ function RevealFoodSupportSection({
               );
             })}
           </div>
-        )}
+        ) : null}
       </div>
     </section>
   );

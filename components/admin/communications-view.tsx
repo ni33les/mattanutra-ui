@@ -69,7 +69,6 @@ function communicationTitle(row: AdminCommunicationRow) {
 }
 
 const lineConnectUrl = "https://line.me/R/ti/p/@344enooi";
-const lineConnectQrUrl = `/api/qr?data=${encodeURIComponent(lineConnectUrl)}`;
 
 type ConnectMethod = "line" | "email";
 type ConnectProvider = ConnectMethod | "sms" | "whatsapp";
@@ -130,7 +129,9 @@ export function AdminCommunicationsView({
   const [lineContactName, setLineContactName] = useState("");
   const [lineCode, setLineCode] = useState<{
     code: string;
+    command: string;
     expiresAt: string;
+    lineUrl: string;
   } | null>(null);
   const [connectMethod, setConnectMethod] = useState<ConnectMethod>("line");
   const [connectModalOpen, setConnectModalOpen] = useState(false);
@@ -322,6 +323,7 @@ export function AdminCommunicationsView({
       const response = await fetch("/api/admin/communications/line-connect", {
         body: JSON.stringify({
           displayName: lineContactName,
+          locale,
           organisationId: settings.selectedOrganisationId
         }),
         credentials: "same-origin",
@@ -336,7 +338,9 @@ export function AdminCommunicationsView({
 
       setLineCode({
         code: json.token.code,
-        expiresAt: json.token.expiresAt
+        command: json.token.command ?? `MN ${json.token.code}`,
+        expiresAt: json.token.expiresAt,
+        lineUrl: json.token.lineUrl
       });
     } catch {
       setSettingsError("Could not create LINE connection code.");
@@ -706,31 +710,37 @@ export function AdminCommunicationsView({
           ) : (
             <div className="space-y-5 px-6 py-5">
               <div className="grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)]">
-                <a
-                  className="block rounded-md bg-white p-2 ring-1 ring-gray-200"
-                  href={lineConnectUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <img
-                    alt="MattaNutra LINE QR code"
-                    className="size-44"
-                    height={176}
-                    src={lineConnectQrUrl}
-                    width={176}
-                  />
-                </a>
-                <div className="text-sm leading-6 text-gray-600">
-                  <p>
-                    Scan the QR code or open the LINE bot link, add it to the chat or group, then create a code below.
-                  </p>
+                {lineCode?.lineUrl ? (
                   <a
-                    className="mt-3 inline-flex text-sm font-semibold text-[#126B4F] hover:text-[#0F5D44]"
-                    href={lineConnectUrl}
+                    className="block rounded-md bg-white p-2 ring-1 ring-gray-200"
+                    href={lineCode.lineUrl}
                     rel="noreferrer"
                     target="_blank"
                   >
-                    Open LINE bot
+                    <img
+                      alt="MattaNutra LINE connect QR code"
+                      className="size-44"
+                      height={176}
+                      src={`/api/qr?data=${encodeURIComponent(lineCode.lineUrl)}`}
+                      width={176}
+                    />
+                  </a>
+                ) : (
+                  <div className="grid size-48 place-items-center rounded-md bg-gray-50 p-4 text-center text-sm leading-6 text-gray-500 ring-1 ring-gray-200">
+                    Create a code to show a QR that includes the connection message.
+                  </div>
+                )}
+                <div className="text-sm leading-6 text-gray-600">
+                  <p>
+                    Enter a contact name, create a code, then scan the QR. The QR opens LINE with the connection message ready to send.
+                  </p>
+                  <a
+                    className="mt-3 inline-flex text-sm font-semibold text-[#126B4F] hover:text-[#0F5D44]"
+                    href={lineCode?.lineUrl ?? lineConnectUrl}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {lineCode ? "Open LINE with code" : "Open LINE bot"}
                   </a>
                 </div>
               </div>
@@ -759,7 +769,7 @@ export function AdminCommunicationsView({
                     Send this message in LINE
                   </div>
                   <div className="mt-2 select-all rounded-md bg-[#20343A] px-3 py-2 font-mono text-sm font-semibold text-white">
-                    MN CONNECT {lineCode.code}
+                    {lineCode.command}
                   </div>
                   <div className="mt-2 text-xs text-gray-500">
                     Expires {formatGeneratedAt(lineCode.expiresAt, locale)}

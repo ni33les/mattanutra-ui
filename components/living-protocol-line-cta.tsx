@@ -349,7 +349,7 @@ export function LivingProtocolLineCta({
               >
                 {qrUrl ? (
                   <img
-                    alt="MattaNutra LINE QR code"
+                    alt="MattaNutra LINE connect QR code"
                     className="size-36"
                     height={144}
                     src={qrUrl}
@@ -364,7 +364,7 @@ export function LivingProtocolLineCta({
               <div className="min-w-0">
                 <div className="rounded-xl bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
                   <p className="font-mono text-lg font-bold text-[var(--mn-ink)]">
-                    {connect?.command ?? (loading ? labels.loading : "MN PLAN")}
+                    {connect?.command ?? (loading ? labels.loading : "MN")}
                   </p>
                   <p className="mt-2 text-xs text-[var(--mn-ash)]">
                     {labels.expires}

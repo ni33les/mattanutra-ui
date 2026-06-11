@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import { selectedFoodSupport } from "../components/formulation-support-helpers.ts";
 import type {
@@ -78,6 +79,26 @@ function result(overrides: Partial<FormulationResult> = {}): FormulationResult {
 }
 
 describe("formulation food support", () => {
+  it("does not expose implementation fallback copy in the reveal empty state", async () => {
+    const [reveal, copy] = await Promise.all([
+      readFile("components/formulation-results.tsx", "utf8"),
+      readFile("components/formulation-reveal-copy.ts", "utf8"),
+    ]);
+
+    assert.doesNotMatch(
+      `${reveal}\n${copy}`,
+      /Food cards are shown only when the selected stack leaves a supportable formula gap/,
+    );
+    assert.doesNotMatch(reveal, /foodSupportEmpty/);
+    assert.match(reveal, /copy\.foodSupportNoGapsHeadline/);
+    assert.match(reveal, /copy\.foodSupportNoGapsBody/);
+    assert.match(reveal, /\) : items\.length > 0 \? \(/);
+    assert.doesNotMatch(
+      reveal,
+      /items\.length < 1 \? \([\s\S]*copy\.foodSupportNoGapsHeadline[\s\S]*copy\.foodSupportNoGapsBody[\s\S]*\) : \(/,
+    );
+  });
+
   it("uses the active product stack gaps instead of stale stored food cards", () => {
     const staleGreenTea = foodItem("green_tea", "Green tea", [
       "supplement:curcumin",

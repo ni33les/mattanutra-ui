@@ -11,6 +11,24 @@ function getConfiguredUrl(value: string | undefined) {
   return value?.trim() || "";
 }
 
+function configuredLineOfficialId() {
+  const officialId =
+    getConfiguredUrl(process.env.NEXT_PUBLIC_LINE_OFFICIAL_ID) || "@344enooi";
+
+  return officialId.startsWith("@") ? officialId : `@${officialId}`;
+}
+
+function lineOfficialIdFromUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    const match = /\/R\/(?:ti\/p|oaMessage)\/([^/?]+)/.exec(parsed.pathname);
+
+    return match?.[1] ? decodeURIComponent(match[1]) : "";
+  } catch {
+    return "";
+  }
+}
+
 function appendQuery(url: string, params: Record<string, string>) {
   try {
     const parsed = new URL(url);
@@ -34,13 +52,14 @@ function getLineUrl(planId: string) {
     return planId ? appendQuery(directUrl, { plan: planId }) : directUrl;
   }
 
-  const officialId =
-    getConfiguredUrl(process.env.NEXT_PUBLIC_LINE_OFFICIAL_ID) || "@344enooi";
-  const normalizedId = officialId.startsWith("@")
-    ? officialId
-    : `@${officialId}`;
+  return `https://line.me/R/ti/p/${encodeURIComponent(configuredLineOfficialId())}`;
+}
 
-  return `https://line.me/R/ti/p/${encodeURIComponent(normalizedId)}`;
+export function buildLineOfficialAccountMessageUrl(message: string) {
+  const directUrl = getConfiguredUrl(process.env.NEXT_PUBLIC_LINE_CHAT_URL);
+  const officialId = lineOfficialIdFromUrl(directUrl) || configuredLineOfficialId();
+
+  return `https://line.me/R/oaMessage/${encodeURIComponent(officialId)}/?${encodeURIComponent(message)}`;
 }
 
 function getTelegramUrl(planId: string) {

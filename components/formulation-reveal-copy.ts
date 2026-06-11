@@ -83,8 +83,6 @@ const baseRevealCopy = {
     foodSupportDefaultBody:
       "Foods do not change the product coverage score. They only appear when the product stack leaves a supplement gap that a managed food can credibly support.",
     foodSupportDefaultHeadline: "Food support, after the products.",
-    foodSupportEmpty:
-      "Food cards are shown only when the selected stack leaves a supportable formula gap.",
     foodSupportEyebrow: "Food support",
     foodSupportFrequency: "Frequency",
     foodSupportGapLabel: "Supports",
@@ -199,8 +197,6 @@ const baseRevealCopy = {
     foodSupportDefaultBody:
       "อาหารไม่เปลี่ยนคะแนนความครอบคลุมของผลิตภัณฑ์ และจะแสดงเฉพาะเมื่อชุดผลิตภัณฑ์ยังเหลือช่องว่างของสารอาหารที่อาหารในแคตตาล็อกช่วยเสริมได้อย่างน่าเชื่อถือ",
     foodSupportDefaultHeadline: "อาหารสนับสนุนหลังจากชุดผลิตภัณฑ์",
-    foodSupportEmpty:
-      "การ์ดอาหารจะแสดงเฉพาะเมื่อชุดที่เลือกยังเหลือช่องว่างในสูตรที่อาหารช่วยเสริมได้",
     foodSupportEyebrow: "อาหารสนับสนุน",
     foodSupportFrequency: "ความถี่",
     foodSupportGapLabel: "สนับสนุน",
@@ -313,7 +309,6 @@ export const revealCopy = {
     "formulaSignedPrefix": "配制于",
     "foodSupportDefaultBody": "食物不会改变产品覆盖评分。只有当产品配方留下补充剂缺口，且可通过管理食物合理支持时，它们才会出现。",
     "foodSupportDefaultHeadline": "产品之后，食物支持。",
-    "foodSupportEmpty": "只有当所选组合留下可由食物支持的配方缺口时，才会显示食物卡片。",
     "foodSupportEyebrow": "食物支持",
     "foodSupportFrequency": "频率",
     "foodSupportGapLabel": "支持",

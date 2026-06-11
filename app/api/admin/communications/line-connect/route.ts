@@ -6,6 +6,7 @@ import {
 } from "@/lib/admin-access";
 import { requestOriginAllowed } from "@/lib/admin-session-cookie";
 import { hasAdminPermission } from "@/lib/admin-rbac";
+import { buildLineOfficialAccountMessageUrl } from "@/lib/chat-links";
 import { createOrganisationLineConnectToken } from "@/lib/communications";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
   const organisationId = text(body.organisationId) || context.effectiveOrganisation.id;
   const displayName = text(body.displayName);
+  const locale = text(body.locale);
 
   if (!canAccessEffectiveOrganisation(context, organisationId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -50,8 +52,16 @@ export async function POST(request: NextRequest) {
 
   const token = await createOrganisationLineConnectToken({
     displayName,
+    locale,
     organisationId
   });
+  const command = `MN ${token.code}`;
 
-  return NextResponse.json({ token });
+  return NextResponse.json({
+    token: {
+      ...token,
+      command,
+      lineUrl: buildLineOfficialAccountMessageUrl(command)
+    }
+  });
 }

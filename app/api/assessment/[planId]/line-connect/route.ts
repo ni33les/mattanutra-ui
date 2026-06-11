@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isUuid } from "@/lib/assessment-store";
 import { createCustomerLineConnectToken } from "@/lib/communications";
-import { buildChatChannels } from "@/lib/chat-links";
+import { buildLineOfficialAccountMessageUrl } from "@/lib/chat-links";
 
 export const runtime = "nodejs";
 
@@ -48,15 +48,13 @@ export async function POST(
       retailCustomerOrderId: text(body.retailCustomerOrderId),
       source: text(body.source) || "customer_line_cta"
     });
-    const lineChannel = buildChatChannels(planId).find(
-      (channel) => channel.id === "line"
-    );
+    const command = `MN ${token.code}`;
 
     return noStoreJson({
       code: token.code,
-      command: `MN PLAN ${token.code}`,
+      command,
       expiresAt: token.expiresAt,
-      lineUrl: lineChannel?.url ?? "https://line.me/R/ti/p/@344enooi",
+      lineUrl: buildLineOfficialAccountMessageUrl(command),
       retailCustomerOrderId: token.retailCustomerOrderId
     });
   } catch (error) {

@@ -5,23 +5,23 @@ import Image from "next/image";
 import type { AdminProductRow } from "@/lib/admin-products";
 import {
   adminLocalizedFallbackLabel,
-  adminLocalizedProductText
+  adminLocalizedProductText,
 } from "@/lib/admin-localized-display";
 import { siteLocaleRegistry, type Locale } from "@/lib/i18n";
 import {
   productCountryLabel,
   productCountryOptions,
-  type ProductCountryPricing
+  type ProductCountryPricing,
 } from "@/lib/product-countries";
 import {
   defaultRegulatoryAgencyForCountry,
   regulatoryAgencyByCode,
-  regulatoryAgencyOptionsForCountry
+  regulatoryAgencyOptionsForCountry,
 } from "@/lib/product-regulatory-agencies";
 import { supportedOrganisationCurrencies } from "@/lib/currencies";
 import {
   adminLocaleTextClass,
-  classNames
+  classNames,
 } from "@/components/admin/dashboard-shared";
 import {
   productBusinessState,
@@ -37,24 +37,29 @@ import {
   productTranslationFor,
   productTranslationLocales,
   productTranslationStatusClass,
-  productTranslationStatusLabel
+  productTranslationStatusLabel,
 } from "@/components/admin/product-view-helpers";
 
 function regulatoryApprovalSummary(
-  approvals: readonly AdminProductRow["regulatoryApprovals"][number][] = []
+  approvals: readonly AdminProductRow["regulatoryApprovals"][number][] = [],
 ) {
-  const active = approvals.filter((approval) =>
-    (approval.status === "verified" || approval.status === "sourced") &&
-    approval.approvalNumber.trim()
+  const active = approvals.filter(
+    (approval) =>
+      (approval.status === "verified" || approval.status === "sourced") &&
+      approval.approvalNumber.trim(),
   );
 
   if (active.length < 1) {
     return "-";
   }
 
-  const summary = active.slice(0, 2).map((approval) =>
-    `${approval.agencyCode} ${approval.approvalNumber}`
-  ).join(", ");
+  const summary = active
+    .slice(0, 2)
+    .map(
+      (approval) =>
+        `${approval.agencyCode.replaceAll("_", " ")} ${approval.approvalNumber}`,
+    )
+    .join(", ");
 
   return active.length > 2 ? `${summary} +${active.length - 2}` : summary;
 }
@@ -68,25 +73,28 @@ type ProductCountryApprovalPatch = Readonly<{
 
 function directCountryApproval(
   approvals: readonly AdminProductRow["regulatoryApprovals"][number][] = [],
-  countryCode: string
+  countryCode: string,
 ) {
-  return approvals.find((approval) =>
-    approval.scopeType === "country" &&
-    approval.scopeCode.toUpperCase() === countryCode.toUpperCase()
-  ) ?? null;
+  return (
+    approvals.find(
+      (approval) =>
+        approval.scopeType === "country" &&
+        approval.scopeCode.toUpperCase() === countryCode.toUpperCase(),
+    ) ?? null
+  );
 }
 
 function inheritedApprovalSummary(
-  approvals: readonly AdminProductRow["regulatoryApprovals"][number][] = []
+  approvals: readonly AdminProductRow["regulatoryApprovals"][number][] = [],
 ) {
   return regulatoryApprovalSummary(
-    approvals.filter((approval) => approval.scopeType === "region")
+    approvals.filter((approval) => approval.scopeType === "region"),
   );
 }
 
 function approvalDisplayLabel(
   approval: AdminProductRow["regulatoryApprovals"][number] | null,
-  fallback: string
+  fallback: string,
 ) {
   return approval
     ? `${approval.agencyName}: ${approval.approvalNumber}`
@@ -95,7 +103,7 @@ function approvalDisplayLabel(
 
 export function ProductInsightStat({
   label,
-  value
+  value,
 }: Readonly<{
   label: string;
   value: number;
@@ -109,7 +117,7 @@ export function ProductInsightStat({
 }
 
 export function LocalizedFallbackBadge({
-  label
+  label,
 }: Readonly<{
   label: string | null;
 }>) {
@@ -134,7 +142,7 @@ export function ProductCountryManager({
   pricingLabels,
   regulatoryApprovals,
   variant = "default",
-  removeLabel
+  removeLabel,
 }: Readonly<{
   addCountryLabel: string;
   allowedCountryCodes?: readonly string[];
@@ -145,11 +153,11 @@ export function ProductCountryManager({
   onAdd: (countryCode: string) => void;
   onPricingChange?: (
     countryCode: string,
-    patch: Partial<ProductCountryPricing>
+    patch: Partial<ProductCountryPricing>,
   ) => void;
   onRegulatoryApprovalChange?: (
     countryCode: string,
-    patch: ProductCountryApprovalPatch
+    patch: ProductCountryApprovalPatch,
   ) => boolean | void | Promise<boolean | void>;
   onRemove: (countryCode: string) => void;
   pricingLabels?: Readonly<{
@@ -172,12 +180,11 @@ export function ProductCountryManager({
   removeLabel: string;
 }>) {
   const safeCountryCodes = Array.isArray(countryCodes) ? [...countryCodes] : [];
-  const allowedSet = allowedCountryCodes
-    ? new Set(allowedCountryCodes)
-    : null;
-  const availableOptions = productCountryOptions.filter((country) =>
-    !safeCountryCodes.includes(country.code) &&
-    (!allowedSet || allowedSet.has(country.code))
+  const allowedSet = allowedCountryCodes ? new Set(allowedCountryCodes) : null;
+  const availableOptions = productCountryOptions.filter(
+    (country) =>
+      !safeCountryCodes.includes(country.code) &&
+      (!allowedSet || allowedSet.has(country.code)),
   );
   const [approvalDialog, setApprovalDialog] = useState<Readonly<{
     agencyCode: string;
@@ -198,7 +205,7 @@ export function ProductCountryManager({
       approvalNumber: approval?.approvalNumber ?? "",
       countryCode,
       evidenceUrl: approval?.evidenceUrl ?? "",
-      saving: false
+      saving: false,
     });
   }
 
@@ -209,11 +216,11 @@ export function ProductCountryManager({
 
     setApprovalDialog({
       ...approvalDialog,
-      saving: true
+      saving: true,
     });
     const agency = regulatoryAgencyByCode(
       approvalDialog.countryCode,
-      approvalDialog.agencyCode
+      approvalDialog.agencyCode,
     );
     const result = await onRegulatoryApprovalChange(
       approvalDialog.countryCode,
@@ -221,8 +228,8 @@ export function ProductCountryManager({
         agencyCode: agency.agencyCode,
         agencyName: agency.agencyName,
         approvalNumber: approvalDialog.approvalNumber,
-        evidenceUrl: approvalDialog.evidenceUrl.trim() || null
-      }
+        evidenceUrl: approvalDialog.evidenceUrl.trim() || null,
+      },
     );
 
     if (result !== false) {
@@ -232,7 +239,7 @@ export function ProductCountryManager({
 
     setApprovalDialog({
       ...approvalDialog,
-      saving: false
+      saving: false,
     });
   }
 
@@ -240,7 +247,7 @@ export function ProductCountryManager({
     <div
       className={classNames(
         "rounded-xl border border-gray-100 bg-gray-50",
-        variant === "compact" ? "p-3" : "p-4"
+        variant === "compact" ? "p-3" : "p-4",
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -293,14 +300,14 @@ export function ProductCountryManager({
             <tbody className="divide-y divide-gray-100">
               {safeCountryCodes.map((countryCode) => {
                 const pricing = countryPricing?.find(
-                  (item) => item.countryCode === countryCode
+                  (item) => item.countryCode === countryCode,
                 );
                 const approval = directCountryApproval(
                   regulatoryApprovals,
-                  countryCode
+                  countryCode,
                 );
                 const inherited = inheritedApprovalSummary(
-                  pricing?.effectiveRegulatoryApprovals
+                  pricing?.effectiveRegulatoryApprovals,
                 );
 
                 return (
@@ -321,7 +328,7 @@ export function ProductCountryManager({
                             parsed >= 0;
 
                           onPricingChange(countryCode, {
-                            rrpPriceAmount: validAmount ? parsed : null
+                            rrpPriceAmount: validAmount ? parsed : null,
                           });
                         }}
                         placeholder="RRP"
@@ -334,7 +341,9 @@ export function ProductCountryManager({
                       <select
                         className="w-24 rounded-md bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
                         onChange={(event) =>
-                          onPricingChange(countryCode, { currency: event.target.value })
+                          onPricingChange(countryCode, {
+                            currency: event.target.value,
+                          })
                         }
                         value={pricing?.currency ?? "THB"}
                       >
@@ -349,9 +358,7 @@ export function ProductCountryManager({
                       <button
                         className={classNames(
                           "text-left text-xs font-semibold underline-offset-2 hover:underline",
-                          approval
-                            ? "text-[#126B4F]"
-                            : "text-amber-700"
+                          approval ? "text-[#126B4F]" : "text-amber-700",
                         )}
                         disabled={!onRegulatoryApprovalChange}
                         onClick={() => openApprovalDialog(countryCode)}
@@ -359,7 +366,7 @@ export function ProductCountryManager({
                       >
                         {approvalDisplayLabel(
                           approval,
-                          pricingLabels?.notAvailable ?? "Not available"
+                          pricingLabels?.notAvailable ?? "Not available",
                         )}
                       </button>
                       {inherited !== "-" ? (
@@ -421,7 +428,8 @@ export function ProductCountryManager({
           <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl ring-1 ring-gray-200">
             <div>
               <h3 className="text-base font-semibold text-gray-900">
-                {pricingLabels?.associateApproval ?? "Associate approval number"}
+                {pricingLabels?.associateApproval ??
+                  "Associate approval number"}
               </h3>
               <p className="mt-1 text-sm text-gray-500">
                 {productCountryLabel(approvalDialog.countryCode)}
@@ -436,13 +444,13 @@ export function ProductCountryManager({
                   onChange={(event) =>
                     setApprovalDialog({
                       ...approvalDialog,
-                      agencyCode: event.target.value
+                      agencyCode: event.target.value,
                     })
                   }
                   value={approvalDialog.agencyCode}
                 >
                   {regulatoryAgencyOptionsForCountry(
-                    approvalDialog.countryCode
+                    approvalDialog.countryCode,
                   ).map((agency) => (
                     <option key={agency.agencyCode} value={agency.agencyCode}>
                       {agency.agencyName}
@@ -458,7 +466,7 @@ export function ProductCountryManager({
                   onChange={(event) =>
                     setApprovalDialog({
                       ...approvalDialog,
-                      approvalNumber: event.target.value
+                      approvalNumber: event.target.value,
                     })
                   }
                   value={approvalDialog.approvalNumber}
@@ -472,7 +480,7 @@ export function ProductCountryManager({
                   onChange={(event) =>
                     setApprovalDialog({
                       ...approvalDialog,
-                      evidenceUrl: event.target.value
+                      evidenceUrl: event.target.value,
                     })
                   }
                   type="url"
@@ -496,8 +504,8 @@ export function ProductCountryManager({
                 type="button"
               >
                 {approvalDialog.saving
-                  ? pricingLabels?.saveAssociation ?? "Save association"
-                  : pricingLabels?.saveAssociation ?? "Save association"}
+                  ? (pricingLabels?.saveAssociation ?? "Save association")
+                  : (pricingLabels?.saveAssociation ?? "Save association")}
               </button>
             </div>
           </div>
@@ -517,14 +525,17 @@ type ProductIdentifierType = AdminProductRow["identifiers"][number]["type"];
 function identifierValue(row: AdminProductRow, type: ProductIdentifierType) {
   const identifiers = Array.isArray(row.identifiers) ? row.identifiers : [];
 
-  return identifiers.find((identifier) =>
-    identifier.type === type && identifier.status === "active"
-  )?.value ?? "";
+  return (
+    identifiers.find(
+      (identifier) =>
+        identifier.type === type && identifier.status === "active",
+    )?.value ?? ""
+  );
 }
 
 function normalizedDraftIdentifierValue(
   type: ProductIdentifierType,
-  value: string
+  value: string,
 ) {
   const trimmed = value.trim();
 
@@ -538,7 +549,7 @@ function normalizedDraftIdentifierValue(
 export function ProductIdentifiersEditor({
   draft,
   setDraft,
-  viewLabels
+  viewLabels,
 }: Readonly<{
   draft: AdminProductRow;
   setDraft: (row: AdminProductRow) => void;
@@ -552,7 +563,7 @@ export function ProductIdentifiersEditor({
   function updateIdentifier(type: ProductIdentifierType, value: string) {
     const trimmed = value.trim();
     const nextIdentifiers = identifiers.filter(
-      (identifier) => identifier.type !== type
+      (identifier) => identifier.type !== type,
     );
 
     setDraft({
@@ -569,17 +580,19 @@ export function ProductIdentifiersEditor({
               status: "active",
               type,
               updatedAt: null,
-              value: type === "ean13"
-                ? normalizedDraftIdentifierValue(type, trimmed)
-                : trimmed
-            }
+              value:
+                type === "ean13"
+                  ? normalizedDraftIdentifierValue(type, trimmed)
+                  : trimmed,
+            },
           ]
-        : nextIdentifiers
+        : nextIdentifiers,
     });
   }
 
-  const candidateRows = identifierCandidates.filter((candidate) =>
-    candidate.status === "pending" || candidate.status === "conflict"
+  const candidateRows = identifierCandidates.filter(
+    (candidate) =>
+      candidate.status === "pending" || candidate.status === "conflict",
   );
 
   return (
@@ -640,12 +653,8 @@ export function ProductIdentifiersEditor({
                 <th className="px-3 py-2 font-semibold">
                   {viewLabels.identifierValue}
                 </th>
-                <th className="px-3 py-2 font-semibold">
-                  {viewLabels.source}
-                </th>
-                <th className="px-3 py-2 font-semibold">
-                  {viewLabels.status}
-                </th>
+                <th className="px-3 py-2 font-semibold">{viewLabels.source}</th>
+                <th className="px-3 py-2 font-semibold">{viewLabels.status}</th>
                 <th className="px-3 py-2 text-right font-semibold">
                   {viewLabels.approve}
                 </th>
@@ -657,9 +666,7 @@ export function ProductIdentifiersEditor({
                   <td className="px-3 py-2 font-medium text-gray-800">
                     {candidate.type}
                   </td>
-                  <td className="px-3 py-2 text-gray-700">
-                    {candidate.value}
-                  </td>
+                  <td className="px-3 py-2 text-gray-700">{candidate.value}</td>
                   <td className="px-3 py-2 text-gray-500">
                     {candidate.source}
                   </td>
@@ -693,7 +700,7 @@ export function ProductCard({
   locale,
   onSelect,
   row,
-  viewLabels
+  viewLabels,
 }: Readonly<{
   href?: string;
   locale: Locale;
@@ -707,9 +714,23 @@ export function ProductCard({
   const coveragePercent =
     row.decisionStats?.averageProductCoveragePercent ??
     row.recommendationHistory.averageProductCoveragePercent;
-  const readyCountryPrice = row.countryPricing.find((item) =>
-    item.rrpPriceAmount !== null
+  const readyCountryPrice = row.countryPricing.find(
+    (item) => item.rrpPriceAmount !== null && item.rrpPriceAmount > 0,
   );
+  const approvalSummary = regulatoryApprovalSummary(row.regulatoryApprovals);
+  const sourceTitle =
+    localized.title.canonicalValue &&
+    localized.title.canonicalValue !== localized.title.value
+      ? localized.title.canonicalValue
+      : "";
+  const decisionSummary = [
+    productDecisionSummary(row, locale),
+    coveragePercent
+      ? `${viewLabels.averageClientFit} ${Math.round(coveragePercent)}%`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const content = (
     <>
@@ -735,40 +756,64 @@ export function ProductCard({
                 <h3 className="text-base font-semibold leading-6 text-gray-900">
                   {localized.title.value}
                 </h3>
+                <p className="text-sm font-medium text-gray-500">
+                  {row.brandName?.trim() || viewLabels.notAvailable}
+                </p>
                 <LocalizedFallbackBadge label={fallbackLabel} />
               </div>
-              {localized.title.canonicalValue &&
-              localized.title.canonicalValue !== localized.title.value ? (
-                <p className="mt-0.5 text-xs text-gray-400">
-                  {viewLabels.sourceTitle}: {localized.title.canonicalValue}
-                </p>
-              ) : null}
-              <p className="mt-1 text-sm text-gray-500">
-                {[
-                  row.brandName,
-                  productStatusLabel(row.productKind, locale),
-                  row.productAudience === "both"
-                    ? null
-                    : productStatusLabel(row.productAudience, locale),
-                  regulatoryApprovalSummary(row.regulatoryApprovals) !== "-"
-                    ? regulatoryApprovalSummary(row.regulatoryApprovals)
-                    : null,
-                  row.availableCountryCodes.length > 0
-                    ? `${viewLabels.markets} ${row.availableCountryCodes.join(", ")}`
-                    : null,
-                  readyCountryPrice?.rrpPriceAmount !== null &&
-                  readyCountryPrice?.rrpPriceAmount !== undefined
-                    ? `RRP ${readyCountryPrice.rrpPriceAmount} ${readyCountryPrice.currency}`
-                    : null
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="shrink-0 font-semibold uppercase tracking-wide text-gray-400">
+                    {viewLabels.markets}
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {row.availableCountryCodes.length > 0 ? (
+                      row.availableCountryCodes.map((countryCode) => (
+                        <span
+                          className="rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-700"
+                          key={countryCode}
+                        >
+                          {countryCode}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="font-medium text-gray-500">
+                        {viewLabels.notAvailable}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="min-w-0 truncate font-medium text-gray-700">
+                    {approvalSummary !== "-"
+                      ? approvalSummary
+                      : viewLabels.notAvailable}
+                  </span>
+                </div>
+                {readyCountryPrice?.rrpPriceAmount ? (
+                  <>
+                    <span
+                      aria-label={viewLabels.rrp}
+                      className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700 ring-1 ring-emerald-100"
+                    >
+                      {readyCountryPrice.rrpPriceAmount}{" "}
+                      {readyCountryPrice.currency}
+                    </span>
+                  </>
+                ) : null}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {row.productAudience === "both" ? null : (
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                    {productStatusLabel(row.productAudience, locale)}
+                  </span>
+                )}
+              </div>
             </div>
             <span
               className={classNames(
                 "rounded-full border px-2.5 py-1 text-xs font-medium",
-                productBusinessStateClass(state)
+                productBusinessStateClass(state),
               )}
             >
               {productBusinessStateLabel(state, locale)}
@@ -776,27 +821,42 @@ export function ProductCard({
           </div>
           <div
             aria-label={viewLabels.translationStatus}
-            className="mt-3 flex flex-wrap gap-1.5"
+            className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-gray-500"
           >
+            <span className="font-semibold uppercase tracking-wide text-gray-400">
+              {viewLabels.translations}
+            </span>
             {productTranslationLocales(row).map((siteLocale) => {
               const translation = productTranslationFor(row, siteLocale.code);
 
               return (
                 <span
                   className={classNames(
-                    "rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                    "inline-flex items-center gap-1.5 font-semibold",
                     siteLocale.code === "zh-CN"
                       ? adminLocaleTextClass("zh-CN", "label")
                       : siteLocale.code === "th"
                         ? adminLocaleTextClass("th", "label")
                         : "uppercase tracking-wide",
-                    productTranslationStatusClass(translation.status)
+                    translation.status === "missing"
+                      ? "text-gray-400"
+                      : "text-gray-600",
                   )}
                   key={siteLocale.code}
                   title={`${siteLocale.nativeLabel}: ${productTranslationStatusLabel(translation.status, locale)}`}
                 >
-                  {siteLocale.label}{" "}
-                  {productTranslationStatusLabel(translation.status, locale)}
+                  <span
+                    aria-hidden="true"
+                    className={classNames(
+                      "size-1.5 rounded-full",
+                      translation.status === "complete"
+                        ? "bg-emerald-500"
+                        : translation.status === "draft"
+                          ? "bg-amber-400"
+                          : "bg-gray-300",
+                    )}
+                  />
+                  {siteLocale.label}
                 </span>
               );
             })}
@@ -820,13 +880,13 @@ export function ProductCard({
               {viewLabels.noParsedFacts}
             </p>
           )}
-          <p className="mt-3 text-sm text-gray-500">
-            {productDecisionSummary(row, locale)}
-            {coveragePercent
-              ? ` · ${viewLabels.averageClientFit} ${Math.round(coveragePercent)}%`
-              : ""}
-          </p>
         </div>
+      </div>
+      <div className="mt-4 flex items-end justify-between gap-4 border-t border-gray-100 pt-3 text-xs leading-5 text-gray-400">
+        <span className="min-w-0 truncate">{sourceTitle}</span>
+        <span className="shrink-0 text-right font-medium text-gray-500">
+          {decisionSummary}
+        </span>
       </div>
     </>
   );
@@ -850,10 +910,13 @@ export function ProductFactsEditor({
   onIncreaseSafetyLimit,
   saving,
   setDraft,
-  viewLabels
+  viewLabels,
 }: Readonly<{
   draft: AdminProductRow;
-  onIncreaseSafetyLimit: (row: AdminProductRow, factId: string) => Promise<boolean>;
+  onIncreaseSafetyLimit: (
+    row: AdminProductRow,
+    factId: string,
+  ) => Promise<boolean>;
   saving: boolean;
   setDraft: (row: AdminProductRow) => void;
   viewLabels: Readonly<Record<string, string>>;
@@ -864,15 +927,15 @@ export function ProductFactsEditor({
     setDraft({
       ...draft,
       facts: draft.facts.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, ...patch } : item
-      )
+        itemIndex === index ? { ...item, ...patch } : item,
+      ),
     });
   }
 
   function removeFact(index: number) {
     setDraft({
       ...draft,
-      facts: draft.facts.filter((_, itemIndex) => itemIndex !== index)
+      facts: draft.facts.filter((_, itemIndex) => itemIndex !== index),
     });
   }
 
@@ -896,9 +959,9 @@ export function ProductFactsEditor({
           sourceText: null,
           sourceUrl: null,
           supplementStatus: null,
-          unit: null
-        }
-      ]
+          unit: null,
+        },
+      ],
     });
   }
 
@@ -927,7 +990,7 @@ export function ProductFactsEditor({
               productFactSafetyLimitIncreaseLabel(fact);
             const inputClass = classNames(
               "rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 outline-none focus:ring-2 focus:ring-[#1FA77A]",
-              hasIssues ? "ring-amber-200" : "ring-gray-200"
+              hasIssues ? "ring-amber-200" : "ring-gray-200",
             );
 
             return (
@@ -938,7 +1001,7 @@ export function ProductFactsEditor({
                     ? "border-red-200 bg-red-50 ring-1 ring-red-100"
                     : hasIssues
                       ? "border-amber-200 bg-amber-50 ring-1 ring-amber-100"
-                      : "border-gray-100 bg-gray-50"
+                      : "border-gray-100 bg-gray-50",
                 )}
                 key={fact.id}
               >
@@ -962,7 +1025,7 @@ export function ProductFactsEditor({
                         Number.isFinite(parsed) &&
                         parsed >= 0
                           ? parsed
-                          : null
+                          : null,
                     });
                   }}
                   placeholder={viewLabels.amount}
@@ -972,7 +1035,7 @@ export function ProductFactsEditor({
                   className={inputClass}
                   onChange={(event) =>
                     updateFact(index, {
-                      unit: event.target.value.trim() || null
+                      unit: event.target.value.trim() || null,
                     })
                   }
                   value={fact.unit ?? ""}
@@ -988,13 +1051,16 @@ export function ProductFactsEditor({
                   className={inputClass}
                   onChange={(event) =>
                     updateFact(index, {
-                      confidence: event.target.value as ProductFact["confidence"]
+                      confidence: event.target
+                        .value as ProductFact["confidence"],
                     })
                   }
                   value={fact.confidence}
                 >
                   <option value="high">{viewLabels.confidenceHigh}</option>
-                  <option value="moderate">{viewLabels.confidenceModerate}</option>
+                  <option value="moderate">
+                    {viewLabels.confidenceModerate}
+                  </option>
                   <option value="low">{viewLabels.confidenceLow}</option>
                 </select>
                 <div className="flex items-center justify-end gap-2">
@@ -1025,14 +1091,14 @@ export function ProductFactsEditor({
                   <div
                     className={classNames(
                       "flex flex-wrap items-center gap-1.5 text-xs font-medium sm:col-span-5",
-                      highSeverity ? "text-red-800" : "text-amber-800"
+                      highSeverity ? "text-red-800" : "text-amber-800",
                     )}
                   >
                     {factIssues.map((issue) => (
                       <span
                         className={classNames(
                           "rounded-full border bg-white px-2 py-1",
-                          highSeverity ? "border-red-200" : "border-amber-200"
+                          highSeverity ? "border-red-200" : "border-amber-200",
                         )}
                         key={issue}
                       >
@@ -1058,7 +1124,7 @@ export function ProductTranslationEditor({
   draft,
   locale,
   setDraft,
-  viewLabels
+  viewLabels,
 }: Readonly<{
   draft: AdminProductRow;
   locale: Locale;
@@ -1069,14 +1135,14 @@ export function ProductTranslationEditor({
     useState<string>(siteLocaleRegistry[0]?.code ?? "en");
   const translationLocales = productTranslationLocales(draft);
   const activeTranslationLocale = translationLocales.some(
-    (siteLocale) => siteLocale.code === selectedTranslationLocale
+    (siteLocale) => siteLocale.code === selectedTranslationLocale,
   )
     ? selectedTranslationLocale
     : (translationLocales[0]?.code ?? "en");
   const activeTranslationMeta = productLocaleMeta(activeTranslationLocale);
   const activeTranslation = productTranslationFor(
     draft,
-    activeTranslationLocale
+    activeTranslationLocale,
   );
 
   function translationFor(locale: string) {
@@ -1085,12 +1151,12 @@ export function ProductTranslationEditor({
 
   function updateTranslation(
     locale: string,
-    patch: Readonly<{ description?: string | null; title?: string | null }>
+    patch: Readonly<{ description?: string | null; title?: string | null }>,
   ) {
     const current = translationFor(locale);
     const nextTranslation = {
       ...current,
-      ...patch
+      ...patch,
     };
     const hasTitle = Boolean(nextTranslation.title?.trim());
     const hasDescription = Boolean(nextTranslation.description?.trim());
@@ -1105,8 +1171,8 @@ export function ProductTranslationEditor({
             : hasTitle || hasDescription
               ? ("draft" as const)
               : ("missing" as const),
-        title: nextTranslation.title?.trim() || null
-      }
+        title: nextTranslation.title?.trim() || null,
+      },
     };
     const nextDraft: AdminProductRow = {
       ...draft,
@@ -1115,15 +1181,15 @@ export function ProductTranslationEditor({
         ? {
             description: translations.en?.description ?? draft.description,
             descriptionEn: translations.en?.description ?? null,
-            titleEn: translations.en?.title ?? null
+            titleEn: translations.en?.title ?? null,
           }
         : {}),
       ...(locale === "th"
         ? {
             descriptionTh: translations.th?.description ?? null,
-            titleTh: translations.th?.title ?? null
+            titleTh: translations.th?.title ?? null,
           }
-        : {})
+        : {}),
     };
 
     setDraft(nextDraft);
@@ -1140,7 +1206,7 @@ export function ProductTranslationEditor({
         <span
           className={classNames(
             "rounded-full border px-2.5 py-1 text-xs font-semibold",
-            productTranslationStatusClass(activeTranslation.status)
+            productTranslationStatusClass(activeTranslation.status),
           )}
         >
           {activeTranslationMeta.label}{" "}
@@ -1164,7 +1230,7 @@ export function ProductTranslationEditor({
                 productTranslationStatusClass(translation.status),
                 selected
                   ? "ring-2 ring-[#1FA77A] ring-offset-1"
-                  : "hover:border-emerald-200 hover:text-[#126B4F]"
+                  : "hover:border-emerald-200 hover:text-[#126B4F]",
               )}
               key={siteLocale.code}
               onClick={() => setSelectedTranslationLocale(siteLocale.code)}
@@ -1184,7 +1250,7 @@ export function ProductTranslationEditor({
             className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
             onChange={(event) =>
               updateTranslation(activeTranslationLocale, {
-                title: event.target.value
+                title: event.target.value,
               })
             }
             type="text"
@@ -1197,7 +1263,7 @@ export function ProductTranslationEditor({
             className="min-h-28 resize-y rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-200 outline-none focus:ring-2 focus:ring-[#1FA77A]"
             onChange={(event) =>
               updateTranslation(activeTranslationLocale, {
-                description: event.target.value
+                description: event.target.value,
               })
             }
             value={activeTranslation.description ?? ""}

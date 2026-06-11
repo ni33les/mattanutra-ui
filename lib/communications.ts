@@ -325,7 +325,7 @@ function hashLineConnectCode(code: string) {
 }
 
 function newLineConnectCode() {
-  return randomBytes(4).toString("hex").toUpperCase();
+  return randomBytes(3).toString("hex").toUpperCase();
 }
 
 function objectValue(value: unknown) {
@@ -1255,6 +1255,7 @@ export async function deleteDisabledOrganisationCommunicationChannel(input: Read
 
 export async function createOrganisationLineConnectToken(input: Readonly<{
   displayName?: string | null;
+  locale?: string | null;
   organisationId: string;
 }>) {
   if (!isUuid(input.organisationId)) {
@@ -1266,6 +1267,7 @@ export async function createOrganisationLineConnectToken(input: Readonly<{
   const tokenHash = hashLineConnectCode(code);
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
   const displayName = optionalText(input.displayName);
+  const locale = optionalText(input.locale);
 
   await ensureOrganisationCommunicationIdentity({
     organisationId: input.organisationId,
@@ -1295,6 +1297,7 @@ export async function createOrganisationLineConnectToken(input: Readonly<{
       ${sql.json(toJsonValue({
         contactName: displayName,
         displayName,
+        locale,
         source: "admin_connect"
       }))},
       now(),
@@ -1414,6 +1417,7 @@ export async function consumeOrganisationLineConnectCode(input: Readonly<{
 
   return {
     channel,
+    locale: optionalText(tokenMetadata.locale),
     organisationId: token.organisation_id
   };
 }
@@ -1559,6 +1563,16 @@ export async function consumeCustomerLineConnectCode(input: Readonly<{
 
   const identityId = await ensurePlanIdentity(sql, token.plan_id);
   const tokenMetadata = objectValue(token.metadata);
+  const assessmentRows = await sql<Array<{
+    locale: string | null;
+    selected_plan: string | null;
+  }>>`
+    select locale, selected_plan::text
+    from public.assessments
+    where plan_id = ${token.plan_id}::uuid
+    limit 1
+  `;
+  const assessment = assessmentRows[0];
   const channel = await upsertChannel(sql, {
     actorType: "human",
     address: recipientId,
@@ -1611,8 +1625,10 @@ export async function consumeCustomerLineConnectCode(input: Readonly<{
 
   return {
     channel,
+    locale: optionalText(assessment?.locale),
     planId: token.plan_id,
-    retailCustomerOrderId: token.retail_customer_order_id
+    retailCustomerOrderId: token.retail_customer_order_id,
+    selectedPlan: optionalText(assessment?.selected_plan)
   };
 }
 

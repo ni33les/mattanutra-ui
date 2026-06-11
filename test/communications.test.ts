@@ -199,8 +199,12 @@ describe("communications channel selection", () => {
     assert.match(workerProfiles, /"route_admin_communication"/);
     assert.match(webhook, /x-line-signature/i);
     assert.match(webhook, /timingSafeEqual/);
-    assert.match(webhook, /MN\\s\+CONNECT/);
-    assert.match(webhook, /MN\\s\+PLAN/);
+    assert.match(webhook, /lineConnectCommandFromMessage/);
+    assert.match(webhook, /CONNECT\|PLAN/);
+    assert.match(webhook, /: "either";/);
+    assert.match(webhook, /: "either";[\s\S]*return \{[\s\S]*scope/);
+    assert.match(webhook, /adminConnectedReply/);
+    assert.match(webhook, /customerConnectedReply/);
     assert.match(webhook, /enqueuePanyaCustomerChatReplyTask/);
     assert.match(webhook, /https:\/\/api\.line\.me\/v2\/bot\/message\/reply/);
     assert.match(webhook, /replySent/);
@@ -227,8 +231,11 @@ describe("communications channel selection", () => {
     assert.match(view, /action: "delete_channel"/);
     assert.match(view, /Contact name/);
     assert.match(view, /Create LINE connect code/);
+    assert.match(view, /Create a code to show a QR that includes the connection message/);
+    assert.match(view, /lineCode\.lineUrl/);
+    assert.match(view, /lineCode\.command/);
     assert.match(view, /https:\/\/line\.me\/R\/ti\/p\/@344enooi/);
-    assert.match(view, /MattaNutra LINE QR code/);
+    assert.match(view, /MattaNutra LINE connect QR code/);
     assert.match(lineFormat, /environment\.toUpperCase\(\)/);
     assert.match(lineFormat, /\^\(DEV\|UAT\)\\n\\n/);
     assert.match(lineFormat, /MATTANUTRA_ENV/);
