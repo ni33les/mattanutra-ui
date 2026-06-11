@@ -152,6 +152,9 @@ const preserveSnapshot =
 const preserveConfig =
   process.env.MATTANUTRA_UAT_PRESERVE_CONFIG !== "false" &&
   !hasArg("no-preserve-config");
+const restorePreservedConfigOnly =
+  process.env.MATTANUTRA_UAT_PRESERVE_CONFIG_MODE === "restore-only" ||
+  hasArg("restore-preserved-config");
 
 if (!snapshot) {
   fail(
@@ -191,7 +194,7 @@ const rebuildEnv = {
 
 console.log(`[uat-rebuild] Rebuilding UAT from ${snapshotPath}`);
 
-if (preserveConfig) {
+if (preserveConfig && !restorePreservedConfigOnly) {
   console.log(
     `[uat-rebuild] Preserving UAT access/config rows into ${preserveSnapshot}`,
   );
@@ -199,6 +202,10 @@ if (preserveConfig) {
     "scripts/uat-preserved-config.ts",
     ["snapshot", `--snapshot=${preserveSnapshot}`],
     rebuildEnv,
+  );
+} else if (preserveConfig) {
+  console.log(
+    `[uat-rebuild] Reusing existing preserved UAT access/config snapshot ${preserveSnapshot}`,
   );
 }
 
