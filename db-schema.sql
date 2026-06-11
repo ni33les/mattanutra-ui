@@ -1020,7 +1020,7 @@ COMMENT ON TABLE public.finance_accounts IS 'Account master table for providers 
 --
 
 CREATE TABLE public.finance_transactions (
-    id uuid NOT NULL,
+    id uuid NOT NULL PRIMARY KEY,
     occurred_at timestamp with time zone DEFAULT now() NOT NULL,
     category text NOT NULL,
     entry_type text DEFAULT 'nominal'::text NOT NULL,
@@ -2309,7 +2309,7 @@ COMMENT ON TABLE public.retail_shopping_list_lines IS 'Simple retailer shopping-
 --
 
 CREATE TABLE public.retail_customer_orders (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
     organisation_id uuid NOT NULL,
     order_number text NOT NULL,
     source text DEFAULT 'manual'::text NOT NULL,
@@ -3389,14 +3389,6 @@ ALTER TABLE ONLY public.cron
 
 
 --
--- Name: finance_transactions finance_transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.finance_transactions
-    ADD CONSTRAINT finance_transactions_pkey PRIMARY KEY (id);
-
-
---
 -- Name: finance_fx_rates finance_fx_rates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3827,14 +3819,6 @@ ALTER TABLE ONLY public.retail_shopping_lists
 --
 
 --
-
---
--- Name: retail_customer_orders retail_customer_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.retail_customer_orders
-    ADD CONSTRAINT retail_customer_orders_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: retail_customer_orders retail_customer_orders_org_order_number_key; Type: CONSTRAINT; Schema: public; Owner: -
