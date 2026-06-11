@@ -2424,7 +2424,7 @@ CREATE TABLE public.retail_order_allocations (
 --
 
 CREATE TABLE public.retail_carrier_accounts (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
     organisation_id uuid NOT NULL REFERENCES public.organisations(id) ON DELETE RESTRICT,
     carrier_id text NOT NULL,
     display_name text,
@@ -2449,7 +2449,7 @@ CREATE TABLE public.retail_carrier_accounts (
 --
 
 CREATE TABLE public.retail_order_shipments (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
     retail_customer_order_id uuid NOT NULL REFERENCES public.retail_customer_orders(id) ON DELETE CASCADE,
     organisation_id uuid NOT NULL REFERENCES public.organisations(id) ON DELETE RESTRICT,
     carrier_account_id uuid REFERENCES public.retail_carrier_accounts(id) ON DELETE SET NULL,
