@@ -305,6 +305,8 @@ async function restoreTable(
     fail(`Cannot restore ${table.name}; target table is missing`);
   }
 
+  await deleteNaturalKeyConflicts(sql, table.name, rows);
+
   const columns = await tableColumns(sql, table.name);
   const insertColumns = columns.filter((column: string) =>
     rows.some((row) => Object.prototype.hasOwnProperty.call(row, column)),
@@ -338,6 +340,49 @@ async function restoreTable(
   }
 
   return rows.length;
+}
+
+async function deleteNaturalKeyConflicts(
+  sql: Db,
+  tableName: string,
+  rows: readonly Record<string, unknown>[],
+) {
+  for (const row of rows) {
+    if (tableName === "organisations" && row.slug && row.id) {
+      await sql`
+        delete from public.organisations
+        where lower(slug) = lower(${String(row.slug)})
+          and id::text <> ${String(row.id)}
+      `;
+      continue;
+    }
+
+    if (tableName === "people" && row.email && row.id) {
+      await sql`
+        delete from public.people
+        where lower(email) = lower(${String(row.email)})
+          and id::text <> ${String(row.id)}
+      `;
+      continue;
+    }
+
+    if (tableName === "finance_accounts" && row.name && row.id) {
+      await sql`
+        delete from public.finance_accounts
+        where lower(name) = lower(${String(row.name)})
+          and id::text <> ${String(row.id)}
+      `;
+      continue;
+    }
+
+    if (tableName === "agents" && row.name && row.id) {
+      await sql`
+        delete from public.agents
+        where lower(name) = lower(${String(row.name)})
+          and id::text <> ${String(row.id)}
+      `;
+    }
+  }
 }
 
 async function restoreConfig(sql: Db, snapshotPath: string) {
