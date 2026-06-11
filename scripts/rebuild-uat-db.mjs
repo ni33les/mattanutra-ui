@@ -24,7 +24,7 @@ function run(command, args, env = process.env) {
   return new Promise((resolveRun, reject) => {
     const child = spawn(command, args, {
       env,
-      stdio: "inherit"
+      stdio: "inherit",
     });
 
     child.on("error", reject);
@@ -34,7 +34,9 @@ function run(command, args, env = process.env) {
         return;
       }
 
-      reject(new Error(`${command} ${args.join(" ")} failed with exit code ${code}`));
+      reject(
+        new Error(`${command} ${args.join(" ")} failed with exit code ${code}`),
+      );
     });
   });
 }
@@ -47,6 +49,20 @@ function runNpmScript(scriptName, env = process.env) {
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
   return run(npmCommand, ["run", scriptName], env);
+}
+
+function runTsScript(scriptName, args = [], env = process.env) {
+  return runNode(
+    [
+      "--env-file-if-exists=.env.local",
+      "--experimental-strip-types",
+      "--import",
+      "./scripts/register-ts-path-loader.mjs",
+      scriptName,
+      ...args,
+    ],
+    env,
+  );
 }
 
 function shouldUseSsl(connectionString) {
@@ -71,7 +87,7 @@ async function terminateTargetSessions(env) {
     idle_timeout: 5,
     max: 1,
     prepare: false,
-    ...(shouldUseSsl(env.DB_URL) ? { ssl: "require" } : {})
+    ...(shouldUseSsl(env.DB_URL) ? { ssl: "require" } : {}),
   });
 
   try {
@@ -83,21 +99,70 @@ async function terminateTargetSessions(env) {
     `;
 
     if (summary.terminated > 0) {
-      console.log(`[uat-rebuild] Terminated ${summary.terminated} existing UAT database session(s).`);
+      console.log(
+        `[uat-rebuild] Terminated ${summary.terminated} existing UAT database session(s).`,
+      );
     }
   } finally {
     await sql.end({ timeout: 5 });
   }
 }
 
-const snapshot = argValue("snapshot") ?? process.env.MATTANUTRA_CATALOGUE_SNAPSHOT;
+async function grantMnAccess(env) {
+  if (!env.DB_URL) {
+    fail("DB_URL is required.");
+  }
+
+  const sql = postgres(env.DB_URL, {
+    connect_timeout: Number(env.DB_CONNECT_TIMEOUT_SECONDS ?? 10),
+    idle_timeout: 5,
+    max: 1,
+    prepare: false,
+    ...(shouldUseSsl(env.DB_URL) ? { ssl: "require" } : {}),
+  });
+
+  try {
+    await sql`
+      do $$
+      begin
+        if exists (select 1 from pg_roles where rolname = 'mn') then
+          grant usage on schema public to mn;
+          grant select, insert, update, delete on all tables in schema public to mn;
+          grant usage, select on all sequences in schema public to mn;
+          alter default privileges in schema public
+            grant select, insert, update, delete on tables to mn;
+          alter default privileges in schema public
+            grant usage, select on sequences to mn;
+        end if;
+      end $$;
+    `;
+    console.log(
+      "[uat-rebuild] Granted public schema/table/sequence access to role mn when present.",
+    );
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+const snapshot =
+  argValue("snapshot") ?? process.env.MATTANUTRA_CATALOGUE_SNAPSHOT;
+const preserveSnapshot =
+  argValue("preserve-snapshot") ??
+  `reports/uat-preserved-config-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+const preserveConfig =
+  process.env.MATTANUTRA_UAT_PRESERVE_CONFIG !== "false" &&
+  !hasArg("no-preserve-config");
 
 if (!snapshot) {
-  fail("Pass --snapshot=<dev-master-snapshot.json> or set MATTANUTRA_CATALOGUE_SNAPSHOT.");
+  fail(
+    "Pass --snapshot=<dev-master-snapshot.json> or set MATTANUTRA_CATALOGUE_SNAPSHOT.",
+  );
 }
 
 if (process.env.MATTANUTRA_ENV !== "uat" && !hasArg("allow-non-uat-env")) {
-  fail("Refusing to rebuild unless MATTANUTRA_ENV=uat or --allow-non-uat-env is passed.");
+  fail(
+    "Refusing to rebuild unless MATTANUTRA_ENV=uat or --allow-non-uat-env is passed.",
+  );
 }
 
 if (process.env.MATTANUTRA_CONFIRM_DB_RESET !== "blitz") {
@@ -109,38 +174,66 @@ if (process.env.MATTANUTRA_CONFIRM_CATALOGUE_RELOAD !== "reload") {
 }
 
 if (process.env.MATTANUTRA_ALLOW_REMOTE_DEV_RESET !== "true") {
-  fail("MATTANUTRA_ALLOW_REMOTE_DEV_RESET=true is required for a remote UAT rebuild.");
+  fail(
+    "MATTANUTRA_ALLOW_REMOTE_DEV_RESET=true is required for a remote UAT rebuild.",
+  );
 }
 
 const snapshotPath = resolve(snapshot);
 const rebuildEnv = {
   ...process.env,
   DB_ALLOW_DIRECT_CONNECTION: process.env.DB_ALLOW_DIRECT_CONNECTION ?? "true",
-  DB_APPLICATION_NAME: process.env.DB_APPLICATION_NAME ?? "mattanutra-uat-rebuild",
+  DB_APPLICATION_NAME:
+    process.env.DB_APPLICATION_NAME ?? "mattanutra-uat-rebuild",
   DB_POOL_MAX: process.env.DB_POOL_MAX ?? "1",
-  MATTANUTRA_STRICT_MASTER_SNAPSHOT: "true"
+  MATTANUTRA_STRICT_MASTER_SNAPSHOT: "true",
 };
 
 console.log(`[uat-rebuild] Rebuilding UAT from ${snapshotPath}`);
 
-await terminateTargetSessions(rebuildEnv);
-await runNode([
-  "--env-file-if-exists=.env.local",
-  "scripts/reset-dev-db.mjs",
-  "--confirm-blitz"
-], rebuildEnv);
+if (preserveConfig) {
+  console.log(
+    `[uat-rebuild] Preserving UAT access/config rows into ${preserveSnapshot}`,
+  );
+  await runTsScript(
+    "scripts/uat-preserved-config.ts",
+    ["snapshot", `--snapshot=${preserveSnapshot}`],
+    rebuildEnv,
+  );
+}
 
 await terminateTargetSessions(rebuildEnv);
-await runNode([
-  "--env-file-if-exists=.env.local",
-  "--experimental-strip-types",
-  "--import",
-  "./scripts/register-ts-path-loader.mjs",
-  "scripts/catalogue-reload.ts",
-  `--input=${snapshotPath}`,
-  "--confirm-catalogue-reload",
-  "--strict-master-data"
-], rebuildEnv);
+await runNode(
+  [
+    "--env-file-if-exists=.env.local",
+    "scripts/reset-dev-db.mjs",
+    "--confirm-blitz",
+  ],
+  rebuildEnv,
+);
+
+await terminateTargetSessions(rebuildEnv);
+await runNode(
+  [
+    "--env-file-if-exists=.env.local",
+    "--experimental-strip-types",
+    "--import",
+    "./scripts/register-ts-path-loader.mjs",
+    "scripts/catalogue-reload.ts",
+    `--input=${snapshotPath}`,
+    "--confirm-catalogue-reload",
+    "--strict-master-data",
+  ],
+  rebuildEnv,
+);
+
+if (preserveConfig) {
+  await runTsScript(
+    "scripts/uat-preserved-config.ts",
+    ["restore", `--snapshot=${preserveSnapshot}`],
+    rebuildEnv,
+  );
+}
 
 for (const scriptName of [
   "admin-access:schema:apply",
@@ -158,10 +251,29 @@ for (const scriptName of [
   "locales:schema:apply",
   "versions:core:apply",
   "versions:core:check",
-  "products:validation-consistency"
+  "products:validation-consistency",
 ]) {
   await terminateTargetSessions(rebuildEnv);
   await runNpmScript(scriptName, rebuildEnv);
 }
 
-console.log("[uat-rebuild] UAT rebuild complete. Restart app and workers after this point.");
+await terminateTargetSessions(rebuildEnv);
+await runNpmScript("uat:seed:minimal-runtime", {
+  ...rebuildEnv,
+  MATTANUTRA_CONFIRM_UAT_MINIMAL_SEED: "seed",
+  MATTANUTRA_UAT_PRESERVE_CONFIG: preserveConfig ? "true" : "false",
+});
+
+if (preserveConfig) {
+  await runTsScript(
+    "scripts/uat-preserved-config.ts",
+    ["verify", `--snapshot=${preserveSnapshot}`],
+    rebuildEnv,
+  );
+}
+
+await grantMnAccess(rebuildEnv);
+
+console.log(
+  "[uat-rebuild] UAT rebuild complete. Restart app and workers after this point.",
+);

@@ -54,7 +54,7 @@ const retailPreferenceEvents = [
   "retail_order_cancelled",
   "retail_order_returned",
   "retail_settlement_needs_review",
-  "retail_settlement_payout_paid"
+  "retail_settlement_payout_paid",
 ] as const;
 
 const platformPreferenceEvents = [
@@ -67,11 +67,15 @@ const platformPreferenceEvents = [
   "platform_worker_unavailable",
   "platform_task_stuck",
   "platform_communication_failed",
-  "platform_technical_alert"
+  "platform_technical_alert",
 ] as const;
 
 function envText(name: string) {
   return process.env[name]?.trim() || "";
+}
+
+function hasArg(name: string) {
+  return process.argv.includes(`--${name}`);
 }
 
 function fail(message: string): never {
@@ -106,7 +110,7 @@ function makeSql(connectionString: string) {
     idle_timeout: 5,
     max: 1,
     prepare: false,
-    ...(shouldUseSsl(connectionString) ? { ssl: "require" } : {})
+    ...(shouldUseSsl(connectionString) ? { ssl: "require" } : {}),
   });
 }
 
@@ -180,7 +184,7 @@ async function fetchSourceDelightData(source: Db) {
 
 async function ensureDelightOrganisation(
   target: Db,
-  organisation: SourceDelightOrganisation
+  organisation: SourceDelightOrganisation,
 ) {
   await target`
     insert into public.organisations (
@@ -205,13 +209,15 @@ async function ensureDelightOrganisation(
       ${organisation.default_locale || "en"},
       ${organisation.country_code || "TH"},
       ${organisation.currency || "THB"},
-      ${target.json(toJsonValue({
-        ...(organisation.metadata && typeof organisation.metadata === "object"
-          ? organisation.metadata as Record<string, unknown>
-          : {}),
-        reseededForUatAt: new Date().toISOString(),
-        source: "seed-uat-minimal-runtime"
-      }))}::jsonb,
+      ${target.json(
+        toJsonValue({
+          ...(organisation.metadata && typeof organisation.metadata === "object"
+            ? (organisation.metadata as Record<string, unknown>)
+            : {}),
+          reseededForUatAt: new Date().toISOString(),
+          source: "seed-uat-minimal-runtime",
+        }),
+      )}::jsonb,
       now(),
       now()
     )
@@ -234,7 +240,7 @@ async function seedDelightSellables(
   input: Readonly<{
     organisationId: string;
     sellables: readonly SourceDelightSellable[];
-  }>
+  }>,
 ) {
   let sellableCount = 0;
   let stockCount = 0;
@@ -279,13 +285,15 @@ async function seedDelightSellables(
         ${row.lead_time_days ?? 0},
         ${row.backorder_policy || "allow"},
         ${row.notes},
-        ${target.json(toJsonValue({
-          ...(row.metadata && typeof row.metadata === "object"
-            ? row.metadata as Record<string, unknown>
-            : {}),
-          reseededForUatAt: new Date().toISOString(),
-          source: "seed-uat-minimal-runtime"
-        }))}::jsonb,
+        ${target.json(
+          toJsonValue({
+            ...(row.metadata && typeof row.metadata === "object"
+              ? (row.metadata as Record<string, unknown>)
+              : {}),
+            reseededForUatAt: new Date().toISOString(),
+            source: "seed-uat-minimal-runtime",
+          }),
+        )}::jsonb,
         now(),
         now()
       )
@@ -328,14 +336,16 @@ async function seedDelightSellables(
         ${row.stock_retail_price_amount ?? row.rrp_price_amount},
         ${row.currency || "THB"},
         ${row.stock_notes ?? row.notes},
-        ${target.json(toJsonValue({
-          ...(row.stock_metadata && typeof row.stock_metadata === "object"
-            ? row.stock_metadata as Record<string, unknown>
-            : {}),
-          reseededForUatAt: new Date().toISOString(),
-          source: "seed-uat-minimal-runtime",
-          stockQuantityResetToZero: true
-        }))}::jsonb,
+        ${target.json(
+          toJsonValue({
+            ...(row.stock_metadata && typeof row.stock_metadata === "object"
+              ? (row.stock_metadata as Record<string, unknown>)
+              : {}),
+            reseededForUatAt: new Date().toISOString(),
+            source: "seed-uat-minimal-runtime",
+            stockQuantityResetToZero: true,
+          }),
+        )}::jsonb,
         now(),
         now()
       )
@@ -381,7 +391,7 @@ async function ensureAgentCredential(
     membershipOrganisationId: string;
     role: "platform_agent" | "retail_agent";
     seed: WorkerCredentialSeed;
-  }>
+  }>,
 ) {
   const definition = SYSTEM_AGENTS[input.seed.agentKey];
 
@@ -409,11 +419,13 @@ async function ensureAgentCredential(
       ${[...definition.capabilities]},
       ${definition.model},
       ${input.membershipOrganisationId}::uuid,
-      ${target.json(toJsonValue({
-        ...definition.metadata,
-        reseededForUatAt: new Date().toISOString(),
-        source: "seed-uat-minimal-runtime"
-      }))}::jsonb,
+      ${target.json(
+        toJsonValue({
+          ...definition.metadata,
+          reseededForUatAt: new Date().toISOString(),
+          source: "seed-uat-minimal-runtime",
+        }),
+      )}::jsonb,
       now(),
       now(),
       now()
@@ -448,11 +460,13 @@ async function ensureAgentCredential(
       ${definition.id}::uuid,
       ${input.role},
       'active',
-      ${target.json(toJsonValue({
-        reseededForUatAt: new Date().toISOString(),
-        source: "seed-uat-minimal-runtime",
-        systemAgentKey: input.seed.agentKey
-      }))}::jsonb,
+      ${target.json(
+        toJsonValue({
+          reseededForUatAt: new Date().toISOString(),
+          source: "seed-uat-minimal-runtime",
+          systemAgentKey: input.seed.agentKey,
+        }),
+      )}::jsonb,
       now(),
       now()
     )
@@ -490,12 +504,14 @@ async function ensureAgentCredential(
       ${input.apiKey.slice(0, 12)},
       ${`${definition.name} - UAT`},
       'active',
-      ${target.json(toJsonValue({
-        envKey: input.seed.envKey,
-        reseededForUatAt: new Date().toISOString(),
-        source: "seed-uat-minimal-runtime",
-        systemAgentKey: input.seed.agentKey
-      }))}::jsonb,
+      ${target.json(
+        toJsonValue({
+          envKey: input.seed.envKey,
+          reseededForUatAt: new Date().toISOString(),
+          source: "seed-uat-minimal-runtime",
+          systemAgentKey: input.seed.agentKey,
+        }),
+      )}::jsonb,
       now(),
       now()
     )
@@ -517,32 +533,66 @@ async function seedWorkerCredentials(
   input: Readonly<{
     delightOrganisationId: string;
     platformOrganisationId: string;
-  }>
+  }>,
 ) {
   const tokens = workerCredentialSeeds.map((seed) => ({
     seed,
-    token: apiKeyFor(seed)
+    token: apiKeyFor(seed),
   }));
   const duplicateTokens = tokens
     .map((item) => item.token)
     .filter((token, index, all) => all.indexOf(token) !== index);
 
   if (duplicateTokens.length > 0) {
-    fail("Worker API keys must be unique per worker profile for DB-managed credentials");
+    fail(
+      "Worker API keys must be unique per worker profile for DB-managed credentials",
+    );
   }
 
   for (const item of tokens) {
     await ensureAgentCredential(target, {
       apiKey: item.token,
-      membershipOrganisationId: item.seed.role === "retail_agent"
-        ? input.delightOrganisationId
-        : input.platformOrganisationId,
+      membershipOrganisationId:
+        item.seed.role === "retail_agent"
+          ? input.delightOrganisationId
+          : input.platformOrganisationId,
       role: item.seed.role,
-      seed: item.seed
+      seed: item.seed,
     });
   }
 
   return { credentialCount: tokens.length };
+}
+
+async function seedWorkerCredentialsIfMissing(
+  target: Db,
+  input: Readonly<{
+    delightOrganisationId: string;
+    platformOrganisationId: string;
+  }>,
+) {
+  const expectedEnvKeys = workerCredentialSeeds.map((seed) => seed.envKey);
+  const rows = await target<Array<{ env_key: string }>>`
+    select distinct agent_credentials.metadata->>'envKey' as env_key
+    from public.agent_credentials
+    where agent_credentials.status = 'active'
+      and agent_credentials.revoked_at is null
+      and agent_credentials.metadata->>'envKey' = any(${expectedEnvKeys}::text[])
+  `;
+  const present = new Set(rows.map((row) => row.env_key));
+  const missing = expectedEnvKeys.filter((envKey) => !present.has(envKey));
+
+  if (missing.length < 1) {
+    return {
+      credentialAction: "preserved",
+      credentialCount: rows.length,
+    };
+  }
+
+  return {
+    ...(await seedWorkerCredentials(target, input)),
+    credentialAction: `seeded_missing:${missing.join(",")}`,
+  };
 }
 
 async function seedNotificationPreferences(
@@ -550,7 +600,8 @@ async function seedNotificationPreferences(
   input: Readonly<{
     delightOrganisationId: string;
     platformOrganisationId: string;
-  }>
+    preserveExisting?: boolean;
+  }>,
 ) {
   let preferenceCount = 0;
 
@@ -578,11 +629,15 @@ async function seedNotificationPreferences(
           now()
         )
         on conflict (organisation_id, event_key, channel_type)
-        do update set
-          enabled = excluded.enabled,
-          preference_rank = excluded.preference_rank,
-          metadata = public.organisation_notification_preferences.metadata || excluded.metadata,
-          updated_at = now()
+        ${
+          input.preserveExisting
+            ? target`do nothing`
+            : target`do update set
+              enabled = excluded.enabled,
+              preference_rank = excluded.preference_rank,
+              metadata = public.organisation_notification_preferences.metadata || excluded.metadata,
+              updated_at = now()`
+        }
       `;
       preferenceCount += 1;
     }
@@ -614,11 +669,15 @@ async function seedNotificationPreferences(
           now()
         )
         on conflict (organisation_id, event_key, channel_type)
-        do update set
-          enabled = excluded.enabled,
-          preference_rank = excluded.preference_rank,
-          metadata = public.organisation_notification_preferences.metadata || excluded.metadata,
-          updated_at = now()
+        ${
+          input.preserveExisting
+            ? target`do nothing`
+            : target`do update set
+              enabled = excluded.enabled,
+              preference_rank = excluded.preference_rank,
+              metadata = public.organisation_notification_preferences.metadata || excluded.metadata,
+              updated_at = now()`
+        }
       `;
       preferenceCount += 1;
     }
@@ -647,6 +706,10 @@ async function main() {
     fail("MATTANUTRA_CONFIRM_UAT_MINIMAL_SEED=seed is required");
   }
 
+  const preserveConfig =
+    process.env.MATTANUTRA_UAT_PRESERVE_CONFIG === "true" ||
+    hasArg("--preserve-config");
+
   if (!connectionLooksLike(targetConnection, /uat|mattanutra-uat/i)) {
     fail("DB_URL does not look like UAT");
   }
@@ -665,15 +728,21 @@ async function main() {
     await ensureDelightOrganisation(target, organisation);
     const sellableResult = await seedDelightSellables(target, {
       organisationId: organisation.id,
-      sellables
+      sellables,
     });
-    const credentialResult = await seedWorkerCredentials(target, {
-      delightOrganisationId: organisation.id,
-      platformOrganisationId: platformId
-    });
+    const credentialResult = preserveConfig
+      ? await seedWorkerCredentialsIfMissing(target, {
+          delightOrganisationId: organisation.id,
+          platformOrganisationId: platformId,
+        })
+      : await seedWorkerCredentials(target, {
+          delightOrganisationId: organisation.id,
+          platformOrganisationId: platformId,
+        });
     const preferenceResult = await seedNotificationPreferences(target, {
       delightOrganisationId: organisation.id,
-      platformOrganisationId: platformId
+      platformOrganisationId: platformId,
+      preserveExisting: preserveConfig,
     });
     const stockRows = await target<Array<{ stock_sum: string }>>`
       select coalesce(sum(stock_quantity), 0)::text as stock_sum
@@ -682,21 +751,25 @@ async function main() {
         and status = 'active'
     `;
 
-    console.log(JSON.stringify({
-      delightOrganisationId: organisation.id,
-      delightOrganisationName: organisation.name,
-      sourceSellables: sellables.length,
-      stockQuantitySum: Number(stockRows[0]?.stock_sum ?? 0),
-      ...sellableResult,
-      ...credentialResult,
-      ...preferenceResult,
-      status: "ok"
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          delightOrganisationId: organisation.id,
+          delightOrganisationName: organisation.name,
+          sourceSellables: sellables.length,
+          stockQuantitySum: Number(stockRows[0]?.stock_sum ?? 0),
+          ...sellableResult,
+          ...credentialResult,
+          ...preferenceResult,
+          preservedConfig: preserveConfig,
+          status: "ok",
+        },
+        null,
+        2,
+      ),
+    );
   } finally {
-    await Promise.all([
-      source.end({ timeout: 5 }),
-      target.end({ timeout: 5 })
-    ]);
+    await Promise.all([source.end({ timeout: 5 }), target.end({ timeout: 5 })]);
   }
 }
 

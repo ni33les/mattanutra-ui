@@ -3,9 +3,9 @@ import { spawn } from "node:child_process";
 import postgres from "postgres";
 
 const targetBaseUrl = (
-  process.env.UAT_SITE_URL ||
-  "https://uat.mattanutra.com"
+  process.env.UAT_SITE_URL || "https://uat.mattanutra.com"
 ).replace(/\/+$/, "");
+const expectCleanRuntime = process.env.UAT_EXPECT_CLEAN_RUNTIME === "true";
 const lineWebhookUrl = `${targetBaseUrl}/api/line/webhook`;
 const expectedLineWebhookUrl = "https://uat.mattanutra.com/api/line/webhook";
 const requiredTables = [
@@ -26,7 +26,7 @@ const requiredTables = [
   "retail_shopping_list_lines",
   "retail_shopping_lists",
   "tasks",
-  "worker_sessions"
+  "worker_sessions",
 ];
 const criticalTaskTypes = [
   "customer_chat_reply",
@@ -37,7 +37,7 @@ const criticalTaskTypes = [
   "retail_order_ship",
   "retail_shopping_list_review",
   "route_admin_communication",
-  "send_retail_order_workflow_email"
+  "send_retail_order_workflow_email",
 ];
 const requiredWorkerProfiles = [
   { envKey: "WORKER_ADVISOR_AGENT_API_KEY", mode: "advisor" },
@@ -52,9 +52,11 @@ const requiredWorkerProfiles = [
   { envKey: "WORKER_HOSTING_AGENT_API_KEY", mode: "hosting" },
   { envKey: "WORKER_PANYA_AGENT_API_KEY", mode: "panya" },
   { envKey: "WORKER_PRODUCTS_AGENT_API_KEY", mode: "products" },
-  { envKey: "WORKER_STOCK_AGENT_API_KEY", mode: "stock" }
+  { envKey: "WORKER_STOCK_AGENT_API_KEY", mode: "stock" },
 ];
-const requiredUatAppEnvKeys = requiredWorkerProfiles.map((profile) => profile.envKey);
+const requiredUatAppEnvKeys = requiredWorkerProfiles.map(
+  (profile) => profile.envKey,
+);
 const retiredDatabaseUrlKey = ["DATABASE", "URL"].join("_");
 const checks = [];
 let digitalOceanAppId = null;
@@ -67,7 +69,7 @@ function record(name, ok, details = "", severity = "error") {
     details,
     name,
     ok,
-    severity
+    severity,
   });
   const prefix = ok ? "[ok]" : severity === "warn" ? "[warn]" : "[fail]";
   console.log(`${prefix} ${name}${details ? ` - ${details}` : ""}`);
@@ -82,9 +84,7 @@ function uatDbConnection() {
 
   const fallback = process.env.DB_URL?.trim();
 
-  return fallback && /(?:uat|mattanutra-uat)/i.test(fallback)
-    ? fallback
-    : null;
+  return fallback && /(?:uat|mattanutra-uat)/i.test(fallback) ? fallback : null;
 }
 
 async function checkRoute(path) {
@@ -92,7 +92,7 @@ async function checkRoute(path) {
 
   try {
     const response = await fetch(url, {
-      redirect: "manual"
+      redirect: "manual",
     });
     const ok = response.status >= 200 && response.status < 500;
 
@@ -101,7 +101,7 @@ async function checkRoute(path) {
     record(
       `route ${path}`,
       false,
-      error instanceof Error ? error.message : "request failed"
+      error instanceof Error ? error.message : "request failed",
     );
   }
 }
@@ -110,21 +110,29 @@ async function checkDigitalOceanDeployment() {
   const token = process.env.DIGITALOCEAN_ACCESS_TOKEN?.trim();
 
   if (!token) {
-    record("DigitalOcean deployment", false, "DIGITALOCEAN_ACCESS_TOKEN not configured", "warn");
+    record(
+      "DigitalOcean deployment",
+      false,
+      "DIGITALOCEAN_ACCESS_TOKEN not configured",
+      "warn",
+    );
     return;
   }
 
   const configuredAppId = process.env.UAT_DIGITALOCEAN_APP_ID?.trim();
-  const appName = process.env.UAT_DIGITALOCEAN_APP_NAME?.trim() || "mattanutra-ui-uat";
+  const appName =
+    process.env.UAT_DIGITALOCEAN_APP_NAME?.trim() || "mattanutra-ui-uat";
   let appId = configuredAppId;
 
   try {
     if (!appId) {
       const appsResponse = await fetch("https://api.digitalocean.com/v2/apps", {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       const apps = await appsResponse.json();
-      appId = apps.apps?.find((app) => app.spec?.name === appName || app.name === appName)?.id;
+      appId = apps.apps?.find(
+        (app) => app.spec?.name === appName || app.name === appName,
+      )?.id;
     }
 
     if (!appId) {
@@ -134,25 +142,30 @@ async function checkDigitalOceanDeployment() {
 
     digitalOceanAppId = appId;
 
-    const appResponse = await fetch(`https://api.digitalocean.com/v2/apps/${appId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const appResponse = await fetch(
+      `https://api.digitalocean.com/v2/apps/${appId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     const appData = await appResponse.json();
     const envKeys = configuredEnvKeysFromAppSpec(appData.app?.spec);
     const serviceEnvKeys = configuredServiceEnvKeysFromAppSpec(
       appData.app?.spec,
       process.env.UAT_DIGITALOCEAN_COMPONENT_NAME?.trim() ||
         process.env.UAT_DIGITALOCEAN_SERVICE_NAME?.trim() ||
-        "mattanutra-ui"
+        "mattanutra-ui",
     );
-    const missingEnvKeys = requiredUatAppEnvKeys.filter((key) => !envKeys.has(key));
+    const missingEnvKeys = requiredUatAppEnvKeys.filter(
+      (key) => !envKeys.has(key),
+    );
 
     record(
       "DigitalOcean worker env",
       missingEnvKeys.length === 0,
       missingEnvKeys.length === 0
         ? `${requiredUatAppEnvKeys.length} worker keys configured`
-        : `missing ${missingEnvKeys.join(", ")}`
+        : `missing ${missingEnvKeys.join(", ")}`,
     );
     record(
       "DigitalOcean DB env",
@@ -161,20 +174,20 @@ async function checkDigitalOceanDeployment() {
         ? serviceEnvKeys.has("DB_URL")
           ? "DB_URL configured on app and service"
           : "DB_URL configured at app level"
-        : "DB_URL missing from app spec"
+        : "DB_URL missing from app spec",
     );
     if (serviceEnvKeys.has(retiredDatabaseUrlKey)) {
       record(
         "DigitalOcean retired DB env",
         false,
         `service still has ${retiredDatabaseUrlKey}; ignored by runtime code but should be removed`,
-        "warn"
+        "warn",
       );
     }
 
     const response = await fetch(
       `https://api.digitalocean.com/v2/apps/${appId}/deployments`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` } },
     );
     const data = await response.json();
     const active = data.deployments?.[0];
@@ -184,13 +197,15 @@ async function checkDigitalOceanDeployment() {
     record(
       "DigitalOcean deployment",
       ok,
-      active ? `phase=${active.phase} cause=${active.cause ?? "unknown"}` : "no deployment"
+      active
+        ? `phase=${active.phase} cause=${active.cause ?? "unknown"}`
+        : "no deployment",
     );
   } catch (error) {
     record(
       "DigitalOcean deployment",
       false,
-      error instanceof Error ? error.message : "deployment check failed"
+      error instanceof Error ? error.message : "deployment check failed",
     );
   }
 }
@@ -199,7 +214,12 @@ async function checkRecentRuntimeLogs() {
   const token = process.env.DIGITALOCEAN_ACCESS_TOKEN?.trim();
 
   if (!token || !digitalOceanAppId || !digitalOceanDeploymentId) {
-    record("worker auth runtime logs", false, "DigitalOcean deployment log context unavailable", "warn");
+    record(
+      "worker auth runtime logs",
+      false,
+      "DigitalOcean deployment log context unavailable",
+      "warn",
+    );
     return;
   }
 
@@ -211,7 +231,7 @@ async function checkRecentRuntimeLogs() {
   try {
     const response = await fetch(
       `https://api.digitalocean.com/v2/apps/${digitalOceanAppId}/components/${componentName}/logs?type=RUN`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` } },
     );
 
     if (!response.ok) {
@@ -219,7 +239,7 @@ async function checkRecentRuntimeLogs() {
         "worker auth runtime logs",
         false,
         `log endpoint status=${response.status}`,
-        "warn"
+        "warn",
       );
       return;
     }
@@ -227,11 +247,16 @@ async function checkRecentRuntimeLogs() {
     const data = await response.json();
     const urls = [
       ...(Array.isArray(data.historic_urls) ? data.historic_urls : []),
-      data.live_url
+      data.live_url,
     ].filter(Boolean);
 
     if (urls.length < 1) {
-      record("worker auth runtime logs", false, "no runtime log URLs returned", "warn");
+      record(
+        "worker auth runtime logs",
+        false,
+        "no runtime log URLs returned",
+        "warn",
+      );
       return;
     }
 
@@ -240,11 +265,17 @@ async function checkRecentRuntimeLogs() {
         const logResponse = await fetch(url);
 
         return logResponse.ok ? logResponse.text() : "";
-      })
+      }),
     );
     const logs = textParts.join("\n");
-    const hasWorker401 = /\/api\/workers\/register failed with 401|Worker API access is not authorized/i.test(logs);
-    const hasRuntimeDbUrlMissing = /DB_URL is not visible in the runtime process|DB_URL is not configured in the service runtime environment|\[workers:doctor\] DB_URL is required/i.test(logs);
+    const hasWorker401 =
+      /\/api\/workers\/register failed with 401|Worker API access is not authorized/i.test(
+        logs,
+      );
+    const hasRuntimeDbUrlMissing =
+      /DB_URL is not visible in the runtime process|DB_URL is not configured in the service runtime environment|\[workers:doctor\] DB_URL is required/i.test(
+        logs,
+      );
 
     record(
       "worker auth runtime logs",
@@ -253,14 +284,14 @@ async function checkRecentRuntimeLogs() {
         ? "worker registration 401 found in active runtime logs"
         : hasRuntimeDbUrlMissing
           ? "runtime logs show DB_URL is not visible to start:platform"
-          : "no worker auth or DB_URL runtime failures found"
+          : "no worker auth or DB_URL runtime failures found",
     );
   } catch (error) {
     record(
       "worker auth runtime logs",
       false,
       error instanceof Error ? error.message : "runtime log check failed",
-      "warn"
+      "warn",
     );
   }
 }
@@ -276,15 +307,15 @@ function runWorkerDoctor(connection) {
         "./scripts/register-ts-path-loader.mjs",
         "scripts/workers-doctor.ts",
         "--require-all",
-        "--json"
+        "--json",
       ],
       {
         env: {
           ...process.env,
-          DB_URL: connection
+          DB_URL: connection,
         },
-        stdio: ["ignore", "pipe", "pipe"]
-      }
+        stdio: ["ignore", "pipe", "pipe"],
+      },
     );
     let stdout = "";
     let stderr = "";
@@ -300,14 +331,14 @@ function runWorkerDoctor(connection) {
         code: 1,
         error: error instanceof Error ? error.message : String(error),
         stdout,
-        stderr
+        stderr,
       });
     });
     child.on("exit", (code) => {
       resolve({
         code: code ?? 1,
         stdout,
-        stderr
+        stderr,
       });
     });
   });
@@ -339,13 +370,11 @@ function configuredEnvKeysFromAppSpec(spec) {
 
 function configuredServiceEnvKeysFromAppSpec(spec, serviceName) {
   const service = (spec?.services ?? []).find(
-    (candidate) => candidate?.name === serviceName
+    (candidate) => candidate?.name === serviceName,
   );
 
   return new Set(
-    (service?.envs ?? [])
-      .map((envVar) => envVar?.key)
-      .filter(Boolean)
+    (service?.envs ?? []).map((envVar) => envVar?.key).filter(Boolean),
   );
 }
 
@@ -354,32 +383,43 @@ async function checkLineWebhook() {
   const channelSecret = process.env.LINE_CHANNEL_SECRET?.trim();
 
   if (!accessToken) {
-    record("LINE webhook endpoint", false, "LINE_CHANNEL_ACCESS_TOKEN not configured", "warn");
+    record(
+      "LINE webhook endpoint",
+      false,
+      "LINE_CHANNEL_ACCESS_TOKEN not configured",
+      "warn",
+    );
   } else {
     try {
       const response = await fetch(
         "https://api.line.me/v2/bot/channel/webhook/endpoint",
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       const data = await response.json();
-      const ok = data.endpoint === expectedLineWebhookUrl && data.active === true;
+      const ok =
+        data.endpoint === expectedLineWebhookUrl && data.active === true;
 
       record(
         "LINE webhook endpoint",
         ok,
-        `endpoint=${data.endpoint ?? "unknown"} active=${String(data.active)}`
+        `endpoint=${data.endpoint ?? "unknown"} active=${String(data.active)}`,
       );
     } catch (error) {
       record(
         "LINE webhook endpoint",
         false,
-        error instanceof Error ? error.message : "LINE endpoint check failed"
+        error instanceof Error ? error.message : "LINE endpoint check failed",
       );
     }
   }
 
   if (!channelSecret) {
-    record("LINE webhook signature", false, "LINE_CHANNEL_SECRET not configured", "warn");
+    record(
+      "LINE webhook signature",
+      false,
+      "LINE_CHANNEL_SECRET not configured",
+      "warn",
+    );
     return;
   }
 
@@ -392,9 +432,9 @@ async function checkLineWebhook() {
       body,
       headers: {
         "Content-Type": "application/json",
-        "x-line-signature": signature
+        "x-line-signature": signature,
       },
-      method: "POST"
+      method: "POST",
     });
 
     record("LINE webhook signature", response.ok, `status=${response.status}`);
@@ -402,7 +442,7 @@ async function checkLineWebhook() {
     record(
       "LINE webhook signature",
       false,
-      error instanceof Error ? error.message : "signature smoke failed"
+      error instanceof Error ? error.message : "signature smoke failed",
     );
   }
 }
@@ -415,14 +455,14 @@ async function checkDatabase() {
       "UAT database",
       false,
       "Set UAT_DB_URL, or DB_URL containing uat, to run DB checks",
-      "warn"
+      "warn",
     );
     return;
   }
 
   const sql = postgres(connection, {
     max: 1,
-    prepare: false
+    prepare: false,
   });
 
   try {
@@ -434,7 +474,7 @@ async function checkDatabase() {
     record(
       "UAT database",
       /uat|mattanutra-uat/i.test(databaseName),
-      `database=${databaseName}`
+      `database=${databaseName}`,
     );
 
     const tableRows = await sql`
@@ -451,14 +491,15 @@ async function checkDatabase() {
       missingTables.length === 0,
       missingTables.length === 0
         ? `${requiredTables.length} required tables available`
-        : `missing ${missingTables.join(", ")}`
+        : `missing ${missingTables.join(", ")}`,
     );
 
     const delightRows = await sql`
       select
         organisations.id::text,
         count(distinct retail_sellable_products.id)::int as sellable_count,
-        count(distinct retail_product_stock.id)::int as stock_count
+        count(distinct retail_product_stock.id)::int as stock_count,
+        coalesce(sum(retail_product_stock.stock_quantity), 0)::int as stock_quantity_sum
       from public.organisations
       left join public.retail_sellable_products
         on retail_sellable_products.organisation_id = organisations.id
@@ -474,8 +515,9 @@ async function checkDatabase() {
 
     record(
       "Delight sellable catalogue",
-      Number(delight?.sellable_count ?? 0) > 0,
-      `sellable=${delight?.sellable_count ?? 0} stock_rows=${delight?.stock_count ?? 0}`
+      Number(delight?.sellable_count ?? 0) > 0 &&
+        (!expectCleanRuntime || Number(delight?.stock_quantity_sum ?? 0) === 0),
+      `sellable=${delight?.sellable_count ?? 0} stock_rows=${delight?.stock_count ?? 0} stock_sum=${delight?.stock_quantity_sum ?? 0}`,
     );
 
     const workerRows = await sql`
@@ -506,7 +548,7 @@ async function checkDatabase() {
       order by expected.mode
     `;
     const staleWorkerProfiles = workerRows.filter(
-      (row) => Number(row.fresh_sessions ?? 0) < 1
+      (row) => Number(row.fresh_sessions ?? 0) < 1,
     );
 
     record(
@@ -514,7 +556,7 @@ async function checkDatabase() {
       staleWorkerProfiles.length === 0,
       staleWorkerProfiles.length === 0
         ? `${requiredWorkerProfiles.length} required profiles fresh`
-        : `stale=${staleWorkerProfiles.map((row) => row.mode).join(", ")}`
+        : `stale=${staleWorkerProfiles.map((row) => row.mode).join(", ")}`,
     );
 
     const doctor = await runWorkerDoctor(connection);
@@ -544,7 +586,7 @@ async function checkDatabase() {
     record(
       "critical task leases",
       Number(stuckRows[0]?.stuck_count ?? 0) === 0,
-      `stuck=${stuckRows[0]?.stuck_count ?? 0}`
+      `stuck=${stuckRows[0]?.stuck_count ?? 0}`,
     );
 
     const channelRows = await sql`
@@ -563,10 +605,56 @@ async function checkDatabase() {
 
     record(
       "Delight communication channels",
-      Number(channels?.line_channels ?? 0) + Number(channels?.email_channels ?? 0) > 0,
+      Number(channels?.line_channels ?? 0) +
+        Number(channels?.email_channels ?? 0) >
+        0,
       `line=${channels?.line_channels ?? 0} email=${channels?.email_channels ?? 0}`,
-      "warn"
+      expectCleanRuntime ? "error" : "warn",
     );
+
+    if (expectCleanRuntime) {
+      const operationalTables = [
+        "assessments",
+        "communication_messages",
+        "payments",
+        "retail_customer_orders",
+        "retail_shopping_lists",
+        "retail_stock_movements",
+        "tasks",
+      ];
+      const runtimeRows = await sql`
+        select table_name, row_count::int
+        from (
+          select 'assessments' as table_name, count(*) as row_count from public.assessments
+          union all
+          select 'communication_messages', count(*) from public.communication_messages
+          union all
+          select 'payments', count(*) from public.payments
+          union all
+          select 'retail_customer_orders', count(*) from public.retail_customer_orders
+          union all
+          select 'retail_shopping_lists', count(*) from public.retail_shopping_lists
+          union all
+          select 'retail_stock_movements', count(*) from public.retail_stock_movements
+          union all
+          select 'tasks', count(*) from public.tasks
+        ) counts
+        order by table_name
+      `;
+      const nonEmpty = runtimeRows.filter(
+        (row) => Number(row.row_count ?? 0) > 0,
+      );
+
+      record(
+        "clean operational runtime",
+        nonEmpty.length === 0,
+        nonEmpty.length === 0
+          ? `${operationalTables.length} operational tables empty`
+          : nonEmpty
+              .map((row) => `${row.table_name}=${row.row_count}`)
+              .join(", "),
+      );
+    }
   } finally {
     await sql.end({ timeout: 5 });
   }
@@ -584,8 +672,12 @@ async function main() {
   await checkDatabase();
   await checkRecentRuntimeLogs();
 
-  const failures = checks.filter((check) => !check.ok && check.severity !== "warn");
-  const warnings = checks.filter((check) => !check.ok && check.severity === "warn");
+  const failures = checks.filter(
+    (check) => !check.ok && check.severity !== "warn",
+  );
+  const warnings = checks.filter(
+    (check) => !check.ok && check.severity === "warn",
+  );
 
   console.log(
     JSON.stringify(
@@ -593,11 +685,11 @@ async function main() {
         checkedAt: new Date().toISOString(),
         failureCount: failures.length,
         targetBaseUrl,
-        warningCount: warnings.length
+        warningCount: warnings.length,
       },
       null,
-      2
-    )
+      2,
+    ),
   );
 
   if (failures.length > 0) {

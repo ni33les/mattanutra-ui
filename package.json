@@ -17,6 +17,7 @@
     "catalogue:snapshot": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/catalogue-snapshot.ts",
     "catalogue:reload": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/catalogue-reload.ts",
     "uat:master:snapshot": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/catalogue-snapshot.ts --strict-master-data",
+    "uat:preserve-config": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/uat-preserved-config.ts",
     "uat:rebuild": "node --env-file-if-exists=.env.local scripts/rebuild-uat-db.mjs",
     "uat:seed:minimal-runtime": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/seed-uat-minimal-runtime.ts",
     "uat:smoke": "node --env-file-if-exists=.env.local scripts/uat-smoke.mjs",
