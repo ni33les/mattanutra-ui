@@ -234,7 +234,7 @@ describe("communications channel selection", () => {
     assert.match(view, /Create a code to show a QR that includes the connection message/);
     assert.match(view, /lineCode\.lineUrl/);
     assert.match(view, /lineCode\.command/);
-    assert.match(view, /https:\/\/line\.me\/R\/ti\/p\/@344enooi/);
+    assert.match(view, /lineOfficialAccountUrl/);
     assert.match(view, /MattaNutra LINE connect QR code/);
     assert.match(lineFormat, /environment\.toUpperCase\(\)/);
     assert.match(lineFormat, /\^\(DEV\|UAT\)\\n\\n/);

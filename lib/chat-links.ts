@@ -18,6 +18,16 @@ function configuredLineOfficialId() {
   return officialId.startsWith("@") ? officialId : `@${officialId}`;
 }
 
+export function lineOfficialAccountUrl() {
+  const directUrl = getConfiguredUrl(process.env.NEXT_PUBLIC_LINE_CHAT_URL);
+
+  if (directUrl) {
+    return directUrl;
+  }
+
+  return `https://line.me/R/ti/p/${encodeURIComponent(configuredLineOfficialId())}`;
+}
+
 function lineOfficialIdFromUrl(value: string) {
   try {
     const parsed = new URL(value);
@@ -52,7 +62,7 @@ function getLineUrl(planId: string) {
     return planId ? appendQuery(directUrl, { plan: planId }) : directUrl;
   }
 
-  return `https://line.me/R/ti/p/${encodeURIComponent(configuredLineOfficialId())}`;
+  return lineOfficialAccountUrl();
 }
 
 export function buildLineOfficialAccountMessageUrl(message: string) {

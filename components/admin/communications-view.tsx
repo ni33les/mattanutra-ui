@@ -28,6 +28,7 @@ import {
 } from "@/components/admin/dashboard-shared";
 import { SupplementListMeta } from "@/components/admin/safety-views";
 import { AdminModal } from "@/components/admin/ui";
+import { lineOfficialAccountUrl } from "@/lib/chat-links";
 
 function communicationStatusLabel(
   labels: AdminContent,
@@ -68,7 +69,7 @@ function communicationTitle(row: AdminCommunicationRow) {
   );
 }
 
-const lineConnectUrl = "https://line.me/R/ti/p/@344enooi";
+const lineConnectUrl = lineOfficialAccountUrl();
 
 type ConnectMethod = "line" | "email";
 type ConnectProvider = ConnectMethod | "sms" | "whatsapp";

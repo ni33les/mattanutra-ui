@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { SVGProps } from "react";
 import { HealthspanLogo } from "@/components/healthspan-logo";
+import { lineOfficialAccountUrl } from "@/lib/chat-links";
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
 
 const socialLinks = [
   {
-    href: "https://line.me/R/ti/p/@344enooi?oat_content=url&ts=05091931",
+    href: lineOfficialAccountUrl(),
     name: "LINE",
     icon: (props: SVGProps<SVGSVGElement>) => (
       <svg fill="currentColor" viewBox="0 0 24 24" {...props}>
