@@ -82,16 +82,17 @@ describe("communications channel selection", () => {
     assert.equal(normalizeLineUserId("richard"), null);
   });
 
-  it("stamps outbound LINE messages with the actual non-production environment", () => {
+  it("does not stamp outbound LINE messages with environment labels", () => {
     const originalEnvironment = process.env.MATTANUTRA_ENV;
 
     try {
       process.env.MATTANUTRA_ENV = "uat";
-      assert.equal(formatOutboundLineMessage("Order ready"), "UAT\n\nOrder ready");
-      assert.equal(formatOutboundLineMessage("DEV\n\nOrder ready"), "UAT\n\nOrder ready");
+      assert.equal(formatOutboundLineMessage("Order ready"), "Order ready");
+      assert.equal(formatOutboundLineMessage("DEV\n\nOrder ready"), "Order ready");
+      assert.equal(formatOutboundLineMessage("UAT\n\nOrder ready"), "Order ready");
 
       process.env.MATTANUTRA_ENV = "dev";
-      assert.equal(formatOutboundLineMessage("Order ready"), "DEV\n\nOrder ready");
+      assert.equal(formatOutboundLineMessage("Order ready"), "Order ready");
 
       process.env.MATTANUTRA_ENV = "prd";
       assert.equal(formatOutboundLineMessage("Order ready"), "Order ready");
@@ -237,9 +238,10 @@ describe("communications channel selection", () => {
     assert.match(view, /lineOfficialAccountUrl/);
     assert.match(view, /MattaNutra LINE connect QR code/);
     assert.doesNotMatch(view, /Create LINE connect code/);
-    assert.match(lineFormat, /environment\.toUpperCase\(\)/);
+    assert.match(lineFormat, /formatOutboundLineMessage/);
     assert.match(lineFormat, /\^\(DEV\|UAT\)\\n\\n/);
-    assert.match(lineFormat, /MATTANUTRA_ENV/);
+    assert.doesNotMatch(lineFormat, /MATTANUTRA_ENV/);
+    assert.doesNotMatch(lineFormat, /environment\.toUpperCase\(\)/);
     assert.match(adminSettings, /context\.effectiveOrganisation\.id/);
     assert.match(adminSettings, /adminCommunicationEventKeysForScope\(scope\)/);
     assert.doesNotMatch(adminSettings, /where organisation_type = 'tenant'[\s\S]*order by lower\(name\)/);
