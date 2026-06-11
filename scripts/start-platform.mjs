@@ -23,10 +23,10 @@ logRuntimeEnvDiagnostic("after-loadEnvConfig", runtimeEnvAfterLoad);
 
 if (restoredDbUrlAfterEnvLoad) {
   console.error(
-    "[platform] DB_URL was restored after local env loading removed or blanked it."
+    "[platform] DB_URL was restored after local env loading removed or blanked it.",
   );
   logRuntimeEnvDiagnostic("after-db-url-restore", runtimeEnvAfterRestore, {
-    force: true
+    force: true,
   });
 }
 
@@ -38,8 +38,12 @@ const probeHost =
 const workerMode = process.env.PLATFORM_WORKER_MODE || "all";
 const workerApiBaseUrl =
   process.env.PLATFORM_WORKER_API_BASE_URL || `http://127.0.0.1:${port}`;
-const startupTimeoutMs = Number(process.env.PLATFORM_STARTUP_TIMEOUT_MS || 120_000);
-const shutdownTimeoutMs = Number(process.env.PLATFORM_SHUTDOWN_TIMEOUT_MS || 25_000);
+const startupTimeoutMs = Number(
+  process.env.PLATFORM_STARTUP_TIMEOUT_MS || 120_000,
+);
+const shutdownTimeoutMs = Number(
+  process.env.PLATFORM_SHUTDOWN_TIMEOUT_MS || 25_000,
+);
 const workerAuthConfigurationExitCode = 78;
 
 const children = new Map();
@@ -64,7 +68,7 @@ function visibleWorkerAgentKeys(env = process.env) {
       ([key, value]) =>
         key.startsWith("WORKER_") &&
         key.endsWith("_AGENT_API_KEY") &&
-        value?.trim()
+        value?.trim(),
     )
     .map(([key]) => key)
     .sort();
@@ -81,11 +85,7 @@ function describeRuntimeEnv(env = process.env) {
     })
     .sort();
   const dbUrlVariantKeys = keys
-    .filter(
-      (key) =>
-        key !== "DB_URL" &&
-        key.trim().toUpperCase() === "DB_URL"
-    )
+    .filter((key) => key !== "DB_URL" && key.trim().toUpperCase() === "DB_URL")
     .sort();
   const workerAgentKeys = visibleWorkerAgentKeys(env);
 
@@ -96,10 +96,10 @@ function describeRuntimeEnv(env = process.env) {
     dbUrlVariantKeys,
     retiredDatabaseUrlPresent: Object.prototype.hasOwnProperty.call(
       env,
-      retiredDatabaseUrlKey
+      retiredDatabaseUrlKey,
     ),
     workerAgentKeyCount: workerAgentKeys.length,
-    workerAgentKeys
+    workerAgentKeys,
   };
 }
 
@@ -108,9 +108,7 @@ function logRuntimeEnvDiagnostic(label, summary, options = {}) {
     return;
   }
 
-  console.error(
-    `[platform-env] ${label} ${JSON.stringify(summary)}`
-  );
+  console.error(`[platform-env] ${label} ${JSON.stringify(summary)}`);
 }
 
 function sleep(ms) {
@@ -125,7 +123,7 @@ function startProcess(name, command, args, env = process.env) {
   const child = spawn(command, args, {
     detached: process.platform !== "win32",
     env,
-    stdio: "inherit"
+    stdio: "inherit",
   });
 
   children.set(name, child);
@@ -141,13 +139,13 @@ function startProcess(name, command, args, env = process.env) {
     if (name === "worker") {
       if (code === workerAuthConfigurationExitCode) {
         console.error(
-          "[platform] worker stopped because one or more DB-managed credentials are not authorized. Run npm run workers:doctor -- --require-all, repair the credentials, then redeploy."
+          "[platform] worker stopped because one or more DB-managed credentials are not authorized. Run npm run workers:doctor -- --require-all, repair the credentials, then redeploy.",
         );
         return;
       }
 
       console.error(
-        `[platform] worker exited code=${code ?? "null"} signal=${signal ?? "null"}; restarting in ${workerRestartDelayMs}ms`
+        `[platform] worker exited code=${code ?? "null"} signal=${signal ?? "null"}; restarting in ${workerRestartDelayMs}ms`,
       );
       setTimeout(() => {
         if (!shuttingDown) {
@@ -159,7 +157,7 @@ function startProcess(name, command, args, env = process.env) {
     }
 
     console.error(
-      `[platform] ${name} exited code=${code ?? "null"} signal=${signal ?? "null"}`
+      `[platform] ${name} exited code=${code ?? "null"} signal=${signal ?? "null"}`,
     );
     void shutdown(code && code > 0 ? code : 1);
   });
@@ -171,7 +169,7 @@ function runOneShotProcess(name, command, args, env = process.env) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       env,
-      stdio: "inherit"
+      stdio: "inherit",
     });
 
     console.log(`[platform] started ${name} pid=${child.pid}`);
@@ -185,8 +183,8 @@ function runOneShotProcess(name, command, args, env = process.env) {
 
       reject(
         new Error(
-          `${name} exited code=${code ?? "null"} signal=${signal ?? "null"}`
-        )
+          `${name} exited code=${code ?? "null"} signal=${signal ?? "null"}`,
+        ),
       );
     });
   });
@@ -225,7 +223,7 @@ async function waitForWeb() {
   throw new Error(
     `Web server did not listen on ${probeHost}:${port} within ${startupTimeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : "unknown error"
-    }`
+    }`,
   );
 }
 
@@ -242,7 +240,10 @@ function terminate(child, signal) {
     }
   } catch (error) {
     if (error?.code !== "ESRCH") {
-      console.error(`[platform] failed to send ${signal} to pid=${child.pid}`, error);
+      console.error(
+        `[platform] failed to send ${signal} to pid=${child.pid}`,
+        error,
+      );
     }
   }
 }
@@ -293,26 +294,23 @@ function startWorker() {
       "--import",
       "./scripts/register-ts-path-loader.mjs",
       "workers/runner.ts",
-      workerMode
+      workerMode,
     ],
     {
       ...process.env,
-      WORKER_API_BASE_URL: workerApiBaseUrl
-    }
+      WORKER_API_BASE_URL: workerApiBaseUrl,
+    },
   );
 }
 
 async function checkWorkerCredentials() {
   const runtimeEnvBeforePreflight = describeRuntimeEnv(process.env);
 
-  logRuntimeEnvDiagnostic(
-    "before-worker-preflight",
-    runtimeEnvBeforePreflight
-  );
+  logRuntimeEnvDiagnostic("before-worker-preflight", runtimeEnvBeforePreflight);
 
   if (!process.env.DB_URL?.trim()) {
     console.error(
-      "[platform] DB_URL is not visible in the runtime process; web is running without platform workers. Confirm DB_URL is RUN_TIME/RUN_AND_BUILD_TIME for the mattanutra-ui runtime and redeploy after changing env."
+      "[platform] DB_URL is not visible in the runtime process; web is running without platform workers. Confirm DB_URL is RUN_TIME/RUN_AND_BUILD_TIME for the mattanutra-ui runtime and redeploy after changing env.",
     );
     logRuntimeEnvDiagnostic(
       "worker-preflight-missing-db-url",
@@ -321,9 +319,9 @@ async function checkWorkerCredentials() {
         afterRestore: runtimeEnvAfterRestore,
         beforeLoadEnvConfig: runtimeEnvBeforeLoad,
         beforeWorkerPreflight: runtimeEnvBeforePreflight,
-        restoredDbUrlAfterEnvLoad
+        restoredDbUrlAfterEnvLoad,
       },
-      { force: true }
+      { force: true },
     );
     return false;
   }
@@ -338,9 +336,10 @@ async function checkWorkerCredentials() {
         "--import",
         "./scripts/register-ts-path-loader.mjs",
         "scripts/workers-doctor.ts",
-        "--require-all"
+        "--configured-only",
+        "--require-all",
       ],
-      process.env
+      process.env,
     );
 
     return true;
@@ -349,7 +348,7 @@ async function checkWorkerCredentials() {
 
     console.error(`[platform] worker auth preflight failed: ${message}`);
     console.error(
-      "[platform] web is running without platform workers. Run npm run workers:doctor -- --repair --require-all with the same DB_URL and worker env, then redeploy."
+      "[platform] web is running without platform workers. Run npm run workers:doctor -- --repair --require-all with the same DB_URL and worker env, then redeploy.",
     );
 
     return false;
@@ -367,17 +366,17 @@ async function main() {
     "-H",
     bindHost,
     "-p",
-    String(port)
+    String(port),
   ]);
   await waitForWeb();
 
   console.log(
-    `[platform] web is listening on ${bindHost}:${port} (probe ${probeHost}:${port})`
+    `[platform] web is listening on ${bindHost}:${port} (probe ${probeHost}:${port})`,
   );
 
   if (!workerAgentKeyConfigured()) {
     console.error(
-      "[platform] DB-managed agent API keys are not configured; web is running without platform workers. Set profile-specific WORKER_<MODE>_AGENT_API_KEY values to enable workers."
+      "[platform] DB-managed agent API keys are not configured; web is running without platform workers. Set profile-specific WORKER_<MODE>_AGENT_API_KEY values to enable workers.",
     );
     return;
   }

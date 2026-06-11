@@ -3,21 +3,22 @@ import { hashAdminToken } from "@/lib/admin-session-cookie";
 import { permissionsForAgentRole } from "@/lib/admin-rbac";
 import {
   requiredCapabilitiesForWorkTaskType,
-  SYSTEM_AGENTS
+  SYSTEM_AGENTS,
 } from "@/lib/system-agents";
 import {
   RUNTIME_WORKER_PROFILES,
-  type RuntimeWorkerCredentialProfile
+  type RuntimeWorkerCredentialProfile,
 } from "@/lib/worker-agent-credentials";
 import {
   hasRequiredCapabilities,
-  normalizeCapabilities
+  normalizeCapabilities,
 } from "@/lib/task-service-utils";
 
 type Db = postgres.Sql;
 const retiredDatabaseUrlKey = ["DATABASE", "URL"].join("_");
 
 type DoctorArgs = Readonly<{
+  configuredOnly: boolean;
   json: boolean;
   repair: boolean;
   requireAll: boolean;
@@ -57,9 +58,10 @@ function parseArgs(argv: readonly string[]): DoctorArgs {
   const flags = new Set(argv);
 
   return {
+    configuredOnly: flags.has("--configured-only"),
     json: flags.has("--json"),
     repair: flags.has("--repair"),
-    requireAll: flags.has("--require-all")
+    requireAll: flags.has("--require-all"),
   };
 }
 
@@ -89,17 +91,13 @@ function describeRuntimeEnv(env: NodeJS.ProcessEnv = process.env) {
     })
     .sort();
   const dbUrlVariantKeys = keys
-    .filter(
-      (key) =>
-        key !== "DB_URL" &&
-        key.trim().toUpperCase() === "DB_URL"
-    )
+    .filter((key) => key !== "DB_URL" && key.trim().toUpperCase() === "DB_URL")
     .sort();
   const workerAgentKeyCount = Object.entries(env).filter(
     ([key, value]) =>
       key.startsWith("WORKER_") &&
       key.endsWith("_AGENT_API_KEY") &&
-      value?.trim()
+      value?.trim(),
   ).length;
   const hasDbUrlKey = Object.prototype.hasOwnProperty.call(env, "DB_URL");
 
@@ -110,19 +108,22 @@ function describeRuntimeEnv(env: NodeJS.ProcessEnv = process.env) {
     dbUrlVariantKeys,
     retiredDatabaseUrlPresent: Object.prototype.hasOwnProperty.call(
       env,
-      retiredDatabaseUrlKey
+      retiredDatabaseUrlKey,
     ),
-    workerAgentKeyCount
+    workerAgentKeyCount,
   };
 }
 
-function logRuntimeEnvDiagnostic(label: string, options: { force?: boolean } = {}) {
+function logRuntimeEnvDiagnostic(
+  label: string,
+  options: { force?: boolean } = {},
+) {
   if (!options.force && process.env.PLATFORM_ENV_DIAGNOSTICS !== "1") {
     return;
   }
 
   console.error(
-    `[workers:doctor-env] ${label} ${JSON.stringify(describeRuntimeEnv())}`
+    `[workers:doctor-env] ${label} ${JSON.stringify(describeRuntimeEnv())}`,
   );
 }
 
@@ -148,19 +149,21 @@ function makeSql(connection: string) {
     idle_timeout: 5,
     max: 1,
     prepare: false,
-    ...(shouldUseSsl(connection) ? { ssl: "require" } : {})
+    ...(shouldUseSsl(connection) ? { ssl: "require" } : {}),
   });
 }
 
 function uniqueTexts(values: readonly string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+  return Array.from(
+    new Set(values.map((value) => value.trim()).filter(Boolean)),
+  );
 }
 
 function requiredCapabilities(profile: RuntimeWorkerCredentialProfile) {
   return uniqueTexts(
     profile.taskTypes.flatMap((taskType) =>
-      requiredCapabilitiesForWorkTaskType(taskType)
-    )
+      requiredCapabilitiesForWorkTaskType(taskType),
+    ),
   );
 }
 
@@ -180,7 +183,7 @@ function credentialExpired(value: string | null) {
 
 async function loadProfileRow(
   sql: Db,
-  profile: RuntimeWorkerCredentialProfile
+  profile: RuntimeWorkerCredentialProfile,
 ) {
   const definition = SYSTEM_AGENTS[profile.agentKey];
   const rows = await sql<ProfileRow[]>`
@@ -229,7 +232,7 @@ async function repairCredentialHash(
     credentialHash: string;
     envKey: string;
     token: string;
-  }>
+  }>,
 ) {
   await sql`
     update public.agent_credentials
@@ -240,7 +243,7 @@ async function repairCredentialHash(
       metadata = metadata || ${sql.json({
         envKey: input.envKey,
         repairedAt: new Date().toISOString(),
-        repairSource: "workers-doctor"
+        repairSource: "workers-doctor",
       })}::jsonb,
       updated_at = now()
     where id = ${input.credentialId}::uuid
@@ -250,7 +253,7 @@ async function repairCredentialHash(
 async function checkProfile(
   sql: Db,
   profile: RuntimeWorkerCredentialProfile,
-  args: DoctorArgs
+  args: DoctorArgs,
 ): Promise<WorkerProfileCheck> {
   const definition = SYSTEM_AGENTS[profile.agentKey];
   const token = profileToken(profile);
@@ -323,7 +326,7 @@ async function checkProfile(
           credentialHash: expectedHash,
           credentialId: row.credential_id,
           envKey: profile.envKey,
-          token
+          token,
         });
         repaired = true;
       } else {
@@ -332,7 +335,9 @@ async function checkProfile(
     }
   }
 
-  const agentPermissions = permissionsForAgentRole(profile.role) as readonly string[];
+  const agentPermissions = permissionsForAgentRole(
+    profile.role,
+  ) as readonly string[];
 
   if (!agentPermissions.includes("tasks.write")) {
     issues.push("missing_tasks_write_permission");
@@ -341,7 +346,7 @@ async function checkProfile(
   if (
     !hasRequiredCapabilities(
       required,
-      normalizeCapabilities(row?.agent_capabilities ?? [])
+      normalizeCapabilities(row?.agent_capabilities ?? []),
     )
   ) {
     issues.push("missing_required_capability");
@@ -364,7 +369,7 @@ async function checkProfile(
     repaired,
     requiredCapabilities: required,
     role: profile.role,
-    taskTypes: profile.taskTypes
+    taskTypes: profile.taskTypes,
   };
 }
 
@@ -375,7 +380,7 @@ function printTextReport(checks: readonly WorkerProfileCheck[]) {
     const issueText = check.ok ? "" : ` issues=${check.issues.join(",")}`;
 
     console.log(
-      `${prefix} ${check.mode} ${check.agentName} env=${check.envKey} role=${check.role}${repairText}${issueText}`
+      `${prefix} ${check.mode} ${check.agentName} env=${check.envKey} role=${check.role}${repairText}${issueText}`,
     );
   }
 }
@@ -388,7 +393,7 @@ async function main() {
   if (!connection) {
     const payload = {
       error: "DB_URL is required",
-      ok: false
+      ok: false,
     };
 
     if (args.json) {
@@ -408,6 +413,10 @@ async function main() {
     const checks: WorkerProfileCheck[] = [];
 
     for (const profile of RUNTIME_WORKER_PROFILES) {
+      if (args.configuredOnly && !profileToken(profile)) {
+        continue;
+      }
+
       checks.push(await checkProfile(sql, profile, args));
     }
 
@@ -417,7 +426,7 @@ async function main() {
       failureCount: failures.length,
       ok: failures.length === 0,
       profiles: checks,
-      repairMode: args.repair
+      repairMode: args.repair,
     };
 
     if (args.json) {
@@ -425,7 +434,7 @@ async function main() {
     } else {
       printTextReport(checks);
       console.log(
-        `[workers:doctor] ${payload.ok ? "pass" : "fail"} profiles=${checks.length} failures=${failures.length}`
+        `[workers:doctor] ${payload.ok ? "pass" : "fail"} profiles=${checks.length} failures=${failures.length}`,
       );
     }
 

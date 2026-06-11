@@ -2,19 +2,16 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import nextEnv from "@next/env";
 import { executeTaskWorkItem } from "../lib/task-execution.ts";
-import {
-  SYSTEM_AGENTS,
-  type SystemAgentKey
-} from "../lib/system-agents.ts";
+import { SYSTEM_AGENTS, type SystemAgentKey } from "../lib/system-agents.ts";
 import {
   RUNTIME_WORKER_PROFILE_MODES,
   runtimeWorkerProfileForMode,
-  type WorkerProfileMode
+  type WorkerProfileMode,
 } from "../lib/worker-agent-credentials.ts";
 import {
   isWorkerAuthConfigurationError,
   WorkerApiClient,
-  type WorkerAgentConfig
+  type WorkerAgentConfig,
 } from "./api-client.ts";
 
 nextEnv.loadEnvConfig(process.cwd());
@@ -72,7 +69,7 @@ function positiveInteger(value: string | undefined, fallback: number) {
 function boundedPositiveInteger(
   value: string | undefined,
   fallback: number,
-  max: number
+  max: number,
 ) {
   return Math.min(positiveInteger(value, fallback), max);
 }
@@ -95,14 +92,14 @@ function errorMessage(error: unknown) {
 
 function isStaleWorkerSessionError(error: unknown) {
   return /worker session (?:not found|is not active|no longer exists)/i.test(
-    errorMessage(error)
+    errorMessage(error),
   );
 }
 
 async function retryApiCall<T>(
   label: string,
   operation: () => Promise<T>,
-  attempts = 3
+  attempts = 3,
 ) {
   let lastError: unknown;
 
@@ -122,7 +119,9 @@ async function retryApiCall<T>(
     }
   }
 
-  throw new Error(`${label} failed after ${attempts} attempts: ${errorMessage(lastError)}`);
+  throw new Error(
+    `${label} failed after ${attempts} attempts: ${errorMessage(lastError)}`,
+  );
 }
 
 function workerMode(value: string | undefined): WorkerMode {
@@ -150,7 +149,11 @@ function workerVersion() {
   return envText("WORKER_VERSION", envText("npm_package_version", "dev"));
 }
 
-function instanceId(mode: WorkerProfileMode, slotIndex: number, slotCount: number) {
+function instanceId(
+  mode: WorkerProfileMode,
+  slotIndex: number,
+  slotCount: number,
+) {
   const base = envText("WORKER_INSTANCE_ID", `${hostname()}:${process.pid}`);
   const slotSuffix = slotCount > 1 ? `:${slotIndex + 1}` : "";
 
@@ -159,7 +162,7 @@ function instanceId(mode: WorkerProfileMode, slotIndex: number, slotCount: numbe
 
 function agentProfile(
   agentKey: SystemAgentKey,
-  taskTypes: readonly string[]
+  taskTypes: readonly string[],
 ): WorkerAgentConfig {
   const agent = SYSTEM_AGENTS[agentKey];
 
@@ -168,12 +171,12 @@ function agentProfile(
     id: agent.id,
     metadata: {
       ...agent.metadata,
-      systemAgent: true
+      systemAgent: true,
     },
     model: agent.model,
     name: agent.name,
     taskTypes,
-    type: agent.type
+    type: agent.type,
   };
 }
 
@@ -192,18 +195,20 @@ function workerConcurrency(mode: WorkerProfileMode) {
   const defaultConcurrency = boundedPositiveInteger(
     process.env.WORKER_CONCURRENCY,
     1,
-    MAX_WORKER_PROFILE_CONCURRENCY
+    MAX_WORKER_PROFILE_CONCURRENCY,
   );
 
   return boundedPositiveInteger(
     process.env[profileEnvName],
     defaultConcurrency,
-    MAX_WORKER_PROFILE_CONCURRENCY
+    MAX_WORKER_PROFILE_CONCURRENCY,
   );
 }
 
 function uniqueTexts(values: readonly string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+  return Array.from(
+    new Set(values.map((value) => value.trim()).filter(Boolean)),
+  );
 }
 
 function workerAgentKeys(mode: WorkerProfileMode) {
@@ -213,7 +218,7 @@ function workerAgentKeys(mode: WorkerProfileMode) {
       ? uniqueTexts(
           envText("WORKER_STOCK_AGENT_API_KEYS")
             .split(",")
-            .map((value) => value.trim())
+            .map((value) => value.trim()),
         )
       : [];
 
@@ -232,7 +237,7 @@ function requireConfigs(mode: WorkerProfileMode) {
     throw new Error(
       `A DB-managed agent API key is required for the ${mode} worker. Set WORKER_${mode.toUpperCase()}_AGENT_API_KEY${
         mode === "stock" ? " or WORKER_STOCK_AGENT_API_KEYS" : ""
-      }.`
+      }.`,
     );
   }
 
@@ -245,13 +250,13 @@ function workerProfileModesForRun(mode: WorkerMode) {
   }
 
   return WORKER_PROFILE_MODES.filter(
-    (profileMode) => profileMode !== "chat" || workerAgentKeys("chat").length > 0
+    (profileMode) => workerAgentKeys(profileMode).length > 0,
   );
 }
 
 async function executeWorkItem(
   client: WorkerApiClient,
-  workItem: Record<string, unknown>
+  workItem: Record<string, unknown>,
 ) {
   if (workItem.taskType === "client_safety_followup") {
     const communication = await client.sendCommunication({
@@ -260,7 +265,7 @@ async function executeWorkItem(
       metadata: workItem.metadata,
       planId: workItem.planId,
       subject: workItem.subject,
-      taskId: workItem.taskId
+      taskId: workItem.taskId,
     });
 
     return { communication };
@@ -273,7 +278,7 @@ async function runAgentLoop(
   mode: WorkerProfileMode,
   config: Readonly<{ baseUrl: string; token: string }>,
   slotIndex: number,
-  slotCount: number
+  slotCount: number,
 ) {
   const client = new WorkerApiClient(config);
   const agentConfig = profileForMode(mode);
@@ -291,11 +296,11 @@ async function runAgentLoop(
           profileMode: mode,
           runId: WORKER_RUN_ID,
           slotCount,
-          slotIndex
+          slotIndex,
         },
-        workerVersion: workerVersion()
+        workerVersion: workerVersion(),
       }),
-    5
+    5,
   );
   const agent = registration.agent;
   const workerSessionId = registration.session.id;
@@ -303,16 +308,16 @@ async function runAgentLoop(
   const leaseSeconds =
     positiveInteger(
       process.env.WORKER_LEASE_SECONDS,
-      registration.polling.leaseSeconds
+      registration.polling.leaseSeconds,
     ) || DEFAULT_LEASE_SECONDS;
   const waitSeconds =
     positiveInteger(
       process.env.WORKER_POLL_WAIT_SECONDS,
-      registration.polling.waitSeconds
+      registration.polling.waitSeconds,
     ) || DEFAULT_POLL_WAIT_SECONDS;
   const heartbeatIntervalMs = positiveInteger(
     process.env.WORKER_HEARTBEAT_INTERVAL_MS,
-    DEFAULT_HEARTBEAT_INTERVAL_MS
+    DEFAULT_HEARTBEAT_INTERVAL_MS,
   );
 
   activeSession = { agentId: agent.id, client, workerSessionId };
@@ -323,40 +328,44 @@ async function runAgentLoop(
   let heartbeatTaskId: string | null = null;
   let staleHeartbeatError: Error | null = null;
   const heartbeat = setInterval(() => {
-    void retryApiCall(`${agent.name} heartbeat`, () =>
-      client.heartbeat({
-        agentId: agent.id,
-        currentTaskId: heartbeatTaskId,
-        status: heartbeatStatus,
-        workerSessionId
-      }),
-      2
+    void retryApiCall(
+      `${agent.name} heartbeat`,
+      () =>
+        client.heartbeat({
+          agentId: agent.id,
+          currentTaskId: heartbeatTaskId,
+          status: heartbeatStatus,
+          workerSessionId,
+        }),
+      2,
     ).catch((error) => {
       if (isStaleWorkerSessionError(error)) {
         staleHeartbeatError = new Error(
-          `${agent.name} worker session ${workerSessionId} no longer exists; re-registering`
+          `${agent.name} worker session ${workerSessionId} no longer exists; re-registering`,
         );
         return;
       }
 
       console.error(
-        `[agent] ${agent.name} heartbeat failed: ${errorMessage(error)}`
+        `[agent] ${agent.name} heartbeat failed: ${errorMessage(error)}`,
       );
     });
   }, heartbeatIntervalMs);
-  (heartbeat as ReturnType<typeof setInterval> & { unref?: () => void }).unref?.();
+  (
+    heartbeat as ReturnType<typeof setInterval> & { unref?: () => void }
+  ).unref?.();
 
   try {
     await retryApiCall(`${agent.name} initial heartbeat`, () =>
       client.heartbeat({
         agentId: agent.id,
         status: "idle",
-        workerSessionId
-      })
+        workerSessionId,
+      }),
     );
 
     console.log(
-      `[agent] ${agent.name}${slotLabel} registered session ${workerSessionId} for ${agentConfig.taskTypes.join(", ")}`
+      `[agent] ${agent.name}${slotLabel} registered session ${workerSessionId} for ${agentConfig.taskTypes.join(", ")}`,
     );
 
     let pollingBackoffMs = 1_000;
@@ -376,7 +385,7 @@ async function runAgentLoop(
           leaseSeconds,
           taskTypes: agentConfig.taskTypes,
           waitSeconds,
-          workerSessionId
+          workerSessionId,
         });
         pollingBackoffMs = 1_000;
       } catch (error) {
@@ -385,15 +394,18 @@ async function runAgentLoop(
 
         if (isStaleWorkerSessionError(error)) {
           throw new Error(
-            `${agent.name} worker session ${workerSessionId} no longer exists; re-registering`
+            `${agent.name} worker session ${workerSessionId} no longer exists; re-registering`,
           );
         }
 
         console.error(
-          `[agent] ${agent.name} polling failed: ${errorMessage(error)}`
+          `[agent] ${agent.name} polling failed: ${errorMessage(error)}`,
         );
         await sleep(jitter(pollingBackoffMs));
-        pollingBackoffMs = nextBackoff(pollingBackoffMs, MAX_POLLING_BACKOFF_MS);
+        pollingBackoffMs = nextBackoff(
+          pollingBackoffMs,
+          MAX_POLLING_BACKOFF_MS,
+        );
         continue;
       }
 
@@ -410,23 +422,30 @@ async function runAgentLoop(
       const workItem = reserved.workItem;
       heartbeatStatus = "working";
       heartbeatTaskId = taskId;
-      const renew = setInterval(() => {
-        void retryApiCall(`${agent.name} task lease renewal`, () =>
-          client.renew({
-            agentId: agent.id,
-            leaseSeconds,
-            reservationId,
-            taskId,
-            workerSessionId
-          }),
-          2
-        ).catch((error) => {
-          console.error(
-            `[agent] ${agent.name} could not renew task ${taskId}: ${errorMessage(error)}`
-          );
-        });
-      }, Math.max(30_000, Math.floor(leaseSeconds * 400)));
-      (renew as ReturnType<typeof setInterval> & { unref?: () => void }).unref?.();
+      const renew = setInterval(
+        () => {
+          void retryApiCall(
+            `${agent.name} task lease renewal`,
+            () =>
+              client.renew({
+                agentId: agent.id,
+                leaseSeconds,
+                reservationId,
+                taskId,
+                workerSessionId,
+              }),
+            2,
+          ).catch((error) => {
+            console.error(
+              `[agent] ${agent.name} could not renew task ${taskId}: ${errorMessage(error)}`,
+            );
+          });
+        },
+        Math.max(30_000, Math.floor(leaseSeconds * 400)),
+      );
+      (
+        renew as ReturnType<typeof setInterval> & { unref?: () => void }
+      ).unref?.();
 
       try {
         const resultPayload = await executeWorkItem(client, workItem);
@@ -438,8 +457,8 @@ async function runAgentLoop(
             reservationId,
             resultPayload: resultPayload as Record<string, unknown>,
             taskId,
-            workerSessionId
-          })
+            workerSessionId,
+          }),
         );
         heartbeatStatus = "idle";
         heartbeatTaskId = null;
@@ -453,21 +472,21 @@ async function runAgentLoop(
             errorMessage: errorMessage(error),
             reservationId,
             resultPayload: {
-              taskType
+              taskType,
             },
             taskId,
-            workerSessionId
-          })
+            workerSessionId,
+          }),
         ).catch((failureError) => {
           staleSession ||= isStaleWorkerSessionError(failureError);
           console.error(
-            `[agent] ${agent.name} could not mark task failed: ${errorMessage(failureError)}`
+            `[agent] ${agent.name} could not mark task failed: ${errorMessage(failureError)}`,
           );
         });
 
         if (staleSession) {
           throw new Error(
-            `${agent.name} worker session ${workerSessionId} went stale while handling task ${taskId}; re-registering`
+            `${agent.name} worker session ${workerSessionId} went stale while handling task ${taskId}; re-registering`,
           );
         }
 
@@ -484,10 +503,7 @@ async function runAgentLoop(
   }
 }
 
-async function markSessionOffline(
-  sessionKey: string,
-  session: ActiveSession
-) {
+async function markSessionOffline(sessionKey: string, session: ActiveSession) {
   activeSessions.delete(sessionKey);
 
   await retryApiCall(
@@ -496,12 +512,12 @@ async function markSessionOffline(
       session.client.heartbeat({
         agentId: session.agentId,
         status: "offline",
-        workerSessionId: session.workerSessionId
+        workerSessionId: session.workerSessionId,
       }),
-    2
+    2,
   ).catch((error) => {
     console.error(
-      `[agent] could not mark session ${session.workerSessionId} offline: ${errorMessage(error)}`
+      `[agent] could not mark session ${session.workerSessionId} offline: ${errorMessage(error)}`,
     );
   });
 }
@@ -511,8 +527,8 @@ async function markSessionsOffline() {
 
   await Promise.allSettled(
     sessions.map(([sessionKey, session]) =>
-      markSessionOffline(sessionKey, session)
-    )
+      markSessionOffline(sessionKey, session),
+    ),
   );
 }
 
@@ -521,7 +537,7 @@ async function runSupervisedAgentLoop(
   config: Readonly<{ baseUrl: string; token: string }>,
   slotIndex = 0,
   slotCount = 1,
-  startupDelayMs = 0
+  startupDelayMs = 0,
 ) {
   const agentName = profileForMode(mode).name;
   const slotLabel = slotCount > 1 ? ` slot ${slotIndex + 1}/${slotCount}` : "";
@@ -539,19 +555,19 @@ async function runSupervisedAgentLoop(
       if (isWorkerAuthConfigurationError(error)) {
         fatalAuthProfileFailure = true;
         console.error(
-          `[agent] ${agentName}${slotLabel} stopped: worker API credential is not authorized. Run workers:doctor --require-all and repair this profile before restarting workers.`
+          `[agent] ${agentName}${slotLabel} stopped: worker API credential is not authorized. Run workers:doctor --require-all and repair this profile before restarting workers.`,
         );
         return;
       }
 
       console.error(
-        `[agent] ${agentName}${slotLabel} loop failed: ${errorMessage(error)}`
+        `[agent] ${agentName}${slotLabel} loop failed: ${errorMessage(error)}`,
       );
     }
 
     if (!shuttingDown) {
       console.error(
-        `[agent] ${agentName}${slotLabel} restarting in ${restartBackoffMs}ms`
+        `[agent] ${agentName}${slotLabel} restarting in ${restartBackoffMs}ms`,
       );
       await sleep(jitter(restartBackoffMs));
       restartBackoffMs = nextBackoff(restartBackoffMs);
@@ -585,10 +601,9 @@ async function runWorker(mode: WorkerMode) {
           config,
           slotIndex,
           slotCount,
-          (profileIndex + slotIndex) * WORKER_PROFILE_STARTUP_STAGGER_MS
+          (profileIndex + slotIndex) * WORKER_PROFILE_STARTUP_STAGGER_MS,
         );
-      }
-      )
+      }),
     );
   });
 
