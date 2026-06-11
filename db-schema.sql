@@ -1000,8 +1000,8 @@ CREATE TABLE public.cron (
 --
 
 CREATE TABLE public.finance_accounts (
-    id uuid NOT NULL,
-    name text NOT NULL,
+    id uuid NOT NULL PRIMARY KEY,
+    name text NOT NULL UNIQUE,
     description text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
@@ -3386,22 +3386,6 @@ ALTER TABLE ONLY public.organisation_notification_preferences
 
 ALTER TABLE ONLY public.cron
     ADD CONSTRAINT cron_pkey PRIMARY KEY (id);
-
-
---
--- Name: finance_accounts finance_accounts_name_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.finance_accounts
-    ADD CONSTRAINT finance_accounts_name_key UNIQUE (name);
-
-
---
--- Name: finance_accounts finance_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.finance_accounts
-    ADD CONSTRAINT finance_accounts_pkey PRIMARY KEY (id);
 
 
 --
