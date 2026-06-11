@@ -216,6 +216,14 @@ async function tableColumns(sql: Db, tableName: string) {
   return rows.map((row: { column_name: string }) => row.column_name);
 }
 
+async function tableExists(sql: Db, tableName: string) {
+  const rows = await sql<Array<{ exists: boolean }>>`
+    select to_regclass(${`public.${tableName}`}) is not null as exists
+  `;
+
+  return rows[0]?.exists === true;
+}
+
 function assertSnapshot(snapshot: PreservedSnapshot) {
   const missing = preservedTables
     .filter((table) => table.requireNonEmpty)
@@ -237,6 +245,15 @@ async function snapshotConfig(
   const tables: Record<string, readonly Record<string, unknown>[]> = {};
 
   for (const table of preservedTables) {
+    if (!(await tableExists(sql, table.name))) {
+      if (table.requireNonEmpty && input.requireNonEmpty) {
+        fail(`Required preserved table is missing: ${table.name}`);
+      }
+
+      tables[table.name] = [];
+      continue;
+    }
+
     tables[table.name] = (await sql.unsafe(table.query)) as Record<
       string,
       unknown
@@ -282,6 +299,10 @@ async function restoreTable(
 ) {
   if (rows.length < 1) {
     return 0;
+  }
+
+  if (!(await tableExists(sql, table.name))) {
+    fail(`Cannot restore ${table.name}; target table is missing`);
   }
 
   const columns = await tableColumns(sql, table.name);
@@ -360,11 +381,21 @@ async function verifyConfig(sql: Db, snapshotPath: string) {
   assertSnapshot(snapshot);
 
   for (const table of preservedTables) {
+    const expected = snapshot.tables[table.name]?.length ?? 0;
+
+    if (!(await tableExists(sql, table.name))) {
+      if (expected > 0) {
+        fail(`Restore verification failed for ${table.name}: table is missing`);
+      }
+
+      details[table.name] = { actual: 0, expected };
+      continue;
+    }
+
     const rows = await sql<Array<{ count: string }>>`
       select count(*)::text as count
       from public.${sql(table.name)}
     `;
-    const expected = snapshot.tables[table.name]?.length ?? 0;
     const actual = Number(rows[0]?.count ?? 0);
 
     details[table.name] = { actual, expected };
