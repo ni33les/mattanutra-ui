@@ -386,14 +386,16 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
               </dl>
             </section>
 
-            <section className="rounded-xl bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]">
-              <LivingProtocolLineCta
-                locale={locale}
-                planId={order.planId}
-                retailCustomerOrderId={order.orderId}
-                source="order_tracking"
-              />
-            </section>
+            {!order.hasActiveLineChannel ? (
+              <section className="rounded-xl bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]">
+                <LivingProtocolLineCta
+                  locale={locale}
+                  planId={order.planId}
+                  retailCustomerOrderId={order.orderId}
+                  source="order_tracking"
+                />
+              </section>
+            ) : null}
 
             {order.shipment || order.status === "shipped" ? (
               <section className="rounded-xl bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)]">

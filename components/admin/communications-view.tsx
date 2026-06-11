@@ -7,7 +7,7 @@ import {
   Plus,
   type LucideIcon
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   AdminCommunicationRow,
   AdminCommunicationsData,
@@ -127,7 +127,6 @@ export function AdminCommunicationsView({
   );
   const [emailContactName, setEmailContactName] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
-  const [lineContactName, setLineContactName] = useState("");
   const [lineCode, setLineCode] = useState<{
     code: string;
     command: string;
@@ -136,6 +135,8 @@ export function AdminCommunicationsView({
   } | null>(null);
   const [connectMethod, setConnectMethod] = useState<ConnectMethod>("line");
   const [connectModalOpen, setConnectModalOpen] = useState(false);
+  const [lineCodeAutoRequestKey, setLineCodeAutoRequestKey] = useState("");
+  const [lineCodeBusy, setLineCodeBusy] = useState(false);
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [retryErrorId, setRetryErrorId] = useState<string | null>(null);
@@ -184,6 +185,45 @@ export function AdminCommunicationsView({
       value: formatNumber(data.summary.noChannel, locale)
     }
   ];
+
+  function defaultLineContactName() {
+    if (!settings) {
+      return "MattaNutra LINE";
+    }
+
+    return settings.scope === "platform"
+      ? "MattaNutra Platform"
+      : settings.selectedOrganisationName;
+  }
+
+  useEffect(() => {
+    const selectedOrganisationId = settings?.selectedOrganisationId;
+
+    if (
+      !connectModalOpen ||
+      connectMethod !== "line" ||
+      lineCode ||
+      !selectedOrganisationId ||
+      lineCodeAutoRequestKey === selectedOrganisationId ||
+      lineCodeBusy ||
+      !settings?.canManage
+    ) {
+      return;
+    }
+
+    setLineCodeAutoRequestKey(selectedOrganisationId);
+    void startLineConnection(defaultLineContactName());
+  }, [
+    connectMethod,
+    connectModalOpen,
+    lineCode,
+    lineCodeAutoRequestKey,
+    lineCodeBusy,
+    settings?.canManage,
+    settings?.scope,
+    settings?.selectedOrganisationId,
+    settings?.selectedOrganisationName
+  ]);
 
   async function retryMessage(row: AdminCommunicationRow) {
     setRetryErrorId(null);
@@ -292,6 +332,7 @@ export function AdminCommunicationsView({
   function openConnectModal() {
     setSettingsError("");
     setLineCode(null);
+    setLineCodeAutoRequestKey("");
     setConnectModalOpen(true);
   }
 
@@ -302,6 +343,7 @@ export function AdminCommunicationsView({
 
     setConnectMethod(provider.id);
     setLineCode(null);
+    setLineCodeAutoRequestKey("");
   }
 
   function closeConnectModal() {
@@ -312,18 +354,22 @@ export function AdminCommunicationsView({
     }
   }
 
-  async function startLineConnection() {
+  async function startLineConnection(displayNameOverride?: string) {
     if (!settings) {
       return;
     }
 
-    setSettingsBusy(true);
+    const displayName =
+      displayNameOverride?.trim() ||
+      defaultLineContactName();
+
+    setLineCodeBusy(true);
     setSettingsError("");
 
     try {
       const response = await fetch("/api/admin/communications/line-connect", {
         body: JSON.stringify({
-          displayName: lineContactName,
+          displayName,
           locale,
           organisationId: settings.selectedOrganisationId
         }),
@@ -346,7 +392,7 @@ export function AdminCommunicationsView({
     } catch {
       setSettingsError("Could not create LINE connection code.");
     } finally {
-      setSettingsBusy(false);
+      setLineCodeBusy(false);
     }
   }
 
@@ -728,12 +774,14 @@ export function AdminCommunicationsView({
                   </a>
                 ) : (
                   <div className="grid size-48 place-items-center rounded-md bg-gray-50 p-4 text-center text-sm leading-6 text-gray-500 ring-1 ring-gray-200">
-                    Create a code to show a QR that includes the connection message.
+                    {lineCodeBusy
+                      ? "Preparing LINE QR..."
+                      : "LINE QR could not be prepared."}
                   </div>
                 )}
                 <div className="text-sm leading-6 text-gray-600">
                   <p>
-                    Enter a contact name, create a code, then scan the QR. The QR opens LINE with the connection message ready to send.
+                    Scan the QR or open LINE. The connection message is already filled in; just send it in the chat or group.
                   </p>
                   <a
                     className="mt-3 inline-flex text-sm font-semibold text-[#126B4F] hover:text-[#0F5D44]"
@@ -745,25 +793,6 @@ export function AdminCommunicationsView({
                   </a>
                 </div>
               </div>
-              <label className="block">
-                <span className="text-sm font-semibold text-gray-800">Contact name</span>
-                <input
-                  className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50"
-                  disabled={!settings.canManage || settingsBusy}
-                  onChange={(event) => setLineContactName(event.target.value)}
-                  placeholder="Person or group name"
-                  type="text"
-                  value={lineContactName}
-                />
-              </label>
-              <button
-                className="w-full rounded-md bg-[#20343A] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={!settings.canManage || settingsBusy || !lineContactName.trim()}
-                onClick={startLineConnection}
-                type="button"
-              >
-                Create LINE connect code
-              </button>
               {lineCode ? (
                 <div className="rounded-md bg-gray-50 p-3 ring-1 ring-gray-200">
                   <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">

@@ -26,6 +26,7 @@ import {
 import { createTask } from "@/lib/task-service";
 import { writeBpmEvent } from "@/lib/bpm";
 import {
+  ensureCommunicationSchema,
   queueAdminOrganisationCommunication,
   queuePlatformAdminCommunication
 } from "@/lib/communications";
@@ -110,6 +111,7 @@ type TrackingOrder = Readonly<{
   currency: string;
   customerEmail: string | null;
   customerName: string | null;
+  hasActiveLineChannel: boolean;
   lines: QuoteLine[];
   orderId: string | null;
   orderNumber: string | null;
@@ -1299,9 +1301,11 @@ export async function getTrackingOrderByReference(
   }
 
   await ensureRetailCheckoutSchema(sql);
+  await ensureCommunicationSchema(sql);
 
   const isTokenReference = trackingReference.length >= 32;
   const rows = await sql<Array<CheckoutPaymentRow & {
+    has_active_line_channel: boolean | null;
     order_metadata: unknown;
     order_number: string | null;
     order_status: string | null;
@@ -1309,6 +1313,16 @@ export async function getTrackingOrderByReference(
   }>>`
     select
       retail_checkout_payments.*,
+      exists (
+        select 1
+        from public.plan_communication_identities
+        join public.communication_channels
+          on communication_channels.identity_id = plan_communication_identities.identity_id
+        where plan_communication_identities.plan_id = retail_checkout_payments.plan_id
+          and communication_channels.channel_type = 'line'
+          and communication_channels.status = 'active'
+        limit 1
+      ) as has_active_line_channel,
       retail_customer_orders.metadata as order_metadata,
       retail_customer_orders.order_number,
       retail_customer_orders.status as order_status,
@@ -1352,6 +1366,7 @@ export async function getTrackingOrderByReference(
     currency: row.currency,
     customerEmail: row.customer_email,
     customerName: row.customer_name,
+    hasActiveLineChannel: row.has_active_line_channel === true,
     lines: arrayValue<QuoteLine>(row.quote_lines),
     orderId: row.retail_customer_order_id,
     orderNumber: row.order_number,

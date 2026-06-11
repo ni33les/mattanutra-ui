@@ -36,6 +36,15 @@ describe("retail product checkout static contracts", () => {
     assert.match(trackingPage, /getTrackingOrderByReference\(token, locale\)/);
   });
 
+  it("shows Panya connection on tracking only until LINE is connected", () => {
+    assert.match(checkoutService, /has_active_line_channel/);
+    assert.match(checkoutService, /plan_communication_identities/);
+    assert.match(checkoutService, /communication_channels\.channel_type = 'line'/);
+    assert.match(checkoutService, /hasActiveLineChannel: row\.has_active_line_channel === true/);
+    assert.match(trackingPage, /!order\.hasActiveLineChannel/);
+    assert.match(trackingPage, /source="order_tracking"/);
+  });
+
   it("surfaces shipment metadata on tracking and shipped emails", () => {
     assert.match(checkoutService, /retail_customer_orders\.metadata as order_metadata/);
     assert.match(checkoutService, /shipment: shipmentFromMetadata\(row\.order_metadata\)/);

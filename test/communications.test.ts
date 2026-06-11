@@ -230,12 +230,13 @@ describe("communications channel selection", () => {
     assert.match(view, /Coming soon/);
     assert.match(view, /action: "delete_channel"/);
     assert.match(view, /Contact name/);
-    assert.match(view, /Create LINE connect code/);
-    assert.match(view, /Create a code to show a QR that includes the connection message/);
+    assert.match(view, /Preparing LINE QR/);
+    assert.match(view, /connection message is already filled in/);
     assert.match(view, /lineCode\.lineUrl/);
     assert.match(view, /lineCode\.command/);
     assert.match(view, /lineOfficialAccountUrl/);
     assert.match(view, /MattaNutra LINE connect QR code/);
+    assert.doesNotMatch(view, /Create LINE connect code/);
     assert.match(lineFormat, /environment\.toUpperCase\(\)/);
     assert.match(lineFormat, /\^\(DEV\|UAT\)\\n\\n/);
     assert.match(lineFormat, /MATTANUTRA_ENV/);

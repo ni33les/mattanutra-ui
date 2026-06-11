@@ -75,8 +75,13 @@ describe("assessment payment confirmation page", () => {
     assert.doesNotMatch(assessmentReturnPage, /design annotations?/i);
   });
 
-  it("does not change the product basket payment return page", () => {
+  it("keeps product basket return as a redirect-only compatibility endpoint", () => {
+    assert.match(basketReturnPage, /redirect\(result\.destination\)/);
+    assert.match(basketReturnPage, /fulfillRetailCheckoutSession/);
     assert.doesNotMatch(basketReturnPage, /Your formula is being built/);
+    assert.doesNotMatch(basketReturnPage, /Product payment status/);
+    assert.doesNotMatch(basketReturnPage, /<TitleBar/);
+    assert.doesNotMatch(basketReturnPage, /LivingProtocolLineCta/);
     assert.doesNotMatch(basketReturnPage, /payment_confirmation_cta_clicked/);
   });
 });
