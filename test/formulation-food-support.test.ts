@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
-import { selectedFoodSupport } from "../components/formulation-support-helpers.ts";
+import {
+  selectedFoodSupport,
+  visibleSupplementRecommendationCount,
+} from "../components/formulation-support-helpers.ts";
 import type {
   FoodGapSupportItem,
   FormulationResult,
   ProductNeedCoverage,
+  RecommendedProduct,
 } from "../lib/formulation-types.ts";
 
 function need(
@@ -54,6 +58,43 @@ function foodItem(
   };
 }
 
+function product(id: string): RecommendedProduct {
+  return {
+    covers: [id],
+    description: `Product for ${id}`,
+    id: `product-${id}`,
+    marketplace: "Imported product",
+    name: `Product ${id}`,
+    priority: 1,
+    tag: "Matched",
+    url: "https://example.com/product",
+  };
+}
+
+function supplement(
+  id: string,
+  hidden = false,
+): FormulationResult["supplementBreakdown"][number] {
+  return {
+    category: "Targeted",
+    dailyDose: "100 mg/day",
+    effectivenessRank: Number(id.replace(/\D/g, "")) || 1,
+    id,
+    rationale: `Supports ${id}.`,
+    ...(hidden
+      ? {
+          safety: {
+            action: "human_review" as const,
+            message: "Needs review",
+            visibility: "hidden" as const,
+          },
+        }
+      : {}),
+    status: hidden ? "review" : "add",
+    supplement: `Supplement ${id}`,
+  };
+}
+
 function result(overrides: Partial<FormulationResult> = {}): FormulationResult {
   return {
     access: "full",
@@ -79,6 +120,33 @@ function result(overrides: Partial<FormulationResult> = {}): FormulationResult {
 }
 
 describe("formulation food support", () => {
+  it("counts visible supplement rows instead of product rows or locked totals", () => {
+    const payload = result({
+      lockedSupplementCount: 3,
+      recommendations: ["s1", "s2", "s3", "s4", "s5"].map(product),
+      supplementBreakdown: [
+        supplement("s1"),
+        supplement("s2"),
+        supplement("s3"),
+        supplement("s4"),
+        supplement("s5"),
+        supplement("s6"),
+        supplement("s7-hidden", true),
+      ],
+      totalSupplementCount: 7,
+    });
+
+    assert.equal(visibleSupplementRecommendationCount(payload), 6);
+  });
+
+  it("tells formulation AI not to pad supplement counts to eight", async () => {
+    const source = await readFile("lib/formulation-analysis.ts", "utf8");
+
+    assert.match(source, /assessment-justified number of items/);
+    assert.match(source, /do not default to 8/i);
+    assert.doesNotMatch(source, /supplementBreakdown must contain 6 to 18 items/);
+  });
+
   it("does not expose implementation fallback copy in the reveal empty state", async () => {
     const [reveal, copy] = await Promise.all([
       readFile("components/formulation-results.tsx", "utf8"),

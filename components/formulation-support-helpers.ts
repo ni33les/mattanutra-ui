@@ -859,8 +859,22 @@ export function selectedFoodSupport(
   };
 }
 
-export function visibleFormulaIngredients(ingredients: FormulationIngredient[]) {
+export function visibleFormulaIngredients(
+  ingredients: readonly FormulationIngredient[]
+) {
   return ingredients.filter((ingredient) => ingredient.safety?.visibility !== "hidden");
+}
+
+export function visibleSupplementIngredientCount(
+  ingredients: readonly FormulationIngredient[] | null | undefined
+) {
+  return visibleFormulaIngredients(ingredients ?? []).length;
+}
+
+export function visibleSupplementRecommendationCount(
+  result: Pick<FormulationResult, "supplementBreakdown"> | null | undefined
+) {
+  return visibleSupplementIngredientCount(result?.supplementBreakdown);
 }
 
 export function groupedFormulaIngredients(ingredients: FormulationIngredient[]) {

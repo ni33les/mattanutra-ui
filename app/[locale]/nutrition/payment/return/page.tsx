@@ -13,6 +13,7 @@ import {
   getStoredAssessmentPrefill,
   getStoredFormulationResult
 } from "@/lib/assessment-store";
+import { visibleSupplementRecommendationCount } from "@/components/formulation-support-helpers";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import { formatCurrencyAmount } from "@/lib/currencies";
 import type { FormulationResult } from "@/lib/formulation-types";
@@ -417,17 +418,7 @@ function nutrientLabel(locale: Locale, count: number) {
 }
 
 function selectedNutrientCount(formula: FormulationResult | null) {
-  if (!formula) {
-    return 0;
-  }
-
-  return Math.max(
-    0,
-    formula.recommendations.length ||
-      formula.lockedSupplementCount ||
-      formula.totalSupplementCount ||
-      0
-  );
+  return visibleSupplementRecommendationCount(formula);
 }
 
 function evaluatedIngredientCount(
@@ -435,21 +426,21 @@ function evaluatedIngredientCount(
   selectedCount: number,
   healthScoreContext?: HealthScoreConfirmationContext | null
 ) {
+  if (formula) {
+    return Math.max(
+      selectedCount,
+      formula.catalogueSupplementCount ||
+        formula.totalSupplementCount ||
+        formula.lockedSupplementCount ||
+        0
+    );
+  }
+
   if (healthScoreContext?.evaluatedIngredientCount) {
     return Math.max(selectedCount, healthScoreContext.evaluatedIngredientCount);
   }
 
-  if (!formula) {
-    return selectedCount;
-  }
-
-  return Math.max(
-    selectedCount,
-    formula.catalogueSupplementCount ||
-      formula.totalSupplementCount ||
-      formula.lockedSupplementCount ||
-      0
-  );
+  return selectedCount;
 }
 
 function catalogueFitPercent(formula: FormulationResult | null) {
@@ -560,10 +551,11 @@ function buildConfirmationView(
   const paymentAmount = formatPayment(input.payment, input.locale);
 
   if (input.status === "paid_with_plan") {
-    const selectedCount = selectedNutrientCount(input.formula);
-    const safeSelectedCount = selectedCount || 0;
+    const formulaSelectedCount = selectedNutrientCount(input.formula);
     const healthSelectedCount = input.healthScore?.selectedIngredientCount ?? 0;
-    const displaySelectedCount = safeSelectedCount || healthSelectedCount || 0;
+    const displaySelectedCount = input.formula
+      ? formulaSelectedCount
+      : healthSelectedCount;
     const evaluatedCount = evaluatedIngredientCount(
       input.formula,
       displaySelectedCount,

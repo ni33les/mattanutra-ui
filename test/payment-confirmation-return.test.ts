@@ -48,9 +48,15 @@ describe("assessment payment confirmation page", () => {
     assert.match(assessmentReturnPage, /getStoredAssessmentPrefill/);
     assert.match(assessmentReturnPage, /getStoredFormulationResult/);
     assert.match(assessmentReturnPage, /computeHealthScore/);
+    assert.match(assessmentReturnPage, /visibleSupplementRecommendationCount/);
     assert.match(assessmentReturnPage, /productRecommendations\?\.stackCoveragePercent/);
     assert.match(assessmentReturnPage, /AMOUNT_MICROS_PER_UNIT/);
     assert.match(assessmentReturnPage, /formatCurrencyAmount/);
+    assert.match(
+      assessmentReturnPage,
+      /input\.formula[\s\S]*\? formulaSelectedCount[\s\S]*: healthSelectedCount/
+    );
+    assert.doesNotMatch(assessmentReturnPage, /formula\.recommendations\.length/);
   });
 
   it("keeps reservation, pending, expired, and error states explicit", () => {

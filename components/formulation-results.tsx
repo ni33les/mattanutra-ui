@@ -50,6 +50,8 @@ import {
   selectedFoodSupport,
   supplementBenefitTags,
   visibleFormulaIngredients,
+  visibleSupplementIngredientCount,
+  visibleSupplementRecommendationCount,
 } from "@/components/formulation-support-helpers";
 import {
   formatTemplate,
@@ -551,7 +553,7 @@ function RevealResultsPage({
 }>) {
   const copy = revealCopy[locale];
   const visibleIngredients = visibleFormulaIngredients(ingredients);
-  const recommendedSupplementCount = visibleIngredients.length;
+  const recommendedSupplementCount = visibleSupplementIngredientCount(ingredients);
   const supplementLabelById = new Map(
     visibleIngredients.map((ingredient) => [
       ingredient.id,
@@ -1118,9 +1120,7 @@ function RevealProductsSection({
     organisationId: string | null;
     optionsKey: string;
   }>({ organisationId: null, optionsKey: "" });
-  const supplementSelectedCount = result.supplementBreakdown.filter(
-    (ingredient) => ingredient.safety?.visibility !== "hidden",
-  ).length;
+  const supplementSelectedCount = visibleSupplementRecommendationCount(result);
   const productSelectedText = localizedCountText(products.length, locale, true);
   const supplementSelectedText = localizedCountText(
     supplementSelectedCount,

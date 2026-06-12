@@ -256,7 +256,8 @@ function userPrompt({
       },
       instructions: [
         "Return a JSON object with exactly three top-level keys: supplementBreakdown, marketingPoints, and cautions.",
-        "supplementBreakdown must contain 6 to 18 items.",
+        "supplementBreakdown should contain the assessment-justified number of items, usually 4 to 14.",
+        "Do not pad to a fixed count and do not default to 8; use fewer items for narrow/simple profiles and more only when distinct needs clearly support them.",
         "marketingPoints must contain 3 concise points that are specific to this assessment, the HealthScore, and the plan.",
         "Every marketingPoints array entry must be an object with id, title, and body.",
         "cautions must be an array. Return an empty array only when the assessment context truly has no relevant cautions.",
