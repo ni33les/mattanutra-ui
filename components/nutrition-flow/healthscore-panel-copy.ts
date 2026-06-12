@@ -101,12 +101,12 @@ const basePageCopy = {
     fallbackFindingTitle: "Your HealthScore has a clear starting point",
     fallbackFindingBody:
       "The lowest pillar and safety context decide what the plan should prioritise first.",
-    subtractionEyebrow: "How your formula was built",
+    subtractionEyebrow: "How your plan preview was filtered",
     subtractionTitle:
-      "Your right amount is what remains after the unsuitable options are removed.",
+      "This preview filters broad nutrition possibilities before your final formula is generated.",
     evaluatedFallback: "evaluated",
     setAsideFallback: "set aside",
-    chosenFallback: "right for your score",
+    chosenFallback: "shortlisted",
     methodEyebrow: "How MattaNutra thinks",
     methodTitle:
       "A fixed scoring model across five domains, not a guess and not an average of strangers.",
@@ -292,12 +292,12 @@ const basePageCopy = {
     fallbackFindingTitle: "คะแนนสุขภาพของคุณมีจุดเริ่มต้นที่ชัดเจน",
     fallbackFindingBody:
       "เสาหลักที่ต่ำที่สุดและบริบทความเหมาะสมเป็นตัวกำหนดว่าแผนควรเริ่มจากอะไร",
-    subtractionEyebrow: "สูตรของคุณถูกสร้างอย่างไร",
+    subtractionEyebrow: "ตัวอย่างแผนถูกคัดกรองอย่างไร",
     subtractionTitle:
-      "ปริมาณที่พอดีคือสิ่งที่เหลือหลังตัดตัวเลือกที่ไม่เหมาะออก",
+      "ตัวอย่างนี้คัดกรองความเป็นไปได้ด้านโภชนาการก่อนสร้างสูตรจริงของคุณ",
     evaluatedFallback: "ประเมิน",
     setAsideFallback: "ตัดออก",
-    chosenFallback: "เหมาะกับคะแนนของคุณ",
+    chosenFallback: "รายการคัดเลือก",
     methodEyebrow: "วิธีคิดของ MattaNutra",
     methodTitle:
       "โมเดลคะแนนคงที่ห้าด้าน ไม่ใช่การเดา และไม่ใช่ค่าเฉลี่ยของคนอื่น",
@@ -502,11 +502,11 @@ export const pageCopy = {
     whatCaughtSub: "完整呈现，毫无保留。",
     fallbackFindingTitle: "您的 HealthScore 有明确的起点",
     fallbackFindingBody: "得分最低的支柱和安全背景决定计划应优先处理的内容。",
-    subtractionEyebrow: "您的配方如何构建",
-    subtractionTitle: "您的 right amount 是移除不适合选项后剩余的内容。",
+    subtractionEyebrow: "您的方案预览如何筛选",
+    subtractionTitle: "这个预览会先筛选广泛的营养可能性；最终配方会在生成后确定。",
     evaluatedFallback: "已评估",
     setAsideFallback: "已排除",
-    chosenFallback: "适合您的分数",
+    chosenFallback: "候选清单",
     methodEyebrow: "MattaNutra 的思考方式",
     methodTitle: "跨五个领域的固定评分模型，而非猜测或陌生人的平均值。",
     fallbackMethodCards: [

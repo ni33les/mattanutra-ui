@@ -672,6 +672,10 @@
       "view": "supplement-insights"
     },
     {
+      "name": "目录外",
+      "view": "out-of-catalog-insights"
+    },
+    {
       "name": "产品",
       "view": "product-insights"
     }
@@ -716,6 +720,7 @@
     "organisations": "组织",
     "people": "人员",
     "panya": "Panya",
+    "out-of-catalog-insights": "目录外洞察",
     "product-insights": "产品洞察",
     "products": "产品",
     "retail-customer-orders": "客户订单",

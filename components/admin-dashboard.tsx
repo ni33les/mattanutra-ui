@@ -332,7 +332,11 @@ function adminViewDatabaseAvailable({
     return retailStockData.databaseAvailable;
   }
 
-  if (view === "product-insights" || view === "supplement-insights") {
+  if (
+    view === "out-of-catalog-insights" ||
+    view === "product-insights" ||
+    view === "supplement-insights"
+  ) {
     return recommendationInsightsData.databaseAvailable;
   }
 
@@ -606,6 +610,7 @@ export function AdminDashboard({
           view === "glance" ||
           view === "leads" ||
           view === "panya" ||
+          view === "out-of-catalog-insights" ||
           view === "product-insights" ||
           view === "retail-financials" ||
           view === "settlements" ||
@@ -806,11 +811,19 @@ export function AdminDashboard({
               selectedRetailCustomerOrderId={selectedRetailCustomerOrderId}
               view={view}
             />
-          ) : view === "product-insights" || view === "supplement-insights" ? (
+          ) : view === "out-of-catalog-insights" ||
+            view === "product-insights" ||
+            view === "supplement-insights" ? (
             <AdminRecommendationInsightsView
               data={recommendationInsightsData}
               locale={locale}
-              mode={view === "product-insights" ? "products" : "supplements"}
+              mode={
+                view === "product-insights"
+                  ? "products"
+                  : view === "out-of-catalog-insights"
+                    ? "out-of-catalog"
+                    : "supplements"
+              }
             />
           ) : view === "supplements" ? (
             <AdminSupplementsView

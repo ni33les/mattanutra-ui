@@ -1177,8 +1177,8 @@ function subtractionCopy(
   if (locale === "th") {
     return {
       body:
-        `แผนที่ดีไม่ได้สร้างจากการเพิ่มทุกอย่างที่อาจช่วย แต่สร้างจากการตัดสิ่งที่ไม่พอดีออก จนเหลือเฉพาะสิ่งที่ตรงกับคะแนน ${goalList} และ${constraint}`,
-      labelChosen: "เหมาะกับคะแนนของคุณ",
+        `ตัวอย่างแผนที่ดีไม่ได้เริ่มจากการเพิ่มทุกอย่างที่อาจช่วย แต่เริ่มจากการคัดสิ่งที่ไม่พอดีออกตามคะแนน ${goalList} และ${constraint} ก่อนสร้างสูตรจริง`,
+      labelChosen: "รายการคัดเลือก",
       labelEvaluated: "ส่วนผสมที่ประเมิน",
       labelSetAside: "ตัดออกสำหรับคุณ"
     };
@@ -1187,8 +1187,8 @@ function subtractionCopy(
   if (locale === "zh-CN") {
     return {
       body:
-        `好的计划不是把所有可能有帮助的东西都加进去，而是移除所有不适合的内容，直到只留下匹配你的分数、${goalList}和${constraint}的部分。`,
-      labelChosen: "适合你的分数",
+        `好的方案预览不是把所有可能有帮助的东西都加进去，而是先根据你的分数、${goalList}和${constraint}筛掉不适合的内容，再生成最终配方。`,
+      labelChosen: "候选清单",
       labelEvaluated: "已评估成分",
       labelSetAside: "已为你排除"
     };
@@ -1196,8 +1196,8 @@ function subtractionCopy(
 
   return {
     body:
-      `A good plan is not built by adding everything that might help. It is built by removing everything that does not fit until only what matches your score, ${goalList}, and ${constraint} remains.`,
-    labelChosen: "right for your score",
+      `A good plan preview is not built by adding everything that might help. It first filters out what does not fit your score, ${goalList}, and ${constraint} before the final formula is generated.`,
+    labelChosen: "shortlisted",
     labelEvaluated: "ingredients evaluated",
     labelSetAside: "set aside for you"
   };

@@ -53,10 +53,13 @@ export type AdminRecommendationInsightsData = Readonly<{
     chosenProductPlans: number;
     chosenSupplementPlans: number;
     nearMissProducts: number;
+    outOfCatalogSupplements: number;
     rejectedProducts: number;
     safetyHiddenSupplements: number;
     unmatchedSupplements: number;
   };
+  outOfCatalogSupplementStatusMix: InsightBucketRow[];
+  outOfCatalogSupplements: InsightRankRow[];
   supplementDoseBuckets: InsightBucketRow[];
   supplementStatusMix: InsightBucketRow[];
   supplementTop: InsightRankRow[];
@@ -78,6 +81,7 @@ const emptyStats = {
   chosenProductPlans: 0,
   chosenSupplementPlans: 0,
   nearMissProducts: 0,
+  outOfCatalogSupplements: 0,
   rejectedProducts: 0,
   safetyHiddenSupplements: 0,
   unmatchedSupplements: 0
@@ -94,6 +98,8 @@ export function emptyAdminRecommendationInsightsData(
     productServingBuckets: [],
     productTopChosen: [],
     productTopNearMisses: [],
+    outOfCatalogSupplementStatusMix: [],
+    outOfCatalogSupplements: [],
     range,
     summary: emptyStats,
     supplementDoseBuckets: [],
@@ -472,8 +478,14 @@ export async function getAdminRecommendationInsightsData(
     }
 
     const start = rangeStartParam(range);
-    const [supplementTop, supplementDoseBuckets, supplementStatusMix, unmatchedSupplements] =
-      await Promise.all([
+    const [
+      supplementTop,
+      supplementDoseBuckets,
+      supplementStatusMix,
+      unmatchedSupplements,
+      outOfCatalogSupplements,
+      outOfCatalogSupplementStatusMix
+    ] = await Promise.all([
         sql<Array<{ count: number | string; id: string; label: string }>>`
           select
             selection_rows.id,
@@ -567,6 +579,54 @@ export async function getAdminRecommendationInsightsData(
           group by supplement_recommendation_selections.supplement_name_text
           order by count desc, label asc
           limit 10
+        `,
+        sql<Array<{
+          count: number | string;
+          label: string;
+          secondary_label: string | null;
+        }>>`
+          select
+            supplement_recommendation_selections.supplement_name_text as label,
+            concat_ws(
+              ' · ',
+              nullif(supplement_recommendation_selections.safety_action, ''),
+              nullif(supplement_recommendation_selections.safety_visibility, ''),
+              nullif(supplement_recommendation_selections.status, '')
+            ) as secondary_label,
+            count(distinct supplement_recommendation_selections.plan_id) as count
+          from public.supplement_recommendation_selections
+          join public.assessments
+            on assessments.plan_id = supplement_recommendation_selections.plan_id
+          where supplement_recommendation_selections.is_current = true
+            and supplement_recommendation_selections.supplement_id is null
+            and assessments.selected_plan is not null
+            and (${start}::timestamptz is null or supplement_recommendation_selections.generated_at >= ${start})
+          group by
+            supplement_recommendation_selections.supplement_name_text,
+            supplement_recommendation_selections.safety_action,
+            supplement_recommendation_selections.safety_visibility,
+            supplement_recommendation_selections.status
+          order by count desc, label asc
+          limit 20
+        `,
+        sql<Array<{ count: number | string; status: string }>>`
+          select
+            case
+              when supplement_recommendation_selections.safety_action = 'unknown_supplement' then 'unknown supplement'
+              when supplement_recommendation_selections.safety_visibility = 'hidden' then 'hidden for review'
+              when supplement_recommendation_selections.status is not null then supplement_recommendation_selections.status
+              else 'unmatched'
+            end as status,
+            count(*) as count
+          from public.supplement_recommendation_selections
+          join public.assessments
+            on assessments.plan_id = supplement_recommendation_selections.plan_id
+          where supplement_recommendation_selections.is_current = true
+            and supplement_recommendation_selections.supplement_id is null
+            and assessments.selected_plan is not null
+            and (${start}::timestamptz is null or supplement_recommendation_selections.generated_at >= ${start})
+          group by 1
+          order by count desc, status asc
         `
       ]);
     const [
@@ -678,6 +738,7 @@ export async function getAdminRecommendationInsightsData(
       chosenProductPlans: sumCounts(productTopChosen),
       chosenSupplementPlans: sumCounts(supplementTop),
       nearMissProducts: sumCounts(productTopNearMisses),
+      outOfCatalogSupplements: sumCounts(outOfCatalogSupplements),
       rejectedProducts: sumCounts(productRejectionReasons),
       safetyHiddenSupplements: numberValue(
         supplementStatusMix.find((item) => item.status === "safety hidden")?.count
@@ -711,6 +772,16 @@ export async function getAdminRecommendationInsightsData(
       productTopNearMisses: productTopNearMisses.map((row) => ({
         count: numberValue(row.count),
         id: row.id,
+        label: row.label,
+        secondaryLabel: row.secondary_label
+      })),
+      outOfCatalogSupplementStatusMix: outOfCatalogSupplementStatusMix.map((row) => ({
+        count: numberValue(row.count),
+        label: row.status
+      })),
+      outOfCatalogSupplements: outOfCatalogSupplements.map((row) => ({
+        count: numberValue(row.count),
+        id: row.label,
         label: row.label,
         secondaryLabel: row.secondary_label
       })),

@@ -237,6 +237,7 @@ const adminViews = [
   "agents",
   "alerts",
   "content",
+  "out-of-catalog-insights",
   "product-insights",
   "supplement-insights",
   "visibility",
@@ -365,6 +366,7 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
 
   if (
     view === "foods" ||
+    view === "out-of-catalog-insights" ||
     view === "product-insights" ||
     view === "products" ||
     view === "supplement-insights" ||

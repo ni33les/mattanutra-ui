@@ -281,7 +281,11 @@ export default async function LocalizedAdminDashboardPage({
     } else {
       retailStockData = await getAdminRetailStockData(adminContext, locale);
     }
-  } else if (view === "product-insights" || view === "supplement-insights") {
+  } else if (
+    view === "out-of-catalog-insights" ||
+    view === "product-insights" ||
+    view === "supplement-insights"
+  ) {
     recommendationInsightsData = await getAdminRecommendationInsightsData(
       range,
       locale

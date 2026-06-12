@@ -20,6 +20,10 @@ describe("recommendation selection projections", () => {
       "components/admin/dashboard-content.tsx",
       "utf8"
     );
+    const recommendationInsights = readFileSync(
+      "lib/admin-recommendation-insights.ts",
+      "utf8"
+    );
     const productSearch = readFileSync("lib/admin-product-search.ts", "utf8");
     const taskExecution = readFileSync("lib/task-execution.ts", "utf8");
     const taskWorker = readFileSync("lib/task-worker.ts", "utf8");
@@ -38,8 +42,16 @@ describe("recommendation selection projections", () => {
     assert.match(applyScript, /add column if not exists selected_retailer_organisation_id uuid/);
     assert.match(dashboardContent, /insightsTitle/);
     assert.match(dashboardContent, /supplement-insights/);
+    assert.match(dashboardContent, /out-of-catalog-insights/);
     assert.match(dashboardContent, /product-insights/);
     assert.match(adminDashboard, /AdminRecommendationInsightsView/);
+    assert.match(adminDashboard, /out-of-catalog/);
+    assert.match(recommendationInsights, /outOfCatalogSupplements/);
+    assert.match(
+      recommendationInsights,
+      /supplement_recommendation_selections\.supplement_id is null/
+    );
+    assert.match(recommendationInsights, /unknown_supplement/);
     assert.match(productSearch, /getRetailerAwareProductRecommendationCandidateSets/);
     assert.match(productSearch, /sellable\.status = 'active'/);
     assert.match(productSearch, /availableNow <= 0 && !backorderAllowed/);

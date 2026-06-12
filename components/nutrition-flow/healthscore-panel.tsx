@@ -1052,7 +1052,7 @@ function SubtractionBeat({
                     {labels[index]}
                   </p>
                 </div>
-                {index < 2 ? (
+                {index < numbers.length - 1 ? (
                   <ArrowRightIcon
                     aria-hidden={true}
                     className="mx-auto size-5 rotate-90 text-[var(--mn-ash-soft)] sm:mb-8 sm:size-7 sm:rotate-0"

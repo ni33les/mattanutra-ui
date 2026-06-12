@@ -48,6 +48,7 @@ export type AdminDashboardView =
   | "organisations"
   | "people"
   | "panya"
+  | "out-of-catalog-insights"
   | "product-insights"
   | "products"
   | "reviews"
@@ -1438,6 +1439,7 @@ const baseContent = {
     retailSellingTitle: "Orders",
     insights: [
       { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" },
+      { icon: ExclamationTriangleIcon, name: "Out-of-catalog", view: "out-of-catalog-insights" },
       { icon: ShoppingBagIcon, name: "Products", view: "product-insights" }
     ],
     insightsTitle: "Insights",
@@ -1468,6 +1470,7 @@ const baseContent = {
       organisations: "Organisations",
       people: "People",
       panya: "Panya",
+      "out-of-catalog-insights": "Out-of-catalog Insights",
       "product-insights": "Product Insights",
       products: "Products",
       "retail-customer-orders": "Customer Orders",
@@ -2290,6 +2293,7 @@ const baseContent = {
     retailSellingTitle: "คำสั่งซื้อ",
     insights: [
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplement-insights" },
+      { icon: ExclamationTriangleIcon, name: "นอกแคตตาล็อก", view: "out-of-catalog-insights" },
       { icon: ShoppingBagIcon, name: "สินค้า", view: "product-insights" }
     ],
     insightsTitle: "อินไซต์",
@@ -2320,6 +2324,7 @@ const baseContent = {
       organisations: "องค์กร",
       people: "ผู้ใช้",
       panya: "Panya",
+      "out-of-catalog-insights": "ข้อมูลนอกแคตตาล็อก",
       "product-insights": "ข้อมูลสินค้า",
       products: "สินค้า",
       "retail-customer-orders": "คำสั่งซื้อลูกค้า",

@@ -22,6 +22,8 @@ const baseLabels = {
     empty: "No recommendation insight data is available for this timeframe.",
     nearMisses: "Near misses",
     noDoseBuckets: "No dose buckets are available for this timeframe.",
+    outOfCatalog: "Out-of-catalog",
+    outOfCatalogStatus: "Review status",
     productOutcomes: "Product outcomes",
     products: "Products",
     rejectionReasons: "Rejection reasons",
@@ -40,6 +42,8 @@ const baseLabels = {
     empty: "ยังไม่มีข้อมูลเชิงลึกของคำแนะนำในช่วงเวลานี้",
     nearMisses: "สินค้าที่เกือบถูกเลือก",
     noDoseBuckets: "ยังไม่มีกลุ่มขนาดรับประทานในช่วงเวลานี้",
+    outOfCatalog: "นอกแคตตาล็อก",
+    outOfCatalogStatus: "สถานะรีวิว",
     productOutcomes: "ผลลัพธ์สินค้า",
     products: "สินค้า",
     rejectionReasons: "เหตุผลที่ไม่เลือก",
@@ -62,6 +66,8 @@ const labels = {
     empty: "此时间范围内没有推荐洞察数据。",
     nearMisses: "接近入选",
     noDoseBuckets: "此时间范围内没有剂量分组。",
+    outOfCatalog: "目录外补充剂",
+    outOfCatalogStatus: "审核状态",
     productOutcomes: "产品结果",
     products: "产品",
     rejectionReasons: "未选原因",
@@ -273,14 +279,41 @@ export function AdminRecommendationInsightsView({
 }: Readonly<{
   data: AdminRecommendationInsightsData;
   locale: Locale;
-  mode: "products" | "supplements";
+  mode: "out-of-catalog" | "products" | "supplements";
 }>) {
   const copy = labels[locale];
   const supplementMode = mode === "supplements";
-  const hasRows = supplementMode
-    ? data.supplementTop.length > 0
-    : data.productTopChosen.length > 0 || data.productTopNearMisses.length > 0;
-  const metrics: BusinessMetric[] = supplementMode
+  const outOfCatalogMode = mode === "out-of-catalog";
+  const hasRows = outOfCatalogMode
+    ? data.outOfCatalogSupplements.length > 0
+    : supplementMode
+      ? data.supplementTop.length > 0
+      : data.productTopChosen.length > 0 || data.productTopNearMisses.length > 0;
+  const metrics: BusinessMetric[] = outOfCatalogMode
+    ? [
+        {
+          color: businessMetricColors.failed,
+          id: "outOfCatalogSupplements",
+          label: copy.outOfCatalog,
+          series: [],
+          value: formatNumber(data.summary.outOfCatalogSupplements, locale)
+        },
+        {
+          color: businessMetricColors.medium,
+          id: "safetyHiddenSupplements",
+          label: copy.safetyHidden,
+          series: [],
+          value: formatNumber(data.summary.safetyHiddenSupplements, locale)
+        },
+        {
+          color: businessMetricColors.total,
+          id: "supplementNeeds",
+          label: copy.trendSupplements,
+          series: data.trend.supplementChosen,
+          value: formatNumber(data.summary.chosenSupplementPlans, locale)
+        }
+      ]
+    : supplementMode
     ? [
         {
           color: businessMetricColors.total,
@@ -328,12 +361,21 @@ export function AdminRecommendationInsightsView({
         }
       ];
   const trendMetric: BusinessMetric = {
-    color: supplementMode ? businessMetricColors.total : businessMetricColors.succeeded,
+    color:
+      supplementMode || outOfCatalogMode
+        ? businessMetricColors.total
+        : businessMetricColors.succeeded,
     id: "trend",
-    label: supplementMode ? copy.trendSupplements : copy.trendProducts,
-    series: supplementMode ? data.trend.supplementChosen : data.trend.productChosen,
+    label:
+      supplementMode || outOfCatalogMode
+        ? copy.trendSupplements
+        : copy.trendProducts,
+    series:
+      supplementMode || outOfCatalogMode
+        ? data.trend.supplementChosen
+        : data.trend.productChosen,
     value: formatNumber(
-      supplementMode
+      supplementMode || outOfCatalogMode
         ? data.summary.chosenSupplementPlans
         : data.summary.chosenProductPlans,
       locale
@@ -358,7 +400,22 @@ export function AdminRecommendationInsightsView({
         />
       ) : null}
 
-      {supplementMode ? (
+      {outOfCatalogMode ? (
+        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <RankList
+            emptyLabel={copy.empty}
+            locale={locale}
+            rows={data.outOfCatalogSupplements}
+            title={copy.outOfCatalog}
+          />
+          <BucketPanel
+            emptyLabel={copy.empty}
+            locale={locale}
+            rows={data.outOfCatalogSupplementStatusMix}
+            title={copy.outOfCatalogStatus}
+          />
+        </div>
+      ) : supplementMode ? (
         <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
           <RankList
             emptyLabel={copy.empty}

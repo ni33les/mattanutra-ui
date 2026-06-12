@@ -13,12 +13,12 @@ import {
   getStoredAssessmentPrefill,
   getStoredFormulationResult
 } from "@/lib/assessment-store";
-import { visibleSupplementRecommendationCount } from "@/components/formulation-support-helpers";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import { formatCurrencyAmount } from "@/lib/currencies";
 import type { FormulationResult } from "@/lib/formulation-types";
 import { computeHealthScore, type HealthScoreResult } from "@/lib/health-score";
 import { isLocale, locales, type Locale, type LocaleCode } from "@/lib/i18n";
+import { visibleSupplementRecommendationCount } from "@/lib/nutrition-journey-status";
 import {
   paymentCheckoutPath,
   paymentReturnPath
@@ -153,7 +153,9 @@ const copy = {
         badge: "Payment confirmed",
         headline: "Your formula is being built",
         message:
-          "In a moment you'll see exactly which {count} nutrients were chosen for you — and why each one made the cut."
+          "In a moment you'll see exactly which nutrients were chosen for you — and why each one made the cut.",
+        readyMessage:
+          "Your formula is ready. We selected {count} nutrients for you, with dosing and product guidance matched to your assessment."
       },
       paidReservation: {
         badge: "Payment confirmed",
@@ -254,7 +256,9 @@ const copy = {
         badge: "ยืนยันการชำระเงินแล้ว",
         headline: "กำลังสร้างสูตรของคุณ",
         message:
-          "อีกสักครู่คุณจะเห็นว่าสารอาหาร {count} รายการใดถูกเลือกให้คุณ และเหตุผลของแต่ละรายการ"
+          "อีกสักครู่คุณจะเห็นว่าสารอาหารใดถูกเลือกให้คุณ และเหตุผลของแต่ละรายการ",
+        readyMessage:
+          "สูตรของคุณพร้อมแล้ว เราเลือกสารอาหาร {count} รายการให้คุณ พร้อมขนาดรับประทานและคำแนะนำผลิตภัณฑ์ที่ตรงกับแบบประเมิน"
       },
       paidReservation: {
         badge: "ยืนยันการชำระเงินแล้ว",
@@ -353,8 +357,9 @@ const copy = {
       paid: {
         badge: "付款已确认",
         headline: "正在生成你的配方",
-        message:
-          "稍后你会看到为你选择的 {count} 种营养素，以及每一种入选的原因。"
+        message: "稍后你会看到为你选择的营养素，以及每一种入选的原因。",
+        readyMessage:
+          "你的配方已准备好。我们为你选择了 {count} 种营养素，并根据评估匹配剂量和产品建议。"
       },
       paidReservation: {
         badge: "付款已确认",
@@ -552,10 +557,7 @@ function buildConfirmationView(
 
   if (input.status === "paid_with_plan") {
     const formulaSelectedCount = selectedNutrientCount(input.formula);
-    const healthSelectedCount = input.healthScore?.selectedIngredientCount ?? 0;
-    const displaySelectedCount = input.formula
-      ? formulaSelectedCount
-      : healthSelectedCount;
+    const displaySelectedCount = input.formula ? formulaSelectedCount : 0;
     const evaluatedCount = evaluatedIngredientCount(
       input.formula,
       displaySelectedCount,
@@ -588,10 +590,10 @@ function buildConfirmationView(
       headline: labels.states.paid.headline,
       message:
         displaySelectedCount > 0
-          ? replaceTokens(labels.states.paid.message, {
+          ? replaceTokens(labels.states.paid.readyMessage, {
               count: displaySelectedCount
             })
-          : labels.healthScoreMissing,
+          : labels.states.paid.message,
       receiptSummary: receiptParts.join(" · "),
       receiptTitle: labels.formulaReceiptTitle,
       status: input.status,

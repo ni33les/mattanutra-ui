@@ -52,11 +52,25 @@ describe("assessment payment confirmation page", () => {
     assert.match(assessmentReturnPage, /productRecommendations\?\.stackCoveragePercent/);
     assert.match(assessmentReturnPage, /AMOUNT_MICROS_PER_UNIT/);
     assert.match(assessmentReturnPage, /formatCurrencyAmount/);
-    assert.match(
+    assert.doesNotMatch(
       assessmentReturnPage,
       /input\.formula[\s\S]*\? formulaSelectedCount[\s\S]*: healthSelectedCount/
     );
+    assert.match(assessmentReturnPage, /input\.formula \? formulaSelectedCount : 0/);
+    assert.match(assessmentReturnPage, /readyMessage/);
     assert.doesNotMatch(assessmentReturnPage, /formula\.recommendations\.length/);
+  });
+
+  it("does not present HealthScore subtraction counts as selected nutrients before formulation exists", () => {
+    assert.doesNotMatch(assessmentReturnPage, /const healthSelectedCount/);
+    assert.doesNotMatch(
+      assessmentReturnPage,
+      /displaySelectedCount[\s\S]*healthScore\?\.selectedIngredientCount/
+    );
+    assert.match(
+      assessmentReturnPage,
+      /displaySelectedCount > 0[\s\S]*labels\.states\.paid\.readyMessage[\s\S]*labels\.states\.paid\.message/
+    );
   });
 
   it("keeps reservation, pending, expired, and error states explicit", () => {
