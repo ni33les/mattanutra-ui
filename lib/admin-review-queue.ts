@@ -731,87 +731,85 @@ export async function completeGenericHumanReviewTask(
       ? "Human review task dismissed from the review queue."
       : "Human review task completed from the review queue.");
 
-  return sql.begin(async (transaction) => {
-    if (!(await taskTablesAvailable(transaction))) {
-      throw new Error("Review task not found");
-    }
+  if (!(await taskTablesAvailable(sql))) {
+    throw new Error("Review task not found");
+  }
 
-    const tasks = await transaction<CompletedTaskRow[]>`
-      update public.tasks
-      set
-        status = ${targetStatus},
-        completed_at = now(),
-        lease_until = null,
-        reserved_by_agent_id = null,
-        result_payload = coalesce(result_payload, '{}'::jsonb) ||
-          ${transaction.json(resultPayload)}::jsonb,
-        updated_at = now()
-      where id = ${input.id}::uuid
-        and actor_type = 'human'
-        and not (task_type = any(${[...REVIEW_TASK_TYPES]}::text[]))
-        and not (task_type = any(${[...GENERIC_HUMAN_REVIEW_EXCLUDED_TASK_TYPES]}::text[]))
-        and status not in ('completed', 'failed', 'cancelled', 'skipped')
-      returning id::text
-    `;
+  const tasks = await sql<CompletedTaskRow[]>`
+    update public.tasks
+    set
+      status = ${targetStatus},
+      completed_at = now(),
+      lease_until = null,
+      reserved_by_agent_id = null,
+      result_payload = coalesce(result_payload, '{}'::jsonb) ||
+        ${sql.json(resultPayload)}::jsonb,
+      updated_at = now()
+    where id = ${input.id}::uuid
+      and actor_type = 'human'
+      and not (task_type = any(${[...REVIEW_TASK_TYPES]}::text[]))
+      and not (task_type = any(${[...GENERIC_HUMAN_REVIEW_EXCLUDED_TASK_TYPES]}::text[]))
+      and status not in ('completed', 'failed', 'cancelled', 'skipped')
+    returning id::text
+  `;
 
-    if (!tasks[0]) {
-      throw new Error("Review task not found");
-    }
+  if (!tasks[0]) {
+    throw new Error("Review task not found");
+  }
 
-    await transaction`
-      insert into public.task_comments (
-        id,
-        task_id,
-        author_type,
-        author_name,
-        visibility,
-        comment_type,
-        body,
-        metadata,
-        created_at
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${tasks[0].id}::uuid,
-        'human',
-        ${input.actor ?? "admin_dashboard"},
-        'admin',
-        'decision',
-        ${commentBody},
-        ${transaction.json(resultPayload)},
-        now()
-      )
-    `;
+  await sql`
+    insert into public.task_comments (
+      id,
+      task_id,
+      author_type,
+      author_name,
+      visibility,
+      comment_type,
+      body,
+      metadata,
+      created_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${tasks[0].id}::uuid,
+      'human',
+      ${input.actor ?? "admin_dashboard"},
+      'admin',
+      'decision',
+      ${commentBody},
+      ${sql.json(resultPayload)},
+      now()
+    )
+  `;
 
-    await transaction`
-      insert into public.task_events (
-        id,
-        task_id,
-        event_type,
-        event_status,
-        severity,
-        event_payload,
-        occurred_at,
-        created_at
-      )
-      values (
-        ${randomUUID()}::uuid,
-        ${tasks[0].id}::uuid,
-        ${eventType},
-        'succeeded',
-        'medium',
-        ${transaction.json(resultPayload)},
-        now(),
-        now()
-      )
-    `;
+  await sql`
+    insert into public.task_events (
+      id,
+      task_id,
+      event_type,
+      event_status,
+      severity,
+      event_payload,
+      occurred_at,
+      created_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${tasks[0].id}::uuid,
+      ${eventType},
+      'succeeded',
+      'medium',
+      ${sql.json(resultPayload)},
+      now(),
+      now()
+    )
+  `;
 
-    notifyTaskQueueChanged();
+  notifyTaskQueueChanged();
 
-    return {
-      removedTaskIds: [tasks[0].id]
-    };
-  });
+  return {
+    removedTaskIds: [tasks[0].id]
+  };
 }
 
 async function appendReviewedFormulationVersion(

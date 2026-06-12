@@ -307,7 +307,7 @@ export function AdminPanyaView({
             Customer agent control room
           </h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
-            Configure Panya's voice, limits, check-ins, and review permanent
+            Configure Panya&apos;s voice, limits, check-ins, and review permanent
             customer conversations across LINE and future chat channels.
           </p>
         </div>
