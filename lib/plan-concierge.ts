@@ -60,6 +60,7 @@ export type AppendPlanChatMessageInput = Readonly<{
   allowUnpaidSupport?: boolean;
   body: string;
   channel?: PlanChatChannel | null;
+  enforcePlanChatLimit?: boolean;
   externalMessageId?: string | null;
   feedback?: unknown;
   identityId?: string | null;
@@ -339,6 +340,7 @@ export async function appendPlanChatMessage(
     }
 
     if (
+      input.enforcePlanChatLimit !== false &&
       (await planChatUserMessageCount(sql, input.planId)) >=
       PLAN_CHAT_MAX_USER_ROUNDS
     ) {

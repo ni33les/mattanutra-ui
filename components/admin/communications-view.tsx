@@ -7,7 +7,7 @@ import {
   Plus,
   type LucideIcon
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type {
   AdminCommunicationRow,
   AdminCommunicationsData,
@@ -186,7 +186,7 @@ export function AdminCommunicationsView({
     }
   ];
 
-  function defaultLineContactName() {
+  const defaultLineContactName = useCallback(() => {
     if (!settings) {
       return "MattaNutra LINE";
     }
@@ -194,7 +194,49 @@ export function AdminCommunicationsView({
     return settings.scope === "platform"
       ? "MattaNutra Platform"
       : settings.selectedOrganisationName;
-  }
+  }, [settings]);
+
+  const startLineConnection = useCallback(async (displayNameOverride?: string) => {
+    if (!settings) {
+      return;
+    }
+
+    const displayName =
+      displayNameOverride?.trim() ||
+      defaultLineContactName();
+
+    setLineCodeBusy(true);
+    setSettingsError("");
+
+    try {
+      const response = await fetch("/api/admin/communications/line-connect", {
+        body: JSON.stringify({
+          displayName,
+          locale,
+          organisationId: settings.selectedOrganisationId
+        }),
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        method: "POST"
+      });
+      const json = await response.json();
+
+      if (!response.ok || !json.token?.code) {
+        throw new Error("Unable to create LINE connection code");
+      }
+
+      setLineCode({
+        code: json.token.code,
+        command: json.token.command ?? `MN ${json.token.code}`,
+        expiresAt: json.token.expiresAt,
+        lineUrl: json.token.lineUrl
+      });
+    } catch {
+      setSettingsError("Could not create LINE connection code.");
+    } finally {
+      setLineCodeBusy(false);
+    }
+  }, [defaultLineContactName, locale, settings]);
 
   useEffect(() => {
     const selectedOrganisationId = settings?.selectedOrganisationId;
@@ -211,18 +253,25 @@ export function AdminCommunicationsView({
       return;
     }
 
-    setLineCodeAutoRequestKey(selectedOrganisationId);
-    void startLineConnection(defaultLineContactName());
+    const displayName = defaultLineContactName();
+    const timeout = window.setTimeout(() => {
+      setLineCodeAutoRequestKey(selectedOrganisationId);
+      void startLineConnection(displayName);
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
   }, [
     connectMethod,
     connectModalOpen,
+    defaultLineContactName,
     lineCode,
     lineCodeAutoRequestKey,
     lineCodeBusy,
     settings?.canManage,
     settings?.scope,
     settings?.selectedOrganisationId,
-    settings?.selectedOrganisationName
+    settings?.selectedOrganisationName,
+    startLineConnection
   ]);
 
   async function retryMessage(row: AdminCommunicationRow) {
@@ -351,48 +400,6 @@ export function AdminCommunicationsView({
 
     if (settings) {
       void loadOrganisationSettings(settings.selectedOrganisationId);
-    }
-  }
-
-  async function startLineConnection(displayNameOverride?: string) {
-    if (!settings) {
-      return;
-    }
-
-    const displayName =
-      displayNameOverride?.trim() ||
-      defaultLineContactName();
-
-    setLineCodeBusy(true);
-    setSettingsError("");
-
-    try {
-      const response = await fetch("/api/admin/communications/line-connect", {
-        body: JSON.stringify({
-          displayName,
-          locale,
-          organisationId: settings.selectedOrganisationId
-        }),
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        method: "POST"
-      });
-      const json = await response.json();
-
-      if (!response.ok || !json.token?.code) {
-        throw new Error("Unable to create LINE connection code");
-      }
-
-      setLineCode({
-        code: json.token.code,
-        command: json.token.command ?? `MN ${json.token.code}`,
-        expiresAt: json.token.expiresAt,
-        lineUrl: json.token.lineUrl
-      });
-    } catch {
-      setSettingsError("Could not create LINE connection code.");
-    } finally {
-      setLineCodeBusy(false);
     }
   }
 

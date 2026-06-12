@@ -28,6 +28,7 @@ import {
   type BusinessMetric,
 } from "@/components/admin/dashboard-shared";
 import { safetyMetric } from "@/components/admin/safety-view-helpers";
+import { AdminButton, AdminModal } from "@/components/admin/ui";
 import { SupplementDetailsModal } from "@/components/admin/supplement-view";
 import { PlanSafetyReviewModal } from "@/components/admin/plan-safety-review-modal";
 import { ProductImportReviewModal } from "@/components/admin/product-import-review-modal";
@@ -42,6 +43,134 @@ import {
   type FoodReviewDraftFields,
   type ReviewMetricFilter,
 } from "@/components/admin/review-queue-helpers";
+
+function GenericHumanReviewTaskModal({
+  error,
+  labels,
+  locale,
+  note,
+  onClose,
+  onNoteChange,
+  onResolve,
+  row,
+  saving,
+}: Readonly<{
+  error: string | null;
+  labels: AdminContent;
+  locale: Locale;
+  note: string;
+  onClose: () => void;
+  onNoteChange: (value: string) => void;
+  onResolve: (outcome: "completed" | "dismissed") => void;
+  row: AdminReviewTaskRow;
+  saving: boolean;
+}>) {
+  return (
+    <AdminModal
+      closeDisabled={saving}
+      description={labels.reviewQueue.completeHumanTaskHint}
+      onClose={onClose}
+      size="lg"
+      title={labels.reviewQueue.completeHumanTaskTitle}
+    >
+      <div className="space-y-5 px-6 py-5">
+        <div className="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-200">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={classNames(
+                taskStatusClass(row.status),
+                "rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
+              )}
+            >
+              {readableToken(row.status)}
+            </span>
+            <span
+              className={classNames(
+                taskValueClass(row.businessValue),
+                "rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
+              )}
+            >
+              {taskValueLabel(row.businessValue, locale)}
+            </span>
+          </div>
+          <h3 className="mt-3 text-lg font-semibold text-gray-900">
+            {row.supplementName}
+          </h3>
+          {row.description || row.flagReason ? (
+            <p className="mt-2 text-sm leading-6 text-gray-600">
+              {row.description ?? row.flagReason}
+            </p>
+          ) : null}
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="font-semibold text-gray-500">
+                {labels.reviewQueue.taskType}
+              </dt>
+              <dd className="mt-1 text-gray-900">{readableToken(row.taskType)}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-gray-500">
+                {labels.reviewQueue.due}
+              </dt>
+              <dd className="mt-1 text-gray-900">
+                {row.dueAt ? formatGeneratedAt(row.dueAt, locale) : ""}
+              </dd>
+            </div>
+            {row.sourceEntityType || row.sourceEntityId ? (
+              <div className="sm:col-span-2">
+                <dt className="font-semibold text-gray-500">
+                  {labels.reviewQueue.source}
+                </dt>
+                <dd className="mt-1 break-all text-gray-900">
+                  {[row.sourceEntityType, row.sourceEntityId]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        </div>
+
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-800">
+            {labels.reviewQueue.reviewerNote}
+          </span>
+          <textarea
+            className="mt-2 min-h-28 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
+            onChange={(event) => onNoteChange(event.target.value)}
+            value={note}
+          />
+        </label>
+
+        {error ? (
+          <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-100">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-4">
+          <AdminButton disabled={saving} onClick={onClose} variant="secondary">
+            {labels.reviewQueue.close}
+          </AdminButton>
+          <AdminButton
+            disabled={saving}
+            onClick={() => onResolve("dismissed")}
+            variant="secondary"
+          >
+            {labels.reviewQueue.dismissTask}
+          </AdminButton>
+          <AdminButton
+            disabled={saving}
+            onClick={() => onResolve("completed")}
+            variant="primary"
+          >
+            {saving ? "..." : labels.reviewQueue.completeTask}
+          </AdminButton>
+        </div>
+      </div>
+    </AdminModal>
+  );
+}
 
 export function AdminReviewQueueView({
   accessToken,
@@ -80,6 +209,9 @@ export function AdminReviewQueueView({
     queuedLabel: string;
     row: AdminReviewTaskRow;
   } | null>(null);
+  const [selectedGenericReview, setSelectedGenericReview] =
+    useState<AdminReviewTaskRow | null>(null);
+  const [genericReviewNote, setGenericReviewNote] = useState("");
   const [selectedReviewMetricId, setSelectedReviewMetricId] =
     useState<ReviewMetricFilter>("reviewsTotal");
   const [dismissedReviewTaskId, setDismissedReviewTaskId] = useState<
@@ -414,8 +546,102 @@ export function AdminReviewQueueView({
     }
   }
 
+  async function resolveGenericHumanReview(
+    row: AdminReviewTaskRow,
+    outcome: "completed" | "dismissed",
+  ) {
+    setSavingReviewId(row.id);
+    setErrorReviewId(null);
+    setErrorReviewMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/review-tasks/${row.id}`, {
+        body: JSON.stringify({
+          accessToken,
+          action: "complete_human_task",
+          outcome,
+          reviewerNote: genericReviewNote,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "PATCH",
+      });
+
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+
+        throw new Error(
+          errorPayload?.message ?? "Unable to clear human review task",
+        );
+      }
+
+      const payload = (await response.json()) as {
+        result?: {
+          removedTaskIds?: string[];
+        };
+      };
+      const removedTaskIds = new Set(
+        payload.result?.removedTaskIds?.length
+          ? payload.result.removedTaskIds
+          : [row.id],
+      );
+
+      setLocalQueueData((currentData) => {
+        const rows = currentData.rows.filter(
+          (item) => !removedTaskIds.has(item.id),
+        );
+
+        return {
+          ...currentData,
+          rows,
+          summary: {
+            doseReduced: rows.filter(
+              (item) => item.reviewKind === "dose_reduced",
+            ).length,
+            reviewRequired: rows.filter(
+              (item) =>
+                item.reviewKind !== "dose_reduced" &&
+                item.reviewKind !== "unknown_supplement" &&
+                item.reviewKind !== "unknown_food",
+            ).length,
+            total: rows.length,
+            unknown: rows.filter(
+              (item) =>
+                item.reviewKind === "unknown_supplement" ||
+                item.reviewKind === "unknown_food",
+            ).length,
+          },
+        };
+      });
+
+      setDismissedReviewTaskId(row.id);
+      setSelectedGenericReview(null);
+      setGenericReviewNote("");
+    } catch (decisionError) {
+      console.error("Unable to clear human review task", decisionError);
+      setErrorReviewId(row.id);
+      setErrorReviewMessage(
+        decisionError instanceof Error
+          ? decisionError.message
+          : "Unable to clear human review task",
+      );
+    } finally {
+      setSavingReviewId(null);
+    }
+  }
+
   function selectReview(row: AdminReviewTaskRow) {
     setDismissedReviewTaskId(null);
+    if (row.itemType === "task") {
+      setSelectedGenericReview(row);
+      setGenericReviewNote("");
+      setSelectedReview(null);
+      return;
+    }
+
     setSelectedReview({
       associatedSupplementId: "",
       draft: reviewRowToSupplementDraft(labels, row),
@@ -426,7 +652,16 @@ export function AdminReviewQueueView({
 
   const linkedReviewRow =
     selectedReviewTaskId && dismissedReviewTaskId !== selectedReviewTaskId
-      ? (queueData.rows.find((item) => item.id === selectedReviewTaskId) ??
+      ? (queueData.rows.find(
+          (item) => item.id === selectedReviewTaskId && item.itemType !== "task",
+        ) ??
+        null)
+      : null;
+  const linkedGenericReviewRow =
+    selectedReviewTaskId && dismissedReviewTaskId !== selectedReviewTaskId
+      ? (queueData.rows.find(
+          (item) => item.id === selectedReviewTaskId && item.itemType === "task",
+        ) ??
         null)
       : null;
   const visibleReview =
@@ -439,12 +674,21 @@ export function AdminReviewQueueView({
           row: linkedReviewRow,
         }
       : null);
+  const visibleGenericReview = selectedGenericReview ?? linkedGenericReviewRow;
 
   function closeReviewModal() {
     setDismissedReviewTaskId(
       selectedReviewTaskId ?? visibleReview?.row.id ?? null,
     );
     setSelectedReview(null);
+  }
+
+  function closeGenericReviewModal() {
+    setDismissedReviewTaskId(
+      selectedReviewTaskId ?? visibleGenericReview?.id ?? null,
+    );
+    setSelectedGenericReview(null);
+    setGenericReviewNote("");
   }
 
   const reviewMetrics: BusinessMetric[] = [
@@ -482,6 +726,13 @@ export function AdminReviewQueueView({
       label: labels.pageTitles.products,
       locale,
       value: reviewMetricSummary.product,
+    }),
+    safetyMetric({
+      color: businessMetricColors.human,
+      id: "reviewsTask",
+      label: labels.reviewQueue.taskReview,
+      locale,
+      value: reviewMetricSummary.task,
     }),
   ];
 
@@ -588,6 +839,8 @@ export function AdminReviewQueueView({
                           ? labels.reviewQueue.foodItem
                           : row.itemType === "product"
                             ? labels.reviewQueue.productItem
+                            : row.itemType === "task"
+                              ? labels.reviewQueue.taskItem
                             : labels.reviewQueue.suppItem}
                       </span>{" "}
                       {reviewDisplayName(
@@ -628,7 +881,25 @@ export function AdminReviewQueueView({
         </div>
       )}
 
-      {visibleReview?.row.reviewKind === "product_import" &&
+      {visibleGenericReview ? (
+        <GenericHumanReviewTaskModal
+          error={
+            errorReviewId === visibleGenericReview.id
+              ? errorReviewMessage
+              : null
+          }
+          labels={labels}
+          locale={locale}
+          note={genericReviewNote}
+          onClose={closeGenericReviewModal}
+          onNoteChange={setGenericReviewNote}
+          onResolve={(outcome) =>
+            void resolveGenericHumanReview(visibleGenericReview, outcome)
+          }
+          row={visibleGenericReview}
+          saving={savingReviewId === visibleGenericReview.id}
+        />
+      ) : visibleReview?.row.reviewKind === "product_import" &&
       visibleReview.row.itemType === "product" ? (
         <ProductImportReviewModal
           displayName={reviewDisplayName(

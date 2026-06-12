@@ -58,6 +58,7 @@ export function adminHref(
   filters?: AdminDashboardFilters,
   state?: Readonly<{
     orderId?: string | null;
+    panyaSection?: "configuration" | "conversations" | null;
     reviewTaskId?: string | null;
     taskId?: string | null;
   }>
@@ -87,6 +88,10 @@ export function adminHref(
 
   if (state?.orderId) {
     params.set("order", state.orderId);
+  }
+
+  if (state?.panyaSection) {
+    params.set("section", state.panyaSection);
   }
 
   return `/${locale}/admin/dashboard?${params.toString()}`;
@@ -278,6 +283,7 @@ function SidebarNavList({
   items,
   locale,
   onNavigate,
+  panyaSection,
   range,
   title,
   view
@@ -288,6 +294,7 @@ function SidebarNavList({
   items: AdminNavItem[];
   locale: Locale;
   onNavigate?: () => void;
+  panyaSection?: "configuration" | "conversations";
   range: AdminDashboardRange;
   title?: string;
   view: AdminDashboardView;
@@ -314,9 +321,13 @@ function SidebarNavList({
       ) : null}
       <ul role="list" className={classNames("-mx-2 space-y-1", title && "mt-2")}>
         {visibleItems.map((item) => {
-          const current = item.view === view;
+          const current =
+            item.view === view &&
+            (!item.panyaSection || item.panyaSection === panyaSection);
           const href = item.view
-            ? adminHref(locale, accessToken, range, item.view, filters)
+            ? adminHref(locale, accessToken, range, item.view, filters, {
+                panyaSection: item.panyaSection
+              })
             : item.href ?? "#";
 
           return (
@@ -358,6 +369,7 @@ export function AdminLocaleSwitcher({
   labels,
   locale,
   orderId,
+  panyaSection,
   range,
   reviewTaskId,
   taskId,
@@ -368,6 +380,7 @@ export function AdminLocaleSwitcher({
   labels: AdminContent;
   locale: Locale;
   orderId?: string | null;
+  panyaSection?: "configuration" | "conversations";
   range: AdminDashboardRange;
   reviewTaskId?: string | null;
   taskId?: string | null;
@@ -384,6 +397,7 @@ export function AdminLocaleSwitcher({
           )}
           href={adminHref(localeCode, accessToken, range, view, filters, {
             orderId,
+            panyaSection,
             reviewTaskId,
             taskId
           })}
@@ -447,6 +461,7 @@ export function SidebarContent({
   labels,
   locale,
   onNavigate,
+  panyaSection,
   range,
   view
 }: Readonly<{
@@ -456,6 +471,7 @@ export function SidebarContent({
   labels: AdminContent;
   locale: Locale;
   onNavigate?: () => void;
+  panyaSection?: "configuration" | "conversations";
   range: AdminDashboardRange;
   view: AdminDashboardView;
 }>) {
@@ -522,6 +538,7 @@ export function SidebarContent({
             items={labels.performance}
             locale={locale}
             onNavigate={rememberSidebarScroll}
+            panyaSection={panyaSection}
             range={range}
             title={labels.performanceTitle}
             view={view}
@@ -533,8 +550,21 @@ export function SidebarContent({
             items={labels.marketing}
             locale={locale}
             onNavigate={rememberSidebarScroll}
+            panyaSection={panyaSection}
             range={range}
             title={labels.marketingTitle}
+            view={view}
+          />
+          <SidebarNavList
+            accessToken={accessToken}
+            allowedViews={allowedViews}
+            filters={filters}
+            items={labels.panyaNavigation}
+            locale={locale}
+            onNavigate={rememberSidebarScroll}
+            panyaSection={panyaSection}
+            range={range}
+            title={labels.panyaTitle}
             view={view}
           />
           <SidebarNavList
@@ -544,6 +574,7 @@ export function SidebarContent({
             items={labels.contentNavigation}
             locale={locale}
             onNavigate={rememberSidebarScroll}
+            panyaSection={panyaSection}
             range={range}
             title={labels.contentTitle}
             view={view}
@@ -555,6 +586,7 @@ export function SidebarContent({
             items={labels.governance}
             locale={locale}
             onNavigate={rememberSidebarScroll}
+            panyaSection={panyaSection}
             range={range}
             title={labels.governanceTitle}
             view={view}
@@ -566,6 +598,7 @@ export function SidebarContent({
             items={labels.retailSellingNavigation}
             locale={locale}
             onNavigate={rememberSidebarScroll}
+            panyaSection={panyaSection}
             range={range}
             title={labels.retailSellingTitle}
             view={view}
@@ -577,6 +610,7 @@ export function SidebarContent({
             items={labels.retailInventoryNavigation}
             locale={locale}
             onNavigate={rememberSidebarScroll}
+            panyaSection={panyaSection}
             range={range}
             title={labels.retailInventoryTitle}
             view={view}
@@ -588,6 +622,7 @@ export function SidebarContent({
             items={labels.retailBuyingNavigation}
             locale={locale}
             onNavigate={rememberSidebarScroll}
+            panyaSection={panyaSection}
             range={range}
             title={labels.retailBuyingTitle}
             view={view}
@@ -599,6 +634,7 @@ export function SidebarContent({
             items={labels.insights}
             locale={locale}
             onNavigate={rememberSidebarScroll}
+            panyaSection={panyaSection}
             range={range}
             title={labels.insightsTitle}
             view={view}
@@ -610,6 +646,7 @@ export function SidebarContent({
             items={labels.execution}
             locale={locale}
             onNavigate={rememberSidebarScroll}
+            panyaSection={panyaSection}
             range={range}
             title={labels.executionTitle}
             view={view}
@@ -621,6 +658,7 @@ export function SidebarContent({
             items={labels.administration}
             locale={locale}
             onNavigate={rememberSidebarScroll}
+            panyaSection={panyaSection}
             range={range}
             title={labels.administrationTitle}
             view={view}

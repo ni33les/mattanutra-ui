@@ -19,6 +19,7 @@ import { normalizeAdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import {
   emptyCommunicationsData
 } from "@/lib/admin-communications";
+import { emptyAdminPanyaData } from "@/lib/admin-panya";
 import {
   emptyAgentsData,
   emptyVisibilityData
@@ -163,6 +164,8 @@ export default async function ProductDetailPage({
       foodsData={emptyAdminFoodsData()}
       leadsData={emptyLeadsData()}
       locale={locale}
+      panyaData={emptyAdminPanyaData()}
+      panyaSection="conversations"
       productsData={productsData}
       productDetailId={productId}
       retailFinancialsData={emptyAdminRetailFinancialsData(range)}

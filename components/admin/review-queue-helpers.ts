@@ -22,6 +22,7 @@ export type ReviewMetricFilter =
   | "reviewsPlan"
   | "reviewsProduct"
   | "reviewsSupplement"
+  | "reviewsTask"
   | "reviewsTotal";
 
 export type ReviewTaskGroup = Readonly<{
@@ -55,6 +56,10 @@ export function reviewDisplayName(
   foodsData: AdminFoodsData,
 ) {
   const normalizedName = row.supplementName.trim().toLowerCase();
+
+  if (row.itemType === "task") {
+    return row.supplementName;
+  }
 
   if (row.itemType === "product") {
     const product = productsData.rows.find(
@@ -114,6 +119,10 @@ export function reviewKindLabel(labels: AdminContent, row: AdminReviewTaskRow) {
     return labels.reviewQueue.unknown;
   }
 
+  if (row.reviewKind === "generic_human_task") {
+    return labels.reviewQueue.taskReview;
+  }
+
   if (row.reviewKind === "condition_review") {
     return labels.reviewQueue.reviewRequired;
   }
@@ -142,6 +151,7 @@ export function isUnknownFoodReviewRow(row: AdminReviewTaskRow) {
 export function isPlanReviewRow(row: AdminReviewTaskRow) {
   return (
     Boolean(row.planId) &&
+    row.itemType !== "task" &&
     !isProductReviewRow(row) &&
     !isUnknownSupplementReviewRow(row) &&
     !isUnknownFoodReviewRow(row)
@@ -149,6 +159,10 @@ export function isPlanReviewRow(row: AdminReviewTaskRow) {
 }
 
 export function reviewScopeLabel(labels: AdminContent, row: AdminReviewTaskRow) {
+  if (row.itemType === "task") {
+    return labels.reviewQueue.taskReview;
+  }
+
   if (isProductReviewRow(row)) {
     return labels.reviewQueue.productReview;
   }
@@ -184,6 +198,10 @@ export function reviewMatchesMetric(
     return isProductReviewRow(row);
   }
 
+  if (metricId === "reviewsTask") {
+    return row.itemType === "task";
+  }
+
   if (metricId === "reviewsPlan") {
     return isPlanReviewRow(row);
   }
@@ -202,6 +220,8 @@ export function reviewMetricCounts(rows: readonly AdminReviewTaskRow[]) {
 
       if (isProductReviewRow(row)) {
         counts.product += 1;
+      } else if (row.itemType === "task") {
+        counts.task += 1;
       } else if (isPlanReviewRow(row)) {
         counts.plan += 1;
       } else if (row.itemType === "food") {
@@ -217,6 +237,7 @@ export function reviewMetricCounts(rows: readonly AdminReviewTaskRow[]) {
       plan: 0,
       product: 0,
       supplement: 0,
+      task: 0,
       total: 0,
     },
   );
@@ -303,6 +324,12 @@ export function reviewValuePill(labels: AdminContent, value: number) {
 export function reviewContextText(labels: AdminContent, row: AdminReviewTaskRow) {
   const details = [
     row.planId ? `${labels.reviewQueue.plan}: ${row.planId}` : "",
+    row.itemType === "task" && row.taskType
+      ? `${labels.reviewQueue.taskType}: ${readableReviewToken(row.taskType)}`
+      : "",
+    row.itemType === "task" && row.dueAt
+      ? `${labels.reviewQueue.due}: ${new Date(row.dueAt).toLocaleDateString()}`
+      : "",
     row.originalDose
       ? `${labels.reviewQueue.originalDose}: ${row.originalDose}`
       : "",
@@ -363,6 +390,14 @@ export function formatReviewQueueDose(
 }
 
 export function reviewProposedDose(row: AdminReviewTaskRow, locale: Locale) {
+  if (row.itemType === "task") {
+    return row.dueAt
+      ? new Intl.DateTimeFormat(formatLocale(locale), {
+          dateStyle: "medium",
+        }).format(new Date(row.dueAt))
+      : readableReviewToken(row.taskType);
+  }
+
   if (row.itemType === "product") {
     return row.productImport?.fdaApprovalNumber ?? "";
   }
@@ -375,6 +410,14 @@ export function reviewProposedDose(row: AdminReviewTaskRow, locale: Locale) {
     row.clientDoseText ??
     formatReviewQueueDose(row.clientDoseAmount, row.clientDoseUnit, locale)
   );
+}
+
+function readableReviewToken(value: string) {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export function localizedReviewValue(

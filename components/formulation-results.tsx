@@ -1910,15 +1910,19 @@ function RevealPanyaLineSupportSection({
 
   useEffect(() => {
     connectRequestStartedRef.current = false;
-    setConnect(null);
-    setConnectError("");
-    setCopied(false);
-    postRevealPanyaLineBpm({
-      eventName: "customer_line_cta_viewed",
-      locale,
-      planId,
-    });
-    void createConnectCode(false, true);
+    const timeout = window.setTimeout(() => {
+      setConnect(null);
+      setConnectError("");
+      setCopied(false);
+      postRevealPanyaLineBpm({
+        eventName: "customer_line_cta_viewed",
+        locale,
+        planId,
+      });
+      void createConnectCode(false, true);
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
   }, [locale, planId]);
 
   async function createConnectCode(trackClick = true, ignoreExisting = false) {

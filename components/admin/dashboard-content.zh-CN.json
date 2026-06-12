@@ -570,6 +570,19 @@
     }
   ],
   "marketingTitle": "营销",
+  "panyaNavigation": [
+    {
+      "name": "配置",
+      "view": "panya",
+      "panyaSection": "configuration"
+    },
+    {
+      "name": "对话",
+      "view": "panya",
+      "panyaSection": "conversations"
+    }
+  ],
+  "panyaTitle": "Panya",
   "administration": [
     {
       "name": "组织",
@@ -702,6 +715,7 @@
     "memberships": "成员关系",
     "organisations": "组织",
     "people": "人员",
+    "panya": "Panya",
     "product-insights": "产品洞察",
     "products": "产品",
     "retail-customer-orders": "客户订单",
@@ -734,9 +748,15 @@
     "confidenceLow": "低",
     "confidenceModerate": "中",
     "clientDose": "客户剂量",
+    "close": "关闭",
     "disapprove": "不批准",
+    "dismissTask": "忽略任务",
     "duplicateProduct": "与现有产品重复",
+    "completeTask": "完成",
+    "completeHumanTaskHint": "用于没有专用编辑器的审核或升级任务。完成或忽略会将任务从审核队列中清除，并记录审核备注。",
+    "completeHumanTaskTitle": "清理人工审核任务",
     "doseReduced": "剂量已降低",
+    "due": "到期",
     "empty": "暂无待处理的补充剂审核任务。",
     "flagReason": "审核原因",
     "foodFrequency": "频率",
@@ -765,10 +785,14 @@
     "remove": "移除",
     "reviewPlanSafety": "审核营养方案安全性",
     "selectProduct": "选择产品",
+    "source": "来源",
     "suppItem": "补充剂",
     "suggestFoodReview": "使用 AI 建议食品详情",
     "suggestFoodReviewBusy": "AI 正在起草食品详情...",
     "suggestFoodReviewError": "无法建议食品详情。",
+    "taskItem": "任务",
+    "taskReview": "任务审核",
+    "taskType": "任务类型",
     "total": "总计",
     "unknown": "未知补充剂"
   },

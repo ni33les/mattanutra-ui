@@ -66,6 +66,8 @@ drop table if exists
   public.payment_versions,
   public.payments,
   public.people,
+  public.panya_config_versions,
+  public.panya_daily_usage,
   public.plan_chat_messages,
   public.plan_communication_identities,
   public.plan_feedback,
@@ -1431,6 +1433,63 @@ CREATE TABLE public.payments (
 --
 
 COMMENT ON TABLE public.payments IS 'Current payment projection. payment_versions is the append-only source-of-truth.';
+
+
+--
+-- Name: panya_config_versions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.panya_config_versions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    version integer NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_by_person_id uuid,
+    activated_by_person_id uuid,
+    activated_at timestamp with time zone,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT panya_config_versions_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'archived'::text])))
+);
+
+
+--
+-- Name: TABLE panya_config_versions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.panya_config_versions IS 'Versioned platform-governed Panya persona, guardrails, quota, and check-in configuration.';
+
+
+--
+-- Name: panya_daily_usage; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.panya_daily_usage (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    conversation_key text NOT NULL,
+    plan_id uuid,
+    identity_id uuid,
+    channel_id uuid,
+    usage_day date NOT NULL,
+    timezone text NOT NULL,
+    entitlement text NOT NULL,
+    source text DEFAULT 'line'::text NOT NULL,
+    user_message_count integer DEFAULT 0 NOT NULL,
+    quota_limit integer NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT panya_daily_usage_count_check CHECK (((user_message_count >= 0) AND (quota_limit > 0))),
+    CONSTRAINT panya_daily_usage_entitlement_check CHECK ((entitlement = ANY (ARRAY['living_protocol'::text, 'right_amount_formula'::text, 'unpaid'::text])))
+);
+
+
+--
+-- Name: TABLE panya_daily_usage; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.panya_daily_usage IS 'Atomic per-conversation, per-customer-local-day Panya usage counter for customer chat quotas.';
 
 
 --
@@ -3525,6 +3584,22 @@ ALTER TABLE ONLY public.payments
 
 
 --
+-- Name: panya_config_versions panya_config_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.panya_config_versions
+    ADD CONSTRAINT panya_config_versions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: panya_daily_usage panya_daily_usage_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.panya_daily_usage
+    ADD CONSTRAINT panya_daily_usage_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: plan_chat_messages plan_chat_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4708,6 +4783,41 @@ CREATE INDEX payments_status_idx ON public.payments USING btree (status, created
 --
 
 CREATE UNIQUE INDEX payments_stripe_checkout_session_idx ON public.payments USING btree (stripe_checkout_session_id) WHERE (stripe_checkout_session_id IS NOT NULL);
+
+
+--
+-- Name: panya_config_versions_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX panya_config_versions_active_idx ON public.panya_config_versions USING btree (status) WHERE (status = 'active'::text);
+
+
+--
+-- Name: panya_config_versions_version_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX panya_config_versions_version_idx ON public.panya_config_versions USING btree (version);
+
+
+--
+-- Name: panya_daily_usage_channel_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX panya_daily_usage_channel_idx ON public.panya_daily_usage USING btree (channel_id, usage_day DESC) WHERE (channel_id IS NOT NULL);
+
+
+--
+-- Name: panya_daily_usage_plan_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX panya_daily_usage_plan_idx ON public.panya_daily_usage USING btree (plan_id, usage_day DESC) WHERE (plan_id IS NOT NULL);
+
+
+--
+-- Name: panya_daily_usage_unique_day_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX panya_daily_usage_unique_day_idx ON public.panya_daily_usage USING btree (conversation_key, usage_day);
 
 
 --
@@ -5921,6 +6031,46 @@ ALTER TABLE ONLY public.payment_versions
 
 ALTER TABLE ONLY public.payments
     ADD CONSTRAINT payments_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.assessments(plan_id) ON DELETE SET NULL;
+
+
+--
+-- Name: panya_config_versions panya_config_versions_activated_by_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.panya_config_versions
+    ADD CONSTRAINT panya_config_versions_activated_by_person_id_fkey FOREIGN KEY (activated_by_person_id) REFERENCES public.people(id) ON DELETE SET NULL;
+
+
+--
+-- Name: panya_config_versions panya_config_versions_created_by_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.panya_config_versions
+    ADD CONSTRAINT panya_config_versions_created_by_person_id_fkey FOREIGN KEY (created_by_person_id) REFERENCES public.people(id) ON DELETE SET NULL;
+
+
+--
+-- Name: panya_daily_usage panya_daily_usage_channel_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.panya_daily_usage
+    ADD CONSTRAINT panya_daily_usage_channel_id_fkey FOREIGN KEY (channel_id) REFERENCES public.communication_channels(id) ON DELETE SET NULL;
+
+
+--
+-- Name: panya_daily_usage panya_daily_usage_identity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.panya_daily_usage
+    ADD CONSTRAINT panya_daily_usage_identity_id_fkey FOREIGN KEY (identity_id) REFERENCES public.communication_identities(id) ON DELETE SET NULL;
+
+
+--
+-- Name: panya_daily_usage panya_daily_usage_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.panya_daily_usage
+    ADD CONSTRAINT panya_daily_usage_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.assessments(plan_id) ON DELETE SET NULL;
 
 
 --

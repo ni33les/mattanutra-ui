@@ -1633,23 +1633,48 @@ async function applyCustomerChatReplyResult(
           planId: task.planId
         })
       : null;
+  const conversationThreadKey = `${prepared.message.identityId ?? "no-identity"}:${task.planId}`;
+  const conversationLocale = isLocale(analysis.locale) ? analysis.locale : "en";
 
   const escalationTask = escalate
-    ? await createTask({
+      ? await createTask({
         actorType: "human",
         businessValue: 420,
+        context: {
+          conversationView: "panya",
+          escalationReason: escalationReason || null,
+          source: "panya_customer_chat_reply"
+        },
         createdByTaskId: task.id,
         description:
           "Review a customer LINE conversation that Panya marked for human follow-up.",
         groupLabel: "Customer chat escalation",
+        dueAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
         idempotencyKey: `panya-escalation:${messageId}`,
         idempotencyScope: "active",
         idempotencyScopeKey: `panya-escalation:${task.planId}`,
         maxAttempts: 1,
         payload: {
           assistantMessageId: assistantRows[0]?.id ?? null,
+          conversationThreadKey,
           escalationReason: escalationReason || null,
-          messageId
+          messageId,
+          planId: task.planId,
+          panyaConversationUrl: `/${conversationLocale}/admin/dashboard?view=panya&conversation=${encodeURIComponent(conversationThreadKey)}`
+        },
+        initialComment: {
+          authorType: "system",
+          body: escalationReason
+            ? `Panya escalated this conversation: ${escalationReason}`
+            : "Panya escalated this customer conversation for human review.",
+          commentType: "note",
+          metadata: {
+            assistantMessageId: assistantRows[0]?.id ?? null,
+            messageId,
+            planId: task.planId,
+            source: "panya_customer_chat_reply"
+          },
+          visibility: "admin"
         },
         planId: task.planId,
         priorityReason: "Panya marked this customer message for human review.",

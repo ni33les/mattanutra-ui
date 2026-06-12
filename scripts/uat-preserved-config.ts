@@ -4,7 +4,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import postgres from "postgres";
 
-type Db = any;
+type Db = postgres.Sql | postgres.TransactionSql;
+type RootDb = postgres.Sql;
 
 type PreserveTable = Readonly<{
   conflictColumns: readonly string[];
@@ -186,7 +187,7 @@ function connectionLooksLikeUat(connectionString: string) {
   }
 }
 
-function makeSql(connectionString: string) {
+function makeSql(connectionString: string): RootDb {
   return postgres(connectionString, {
     connect_timeout: Number(process.env.DB_CONNECT_TIMEOUT_SECONDS ?? 10),
     idle_timeout: 5,
@@ -194,6 +195,25 @@ function makeSql(connectionString: string) {
     prepare: false,
     ...(shouldUseSsl(connectionString) ? { ssl: "require" } : {}),
   });
+}
+
+function preservedSqlValue(value: unknown): postgres.ParameterOrJSON<never> {
+  if (
+    value === null ||
+    typeof value === "boolean" ||
+    typeof value === "number" ||
+    typeof value === "string" ||
+    value instanceof Date ||
+    value instanceof Uint8Array
+  ) {
+    return value;
+  }
+
+  if (value === undefined) {
+    return null;
+  }
+
+  return JSON.parse(JSON.stringify(value)) as postgres.ParameterOrJSON<never>;
 }
 
 async function currentDatabase(sql: Db) {
@@ -335,7 +355,7 @@ async function restoreTable(
   for (const row of rows) {
     await sql.unsafe(
       sqlText,
-      insertColumns.map((column: string) => row[column] ?? null),
+      insertColumns.map((column: string) => preservedSqlValue(row[column])),
     );
   }
 
@@ -385,7 +405,7 @@ async function deleteNaturalKeyConflicts(
   }
 }
 
-async function restoreConfig(sql: Db, snapshotPath: string) {
+async function restoreConfig(sql: RootDb, snapshotPath: string) {
   const snapshot = JSON.parse(
     await readFile(snapshotPath, "utf8"),
   ) as PreservedSnapshot;
@@ -393,7 +413,7 @@ async function restoreConfig(sql: Db, snapshotPath: string) {
 
   assertSnapshot(snapshot);
 
-  await sql.begin(async (transaction: Db) => {
+  await sql.begin(async (transaction: postgres.TransactionSql) => {
     for (const table of preservedTables) {
       restored[table.name] = await restoreTable(
         transaction,

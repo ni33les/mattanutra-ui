@@ -245,6 +245,7 @@ if (preserveConfig) {
 for (const scriptName of [
   "admin-access:schema:apply",
   "communications:schema:apply",
+  "panya:schema:apply",
   "payments:schema:apply",
   "retail-checkout:schema:apply",
   "retail-financials:schema:apply",
