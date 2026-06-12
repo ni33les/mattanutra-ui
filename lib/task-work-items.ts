@@ -52,6 +52,10 @@ import {
   buildReassessmentEmailSubject
 } from "@/lib/reassessment-email";
 import {
+  buildAssessmentResultsUrl,
+  siteBaseUrl
+} from "@/lib/site-url";
+import {
   adminCommunicationEventKeys,
   type AdminCommunicationChannelType,
   type AdminCommunicationEventKey
@@ -214,7 +218,8 @@ export type CustomerChatReplyWorkItem = Readonly<{
     firstName: string | null;
     locale: Locale;
   }>;
-  entitlement: "living_protocol" | "paid_plan" | "unpaid";
+  entitlement: "living_protocol" | "right_amount_formula" | "unpaid";
+  entitlementLabel: string;
   order: Readonly<{
     currency: string | null;
     orderId: string | null;
@@ -226,7 +231,9 @@ export type CustomerChatReplyWorkItem = Readonly<{
   plan: Readonly<{
     answerSummary: unknown;
     healthScore: unknown;
+    planUrl: string;
     selectedPlan: string | null;
+    selectedPlanLabel: string;
     status: string | null;
   }>;
   planId: string;
@@ -1179,7 +1186,33 @@ function customerEntitlement(selectedPlan: string | null) {
     return "living_protocol" as const;
   }
 
-  return selectedPlan ? "paid_plan" as const : "unpaid" as const;
+  return selectedPlan ? "right_amount_formula" as const : "unpaid" as const;
+}
+
+function customerEntitlementLabel(
+  entitlement: CustomerChatReplyWorkItem["entitlement"]
+) {
+  if (entitlement === "living_protocol") {
+    return "Living Protocol";
+  }
+
+  if (entitlement === "right_amount_formula") {
+    return "Right Amount Formula";
+  }
+
+  return "Connected customer";
+}
+
+function selectedPlanLabel(selectedPlan: string | null) {
+  if (selectedPlan === "pro") {
+    return "Living Protocol";
+  }
+
+  if (selectedPlan === "precision") {
+    return "Right Amount Formula";
+  }
+
+  return selectedPlan ? selectedPlan : "Unpaid";
 }
 
 async function latestCustomerOrderSummary(
@@ -1224,15 +1257,17 @@ async function latestCustomerOrderSummary(
   const amount = Number(row.amount);
   const totalAmount = Number.isFinite(amount) ? amount / 1_000_000 : null;
 
+  const trackingPath = row.order_number
+    ? `/${locale}/order/track/${encodeURIComponent(row.order_number)}`
+    : null;
+
   return {
     currency: row.currency,
     orderId: row.order_id,
     orderNumber: row.order_number,
     status: row.status,
     totalAmount,
-    trackingUrl: row.order_number
-      ? `/${locale}/order/track/${encodeURIComponent(row.order_number)}`
-      : null
+    trackingUrl: trackingPath ? `${siteBaseUrl()}${trackingPath}` : null
   };
 }
 
@@ -1294,6 +1329,8 @@ async function buildCustomerChatReplyWorkItem(
     limit 30
   `;
 
+  const entitlement = customerEntitlement(row.selected_plan);
+
   return {
     chatMessages: chatRows.map(mapChatMessage),
     communicationMessageId: isUuid(communicationMessageId)
@@ -1303,12 +1340,15 @@ async function buildCustomerChatReplyWorkItem(
       firstName: row.first_name,
       locale
     },
-    entitlement: customerEntitlement(row.selected_plan),
+    entitlement,
+    entitlementLabel: customerEntitlementLabel(entitlement),
     order: await latestCustomerOrderSummary(sql, task.planId, locale),
     plan: {
       answerSummary: row.answer_summary ?? null,
       healthScore: row.health_score ?? null,
+      planUrl: buildAssessmentResultsUrl(locale, task.planId),
       selectedPlan: row.selected_plan,
+      selectedPlanLabel: selectedPlanLabel(row.selected_plan),
       status: row.status
     },
     planId: task.planId,

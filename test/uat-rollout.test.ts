@@ -155,6 +155,7 @@ describe("UAT destructive rebuild master data guardrails", () => {
     assert.match(uatRebuildScript, /DB_POOL_MAX/);
     assert.match(uatRebuildScript, /admin-access:schema:apply/);
     assert.match(uatRebuildScript, /communications:schema:apply/);
+    assert.match(uatRebuildScript, /panya:schema:apply/);
     assert.match(uatRebuildScript, /retail-checkout:schema:apply/);
     assert.match(uatRebuildScript, /retail-stock:schema:apply/);
     assert.match(uatRebuildScript, /product-identifiers:schema:apply/);

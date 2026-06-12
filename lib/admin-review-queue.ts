@@ -22,6 +22,11 @@ import { appendSupplementSafetyLimitVersion } from "@/lib/supplement-safety-limi
 import { safetyReviewItemColumnsAvailable } from "@/lib/safety-review-schema";
 import { notifyTaskQueueChanged } from "@/lib/task-wakeup";
 import {
+  ADMIN_REVIEW_TASK_TYPES as REVIEW_TASK_TYPES,
+  GENERIC_HUMAN_REVIEW_EXCLUDED_TASK_TYPES,
+  expireOverdueGenericHumanReviewTasks
+} from "@/lib/human-review-task-expiry";
+import {
   enqueueFoodGapSupportTask,
   enqueueProductRecommendationsTask
 } from "@/lib/task-worker";
@@ -48,12 +53,14 @@ export type AdminReviewTaskRow = Readonly<{
   clientDoseAmount: number | null;
   clientDoseText: string | null;
   clientDoseUnit: string | null;
+  description: string | null;
+  dueAt: string | null;
   flagReason: string | null;
   businessValue: number;
   taskGroupId: string | null;
   groupLabel: string | null;
   id: string;
-  itemType: "food" | "product" | "supplement";
+  itemType: "food" | "product" | "supplement" | "task";
   limitAmount: number | null;
   limitUnit: string | null;
   maxAmount: number | null;
@@ -65,8 +72,11 @@ export type AdminReviewTaskRow = Readonly<{
   requiredFields: string[];
   reviewId: string | null;
   reviewKind: string;
+  sourceEntityId: string | null;
+  sourceEntityType: string | null;
   status: string;
   supplementName: string;
+  taskType: string;
   productImport: {
     description: string | null;
     descriptionEn: string | null;
@@ -112,6 +122,8 @@ export type AdminReviewMutationResult = Readonly<{
 
 type ReviewTaskDbRow = Readonly<{
   ai_suggestion: Record<string, unknown> | null;
+  description: string | null;
+  due_at: Date | string | null;
   flag_reason: string | null;
   business_value: number | string;
   task_group_id: string | null;
@@ -123,12 +135,15 @@ type ReviewTaskDbRow = Readonly<{
   plan_id: string | null;
   queued_at: Date | string;
   review_id: string | null;
+  source_entity_id: string | null;
+  source_entity_type: string | null;
   item_name: string | null;
   item_type: "food" | "supplement" | null;
   status: string;
   suggested_dose_unit: string | null;
   suggested_dose_value: number | string | null;
   task_id?: string | null;
+  task_type: string;
 }>;
 
 type Db = postgres.Sql | postgres.TransactionSql;
@@ -192,15 +207,6 @@ async function queueProductMatchAfterPlanReview(input: Readonly<{
   }
 }
 
-const REVIEW_TASK_TYPES = [
-  "classify_food",
-  "classify_supplement",
-  "review_food_for_plan",
-  "review_supplement_for_plan",
-  "review_product_import",
-  "dose_reduction_notice"
-] as const;
-
 export type ResolveAdminReviewTaskInput = Readonly<{
   actor?: string | null;
   associatedSupplementId?: string | null;
@@ -225,6 +231,13 @@ export type DecideAdminPlanReviewTaskInput = Readonly<{
   foodServing?: AdminReviewLocalizedText | null;
   id: string;
   reviewerNote?: string | null;
+}>;
+
+export type CompleteGenericHumanReviewTaskInput = Readonly<{
+  actor?: string | null;
+  id: string;
+  note?: string | null;
+  outcome: "completed" | "dismissed";
 }>;
 
 export function emptyAdminReviewQueueData(): AdminReviewQueueData {
@@ -265,12 +278,19 @@ function reviewGroupLabel(label: string | null, payload: Record<string, unknown>
 function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
   const payload = row.payload ?? {};
   const aiSuggestion = row.ai_suggestion ?? {};
-  const reviewKind = textOrNull(payload.reviewKind) ?? "review_required";
-  const itemType = reviewKind === "product_import" || textOrNull(payload.itemType) === "product"
-    ? "product"
-    : reviewKind === "unknown_food" || row.item_type === "food"
-      ? "food"
-      : "supplement";
+  const genericTask = !REVIEW_TASK_TYPES.includes(
+    row.task_type as (typeof REVIEW_TASK_TYPES)[number]
+  );
+  const reviewKind =
+    textOrNull(payload.reviewKind) ??
+    (genericTask ? "generic_human_task" : "review_required");
+  const itemType = genericTask || textOrNull(payload.itemType) === "task"
+    ? "task"
+    : reviewKind === "product_import" || textOrNull(payload.itemType) === "product"
+      ? "product"
+      : reviewKind === "unknown_food" || row.item_type === "food"
+        ? "food"
+        : "supplement";
   const productImportTranslations =
     payload.translations && typeof payload.translations === "object" && !Array.isArray(payload.translations)
       ? Object.fromEntries(
@@ -309,6 +329,8 @@ function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
       textOrNull(payload.originalDose) ??
       formatReviewDose(clientDoseAmount, clientDoseUnit),
     clientDoseUnit,
+    description: row.description,
+    dueAt: row.due_at ? new Date(row.due_at).toISOString() : null,
     flagReason: row.flag_reason,
     businessValue: Number(row.business_value) || 0,
     taskGroupId: row.task_group_id,
@@ -326,19 +348,25 @@ function rowFromDb(row: ReviewTaskDbRow): AdminReviewTaskRow {
     requiredFields: textArray(payload.requiredFields),
     reviewId: row.review_id,
     reviewKind,
+    sourceEntityId: row.source_entity_id,
+    sourceEntityType: row.source_entity_type,
     status: row.status,
     supplementName:
       textOrNull(row.item_name) ??
+      textOrNull(payload.title) ??
       textOrNull(payload.productName) ??
       textOrNull(payload.foodName) ??
       textOrNull(payload.normalizedFoodName) ??
       textOrNull(payload.supplementName) ??
       textOrNull(payload.normalizedSupplementName) ??
-      (itemType === "food"
+      (itemType === "task"
+        ? row.task_type
+        : itemType === "food"
         ? "Unknown food"
         : itemType === "product"
           ? "Unknown product"
           : "Unknown supplement"),
+    taskType: row.task_type,
     productImport: itemType === "product"
       ? {
           description: textOrNull(payload.description),
@@ -409,9 +437,42 @@ function buildSummary(rows: AdminReviewTaskRow[]) {
 
 async function loadReviewTaskRows(sql: postgres.Sql) {
   const itemColumnsAvailable = await safetyReviewItemColumnsAvailable(sql);
+  const genericHumanTaskQuery = sql`
+    select
+      tasks.id::text,
+      tasks.id::text as task_id,
+      tasks.plan_id::text as plan_id,
+      tasks.status,
+      tasks.business_value,
+      tasks.task_group_id::text,
+      tasks.group_label,
+      tasks.task_type,
+      tasks.description,
+      tasks.due_at,
+      tasks.payload,
+      tasks.created_at as queued_at,
+      null::uuid::text as review_id,
+      coalesce(tasks.priority_reason, tasks.description) as flag_reason,
+      null::numeric as suggested_dose_value,
+      null::text as suggested_dose_unit,
+      null::numeric as limit_value,
+      null::text as limit_unit,
+      tasks.title as item_name,
+      'supplement'::text as item_type,
+      null::jsonb as ai_suggestion,
+      tasks.source_entity_id::text,
+      tasks.source_entity_type
+    from public.tasks tasks
+    where tasks.actor_type = 'human'
+      and not (tasks.task_type = any(${[...REVIEW_TASK_TYPES]}::text[]))
+      and not (tasks.task_type = any(${[...GENERIC_HUMAN_REVIEW_EXCLUDED_TASK_TYPES]}::text[]))
+      and tasks.status not in ('completed', 'failed', 'cancelled', 'skipped')
+      and coalesce(tasks.due_at, tasks.created_at + interval '3 days') > now()
+  `;
 
   if (!itemColumnsAvailable) {
     return sql<ReviewTaskDbRow[]>`
+      with review_tasks as (
       select
         tasks.id::text,
         tasks.id::text as task_id,
@@ -420,6 +481,9 @@ async function loadReviewTaskRows(sql: postgres.Sql) {
         tasks.business_value,
         tasks.task_group_id::text,
         tasks.group_label,
+        tasks.task_type,
+        tasks.description,
+        tasks.due_at,
         tasks.payload,
         tasks.created_at as queued_at,
         safety_reviews.id::text as review_id,
@@ -434,7 +498,9 @@ async function loadReviewTaskRows(sql: postgres.Sql) {
             then 'food'
           else 'supplement'
         end as item_type,
-        safety_reviews.ai_suggestion
+        safety_reviews.ai_suggestion,
+        tasks.source_entity_id::text,
+        tasks.source_entity_type
       from public.tasks tasks
       left join lateral (
         select *
@@ -445,14 +511,20 @@ async function loadReviewTaskRows(sql: postgres.Sql) {
       ) safety_reviews on true
       where tasks.task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
         and tasks.status not in ('completed', 'failed', 'cancelled', 'skipped')
+      union all
+      ${genericHumanTaskQuery}
+      )
+      select *
+      from review_tasks
       order by
-        tasks.business_value desc,
-        tasks.created_at asc
+        business_value desc,
+        queued_at asc
       limit 200
     `;
   }
 
   return sql<ReviewTaskDbRow[]>`
+    with review_tasks as (
     select
       tasks.id::text,
       tasks.id::text as task_id,
@@ -461,6 +533,9 @@ async function loadReviewTaskRows(sql: postgres.Sql) {
       tasks.business_value,
       tasks.task_group_id::text,
       tasks.group_label,
+      tasks.task_type,
+      tasks.description,
+      tasks.due_at,
       tasks.payload,
       tasks.created_at as queued_at,
       safety_reviews.id::text as review_id,
@@ -478,7 +553,9 @@ async function loadReviewTaskRows(sql: postgres.Sql) {
           else 'supplement'
         end
       ) as item_type,
-      safety_reviews.ai_suggestion
+      safety_reviews.ai_suggestion,
+      tasks.source_entity_id::text,
+      tasks.source_entity_type
     from public.tasks tasks
     left join lateral (
       select *
@@ -489,9 +566,14 @@ async function loadReviewTaskRows(sql: postgres.Sql) {
     ) safety_reviews on true
     where tasks.task_type = any(${[...REVIEW_TASK_TYPES]}::text[])
       and tasks.status not in ('completed', 'failed', 'cancelled', 'skipped')
+    union all
+    ${genericHumanTaskQuery}
+    )
+    select *
+    from review_tasks
     order by
-      tasks.business_value desc,
-      tasks.created_at asc
+      business_value desc,
+      queued_at asc
     limit 200
   `;
 }
@@ -504,6 +586,7 @@ export async function getAdminReviewQueueData(): Promise<AdminReviewQueueData> {
   }
 
   try {
+    await expireOverdueGenericHumanReviewTasks(sql);
     const rows = await loadReviewTaskRows(sql);
     const mappedRows = rows.map(rowFromDb);
 
@@ -620,6 +703,115 @@ async function completeSupplementReviewTasks(
   }
 
   return tasks;
+}
+
+export async function completeGenericHumanReviewTask(
+  input: CompleteGenericHumanReviewTaskInput
+): Promise<AdminReviewMutationResult> {
+  const sql = getSql();
+
+  if (!sql) {
+    throw new Error("Database is unavailable");
+  }
+
+  const resultPayload = toJsonValue({
+    actor: input.actor ?? "admin_dashboard",
+    note: textOrNull(input.note),
+    outcome: input.outcome,
+    source: "admin_review_queue"
+  });
+  const targetStatus = input.outcome === "dismissed" ? "skipped" : "completed";
+  const eventType =
+    input.outcome === "dismissed"
+      ? "human_review_task_dismissed"
+      : "human_review_task_completed";
+  const commentBody =
+    textOrNull(input.note) ??
+    (input.outcome === "dismissed"
+      ? "Human review task dismissed from the review queue."
+      : "Human review task completed from the review queue.");
+
+  return sql.begin(async (transaction) => {
+    if (!(await taskTablesAvailable(transaction))) {
+      throw new Error("Review task not found");
+    }
+
+    const tasks = await transaction<CompletedTaskRow[]>`
+      update public.tasks
+      set
+        status = ${targetStatus},
+        completed_at = now(),
+        lease_until = null,
+        reserved_by_agent_id = null,
+        result_payload = coalesce(result_payload, '{}'::jsonb) ||
+          ${transaction.json(resultPayload)}::jsonb,
+        updated_at = now()
+      where id = ${input.id}::uuid
+        and actor_type = 'human'
+        and not (task_type = any(${[...REVIEW_TASK_TYPES]}::text[]))
+        and not (task_type = any(${[...GENERIC_HUMAN_REVIEW_EXCLUDED_TASK_TYPES]}::text[]))
+        and status not in ('completed', 'failed', 'cancelled', 'skipped')
+      returning id::text
+    `;
+
+    if (!tasks[0]) {
+      throw new Error("Review task not found");
+    }
+
+    await transaction`
+      insert into public.task_comments (
+        id,
+        task_id,
+        author_type,
+        author_name,
+        visibility,
+        comment_type,
+        body,
+        metadata,
+        created_at
+      )
+      values (
+        ${randomUUID()}::uuid,
+        ${tasks[0].id}::uuid,
+        'human',
+        ${input.actor ?? "admin_dashboard"},
+        'admin',
+        'decision',
+        ${commentBody},
+        ${transaction.json(resultPayload)},
+        now()
+      )
+    `;
+
+    await transaction`
+      insert into public.task_events (
+        id,
+        task_id,
+        event_type,
+        event_status,
+        severity,
+        event_payload,
+        occurred_at,
+        created_at
+      )
+      values (
+        ${randomUUID()}::uuid,
+        ${tasks[0].id}::uuid,
+        ${eventType},
+        'succeeded',
+        'medium',
+        ${transaction.json(resultPayload)},
+        now(),
+        now()
+      )
+    `;
+
+    notifyTaskQueueChanged();
+
+    return {
+      removedTaskIds: [tasks[0].id]
+    };
+  });
 }
 
 async function appendReviewedFormulationVersion(

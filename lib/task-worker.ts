@@ -20,6 +20,7 @@ import {
   normalizeProductStackPreference,
   type ProductStackPreference
 } from "@/lib/product-recommendations";
+import { queueDuePanyaCheckIn } from "@/lib/panya";
 import { requiredCapabilitiesForWorkTaskType } from "@/lib/system-agents";
 import { createTask, type TaskDependencyType } from "@/lib/task-service";
 import {
@@ -920,6 +921,7 @@ export async function enqueueNutritionPlanChatReplyTask({
         updated_at = now()
       where id = ${messageId}::uuid
     `;
+
   }
 
   return taskId;
@@ -987,6 +989,24 @@ export async function enqueuePanyaCustomerChatReplyTask({
         updated_at = now()
       where id = ${messageId}::uuid
     `;
+
+    await writeBpmEvent({
+      actorType: "system",
+      emittedBy: "panya_task_queue",
+      eventName: "panya_reply_task_queued",
+      eventStatus: "queued",
+      eventType: "chat",
+      planId,
+      properties: {
+        communicationMessageId: isUuid(communicationMessageId ?? "")
+          ? communicationMessageId
+          : null,
+        messageId,
+        taskId
+      },
+      severity: "low",
+      sql
+    });
   }
 
   return taskId;
@@ -2641,6 +2661,7 @@ async function enqueueReassessmentEmailTask({
 async function claimDueCronActions(sql: postgres.Sql) {
   return sql<
     Array<{
+      action_type: string;
       id: string;
       plan_id: string | null;
       recipient: unknown;
@@ -2666,7 +2687,7 @@ async function claimDueCronActions(sql: postgres.Sql) {
       for update skip locked
       limit 25
     )
-    returning id::text, plan_id::text, recipient, payload
+    returning id::text, action_type, plan_id::text, recipient, payload
   `;
 }
 
@@ -2689,7 +2710,24 @@ async function enqueueDueCronTasks() {
 
     try {
       if (!isUuid(action.id) || !isUuid(planId)) {
-        throw new Error("Scheduled reassessment action is missing identifiers");
+        throw new Error("Scheduled action is missing identifiers");
+      }
+
+      if (action.action_type === "panya_checkin") {
+        const result = await queueDuePanyaCheckIn({
+          cronId: action.id,
+          planId
+        });
+
+        if (result.queued) {
+          queued += 1;
+        }
+
+        continue;
+      }
+
+      if (action.action_type !== "reassessment") {
+        throw new Error(`Unsupported scheduled action ${action.action_type}`);
       }
 
       const emailValidation = validateLeadEmail(email);

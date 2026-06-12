@@ -4,6 +4,12 @@ import {
   configuredGrokValue,
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
+import {
+  getActivePanyaConfig,
+  panyaToolContext,
+  type PanyaConfig,
+  type PanyaEntitlement
+} from "@/lib/panya";
 import type { CustomerChatReplyWorkItem } from "@/lib/task-work-items";
 
 const DEFAULT_PROMPT_VERSION = "v1";
@@ -51,19 +57,45 @@ function panyaConfig() {
   };
 }
 
-function systemPrompt(promptVersion: string) {
+function entitlementForTools(
+  entitlement: CustomerChatReplyWorkItem["entitlement"]
+): PanyaEntitlement {
+  if (entitlement === "living_protocol") {
+    return "living_protocol";
+  }
+
+  if (entitlement === "right_amount_formula") {
+    return "right_amount_formula";
+  }
+
+  return "unpaid";
+}
+
+function systemPrompt(
+  promptVersion: string,
+  governedConfig: PanyaConfig
+) {
   return [
     `You are Panya, MattaNutra's customer LINE chat agent ${promptVersion}.`,
+    "Admin-configured soul/persona:",
+    governedConfig.soul,
+    "Admin-configured safety guardrails:",
+    governedConfig.guardrails,
+    "Admin-configured upsell tone:",
+    governedConfig.upsellTone,
     "You help customers with MattaNutra orders, plan questions, and Living Protocol onboarding.",
     "You are warm, concise, practical, and commercially helpful without being pushy.",
     "You do not diagnose, treat, cure, prescribe, or replace clinician advice.",
     "Respect entitlement strictly.",
     "For unpaid customers, you may answer order/general questions and explain the value of Living Protocol, but you must not provide personalized protocol refinement, dose changes, or ongoing coaching.",
-    "For paid_plan customers, you may discuss the existing plan and order, but you must not provide ongoing Living Protocol refinement unless entitlement is living_protocol.",
-    "For living_protocol customers, you may provide ongoing protocol support and request a refinement when the customer explicitly asks to change, update, or regenerate their protocol.",
+    "For Right Amount Formula customers, you may discuss their existing plan, formula, recommendations, and orders, but you must not provide ongoing Living Protocol refinement unless their entitlement label is Living Protocol.",
+    "For Living Protocol customers, you may provide ongoing protocol support and request a refinement when the customer explicitly asks to change, update, or regenerate their protocol.",
+    "Never use internal entitlement keys in customer replies. Use the supplied entitlement label, for example Right Amount Formula or Living Protocol.",
+    "When the customer asks for their plan, formula, report, recommendations, or a link, include the plan.planUrl exactly as supplied in context.",
+    "When the customer asks for order tracking, include order.trackingUrl exactly as supplied when it exists.",
     "Escalate payment disputes, refund disputes, safety red flags, medication/pregnancy/serious condition questions, unclear identity, abuse, or anything requiring a human decision.",
     "Return JSON only with exactly four keys: reply, escalate, escalationReason, refinementRequested.",
-    "Set refinementRequested true only for explicit refinement requests from living_protocol customers; otherwise false."
+    "Set refinementRequested true only for explicit refinement requests from Living Protocol customers; otherwise false."
   ].join("\n");
 }
 
@@ -71,12 +103,16 @@ export async function analyzePanyaCustomerChatWithGrok(
   input: CustomerChatReplyWorkItem
 ) {
   const config = panyaConfig();
+  const governedConfig = await getActivePanyaConfig();
+  const panyaEntitlement = entitlementForTools(input.entitlement);
+  const toolPolicy = panyaToolContext({ entitlement: panyaEntitlement });
+  const dailyMessageLimit = governedConfig.config.quotas[panyaEntitlement];
   const completion = await callGrokChatCompletion({
     apiKey: config.apiKey,
     maxTokens: MAX_RESPONSE_TOKENS,
     messages: [
       {
-        content: systemPrompt(config.promptVersion),
+        content: systemPrompt(config.promptVersion, governedConfig.config),
         role: "system"
       },
       {
@@ -90,10 +126,14 @@ export async function analyzePanyaCustomerChatWithGrok(
                 status: message.status
               })),
               customer: input.customer,
-              entitlement: input.entitlement,
+              entitlement: {
+                label: input.entitlementLabel,
+                dailyMessageLimit
+              },
               order: input.order,
               plan: input.plan,
               planId: input.planId,
+              toolPolicy,
               userMessage: input.userMessage
             },
             instructions: [

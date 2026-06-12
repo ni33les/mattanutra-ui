@@ -47,6 +47,7 @@ export type AdminDashboardView =
   | "memberships"
   | "organisations"
   | "people"
+  | "panya"
   | "product-insights"
   | "products"
   | "reviews"
@@ -108,6 +109,7 @@ export type AdminNavItem = Readonly<{
   href?: string;
   icon: Icon;
   name: string;
+  panyaSection?: "configuration" | "conversations";
   view?: AdminDashboardView;
 }>;
 
@@ -633,6 +635,8 @@ export type AdminContent = Readonly<{
   marketingTitle: string;
   openSidebar: string;
   pageTitles: Record<AdminDashboardView, string>;
+  panyaNavigation: AdminNavItem[];
+  panyaTitle: string;
   performance: AdminNavItem[];
   performanceTitle: string;
   retailBuyingNavigation: AdminNavItem[];
@@ -650,9 +654,15 @@ export type AdminContent = Readonly<{
     confidenceLow: string;
     confidenceModerate: string;
     clientDose: string;
+    close: string;
     disapprove: string;
+    dismissTask: string;
     duplicateProduct: string;
+    completeTask: string;
+    completeHumanTaskHint: string;
+    completeHumanTaskTitle: string;
     doseReduced: string;
+    due: string;
     empty: string;
     flagReason: string;
     foodFrequency: string;
@@ -681,10 +691,14 @@ export type AdminContent = Readonly<{
     remove: string;
     reviewPlanSafety: string;
     selectProduct: string;
+    source: string;
     suppItem: string;
     suggestFoodReview: string;
     suggestFoodReviewBusy: string;
     suggestFoodReviewError: string;
+    taskItem: string;
+    taskReview: string;
+    taskType: string;
     total: string;
     unknown: string;
   };
@@ -1368,6 +1382,21 @@ const baseContent = {
       { icon: EnvelopeIcon, name: "Leads", view: "leads" }
     ],
     marketingTitle: "Marketing",
+    panyaNavigation: [
+      {
+        icon: Cog6ToothIcon,
+        name: "Configuration",
+        panyaSection: "configuration",
+        view: "panya"
+      },
+      {
+        icon: ChatBubbleLeftRightIcon,
+        name: "Conversations",
+        panyaSection: "conversations",
+        view: "panya"
+      }
+    ],
+    panyaTitle: "Panya",
     administration: [
       { icon: BuildingOffice2Icon, name: "Organisations", view: "organisations" },
       { icon: UserGroupIcon, name: "Memberships", view: "memberships" },
@@ -1438,6 +1467,7 @@ const baseContent = {
       memberships: "Memberships",
       organisations: "Organisations",
       people: "People",
+      panya: "Panya",
       "product-insights": "Product Insights",
       products: "Products",
       "retail-customer-orders": "Customer Orders",
@@ -1470,9 +1500,16 @@ const baseContent = {
       confidenceLow: "Low",
       confidenceModerate: "Moderate",
       clientDose: "Client dose",
+      close: "Close",
       disapprove: "Disapprove",
+      dismissTask: "Dismiss",
       duplicateProduct: "Duplicate of existing product",
+      completeTask: "Complete",
+      completeHumanTaskHint:
+        "Use this for review/escalation tasks that do not have a specialist editor. Completing or dismissing the task clears it from the review queue and records an audit note.",
+      completeHumanTaskTitle: "Clear human review task",
       doseReduced: "Dose reduced",
+      due: "Due",
       empty: "No supplement review tasks are waiting.",
       flagReason: "Review reason",
       foodFrequency: "Frequency",
@@ -1501,10 +1538,14 @@ const baseContent = {
       remove: "Remove",
       reviewPlanSafety: "Review nutrition safety for plan",
       selectProduct: "Select product",
+      source: "Source",
       suppItem: "Supp",
       suggestFoodReview: "Suggest food details with AI",
       suggestFoodReviewBusy: "AI is drafting food details...",
       suggestFoodReviewError: "Could not suggest food details.",
+      taskItem: "Task",
+      taskReview: "Task review",
+      taskType: "Task type",
       total: "Total",
       unknown: "Unknown supplement"
     },
@@ -2193,6 +2234,21 @@ const baseContent = {
       { icon: EnvelopeIcon, name: "ลีด", view: "leads" }
     ],
     marketingTitle: "การตลาด",
+    panyaNavigation: [
+      {
+        icon: Cog6ToothIcon,
+        name: "การตั้งค่า",
+        panyaSection: "configuration",
+        view: "panya"
+      },
+      {
+        icon: ChatBubbleLeftRightIcon,
+        name: "บทสนทนา",
+        panyaSection: "conversations",
+        view: "panya"
+      }
+    ],
+    panyaTitle: "Panya",
     administration: [
       { icon: BuildingOffice2Icon, name: "องค์กร", view: "organisations" },
       { icon: UserGroupIcon, name: "สมาชิก", view: "memberships" },
@@ -2263,6 +2319,7 @@ const baseContent = {
       memberships: "สมาชิก",
       organisations: "องค์กร",
       people: "ผู้ใช้",
+      panya: "Panya",
       "product-insights": "ข้อมูลสินค้า",
       products: "สินค้า",
       "retail-customer-orders": "คำสั่งซื้อลูกค้า",
@@ -2295,9 +2352,16 @@ const baseContent = {
       confidenceLow: "ต่ำ",
       confidenceModerate: "ปานกลาง",
       clientDose: "ขนาดสำหรับลูกค้า",
+      close: "ปิด",
       disapprove: "ไม่อนุมัติ",
+      dismissTask: "ยกเลิกงาน",
       duplicateProduct: "ซ้ำกับสินค้าที่มีอยู่",
+      completeTask: "เสร็จสิ้น",
+      completeHumanTaskHint:
+        "ใช้สำหรับงานรีวิวหรือ escalation ที่ไม่มีหน้าจอแก้ไขเฉพาะ การทำเครื่องหมายเสร็จหรือยกเลิกจะลบงานออกจากคิวรีวิวและบันทึกหมายเหตุไว้",
+      completeHumanTaskTitle: "เคลียร์งานรีวิวของมนุษย์",
       doseReduced: "ลดขนาดแล้ว",
+      due: "ครบกำหนด",
       empty: "ไม่มีงานรีวิวอาหารเสริมที่รอดำเนินการ",
       flagReason: "เหตุผลที่ต้องรีวิว",
       foodFrequency: "ความถี่",
@@ -2326,10 +2390,14 @@ const baseContent = {
       remove: "ลบ",
       reviewPlanSafety: "รีวิวความปลอดภัยของแผนโภชนาการ",
       selectProduct: "เลือกสินค้า",
+      source: "แหล่งที่มา",
       suppItem: "อาหารเสริม",
       suggestFoodReview: "แนะนำรายละเอียดอาหารด้วย AI",
       suggestFoodReviewBusy: "AI กำลังร่างรายละเอียดอาหาร...",
       suggestFoodReviewError: "ไม่สามารถแนะนำรายละเอียดอาหารได้",
+      taskItem: "งาน",
+      taskReview: "รีวิวงาน",
+      taskType: "ประเภทงาน",
       total: "ทั้งหมด",
       unknown: "อาหารเสริมใหม่"
     },

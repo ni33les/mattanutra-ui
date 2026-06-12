@@ -2029,6 +2029,10 @@ async function queueRetailStockIntelligenceRefresh(
   }
 }
 
+function humanReviewDueAt(days = 3) {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+}
+
 async function queueRetailOperationTask(input: Readonly<{
   commandId?: RetailCommandId;
   description: string;
@@ -2084,7 +2088,7 @@ async function queueRetailOperationTask(input: Readonly<{
       profitImpactAmount: input.profitImpactAmount ?? null,
       profitImpactCurrency: input.profitImpactCurrency ?? null,
       requiredCapabilities: [AGENT_CAPABILITIES.retailStockPolicyReview],
-      scheduledFor: input.dueAt ?? new Date(),
+      scheduledFor: new Date(),
       sourceEntityId: input.sourceEntityId ?? null,
       sourceEntityType: input.sourceEntityType ?? null,
       taskType: input.taskType,
@@ -2568,10 +2572,11 @@ async function queueStockReviewTasks(row: RetailStockSnapshotRow, reason: string
   if (stockQuantity === 0) {
     await queueRetailOperationTask({
       description: "Review out-of-stock retail inventory and decide whether to reorder.",
+      dueAt: humanReviewDueAt(),
       idempotencyKey: `${row.id}:low-stock`,
       organisationId: row.organisation_id,
       priorityReason: "Product is out of stock.",
-      priorityScore: 760,
+      priorityScore: 360,
       profitImpactAmount: stockoutImpact,
       profitImpactCurrency: row.currency,
       sourceEntityId: row.id,
@@ -2775,7 +2780,7 @@ export async function refreshRetailStockReorderAdvice(input: Readonly<{
     ) {
       const priorityScore =
         riskLevel === "out_of_stock"
-          ? 820
+          ? 360
           : riskLevel === "reorder"
             ? 640
             : 360;
@@ -2788,7 +2793,10 @@ export async function refreshRetailStockReorderAdvice(input: Readonly<{
 
       await queueRetailOperationTask({
         description: "Review reorder advice and add any shortages to the shopping list.",
-        dueAt: reorderBy,
+        dueAt:
+          reorderBy && riskLevel !== "out_of_stock"
+            ? reorderBy
+            : humanReviewDueAt(),
         idempotencyKey: `${row.id}:reorder:${riskLevel}`,
         organisationId: row.organisation_id,
         payload: {

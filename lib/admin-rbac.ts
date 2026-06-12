@@ -19,6 +19,8 @@ export type AdminPermission =
   | "marketing.read"
   | "performance.read"
   | "performance.write"
+  | "panya.read"
+  | "panya.write"
   | "reviews.read"
   | "reviews.write"
   | "settings.read"
@@ -76,6 +78,8 @@ const allPermissions = [
   "marketing.read",
   "performance.read",
   "performance.write",
+  "panya.read",
+  "panya.write",
   "reviews.read",
   "reviews.write",
   "settings.read",
@@ -237,6 +241,7 @@ const adminViews = [
   "supplement-insights",
   "visibility",
   "people",
+  "panya",
   "memberships",
   "organisations",
   "access-agents",
@@ -269,7 +274,7 @@ function adminViewAvailableForOrganisation(
   }
 
   return organisationType === "tenant"
-    ? view !== "financials" && view !== "settlements"
+    ? view !== "financials" && view !== "panya" && view !== "settlements"
     : true;
 }
 
@@ -344,6 +349,10 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
 
   if (view === "communications") {
     return "communications.read";
+  }
+
+  if (view === "panya") {
+    return "panya.read";
   }
 
   if (
@@ -470,6 +479,10 @@ export function permissionForAdminRequest(
     return write ? "communications.write" : "communications.read";
   }
 
+  if (pathname.startsWith("/api/admin/panya")) {
+    return write ? "panya.write" : "panya.read";
+  }
+
   if (
     pathname.startsWith("/api/admin/content") ||
     pathname.startsWith("/api/admin/blog")
@@ -502,6 +515,10 @@ export function permissionForAdminRequest(
 
     if (view === "communications") {
       return "communications.read";
+    }
+
+    if (view === "panya") {
+      return "panya.read";
     }
 
     if (view === "tasks") {

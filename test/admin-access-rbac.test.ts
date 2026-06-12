@@ -74,10 +74,12 @@ describe("admin RBAC", () => {
     assert.equal(adminViewAllowed(principal, "stock", "platform"), false);
     assert.equal(adminViewAllowed(principal, "retail-financials", "platform"), false);
     assert.equal(adminViewAllowed(principal, "settlements", "platform"), true);
+    assert.equal(adminViewAllowed(principal, "panya", "platform"), true);
     assert.equal(firstAllowedAdminView(principal, "glance", "platform"), "glance");
     assert.equal(adminViewAllowed(principal, "stock", "tenant"), true);
     assert.equal(adminViewAllowed(principal, "retail-financials", "tenant"), true);
     assert.equal(adminViewAllowed(principal, "settlements", "tenant"), false);
+    assert.equal(adminViewAllowed(principal, "panya", "tenant"), false);
     assert.equal(
       allowedAdminViews(principal, "tenant").includes("retail-customer-orders"),
       true
@@ -113,6 +115,7 @@ describe("admin RBAC", () => {
     assert.equal(adminViewAllowed(principal, "financials"), false);
     assert.equal(adminViewAllowed(principal, "retail-financials"), false);
     assert.equal(adminViewAllowed(principal, "settlements"), false);
+    assert.equal(adminViewAllowed(principal, "panya"), false);
     assert.equal(adminViewAllowed(principal, "products"), false);
     assert.equal(adminViewAllowed(principal, "visibility"), false);
     assert.equal(
@@ -140,6 +143,7 @@ describe("admin RBAC", () => {
     assert.equal(adminViewAllowed(principal, "financials", "tenant"), false);
     assert.equal(adminViewAllowed(principal, "retail-financials", "tenant"), true);
     assert.equal(adminViewAllowed(principal, "settlements", "tenant"), false);
+    assert.equal(adminViewAllowed(principal, "panya", "tenant"), false);
     assert.equal(adminViewAllowed(principal, "products"), false);
     assert.equal(adminViewAllowed(principal, "visibility"), false);
     assert.equal(

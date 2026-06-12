@@ -112,7 +112,7 @@ describe("retail financial settlements", () => {
     assert.match(dashboardContent, /name: "Settlements", view: "settlements"/);
     assert.match(dashboardContent, /"retail-financials"/);
     assert.match(dashboardContent, /name: "Financials", view: "retail-financials"/);
-    assert.match(rbac, /view !== "financials" && view !== "settlements"/);
+    assert.match(rbac, /view !== "financials" && view !== "panya" && view !== "settlements"/);
     assert.match(rbac, /view === "financials"[\s\S]*view === "retail-financials"[\s\S]*view === "settlements"/);
     assert.doesNotMatch(financialsView, /Retailer settlement balances/);
     assert.doesNotMatch(financialsView, /retailFinancialsData/);

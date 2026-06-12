@@ -12,6 +12,7 @@ import type {
   AdminTaskVisibilityData
 } from "@/lib/admin-execution";
 import type { AdminCommunicationsData } from "@/lib/admin-communications";
+import type { AdminPanyaData } from "@/lib/admin-panya";
 import type {
   AdminReviewQueueData
 } from "@/lib/admin-review-queue";
@@ -78,6 +79,7 @@ import { AdminAgentsView } from "@/components/admin/agents-view";
 import { AdminCampaignsView } from "@/components/admin/marketing-campaigns";
 import { AdminLeadsView } from "@/components/admin/marketing-leads";
 import { AdminCommunicationsView } from "@/components/admin/communications-view";
+import { AdminPanyaView } from "@/components/admin/panya-view";
 import { AdminTechnicalAlertsView } from "@/components/admin/technical-alerts-view";
 import { AdminFinancialsView } from "@/components/admin/financials-view";
 import { AdminRetailFinancialsView } from "@/components/admin/retail-financials-view";
@@ -212,6 +214,7 @@ function adminViewDatabaseAvailable({
   foodsData,
   flowData,
   leadsData,
+  panyaData,
   productsData,
   productDetailId,
   retailFinancialsData,
@@ -233,6 +236,7 @@ function adminViewDatabaseAvailable({
   foodsData: AdminFoodsData;
   flowData: AdminFlowData;
   leadsData: AdminLeadsData;
+  panyaData: AdminPanyaData;
   productsData: AdminProductsData;
   productDetailId?: string | null;
   retailFinancialsData: AdminRetailFinancialsData;
@@ -286,6 +290,10 @@ function adminViewDatabaseAvailable({
 
   if (view === "communications") {
     return communicationsData.databaseAvailable;
+  }
+
+  if (view === "panya") {
+    return panyaData.databaseAvailable;
   }
 
   if (view === "flow") {
@@ -359,6 +367,8 @@ export function AdminDashboard({
   flowData,
   leadsData,
   locale,
+  panyaData,
+  panyaSection,
   productDetailId,
   productsData,
   retailFinancialsData,
@@ -388,6 +398,8 @@ export function AdminDashboard({
   flowData: AdminFlowData;
   leadsData: AdminLeadsData;
   locale: Locale;
+  panyaData: AdminPanyaData;
+  panyaSection: "configuration" | "conversations";
   productDetailId?: string | null;
   productsData: AdminProductsData;
   retailFinancialsData: AdminRetailFinancialsData;
@@ -459,6 +471,7 @@ export function AdminDashboard({
     foodsData,
     flowData,
     leadsData,
+    panyaData,
     productsData,
     retailFinancialsData,
     retailStockData,
@@ -480,6 +493,7 @@ export function AdminDashboard({
             labels={labels}
             locale={locale}
             onNavigate={() => setSidebarOpen(false)}
+            panyaSection={panyaSection}
             range={data.range}
             view={view}
           />
@@ -500,6 +514,7 @@ export function AdminDashboard({
           filters={filters}
           labels={labels}
           locale={locale}
+          panyaSection={panyaSection}
           range={data.range}
           view={view}
         />
@@ -526,6 +541,7 @@ export function AdminDashboard({
             labels={labels}
             locale={locale}
             orderId={selectedRetailCustomerOrderId}
+            panyaSection={panyaSection}
             range={data.range}
             reviewTaskId={selectedReviewTaskId}
             taskId={selectedTaskId}
@@ -559,6 +575,7 @@ export function AdminDashboard({
                 labels={labels}
                 locale={locale}
                 orderId={selectedRetailCustomerOrderId}
+                panyaSection={panyaSection}
                 range={data.range}
                 reviewTaskId={selectedReviewTaskId}
                 taskId={selectedTaskId}
@@ -588,6 +605,7 @@ export function AdminDashboard({
           view === "flow" ||
           view === "glance" ||
           view === "leads" ||
+          view === "panya" ||
           view === "product-insights" ||
           view === "retail-financials" ||
           view === "settlements" ||
@@ -724,6 +742,14 @@ export function AdminDashboard({
               data={communicationsData}
               labels={labels}
               locale={locale}
+            />
+          ) : view === "panya" ? (
+            <AdminPanyaView
+              accessToken={accessToken}
+              data={panyaData}
+              locale={locale}
+              section={panyaSection}
+              range={data.range}
             />
           ) : view === "alerts" ? (
             <AdminTechnicalAlertsView

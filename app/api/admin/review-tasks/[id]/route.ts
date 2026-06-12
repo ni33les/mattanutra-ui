@@ -4,6 +4,7 @@ import { isProductAudience, resolveProductImportReview } from "@/lib/admin-produ
 import type { ProductImportFactInput } from "@/lib/admin-products";
 import type { ProductAudience } from "@/lib/product-recommendations";
 import {
+  completeGenericHumanReviewTask,
   decideAdminPlanReviewTask,
   dismissAdminReviewTask,
   resolveAdminReviewTask,
@@ -291,6 +292,7 @@ export async function PATCH(
   if (
     action !== "approve" &&
     action !== "approve_product" &&
+    action !== "complete_human_task" &&
     action !== "disapprove" &&
     action !== "dismiss" &&
     action !== "ignore_import" &&
@@ -309,6 +311,8 @@ export async function PATCH(
   }
 
   const associatedSupplementId = textOrNull(body.associatedSupplementId);
+  const genericOutcome =
+    body.outcome === "dismissed" ? "dismissed" : "completed";
   const productAudience = parseProductAudience(body.productAudience);
 
   if (body.productAudience !== undefined && !productAudience) {
@@ -389,6 +393,13 @@ export async function PATCH(
             titleTh: body.titleTh === undefined ? undefined : textOrNull(body.titleTh),
             titleZhCn: body.titleZhCn === undefined ? undefined : textOrNull(body.titleZhCn),
             translations: translationsFromBody(body.translations)
+          })
+        : action === "complete_human_task"
+        ? await completeGenericHumanReviewTask({
+            actor: "admin_dashboard",
+            id,
+            note: textOrNull(body.reviewerNote),
+            outcome: genericOutcome
           })
         : action === "dismiss"
         ? await dismissAdminReviewTask({

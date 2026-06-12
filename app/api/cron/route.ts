@@ -4,6 +4,7 @@ import {
   enqueueDigitalOceanBillingSyncTask,
   enqueueDueScheduledActions
 } from "@/lib/task-worker";
+import { expireOverdueGenericHumanReviewTasks } from "@/lib/human-review-task-expiry";
 
 export const runtime = "nodejs";
 
@@ -15,15 +16,17 @@ async function runDueWork(request: Request) {
   }
 
   try {
-    const [result, digitalOcean] = await Promise.all([
+    const [result, digitalOcean, humanReviewTasks] = await Promise.all([
       enqueueDueScheduledActions(),
-      enqueueDigitalOceanBillingSyncTask()
+      enqueueDigitalOceanBillingSyncTask(),
+      expireOverdueGenericHumanReviewTasks()
     ]);
 
     return NextResponse.json(
       {
         ...(result ?? { queued: 0 }),
-        digitalOcean
+        digitalOcean,
+        humanReviewTasks
       },
       {
         headers: {

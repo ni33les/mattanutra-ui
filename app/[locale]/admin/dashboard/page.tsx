@@ -22,6 +22,10 @@ import {
   emptyCommunicationsData,
   getAdminCommunicationsData
 } from "@/lib/admin-communications";
+import {
+  emptyAdminPanyaData,
+  getAdminPanyaData
+} from "@/lib/admin-panya";
 import { normalizeAdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import {
   emptyAgentsData,
@@ -99,6 +103,10 @@ function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function panyaSectionParam(value: string | string[] | undefined) {
+  return firstParam(value) === "configuration" ? "configuration" : "conversations";
+}
+
 function dashboardUrl(
   locale: Locale,
   query: Record<string, string | string[] | undefined>,
@@ -151,6 +159,7 @@ export default async function LocalizedAdminDashboardPage({
   const selectedReviewTaskId = firstParam(query.review);
   const selectedTaskId = firstParam(query.task);
   const selectedRetailCustomerOrderId = firstParam(query.order);
+  const panyaSection = panyaSectionParam(query.section);
   const cookieStore = await cookies();
   const sessionContext = await resolveAdminSession({
     csrfToken: cookieStore.get(adminCsrfCookieName)?.value,
@@ -200,6 +209,7 @@ export default async function LocalizedAdminDashboardPage({
   let flowData = emptyFlow(range);
   let leadsData = emptyLeadsData();
   let productsData = emptyAdminProductsData();
+  let panyaData = emptyAdminPanyaData();
   let retailStockData = emptyAdminRetailStockData();
   let recommendationInsightsData = emptyAdminRecommendationInsightsData(range);
   let reviewQueueData = emptyAdminReviewQueueData();
@@ -238,6 +248,12 @@ export default async function LocalizedAdminDashboardPage({
     contentData = await getAdminContentData(range, filters);
   } else if (view === "communications") {
     communicationsData = await getAdminCommunicationsData(range, adminContext);
+  } else if (view === "panya") {
+    panyaData = await getAdminPanyaData(
+      range,
+      adminContext,
+      firstParam(query.conversation)
+    );
   } else if (view === "financials") {
     financialsData = await getAdminFinancialsData(range);
   } else if (view === "settlements") {
@@ -301,6 +317,8 @@ export default async function LocalizedAdminDashboardPage({
       leadsData={leadsData}
       locale={locale}
       productsData={productsData}
+      panyaData={panyaData}
+      panyaSection={panyaSection}
       retailFinancialsData={retailFinancialsData}
       retailStockData={retailStockData}
       recommendationInsightsData={recommendationInsightsData}

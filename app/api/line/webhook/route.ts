@@ -7,6 +7,11 @@ import {
 } from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import { formatOutboundLineMessage } from "@/lib/line-message-format";
+import {
+  checkAndRecordPanyaUserMessage,
+  queuePanyaQuotaLimitReply,
+  schedulePanyaCheckInForPlan
+} from "@/lib/panya";
 import { appendPlanChatMessage } from "@/lib/plan-concierge";
 import { enqueuePanyaCustomerChatReplyTask } from "@/lib/task-worker";
 
@@ -259,6 +264,11 @@ export async function POST(request: Request) {
           : null;
 
       if (customerConnected) {
+        await schedulePanyaCheckInForPlan({
+          planId: customerConnected.planId,
+          source: "customer_line_connected"
+        });
+
         const replySent = await replyToLine({
           replyToken,
           text: customerConnectedReply({
@@ -303,10 +313,35 @@ export async function POST(request: Request) {
       const sql = getSql();
 
       if (sql) {
+        const quota = await checkAndRecordPanyaUserMessage({
+          channelId: inbound.channelId,
+          communicationMessageId: inbound.id,
+          identityId: inbound.identityId,
+          planId: inbound.planId,
+          source: "line"
+        });
+
+        if (quota && !quota.allowed) {
+          await queuePanyaQuotaLimitReply({
+            createdByMessageId: inbound.id,
+            planId: inbound.planId,
+            quota
+          });
+
+          results.push({
+            captured: true,
+            messageId: inbound.id,
+            panyaQuotaBlocked: true,
+            planId: inbound.planId
+          });
+          continue;
+        }
+
         const chatMessage = await appendPlanChatMessage(sql, {
           allowUnpaidSupport: true,
           body: message,
           channel: "line",
+          enforcePlanChatLimit: false,
           externalMessageId: inbound.id,
           identityId: inbound.identityId,
           metadata: {
