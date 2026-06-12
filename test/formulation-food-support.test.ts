@@ -139,12 +139,12 @@ describe("formulation food support", () => {
     assert.equal(visibleSupplementRecommendationCount(payload), 6);
   });
 
-  it("tells formulation AI not to pad supplement counts to eight", async () => {
+  it("lets formulation AI choose a supplement count within the intended range", async () => {
     const source = await readFile("lib/formulation-analysis.ts", "utf8");
 
-    assert.match(source, /assessment-justified items/);
-    assert.match(source, /targetSupplementCount/);
-    assert.match(source, /do not default to 8/i);
+    assert.match(source, /assessment-justified number of items, usually 6 to 12/);
+    assert.match(source, /Choose the right number of supplements/);
+    assert.doesNotMatch(source, /targetSupplementCount/);
     assert.doesNotMatch(source, /supplementBreakdown must contain 6 to 18 items/);
   });
 

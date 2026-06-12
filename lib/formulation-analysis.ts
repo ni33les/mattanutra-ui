@@ -13,10 +13,6 @@ import type {
   FormulationStatus
 } from "@/lib/formulation-types";
 import {
-  normalizeFormulationSupplementCount,
-  targetSupplementBreakdownCount
-} from "@/lib/formulation-count-policy";
-import {
   callGrokChatCompletion,
   configuredGrokModel,
   configuredGrokValue,
@@ -179,8 +175,7 @@ function userPrompt({
   planFeedback,
   previousFoodGuidance,
   previousFormulation,
-  planId,
-  targetSupplementCount
+  planId
 }: Pick<
   AnalysisInput,
   | "answers"
@@ -192,7 +187,7 @@ function userPrompt({
   | "previousFoodGuidance"
   | "previousFormulation"
   | "planId"
-> & { targetSupplementCount: number }) {
+>) {
   return JSON.stringify(
     {
       assessment: answers,
@@ -261,9 +256,8 @@ function userPrompt({
       },
       instructions: [
         "Return a JSON object with exactly three top-level keys: supplementBreakdown, marketingPoints, and cautions.",
-        `supplementBreakdown must contain exactly ${targetSupplementCount} assessment-justified items for this assessment.`,
-        "The targetSupplementCount is computed from assessment complexity, budget, pill-count preference, and safety constraints; follow it instead of a generic template.",
-        "Do not pad to a fixed count and do not default to 8; if a generic eight-item list would be tempting, use targetSupplementCount instead.",
+        "supplementBreakdown should contain the assessment-justified number of items, usually 6 to 12.",
+        "Choose the right number of supplements for this assessment. Do not pad to a fixed count.",
         "marketingPoints must contain 3 concise points that are specific to this assessment, the HealthScore, and the plan.",
         "Every marketingPoints array entry must be an object with id, title, and body.",
         "cautions must be an array. Return an empty array only when the assessment context truly has no relevant cautions.",
@@ -298,14 +292,7 @@ function userPrompt({
       locale,
       outputLocaleMode: "single_display_locale",
       plan,
-      planId,
-      selectionPolicy: {
-        countRule:
-          `Return exactly ${targetSupplementCount} supplementBreakdown items before safety review.`,
-        countSource:
-          "assessment-derived target, not a static preview or product-count target",
-        targetSupplementCount
-      }
+      planId
     },
     null,
     2
@@ -705,14 +692,13 @@ export async function analyzeFormulationWithGrok(
   input: AnalysisInput
 ): Promise<AnalysisResult> {
   const config = getGrokConfig();
-  const targetSupplementCount = targetSupplementBreakdownCount(input.answers);
   const messages: Array<{
     content: string;
     role: "assistant" | "system" | "user";
   }> = [
     { content: systemPrompt(config.promptVersion), role: "system" },
     {
-      content: userPrompt({ ...input, targetSupplementCount }),
+      content: userPrompt(input),
       role: "user"
     }
   ];
@@ -726,8 +712,7 @@ export async function analyzeFormulationWithGrok(
         attempt,
         model: config.model,
         promptVersion: config.promptVersion,
-        reasoningEffort: config.reasoningEffort,
-        targetSupplementCount
+        reasoningEffort: config.reasoningEffort
       }
     });
 
@@ -743,31 +728,23 @@ export async function analyzeFormulationWithGrok(
       const validation = validateFormulation(parsed);
 
       if (validation.formulation) {
-        const rawItemCount = validation.formulation.supplementBreakdown.length;
-        const formulation = normalizeFormulationSupplementCount(
-          validation.formulation,
-          targetSupplementCount
-        );
-
         await audit(input, {
           eventType: "grok_validation_passed",
           level: "low",
           payload: {
             attempt,
-            itemCount: formulation.supplementBreakdown.length,
+            itemCount: validation.formulation.supplementBreakdown.length,
             model: completion.model ?? config.model,
             promptVersion: config.promptVersion,
-            rawItemCount,
             reasoningEffort: config.reasoningEffort,
             responseId: completion.id,
-            targetSupplementCount,
             usage: completion.usage
           }
         });
 
         return {
           attempts: attempt,
-          formulation,
+          formulation: validation.formulation,
           model: completion.model ?? config.model,
           promptVersion: config.promptVersion,
           reasoningEffort: config.reasoningEffort,
