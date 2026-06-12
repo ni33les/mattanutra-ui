@@ -391,6 +391,7 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
                 <LivingProtocolLineCta
                   locale={locale}
                   planId={order.planId}
+                  presentation="inline_qr"
                   retailCustomerOrderId={order.orderId}
                   source="order_tracking"
                 />

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Copy, ExternalLink, MessageCircle, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 
@@ -8,7 +9,7 @@ type LivingProtocolLineCtaProps = Readonly<{
   className?: string;
   locale: Locale;
   mode?: "general" | "living_protocol" | "nutrition_plan";
-  presentation?: "button" | "section";
+  presentation?: "button" | "inline_qr" | "section";
   planId: string;
   retailCustomerOrderId?: string | null;
   showBody?: boolean;
@@ -216,20 +217,12 @@ export function LivingProtocolLineCta({
     });
   }, [locale, planId, source]);
 
-  async function openConnect() {
-    setOpen(true);
-    setError("");
-    postBpm({
-      eventName: "customer_line_cta_clicked",
-      locale,
-      planId,
-      source
-    });
-
+  const createConnectCode = useCallback(async () => {
     if (connect || loading) {
       return;
     }
 
+    setError("");
     setLoading(true);
 
     try {
@@ -260,6 +253,30 @@ export function LivingProtocolLineCta({
     } finally {
       setLoading(false);
     }
+  }, [connect, labels.error, loading, planId, retailCustomerOrderId, source]);
+
+  useEffect(() => {
+    if (presentation !== "inline_qr") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void createConnectCode();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [createConnectCode, presentation]);
+
+  async function openConnect() {
+    setOpen(true);
+    postBpm({
+      eventName: "customer_line_cta_clicked",
+      locale,
+      planId,
+      source
+    });
+
+    await createConnectCode();
   }
 
   async function copyCommand() {
@@ -285,7 +302,59 @@ export function LivingProtocolLineCta({
 
   return (
     <div className={className}>
-      {presentation === "section" ? (
+      {presentation === "inline_qr" ? (
+        <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mn-teal-deep)]">
+              {modeLabels.eyebrow}
+            </p>
+            <h2 className="mt-2 font-serif text-2xl font-medium leading-tight text-[var(--mn-ink)]">
+              {modeLabels.heading}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
+              {modeLabels.body}
+            </p>
+            <p className="mt-4 text-xs leading-5 text-[var(--mn-ash)]">
+              {labels.instructions}
+            </p>
+            <div className="mt-4 rounded-lg bg-[var(--mn-cream)] px-3 py-2 ring-1 ring-[var(--mn-line)]">
+              <p className="font-mono text-sm font-bold text-[var(--mn-ink)]">
+                {connect?.command ?? (loading ? labels.loading : "MN")}
+              </p>
+              <p className="mt-1 text-xs text-[var(--mn-ash)]">
+                {labels.expires}
+              </p>
+            </div>
+            {error ? (
+              <p className="mt-3 text-sm font-semibold text-[var(--mn-error)]">
+                {error}
+              </p>
+            ) : null}
+          </div>
+          <a
+            aria-label={modeLabels.dialogTitle}
+            className="grid size-40 place-items-center rounded-xl bg-white p-2 ring-1 ring-[var(--mn-line)] transition hover:ring-[var(--mn-teal)]"
+            href={connect?.lineUrl ?? "#"}
+            rel="noreferrer"
+            target="_blank"
+          >
+            {qrUrl ? (
+              <Image
+                alt="MattaNutra LINE connect QR code"
+                className="size-36"
+                height={144}
+                src={qrUrl}
+                unoptimized={true}
+                width={144}
+              />
+            ) : (
+              <span className="px-3 text-center text-sm text-[var(--mn-ash)]">
+                {loading ? labels.loading : "LINE"}
+              </span>
+            )}
+          </a>
+        </div>
+      ) : presentation === "section" ? (
         <div className="overflow-hidden rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-soft)] sm:p-6">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="max-w-3xl">
@@ -348,11 +417,12 @@ export function LivingProtocolLineCta({
                 target="_blank"
               >
                 {qrUrl ? (
-                  <img
+                  <Image
                     alt="MattaNutra LINE connect QR code"
                     className="size-36"
                     height={144}
                     src={qrUrl}
+                    unoptimized={true}
                     width={144}
                   />
                 ) : (

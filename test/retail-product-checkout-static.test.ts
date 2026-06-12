@@ -42,6 +42,7 @@ describe("retail product checkout static contracts", () => {
     assert.match(checkoutService, /communication_channels\.channel_type = 'line'/);
     assert.match(checkoutService, /hasActiveLineChannel: row\.has_active_line_channel === true/);
     assert.match(trackingPage, /!order\.hasActiveLineChannel/);
+    assert.match(trackingPage, /presentation="inline_qr"/);
     assert.match(trackingPage, /source="order_tracking"/);
   });
 

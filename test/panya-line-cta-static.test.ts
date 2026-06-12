@@ -32,7 +32,8 @@ describe("reveal Panya LINE CTA", () => {
     assert.doesNotMatch(reveal, /source="reveal_products_checkout"/);
     assert.match(cta, /Connect with Panya for ongoing nutrition support/);
     assert.match(cta, /Connect with Panya to discuss your nutrition plan/);
-    assert.match(cta, /presentation\?: "button" \| "section"/);
+    assert.match(cta, /presentation\?: "button" \| "inline_qr" \| "section"/);
+    assert.match(cta, /presentation !== "inline_qr"/);
     assert.match(cta, /showBody\?: boolean/);
     assert.doesNotMatch(cta, /MN PLAN/);
     assert.match(route, /const command = `MN \$\{token\.code\}`/);
