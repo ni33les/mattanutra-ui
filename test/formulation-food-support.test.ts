@@ -142,7 +142,8 @@ describe("formulation food support", () => {
   it("tells formulation AI not to pad supplement counts to eight", async () => {
     const source = await readFile("lib/formulation-analysis.ts", "utf8");
 
-    assert.match(source, /assessment-justified number of items/);
+    assert.match(source, /assessment-justified items/);
+    assert.match(source, /targetSupplementCount/);
     assert.match(source, /do not default to 8/i);
     assert.doesNotMatch(source, /supplementBreakdown must contain 6 to 18 items/);
   });

@@ -9,6 +9,11 @@ import {
   parseDoseLimit,
   type ParsedDose
 } from "@/lib/dose-conversion";
+import {
+  normalizeVisibleFormulationSupplementCount,
+  targetSupplementBreakdownCount,
+  visibleSupplementBreakdownCount
+} from "@/lib/formulation-count-policy";
 import type { FormulationBlueprint, FormulationIngredient, LocalizedText } from "@/lib/formulation-types";
 import { resolveLocalizedText, type Locale } from "@/lib/i18n";
 import { productFactAliasKeys, productKeysMatch } from "@/lib/product-recommendations";
@@ -979,21 +984,54 @@ export async function applyFormulationSafety(
     supplementBreakdown.push(withAutomatedSafetyStatus(ingredient));
   }
 
+  const visibleCountBeforeNormalization =
+    visibleSupplementBreakdownCount(supplementBreakdown);
+  const targetSupplementCount = targetSupplementBreakdownCount(input.answers);
+  const normalizedFormulation = normalizeVisibleFormulationSupplementCount(
+    {
+      ...input.formulation,
+      safetySummary: summary,
+      supplementBreakdown
+    },
+    targetSupplementCount
+  );
+  const visibleCountAfterNormalization = visibleSupplementBreakdownCount(
+    normalizedFormulation.supplementBreakdown
+  );
+
+  if (visibleCountAfterNormalization !== visibleCountBeforeNormalization) {
+    await audit(input, {
+      eventType: "formulation_count_normalized",
+      level: "low",
+      payload: {
+        targetSupplementCount,
+        visibleCountAfterNormalization,
+        visibleCountBeforeNormalization
+      }
+    });
+  }
+
   await audit(input, {
     eventType: "formulation_safety_completed",
     level: summary.reviewCount > 0 || summary.removedCount > 0 ? "medium" : "low",
-    payload: summary
+    payload: {
+      ...summary,
+      targetSupplementCount,
+      visibleCountAfterNormalization,
+      visibleCountBeforeNormalization
+    }
   });
   await logSafetyBpm(
     input,
     "formulation_safety_completed",
     summary.reviewCount > 0 || summary.removedCount > 0 ? "medium" : "low",
-    summary
+    {
+      ...summary,
+      targetSupplementCount,
+      visibleCountAfterNormalization,
+      visibleCountBeforeNormalization
+    }
   );
 
-  return {
-    ...input.formulation,
-    safetySummary: summary,
-    supplementBreakdown
-  } satisfies FormulationBlueprint;
+  return normalizedFormulation satisfies FormulationBlueprint;
 }
