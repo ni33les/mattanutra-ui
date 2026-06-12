@@ -142,8 +142,10 @@ describe("formulation food support", () => {
   it("lets formulation AI choose a supplement count within the intended range", async () => {
     const source = await readFile("lib/formulation-analysis.ts", "utf8");
 
-    assert.match(source, /assessment-justified number of items, usually 6 to 12/);
-    assert.match(source, /Choose the right number of supplements/);
+    assert.match(source, /rank every supplement that is clearly effective and needed/);
+    assert.match(source, /complete ranked set of assessment-justified items, usually 6 to 12/);
+    assert.match(source, /return the top 12 by expected impact and safety fit/);
+    assert.match(source, /Eight is acceptable only when exactly eight/);
     assert.doesNotMatch(source, /targetSupplementCount/);
     assert.doesNotMatch(source, /supplementBreakdown must contain 6 to 18 items/);
   });
