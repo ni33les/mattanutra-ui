@@ -7,7 +7,7 @@ import {
   isUuid,
   persistAssessmentSubmission
 } from "@/lib/assessment-store";
-import { computeHealthScore } from "@/lib/health-score";
+import { computeHealthScore, type HealthScoreResult } from "@/lib/health-score";
 import {
   enqueueAssessmentPregenerationTasks,
   enqueueDueScheduledActions,
@@ -15,7 +15,7 @@ import {
   scheduleReassessmentAction
 } from "@/lib/task-worker";
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
-import { isLocale } from "@/lib/i18n";
+import { isLocale, type Locale } from "@/lib/i18n";
 import { bindPaidReservationToAssessment } from "@/lib/stripe-payments";
 
 export const runtime = "nodejs";
@@ -34,6 +34,33 @@ function buildHealthScore(answers: unknown, locale: unknown) {
   const normalizedLocale = isLocale(locale) ? locale : "en";
 
   return computeHealthScore(answers, normalizedLocale);
+}
+
+function refreshedHealthScore(
+  answers: unknown,
+  locale: Locale,
+  storedHealthScore: HealthScoreResult | null | undefined,
+  storedLocale: unknown
+): HealthScoreResult {
+  const refreshed = computeHealthScore(answers ?? null, locale);
+  const refreshedPageContent = refreshed.pageContent;
+
+  if (!refreshedPageContent || !storedHealthScore || storedLocale !== locale) {
+    return refreshed;
+  }
+
+  return {
+    ...refreshed,
+    advice: storedHealthScore.advice ?? refreshed.advice,
+    pageContent: {
+      ...refreshedPageContent,
+      ...(storedHealthScore.pageContent?.aiCopy
+        ? {
+            aiCopy: storedHealthScore.pageContent.aiCopy
+          }
+        : {})
+    }
+  } satisfies HealthScoreResult;
 }
 
 function healthScoreBpmFields(snapshot: { healthScore?: ReturnType<typeof computeHealthScore> }) {
@@ -98,11 +125,16 @@ export async function GET(
   if (healthScoreView && displayLocale) {
     const prefill = await getStoredAssessmentPrefill(planId);
 
-    if (prefill?.healthScore && prefill.locale !== displayLocale) {
+    if (prefill?.healthScore) {
       return NextResponse.json(
         {
           ...snapshot,
-          healthScore: computeHealthScore(prefill.answers, displayLocale)
+          healthScore: refreshedHealthScore(
+            prefill.answers,
+            displayLocale,
+            prefill.healthScore,
+            prefill.locale
+          )
         },
         {
           headers: {

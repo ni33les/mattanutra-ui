@@ -161,6 +161,78 @@ describe("HealthScore v4 deterministic scoring", () => {
     ]);
   });
 
+  it("derives the HealthScore selected nutrient count from assessment complexity", () => {
+    const simple = computeHealthScore(
+      {
+        activity: "active",
+        alcohol: "none",
+        diet: "whole",
+        digestion: "none",
+        energy: "good",
+        foodFrequency: {
+          fish: "often",
+          fruitveg: "3+"
+        },
+        goals: ["sleep"],
+        meds: "none",
+        sex: "female",
+        sleepHrs: "8-9",
+        smoking: "never",
+        stress: "low"
+      },
+      "en"
+    );
+    const broad = computeHealthScore(
+      {
+        activity: "active",
+        alcohol: "4-7",
+        antibiotics: "yes",
+        diet: "whole",
+        digestion: "constipation",
+        energy: "excellent",
+        foodFrequency: {
+          dairy: "never",
+          eggs: "weekly",
+          fish: "rare",
+          fruitveg: "1-2",
+          legumes: "most",
+          redmeat: "3+"
+        },
+        goals: ["sleep", "fitness", "energy"],
+        hrv: "46",
+        labs: {
+          b12: "520",
+          ferritin: "80",
+          hba1c: "5.3",
+          o3: "6.2",
+          vitd: "42"
+        },
+        labUnits: {
+          b12: "pg/mL",
+          ferritin: "ng/mL",
+          hba1c: "%",
+          o3: "%",
+          vitd: "ng/mL"
+        },
+        medTypes: ["statin"],
+        meds: "yes",
+        sex: "female",
+        sleepHrs: "8-9",
+        smoking: "occasional",
+        stress: "moderate",
+        symptoms: ["stress", "fatigue"],
+        vo2: "48"
+      },
+      "en"
+    );
+
+    assert.equal(simple.pageContent?.locked.subtraction.chosen, 6);
+    assert.equal(simple.pageContent?.locked.nutrientsChosen, 6);
+    assert.equal(broad.pageContent?.locked.subtraction.chosen, 12);
+    assert.equal(broad.pageContent?.locked.subtraction.setAside, 108);
+    assert.equal(broad.pageContent?.locked.nutrientsChosen, 12);
+  });
+
   it("keeps deterministic fallback copy clear of forbidden substrings", () => {
     const result = computeHealthScore(profileOne(), "en");
     const hits: string[] = [];
