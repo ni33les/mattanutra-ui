@@ -71,6 +71,7 @@ const baseRevealCopy = {
     formulaLead:
       "Every dose below is sized to your body, your goals, and the safety context you shared. Product fit shows how closely the selected stack covers each nutrient.",
     formulaTitle: "Exactly enough.",
+    formulaTitleEmphasis: "Exactly enough.",
     formulaTitleTemplate: "{supplementSelectedText} nutrients. Exactly enough.",
     formulaMetaEvaluatedCount: "evaluated",
     formulaMetaEvaluated: "Precision tier",
@@ -112,6 +113,7 @@ const baseRevealCopy = {
       "Your formula begins with who you are. Body, location, the goals that actually matter to you, and the constraints we honour without compromise.",
     personalizationEyebrow: "Built from your assessment",
     personalizationTitle: "Everything you told us, folded into one plan.",
+    personalizationTitleEmphasis: "folded into one plan",
     productsBody:
       "Products are shown as the closest available stack from the approved catalogue. The goal is fewer bottles, clear coverage, and no unnecessary overlap.",
     productsLead:
@@ -186,6 +188,7 @@ const baseRevealCopy = {
     formulaLead:
       "ปริมาณด้านล่างปรับตามร่างกาย เป้าหมาย และบริบทความปลอดภัยที่คุณให้ไว้ ความพอดีของสินค้าแสดงว่าชุดที่เลือกครอบคลุมสารอาหารแต่ละรายการได้แค่ไหน",
     formulaTitle: "พอดี ไม่มากเกินจำเป็น",
+    formulaTitleEmphasis: "ไม่มากเกินจำเป็น",
     formulaTitleTemplate: "{supplementSelectedText} สารอาหาร ในปริมาณที่พอดี",
     formulaMetaEvaluatedCount: "ประเมินแล้ว",
     formulaMetaEvaluated: "ระดับความแม่นยำ",
@@ -226,6 +229,7 @@ const baseRevealCopy = {
       "สูตรนี้เริ่มจากตัวคุณ ทั้งข้อมูลร่างกาย ที่อยู่ เป้าหมายที่สำคัญจริง และข้อจำกัดที่ต้องเคารพอย่างจริงจัง",
     personalizationEyebrow: "สร้างจากแบบประเมินของคุณ",
     personalizationTitle: "ทุกอย่างที่คุณบอกเรา ถูกพับรวมเป็นแผนเดียว",
+    personalizationTitleEmphasis: "ถูกพับรวมเป็นแผนเดียว",
     productsBody:
       "ผลิตภัณฑ์ที่แสดงคือชุดที่ใกล้ที่สุดจากแคตตาล็อกที่อนุมัติแล้ว เป้าหมายคือขวดน้อยลง ความครอบคลุมชัดเจน และไม่ซ้ำซ้อนเกินจำเป็น",
     productsLead:
@@ -300,6 +304,7 @@ export const revealCopy = {
     "formulaEyebrow": "您的配方",
     "formulaLead": "以下每种剂量均根据您的身体、目标以及您分享的安全背景进行调整。产品匹配度显示所选配方对每种营养素的覆盖程度。",
     "formulaTitle": "恰到好处。",
+    "formulaTitleEmphasis": "恰到好处。",
     "formulaTitleTemplate": "{supplementSelectedText} 种营养素。恰到好处。",
     "formulaMetaEvaluatedCount": "已评估",
     "formulaMetaEvaluated": "精准层级",
@@ -334,6 +339,7 @@ export const revealCopy = {
     "personalizationBody": "您的配方始于您是谁。身体、位置、对您真正重要的目标，以及我们毫不妥协地尊重的限制。",
     "personalizationEyebrow": "基于您的评估打造",
     "personalizationTitle": "将您告知的一切融入一个计划。",
+    "personalizationTitleEmphasis": "融入一个计划",
     "productsBody": "产品显示为来自已批准目录的最接近可用配方。目标是减少瓶数、清晰覆盖且无不必要的重叠。",
     "productsLead": "我们在泰国市场搜索了尽可能接近您配方的产品：经过验证的剂量、足够干净的标签，以及可用的直接市场链接。",
     "productsEmpty": "配方已就绪，但产品目录尚未包含针对这些需求的已批准配方。",

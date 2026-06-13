@@ -215,6 +215,34 @@ function safeKey(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "-");
 }
 
+function renderTitleWithEmphasis(
+  title: string,
+  emphasis: string | null | undefined,
+) {
+  const cleanEmphasis = emphasis?.trim();
+
+  if (!cleanEmphasis) {
+    return title;
+  }
+
+  const index = title.indexOf(cleanEmphasis);
+
+  if (index < 0) {
+    return title;
+  }
+
+  const before = title.slice(0, index);
+  const after = title.slice(index + cleanEmphasis.length);
+
+  return (
+    <>
+      {before}
+      <em>{cleanEmphasis}</em>
+      {after}
+    </>
+  );
+}
+
 function renderRevealHeroHeadline(
   result: FormulationResult,
   locale: Locale,
@@ -331,6 +359,121 @@ function assessmentGroups(result: FormulationResult, locale: Locale) {
   );
 
   return { cautions, goals, profile, signals };
+}
+
+function renderAssessmentTitle(
+  title: string,
+  copy: typeof revealCopy.en,
+  locale: Locale,
+) {
+  if (locale !== "en" || title !== copy.personalizationTitle) {
+    return renderTitleWithEmphasis(title, copy.personalizationTitleEmphasis);
+  }
+
+  return (
+    <>
+      Everything you told us,
+      <br />
+      <em>{copy.personalizationTitleEmphasis}</em>.
+    </>
+  );
+}
+
+function renderDistillationTitle({
+  copy,
+  locale,
+  narrative,
+  selectedText,
+  totalText,
+}: Readonly<{
+  copy: typeof revealCopy.en;
+  locale: Locale;
+  narrative: string;
+  selectedText: string;
+  totalText: string;
+}>) {
+  if (locale !== "en") {
+    return narrative;
+  }
+
+  const expected = formatTemplate(copy.distilledTitleTemplate, {
+    supplementSelectedText: selectedText,
+    supplementTotalText: totalText,
+  });
+
+  if (narrative !== expected) {
+    return narrative;
+  }
+
+  return (
+    <>
+      We evaluated <em>{totalText}</em> ingredients.
+      <br />
+      {selectedText} earned a place in your formula.
+    </>
+  );
+}
+
+function renderFormulaTitle({
+  copy,
+  locale,
+  selectedText,
+  title,
+}: Readonly<{
+  copy: typeof revealCopy.en;
+  locale: Locale;
+  selectedText: string;
+  title: string;
+}>) {
+  const expected = formatTemplate(copy.formulaTitleTemplate, {
+    supplementSelectedText: selectedText,
+  });
+
+  if (locale !== "en" || title !== expected) {
+    return renderTitleWithEmphasis(title, copy.formulaTitleEmphasis);
+  }
+
+  return (
+    <>
+      {selectedText} nutrients.{" "}
+      <em>{copy.formulaTitleEmphasis}</em>
+    </>
+  );
+}
+
+function renderProductsTitle({
+  allCovered,
+  copy,
+  coveredText,
+  locale,
+  pending,
+  productSelectedText,
+  selectedTextLower,
+  title,
+}: Readonly<{
+  allCovered: boolean;
+  copy: typeof revealCopy.en;
+  coveredText: string;
+  locale: Locale;
+  pending: boolean;
+  productSelectedText: string;
+  selectedTextLower: string;
+  title: string;
+}>) {
+  if (pending || locale !== "en") {
+    return title;
+  }
+
+  const emphasized = allCovered
+    ? `All ${selectedTextLower} nutrients.`
+    : `${coveredText} of ${selectedTextLower} nutrients.`;
+
+  return (
+    <>
+      {productSelectedText} bottles.{" "}
+      <em>{emphasized}</em>
+    </>
+  );
 }
 
 export function RevealFinalResultsPage({
@@ -616,6 +759,12 @@ function RevealAssessmentSection({
   locale: Locale;
   result: FormulationResult;
 }>) {
+  const assessmentTitle = revealSlotCopy(
+    result,
+    "breadcrumbsTitle",
+    locale,
+    copy.personalizationTitle,
+  );
   const cards = [
     { items: groups.goals, label: finalCopy.assessmentGoals, tone: "mint" },
     { items: groups.signals, label: finalCopy.assessmentSymptoms, tone: "paper" },
@@ -635,13 +784,8 @@ function RevealAssessmentSection({
               <span className="mn-reveal-final-label-number">01</span>
               {copy.personalizationEyebrow}
             </div>
-            <h2 className="mn-reveal-final-heading mt-4 text-[clamp(28px,3.4vw,42px)]">
-              {revealSlotCopy(
-                result,
-                "breadcrumbsTitle",
-                locale,
-                copy.personalizationTitle,
-              )}
+            <h2 className="mn-reveal-final-heading mt-3 text-[clamp(28px,3.4vw,42px)] leading-[1.15]">
+              {renderAssessmentTitle(assessmentTitle, copy, locale)}
             </h2>
           </div>
           <p className="max-w-[520px] text-base leading-[1.65] text-[var(--mn-ink-soft)]">
@@ -708,10 +852,17 @@ function RevealDistillationSection({
     locale,
     true,
   );
+  const supplementTotalText = localizedCountText(catalogueSupplementCount, locale);
   const distillNarrative = formatTemplate(copy.distilledTitleTemplate, {
     supplementSelectedText,
-    supplementTotalText: localizedCountText(catalogueSupplementCount, locale),
+    supplementTotalText,
   });
+  const resolvedDistillNarrative = revealSlotCopy(
+    result,
+    "distillNarrative",
+    locale,
+    distillNarrative,
+  );
 
   return (
     <section className="mn-reveal-distillation border-t border-[var(--mn-line)] py-24 text-center">
@@ -720,10 +871,16 @@ function RevealDistillationSection({
           <span className="mn-reveal-final-label-number">02</span>
           {copy.distilledEyebrow}
         </div>
-        <h2 className="mn-reveal-final-heading mx-auto mt-7 max-w-3xl text-[clamp(28px,3.6vw,44px)] leading-[1.2]" data-reveal>
-          {revealSlotCopy(result, "distillNarrative", locale, distillNarrative)}
+        <h2 className="mn-reveal-final-heading mx-auto mt-7 max-w-[720px] text-[clamp(28px,3.6vw,44px)] leading-[1.2]" data-reveal>
+          {renderDistillationTitle({
+            copy,
+            locale,
+            narrative: resolvedDistillNarrative,
+            selectedText: supplementSelectedText,
+            totalText: supplementTotalText,
+          })}
         </h2>
-        <div className="mn-reveal-distillation-pair mx-auto mt-16 flex flex-col items-center justify-center gap-8 sm:flex-row sm:gap-[clamp(30px,5vw,80px)]" data-reveal>
+        <div className="mn-reveal-distillation-pair mx-auto mb-10 mt-16 flex flex-col items-center justify-center gap-8 sm:flex-row sm:gap-[clamp(30px,5vw,80px)]" data-reveal>
           <div className="mn-reveal-distillation-count text-center">
             <div className="mn-reveal-distillation-number mn-reveal-distillation-number--from tabular-nums">
               <CountUpNumber active={true} duration={1100} value={catalogueSupplementCount} />
@@ -782,6 +939,12 @@ function RevealFormulaFinalSection({
   const formulaTitle = formatTemplate(copy.formulaTitleTemplate, {
     supplementSelectedText,
   });
+  const resolvedFormulaTitle = revealSlotCopy(
+    result,
+    "formulaTitle",
+    locale,
+    formulaTitle,
+  );
   const formulaLead = revealSlotCopy(
     result,
     "formulaLead",
@@ -810,29 +973,35 @@ function RevealFormulaFinalSection({
               <span className="mn-reveal-final-label-number">03</span>
               {copy.formulaEyebrow}
             </div>
-            <h2 className="mn-reveal-final-heading mt-4 text-[clamp(36px,4.4vw,56px)]">
-              {revealSlotCopy(result, "formulaTitle", locale, formulaTitle)}
+            <h2 className="mn-reveal-final-heading mt-4 text-[clamp(36px,4.4vw,56px)] leading-[1.05]">
+              {renderFormulaTitle({
+                copy,
+                locale,
+                selectedText: supplementSelectedText,
+                title: resolvedFormulaTitle,
+              })}
             </h2>
           </div>
           <p className="max-w-[520px] text-base leading-[1.7] text-[var(--mn-ink-soft)]">
             {formulaLead}
-            <span className="mt-3 block rounded-full bg-[var(--mn-mint)] px-4 py-2 text-sm font-semibold text-[var(--mn-teal-deep)]">
+            <span className="mn-reveal-formula-hint mt-3 inline-flex items-center gap-2 mn-reveal-font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--mn-teal)]">
+              <span aria-hidden={true} className="grid size-[18px] place-items-center rounded-full border border-[var(--mn-teal)] text-[11px] leading-none">
+                +
+              </span>
               {finalCopy.formulaHint}
             </span>
           </p>
         </div>
 
         <div className="mn-reveal-final-card mn-reveal-formula-card mt-14 px-5 py-8 sm:px-8 lg:px-12" data-reveal>
-          <div className="mn-reveal-formula-meta mb-2 grid gap-3 border-b border-[var(--mn-line)] pb-6 mn-reveal-font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--mn-ash)] sm:grid-cols-[1fr_auto] sm:items-center">
-            <div className="flex flex-col gap-3">
-              <span>{copy.formulaMetaTier}</span>
-              <span>
-                {catalogueSupplementCount} {copy.formulaMetaEvaluatedCount} ·{" "}
-                {ingredients.length} {copy.formulaMetaSelected}
-              </span>
-            </div>
+          <div className="mn-reveal-formula-meta mb-2 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--mn-line)] pb-6 mn-reveal-font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--mn-ash)]">
+            <span>{copy.formulaMetaTier}</span>
             <span className="mn-reveal-font-display text-[15px] font-medium italic normal-case tracking-normal text-[var(--mn-teal-deep)]">
               {copy.formulaMetaFocus}: {formulaFocus}
+            </span>
+            <span>
+              {catalogueSupplementCount} {copy.formulaMetaEvaluatedCount} ·{" "}
+              {ingredients.length} {copy.formulaMetaSelected}
             </span>
           </div>
 
@@ -1192,6 +1361,10 @@ function RevealProductsFinalSection({
     locale,
     true,
   );
+  const supplementSelectedTextLower = localizedCountText(
+    supplementSelectedCount,
+    locale,
+  );
   const productsTitle = productMatchingPending
     ? copy.productsPendingTitle
     : formatTemplate(
@@ -1271,7 +1444,16 @@ function RevealProductsFinalSection({
             {copy.productsEyebrow}
           </div>
           <h2 className="mn-reveal-final-heading mx-auto mt-4 max-w-[760px] text-[clamp(34px,4.2vw,54px)]">
-            {productsTitle}
+            {renderProductsTitle({
+              allCovered: coveredProductNeedCount >= supplementSelectedCount,
+              copy,
+              coveredText: coveredProductNeedText,
+              locale,
+              pending: productMatchingPending,
+              productSelectedText,
+              selectedTextLower: supplementSelectedTextLower,
+              title: productsTitle,
+            })}
           </h2>
           <p className="mx-auto mt-4 max-w-[580px] text-[15px] leading-[1.7] text-[var(--mn-ink-soft)]">
             {productMatchingPending

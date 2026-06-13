@@ -3210,9 +3210,9 @@
   }
 
   .mn-reveal-final-wrap {
-    width: min(100%, 1180px);
+    width: min(calc(100% - 2.5rem), 1180px);
     margin-inline: auto;
-    padding-inline: 1.25rem;
+    padding-inline: 0;
   }
 
   .mn-reveal-final .mn-reveal-brandbar {
@@ -3234,13 +3234,13 @@
 
   @media (min-width: 640px) {
     .mn-reveal-final-wrap {
-      padding-inline: 2rem;
+      width: min(calc(100% - 4rem), 1180px);
     }
   }
 
   @media (min-width: 1024px) {
     .mn-reveal-final-wrap {
-      padding-inline: 3.5rem;
+      width: min(calc(100% - 7rem), 1180px);
     }
   }
 
@@ -3307,7 +3307,7 @@
     font-family: var(--mn-font-display), Georgia, serif;
     font-weight: 400;
     line-height: 1.08;
-    text-wrap: balance;
+    text-wrap: normal;
   }
 
   :lang(th) .mn-reveal-final-heading,
@@ -3345,6 +3345,10 @@
   .mn-reveal-final-heading em {
     color: var(--mn-teal);
     font-style: italic;
+  }
+
+  .mn-reveal-final .mn-reveal-formula-hint {
+    line-height: 1.45;
   }
 
   .mn-reveal-final-card {
