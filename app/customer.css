@@ -3752,24 +3752,25 @@
     font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", var(--mn-font-body), ui-sans-serif, system-ui, sans-serif;
   }
 
-  .mn-reveal-final [class*="tracking-"] {
-    letter-spacing: 0 !important;
-  }
-
   .mn-reveal-final.mn-reveal-font-body,
   .mn-reveal-final .mn-reveal-font-body {
     font-family: var(--mn-font-body), var(--mn-font-thai), ui-sans-serif, system-ui, sans-serif;
-    letter-spacing: 0;
   }
 
   .mn-reveal-final .mn-reveal-font-display {
     font-family: var(--mn-font-display), Georgia, serif;
-    letter-spacing: 0;
   }
 
   .mn-reveal-final .mn-reveal-font-mono {
     font-family: var(--mn-font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-    letter-spacing: 0;
+  }
+
+  .mn-reveal-final .mn-reveal-track-hero-title {
+    letter-spacing: -0.03em;
+  }
+
+  .mn-reveal-final .mn-reveal-track-hero-copy {
+    letter-spacing: -0.015em;
   }
 
   .mn-reveal-final::before {
@@ -3814,10 +3815,10 @@
     color: var(--mn-teal);
     font-family: var(--mn-font-mono), ui-monospace, monospace;
     font-size: 0.6875rem;
-    font-weight: 600;
-    line-height: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
     text-transform: uppercase;
-    letter-spacing: 0;
+    letter-spacing: 0.32em;
   }
 
   .mn-reveal-hero-eyebrow::before,
@@ -3874,6 +3875,7 @@
     font-family: var(--mn-font-thai), var(--mn-font-body), ui-sans-serif, system-ui, sans-serif !important;
     font-style: normal !important;
     line-height: 1.24;
+    letter-spacing: 0 !important;
   }
 
   :lang(zh-CN) .mn-reveal-final-heading,
@@ -3882,6 +3884,7 @@
     font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", var(--mn-font-body), ui-sans-serif, system-ui, sans-serif !important;
     font-style: normal !important;
     line-height: 1.18;
+    letter-spacing: 0 !important;
   }
 
   :lang(th) .mn-reveal-final-label,

@@ -97,8 +97,14 @@ describe("final reveal UX", () => {
     assert.match(reveal, /className="mn-reveal-final mn-reveal-font-body w-full"/);
     assert.match(reveal, /mn-reveal-font-display/);
     assert.match(reveal, /mn-reveal-font-mono/);
+    assert.match(reveal, /mn-reveal-track-hero-title/);
+    assert.match(reveal, /mn-reveal-track-hero-copy/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-track-hero-title\s*\{[\s\S]*letter-spacing:\s*-0\.03em/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-track-hero-copy\s*\{[\s\S]*letter-spacing:\s*-0\.015em/);
+    assert.match(css, /\.mn-reveal-final-label\s*\{[\s\S]*letter-spacing:\s*0\.32em/);
     assert.doesNotMatch(reveal, /font-\[family:var\(--mn-font-/);
     assert.doesNotMatch(css, /\[class\*="font-\[family:var\(--mn-font-/);
+    assert.doesNotMatch(css, /\.mn-reveal-final \[class\*="tracking-"\]\s*\{[\s\S]*letter-spacing:\s*0\s*!important/);
     assert.match(css, /\.mn-reveal-final-label\s*\{[\s\S]*font-family:\s*var\(--mn-font-mono\)/);
     assert.match(css, /\.mn-reveal-final-heading\s*\{[\s\S]*font-family:\s*var\(--mn-font-display\)/);
     assert.match(css, /:lang\(th\) \.mn-reveal-final/);

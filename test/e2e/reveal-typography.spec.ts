@@ -38,14 +38,22 @@ test("final reveal renders the handoff fonts and hero eyebrow rules", async ({
   const headlineFont = await headline.evaluate(
     (element) => getComputedStyle(element).fontFamily,
   );
+  const headlineTracking = await headline.evaluate((element) =>
+    Number.parseFloat(getComputedStyle(element).letterSpacing),
+  );
   expect(headlineFont).toMatch(/Fraunces/i);
+  expect(headlineTracking).toBeLessThan(-3);
 
   const eyebrow = page.locator(".mn-reveal-hero-eyebrow").first();
   await expect(eyebrow).toBeVisible();
   const eyebrowFont = await eyebrow.evaluate(
     (element) => getComputedStyle(element).fontFamily,
   );
+  const eyebrowTracking = await eyebrow.evaluate((element) =>
+    Number.parseFloat(getComputedStyle(element).letterSpacing),
+  );
   expect(eyebrowFont).toMatch(/JetBrains Mono/i);
+  expect(eyebrowTracking).toBeGreaterThan(3);
 
   const ruleWidths = await eyebrow.evaluate((element) => {
     const before = getComputedStyle(element, "::before");

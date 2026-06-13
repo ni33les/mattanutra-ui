@@ -372,11 +372,11 @@ export function RevealFinalResultsPage({
               {copy.heroFor}
             </div>
           ) : null}
-          <h1 className="hero-rise hero-rise-d3 mt-3 mn-reveal-font-display text-[clamp(64px,10vw,132px)] font-normal italic leading-[0.98] tracking-normal text-[var(--mn-teal-deep)]">
+          <h1 className="hero-rise hero-rise-d3 mt-3 mn-reveal-font-display mn-reveal-track-hero-title text-[clamp(64px,10vw,132px)] font-normal italic leading-[0.98] text-[var(--mn-teal-deep)]">
             {firstName || copy.heroTitle}
             <span className="text-[var(--mn-gold)]">.</span>
           </h1>
-          <p className="hero-rise hero-rise-d4 mx-auto mt-8 max-w-[680px] mn-reveal-font-display text-[clamp(28px,3.6vw,44px)] font-normal leading-[1.18] tracking-normal text-[var(--mn-ink)]">
+          <p className="hero-rise hero-rise-d4 mx-auto mt-8 max-w-[680px] mn-reveal-font-display mn-reveal-track-hero-copy text-[clamp(28px,3.6vw,44px)] font-normal leading-[1.18] text-[var(--mn-ink)]">
             {revealSlotCopy(result, "heroHeadline", locale, copy.heroHeadline)}
           </p>
           <p className="hero-rise hero-rise-d5 mx-auto mt-7 max-w-[520px] text-[15px] leading-7 text-[var(--mn-ink-soft)]">
