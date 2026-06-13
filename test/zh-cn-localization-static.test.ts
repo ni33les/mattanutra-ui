@@ -262,10 +262,10 @@ describe("zh-CN localization guardrails", () => {
   });
 
   it("keeps Chinese formulation fallbacks out of Thai and English branches", () => {
-    const formulation = source("../components/formulation-results.tsx");
+    const formulation = source("../components/reveal-final-results.tsx");
 
     assert.match(formulation, /locale === "zh-CN"[\s\S]*?食物层面支持/);
-    assert.match(formulation, /locale === "zh-CN"[\s\S]*?copy\.formulaSignedPrefix/);
+    assert.match(formulation, /locale === "zh-CN"[\s\S]*?joinFoodSupportFormulaGapLabels/);
     assert.doesNotMatch(
       formulation,
       /locale === "en"[\s\S]{0,120}:[\s\n]*`\$\{copy\.formulaSignedPrefix\}สำหรับ/

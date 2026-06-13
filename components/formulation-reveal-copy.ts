@@ -466,6 +466,222 @@ export const revealFoodSupportPendingCards = {
   ],
 } satisfies Record<Locale, Array<{ body: string; title: string }>>;
 
+export const revealFinalCopy = {
+  en: {
+    addBack: "Add back",
+    alternatePharmacy: "Alternative",
+    assessmentCautions: "Cautions",
+    assessmentGoals: "Goals",
+    assessmentProfile: "Profile",
+    assessmentSymptoms: "Signals",
+    basketEmpty: "Select at least one product to continue",
+    basketSelected: "Basket items",
+    bestValue: "Best value",
+    brandFormula: "Formula",
+    checkout: "Checkout basket",
+    compactInfo:
+      "Compact reduces bottle count where the catalogue can still support your Right Amount.",
+    deliveryNote: "One payment, one parcel, pharmacy confirmed.",
+    fastest: "Fastest",
+    foodEmptyBody:
+      "The selected stack covers the formula gaps we can currently support with products. Keep meals steady and use Panya if you want a food-first reinforcement guide.",
+    foodEmptyTitle:
+      "Your stack covers the formula. Food remains optional reinforcement.",
+    foodCoverageTitle: "Coverage built across both",
+    foodNote:
+      "Coverage is built across both: products handle measured formula coverage, foods reinforce the gaps without changing the basket score.",
+    formulaHint: "Tap any nutrient to see the reasoning",
+    formulaMatch: "Formula match",
+    formulaMatchTooltip:
+      "How closely the selected products meet the doses in your formula, averaged across covered nutrients.",
+    khunAlt: "Khun Dream, Licensed Pharmacist at Delight Pharmacy, Chiang Mai",
+    khunCredentialOne: "Thai FDA registered",
+    khunCredentialThree: "Chiang Mai based",
+    khunCredentialTwo: "Every batch verified",
+    khunEyebrow: "Pharmacist verification",
+    khunName: "Khun Dream",
+    khunQuote:
+      "Every MattaNutra order passes my desk. I check the batch, the expiry, and the formula match before it ships. Your body deserves that.",
+    khunRole: "Licensed Pharmacist · Delight Pharmacy, Chiang Mai",
+    khunTitle: "Checked by Khun Dream before it leaves the pharmacy.",
+    lineGenerated: "Generated",
+    linePlan: "Plan",
+    nutrientDecision: "Decision",
+    nutrientSafety: "Safety",
+    nutrientWhy: "Why this, for you",
+    none: "None",
+    panyaButtonLead:
+      "Scan the QR or open LINE. The connect message is prefilled; tap send in LINE and Panya will recognise this plan.",
+    panyaCopied: "Copied",
+    panyaCopyCode: "Copy code",
+    panyaCreateCode: "Create new code",
+    panyaError: "Could not create a LINE code at this time.",
+    panyaExpires: "Code expires soon",
+    panyaLivingBody:
+      "Your plan is not meant to sit still. Use LINE to keep the conversation going as sleep, stress, travel, food, or symptoms change.",
+    panyaLivingHeading: "Ongoing nutrition support, connected to this plan.",
+    panyaLoading: "Creating code...",
+    panyaOpenLine: "Open LINE",
+    panyaPlanBody:
+      "Use LINE to ask about your formula, why each nutrient was selected, and how to move from this plan into your daily routine.",
+    panyaPlanHeading: "Talk through your nutrition plan with Panya.",
+    panyaQrAlt: "MattaNutra LINE connect QR code",
+    panyaQrPlaceholder: "Preparing your LINE QR...",
+    panyaSection: "Panya support",
+    pharmacyBody:
+      "All selected products are checked against your formula, stock data, serving burden, and the selected retailer before checkout.",
+    pharmacyTitle: "Sourced through the best available pharmacy match.",
+    productRemoved: "Removed",
+    remove: "Remove",
+    selectedPharmacy: "Selected pharmacy",
+    shelvesTrust:
+      "Verified dosing, clean enough labels, direct marketplace or pharmacy routing, and no unnecessary overlap.",
+    subtotal: "Subtotal"
+  },
+  th: {
+    addBack: "เพิ่มกลับ",
+    alternatePharmacy: "ตัวเลือกอื่น",
+    assessmentCautions: "ข้อควรระวัง",
+    assessmentGoals: "เป้าหมาย",
+    assessmentProfile: "โปรไฟล์",
+    assessmentSymptoms: "สัญญาณ",
+    basketEmpty: "เลือกสินค้าอย่างน้อยหนึ่งรายการเพื่อดำเนินการต่อ",
+    basketSelected: "สินค้าในตะกร้า",
+    bestValue: "คุ้มค่าที่สุด",
+    brandFormula: "สูตร",
+    checkout: "ชำระเงิน",
+    compactInfo:
+      "Compact ลดจำนวนขวดเมื่อแคตตาล็อกยังช่วยรองรับ Right Amount ของคุณได้",
+    deliveryNote: "ชำระครั้งเดียว จัดส่งหนึ่งพัสดุ ยืนยันโดยร้านขายยา",
+    fastest: "เร็วที่สุด",
+    foodEmptyBody:
+      "ชุดที่เลือกครอบคลุมช่องว่างของสูตรที่ผลิตภัณฑ์รองรับได้ในตอนนี้แล้ว ให้มื้ออาหารสม่ำเสมอ และคุยกับ Panya หากต้องการคู่มืออาหารเสริมเพิ่มเติม",
+    foodEmptyTitle:
+      "ชุดผลิตภัณฑ์ครอบคลุมสูตรแล้ว อาหารยังเป็นการเสริมทางเลือก",
+    foodCoverageTitle: "ความครอบคลุมเกิดจากทั้งสองด้าน",
+    foodNote:
+      "ความครอบคลุมเกิดจากทั้งสองด้าน: ผลิตภัณฑ์ดูแลตัวเลขสูตร ส่วนอาหารช่วยเสริมช่องว่างโดยไม่เปลี่ยนคะแนนตะกร้า",
+    formulaHint: "แตะสารอาหารเพื่อดูเหตุผล",
+    formulaMatch: "ความตรงกับสูตร",
+    formulaMatchTooltip:
+      "ความใกล้เคียงของผลิตภัณฑ์ที่เลือกกับขนาดในสูตร เฉลี่ยจากสารอาหารที่ครอบคลุม",
+    khunAlt: "คุณดรีม เภสัชกรประจำ Delight Pharmacy เชียงใหม่",
+    khunCredentialOne: "ขึ้นทะเบียน อย. ไทย",
+    khunCredentialThree: "ประจำเชียงใหม่",
+    khunCredentialTwo: "ตรวจทุกล็อต",
+    khunEyebrow: "ตรวจโดยเภสัชกร",
+    khunName: "คุณดรีม",
+    khunQuote:
+      "ทุกคำสั่งซื้อของ MattaNutra ผ่านโต๊ะของฉัน ฉันตรวจล็อต วันหมดอายุ และความตรงกับสูตรก่อนจัดส่ง ร่างกายของคุณสมควรได้รับการดูแลแบบนั้น",
+    khunRole: "เภสัชกร · Delight Pharmacy เชียงใหม่",
+    khunTitle: "คุณดรีมตรวจอีกครั้งก่อนออกจากร้านขายยา",
+    lineGenerated: "สร้างเมื่อ",
+    linePlan: "แผน",
+    nutrientDecision: "เหตุผลการเลือก",
+    nutrientSafety: "ความปลอดภัย",
+    nutrientWhy: "ทำไมจึงเหมาะกับคุณ",
+    none: "ไม่มี",
+    panyaButtonLead:
+      "สแกน QR หรือเปิด LINE ข้อความเชื่อมต่อจะถูกใส่ไว้ให้แล้ว กดส่งใน LINE แล้ว Panya จะรู้ว่าเป็นแผนนี้",
+    panyaCopied: "คัดลอกแล้ว",
+    panyaCopyCode: "คัดลอกรหัส",
+    panyaCreateCode: "สร้างรหัสใหม่",
+    panyaError: "ไม่สามารถสร้างรหัส LINE ได้ในขณะนี้",
+    panyaExpires: "รหัสจะหมดอายุเร็ว ๆ นี้",
+    panyaLivingBody:
+      "แผนของคุณไม่ควรหยุดนิ่ง ใช้ LINE เพื่อคุยต่อเมื่อการนอน ความเครียด การเดินทาง อาหาร หรืออาการเปลี่ยนไป",
+    panyaLivingHeading: "การดูแลโภชนาการต่อเนื่อง ที่เชื่อมกับแผนนี้",
+    panyaLoading: "กำลังสร้างรหัส...",
+    panyaOpenLine: "เปิด LINE",
+    panyaPlanBody:
+      "ใช้ LINE เพื่อถามเรื่องสูตรของคุณ เหตุผลที่เลือกสารอาหารแต่ละตัว และวิธีนำแผนนี้ไปใช้ในชีวิตประจำวัน",
+    panyaPlanHeading: "คุยเรื่องแผนโภชนาการของคุณกับ Panya",
+    panyaQrAlt: "คิวอาร์โค้ดเชื่อมต่อ LINE ของ MattaNutra",
+    panyaQrPlaceholder: "กำลังเตรียมคิวอาร์ LINE ของคุณ...",
+    panyaSection: "Panya support",
+    pharmacyBody:
+      "ผลิตภัณฑ์ที่เลือกถูกตรวจเทียบกับสูตร สต็อก จำนวนเสิร์ฟ และร้านค้าที่เลือกก่อนชำระเงิน",
+    pharmacyTitle: "จัดจากร้านขายยาที่เหมาะที่สุดในข้อมูลปัจจุบัน",
+    productRemoved: "นำออกแล้ว",
+    remove: "นำออก",
+    selectedPharmacy: "ร้านขายยาที่เลือก",
+    shelvesTrust:
+      "ขนาดที่ตรวจได้ ฉลากชัดเจน ลิงก์ซื้อหรือเส้นทางร้านขายยา และไม่ซ้ำซ้อนเกินจำเป็น",
+    subtotal: "ยอดรวม"
+  },
+  "zh-CN": {
+    addBack: "加回",
+    alternatePharmacy: "其他选择",
+    assessmentCautions: "注意事项",
+    assessmentGoals: "目标",
+    assessmentProfile: "档案",
+    assessmentSymptoms: "信号",
+    basketEmpty: "请至少选择一件产品继续",
+    basketSelected: "购物篮商品",
+    bestValue: "最优价格",
+    brandFormula: "配方",
+    checkout: "结账",
+    compactInfo:
+      "Compact 会在目录仍可支持你的 Right Amount 时减少瓶数。",
+    deliveryNote: "一次付款，一个包裹，由药房确认。",
+    fastest: "最快",
+    foodEmptyBody:
+      "所选组合已覆盖目前可由产品支持的配方缺口。饮食保持稳定即可；如需食物优先的强化指南，可联系 Panya。",
+    foodEmptyTitle:
+      "你的组合已覆盖配方。食物仍可作为可选强化。",
+    foodCoverageTitle: "覆盖来自两个层面",
+    foodNote:
+      "覆盖来自两个层面：产品负责可衡量的配方覆盖，食物强化缺口但不改变购物篮评分。",
+    formulaHint: "点开任一营养素查看理由",
+    formulaMatch: "配方匹配",
+    formulaMatchTooltip:
+      "所选产品与配方剂量的接近程度，按已覆盖营养素平均计算。",
+    khunAlt: "Khun Dream，清迈 Delight Pharmacy 执业药师",
+    khunCredentialOne: "泰国 FDA 注册",
+    khunCredentialThree: "清迈本地",
+    khunCredentialTwo: "每批次验证",
+    khunEyebrow: "药师核验",
+    khunName: "Khun Dream",
+    khunQuote:
+      "每一份 MattaNutra 订单都会经过我的桌面。我会在发货前检查批次、有效期和配方匹配。你的身体值得这样的确认。",
+    khunRole: "执业药师 · 清迈 Delight Pharmacy",
+    khunTitle: "离开药房前，由 Khun Dream 再次核验。",
+    lineGenerated: "生成",
+    linePlan: "方案",
+    nutrientDecision: "选择依据",
+    nutrientSafety: "安全",
+    nutrientWhy: "为什么适合你",
+    none: "无",
+    panyaButtonLead:
+      "扫描二维码或打开 LINE。连接消息会自动填好；在 LINE 中点发送后，Panya 会识别这份方案。",
+    panyaCopied: "已复制",
+    panyaCopyCode: "复制代码",
+    panyaCreateCode: "创建新代码",
+    panyaError: "目前无法创建 LINE 代码。",
+    panyaExpires: "代码即将过期",
+    panyaLivingBody:
+      "你的方案不应该停在页面上。当睡眠、压力、旅行、饮食或症状变化时，可通过 LINE 持续沟通。",
+    panyaLivingHeading: "与这份方案相连的持续营养支持。",
+    panyaLoading: "正在创建代码...",
+    panyaOpenLine: "打开 LINE",
+    panyaPlanBody:
+      "通过 LINE 询问你的配方、每种营养素被选择的原因，以及如何把这份方案融入日常生活。",
+    panyaPlanHeading: "和 Panya 一起讨论你的营养方案。",
+    panyaQrAlt: "MattaNutra LINE 连接二维码",
+    panyaQrPlaceholder: "正在准备你的 LINE 二维码...",
+    panyaSection: "Panya 支持",
+    pharmacyBody:
+      "结账前，每件所选产品都会根据你的配方、库存、服用负担和所选零售方进行核对。",
+    pharmacyTitle: "由当前最匹配的药房来源履约。",
+    productRemoved: "已移除",
+    remove: "移除",
+    selectedPharmacy: "已选药房",
+    shelvesTrust:
+      "验证剂量、清晰标签、购买或药房履约路径，以及避免不必要重叠。",
+    subtotal: "小计"
+  }
+} satisfies Record<Locale, Record<string, string>>;
+
 const benefitTagLabels: Record<Locale, Record<string, string>> = {
   en: {
     anti_inflammatory: "Anti inflammatory",

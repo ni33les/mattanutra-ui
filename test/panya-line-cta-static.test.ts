@@ -5,20 +5,20 @@ import { describe, it } from "node:test";
 describe("reveal Panya LINE CTA", () => {
   it("places Panya as a top-level reveal section instead of a checkout widget", async () => {
     const [reveal, cta, route, chatLinks, communications] = await Promise.all([
-      readFile("components/formulation-results.tsx", "utf8"),
+      readFile("components/reveal-final-results.tsx", "utf8"),
       readFile("components/living-protocol-line-cta.tsx", "utf8"),
       readFile("app/api/assessment/[planId]/line-connect/route.ts", "utf8"),
       readFile("lib/chat-links.ts", "utf8"),
       readFile("lib/communications.ts", "utf8"),
     ]);
 
-    assert.match(reveal, /function RevealPanyaLineSupportSection/);
+    assert.match(reveal, /function RevealPanyaFinalSection/);
     assert.match(reveal, /id="panya-support"/);
     assert.match(reveal, /source: "reveal_panya_support"/);
-    assert.match(reveal, /05 · \{labels\.eyebrow\}/);
-    assert.match(reveal, /06 · \{copy\.foodSupportEyebrow\}/);
-    assert.match(reveal, /bg-\[var\(--mn-cream\)\]/);
-    assert.match(reveal, /bg-\[var\(--mn-cream-deep\)\] py-20/);
+    assert.match(reveal, /finalCopy\.panyaSection/);
+    assert.match(reveal, /<RevealPanyaFinalSection/);
+    assert.match(reveal, /<RevealFoodSupportFinalSection/);
+    assert.match(reveal, /mn-reveal-panya border-t border-\[var\(--mn-line\)\] bg-\[var\(--mn-cream\)\] py-20/);
     assert.match(reveal, /panyaLineModeForPlan/);
     assert.match(reveal, /const qrUrl = useMemo/);
     assert.match(reveal, /copyConnectCode/);

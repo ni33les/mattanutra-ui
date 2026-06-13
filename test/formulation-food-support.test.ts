@@ -152,7 +152,7 @@ describe("formulation food support", () => {
 
   it("does not expose implementation fallback copy in the reveal empty state", async () => {
     const [reveal, copy] = await Promise.all([
-      readFile("components/formulation-results.tsx", "utf8"),
+      readFile("components/reveal-final-results.tsx", "utf8"),
       readFile("components/formulation-reveal-copy.ts", "utf8"),
     ]);
 
@@ -161,9 +161,9 @@ describe("formulation food support", () => {
       /Food cards are shown only when the selected stack leaves a supportable formula gap/,
     );
     assert.doesNotMatch(reveal, /foodSupportEmpty/);
-    assert.match(reveal, /copy\.foodSupportNoGapsHeadline/);
-    assert.match(reveal, /copy\.foodSupportNoGapsBody/);
-    assert.match(reveal, /\) : items\.length > 0 \? \(/);
+    assert.match(reveal, /finalCopy\.foodEmptyTitle/);
+    assert.match(reveal, /finalCopy\.foodEmptyBody/);
+    assert.match(reveal, /\) : foodCards\.length > 0 \? \(/);
     assert.doesNotMatch(
       reveal,
       /items\.length < 1 \? \([\s\S]*copy\.foodSupportNoGapsHeadline[\s\S]*copy\.foodSupportNoGapsBody[\s\S]*\) : \(/,
