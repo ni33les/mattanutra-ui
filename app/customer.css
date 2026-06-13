@@ -3796,6 +3796,23 @@
     padding-inline: 1.25rem;
   }
 
+  .mn-reveal-final .mn-reveal-brandbar {
+    min-height: 70px;
+  }
+
+  .mn-reveal-final .mn-reveal-brandmark {
+    box-shadow: 0 14px 34px rgb(28 60 48 / 0.12);
+  }
+
+  .mn-reveal-final .mn-reveal-brand-word {
+    letter-spacing: -0.01em;
+  }
+
+  .mn-reveal-final .mn-reveal-brand-tagline {
+    font-family: var(--mn-font-mono), ui-monospace, monospace;
+    letter-spacing: 0.22em;
+  }
+
   @media (min-width: 640px) {
     .mn-reveal-final-wrap {
       padding-inline: 2rem;
@@ -3819,6 +3836,11 @@
     line-height: 1.5;
     text-transform: uppercase;
     letter-spacing: 0.32em;
+  }
+
+  .mn-reveal-final .mn-reveal-hero-headline em {
+    color: var(--mn-teal);
+    font-style: italic;
   }
 
   .mn-reveal-hero-eyebrow::before,

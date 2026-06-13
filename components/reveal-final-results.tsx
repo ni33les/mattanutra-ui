@@ -127,6 +127,37 @@ function formatRevealEta(locale: Locale, etaDate: string | null | undefined) {
   return `ETA ${formatted}`;
 }
 
+function formatRevealBrandDate(
+  locale: Locale,
+  generatedAt: string,
+  fallback: string,
+) {
+  const date = new Date(generatedAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return fallback;
+  }
+
+  if (locale === "en") {
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      timeZone: "UTC",
+      year: "numeric",
+    })
+      .format(date)
+      .replace(/,/g, "")
+      .toUpperCase();
+  }
+
+  return new Intl.DateTimeFormat(localeHtmlLang(locale), {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(date);
+}
+
 function optionSubtotal(option: RevealRetailerOption) {
   const subtotal = Number(option.subtotalAmount);
 
@@ -183,6 +214,102 @@ function shortPlanId(planId: string) {
 
 function safeKey(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+
+function renderRevealHeroHeadline(
+  result: FormulationResult,
+  locale: Locale,
+  copy: typeof revealCopy.en,
+) {
+  const headline = revealSlotCopy(result, "heroHeadline", locale, copy.heroHeadline);
+
+  if (locale === "en" && headline === copy.heroHeadline) {
+    return (
+      <>
+        A formula built around{" "}
+        <em>your body, your goals,</em>
+        <br />
+        and the way you actually live.
+      </>
+    );
+  }
+
+  return headline;
+}
+
+function RevealBrandBar({
+  finalCopy,
+  formattedDate,
+  locale,
+  planId,
+}: Readonly<{
+  finalCopy: typeof revealFinalCopy.en;
+  formattedDate: string;
+  locale: Locale;
+  planId: string;
+}>) {
+  return (
+    <header className="mn-reveal-brandbar sticky top-0 z-50 border-b border-[rgb(221_218_207_/_0.6)] bg-[var(--mn-cream)]/80 backdrop-blur-md">
+      <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-6 px-5 py-4 sm:px-8 lg:px-14">
+        <Link
+          aria-label={finalCopy.brandHomeLabel}
+          className="flex items-center gap-3"
+          href={`/${locale}`}
+        >
+          <span
+            aria-hidden={true}
+            className="mn-reveal-brandmark flex size-9 items-center justify-center rounded-lg bg-[var(--mn-teal-deep)]"
+          >
+            <svg
+              className="size-5"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M12 3 C12 3 6 8 6 14 C6 17.3 8.7 20 12 20 C15.3 20 18 17.3 18 14 C18 8 12 3 12 3Z"
+                fill="#DCE9DE"
+                opacity=".9"
+              />
+              <path
+                d="M12 8 L12 20"
+                stroke="#1F6E58"
+                strokeLinecap="round"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M12 13 C12 13 9 11 7 12"
+                stroke="#1F6E58"
+                strokeLinecap="round"
+                strokeWidth="1.2"
+              />
+              <path
+                d="M12 15.5 C12 15.5 15 13.5 17 14.5"
+                stroke="#1F6E58"
+                strokeLinecap="round"
+                strokeWidth="1.2"
+              />
+            </svg>
+          </span>
+          <span>
+            <span className="mn-reveal-brand-word block mn-reveal-font-display text-[22px] font-semibold leading-none">
+              <span className="text-[var(--mn-ink)]">Matta</span>
+              <span className="text-[var(--mn-teal)]">Nutra</span>
+            </span>
+            <span className="mn-reveal-brand-tagline mt-1 block text-[10px] uppercase text-[var(--mn-ash)]">
+              {finalCopy.brandTagline}
+            </span>
+          </span>
+        </Link>
+        <div className="hidden items-center mn-reveal-font-mono text-[11px] tracking-[0.04em] text-[var(--mn-ash)] sm:flex">
+          <span className="live-dot mr-2 inline-block size-1.5 rounded-full bg-[var(--mn-teal)]" />
+          <span>
+            {finalCopy.brandFormula.toUpperCase()} · {shortPlanId(planId)} ·{" "}
+            {formattedDate}
+          </span>
+        </div>
+      </div>
+    </header>
+  );
 }
 
 function assessmentGroups(result: FormulationResult, locale: Locale) {
@@ -256,6 +383,7 @@ export function RevealFinalResultsPage({
     revealSlotCopy(result, "heroSub", locale, copy.heroSub),
     { supplementSelectedText },
   );
+  const brandDate = formatRevealBrandDate(locale, result.generatedAt, formattedDate);
   const heroMeta = revealHeroMetaItems(result, locale);
   const firstName =
     typeof result.firstName === "string" && result.firstName.trim()
@@ -282,21 +410,16 @@ export function RevealFinalResultsPage({
     <section className="mn-reveal-final mn-reveal-font-body w-full">
       <LandingReveal />
 
-      <div className="border-b border-[var(--mn-line)] bg-[var(--mn-cream)]/80 backdrop-blur-md">
-        <div className="mn-reveal-final-wrap flex flex-wrap items-center justify-between gap-3 py-4">
-          <div className="mn-reveal-font-mono text-[11px] tracking-[0.04em] text-[var(--mn-ash)]">
-            <span className="live-dot mr-2 inline-block size-1.5 rounded-full bg-[var(--mn-teal)] align-[2px]" />
-            {finalCopy.brandFormula} · {shortPlanId(planId)} · {formattedDate}
-          </div>
-          <div className="hidden mn-reveal-font-mono text-[11px] tracking-[0.12em] text-[var(--mn-ash)] sm:block">
-            {finalCopy.linePlan} {shortPlanId(planId)}
-          </div>
-        </div>
-      </div>
+      <RevealBrandBar
+        finalCopy={finalCopy}
+        formattedDate={brandDate}
+        locale={locale}
+        planId={planId}
+      />
 
       <section
         aria-label={copy.heroTitle}
-        className="relative flex min-h-[calc(100vh-8.75rem)] items-center justify-center overflow-hidden px-5 py-20 pb-32 text-center sm:px-8 lg:px-14"
+        className="relative flex min-h-[calc(100vh-70px)] items-center justify-center overflow-hidden px-5 py-20 pb-32 text-center sm:px-8 lg:px-14"
       >
         <div
           aria-hidden={true}
@@ -364,25 +487,25 @@ export function RevealFinalResultsPage({
         </svg>
 
         <div className="relative w-full max-w-[820px]">
-          <div className="hero-rise hero-rise-d1 mn-reveal-final-label mn-reveal-hero-eyebrow justify-center">
+          <div className="hero-rise hero-rise-d1 mb-9 mn-reveal-final-label mn-reveal-hero-eyebrow justify-center">
             {copy.heroEyebrow}
           </div>
           {firstName ? (
-            <div className="hero-rise hero-rise-d2 mt-9 mn-reveal-font-display text-[clamp(22px,2.4vw,28px)] font-light italic text-[var(--mn-ink-soft)]">
+            <div className="hero-rise hero-rise-d2 mb-3 mn-reveal-font-display text-[clamp(22px,2.4vw,28px)] font-light italic text-[var(--mn-ink-soft)]">
               {copy.heroFor}
             </div>
           ) : null}
-          <h1 className="hero-rise hero-rise-d3 mt-3 mn-reveal-font-display mn-reveal-track-hero-title text-[clamp(64px,10vw,132px)] font-normal italic leading-[0.98] text-[var(--mn-teal-deep)]">
+          <h1 className="hero-rise hero-rise-d3 mb-8 mn-reveal-font-display mn-reveal-track-hero-title text-[clamp(64px,10vw,132px)] font-normal italic leading-[0.98] text-[var(--mn-teal-deep)]">
             {firstName || copy.heroTitle}
             <span className="text-[var(--mn-gold)]">.</span>
           </h1>
-          <p className="hero-rise hero-rise-d4 mx-auto mt-8 max-w-[680px] mn-reveal-font-display mn-reveal-track-hero-copy text-[clamp(28px,3.6vw,44px)] font-normal leading-[1.18] text-[var(--mn-ink)]">
-            {revealSlotCopy(result, "heroHeadline", locale, copy.heroHeadline)}
+          <p className="hero-rise hero-rise-d4 mx-auto mb-7 max-w-[680px] mn-reveal-font-display mn-reveal-hero-headline mn-reveal-track-hero-copy text-[clamp(28px,3.6vw,44px)] font-normal leading-[1.18] text-[var(--mn-ink)]">
+            {renderRevealHeroHeadline(result, locale, copy)}
           </p>
-          <p className="hero-rise hero-rise-d5 mx-auto mt-7 max-w-[520px] text-[15px] leading-7 text-[var(--mn-ink-soft)]">
+          <p className="hero-rise hero-rise-d5 mx-auto mb-14 max-w-[480px] text-[15px] leading-7 text-[var(--mn-ink-soft)]">
             {heroSub}
           </p>
-          <div className="hero-rise hero-rise-d6 mx-auto mt-12 inline-flex max-w-full flex-wrap items-center justify-center gap-3 rounded-full border border-[var(--mn-line)] bg-white/50 px-[22px] py-3 mn-reveal-font-mono text-[11px] tracking-[0.06em] text-[var(--mn-ink-soft)] backdrop-blur-md">
+          <div className="hero-rise hero-rise-d6 mx-auto inline-flex max-w-full flex-wrap items-center justify-center gap-3 rounded-full border border-[var(--mn-line)] bg-white/50 px-[22px] py-3 mn-reveal-font-mono text-[11px] tracking-[0.06em] text-[var(--mn-ink-soft)] backdrop-blur-md">
             {heroMeta.length > 0
               ? heroMeta.map((item, index) => (
                   <span className="inline-flex items-center gap-3" key={`${item}:${index}`}>

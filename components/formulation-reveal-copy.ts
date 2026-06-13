@@ -106,7 +106,7 @@ const baseRevealCopy = {
     heroMetaGenerated: "Generated",
     heroMetaPlan: "Plan ID",
     heroSub:
-      "No guesswork. No pharmacy aisle confusion. {supplementSelectedText} nutrients, chosen with intention, paired with the exact products to buy.",
+      "{supplementSelectedText} nutrients, chosen with intention, sourced and delivered through our verified Chiang Mai pharmacy partner — one payment, one parcel.",
     personalizationBody:
       "Your formula begins with who you are. Body, location, the goals that actually matter to you, and the constraints we honour without compromise.",
     personalizationEyebrow: "Built from your assessment",
@@ -219,7 +219,7 @@ const baseRevealCopy = {
     heroMetaGenerated: "สร้างเมื่อ",
     heroMetaPlan: "รหัสแผน",
     heroSub:
-      "ไม่ใช่การเดา ไม่ใช่การหยิบจากชั้นวางแบบสุ่ม สารอาหาร {supplementSelectedText} รายการถูกเลือกอย่างตั้งใจ แล้วจับคู่กับผลิตภัณฑ์ที่ซื้อได้จริงเมื่อข้อมูลรองรับ",
+      "สารอาหาร {supplementSelectedText} รายการ ถูกเลือกอย่างตั้งใจ จัดหาและส่งผ่านพาร์ทเนอร์ร้านขายยาที่ตรวจสอบแล้วในเชียงใหม่ ชำระครั้งเดียว รับหนึ่งพัสดุ",
     personalizationBody:
       "สูตรนี้เริ่มจากตัวคุณ ทั้งข้อมูลร่างกาย ที่อยู่ เป้าหมายที่สำคัญจริง และข้อจำกัดที่ต้องเคารพอย่างจริงจัง",
     personalizationEyebrow: "สร้างจากแบบประเมินของคุณ",
@@ -327,7 +327,7 @@ export const revealCopy = {
     "heroHeadline": "根据您的身体、目标以及实际生活方式打造的配方。",
     "heroMetaGenerated": "生成于",
     "heroMetaPlan": "计划 ID",
-    "heroSub": "无需猜测。无需药房货架困惑。{supplementSelectedText} 种营养素，精心挑选，并搭配确切的购买产品。",
+    "heroSub": "{supplementSelectedText} 种营养素，精心挑选，并通过我们已验证的清迈药房合作伙伴采购和配送。一次付款，一个包裹。",
     "personalizationBody": "您的配方始于您是谁。身体、位置、对您真正重要的目标，以及我们毫不妥协地尊重的限制。",
     "personalizationEyebrow": "基于您的评估打造",
     "personalizationTitle": "将您告知的一切融入一个计划。",
@@ -478,6 +478,8 @@ export const revealFinalCopy = {
     basketSelected: "Basket items",
     bestValue: "Best value",
     brandFormula: "Formula",
+    brandHomeLabel: "MattaNutra home",
+    brandTagline: "Know the right amount",
     checkout: "Checkout basket",
     compactInfo:
       "Compact reduces bottle count where the catalogue can still support your Right Amount.",
@@ -549,6 +551,8 @@ export const revealFinalCopy = {
     basketSelected: "สินค้าในตะกร้า",
     bestValue: "คุ้มค่าที่สุด",
     brandFormula: "สูตร",
+    brandHomeLabel: "หน้าแรก MattaNutra",
+    brandTagline: "รู้ปริมาณที่พอดี",
     checkout: "ชำระเงิน",
     compactInfo:
       "Compact ลดจำนวนขวดเมื่อแคตตาล็อกยังช่วยรองรับ Right Amount ของคุณได้",
@@ -620,6 +624,8 @@ export const revealFinalCopy = {
     basketSelected: "购物篮商品",
     bestValue: "最优价格",
     brandFormula: "配方",
+    brandHomeLabel: "MattaNutra 首页",
+    brandTagline: "知道真正合适的量",
     checkout: "结账",
     compactInfo:
       "Compact 会在目录仍可支持你的 Right Amount 时减少瓶数。",

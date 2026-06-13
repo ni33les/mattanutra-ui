@@ -22,6 +22,10 @@ const layout = readFileSync(
   new URL("../app/[locale]/layout.tsx", import.meta.url),
   "utf8",
 );
+const route = readFileSync(
+  new URL("../app/[locale]/nutrition/reveal/page.tsx", import.meta.url),
+  "utf8",
+);
 const khunDream = new URL(
   "../public/reveal/khun_dream.webp",
   import.meta.url,
@@ -44,6 +48,23 @@ describe("final reveal UX", () => {
     assert.match(wrapper, /productCoveragePending=\{productCoveragePending\}/);
     assert.match(wrapper, /selectedProductStackPreference=/);
     assert.match(wrapper, /onProductStackPollingStart=\{startProductStackPolling\}/);
+  });
+
+  it("uses reveal-native chrome for the successful paid reveal route", () => {
+    const successReturnStart = route.indexOf(
+      "  return (",
+      route.indexOf("const initialResult"),
+    );
+    const successReturnEnd = route.indexOf("</main>", successReturnStart);
+    const successReturn = route.slice(successReturnStart, successReturnEnd);
+
+    assert.match(successReturn, /<FormulationResults/);
+    assert.doesNotMatch(successReturn, /<TitleBar/);
+    assert.match(reveal, /function RevealBrandBar/);
+    assert.match(reveal, /className="mn-reveal-brandbar/);
+    assert.match(reveal, /mn-reveal-brand-word/);
+    assert.match(reveal, /mn-reveal-brand-tagline/);
+    assert.match(reveal, /min-h-\[calc\(100vh-70px\)\]/);
   });
 
   it("keeps the final handoff section order", () => {
@@ -94,6 +115,8 @@ describe("final reveal UX", () => {
     assert.match(css, /\.mn-reveal-final \.mn-reveal-font-body\s*\{[\s\S]*font-family:\s*var\(--mn-font-body\)/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-font-display\s*\{[\s\S]*font-family:\s*var\(--mn-font-display\)/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-font-mono\s*\{[\s\S]*font-family:\s*var\(--mn-font-mono\)/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-brand-word\s*\{[\s\S]*letter-spacing:\s*-0\.01em/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-brand-tagline\s*\{[\s\S]*letter-spacing:\s*0\.22em/);
     assert.match(reveal, /className="mn-reveal-final mn-reveal-font-body w-full"/);
     assert.match(reveal, /mn-reveal-font-display/);
     assert.match(reveal, /mn-reveal-font-mono/);
@@ -107,6 +130,9 @@ describe("final reveal UX", () => {
     assert.doesNotMatch(css, /\.mn-reveal-final \[class\*="tracking-"\]\s*\{[\s\S]*letter-spacing:\s*0\s*!important/);
     assert.match(css, /\.mn-reveal-final-label\s*\{[\s\S]*font-family:\s*var\(--mn-font-mono\)/);
     assert.match(css, /\.mn-reveal-final-heading\s*\{[\s\S]*font-family:\s*var\(--mn-font-display\)/);
+    assert.match(reveal, /renderRevealHeroHeadline/);
+    assert.match(reveal, /mn-reveal-hero-headline/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-hero-headline em\s*\{[\s\S]*color:\s*var\(--mn-teal\)/);
     assert.match(css, /:lang\(th\) \.mn-reveal-final/);
     assert.match(css, /:lang\(zh-CN\) \.mn-reveal-final/);
   });
