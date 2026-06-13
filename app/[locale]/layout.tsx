@@ -36,7 +36,10 @@ const bodyFont = DM_Sans({
 const displayFont = Fraunces({
   subsets: ["latin"],
   variable: "--mn-font-display",
-  display: "swap"
+  display: "swap",
+  style: ["normal", "italic"],
+  weight: "variable",
+  axes: ["opsz"]
 });
 
 const monoFont = JetBrains_Mono({

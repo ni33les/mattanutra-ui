@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Inter, Playfair_Display } from "next/font/google";
 import { notFound } from "next/navigation";
 import {
   AlertTriangle,
@@ -75,20 +74,6 @@ type HealthScoreConfirmationContext = Readonly<{
   evaluatedIngredientCount?: number;
   selectedIngredientCount?: number;
 }>;
-
-const confirmationBodyFont = Inter({
-  subsets: ["latin"],
-  variable: "--mn-payment-font-body",
-  display: "swap",
-  weight: ["400", "500", "600"]
-});
-
-const confirmationDisplayFont = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--mn-payment-font-display",
-  display: "swap",
-  weight: ["400", "600", "700"]
-});
 
 const copy = {
   en: {
@@ -783,9 +768,7 @@ export default async function PaymentReturnPage({
         variant="landing"
       />
       <main className="flex flex-1 items-center justify-center px-6 py-[60px]">
-        <div
-          className={`${confirmationBodyFont.variable} ${confirmationDisplayFont.variable} w-full max-w-[520px] [--mn-font-body:var(--mn-payment-font-body)] [--mn-font-display:var(--mn-payment-font-display)] font-[family:var(--mn-font-body),Inter,sans-serif]`}
-        >
+        <div className="w-full max-w-[520px] mn-font-body">
           <article
             className="mb-3.5 overflow-hidden rounded-[18px] bg-white px-8 py-10 text-center"
           >

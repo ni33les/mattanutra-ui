@@ -8,7 +8,7 @@ export function LegalDocument({ content }: LegalDocumentProps) {
   return (
     <article className="mx-auto w-full max-w-4xl px-6 py-12 sm:px-8 sm:py-16">
       <div className="rounded-[var(--mn-radius-lg)] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-card)] ring-1 ring-[var(--mn-line)] sm:p-10">
-        <p className="font-[family:var(--mn-font-mono)] text-sm font-semibold uppercase tracking-[0.16em] text-[var(--mn-gold)]">
+        <p className="mn-font-mono text-sm font-semibold uppercase tracking-[0.16em] text-[var(--mn-gold)]">
           {content.eyebrow}
         </p>
         <h1 className="mn-hero-title mt-3 text-4xl font-semibold tracking-normal text-[var(--mn-ink)] text-balance sm:text-5xl">

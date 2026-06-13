@@ -33,9 +33,10 @@ describe("assessment payment confirmation page", () => {
     assert.match(assessmentReturnPage, /mn-customer-shell/);
     assert.match(assessmentReturnPage, /<TitleBar/);
     assert.match(assessmentReturnPage, /variant="landing"/);
-    assert.match(assessmentReturnPage, /Playfair_Display/);
-    assert.match(assessmentReturnPage, /--mn-payment-font-display/);
-    assert.match(assessmentReturnPage, /--mn-font-display:var\(--mn-payment-font-display\)/);
+    assert.match(assessmentReturnPage, /className="w-full max-w-\[520px\] mn-font-body"/);
+    assert.doesNotMatch(assessmentReturnPage, /from "next\/font\/google"/);
+    assert.doesNotMatch(assessmentReturnPage, /Playfair_Display|Inter\(/);
+    assert.doesNotMatch(assessmentReturnPage, /--mn-payment-font-/);
     assert.match(assessmentReturnPage, /font-serif text-\[30px\]/);
     assert.doesNotMatch(assessmentReturnPage, /<style>|<\/style>|class="hero-card"|class="steps-card"|class="cta-btn"/i);
     assert.doesNotMatch(assessmentReturnPage, /function PaymentConfirmationHeader|logoSubtitle|Free Assessment|Pricing/);

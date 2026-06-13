@@ -59,7 +59,7 @@ export function LanguageSwitcher({
             href={next}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "px-3 py-1.5 font-[family:var(--mn-font-body)] text-xs font-semibold uppercase tracking-normal transition",
+              "px-3 py-1.5 mn-font-body text-xs font-semibold uppercase tracking-normal transition",
               isCjkLocale(locale) && "normal-case tracking-normal",
               isActive
                 ? "bg-[var(--mn-ink)] text-[var(--mn-paper)] shadow-sm"

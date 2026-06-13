@@ -32,6 +32,7 @@ test("final reveal renders the handoff fonts and hero eyebrow rules", async ({
 
   await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".mn-reveal-final", { state: "visible" });
+  await page.evaluate(() => document.fonts.ready);
   await expect(page.locator(".mn-titlebar")).toHaveCount(0);
   await expect(page.locator(".mn-reveal-brandbar")).toBeVisible();
 
@@ -43,8 +44,28 @@ test("final reveal renders the handoff fonts and hero eyebrow rules", async ({
   const headlineTracking = await headline.evaluate((element) =>
     Number.parseFloat(getComputedStyle(element).letterSpacing),
   );
+  const headlineStyle = await headline.evaluate(
+    (element) => getComputedStyle(element).fontStyle,
+  );
+  const frauncesFaces = await page.evaluate(() =>
+    Array.from(document.fonts)
+      .filter((face) => /Fraunces/i.test(face.family))
+      .map((face) => ({
+        family: face.family,
+        status: face.status,
+        style: face.style,
+        weight: face.weight,
+      })),
+  );
+
   expect(headlineFont).toMatch(/Fraunces/i);
+  expect(headlineStyle).toBe("italic");
   expect(headlineTracking).toBeLessThan(-3);
+  expect(
+    frauncesFaces.some(
+      (face) => face.status === "loaded" && face.style === "italic",
+    ),
+  ).toBe(true);
 
   const eyebrow = page.locator(".mn-reveal-hero-eyebrow").first();
   await expect(eyebrow).toBeVisible();
@@ -71,6 +92,10 @@ test("final reveal renders the handoff fonts and hero eyebrow rules", async ({
   expect(ruleWidths.after).toBeGreaterThan(20);
   await expect(page.locator(".mn-reveal-hero-headline em")).toBeVisible();
   await expect(page.locator(".mn-reveal-pharmacist.ink-section")).toBeVisible();
+  await page.screenshot({
+    fullPage: false,
+    path: "test-results/reveal-typography-smoke.png",
+  });
   expect(
     stylesheetResponses.some(
       (response) =>

@@ -311,7 +311,7 @@ export function StripeCheckoutPanel({
   if (!hasStripePublishableKey) {
     if (isMockCheckout && paymentId) {
       return (
-        <div className="mn-v11-card">
+        <div className="mn-commerce-card">
           <p className="mb-5 text-sm leading-6 text-[var(--mn-ink-soft)]">
             {labels.mockIntro}
           </p>
@@ -335,7 +335,7 @@ export function StripeCheckoutPanel({
     }
 
     return (
-      <div className="mn-v11-card">
+      <div className="mn-commerce-card">
         <p className="mb-5 text-sm leading-6 text-[var(--mn-ink-soft)]">
           {labels.mockIntro}
         </p>
@@ -368,7 +368,7 @@ export function StripeCheckoutPanel({
 
   if (!hasValidStripePublishableKey) {
     return (
-      <div className="mn-v11-card">
+      <div className="mn-commerce-card">
         <p className="mb-4 rounded-lg bg-[var(--mn-error-soft)] p-3 text-sm font-semibold text-[var(--mn-error)]">
           {labels.configError}
         </p>
@@ -377,7 +377,7 @@ export function StripeCheckoutPanel({
   }
 
   return (
-    <div className="mn-v11-card">
+    <div className="mn-commerce-card">
       <div className="mb-5 flex items-center justify-between gap-4">
         <p className="mn-mono-label text-xs font-bold uppercase tracking-[0.16em] text-[var(--mn-teal-deep)]">
           {labels.loading}

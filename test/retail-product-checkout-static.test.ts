@@ -26,6 +26,14 @@ const revealPage = readFileSync(
   new URL("../components/formulation-results.tsx", import.meta.url),
   "utf8"
 );
+const revealFinalPage = readFileSync(
+  new URL("../components/reveal-final-results.tsx", import.meta.url),
+  "utf8"
+);
+const revealCopy = readFileSync(
+  new URL("../components/formulation-reveal-copy.ts", import.meta.url),
+  "utf8"
+);
 
 describe("retail product checkout static contracts", () => {
   it("keeps order-number and legacy token tracking compatibility", () => {
@@ -66,14 +74,17 @@ describe("retail product checkout static contracts", () => {
   });
 
   it("carries a clicked reveal pharmacy option into checkout routing", () => {
-    assert.match(revealPage, /setRetailerSelection/);
-    assert.match(revealPage, /params\.set\("retailer", selectedRetailerOrganisationId\)/);
-    assert.match(revealPage, /formatRevealEta\(locale, option\.etaDate\)/);
-    assert.match(revealPage, /bestValueRetailerOrganisationId/);
-    assert.match(revealPage, /fastestRetailerOrganisationId/);
-    assert.match(revealPage, /Best Value/);
-    assert.match(revealPage, /Fastest/);
-    assert.doesNotMatch(revealPage, /\{option\.productCount \?\? 0\} products/);
+    assert.match(revealPage, /<RevealFinalResultsPage/);
+    assert.match(revealFinalPage, /setRetailerSelection/);
+    assert.match(revealFinalPage, /params\.set\("retailer", selectedRetailerOrganisationId\)/);
+    assert.match(revealFinalPage, /formatRevealEta\(locale, option\.etaDate\)/);
+    assert.match(revealFinalPage, /bestValueRetailerOrganisationId/);
+    assert.match(revealFinalPage, /fastestRetailerOrganisationId/);
+    assert.match(revealFinalPage, /finalCopy\.bestValue/);
+    assert.match(revealFinalPage, /finalCopy\.fastest/);
+    assert.match(revealCopy, /bestValue: "Best value"/);
+    assert.match(revealCopy, /fastest: "Fastest"/);
+    assert.doesNotMatch(revealFinalPage, /\{option\.productCount \?\? 0\} products/);
     assert.match(checkoutPage, /query\.retailer/);
     assert.match(checkoutPage, /selectedRetailerOrganisationId=\{selectedRetailerOrganisationId\}/);
     assert.match(checkoutPanel, /selectedRetailerOrganisationId/);

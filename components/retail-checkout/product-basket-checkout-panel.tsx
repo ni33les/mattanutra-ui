@@ -786,13 +786,13 @@ export function ProductBasketCheckoutPanel({
     <div className="pb-32 lg:pb-0">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="space-y-5">
-          <section className="mn-v11-card">
+          <section className="mn-commerce-card">
             <h2 className="font-serif text-3xl font-medium text-[var(--mn-ink)]">
               {labels.title}
             </h2>
           </section>
 
-          <section className="mn-v11-card" aria-labelledby="checkout-contact">
+          <section className="mn-commerce-card" aria-labelledby="checkout-contact">
             <h3
               className="font-serif text-2xl font-medium text-[var(--mn-ink)]"
               id="checkout-contact"
@@ -806,7 +806,7 @@ export function ProductBasketCheckoutPanel({
             </div>
           </section>
 
-          <section className="mn-v11-card" aria-labelledby="checkout-delivery">
+          <section className="mn-commerce-card" aria-labelledby="checkout-delivery">
             <h3
               className="font-serif text-2xl font-medium text-[var(--mn-ink)]"
               id="checkout-delivery"
@@ -885,7 +885,7 @@ export function ProductBasketCheckoutPanel({
             </div>
           </section>
 
-          <section className="mn-v11-card" aria-labelledby="checkout-shipping">
+          <section className="mn-commerce-card" aria-labelledby="checkout-shipping">
             <h3
               className="font-serif text-2xl font-medium text-[var(--mn-ink)]"
               id="checkout-shipping"
@@ -916,7 +916,7 @@ export function ProductBasketCheckoutPanel({
             </div>
           </section>
 
-          <section className="mn-v11-card" aria-labelledby="checkout-payment">
+          <section className="mn-commerce-card" aria-labelledby="checkout-payment">
             <h3
               className="font-serif text-2xl font-medium text-[var(--mn-ink)]"
               id="checkout-payment"

@@ -381,7 +381,7 @@ function HealthScoreProgress({
   return (
     <div
       aria-label="HealthScore assessment progress"
-      className="mx-auto flex w-full max-w-3xl items-center justify-center gap-1.5 font-[family:var(--mn-font-mono)] text-[0.68rem]"
+      className="mx-auto flex w-full max-w-3xl items-center justify-center gap-1.5 mn-font-mono text-[0.68rem]"
     >
       {copy.progress.map(([title, body], index) => {
         const complete = index === 0;
@@ -462,7 +462,7 @@ function ScoreSpectrum({
           className="absolute top-2 h-10 w-px bg-[var(--mn-ink-soft)]"
           style={{ left: `${medianMarker}%` }}
         >
-          <span className="absolute bottom-[-1.35rem] left-1/2 -translate-x-1/2 whitespace-nowrap font-[family:var(--mn-font-mono)] text-[0.58rem] text-[var(--mn-ink-soft)]">
+          <span className="absolute bottom-[-1.35rem] left-1/2 -translate-x-1/2 whitespace-nowrap mn-font-mono text-[0.58rem] text-[var(--mn-ink-soft)]">
             {copy.spectrumTypical} · {median}
           </span>
         </div>
@@ -470,16 +470,16 @@ function ScoreSpectrum({
           className="absolute top-0 h-12 w-0.5 bg-[var(--mn-teal-deep)]"
           style={{ left: `${marker}%` }}
         >
-          <span className="absolute top-[-1.35rem] left-1/2 -translate-x-1/2 whitespace-nowrap font-[family:var(--mn-font-mono)] text-[0.62rem] font-bold text-[var(--mn-teal-deep)]">
+          <span className="absolute top-[-1.35rem] left-1/2 -translate-x-1/2 whitespace-nowrap mn-font-mono text-[0.62rem] font-bold text-[var(--mn-teal-deep)]">
             {copy.spectrumYou} · {score}
           </span>
         </div>
       </div>
-      <div className="mt-6 flex justify-between font-[family:var(--mn-font-mono)] text-[0.62rem] text-[var(--mn-ash-soft)]">
+      <div className="mt-6 flex justify-between mn-font-mono text-[0.62rem] text-[var(--mn-ash-soft)]">
         <span>{copy.spectrumStart}</span>
         <span>{copy.spectrumEnd}</span>
       </div>
-      <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 font-[family:var(--mn-font-mono)] text-[0.68rem] text-[var(--mn-ash)]">
+      <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 mn-font-mono text-[0.68rem] text-[var(--mn-ash)]">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2 w-3.5 rounded-sm bg-[var(--mn-teal-deep)]" />
           {copy.spectrumWhere}
@@ -542,7 +542,7 @@ function HealthScoreHero({
       <HealthScoreProgress locale={locale} />
       <div className="mx-auto max-w-5xl pt-10 sm:pt-14">
         <RevealBlock>
-          <p className="font-[family:var(--mn-font-mono)] text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
+          <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
             {copy.heroEyebrow}
           </p>
         </RevealBlock>
@@ -578,11 +578,11 @@ function HealthScoreHero({
             ref={scoreRef}
           >
             <div className="flex flex-wrap items-center justify-center gap-2">
-              <span className="rounded-full bg-[var(--mn-gold-tint)] px-3 py-1.5 font-[family:var(--mn-font-mono)] text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-[#8a6d23]">
+              <span className="rounded-full bg-[var(--mn-gold-tint)] px-3 py-1.5 mn-font-mono text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-[#8a6d23]">
                 {displayBand(result.band, locale)}
               </span>
               {percentile !== null ? (
-                <span className="rounded-full bg-[var(--mn-mint)] px-3 py-1.5 font-[family:var(--mn-font-mono)] text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
+                <span className="rounded-full bg-[var(--mn-mint)] px-3 py-1.5 mn-font-mono text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
                   {percentile >= 80
                     ? copy.topTier
                     : `${copy.percentile}: ${percentile}`}
@@ -597,7 +597,7 @@ function HealthScoreHero({
                 duration={1100}
                 value={score}
               />
-              <span className="mt-4 font-[family:var(--mn-font-mono)] text-[clamp(1.25rem,4vw,2.1rem)] font-semibold text-[var(--mn-ash-soft)]">
+              <span className="mt-4 mn-font-mono text-[clamp(1.25rem,4vw,2.1rem)] font-semibold text-[var(--mn-ash-soft)]">
                 {copy.scoreOutOf}
               </span>
             </div>
@@ -651,7 +651,7 @@ function GapCards({
   return (
     <section className="pt-2" id="signals">
       <RevealBlock className="max-w-[60ch]">
-        <p className="font-[family:var(--mn-font-mono)] text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
+        <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
           {copy.scoreMeaningEyebrow(score)}
         </p>
         <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">
@@ -678,7 +678,7 @@ function GapCards({
               key={`${card.tag}-${card.value}-${index}`}
             >
               <article className="relative h-full rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-soft)] motion-safe:transition motion-safe:duration-300 motion-safe:hover:-translate-y-1">
-                <span className="font-[family:var(--mn-font-mono)] text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-[var(--mn-ash-soft)]">
+                <span className="mn-font-mono text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-[var(--mn-ash-soft)]">
                   {tag}
                 </span>
                 <div className="mt-2 font-serif text-4xl font-medium leading-none text-[var(--mn-teal-deep)]">
@@ -759,7 +759,7 @@ function PillarBars({
   return (
     <section>
       <RevealBlock className="max-w-[60ch]">
-        <p className="font-[family:var(--mn-font-mono)] text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
+        <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
           {copy.pillarEyebrow}
         </p>
         <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">
@@ -791,7 +791,7 @@ function PillarBars({
                       {pillarTag ? (
                         <span
                           className={cx(
-                            "w-fit rounded-full bg-[var(--mn-mint)] px-2 py-0.5 font-[family:var(--mn-font-mono)] text-[0.58rem] font-semibold text-[var(--mn-teal-deep)]",
+                            "w-fit rounded-full bg-[var(--mn-mint)] px-2 py-0.5 mn-font-mono text-[0.58rem] font-semibold text-[var(--mn-teal-deep)]",
                             locale === "en" && "uppercase tracking-[0.12em]",
                           )}
                         >
@@ -811,7 +811,7 @@ function PillarBars({
                       style={{ width: visible ? `${clamp(pillar.value)}%` : 0 }}
                     />
                   </div>
-                  <span className="font-[family:var(--mn-font-mono)] text-sm font-semibold text-[var(--mn-ink)] sm:text-right">
+                  <span className="mn-font-mono text-sm font-semibold text-[var(--mn-ink)] sm:text-right">
                     {pillar.value}
                   </span>
                 </div>
@@ -902,7 +902,7 @@ function FindingsSection({
   return (
     <section>
       <RevealBlock className="max-w-[60ch]">
-        <p className="font-[family:var(--mn-font-mono)] text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
+        <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
           {page?.copySeeds.findingsMode === "strengths"
             ? copy.pillarsEyebrow
             : copy.whatCaught}
@@ -1016,7 +1016,7 @@ function SubtractionBeat({
           className="rounded-3xl border border-[var(--mn-line)] bg-[linear-gradient(160deg,var(--mn-paper),var(--mn-cream-deep))] px-5 py-12 text-center shadow-[var(--mn-shadow-soft)] sm:px-10"
           ref={ref}
         >
-          <p className="font-[family:var(--mn-font-mono)] text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
+          <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
             {copy.subtractionEyebrow}
           </p>
           <div className="mt-6 grid gap-5 sm:flex sm:items-end sm:justify-center sm:gap-x-7 lg:gap-x-12">
@@ -1042,7 +1042,7 @@ function SubtractionBeat({
                   />
                   <p
                     className={cx(
-                      "mt-2 max-w-[11rem] text-center font-[family:var(--mn-font-mono)] text-[0.68rem] font-semibold leading-[1.35]",
+                      "mt-2 max-w-[11rem] text-center mn-font-mono text-[0.68rem] font-semibold leading-[1.35]",
                       locale === "en" && "uppercase tracking-[0.12em]",
                       index === 2
                         ? "text-[var(--mn-teal-deep)]"
@@ -1100,7 +1100,7 @@ function MethodCards({
   return (
     <section>
       <RevealBlock className="max-w-[60ch]">
-        <p className="font-[family:var(--mn-font-mono)] text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
+        <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
           {copy.methodEyebrow}
         </p>
         <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">
@@ -1192,7 +1192,7 @@ function PriceCard({
     >
       <span
         className={cx(
-          "absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full px-4 py-2 text-center font-[family:var(--mn-font-mono)] text-[0.64rem] font-semibold uppercase tracking-[0.16em] whitespace-nowrap",
+          "absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full px-4 py-2 text-center mn-font-mono text-[0.64rem] font-semibold uppercase tracking-[0.16em] whitespace-nowrap",
           featured
             ? "bg-[linear-gradient(90deg,var(--mn-gold),var(--mn-gold-soft))] text-[#3a2d08]"
             : "bg-[var(--mn-gold-tint)] text-[#8a6d23]",
@@ -1202,7 +1202,7 @@ function PriceCard({
       </span>
       <p
         className={cx(
-          "mt-3 flex items-center gap-2 font-[family:var(--mn-font-mono)] text-[0.68rem] font-semibold uppercase tracking-[0.13em]",
+          "mt-3 flex items-center gap-2 mn-font-mono text-[0.68rem] font-semibold uppercase tracking-[0.13em]",
           featured
             ? "text-[var(--mn-teal-light)]"
             : "text-[var(--mn-teal-deep)]",
@@ -1308,7 +1308,7 @@ function PriceCard({
             className="size-5 text-[var(--mn-teal-light)]"
           />
           <span>{includes}</span>
-          <span className="ml-auto font-[family:var(--mn-font-mono)] text-[0.68rem] uppercase tracking-[0.14em] text-[var(--mn-gold-soft)]">
+          <span className="ml-auto mn-font-mono text-[0.68rem] uppercase tracking-[0.14em] text-[var(--mn-gold-soft)]">
             PLUS
           </span>
         </div>
@@ -1405,7 +1405,7 @@ function PricingSection({
   return (
     <section id="pricing">
       <RevealBlock className="max-w-[64ch]">
-        <p className="font-[family:var(--mn-font-mono)] text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
+        <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
           {copy.pricingEyebrow}
         </p>
         <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">

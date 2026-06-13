@@ -41,14 +41,14 @@ function SectionIntro({
     <div className="mx-auto max-w-3xl text-center" data-reveal>
       <p
         className={
-          light ? "mn-v14-eyebrow mn-v14-eyebrow--light" : "mn-v14-eyebrow"
+          light ? "mn-v15-eyebrow mn-v15-eyebrow--light" : "mn-v15-eyebrow"
         }
       >
         {eyebrow}
       </p>
       <h2
         className={
-          light ? "mn-v14-heading mn-v14-heading--light" : "mn-v14-heading"
+          light ? "mn-v15-heading mn-v15-heading--light" : "mn-v15-heading"
         }
       >
         {title} {accent ? <span>{accent}</span> : null}
@@ -57,8 +57,8 @@ function SectionIntro({
         <p
           className={
             light
-              ? "mn-v14-section-copy mn-v14-section-copy--light"
-              : "mn-v14-section-copy"
+              ? "mn-v15-section-copy mn-v15-section-copy--light"
+              : "mn-v15-section-copy"
           }
         >
           {body}
@@ -73,7 +73,7 @@ function CheckItem({
   light = false,
 }: Readonly<{ children: string; light?: boolean }>) {
   return (
-    <li className={light ? "mn-v14-check mn-v14-check--light" : "mn-v14-check"}>
+    <li className={light ? "mn-v15-check mn-v15-check--light" : "mn-v15-check"}>
       <CheckCircle2 aria-hidden className="mt-0.5 size-5 shrink-0" />
       <span>{children}</span>
     </li>
@@ -124,16 +124,16 @@ export function LandingPage({
     <div className="flex-1">
       <LandingReveal />
 
-      <section className="mn-v14-hero">
-        <div className="mn-v14-glow mn-v14-glow--hero-a" />
-        <div className="mn-v14-glow mn-v14-glow--hero-b" />
-        <div className="mn-v14-container relative z-[1] grid items-center gap-14 py-20 lg:grid-cols-[1.02fr_0.98fr] lg:py-24">
+      <section className="mn-v15-hero">
+        <div className="mn-v15-glow mn-v15-glow--hero-a" />
+        <div className="mn-v15-glow mn-v15-glow--hero-b" />
+        <div className="mn-v15-container relative z-[1] grid items-center gap-14 py-20 lg:grid-cols-[1.02fr_0.98fr] lg:py-24">
           <div>
-            <p className="mn-v14-eyebrow" data-reveal>
+            <p className="mn-v15-eyebrow" data-reveal>
               {copy.hero.eyebrow}
             </p>
             <h1
-              className="mn-hero-title mt-6 max-w-4xl font-[family:var(--mn-font-display)] text-5xl font-medium leading-[1.02] text-[var(--mn-ink)] sm:text-6xl lg:text-7xl"
+              className="mn-hero-title mt-6 max-w-4xl mn-font-display text-5xl font-medium leading-[1.02] text-[var(--mn-ink)] sm:text-6xl lg:text-7xl"
               data-reveal
             >
               {copy.hero.title}
@@ -152,7 +152,7 @@ export function LandingPage({
               className="mt-8 max-w-xl border-l-2 border-[var(--mn-gold-soft)] pl-5"
               data-reveal
             >
-              <p className="font-[family:var(--mn-font-display)] text-2xl italic text-[var(--mn-gold)]">
+              <p className="mn-font-display text-2xl italic text-[var(--mn-gold)]">
                 {copy.hero.paliTitle}
               </p>
               <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
@@ -160,12 +160,12 @@ export function LandingPage({
               </p>
             </div>
             <div className="mt-9 flex flex-wrap gap-3" data-reveal>
-              <Link className="mn-v14-button" href={assessmentPath}>
+              <Link className="mn-v15-button" href={assessmentPath}>
                 {copy.hero.primary}
                 <ArrowRight aria-hidden className="size-4" />
               </Link>
               <Link
-                className="mn-v14-button mn-v14-button--outline"
+                className="mn-v15-button mn-v15-button--outline"
                 href="#how-it-works"
               >
                 {copy.hero.secondary}
@@ -192,12 +192,12 @@ export function LandingPage({
               ))}
             </ul>
           </div>
-          <div className="mn-v14-hero-scatter" data-reveal>
-            <span className="mn-v14-hero-orb" />
-            <span className="mn-v14-hero-orb-inner" />
+          <div className="mn-v15-hero-scatter" data-reveal>
+            <span className="mn-v15-hero-orb" />
+            <span className="mn-v15-hero-orb-inner" />
             <Image
               alt="MattaNutra emblem"
-              className="mn-v14-hero-figure"
+              className="mn-v15-hero-figure"
               height={465}
               priority
               sizes="(min-width: 768px) 230px, 140px"
@@ -206,7 +206,7 @@ export function LandingPage({
             />
             {copy.hero.ingredientPills.map((pill, index) => (
               <span
-                className="mn-v14-float-pill"
+                className="mn-v15-float-pill"
                 data-pill-index={index}
                 key={pill}
               >
@@ -219,7 +219,7 @@ export function LandingPage({
       </section>
 
       <div className="border-b border-[var(--mn-line)] bg-[var(--mn-cream)]">
-        <div className="mn-v14-container py-8">
+        <div className="mn-v15-container py-8">
           <div className="mx-auto grid max-w-5xl gap-4 rounded-2xl border border-[color-mix(in_srgb,var(--mn-gold-soft)_40%,transparent)] bg-[radial-gradient(circle_at_85%_0%,rgba(45,143,114,0.28),transparent_55%),linear-gradient(160deg,#1F6E58_0%,#0E2D4D_100%)] p-5 text-[var(--mn-cream)] shadow-[0_34px_70px_-34px_rgba(10,37,64,0.6)] md:grid-cols-3 md:p-6" data-reveal>
             {copy.proof.map((item, index) => (
               <div className="flex items-start gap-3" key={item.title}>
@@ -247,7 +247,7 @@ export function LandingPage({
       </div>
 
       <section className="border-b border-[var(--mn-line)] bg-[var(--mn-paper)]">
-        <div className="mn-v14-container py-20 lg:py-24">
+        <div className="mn-v15-container py-20 lg:py-24">
           <SectionIntro
             accent={copy.clarity.accent}
             body={copy.clarity.body}
@@ -270,7 +270,7 @@ export function LandingPage({
                   width={1000}
                 />
                 <div className="p-5">
-                  <h3 className="font-[family:var(--mn-font-display)] text-xl font-medium text-[var(--mn-ink)]">
+                  <h3 className="mn-font-display text-xl font-medium text-[var(--mn-ink)]">
                     {card.title}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-[var(--mn-ash)]">
@@ -281,7 +281,7 @@ export function LandingPage({
             ))}
           </div>
           <div className="mx-auto mt-16 max-w-[900px] border-t border-[var(--mn-line)] pt-10" data-reveal id="promises">
-            <p className="mb-7 text-center font-[family:var(--mn-font-display)] text-[20px] text-[var(--mn-ink)]">
+            <p className="mb-7 text-center mn-font-display text-[20px] text-[var(--mn-ink)]">
               {copy.promises.title}{" "}
               <em className="italic text-[var(--mn-teal-deep)]">
                 {copy.promises.accent}
@@ -297,7 +297,7 @@ export function LandingPage({
                       <PromiseIcon aria-hidden className="size-[18px]" strokeWidth={1.8} />
                     </span>
                     <span className="text-left">
-                      <span className="block font-[family:var(--mn-font-display)] text-[16px] leading-tight text-[var(--mn-ink)]">
+                      <span className="block mn-font-display text-[16px] leading-tight text-[var(--mn-ink)]">
                         {title}
                       </span>
                       <span className="block text-[12.5px] text-[var(--mn-ash)]">
@@ -313,10 +313,10 @@ export function LandingPage({
       </section>
 
       <section
-        className="mn-v14-section border-y border-[var(--mn-line)] bg-[var(--mn-paper)]"
+        className="mn-v15-section border-y border-[var(--mn-line)] bg-[var(--mn-paper)]"
         id="how-it-works"
       >
-        <div className="mn-v14-container">
+        <div className="mn-v15-container">
           <SectionIntro
             accent={copy.how.accent}
             body={copy.how.intro}
@@ -325,7 +325,7 @@ export function LandingPage({
           />
           <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {copy.how.steps.map(([title, label, body], index) => (
-              <article className="mn-v14-step-card" data-reveal key={title}>
+              <article className="mn-v15-step-card" data-reveal key={title}>
                 <span>{index + 1}</span>
                 <h3>{title}</h3>
                 <p>{body}</p>
@@ -338,11 +338,11 @@ export function LandingPage({
 
       <section id="living-protocol">
         <div className="relative overflow-hidden border-b border-[var(--mn-line)] bg-[var(--mn-cream)]">
-          <div className="mn-v14-glow mn-v14-glow--protocol" />
-          <div className="mn-v14-container relative z-[1] grid items-center gap-14 py-20 lg:grid-cols-2 lg:py-24">
+          <div className="mn-v15-glow mn-v15-glow--protocol" />
+          <div className="mn-v15-container relative z-[1] grid items-center gap-14 py-20 lg:grid-cols-2 lg:py-24">
             <div data-reveal>
-              <p className="mn-v14-badge">{copy.protocol.eyebrow}</p>
-              <h2 className="mn-v14-heading mt-5 text-left">
+              <p className="mn-v15-badge">{copy.protocol.eyebrow}</p>
+              <h2 className="mn-v15-heading mt-5 text-left">
                 {copy.protocol.title}
                 <br />
                 <span>{copy.protocol.accent}</span>
@@ -351,12 +351,12 @@ export function LandingPage({
                 {copy.protocol.intro}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link className="mn-v14-button" href="#start-free">
+                <Link className="mn-v15-button" href="#start-free">
                   {copy.protocol.primary}
                   <ArrowRight aria-hidden className="size-4" />
                 </Link>
                 <Link
-                  className="mn-v14-button mn-v14-button--outline"
+                  className="mn-v15-button mn-v15-button--outline"
                   href="#lp-practice"
                 >
                   {copy.protocol.secondary}
@@ -368,8 +368,8 @@ export function LandingPage({
                 ))}
               </ul>
             </div>
-            <div className="mn-v14-phone" data-reveal>
-              <div className="mn-v14-phone-header">
+            <div className="mn-v15-phone" data-reveal>
+              <div className="mn-v15-phone-header">
                 <span>M</span>
                 <div>
                   <strong>MattaNutra</strong>
@@ -378,12 +378,12 @@ export function LandingPage({
                 <em>{copy.protocol.channel}</em>
               </div>
               <div className="grid gap-3 bg-[var(--mn-cream)] p-4">
-                <p className="mn-v14-chat">{copy.protocol.chat[0]}</p>
-                <p className="mn-v14-chat mn-v14-chat--user">
+                <p className="mn-v15-chat">{copy.protocol.chat[0]}</p>
+                <p className="mn-v15-chat mn-v15-chat--user">
                   {copy.protocol.chat[1]}
                 </p>
-                <p className="mn-v14-chat">{copy.protocol.chat[2]}</p>
-                <div className="mn-v14-protocol-card">
+                <p className="mn-v15-chat">{copy.protocol.chat[2]}</p>
+                <div className="mn-v15-protocol-card">
                   <div>
                     <p>{copy.protocol.updateLabel}</p>
                     <h3>{copy.protocol.tripTitle}</h3>
@@ -396,8 +396,8 @@ export function LandingPage({
                       </li>
                     ))}
                   </ul>
-                  <p className="mn-v14-based-on">{copy.protocol.basedOn}</p>
-                  <details className="mn-v14-reasoning">
+                  <p className="mn-v15-based-on">{copy.protocol.basedOn}</p>
+                  <details className="mn-v15-reasoning">
                     <summary>{copy.protocol.reasoningLabel}</summary>
                     <div>
                       {copy.protocol.reasoning.map((item) => (
@@ -406,27 +406,27 @@ export function LandingPage({
                     </div>
                   </details>
                 </div>
-                <div className="mn-v14-chat">
+                <div className="mn-v15-chat">
                   <p>{copy.protocol.foodNudge}</p>
                   <span className="mt-2 flex flex-wrap gap-1.5">
                     {copy.protocol.foodTags.map((tag) => (
-                      <span className="mn-v14-food-tag" key={tag}>
+                      <span className="mn-v15-food-tag" key={tag}>
                         {tag}
                       </span>
                     ))}
                   </span>
                 </div>
-                <p className="mn-v14-chat mn-v14-chat--user">
+                <p className="mn-v15-chat mn-v15-chat--user">
                   {copy.protocol.vitaminQuestion}
                 </p>
-                <p className="mn-v14-chat">{copy.protocol.vitaminAnswer}</p>
+                <p className="mn-v15-chat">{copy.protocol.vitaminAnswer}</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="mn-v14-band">
-          <div className="mn-v14-container" data-reveal>
+        <div className="mn-v15-band">
+          <div className="mn-v15-container" data-reveal>
             <h2>
               {copy.protocolBand.title}
               <br />
@@ -436,8 +436,8 @@ export function LandingPage({
           </div>
         </div>
 
-        <div className="mn-v14-section" id="lp-practice">
-          <div className="mn-v14-container">
+        <div className="mn-v15-section" id="lp-practice">
+          <div className="mn-v15-container">
             <SectionIntro
               accent={copy.practice.accent}
               body={copy.practice.intro}
@@ -447,7 +447,7 @@ export function LandingPage({
             <div className="mt-12 grid gap-7 md:grid-cols-3">
               {copy.practice.steps.map(([title, body, examples], index) => (
                 <article
-                  className="mn-v14-practice-card"
+                  className="mn-v15-practice-card"
                   data-reveal
                   key={title}
                 >
@@ -465,8 +465,8 @@ export function LandingPage({
           </div>
         </div>
 
-        <div className="mn-v14-section border-y border-[var(--mn-sand-deep)] bg-[var(--mn-sand-soft)]">
-          <div className="mn-v14-container">
+        <div className="mn-v15-section border-y border-[var(--mn-sand-deep)] bg-[var(--mn-sand-soft)]">
+          <div className="mn-v15-container">
             <SectionIntro
               accent={copy.food.accent}
               body={copy.food.intro}
@@ -490,8 +490,8 @@ export function LandingPage({
                   <article
                     className={
                       index === 2
-                        ? "mn-v14-food-card mn-v14-food-card--mint"
-                        : "mn-v14-food-card"
+                        ? "mn-v15-food-card mn-v15-food-card--mint"
+                        : "mn-v15-food-card"
                     }
                     data-reveal
                     key={title}
@@ -508,7 +508,7 @@ export function LandingPage({
               </div>
             </div>
             <p
-              className="mx-auto mt-12 max-w-2xl text-center font-[family:var(--mn-font-display)] text-xl italic leading-8 text-[var(--mn-ink-soft)]"
+              className="mx-auto mt-12 max-w-2xl text-center mn-font-display text-xl italic leading-8 text-[var(--mn-ink-soft)]"
               data-reveal
             >
               {copy.food.note}
@@ -516,9 +516,9 @@ export function LandingPage({
           </div>
         </div>
 
-        <div className="mn-v14-difference">
+        <div className="mn-v15-difference">
           <div className="mx-auto max-w-3xl px-7" data-reveal>
-            <p className="mn-v14-badge mn-v14-badge--dark">
+            <p className="mn-v15-badge mn-v15-badge--dark">
               {copy.difference.eyebrow}
             </p>
             <h2>
@@ -529,7 +529,7 @@ export function LandingPage({
             {copy.difference.paragraphs.map((paragraph, index) => (
               <p
                 className={
-                  index === 2 ? "mn-v14-difference-signoff" : undefined
+                  index === 2 ? "mn-v15-difference-signoff" : undefined
                 }
                 key={paragraph}
               >
@@ -539,11 +539,11 @@ export function LandingPage({
           </div>
         </div>
 
-        <div className="mn-v14-bridge">
+        <div className="mn-v15-bridge">
           <div className="mx-auto max-w-3xl px-7 text-center" data-reveal>
             <h2>{copy.bridge.title}</h2>
             <p>{copy.bridge.body}</p>
-            <Link className="mn-v14-button mt-7" href={assessmentPath}>
+            <Link className="mn-v15-button mt-7" href={assessmentPath}>
               {copy.bridge.cta}
               <ArrowRight aria-hidden className="size-4" />
             </Link>
@@ -552,8 +552,8 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="mn-v14-section" id="testimonials">
-        <div className="mn-v14-container">
+      <section className="mn-v15-section" id="testimonials">
+        <div className="mn-v15-container">
           <SectionIntro
             body={copy.results.intro}
             eyebrow={copy.results.eyebrow}
@@ -562,7 +562,7 @@ export function LandingPage({
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {testimonialCards.map((testimonial) => (
               <article
-                className="mn-v14-testimonial-card"
+                className="mn-v15-testimonial-card"
                 data-reveal
                 key={testimonial.id}
               >
@@ -598,7 +598,7 @@ export function LandingPage({
               {copy.results.join}
             </p>
             <br />
-            <Link className="mn-v14-button" href={assessmentPath}>
+            <Link className="mn-v15-button" href={assessmentPath}>
               {copy.results.cta}
               <ArrowRight aria-hidden className="size-4" />
             </Link>
@@ -606,13 +606,13 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="mn-v14-origin" id="origin">
-        <div className="mn-v14-glow mn-v14-glow--origin-a" />
-        <div className="mn-v14-glow mn-v14-glow--origin-b" />
+      <section className="mn-v15-origin" id="origin">
+        <div className="mn-v15-glow mn-v15-glow--origin-a" />
+        <div className="mn-v15-glow mn-v15-glow--origin-b" />
         <div className="relative z-[1] mx-auto max-w-5xl px-7">
           <div className="max-w-3xl" data-reveal>
-            <p className="mn-v14-eyebrow">{copy.origin.eyebrow}</p>
-            <h2 className="mn-v14-heading mt-4 text-left">
+            <p className="mn-v15-eyebrow">{copy.origin.eyebrow}</p>
+            <h2 className="mn-v15-heading mt-4 text-left">
               {copy.origin.title}
               <br />
               <span>{copy.origin.accent}</span>
@@ -625,7 +625,7 @@ export function LandingPage({
             </p>
           </div>
           <div
-            className="mn-v14-origin-build"
+            className="mn-v15-origin-build"
             role="img"
             aria-label={copy.origin.buildAlt}
             data-reveal
@@ -647,7 +647,7 @@ export function LandingPage({
             ))}
           </div>
           <div className="max-w-3xl" data-reveal>
-            <h3 className="font-[family:var(--mn-font-display)] text-2xl font-medium text-[var(--mn-ink)]">
+            <h3 className="mn-font-display text-2xl font-medium text-[var(--mn-ink)]">
               {copy.origin.founders}
             </h3>
             {copy.origin.founderParagraphs.map((paragraph) => (
@@ -667,7 +667,7 @@ export function LandingPage({
               <Clock aria-hidden className="size-5" />
             </span>
             <span className="grid leading-tight">
-              <span className="font-[family:var(--mn-font-display)] text-lg italic text-[var(--mn-ink-soft)]">
+              <span className="mn-font-display text-lg italic text-[var(--mn-ink-soft)]">
                 {copy.origin.signoff}
               </span>
               <span className="mt-1 text-xs font-semibold text-[var(--mn-ash)]">
@@ -678,8 +678,8 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="mn-v14-section" id="start-free">
-        <div className="mn-v14-container">
+      <section className="mn-v15-section" id="start-free">
+        <div className="mn-v15-container">
           <SectionIntro
             body={copy.questionnaire.body}
             eyebrow={copy.questionnaire.eyebrow}
@@ -687,10 +687,10 @@ export function LandingPage({
           />
           <div className="mx-auto mt-12 max-w-[680px] overflow-hidden rounded-[24px] bg-[var(--mn-paper)] shadow-[0_40px_80px_-44px_rgba(10,37,64,0.55)] ring-1 ring-[var(--mn-line)]" data-reveal>
             <div className="flex items-center gap-2.5 border-b border-[var(--mn-line)] bg-[var(--mn-cream)] px-5 py-3.5">
-              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-linear-to-br from-[var(--mn-teal-light)] to-[var(--mn-teal-deep)] font-[family:var(--mn-font-display)] text-xs text-white">
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-linear-to-br from-[var(--mn-teal-light)] to-[var(--mn-teal-deep)] mn-font-display text-xs text-white">
                 M
               </span>
-              <span className="font-[family:var(--mn-font-mono)] text-[10px] uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]">
+              <span className="mn-font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]">
                 {copy.questionnaire.cardLabel}
               </span>
               <span className="ml-auto inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-[var(--mn-ash)]">
@@ -703,7 +703,7 @@ export function LandingPage({
             </div>
             <div className="px-5 pt-4">
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center rounded-full border border-[var(--mn-sand-deep)] bg-[var(--mn-gold-tint)] px-2.5 py-1 font-[family:var(--mn-font-mono)] text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--mn-gold)]">
+                <span className="inline-flex items-center rounded-full border border-[var(--mn-sand-deep)] bg-[var(--mn-gold-tint)] px-2.5 py-1 mn-font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--mn-gold)]">
                   {copy.questionnaire.sampleLabel}
                 </span>
                 <span className="text-xs text-[var(--mn-ash)]">
@@ -711,10 +711,10 @@ export function LandingPage({
                 </span>
               </div>
               <div className="mt-4 flex items-center justify-between">
-                <span className="font-[family:var(--mn-font-mono)] text-[10px] uppercase tracking-[0.16em] text-[var(--mn-ash)]">
+                <span className="mn-font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--mn-ash)]">
                   {copy.questionnaire.progressPath}
                 </span>
-                <span className="font-[family:var(--mn-font-display)] text-[15px] text-[var(--mn-teal-deep)]">
+                <span className="mn-font-display text-[15px] text-[var(--mn-teal-deep)]">
                   {copy.questionnaire.progress}
                 </span>
               </div>
@@ -726,16 +726,16 @@ export function LandingPage({
               </p>
             </div>
             <div className="mx-5 mt-4 rounded-2xl border border-[var(--mn-mint-deep)] border-l-4 border-l-[var(--mn-teal)] bg-linear-to-br from-[var(--mn-mint)] to-[var(--mn-cream)] px-5 py-4">
-              <p className="font-[family:var(--mn-font-display)] text-[15px] italic leading-[1.5] text-[var(--mn-ink-soft)]">
+              <p className="mn-font-display text-[15px] italic leading-[1.5] text-[var(--mn-ink-soft)]">
                 “{copy.questionnaire.quote}”
               </p>
             </div>
             <div className="px-5 pt-5">
               <div className="flex items-baseline justify-between">
-                <span className="font-[family:var(--mn-font-display)] text-base text-[var(--mn-ink)]">
+                <span className="mn-font-display text-base text-[var(--mn-ink)]">
                   {copy.questionnaire.skinTone}
                 </span>
-                <span className="font-[family:var(--mn-font-mono)] text-[10px] uppercase tracking-[0.14em] text-[var(--mn-ash)]">
+                <span className="mn-font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--mn-ash)]">
                   {copy.questionnaire.foundation}
                 </span>
               </div>
@@ -835,7 +835,7 @@ export function LandingPage({
             </div>
           </div>
           <div className="mt-9 text-center" data-reveal>
-            <Link className="mn-v14-button" href={assessmentPath}>
+            <Link className="mn-v15-button" href={assessmentPath}>
               {copy.hero.primary}
               <ArrowRight aria-hidden className="size-4" />
             </Link>
@@ -847,17 +847,17 @@ export function LandingPage({
       </section>
 
       <section
-        className="mn-v14-section border-y border-[var(--mn-line)] bg-[var(--mn-paper)]"
+        className="mn-v15-section border-y border-[var(--mn-line)] bg-[var(--mn-paper)]"
         id="journal"
       >
-        <div className="mn-v14-container">
+        <div className="mn-v15-container">
           <div
             className="mb-12 flex flex-wrap items-end justify-between gap-6"
             data-reveal
           >
             <div>
-              <p className="mn-v14-eyebrow">{copy.journal.eyebrow}</p>
-              <h2 className="mn-v14-heading mt-3 text-left">
+              <p className="mn-v15-eyebrow">{copy.journal.eyebrow}</p>
+              <h2 className="mn-v15-heading mt-3 text-left">
                 {copy.journal.title} <span>{copy.journal.accent}</span>
               </h2>
             </div>
@@ -872,7 +872,7 @@ export function LandingPage({
           <div className="grid gap-7 md:grid-cols-3">
             {journalCards.map((post, index) => (
               <Link
-                className="mn-v14-journal-card group"
+                className="mn-v15-journal-card group"
                 data-reveal
                 href={post.href}
                 key={post.title}
@@ -889,7 +889,7 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="mn-v14-section" id="faq">
+      <section className="mn-v15-section" id="faq">
         <div className="mx-auto max-w-5xl px-7">
           <SectionIntro
             accent={copy.faq.accent}
@@ -898,7 +898,7 @@ export function LandingPage({
           />
           <div className="mt-12 grid gap-3.5">
             {copy.faq.items.map(([question, answer]) => (
-              <details className="mn-v14-faq-item" data-reveal key={question}>
+              <details className="mn-v15-faq-item" data-reveal key={question}>
                 <summary>
                   {question}
                   <span>+</span>
@@ -910,8 +910,8 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="mn-v14-final-cta" id="assessment">
-        <div className="mn-v14-glow mn-v14-glow--final" />
+      <section className="mn-v15-final-cta" id="assessment">
+        <div className="mn-v15-glow mn-v15-glow--final" />
         <div
           className="relative z-[1] mx-auto max-w-4xl px-7 text-center"
           data-reveal
@@ -924,20 +924,20 @@ export function LandingPage({
           <p>{copy.final.body}</p>
           <div className="mt-9 flex flex-wrap justify-center gap-3">
             <Link
-              className="mn-v14-button mn-v14-button--cream"
+              className="mn-v15-button mn-v15-button--cream"
               href={assessmentPath}
             >
               {copy.final.primary}
               <ArrowRight aria-hidden className="size-4" />
             </Link>
             <Link
-              className="mn-v14-button mn-v14-button--ghost"
+              className="mn-v15-button mn-v15-button--ghost"
               href="#how-it-works"
             >
               {copy.final.secondary}
             </Link>
           </div>
-          <p className="mt-8 font-[family:var(--mn-font-display)] text-lg text-[var(--mn-gold-soft)]">
+          <p className="mt-8 mn-font-display text-lg text-[var(--mn-gold-soft)]">
             {copy.final.quote}
           </p>
         </div>

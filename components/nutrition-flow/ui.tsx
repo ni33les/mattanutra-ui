@@ -109,7 +109,7 @@ export function SectionProgress({
       )}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <p className="flex items-center gap-2 font-[family:var(--mn-font-mono)] text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        <p className="flex items-center gap-2 mn-font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           <span className="size-1.5 rounded-full bg-[var(--mn-teal)]" />
           {label}
         </p>

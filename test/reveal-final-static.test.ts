@@ -109,6 +109,9 @@ describe("final reveal UX", () => {
   it("applies the final reveal type system from the localized route shell", () => {
     assert.match(layout, /DM_Sans/);
     assert.match(layout, /Fraunces/);
+    assert.match(layout, /style:\s*\["normal", "italic"\]/);
+    assert.match(layout, /weight:\s*"variable"/);
+    assert.match(layout, /axes:\s*\["opsz"\]/);
     assert.match(layout, /JetBrains_Mono/);
     assert.match(layout, /Noto_Sans_Thai/);
     assert.match(css, /\.mn-reveal-final\s*\{[\s\S]*font-family:\s*var\(--mn-font-body\)/);

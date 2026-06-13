@@ -228,7 +228,7 @@ export function BlogArticle({
       <div className="relative isolate overflow-hidden bg-[var(--mn-cream)] py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-2xl lg:mx-0">
-            <p className="mn-v11-eyebrow">
+            <p className="mn-section-eyebrow">
               {copy.journal}
             </p>
             <h1 className="mn-hero-title mt-3 font-serif text-4xl font-medium tracking-normal text-pretty text-[var(--mn-ink)] sm:text-5xl">
