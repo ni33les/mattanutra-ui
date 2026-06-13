@@ -72,6 +72,7 @@ const baseRevealCopy = {
       "Every dose below is sized to your body, your goals, and the safety context you shared. Product fit shows how closely the selected stack covers each nutrient.",
     formulaTitle: "Exactly enough.",
     formulaTitleTemplate: "{supplementSelectedText} nutrients. Exactly enough.",
+    formulaMetaEvaluatedCount: "evaluated",
     formulaMetaEvaluated: "Precision tier",
     formulaMetaSelected: "selected",
     formulaMetaNoPadding: "no padding",
@@ -129,7 +130,7 @@ const baseRevealCopy = {
     productsAllTitleTemplate:
       "{productSelectedText} bottles. All {supplementSelectedTextLower} nutrients.",
     productsPartialTitleTemplate:
-      "{productSelectedText} bottles. {coveredText} of {supplementSelectedTextLower} nutrients.",
+      "{productSelectedText} bottles. {coveredProductNeedText} of {supplementSelectedTextLower} nutrients.",
     supplementsRecommended: "Selected for you",
     productsRecommended: "products recommended for you",
     productDoseRecommended: "Recommended dose",
@@ -186,6 +187,7 @@ const baseRevealCopy = {
       "ปริมาณด้านล่างปรับตามร่างกาย เป้าหมาย และบริบทความปลอดภัยที่คุณให้ไว้ ความพอดีของสินค้าแสดงว่าชุดที่เลือกครอบคลุมสารอาหารแต่ละรายการได้แค่ไหน",
     formulaTitle: "พอดี ไม่มากเกินจำเป็น",
     formulaTitleTemplate: "{supplementSelectedText} สารอาหาร ในปริมาณที่พอดี",
+    formulaMetaEvaluatedCount: "ประเมินแล้ว",
     formulaMetaEvaluated: "ระดับความแม่นยำ",
     formulaMetaSelected: "เลือก",
     formulaMetaNoPadding: "ไม่เติมเกินจำเป็น",
@@ -242,7 +244,7 @@ const baseRevealCopy = {
     productsAllTitleTemplate:
       "{productSelectedText} ขวด ครอบคลุมสารอาหารครบ {supplementSelectedText} รายการ",
     productsPartialTitleTemplate:
-      "{productSelectedText} ขวด ครอบคลุมสารอาหาร {coveredText} จาก {supplementSelectedText} รายการ",
+      "{productSelectedText} ขวด ครอบคลุมสารอาหาร {coveredProductNeedText} จาก {supplementSelectedText} รายการ",
     supplementsRecommended: "เลือกสำหรับคุณ",
     productsRecommended: "ผลิตภัณฑ์ที่แนะนำสำหรับคุณ",
     productDoseRecommended: "ขนาดที่แนะนำ",
@@ -299,6 +301,7 @@ export const revealCopy = {
     "formulaLead": "以下每种剂量均根据您的身体、目标以及您分享的安全背景进行调整。产品匹配度显示所选配方对每种营养素的覆盖程度。",
     "formulaTitle": "恰到好处。",
     "formulaTitleTemplate": "{supplementSelectedText} 种营养素。恰到好处。",
+    "formulaMetaEvaluatedCount": "已评估",
     "formulaMetaEvaluated": "精准层级",
     "formulaMetaSelected": "已选",
     "formulaMetaNoPadding": "无多余添加",
@@ -342,7 +345,7 @@ export const revealCopy = {
     "productsEyebrow": "从货架到确定性",
     "productsTitle": "从货架到确定性。",
     "productsAllTitleTemplate": "{productSelectedText} 瓶。全部 {supplementSelectedTextLower} 种营养素。",
-    "productsPartialTitleTemplate": "{productSelectedText} 瓶。{coveredText} 种 {supplementSelectedTextLower} 营养素。",
+    "productsPartialTitleTemplate": "{productSelectedText} 瓶。覆盖 {coveredProductNeedText}/{supplementSelectedTextLower} 种营养素。",
     "supplementsRecommended": "为您精选",
     "productsRecommended": "为您推荐的产品",
     "productDoseRecommended": "推荐剂量",

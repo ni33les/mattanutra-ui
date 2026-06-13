@@ -93,14 +93,71 @@ test("final reveal renders the handoff fonts and hero eyebrow rules", async ({
   await expect(page.locator(".mn-reveal-hero-headline em")).toBeVisible();
   await expect(page.locator(".mn-reveal-pharmacist.ink-section")).toBeVisible();
 
+  const assessmentCells = page.locator(".mn-reveal-assessment-cell");
+  await expect(assessmentCells).toHaveCount(4);
+  const assessmentMetrics = await assessmentCells.evaluateAll((elements) =>
+    elements.map((element) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+
+      return {
+        backgroundColor: style.backgroundColor,
+        height: rect.height,
+      };
+    }),
+  );
+  for (const metric of assessmentMetrics) {
+    expect(metric.height).toBeLessThan(150);
+    expect(metric.backgroundColor).not.toMatch(/251,\s*243,\s*232|251,\s*239,\s*220/);
+  }
+
+  const distillationNumber = page.locator(".mn-reveal-distillation-number").first();
+  await expect(distillationNumber).toBeVisible();
+  const distillationFont = await distillationNumber.evaluate(
+    (element) => getComputedStyle(element).fontFamily,
+  );
+  const distillationSize = await distillationNumber.evaluate((element) =>
+    Number.parseFloat(getComputedStyle(element).fontSize),
+  );
+  expect(distillationFont).toMatch(/Fraunces/i);
+  expect(distillationSize).toBeGreaterThan(72);
+
+  const firstDose = page.locator(".mn-reveal-formula .nutrient-dose").first();
+  const firstCoverage = page.locator(".mn-reveal-formula .nutrient-coverage").first();
+  const firstExpand = page.locator(".mn-reveal-formula .expand-icon").first();
+  await expect(firstDose).toBeVisible();
+  await expect(firstCoverage).toBeVisible();
+  await expect(firstExpand).toBeVisible();
+  const formulaRects = await Promise.all([
+    firstDose.boundingBox(),
+    firstCoverage.boundingBox(),
+    firstExpand.boundingBox(),
+  ]);
+  expect(formulaRects[0]).not.toBeNull();
+  expect(formulaRects[1]).not.toBeNull();
+  expect(formulaRects[2]).not.toBeNull();
+  expect(formulaRects[0]!.x + formulaRects[0]!.width).toBeLessThanOrEqual(
+    formulaRects[1]!.x + 4,
+  );
+  expect(formulaRects[1]!.x + formulaRects[1]!.width).toBeLessThanOrEqual(
+    formulaRects[2]!.x + 4,
+  );
+
   const productsSection = page.locator("#products").first();
   await expect(productsSection).toBeVisible();
   await expect(productsSection).toHaveClass(/mn-reveal-products/);
   await expect(productsSection).not.toHaveClass(/ink-section/);
-  const productsBackground = await productsSection.evaluate(
-    (element) => getComputedStyle(element).backgroundColor,
-  );
-  expect(productsBackground).not.toMatch(/rgb\(10,\s*37,\s*64\)|rgb\(14,\s*45,\s*77\)|rgb\(15,\s*44,\s*34\)/);
+  const productsBackground = await productsSection.evaluate((element) => {
+    const style = getComputedStyle(element);
+
+    return {
+      color: style.backgroundColor,
+      image: style.backgroundImage,
+    };
+  });
+  expect(productsBackground.image).toMatch(/linear-gradient/i);
+  expect(`${productsBackground.color} ${productsBackground.image}`).toMatch(/242,\s*235,\s*216|250,\s*246,\s*236/);
+  expect(`${productsBackground.color} ${productsBackground.image}`).not.toMatch(/rgb\(10,\s*37,\s*64\)|rgb\(14,\s*45,\s*77\)|rgb\(15,\s*44,\s*34\)|rgb\(255,\s*255,\s*255\)/);
   await expect(
     page.locator("#products .mn-reveal-concierge-banner").first(),
   ).toBeVisible();

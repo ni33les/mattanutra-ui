@@ -3528,6 +3528,55 @@
     outline-offset: 3px;
   }
 
+  .mn-reveal-final .mn-reveal-assessment-intro {
+    margin-bottom: 2.5rem;
+  }
+
+  .mn-reveal-final .mn-reveal-assessment-grid {
+    background: var(--mn-paper);
+  }
+
+  .mn-reveal-final .mn-reveal-assessment-cell {
+    min-height: 0;
+    background: var(--mn-paper);
+  }
+
+  .mn-reveal-final .mn-reveal-assessment-cell-label {
+    line-height: 1.2;
+  }
+
+  .mn-reveal-final .mn-reveal-assessment-pill {
+    line-height: 1.25;
+  }
+
+  .mn-reveal-final .mn-reveal-assessment-pill--caution {
+    background: var(--mn-reveal-caution-bg);
+  }
+
+  .mn-reveal-final .mn-reveal-distillation-pair {
+    width: min(100%, 760px);
+  }
+
+  .mn-reveal-final .mn-reveal-distillation-number {
+    font-family: var(--mn-font-display), Georgia, serif;
+    font-size: clamp(80px, 12vw, 160px);
+    font-weight: 300;
+    line-height: 0.9;
+    letter-spacing: 0;
+  }
+
+  .mn-reveal-final .mn-reveal-distillation-number--from {
+    color: var(--mn-ash-soft);
+  }
+
+  .mn-reveal-final .mn-reveal-distillation-number--to {
+    color: var(--mn-teal-deep);
+  }
+
+  .mn-reveal-final .mn-reveal-distillation-label {
+    line-height: 1.35;
+  }
+
   .mn-reveal-final .mn-reveal-assessment,
   .mn-reveal-final .mn-reveal-formula {
     background: var(--mn-cream);
@@ -3565,6 +3614,32 @@
   .mn-reveal-final .mn-reveal-products .summary-card,
   .mn-reveal-final .mn-reveal-products .checkout-card {
     box-shadow: 0 18px 40px -28px rgb(10 37 64 / 0.2);
+  }
+
+  .mn-reveal-final .mn-reveal-formula-meta {
+    align-items: center;
+  }
+
+  .mn-reveal-final .mn-reveal-nutrient-header {
+    align-items: start;
+  }
+
+  .mn-reveal-final .mn-reveal-nutrient-header .expand-icon {
+    justify-self: end;
+  }
+
+  @media (max-width: 767px) {
+    .mn-reveal-final .mn-reveal-assessment-cell {
+      padding: 1.25rem;
+    }
+
+    .mn-reveal-final .mn-reveal-distillation-arrow {
+      transform: rotate(90deg);
+    }
+
+    .mn-reveal-final .mn-reveal-nutrient-header {
+      padding-right: 0;
+    }
   }
 
   .mn-reveal-final .ink-section {

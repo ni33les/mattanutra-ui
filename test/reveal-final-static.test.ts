@@ -110,6 +110,9 @@ describe("final reveal UX", () => {
     assert.match(css, /\.mn-reveal-final \.mn-reveal-distillation/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-products/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-products \.product-card/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-assessment-cell/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-distillation-number/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-nutrient-header/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-pharmacist/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-safety/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-closing/);
@@ -206,6 +209,44 @@ describe("final reveal UX", () => {
     assert.match(reveal, /visibleSupplementRecommendationCount\(result\)/);
     assert.doesNotMatch(reveal, /lockedSupplementCount/);
     assert.doesNotMatch(reveal, /nutrientsChosen/);
+  });
+
+  it("keeps the assessment grid compact and paper-backed", () => {
+    assert.match(reveal, /mn-reveal-assessment-grid/);
+    assert.match(reveal, /mn-reveal-assessment-cell/);
+    assert.match(reveal, /mn-reveal-assessment-pill--caution/);
+    assert.match(reveal, /mn-reveal-assessment-pill--profile/);
+    assert.doesNotMatch(reveal, /min-h-44/);
+    assert.doesNotMatch(
+      reveal,
+      /mn-reveal-assessment-cell[^`]*card\.tone === "caution"[^`]*bg-\[var\(--mn-reveal-caution-bg\)\]/,
+    );
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-assessment-cell\s*\{[\s\S]*min-height:\s*0/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-assessment-cell\s*\{[\s\S]*background:\s*var\(--mn-paper\)/);
+  });
+
+  it("renders the final distillation as the handoff count pair", () => {
+    assert.doesNotMatch(reveal, /RevealDistillationCard/);
+    assert.match(reveal, /mn-reveal-distillation-pair/);
+    assert.match(reveal, /mn-reveal-distillation-number--from/);
+    assert.match(reveal, /mn-reveal-distillation-arrow/);
+    assert.match(reveal, /mn-reveal-distillation-number--to/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-distillation-number\s*\{[\s\S]*font-family:\s*var\(--mn-font-display\)/);
+  });
+
+  it("keeps the formula expander out of the dose and coverage columns", () => {
+    assert.match(reveal, /mn-reveal-nutrient-header/);
+    assert.match(reveal, /nutrient-dose/);
+    assert.match(reveal, /nutrient-coverage/);
+    assert.match(reveal, /md:grid-cols-\[36px_minmax\(160px,1\.25fr\)_minmax\(260px,2\.2fr\)_minmax\(96px,auto\)_minmax\(72px,auto\)_32px\]/);
+    assert.doesNotMatch(reveal, /expand-icon absolute/);
+  });
+
+  it("keeps product coverage grammar from duplicating the total", () => {
+    assert.doesNotMatch(reveal, /function countOfText/);
+    assert.match(reveal, /coveredProductNeedText/);
+    assert.match(copy, /productsPartialTitleTemplate:\s*"\{productSelectedText\} bottles\. \{coveredProductNeedText\} of \{supplementSelectedTextLower\} nutrients\."/);
+    assert.doesNotMatch(copy, /productsPartialTitleTemplate:\s*"\{productSelectedText\}[^"]*\{coveredText\}/);
   });
 
   it("matches the handoff product shelf instead of the old dark reveal band", () => {

@@ -196,14 +196,14 @@ describe("plan reveal V3 migration", () => {
     assert.match(landingReveal, /MutationObserver/);
     assert.match(landingReveal, /addedNodes/);
     assert.match(revealFinalResults, /CountUpNumber/);
-    assert.match(revealFinalResults, /RevealDistillationCard/);
+    assert.match(revealFinalResults, /mn-reveal-distillation-pair/);
     assert.match(formulationRevealCopy, /Your Right Amount Has Arrived/);
     assert.match(formulationRevealCopy, /A formula built around your body, your goals/);
     assert.match(formulationRevealCopy, /Everything you told us, folded into one plan/);
     assert.match(formulationRevealCopy, /We evaluated \{supplementTotalText\} ingredients/);
     assert.match(formulationRevealCopy, /\{supplementSelectedText\} nutrients\. Exactly enough\./);
     assert.match(formulationRevealCopy, /\{productSelectedText\} bottles\. All \{supplementSelectedTextLower\} nutrients\./);
-    assert.match(formulationRevealCopy, /\{productSelectedText\} bottles\. \{coveredText\} of \{supplementSelectedTextLower\} nutrients\./);
+    assert.match(formulationRevealCopy, /\{productSelectedText\} bottles\. \{coveredProductNeedText\} of \{supplementSelectedTextLower\} nutrients\./);
     assert.doesNotMatch(revealFinalResults, /copy\.heroMetaPlan/);
     assert.doesNotMatch(revealFinalResults, /copy\.heroMetaGenerated/);
     assert.match(formulationRevealCopy, /localizedPlanText\(revealPageCopy\[slot\]/);

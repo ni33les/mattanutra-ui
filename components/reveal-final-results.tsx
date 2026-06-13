@@ -7,7 +7,6 @@ import { Check, Copy, ExternalLink, MessageCircle, Printer } from "lucide-react"
 import { LandingReveal } from "@/components/landing-reveal";
 import { PreviewPaywallPanel } from "@/components/formulation-results-panels";
 import {
-  RevealDistillationCard,
   productCoveredNeedCount,
   replaceRevealStackUrl,
   revealContextChips,
@@ -334,18 +333,6 @@ function assessmentGroups(result: FormulationResult, locale: Locale) {
   return { cautions, goals, profile, signals };
 }
 
-function countOfText(locale: Locale, covered: number, total: number) {
-  if (locale === "th") {
-    return `${covered} จาก ${total}`;
-  }
-
-  if (locale === "zh-CN") {
-    return `${covered}/${total}`;
-  }
-
-  return `${localizedCountText(covered, locale)} of ${localizedCountText(total, locale)}`;
-}
-
 export function RevealFinalResultsPage({
   activeProductRecommendations,
   formattedDate,
@@ -632,7 +619,7 @@ function RevealAssessmentSection({
   const cards = [
     { items: groups.goals, label: finalCopy.assessmentGoals, tone: "mint" },
     { items: groups.signals, label: finalCopy.assessmentSymptoms, tone: "paper" },
-    { items: groups.profile, label: finalCopy.assessmentProfile, tone: "paper" },
+    { items: groups.profile, label: finalCopy.assessmentProfile, tone: "profile" },
     { items: groups.cautions, label: finalCopy.assessmentCautions, tone: "caution" },
   ];
 
@@ -642,7 +629,7 @@ function RevealAssessmentSection({
       id="assessment"
     >
       <div className="mn-reveal-final-wrap">
-        <div className="grid gap-10 md:grid-cols-[1fr_1.4fr] md:items-end" data-reveal>
+        <div className="mn-reveal-assessment-intro grid gap-10 md:grid-cols-[1fr_1.4fr] md:items-end" data-reveal>
           <div>
             <div className="mn-reveal-final-label">
               <span className="mn-reveal-final-label-number">01</span>
@@ -666,28 +653,28 @@ function RevealAssessmentSection({
             )}
           </p>
         </div>
-        <div className="mt-10 grid overflow-hidden rounded-md border border-[var(--mn-line)] bg-[var(--mn-paper)] sm:grid-cols-2" data-reveal>
+        <div className="mn-reveal-assessment-grid mt-10 grid overflow-hidden rounded-md border border-[var(--mn-line)] bg-[var(--mn-paper)] sm:grid-cols-2" data-reveal>
           {cards.map((card, index) => (
             <div
-              className={`min-h-44 p-6 ${
+              className={`mn-reveal-assessment-cell p-6 ${
                 index % 2 === 0 ? "sm:border-r" : ""
-              } ${index < 2 ? "border-b" : ""} border-[var(--mn-line)] ${
-                card.tone === "caution" ? "bg-[var(--mn-reveal-caution-bg)]" : ""
-              }`}
+              } ${index < 2 ? "border-b" : ""} border-[var(--mn-line)]`}
               key={card.label}
             >
-              <div className="mb-4 mn-reveal-font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--mn-ash)]">
+              <div className="mn-reveal-assessment-cell-label mb-3 mn-reveal-font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--mn-ash)]">
                 {card.label}
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="mn-reveal-assessment-pills flex flex-wrap gap-1.5">
                 {(card.items.length > 0 ? card.items : [finalCopy.none]).map((item) => (
                   <span
-                    className={`rounded-full px-3 py-[5px] text-xs font-semibold ${
+                    className={`mn-reveal-assessment-pill rounded-full px-3 py-[5px] text-xs font-semibold ${
                       card.tone === "caution"
-                        ? "bg-white/75 text-[var(--mn-reveal-caution-ink)] ring-1 ring-[var(--mn-reveal-caution-edge)]"
+                        ? "mn-reveal-assessment-pill--caution bg-[var(--mn-reveal-caution-bg)] text-[var(--mn-reveal-caution-ink)] ring-1 ring-[var(--mn-reveal-caution-edge)]"
                         : card.tone === "mint"
-                          ? "bg-[var(--mn-mint-deep)] text-[var(--mn-teal-deep)]"
-                          : "bg-[var(--mn-mint)] text-[var(--mn-ink-soft)]"
+                          ? "mn-reveal-assessment-pill--mint bg-[var(--mn-mint-deep)] text-[var(--mn-teal-deep)]"
+                          : card.tone === "profile"
+                            ? "mn-reveal-assessment-pill--profile bg-[var(--mn-cream-deep)] text-[var(--mn-ink)]"
+                            : "mn-reveal-assessment-pill--paper bg-[var(--mn-mint)] text-[var(--mn-ink-soft)]"
                     }`}
                     key={item}
                   >
@@ -733,19 +720,31 @@ function RevealDistillationSection({
           <span className="mn-reveal-final-label-number">02</span>
           {copy.distilledEyebrow}
         </div>
-        <h2 className="mn-reveal-final-heading mx-auto mt-6 max-w-3xl text-[clamp(32px,4vw,52px)]" data-reveal>
+        <h2 className="mn-reveal-final-heading mx-auto mt-7 max-w-3xl text-[clamp(28px,3.6vw,44px)] leading-[1.2]" data-reveal>
           {revealSlotCopy(result, "distillNarrative", locale, distillNarrative)}
         </h2>
-        <div className="mt-12" data-reveal>
-          <RevealDistillationCard
-            fromCount={catalogueSupplementCount}
-            fromLabel={copy.catalogueSupplements}
-            toCount={supplementSelectedCount}
-            toLabel={copy.supplementsRecommended}
-            variant="plain"
-          />
+        <div className="mn-reveal-distillation-pair mx-auto mt-16 flex flex-col items-center justify-center gap-8 sm:flex-row sm:gap-[clamp(30px,5vw,80px)]" data-reveal>
+          <div className="mn-reveal-distillation-count text-center">
+            <div className="mn-reveal-distillation-number mn-reveal-distillation-number--from tabular-nums">
+              <CountUpNumber active={true} duration={1100} value={catalogueSupplementCount} />
+            </div>
+            <p className="mn-reveal-distillation-label mt-3.5 mn-reveal-font-mono text-[11px] uppercase tracking-[0.26em] text-[var(--mn-ash)]">
+              {copy.catalogueSupplements}
+            </p>
+          </div>
+          <div className="mn-reveal-distillation-arrow mn-reveal-font-display text-[clamp(40px,6vw,72px)] font-light italic text-[var(--mn-gold)] sm:-translate-y-3" aria-hidden={true}>
+            →
+          </div>
+          <div className="mn-reveal-distillation-count text-center">
+            <div className="mn-reveal-distillation-number mn-reveal-distillation-number--to tabular-nums">
+              <CountUpNumber active={true} duration={1400} value={supplementSelectedCount} />
+            </div>
+            <p className="mn-reveal-distillation-label mt-3.5 mn-reveal-font-mono text-[11px] uppercase tracking-[0.26em] text-[var(--mn-ink-soft)]">
+              {copy.supplementsRecommended}
+            </p>
+          </div>
         </div>
-        <p className="mx-auto mt-8 max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]" data-reveal>
+        <p className="mx-auto mt-10 max-w-[600px] text-sm leading-[1.7] text-[var(--mn-ink-soft)]" data-reveal>
           {revealSlotCopy(result, "distillFoot", locale, copy.distilledFoot)}
         </p>
       </div>
@@ -823,16 +822,17 @@ function RevealFormulaFinalSection({
           </p>
         </div>
 
-        <div className="mn-reveal-final-card mt-14 px-5 py-8 sm:px-8 lg:px-12" data-reveal>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--mn-line)] pb-6 mn-reveal-font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--mn-ash)]">
-            <span>{copy.formulaMetaTier}</span>
+        <div className="mn-reveal-final-card mn-reveal-formula-card mt-14 px-5 py-8 sm:px-8 lg:px-12" data-reveal>
+          <div className="mn-reveal-formula-meta mb-2 grid gap-3 border-b border-[var(--mn-line)] pb-6 mn-reveal-font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--mn-ash)] sm:grid-cols-[1fr_auto] sm:items-center">
+            <div className="flex flex-col gap-3">
+              <span>{copy.formulaMetaTier}</span>
+              <span>
+                {catalogueSupplementCount} {copy.formulaMetaEvaluatedCount} ·{" "}
+                {ingredients.length} {copy.formulaMetaSelected}
+              </span>
+            </div>
             <span className="mn-reveal-font-display text-[15px] font-medium italic normal-case tracking-normal text-[var(--mn-teal-deep)]">
               {copy.formulaMetaFocus}: {formulaFocus}
-            </span>
-            <span>
-              {productCoveragePending
-                ? copy.formulaMetaProductFitPending
-                : copy.formulaMetaNrv}
             </span>
           </div>
 
@@ -884,7 +884,7 @@ function RevealFormulaFinalSection({
                       type="checkbox"
                     />
                     <label
-                      className="nutrient-header relative grid cursor-pointer select-none grid-cols-[32px_1fr_auto] items-start gap-3.5 rounded py-5 pr-14 transition-colors hover:bg-[var(--mn-cream)] md:grid-cols-[36px_1.4fr_2.2fr_auto_auto] md:gap-5 md:pr-2"
+                      className="nutrient-header mn-reveal-nutrient-header relative grid cursor-pointer select-none grid-cols-[32px_minmax(0,1fr)_32px] items-start gap-3.5 rounded py-5 transition-colors hover:bg-[var(--mn-cream)] md:grid-cols-[36px_minmax(160px,1.25fr)_minmax(260px,2.2fr)_minmax(96px,auto)_minmax(72px,auto)_32px] md:gap-5 md:pr-2"
                       htmlFor={toggleId}
                     >
                       <span className="mn-reveal-font-display text-2xl italic text-[var(--mn-gold)]">
@@ -898,7 +898,7 @@ function RevealFormulaFinalSection({
                           {localizedCategoryLabel(ingredient.category, locale)}
                         </span>
                       </span>
-                      <span className="hidden text-sm leading-[1.6] text-[var(--mn-ink-soft)] md:block">
+                      <span className="mn-reveal-nutrient-rationale hidden text-sm leading-[1.6] text-[var(--mn-ink-soft)] md:block">
                         {rationale}
                         {benefit ? (
                           <span className="mt-2 block w-max max-w-full rounded-full bg-[var(--mn-mint)] px-3 py-1 text-xs font-semibold text-[var(--mn-teal-deep)]">
@@ -906,13 +906,13 @@ function RevealFormulaFinalSection({
                           </span>
                         ) : null}
                       </span>
-                      <span className="hidden mn-reveal-font-mono text-sm font-semibold text-[var(--mn-ink)] md:block">
+                      <span className="nutrient-dose hidden whitespace-nowrap text-right mn-reveal-font-mono text-sm font-semibold text-[var(--mn-ink)] md:block">
                         {dailyDose}
                       </span>
-                      <span className="hidden mn-reveal-font-mono text-sm font-semibold text-[var(--mn-teal-deep)] md:block">
+                      <span className="nutrient-coverage hidden whitespace-nowrap text-right mn-reveal-font-mono text-sm font-semibold text-[var(--mn-teal-deep)] md:block">
                         {coverage === null ? copy.productsPendingBadge : `${coverage}%`}
                       </span>
-                      <span className="expand-icon absolute right-3 top-5 grid size-8 place-items-center rounded-full border border-[var(--mn-line)] bg-white text-lg leading-none text-[var(--mn-ash)] transition">
+                      <span className="expand-icon grid size-8 place-items-center rounded-full border border-[var(--mn-line)] bg-white text-lg leading-none text-[var(--mn-ash)] transition">
                         +
                       </span>
                     </label>
@@ -1187,10 +1187,10 @@ function RevealProductsFinalSection({
     Math.max(0, supplementSelectedCount),
   );
   const productSelectedText = localizedCountText(products.length, locale, true);
-  const coverageText = countOfText(
-    locale,
+  const coveredProductNeedText = localizedCountText(
     coveredProductNeedCount,
-    supplementSelectedCount,
+    locale,
+    true,
   );
   const productsTitle = productMatchingPending
     ? copy.productsPendingTitle
@@ -1199,7 +1199,7 @@ function RevealProductsFinalSection({
           ? copy.productsAllTitleTemplate
           : copy.productsPartialTitleTemplate,
         {
-          coveredText: coverageText,
+          coveredProductNeedText,
           productSelectedText,
           supplementSelectedText: localizedCountText(
             supplementSelectedCount,
