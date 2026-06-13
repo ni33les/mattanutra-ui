@@ -18,7 +18,10 @@ describe("reveal Panya LINE CTA", () => {
     assert.match(reveal, /finalCopy\.panyaSection/);
     assert.match(reveal, /<RevealPanyaFinalSection/);
     assert.match(reveal, /<RevealFoodSupportFinalSection/);
-    assert.match(reveal, /mn-reveal-panya border-t border-\[var\(--mn-line\)\] bg-\[var\(--mn-cream\)\] py-20/);
+    assert.match(reveal, /mn-reveal-panya border-t border-\[var\(--mn-line\)\] py-16/);
+    assert.match(reveal, /mn-reveal-panya-card/);
+    assert.match(reveal, /mn-reveal-panya-connect/);
+    assert.doesNotMatch(reveal, /panyaSection[\s\S]{0,120}mn-reveal-final-label-number/);
     assert.match(reveal, /panyaLineModeForPlan/);
     assert.match(reveal, /const qrUrl = useMemo/);
     assert.match(reveal, /copyConnectCode/);

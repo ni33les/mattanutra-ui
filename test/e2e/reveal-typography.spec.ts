@@ -92,10 +92,91 @@ test("final reveal renders the handoff fonts and hero eyebrow rules", async ({
   expect(ruleWidths.after).toBeGreaterThan(20);
   await expect(page.locator(".mn-reveal-hero-headline em")).toBeVisible();
   await expect(page.locator(".mn-reveal-pharmacist.ink-section")).toBeVisible();
-  await page.screenshot({
-    fullPage: false,
-    path: "test-results/reveal-typography-smoke.png",
-  });
+
+  const productsSection = page.locator("#products").first();
+  await expect(productsSection).toBeVisible();
+  await expect(productsSection).toHaveClass(/mn-reveal-products/);
+  await expect(productsSection).not.toHaveClass(/ink-section/);
+  const productsBackground = await productsSection.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
+  expect(productsBackground).not.toMatch(/rgb\(10,\s*37,\s*64\)|rgb\(14,\s*45,\s*77\)|rgb\(15,\s*44,\s*34\)/);
+  await expect(
+    page.locator("#products .mn-reveal-concierge-banner").first(),
+  ).toBeVisible();
+  await expect(
+    page.locator("#products .mn-reveal-selected-pharmacy").first(),
+  ).toBeVisible();
+  await expect(page.locator("#products .summary-card").first()).toBeVisible();
+  await expect(page.locator("#products .checkout-card").first()).toBeVisible();
+  expect(await page.locator("#products .product-card").count()).toBeGreaterThan(0);
+
+  await expect(page.locator(".mn-reveal-food").first()).toBeVisible();
+  await expect(page.locator(".mn-reveal-panya").first()).toBeVisible();
+  await expect(page.locator(".mn-reveal-panya .mn-reveal-final-label-number")).toHaveCount(0);
+  await expect(page.locator(".mn-reveal-safety.ink-section").first()).toBeVisible();
+  await expect(page.locator(".mn-reveal-closing.ink-section").first()).toBeVisible();
+
+  const checkoutHref = await page
+    .locator("#products .checkout-card a[href*='/basket/checkout']")
+    .first()
+    .getAttribute("href");
+  expect(checkoutHref).toContain("plan=");
+  expect(checkoutHref).toContain("selected=");
+  expect(checkoutHref).toContain("removed=");
+
+  const visualViewports = [
+    {
+      height: 720,
+      sections: [
+        ["hero", headline],
+        ["assessment", page.locator(".mn-reveal-assessment").first()],
+        ["distillation", page.locator(".mn-reveal-distillation").first()],
+        ["formula", page.locator(".mn-reveal-formula").first()],
+        ["products", productsSection],
+        ["food-panya", page.locator(".mn-reveal-food").first()],
+        ["safety", page.locator(".mn-reveal-safety").first()],
+        ["closing", page.locator(".mn-reveal-closing").first()],
+      ] as const,
+      width: 1280,
+    },
+    {
+      height: 900,
+      sections: [
+        ["assessment", page.locator(".mn-reveal-assessment").first()],
+        ["products", productsSection],
+        ["food-panya", page.locator(".mn-reveal-food").first()],
+        ["closing", page.locator(".mn-reveal-closing").first()],
+      ] as const,
+      width: 834,
+    },
+    {
+      height: 844,
+      sections: [
+        ["assessment", page.locator(".mn-reveal-assessment").first()],
+        ["formula", page.locator(".mn-reveal-formula").first()],
+        ["products", productsSection],
+        ["food-panya", page.locator(".mn-reveal-food").first()],
+        ["closing", page.locator(".mn-reveal-closing").first()],
+      ] as const,
+      width: 390,
+    },
+  ];
+
+  for (const viewport of visualViewports) {
+    await page.setViewportSize({
+      height: viewport.height,
+      width: viewport.width,
+    });
+
+    for (const [sectionName, locator] of viewport.sections) {
+      await locator.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        fullPage: false,
+        path: `test-results/reveal-${sectionName}-${viewport.width}.png`,
+      });
+    }
+  }
   expect(
     stylesheetResponses.some(
       (response) =>

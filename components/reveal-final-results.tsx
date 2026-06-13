@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Copy, ExternalLink, MessageCircle } from "lucide-react";
+import { Check, Copy, ExternalLink, MessageCircle, Printer } from "lucide-react";
 import { LandingReveal } from "@/components/landing-reveal";
 import { PreviewPaywallPanel } from "@/components/formulation-results-panels";
 import {
@@ -637,7 +637,10 @@ function RevealAssessmentSection({
   ];
 
   return (
-    <section className="border-t border-[var(--mn-line)] py-20" id="assessment">
+    <section
+      className="mn-reveal-assessment border-t border-[var(--mn-line)] py-20"
+      id="assessment"
+    >
       <div className="mn-reveal-final-wrap">
         <div className="grid gap-10 md:grid-cols-[1fr_1.4fr] md:items-end" data-reveal>
           <div>
@@ -724,7 +727,7 @@ function RevealDistillationSection({
   });
 
   return (
-    <section className="py-20 text-center">
+    <section className="mn-reveal-distillation border-t border-[var(--mn-line)] py-24 text-center">
       <div className="mn-reveal-final-wrap">
         <div className="mn-reveal-final-label justify-center" data-reveal>
           <span className="mn-reveal-final-label-number">02</span>
@@ -739,6 +742,7 @@ function RevealDistillationSection({
             fromLabel={copy.catalogueSupplements}
             toCount={supplementSelectedCount}
             toLabel={copy.supplementsRecommended}
+            variant="plain"
           />
         </div>
         <p className="mx-auto mt-8 max-w-2xl text-sm leading-7 text-[var(--mn-ink-soft)]" data-reveal>
@@ -796,7 +800,10 @@ function RevealFormulaFinalSection({
     : `${copy.formulaSignedPrefix} ${formattedDate}`;
 
   return (
-    <section className="border-t border-[var(--mn-line)] py-24" id="formula">
+    <section
+      className="mn-reveal-formula border-t border-[var(--mn-line)] py-24"
+      id="formula"
+    >
       <div className="mn-reveal-final-wrap">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-end" data-reveal>
           <div>
@@ -1037,6 +1044,19 @@ function RevealProductsFinalSection({
     retailerOptions.find(
       (option) => option.organisationId === selectedRetailerOrganisationId,
     ) ?? retailerOptions[0] ?? null;
+  const selectedRetailerAmount =
+    selectedRetailerOption ? optionSubtotal(selectedRetailerOption) : null;
+  const selectedRetailerAmountText =
+    selectedRetailerOption && selectedRetailerAmount !== null
+      ? new Intl.NumberFormat(localeHtmlLang(locale), {
+          currency: selectedRetailerOption.currency || "THB",
+          maximumFractionDigits: 0,
+          style: "currency",
+        }).format(selectedRetailerAmount)
+      : null;
+  const selectedRetailerEtaText = selectedRetailerOption
+    ? formatRevealEta(locale, selectedRetailerOption.etaDate)
+    : null;
   const bestValueRetailerOrganisationId =
     [...retailerOptions]
       .filter((option) => optionSubtotal(option) !== null)
@@ -1055,6 +1075,9 @@ function RevealProductsFinalSection({
           (optionSubtotal(left) ?? Number.POSITIVE_INFINITY) -
             (optionSubtotal(right) ?? Number.POSITIVE_INFINITY),
       )[0]?.organisationId ?? null;
+  const alternateRetailerOptions = retailerOptions.filter(
+    (option) => option.organisationId !== selectedRetailerOrganisationId,
+  );
   const controlPreferences =
     productOptions.length > 0 || result.productRecommendations
       ? productStackPreferenceOrder
@@ -1237,33 +1260,39 @@ function RevealProductsFinalSection({
   }
 
   return (
-    <section className="ink-section border-t border-[#123857] py-24" id="products">
+    <section
+      className="mn-reveal-products border-t border-[var(--mn-line)] py-24"
+      id="products"
+    >
       <div className="mn-reveal-final-wrap">
-        <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-end" data-reveal>
-          <div>
-            <div className="mn-reveal-final-label text-[var(--mn-teal-light)]">
-              <span className="mn-reveal-final-label-number">04</span>
-              {copy.productsEyebrow}
-            </div>
-            <h2 className="mt-4 mn-reveal-font-display text-[clamp(36px,4.4vw,56px)] font-normal leading-[1.05] text-white">
-              {productsTitle}
-            </h2>
+        <div className="mx-auto max-w-[760px] text-center" data-reveal>
+          <div className="mn-reveal-final-label justify-center">
+            <span className="mn-reveal-final-label-number">04</span>
+            {copy.productsEyebrow}
           </div>
-          <p className="text-base leading-[1.7] text-[var(--mn-cream)]/82">
+          <h2 className="mn-reveal-final-heading mx-auto mt-4 max-w-[760px] text-[clamp(34px,4.2vw,54px)]">
+            {productsTitle}
+          </h2>
+          <p className="mx-auto mt-4 max-w-[580px] text-[15px] leading-[1.7] text-[var(--mn-ink-soft)]">
             {productMatchingPending
               ? copy.productsPending
               : revealSlotCopy(result, "productsLead", locale, copy.productsLead)}
           </p>
         </div>
 
-        <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.06] p-5" data-reveal>
-          <div className="grid gap-5 md:grid-cols-[1fr_auto] md:items-center">
-            <p className="text-[13px] leading-[1.6] text-[var(--mn-cream)]/80">
-              <strong className="text-[var(--mn-cream)]">{finalCopy.pharmacyTitle}</strong>{" "}
-              {finalCopy.pharmacyBody} <strong className="text-[var(--mn-cream)]">{finalCopy.deliveryNote}</strong>
-            </p>
-            <p className="rounded-full bg-[var(--mn-gold-soft)] px-4 py-2 text-center text-xs font-bold text-[var(--mn-ink)]">
-              {finalCopy.shelvesTrust}
+        <div className="mn-reveal-concierge-banner mx-auto my-9 grid max-w-[880px] grid-cols-[auto_minmax(0,1fr)] items-center gap-5 rounded-2xl bg-[var(--mn-teal-deep)] px-7 py-5 text-[var(--mn-cream)]" data-reveal>
+          <div className="grid size-12 shrink-0 place-items-center rounded-full bg-white/10 text-[var(--mn-gold-soft)]">
+            <Check aria-hidden={true} className="size-5" />
+          </div>
+          <div>
+            <h3 className="mn-reveal-font-display text-lg font-medium italic leading-tight text-[var(--mn-gold-soft)]">
+              {finalCopy.pharmacyTitle}
+            </h3>
+            <p className="mt-1 text-[13px] leading-[1.6] text-[var(--mn-cream)]/82">
+              {finalCopy.pharmacyBody}{" "}
+              <strong className="font-semibold text-[var(--mn-cream)]">
+                {finalCopy.deliveryNote}
+              </strong>
             </p>
           </div>
         </div>
@@ -1325,11 +1354,48 @@ function RevealProductsFinalSection({
           </div>
         ) : null}
 
-        {retailerOptions.length > 0 ? (
-          <div className="mb-6 grid gap-3 md:grid-cols-3" data-reveal>
-            {retailerOptions.map((option) => {
-              const selected =
-                option.organisationId === selectedRetailerOrganisationId;
+        {selectedRetailerOption ? (
+          <div className="mn-reveal-selected-pharmacy mx-auto mb-10 max-w-[460px] overflow-hidden rounded-xl border border-[var(--mn-line)] bg-[var(--mn-paper)]" data-reveal>
+            <div className="border-l-4 border-[var(--mn-teal)] px-7 py-6">
+              <p className="mn-reveal-font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
+                {finalCopy.selectedPharmacy}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {selectedRetailerOption.organisationId ===
+                bestValueRetailerOrganisationId ? (
+                  <span className="rounded-full bg-[var(--mn-reveal-caution-bg)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--mn-reveal-caution-ink)]">
+                    {finalCopy.bestValue}
+                  </span>
+                ) : null}
+                {selectedRetailerOption.organisationId ===
+                fastestRetailerOrganisationId ? (
+                  <span className="rounded-full bg-[var(--mn-gold-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--mn-ink)]">
+                    {finalCopy.fastest}
+                  </span>
+                ) : null}
+              </div>
+              <h3 className="mt-3 mn-reveal-font-display text-2xl font-medium italic leading-[1.2] text-[var(--mn-ink)]">
+                {selectedRetailerOption.organisationName}
+              </h3>
+              <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-[var(--mn-line)] pt-3">
+                <p className="mn-reveal-font-mono text-[11px] tracking-[0.04em] text-[var(--mn-ink-soft)]">
+                  {[selectedRetailerEtaText, finalCopy.deliveryNote]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {selectedRetailerAmountText ? (
+                  <p className="whitespace-nowrap mn-reveal-font-display text-lg font-medium italic text-[var(--mn-teal-deep)]">
+                    {selectedRetailerAmountText}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {alternateRetailerOptions.length > 0 ? (
+          <div className="mn-reveal-retailer-choices mx-auto mb-10 grid max-w-[760px] gap-3 md:grid-cols-2" data-reveal>
+            {alternateRetailerOptions.map((option) => {
               const isBestValue =
                 option.organisationId === bestValueRetailerOrganisationId;
               const isFastest =
@@ -1346,12 +1412,7 @@ function RevealProductsFinalSection({
 
               return (
                 <button
-                  aria-pressed={selected}
-                  className={`rounded-xl p-4 text-left ring-1 transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mn-teal-light)] ${
-                    selected
-                      ? "bg-[var(--mn-paper)] text-[var(--mn-ink)] ring-[var(--mn-gold-soft)]"
-                      : "bg-white/[0.08] text-[var(--mn-cream)] ring-white/15"
-                  }`}
+                  className="mn-reveal-pharmacy-card rounded-xl bg-[var(--mn-paper)] p-4 text-left text-[var(--mn-ink)] ring-1 ring-[var(--mn-line)] transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mn-teal-light)]"
                   key={option.organisationId ?? option.organisationName}
                   onClick={() => {
                     setRetailerSelection({
@@ -1361,14 +1422,14 @@ function RevealProductsFinalSection({
                   }}
                   type="button"
                 >
-                  <p className={`mn-reveal-font-mono text-[10px] uppercase tracking-[0.14em] ${selected ? "text-[var(--mn-teal-deep)]" : "text-[var(--mn-cream)]/70"}`}>
-                    {selected ? finalCopy.selectedPharmacy : finalCopy.alternatePharmacy}
+                  <p className="mn-reveal-font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
+                    {finalCopy.alternatePharmacy}
                   </p>
-                  <p className="mt-2 mn-reveal-font-display text-xl font-medium leading-tight">
+                  <p className="mt-2 mn-reveal-font-display text-lg font-medium leading-tight">
                     {option.organisationName}
                   </p>
                   {amountText || etaText ? (
-                    <p className={`mt-2 text-xs leading-5 ${selected ? "text-[var(--mn-ink-soft)]" : "text-[var(--mn-cream)]/72"}`}>
+                    <p className="mt-2 text-xs leading-5 text-[var(--mn-ink-soft)]">
                       {[amountText, etaText].filter(Boolean).join(" · ")}
                     </p>
                   ) : null}
@@ -1393,71 +1454,71 @@ function RevealProductsFinalSection({
         ) : null}
 
         {productMatchingPending ? (
-          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3" data-reveal>
+          <div className="products-grid grid gap-5 sm:grid-cols-2 xl:grid-cols-3" data-reveal>
             {revealProductPendingCards[locale].map((card) => (
               <article
-                className="product-card rounded-xl border border-white/15 bg-white/[0.08] p-6"
+                className="product-card rounded-xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6"
                 key={card.title}
               >
-                <p className="mn-reveal-font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--mn-teal-light)]">
+                <p className="mn-reveal-font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
                   {copy.productsPendingBadge}
                 </p>
-                <h3 className="mt-3 mn-reveal-font-display text-2xl font-medium leading-tight text-white">
+                <h3 className="mt-3 mn-reveal-font-display text-2xl font-medium leading-tight text-[var(--mn-ink)]">
                   {card.title}
                 </h3>
-                <p className="mt-3 text-sm leading-6 text-[var(--mn-cream)]/75">
+                <p className="mt-3 text-sm leading-6 text-[var(--mn-ink-soft)]">
                   {card.body}
                 </p>
               </article>
             ))}
           </div>
         ) : products.length < 1 ? (
-          <div className="rounded-xl border border-white/15 bg-white/[0.08] p-8 text-center text-[var(--mn-cream)]/80" data-reveal>
+          <div className="rounded-xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-8 text-center text-[var(--mn-ink-soft)]" data-reveal>
             {copy.productsEmpty}
           </div>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4" data-reveal>
+          <div className="products-grid grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(220px,1fr))]" data-reveal>
             {products.map((product, index) => {
               const productId = product.productId ?? product.id;
               const selected = selectedBasketIds.has(productId);
 
               return (
                 <article
-                  className={`product-card flex min-h-full flex-col overflow-hidden rounded-2xl border transition ${
+                  className={`product-card relative flex min-h-full flex-col rounded-xl border p-5 pb-5 transition ${
                     selected
-                      ? "border-[var(--mn-line)] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-soft)] hover:-translate-y-1"
-                      : "border-white/15 bg-white/[0.08] opacity-75"
+                      ? "border-[var(--mn-line)] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-soft)] hover:-translate-y-1 hover:shadow-[var(--mn-shadow-card)]"
+                      : "border-[var(--mn-line)] bg-[var(--mn-paper)] opacity-70"
                   }`}
                   key={`${product.recommendationRunId ?? "product"}:${product.id}`}
                 >
-                  <div className="relative flex h-56 items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#fff,var(--mn-mint))]">
-                    <span className="absolute left-4 top-4 z-10 mn-reveal-font-display text-3xl italic text-[var(--mn-gold)]">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <span className="absolute right-4 top-4 z-10 rounded-full bg-white/85 px-3 py-1 text-[11px] font-bold text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]">
-                      {selected ? copy.productVerified : finalCopy.productRemoved}
-                    </span>
+                  <span className="absolute left-5 top-4 z-10 mn-reveal-font-display text-[22px] italic leading-none text-[var(--mn-gold)]">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className="absolute right-5 top-4 z-10 rounded-full bg-[var(--mn-mint-deep)] px-2.5 py-1 text-[10px] font-semibold tracking-[0.04em] text-[var(--mn-teal-deep)]">
+                    {selected ? copy.productVerified : finalCopy.productRemoved}
+                  </span>
+                  <div className="my-10 mb-4 flex h-[130px] w-[110px] self-center">
                     {product.imageUrl ? (
                       <Image
                         alt={product.name}
-                        className="relative z-[1] h-full w-full object-contain p-8"
-                        height={240}
+                        className="h-full w-full object-contain"
+                        height={260}
                         loading="eager"
                         src={product.imageUrl}
                         unoptimized={true}
-                        width={320}
+                        width={220}
                       />
                     ) : (
-                      <div className="grid size-28 place-items-center rounded-2xl bg-white mn-reveal-font-display text-4xl italic text-[var(--mn-teal-deep)] ring-1 ring-[var(--mn-line)]">
-                        MN
+                      <div className="grid h-full w-full place-items-center rounded bg-[var(--mn-mint-deep)] px-2 text-center mn-reveal-font-mono text-[9px] uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
+                        Product photo
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-1 flex-col p-5">
+                  <div className="flex flex-1 flex-col">
                     <p className="mn-reveal-font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--mn-ash)]">
                       {localizedMarketplaceName(product.marketplace, locale)}
                     </p>
-                    <h3 className="mt-2 min-h-14 mn-reveal-font-display text-base font-medium leading-[1.25] text-[var(--mn-ink)]">
+                    <h3 className="mt-2 min-h-[60px] mn-reveal-font-display text-base font-medium leading-[1.25] text-[var(--mn-ink)]">
                       {product.name}
                     </h3>
                     <div className="mt-4 flex flex-wrap gap-1.5">
@@ -1483,7 +1544,7 @@ function RevealProductsFinalSection({
                       })}
                     </p>
                     <button
-                      className="product-remove-btn mt-5 w-fit rounded-full border border-[var(--mn-line)] px-4 py-2 text-xs font-bold text-[var(--mn-ash)] transition hover:border-[var(--mn-teal)] hover:text-[var(--mn-teal-deep)]"
+                      className="product-remove-btn mt-5 w-fit rounded-full border border-[var(--mn-line)] bg-transparent px-3.5 py-1.5 mn-reveal-font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--mn-ink-soft)] transition hover:border-[var(--mn-reveal-caution-edge)] hover:bg-[var(--mn-reveal-caution-bg)] hover:text-[var(--mn-reveal-caution-ink)]"
                       onClick={() => {
                         updateSelectedBasketIds((current) => {
                           const next = new Set(current);
@@ -1506,8 +1567,16 @@ function RevealProductsFinalSection({
           </div>
         )}
 
-        <div className="summary-card mt-8 rounded-2xl border border-white/15 bg-[var(--mn-paper)] p-6 text-[var(--mn-ink)]" data-reveal>
-          <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr] lg:items-center">
+        <div className="summary-card mt-8 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] px-8 py-7 text-[var(--mn-ink)]" data-reveal>
+          <div className="mb-6 h-1.5 overflow-hidden rounded-full bg-[var(--mn-line)]/40">
+            <div
+              className="h-full rounded-full bg-linear-to-r from-[var(--mn-teal)] to-[var(--mn-teal-deep)] transition-[width] duration-1000"
+              style={{
+                width: `${Math.min(100, Math.max(0, selectedBasketCoverage))}%`,
+              }}
+            />
+          </div>
+          <div className="grid gap-5 md:grid-cols-[1.4fr_repeat(3,1fr)] md:items-center">
             <div>
               <h3 className="mn-reveal-font-display text-[22px] font-medium leading-[1.25]">
                 {productMatchingPending
@@ -1521,50 +1590,41 @@ function RevealProductsFinalSection({
                 {copy.coverageSub}
               </p>
             </div>
-            <div>
-              <div className="h-2 overflow-hidden rounded-full bg-[var(--mn-line)]">
-                <div
-                  className="h-full rounded-full bg-[var(--mn-teal)] transition-[width] duration-1000"
-                  style={{
-                    width: `${Math.min(100, Math.max(0, selectedBasketCoverage))}%`,
-                  }}
-                />
-              </div>
-              <div className="mt-5 grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <p className="mn-reveal-font-display text-[32px] font-medium italic leading-none text-[var(--mn-teal-deep)]">
-                    <CountUpNumber active={true} value={selectedBasketProducts.length} />
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--mn-ash)]">
-                    {finalCopy.basketSelected}
-                  </p>
-                </div>
-                <div>
-                  <p className="mn-reveal-font-display text-[32px] font-medium italic leading-none text-[var(--mn-teal-deep)]">
-                    <CountUpNumber active={true} value={coveredProductNeedCount} />
-                    /{Math.max(supplementSelectedCount, productNeedCount)}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--mn-ash)]">
-                    {copy.prioritiesCovered}
-                  </p>
-                </div>
-                <div className="group relative">
-                  <p className="mn-reveal-font-display text-[32px] font-medium italic leading-none text-[var(--mn-teal-deep)]">
-                    <CountUpNumber active={true} value={selectedBasketCoverage} />%
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--mn-ash)]">
-                    {finalCopy.formulaMatch}
-                  </p>
-                  <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 rounded-md bg-[var(--mn-ink)] px-3 py-2 text-left text-[11px] leading-[1.5] text-[var(--mn-cream)] opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                    {finalCopy.formulaMatchTooltip}
-                  </span>
-                </div>
-              </div>
+            <div className="text-center">
+              <p className="mn-reveal-font-display text-[32px] font-medium italic leading-none text-[var(--mn-teal-deep)]">
+                <CountUpNumber active={true} value={selectedBasketProducts.length} />
+              </p>
+              <p className="mt-2 mn-reveal-font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--mn-ash)]">
+                {finalCopy.basketSelected}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="mn-reveal-font-display text-[32px] font-medium italic leading-none text-[var(--mn-teal-deep)]">
+                <CountUpNumber active={true} value={coveredProductNeedCount} />
+                /{Math.max(supplementSelectedCount, productNeedCount)}
+              </p>
+              <p className="mt-2 mn-reveal-font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--mn-ash)]">
+                {copy.prioritiesCovered}
+              </p>
+            </div>
+            <div className="group relative text-center">
+              <p className="mn-reveal-font-display text-[32px] font-medium italic leading-none text-[var(--mn-teal-deep)]">
+                <CountUpNumber active={true} value={selectedBasketCoverage} />%
+              </p>
+              <p className="mt-2 inline-flex items-center gap-1 mn-reveal-font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--mn-ash)]">
+                {finalCopy.formulaMatch}
+                <span className="grid size-3 place-items-center rounded-full border border-[var(--mn-ash)] text-[8px]">
+                  i
+                </span>
+              </p>
+              <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 rounded-md bg-[var(--mn-ink)] px-3 py-2 text-left text-[11px] leading-[1.5] text-[var(--mn-cream)] opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                {finalCopy.formulaMatchTooltip}
+              </span>
             </div>
           </div>
         </div>
 
-        <div className="checkout-card mt-6 grid gap-6 rounded-2xl border border-white/15 bg-[var(--mn-paper)] p-6 md:grid-cols-[1fr_auto] md:items-center" data-reveal>
+        <div className="checkout-card mt-6 grid gap-6 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] px-8 py-6 md:grid-cols-[1fr_auto] md:items-center" data-reveal>
           <div>
             <div className="mn-reveal-font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--mn-ash)]">
               {finalCopy.subtotal}
@@ -1816,7 +1876,7 @@ function RevealFoodSupportFinalSection({
   }
 
   return (
-    <section className="border-t border-[var(--mn-line)] bg-[var(--mn-cream-deep)] py-24">
+    <section className="mn-reveal-food border-t border-[var(--mn-line)] bg-[var(--mn-cream-deep)] py-24">
       <div className="mn-reveal-final-wrap">
         <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-end" data-reveal>
           <div>
@@ -2041,15 +2101,14 @@ function RevealPanyaFinalSection({
 
   return (
     <section
-      className="mn-reveal-panya border-t border-[var(--mn-line)] bg-[var(--mn-cream)] py-20"
+      className="mn-reveal-panya border-t border-[var(--mn-line)] py-16"
       data-reveal
       id="panya-support"
     >
       <div className="mn-reveal-final-wrap">
-        <div className="grid gap-8 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-soft)] md:grid-cols-[0.85fr_1.15fr] md:items-center md:p-8">
+        <div className="mn-reveal-panya-card grid gap-8 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-soft)] md:grid-cols-[0.85fr_1.15fr] md:items-center md:p-8">
           <div>
             <div className="mn-reveal-final-label">
-              <span className="mn-reveal-final-label-number">5.5</span>
               {finalCopy.panyaSection}
             </div>
             <h2 className="mn-reveal-final-heading mt-4 text-[clamp(30px,3.8vw,48px)]">
@@ -2059,7 +2118,7 @@ function RevealPanyaFinalSection({
               {body}
             </p>
           </div>
-          <div className="rounded-xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-soft)]">
+          <div className="mn-reveal-panya-connect rounded-xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-soft)]">
             <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
               <a
                 className={`grid size-40 place-items-center rounded-xl bg-white p-2 ring-1 ring-[var(--mn-line)] ${
@@ -2282,10 +2341,11 @@ function RevealClosingFinalSection({
           </p>
           <div className="closing-actions mt-14 flex flex-col justify-center gap-3.5 sm:flex-row">
             <button
-              className="inline-flex items-center justify-center rounded-full bg-[var(--mn-gold-soft)] px-7 py-4 text-sm font-semibold text-[var(--mn-teal-deep)] transition hover:bg-[#f2ddaa]"
+              className="inline-flex items-center justify-center gap-2.5 rounded-full bg-[var(--mn-gold-soft)] px-7 py-4 text-sm font-semibold text-[var(--mn-teal-deep)] transition hover:-translate-y-0.5 hover:bg-[#f2ddaa]"
               onClick={() => window.print()}
               type="button"
             >
+              <Printer aria-hidden={true} className="size-4" />
               {copy.print}
             </button>
             <Link

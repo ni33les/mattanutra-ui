@@ -3528,6 +3528,45 @@
     outline-offset: 3px;
   }
 
+  .mn-reveal-final .mn-reveal-assessment,
+  .mn-reveal-final .mn-reveal-formula {
+    background: var(--mn-cream);
+  }
+
+  .mn-reveal-final .mn-reveal-distillation {
+    background:
+      radial-gradient(ellipse 60% 50% at 50% 50%, rgb(220 233 222 / 0.5) 0%, transparent 70%),
+      var(--mn-cream);
+  }
+
+  .mn-reveal-final .mn-reveal-products {
+    background:
+      linear-gradient(180deg, transparent 0%, var(--mn-cream-deep) 100%),
+      var(--mn-cream);
+  }
+
+  .mn-reveal-final .mn-reveal-concierge-banner {
+    box-shadow: 0 24px 60px -34px rgb(31 110 88 / 0.62);
+  }
+
+  .mn-reveal-final .mn-reveal-selected-pharmacy {
+    box-shadow: var(--mn-shadow-soft);
+  }
+
+  .mn-reveal-final .mn-reveal-pharmacy-card {
+    border-left: 4px solid transparent;
+    box-shadow: var(--mn-shadow-soft);
+  }
+
+  .mn-reveal-final .mn-reveal-products .product-card {
+    box-shadow: var(--mn-shadow-soft);
+  }
+
+  .mn-reveal-final .mn-reveal-products .summary-card,
+  .mn-reveal-final .mn-reveal-products .checkout-card {
+    box-shadow: 0 18px 40px -28px rgb(10 37 64 / 0.2);
+  }
+
   .mn-reveal-final .ink-section {
     overflow: hidden;
     background:
@@ -3561,6 +3600,14 @@
   .mn-reveal-final .mn-reveal-panya {
     background:
       linear-gradient(180deg, var(--mn-cream) 0%, var(--mn-cream-deep) 100%);
+  }
+
+  .mn-reveal-final .mn-reveal-panya-card {
+    box-shadow: 0 26px 70px -46px rgb(10 37 64 / 0.28);
+  }
+
+  .mn-reveal-final .mn-reveal-panya-connect {
+    box-shadow: 0 18px 46px -34px rgb(10 37 64 / 0.26);
   }
 
   .mn-reveal-final .mn-reveal-foodgap-card {

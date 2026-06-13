@@ -60,6 +60,7 @@ describe("final reveal UX", () => {
 
     assert.match(successReturn, /<FormulationResults/);
     assert.doesNotMatch(successReturn, /<TitleBar/);
+    assert.match(successReturn, /<SiteFooter/);
     assert.match(reveal, /function RevealBrandBar/);
     assert.match(reveal, /className="mn-reveal-brandbar/);
     assert.match(reveal, /mn-reveal-brand-word/);
@@ -80,6 +81,13 @@ describe("final reveal UX", () => {
       "function RevealClosingFinalSection",
     ]);
     assert.doesNotMatch(reveal, /function RevealSafetyClosingSection/);
+    assert.doesNotMatch(reveal, />5\.5</);
+    assert.match(reveal, /<span className="mn-reveal-final-label-number">01<\/span>/);
+    assert.match(reveal, /<span className="mn-reveal-final-label-number">02<\/span>/);
+    assert.match(reveal, /<span className="mn-reveal-final-label-number">03<\/span>/);
+    assert.match(reveal, /<span className="mn-reveal-final-label-number">04<\/span>/);
+    assert.match(reveal, /<span className="mn-reveal-final-label-number">05<\/span>/);
+    assert.match(reveal, /<span className="mn-reveal-final-label-number">06<\/span>/);
   });
 
   it("keeps checkout as the current basket handoff contract", () => {
@@ -98,6 +106,10 @@ describe("final reveal UX", () => {
     assert.match(css, /\.mn-reveal-final \.pharmacist-portrait img/);
     assert.match(css, /object-position: 50% 12%/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-foodgap-card/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-assessment/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-distillation/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-products/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-products \.product-card/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-pharmacist/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-safety/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-closing/);
@@ -165,6 +177,7 @@ describe("final reveal UX", () => {
   });
 
   it("uses compact food-gap cards and keeps safety separate from closing", () => {
+    assert.match(reveal, /className="mn-reveal-food border-t/);
     assert.match(reveal, /className="mn-reveal-foodgap-card foodgap-card"/);
     assert.match(reveal, /mn-reveal-foodgap-card__header/);
     assert.match(reveal, /mn-reveal-foodgap-card__icon/);
@@ -176,6 +189,11 @@ describe("final reveal UX", () => {
 
   it("keeps Panya as a top-level reveal section with existing LINE behavior", () => {
     assert.match(reveal, /id="panya-support"/);
+    assert.match(reveal, /className="mn-reveal-panya border-t/);
+    assert.match(reveal, /className="mn-reveal-panya-card/);
+    assert.match(reveal, /className="mn-reveal-panya-connect/);
+    assert.match(reveal, /<div className="mn-reveal-final-label">\s*\{finalCopy\.panyaSection\}/);
+    assert.doesNotMatch(reveal, /panyaSection\}\s*<\/div>[\s\S]{0,120}mn-reveal-final-label-number/);
     assert.match(reveal, /source: "reveal_panya_support"/);
     assert.match(reveal, /\/api\/assessment\/\$\{encodeURIComponent\(planId\)\}\/line-connect/);
     assert.match(reveal, /\/api\/qr\?data=/);
@@ -188,5 +206,19 @@ describe("final reveal UX", () => {
     assert.match(reveal, /visibleSupplementRecommendationCount\(result\)/);
     assert.doesNotMatch(reveal, /lockedSupplementCount/);
     assert.doesNotMatch(reveal, /nutrientsChosen/);
+  });
+
+  it("matches the handoff product shelf instead of the old dark reveal band", () => {
+    assert.match(reveal, /className="mn-reveal-products border-t border-\[var\(--mn-line\)\] py-24"/);
+    assert.doesNotMatch(reveal, /className="ink-section[^"]*"\s+id="products"/);
+    assert.match(reveal, /mn-reveal-concierge-banner/);
+    assert.match(reveal, /mn-reveal-selected-pharmacy/);
+    assert.match(reveal, /mn-reveal-retailer-choices/);
+    assert.match(reveal, /mn-reveal-pharmacy-card/);
+    assert.match(reveal, /className="products-grid grid grid-cols-1 gap-5/);
+    assert.match(reveal, /className="summary-card mt-8 rounded-2xl border border-\[var\(--mn-line\)\] bg-\[var\(--mn-paper\)\] px-8 py-7/);
+    assert.match(reveal, /className="checkout-card mt-6 grid gap-6 rounded-2xl border border-\[var\(--mn-line\)\] bg-\[var\(--mn-paper\)\] px-8 py-6/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-products\s*\{[\s\S]*var\(--mn-cream-deep\)/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-selected-pharmacy/);
   });
 });
