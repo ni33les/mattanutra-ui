@@ -33,8 +33,8 @@ test("final reveal renders the handoff fonts and hero eyebrow rules", async ({
   await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".mn-reveal-final", { state: "visible" });
   await page.evaluate(() => document.fonts.ready);
-  await expect(page.locator(".mn-titlebar")).toHaveCount(0);
-  await expect(page.locator(".mn-reveal-brandbar")).toBeVisible();
+  await expect(page.locator(".mn-titlebar")).toBeVisible();
+  await expect(page.locator(".mn-reveal-brandbar")).toHaveCount(0);
 
   const headline = page.locator(".mn-reveal-final h1").first();
   await expect(headline).toBeVisible();

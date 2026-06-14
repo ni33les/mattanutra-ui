@@ -130,6 +130,7 @@ export default async function BlogArticlePage({
           currentLocale={locale}
           currentPath={currentPath}
           title={dictionary.hero.eyebrow}
+          variant="landing"
         />
         <ServiceIssue href={currentPath} locale={locale} />
         <SiteFooter content={dictionary.footer} locale={locale} />
@@ -155,11 +156,12 @@ export default async function BlogArticlePage({
         currentPath={currentPath}
         localizedPaths={localizedPaths}
         title={dictionary.hero.eyebrow}
+        variant="landing"
       />
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
         <BlogArticle cta={getArticleCta(locale)} post={post} />
-        <SiteFooter content={dictionary.footer} locale={locale} />
       </div>
+      <SiteFooter content={dictionary.footer} locale={locale} />
     </main>
   );
 }

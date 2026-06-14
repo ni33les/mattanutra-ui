@@ -28,7 +28,7 @@ export const assessmentUiCopy = {
         : `${progress}% complete. Essentials are ready; optional precision data can refine the formula further.`,
     precisionMarks: ["Start", "Essentials -> 80%", "Precision -> 100%"],
     stagesAria: "Assessment stages",
-    processingError: "We could not start processing. Please try again.",
+    processingError: "We could not start processing at this time.",
     scoreProcessingSubtitle: "We are scoring your main wellness domains from your answers.",
     scoreProcessingTitle: "Preparing your HealthScore",
     scoreGate: {
@@ -36,6 +36,20 @@ export const assessmentUiCopy = {
       title: "Your HealthScore is ready"
     },
     retry: "Try again",
+    resume: {
+      body:
+        "Leave your email and we will send a private link back to this exact spot. That is all it is for.",
+      error: "We could not send the private link at this time.",
+      inputLabel: "Email address",
+      invalid: "Enter a valid email address or leave this optional field blank.",
+      optional: "Optional",
+      placeholder: "you@email.com (only if you want a way back)",
+      privacy: "Saved only to return you to your assessment. Never used for marketing without consent.",
+      send: "Send private link",
+      sending: "Sending...",
+      sent: "Private link sent. Check your inbox.",
+      title: "Need to step away?"
+    },
     section: (current: number, total: number) => `Step ${current} / ${total}`,
     selectCountry: "Select country",
     sunHint: "Helps tune vitamin D and sun exposure context.",
@@ -56,7 +70,7 @@ export const assessmentUiCopy = {
         : `เสร็จแล้ว ${progress}% ข้อมูลหลักพร้อมแล้ว ข้อมูลเสริมช่วยปรับสูตรให้ละเอียดขึ้น`,
     precisionMarks: ["เริ่มต้น", "ข้อมูลหลัก -> 80%", "ความแม่นยำ -> 100%"],
     stagesAria: "ขั้นตอนแบบประเมิน",
-    processingError: "ไม่สามารถเริ่มการประมวลผลได้ โปรดลองอีกครั้ง",
+    processingError: "ไม่สามารถเริ่มการประมวลผลได้ในขณะนี้",
     scoreProcessingSubtitle: "เรากำลังประเมินภาพรวมสุขภาพจากคำตอบของคุณ",
     scoreProcessingTitle: "กำลังเตรียมคะแนนสุขภาพของคุณ",
     scoreGate: {
@@ -64,6 +78,20 @@ export const assessmentUiCopy = {
       title: "คะแนนสุขภาพของคุณพร้อมแล้ว"
     },
     retry: "ลองอีกครั้ง",
+    resume: {
+      body:
+        "ฝากอีเมลไว้ แล้วเราจะส่งลิงก์ส่วนตัวเพื่อกลับมายังจุดนี้เท่านั้น",
+      error: "ไม่สามารถส่งลิงก์ส่วนตัวได้ในขณะนี้",
+      inputLabel: "อีเมล",
+      invalid: "กรุณาใส่อีเมลที่ถูกต้อง หรือเว้นช่องนี้ไว้",
+      optional: "ไม่บังคับ",
+      placeholder: "you@email.com (ถ้าต้องการลิงก์กลับมา)",
+      privacy: "บันทึกไว้เพื่อกลับมาทำแบบประเมินต่อเท่านั้น ไม่ใช้เพื่อการตลาดหากไม่ได้ยินยอม",
+      send: "ส่งลิงก์ส่วนตัว",
+      sending: "กำลังส่ง...",
+      sent: "ส่งลิงก์ส่วนตัวแล้ว โปรดตรวจสอบอีเมล",
+      title: "ต้องพักก่อนหรือไม่?"
+    },
     section: (current: number, total: number) => `ขั้นตอน ${current} / ${total}`,
     selectCountry: "เลือกประเทศ",
     sunHint: "ช่วยปรับบริบทวิตามินดีและการได้รับแดด",
@@ -84,7 +112,7 @@ export const assessmentUiCopy = {
         : `已完成 ${progress}%。核心信息已准备好；可选精准数据能进一步优化配方。`,
     precisionMarks: ["开始", "核心 -> 80%", "精准 -> 100%"],
     stagesAria: "评估步骤",
-    processingError: "无法开始处理，请重试。",
+    processingError: "目前无法开始处理。",
     scoreProcessingSubtitle: "我们正在根据你的回答评估主要健康维度。",
     scoreProcessingTitle: "正在准备你的 HealthScore",
     scoreGate: {
@@ -92,6 +120,20 @@ export const assessmentUiCopy = {
       title: "你的 HealthScore 已准备好"
     },
     retry: "重试",
+    resume: {
+      body:
+        "留下邮箱，我们会发送一个私人链接，让你回到当前这一步。仅用于恢复评估进度。",
+      error: "目前无法发送私人链接。",
+      inputLabel: "邮箱地址",
+      invalid: "请输入有效邮箱，或留空此可选项。",
+      optional: "可选",
+      placeholder: "you@email.com（仅在你想稍后回来时填写）",
+      privacy: "仅用于恢复你的评估进度。未经同意不会用于营销。",
+      send: "发送私人链接",
+      sending: "发送中...",
+      sent: "私人链接已发送，请查看收件箱。",
+      title: "需要稍后继续？"
+    },
     section: (current: number, total: number) => `第 ${current} / ${total} 步`,
     selectCountry: "选择国家",
     sunHint: "帮助调整维生素 D 和日晒背景。",
@@ -116,6 +158,19 @@ export const assessmentUiCopy = {
     title: string;
   };
   retry: string;
+  resume: {
+    body: string;
+    error: string;
+    inputLabel: string;
+    invalid: string;
+    optional: string;
+    placeholder: string;
+    privacy: string;
+    send: string;
+    sending: string;
+    sent: string;
+    title: string;
+  };
   section: (current: number, total: number) => string;
   selectCountry: string;
   stagesAria: string;

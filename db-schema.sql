@@ -661,6 +661,8 @@ CREATE TABLE public.assessments (
     answers jsonb DEFAULT '{}'::jsonb NOT NULL,
     answer_summary jsonb DEFAULT '{}'::jsonb NOT NULL,
     first_name text,
+    contact_email text,
+    contact_email_captured_at timestamp with time zone,
     health_score jsonb DEFAULT '{}'::jsonb NOT NULL,
     queue_position integer,
     error_message text,
@@ -668,6 +670,28 @@ CREATE TABLE public.assessments (
     plan_selected_at timestamp with time zone,
     processing_started_at timestamp with time zone,
     completed_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: assessment_resume_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.assessment_resume_drafts (
+    id uuid PRIMARY KEY,
+    plan_id uuid NOT NULL,
+    locale text NOT NULL REFERENCES public.site_locales(code),
+    answers jsonb DEFAULT '{}'::jsonb NOT NULL,
+    section_index integer DEFAULT 0 NOT NULL,
+    contact_email text NOT NULL,
+    email_hash text NOT NULL,
+    token_hash text UNIQUE NOT NULL,
+    payment_id uuid,
+    expires_at timestamp with time zone NOT NULL,
+    last_opened_at timestamp with time zone,
+    finalized_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 

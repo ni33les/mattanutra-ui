@@ -346,6 +346,9 @@ describe("admin RBAC", () => {
     assert.match(access, /function normalOrganisationCountry/);
 	    assert.match(access, /currency = \$\{normalizedCurrency\}/);
 	    assert.match(access, /country_code = \$\{normalizedCountryCode\}/);
+    assert.match(access, /normalizeDispatchCity\(dispatchCity\)/);
+    assert.match(access, /jsonb_build_object\('dispatchCity'/);
+    assert.match(access, /returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency, metadata/);
 	    assert.match(access, /Only platform admins can update organisation currency/);
 	    assert.match(access, /canEditCustomerPriceMargin/);
 	    assert.match(access, /Customer margin can only be updated at platform level/);
@@ -361,12 +364,17 @@ describe("admin RBAC", () => {
     assert.match(accessRoute, /const countryCode = countryValue\(body\.countryCode, "TH"\)/);
     assert.match(accessRoute, /currency,/);
     assert.match(accessRoute, /countryCode,/);
+    assert.match(accessRoute, /dispatchCity: text\(body\.dispatchCity\)/);
     assert.match(accessView, /supportedOrganisationCurrencies/);
     assert.match(accessView, /productCountryOptions/);
+    assert.match(accessView, /organisationDispatchCityLabels/);
     assert.match(accessView, /currency: String\(form\.get\("currency"\) \?\? "THB"\)/);
     assert.match(accessView, /countryCode: String\(form\.get\("countryCode"\) \?\? "TH"\)/);
+    assert.match(accessView, /dispatchCity: String\(form\.get\("dispatchCity"\) \?\? ""\)/);
     assert.match(accessView, /name="currency"/);
     assert.match(accessView, /name="countryCode"/);
+    assert.match(accessView, /name="dispatchCity"/);
+    assert.match(accessView, /defaultValue=\{organisation\.dispatchCity \?\? ""\}/);
     assert.match(accessView, /defaultValue=\{organisation\.currency\}/);
     assert.match(accessView, /defaultValue=\{organisation\.countryCode\}/);
     assert.match(accessView, /labels\.settings\.currency/);

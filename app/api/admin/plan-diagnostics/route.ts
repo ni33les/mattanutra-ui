@@ -101,6 +101,7 @@ export async function GET(request: Request) {
     sql<Array<{
       completed_at: Date | string | null;
       health_score: unknown;
+      contact_email: string | null;
       locale: string;
       plan_selected_at: Date | string | null;
       selected_plan: string | null;
@@ -109,6 +110,7 @@ export async function GET(request: Request) {
     }>>`
       select
         completed_at,
+        contact_email,
         health_score,
         locale,
         plan_selected_at,
@@ -219,6 +221,7 @@ export async function GET(request: Request) {
     `,
     sql<Array<{
       actor_type: string;
+      address: string;
       channel_type: string;
       id: string;
       status: string;
@@ -226,6 +229,7 @@ export async function GET(request: Request) {
     }>>`
       select
         communication_channels.id::text,
+        communication_channels.address,
         communication_channels.channel_type,
         communication_channels.status,
         communication_channels.actor_type,
@@ -290,7 +294,9 @@ export async function GET(request: Request) {
   return NextResponse.json(
     {
       communication: {
+        contactEmail: assessment.contact_email,
         channels: communicationRows.map((row) => ({
+          address: row.channel_type === "email" ? row.address : null,
           actorType: row.actor_type,
           channelType: row.channel_type,
           id: row.id,

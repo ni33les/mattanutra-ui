@@ -20,7 +20,10 @@ import {
   normalizeProductStackPreference,
   type ProductStackPreference
 } from "@/lib/product-recommendations";
-import { queueDuePanyaCheckIn } from "@/lib/panya";
+import {
+  queueDuePanyaCheckIn,
+  queueDuePanyaReorderCallback
+} from "@/lib/panya";
 import { requiredCapabilitiesForWorkTaskType } from "@/lib/system-agents";
 import { createTask, type TaskDependencyType } from "@/lib/task-service";
 import {
@@ -2715,6 +2718,19 @@ async function enqueueDueCronTasks() {
 
       if (action.action_type === "panya_checkin") {
         const result = await queueDuePanyaCheckIn({
+          cronId: action.id,
+          planId
+        });
+
+        if (result.queued) {
+          queued += 1;
+        }
+
+        continue;
+      }
+
+      if (action.action_type === "panya_reorder_callback") {
+        const result = await queueDuePanyaReorderCallback({
           cronId: action.id,
           planId
         });

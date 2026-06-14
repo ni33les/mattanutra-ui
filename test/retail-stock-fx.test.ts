@@ -321,12 +321,16 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /<PackageCheck aria-hidden="true"/);
 	    assert.match(view, /<Truck aria-hidden="true"/);
 	    assert.match(view, /<ReceiptText aria-hidden="true"/);
-    assert.match(view, /title="Mark Shipped"/);
+    assert.doesNotMatch(view, /title="Mark Shipped"/);
 	    assert.match(view, /labels\.stock\.bookPickup/);
 	    assert.match(view, /book_order_pickup/);
-	    assert.match(view, /openShipmentEditor\(customerOrderDetail\)/);
-	    assert.match(view, /Products are packed and ready to hand to the courier\/customer\./);
-	    assert.match(view, /confirmedPacked/);
+	    assert.match(view, /openPickupDialog\(customerOrderDetail\)/);
+	    assert.match(view, /markCustomerOrderShipped\(customerOrderDetail\)/);
+	    assert.match(view, /runCustomerOrderAction\(customerOrderDetail, "mark_packed"\)/);
+	    assert.match(view, /Generate official label/);
+	    assert.match(view, /Print fallback label/);
+	    assert.doesNotMatch(view, /Products are packed and ready to hand to the courier\/customer\./);
+	    assert.doesNotMatch(view, /confirmedPacked/);
 	    assert.match(view, /carrierName/);
 	    assert.match(view, /trackingNumber/);
 	    assert.match(view, /trackingUrl/);
@@ -334,10 +338,6 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.doesNotMatch(
 	      view,
 	      /runCustomerOrderAction\(customerOrderDetail, "mark_picking"\)/
-	    );
-	    assert.doesNotMatch(
-	      view,
-	      /runCustomerOrderAction\(customerOrderDetail, "mark_packed"\)/
 	    );
 	    assert.doesNotMatch(view, /package-insert|packageInsert|FileText/);
 	    assert.match(service, /function deliveryDetailsFromMetadata/);
@@ -451,6 +451,7 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /function customerOrderIncludedInAllMetric/);
 	    assert.match(view, /!customerOrderAllExcludedStatuses\.has\(order\.status\)/);
 	    assert.match(view, /function customerOrderHasPickupBooked/);
+	    assert.match(view, /\["booked", "queued", "requested"\]\.includes\(providerStatus\)/);
 	    assert.match(view, /function customerOrderStatusMetricKey/);
 	    assert.match(view, /return "pickup_booked";/);
 	    assert.match(view, /if \(status === "picking"\) \{\s*return "packed";\s*\}/);
@@ -560,6 +561,9 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /current === "ready_to_pack"[\s\S]*current === "ready_to_ship"[\s\S]*current === "pickup_booked"[\s\S]*current === "sent"[\s\S]*key: "awaiting_stock"/);
 	    assert.match(view, /label: labels\.stock\.readyToPack/);
 	    assert.match(view, /label: labels\.stock\.readyToShip/);
+	    assert.match(view, /active: current === "ready_to_ship" \|\| current === "pickup_booked"/);
+	    assert.match(view, /active: false,[\s\S]*key: "pickup_booked"/);
+	    assert.match(view, /active: false,[\s\S]*key: "sent"/);
 	    assert.match(view, /label: labels\.stock\.pickupBooked/);
 	    assert.match(view, /order\.workflowTimeline\.boxedAt \?\? order\.workflowTimeline\.allocatedAt/);
 	    assert.match(view, /grid gap-3 md:grid-cols-6/);
@@ -584,7 +588,7 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /retailAvailabilityLabel\(\s*line\.availabilityStatus\s*\)/);
 	    assert.doesNotMatch(view, /readableToken\(line\.availabilityStatus\)/);
 	    assert.match(view, /\{labels\.stock\.quantity\}[\s\S]*\{line\.quantityOrdered\}[\s\S]*\{labels\.stock\.retailPrice\}[\s\S]*formatPrice\([\s\S]*line\.retailPriceAmount[\s\S]*\{labels\.stock\.lineTotal\}[\s\S]*line\.retailPriceAmount \* line\.quantityOrdered/);
-	    assert.match(view, /shipmentEditorLines\.map\(\(line\) =>/);
+	    assert.match(view, /const pickupDialogItemCount = pickupDialogLines\.reduce/);
 	    assert.match(view, /\{labels\.stock\.quantity\}[\s\S]*\{labels\.stock\.retailPrice\}[\s\S]*\{labels\.stock\.lineTotal\}/);
 	    assert.doesNotMatch(view, /\{labels\.stock\.lineTotal\}: /);
 	    assert.doesNotMatch(view, /\{labels\.stock\.allocate\}: \{line\.quantityAllocated\}/);
@@ -689,8 +693,10 @@ describe("retail stock and FX infrastructure", () => {
 				    assert.doesNotMatch(view, /panel === "reorder"/);
 				    assert.doesNotMatch(view, /labels\.stock\.purchasePlan/);
 				    assert.match(view, /labels\.stock\.reorderRecommendations/);
-				    assert.doesNotMatch(view, /labels\.stock\.reorderBackordersDescription/);
-				    assert.doesNotMatch(view, /labels\.stock\.reorderRecommendationsDescription/);
+				    assert.match(view, /labels\.stock\.reorderBackordersDescription/);
+				    assert.match(view, /labels\.stock\.reorderRecommendationsDescription/);
+				    assert.match(view, /defaultOutstandingPurchaseKeys[\s\S]*reorderPurchaseItems\[0\]\?\.organisationId/);
+				    assert.match(view, /return reorderPurchaseItems[\s\S]*orgProductKey\(item\.organisationId, item\.productId\)/);
 				    assert.doesNotMatch(view, /<th className="py-2 pl-3 pr-3" \/>[\s\S]*<th className="py-2 pr-3">\{labels\.stock\.product\}<\/th>[\s\S]*<th className="py-2 pr-3">Brand<\/th>[\s\S]*<th className="py-2 pr-3">\{labels\.stock\.quantity\}<\/th>/);
 				    assert.doesNotMatch(view, /<th className="py-2 pl-3 pr-3">\s*\{labels\.stock\.selectProduct\}\s*<\/th>/);
 				    assert.match(view, /className="px-3 pb-3 pt-5"/);
@@ -700,6 +706,10 @@ describe("retail stock and FX infrastructure", () => {
 				    assert.match(view, /reorderRecommendationItems/);
 				    assert.match(view, /shoppingListCandidateItems/);
 				    assert.match(view, /labels\.stock\.reorderRecommendations[\s\S]*labels\.stock\.createShoppingList[\s\S]*labels\.stock\.shoppingLists/);
+				    assert.match(view, /pendingShoppingList/);
+				    assert.match(view, /setPendingShoppingList\(\{/);
+				    assert.match(view, /const shoppingListModalList = activeShoppingList \?\? pendingShoppingList/);
+				    assert.match(view, /shoppingListModalList \? \(/);
 				    assert.doesNotMatch(view, /min-w-\[680px\]/);
 				    assert.match(view, /labels\.stock\.shoppingLists/);
 				    assert.match(view, /labels\.stock\.quantity/);
@@ -937,6 +947,19 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(service, /selectedRetailerOrganisationId/);
 	    assert.match(service, /shippingCountry/);
 	    assert.match(service, /completeOrderWorkflowTask/);
+	    assert.match(service, /recordRetailCustomerOrderPickupBooked/);
+	    assert.match(service, /action: "book_pickup"/);
+	    assert.match(service, /workflowAction: "book_pickup"/);
+	    assert.match(service, /bookPickup: AdminRetailCustomerOrderActionState/);
+	    assert.match(service, /taskType: "retail_order_pack"/);
+	    assert.match(service, /idempotencyKey: `\$\{order\.id\}:pack`/);
+	    assert.match(service, /expectedTaskTypes: \["retail_order_ship"\]/);
+	    assert.doesNotMatch(service, /action: "book_pickup"[\s\S]*completeOrderWorkflowTask/);
+	    assert.match(service, /customerOrderPickupInProgress\(status, shipment\)/);
+	    assert.match(service, /customerOrderPickupInProgressFromShipmentTable/);
+	    assert.match(service, /reason: "pickup_in_progress"/);
+	    assert.match(service, /pickupInProgress: true/);
+	    assert.match(service, /shipment\?\.pickupBookedAt \?\?[\s\S]*customerOrderPickupInProgress\(status, shipment\) \? updatedAt : null/);
 	    assert.match(service, /assertOrderWorkflowTaskClaimable/);
 	    assert.match(service, /reconcileRetailOrderLifecycle/);
 	    assert.match(service, /admin\.retail_order_lifecycle_reconciled/);
@@ -997,6 +1020,12 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(carrierService, /carrier_shipment_create/);
 	    assert.match(carrierService, /carrier_label_generate/);
 	    assert.match(carrierService, /carrier_pickup_book/);
+	    assert.match(carrierService, /recordRetailCustomerOrderPickupBooked/);
+	    assert.match(carrierService, /pickupProviderStatus: "requested"/);
+	    assert.match(carrierService, /const hasPickupDetails = Boolean/);
+	    assert.match(carrierService, /pickupProviderStatus: input\.pickupProviderStatus \?\? null/);
+	    assert.match(carrierService, /pickup: hasPickupDetails/);
+	    assert.match(carrierService, /pickupProviderStatus: input\.pickupProviderStatus\?\.trim\(\) \|\| "booked"/);
 	    assert.match(carrierService, /carrier_tracking_sync/);
 	    assert.doesNotMatch(carrierService, /carrier_adapter_not_configured/);
 	    assert.doesNotMatch(retailStockRoute, /carrier_tracking_adapter_not_configured/);

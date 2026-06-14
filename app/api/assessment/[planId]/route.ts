@@ -17,6 +17,11 @@ import {
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { bindPaidReservationToAssessment } from "@/lib/stripe-payments";
+import {
+  finalizeAssessmentResumeDraft,
+  finalizeAssessmentResumeDraftForContact
+} from "@/lib/assessment-resume-store";
+import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
 export const runtime = "nodejs";
 
@@ -30,19 +35,24 @@ function reassessmentEmailFromAnswers(answers: unknown) {
   return typeof value === "string" ? value : "";
 }
 
-function buildHealthScore(answers: unknown, locale: unknown) {
+async function buildHealthScore(answers: unknown, locale: unknown) {
   const normalizedLocale = isLocale(locale) ? locale : "en";
 
-  return computeHealthScore(answers, normalizedLocale);
+  return computeHealthScore(answers, normalizedLocale, {
+    evaluatedIngredientCount: await getEvaluatedIngredientCatalogueCount()
+  });
 }
 
 function refreshedHealthScore(
   answers: unknown,
+  evaluatedIngredientCount: number,
   locale: Locale,
   storedHealthScore: HealthScoreResult | null | undefined,
   storedLocale: unknown
 ): HealthScoreResult {
-  const refreshed = computeHealthScore(answers ?? null, locale);
+  const refreshed = computeHealthScore(answers ?? null, locale, {
+    evaluatedIngredientCount
+  });
   const refreshedPageContent = refreshed.pageContent;
 
   if (!refreshedPageContent || !storedHealthScore || storedLocale !== locale) {
@@ -131,6 +141,7 @@ export async function GET(
           ...snapshot,
           healthScore: refreshedHealthScore(
             prefill.answers,
+            await getEvaluatedIngredientCatalogueCount(),
             displayLocale,
             prefill.healthScore,
             prefill.locale
@@ -159,19 +170,23 @@ export async function PATCH(
   const { planId } = await params;
   let body: {
     answers?: unknown;
+    contactEmail?: unknown;
     intent?: "capture" | "process";
     locale?: unknown;
     paymentId?: unknown;
     plan?: unknown;
+    resumeToken?: unknown;
   } = {};
 
   try {
     body = (await request.json()) as {
       answers?: unknown;
+      contactEmail?: unknown;
       intent?: "capture" | "process";
       locale?: unknown;
       paymentId?: unknown;
       plan?: unknown;
+      resumeToken?: unknown;
     };
   } catch {
     body = {};
@@ -210,7 +225,7 @@ export async function PATCH(
     const effectiveAnswers =
       body.answers === undefined ? existingPrefill?.answers : body.answers;
     const selectedPlan = existingPrefill?.plan ?? null;
-    const healthScore = buildHealthScore(effectiveAnswers, body.locale);
+    const healthScore = await buildHealthScore(effectiveAnswers, body.locale);
     const snapshot = createAssessmentSnapshot({
       healthScore,
       plan: selectedPlan ?? existingSnapshot?.plan,
@@ -221,11 +236,35 @@ export async function PATCH(
 
     await persistAssessmentSubmission({
       answers: effectiveAnswers,
+      contactEmail: body.contactEmail,
       locale: body.locale,
       selectedPlan,
       snapshot,
       status: "captured"
     });
+
+    const finalizedResumeEmail =
+      await finalizeAssessmentResumeDraft({
+        planId: snapshot.planId,
+        token: body.resumeToken
+      }) ??
+      await finalizeAssessmentResumeDraftForContact({
+        contactEmail: body.contactEmail,
+        planId: snapshot.planId
+      });
+
+    if (finalizedResumeEmail) {
+      await writeBpmEvent({
+        actorType: "visitor",
+        attribution: bpm.attribution,
+        email: finalizedResumeEmail,
+        eventName: "assessment_resume_finalized",
+        eventType: "funnel",
+        locale: body.locale,
+        planId: snapshot.planId,
+        ray: typeof bpm.ray === "string" ? bpm.ray : null
+      });
+    }
 
     await writeBpmEvent({
       actorType: "visitor",

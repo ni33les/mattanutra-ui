@@ -36,6 +36,7 @@ import {
   sendRetailOrderWorkflowEmail
 } from "@/lib/retail-order-workflow";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
+import { schedulePanyaReorderCallbackForOrder } from "@/lib/panya";
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
 type RetailCheckoutDb = postgres.Sql | postgres.TransactionSql;
@@ -1058,6 +1059,20 @@ async function fulfillRetailCheckoutPayment(
       planId: updated.plan_id,
       sql
     });
+  }
+
+  try {
+    const callbackLocale: Locale = isLocale(updated.locale) ? updated.locale : "en";
+
+    await schedulePanyaReorderCallbackForOrder({
+      locale: callbackLocale,
+      orderId,
+      orderNumber,
+      planId: updated.plan_id,
+      source: "retail_checkout_fulfilled"
+    });
+  } catch (error) {
+    console.warn("Unable to schedule Panya reorder callback", error);
   }
 
   return {

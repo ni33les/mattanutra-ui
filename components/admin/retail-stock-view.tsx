@@ -15,6 +15,7 @@ import type {
   AdminRetailCustomerOrder,
   AdminRetailCustomerOrderAddress,
   AdminRetailCustomerOrderLine,
+  AdminRetailShoppingList,
   AdminRetailStockData,
   AdminRetailStockMovement,
   AdminRetailStockProductOption,
@@ -219,16 +220,15 @@ type CustomerOrderDraft = Readonly<{
   shippingCountry: string;
 }>;
 
-type ShipmentDraft = Readonly<{
+type PickupDialogDraft = Readonly<{
   carrierName: string;
-  confirmedPacked: boolean;
   shipmentNotes: string;
   trackingNumber: string;
   trackingUrl: string;
 }>;
 
-type ShipmentEditor = Readonly<{
-  draft: ShipmentDraft;
+type PickupDialog = Readonly<{
+  draft: PickupDialogDraft;
   order: AdminRetailCustomerOrder;
 }>;
 
@@ -437,11 +437,21 @@ function customerOrderRetailValue(order: AdminRetailCustomerOrder) {
 }
 
 function customerOrderHasPickupBooked(order: AdminRetailCustomerOrder) {
-  return Boolean(order.shipment?.pickupBookedAt) &&
-    order.status !== "shipped" &&
-    order.status !== "delivered" &&
-    order.status !== "cancelled" &&
-    order.status !== "returned";
+  const providerStatus = order.shipment?.pickupProviderStatus?.trim().toLowerCase();
+
+  if (
+    order.status === "shipped" ||
+    order.status === "delivered" ||
+    order.status === "cancelled" ||
+    order.status === "returned"
+  ) {
+    return false;
+  }
+
+  return Boolean(
+    order.shipment?.pickupBookedAt ||
+      (providerStatus && ["booked", "queued", "requested"].includes(providerStatus))
+  );
 }
 
 function customerOrderStatusFilterLabel(status: CustomerOrderMetricKey) {
@@ -715,7 +725,7 @@ function buildCustomerOrderWorkflowSteps(
       label: labels.stock.readyToPack
     },
     {
-      active: current === "ready_to_ship",
+      active: current === "ready_to_ship" || current === "pickup_booked",
       at: order.workflowTimeline.boxedAt ?? order.workflowTimeline.allocatedAt,
       complete:
         Boolean(order.workflowTimeline.boxedAt) ||
@@ -726,7 +736,7 @@ function buildCustomerOrderWorkflowSteps(
       label: labels.stock.readyToShip
     },
     {
-      active: current === "pickup_booked",
+      active: false,
       at: order.workflowTimeline.pickupBookedAt,
       complete:
         Boolean(order.workflowTimeline.pickupBookedAt) ||
@@ -736,7 +746,7 @@ function buildCustomerOrderWorkflowSteps(
       label: labels.stock.pickupBooked
     },
     {
-      active: current === "sent",
+      active: false,
       at: order.workflowTimeline.sentAt,
       complete: Boolean(order.workflowTimeline.sentAt) || current === "sent",
       key: "sent",
@@ -1340,10 +1350,12 @@ export function AdminRetailStockView({
   const [shoppingListDraftLines, setShoppingListDraftLines] = useState<
     ShoppingListLineDraft[]
   >([]);
+  const [pendingShoppingList, setPendingShoppingList] =
+    useState<AdminRetailShoppingList | null>(null);
   const [selectedShoppingListId, setSelectedShoppingListId] = useState("");
   const [customerOrderDraft, setCustomerOrderDraft] =
     useState<CustomerOrderDraft | null>(null);
-  const [shipmentEditor, setShipmentEditor] = useState<ShipmentEditor | null>(null);
+  const [pickupDialog, setPickupDialog] = useState<PickupDialog | null>(null);
   const [kexSettingsDraft, setKexSettingsDraft] =
     useState<KexSettingsDraft>(emptyKexSettingsDraft);
   const [customerOrderAvailability, setCustomerOrderAvailability] =
@@ -1839,17 +1851,17 @@ export function AdminRetailStockView({
   const defaultOutstandingPurchaseKeys = useMemo(() => {
     const targetOrganisationId =
       selectedOrganisationId === "all"
-        ? shoppingListCandidateItems[0]?.organisationId
+        ? reorderPurchaseItems[0]?.organisationId
         : selectedOrganisationId;
 
     if (!targetOrganisationId) {
       return [];
     }
 
-    return shoppingListCandidateItems
+    return reorderPurchaseItems
       .filter((item) => item.organisationId === targetOrganisationId)
       .map((item) => orgProductKey(item.organisationId, item.productId));
-  }, [selectedOrganisationId, shoppingListCandidateItems]);
+  }, [reorderPurchaseItems, selectedOrganisationId]);
   const defaultOutstandingPurchaseKeySignature = useMemo(
     () => defaultOutstandingPurchaseKeys.join("\u0000"),
     [defaultOutstandingPurchaseKeys]
@@ -1899,6 +1911,7 @@ export function AdminRetailStockView({
       visibleShoppingLists.find((list) => list.id === selectedShoppingListId) ?? null,
     [selectedShoppingListId, visibleShoppingLists]
   );
+  const shoppingListModalList = activeShoppingList ?? pendingShoppingList;
   const activeShoppingListLines = useMemo(
     () =>
       activeShoppingList
@@ -2206,32 +2219,109 @@ export function AdminRetailStockView({
       return;
     }
 
+    const organisation = data.organisations.find(
+      (candidate) => candidate.id === organisationId
+    );
+    const organisationCurrency =
+      rows.find((row) => row.organisationId === organisationId)?.currency ??
+      rows[0]?.currency ??
+      "THB";
+    const createdAt = new Date().toISOString();
+    const selectedLineInputs = selectedOutstandingPurchaseItems.map((item) => {
+      const row = stockRowByOrgProduct.get(
+        orgProductKey(item.organisationId, item.productId)
+      );
+      const assignedQuantity = Math.max(1, Math.ceil(item.amountToBuyUnits));
+      const requiredQuantity =
+        item.source === "backorder"
+          ? item.unorderedNeedUnits
+          : item.amountToBuyUnits;
+      const unorderedNeedQuantity =
+        item.source === "backorder" ? item.unorderedNeedUnits : 0;
+
+      return {
+        assignedQuantity,
+        currentStockQuantity: row?.stockQuantity ?? 0,
+        item,
+        requiredQuantity,
+        unorderedNeedQuantity
+      };
+    });
+    const draftLines: ShoppingListLineDraft[] = selectedLineInputs.map(
+      ({
+        assignedQuantity,
+        currentStockQuantity,
+        item,
+        requiredQuantity,
+        unorderedNeedQuantity
+      }) => ({
+        actualQuantity: String(assignedQuantity),
+        assignedQuantity: String(assignedQuantity),
+        brandName: item.brandName,
+        currentStockQuantity: String(currentStockQuantity),
+        ean13: null,
+        id: `pending:${orgProductKey(item.organisationId, item.productId)}`,
+        manufacturerSku: null,
+        productId: item.productId,
+        productTitle: item.productTitle,
+        requiredQuantity: String(requiredQuantity),
+        retailPriceAmount: "",
+        stockedQuantity: String(currentStockQuantity),
+        unorderedNeedQuantity: String(unorderedNeedQuantity),
+        wholesalePriceAmount:
+          item.wholesalePriceAmount === null
+            ? ""
+            : String(item.wholesalePriceAmount)
+      })
+    );
+
+    setSelectedShoppingListId("");
+    setShoppingListDraftLines(draftLines);
+    setPendingShoppingList({
+      actualUnits: selectedLineInputs.reduce(
+        (total, line) => total + line.assignedQuantity,
+        0
+      ),
+      createdAt,
+      currency: organisationCurrency,
+      id: "pending-shopping-list",
+      lineCount: draftLines.length,
+      listNumber: labels.stock.createShoppingList,
+      organisationId,
+      organisationName: organisation?.name ?? organisationId,
+      requiredUnits: selectedLineInputs.reduce(
+        (total, line) => total + line.requiredQuantity,
+        0
+      ),
+      status: "active",
+      stockedUnits: selectedLineInputs.reduce(
+        (total, line) => total + line.currentStockQuantity,
+        0
+      ),
+      updatedAt: createdAt
+    });
+
     const created = await runRetailAction(
       {
         action: "create_shopping_list",
-        lines: selectedOutstandingPurchaseItems.map((item) => {
-          const row = stockRowByOrgProduct.get(
-            orgProductKey(item.organisationId, item.productId)
-          );
-          const assignedQuantity = Math.max(1, Math.ceil(item.amountToBuyUnits));
-          const requiredQuantity =
-            item.source === "backorder"
-              ? item.unorderedNeedUnits
-              : item.amountToBuyUnits;
-          const unorderedNeedQuantity =
-            item.source === "backorder" ? item.unorderedNeedUnits : 0;
-
-          return {
-            currentStockQuantity: row?.stockQuantity ?? 0,
+        lines: selectedLineInputs.map(
+          ({
+            assignedQuantity,
+            currentStockQuantity,
+            item,
+            requiredQuantity,
+            unorderedNeedQuantity
+          }) => ({
             actualQuantity: assignedQuantity,
             assignedQuantity,
+            currentStockQuantity,
             productId: item.productId,
             requiredQuantity,
             retailPriceAmount: null,
             unorderedNeedQuantity,
             wholesalePriceAmount: item.wholesalePriceAmount
-          };
-        }),
+          })
+        ),
         organisationId
       },
       `shopping-list:${organisationId}`
@@ -2246,6 +2336,8 @@ export function AdminRetailStockView({
         setSelectedShoppingListId(createdShoppingListId);
       }
     }
+
+    setPendingShoppingList(null);
   }
 
   async function saveShoppingListDraft() {
@@ -2706,17 +2798,16 @@ export function AdminRetailStockView({
     );
   }
 
-  function openShipmentEditor(order: AdminRetailCustomerOrder) {
+  function openPickupDialog(order: AdminRetailCustomerOrder) {
     const existingCarrierName = order.shipment?.carrierName ?? "";
 
-    setShipmentEditor({
+    setPickupDialog({
       draft: {
         carrierName: shipmentCarrierOptions.some(
           (carrier) => carrier === existingCarrierName
         )
           ? existingCarrierName
           : kexCarrierName,
-        confirmedPacked: false,
         shipmentNotes: order.shipment?.shipmentNotes ?? "",
         trackingNumber: order.shipment?.trackingNumber ?? "",
         trackingUrl: order.shipment?.trackingUrl ?? ""
@@ -2725,8 +2816,8 @@ export function AdminRetailStockView({
     });
   }
 
-  function updateShipmentDraft(patch: Partial<ShipmentDraft>) {
-    setShipmentEditor((current) =>
+  function updatePickupDraft(patch: Partial<PickupDialogDraft>) {
+    setPickupDialog((current) =>
       current
         ? {
             ...current,
@@ -2739,78 +2830,64 @@ export function AdminRetailStockView({
     );
   }
 
-  async function shipCustomerOrder() {
-    if (!shipmentEditor) {
-      return;
-    }
-
-    if (!shipmentEditor.draft.confirmedPacked) {
-      setError("Confirm the products are packed before shipping.");
-      return;
-    }
-
+  async function markCustomerOrderShipped(order: AdminRetailCustomerOrder) {
     const saved = await runRetailAction(
       {
         action: "advance_customer_order",
-        carrierName: shipmentEditor.draft.carrierName || null,
-        customerOrderId: shipmentEditor.order.id,
+        carrierName: order.shipment?.carrierName ?? null,
+        customerOrderId: order.id,
         orderAction: "mark_shipped",
-        shipmentNotes: shipmentEditor.draft.shipmentNotes || null,
-        trackingNumber: shipmentEditor.draft.trackingNumber || null,
-        trackingUrl: shipmentEditor.draft.trackingUrl || null
+        shipmentNotes: order.shipment?.shipmentNotes ?? null,
+        trackingNumber: order.shipment?.trackingNumber ?? null,
+        trackingUrl: order.shipment?.trackingUrl ?? null
       },
-      `order:${shipmentEditor.order.id}:mark_shipped`,
+      `order:${order.id}:mark_shipped`,
       { closeWorkflows: false }
     );
 
     if (saved) {
-      setShipmentEditor(null);
+      setPickupDialog(null);
     }
   }
 
   async function bookPickupForCustomerOrder() {
-    if (!shipmentEditor) {
-      return;
-    }
-
-    if (!shipmentEditor.draft.confirmedPacked) {
-      setError("Confirm the products are packed before booking pickup.");
+    if (!pickupDialog) {
       return;
     }
 
     const saved = await runRetailAction(
       {
         action: "book_order_pickup",
-        carrierName: shipmentEditor.draft.carrierName || null,
-        customerOrderId: shipmentEditor.order.id,
-        shipmentNotes: shipmentEditor.draft.shipmentNotes || null,
-        trackingNumber: shipmentEditor.draft.trackingNumber || null,
-        trackingUrl: shipmentEditor.draft.trackingUrl || null
+        carrierName: pickupDialog.draft.carrierName || null,
+        customerOrderId: pickupDialog.order.id,
+        shipmentNotes: pickupDialog.draft.shipmentNotes || null,
+        trackingNumber: pickupDialog.draft.trackingNumber || null,
+        trackingUrl: pickupDialog.draft.trackingUrl || null
       },
-      `order:${shipmentEditor.order.id}:book_pickup`,
+      `order:${pickupDialog.order.id}:book_pickup`,
       { closeWorkflows: false }
     );
 
     if (saved) {
-      setShipmentEditor(null);
+      setPickupDialog(null);
     }
   }
 
   async function printOrRequestShipmentLabel() {
-    if (!shipmentEditor) {
+    if (!pickupDialog) {
       return;
     }
 
     const selectedCarrier = shipmentCarrierSelectValue(
-      shipmentEditor.draft.carrierName
+      pickupDialog.draft.carrierName
     );
 
-    if (shipmentEditor.order.shipment?.labelUrl || selectedCarrier !== kexCarrierName) {
+    if (pickupDialog.order.shipment?.labelUrl || selectedCarrier !== kexCarrierName) {
       printShipmentLabel({
         labels,
-        lines: shipmentEditorLines,
+        lines: pickupDialogLines,
         locale,
-        order: shipmentEditor.order
+        order: pickupDialog.order
       });
       return;
     }
@@ -2818,10 +2895,10 @@ export function AdminRetailStockView({
     await runRetailAction(
       {
         action: "generate_order_shipping_label",
-        carrierName: shipmentEditor.draft.carrierName || kexCarrierName,
-        customerOrderId: shipmentEditor.order.id
+        carrierName: pickupDialog.draft.carrierName || kexCarrierName,
+        customerOrderId: pickupDialog.order.id
       },
-      `order:${shipmentEditor.order.id}:generate_shipping_label`,
+      `order:${pickupDialog.order.id}:generate_shipping_label`,
       { closeWorkflows: false }
     );
   }
@@ -2963,19 +3040,25 @@ export function AdminRetailStockView({
   const customerOrderWorkflowSteps = customerOrderDetail
     ? buildCustomerOrderWorkflowSteps(labels, customerOrderDetail)
     : [];
-  const shipmentEditorLines = shipmentEditor
+  const pickupDialogLines = pickupDialog
     ? data.customerOrderLines.filter(
-        (line) => line.customerOrderId === shipmentEditor.order.id
+        (line) => line.customerOrderId === pickupDialog.order.id
       )
     : [];
-  const shipmentEditorAddressLines = shipmentEditor
-    ? addressDisplayLines(deliveryAddressForOrder(shipmentEditor.order))
+  const pickupDialogAddressLines = pickupDialog
+    ? addressDisplayLines(deliveryAddressForOrder(pickupDialog.order))
     : [];
-  const shipmentEditorTotal =
-    shipmentEditor ? customerOrderRetailValue(shipmentEditor.order) : null;
-  const canConfirmShipment = Boolean(
-    shipmentEditor?.draft.confirmedPacked && data.canWrite && !busyId
+  const pickupDialogItemCount = pickupDialogLines.reduce(
+    (total, line) => total + line.quantityOrdered,
+    0
   );
+  const pickupDialogLabelAction =
+    pickupDialog?.order.shipment?.labelUrl
+      ? "Print label"
+      : shipmentCarrierSelectValue(pickupDialog?.draft.carrierName ?? "") ===
+          kexCarrierName
+        ? "Generate official label"
+        : "Print fallback label";
   return (
     <div className="mt-8 space-y-6">
       {panel === "list" ? (
@@ -3926,10 +4009,35 @@ export function AdminRetailStockView({
                   {labels.stock.allocateAvailable}
                 </AdminButton>
               ) : null}
+              {data.canWrite && customerOrderDetail.actionStates.pack.enabled ? (
+                <AdminButton
+                  disabled={Boolean(busyId)}
+                  onClick={() =>
+                    runCustomerOrderAction(customerOrderDetail, "mark_packed")
+                  }
+                  title={customerOrderDetail.actionStates.pack.reason ?? undefined}
+                >
+                  Mark Packed
+                </AdminButton>
+              ) : null}
+              {data.canWrite &&
+              customerOrderDetail.actionStates.bookPickup.enabled ? (
+                <AdminButton
+                  disabled={Boolean(busyId)}
+                  onClick={() => openPickupDialog(customerOrderDetail)}
+                  title={
+                    customerOrderDetail.actionStates.bookPickup.reason ??
+                    undefined
+                  }
+                >
+                  {labels.stock.bookPickup}
+                </AdminButton>
+              ) : null}
               {data.canWrite && customerOrderDetail.actionStates.ship.enabled ? (
                 <AdminButton
                   disabled={Boolean(busyId)}
-                  onClick={() => openShipmentEditor(customerOrderDetail)}
+                  onClick={() => void markCustomerOrderShipped(customerOrderDetail)}
+                  title={customerOrderDetail.actionStates.ship.reason ?? undefined}
                 >
                   Mark Shipped
                 </AdminButton>
@@ -4158,6 +4266,16 @@ export function AdminRetailStockView({
         {panel === "stock-advice" ? (
           <div className="mt-5 space-y-6">
             <section className="rounded-md bg-white p-4 ring-1 ring-gray-200">
+              <p className="mb-4 max-w-3xl text-sm leading-6 text-gray-600">
+                <span className="font-semibold text-gray-900">
+                  {labels.stock.reorderBackorders}
+                </span>{" "}
+                {labels.stock.reorderBackordersDescription}{" "}
+                <span className="font-semibold text-gray-900">
+                  {labels.stock.reorderRecommendations}
+                </span>{" "}
+                {labels.stock.reorderRecommendationsDescription}
+              </p>
               <div className="overflow-x-auto rounded-md ring-1 ring-gray-200">
                 <table className="min-w-[640px] w-full table-fixed text-left text-sm">
                   <colgroup>
@@ -4445,161 +4563,77 @@ export function AdminRetailStockView({
             ))}
           </div>
         ) : null}
-      {activeShoppingList ? (
+      {shoppingListModalList ? (
         <RetailShoppingListModal
-          busy={Boolean(busyId)}
+          busy={Boolean(busyId) || !activeShoppingList}
           labels={labels}
           lines={shoppingListDraftLines}
-          list={activeShoppingList}
-          onClose={() => setSelectedShoppingListId("")}
+          list={shoppingListModalList}
+          onClose={() => {
+            setSelectedShoppingListId("");
+            setPendingShoppingList(null);
+          }}
           onLinesChange={setShoppingListDraftLines}
           onReopen={() => void reopenShoppingList()}
           onSave={() => void saveShoppingListDraft()}
         />
       ) : null}
-      {shipmentEditor ? (
+      {pickupDialog ? (
         <AdminModal
           closeDisabled={Boolean(busyId)}
           closeLabel={labels.stock.cancel}
           description={
             <span>
-              Confirm the order is packed, then add courier details, book pickup
-              or ship when ready.
+              Select the courier and book pickup. Labels are helpful but not
+              required before pickup is requested.
             </span>
           }
-          onClose={() => setShipmentEditor(null)}
-          size="xl"
-          title="Mark Shipped"
+          onClose={() => setPickupDialog(null)}
+          size="lg"
+          title={labels.stock.bookPickup}
         >
           <div className="space-y-5 px-6 py-5">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.45fr)]">
-              <section className="rounded-md bg-gray-50 p-4 ring-1 ring-gray-100">
+            <section className="grid gap-3 rounded-md bg-gray-50 p-4 text-sm ring-1 ring-gray-100 sm:grid-cols-2">
+              <div>
                 <div className="text-xs font-semibold uppercase text-gray-500">
                   {labels.stock.customerOrders}
                 </div>
-                <div className="mt-2 text-lg font-semibold text-gray-900">
-                  {shipmentEditor.order.orderNumber}
+                <div className="mt-1 font-semibold text-gray-900">
+                  {pickupDialog.order.orderNumber}
                 </div>
-                <div className="mt-1 text-sm text-gray-600">
-                  {shipmentEditor.order.customerName ||
-                    shipmentEditor.order.customerEmail ||
+                <div className="mt-1 text-gray-600">
+                  {pickupDialog.order.customerName ||
+                    pickupDialog.order.customerEmail ||
                     emptyRetailField}
                 </div>
-                <div className="mt-4 text-xs font-semibold uppercase text-gray-500">
+              </div>
+              <div>
+                <div className="text-xs font-semibold uppercase text-gray-500">
+                  {labels.stock.orderItems}
+                </div>
+                <div className="mt-1 font-semibold text-gray-900">
+                  {formatNumber(pickupDialogItemCount, locale)}{" "}
+                  {labels.stock.units}
+                </div>
+                <div className="mt-1 text-gray-600">
+                  {pickupDialog.order.organisationName}
+                </div>
+              </div>
+              <div className="sm:col-span-2">
+                <div className="text-xs font-semibold uppercase text-gray-500">
                   {labels.stock.deliveryAddress}
                 </div>
-                <div className="mt-2 space-y-1 text-sm text-gray-800">
-                  {shipmentEditorAddressLines.length > 0 ? (
-                    shipmentEditorAddressLines.map((line) => (
+                <div className="mt-1 space-y-1 text-gray-800">
+                  {pickupDialogAddressLines.length > 0 ? (
+                    pickupDialogAddressLines.map((line) => (
                       <div key={line}>{line}</div>
                     ))
                   ) : (
                     <div className="text-gray-500">{emptyRetailField}</div>
                   )}
                 </div>
-              </section>
-
-              <section className="rounded-md bg-gray-50 p-4 ring-1 ring-gray-100">
-                <div className="text-xs font-semibold uppercase text-gray-500">
-                  {labels.stock.retailValue}
-                </div>
-                <div className="mt-2 text-3xl font-semibold text-gray-900">
-                  {shipmentEditorTotal === null
-                    ? emptyRetailField
-                    : (formatPrice(
-                        locale,
-                        shipmentEditor.order.currency,
-                        shipmentEditorTotal
-                      ) ?? emptyRetailField)}
-                </div>
-                <div className="mt-4 text-xs font-semibold uppercase text-gray-500">
-                  {labels.stock.organisation}
-                </div>
-                <div className="mt-1 text-sm font-semibold text-gray-900">
-                  {shipmentEditor.order.organisationName}
-                </div>
-              </section>
-            </div>
-
-            <section>
-              <h3 className="text-sm font-semibold text-gray-900">
-                {labels.stock.orderItems}
-              </h3>
-              <div className="mt-3 overflow-x-auto rounded-md ring-1 ring-gray-200">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                    <tr>
-                      <th className="px-3 py-2">{labels.stock.product}</th>
-                      <th className="px-3 py-2 text-right">
-                        {labels.stock.quantity}
-                      </th>
-                      <th className="px-3 py-2 text-right">
-                        {labels.stock.retailPrice}
-                      </th>
-                      <th className="px-3 py-2 text-right">
-                        {labels.stock.lineTotal}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
-                    {shipmentEditorLines.map((line) => (
-                      <tr key={line.id}>
-                        <td className="px-3 py-2 font-medium text-gray-900">
-                          {line.productTitle}
-                        </td>
-                        <td className="px-3 py-2 text-right text-gray-700">
-                          {line.quantityOrdered}
-                        </td>
-                        <td className="px-3 py-2 text-right font-semibold text-gray-900">
-                          {line.retailPriceAmount === null
-                            ? emptyRetailField
-                            : (formatPrice(
-                                locale,
-                                shipmentEditor.order.currency,
-                                line.retailPriceAmount
-                              ) ?? emptyRetailField)}
-                        </td>
-                        <td className="px-3 py-2 text-right font-semibold text-gray-900">
-                          {line.retailPriceAmount === null
-                            ? emptyRetailField
-                            : (formatPrice(
-                                locale,
-                                shipmentEditor.order.currency,
-                                line.retailPriceAmount * line.quantityOrdered
-                              ) ?? emptyRetailField)}
-                        </td>
-                      </tr>
-                    ))}
-                    {shipmentEditorLines.length === 0 ? (
-                      <tr>
-                        <td
-                          className="px-3 py-8 text-center text-sm text-gray-500"
-                          colSpan={4}
-                        >
-                          {labels.stock.noItemsSelected}
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
               </div>
             </section>
-
-            <label className="flex items-start gap-3 rounded-md bg-[#F0FDF7] p-4 text-sm font-semibold text-gray-900 ring-1 ring-[#B7F2D8]">
-              <input
-                checked={shipmentEditor.draft.confirmedPacked}
-                className="mt-0.5 size-4 rounded border-gray-300 text-[#1FA77A] focus:ring-[#1FA77A]"
-                onChange={(event) =>
-                  updateShipmentDraft({
-                    confirmedPacked: event.target.checked
-                  })
-                }
-                type="checkbox"
-              />
-              <span>
-                Products are packed and ready to hand to the courier/customer.
-              </span>
-            </label>
 
             <section className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-1 text-xs font-semibold text-gray-500">
@@ -4607,12 +4641,12 @@ export function AdminRetailStockView({
                 <select
                   className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1FA77A]"
                   onChange={(event) => {
-                    updateShipmentDraft({
+                    updatePickupDraft({
                       carrierName: event.target.value || kexCarrierName
                     });
                   }}
                   value={shipmentCarrierSelectValue(
-                    shipmentEditor.draft.carrierName
+                    pickupDialog.draft.carrierName
                   )}
                 >
                   {shipmentCarrierOptions.map((carrier) => (
@@ -4623,17 +4657,17 @@ export function AdminRetailStockView({
                 </select>
               </label>
               <div className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-amber-100 sm:col-span-2">
-                {shipmentLabelStatusText(shipmentEditor.order.shipment)}
+                {shipmentLabelStatusText(pickupDialog.order.shipment)}
               </div>
               <label className="grid gap-1 text-xs font-semibold text-gray-500">
                 Tracking number
                 <input
                   className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1FA77A]"
                   onChange={(event) =>
-                    updateShipmentDraft({ trackingNumber: event.target.value })
+                    updatePickupDraft({ trackingNumber: event.target.value })
                   }
                   placeholder="Optional"
-                  value={shipmentEditor.draft.trackingNumber}
+                  value={pickupDialog.draft.trackingNumber}
                 />
               </label>
               <label className="grid gap-1 text-xs font-semibold text-gray-500">
@@ -4641,22 +4675,22 @@ export function AdminRetailStockView({
                 <input
                   className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1FA77A]"
                   onChange={(event) =>
-                    updateShipmentDraft({ trackingUrl: event.target.value })
+                    updatePickupDraft({ trackingUrl: event.target.value })
                   }
                   placeholder="https://..."
                   type="url"
-                  value={shipmentEditor.draft.trackingUrl}
+                  value={pickupDialog.draft.trackingUrl}
                 />
               </label>
               <label className="grid gap-1 text-xs font-semibold text-gray-500 sm:col-span-2">
-                Shipment notes
+                Pickup notes
                 <textarea
-                  className="min-h-24 rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                  className="min-h-20 rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1FA77A]"
                   onChange={(event) =>
-                    updateShipmentDraft({ shipmentNotes: event.target.value })
+                    updatePickupDraft({ shipmentNotes: event.target.value })
                   }
                   placeholder="Optional"
-                  value={shipmentEditor.draft.shipmentNotes}
+                  value={pickupDialog.draft.shipmentNotes}
                 />
               </label>
             </section>
@@ -4670,7 +4704,7 @@ export function AdminRetailStockView({
           <div className="flex flex-wrap justify-end gap-3 border-t border-gray-100 px-6 py-4">
             <AdminButton
               disabled={Boolean(busyId)}
-              onClick={() => setShipmentEditor(null)}
+              onClick={() => setPickupDialog(null)}
               variant="secondary"
             >
               {labels.stock.cancel}
@@ -4682,20 +4716,13 @@ export function AdminRetailStockView({
               variant="secondary"
             >
               <Truck aria-hidden="true" className="size-4" />
-              {labels.stock.shippingLabel}
+              {pickupDialogLabelAction}
             </AdminButton>
             <AdminButton
-              disabled={!canConfirmShipment}
+              disabled={!data.canWrite || Boolean(busyId)}
               onClick={() => void bookPickupForCustomerOrder()}
-              variant="secondary"
             >
               {labels.stock.bookPickup}
-            </AdminButton>
-            <AdminButton
-              disabled={!canConfirmShipment}
-              onClick={() => void shipCustomerOrder()}
-            >
-              Mark Shipped
             </AdminButton>
           </div>
         </AdminModal>

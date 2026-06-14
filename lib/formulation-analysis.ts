@@ -220,6 +220,8 @@ function userPrompt({
             category:
               "Foundation | Foundation add-on | Add separately | Targeted | Review",
             dailyDose: "short daily dose string in the requested display locale, e.g. 200 mg/day",
+            decision:
+              "one sentence explaining the final dose/status decision in the requested display locale",
             effectivenessRank:
               "integer starting at 1; 1 is the most effective/highest-impact suggestion for this person",
             id: "stable kebab-case identifier",
@@ -234,7 +236,9 @@ function userPrompt({
               }
             ],
             status: "covered | add | review",
-            supplement: "supplement name in the requested display locale"
+            supplement: "supplement name in the requested display locale",
+            whyThisIsForYou:
+              "one concise paragraph explaining why this ingredient is for this specific person, combining ingredient role, assessment fit, goals, signals, dose context, and safety context in the requested display locale"
           }
         ],
         cautions: [
@@ -280,10 +284,11 @@ function userPrompt({
         "Do not reintroduce supplements the client asked to remove or avoid unless safety or clarity requires status=review with a conservative explanation.",
         "Use previousSupplementGuidance only as context; this response must be a fresh full version, not a patch.",
         "Every supplementBreakdown array entry must be an object. Do not put plain strings in the array.",
-        "Every item must include id, category, supplement, dailyDose, effectivenessRank, status, and rationale.",
+        "Every item must include id, category, supplement, dailyDose, effectivenessRank, status, rationale, whyThisIsForYou, and decision.",
         "Set effectivenessRank as a unique integer from 1 to the number of items, where 1 is the most effective/highest-impact supplement suggestion for this person's assessment.",
         "Order supplementBreakdown by effectivenessRank ascending.",
-        "supplement, dailyDose, and rationale must each be plain strings in the requested display locale.",
+        "supplement, dailyDose, rationale, whyThisIsForYou, and decision must each be plain strings in the requested display locale.",
+        "Write whyThisIsForYou as one customer-facing paragraph for the drawer heading 'Why this is for you'. Write decision as the practical dose/status decision.",
         "Keep dailyDose machine-readable: start with one numeric amount and one unit, using mg/day, mcg/day, g/day, or IU/day whenever possible.",
         "Avoid capsule counts, serving sizes, proprietary-blend doses, vague ranges, or multiple units in dailyDose. If uncertain, use a conservative numeric dose and set status=review.",
         "Write user-facing fields naturally in the requested display locale, not transliterated English unless the ingredient name is normally used that way.",
@@ -310,6 +315,7 @@ function retryPrompt(errors: string[]) {
     "Every supplementBreakdown item must be a JSON object, not a string.",
     "marketingPoints must contain 3 objects with id, title, and body in the requested display locale.",
     "cautions must be an array of caution objects in the requested display locale.",
+    "Every supplement item must include whyThisIsForYou and decision as plain strings in the requested display locale.",
     "Every item must include a unique integer effectivenessRank where 1 is highest impact.",
     "If a field is uncertain, set status to review and still return valid JSON.",
     "Validation errors:",
@@ -437,6 +443,19 @@ function readLocalizedText(
   errors: string[]
 ): LocalizedText {
   return readLocalizedTextAt(record, key, `supplementBreakdown[${index}]`, errors);
+}
+
+function readOptionalLocalizedText(
+  record: Record<string, unknown>,
+  key: string,
+  index: number,
+  errors: string[]
+): LocalizedText | undefined {
+  if (!(key in record)) {
+    return undefined;
+  }
+
+  return readLocalizedText(record, key, index, errors);
 }
 
 function textFromLocalizedCandidate(value: unknown) {
@@ -592,13 +611,22 @@ function validateFormulation(value: unknown) {
     const category = readText(item, "category") || "Targeted";
     const supplement = readLocalizedText(item, "supplement", index, errors);
     const dailyDose = readLocalizedText(item, "dailyDose", index, errors);
+    const decision = readLocalizedText(item, "decision", index, errors);
     const rawRank = Number(item.effectivenessRank);
     const effectivenessRank = Number.isInteger(rawRank) ? rawRank : 0;
+    const forYou = readOptionalLocalizedText(item, "forYou", index, errors);
     const rawStatus = readText(item, "status");
     const status = VALID_STATUSES.has(rawStatus as FormulationStatus)
       ? rawStatus
       : "review";
     const rationale = readLocalizedText(item, "rationale", index, errors);
+    const whyThis = readOptionalLocalizedText(item, "whyThis", index, errors);
+    const whyThisIsForYou = readLocalizedText(
+      item,
+      "whyThisIsForYou",
+      index,
+      errors
+    );
     const itemCautions = Array.isArray(item.cautions)
       ? readCautionsAt(item.cautions, `supplementBreakdown[${index}].cautions`, errors)
       : [];
@@ -629,11 +657,15 @@ function validateFormulation(value: unknown) {
       category,
       ...(itemCautions.length > 0 ? { cautions: itemCautions } : {}),
       dailyDose,
+      decision,
       effectivenessRank,
+      ...(forYou ? { forYou } : {}),
       id,
       rationale,
       status: status as FormulationStatus,
-      supplement
+      supplement,
+      ...(whyThis ? { whyThis } : {}),
+      whyThisIsForYou
     });
   });
 

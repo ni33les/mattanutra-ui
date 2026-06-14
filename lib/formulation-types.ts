@@ -28,7 +28,9 @@ export type FormulationIngredient = {
   category: string;
   cautions?: FormulationCaution[];
   dailyDose: LocalizedText;
+  decision?: LocalizedText;
   effectivenessRank: number;
+  forYou?: LocalizedText;
   id: string;
   rationale: LocalizedText;
   safety?: {
@@ -41,6 +43,8 @@ export type FormulationIngredient = {
   };
   status: FormulationStatus;
   supplement: LocalizedText;
+  whyThisIsForYou?: LocalizedText;
+  whyThis?: LocalizedText;
 };
 
 export type FoodGuidanceItem = {
@@ -274,6 +278,7 @@ export type ProductRecommendationOption = {
   retailerOptions?: Array<{
     backorderCount?: number;
     currency?: string | null;
+    dispatchCity?: string | null;
     etaDate?: string | null;
     organisationId?: string | null;
     organisationName?: string | null;

@@ -51,7 +51,21 @@ describe("recommendation selection projections", () => {
       recommendationInsights,
       /supplement_recommendation_selections\.supplement_id is null/
     );
+    assert.match(recommendationInsights, /left join public\.supplements/);
+    assert.match(recommendationInsights, /supplements\.source_status/);
+    assert.match(recommendationInsights, /Non-core active/);
+    assert.match(recommendationInsights, /Missing catalogue match/);
+    assert.match(recommendationInsights, /Blocked or inactive/);
+    assert.match(recommendationInsights, /Hidden for review/);
     assert.match(recommendationInsights, /unknown_supplement/);
+    assert.match(
+      recommendationInsights,
+      /coalesce\(supplements\.source_status, 'core'\) <> 'core'/
+    );
+    assert.match(
+      recommendationInsights,
+      /coalesce\(supplements\.list_status, 'active'\) <> 'active'/
+    );
     assert.match(productSearch, /getRetailerAwareProductRecommendationCandidateSets/);
     assert.match(productSearch, /sellable\.status = 'active'/);
     assert.match(productSearch, /availableNow <= 0 && !backorderAllowed/);

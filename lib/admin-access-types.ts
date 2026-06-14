@@ -12,6 +12,7 @@ export type AdminOrganisation = Readonly<{
   countryCode: string;
   currency: string;
   defaultLocale: Locale;
+  dispatchCity?: string | null;
   id: string;
   name: string;
   slug: string;

@@ -37,6 +37,10 @@ function leadStageClass(stage: string) {
 }
 
 function leadDisplayName(row: AdminLeadRow) {
+  if (row.contactEmail) {
+    return row.contactEmail;
+  }
+
   if (row.emailHash) {
     return `Email ${compactId(row.emailHash)}`;
   }
@@ -322,6 +326,10 @@ function LeadDetailsModal({
               <SupplementListMeta
                 label={labels.marketingPages.ray}
                 value={row.ray}
+              />
+              <SupplementListMeta
+                label="Email"
+                value={row.contactEmail}
               />
               <SupplementListMeta
                 label={labels.marketingPages.emailHash}

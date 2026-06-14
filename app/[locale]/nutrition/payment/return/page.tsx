@@ -27,6 +27,7 @@ import {
   fulfillCheckoutSession,
   paymentReturnDestination
 } from "@/lib/stripe-payments";
+import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
 type PaymentReturnPageProps = Readonly<{
   params: Promise<{
@@ -126,7 +127,7 @@ const copy = {
         badge: "Payment expired",
         headline: "This checkout session has expired",
         message:
-          "Your payment was not completed. You can safely return to checkout and try again."
+          "Your payment was not completed. You can safely return to checkout when you are ready."
       },
       fulfillmentFailed: {
         badge: "Payment received",
@@ -331,7 +332,7 @@ const copy = {
       expired: {
         badge: "付款会话已过期",
         headline: "这个结账会话已过期",
-        message: "你的付款未完成。你可以安全返回结账页再试一次。"
+        message: "你的付款未完成。准备好后可以安全返回结账页。"
       },
       fulfillmentFailed: {
         badge: "已收到付款",
@@ -469,10 +470,9 @@ async function loadHealthScoreContext(
       return null;
     }
 
-    const healthScore =
-      prefill.locale === locale
-        ? prefill.healthScore
-        : computeHealthScore(prefill.answers ?? null, locale);
+    const healthScore = computeHealthScore(prefill.answers ?? null, locale, {
+      evaluatedIngredientCount: await getEvaluatedIngredientCatalogueCount()
+    });
     const counts = healthScoreIngredientCounts(healthScore);
 
     return counts;

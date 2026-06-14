@@ -26,6 +26,14 @@ const route = readFileSync(
   new URL("../app/[locale]/nutrition/reveal/page.tsx", import.meta.url),
   "utf8",
 );
+const formulationAnalysis = readFileSync(
+  new URL("../lib/formulation-analysis.ts", import.meta.url),
+  "utf8",
+);
+const formulationTypes = readFileSync(
+  new URL("../lib/formulation-types.ts", import.meta.url),
+  "utf8",
+);
 const khunDream = new URL(
   "../public/reveal/khun_dream.webp",
   import.meta.url,
@@ -48,9 +56,11 @@ describe("final reveal UX", () => {
     assert.match(wrapper, /productCoveragePending=\{productCoveragePending\}/);
     assert.match(wrapper, /selectedProductStackPreference=/);
     assert.match(wrapper, /onProductStackPollingStart=\{startProductStackPolling\}/);
+    assert.match(reveal, /productCoveragePending=\{productCoveragePending\}[\s\S]*productOptions=\{productOptions\}/);
+    assert.match(reveal, /products\.length < 1 &&[\s\S]*productCoveragePending[\s\S]*productStackLoading/);
   });
 
-  it("uses reveal-native chrome for the successful paid reveal route", () => {
+  it("uses the standard site header for the successful paid reveal route", () => {
     const successReturnStart = route.indexOf(
       "  return (",
       route.indexOf("const initialResult"),
@@ -59,12 +69,13 @@ describe("final reveal UX", () => {
     const successReturn = route.slice(successReturnStart, successReturnEnd);
 
     assert.match(successReturn, /<FormulationResults/);
-    assert.doesNotMatch(successReturn, /<TitleBar/);
+    assert.match(successReturn, /<TitleBar/);
+    assert.match(successReturn, /<TitleBar[\s\S]*?<FormulationResults/);
     assert.match(successReturn, /<SiteFooter/);
-    assert.match(reveal, /function RevealBrandBar/);
-    assert.match(reveal, /className="mn-reveal-brandbar/);
-    assert.match(reveal, /mn-reveal-brand-word/);
-    assert.match(reveal, /mn-reveal-brand-tagline/);
+    assert.doesNotMatch(reveal, /function RevealBrandBar/);
+    assert.doesNotMatch(reveal, /mn-reveal-brandbar/);
+    assert.doesNotMatch(reveal, /mn-reveal-brand-word/);
+    assert.doesNotMatch(reveal, /mn-reveal-brand-tagline/);
     assert.match(reveal, /min-h-\[calc\(100vh-70px\)\]/);
   });
 
@@ -133,8 +144,9 @@ describe("final reveal UX", () => {
     assert.match(css, /\.mn-reveal-final \.mn-reveal-font-body\s*\{[\s\S]*font-family:\s*var\(--mn-font-body\)/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-font-display\s*\{[\s\S]*font-family:\s*var\(--mn-font-display\)/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-font-mono\s*\{[\s\S]*font-family:\s*var\(--mn-font-mono\)/);
-    assert.match(css, /\.mn-reveal-final \.mn-reveal-brand-word\s*\{[\s\S]*letter-spacing:\s*-0\.01em/);
-    assert.match(css, /\.mn-reveal-final \.mn-reveal-brand-tagline\s*\{[\s\S]*letter-spacing:\s*0\.22em/);
+    assert.doesNotMatch(css, /\.mn-reveal-final \.mn-reveal-brandbar/);
+    assert.doesNotMatch(css, /\.mn-reveal-final \.mn-reveal-brand-word/);
+    assert.doesNotMatch(css, /\.mn-reveal-final \.mn-reveal-brand-tagline/);
     assert.match(reveal, /className="mn-reveal-final mn-reveal-font-body w-full"/);
     assert.match(reveal, /mn-reveal-font-display/);
     assert.match(reveal, /mn-reveal-font-mono/);
@@ -238,8 +250,41 @@ describe("final reveal UX", () => {
     assert.match(reveal, /mn-reveal-nutrient-header/);
     assert.match(reveal, /nutrient-dose/);
     assert.match(reveal, /nutrient-coverage/);
-    assert.match(reveal, /md:grid-cols-\[36px_minmax\(160px,1\.25fr\)_minmax\(260px,2\.2fr\)_minmax\(96px,auto\)_minmax\(72px,auto\)_32px\]/);
+    assert.match(reveal, /md:grid-cols-\[36px_minmax\(160px,1\.25fr\)_minmax\(260px,2\.2fr\)_minmax\(96px,auto\)_minmax\(72px,auto\)_36px\]/);
+    assert.match(reveal, /<span aria-hidden=\{true\} className="expand-icon" \/>/);
     assert.doesNotMatch(reveal, /expand-icon absolute/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-nutrient-header \.expand-icon::before/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-nutrient-header \.expand-icon::after/);
+    assert.match(css, /align-self:\s*center/);
+    assert.match(css, /justify-self:\s*center/);
+  });
+
+  it("passes AI-generated supplement drawer copy through the formulation result", () => {
+    assert.match(formulationTypes, /whyThisIsForYou\?: LocalizedText/);
+    assert.match(formulationTypes, /whyThis\?: LocalizedText/);
+    assert.match(formulationTypes, /forYou\?: LocalizedText/);
+    assert.match(formulationTypes, /decision\?: LocalizedText/);
+    assert.match(
+      formulationAnalysis,
+      /Every item must include id, category, supplement, dailyDose, effectivenessRank, status, rationale, whyThisIsForYou, and decision\./,
+    );
+    assert.match(formulationAnalysis, /const whyThisIsForYou = readLocalizedText\(\s*item,\s*"whyThisIsForYou"/);
+    assert.match(formulationAnalysis, /const whyThis = readOptionalLocalizedText\(item, "whyThis"/);
+    assert.match(formulationAnalysis, /const forYou = readOptionalLocalizedText\(item, "forYou"/);
+    assert.match(formulationAnalysis, /const decision = readLocalizedText\(item, "decision"/);
+    assert.match(reveal, /ingredient\.whyThisIsForYou/);
+    assert.match(reveal, /ingredient\.whyThis/);
+    assert.match(reveal, /ingredient\.forYou/);
+    assert.match(reveal, /ingredient\.decision/);
+    assert.match(reveal, /finalCopy\.nutrientWhy/);
+    assert.doesNotMatch(reveal, /finalCopy\.nutrientForYou/);
+    assert.match(reveal, /finalCopy\.nutrientDecision/);
+    assert.match(reveal, /mn-reveal-nutrient-detail/);
+    assert.doesNotMatch(reveal, /mn-reveal-nutrient-drawer-card/);
+    assert.match(copy, /nutrientWhy: "Why this is for you"/);
+    assert.doesNotMatch(copy, /nutrientForYou/);
+    assert.match(copy, /nutrientDecision: "Decision"/);
+    assert.doesNotMatch(css, /\.mn-reveal-final \.mn-reveal-nutrient-drawer-card/);
   });
 
   it("keeps product coverage grammar from duplicating the total", () => {
@@ -256,10 +301,27 @@ describe("final reveal UX", () => {
     assert.match(reveal, /mn-reveal-selected-pharmacy/);
     assert.match(reveal, /mn-reveal-retailer-choices/);
     assert.match(reveal, /mn-reveal-pharmacy-card/);
-    assert.match(reveal, /className="products-grid grid grid-cols-1 gap-5/);
-    assert.match(reveal, /className="summary-card mt-8 rounded-2xl border border-\[var\(--mn-line\)\] bg-\[var\(--mn-paper\)\] px-8 py-7/);
-    assert.match(reveal, /className="checkout-card mt-6 grid gap-6 rounded-2xl border border-\[var\(--mn-line\)\] bg-\[var\(--mn-paper\)\] px-8 py-6/);
+    assert.match(reveal, /aria-pressed=\{selected\}/);
+    assert.match(reveal, /max-w-\[860px\] flex-col justify-center gap-3\.5 sm:flex-row sm:flex-wrap/);
+    assert.match(reveal, /sm:w-\[360px\]/);
+    assert.match(reveal, /mb-3\.5 flex items-start justify-between gap-3/);
+    assert.match(reveal, /flex shrink-0 flex-wrap justify-end gap-1\.5/);
+    assert.match(reveal, /border-l-4 border-\[var\(--mn-teal-deep\)\]/);
+    assert.match(reveal, /mn-reveal-font-display text-2xl font-medium italic leading-\[1\.2\]/);
+    assert.match(reveal, /amountParts\.currencyText/);
+    assert.doesNotMatch(reveal, /mn-reveal-pharmacy-check/);
+    assert.match(
+      reveal,
+      /selected[\s\S]{0,80}\?[\s\S]{0,80}finalCopy\.selectedPharmacy[\s\S]{0,80}:[\s\S]{0,80}finalCopy\.alternatePharmacy/,
+    );
+    assert.doesNotMatch(reveal, /alternateRetailerOptions/);
+    assert.doesNotMatch(reveal, /orderedRetailerOptions/);
+    assert.doesNotMatch(reveal, /mn-reveal-pharmacy-card[\s\S]{0,260}hover:-translate-y/);
+    assert.doesNotMatch(reveal, /grid max-w-\[960px\]/);
+    assert.match(reveal, /className="products-grid grid grid-cols-1 gap-6/);
+    assert.match(reveal, /className="summary-card mt-9 rounded-2xl border border-\[var\(--mn-line\)\] bg-\[var\(--mn-paper\)\] px-8 py-8/);
+    assert.match(reveal, /className="checkout-card mt-7 grid gap-7 rounded-2xl border border-\[var\(--mn-line\)\] bg-\[var\(--mn-paper\)\] px-8 py-7/);
     assert.match(css, /\.mn-reveal-final \.mn-reveal-products\s*\{[\s\S]*var\(--mn-cream-deep\)/);
-    assert.match(css, /\.mn-reveal-final \.mn-reveal-selected-pharmacy/);
+    assert.match(css, /\.mn-reveal-final \.mn-reveal-pharmacy-card\.mn-reveal-selected-pharmacy/);
   });
 });

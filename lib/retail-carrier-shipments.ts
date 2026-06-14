@@ -6,7 +6,10 @@ import { writeBpmEvent } from "@/lib/bpm";
 import { queueAdminOrganisationCommunication } from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import { markRetailOrderSettlementDue } from "@/lib/admin-retail-financials";
-import { repairRetailCustomerOrderAllocationIntegrityForSystem } from "@/lib/admin-retail-stock";
+import {
+  recordRetailCustomerOrderPickupBooked,
+  repairRetailCustomerOrderAllocationIntegrityForSystem
+} from "@/lib/admin-retail-stock";
 import {
   bookKexPickup,
   createKexShipment,
@@ -398,6 +401,13 @@ function shipmentSnapshot(input: Readonly<{
   trackingNumber?: string | null;
   trackingUrl?: string | null;
 }>) {
+  const hasPickupDetails = Boolean(
+    input.pickupBookedAt ||
+      input.pickupProviderStatus ||
+      input.pickupWindowEnd ||
+      input.pickupWindowStart
+  );
+
   return {
     carrierId: input.carrierId,
     carrierName: input.carrierName,
@@ -407,14 +417,18 @@ function shipmentSnapshot(input: Readonly<{
     labelContentType: input.labelContentType ?? null,
     labelStatus: input.labelStatus ?? null,
     labelUrl: input.labelUrl ?? null,
-    pickup: input.pickupBookedAt
+    pickup: hasPickupDetails
       ? {
-          bookedAt: input.pickupBookedAt,
+          bookedAt: input.pickupBookedAt ?? null,
           providerStatus: input.pickupProviderStatus ?? null,
           windowEnd: input.pickupWindowEnd ?? null,
           windowStart: input.pickupWindowStart ?? null
         }
       : null,
+    pickupBookedAt: input.pickupBookedAt ?? null,
+    pickupProviderStatus: input.pickupProviderStatus ?? null,
+    pickupWindowEnd: input.pickupWindowEnd ?? null,
+    pickupWindowStart: input.pickupWindowStart ?? null,
     shipmentNotes: input.shipmentNotes ?? null,
     shippedAt: input.shippedAt ?? null,
     status: input.status ?? null,
@@ -1355,8 +1369,8 @@ export async function bookRetailOrderPickup(
 
   const order = await orderForShipment(sql, context, input.customerOrderId.trim());
 
-  if (order.status !== "allocated" && order.status !== "picking" && order.status !== "packed") {
-    throw new Error("Order must be ready to ship before pickup can be booked");
+  if (order.status !== "packed") {
+    throw new Error("Order must be packed before pickup can be booked");
   }
 
   const shipmentId = await createRetailOrderShipment(context, {
@@ -1418,6 +1432,11 @@ export async function bookRetailOrderPickup(
       },
       orderId: order.id,
       organisationId: order.organisation_id,
+      shipmentId
+    });
+    await recordRetailCustomerOrderPickupBooked(context, {
+      customerOrderId: order.id,
+      pickupProviderStatus: "requested",
       shipmentId
     });
 
@@ -1513,6 +1532,11 @@ export async function bookRetailOrderPickup(
     organisationId: order.organisation_id,
     resourceId: order.id,
     resourceType: "retail_customer_order"
+  });
+  await recordRetailCustomerOrderPickupBooked(context, {
+    customerOrderId: order.id,
+    pickupProviderStatus: input.pickupProviderStatus?.trim() || "booked",
+    shipmentId: shipment.id
   });
 
   return shipment.id;

@@ -23,7 +23,7 @@ const copy = {
   en: {
     cancel: "Cancel",
     configError:
-      "Checkout is not configured yet. Please try again later or contact support.",
+      "Checkout is not configured at this time. Please contact support.",
     creatingSession: "Creating your payment session...",
     loading: "Loading secure checkout...",
     mockCta: "Simulate successful payment",
@@ -31,13 +31,13 @@ const copy = {
       "Local development is using mock payment mode. No Stripe keys or card details are needed.",
     retry: "Try again",
     stripeLoadTimeout:
-      "Stripe did not finish loading. Please check browser blockers or try again.",
-    unable: "We could not open checkout. Please try again."
+      "Stripe did not finish loading. Please check browser blockers.",
+    unable: "We could not open checkout at this time."
   },
   th: {
     cancel: "ยกเลิก",
     configError:
-      "ยังไม่ได้ตั้งค่าการชำระเงิน โปรดลองอีกครั้งภายหลังหรือติดต่อทีมงาน",
+      "ยังไม่ได้ตั้งค่าการชำระเงินในขณะนี้ โปรดติดต่อทีมงาน",
     creatingSession: "กำลังสร้างเซสชันการชำระเงิน...",
     loading: "กำลังโหลดหน้าชำระเงินที่ปลอดภัย...",
     mockCta: "จำลองการชำระเงินสำเร็จ",
@@ -45,19 +45,19 @@ const copy = {
       "โหมดพัฒนาบนเครื่องนี้ใช้การชำระเงินจำลอง จึงไม่ต้องใช้คีย์ Stripe หรือข้อมูลบัตร",
     retry: "ลองอีกครั้ง",
     stripeLoadTimeout:
-      "Stripe โหลดไม่เสร็จ โปรดตรวจสอบตัวบล็อกในเบราว์เซอร์หรือลองอีกครั้ง",
-    unable: "ไม่สามารถเปิดหน้าชำระเงินได้ โปรดลองอีกครั้ง"
+      "Stripe โหลดไม่เสร็จ โปรดตรวจสอบตัวบล็อกในเบราว์เซอร์",
+    unable: "ไม่สามารถเปิดหน้าชำระเงินได้ในขณะนี้"
   },
   "zh-CN": {
     cancel: "取消",
-    configError: "结账尚未配置。请稍后重试或联系支持。",
+    configError: "目前尚未配置结账。请联系支持。",
     creatingSession: "正在创建支付会话...",
     loading: "正在加载安全结账...",
     mockCta: "模拟支付成功",
     mockIntro: "本地开发正在使用模拟支付模式，不需要 Stripe 密钥或银行卡信息。",
     retry: "重试",
-    stripeLoadTimeout: "Stripe 未完成加载。请检查浏览器拦截器或重试。",
-    unable: "无法打开结账，请重试。"
+    stripeLoadTimeout: "Stripe 未完成加载。请检查浏览器拦截器。",
+    unable: "目前无法打开结账。"
   }
 };
 

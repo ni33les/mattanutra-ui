@@ -84,6 +84,11 @@ function configFromState(state: ReturnType<typeof initialConfigState>): PanyaCon
       }
     },
     guardrails: state.guardrails,
+    protocolAdvice: {
+      living_protocol: state.adviceLivingProtocol,
+      right_amount_formula: state.adviceRightAmountFormula,
+      unpaid: state.adviceUnpaid
+    },
     quotas: {
       living_protocol: Number(state.quotaLivingProtocol) || 32,
       right_amount_formula: Number(state.quotaRightAmountFormula) || 12,
@@ -96,6 +101,9 @@ function configFromState(state: ReturnType<typeof initialConfigState>): PanyaCon
 
 function initialConfigState(config: PanyaConfig) {
   return {
+    adviceLivingProtocol: config.protocolAdvice.living_protocol,
+    adviceRightAmountFormula: config.protocolAdvice.right_amount_formula,
+    adviceUnpaid: config.protocolAdvice.unpaid,
     checkInsEnabled: config.checkIns.enabled,
     guardrails: config.guardrails,
     minimumDaysBetweenMessages: configNumber(
@@ -150,6 +158,8 @@ export function AdminPanyaView({
   const [replyBody, setReplyBody] = useState("");
   const [replyBusy, setReplyBusy] = useState(false);
   const [replyError, setReplyError] = useState("");
+  const [resolveBusy, setResolveBusy] = useState(false);
+  const [resolveError, setResolveError] = useState("");
   const metrics = useMemo<BusinessMetric[]>(
     () => [
       {
@@ -195,6 +205,13 @@ export function AdminPanyaView({
     visibleConversations[0] ??
     data.conversations[0] ??
     null;
+  const selectedThreadEscalated = Boolean(
+    selectedThread &&
+      (
+        selectedThread.escalationCount > 0 ||
+        selectedThread.openEscalationTaskId
+      )
+  );
   const exportQuery = accessToken
     ? `?access_token=${encodeURIComponent(accessToken)}`
     : "";
@@ -238,7 +255,7 @@ export function AdminPanyaView({
         throw new Error(configText(json.error) || "Could not save Panya config");
       }
 
-      setMessage("Panya configuration activated.");
+      setMessage("Panya configuration saved.");
     } catch (saveError) {
       setError(
         saveError instanceof Error
@@ -296,6 +313,48 @@ export function AdminPanyaView({
     }
   }
 
+  async function resolveSelectedEscalation() {
+    if (!selectedThread || resolveBusy || !selectedThreadEscalated) {
+      return;
+    }
+
+    setResolveBusy(true);
+    setResolveError("");
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/panya", {
+        body: JSON.stringify({
+          action: "resolve_escalation",
+          planId: selectedThread.planId,
+          threadKey: selectedThread.threadKey
+        }),
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        method: "POST"
+      });
+      const json = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(configText(json.error) || "Could not resolve escalation");
+      }
+
+      setMessage("Escalation resolved.");
+
+      if (typeof window !== "undefined") {
+        window.location.href = conversationHref(selectedThread.threadKey);
+      }
+    } catch (resolveActionError) {
+      setResolveError(
+        resolveActionError instanceof Error
+          ? resolveActionError.message
+          : "Could not resolve escalation"
+      );
+    } finally {
+      setResolveBusy(false);
+    }
+  }
+
   return (
     <section className="mt-8 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -350,7 +409,7 @@ export function AdminPanyaView({
             "rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200"
           )}
         >
-          <div className="flex items-start justify-between gap-3">
+          <div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900">
                 Soul and guardrails
@@ -363,14 +422,6 @@ export function AdminPanyaView({
                 .
               </p>
             </div>
-            <button
-              className="rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={busy}
-              onClick={saveConfig}
-              type="button"
-            >
-              {busy ? "Saving..." : "Activate config"}
-            </button>
           </div>
 
           {message ? (
@@ -428,6 +479,56 @@ export function AdminPanyaView({
                 value={configState.upsellTone}
               />
             </label>
+
+            <div className="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-200">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900">
+                  Protocol-specific AI advice
+                </h4>
+                <p className="mt-1 text-xs leading-5 text-gray-600">
+                  These instructions are injected into Panya&apos;s AI prompt for
+                  the customer&apos;s current protocol entitlement.
+                </p>
+              </div>
+              <div className="mt-3 grid gap-3">
+                {[
+                  [
+                    "Living Protocol advice",
+                    "adviceLivingProtocol",
+                    "Use for subscription customers who can receive ongoing protocol support."
+                  ],
+                  [
+                    "Right Amount Formula advice",
+                    "adviceRightAmountFormula",
+                    "Use for paid one-off formula customers."
+                  ],
+                  [
+                    "Unpaid advice",
+                    "adviceUnpaid",
+                    "Use for customers without a paid plan entitlement."
+                  ]
+                ].map(([label, key, helper]) => (
+                  <label className="block" key={key}>
+                    <span className="text-xs font-semibold text-gray-700">
+                      {label}
+                    </span>
+                    <textarea
+                      className="mt-1 min-h-24 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
+                      onChange={(event) =>
+                        setConfigState((current) => ({
+                          ...current,
+                          [key]: event.target.value
+                        }))
+                      }
+                      value={String(configState[key as keyof typeof configState])}
+                    />
+                    <span className="mt-1 block text-xs text-gray-500">
+                      {helper}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
               {[
@@ -528,6 +629,17 @@ export function AdminPanyaView({
                   </label>
                 ))}
               </div>
+            </div>
+
+            <div className="flex justify-end border-t border-gray-100 pt-4">
+              <button
+                className="rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={busy}
+                onClick={saveConfig}
+                type="button"
+              >
+                {busy ? "Saving..." : "Save"}
+              </button>
             </div>
           </div>
         </section>
@@ -641,24 +753,45 @@ export function AdminPanyaView({
           ) : null}
         </div>
 
-        {selectedThread?.openEscalationTaskId ? (
+        {selectedThreadEscalated ? (
           <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
-            <div className="font-semibold">Human review task is open</div>
+            <div className="font-semibold">
+              {selectedThread?.openEscalationTaskId
+                ? "Human review task is open"
+                : "Conversation is escalated"}
+            </div>
             <p className="mt-1">
               Panya escalated this conversation. Review the task flow item or
-              reply directly below.
+              reply directly below. Resolve it when the human follow-up is done.
             </p>
-            <a
-              className="mt-3 inline-flex rounded-md bg-white px-3 py-2 text-sm font-semibold text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100"
-              href={adminTaskVisibilityHref({
-                accessToken,
-                locale,
-                range,
-                taskId: selectedThread.openEscalationTaskId
-              })}
-            >
-              Open human task
-            </a>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {selectedThread?.openEscalationTaskId ? (
+                <a
+                  className="inline-flex rounded-md bg-white px-3 py-2 text-sm font-semibold text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100"
+                  href={adminTaskVisibilityHref({
+                    accessToken,
+                    locale,
+                    range,
+                    taskId: selectedThread.openEscalationTaskId
+                  })}
+                >
+                  Open human task
+                </a>
+              ) : null}
+              <button
+                className="inline-flex rounded-md bg-[#1FA77A] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={resolveBusy}
+                onClick={resolveSelectedEscalation}
+                type="button"
+              >
+                {resolveBusy ? "Resolving..." : "Resolve"}
+              </button>
+            </div>
+            {resolveError ? (
+              <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-100">
+                {resolveError}
+              </p>
+            ) : null}
           </div>
         ) : null}
 

@@ -214,6 +214,7 @@ async function ensureDelightOrganisation(
           ...(organisation.metadata && typeof organisation.metadata === "object"
             ? (organisation.metadata as Record<string, unknown>)
             : {}),
+          dispatchCity: "Chiang Mai",
           reseededForUatAt: new Date().toISOString(),
           source: "seed-uat-minimal-runtime",
         }),
@@ -230,7 +231,14 @@ async function ensureDelightOrganisation(
       default_locale = excluded.default_locale,
       country_code = excluded.country_code,
       currency = excluded.currency,
-      metadata = public.organisations.metadata || excluded.metadata,
+      metadata =
+        public.organisations.metadata ||
+        excluded.metadata ||
+        case
+          when public.organisations.metadata ? 'dispatchCity'
+            then jsonb_build_object('dispatchCity', public.organisations.metadata->>'dispatchCity')
+          else '{}'::jsonb
+        end,
       updated_at = now()
   `;
 }

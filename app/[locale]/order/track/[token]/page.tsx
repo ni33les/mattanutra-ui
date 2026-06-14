@@ -393,6 +393,7 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
                   planId={order.planId}
                   presentation="inline_qr"
                   retailCustomerOrderId={order.orderId}
+                  showEyebrow={false}
                   source="order_tracking"
                 />
               </section>

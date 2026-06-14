@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
           ? numberValue(body.customerPriceMarginPercent)
           : undefined,
         defaultLocale: localeValue(body.defaultLocale),
+        dispatchCity: text(body.dispatchCity),
         name
       });
       const response = NextResponse.json({

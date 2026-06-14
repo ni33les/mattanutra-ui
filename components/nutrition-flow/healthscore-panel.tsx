@@ -1,27 +1,25 @@
 "use client";
 
+import Image from "next/image";
 import {
-  AdjustmentsHorizontalIcon,
   ArrowRightIcon,
-  BeakerIcon,
   CheckCircleIcon,
-  ClipboardDocumentCheckIcon,
-  LockClosedIcon,
   ShieldCheckIcon,
-  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
-import type {
-  HealthScoreGapCard,
-  HealthScoreMethodCard,
-  HealthScorePageAiCard,
-  HealthScoreResult,
-  LocalizedHealthScoreText,
+import {
+  DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT,
+  type HealthScoreGapCard,
+  type HealthScoreMethodCard,
+  type HealthScorePageAiCard,
+  type HealthScoreResult,
+  type LocalizedHealthScoreText,
 } from "@/lib/health-score";
 import type { Locale } from "@/lib/i18n";
 import {
   pageCopy,
+  type HealthScorePageCopy,
   type PricePlan,
 } from "@/components/nutrition-flow/healthscore-panel-copy";
 import { paymentCheckoutPath } from "@/lib/payment-paths";
@@ -112,12 +110,12 @@ function RevealBlock({
     <div
       ref={ref}
       className={cx(
-        "motion-safe:transition-all motion-safe:duration-700 motion-safe:ease-out",
-        delay === 1 && "motion-safe:delay-75",
-        delay === 2 && "motion-safe:delay-150",
-        delay === 3 && "motion-safe:delay-300",
-        delay === 4 && "motion-safe:delay-[420ms]",
-        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6",
+        "reveal",
+        delay === 1 && "d1",
+        delay === 2 && "d2",
+        delay === 3 && "d3",
+        delay === 4 && "d4",
+        visible && "in",
         className,
       )}
     >
@@ -171,8 +169,50 @@ function CountUpNumber({
   );
 }
 
-function stripInlineMarkup(value: string) {
-  return value.replace(/<\/?b>/g, "");
+function renderInlineMarkup(value: string) {
+  const pieces = value.split(/(<\/?(?:b|em)>)/gi);
+  const active: Array<"b" | "em"> = [];
+  const nodes: ReactNode[] = [];
+
+  pieces.forEach((piece, index) => {
+    const tag = piece.toLowerCase();
+
+    if (tag === "<b>" || tag === "<em>") {
+      active.push(tag.slice(1, -1) as "b" | "em");
+      return;
+    }
+
+    if (tag === "</b>" || tag === "</em>") {
+      const closing = tag.slice(2, -1);
+      const activeIndex = active.lastIndexOf(closing as "b" | "em");
+
+      if (activeIndex >= 0) {
+        active.splice(activeIndex, 1);
+      }
+      return;
+    }
+
+    if (!piece) {
+      return;
+    }
+
+    const key = `${index}-${piece}`;
+    const current = active.at(-1);
+
+    if (current === "b") {
+      nodes.push(<b key={key}>{piece}</b>);
+      return;
+    }
+
+    if (current === "em") {
+      nodes.push(<em key={key}>{piece}</em>);
+      return;
+    }
+
+    nodes.push(piece);
+  });
+
+  return nodes;
 }
 
 const thaiScriptPattern = /[\u0E00-\u0E7F]/;
@@ -230,14 +270,6 @@ export function localizeHealthScoreText(
   locale: Locale,
 ) {
   return localize(value, locale);
-}
-
-function aiCardHeadline(
-  card: HealthScorePageAiCard | undefined,
-  locale: Locale,
-  fallback: string,
-) {
-  return localize(card?.headline ?? card?.title, locale, fallback);
 }
 
 function aiCardBody(
@@ -303,8 +335,10 @@ function normalizedPillars(result: HealthScoreResult) {
   return (
     result.pageContent?.locked.pillars ??
     result.domains.map((domain) => ({
+      fillClass: domain.score >= 50 ? "hi" as const : "lo" as const,
       goalLinked: false,
       id: domain.id,
+      isHero: false,
       label: domain.label,
       tag: null,
       value: domain.score,
@@ -371,133 +405,47 @@ function findings(result: HealthScoreResult, locale: Locale) {
   ];
 }
 
-function HealthScoreProgress({
-  locale,
-}: Readonly<{
+type HealthScoreViewModel = Readonly<{
+  bandLine: string;
+  bandPill: string;
+  copy: HealthScorePageCopy;
+  findings: ReturnType<typeof findings>;
+  findingsEyebrow: string;
+  findingsHeadline: string;
+  findingsSub: string;
+  firstName?: string;
+  gapCards: HealthScoreGapCard[];
+  heroBody: string;
+  heroTitle: string;
+  highestLeverageBody: string;
   locale: Locale;
-}>) {
-  const copy = pageCopy[locale];
-
-  return (
-    <div
-      aria-label="HealthScore assessment progress"
-      className="mx-auto flex w-full max-w-3xl items-center justify-center gap-1.5 mn-font-mono text-[0.68rem]"
-    >
-      {copy.progress.map(([title, body], index) => {
-        const complete = index === 0;
-        const active = index === 1;
-
-        return (
-          <div className="flex items-center gap-1.5" key={title}>
-            {index > 0 ? (
-              <span
-                aria-hidden={true}
-                className="h-px w-4 bg-[var(--mn-line)] sm:w-7"
-              />
-            ) : null}
-            <span
-              className={cx(
-                "inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-[var(--mn-ash-soft)] sm:px-3",
-                active &&
-                  "bg-white text-[var(--mn-ink)] shadow-[var(--mn-shadow-soft)]",
-                complete && "text-[var(--mn-teal-deep)]",
-              )}
-            >
-              <span
-                className={cx(
-                  "grid size-[1.125rem] place-items-center rounded-full border text-[0.58rem] font-bold",
-                  complete
-                    ? "border-[var(--mn-teal-deep)] bg-[var(--mn-teal-deep)] text-white"
-                    : active
-                      ? "border-2 border-[var(--mn-teal)] text-[var(--mn-teal)]"
-                      : "border-current",
-                )}
-              >
-                {complete ? "✓" : index + 1}
-              </span>
-              <span className="hidden font-semibold sm:inline">{title}</span>
-              <span className="sr-only">{body}</span>
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ScoreSpectrum({
-  locale,
-  result,
-}: Readonly<{
-  locale: Locale;
+  median: number;
+  methodCards: HealthScoreMethodCard[];
+  methodHeadline: string;
+  opportunityPill: string;
+  pillarHeadline: string;
+  pillars: ReturnType<typeof normalizedPillars>;
+  percentile: number;
+  relativityHeadline: string;
+  relativitySub: string;
   result: HealthScoreResult;
-}>) {
-  const copy = pageCopy[locale];
-  const score = result.pageContent?.locked.score ?? result.score;
-  const median = result.pageContent?.locked.median ?? 64;
-  const marker = scorePosition(score);
-  const medianMarker = scorePosition(median);
-  const gapLeft = Math.min(marker, medianMarker);
-  const gapWidth = Math.abs(marker - medianMarker);
-  const { ref, visible } = useInViewOnce<HTMLDivElement>();
-  const ahead = score >= median;
+  score: number;
+  spectrum: Readonly<{
+    gapLeft: number;
+    gapWidth: number;
+    legendCaptions: readonly [string, string, string];
+    medianMarker: number;
+    scoreMarker: number;
+  }>;
+  strengthNote: string;
+  subtraction: Readonly<{
+    body: string;
+    labels: readonly [string, string, string];
+    numbers: readonly [number, number, number];
+  }>;
+}>;
 
-  return (
-    <div className="mx-auto mt-8 max-w-2xl" ref={ref}>
-      <div className="relative h-16 sm:h-14">
-        <div className="absolute inset-x-0 top-6 h-2.5 overflow-hidden rounded-full bg-[linear-gradient(90deg,#E7DFCB_36%,#E3EEE6_70%,var(--mn-teal-glow))]" />
-        {gapWidth > 0 ? (
-          <div
-            aria-hidden={true}
-            className="absolute top-[1.125rem] h-[1.125rem] rounded border border-dashed border-[var(--mn-teal)] bg-[color-mix(in_srgb,var(--mn-teal)_10%,transparent)]"
-            style={{ left: `${gapLeft}%`, width: `${gapWidth}%` }}
-          />
-        ) : null}
-        <div
-          aria-hidden={true}
-          className="absolute left-0 top-6 h-2.5 rounded-full bg-[linear-gradient(90deg,var(--mn-teal-deep),var(--mn-teal-light))] shadow-[0_0_0_1px_rgba(31,110,88,.18)] motion-safe:transition-[width] motion-safe:duration-[1600ms] motion-safe:ease-out"
-          style={{ width: visible ? `${marker}%` : 0 }}
-        />
-        <div
-          className="absolute top-2 h-10 w-px bg-[var(--mn-ink-soft)]"
-          style={{ left: `${medianMarker}%` }}
-        >
-          <span className="absolute bottom-[-1.35rem] left-1/2 -translate-x-1/2 whitespace-nowrap mn-font-mono text-[0.58rem] text-[var(--mn-ink-soft)]">
-            {copy.spectrumTypical} · {median}
-          </span>
-        </div>
-        <div
-          className="absolute top-0 h-12 w-0.5 bg-[var(--mn-teal-deep)]"
-          style={{ left: `${marker}%` }}
-        >
-          <span className="absolute top-[-1.35rem] left-1/2 -translate-x-1/2 whitespace-nowrap mn-font-mono text-[0.62rem] font-bold text-[var(--mn-teal-deep)]">
-            {copy.spectrumYou} · {score}
-          </span>
-        </div>
-      </div>
-      <div className="mt-6 flex justify-between mn-font-mono text-[0.62rem] text-[var(--mn-ash-soft)]">
-        <span>{copy.spectrumStart}</span>
-        <span>{copy.spectrumEnd}</span>
-      </div>
-      <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 mn-font-mono text-[0.68rem] text-[var(--mn-ash)]">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-3.5 rounded-sm bg-[var(--mn-teal-deep)]" />
-          {copy.spectrumWhere}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-3.5 rounded-sm border border-dashed border-[var(--mn-teal)] bg-[color-mix(in_srgb,var(--mn-teal)_10%,transparent)]" />
-          {ahead ? copy.spectrumGapAhead : copy.spectrumGapBehind}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-3.5 rounded-sm bg-[linear-gradient(90deg,var(--mn-teal-glow),transparent)]" />
-          {copy.spectrumHeadroom}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function HealthScoreHero({
+function buildHealthScoreViewModel({
   firstName,
   locale,
   result,
@@ -505,168 +453,338 @@ function HealthScoreHero({
   firstName?: string;
   locale: Locale;
   result: HealthScoreResult;
-}>) {
+}>): HealthScoreViewModel {
   const copy = pageCopy[locale];
   const page = result.pageContent;
-  const score = page?.locked.score ?? result.score;
   const ai = page?.aiCopy;
-  const heroTitle = localize(
-    ai?.heroTitle,
-    locale,
-    localizedLegacyText(
+  const score = page?.locked.score ?? result.score;
+  const median = page?.locked.median ?? page?.copySeeds.relativity.spectrumMedian ?? 60;
+  const percentile = page?.locked.percentile ?? 0;
+  const relativity = page?.copySeeds.relativity;
+  const subtraction = page?.locked.subtraction ?? {
+    chosen: 8,
+    evaluated: DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT,
+    mode: "nutrients" as const,
+    setAside: DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT - 8,
+  };
+  const subtractionSeed = page?.copySeeds.subtraction;
+  const scoreMarker = relativity?.spectrumYouPct ?? scorePosition(score);
+  const medianMarker = relativity?.spectrumMedianPct ?? scorePosition(median);
+
+  return {
+    bandLine: localizedLegacyText(
+      page?.copySeeds.bandLine,
+      locale,
+      copy.defaultBandLine,
+    ),
+    bandPill: localizedLegacyText(
+      page?.copySeeds.bandPill,
+      locale,
+      displayBand(result.band, locale),
+    ),
+    copy,
+    findings: findings(result, locale),
+    findingsEyebrow:
+      page?.copySeeds.findingsMode === "strengths"
+        ? copy.pillarsEyebrow
+        : copy.whatCaught,
+    findingsHeadline: localizedLegacyText(
+      page?.copySeeds.findingsHeadline,
+      locale,
+      copy.gapTitle,
+    ),
+    findingsSub: localizedLegacyText(
+      page?.copySeeds.findingsSub,
+      locale,
+      copy.whatCaughtSub,
+    ),
+    firstName,
+    gapCards: gapCards(result, locale),
+    heroBody: localize(
+      ai?.heroBody,
+      locale,
+      localizedLegacyText(
+        page?.copySeeds.heroBody ?? result.summary,
+        locale,
+        copy.defaultHeroBody,
+      ),
+    ),
+    heroTitle: localizedLegacyText(
       page?.copySeeds.goalMirror,
       locale,
       copy.heroTitle(score),
     ),
-  );
-  const heroBody = localize(
-    ai?.heroBody,
-    locale,
-    localizedLegacyText(
-      page?.copySeeds.heroBody ?? result.summary,
+    highestLeverageBody: localizedLegacyText(
+      page?.copySeeds.highestLeverage?.text,
       locale,
-      copy.defaultHeroBody,
+      "",
     ),
-  );
-  const bandLine = localize(
-    ai?.bandLine,
     locale,
-    localizedLegacyText(page?.copySeeds.bandLine, locale, copy.defaultBandLine),
+    median,
+    methodCards: methodCards(result, locale),
+    methodHeadline: localizedLegacyText(
+      page?.copySeeds.methodHeadline,
+      locale,
+      copy.methodTitle,
+    ),
+    opportunityPill: localizedLegacyText(
+      page?.copySeeds.opportunityPill,
+      locale,
+      percentile >= 80 ? copy.topTier : copy.pillOpportunity,
+    ),
+    pillarHeadline: localizedLegacyText(
+      page?.copySeeds.pillarHeadline,
+      locale,
+      copy.pillarsTitle,
+    ),
+    pillars: normalizedPillars(result),
+    percentile,
+    relativityHeadline: localizedLegacyText(
+      relativity?.headline,
+      locale,
+      copy.fallbackScoreMeaning(score, percentile),
+    ),
+    relativitySub: localize(
+      ai?.relativitySub,
+      locale,
+      localizedLegacyText(relativity?.sub, locale, copy.fallbackScoreMeaningSub),
+    ),
+    result,
+    score,
+    spectrum: {
+      gapLeft: relativity?.spectrumGapLeftPct ?? Math.min(scoreMarker, medianMarker),
+      gapWidth:
+        relativity?.spectrumGapWidthPct ?? Math.abs(scoreMarker - medianMarker),
+      legendCaptions: relativity?.legendCaptions ?? [
+        copy.spectrumWhere,
+        score >= median ? copy.spectrumGapAhead : copy.spectrumGapBehind,
+        copy.spectrumHeadroom,
+      ],
+      medianMarker,
+      scoreMarker,
+    },
+    strengthNote: localizedLegacyText(
+      page?.copySeeds.strengthNote,
+      locale,
+      "",
+    ),
+    subtraction: {
+      body: localizedLegacyText(
+        subtractionSeed?.body,
+        locale,
+        copy.subtractionTitle,
+      ),
+      labels: [
+        localizedLegacyText(
+          subtractionSeed?.labelEvaluated,
+          locale,
+          copy.evaluatedFallback,
+        ),
+        localizedLegacyText(
+          subtractionSeed?.labelSetAside,
+          locale,
+          copy.setAsideFallback,
+        ),
+        localizedLegacyText(
+          subtractionSeed?.labelChosen,
+          locale,
+          copy.chosenFallback,
+        ),
+      ],
+      numbers: [
+        subtraction.evaluated,
+        subtraction.setAside,
+        subtraction.chosen,
+      ],
+    },
+  };
+}
+
+function ScoreSpectrum({
+  model,
+}: Readonly<{
+  model: HealthScoreViewModel;
+}>) {
+  const { copy, median, score, spectrum } = model;
+  const { ref, visible } = useInViewOnce<HTMLDivElement>();
+  const ahead = score >= median;
+  const medianMarkerElement = (
+    <div
+      className="marker med"
+      style={{ left: `${spectrum.medianMarker}%` }}
+    >
+      <span className="cap bot">
+        {copy.spectrumTypical} · {median}
+      </span>
+    </div>
   );
-  const percentile = page?.locked.percentile ?? null;
-  const { ref: scoreRef, visible: scoreVisible } =
-    useInViewOnce<HTMLDivElement>();
+  const scoreMarkerElement = (
+    <div
+      className="marker you"
+      style={{ left: `${spectrum.scoreMarker}%` }}
+    >
+      <span className="cap top">
+        {copy.spectrumYou} · {score}
+      </span>
+    </div>
+  );
 
   return (
-    <header className="space-y-8 text-center">
-      <HealthScoreProgress locale={locale} />
-      <div className="mx-auto max-w-5xl pt-10 sm:pt-14">
-        <RevealBlock>
-          <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
-            {copy.heroEyebrow}
-          </p>
-        </RevealBlock>
-        <RevealBlock delay={1}>
-          {firstName ? (
-            <p className="mt-4 text-sm font-semibold text-[var(--mn-gold)]">
-              {copy.heroGreeting(firstName)}
-            </p>
-          ) : null}
-          <h1
-            className={cx(
-              "mn-hero-title mx-auto mt-5 max-w-[16ch] font-serif text-[clamp(2rem,5.4vw,3.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)]",
-              locale === "en" ? "text-balance" : "break-words",
-            )}
-          >
-            {heroTitle}
-          </h1>
-        </RevealBlock>
-        <RevealBlock delay={2}>
-          <p
-            className={cx(
-              "mn-hero-subtitle mx-auto mt-5 max-w-[54ch] text-[1.05rem] text-[var(--mn-ink-soft)]",
-              copy.bodyClass,
-            )}
-          >
-            {heroBody}
-          </p>
-        </RevealBlock>
-
-        <RevealBlock delay={3}>
-          <aside
-            className="relative mx-auto mt-12 max-w-[47.5rem] overflow-hidden rounded-3xl border border-[var(--mn-line)] bg-[var(--mn-paper)] px-5 py-8 shadow-[var(--mn-shadow-card)] before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-[linear-gradient(90deg,var(--mn-teal-deep),var(--mn-teal-light),var(--mn-gold-soft))] sm:px-10 sm:py-10"
-            ref={scoreRef}
-          >
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <span className="rounded-full bg-[var(--mn-gold-tint)] px-3 py-1.5 mn-font-mono text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-[#8a6d23]">
-                {displayBand(result.band, locale)}
-              </span>
-              {percentile !== null ? (
-                <span className="rounded-full bg-[var(--mn-mint)] px-3 py-1.5 mn-font-mono text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
-                  {percentile >= 80
-                    ? copy.topTier
-                    : `${copy.percentile}: ${percentile}`}
-                </span>
-              ) : null}
-            </div>
-
-            <div className="mt-5 flex items-start justify-center">
-              <CountUpNumber
-                active={scoreVisible}
-                className="font-serif text-[clamp(6rem,17vw,9.75rem)] font-light leading-[0.9] tracking-[-0.04em] text-[var(--mn-ink)]"
-                duration={1100}
-                value={score}
-              />
-              <span className="mt-4 mn-font-mono text-[clamp(1.25rem,4vw,2.1rem)] font-semibold text-[var(--mn-ash-soft)]">
-                {copy.scoreOutOf}
-              </span>
-            </div>
-
-            <ScoreSpectrum locale={locale} result={result} />
-
-            <p
-              className={cx(
-                "mx-auto mt-7 max-w-[46ch] text-base text-[var(--mn-ink-soft)]",
-                copy.bodyClass,
-              )}
-            >
-              {bandLine}
-            </p>
-          </aside>
-        </RevealBlock>
+    <div className="spectrum" ref={ref}>
+      <div className="spec-track">
+        <div className="spec-bar" />
+        <div className="spec-grow">{copy.spectrumHeadroom}</div>
+        {spectrum.gapWidth > 0 ? (
+          <div
+            aria-hidden={true}
+            className="spec-gap"
+            style={{ left: `${spectrum.gapLeft}%`, width: `${spectrum.gapWidth}%` }}
+          />
+        ) : null}
+        <div
+          aria-hidden={true}
+          className="spec-fill"
+          style={{ width: visible ? `${spectrum.scoreMarker}%` : 0 }}
+        />
+        {ahead ? medianMarkerElement : scoreMarkerElement}
+        {ahead ? scoreMarkerElement : medianMarkerElement}
       </div>
+      <div className="spec-ends">
+        <span>{copy.spectrumStart}</span>
+        <span>{copy.spectrumEnd}</span>
+      </div>
+      <div className="spec-legend">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="lg-sw bg-[var(--mn-teal-deep)]" />
+          {spectrum.legendCaptions[0]}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="lg-sw border border-dashed border-[var(--mn-teal)] bg-[color-mix(in_srgb,var(--mn-teal)_10%,transparent)]" />
+          {spectrum.legendCaptions[1]}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="lg-sw bg-[linear-gradient(90deg,var(--mn-teal-glow),transparent)]" />
+          {spectrum.legendCaptions[2]}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function HealthScoreHero({
+  model,
+}: Readonly<{
+  model: HealthScoreViewModel;
+}>) {
+  const {
+    bandLine,
+    bandPill,
+    copy,
+    firstName,
+    heroBody,
+    heroTitle,
+    locale,
+    opportunityPill,
+    score,
+  } = model;
+  const { ref: scoreRef, visible: scoreVisible } =
+    useInViewOnce<HTMLDivElement>();
+  const headline = firstName
+    ? locale === "en"
+      ? heroTitle.replace(/^You\b/, "you")
+      : heroTitle
+    : heroTitle;
+
+  return (
+    <header className="hero wrap">
+      <RevealBlock>
+        <span className="eyebrow">
+          {copy.assessmentComplete}
+        </span>
+      </RevealBlock>
+      <RevealBlock delay={1}>
+        <h1
+          className={cx(
+            "goalmirror",
+            locale === "en" ? "text-balance" : "break-words",
+          )}
+        >
+          {firstName ? `${firstName}, ` : null}
+          {renderInlineMarkup(headline)}
+        </h1>
+      </RevealBlock>
+      <RevealBlock delay={2}>
+        <p className={cx("hero-sub", copy.bodyClass)}>
+          {renderInlineMarkup(heroBody)}
+        </p>
+      </RevealBlock>
+
+      <RevealBlock delay={3}>
+        <aside
+          className="scorecard"
+          ref={scoreRef}
+        >
+          <div className="score-top">
+            <span className="band-pill">
+              {bandPill}
+            </span>
+            <span className="opp-pill">
+              {opportunityPill}
+            </span>
+          </div>
+
+          <div className="bignum">
+            <CountUpNumber
+              active={scoreVisible}
+              duration={1100}
+              value={score}
+            />
+            <span className="of">
+              {copy.scoreOutOf}
+            </span>
+          </div>
+
+          <p className={cx("scoreline", copy.bodyClass)}>
+            {renderInlineMarkup(bandLine)}
+          </p>
+
+          <ScoreSpectrum model={model} />
+        </aside>
+      </RevealBlock>
     </header>
   );
 }
 
 function GapCards({
-  locale,
-  result,
+  model,
 }: Readonly<{
-  locale: Locale;
-  result: HealthScoreResult;
+  model: HealthScoreViewModel;
 }>) {
-  const copy = pageCopy[locale];
-  const page = result.pageContent;
-  const ai = page?.aiCopy;
-  const score = page?.locked.score ?? result.score;
-  const percentile = page?.locked.percentile ?? 0;
-  const relativity = page?.copySeeds.relativity;
-  const title = localize(
-    ai?.relativityHeadline,
+  const {
+    copy,
+    gapCards: cards,
     locale,
-    localizedLegacyText(
-      relativity?.headline,
-      locale,
-      copy.fallbackScoreMeaning(score, percentile),
-    ),
-  );
-  const body = localize(
-    ai?.relativitySub,
-    locale,
-    localizedLegacyText(relativity?.sub, locale, copy.fallbackScoreMeaningSub),
-  );
-  const cards = gapCards(result, locale);
+    relativityHeadline,
+    relativitySub,
+    result,
+    score,
+  } = model;
+  const ai = result.pageContent?.aiCopy;
 
   return (
-    <section className="pt-2" id="signals">
-      <RevealBlock className="max-w-[60ch]">
-        <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
+    <section className="wrap" id="signals">
+      <RevealBlock className="sec-head">
+        <p className="eyebrow">
           {copy.scoreMeaningEyebrow(score)}
         </p>
-        <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">
-          {title}
+        <h2 className={locale === "en" ? "text-balance" : ""}>
+          {renderInlineMarkup(relativityHeadline)}
         </h2>
-        <p
-          className={cx(
-            "mt-4 max-w-[54ch] text-[1.05rem] text-[var(--mn-ink-soft)]",
-            copy.bodyClass,
-          )}
-        >
-          {body}
+        <p className={copy.bodyClass}>
+          {renderInlineMarkup(relativitySub)}
         </p>
       </RevealBlock>
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
+      <div className="gaprow">
         {cards.map((card, index) => {
           const aiCard = ai?.gapTrio?.[index];
           const fallbackCard = copy.fallbackGaps[index] ?? card;
@@ -677,35 +795,26 @@ function GapCards({
               delay={(index + 1) as 1 | 2 | 3}
               key={`${card.tag}-${card.value}-${index}`}
             >
-              <article className="relative h-full rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-soft)] motion-safe:transition motion-safe:duration-300 motion-safe:hover:-translate-y-1">
-                <span className="mn-font-mono text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-[var(--mn-ash-soft)]">
+              <article className="gapcard">
+                <span className="gn">
                   {tag}
                 </span>
-                <div className="mt-2 font-serif text-4xl font-medium leading-none text-[var(--mn-teal-deep)]">
+                <div className="gpct">
                   {card.value}
                 </div>
-                <h3 className="mt-3 text-lg font-semibold leading-snug text-[var(--mn-ink)]">
-                  {aiCardHeadline(
-                    aiCard,
+                <h3>
+                  {renderInlineMarkup(localizedLegacyText(
+                    card.headline,
                     locale,
-                    localizedLegacyText(
-                      card.headline,
-                      locale,
-                      fallbackCard.headline,
-                    ),
-                  )}
+                    fallbackCard.headline,
+                  ))}
                 </h3>
-                <p
-                  className={cx(
-                    "mt-3 text-sm text-[var(--mn-ink-soft)]",
-                    copy.bodyClass,
-                  )}
-                >
-                  {aiCardBody(
+                <p className={copy.bodyClass}>
+                  {renderInlineMarkup(aiCardBody(
                     aiCard,
                     locale,
                     localizedLegacyText(card.body, locale, fallbackCard.body),
-                  )}
+                  ))}
                 </p>
               </article>
             </RevealBlock>
@@ -717,59 +826,34 @@ function GapCards({
 }
 
 function PillarBars({
-  locale,
-  result,
+  model,
 }: Readonly<{
-  locale: Locale;
-  result: HealthScoreResult;
+  model: HealthScoreViewModel;
 }>) {
-  const copy = pageCopy[locale];
-  const pillars = normalizedPillars(result);
-  const page = result.pageContent;
-  const ai = page?.aiCopy;
-  const headline = localize(
-    ai?.pillarHeadline,
+  const {
+    copy,
+    highestLeverageBody,
     locale,
-    localizedLegacyText(
-      page?.copySeeds.pillarHeadline,
-      locale,
-      copy.pillarsTitle,
-    ),
-  );
-  const highestLeverage = page?.copySeeds.highestLeverage;
-  const highestLeverageBody = localize(
-    ai?.highestLeverageBody,
-    locale,
-    localizedLegacyText(
-      highestLeverage?.text ? stripInlineMarkup(highestLeverage.text) : "",
-      locale,
-      "",
-    ),
-  );
-  const strengthNote = localize(
-    ai?.strengthNote,
-    locale,
-    localizedLegacyText(page?.copySeeds.strengthNote, locale, ""),
-  );
+    pillarHeadline,
+    pillars,
+    strengthNote,
+  } = model;
   const { ref, visible } = useInViewOnce<HTMLDivElement>();
-  const leveragePillar = highestLeverage
-    ? pillars.find((pillar) => pillar.label === highestLeverage.pillar)
-    : pillars.slice().sort((left, right) => left.value - right.value)[0];
 
   return (
-    <section>
-      <RevealBlock className="max-w-[60ch]">
-        <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
+    <section className="wrap">
+      <RevealBlock className="sec-head">
+        <p className="eyebrow">
           {copy.pillarEyebrow}
         </p>
-        <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">
-          {headline}
+        <h2 className={locale === "en" ? "text-balance" : ""}>
+          {renderInlineMarkup(pillarHeadline)}
         </h2>
       </RevealBlock>
 
       <RevealBlock delay={1}>
         <div
-          className="mt-8 rounded-3xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-soft)] sm:p-8"
+          className="pillars"
           ref={ref}
         >
           {pillars.map((pillar) =>
@@ -779,68 +863,49 @@ function PillarBars({
               return (
                 <div
                   className={cx(
-                    "grid gap-2 border-b border-[var(--mn-line)] py-4 last:border-b-0 sm:grid-cols-[11rem_1fr_3.5rem] sm:items-center sm:gap-4",
-                    leveragePillar?.id === pillar.id &&
-                      "rounded-2xl border-b-0 bg-[var(--mn-mint)] px-4 sm:-mx-4",
+                    "prow",
+                    pillar.isHero && "hero",
                   )}
                   key={pillar.id}
                 >
-                  <div className="min-w-0">
-                    <h3 className="flex flex-col gap-1 text-[0.95rem] font-semibold leading-snug text-[var(--mn-ink)]">
+                  <div className="pname">
+                    <h3>
                       {displayPillarLabel(pillar, locale)}
                       {pillarTag ? (
-                        <span
-                          className={cx(
-                            "w-fit rounded-full bg-[var(--mn-mint)] px-2 py-0.5 mn-font-mono text-[0.58rem] font-semibold text-[var(--mn-teal-deep)]",
-                            locale === "en" && "uppercase tracking-[0.12em]",
-                          )}
-                        >
-                          {pillarTag}
+                        <span className="gtag">
+                          {copy.goalLinkedLabel} · {pillarTag}
                         </span>
                       ) : null}
                     </h3>
                   </div>
-                  <div className="h-2.5 overflow-hidden rounded-full bg-[var(--mn-cream-deep)]">
+                  <div className="ptrack">
                     <div
-                      className={cx(
-                        "h-full rounded-full motion-safe:transition-[width] motion-safe:duration-[1300ms] motion-safe:ease-out",
-                        pillar.value >= 70
-                          ? "bg-[linear-gradient(90deg,var(--mn-teal-deep),var(--mn-teal-light))]"
-                          : "bg-[linear-gradient(90deg,#C98A2B,var(--mn-gold-soft))]",
-                      )}
+                      className={cx("pfill", pillar.fillClass)}
                       style={{ width: visible ? `${clamp(pillar.value)}%` : 0 }}
                     />
                   </div>
-                  <span className="mn-font-mono text-sm font-semibold text-[var(--mn-ink)] sm:text-right">
-                    {pillar.value}
+                  <span className="pval">
+                    {pillar.value}%
                   </span>
                 </div>
               );
             })(),
           )}
           {highestLeverageBody ? (
-            <div className="mt-6 rounded-r-2xl border-l-4 border-[var(--mn-teal)] bg-[var(--mn-mint)] px-5 py-4">
-              <p className="text-sm font-semibold text-[var(--mn-teal-deep)]">
-                {copy.highestLeverageLabel}
-              </p>
-              <p
-                className={cx(
-                  "mt-2 text-sm text-[var(--mn-ink-soft)]",
-                  copy.bodyClass,
-                )}
-              >
-                {highestLeverageBody}
+            <div className="leverbox">
+              <p className={copy.bodyClass}>
+                {renderInlineMarkup(highestLeverageBody)}
               </p>
             </div>
           ) : null}
           {strengthNote ? (
             <p
               className={cx(
-                "mt-4 text-sm text-[var(--mn-ash)]",
+                "notebox",
                 copy.bodyClass,
               )}
             >
-              {strengthNote}
+              {renderInlineMarkup(strengthNote)}
             </p>
           ) : null}
         </div>
@@ -849,77 +914,36 @@ function PillarBars({
   );
 }
 
-function FindingIcon({
-  index,
-}: Readonly<{
-  index: number;
-}>) {
-  const className = "size-5";
-
-  if (index === 1) {
-    return <ShieldCheckIcon aria-hidden={true} className={className} />;
-  }
-
-  if (index === 2) {
-    return (
-      <ClipboardDocumentCheckIcon aria-hidden={true} className={className} />
-    );
-  }
-
-  return <SparklesIcon aria-hidden={true} className={className} />;
-}
-
 function FindingsSection({
-  locale,
-  result,
+  model,
 }: Readonly<{
-  locale: Locale;
-  result: HealthScoreResult;
+  model: HealthScoreViewModel;
 }>) {
-  const copy = pageCopy[locale];
-  const page = result.pageContent;
-  const ai = page?.aiCopy;
-  const items = findings(result, locale);
-  const headline = localize(
-    ai?.findingsHeadline,
+  const {
+    copy,
+    findings: items,
+    findingsEyebrow,
+    findingsHeadline,
+    findingsSub,
     locale,
-    localizedLegacyText(
-      page?.copySeeds.findingsHeadline,
-      locale,
-      copy.gapTitle,
-    ),
-  );
-  const sub = localize(
-    ai?.findingsSub,
-    locale,
-    localizedLegacyText(
-      page?.copySeeds.findingsSub,
-      locale,
-      copy.whatCaughtSub,
-    ),
-  );
+    result,
+  } = model;
+  const ai = result.pageContent?.aiCopy;
 
   return (
-    <section>
-      <RevealBlock className="max-w-[60ch]">
-        <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
-          {page?.copySeeds.findingsMode === "strengths"
-            ? copy.pillarsEyebrow
-            : copy.whatCaught}
+    <section className="wrap">
+      <RevealBlock className="sec-head">
+        <p className="eyebrow">
+          {findingsEyebrow}
         </p>
-        <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">
-          {headline}
+        <h2 className={locale === "en" ? "text-balance" : ""}>
+          {renderInlineMarkup(findingsHeadline)}
         </h2>
-        <p
-          className={cx(
-            "mt-4 text-[1.05rem] text-[var(--mn-ink-soft)]",
-            copy.bodyClass,
-          )}
-        >
-          {sub}
+        <p className={copy.bodyClass}>
+          {renderInlineMarkup(findingsSub)}
         </p>
       </RevealBlock>
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
+      <div className="finds">
         {items.map((item, index) => {
           const aiCard = ai?.findings?.[index];
           const isSingle = items.length === 1;
@@ -930,41 +954,32 @@ function FindingsSection({
 
           return (
             <RevealBlock
-              className={isSingle ? "md:col-span-3" : ""}
+              className={isSingle ? "mn-hs-find-single" : ""}
               delay={(index + 1) as 1 | 2 | 3}
               key={`${item.code}-${index}`}
             >
               <article
                 className={cx(
-                  "h-full min-h-56 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-soft)]",
-                  isSingle && "border-[var(--mn-teal-glow)]",
+                  "find",
+                  index === 0 && "open",
                 )}
               >
-                <div className="grid size-10 place-items-center rounded-xl bg-[var(--mn-mint)] text-[var(--mn-teal-deep)]">
-                  <FindingIcon index={index} />
+                <div className="fic">
+                  {item.icon === "sun" ? "☼" : item.icon === "◎" ? "◎" : "✦"}
                 </div>
-                <h3 className="mt-5 text-xl font-semibold leading-snug text-[var(--mn-ink)]">
-                  {aiCardHeadline(
-                    aiCard,
+                <h3>
+                  {renderInlineMarkup(localizedLegacyText(
+                    item.headline,
                     locale,
-                    localizedLegacyText(
-                      item.headline,
-                      locale,
-                      fallbackCard.headline,
-                    ),
-                  )}
+                    fallbackCard.headline,
+                  ))}
                 </h3>
-                <p
-                  className={cx(
-                    "mt-3 text-sm text-[var(--mn-ink-soft)]",
-                    copy.bodyClass,
-                  )}
-                >
-                  {aiCardBody(
+                <p className={copy.bodyClass}>
+                  {renderInlineMarkup(aiCardBody(
                     aiCard,
                     locale,
                     localizedLegacyText(item.body, locale, fallbackCard.body),
-                  )}
+                  ))}
                 </p>
               </article>
             </RevealBlock>
@@ -976,86 +991,49 @@ function FindingsSection({
 }
 
 function SubtractionBeat({
-  locale,
-  result,
+  model,
 }: Readonly<{
-  locale: Locale;
-  result: HealthScoreResult;
+  model: HealthScoreViewModel;
 }>) {
-  const copy = pageCopy[locale];
-  const page = result.pageContent;
-  const ai = page?.aiCopy;
-  const subtraction = page?.locked.subtraction ?? {
-    chosen: 8,
-    evaluated: 120,
-    mode: "nutrients" as const,
-    setAside: 112,
-  };
-  const seed = page?.copySeeds.subtraction;
-  const body = localize(
-    ai?.subtractionBody,
-    locale,
-    localizedLegacyText(seed?.body, locale, copy.subtractionTitle),
-  );
-  const labels = [
-    localizedLegacyText(seed?.labelEvaluated, locale, copy.evaluatedFallback),
-    localizedLegacyText(seed?.labelSetAside, locale, copy.setAsideFallback),
-    localizedLegacyText(seed?.labelChosen, locale, copy.chosenFallback),
-  ];
-  const numbers = [
-    subtraction.evaluated,
-    subtraction.setAside,
-    subtraction.chosen,
-  ];
+  const { copy, locale, subtraction } = model;
   const { ref, visible } = useInViewOnce<HTMLDivElement>();
 
   return (
-    <section>
+    <section className="wrap mn-hs-shortlist-section">
       <RevealBlock>
         <div
-          className="rounded-3xl border border-[var(--mn-line)] bg-[linear-gradient(160deg,var(--mn-paper),var(--mn-cream-deep))] px-5 py-12 text-center shadow-[var(--mn-shadow-soft)] sm:px-10"
+          className="subtract"
           ref={ref}
         >
-          <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
+          <p className="eyebrow">
             {copy.subtractionEyebrow}
           </p>
-          <div className="mt-6 grid gap-5 sm:flex sm:items-end sm:justify-center sm:gap-x-7 lg:gap-x-12">
-            {numbers.map((number, index) => (
+          <div className="subnums">
+            {subtraction.numbers.map((number, index) => (
               <div
-                className="grid gap-4 sm:grid-cols-[minmax(7rem,auto)_auto] sm:items-center sm:gap-7"
-                key={`${labels[index]}-${number}`}
+                className="contents"
+                key={`${subtraction.labels[index]}-${number}`}
               >
-                <div className="flex min-w-0 flex-col items-center">
+                <div className={cx("subn", index === 0 ? "a" : index === 1 ? "b" : "c")}>
                   <CountUpNumber
                     active={visible}
-                    className={cx(
-                      "font-serif font-light leading-none tracking-normal",
-                      index === 0 &&
-                        "text-[clamp(3.25rem,15vw,5.125rem)] text-[var(--mn-ash-soft)] sm:text-[clamp(3rem,8vw,5.125rem)]",
-                      index === 1 &&
-                        "text-[clamp(3.25rem,15vw,5.125rem)] text-[var(--mn-ink-soft)] sm:text-[clamp(3rem,8vw,5.125rem)]",
-                      index === 2 &&
-                        "text-[clamp(4rem,18vw,7rem)] text-[var(--mn-teal-deep)] sm:text-[clamp(4.4rem,12vw,8rem)]",
-                    )}
+                    className="n"
                     duration={900 + index * 200}
                     value={number}
                   />
                   <p
                     className={cx(
-                      "mt-2 max-w-[11rem] text-center mn-font-mono text-[0.68rem] font-semibold leading-[1.35]",
-                      locale === "en" && "uppercase tracking-[0.12em]",
-                      index === 2
-                        ? "text-[var(--mn-teal-deep)]"
-                        : "text-[var(--mn-ash)]",
+                      "l",
+                      locale !== "en" && "normal-case tracking-normal",
                     )}
                   >
-                    {labels[index]}
+                    {subtraction.labels[index]}
                   </p>
                 </div>
-                {index < numbers.length - 1 ? (
+                {index < subtraction.numbers.length - 1 ? (
                   <ArrowRightIcon
                     aria-hidden={true}
-                    className="mx-auto size-5 rotate-90 text-[var(--mn-ash-soft)] sm:mb-8 sm:size-7 sm:rotate-0"
+                    className="subarrow"
                   />
                 ) : null}
               </div>
@@ -1063,11 +1041,11 @@ function SubtractionBeat({
           </div>
           <p
             className={cx(
-              "mx-auto mt-7 max-w-[58ch] text-base text-[var(--mn-ink-soft)]",
+              "",
               copy.bodyClass,
             )}
           >
-            {body}
+            {renderInlineMarkup(subtraction.body)}
           </p>
         </div>
       </RevealBlock>
@@ -1076,40 +1054,25 @@ function SubtractionBeat({
 }
 
 function MethodCards({
-  locale,
-  result,
+  model,
 }: Readonly<{
-  locale: Locale;
-  result: HealthScoreResult;
+  model: HealthScoreViewModel;
 }>) {
-  const copy = pageCopy[locale];
-  const page = result.pageContent;
-  const ai = page?.aiCopy;
-  const headline = localize(
-    ai?.methodHeadline,
-    locale,
-    localizedLegacyText(
-      page?.copySeeds.methodHeadline,
-      locale,
-      copy.methodTitle,
-    ),
-  );
-  const cards = methodCards(result, locale);
-  const icons = [BeakerIcon, AdjustmentsHorizontalIcon, LockClosedIcon];
+  const { copy, locale, methodCards: cards, methodHeadline, result } = model;
+  const ai = result.pageContent?.aiCopy;
 
   return (
-    <section>
-      <RevealBlock className="max-w-[60ch]">
-        <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
+    <section className="wrap mn-hs-method-section">
+      <RevealBlock className="sec-head">
+        <p className="eyebrow">
           {copy.methodEyebrow}
         </p>
-        <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">
-          {headline}
+        <h2 className={locale === "en" ? "text-balance" : ""}>
+          {renderInlineMarkup(methodHeadline)}
         </h2>
       </RevealBlock>
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
+      <div className="method">
         {cards.map((card, index) => {
-          const Icon = icons[index] ?? BeakerIcon;
           const aiCard = ai?.methodCards?.[index];
           const fallbackCard = copy.fallbackMethodCards[index] ?? card;
 
@@ -1118,40 +1081,31 @@ function MethodCards({
               delay={(index + 1) as 1 | 2 | 3}
               key={`${card.title}-${index}`}
             >
-              <article className="h-full rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-soft)]">
-                <div className="font-serif text-3xl leading-none text-[var(--mn-teal-glow)]">
-                  {index + 1}
+              <article className="mstep">
+                <div className="mn">
+                  {card.number ?? index + 1}
                 </div>
-                <h3 className="mt-3 text-base font-semibold leading-snug text-[var(--mn-ink)]">
-                  {aiCardHeadline(
-                    aiCard,
+                <h3>
+                  {renderInlineMarkup(localizedLegacyText(
+                    card.title,
                     locale,
-                    localizedLegacyText(card.title, locale, fallbackCard.title),
-                  )}
+                    fallbackCard.title,
+                  ))}
                 </h3>
-                <p
-                  className={cx(
-                    "mt-2 text-sm text-[var(--mn-ink-soft)]",
-                    copy.bodyClass,
-                  )}
-                >
-                  {aiCardBody(
+                <p className={copy.bodyClass}>
+                  {renderInlineMarkup(aiCardBody(
                     aiCard,
                     locale,
                     localizedLegacyText(card.body, locale, fallbackCard.body),
-                  )}
+                  ))}
                 </p>
-                <Icon
-                  aria-hidden={true}
-                  className="mt-5 size-5 text-[var(--mn-teal-deep)]"
-                />
               </article>
             </RevealBlock>
           );
         })}
       </div>
       <RevealBlock delay={2}>
-        <div className="mt-7 flex items-start gap-3 rounded-2xl bg-[var(--mn-mint)] px-5 py-4 text-[var(--mn-teal-deep)]">
+        <div className="trustline">
           <CheckCircleIcon
             aria-hidden={true}
             className="mt-0.5 size-5 shrink-0"
@@ -1160,6 +1114,182 @@ function MethodCards({
         </div>
       </RevealBlock>
     </section>
+  );
+}
+
+function TrustCard({ locale }: Readonly<{ locale: Locale }>) {
+  const copy = pageCopy[locale];
+
+  return (
+    <section className="wrap mn-hs-trust-section">
+      <RevealBlock>
+        <div className="trustcard">
+          {copy.trustCard.map((item, index) => (
+            <div className="tc-col" key={item.title}>
+              <span className="tc-ic" aria-hidden="true">
+                {index === 0 ? (
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 2" />
+                  </svg>
+                ) : index === 1 ? (
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 4 2 9l10 5 10-5-10-5z" />
+                    <path d="M6 11v4c0 1.5 3 3 6 3s6-1.5 6-3v-4" />
+                    <path d="M22 9v5" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24">
+                    <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
+                    <path d="M12 8v8M8 12h8" />
+                  </svg>
+                )}
+              </span>
+              <div className="tc-txt">
+                <h4>{item.title}</h4>
+                <p>{item.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </RevealBlock>
+    </section>
+  );
+}
+
+function PriceHeroIntro({
+  firstName,
+  locale,
+}: Readonly<{
+  firstName?: string;
+  locale: Locale;
+}>) {
+  const copy = pageCopy[locale];
+  const priceHero = copy.priceHero;
+  const ctaEyebrow = firstName
+    ? `${firstName} — ${priceHero.ctaEyebrow}`
+    : priceHero.ctaEyebrow;
+
+  return (
+    <div className="priceHero">
+      <div>
+        <span className="eyebrow">{ctaEyebrow}</span>
+        <h2>{priceHero.title}</h2>
+        <p className={cx("p1", copy.bodyClass)}>
+          {renderInlineMarkup(priceHero.body)}
+        </p>
+        <ul className="trustChecks">
+          {priceHero.trustChecks.map((item) => (
+            <li key={item}>
+              <span className="tck">✓</span>
+              {item}
+            </li>
+          ))}
+        </ul>
+        <p className={cx("p2", copy.bodyClass)}>
+          {renderInlineMarkup(priceHero.service)}
+        </p>
+        <p className={cx("price-clarify", copy.bodyClass)}>
+          {renderInlineMarkup(priceHero.clarify)}
+        </p>
+      </div>
+      <figure
+        aria-label={priceHero.alt}
+        className="boxFigure"
+      >
+        <Image
+          alt={priceHero.alt}
+          height={760}
+          src="/healthscore/box-v7.jpg"
+          width={960}
+        />
+        <figcaption className="boxCaption">
+          {priceHero.boxCaptionPrefix}{" "}
+          <b>{priceHero.boxCaptionStrong}</b>{" "}
+          {priceHero.boxCaptionSuffix}
+        </figcaption>
+      </figure>
+    </div>
+  );
+}
+
+function PromiseIcon({ index }: Readonly<{ index: number }>) {
+  if (index === 0) {
+    return (
+      <svg viewBox="0 0 24 24">
+        <circle cx="10.5" cy="10.5" r="6" />
+        <path d="m20 20-5-5" />
+      </svg>
+    );
+  }
+
+  if (index === 1) {
+    return (
+      <svg viewBox="0 0 24 24">
+        <path d="M5 19s1-10 9-13c-1 6-4 11-9 13z" />
+        <path d="M5 19c2-3 5-5 9-6" />
+      </svg>
+    );
+  }
+
+  if (index === 2) {
+    return (
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24">
+      <path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z" />
+    </svg>
+  );
+}
+
+function PromiseStrip({ locale }: Readonly<{ locale: Locale }>) {
+  const copy = pageCopy[locale];
+  const tones = ["clarity", "guidance", "personalized", "confidence"] as const;
+
+  return (
+    <div className="promises">
+      {copy.promises.map(([title, subtitle], index) => (
+        <div className={cx("promise", tones[index])} key={title}>
+          <PromiseIcon index={index} />
+          <div className="pTxt">
+            <span className="pTitle">{title}</span>
+            <span className="pSub">{subtitle}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DecisionFrame({ locale }: Readonly<{ locale: Locale }>) {
+  const copy = pageCopy[locale];
+
+  return (
+    <div className="decision">
+      <span className="deye">{copy.decision.eyebrow}</span>
+      <h3>{copy.decision.title}</h3>
+      <p className={cx("dlead", copy.bodyClass)}>
+        {copy.decision.lead}
+      </p>
+      <div className="decisionRows">
+        <div className="drow">
+          <p className={cx("dtxt", copy.bodyClass)}>
+            {copy.decision.optionFormula}
+          </p>
+        </div>
+        <div className="drow">
+          <p className={cx("dtxt", copy.bodyClass)}>
+            {copy.decision.optionProtocol}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1182,116 +1312,32 @@ function PriceCard({
   const includes = "includes" in plan ? plan.includes : undefined;
 
   return (
-    <article
-      className={cx(
-        "relative flex flex-col rounded-3xl p-6 shadow-[var(--mn-shadow-soft)] sm:p-8",
-        featured
-          ? "bg-[linear-gradient(165deg,#11385C_0%,var(--mn-ink)_70%)] text-white"
-          : "border border-[var(--mn-line)] bg-[var(--mn-paper)] text-[var(--mn-ink)]",
-      )}
-    >
-      <span
-        className={cx(
-          "absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full px-4 py-2 text-center mn-font-mono text-[0.64rem] font-semibold uppercase tracking-[0.16em] whitespace-nowrap",
-          featured
-            ? "bg-[linear-gradient(90deg,var(--mn-gold),var(--mn-gold-soft))] text-[#3a2d08]"
-            : "bg-[var(--mn-gold-tint)] text-[#8a6d23]",
-        )}
-      >
+    <article className={cx("plan", featured && "dark")}>
+      <span className={cx("badge", featured ? "badge-pop" : "badge-gold")}>
         {plan.badge}
       </span>
-      <p
-        className={cx(
-          "mt-3 flex items-center gap-2 mn-font-mono text-[0.68rem] font-semibold uppercase tracking-[0.13em]",
-          featured
-            ? "text-[var(--mn-teal-light)]"
-            : "text-[var(--mn-teal-deep)]",
-        )}
-      >
-        <span
-          className={cx(
-            "grid size-8 place-items-center rounded-lg",
-            featured
-              ? "bg-white/10 text-[var(--mn-teal-light)]"
-              : "bg-[var(--mn-mint)] text-[var(--mn-teal-deep)]",
-          )}
-        >
-          {featured ? "♡" : "◎"}
-        </span>
+      <span className={cx("ptype", featured && "dk")}>
+        <span className="tdot">{featured ? "♡" : "◎"}</span>
         {plan.eyebrow}
-      </p>
-      <h3 className="mt-3 font-serif text-3xl font-medium leading-tight tracking-normal">
-        {plan.name}
-      </h3>
-      <p
-        className={cx(
-          "mt-3 min-h-12 text-sm leading-6",
-          featured ? "text-white/70" : "text-[var(--mn-ink-soft)]",
-        )}
-      >
+      </span>
+      <h3>{plan.name}</h3>
+      <p className={cx("pdesc", featured && "dk")}>
         {plan.description}
       </p>
-      <div
-        className={cx("mt-5", featured ? "text-white" : "text-[var(--mn-ink)]")}
-      >
-        <p
-          className={cx(
-            "text-sm",
-            featured ? "text-white/55" : "text-[var(--mn-ash)]",
-          )}
-        >
-          <s>{plan.was}</s>{" "}
-          <span
-            className={cx(
-              "font-bold uppercase",
-              featured ? "text-[var(--mn-gold-soft)]" : "text-[var(--mn-gold)]",
-            )}
-          >
-            {plan.save}
-          </span>
-        </p>
-        <p className="mt-2 flex flex-wrap items-end gap-2">
-          <span
-            className={cx(
-              "pb-2 text-sm font-bold",
-              featured
-                ? "text-[var(--mn-teal-light)]"
-                : "text-[var(--mn-teal-deep)]",
-            )}
-          >
-            THB
-          </span>
-          <strong className="font-serif text-6xl font-medium leading-none tracking-normal">
-            {plan.price}
-          </strong>
-          <span
-            className={cx(
-              "pb-2 text-xs font-bold uppercase tracking-normal",
-              featured
-                ? "text-[var(--mn-teal-light)]"
-                : "text-[var(--mn-teal-deep)]",
-            )}
-          >
-            {plan.term}
-          </span>
-        </p>
-        <p
-          className={cx(
-            "mt-2 text-xs",
-            featured ? "text-white/55" : "text-[var(--mn-ash)]",
-          )}
-        >
-          {plan.fine}
-        </p>
+      <div className="priceblk">
+        <span className={cx("was", featured && "dk")}>{plan.was}</span>
+        <span className={cx("save", featured ? "save-amber" : "save-green")}>
+          {plan.save}
+        </span>
       </div>
+      <div className="priceblk big">
+        <span className={cx("cur", featured && "dk")}>THB</span>
+        <span className={cx("now", featured && "dk")}>{plan.price}</span>
+        <span className={cx("per", featured && "dk")}>{plan.term}</span>
+      </div>
+      <p className={cx("subnote", featured && "dk")}>{plan.fine}</p>
       <button
-        className={cx(
-          "mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-4 text-sm font-bold",
-          featured
-            ? "bg-[var(--mn-teal-light)] text-[#06281d] hover:bg-[var(--mn-teal-glow)]"
-            : "bg-[var(--mn-teal-deep)] text-white hover:bg-[var(--mn-teal)]",
-          disabled ? "cursor-not-allowed opacity-50" : "",
-        )}
+        className={cx("btn", featured ? "btn-teal" : "btn-primary")}
         disabled={disabled}
         onClick={onSelect}
         type="button"
@@ -1302,87 +1348,48 @@ function PriceCard({
         )}
       </button>
       {includes ? (
-        <div className="mt-5 flex flex-wrap items-center gap-2 rounded-2xl border border-white/15 p-4 text-sm text-white/90">
-          <CheckCircleIcon
-            aria-hidden={true}
-            className="size-5 text-[var(--mn-teal-light)]"
-          />
+        <div className="includes">
+          <span className="ck-t">✓</span>
           <span>{includes}</span>
-          <span className="ml-auto mn-font-mono text-[0.68rem] uppercase tracking-[0.14em] text-[var(--mn-gold-soft)]">
-            PLUS
-          </span>
+          <span className="plus">PLUS</span>
         </div>
       ) : null}
       {extraBlocks?.map((block) => (
-        <div className="mt-5 flex items-start gap-3" key={block.title}>
-          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/10 text-[var(--mn-teal-light)]">
-            {block.icon}
-          </div>
+        <div className="featblock" key={block.title}>
+          <div className="fbic">{block.icon}</div>
           <div>
-            <h4 className="text-sm font-bold text-white">{block.title}</h4>
-            <p className="mt-1 text-sm leading-6 text-white/70">{block.body}</p>
+            <h4>{block.title}</h4>
+            <p>{block.body}</p>
           </div>
         </div>
       ))}
-      <ul className="mt-6 space-y-3">
+      <ul className={cx("feat", featured && "dk")}>
         {plan.features.map((feature) => (
-          <li
-            className={cx(
-              "flex gap-3 text-sm leading-6",
-              featured ? "text-white/75" : "text-[var(--mn-ink-soft)]",
-            )}
-            key={feature}
-          >
-            <CheckCircleIcon
-              aria-hidden={true}
-              className={cx(
-                "mt-0.5 size-4 shrink-0",
-                featured
-                  ? "text-[var(--mn-teal-light)]"
-                  : "text-[var(--mn-teal)]",
-              )}
-            />
+          <li key={feature}>
+            <span className="ck">✓</span>
             {feature}
           </li>
         ))}
       </ul>
-      <div
-        className={cx(
-          "mt-6 grid grid-cols-[2.5rem_1fr] gap-3 rounded-2xl p-4 text-sm leading-6",
-          featured
-            ? "bg-white/8 text-white/75 ring-1 ring-white/15"
-            : "bg-[var(--mn-gold-tint)] text-[#6d5427]",
-        )}
-      >
+      <div className={cx("guarantee", featured && "dk")}>
         <ShieldCheckIcon
           aria-hidden={true}
-          className={cx(
-            "size-10 rounded-full p-2 ring-1",
-            featured
-              ? "text-[var(--mn-gold-soft)] ring-[var(--mn-gold-soft)]"
-              : "text-[var(--mn-gold)] ring-[var(--mn-gold)]",
-          )}
+          className="gck"
         />
-        <div>
-          <strong
-            className={cx(
-              "block",
-              featured ? "text-white" : "text-[var(--mn-ink)]",
-            )}
-          >
-            {plan.guarantee}
-          </strong>
-          <p>{plan.guaranteeBody}</p>
-        </div>
+        <span>
+          <b>{plan.guarantee}.</b> {plan.guaranteeBody}
+        </span>
       </div>
     </article>
   );
 }
 
 function PricingSection({
+  firstName,
   locale,
   planId,
 }: Readonly<{
+  firstName?: string;
   locale: Locale;
   planId?: string;
 }>) {
@@ -1403,24 +1410,17 @@ function PricingSection({
   }
 
   return (
-    <section id="pricing">
-      <RevealBlock className="max-w-[64ch]">
-        <p className="mn-font-mono text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[var(--mn-teal-deep)]">
-          {copy.pricingEyebrow}
-        </p>
-        <h2 className="mt-3 font-serif text-[clamp(1.65rem,3.6vw,2.4rem)] font-medium leading-[1.08] tracking-normal text-[var(--mn-ink)] text-balance">
-          {copy.pricingTitle}
-        </h2>
-        <p
-          className={cx(
-            "mt-4 max-w-[54ch] text-[1.05rem] text-[var(--mn-ink-soft)]",
-            copy.bodyClass,
-          )}
-        >
-          {copy.pricingBody}
-        </p>
+    <section className="wrap mn-hs-pricing-section" id="pricing">
+      <RevealBlock>
+        <PriceHeroIntro firstName={firstName} locale={locale} />
       </RevealBlock>
-      <div className="mt-10 grid gap-8 lg:grid-cols-2">
+      <RevealBlock delay={1}>
+        <PromiseStrip locale={locale} />
+      </RevealBlock>
+      <RevealBlock delay={2}>
+        <DecisionFrame locale={locale} />
+      </RevealBlock>
+      <div className="pricing">
         {copy.plans.map((plan, index) => (
           <RevealBlock delay={(index + 1) as 1 | 2} key={plan.name}>
             <PriceCard
@@ -1454,15 +1454,29 @@ function HealthScoreExperience({
   result: HealthScoreResult;
   showPricing: boolean;
 }>) {
+  const rootRef = useRef<HTMLElement | null>(null);
+  const model = buildHealthScoreViewModel({ firstName, locale, result });
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      rootRef.current?.classList.add("is-enhanced");
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
   return (
-    <section className="space-y-14">
-      <HealthScoreHero firstName={firstName} locale={locale} result={result} />
-      <GapCards locale={locale} result={result} />
-      <PillarBars locale={locale} result={result} />
-      <FindingsSection locale={locale} result={result} />
-      <SubtractionBeat locale={locale} result={result} />
-      <MethodCards locale={locale} result={result} />
-      {showPricing ? <PricingSection locale={locale} planId={planId} /> : null}
+    <section className="mn-healthscore-v7" ref={rootRef}>
+      <HealthScoreHero model={model} />
+      <GapCards model={model} />
+      <PillarBars model={model} />
+      <FindingsSection model={model} />
+      <SubtractionBeat model={model} />
+      <MethodCards model={model} />
+      <TrustCard locale={locale} />
+      {showPricing ? (
+        <PricingSection firstName={firstName} locale={locale} planId={planId} />
+      ) : null}
     </section>
   );
 }
@@ -1477,14 +1491,12 @@ export function HealthScorePanel({
   result: HealthScoreResult;
 }>) {
   return (
-    <div className="mt-10">
-      <HealthScoreExperience
-        firstName={firstName}
-        locale={locale}
-        result={result}
-        showPricing={false}
-      />
-    </div>
+    <HealthScoreExperience
+      firstName={firstName}
+      locale={locale}
+      result={result}
+      showPricing={false}
+    />
   );
 }
 

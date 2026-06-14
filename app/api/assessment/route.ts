@@ -17,6 +17,11 @@ import {
 import { bpmContextFromBody, writeBpmEvent } from "@/lib/bpm";
 import { isLocale } from "@/lib/i18n";
 import { bindPaidReservationToAssessment } from "@/lib/stripe-payments";
+import {
+  finalizeAssessmentResumeDraft,
+  finalizeAssessmentResumeDraftForContact
+} from "@/lib/assessment-resume-store";
+import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
 export const runtime = "nodejs";
 
@@ -30,10 +35,12 @@ function reassessmentEmailFromAnswers(answers: unknown) {
   return typeof value === "string" ? value : "";
 }
 
-function buildHealthScore(answers: unknown, locale: unknown) {
+async function buildHealthScore(answers: unknown, locale: unknown) {
   const normalizedLocale = isLocale(locale) ? locale : "en";
 
-  return computeHealthScore(answers, normalizedLocale);
+  return computeHealthScore(answers, normalizedLocale, {
+    evaluatedIngredientCount: await getEvaluatedIngredientCatalogueCount()
+  });
 }
 
 function healthScoreBpmFields(snapshot: { healthScore?: ReturnType<typeof computeHealthScore> }) {
@@ -60,19 +67,23 @@ function healthScoreBpmFields(snapshot: { healthScore?: ReturnType<typeof comput
 export async function POST(request: Request) {
   let body: {
     answers?: unknown;
+    contactEmail?: unknown;
     intent?: "capture" | "process";
     locale?: unknown;
     paymentId?: unknown;
     plan?: unknown;
+    resumeToken?: unknown;
   } = {};
 
   try {
     body = (await request.json()) as {
       answers?: unknown;
+      contactEmail?: unknown;
       intent?: "capture" | "process";
       locale?: unknown;
       paymentId?: unknown;
       plan?: unknown;
+      resumeToken?: unknown;
     };
   } catch {
     body = {};
@@ -94,7 +105,7 @@ export async function POST(request: Request) {
   }
 
   const snapshot = createAssessmentSnapshot({
-    healthScore: buildHealthScore(body.answers, body.locale),
+    healthScore: await buildHealthScore(body.answers, body.locale),
     plan: DEFAULT_ASSESSMENT_PLAN,
     status: "ready"
   });
@@ -102,11 +113,35 @@ export async function POST(request: Request) {
   try {
     await persistAssessmentSubmission({
       answers: body.answers,
+      contactEmail: body.contactEmail,
       locale: body.locale,
       selectedPlan: null,
       snapshot,
       status: "captured"
     });
+
+    const finalizedResumeEmail =
+      await finalizeAssessmentResumeDraft({
+        planId: snapshot.planId,
+        token: body.resumeToken
+      }) ??
+      await finalizeAssessmentResumeDraftForContact({
+        contactEmail: body.contactEmail,
+        planId: snapshot.planId
+      });
+
+    if (finalizedResumeEmail) {
+      await writeBpmEvent({
+        actorType: "visitor",
+        attribution: bpm.attribution,
+        email: finalizedResumeEmail,
+        eventName: "assessment_resume_finalized",
+        eventType: "funnel",
+        locale: body.locale,
+        planId: snapshot.planId,
+        ray: typeof bpm.ray === "string" ? bpm.ray : null
+      });
+    }
 
     await writeBpmEvent({
       actorType: "visitor",

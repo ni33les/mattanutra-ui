@@ -7,6 +7,7 @@ import {
 } from "../lib/product-recommendation-readiness.ts";
 import {
   defaultProductStackPreferenceForResult,
+  productRecommendationOptionsForResult,
 } from "../lib/product-recommendation-options.ts";
 import type {
   FormulationResult,
@@ -132,6 +133,37 @@ describe("formulation results product recommendation readiness", () => {
 
     assert.equal(resultHasProductStackRows(payload, "compact"), true);
     assert.equal(resultHasProductStackRows(payload, "balanced"), false);
+  });
+
+  it("uses main stack rows while variant option rows are still catching up", () => {
+    const payload = result({
+      productRecommendationOptions: [
+        option({
+          id: "balanced",
+          productRecommendations: {
+            matchedCount: 1,
+            needsCount: 1,
+            stackCoveragePercent: 100,
+            stackPreference: "balanced",
+            status: "ready",
+          },
+          recommendations: [],
+        }),
+      ],
+      productRecommendations: {
+        matchedCount: 1,
+        needsCount: 1,
+        stackCoveragePercent: 100,
+        stackPreference: "balanced",
+        status: "ready",
+      },
+      recommendations: [product()],
+    });
+    const options = productRecommendationOptionsForResult(payload);
+
+    assert.equal(resultHasProductStackRows(payload, "balanced"), true);
+    assert.equal(resultHasTransientEmptyProductRecommendations(payload), false);
+    assert.equal(options[0]?.recommendations.length, 1);
   });
 
   it("defaults to balanced when compact and balanced options both exist", () => {

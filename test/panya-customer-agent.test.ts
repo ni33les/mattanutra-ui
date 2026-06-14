@@ -71,6 +71,11 @@ describe("Panya customer agent architecture", () => {
     assert.match(applyScript, /create table if not exists public\.panya_config_versions/);
     assert.match(applyScript, /create table if not exists public\.panya_daily_usage/);
     assert.match(packageJson.scripts?.["panya:schema:apply"] ?? "", /apply-panya-schema\.ts/);
+    assert.match(panya, /protocolAdvice: Record<PanyaEntitlement, string>/);
+    assert.match(panya, /DEFAULT_PANYA_CONFIG[\s\S]*protocolAdvice/);
+    assert.match(panya, /with next_version as \(/);
+    assert.match(panya, /archived as \([\s\S]*update public\.panya_config_versions[\s\S]*where status = 'active'[\s\S]*returning id[\s\S]*\)/);
+    assert.match(panya, /insert into public\.panya_config_versions[\s\S]*from next_version/);
   });
 
   it("keeps the Panya admin page platform-only and dashboard-backed", () => {
@@ -106,12 +111,19 @@ describe("Panya customer agent architecture", () => {
     assert.match(adminPanya, /from public\.retail_checkout_payments/);
     assert.doesNotMatch(adminPanya, /retail_customer_orders\.plan_id/);
     assert.match(adminPanya, /sendAdminPanyaConversationReply/);
+    assert.match(adminPanya, /resolveAdminPanyaConversationEscalation/);
+    assert.match(adminPanya, /panya_escalation_resolved/);
+    assert.match(adminPanya, /metadata = \(coalesce\(metadata, '\{\}'::jsonb\) - 'escalate'\)/);
+    assert.match(adminPanya, /task_type = 'customer_chat_escalation'/);
     assert.match(adminPanya, /messageType: "panya_admin_reply"/);
     assert.match(adminPanya, /queueCustomerChatCommunicationDispatchTask/);
     assert.match(panyaRoute, /action === "send_reply"/);
+    assert.match(panyaRoute, /action === "resolve_escalation"/);
     assert.match(panyaView, /conversationHref\(conversation\.threadKey\)/);
     assert.match(panyaView, /Reply as MattaNutra/);
     assert.match(panyaView, /Send LINE reply/);
+    assert.match(panyaView, /resolveSelectedEscalation/);
+    assert.match(panyaView, /"Resolve"/);
     assert.match(panyaView, /adminTaskVisibilityHref/);
     assert.match(panyaView, /activeSection/);
     assert.match(dashboard, /panyaSection: "configuration" \| "conversations"/);
@@ -125,6 +137,14 @@ describe("Panya customer agent architecture", () => {
     assert.match(panyaView, /Conversation detail/);
     assert.match(panyaView, /message\.escalated/);
     assert.match(panyaView, /bg-red-50 text-red-700 ring-red-200/);
+    assert.match(panyaView, /Protocol-specific AI advice/);
+    assert.match(panyaView, /adviceLivingProtocol/);
+    assert.match(panyaView, /adviceRightAmountFormula/);
+    assert.match(panyaView, /adviceUnpaid/);
+    assert.match(panyaView, /className="flex justify-end border-t border-gray-100 pt-4"/);
+    assert.match(panyaView, /\{busy \? "Saving\.\.\." : "Save"\}/);
+    assert.doesNotMatch(panyaView, /Activate config/);
+    assert.match(panyaRoute, /catch \(error\)[\s\S]*Could not save Panya config/);
   });
 
   it("enforces quota before queuing a Panya reply task from LINE", () => {
@@ -142,18 +162,40 @@ describe("Panya customer agent architecture", () => {
     assert.match(panyaAgent, /getActivePanyaConfig/);
     assert.match(panyaAgent, /panyaToolContext/);
     assert.match(panyaAgent, /dailyMessageLimit/);
+    assert.match(panyaAgent, /Admin-configured advice for this customer's protocol/);
+    assert.match(panyaAgent, /governedConfig\.protocolAdvice\[entitlement\]/);
+    assert.match(panyaAgent, /systemPrompt\([\s\S]*panyaEntitlement[\s\S]*\)/);
     assert.match(panyaAgent, /plan\.planUrl/);
+    assert.match(panyaAgent, /plan\.reassessmentUrl/);
+    assert.match(panyaAgent, /shipping, delivery, order status, pickup, dispatch, courier, tracking/);
+    assert.match(panyaAgent, /order\.shipment\.trackingNumber/);
+    assert.match(panyaAgent, /do not invent an ETA/);
     assert.doesNotMatch(panyaAgent, /paid_plan/);
     assert.match(taskWorkItems, /buildAssessmentResultsUrl/);
+    assert.match(taskWorkItems, /buildReassessmentUrl/);
     assert.match(taskWorkItems, /planUrl: buildAssessmentResultsUrl\(locale, task\.planId\)/);
+    assert.match(taskWorkItems, /reassessmentUrl: buildReassessmentUrl\(locale, task\.planId\)/);
     assert.match(taskWorkItems, /selectedPlanLabel: selectedPlanLabel\(row\.selected_plan\)/);
+    assert.match(taskWorkItems, /orderShipmentFromMetadata/);
+    assert.match(taskWorkItems, /pickupProviderStatus/);
+    assert.match(taskWorkItems, /courierTrackingUrl/);
+    assert.match(taskWorkItems, /retailerName: row\.retailer_name/);
     assert.match(panya, /request_living_protocol_refinement/);
     assert.match(panya, /generate_upgrade_guidance/);
     assert.match(panya, /schedulePanyaCheckInForPlan/);
     assert.match(panya, /queueDuePanyaCheckIn/);
+    assert.match(panya, /schedulePanyaReorderCallbackForOrder/);
+    assert.match(panya, /action_type = 'panya_reorder_callback'/);
+    assert.match(panya, /now\(\) \+ interval '21 days'/);
+    assert.match(panya, /messageType: "panya_reorder_callback"/);
+    assert.match(panya, /buildReassessmentUrl/);
     assert.match(taskWorker, /action\.action_type === "panya_checkin"/);
     assert.match(taskWorker, /queueDuePanyaCheckIn/);
+    assert.match(taskWorker, /action\.action_type === "panya_reorder_callback"/);
+    assert.match(taskWorker, /queueDuePanyaReorderCallback/);
     assert.match(panya, /eventName: "panya_checkin_queued"/);
+    assert.match(panya, /eventName: "panya_reorder_callback_scheduled"/);
+    assert.match(panya, /eventName: "panya_reorder_callback_queued"/);
   });
 
   it("creates visible human escalation tasks from Panya decisions", () => {

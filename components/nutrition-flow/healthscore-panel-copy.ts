@@ -4,10 +4,11 @@ const basePageCopy = {
   en: {
     bodyClass: "leading-7",
     progress: [
-      ["Discover", "Assessment complete"],
-      ["Score", "Your HealthScore is ready"],
-      ["Reveal", "Unlock your plan"],
+      ["Questionnaire", "Assessment complete"],
+      ["HealthScore", "Your HealthScore is ready"],
+      ["Your Plan", "Unlock your plan"],
     ],
+    assessmentComplete: "Your assessment is complete",
     heroEyebrow: "Your free assessment result",
     heroGreeting(firstName: string) {
       return `Ready when you are, ${firstName}.`;
@@ -20,7 +21,7 @@ const basePageCopy = {
     heroCta: "Unlock my Right Amount Plan",
     heroSecondary: "See what shaped it",
     scoreLabel: "HealthScore",
-    scoreOutOf: "/100",
+    scoreOutOf: "/ 100",
     topTier: "Top tier",
     percentile: "Percentile",
     median: "Reference median",
@@ -39,6 +40,7 @@ const basePageCopy = {
       "Needs attention": "Needs attention",
       "Good, with a clear gap": "Good, with a clear gap",
       Strong: "Strong",
+      "Strong, with headroom": "Strong, with headroom",
       Excellent: "Excellent",
     },
     pillarLabels: {
@@ -96,17 +98,18 @@ const basePageCopy = {
     pillarEyebrow: "Your pattern, pillar by pillar",
     pillarsTitle: "A fixed scoring model across five domains, not a guess.",
     highestLeverageLabel: "Your highest-leverage move",
+    goalLinkedLabel: "Goal-linked",
     whatCaught: "What we caught",
     whatCaughtSub: "Laid out in full, nothing held back.",
     fallbackFindingTitle: "Your HealthScore has a clear starting point",
     fallbackFindingBody:
       "The lowest pillar and safety context decide what the plan should prioritise first.",
-    subtractionEyebrow: "How your plan preview was filtered",
+    subtractionEyebrow: "How your formula was built",
     subtractionTitle:
       "This preview filters broad nutrition possibilities before your final formula is generated.",
     evaluatedFallback: "evaluated",
     setAsideFallback: "set aside",
-    chosenFallback: "shortlisted",
+    chosenFallback: "Shortlisted for your score",
     methodEyebrow: "How MattaNutra thinks",
     methodTitle:
       "A fixed scoring model across five domains, not a guess and not an average of strangers.",
@@ -126,12 +129,63 @@ const basePageCopy = {
     ],
     trustLine:
       "Your number is computed by the same rules every time: traceable, point by point. This is wellness guidance, not a diagnosis, and it is built to be shared with your doctor.",
+    pillOpportunity: "High opportunity",
+    trustCard: [
+      {
+        body: "Medicine · Science · Technology",
+        title: "Founders with 100+ years' combined experience",
+      },
+      {
+        body: "Mahidol · Princeton · Stanford · Harvard",
+        title: "Formal education & training",
+      },
+      {
+        body: "Through licensed Thai pharmacy partners",
+        title: "Dispensed by local pharmacists",
+      },
+    ],
+    priceHero: {
+      alt: "An open MattaNutra box containing matched supplement bottles and a thank-you card",
+      body:
+        "THB 690 unlocks them — the exact supplements and brands, doses, and timing, with a safety review built around your profile. Your plan, ready to use every day on your quest for better health.",
+      boxCaptionPrefix:
+        "Above image is an example box only. Unlock your formula to discover what supplements will be in",
+      boxCaptionStrong: "YOUR",
+      boxCaptionSuffix: "personalised box.",
+      clarify:
+        "Your THB 690 covers the plan above. The matched supplements are a separate basket on the next page, billed by MattaNutra at the competitive prices our pharmacy partner gives us.",
+      ctaEyebrow: "Choose your next step",
+      service:
+        "From there, MattaNutra takes care of the rest — sourcing each product through our pharmacy partner and sending it to your door.",
+      title: "Your personalised Right Amount Formula is ready to unlock.",
+      trustChecks: [
+        "Built around your goals, diet, and labs",
+        "Safety-checked against your medications",
+      ],
+    },
+    promises: [
+      ["Clarity", "from Confusion"],
+      ["Guidance", "You Can Trust"],
+      ["Personalised", "Just for You"],
+      ["Confidence", "in Every Choice"],
+    ],
+    decision: {
+      eyebrow: "Two paths · one plan",
+      lead:
+        "The plan itself is yours either way. What changes is whether MattaNutra walks alongside you for the first 90 days as life happens.",
+      optionFormula:
+        "Choose Right Amount Formula for a clear, one-time answer you act on yourself. The plan in full, today — and you decide what comes next.",
+      optionProtocol:
+        "Choose Living Protocol for ongoing, physician-built support — your plan adapts when you travel, sleep poorly, or change your routine, with food-first guidance and safety-checks against your medications and labs.",
+      title:
+        "We have carefully determined your Right Amount. Now it is your turn to choose the plan that best fits your needs.",
+    },
     pricingEyebrow: "Choose your next step",
     pricingTitle: "Unlock the plan that fits how much support you want.",
     pricingBody:
       "Choose the one-time Right Amount Formula for immediate clarity, or the 90-Day Living Protocol for ongoing help turning the plan into daily habits.",
     preparing: "Preparing...",
-    selectionError: "We could not start your plan. Please try again.",
+    selectionError: "We could not start your plan at this time.",
     plans: [
       {
         badge: "Limited time offer",
@@ -197,10 +251,11 @@ const basePageCopy = {
   th: {
     bodyClass: "leading-8 [word-break:keep-all]",
     progress: [
-      ["ค้นพบ", "แบบประเมินเสร็จแล้ว"],
-      ["ให้คะแนน", "คะแนนสุขภาพพร้อมแล้ว"],
-      ["เปิดแผน", "ปลดล็อกแผนของคุณ"],
+      ["แบบสอบถาม", "แบบประเมินเสร็จแล้ว"],
+      ["HealthScore", "คะแนนสุขภาพพร้อมแล้ว"],
+      ["แผนของคุณ", "ปลดล็อกแผนของคุณ"],
     ],
+    assessmentComplete: "แบบประเมินของคุณเสร็จแล้ว",
     heroEyebrow: "ผลประเมินฟรีของคุณ",
     heroGreeting(firstName: string) {
       return `พร้อมแล้วสำหรับคุณ ${firstName}`;
@@ -213,7 +268,7 @@ const basePageCopy = {
     heroCta: "ปลดล็อกแผนปริมาณที่พอดี",
     heroSecondary: "ดูสิ่งที่ใช้คำนวณ",
     scoreLabel: "คะแนนสุขภาพ",
-    scoreOutOf: "/100",
+    scoreOutOf: "/ 100",
     topTier: "ระดับสูง",
     percentile: "เปอร์เซ็นไทล์",
     median: "ค่ากลางอ้างอิง",
@@ -232,6 +287,7 @@ const basePageCopy = {
       "Needs attention": "ต้องให้ความสำคัญ",
       "Good, with a clear gap": "ดี และมีช่องว่างที่ชัดเจน",
       Strong: "แข็งแรง",
+      "Strong, with headroom": "แข็งแรง และยังพัฒนาได้",
       Excellent: "ยอดเยี่ยม",
     },
     pillarLabels: {
@@ -287,17 +343,18 @@ const basePageCopy = {
     pillarEyebrow: "รูปแบบของคุณ ทีละเสาหลัก",
     pillarsTitle: "โมเดลคะแนนคงที่ห้าด้าน ไม่ใช่การเดา",
     highestLeverageLabel: "จุดที่ให้แรงส่งสูงที่สุด",
+    goalLinkedLabel: "เชื่อมกับเป้าหมาย",
     whatCaught: "สิ่งที่เราจับได้",
     whatCaughtSub: "แสดงอย่างชัดเจน ไม่ปิดบัง",
     fallbackFindingTitle: "คะแนนสุขภาพของคุณมีจุดเริ่มต้นที่ชัดเจน",
     fallbackFindingBody:
       "เสาหลักที่ต่ำที่สุดและบริบทความเหมาะสมเป็นตัวกำหนดว่าแผนควรเริ่มจากอะไร",
-    subtractionEyebrow: "ตัวอย่างแผนถูกคัดกรองอย่างไร",
+    subtractionEyebrow: "สูตรของคุณถูกสร้างอย่างไร",
     subtractionTitle:
       "ตัวอย่างนี้คัดกรองความเป็นไปได้ด้านโภชนาการก่อนสร้างสูตรจริงของคุณ",
     evaluatedFallback: "ประเมิน",
     setAsideFallback: "ตัดออก",
-    chosenFallback: "รายการคัดเลือก",
+    chosenFallback: "คัดเลือกสำหรับคะแนนของคุณ",
     methodEyebrow: "วิธีคิดของ MattaNutra",
     methodTitle:
       "โมเดลคะแนนคงที่ห้าด้าน ไม่ใช่การเดา และไม่ใช่ค่าเฉลี่ยของคนอื่น",
@@ -317,12 +374,63 @@ const basePageCopy = {
     ],
     trustLine:
       "คะแนนของคุณคำนวณด้วยกฎเดียวกันทุกครั้ง ตรวจสอบย้อนกลับได้ทีละจุด นี่คือข้อมูลสุขภาวะ ไม่ใช่การวินิจฉัย และออกแบบมาให้คุยต่อกับแพทย์ได้",
+    pillOpportunity: "โอกาสสูง",
+    trustCard: [
+      {
+        body: "การแพทย์ · วิทยาศาสตร์ · เทคโนโลยี",
+        title: "ผู้ก่อตั้งมีประสบการณ์รวมกว่า 100 ปี",
+      },
+      {
+        body: "มหิดล · Princeton · Stanford · Harvard",
+        title: "การศึกษาและการฝึกอบรมอย่างเป็นทางการ",
+      },
+      {
+        body: "ผ่านพันธมิตรร้านขายยาไทยที่ได้รับอนุญาต",
+        title: "จ่ายโดยเภสัชกรท้องถิ่น",
+      },
+    ],
+    priceHero: {
+      alt: "กล่อง MattaNutra เปิดอยู่พร้อมขวดอาหารเสริมและการ์ดขอบคุณ",
+      body:
+        "THB 690 ปลดล็อกสูตร ผลิตภัณฑ์ ปริมาณ เวลาใช้ และการทบทวนความปลอดภัยตามโปรไฟล์ของคุณ แผนของคุณพร้อมใช้ทุกวัน",
+      boxCaptionPrefix:
+        "ภาพด้านบนเป็นตัวอย่างกล่องเท่านั้น ปลดล็อกสูตรของคุณเพื่อดูว่าอาหารเสริมใดจะอยู่ในกล่องส่วนตัวของ",
+      boxCaptionStrong: "คุณ",
+      boxCaptionSuffix: "",
+      clarify:
+        "THB 690 ครอบคลุมแผนด้านบน ส่วนอาหารเสริมที่จับคู่แล้วจะเป็นตะกร้าแยกในหน้าถัดไป โดยคิดราคาตามราคาที่ MattaNutra ได้จากพันธมิตรร้านขายยา",
+      ctaEyebrow: "เลือกขั้นต่อไป",
+      service:
+        "จากนั้น MattaNutra จะดูแลต่อ ตั้งแต่การจัดหาผลิตภัณฑ์ผ่านพันธมิตรร้านขายยาไปจนถึงการส่งถึงบ้าน",
+      title: "สูตร Right Amount ส่วนตัวของคุณพร้อมปลดล็อกแล้ว",
+      trustChecks: [
+        "สร้างจากเป้าหมาย อาหาร และแล็บของคุณ",
+        "ตรวจความเหมาะสมกับยาที่คุณใช้",
+      ],
+    },
+    promises: [
+      ["ความชัดเจน", "จากความสับสน"],
+      ["คำแนะนำ", "ที่เชื่อถือได้"],
+      ["เฉพาะบุคคล", "เพื่อคุณ"],
+      ["ความมั่นใจ", "ในทุกการเลือก"],
+    ],
+    decision: {
+      eyebrow: "สองทางเลือก · แผนเดียว",
+      lead:
+        "ไม่ว่าคุณเลือกทางใด แผนเป็นของคุณ สิ่งที่ต่างคือ MattaNutra จะเดินไปกับคุณใน 90 วันแรกหรือไม่",
+      optionFormula:
+        "เลือก Right Amount Formula หากต้องการคำตอบชัดเจนแบบครั้งเดียวที่คุณนำไปใช้เอง ได้แผนครบวันนี้ และคุณตัดสินใจขั้นต่อไป",
+      optionProtocol:
+        "เลือก Living Protocol หากต้องการการสนับสนุนต่อเนื่องจากทีมแพทย์ แผนจะปรับตามการเดินทาง การนอน ความเครียด และกิจวัตร พร้อมคำแนะนำอาหารและการตรวจความปลอดภัย",
+      title:
+        "เราได้กำหนด Right Amount ของคุณอย่างรอบคอบแล้ว ตอนนี้ถึงเวลาที่คุณเลือกแผนที่เหมาะกับความต้องการของคุณ",
+    },
     pricingEyebrow: "เลือกขั้นต่อไป",
     pricingTitle: "ปลดล็อกแผนที่ตรงกับระดับการสนับสนุนที่คุณต้องการ",
     pricingBody:
       "เลือกสูตรปริมาณที่พอดีแบบครั้งเดียวเพื่อความชัดเจนทันที หรือเลือก Living Protocol 90 วันสำหรับการช่วยเปลี่ยนแผนเป็นกิจวัตรจริง",
     preparing: "กำลังเตรียม...",
-    selectionError: "ไม่สามารถเริ่มแผนได้ กรุณาลองอีกครั้ง",
+    selectionError: "ไม่สามารถเริ่มแผนได้ในขณะนี้",
     plans: [
       {
         badge: "ข้อเสนอพิเศษ",
@@ -408,10 +516,11 @@ export const pageCopy = {
   "zh-CN": {
     bodyClass: "leading-relaxed",
     progress: [
-      ["发现", "评估完成"],
-      ["分数", "您的 HealthScore 已就绪"],
-      ["揭晓", "解锁您的计划"],
+      ["问卷", "评估完成"],
+      ["HealthScore", "您的 HealthScore 已就绪"],
+      ["您的计划", "解锁您的计划"],
     ],
+    assessmentComplete: "您的评估已完成",
     heroGreeting(firstName: string) {
       return `随时准备就绪，${firstName}。`;
     },
@@ -424,7 +533,7 @@ export const pageCopy = {
     heroCta: "解锁我的 Right Amount Plan",
     heroSecondary: "查看影响因素",
     scoreLabel: "HealthScore",
-    scoreOutOf: "/100",
+    scoreOutOf: "/ 100",
     topTier: "顶级",
     percentile: "百分位",
     median: "参考中位数",
@@ -443,6 +552,7 @@ export const pageCopy = {
       "Needs attention": "需要关注",
       "Good, with a clear gap": "良好，但仍有明显差距",
       Strong: "强劲",
+      "Strong, with headroom": "较强，仍有提升空间",
       Excellent: "优秀",
     },
     pillarLabels: {
@@ -498,15 +608,16 @@ export const pageCopy = {
     pillarEyebrow: "您的模式，逐支柱呈现",
     pillarsTitle: "跨五个领域的固定评分模型，而非猜测。",
     highestLeverageLabel: "您的最高杠杆行动",
+    goalLinkedLabel: "目标相关",
     whatCaught: "我们捕捉到的",
     whatCaughtSub: "完整呈现，毫无保留。",
     fallbackFindingTitle: "您的 HealthScore 有明确的起点",
     fallbackFindingBody: "得分最低的支柱和安全背景决定计划应优先处理的内容。",
-    subtractionEyebrow: "您的方案预览如何筛选",
+    subtractionEyebrow: "您的配方如何生成",
     subtractionTitle: "这个预览会先筛选广泛的营养可能性；最终配方会在生成后确定。",
     evaluatedFallback: "已评估",
     setAsideFallback: "已排除",
-    chosenFallback: "候选清单",
+    chosenFallback: "按您的分数筛选",
     methodEyebrow: "MattaNutra 的思考方式",
     methodTitle: "跨五个领域的固定评分模型，而非猜测或陌生人的平均值。",
     fallbackMethodCards: [
@@ -525,12 +636,63 @@ export const pageCopy = {
     ],
     trustLine:
       "您的数字每次都按相同规则计算：可追溯，逐点呈现。这是健康指导而非诊断，适合与医生分享。",
+    pillOpportunity: "高机会",
+    trustCard: [
+      {
+        body: "医学 · 科学 · 技术",
+        title: "创始团队拥有100年以上综合经验",
+      },
+      {
+        body: "Mahidol · Princeton · Stanford · Harvard",
+        title: "正规教育与训练背景",
+      },
+      {
+        body: "通过持牌泰国药房合作伙伴",
+        title: "由本地药剂师配发",
+      },
+    ],
+    priceHero: {
+      alt: "打开的 MattaNutra 盒子，内含匹配的补充剂瓶和感谢卡",
+      body:
+        "THB 690 可解锁具体补充剂、品牌、剂量和服用时机，并包含围绕您资料的安全审查。您的计划可每天使用。",
+      boxCaptionPrefix:
+        "上图仅为示例盒。解锁您的配方，了解",
+      boxCaptionStrong: "您",
+      boxCaptionSuffix: "的个性化盒中会有哪些补充剂。",
+      clarify:
+        "THB 690 覆盖上方计划。匹配的补充剂会在下一页作为单独购物篮，由 MattaNutra 按药房合作伙伴提供的有竞争力价格计费。",
+      ctaEyebrow: "选择下一步",
+      service:
+        "之后，MattaNutra 会继续处理：通过药房合作伙伴采购每款产品并送到您家中。",
+      title: "您的个性化 Right Amount Formula 已可解锁。",
+      trustChecks: [
+        "围绕您的目标、饮食和实验室数据构建",
+        "根据您的用药情况进行安全核查",
+      ],
+    },
+    promises: [
+      ["清晰", "摆脱困惑"],
+      ["指导", "值得信赖"],
+      ["个性化", "只为您"],
+      ["信心", "每个选择"],
+    ],
+    decision: {
+      eyebrow: "两条路径 · 一个计划",
+      lead:
+        "无论选择哪种方式，计划本身都属于您。区别在于 MattaNutra 是否在前90天陪您一起应对真实生活变化。",
+      optionFormula:
+        "选择 Right Amount Formula，获得清晰的一次性答案并自行执行。今天拿到完整计划，之后由您决定下一步。",
+      optionProtocol:
+        "选择 Living Protocol，获得医生团队建立的持续支持；当您旅行、睡眠变差或改变日常时，计划会配合调整，并包含食物优先指导和安全核查。",
+      title:
+        "我们已经仔细确定您的 Right Amount。现在轮到您选择最符合需求的计划。",
+    },
     pricingEyebrow: "选择下一步",
     pricingTitle: "解锁符合您所需支持程度的计划。",
     pricingBody:
       "选择一次性 Right Amount Formula 获得即时清晰度，或选择 90-Day Living Protocol 获得持续帮助，将计划转化为日常习惯。",
     preparing: "准备中...",
-    selectionError: "无法启动您的计划，请重试。",
+    selectionError: "目前无法启动您的计划。",
     plans: [
       {
         badge: "限时优惠",

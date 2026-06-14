@@ -315,6 +315,7 @@ const baseContent = {
         {
           id: "daniel",
           image: assets.testimonials[0],
+          imageAlt: "Daniel L. sitting by a window",
           name: "Daniel L.",
           place: "40, Bangkok",
           role: "Project Manager",
@@ -324,6 +325,7 @@ const baseContent = {
         {
           id: "meilin",
           image: assets.testimonials[1],
+          imageAlt: "Mei Lin T. smiling on a school walkway",
           name: "Mei Lin T.",
           place: "45, Singapore",
           role: "Operations Lead",
@@ -333,6 +335,7 @@ const baseContent = {
         {
           id: "wanida",
           image: assets.testimonials[2],
+          imageAlt: "Wanida P. in her shop",
           name: "Wanida P. (วนิดา)",
           place: "43, Khon Kaen",
           role: "Shop Owner",
@@ -342,6 +345,7 @@ const baseContent = {
         {
           id: "malee",
           image: assets.testimonials[3],
+          imageAlt: "Malee S. seated in a garden courtyard",
           name: "Malee S. (มาลี)",
           place: "41, Phuket",
           role: "Nurse Aide",
@@ -787,6 +791,7 @@ const baseContent = {
         {
           id: "daniel",
           image: assets.testimonials[0],
+          imageAlt: "Daniel L. นั่งอยู่ริมหน้าต่าง",
           name: "Daniel L.",
           place: "40, Bangkok",
           role: "Project Manager",
@@ -796,6 +801,7 @@ const baseContent = {
         {
           id: "meilin",
           image: assets.testimonials[1],
+          imageAlt: "Mei Lin T. ยิ้มบนทางเดินโรงเรียน",
           name: "Mei Lin T.",
           place: "45, Singapore",
           role: "Operations Lead",
@@ -805,6 +811,7 @@ const baseContent = {
         {
           id: "wanida",
           image: assets.testimonials[2],
+          imageAlt: "Wanida P. อยู่ในร้านของเธอ",
           name: "Wanida P. (วนิดา)",
           place: "43, Khon Kaen",
           role: "Shop Owner",
@@ -814,6 +821,7 @@ const baseContent = {
         {
           id: "malee",
           image: assets.testimonials[3],
+          imageAlt: "Malee S. นั่งอยู่ในสวน",
           name: "Malee S. (มาลี)",
           place: "41, Phuket",
           role: "Nurse Aide",
@@ -1258,6 +1266,7 @@ export const content = {
         {
           id: "daniel",
           image: assets.testimonials[0],
+          imageAlt: "Daniel L. 坐在窗边",
           name: "Daniel L.",
           place: "40, 曼谷",
           role: "项目经理",
@@ -1267,6 +1276,7 @@ export const content = {
         {
           id: "meilin",
           image: assets.testimonials[1],
+          imageAlt: "Mei Lin T. 在学校走廊微笑",
           name: "Mei Lin T.",
           place: "45, 新加坡",
           role: "运营负责人",
@@ -1276,6 +1286,7 @@ export const content = {
         {
           id: "wanida",
           image: assets.testimonials[2],
+          imageAlt: "Wanida P. 在自己的店里",
           name: "Wanida P.",
           place: "43, 孔敬",
           role: "店主",
@@ -1285,6 +1296,7 @@ export const content = {
         {
           id: "malee",
           image: assets.testimonials[3],
+          imageAlt: "Malee S. 坐在花园庭院里",
           name: "Malee S.",
           place: "41, 普吉",
           role: "护理助理",

@@ -586,43 +586,97 @@ export async function getAdminRecommendationInsightsData(
           secondary_label: string | null;
         }>>`
           select
-            supplement_recommendation_selections.supplement_name_text as label,
-            concat_ws(
-              ' · ',
-              nullif(supplement_recommendation_selections.safety_action, ''),
-              nullif(supplement_recommendation_selections.safety_visibility, ''),
-              nullif(supplement_recommendation_selections.status, '')
-            ) as secondary_label,
+            coalesce(
+              supplement_translations.name,
+              supplements.name,
+              supplement_recommendation_selections.supplement_name_text,
+              'Unmatched supplement'
+            ) as label,
+            case
+              when supplement_recommendation_selections.supplement_id is null
+                or supplement_recommendation_selections.safety_action = 'unknown_supplement'
+                or (
+                  supplement_recommendation_selections.supplement_id is not null
+                  and supplements.id is null
+                )
+                then 'Missing catalogue match'
+              when coalesce(supplement_recommendation_selections.safety_visibility, 'visible') = 'hidden'
+                then 'Hidden for review'
+              when supplements.is_active = false
+                or coalesce(supplements.list_status, 'active') <> 'active'
+                then 'Blocked or inactive'
+              when coalesce(supplements.source_status, 'core') <> 'core'
+                then 'Non-core active'
+              else 'Out of catalogue'
+            end as secondary_label,
             count(distinct supplement_recommendation_selections.plan_id) as count
           from public.supplement_recommendation_selections
           join public.assessments
             on assessments.plan_id = supplement_recommendation_selections.plan_id
+          left join public.supplements
+            on supplements.id = supplement_recommendation_selections.supplement_id
+          left join public.supplement_translations
+            on supplement_translations.supplement_id = supplements.id
+           and supplement_translations.locale = ${locale}
           where supplement_recommendation_selections.is_current = true
-            and supplement_recommendation_selections.supplement_id is null
+            and (
+              supplement_recommendation_selections.supplement_id is null
+              or supplement_recommendation_selections.safety_action = 'unknown_supplement'
+              or coalesce(supplement_recommendation_selections.safety_visibility, 'visible') = 'hidden'
+              or (
+                supplement_recommendation_selections.supplement_id is not null
+                and supplements.id is null
+              )
+              or supplements.is_active = false
+              or coalesce(supplements.list_status, 'active') <> 'active'
+              or coalesce(supplements.source_status, 'core') <> 'core'
+            )
             and assessments.selected_plan is not null
             and (${start}::timestamptz is null or supplement_recommendation_selections.generated_at >= ${start})
           group by
-            supplement_recommendation_selections.supplement_name_text,
-            supplement_recommendation_selections.safety_action,
-            supplement_recommendation_selections.safety_visibility,
-            supplement_recommendation_selections.status
+            1,
+            2
           order by count desc, label asc
           limit 20
         `,
         sql<Array<{ count: number | string; status: string }>>`
           select
             case
-              when supplement_recommendation_selections.safety_action = 'unknown_supplement' then 'unknown supplement'
-              when supplement_recommendation_selections.safety_visibility = 'hidden' then 'hidden for review'
-              when supplement_recommendation_selections.status is not null then supplement_recommendation_selections.status
-              else 'unmatched'
+              when supplement_recommendation_selections.supplement_id is null
+                or supplement_recommendation_selections.safety_action = 'unknown_supplement'
+                or (
+                  supplement_recommendation_selections.supplement_id is not null
+                  and supplements.id is null
+                )
+                then 'Missing catalogue match'
+              when coalesce(supplement_recommendation_selections.safety_visibility, 'visible') = 'hidden'
+                then 'Hidden for review'
+              when supplements.is_active = false
+                or coalesce(supplements.list_status, 'active') <> 'active'
+                then 'Blocked or inactive'
+              when coalesce(supplements.source_status, 'core') <> 'core'
+                then 'Non-core active'
+              else 'Out of catalogue'
             end as status,
             count(*) as count
           from public.supplement_recommendation_selections
           join public.assessments
             on assessments.plan_id = supplement_recommendation_selections.plan_id
+          left join public.supplements
+            on supplements.id = supplement_recommendation_selections.supplement_id
           where supplement_recommendation_selections.is_current = true
-            and supplement_recommendation_selections.supplement_id is null
+            and (
+              supplement_recommendation_selections.supplement_id is null
+              or supplement_recommendation_selections.safety_action = 'unknown_supplement'
+              or coalesce(supplement_recommendation_selections.safety_visibility, 'visible') = 'hidden'
+              or (
+                supplement_recommendation_selections.supplement_id is not null
+                and supplements.id is null
+              )
+              or supplements.is_active = false
+              or coalesce(supplements.list_status, 'active') <> 'active'
+              or coalesce(supplements.source_status, 'core') <> 'core'
+            )
             and assessments.selected_plan is not null
             and (${start}::timestamptz is null or supplement_recommendation_selections.generated_at >= ${start})
           group by 1

@@ -9,7 +9,48 @@ if (!sql) {
 
 await sql`
   alter table public.assessments
-    add column if not exists first_name text
+    add column if not exists first_name text,
+    add column if not exists contact_email text,
+    add column if not exists contact_email_captured_at timestamptz
+`;
+
+await sql`
+  create table if not exists public.assessment_resume_drafts (
+    id uuid primary key,
+    plan_id uuid not null,
+    locale text not null references public.site_locales(code),
+    answers jsonb not null default '{}'::jsonb,
+    section_index integer not null default 0,
+    contact_email text not null,
+    email_hash text not null,
+    token_hash text not null unique,
+    payment_id uuid,
+    expires_at timestamptz not null,
+    last_opened_at timestamptz,
+    finalized_at timestamptz,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+  )
+`;
+
+await sql`
+  create index if not exists assessment_resume_drafts_plan_idx
+    on public.assessment_resume_drafts(plan_id)
+`;
+
+await sql`
+  create index if not exists assessment_resume_drafts_email_hash_idx
+    on public.assessment_resume_drafts(email_hash)
+`;
+
+await sql`
+  do $$
+  begin
+    if exists (select 1 from pg_roles where rolname = 'mn') then
+      grant select, insert, update, delete on public.assessment_resume_drafts to mn;
+    end if;
+  end
+  $$;
 `;
 
 const rows = await sql<Array<{
@@ -59,5 +100,5 @@ for (const row of rows) {
 }
 
 console.log(
-  `[assessment-schema] first_name column ready; backfilled ${backfilled} assessment${backfilled === 1 ? "" : "s"}.`
+  `[assessment-schema] first_name/contact_email columns and resume drafts ready; backfilled ${backfilled} assessment${backfilled === 1 ? "" : "s"}.`
 );

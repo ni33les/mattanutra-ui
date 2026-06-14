@@ -53,6 +53,7 @@ import {
 } from "@/lib/reassessment-email";
 import {
   buildAssessmentResultsUrl,
+  buildReassessmentUrl,
   siteBaseUrl
 } from "@/lib/site-url";
 import {
@@ -222,9 +223,36 @@ export type CustomerChatReplyWorkItem = Readonly<{
   entitlementLabel: string;
   order: Readonly<{
     currency: string | null;
+    fulfilledAt: string | null;
+    lines: ReadonlyArray<{
+      etaDate: string | null;
+      productTitle: string;
+      quantity: number;
+    }>;
     orderId: string | null;
     orderNumber: string | null;
+    paymentStatus: string | null;
+    placedAt: string | null;
+    retailerName: string | null;
+    shipment: Readonly<{
+      carrierName: string | null;
+      courierTrackingUrl: string | null;
+      pickupBookedAt: string | null;
+      pickupProviderStatus: string | null;
+      pickupWindowEnd: string | null;
+      pickupWindowStart: string | null;
+      shippedAt: string | null;
+      shipmentNotes: string | null;
+      status: string | null;
+      trackingNumber: string | null;
+    }> | null;
+    shippingAddress: Readonly<{
+      city: string | null;
+      country: string | null;
+      province: string | null;
+    }>;
     status: string | null;
+    statusLabel: string | null;
     totalAmount: number | null;
     trackingUrl: string | null;
   }> | null;
@@ -232,6 +260,7 @@ export type CustomerChatReplyWorkItem = Readonly<{
     answerSummary: unknown;
     healthScore: unknown;
     planUrl: string;
+    reassessmentUrl: string;
     selectedPlan: string | null;
     selectedPlanLabel: string;
     status: string | null;
@@ -1215,6 +1244,81 @@ function selectedPlanLabel(selectedPlan: string | null) {
   return selectedPlan ? selectedPlan : "Unpaid";
 }
 
+function orderStatusLabel(status: string | null) {
+  if (!status) {
+    return null;
+  }
+
+  if (status === "allocated" || status === "picking") {
+    return "Preparing";
+  }
+
+  if (status === "awaiting_stock") {
+    return "Order processing";
+  }
+
+  if (status === "packed") {
+    return "Ready to ship";
+  }
+
+  if (status === "shipped") {
+    return "Out for delivery";
+  }
+
+  if (status === "delivered") {
+    return "Delivered";
+  }
+
+  return status.replace(/_/g, " ");
+}
+
+function isoOrNull(value: Date | string | null | undefined) {
+  return value ? new Date(value).toISOString() : null;
+}
+
+function orderShipmentFromMetadata(value: unknown) {
+  const shipment = payloadRecord(payloadRecord(value).shipment);
+  const pickup = payloadRecord(shipment.pickup);
+  const parsed = {
+    carrierName: textFromRecord(shipment, "carrierName"),
+    courierTrackingUrl: textFromRecord(shipment, "trackingUrl"),
+    pickupBookedAt:
+      textFromRecord(pickup, "bookedAt") ??
+      textFromRecord(shipment, "pickupBookedAt"),
+    pickupProviderStatus: textFromRecord(shipment, "pickupProviderStatus"),
+    pickupWindowEnd:
+      textFromRecord(pickup, "windowEnd") ??
+      textFromRecord(shipment, "pickupWindowEnd"),
+    pickupWindowStart:
+      textFromRecord(pickup, "windowStart") ??
+      textFromRecord(shipment, "pickupWindowStart"),
+    shippedAt: textFromRecord(shipment, "shippedAt"),
+    shipmentNotes: textFromRecord(shipment, "shipmentNotes"),
+    status: textFromRecord(shipment, "status"),
+    trackingNumber: textFromRecord(shipment, "trackingNumber")
+  };
+
+  return Object.values(parsed).some(Boolean) ? parsed : null;
+}
+
+function orderLinesFromUnknown(value: unknown) {
+  return Array.isArray(value)
+    ? value.slice(0, 8).map((item) => {
+        const line = payloadRecord(item);
+        const quantity = Number(line.quantity);
+
+        return {
+          etaDate: textFromRecord(line, "etaDate"),
+          productTitle:
+            textFromRecord(line, "productTitle") ??
+            textFromRecord(line, "title") ??
+            "Supplement",
+          quantity: Number.isFinite(quantity) ? Math.max(1, Math.round(quantity)) : 1
+        };
+      })
+    : [];
+}
+
 async function latestCustomerOrderSummary(
   sql: NonNullable<ReturnType<typeof getSql>>,
   planId: string,
@@ -1231,19 +1335,35 @@ async function latestCustomerOrderSummary(
   const rows = await sql<Array<{
     amount: number | string | null;
     currency: string | null;
+    fulfilled_at: Date | string | null;
     order_id: string | null;
+    order_metadata: unknown;
     order_number: string | null;
+    order_placed_at: Date | string | null;
     status: string | null;
+    payment_status: string | null;
+    quote_lines: unknown;
+    retailer_name: string | null;
+    shipping_address: unknown;
   }>>`
     select
       retail_checkout_payments.amount,
       retail_checkout_payments.currency,
+      retail_checkout_payments.fulfilled_at,
+      retail_checkout_payments.quote_lines,
+      retail_checkout_payments.shipping_address,
+      retail_checkout_payments.status as payment_status,
       retail_customer_orders.id::text as order_id,
+      retail_customer_orders.metadata as order_metadata,
       retail_customer_orders.order_number,
-      coalesce(retail_customer_orders.status, retail_checkout_payments.status) as status
+      retail_customer_orders.placed_at as order_placed_at,
+      coalesce(retail_customer_orders.status, retail_checkout_payments.status) as status,
+      organisations.name as retailer_name
     from public.retail_checkout_payments
     left join public.retail_customer_orders
       on retail_customer_orders.id = retail_checkout_payments.retail_customer_order_id
+    left join public.organisations
+      on organisations.id = retail_checkout_payments.selected_retailer_organisation_id
     where retail_checkout_payments.plan_id = ${planId}::uuid
     order by retail_checkout_payments.created_at desc
     limit 1
@@ -1256,6 +1376,16 @@ async function latestCustomerOrderSummary(
 
   const amount = Number(row.amount);
   const totalAmount = Number.isFinite(amount) ? amount / 1_000_000 : null;
+  const address = payloadRecord(row.shipping_address);
+  const shipment = orderShipmentFromMetadata(row.order_metadata);
+  const status =
+    shipment?.pickupBookedAt &&
+    row.status !== "shipped" &&
+    row.status !== "delivered" &&
+    row.status !== "cancelled" &&
+    row.status !== "returned"
+      ? "pickup_booked"
+      : row.status;
 
   const trackingPath = row.order_number
     ? `/${locale}/order/track/${encodeURIComponent(row.order_number)}`
@@ -1263,9 +1393,21 @@ async function latestCustomerOrderSummary(
 
   return {
     currency: row.currency,
+    fulfilledAt: isoOrNull(row.fulfilled_at),
+    lines: orderLinesFromUnknown(row.quote_lines),
     orderId: row.order_id,
     orderNumber: row.order_number,
-    status: row.status,
+    paymentStatus: row.payment_status,
+    placedAt: isoOrNull(row.order_placed_at),
+    retailerName: row.retailer_name,
+    shipment,
+    shippingAddress: {
+      city: textFromRecord(address, "city"),
+      country: textFromRecord(address, "country"),
+      province: textFromRecord(address, "province")
+    },
+    status,
+    statusLabel: orderStatusLabel(status),
     totalAmount,
     trackingUrl: trackingPath ? `${siteBaseUrl()}${trackingPath}` : null
   };
@@ -1347,6 +1489,7 @@ async function buildCustomerChatReplyWorkItem(
       answerSummary: row.answer_summary ?? null,
       healthScore: row.health_score ?? null,
       planUrl: buildAssessmentResultsUrl(locale, task.planId),
+      reassessmentUrl: buildReassessmentUrl(locale, task.planId),
       selectedPlan: row.selected_plan,
       selectedPlanLabel: selectedPlanLabel(row.selected_plan),
       status: row.status

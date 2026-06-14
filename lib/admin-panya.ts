@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   adminDashboardRangeStart,
   type AdminDashboardRange
@@ -524,4 +525,188 @@ export async function sendAdminPanyaConversationReply(input: Readonly<{
     dispatchTaskId: dispatch?.task.id ?? null,
     message: prepared.message
   };
+}
+
+export async function resolveAdminPanyaConversationEscalation(input: Readonly<{
+  context: AdminSessionContext;
+  note?: unknown;
+  planId?: unknown;
+  threadKey: unknown;
+}>) {
+  const sql = getSql();
+  const threadKey = text(input.threadKey);
+  const requestedPlanId = text(input.planId);
+  const planId = isUuid(requestedPlanId) ? requestedPlanId : null;
+  const note = text(input.note) || null;
+  const resolvedAt = new Date().toISOString();
+
+  if (!sql) {
+    throw new Error("Database is not available");
+  }
+
+  if (input.context.effectiveOrganisation.type !== "platform") {
+    throw new Error("Panya escalation resolution is platform-only");
+  }
+
+  if (!threadKey) {
+    throw new Error("Conversation is required");
+  }
+
+  const openTaskRows = await sql<Array<{
+    id: string;
+    plan_id: string | null;
+  }>>`
+    select id::text, plan_id::text
+    from public.tasks
+    where task_type = 'customer_chat_escalation'
+      and status not in ('completed', 'failed', 'cancelled', 'skipped')
+      and (
+        payload ->> 'conversationThreadKey' = ${threadKey}
+        or context ->> 'conversationThreadKey' = ${threadKey}
+        or (
+          ${planId}::uuid is not null
+          and plan_id = ${planId}::uuid
+          and payload ->> 'conversationThreadKey' = ${threadKey}
+        )
+      )
+    order by created_at desc
+  `;
+  const taskIds = openTaskRows.map((task) => task.id);
+  const resolvedMetadata = {
+    actorPersonId: input.context.actorPerson.id,
+    assumedPersonId: input.context.assumedPerson?.id ?? null,
+    note,
+    resolvedAt,
+    source: "admin_panya_resolve_escalation",
+    threadKey
+  };
+  const updatedMessages = await sql<Array<{
+    id: string;
+    plan_id: string | null;
+  }>>`
+    update public.communication_messages
+    set
+      metadata = (coalesce(metadata, '{}'::jsonb) - 'escalate') ||
+        ${sql.json(toJsonValue(resolvedMetadata))}::jsonb,
+      updated_at = now()
+    where coalesce(identity_id::text, 'no-identity') || ':' || coalesce(plan_id::text, 'no-plan') = ${threadKey}
+      and metadata ->> 'escalate' = 'true'
+    returning id::text, plan_id::text
+  `;
+  const resultPayload = toJsonValue({
+    ...resolvedMetadata,
+    resolvedCommunicationMessageIds: updatedMessages.map((message) => message.id)
+  });
+  const completedTasks = taskIds.length > 0
+    ? await sql<Array<{ id: string; plan_id: string | null }>>`
+        update public.tasks
+        set
+          status = 'completed',
+          completed_at = now(),
+          lease_until = null,
+          reserved_by_agent_id = null,
+          result_payload = coalesce(result_payload, '{}'::jsonb) ||
+            ${sql.json(resultPayload)}::jsonb,
+          updated_at = now()
+        where id = any(${taskIds}::uuid[])
+          and task_type = 'customer_chat_escalation'
+          and status not in ('completed', 'failed', 'cancelled', 'skipped')
+        returning id::text, plan_id::text
+      `
+    : [];
+
+  for (const task of completedTasks) {
+    await sql`
+      insert into public.task_comments (
+        id,
+        task_id,
+        author_type,
+        author_name,
+        visibility,
+        comment_type,
+        body,
+        metadata,
+        created_at
+      )
+      values (
+        ${randomUUID()}::uuid,
+        ${task.id}::uuid,
+        'human',
+        ${input.context.actorPerson.displayName || "admin_dashboard"},
+        'admin',
+        'decision',
+        ${note ?? "Panya escalation resolved from the conversation page."},
+        ${sql.json(resultPayload)}::jsonb,
+        now()
+      )
+    `;
+
+    await sql`
+      insert into public.task_events (
+        id,
+        task_id,
+        event_type,
+        event_status,
+        severity,
+        event_payload,
+        occurred_at,
+        created_at
+      )
+      values (
+        ${randomUUID()}::uuid,
+        ${task.id}::uuid,
+        'panya_escalation_resolved',
+        'succeeded',
+        'medium',
+        ${sql.json(resultPayload)}::jsonb,
+        now(),
+        now()
+      )
+    `;
+  }
+
+  const result = {
+    communicationMessageIds: updatedMessages.map((message) => message.id),
+    planId:
+      planId ??
+      updatedMessages.find((message) => message.plan_id)?.plan_id ??
+      completedTasks.find((task) => task.plan_id)?.plan_id ??
+      null,
+    taskIds: completedTasks.map((task) => task.id),
+    threadKey
+  };
+
+  await recordAdminAudit({
+    action: "admin.panya_escalation_resolved",
+    actorPersonId: input.context.actorPerson.id,
+    assumedPersonId: input.context.assumedPerson?.id ?? null,
+    metadata: {
+      communicationMessageIds: result.communicationMessageIds,
+      note,
+      resolvedAt,
+      taskIds: result.taskIds,
+      threadKey
+    },
+    organisationId: input.context.effectiveOrganisation.id,
+    resourceId: threadKey,
+    resourceType: "panya_conversation"
+  });
+
+  await writeBpmEvent({
+    actorType: "admin",
+    emittedBy: "admin_panya",
+    eventName: "panya_escalation_resolved",
+    eventStatus: "completed",
+    eventType: "chat",
+    planId: result.planId,
+    properties: {
+      communicationMessageIds: result.communicationMessageIds,
+      taskIds: result.taskIds,
+      threadKey
+    },
+    severity: "low",
+    sql
+  });
+
+  return result;
 }

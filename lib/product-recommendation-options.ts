@@ -8,7 +8,26 @@ export function productRecommendationOptionsForResult(
   result: FormulationResult,
 ) {
   if (result.productRecommendationOptions?.length) {
-    return result.productRecommendationOptions;
+    const mainStackPreference =
+      result.productRecommendations?.stackPreference ??
+      (result.productRecommendations ? "balanced" : null);
+
+    return result.productRecommendationOptions.map((option) => {
+      if (
+        option.id !== mainStackPreference ||
+        option.recommendations.length > 0 ||
+        result.recommendations.length < 1
+      ) {
+        return option;
+      }
+
+      return {
+        ...option,
+        productRecommendations:
+          result.productRecommendations ?? option.productRecommendations,
+        recommendations: result.recommendations,
+      };
+    });
   }
 
   if (!result.productRecommendations) {

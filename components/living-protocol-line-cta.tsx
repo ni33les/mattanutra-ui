@@ -13,6 +13,7 @@ type LivingProtocolLineCtaProps = Readonly<{
   planId: string;
   retailCustomerOrderId?: string | null;
   showBody?: boolean;
+  showEyebrow?: boolean;
   source: string;
 }>;
 
@@ -36,7 +37,7 @@ const copy = {
     close: "Close",
     copied: "Copied",
     copy: "Copy code",
-    error: "Could not create a LINE code. Please try again.",
+    error: "Could not create a LINE code at this time.",
     expires: "Code expires soon",
     instructions:
       "Scan the QR code or open LINE, then send the code below. It links this chat to your plan without putting private details in the message.",
@@ -74,7 +75,7 @@ const copy = {
     close: "ปิด",
     copied: "คัดลอกแล้ว",
     copy: "คัดลอกรหัส",
-    error: "ไม่สามารถสร้างรหัส LINE ได้ โปรดลองอีกครั้ง",
+    error: "ไม่สามารถสร้างรหัส LINE ได้ในขณะนี้",
     expires: "รหัสจะหมดอายุเร็ว ๆ นี้",
     instructions:
       "สแกน QR หรือเปิด LINE แล้วส่งรหัสด้านล่าง ระบบจะเชื่อมแชทนี้กับแผนของคุณโดยไม่ใส่ข้อมูลส่วนตัวในข้อความ",
@@ -112,7 +113,7 @@ const copy = {
     close: "关闭",
     copied: "已复制",
     copy: "复制代码",
-    error: "无法创建 LINE 代码，请重试。",
+    error: "目前无法创建 LINE 代码。",
     expires: "代码即将过期",
     instructions:
       "扫描二维码或打开 LINE，然后发送下方代码。它会把聊天连接到你的方案，但不会在消息中包含隐私信息。",
@@ -191,6 +192,7 @@ export function LivingProtocolLineCta({
   planId,
   retailCustomerOrderId,
   showBody = true,
+  showEyebrow = true,
   source
 }: LivingProtocolLineCtaProps) {
   const labels = copy[locale];
@@ -303,37 +305,10 @@ export function LivingProtocolLineCta({
   return (
     <div className={className}>
       {presentation === "inline_qr" ? (
-        <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mn-teal-deep)]">
-              {modeLabels.eyebrow}
-            </p>
-            <h2 className="mt-2 font-serif text-2xl font-medium leading-tight text-[var(--mn-ink)]">
-              {modeLabels.heading}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
-              {modeLabels.body}
-            </p>
-            <p className="mt-4 text-xs leading-5 text-[var(--mn-ash)]">
-              {labels.instructions}
-            </p>
-            <div className="mt-4 rounded-lg bg-[var(--mn-cream)] px-3 py-2 ring-1 ring-[var(--mn-line)]">
-              <p className="font-mono text-sm font-bold text-[var(--mn-ink)]">
-                {connect?.command ?? (loading ? labels.loading : "MN")}
-              </p>
-              <p className="mt-1 text-xs text-[var(--mn-ash)]">
-                {labels.expires}
-              </p>
-            </div>
-            {error ? (
-              <p className="mt-3 text-sm font-semibold text-[var(--mn-error)]">
-                {error}
-              </p>
-            ) : null}
-          </div>
+        <div className="flow-root mn-font-body text-sm leading-6 text-[var(--mn-ink-soft)]">
           <a
             aria-label={modeLabels.dialogTitle}
-            className="grid size-40 place-items-center rounded-xl bg-white p-2 ring-1 ring-[var(--mn-line)] transition hover:ring-[var(--mn-teal)]"
+            className="mx-auto mb-4 grid size-36 place-items-center rounded-xl bg-white p-2 ring-1 ring-[var(--mn-line)] transition hover:ring-[var(--mn-teal)] sm:float-right sm:mb-3 sm:ml-4"
             href={connect?.lineUrl ?? "#"}
             rel="noreferrer"
             target="_blank"
@@ -341,18 +316,41 @@ export function LivingProtocolLineCta({
             {qrUrl ? (
               <Image
                 alt="MattaNutra LINE connect QR code"
-                className="size-36"
-                height={144}
+                className="size-32"
+                height={128}
                 src={qrUrl}
                 unoptimized={true}
-                width={144}
+                width={128}
               />
             ) : (
-              <span className="px-3 text-center text-sm text-[var(--mn-ash)]">
+              <span className="px-3 text-center text-sm leading-6 text-[var(--mn-ash)]">
                 {loading ? labels.loading : "LINE"}
               </span>
             )}
           </a>
+          {showEyebrow ? (
+            <p className="text-sm font-medium leading-6 text-[var(--mn-ink)]">
+              {modeLabels.eyebrow}
+            </p>
+          ) : null}
+          <h2 className="text-xl font-semibold leading-7 text-[var(--mn-ink)]">
+            {modeLabels.heading}
+          </h2>
+          <p className="mt-3">{modeLabels.body}</p>
+          <p className="mt-3">{labels.instructions}</p>
+          <div className="clear-both mt-4 rounded-lg bg-[var(--mn-cream)] px-3 py-2 ring-1 ring-[var(--mn-line)]">
+            <p className="text-sm font-semibold leading-6 text-[var(--mn-ink)]">
+              {connect?.command ?? (loading ? labels.loading : "MN")}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-[var(--mn-ash)]">
+              {labels.expires}
+            </p>
+          </div>
+          {error ? (
+            <p className="mt-3 text-sm font-semibold text-[var(--mn-error)]">
+              {error}
+            </p>
+          ) : null}
         </div>
       ) : presentation === "section" ? (
         <div className="overflow-hidden rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-soft)] sm:p-6">

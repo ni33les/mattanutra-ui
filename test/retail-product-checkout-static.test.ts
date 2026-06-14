@@ -23,7 +23,7 @@ const checkoutPage = readFileSync(
   "utf8"
 );
 const revealPage = readFileSync(
-  new URL("../components/formulation-results.tsx", import.meta.url),
+  new URL("../components/reveal-final-results.tsx", import.meta.url),
   "utf8"
 );
 const revealFinalPage = readFileSync(
@@ -32,6 +32,18 @@ const revealFinalPage = readFileSync(
 );
 const revealCopy = readFileSync(
   new URL("../components/formulation-reveal-copy.ts", import.meta.url),
+  "utf8"
+);
+const adminProductSearch = readFileSync(
+  new URL("../lib/admin-product-search.ts", import.meta.url),
+  "utf8"
+);
+const taskExecution = readFileSync(
+  new URL("../lib/task-execution.ts", import.meta.url),
+  "utf8"
+);
+const assessmentStore = readFileSync(
+  new URL("../lib/assessment-store.ts", import.meta.url),
   "utf8"
 );
 
@@ -51,6 +63,7 @@ describe("retail product checkout static contracts", () => {
     assert.match(checkoutService, /hasActiveLineChannel: row\.has_active_line_channel === true/);
     assert.match(trackingPage, /!order\.hasActiveLineChannel/);
     assert.match(trackingPage, /presentation="inline_qr"/);
+    assert.match(trackingPage, /showEyebrow=\{false\}/);
     assert.match(trackingPage, /source="order_tracking"/);
   });
 
@@ -74,16 +87,26 @@ describe("retail product checkout static contracts", () => {
   });
 
   it("carries a clicked reveal pharmacy option into checkout routing", () => {
-    assert.match(revealPage, /<RevealFinalResultsPage/);
+    assert.match(revealPage, /export function RevealFinalResultsPage/);
     assert.match(revealFinalPage, /setRetailerSelection/);
     assert.match(revealFinalPage, /params\.set\("retailer", selectedRetailerOrganisationId\)/);
-    assert.match(revealFinalPage, /formatRevealEta\(locale, option\.etaDate\)/);
+    assert.doesNotMatch(revealFinalPage, /formatRevealEta\(locale, option\.etaDate\)/);
+    assert.match(revealFinalPage, /retailerDispatchNote\(finalCopy, option\)/);
+    assert.match(revealFinalPage, /selectedRetailerDispatchNote/);
     assert.match(revealFinalPage, /bestValueRetailerOrganisationId/);
     assert.match(revealFinalPage, /fastestRetailerOrganisationId/);
     assert.match(revealFinalPage, /finalCopy\.bestValue/);
     assert.match(revealFinalPage, /finalCopy\.fastest/);
     assert.match(revealCopy, /bestValue: "Best value"/);
     assert.match(revealCopy, /fastest: "Fastest"/);
+    assert.match(revealCopy, /deliveryNote: "Express delivery · Pharmacy dispatch"/);
+    assert.match(revealCopy, /deliveryNoteTemplate: "Express delivery · \{dispatchCity\} dispatch"/);
+    assert.match(adminProductSearch, /organisations\.metadata as organisation_metadata/);
+    assert.match(adminProductSearch, /dispatchCity: organisationDispatchCity/);
+    assert.match(taskExecution, /dispatchCity: input\.candidateSet\.dispatchCity/);
+    assert.match(taskExecution, /dispatchCity: option\.dispatchCity/);
+    assert.match(assessmentStore, /dispatchCity:[\s\S]{0,120}retailerOption\.dispatchCity/);
+    assert.match(revealFinalPage, /retailerDispatchNote/);
     assert.doesNotMatch(revealFinalPage, /\{option\.productCount \?\? 0\} products/);
     assert.match(checkoutPage, /query\.retailer/);
     assert.match(checkoutPage, /selectedRetailerOrganisationId=\{selectedRetailerOrganisationId\}/);
@@ -95,6 +118,8 @@ describe("retail product checkout static contracts", () => {
     assert.match(checkoutService, /sendRetailOrderWorkflowEmail/);
     assert.match(checkoutService, /event: "confirmed"/);
     assert.match(checkoutService, /event: "awaiting_stock"/);
+    assert.match(checkoutService, /schedulePanyaReorderCallbackForOrder/);
+    assert.match(checkoutService, /source: "retail_checkout_fulfilled"/);
     assert.doesNotMatch(checkoutService, /retail_order_confirmation_email_sent/);
     assert.match(workflowService, /queueRetailOrderWorkflowEmail/);
     assert.match(workflowService, /send_retail_order_workflow_email/);

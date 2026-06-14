@@ -108,6 +108,9 @@ test("admin access management exposes people, organisations, memberships, agents
   assert.match(accessView, /labels\.access\.country/);
   assert.match(accessView, /productCountryOptions/);
   assert.match(accessView, /name="countryCode"/);
+  assert.match(accessView, /organisationDispatchCityLabels/);
+  assert.match(accessView, /name="dispatchCity"/);
+  assert.match(accessView, /defaultValue=\{organisation\.dispatchCity \?\? ""\}/);
   assert.match(accessView, /labels\.access\.deleted/);
   assert.match(accessView, /<option value="deleted">\{labels\.access\.deleted\}<\/option>/);
   assert.match(accessView, /labels\.contentPages\.deleteAction/);

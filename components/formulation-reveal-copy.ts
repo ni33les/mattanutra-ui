@@ -492,7 +492,8 @@ export const revealFinalCopy = {
     checkout: "Checkout basket",
     compactInfo:
       "Compact reduces bottle count where the catalogue can still support your Right Amount.",
-    deliveryNote: "One payment, one parcel, pharmacy confirmed.",
+    deliveryNote: "Express delivery · Pharmacy dispatch",
+    deliveryNoteTemplate: "Express delivery · {dispatchCity} dispatch",
     fastest: "Fastest",
     foodEmptyBody:
       "The selected stack covers the formula gaps we can currently support with products. Keep meals steady and use Panya if you want a food-first reinforcement guide.",
@@ -519,7 +520,7 @@ export const revealFinalCopy = {
     linePlan: "Plan",
     nutrientDecision: "Decision",
     nutrientSafety: "Safety",
-    nutrientWhy: "Why this, for you",
+    nutrientWhy: "Why this is for you",
     none: "None",
     panyaButtonLead:
       "Scan the QR or open LINE. The connect message is prefilled; tap send in LINE and Panya will recognise this plan.",
@@ -565,7 +566,8 @@ export const revealFinalCopy = {
     checkout: "ชำระเงิน",
     compactInfo:
       "Compact ลดจำนวนขวดเมื่อแคตตาล็อกยังช่วยรองรับ Right Amount ของคุณได้",
-    deliveryNote: "ชำระครั้งเดียว จัดส่งหนึ่งพัสดุ ยืนยันโดยร้านขายยา",
+    deliveryNote: "จัดส่งด่วน · จัดส่งจากร้านขายยา",
+    deliveryNoteTemplate: "จัดส่งด่วน · จัดส่งจาก{dispatchCity}",
     fastest: "เร็วที่สุด",
     foodEmptyBody:
       "ชุดที่เลือกครอบคลุมช่องว่างของสูตรที่ผลิตภัณฑ์รองรับได้ในตอนนี้แล้ว ให้มื้ออาหารสม่ำเสมอ และคุยกับ Panya หากต้องการคู่มืออาหารเสริมเพิ่มเติม",
@@ -590,9 +592,9 @@ export const revealFinalCopy = {
     khunTitle: "คุณดรีมตรวจอีกครั้งก่อนออกจากร้านขายยา",
     lineGenerated: "สร้างเมื่อ",
     linePlan: "แผน",
-    nutrientDecision: "เหตุผลการเลือก",
+    nutrientDecision: "การตัดสินใจ",
     nutrientSafety: "ความปลอดภัย",
-    nutrientWhy: "ทำไมจึงเหมาะกับคุณ",
+    nutrientWhy: "ทำไมสิ่งนี้จึงเหมาะกับคุณ",
     none: "ไม่มี",
     panyaButtonLead:
       "สแกน QR หรือเปิด LINE ข้อความเชื่อมต่อจะถูกใส่ไว้ให้แล้ว กดส่งใน LINE แล้ว Panya จะรู้ว่าเป็นแผนนี้",
@@ -638,7 +640,8 @@ export const revealFinalCopy = {
     checkout: "结账",
     compactInfo:
       "Compact 会在目录仍可支持你的 Right Amount 时减少瓶数。",
-    deliveryNote: "一次付款，一个包裹，由药房确认。",
+    deliveryNote: "快速配送 · 药房发货",
+    deliveryNoteTemplate: "快速配送 · {dispatchCity}发货",
     fastest: "最快",
     foodEmptyBody:
       "所选组合已覆盖目前可由产品支持的配方缺口。饮食保持稳定即可；如需食物优先的强化指南，可联系 Panya。",
@@ -663,9 +666,9 @@ export const revealFinalCopy = {
     khunTitle: "离开药房前，由 Khun Dream 再次核验。",
     lineGenerated: "生成",
     linePlan: "方案",
-    nutrientDecision: "选择依据",
+    nutrientDecision: "决定",
     nutrientSafety: "安全",
-    nutrientWhy: "为什么适合你",
+    nutrientWhy: "为什么这适合你",
     none: "无",
     panyaButtonLead:
       "扫描二维码或打开 LINE。连接消息会自动填好；在 LINE 中点发送后，Panya 会识别这份方案。",

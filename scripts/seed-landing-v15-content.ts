@@ -285,7 +285,7 @@ async function main() {
           ${testimonial.place},
           ${testimonial.role},
           ${testimonial.image},
-          ${testimonial.name},
+          ${testimonial.imageAlt},
           ${index + 1},
           'landing_v15_seed',
           ${sql.json({

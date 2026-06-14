@@ -9,6 +9,7 @@ import { devShortcutsEnabledForHost } from "@/lib/dev-shortcuts";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import { getStoredAssessmentPrefill, isUuid } from "@/lib/assessment-store";
+import { getAssessmentResumeDraft } from "@/lib/assessment-resume-store";
 
 type NutritionQuizPageProps = Readonly<{
   params: Promise<{
@@ -17,6 +18,7 @@ type NutritionQuizPageProps = Readonly<{
   searchParams?: Promise<{
     payment?: string;
     plan?: string;
+    resume?: string;
   }>;
 }>;
 
@@ -41,6 +43,10 @@ export default async function NutritionQuizPage({
   const dictionary = getDictionary(locale);
   const returningPlanId =
     typeof query.plan === "string" && isUuid(query.plan) ? query.plan : "";
+  const resumeToken =
+    typeof query.resume === "string" && query.resume.length > 20
+      ? query.resume
+      : "";
   const paymentId =
     typeof query.payment === "string" && isUuid(query.payment)
       ? query.payment
@@ -66,8 +72,12 @@ export default async function NutritionQuizPage({
     );
   }
 
-  const prefill = returningPlanId
-    ? await getStoredAssessmentPrefill(returningPlanId)
+  const resumeDraft = resumeToken
+    ? await getAssessmentResumeDraft(resumeToken)
+    : null;
+  const effectivePlanId = returningPlanId || resumeDraft?.planId || "";
+  const prefill = effectivePlanId && !resumeDraft
+    ? await getStoredAssessmentPrefill(effectivePlanId)
     : null;
 
   return (
@@ -79,11 +89,14 @@ export default async function NutritionQuizPage({
       />
       <AssessmentFlow
         initialStage="quiz"
+        initialSectionIndex={resumeDraft?.sectionIndex}
         locale={locale}
         paymentId={paymentId || undefined}
-        prefillAnswers={prefill?.answers ?? null}
+        prefillAnswers={resumeDraft?.answers ?? prefill?.answers ?? null}
+        prefillContactEmail={resumeDraft?.contactEmail ?? prefill?.contactEmail ?? null}
         returningHealthScore={prefill?.healthScore ?? null}
-        returningPlanId={prefill?.planId ?? undefined}
+        returningPlanId={resumeDraft?.planId ?? prefill?.planId ?? undefined}
+        resumeToken={resumeToken || undefined}
         showDevShortcut={showDevShortcut}
       />
       <SiteFooter content={dictionary.footer} locale={locale} />

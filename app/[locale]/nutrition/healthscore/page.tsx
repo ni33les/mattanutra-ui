@@ -1,18 +1,18 @@
 import { notFound, redirect } from "next/navigation";
-import { headers } from "next/headers";
-import { AssessmentFlow } from "@/components/assessment-flow";
+import { HealthScorePaymentPanel } from "@/components/nutrition-flow/healthscore-panel";
 import { ServiceIssue } from "@/components/service-issue";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
+import { firstNameFromAssessmentAnswers } from "@/lib/assessment-first-name";
 import { getStoredAssessmentPrefill, isUuid } from "@/lib/assessment-store";
 import { checkDatabaseConnection } from "@/lib/db";
-import { devShortcutsEnabledForHost } from "@/lib/dev-shortcuts";
 import { computeHealthScore, type HealthScoreResult } from "@/lib/health-score";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import {
   nutritionHealthScorePath,
   nutritionQuizPath
 } from "@/lib/nutrition-paths";
+import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
 type NutritionHealthScorePageProps = Readonly<{
   params: Promise<{
@@ -31,11 +31,14 @@ export const dynamic = "force-dynamic";
 
 function refreshedHealthScore(
   answers: unknown,
+  evaluatedIngredientCount: number,
   locale: Locale,
   storedHealthScore: HealthScoreResult | null | undefined,
   storedLocale: Locale
 ): HealthScoreResult {
-  const refreshed = computeHealthScore(answers ?? null, locale);
+  const refreshed = computeHealthScore(answers ?? null, locale, {
+    evaluatedIngredientCount
+  });
   const refreshedPageContent = refreshed.pageContent;
 
   if (!refreshedPageContent || !storedHealthScore || storedLocale !== locale) {
@@ -76,10 +79,6 @@ export default async function NutritionHealthScorePage({
   }
 
   const currentPath = nutritionHealthScorePath(locale, planId);
-  const requestHeaders = await headers();
-  const showDevShortcut = devShortcutsEnabledForHost(
-    requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host")
-  );
   const databaseReady = await checkDatabaseConnection();
 
   if (!databaseReady) {
@@ -104,25 +103,25 @@ export default async function NutritionHealthScorePage({
 
   const healthScore = refreshedHealthScore(
     prefill.answers ?? null,
+    await getEvaluatedIngredientCatalogueCount(),
     locale,
     prefill.healthScore,
     prefill.locale
   );
+  const firstName = firstNameFromAssessmentAnswers(prefill.answers);
 
   return (
-    <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
+    <main className="mn-customer-shell flex min-h-screen flex-col bg-[var(--mn-cream)] text-[var(--mn-ink)]">
       <TitleBar
         currentLocale={locale}
         currentPath={currentPath}
         title={dictionary.hero.eyebrow}
       />
-      <AssessmentFlow
-        initialStage="healthscore"
+      <HealthScorePaymentPanel
+        firstName={firstName ?? undefined}
         locale={locale}
-        prefillAnswers={prefill.answers ?? null}
-        returningHealthScore={healthScore}
-        returningPlanId={prefill.planId ?? planId}
-        showDevShortcut={showDevShortcut}
+        planId={prefill.planId ?? planId}
+        result={healthScore}
       />
       <SiteFooter content={dictionary.footer} locale={locale} />
     </main>

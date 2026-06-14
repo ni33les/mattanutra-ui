@@ -102,6 +102,7 @@ export function TitleBar({
 }: TitleBarProps) {
   const copy = titleBarCopy[currentLocale];
   const assessmentPath = nutritionQuizPath(currentLocale);
+  const titleCtaHref = assessmentPath;
   const showAssessmentCta = !isAssessmentStartedPath(currentPath, currentLocale);
   const isLanding = variant === "landing";
 
@@ -193,7 +194,7 @@ export function TitleBar({
         </nav>
         <div className="mn-titlebar-actions">
           {showAssessmentCta ? (
-            <Link className="mn-titlebar-cta" href={assessmentPath}>
+            <Link className="mn-titlebar-cta" href={titleCtaHref}>
               {copy.assessment}
             </Link>
           ) : null}
@@ -218,7 +219,7 @@ export function TitleBar({
               ))}
               <div className="mn-titlebar-mobile-actions">
                 {showAssessmentCta ? (
-                  <Link className="mn-titlebar-mobile-cta" href={assessmentPath}>
+                  <Link className="mn-titlebar-mobile-cta" href={titleCtaHref}>
                     {copy.assessment}
                   </Link>
                 ) : null}

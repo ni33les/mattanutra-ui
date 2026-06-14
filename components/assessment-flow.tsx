@@ -45,6 +45,10 @@ import {
   ASSESSMENT_FIRST_NAME_MAX_LENGTH,
   normalizeAssessmentFirstName
 } from "@/lib/assessment-first-name";
+import {
+  assessmentContactEmailError,
+  normalizeAssessmentContactEmail
+} from "@/lib/assessment-contact";
 import { getBpmPayload, trackBpmEvent } from "@/lib/bpm-client";
 import type { HealthScoreResult } from "@/lib/health-score";
 import type { Locale } from "@/lib/i18n";
@@ -60,11 +64,14 @@ const buildTimeDevShortcutEnabled =
 
 type AssessmentFlowProps = Readonly<{
   initialStage?: "healthscore" | "quiz";
+  initialSectionIndex?: number;
   locale: Locale;
   paymentId?: string;
   prefillAnswers?: unknown;
+  prefillContactEmail?: string | null;
   returningHealthScore?: HealthScoreResult | null;
   returningPlanId?: string;
+  resumeToken?: string;
   showDevShortcut?: boolean;
 }>;
 
@@ -152,11 +159,14 @@ function healthScoreBpmFields(healthScore: HealthScoreResult | null | undefined)
 
 export function AssessmentFlow({
   initialStage = "quiz",
+  initialSectionIndex,
   locale,
   paymentId,
   prefillAnswers,
+  prefillContactEmail,
   returningHealthScore,
   returningPlanId,
+  resumeToken,
   showDevShortcut = false
 }: AssessmentFlowProps) {
   const copy = copies[locale];
@@ -165,8 +175,12 @@ export function AssessmentFlow({
     ? buildReturningScoreGateStatus(returningPlanId, returningHealthScore)
     : null;
   const [answers, setAnswers] = useState<Answers>(() => buildInitialAnswers(prefillAnswers));
+  const [contactEmail, setContactEmail] = useState(prefillContactEmail ?? "");
+  const [resumePlanId, setResumePlanId] = useState(returningPlanId ?? "");
+  const [resumeStatus, setResumeStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+  const [resumeError, setResumeError] = useState("");
   const canShowDevShortcut = buildTimeDevShortcutEnabled || showDevShortcut;
-  const [sectionIndex, setSectionIndex] = useState(0);
+  const [sectionIndex, setSectionIndex] = useState(initialSectionIndex ?? 0);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus | null>(null);
   const [processingError, setProcessingError] = useState("");
   const [capturedStatus, setCapturedStatus] = useState<ProcessingStatus | null>(returningScoreStatus);
@@ -175,10 +189,14 @@ export function AssessmentFlow({
   const captureInFlight = useRef<Promise<ProcessingStatus | null> | null>(null);
   const assessmentStartedTracked = useRef(false);
   const healthScoreViewedTracked = useRef(false);
+  const resumeOpenedTracked = useRef(false);
   const precision = precisionProgress(answers);
   const displayFirstName = normalizeAssessmentFirstName(answers.firstName);
   const vo2Estimate = estimateVo2Max(answers);
   const gaugeLabels = gaugeLabelsByLocale[locale];
+  const normalizedContactEmail = normalizeAssessmentContactEmail(contactEmail);
+  const contactEmailInvalid = assessmentContactEmailError(contactEmail) !== null;
+  const effectiveReturningPlanId = resumePlanId || returningPlanId;
 
   function clearProcessingStatus() {
     setProcessingStatus(null);
@@ -213,6 +231,20 @@ export function AssessmentFlow({
     });
   }, [capturedStatus?.planId, healthScore, locale, returningPlanId, showHealthScore]);
 
+  useEffect(() => {
+    if (!resumeToken || resumeOpenedTracked.current) return;
+
+    resumeOpenedTracked.current = true;
+    trackBpmEvent("assessment_resume_opened", {
+      eventType: "funnel",
+      locale,
+      planId: effectiveReturningPlanId,
+      properties: {
+        sectionIndex
+      }
+    });
+  }, [effectiveReturningPlanId, locale, resumeToken, sectionIndex]);
+
   const ui = assessmentUiCopy[locale];
 
   function setSingle(key: keyof Answers, value: string) {
@@ -226,6 +258,107 @@ export function AssessmentFlow({
       ...(key === "meds" && nextValue !== "yes" ? { medTypes: [], otherMed: "" } : {}),
       ...(key === "tracker" && nextValue !== "other" ? { otherTracker: "" } : {})
     }));
+  }
+
+  function updateContactEmail(value: string) {
+    setContactEmail(value);
+    setResumeStatus("idle");
+    setResumeError("");
+  }
+
+  async function sendResumeLink() {
+    const email = normalizeAssessmentContactEmail(contactEmail);
+
+    if (!email) {
+      setResumeStatus("failed");
+      setResumeError(ui.resume.invalid);
+      return;
+    }
+
+    setResumeStatus("sending");
+    setResumeError("");
+
+    try {
+      const response = await fetchWithTimeout("/api/assessment/resume-link", {
+        body: JSON.stringify({
+          answers,
+          bpm: getBpmPayload(),
+          contactEmail: email,
+          locale,
+          paymentId,
+          planId: effectiveReturningPlanId,
+          sectionIndex
+        }),
+        cache: "no-store",
+        headers: {
+          "content-type": "application/json"
+        },
+        method: "POST"
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        message?: string;
+        planId?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.message || ui.resume.error);
+      }
+
+      if (payload.planId) {
+        setResumePlanId(payload.planId);
+      }
+
+      setContactEmail(email);
+      setResumeStatus("sent");
+    } catch (error) {
+      setResumeStatus("failed");
+      setResumeError(error instanceof Error && error.message ? error.message : ui.resume.error);
+    }
+  }
+
+  function renderResumeEmailCard() {
+    return (
+      <div className="mn-email-card">
+        <div className="mn-email-card__header">
+          <h3>{ui.resume.title}</h3>
+          <span>{ui.resume.optional}</span>
+        </div>
+        <p className="mn-email-card__body">{ui.resume.body}</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+          <label className="block">
+            <span className="sr-only">{ui.resume.inputLabel}</span>
+            <input
+              autoComplete="email"
+              className="mn-text-input"
+              inputMode="email"
+              placeholder={ui.resume.placeholder}
+              type="email"
+              value={contactEmail}
+              onChange={(event) => updateContactEmail(event.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="mn-soft-action-button"
+            disabled={resumeStatus === "sending" || !normalizedContactEmail}
+            onClick={() => void sendResumeLink()}
+          >
+            {resumeStatus === "sending" ? ui.resume.sending : ui.resume.send}
+          </button>
+        </div>
+        <p className="mn-email-card__privacy">{ui.resume.privacy}</p>
+        {contactEmailInvalid ? (
+          <p className="mt-2 text-sm font-semibold text-red-600">{ui.resume.invalid}</p>
+        ) : null}
+        {resumeStatus === "sent" ? (
+          <p className="mt-2 text-sm font-semibold text-[var(--mn-teal-deep)]">{ui.resume.sent}</p>
+        ) : null}
+        {resumeError ? (
+          <p className="mt-2 text-sm font-semibold text-red-600">{resumeError}</p>
+        ) : null}
+      </div>
+    );
   }
 
   function toggleMulti(key: "allergies" | "family" | "goals" | "medTypes" | "suppAllergies" | "symptoms", value: string, max = 99) {
@@ -313,6 +446,12 @@ export function AssessmentFlow({
           ),
           id: "firstName",
           isAnswered: normalizeAssessmentFirstName(answers.firstName) !== null,
+          label: ""
+        },
+        {
+          content: renderResumeEmailCard(),
+          id: "resume-email",
+          isAnswered: Boolean(normalizedContactEmail),
           label: ""
         },
         {
@@ -906,6 +1045,11 @@ export function AssessmentFlow({
       return;
     }
 
+    if (contactEmailInvalid) {
+      setProcessingError(ui.resume.invalid);
+      return;
+    }
+
     if (isFinalStep) {
       void prepareHealthScoreGate(answers);
       return;
@@ -916,6 +1060,11 @@ export function AssessmentFlow({
   }
 
   async function prepareHealthScoreGate(answerPayload = answers) {
+    if (contactEmailInvalid) {
+      setProcessingError(ui.resume.invalid);
+      return;
+    }
+
     setProcessingError("");
     setProcessingStatus({
       planId: "",
@@ -1011,16 +1160,18 @@ export function AssessmentFlow({
 
     captureInFlight.current = (async () => {
       try {
-        const response = returningPlanId
+        const response = effectiveReturningPlanId
           ? await fetchWithTimeout(
-              `/api/assessment/${encodeURIComponent(returningPlanId)}`,
+              `/api/assessment/${encodeURIComponent(effectiveReturningPlanId)}`,
               {
                 body: JSON.stringify({
                   answers: answerPayload,
                   bpm: getBpmPayload(),
+                  contactEmail: normalizedContactEmail,
                   intent: "capture",
                   locale,
-                  paymentId
+                  paymentId,
+                  resumeToken
                 }),
                 cache: "no-store",
                 headers: {
@@ -1033,9 +1184,11 @@ export function AssessmentFlow({
               body: JSON.stringify({
                 answers: answerPayload,
                 bpm: getBpmPayload(),
+                contactEmail: normalizedContactEmail,
                 intent: "capture",
                 locale,
-                paymentId
+                paymentId,
+                resumeToken
               }),
               cache: "no-store",
               headers: {
@@ -1080,7 +1233,7 @@ export function AssessmentFlow({
 	            firstName={displayFirstName}
 	            healthScore={healthScore}
 	            locale={locale}
-	            planId={capturedStatus?.planId ?? returningPlanId ?? undefined}
+	            planId={capturedStatus?.planId ?? effectiveReturningPlanId ?? undefined}
 	          />
 	        ) : (
 	          <div className="space-y-6">

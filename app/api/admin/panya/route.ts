@@ -6,7 +6,10 @@ import {
 } from "@/lib/admin-access";
 import { requestOriginAllowed } from "@/lib/admin-session-cookie";
 import { hasAdminPermission } from "@/lib/admin-rbac";
-import { sendAdminPanyaConversationReply } from "@/lib/admin-panya";
+import {
+  resolveAdminPanyaConversationEscalation,
+  sendAdminPanyaConversationReply
+} from "@/lib/admin-panya";
 import { saveAndActivatePanyaConfig } from "@/lib/panya";
 
 export const dynamic = "force-dynamic";
@@ -68,14 +71,49 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (action === "resolve_escalation") {
+    try {
+      const result = await resolveAdminPanyaConversationEscalation({
+        context,
+        note: body.note,
+        planId: body.planId,
+        threadKey: body.threadKey
+      });
+
+      return NextResponse.json({ result });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Could not resolve escalation"
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   if (action !== "save_config") {
     return NextResponse.json({ error: "Unsupported Panya action" }, { status: 400 });
   }
 
-  const configVersion = await saveAndActivatePanyaConfig({
-    config: body.config,
-    context
-  });
+  try {
+    const configVersion = await saveAndActivatePanyaConfig({
+      config: body.config,
+      context
+    });
 
-  return NextResponse.json({ configVersion });
+    return NextResponse.json({ configVersion });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not save Panya config"
+      },
+      { status: 400 }
+    );
+  }
 }

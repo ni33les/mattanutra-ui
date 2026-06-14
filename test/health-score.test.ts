@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT,
   HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS,
   computeHealthScore
 } from "../lib/health-score.ts";
@@ -26,6 +27,50 @@ function profileOne() {
     sunscreen: "daily",
     supplements: "basic",
     symptoms: ["fatigue", "digestion", "sleep"]
+  };
+}
+
+function excellentProfile() {
+  return {
+    activity: "active",
+    alcohol: "none",
+    antibiotics: "no",
+    diet: "whole",
+    digestion: "none",
+    energy: "excellent",
+    foodFrequency: {
+      dairy: "daily",
+      eggs: "daily",
+      fish: "often",
+      fruitveg: "3+",
+      legumes: "most",
+      redmeat: "rare"
+    },
+    goals: ["sleep"],
+    hrv: "70",
+    labs: {
+      b12: "700",
+      ferritin: "80",
+      hba1c: "5.1",
+      o3: "8",
+      vitd: "45"
+    },
+    labUnits: {
+      b12: "pg/mL",
+      ferritin: "ng/mL",
+      hba1c: "%",
+      o3: "%",
+      vitd: "ng/mL"
+    },
+    meds: "none",
+    sex: "female",
+    sleepHrs: "8-9",
+    smoking: "never",
+    stress: "low",
+    sun: "30+",
+    sunscreen: "sometimes",
+    symptoms: [],
+    vo2: "52"
   };
 }
 
@@ -114,6 +159,95 @@ describe("HealthScore v4 deterministic scoring", () => {
     assert.equal(relativity?.gap, 13);
     assert.equal(relativity?.spectrumMedian, 60);
     assert.equal(relativity?.spectrumYou, 47);
+  });
+
+  it("exposes the v7 presentation contract from deterministic fields", () => {
+    const result = computeHealthScore(profileOne(), "en");
+    const page = result.pageContent;
+
+    assert.ok(page);
+    assert.equal(page.locked.score, 47);
+    assert.equal(page.locked.median, 60);
+    assert.equal(page.locked.percentile, 4);
+    assert.equal(page.copySeeds.bandPill, "Building foundation");
+    assert.equal(page.copySeeds.opportunityPill, "High opportunity");
+    assert.equal(page.copySeeds.relativity.spectrumMedianPct, 48.4);
+    assert.equal(page.copySeeds.relativity.spectrumYouPct, 27.4);
+    assert.equal(page.copySeeds.relativity.spectrumGapLeftPct, 27.4);
+    assert.equal(page.copySeeds.relativity.spectrumGapWidthPct, 21);
+    assert.deepEqual(page.copySeeds.relativity.legendCaptions, [
+      "Where you are",
+      "Recoverable gap",
+      "Room to grow to 92"
+    ]);
+    assert.deepEqual(
+      page.copySeeds.methodCards.map((card) => card.number),
+      [1, 2, 3]
+    );
+    assert.equal(
+      page.locked.pillars.filter((pillar) => pillar.isHero).length,
+      1
+    );
+    assert.deepEqual(
+      page.locked.pillars.map((pillar) => pillar.fillClass),
+      ["hi", "hi", "hi", "lo", "lo"]
+    );
+    assert.deepEqual(
+      page.locked.pillars.map((pillar) => pillar.value),
+      [...page.locked.pillars.map((pillar) => pillar.value)].sort(
+        (left, right) => right - left
+      )
+    );
+    assert.equal(page.copySeeds.subtraction.labelChosen, "Shortlisted for your score");
+    assert.equal(
+      page.locked.subtraction.evaluated,
+      DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT
+    );
+    assert.ok(page.locked.subtraction.chosen >= 6);
+    assert.ok(page.locked.subtraction.chosen <= 12);
+  });
+
+  it("uses rank-framed relativity above median and caps visible percentile", () => {
+    const result = computeHealthScore(excellentProfile(), "en");
+    const page = result.pageContent;
+
+    assert.ok(page);
+    assert.equal(result.score, 92);
+    assert.equal(result.band, "Excellent");
+    assert.equal(page.locked.percentile, 96);
+    assert.equal(page.copySeeds.relativity.mode, "rank");
+    assert.equal(page.copySeeds.relativity.spectrumMedian, 60);
+    assert.equal(page.copySeeds.relativity.spectrumYou, 92);
+    assert.equal(page.copySeeds.opportunityPill, "Top tier");
+  });
+
+  it("localizes v7 read-model labels for public locales", () => {
+    const expected = {
+      en: {
+        bandPill: "Building foundation",
+        shortlisted: "Shortlisted for your score"
+      },
+      th: {
+        bandPill: "กำลังสร้างพื้นฐาน",
+        shortlisted: "คัดเลือกสำหรับคะแนนของคุณ"
+      },
+      "zh-CN": {
+        bandPill: "正在建立基础",
+        shortlisted: "按您的分数筛选"
+      }
+    } as const;
+
+    for (const locale of Object.keys(expected) as Array<keyof typeof expected>) {
+      const page = computeHealthScore(profileOne(), locale).pageContent;
+
+      assert.ok(page);
+      assert.equal(page.copySeeds.bandPill, expected[locale].bandPill);
+      assert.equal(
+        page.copySeeds.subtraction.labelChosen,
+        expected[locale].shortlisted
+      );
+      assert.equal(page.copySeeds.relativity.legendCaptions.length, 3);
+    }
   });
 
   it("normalizes nested answer fields and lab units", () => {
@@ -229,8 +363,23 @@ describe("HealthScore v4 deterministic scoring", () => {
     assert.equal(simple.pageContent?.locked.subtraction.chosen, 6);
     assert.equal(simple.pageContent?.locked.nutrientsChosen, 6);
     assert.equal(broad.pageContent?.locked.subtraction.chosen, 12);
-    assert.equal(broad.pageContent?.locked.subtraction.setAside, 108);
+    assert.equal(
+      broad.pageContent?.locked.subtraction.setAside,
+      DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT - 12
+    );
     assert.equal(broad.pageContent?.locked.nutrientsChosen, 12);
+  });
+
+  it("allows the live supplement catalogue count to override the fallback", () => {
+    const result = computeHealthScore(profileOne(), "en", {
+      evaluatedIngredientCount: 160
+    });
+
+    assert.equal(result.pageContent?.locked.subtraction.evaluated, 160);
+    assert.equal(
+      result.pageContent?.locked.subtraction.setAside,
+      160 - (result.pageContent?.locked.subtraction.chosen ?? 0)
+    );
   });
 
   it("keeps deterministic fallback copy clear of forbidden substrings", () => {

@@ -13,6 +13,7 @@ const landingCopy = source("../components/landing-page-copy.ts");
 const titleBar = source("../components/title-bar.tsx");
 const footer = source("../components/site-footer.tsx");
 const homepage = source("../app/[locale]/page.tsx");
+const blogArticlePage = source("../app/[locale]/blog/[slug]/page.tsx");
 const blog = source("../lib/blog.ts");
 const seedScript = source("../scripts/seed-landing-v15-content.ts");
 
@@ -33,20 +34,37 @@ describe("landing page v15 rebuild", () => {
 
     assert.doesNotMatch(landingPage, /PricingCard/);
     assert.doesNotMatch(landingPage, /id="pricing"/);
+    assert.doesNotMatch(landingPage, /mn-v14-/);
+    assert.doesNotMatch(source("../app/customer.css"), /mn-v14-/);
   });
 
   it("keeps homepage navigation and footer off old pricing anchors", () => {
     assert.match(homepage, /variant="landing"/);
+    assert.match(blogArticlePage, /variant="landing"/);
+    assert.match(
+      blogArticlePage,
+      /<div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">\s*<BlogArticle[\s\S]*?\/>\s*<\/div>\s*<SiteFooter/
+    );
     assert.match(titleBar, /mn-titlebar--landing/);
     assert.match(titleBar, /\/v15\/logo\.png/);
     assert.match(titleBar, /#living-protocol/);
     assert.match(titleBar, /#how-it-works/);
     assert.match(titleBar, /#promises/);
     assert.match(titleBar, /#journal/);
+    assert.match(titleBar, /const titleCtaHref = assessmentPath/);
     assert.doesNotMatch(titleBar, /Free questionnaire/);
     assert.match(footer, /#start-free/);
     assert.doesNotMatch(titleBar, /#pricing/);
     assert.doesNotMatch(footer, /#pricing/);
+  });
+
+  it("sends primary homepage CTAs straight to the questionnaire", () => {
+    assert.match(landingPage, /assessmentPath:\s*string/);
+    assert.match(landingPage, /href=\{assessmentPath\}/);
+
+    const intermediateAssessmentLinks = landingPage.match(/href="#assessment"/g) ?? [];
+    assert.equal(intermediateAssessmentLinks.length, 0);
+    assert.match(landingPage, /<section className="mn-v15-final-cta" id="assessment">/);
   });
 
   it("keeps the English visible copy faithful to the uploaded v15 page", () => {
@@ -75,6 +93,10 @@ describe("landing page v15 rebuild", () => {
     assert.equal(en.results.eyebrow, "Stories like these");
     assert.equal(en.questionnaire.eyebrow, "The free questionnaire");
     assert.equal(en.bridge.note, "Free to start — no credit card required.");
+    assert.match(
+      landingPage,
+      /assets\.foodBowl[\s\S]*copy\.food\.eyebrow[\s\S]*copy\.food\.title[\s\S]*copy\.food\.cards/
+    );
   });
 
   it("has complete localized v15 copy for every public locale", () => {
@@ -85,6 +107,11 @@ describe("landing page v15 rebuild", () => {
       assert.equal(copy.clarity.cards.length, 4, `${locale} clarity cards`);
       assert.equal(copy.how.steps.length, 4, `${locale} flow steps`);
       assert.equal(copy.results.fallback.length, 4, `${locale} testimonials`);
+      assert.equal(
+        copy.results.fallback.filter((testimonial) => testimonial.imageAlt).length,
+        4,
+        `${locale} testimonial image alt text`
+      );
       assert.equal(copy.journal.fallback.length, 3, `${locale} journal cards`);
       assert.equal(copy.questionnaire.sections.length, 6, `${locale} questionnaire sections`);
       assert.ok(copy.food.imageAlt, `${locale} food image alt`);
@@ -132,6 +159,7 @@ describe("landing page v15 rebuild", () => {
     assert.match(seedScript, /homepageVersion:\s*"v15"/);
     assert.match(seedScript, /source_agent[\s\S]*'landing_v15_seed'/);
     assert.match(seedScript, /on conflict \(translation_group_id, locale\) do update/);
+    assert.match(seedScript, /\$\{testimonial\.imageAlt\}/);
     assert.match(seedScript, /public\.testimonials/);
     assert.match(seedScript, /public\.blog_posts/);
     assert.match(seedScript, /for \(const locale of publicLocales\)/);

@@ -65,6 +65,11 @@ export default async function NutritionRevealPage({
 
   return (
     <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
+      <TitleBar
+        currentLocale={locale}
+        currentPath={currentPath}
+        title={dictionary.hero.eyebrow}
+      />
       <FormulationResults
         initialStackPreference={initialStackPreference}
         initialResult={initialResult}

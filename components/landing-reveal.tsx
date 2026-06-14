@@ -11,6 +11,7 @@ export function LandingReveal() {
     }
 
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const observed = new WeakSet<HTMLElement>();
     const revealed = new WeakSet<HTMLElement>();
 
     if (prefersReducedMotion || !("IntersectionObserver" in window)) {
@@ -22,11 +23,16 @@ export function LandingReveal() {
 
     root.classList.add("mn-reveal-ready");
 
+    function revealItem(item: HTMLElement) {
+      revealed.add(item);
+      item.classList.add("mn-reveal-in");
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
-          entry.target.classList.add("mn-reveal-in");
+          revealItem(entry.target as HTMLElement);
           observer.unobserve(entry.target);
         });
       },
@@ -38,11 +44,27 @@ export function LandingReveal() {
 
     function observeItem(item: HTMLElement) {
       if (revealed.has(item) || item.classList.contains("mn-reveal-in")) {
+        revealItem(item);
         return;
       }
 
-      revealed.add(item);
+      if (observed.has(item)) {
+        return;
+      }
+
+      observed.add(item);
       observer.observe(item);
+    }
+
+    function restoreRevealedItem(node: Node) {
+      if (
+        node instanceof HTMLElement &&
+        node.matches("[data-reveal]") &&
+        revealed.has(node) &&
+        !node.classList.contains("mn-reveal-in")
+      ) {
+        node.classList.add("mn-reveal-in");
+      }
     }
 
     function observeRevealItems(node: Node) {
@@ -64,15 +86,25 @@ export function LandingReveal() {
       .forEach((item) => observeItem(item));
     const mutationObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
+        if (mutation.type === "attributes") {
+          restoreRevealedItem(mutation.target);
+          return;
+        }
+
         mutation.addedNodes.forEach((node) => observeRevealItems(node));
       });
     });
 
-    mutationObserver.observe(root, { childList: true, subtree: true });
+    mutationObserver.observe(root, {
+      attributeFilter: ["class", "data-reveal"],
+      attributes: true,
+      childList: true,
+      subtree: true
+    });
     const safety = window.setTimeout(() => {
       root
         .querySelectorAll<HTMLElement>("[data-reveal]")
-        .forEach((item) => item.classList.add("mn-reveal-in"));
+        .forEach((item) => revealItem(item));
     }, 1200);
 
     return () => {

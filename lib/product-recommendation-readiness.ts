@@ -9,7 +9,11 @@ export function resultHasProductStackRows(
   );
 
   if (option) {
-    return option.recommendations.length > 0;
+    return (
+      option.recommendations.length > 0 ||
+      (result.productRecommendations?.stackPreference === stackPreference &&
+        result.recommendations.length > 0)
+    );
   }
 
   const mainStackPreference =
@@ -56,7 +60,7 @@ export function resultHasTransientEmptyProductRecommendations(
       (option) =>
         productRecommendationSummaryExpectsRows(
           option.productRecommendations,
-        ) && option.recommendations.length < 1,
+        ) && !resultHasProductStackRows(result, option.id),
     ),
   );
 

@@ -104,7 +104,7 @@ const baseFormulationResultsCopy = {
     doseAdjustedBody:
       "One or more doses were automatically reduced to stay within the configured MattaNutra safety ceiling.",
     error:
-      "The formulation could not be loaded. Please refresh the page and try again.",
+      "The formulation could not be loaded at this time. Please refresh the page.",
     formula: "Supplement breakdown",
     formulaEmptyBody:
       "Every supplement suggestion needs a safety review before we show it. The review queue has been notified.",
@@ -121,7 +121,7 @@ const baseFormulationResultsCopy = {
     foodsHint:
       "Practical foods and ingredients to build into meals, routines, and future concierge conversations.",
     foodServing: "Serving",
-    finalizeError: "We could not deliver the nutrition plan. Please try again.",
+    finalizeError: "We could not deliver the nutrition plan at this time.",
     finalizePlan: "Deliver Nutrition Plan",
     finalizeReady: "Nutrition plan delivered",
     finalizeWaiting: "Supplement guidance must finish before delivery.",
@@ -162,7 +162,7 @@ const baseFormulationResultsCopy = {
     safetyCaptureChannel: "Preferred channel",
     safetyCaptureChatPlaceholder: "Your handle or number",
     safetyCaptureEmailPlaceholder: "you@example.com",
-    safetyCaptureError: "We could not save that contact detail. Please try again.",
+    safetyCaptureError: "We could not save that contact detail at this time.",
     safetyCaptureSubmit: "Save contact",
     safetyCaptureSuccess:
       "Contact saved. We will use this channel for the review update.",
@@ -203,7 +203,7 @@ const baseFormulationResultsCopy = {
     productCoverage: "ความครอบคลุมจากผลิตภัณฑ์",
     doseAdjustedBody:
       "มีการลดขนาดรับประทานบางรายการให้อยู่ในเพดานความปลอดภัยของ MattaNutra โดยอัตโนมัติ",
-    error: "ไม่สามารถโหลดสูตรได้ กรุณารีเฟรชหน้าและลองอีกครั้ง",
+    error: "ไม่สามารถโหลดสูตรได้ในขณะนี้ กรุณารีเฟรชหน้า",
     formula: "รายการอาหารเสริม",
     formulaEmptyBody:
       "คำแนะนำอาหารเสริมทั้งหมดต้องผ่านการตรวจสอบด้านความปลอดภัยก่อนแสดง ทีมรีวิวได้รับรายการแล้ว",
@@ -220,7 +220,7 @@ const baseFormulationResultsCopy = {
     foodsHint:
       "อาหารและวัตถุดิบที่นำไปใช้กับมื้ออาหาร กิจวัตร และบทสนทนากับผู้ช่วยดูแลต่อไปได้",
     foodServing: "ปริมาณ",
-    finalizeError: "ไม่สามารถส่งมอบแผนโภชนาการได้ กรุณาลองอีกครั้ง",
+    finalizeError: "ไม่สามารถส่งมอบแผนโภชนาการได้ในขณะนี้",
     finalizePlan: "ส่งมอบแผนโภชนาการ",
     finalizeReady: "ส่งมอบแผนโภชนาการแล้ว",
     finalizeWaiting:
@@ -262,7 +262,7 @@ const baseFormulationResultsCopy = {
     safetyCaptureChannel: "ช่องทางที่สะดวก",
     safetyCaptureChatPlaceholder: "แฮนเดิลหรือหมายเลขของคุณ",
     safetyCaptureEmailPlaceholder: "you@example.com",
-    safetyCaptureError: "ไม่สามารถบันทึกช่องทางติดต่อได้ กรุณาลองอีกครั้ง",
+    safetyCaptureError: "ไม่สามารถบันทึกช่องทางติดต่อได้ในขณะนี้",
     safetyCaptureSubmit: "บันทึกช่องทางติดต่อ",
     safetyCaptureSuccess:
       "บันทึกแล้ว เราจะใช้ช่องทางนี้เพื่อแจ้งผลการตรวจสอบ",
@@ -304,7 +304,7 @@ export const formulationResultsCopy = {
     "coverageSuffix": "的推荐补充剂",
     "productCoverage": "产品覆盖",
     "doseAdjustedBody": "为保持在 MattaNutra 设定的安全上限内，一种或多种剂量已自动降低。",
-    "error": "配方无法加载。请刷新页面后重试。",
+    "error": "目前无法加载配方。请刷新页面。",
     "formula": "补充剂明细",
     "formulaEmptyBody": "每项补充剂建议都需要安全审核后才能显示。审核队列已收到通知。",
     "formulaEmptyTitle": "安全审核进行中",
@@ -316,7 +316,7 @@ export const formulationResultsCopy = {
     "foodsEmptyTitle": "食物审核进行中",
     "foodsHint": "实用的食物与食材建议，可融入餐食、日常作息及未来的管家式对话中。",
     "foodServing": "份量",
-    "finalizeError": "无法交付营养计划。请重试。",
+    "finalizeError": "目前无法交付营养计划。",
     "finalizePlan": "交付营养计划",
     "finalizeReady": "营养计划已交付",
     "finalizeWaiting": "补充剂指导必须完成后才能交付。",
@@ -352,7 +352,7 @@ export const formulationResultsCopy = {
     "safetyCaptureChannel": "偏好渠道",
     "safetyCaptureChatPlaceholder": "您的账号或号码",
     "safetyCaptureEmailPlaceholder": "you@example.com",
-    "safetyCaptureError": "无法保存该联系方式。请重试。",
+    "safetyCaptureError": "目前无法保存该联系方式。",
     "safetyCaptureSubmit": "保存联系方式",
     "safetyCaptureSuccess": "联系方式已保存。我们将通过此渠道发送审核更新。",
     "safetyCaptureTitle": "需要我们稍后联系您吗？",

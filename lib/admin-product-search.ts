@@ -14,12 +14,14 @@ import {
   customerPriceFromRpp,
   getCustomerPriceMarginPercent
 } from "@/lib/customer-pricing";
+import { organisationDispatchCity } from "@/lib/organisation-dispatch";
 import type { ProductCandidate } from "@/lib/product-recommendations";
 
 type ProductSearchDb = postgres.Sql | postgres.TransactionSql;
 
 export type ProductRecommendationRetailerOption = Readonly<{
   currency: string;
+  dispatchCity: string | null;
   etaDate: string | null;
   organisationId: string;
   organisationName: string;
@@ -39,7 +41,9 @@ type RetailProductCandidateRow = Readonly<{
   lead_time_days: number | string | null;
   organisation_currency: string | null;
   organisation_id: string;
+  organisation_metadata: unknown;
   organisation_name: string;
+  organisation_slug: string | null;
   product_id: string;
   retail_override_price_amount: number | string | null;
   retail_sellable_product_id: string;
@@ -288,7 +292,9 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
     select
       organisations.id::text as organisation_id,
       organisations.name as organisation_name,
+      organisations.slug as organisation_slug,
       organisations.currency as organisation_currency,
+      organisations.metadata as organisation_metadata,
       sellable.id::text as retail_sellable_product_id,
       sellable.product_id::text,
       sellable.rrp_price_amount as retail_override_price_amount,
@@ -325,6 +331,7 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
   const byRetailer = new Map<string, {
     candidates: ProductCandidate[];
     currency: string;
+    dispatchCity: string | null;
     etaDates: Array<string | null>;
     name: string;
     subtotalAmount: number;
@@ -412,6 +419,11 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
     const retailer = byRetailer.get(retailRow.organisation_id) ?? {
       candidates: [],
       currency: candidate.currency,
+      dispatchCity: organisationDispatchCity({
+        metadata: retailRow.organisation_metadata,
+        name: retailRow.organisation_name,
+        slug: retailRow.organisation_slug
+      }),
       etaDates: [],
       name: retailRow.organisation_name,
       subtotalAmount: 0
@@ -428,6 +440,7 @@ export async function getRetailerAwareProductRecommendationCandidateSets(input: 
       ? retailer.candidates.slice(0, input.limit)
       : retailer.candidates,
     currency: retailer.currency,
+    dispatchCity: retailer.dispatchCity,
     etaDate: latestEtaDate(retailer.etaDates),
     organisationId,
     organisationName: retailer.name,

@@ -40,6 +40,10 @@ import {
   normalizeProductCountryCode
 } from "@/lib/product-countries";
 import {
+  normalizeDispatchCity,
+  organisationDispatchCity
+} from "@/lib/organisation-dispatch";
+import {
   getCustomerPriceMarginPercent,
   normalizeCustomerPriceMarginPercent
 } from "@/lib/customer-pricing";
@@ -370,6 +374,7 @@ function organisation(row: {
   currency?: string | null;
   default_locale: string;
   id: string;
+  metadata?: unknown;
   name: string;
   organisation_type: string;
   slug: string;
@@ -387,6 +392,11 @@ function organisation(row: {
         ? "USD"
         : "THB",
     defaultLocale: localeValue(row.default_locale),
+    dispatchCity: organisationDispatchCity({
+      metadata: row.metadata,
+      name: row.name,
+      slug: row.slug
+    }),
     id: row.id,
     name: row.name,
     slug: row.slug,
@@ -1741,12 +1751,13 @@ export async function getAdminAccessData(
         currency: string | null;
         default_locale: string;
         id: string;
+        metadata: unknown;
         name: string;
         organisation_type: string;
         slug: string;
         status: string;
       }>>`
-        select id::text, slug, name, organisation_type, status, default_locale, country_code, currency
+        select id::text, slug, name, organisation_type, status, default_locale, country_code, currency, metadata
         from public.organisations
         ${organisationScope}
         order by organisation_type asc, lower(name) asc
@@ -2071,6 +2082,7 @@ export async function createOrganisation({
   countryCode,
   currency,
   defaultLocale,
+  dispatchCity,
   name,
   slug,
   type
@@ -2079,6 +2091,7 @@ export async function createOrganisation({
   countryCode?: string | null;
   currency?: string | null;
   defaultLocale: Locale;
+  dispatchCity?: string | null;
   name: string;
   slug: string;
   type: AdminOrganisationType;
@@ -2086,11 +2099,13 @@ export async function createOrganisation({
   const sql = await sqlOrThrow();
   const normalizedCountryCode = normalOrganisationCountry(countryCode);
   const normalizedCurrency = normalOrganisationCurrency(currency, type);
+  const normalizedDispatchCity = normalizeDispatchCity(dispatchCity);
   const rows = await sql<Array<{
     country_code: string | null;
     currency: string | null;
     default_locale: string;
     id: string;
+    metadata: unknown;
     name: string;
     organisation_type: string;
     slug: string;
@@ -2103,7 +2118,8 @@ export async function createOrganisation({
       status,
       default_locale,
       country_code,
-      currency
+      currency,
+      metadata
     )
     values (
       ${slug.trim().toLowerCase()},
@@ -2112,9 +2128,12 @@ export async function createOrganisation({
       'active',
       ${defaultLocale},
       ${normalizedCountryCode},
-      ${normalizedCurrency}
+      ${normalizedCurrency},
+      ${sql.json(toJsonValue(
+        normalizedDispatchCity ? { dispatchCity: normalizedDispatchCity } : {}
+      ))}::jsonb
     )
-    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency
+    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency, metadata
   `;
 
   const savedOrganisation = rows[0] ? organisation(rows[0]) : null;
@@ -2130,6 +2149,7 @@ export async function createOrganisation({
       metadata: {
         currency: savedOrganisation.currency,
         defaultLocale,
+        dispatchCity: savedOrganisation.dispatchCity,
         name: savedOrganisation.name,
         slug: savedOrganisation.slug,
         type: savedOrganisation.type
@@ -2145,6 +2165,7 @@ export async function updateOrganisation({
   countryCode,
   currency,
   defaultLocale,
+  dispatchCity,
   id,
   name,
   slug,
@@ -2154,6 +2175,7 @@ export async function updateOrganisation({
   countryCode?: string | null;
   currency?: string | null;
   defaultLocale: Locale;
+  dispatchCity?: string | null;
   id: string;
   name: string;
   slug: string;
@@ -2166,12 +2188,13 @@ export async function updateOrganisation({
         currency: string | null;
         default_locale: string;
         id: string;
+        metadata: unknown;
         name: string;
         organisation_type: string;
         slug: string;
         status: string;
       }>>`
-        select id::text, slug, name, organisation_type, status, default_locale, country_code, currency
+        select id::text, slug, name, organisation_type, status, default_locale, country_code, currency, metadata
         from public.organisations
         where id = ${id}::uuid
         limit 1
@@ -2184,11 +2207,13 @@ export async function updateOrganisation({
     organisationType
   );
   const normalizedCountryCode = normalOrganisationCountry(countryCode);
+  const normalizedDispatchCity = normalizeDispatchCity(dispatchCity);
   const rows = await sql<Array<{
     country_code: string | null;
     currency: string | null;
     default_locale: string;
     id: string;
+    metadata: unknown;
     name: string;
     organisation_type: string;
     slug: string;
@@ -2202,9 +2227,15 @@ export async function updateOrganisation({
       default_locale = ${defaultLocale},
       country_code = ${normalizedCountryCode},
       currency = ${normalizedCurrency},
+      metadata = case
+        when ${normalizedDispatchCity ?? ""} <> '' then
+          coalesce(metadata, '{}'::jsonb) || jsonb_build_object('dispatchCity', ${normalizedDispatchCity ?? ""})
+        else
+          coalesce(metadata, '{}'::jsonb) - 'dispatchCity'
+      end,
       updated_at = now()
     where id = ${id}::uuid
-    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency
+    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency, metadata
   `;
 
   const savedOrganisation = rows[0] ? organisation(rows[0]) : null;
@@ -3046,12 +3077,14 @@ export async function updateEffectiveOrganisationSettings({
   currency,
   customerPriceMarginPercent,
   defaultLocale,
+  dispatchCity,
   name
 }: Readonly<{
   context: AdminSessionContext;
   currency?: string | null;
   customerPriceMarginPercent?: number | null;
   defaultLocale: Locale;
+  dispatchCity?: string | null;
   name: string;
 }>) {
   if (
@@ -3097,6 +3130,7 @@ export async function updateEffectiveOrganisationSettings({
 
   const sql = await sqlOrThrow();
   const requestedCustomerPriceMargin = customerPriceMarginPercent !== undefined;
+  const normalizedDispatchCity = normalizeDispatchCity(dispatchCity);
 
   if (requestedCustomerPriceMargin && !canEditCustomerPriceMargin) {
     throw new Error("Customer margin can only be updated at platform level");
@@ -3115,6 +3149,7 @@ export async function updateEffectiveOrganisationSettings({
     currency: string | null;
     default_locale: string;
     id: string;
+    metadata: unknown;
     name: string;
     organisation_type: string;
     slug: string;
@@ -3126,12 +3161,24 @@ export async function updateEffectiveOrganisationSettings({
       default_locale = ${defaultLocale},
       currency = ${normalizedCurrency},
       metadata = case
-        when organisation_type = 'platform' then coalesce(metadata, '{}'::jsonb) || ${sql.json(marginMetadataPatch)}::jsonb
-        else coalesce(metadata, '{}'::jsonb) - 'customerPriceMarginPercent'
+        when ${normalizedDispatchCity ?? ""} <> '' then
+          (
+            case
+              when organisation_type = 'platform' then coalesce(metadata, '{}'::jsonb) || ${sql.json(marginMetadataPatch)}::jsonb
+              else coalesce(metadata, '{}'::jsonb) - 'customerPriceMarginPercent'
+            end
+          ) || jsonb_build_object('dispatchCity', ${normalizedDispatchCity ?? ""})
+        else
+          (
+            case
+              when organisation_type = 'platform' then coalesce(metadata, '{}'::jsonb) || ${sql.json(marginMetadataPatch)}::jsonb
+              else coalesce(metadata, '{}'::jsonb) - 'customerPriceMarginPercent'
+            end
+          ) - 'dispatchCity'
       end,
       updated_at = now()
     where id = ${context.effectiveOrganisation.id}::uuid
-    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency
+    returning id::text, slug, name, organisation_type, status, default_locale, country_code, currency, metadata
   `;
   const savedOrganisation = rows[0] ? organisation(rows[0]) : null;
 

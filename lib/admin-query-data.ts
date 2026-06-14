@@ -89,6 +89,7 @@ export type AdminCampaignsData = Readonly<{
 export type AdminLeadRow = Readonly<{
   campaign: string | null;
   communicationIssues: number;
+  contactEmail: string | null;
   currentStage: string;
   emailHash: string | null;
   events: AdminLeadEventRow[];
@@ -271,6 +272,10 @@ const leadEventNames = new Set([
   "assessment_submitted",
   "assessment_captured",
   "assessment_recaptured",
+  "assessment_resume_requested",
+  "assessment_resume_email_sent",
+  "assessment_resume_opened",
+  "assessment_resume_finalized",
   "healthscore_viewed",
   "free_email_requested",
   "free_email_sent",
@@ -291,6 +296,7 @@ function flowNodeCount(flow: AdminFlowData, id: string) {
 }
 
 function currentLeadStage(row: {
+  assessment_resume_requested?: boolean;
   free_email_requested: boolean;
   free_email_sent: boolean;
   healthscore_viewed: boolean;
@@ -322,6 +328,10 @@ function currentLeadStage(row: {
 
   if (row.submitted) {
     return "assessment_completed";
+  }
+
+  if (row.assessment_resume_requested) {
+    return "resume_requested";
   }
 
   if (row.started) {
@@ -473,6 +483,7 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
     Array<{
       campaign: string | null;
       communication_issues: number | string | null;
+      contact_email: string | null;
       email_hash: string | null;
       first_seen_at: Date | string;
       free_email_requested: boolean;
@@ -489,6 +500,7 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
       ray: string | null;
       selected_plan: string | null;
       source: string | null;
+      assessment_resume_requested: boolean;
       started: boolean;
       subject: string;
       submitted: boolean;
@@ -532,6 +544,7 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
         bool_or(event_name in ('home_viewed', 'blog_article_viewed')) as landed,
         bool_or(event_name = 'assessment_started') as started,
         bool_or(event_name in ('assessment_submitted', 'assessment_captured', 'assessment_recaptured')) as submitted,
+        bool_or(event_name in ('assessment_resume_requested', 'assessment_resume_email_sent', 'assessment_resume_opened')) as assessment_resume_requested,
         bool_or(event_name = 'healthscore_viewed') as healthscore_viewed,
         bool_or(event_name = 'free_email_requested') as free_email_requested,
         bool_or(event_name = 'free_email_sent') as free_email_sent,
@@ -562,9 +575,44 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
     )
     select
       lead_rows.*,
+      contact_emails.contact_email,
       coalesce(review_counts.pending_reviews, 0)::int as pending_reviews,
       coalesce(communication_counts.communication_issues, 0)::int as communication_issues
     from lead_rows
+    left join lateral (
+      select contact_email
+      from (
+        select assessments.contact_email, assessments.updated_at
+        from public.assessments
+        where assessments.contact_email is not null
+          and (
+            assessments.plan_id::text = lead_rows.plan_id
+            or assessments.plan_id::text = lead_rows.subject
+          )
+        union all
+        select assessment_resume_drafts.contact_email, assessment_resume_drafts.updated_at
+        from public.assessment_resume_drafts
+        where assessment_resume_drafts.contact_email is not null
+          and (
+            assessment_resume_drafts.email_hash = lead_rows.email_hash
+            or assessment_resume_drafts.plan_id::text = lead_rows.plan_id
+            or assessment_resume_drafts.plan_id::text = lead_rows.subject
+          )
+        union all
+        select communication_channels.address as contact_email, communication_channels.updated_at
+        from public.plan_communication_identities
+        join public.communication_channels
+          on communication_channels.identity_id = plan_communication_identities.identity_id
+        where communication_channels.channel_type = 'email'
+          and communication_channels.status = 'active'
+          and (
+            plan_communication_identities.plan_id::text = lead_rows.plan_id
+            or plan_communication_identities.plan_id::text = lead_rows.subject
+          )
+      ) raw_contact_emails
+      order by updated_at desc
+      limit 1
+    ) contact_emails on true
     left join lateral (
       select count(*)::int as pending_reviews
       from public.tasks
@@ -585,6 +633,7 @@ async function getLeads(params: QueryParams): Promise<AdminLeadsData> {
     .map((row): AdminLeadRow => ({
       campaign: row.campaign,
       communicationIssues: Number(row.communication_issues) || 0,
+      contactEmail: row.contact_email,
       currentStage: currentLeadStage(row),
       emailHash: row.email_hash,
       events: [],

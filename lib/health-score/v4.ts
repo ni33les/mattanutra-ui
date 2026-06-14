@@ -58,6 +58,8 @@ export type {
 } from "@/lib/health-score/v4-types";
 export { HEALTHSCORE_COPY_FORBIDDEN_SUBSTRINGS } from "@/lib/health-score/v4-copy";
 
+export const DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT = 142;
+
 type NormalizedAnswers = Readonly<{
   activity: string;
   age: string;
@@ -224,6 +226,10 @@ function clamp(value: number, min: number, max: number) {
 
 function round1(value: number) {
   return Math.round(value * 10) / 10;
+}
+
+function scoreScalePercent(score: number) {
+  return round1(((score - 30) / 62) * 100);
 }
 
 function optionScore(value: string, scores: Record<string, number>, fallback: number) {
@@ -680,8 +686,7 @@ function pillarLabel(name: PillarName, locale: Locale) {
 }
 
 function buildPillars(result: EngineResult, goals: readonly string[], locale: Locale) {
-  return result.pillars
-    .map((pillar) => {
+  const rows = result.pillars.map((pillar) => {
       const linkedGoals = goals.filter((goal) =>
         GOAL_PILLARS[pillar.name].includes(goal)
       );
@@ -697,14 +702,26 @@ function buildPillars(result: EngineResult, goals: readonly string[], locale: Lo
             : null;
 
       return {
+        fillClass: Math.round(pillar.pct * 100) >= 50 ? "hi" as const : "lo" as const,
         goalLinked: linkedGoals.length > 0,
         id: PILLAR_ID[pillar.name],
+        isHero: false,
         label: pillarLabel(pillar.name, locale),
         name: pillar.name,
         tag,
         value: Math.round(pillar.pct * 100)
       };
-    })
+    });
+  const hero = rows
+    .filter((pillar) => pillar.goalLinked)
+    .slice()
+    .sort((first, second) => first.value - second.value)[0];
+
+  return rows
+    .map((pillar) => ({
+      ...pillar,
+      isHero: Boolean(hero && pillar.name === hero.name)
+    }))
     .sort((first, second) => second.value - first.value);
 }
 
@@ -999,6 +1016,11 @@ function buildGapTrio(
 }
 
 function relativity(score: number, percentile: number, median: number, locale: Locale) {
+  const spectrumYouPct = scoreScalePercent(score);
+  const spectrumMedianPct = scoreScalePercent(median);
+  const spectrumGapLeftPct = Math.min(spectrumYouPct, spectrumMedianPct);
+  const spectrumGapWidthPct = round1(Math.abs(spectrumYouPct - spectrumMedianPct));
+
   if (score >= median) {
     return {
       headline: locale === "th"
@@ -1006,9 +1028,18 @@ function relativity(score: number, percentile: number, median: number, locale: L
         : locale === "zh-CN"
           ? `你领先约 ${percentile}% 完成此评估的人。`
           : `You are ahead of about ${percentile}% of people who finish this assessment.`,
+      legendCaptions: locale === "th"
+        ? ["ตำแหน่งของคุณ", "ระยะที่คุณอยู่ข้างหน้า", "พื้นที่ปรับถึง 92"] as const
+        : locale === "zh-CN"
+          ? ["您的位置", "领先距离", "到92分的提升空间"] as const
+          : ["Where you are", "How far ahead you sit", "Headroom to 92"] as const,
       mode: "rank" as const,
+      spectrumGapLeftPct,
+      spectrumGapWidthPct,
       spectrumMedian: median,
+      spectrumMedianPct,
       spectrumYou: score,
+      spectrumYouPct,
       sub: locale === "th"
         ? "คุณทำหลายอย่างได้ดีแล้ว สิ่งที่เหลือคือการปรับเฉพาะจุดให้คมขึ้น"
         : locale === "zh-CN"
@@ -1026,9 +1057,18 @@ function relativity(score: number, percentile: number, median: number, locale: L
       : locale === "zh-CN"
         ? `完成此评估的人平均约为 ${median} 分。你的差距是 ${gap} 分，而且这些差距并不是年龄本身造成的。`
         : `The average person who finishes this assessment scores about ${median}. Your gap is ${gap} points, and none of them are about age.`,
+    legendCaptions: locale === "th"
+      ? ["ตำแหน่งของคุณ", "ช่องว่างที่ฟื้นกลับได้", "พื้นที่เติบโตถึง 92"] as const
+      : locale === "zh-CN"
+        ? ["您的位置", "可恢复的差距", "到92分的成长空间"] as const
+        : ["Where you are", "Recoverable gap", "Room to grow to 92"] as const,
     mode: "gap" as const,
+    spectrumGapLeftPct,
+    spectrumGapWidthPct,
     spectrumMedian: median,
+    spectrumMedianPct,
     spectrumYou: score,
+    spectrumYouPct,
     sub: locale === "th"
       ? `${gap} คะแนนนี้มาจากจุดเฉพาะที่ฟื้นกลับได้ และจุดใหญ่ที่สุดเชื่อมกับเป้าหมายที่คุณบอกว่าสำคัญ`
       : locale === "zh-CN"
@@ -1110,7 +1150,8 @@ function methodCards(
           ? "เป้าหมายกำหนดทิศทาง"
           : locale === "zh-CN"
             ? "你的目标决定方向"
-            : "Your goals set the direction"
+            : "Your goals set the direction",
+      number: 1
     },
     {
       body:
@@ -1124,7 +1165,8 @@ function methodCards(
           ? "กิจวัตรเพิ่มบริบท"
           : locale === "zh-CN"
             ? "你的日常提供背景"
-            : "Your routine adds the context"
+            : "Your routine adds the context",
+      number: 2
     },
     {
       body: safetyFinding
@@ -1143,7 +1185,8 @@ function methodCards(
           ? "โปรไฟล์ความปลอดภัยขีดเส้น"
           : locale === "zh-CN"
             ? "你的安全资料划定边界"
-            : "Your safety profile draws the lines"
+            : "Your safety profile draws the lines",
+      number: 3
     }
   ] satisfies HealthScoreMethodCard[];
 }
@@ -1178,7 +1221,7 @@ function subtractionCopy(
     return {
       body:
         `ตัวอย่างแผนที่ดีไม่ได้เริ่มจากการเพิ่มทุกอย่างที่อาจช่วย แต่เริ่มจากการคัดสิ่งที่ไม่พอดีออกตามคะแนน ${goalList} และ${constraint} ก่อนสร้างสูตรจริง`,
-      labelChosen: "รายการคัดเลือก",
+      labelChosen: "คัดเลือกสำหรับคะแนนของคุณ",
       labelEvaluated: "ส่วนผสมที่ประเมิน",
       labelSetAside: "ตัดออกสำหรับคุณ"
     };
@@ -1188,7 +1231,7 @@ function subtractionCopy(
     return {
       body:
         `好的方案预览不是把所有可能有帮助的东西都加进去，而是先根据你的分数、${goalList}和${constraint}筛掉不适合的内容，再生成最终配方。`,
-      labelChosen: "候选清单",
+      labelChosen: "按您的分数筛选",
       labelEvaluated: "已评估成分",
       labelSetAside: "已为你排除"
     };
@@ -1197,7 +1240,7 @@ function subtractionCopy(
   return {
     body:
       `A good plan preview is not built by adding everything that might help. It first filters out what does not fit your score, ${goalList}, and ${constraint} before the final formula is generated.`,
-    labelChosen: "shortlisted",
+    labelChosen: "Shortlisted for your score",
     labelEvaluated: "ingredients evaluated",
     labelSetAside: "set aside for you"
   };
@@ -1215,6 +1258,61 @@ function findingsHeadline(count: number, locale: Locale) {
   return count === 1
     ? "1 thing a generic vitamin quiz would have missed."
     : `${count} things a generic vitamin quiz would have missed.`;
+}
+
+function bandPillLabel(band: string, locale: Locale) {
+  const labels: Record<Locale, Record<string, string>> = {
+    en: {
+      "Building foundation": "Building foundation",
+      "Needs attention": "Needs attention",
+      "Good, with a clear gap": "Good, with a clear gap",
+      Strong: "Strong",
+      "Strong, with headroom": "Strong, with headroom",
+      Excellent: "Excellent"
+    },
+    th: {
+      "Building foundation": "กำลังสร้างพื้นฐาน",
+      "Needs attention": "ต้องให้ความสำคัญ",
+      "Good, with a clear gap": "ดี และมีช่องว่างที่ชัดเจน",
+      Strong: "แข็งแรง",
+      "Strong, with headroom": "แข็งแรง และยังพัฒนาได้",
+      Excellent: "ยอดเยี่ยม"
+    },
+    "zh-CN": {
+      "Building foundation": "正在建立基础",
+      "Needs attention": "需要关注",
+      "Good, with a clear gap": "良好，但仍有明显差距",
+      Strong: "强劲",
+      "Strong, with headroom": "较强，仍有提升空间",
+      Excellent: "优秀"
+    }
+  };
+
+  return labels[locale][band] ?? band;
+}
+
+function opportunityPill(band: string, percentile: number, locale: Locale) {
+  if (percentile >= 80 || band === "Excellent" || band === "Strong, with headroom") {
+    return locale === "th"
+      ? "ระดับสูง"
+      : locale === "zh-CN"
+        ? "顶级"
+        : "Top tier";
+  }
+
+  if (band === "Good, with a clear gap") {
+    return locale === "th"
+      ? "ปรับให้คมขึ้นได้"
+      : locale === "zh-CN"
+        ? "可进一步优化"
+        : "Clear refinement";
+  }
+
+  return locale === "th"
+    ? "โอกาสสูง"
+    : locale === "zh-CN"
+      ? "高机会"
+      : "High opportunity";
 }
 
 function healthScoreSelectedNutrientCount(answers: NormalizedAnswers) {
@@ -1284,17 +1382,20 @@ function buildPageContent({
   answers,
   chosenNutrients,
   engine,
+  evaluatedIngredientCount,
   locale,
   subtraction
 }: Readonly<{
   answers: NormalizedAnswers;
   chosenNutrients?: number;
   engine: EngineResult;
+  evaluatedIngredientCount?: number;
   locale: Locale;
   subtraction?: HealthScoreSubtraction;
 }>): HealthScorePageContent {
   const median = 60;
-  const percentile = PERCENTILES[engine.final] ?? (engine.final >= 79 ? 100 : 0);
+  const rawPercentile = PERCENTILES[engine.final] ?? (engine.final >= 79 ? 100 : 0);
+  const percentile = Math.max(1, Math.min(96, rawPercentile));
   const pillarsWithNames = buildPillars(engine, answers.goals, locale);
   const findings = buildFindings(answers, engine, locale);
   const selectedFindings = findings.length > 0
@@ -1302,12 +1403,18 @@ function buildPageContent({
     : buildStrengthFindings(pillarsWithNames, locale);
   const selectedNutrients =
     chosenNutrients ?? healthScoreSelectedNutrientCount(answers);
+  const evaluatedNutrients = Math.max(
+    selectedNutrients,
+    Number.isFinite(evaluatedIngredientCount)
+      ? Math.round(Number(evaluatedIngredientCount))
+      : DEFAULT_HEALTHSCORE_EVALUATED_INGREDIENT_COUNT
+  );
   const selectedSubtraction =
     subtraction ?? {
       chosen: selectedNutrients,
-      evaluated: 120,
+      evaluated: evaluatedNutrients,
       mode: "nutrients" as const,
-      setAside: Math.max(0, 120 - selectedNutrients)
+      setAside: Math.max(0, evaluatedNutrients - selectedNutrients)
     };
   const subtractionText = subtractionCopy(
     selectedSubtraction,
@@ -1316,10 +1423,14 @@ function buildPageContent({
     locale
   );
   const relative = relativity(engine.final, percentile, median, locale);
+  const highlightedGoals = answers.goals.map(
+    (goal) => `<em>${localizedGoalPhrase(goal, locale)}</em>`
+  );
 
   return {
     copySeeds: {
       bandLine: bandLine(engine.final, engine.band, locale),
+      bandPill: bandPillLabel(engine.band, locale),
       findings: selectedFindings,
       findingsHeadline: findings.length > 0
         ? findingsHeadline(selectedFindings.length, locale)
@@ -1344,10 +1455,10 @@ function buildPageContent({
       goalMirror:
         answers.goals.length > 0
           ? locale === "th"
-            ? `คุณมาที่นี่เพื่อ${localizedList(answers.goals.map((goal) => localizedGoalPhrase(goal, locale)), locale)}`
+            ? `คุณมาที่นี่เพื่อ${localizedList(highlightedGoals, locale)}`
             : locale === "zh-CN"
-              ? `你来到这里，是为了${localizedList(answers.goals.map((goal) => localizedGoalPhrase(goal, locale)), locale)}。`
-              : `You came here for ${localizedList(answers.goals.map((goal) => localizedGoalPhrase(goal, locale)), locale)}.`
+              ? `你来到这里，是为了${localizedList(highlightedGoals, locale)}。`
+              : `You came here for ${localizedList(highlightedGoals, locale)}.`
           : locale === "th"
             ? "คุณมาที่นี่เพื่อเข้าใจสุขภาพของตัวเองให้ชัดขึ้น"
             : locale === "zh-CN"
@@ -1365,6 +1476,7 @@ function buildPageContent({
         : locale === "zh-CN"
           ? "这是覆盖五个领域的固定评分模型，不是猜测，也不是陌生人的平均值。"
           : "A fixed scoring model across five domains, not a guess and not an average of strangers.",
+      opportunityPill: opportunityPill(engine.band, percentile, locale),
       pillarHeadline: locale === "th"
         ? `เสาหลักที่เชื่อมกับเป้าหมายบอกว่า ${engine.final >= median ? "สิ่งที่เหลือคือการปรับให้คมขึ้น" : "ควรเริ่มจากจุดไหนก่อน"}`
         : locale === "zh-CN"
@@ -1384,9 +1496,11 @@ function buildPageContent({
       nutrientsChosen: selectedSubtraction.chosen,
       nutrientsEvaluated: selectedSubtraction.evaluated,
       percentile,
-      pillars: pillarsWithNames.map(({ goalLinked, id, label, tag, value }) => ({
+      pillars: pillarsWithNames.map(({ fillClass, goalLinked, id, isHero, label, tag, value }) => ({
+        fillClass,
         goalLinked,
         id,
+        isHero,
         label,
         tag,
         value
@@ -1472,7 +1586,10 @@ function buildMovers(domains: readonly HealthScoreDomain[], locale: Locale): Hea
 
 export function computeHealthScore(
   answersInput: unknown,
-  locale: Locale = "en"
+  locale: Locale = "en",
+  options: Readonly<{
+    evaluatedIngredientCount?: number;
+  }> = {}
 ): HealthScoreResult {
   const answers = normalizeAnswers(answersInput);
   const engine = scoreEngine(answers);
@@ -1485,7 +1602,12 @@ export function computeHealthScore(
     flagCodes: engine.flagCodes,
     headline: headlineForScore(engine.final, locale),
     movers: buildMovers(domains, locale),
-    pageContent: buildPageContent({ answers, engine, locale }),
+    pageContent: buildPageContent({
+      answers,
+      engine,
+      evaluatedIngredientCount: options.evaluatedIngredientCount,
+      locale
+    }),
     raw: engine.raw,
     score: engine.final,
     selfReport: engine.selfReport,

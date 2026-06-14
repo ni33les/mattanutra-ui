@@ -30,7 +30,9 @@ type LocaleLayoutProps = Readonly<{
 const bodyFont = DM_Sans({
   subsets: ["latin"],
   variable: "--mn-font-body",
-  display: "swap"
+  display: "swap",
+  weight: "variable",
+  axes: ["opsz"]
 });
 
 const displayFont = Fraunces({
@@ -45,7 +47,8 @@ const displayFont = Fraunces({
 const monoFont = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--mn-font-mono",
-  display: "swap"
+  display: "swap",
+  weight: ["400", "500", "600"]
 });
 
 const thaiFont = Noto_Sans_Thai({

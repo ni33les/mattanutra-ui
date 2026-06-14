@@ -47,6 +47,21 @@ const roleLabels = {
   }
 } satisfies Record<Locale, Record<AdminRole, string>>;
 
+const dispatchCityLabels = {
+  en: {
+    help: "Used on customer reveal pages as the pharmacy dispatch city.",
+    label: "Dispatch city"
+  },
+  th: {
+    help: "ใช้บนหน้า reveal ของลูกค้าเป็นเมืองที่จัดส่งจากร้านขายยา",
+    label: "เมืองจัดส่ง"
+  },
+  "zh-CN": {
+    help: "用于客户 reveal 页面中的药房发货城市。",
+    label: "发货城市"
+  }
+} satisfies Record<Locale, { help: string; label: string }>;
+
 function statusLabel(labels: AdminContent, status: string) {
   if (status === "active") {
     return labels.access.active;
@@ -103,6 +118,9 @@ export function AdminSettingsView({
   const [organisationCurrency, setOrganisationCurrency] = useState(
     initialSettingsData?.organisation.currency ?? "THB"
   );
+  const [organisationDispatchCity, setOrganisationDispatchCity] = useState(
+    initialSettingsData?.organisation.dispatchCity ?? ""
+  );
   const [customerPriceMarginPercent, setCustomerPriceMarginPercent] = useState(
     String(initialSettingsData?.customerPriceMarginPercent ?? 10)
   );
@@ -135,6 +153,9 @@ export function AdminSettingsView({
       setOrganisationName(result.settingsData.organisation.name);
       setOrganisationLocale(result.settingsData.organisation.defaultLocale);
       setOrganisationCurrency(result.settingsData.organisation.currency);
+      setOrganisationDispatchCity(
+        result.settingsData.organisation.dispatchCity ?? ""
+      );
       setCustomerPriceMarginPercent(
         String(result.settingsData.customerPriceMarginPercent)
       );
@@ -185,6 +206,7 @@ export function AdminSettingsView({
         currency: organisationCurrency,
         ...(canEditCustomerPriceMargin ? { customerPriceMarginPercent } : {}),
         defaultLocale: organisationLocale,
+        dispatchCity: organisationDispatchCity,
         name: organisationName
       });
 
@@ -312,6 +334,21 @@ export function AdminSettingsView({
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-gray-500">
+              {dispatchCityLabels[locale].label}
+              <input
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
+                disabled={!canEditOrganisation || busy}
+                onChange={(event) =>
+                  setOrganisationDispatchCity(event.target.value)
+                }
+                placeholder="Chiang Mai"
+                value={organisationDispatchCity}
+              />
+              <span className="text-[11px] font-normal leading-5 text-gray-400">
+                {dispatchCityLabels[locale].help}
+              </span>
             </label>
             <label className="grid gap-1 text-xs font-semibold text-gray-500">
               {labels.settings.currency}

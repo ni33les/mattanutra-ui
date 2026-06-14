@@ -229,6 +229,7 @@ export async function POST(request: NextRequest) {
         countryCode,
         currency,
         defaultLocale: localeValue(body.defaultLocale),
+        dispatchCity: text(body.dispatchCity),
         name,
         slug,
         type: "tenant"
@@ -276,6 +277,7 @@ export async function POST(request: NextRequest) {
         countryCode,
         currency,
         defaultLocale: localeValue(body.defaultLocale),
+        dispatchCity: text(body.dispatchCity),
         id: text(body.organisationId),
         name,
         slug,

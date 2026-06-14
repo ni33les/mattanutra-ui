@@ -99,6 +99,7 @@ async function sourceProductIdentifiersForTask(input: Parameters<
 type RetailerRecommendationOption = Readonly<{
   backorderCount: number;
   currency: string;
+  dispatchCity: string | null;
   etaDate: string | null;
   organisationId: string;
   organisationName: string;
@@ -153,6 +154,7 @@ function retailerRecommendationOption(input: Readonly<{
     currency:
       selectedItems.find((item) => item.product.currency)?.product.currency ??
       input.candidateSet.currency,
+    dispatchCity: input.candidateSet.dispatchCity,
     etaDate,
     organisationId: input.candidateSet.organisationId,
     organisationName: input.candidateSet.organisationName,
@@ -171,6 +173,7 @@ function retailerOptionSummary(option: RetailerRecommendationOption) {
   return {
     backorderCount: option.backorderCount,
     currency: option.currency,
+    dispatchCity: option.dispatchCity,
     etaDate: option.etaDate,
     organisationId: option.organisationId,
     organisationName: option.organisationName,

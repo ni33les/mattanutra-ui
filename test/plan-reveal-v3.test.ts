@@ -194,6 +194,8 @@ describe("plan reveal V3 migration", () => {
     assert.match(revealFinalResults, /<LandingReveal \/>/);
     assert.match(revealFinalResults, /data-reveal/);
     assert.match(landingReveal, /MutationObserver/);
+    assert.match(landingReveal, /attributeFilter: \["class", "data-reveal"\]/);
+    assert.match(landingReveal, /function restoreRevealedItem/);
     assert.match(landingReveal, /addedNodes/);
     assert.match(revealFinalResults, /CountUpNumber/);
     assert.match(revealFinalResults, /mn-reveal-distillation-pair/);

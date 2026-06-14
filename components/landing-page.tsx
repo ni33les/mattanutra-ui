@@ -102,7 +102,7 @@ export function LandingPage({
         }))
       : copy.results.fallback.map((testimonial) => ({
           ...testimonial,
-          imageAlt: testimonial.name,
+          imageAlt: testimonial.imageAlt,
         }));
   const journalCards =
     blogPosts.length > 0
@@ -351,7 +351,7 @@ export function LandingPage({
                 {copy.protocol.intro}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link className="mn-v15-button" href="#start-free">
+                <Link className="mn-v15-button" href={assessmentPath}>
                   {copy.protocol.primary}
                   <ArrowRight aria-hidden className="size-4" />
                 </Link>
@@ -467,13 +467,7 @@ export function LandingPage({
 
         <div className="mn-v15-section border-y border-[var(--mn-sand-deep)] bg-[var(--mn-sand-soft)]">
           <div className="mn-v15-container">
-            <SectionIntro
-              accent={copy.food.accent}
-              body={copy.food.intro}
-              eyebrow={copy.food.eyebrow}
-              title={copy.food.title}
-            />
-            <div className="mt-12 grid items-center gap-10 lg:grid-cols-[0.92fr_1.08fr]">
+            <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16" data-reveal>
               <div className="relative" data-reveal>
                 <span className="absolute -inset-3 -z-10 rounded-[28px] bg-linear-to-br from-[var(--mn-mint)] to-[color-mix(in_srgb,var(--mn-sand-soft)_60%,transparent)]" />
                 <Image
@@ -485,27 +479,41 @@ export function LandingPage({
                   width={1024}
                 />
               </div>
-              <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-1">
-                {copy.food.cards.map(([title, body, tags], index) => (
-                  <article
-                    className={
-                      index === 2
-                        ? "mn-v15-food-card mn-v15-food-card--mint"
-                        : "mn-v15-food-card"
-                    }
-                    data-reveal
-                    key={title}
-                  >
-                    <h3>{title}</h3>
-                    <p>{body}</p>
-                    <div>
-                      {tags.map((tag) => (
-                        <span key={tag}>{tag}</span>
-                      ))}
-                    </div>
-                  </article>
-                ))}
+              <div>
+                <p className="mn-v15-badge">
+                  {copy.food.eyebrow}
+                </p>
+                <h2 className="mt-5 mn-font-display text-[clamp(30px,4vw,46px)] font-medium leading-[1.1] tracking-normal text-[var(--mn-ink)]">
+                  {copy.food.title}{" "}
+                  <em className="italic text-[var(--mn-teal-deep)]">
+                    {copy.food.accent}
+                  </em>
+                </h2>
+                <p className="mt-[18px] text-lg leading-8 text-[var(--mn-ink-soft)]">
+                  {copy.food.intro}
+                </p>
               </div>
+            </div>
+            <div className="mt-16 grid gap-6 md:grid-cols-3">
+              {copy.food.cards.map(([title, body, tags], index) => (
+                <article
+                  className={
+                    index === 2
+                      ? "mn-v15-food-card mn-v15-food-card--mint"
+                      : "mn-v15-food-card"
+                  }
+                  data-reveal
+                  key={title}
+                >
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                  <div>
+                    {tags.map((tag) => (
+                      <span key={tag}>{tag}</span>
+                    ))}
+                  </div>
+                </article>
+              ))}
             </div>
             <p
               className="mx-auto mt-12 max-w-2xl text-center mn-font-display text-xl italic leading-8 text-[var(--mn-ink-soft)]"

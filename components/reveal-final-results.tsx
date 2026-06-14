@@ -66,6 +66,7 @@ import type {
   RecommendedProduct,
 } from "@/lib/formulation-types";
 import { localeHtmlLang, type Locale } from "@/lib/i18n";
+import { organisationDispatchCity } from "@/lib/organisation-dispatch";
 
 type RevealFinalResultsPageProps = Readonly<{
   activeProductRecommendations?: FormulationResult["productRecommendations"];
@@ -99,68 +100,46 @@ type RevealRetailerOption = NonNullable<
   ProductRecommendationOption["retailerOptions"]
 >[number];
 
-function formatRevealEta(locale: Locale, etaDate: string | null | undefined) {
-  if (!etaDate) {
-    return null;
-  }
-
-  const date = new Date(`${etaDate}T00:00:00.000Z`);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  const formatted = new Intl.DateTimeFormat(localeHtmlLang(locale), {
-    dateStyle: "medium",
-    timeZone: "UTC",
-  }).format(date);
-
-  if (locale === "th") {
-    return `คาดว่า ${formatted}`;
-  }
-
-  if (locale === "zh-CN") {
-    return `预计 ${formatted}`;
-  }
-
-  return `ETA ${formatted}`;
-}
-
-function formatRevealBrandDate(
-  locale: Locale,
-  generatedAt: string,
-  fallback: string,
-) {
-  const date = new Date(generatedAt);
-
-  if (Number.isNaN(date.getTime())) {
-    return fallback;
-  }
-
-  if (locale === "en") {
-    return new Intl.DateTimeFormat("en-GB", {
-      day: "2-digit",
-      month: "short",
-      timeZone: "UTC",
-      year: "numeric",
-    })
-      .format(date)
-      .replace(/,/g, "")
-      .toUpperCase();
-  }
-
-  return new Intl.DateTimeFormat(localeHtmlLang(locale), {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-    year: "numeric",
-  }).format(date);
-}
-
 function optionSubtotal(option: RevealRetailerOption) {
   const subtotal = Number(option.subtotalAmount);
 
   return Number.isFinite(subtotal) ? subtotal : null;
+}
+
+function formatRevealAmountParts(
+  locale: Locale,
+  amount: number,
+  currency: string,
+) {
+  const formatter = new Intl.NumberFormat(localeHtmlLang(locale), {
+    currency,
+    maximumFractionDigits: 0,
+    style: "currency",
+  });
+  const parts = formatter.formatToParts(amount);
+  const currencyText =
+    parts.find((part) => part.type === "currency")?.value || currency;
+  const amountText = parts
+    .filter((part) => part.type !== "currency")
+    .map((part) => part.value)
+    .join("")
+    .trim();
+
+  return { amountText, currencyText };
+}
+
+function retailerDispatchNote(
+  finalCopy: typeof revealFinalCopy.en,
+  option: RevealRetailerOption | null | undefined,
+) {
+  const dispatchCity = organisationDispatchCity({
+    metadata: option?.dispatchCity ? { dispatchCity: option.dispatchCity } : {},
+    name: option?.organisationName ?? null,
+  });
+
+  return dispatchCity
+    ? formatTemplate(finalCopy.deliveryNoteTemplate, { dispatchCity })
+    : finalCopy.deliveryNote;
 }
 
 function optionEtaTime(option: RevealRetailerOption) {
@@ -205,10 +184,6 @@ function postRevealPanyaLineBpm(input: Readonly<{
     },
     method: "POST",
   }).catch(() => undefined);
-}
-
-function shortPlanId(planId: string) {
-  return planId.slice(0, 8).toUpperCase();
 }
 
 function safeKey(value: string) {
@@ -262,81 +237,6 @@ function renderRevealHeroHeadline(
   }
 
   return headline;
-}
-
-function RevealBrandBar({
-  finalCopy,
-  formattedDate,
-  locale,
-  planId,
-}: Readonly<{
-  finalCopy: typeof revealFinalCopy.en;
-  formattedDate: string;
-  locale: Locale;
-  planId: string;
-}>) {
-  return (
-    <header className="mn-reveal-brandbar sticky top-0 z-50 border-b border-[rgb(221_218_207_/_0.6)] bg-[var(--mn-cream)]/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-6 px-5 py-4 sm:px-8 lg:px-14">
-        <Link
-          aria-label={finalCopy.brandHomeLabel}
-          className="flex items-center gap-3"
-          href={`/${locale}`}
-        >
-          <span
-            aria-hidden={true}
-            className="mn-reveal-brandmark flex size-9 items-center justify-center rounded-lg bg-[var(--mn-teal-deep)]"
-          >
-            <svg
-              className="size-5"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <path
-                d="M12 3 C12 3 6 8 6 14 C6 17.3 8.7 20 12 20 C15.3 20 18 17.3 18 14 C18 8 12 3 12 3Z"
-                fill="#DCE9DE"
-                opacity=".9"
-              />
-              <path
-                d="M12 8 L12 20"
-                stroke="#1F6E58"
-                strokeLinecap="round"
-                strokeWidth="1.5"
-              />
-              <path
-                d="M12 13 C12 13 9 11 7 12"
-                stroke="#1F6E58"
-                strokeLinecap="round"
-                strokeWidth="1.2"
-              />
-              <path
-                d="M12 15.5 C12 15.5 15 13.5 17 14.5"
-                stroke="#1F6E58"
-                strokeLinecap="round"
-                strokeWidth="1.2"
-              />
-            </svg>
-          </span>
-          <span>
-            <span className="mn-reveal-brand-word block mn-reveal-font-display text-[22px] font-semibold leading-none">
-              <span className="text-[var(--mn-ink)]">Matta</span>
-              <span className="text-[var(--mn-teal)]">Nutra</span>
-            </span>
-            <span className="mn-reveal-brand-tagline mt-1 block text-[10px] uppercase text-[var(--mn-ash)]">
-              {finalCopy.brandTagline}
-            </span>
-          </span>
-        </Link>
-        <div className="hidden items-center mn-reveal-font-mono text-[11px] tracking-[0.04em] text-[var(--mn-ash)] sm:flex">
-          <span className="live-dot mr-2 inline-block size-1.5 rounded-full bg-[var(--mn-teal)]" />
-          <span>
-            {finalCopy.brandFormula.toUpperCase()} · {shortPlanId(planId)} ·{" "}
-            {formattedDate}
-          </span>
-        </div>
-      </div>
-    </header>
-  );
 }
 
 function assessmentGroups(result: FormulationResult, locale: Locale) {
@@ -443,7 +343,6 @@ function renderFormulaTitle({
 
 function renderProductsTitle({
   allCovered,
-  copy,
   coveredText,
   locale,
   pending,
@@ -452,7 +351,6 @@ function renderProductsTitle({
   title,
 }: Readonly<{
   allCovered: boolean;
-  copy: typeof revealCopy.en;
   coveredText: string;
   locale: Locale;
   pending: boolean;
@@ -474,6 +372,69 @@ function renderProductsTitle({
       <em>{emphasized}</em>
     </>
   );
+}
+
+function localizedOptionalIngredientText(
+  value: FormulationIngredient["whyThis"],
+  locale: Locale,
+) {
+  return value ? getLocalizedText(value, locale) : "";
+}
+
+function fallbackForYouCopy(
+  locale: Locale,
+  supplement: string,
+  benefitLabel: string,
+  result: FormulationResult,
+) {
+  const goals = result.assessmentSummary.goals
+    .map((goal) => localizedContextChip(goal, locale))
+    .filter(Boolean);
+  const primaryGoal = goals[0] ?? "";
+
+  if (locale === "th") {
+    if (primaryGoal && benefitLabel) {
+      return `${supplement} เชื่อมกับเป้าหมาย ${primaryGoal} และสัญญาณด้าน${benefitLabel}ที่พบจากคำตอบของคุณ`;
+    }
+
+    return `${supplement} ถูกเก็บไว้เพราะสอดคล้องกับเป้าหมายและบริบทที่คุณให้ไว้`;
+  }
+
+  if (locale === "zh-CN") {
+    if (primaryGoal && benefitLabel) {
+      return `${supplement} 对应你的${primaryGoal}目标，并结合问卷中出现的${benefitLabel}信号。`;
+    }
+
+    return `${supplement} 保留下来，是因为它符合你的目标和安全背景。`;
+  }
+
+  if (primaryGoal && benefitLabel) {
+    return `${supplement} maps to your ${primaryGoal} goal and the ${benefitLabel} signal in your assessment.`;
+  }
+
+  return `${supplement} stayed in because it fits the goals, routines, and safety context you shared.`;
+}
+
+function fallbackDecisionCopy(
+  locale: Locale,
+  dailyDose: string,
+  benefitLabel: string,
+) {
+  if (locale === "th") {
+    return benefitLabel
+      ? `${dailyDose} เพื่อสนับสนุนด้าน${benefitLabel}โดยไม่เพิ่มสิ่งที่ไม่จำเป็น`
+      : `${dailyDose} เป็นปริมาณใช้งานจริงที่คงไว้หลังการคัดกรอง`;
+  }
+
+  if (locale === "zh-CN") {
+    return benefitLabel
+      ? `${dailyDose}，用于支持${benefitLabel}，同时避免不必要的添加。`
+      : `${dailyDose} 是筛选后保留的实用每日剂量。`;
+  }
+
+  return benefitLabel
+    ? `${dailyDose} for ${benefitLabel}, without adding unnecessary extras.`
+    : `${dailyDose} is the practical daily dose kept after screening.`;
 }
 
 export function RevealFinalResultsPage({
@@ -513,7 +474,6 @@ export function RevealFinalResultsPage({
     revealSlotCopy(result, "heroSub", locale, copy.heroSub),
     { supplementSelectedText },
   );
-  const brandDate = formatRevealBrandDate(locale, result.generatedAt, formattedDate);
   const heroMeta = revealHeroMetaItems(result, locale);
   const firstName =
     typeof result.firstName === "string" && result.firstName.trim()
@@ -539,13 +499,6 @@ export function RevealFinalResultsPage({
   return (
     <section className="mn-reveal-final mn-reveal-font-body w-full">
       <LandingReveal />
-
-      <RevealBrandBar
-        finalCopy={finalCopy}
-        formattedDate={brandDate}
-        locale={locale}
-        planId={planId}
-      />
 
       <section
         aria-label={copy.heroTitle}
@@ -698,6 +651,7 @@ export function RevealFinalResultsPage({
         onProductStackPollingStart={onProductStackPollingStart}
         onProductStackRefresh={onProductStackRefresh}
         planId={planId}
+        productCoveragePending={productCoveragePending}
         productOptions={productOptions}
         productStackLoading={productStackLoading}
         products={products}
@@ -1033,6 +987,31 @@ function RevealFormulaFinalSection({
                   ? null
                   : productCoverageBySupplementId.get(ingredient.id) ?? 0;
                 const benefit = supplementBenefitTags(ingredient)[0];
+                const benefitLabel = benefit
+                  ? localizedBenefitTagLabel(benefit, locale)
+                  : "";
+                const legacyForYouCopy =
+                  localizedOptionalIngredientText(ingredient.forYou, locale) ||
+                  fallbackForYouCopy(
+                    locale,
+                    supplement,
+                    benefitLabel,
+                    result,
+                  );
+                const legacyWhyThisCopy =
+                  localizedOptionalIngredientText(ingredient.whyThis, locale) ||
+                  rationale;
+                const whyThisCopy =
+                  localizedOptionalIngredientText(
+                    ingredient.whyThisIsForYou,
+                    locale,
+                  ) ||
+                  (legacyWhyThisCopy === legacyForYouCopy
+                    ? legacyWhyThisCopy
+                    : `${legacyWhyThisCopy} ${legacyForYouCopy}`);
+                const decisionCopy =
+                  localizedOptionalIngredientText(ingredient.decision, locale) ||
+                  fallbackDecisionCopy(locale, dailyDose, benefitLabel);
                 const toggleId = `nutrient-${safeKey(ingredient.id)}-${rowNumber}`;
                 const safetyCopy =
                   ingredient.safety?.message
@@ -1053,7 +1032,7 @@ function RevealFormulaFinalSection({
                       type="checkbox"
                     />
                     <label
-                      className="nutrient-header mn-reveal-nutrient-header relative grid cursor-pointer select-none grid-cols-[32px_minmax(0,1fr)_32px] items-start gap-3.5 rounded py-5 transition-colors hover:bg-[var(--mn-cream)] md:grid-cols-[36px_minmax(160px,1.25fr)_minmax(260px,2.2fr)_minmax(96px,auto)_minmax(72px,auto)_32px] md:gap-5 md:pr-2"
+                      className="nutrient-header mn-reveal-nutrient-header relative grid cursor-pointer select-none grid-cols-[32px_minmax(0,1fr)_36px] items-center gap-3.5 rounded py-5 transition-colors hover:bg-[var(--mn-cream)] md:grid-cols-[36px_minmax(160px,1.25fr)_minmax(260px,2.2fr)_minmax(96px,auto)_minmax(72px,auto)_36px] md:gap-5 md:pr-2"
                       htmlFor={toggleId}
                     >
                       <span className="mn-reveal-font-display text-2xl italic text-[var(--mn-gold)]">
@@ -1071,7 +1050,7 @@ function RevealFormulaFinalSection({
                         {rationale}
                         {benefit ? (
                           <span className="mt-2 block w-max max-w-full rounded-full bg-[var(--mn-mint)] px-3 py-1 text-xs font-semibold text-[var(--mn-teal-deep)]">
-                            {localizedBenefitTagLabel(benefit, locale)}
+                            {benefitLabel}
                           </span>
                         ) : null}
                       </span>
@@ -1081,34 +1060,31 @@ function RevealFormulaFinalSection({
                       <span className="nutrient-coverage hidden whitespace-nowrap text-right mn-reveal-font-mono text-sm font-semibold text-[var(--mn-teal-deep)] md:block">
                         {coverage === null ? copy.productsPendingBadge : `${coverage}%`}
                       </span>
-                      <span className="expand-icon grid size-8 place-items-center rounded-full border border-[var(--mn-line)] bg-white text-lg leading-none text-[var(--mn-ash)] transition">
-                        +
-                      </span>
+                      <span aria-hidden={true} className="expand-icon" />
                     </label>
                     <div className="nutrient-body">
-                      <div className="grid gap-5 pb-6 pl-8 md:grid-cols-[1fr_1fr] md:pl-14">
-                        <div>
-                          <p className="mn-reveal-font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]">
+                      <div className="mn-reveal-nutrient-drawer grid gap-6 pb-7 pl-[46px] pr-2 pt-4 md:grid-cols-2 md:gap-10 md:pl-[56px]">
+                        <div className="mn-reveal-nutrient-detail">
+                          <h5 className="mn-reveal-nutrient-detail-label mn-reveal-font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
                             {finalCopy.nutrientWhy}
-                          </p>
-                          <p className="mt-2 text-sm leading-[1.65] text-[var(--mn-ink)]">
-                            {rationale}
+                          </h5>
+                          <p className="mt-2.5 text-sm leading-[1.65] text-[var(--mn-ink)]">
+                            {whyThisCopy}
                           </p>
                         </div>
-                        <div>
-                          <p className="mn-reveal-font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--mn-teal-deep)]">
+                        <div className="mn-reveal-nutrient-detail">
+                          <h5 className="mn-reveal-nutrient-detail-label mn-reveal-font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
                             {finalCopy.nutrientDecision}
+                          </h5>
+                          <p className="mt-2.5 text-sm leading-[1.65] text-[var(--mn-ink)]">
+                            {decisionCopy}
                           </p>
-                          <p className="mt-2 text-sm leading-[1.65] text-[var(--mn-ink-soft)]">
-                            {dailyDose}
-                            {benefit ? ` · ${localizedBenefitTagLabel(benefit, locale)}` : ""}
-                          </p>
-                          <div className="mt-4 rounded-lg bg-[var(--mn-reveal-caution-bg)] p-4 text-sm leading-[1.65] text-[var(--mn-reveal-caution-ink)] ring-1 ring-[var(--mn-reveal-caution-edge)]">
-                            <span className="block mn-reveal-font-mono text-[11px] uppercase tracking-[0.18em]">
-                              {finalCopy.nutrientSafety}
-                            </span>
-                            <span className="mt-1 block">{safetyCopy}</span>
-                          </div>
+                        </div>
+                        <div className="mn-reveal-nutrient-safety flex gap-3.5 rounded-r-md border-l-[3px] border-[var(--mn-gold)] bg-[var(--mn-cream)] px-[18px] py-3.5 text-[13px] leading-[1.6] text-[var(--mn-ink-soft)] md:col-span-2">
+                          <span className="shrink-0 whitespace-nowrap pt-0.5 mn-reveal-font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--mn-gold)]">
+                            {finalCopy.nutrientSafety}
+                          </span>
+                          <span>{safetyCopy}</span>
                         </div>
                       </div>
                     </div>
@@ -1141,6 +1117,7 @@ function RevealProductsFinalSection({
   onProductStackPollingStart,
   onProductStackRefresh,
   planId,
+  productCoveragePending,
   productOptions,
   productStackLoading,
   products,
@@ -1156,6 +1133,7 @@ function RevealProductsFinalSection({
   onProductStackPollingStart: (preference: ProductStackPreference) => void;
   onProductStackRefresh: () => Promise<boolean>;
   planId: string;
+  productCoveragePending: boolean;
   productOptions: ProductRecommendationOption[];
   productStackLoading: boolean;
   products: RecommendedProduct[];
@@ -1213,19 +1191,10 @@ function RevealProductsFinalSection({
     retailerOptions.find(
       (option) => option.organisationId === selectedRetailerOrganisationId,
     ) ?? retailerOptions[0] ?? null;
-  const selectedRetailerAmount =
-    selectedRetailerOption ? optionSubtotal(selectedRetailerOption) : null;
-  const selectedRetailerAmountText =
-    selectedRetailerOption && selectedRetailerAmount !== null
-      ? new Intl.NumberFormat(localeHtmlLang(locale), {
-          currency: selectedRetailerOption.currency || "THB",
-          maximumFractionDigits: 0,
-          style: "currency",
-        }).format(selectedRetailerAmount)
-      : null;
-  const selectedRetailerEtaText = selectedRetailerOption
-    ? formatRevealEta(locale, selectedRetailerOption.etaDate)
-    : null;
+  const selectedRetailerDispatchNote = retailerDispatchNote(
+    finalCopy,
+    selectedRetailerOption,
+  );
   const bestValueRetailerOrganisationId =
     [...retailerOptions]
       .filter((option) => optionSubtotal(option) !== null)
@@ -1244,9 +1213,6 @@ function RevealProductsFinalSection({
           (optionSubtotal(left) ?? Number.POSITIVE_INFINITY) -
             (optionSubtotal(right) ?? Number.POSITIVE_INFINITY),
       )[0]?.organisationId ?? null;
-  const alternateRetailerOptions = retailerOptions.filter(
-    (option) => option.organisationId !== selectedRetailerOrganisationId,
-  );
   const controlPreferences =
     productOptions.length > 0 || result.productRecommendations
       ? productStackPreferenceOrder
@@ -1348,7 +1314,8 @@ function RevealProductsFinalSection({
   }).format(selectedBasketSubtotal);
   const productMatchingPending =
     products.length < 1 &&
-    (productStackLoading ||
+    (productCoveragePending ||
+      productStackLoading ||
       result.productRecommendations?.status === "pending" ||
       productOptions.some((option) => option.productRecommendations.status === "pending"));
   const coveredProductNeedCount = Math.min(
@@ -1446,7 +1413,6 @@ function RevealProductsFinalSection({
           <h2 className="mn-reveal-final-heading mx-auto mt-4 max-w-[760px] text-[clamp(34px,4.2vw,54px)]">
             {renderProductsTitle({
               allCovered: coveredProductNeedCount >= supplementSelectedCount,
-              copy,
               coveredText: coveredProductNeedText,
               locale,
               pending: productMatchingPending,
@@ -1462,7 +1428,7 @@ function RevealProductsFinalSection({
           </p>
         </div>
 
-        <div className="mn-reveal-concierge-banner mx-auto my-9 grid max-w-[880px] grid-cols-[auto_minmax(0,1fr)] items-center gap-5 rounded-2xl bg-[var(--mn-teal-deep)] px-7 py-5 text-[var(--mn-cream)]" data-reveal>
+        <div className="mn-reveal-concierge-banner mx-auto my-10 grid max-w-[880px] grid-cols-[auto_minmax(0,1fr)] items-center gap-5 rounded-2xl bg-[var(--mn-teal-deep)] px-7 py-6 text-[var(--mn-cream)]" data-reveal>
           <div className="grid size-12 shrink-0 place-items-center rounded-full bg-white/10 text-[var(--mn-gold-soft)]">
             <Check aria-hidden={true} className="size-5" />
           </div>
@@ -1473,14 +1439,14 @@ function RevealProductsFinalSection({
             <p className="mt-1 text-[13px] leading-[1.6] text-[var(--mn-cream)]/82">
               {finalCopy.pharmacyBody}{" "}
               <strong className="font-semibold text-[var(--mn-cream)]">
-                {finalCopy.deliveryNote}
+                {selectedRetailerDispatchNote}
               </strong>
             </p>
           </div>
         </div>
 
         {controlPreferences.length > 1 ? (
-          <div className="basket-tabs-wrap my-9 flex items-center justify-center gap-3 text-center" data-reveal>
+          <div className="basket-tabs-wrap my-10 flex items-center justify-center gap-3 text-center" data-reveal>
             <div className="inline-flex rounded-full border border-[var(--mn-line)] bg-[var(--mn-paper)] p-1">
               {controlPreferences.map((preference) => {
                 const option = productOptionsById.get(preference);
@@ -1536,65 +1502,28 @@ function RevealProductsFinalSection({
           </div>
         ) : null}
 
-        {selectedRetailerOption ? (
-          <div className="mn-reveal-selected-pharmacy mx-auto mb-10 max-w-[460px] overflow-hidden rounded-xl border border-[var(--mn-line)] bg-[var(--mn-paper)]" data-reveal>
-            <div className="border-l-4 border-[var(--mn-teal)] px-7 py-6">
-              <p className="mn-reveal-font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--mn-teal-deep)]">
-                {finalCopy.selectedPharmacy}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {selectedRetailerOption.organisationId ===
-                bestValueRetailerOrganisationId ? (
-                  <span className="rounded-full bg-[var(--mn-reveal-caution-bg)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--mn-reveal-caution-ink)]">
-                    {finalCopy.bestValue}
-                  </span>
-                ) : null}
-                {selectedRetailerOption.organisationId ===
-                fastestRetailerOrganisationId ? (
-                  <span className="rounded-full bg-[var(--mn-gold-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--mn-ink)]">
-                    {finalCopy.fastest}
-                  </span>
-                ) : null}
-              </div>
-              <h3 className="mt-3 mn-reveal-font-display text-2xl font-medium italic leading-[1.2] text-[var(--mn-ink)]">
-                {selectedRetailerOption.organisationName}
-              </h3>
-              <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-[var(--mn-line)] pt-3">
-                <p className="mn-reveal-font-mono text-[11px] tracking-[0.04em] text-[var(--mn-ink-soft)]">
-                  {[selectedRetailerEtaText, finalCopy.deliveryNote]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-                {selectedRetailerAmountText ? (
-                  <p className="whitespace-nowrap mn-reveal-font-display text-lg font-medium italic text-[var(--mn-teal-deep)]">
-                    {selectedRetailerAmountText}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {alternateRetailerOptions.length > 0 ? (
-          <div className="mn-reveal-retailer-choices mx-auto mb-10 grid max-w-[760px] gap-3 md:grid-cols-2" data-reveal>
-            {alternateRetailerOptions.map((option) => {
+        {retailerOptions.length > 0 ? (
+          <div className="mn-reveal-retailer-choices mx-auto mb-11 flex max-w-[860px] flex-col justify-center gap-3.5 sm:flex-row sm:flex-wrap" data-reveal>
+            {retailerOptions.map((option) => {
+              const selected =
+                option.organisationId === selectedRetailerOrganisationId;
               const isBestValue =
                 option.organisationId === bestValueRetailerOrganisationId;
               const isFastest =
                 option.organisationId === fastestRetailerOrganisationId;
               const subtotal = optionSubtotal(option);
-              const amountText = subtotal !== null
-                ? new Intl.NumberFormat(localeHtmlLang(locale), {
-                    currency: option.currency || "THB",
-                    maximumFractionDigits: 0,
-                    style: "currency",
-                  }).format(subtotal)
+              const amountParts = subtotal !== null
+                ? formatRevealAmountParts(locale, subtotal, option.currency || "THB")
                 : null;
-              const etaText = formatRevealEta(locale, option.etaDate);
-
+              const dispatchNote = retailerDispatchNote(finalCopy, option);
               return (
                 <button
-                  className="mn-reveal-pharmacy-card rounded-xl bg-[var(--mn-paper)] p-4 text-left text-[var(--mn-ink)] ring-1 ring-[var(--mn-line)] transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mn-teal-light)]"
+                  aria-pressed={selected}
+                  className={`mn-reveal-pharmacy-card ${
+                    selected
+                      ? "mn-reveal-selected-pharmacy"
+                      : "mn-reveal-alternate-pharmacy"
+                  } w-full overflow-hidden rounded-xl border border-[var(--mn-line)] bg-[var(--mn-paper)] text-left text-[var(--mn-ink)] shadow-[var(--mn-shadow-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mn-teal-light)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--mn-cream)] sm:w-[360px]`}
                   key={option.organisationId ?? option.organisationName}
                   onClick={() => {
                     setRetailerSelection({
@@ -1604,31 +1533,54 @@ function RevealProductsFinalSection({
                   }}
                   type="button"
                 >
-                  <p className="mn-reveal-font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
-                    {finalCopy.alternatePharmacy}
-                  </p>
-                  <p className="mt-2 mn-reveal-font-display text-lg font-medium leading-tight">
-                    {option.organisationName}
-                  </p>
-                  {amountText || etaText ? (
-                    <p className="mt-2 text-xs leading-5 text-[var(--mn-ink-soft)]">
-                      {[amountText, etaText].filter(Boolean).join(" · ")}
-                    </p>
-                  ) : null}
-                  {isBestValue || isFastest ? (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {isBestValue ? (
-                        <span className="rounded-full bg-[var(--mn-reveal-caution-bg)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--mn-reveal-caution-ink)]">
-                          {finalCopy.bestValue}
-                        </span>
-                      ) : null}
-                      {isFastest ? (
-                        <span className="rounded-full bg-[var(--mn-gold-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--mn-ink)]">
-                          {finalCopy.fastest}
-                        </span>
+                  <div
+                    className={`px-6 py-6 ${
+                      selected
+                        ? "border-l-4 border-[var(--mn-teal-deep)]"
+                        : "border-l-4 border-transparent"
+                    }`}
+                  >
+                    <div className="mb-3.5 flex items-start justify-between gap-3">
+                      <p className="mn-reveal-font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--mn-teal)]">
+                        {selected
+                          ? finalCopy.selectedPharmacy
+                          : finalCopy.alternatePharmacy}
+                      </p>
+
+                      {isBestValue || isFastest ? (
+                        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                          {isBestValue ? (
+                            <span className="rounded-full bg-[var(--mn-reveal-caution-bg)] px-2.5 py-1 mn-reveal-font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--mn-reveal-caution-ink)]">
+                              {finalCopy.bestValue}
+                            </span>
+                          ) : null}
+                          {isFastest ? (
+                            <span className="rounded-full bg-[var(--mn-gold-soft)] px-2.5 py-1 mn-reveal-font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--mn-ink)]">
+                              {finalCopy.fastest}
+                            </span>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
-                  ) : null}
+
+                    <h3 className="mb-2 mn-reveal-font-display text-2xl font-medium italic leading-[1.2] text-[var(--mn-ink)]">
+                      {option.organisationName}
+                    </h3>
+
+                    <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-[var(--mn-line)] pt-3.5">
+                      <p className="mn-reveal-font-mono text-[11px] leading-5 tracking-[0.04em] text-[var(--mn-ink-soft)]">
+                        {dispatchNote}
+                      </p>
+                      {amountParts ? (
+                        <p className="shrink-0 whitespace-nowrap mn-reveal-font-display text-lg font-medium italic leading-none text-[var(--mn-teal-deep)]">
+                          <span className="mr-0.5 mn-reveal-font-mono text-[10px] not-italic tracking-[0.08em] text-[var(--mn-teal)]">
+                            {amountParts.currencyText}
+                          </span>
+                          {amountParts.amountText}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
                 </button>
               );
             })}
@@ -1636,7 +1588,7 @@ function RevealProductsFinalSection({
         ) : null}
 
         {productMatchingPending ? (
-          <div className="products-grid grid gap-5 sm:grid-cols-2 xl:grid-cols-3" data-reveal>
+          <div className="products-grid grid gap-6 sm:grid-cols-2 xl:grid-cols-3" data-reveal>
             {revealProductPendingCards[locale].map((card) => (
               <article
                 className="product-card rounded-xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6"
@@ -1659,14 +1611,14 @@ function RevealProductsFinalSection({
             {copy.productsEmpty}
           </div>
         ) : (
-          <div className="products-grid grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(220px,1fr))]" data-reveal>
+          <div className="products-grid grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(220px,1fr))]" data-reveal>
             {products.map((product, index) => {
               const productId = product.productId ?? product.id;
               const selected = selectedBasketIds.has(productId);
 
               return (
                 <article
-                  className={`product-card relative flex min-h-full flex-col rounded-xl border p-5 pb-5 transition ${
+                  className={`product-card relative flex min-h-full flex-col rounded-xl border px-5 py-6 transition ${
                     selected
                       ? "border-[var(--mn-line)] bg-[var(--mn-paper)] shadow-[var(--mn-shadow-soft)] hover:-translate-y-1 hover:shadow-[var(--mn-shadow-card)]"
                       : "border-[var(--mn-line)] bg-[var(--mn-paper)] opacity-70"
@@ -1679,7 +1631,7 @@ function RevealProductsFinalSection({
                   <span className="absolute right-5 top-4 z-10 rounded-full bg-[var(--mn-mint-deep)] px-2.5 py-1 text-[10px] font-semibold tracking-[0.04em] text-[var(--mn-teal-deep)]">
                     {selected ? copy.productVerified : finalCopy.productRemoved}
                   </span>
-                  <div className="my-10 mb-4 flex h-[130px] w-[110px] self-center">
+                  <div className="mt-11 mb-5 flex h-[130px] w-[110px] self-center">
                     {product.imageUrl ? (
                       <Image
                         alt={product.name}
@@ -1703,7 +1655,7 @@ function RevealProductsFinalSection({
                     <h3 className="mt-2 min-h-[60px] mn-reveal-font-display text-base font-medium leading-[1.25] text-[var(--mn-ink)]">
                       {product.name}
                     </h3>
-                    <div className="mt-4 flex flex-wrap gap-1.5">
+                    <div className="mt-5 flex flex-wrap gap-1.5">
                       {product.covers.slice(0, 4).map((cover) => (
                         <span
                           className="rounded-full bg-[var(--mn-mint)] px-2.5 py-1 text-xs font-semibold text-[var(--mn-teal-deep)]"
@@ -1717,7 +1669,7 @@ function RevealProductsFinalSection({
                         </span>
                       ))}
                     </div>
-                    <p className="mt-4 flex-1 text-xs leading-[1.55] text-[var(--mn-ink-soft)]">
+                    <p className="mt-5 flex-1 text-xs leading-[1.55] text-[var(--mn-ink-soft)]">
                       {localizedProductDescription({
                         copy,
                         locale,
@@ -1726,7 +1678,7 @@ function RevealProductsFinalSection({
                       })}
                     </p>
                     <button
-                      className="product-remove-btn mt-5 w-fit rounded-full border border-[var(--mn-line)] bg-transparent px-3.5 py-1.5 mn-reveal-font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--mn-ink-soft)] transition hover:border-[var(--mn-reveal-caution-edge)] hover:bg-[var(--mn-reveal-caution-bg)] hover:text-[var(--mn-reveal-caution-ink)]"
+                      className="product-remove-btn mt-6 w-fit rounded-full border border-[var(--mn-line)] bg-transparent px-3.5 py-1.5 mn-reveal-font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--mn-ink-soft)] transition hover:border-[var(--mn-reveal-caution-edge)] hover:bg-[var(--mn-reveal-caution-bg)] hover:text-[var(--mn-reveal-caution-ink)]"
                       onClick={() => {
                         updateSelectedBasketIds((current) => {
                           const next = new Set(current);
@@ -1749,8 +1701,8 @@ function RevealProductsFinalSection({
           </div>
         )}
 
-        <div className="summary-card mt-8 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] px-8 py-7 text-[var(--mn-ink)]" data-reveal>
-          <div className="mb-6 h-1.5 overflow-hidden rounded-full bg-[var(--mn-line)]/40">
+        <div className="summary-card mt-9 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] px-8 py-8 text-[var(--mn-ink)]" data-reveal>
+          <div className="mb-7 h-1.5 overflow-hidden rounded-full bg-[var(--mn-line)]/40">
             <div
               className="h-full rounded-full bg-linear-to-r from-[var(--mn-teal)] to-[var(--mn-teal-deep)] transition-[width] duration-1000"
               style={{
@@ -1758,7 +1710,7 @@ function RevealProductsFinalSection({
               }}
             />
           </div>
-          <div className="grid gap-5 md:grid-cols-[1.4fr_repeat(3,1fr)] md:items-center">
+          <div className="grid gap-6 md:grid-cols-[1.4fr_repeat(3,1fr)] md:items-center">
             <div>
               <h3 className="mn-reveal-font-display text-[22px] font-medium leading-[1.25]">
                 {productMatchingPending
@@ -1806,7 +1758,7 @@ function RevealProductsFinalSection({
           </div>
         </div>
 
-        <div className="checkout-card mt-6 grid gap-6 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] px-8 py-6 md:grid-cols-[1fr_auto] md:items-center" data-reveal>
+        <div className="checkout-card mt-7 grid gap-7 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] px-8 py-7 md:grid-cols-[1fr_auto] md:items-center" data-reveal>
           <div>
             <div className="mn-reveal-font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--mn-ash)]">
               {finalCopy.subtotal}
@@ -1815,7 +1767,7 @@ function RevealProductsFinalSection({
               {basketAmountText}
             </div>
             <p className="mt-1 text-xs leading-5 text-[var(--mn-ink-soft)]">
-              {finalCopy.deliveryNote}
+              {selectedRetailerDispatchNote}
             </p>
           </div>
           {selectedBasketIdList.length > 0 ? (

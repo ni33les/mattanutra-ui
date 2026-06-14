@@ -91,6 +91,12 @@ const agentRoleLabels = {
 
 const agentTypes = ["system", "ai", "deterministic", "external", "human"] as const;
 
+const organisationDispatchCityLabels = {
+  en: "Dispatch city",
+  th: "เมืองจัดส่ง",
+  "zh-CN": "发货城市"
+} satisfies Record<Locale, string>;
+
 function Panel({
   action,
   children,
@@ -516,6 +522,7 @@ export function AdminAccessView({
       countryCode: String(form.get("countryCode") ?? "TH"),
       currency: String(form.get("currency") ?? "THB"),
       defaultLocale: String(form.get("defaultLocale") ?? "en"),
+      dispatchCity: String(form.get("dispatchCity") ?? ""),
       name: String(form.get("name") ?? ""),
       slug: String(form.get("slug") ?? "")
     });
@@ -536,6 +543,7 @@ export function AdminAccessView({
       countryCode: String(form.get("countryCode") ?? "TH"),
       currency: String(form.get("currency") ?? ""),
       defaultLocale: String(form.get("defaultLocale") ?? "en"),
+      dispatchCity: String(form.get("dispatchCity") ?? ""),
       name: String(form.get("name") ?? ""),
       organisationId: String(form.get("organisationId") ?? ""),
       slug: String(form.get("slug") ?? ""),
@@ -734,7 +742,7 @@ export function AdminAccessView({
           <div className="divide-y divide-gray-100">
             {accessData.organisations.map((organisation) => (
               <form
-                className="grid gap-3 py-4 lg:grid-cols-[1.2fr_1fr_0.8fr_0.7fr_0.7fr_0.8fr_auto]"
+                className="grid gap-3 py-4 lg:grid-cols-[1.2fr_1fr_0.8fr_0.7fr_0.8fr_0.7fr_0.8fr_auto]"
                 key={organisation.id}
                 onSubmit={saveOrganisation}
               >
@@ -788,6 +796,16 @@ export function AdminAccessView({
                       </option>
                     ))}
                   </select>
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                  {organisationDispatchCityLabels[locale]}
+                  <input
+                    className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                    defaultValue={organisation.dispatchCity ?? ""}
+                    disabled={!canManageOrganisations || busy}
+                    name="dispatchCity"
+                    placeholder="Chiang Mai"
+                  />
                 </label>
                 <label className="grid gap-1 text-xs font-semibold text-gray-500">
                   {labels.settings.currency}
@@ -878,6 +896,32 @@ export function AdminAccessView({
                 ))}
               </select>
             </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                {labels.access.country}
+                <select
+                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                  defaultValue="TH"
+                  disabled={busy}
+                  name="countryCode"
+                >
+                  {productCountryOptions.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {productCountryLabel(country.code)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-semibold text-gray-500">
+                {organisationDispatchCityLabels[locale]}
+                <input
+                  className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
+                  disabled={busy}
+                  name="dispatchCity"
+                  placeholder="Chiang Mai"
+                />
+              </label>
+            </div>
             <label className="grid gap-1 text-xs font-semibold text-gray-500">
               {labels.settings.currency}
               <select
@@ -889,21 +933,6 @@ export function AdminAccessView({
                 {supportedOrganisationCurrencies.map((currency) => (
                   <option key={currency} value={currency}>
                     {currency}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1 text-xs font-semibold text-gray-500">
-              {labels.access.country}
-              <select
-                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300"
-                defaultValue="TH"
-                disabled={busy}
-                name="countryCode"
-              >
-                {productCountryOptions.map((country) => (
-                  <option key={country.code} value={country.code}>
-                    {productCountryLabel(country.code)}
                   </option>
                 ))}
               </select>

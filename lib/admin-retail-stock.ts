@@ -84,6 +84,7 @@ export type RetailOrderWorkflowStage =
   | "deliver"
   | "delivered"
   | "pack"
+  | "pickup_booked"
   | "pick"
   | "returned"
   | "ship"
@@ -337,6 +338,7 @@ export type AdminRetailCustomerOrderActionState = Readonly<{
 
 export type AdminRetailCustomerOrderActionStates = Readonly<{
   allocateAvailable: AdminRetailCustomerOrderActionState;
+  bookPickup: AdminRetailCustomerOrderActionState;
   deliver: AdminRetailCustomerOrderActionState;
   pack: AdminRetailCustomerOrderActionState;
   pick: AdminRetailCustomerOrderActionState;
@@ -1014,6 +1016,48 @@ function shipmentFromMetadata(
   return Object.values(parsed).some(Boolean) ? parsed : null;
 }
 
+function mergeCustomerOrderShipment(
+  metadataShipment: AdminRetailCustomerOrderShipment | null,
+  latestShipment: AdminRetailCustomerOrderShipment | null
+): AdminRetailCustomerOrderShipment | null {
+  if (!metadataShipment) {
+    return latestShipment;
+  }
+
+  if (!latestShipment) {
+    return metadataShipment;
+  }
+
+  return {
+    carrierId: latestShipment.carrierId ?? metadataShipment.carrierId,
+    carrierName: latestShipment.carrierName ?? metadataShipment.carrierName,
+    exceptionCode: latestShipment.exceptionCode ?? metadataShipment.exceptionCode,
+    exceptionMessage:
+      latestShipment.exceptionMessage ?? metadataShipment.exceptionMessage,
+    labelContentBase64:
+      metadataShipment.labelContentBase64 ?? latestShipment.labelContentBase64,
+    labelContentType:
+      latestShipment.labelContentType ?? metadataShipment.labelContentType,
+    labelStatus: latestShipment.labelStatus ?? metadataShipment.labelStatus,
+    labelUrl: latestShipment.labelUrl ?? metadataShipment.labelUrl,
+    pickupBookedAt:
+      latestShipment.pickupBookedAt ?? metadataShipment.pickupBookedAt,
+    pickupProviderStatus:
+      latestShipment.pickupProviderStatus ?? metadataShipment.pickupProviderStatus,
+    pickupWindowEnd:
+      latestShipment.pickupWindowEnd ?? metadataShipment.pickupWindowEnd,
+    pickupWindowStart:
+      latestShipment.pickupWindowStart ?? metadataShipment.pickupWindowStart,
+    shippedAt: latestShipment.shippedAt ?? metadataShipment.shippedAt,
+    shippedByPersonId:
+      metadataShipment.shippedByPersonId ?? latestShipment.shippedByPersonId,
+    shipmentNotes: latestShipment.shipmentNotes ?? metadataShipment.shipmentNotes,
+    status: latestShipment.status ?? metadataShipment.status,
+    trackingNumber: latestShipment.trackingNumber ?? metadataShipment.trackingNumber,
+    trackingUrl: latestShipment.trackingUrl ?? metadataShipment.trackingUrl
+  };
+}
+
 function lineAvailabilityFromMetadata(value: unknown): Pick<
   AdminRetailCustomerOrderLine,
   | "availabilityStatus"
@@ -1074,8 +1118,12 @@ function workflowStageForStatus(
     return "deliver";
   }
 
-  if (status === "packed" || status === "picking" || status === "allocated") {
+  if (status === "packed") {
     return "ship";
+  }
+
+  if (status === "picking" || status === "allocated") {
+    return "pack";
   }
 
   if (status === "awaiting_stock") {
@@ -1089,6 +1137,59 @@ function workflowStageForStatus(
   return "terminal";
 }
 
+function customerOrderPickupInProgress(
+  status: RetailCustomerOrderStatus,
+  shipment: AdminRetailCustomerOrderShipment | null
+) {
+  if (
+    !shipment ||
+    status === "shipped" ||
+    status === "delivered" ||
+    status === "cancelled" ||
+    status === "returned"
+  ) {
+    return false;
+  }
+
+  const providerStatus = shipment.pickupProviderStatus?.trim().toLowerCase();
+
+  return Boolean(
+    shipment.pickupBookedAt ||
+      shipment.status === "pickup_booked" ||
+      providerStatus === "booked" ||
+      providerStatus === "queued" ||
+      providerStatus === "requested"
+  );
+}
+
+async function customerOrderPickupInProgressFromShipmentTable(
+  sql: StockDb,
+  orderId: string
+) {
+  const ready = (await sql<Array<{ ready: boolean }>>`
+    select to_regclass('public.retail_order_shipments') is not null as ready
+  `)[0]?.ready === true;
+
+  if (!ready) {
+    return false;
+  }
+
+  const rows = await sql<Array<{ in_progress: boolean }>>`
+    select exists (
+      select 1
+      from public.retail_order_shipments
+      where retail_customer_order_id = ${orderId}::uuid
+        and (
+          pickup_booked_at is not null
+          or status = 'pickup_booked'
+          or lower(coalesce(pickup_provider_status, '')) in ('booked', 'queued', 'requested')
+        )
+    ) as in_progress
+  `;
+
+  return rows[0]?.in_progress === true;
+}
+
 function expectedTaskTypeForStage(stage: RetailOrderWorkflowStage) {
   if (stage === "allocate") {
     return "retail_customer_order_allocate";
@@ -1096,6 +1197,18 @@ function expectedTaskTypeForStage(stage: RetailOrderWorkflowStage) {
 
   if (stage === "awaiting_stock") {
     return "retail_shopping_list_review";
+  }
+
+  if (stage === "pick") {
+    return "retail_order_pick";
+  }
+
+  if (stage === "pack") {
+    return "retail_order_pack";
+  }
+
+  if (stage === "pickup_booked") {
+    return "retail_order_ship";
   }
 
   if (stage === "ship") {
@@ -1237,6 +1350,18 @@ function workflowActionForStage(stage: RetailOrderWorkflowStage) {
     return "resolve_stock";
   }
 
+  if (stage === "pick") {
+    return "mark_picking";
+  }
+
+  if (stage === "pack") {
+    return "mark_packed";
+  }
+
+  if (stage === "pickup_booked") {
+    return "mark_shipped";
+  }
+
   if (stage === "ship") {
     return "mark_shipped";
   }
@@ -1342,7 +1467,8 @@ function retailOrderWorkflowTaskDetails(taskType: string) {
 
 export function getRetailCustomerOrderActionStates(
   status: RetailCustomerOrderStatus,
-  pipeline: AdminRetailStockPipelineRow | null
+  pipeline: AdminRetailStockPipelineRow | null,
+  shipment: AdminRetailCustomerOrderShipment | null = null
 ): AdminRetailCustomerOrderActionStates {
   const canConsiderAllocation = status === "placed" || status === "awaiting_stock";
   const allocationRemaining = pipeline
@@ -1363,7 +1489,7 @@ export function getRetailCustomerOrderActionStates(
         : !allocationRemaining
         ? "No unallocated order quantity remains."
         : "No live stock is available to allocate.";
-  const canConsiderShipping =
+  const canConsiderFulfillment =
     status === "allocated" || status === "picking" || status === "packed";
   const allocationsBacked = Boolean(
     pipeline &&
@@ -1371,24 +1497,55 @@ export function getRetailCustomerOrderActionStates(
       pipeline.backedAllocatedUnits >= pipeline.customerDemandUnits &&
       pipeline.unorderedNeedUnits < 1
   );
-  const shipEnabled = canConsiderShipping && allocationsBacked;
+  const pickupInProgress = customerOrderPickupInProgress(status, shipment);
+  const packEnabled =
+    allocationsBacked &&
+    (status === "allocated" || status === "picking") &&
+    !pickupInProgress;
+  const bookPickupEnabled =
+    allocationsBacked && status === "packed" && !pickupInProgress;
+  const shipEnabled =
+    allocationsBacked &&
+    pickupInProgress &&
+    (status === "allocated" || status === "picking" || status === "packed");
+  const fulfillmentBlockedReason = !canConsiderFulfillment
+    ? "Order must be allocated first."
+    : !pipeline
+      ? "Pipeline unavailable. Recheck workflow."
+      : "Allocated stock is no longer available. Recheck workflow.";
 
   return {
     allocateAvailable: {
       enabled: allocationEnabled,
       reason: allocationReason
     },
+    bookPickup: {
+      enabled: bookPickupEnabled,
+      reason: bookPickupEnabled
+        ? null
+        : !allocationsBacked
+          ? fulfillmentBlockedReason
+          : status !== "packed"
+            ? "Order must be packed before pickup can be booked."
+            : "Pickup is already requested or booked."
+    },
     deliver: {
       enabled: status === "shipped",
       reason: status === "shipped" ? null : "Order must be shipped first."
     },
     pack: {
-      enabled: false,
-      reason: "Pick and pack are handled before shipping."
+      enabled: packEnabled,
+      reason: packEnabled
+        ? null
+        : !allocationsBacked
+          ? fulfillmentBlockedReason
+          : status === "packed" || pickupInProgress
+            ? "Order is already packed."
+            : "Order is not ready to pack."
     },
     pick: {
       enabled: false,
-      reason: "Pick and pack are handled before shipping."
+      reason: "Picking is handled inside the packing workflow."
     },
     recheckWorkflow: {
       enabled: true,
@@ -1399,11 +1556,11 @@ export function getRetailCustomerOrderActionStates(
       reason:
         shipEnabled
           ? null
-          : !canConsiderShipping
-            ? "Order must be allocated first."
-            : !pipeline
-              ? "Pipeline unavailable. Recheck workflow."
-              : "Allocated stock is no longer available. Recheck workflow."
+          : !allocationsBacked
+            ? fulfillmentBlockedReason
+            : !pickupInProgress
+              ? "Book pickup before marking the order shipped."
+              : "Order is not ready to ship."
     }
   };
 }
@@ -3141,6 +3298,11 @@ export async function getAdminRetailStockData(
   const operationsTablesAvailable = organisationIds.length > 0
     ? await retailOperationsTablesAvailable(sql)
     : false;
+  const shipmentTablesReady = organisationIds.length > 0
+    ? (await sql<Array<{ ready: boolean }>>`
+        select to_regclass('public.retail_order_shipments') is not null as ready
+      `)[0]?.ready === true
+    : false;
   const carrierTablesReady = organisationIds.length > 0
     ? (await sql<Array<{ ready: boolean }>>`
         select to_regclass('public.retail_carrier_accounts') is not null as ready
@@ -3177,7 +3339,8 @@ export async function getAdminRetailStockData(
   const [
     taskRows,
     customerOrderRows,
-    customerOrderLineRows
+    customerOrderLineRows,
+    customerOrderShipmentRows
   ] = operationsTablesAvailable
     ? await Promise.all([
         sql<Array<{
@@ -3355,9 +3518,54 @@ export async function getAdminRetailStockData(
           where retail_customer_order_lines.organisation_id = any(${organisationIds}::uuid[])
           order by retail_customer_order_lines.created_at desc
           limit 500
-        `
+        `,
+        shipmentTablesReady
+          ? sql<Array<{
+              carrier_id: string | null;
+              carrier_name: string | null;
+              customer_order_id: string;
+              exception_code: string | null;
+              exception_message: string | null;
+              label_metadata: unknown;
+              label_status: string | null;
+              label_url: string | null;
+              metadata: unknown;
+              pickup_booked_at: Date | string | null;
+              pickup_provider_status: string | null;
+              pickup_window_end: Date | string | null;
+              pickup_window_start: Date | string | null;
+              status: string | null;
+              tracking_number: string | null;
+              tracking_url: string | null;
+            }>>`
+              select distinct on (retail_order_shipments.retail_customer_order_id)
+                retail_order_shipments.retail_customer_order_id::text as customer_order_id,
+                retail_order_shipments.carrier_id,
+                retail_order_shipments.carrier_name,
+                retail_order_shipments.exception_code,
+                retail_order_shipments.exception_message,
+                retail_order_shipments.label_metadata,
+                retail_order_shipments.label_status,
+                retail_order_shipments.label_url,
+                retail_order_shipments.metadata,
+                retail_order_shipments.pickup_booked_at,
+                retail_order_shipments.pickup_provider_status,
+                retail_order_shipments.pickup_window_end,
+                retail_order_shipments.pickup_window_start,
+                retail_order_shipments.status,
+                retail_order_shipments.tracking_number,
+                retail_order_shipments.tracking_url
+              from public.retail_order_shipments
+              join public.retail_customer_orders
+                on retail_customer_orders.id = retail_order_shipments.retail_customer_order_id
+              where retail_customer_orders.organisation_id = any(${organisationIds}::uuid[])
+              order by
+                retail_order_shipments.retail_customer_order_id,
+                retail_order_shipments.updated_at desc
+            `
+          : Promise.resolve([])
       ])
-    : [[], [], []];
+    : [[], [], [], []];
   if (organisationIds.length > 0) {
     await ensureRetailShoppingListTablesAvailable(sql);
   }
@@ -3481,6 +3689,38 @@ export async function getAdminRetailStockData(
         orderId as string,
         aggregatePipelineRows(pipelineRows, orderId as string)
       ])
+  );
+  const shipmentByOrderId = new Map<string, AdminRetailCustomerOrderShipment>(
+    customerOrderShipmentRows.map((row) => {
+      const labelMetadata = objectRecord(row.label_metadata);
+      const metadata = objectRecord(row.metadata);
+
+      return [
+        row.customer_order_id,
+        {
+          carrierId: row.carrier_id,
+          carrierName: row.carrier_name,
+          exceptionCode: row.exception_code,
+          exceptionMessage: row.exception_message,
+          labelContentBase64: stringMetadata(labelMetadata.contentBase64),
+          labelContentType: stringMetadata(labelMetadata.contentType),
+          labelStatus: row.label_status,
+          labelUrl: row.label_url,
+          pickupBookedAt: isoDateTimeOrNull(row.pickup_booked_at),
+          pickupProviderStatus: row.pickup_provider_status,
+          pickupWindowEnd: isoDateTimeOrNull(row.pickup_window_end),
+          pickupWindowStart: isoDateTimeOrNull(row.pickup_window_start),
+          shippedAt: null,
+          shippedByPersonId: null,
+          shipmentNotes:
+            stringMetadata(metadata.shipmentNotes) ??
+            stringMetadata(metadata.requestedShipmentNotes),
+          status: row.status,
+          trackingNumber: row.tracking_number,
+          trackingUrl: row.tracking_url
+        }
+      ];
+    })
   );
   const [adminAuditRows, taskEventRows] = organisationIds.length > 0
     ? await Promise.all([
@@ -3694,17 +3934,29 @@ export async function getAdminRetailStockData(
     customerOrders: customerOrderRows.map((row) => {
       const status = customerOrderStatus(row.status);
       const pipeline = pipelineByOrderId.get(row.id) ?? null;
+      const shipment = mergeCustomerOrderShipment(
+        shipmentFromMetadata(row.metadata),
+        shipmentByOrderId.get(row.id) ?? null
+      );
       const workflowStage =
-        (status === "allocated" || status === "picking" || status === "packed") &&
-        pipeline &&
-        !orderPipelineFullyBacked(pipeline)
+        customerOrderPickupInProgress(status, shipment)
+          ? "pickup_booked"
+          : (status === "allocated" ||
+              status === "picking" ||
+              status === "packed") &&
+            pipeline &&
+            !orderPipelineFullyBacked(pipeline)
           ? "awaiting_stock"
           : workflowStageForStatus(status);
       const relatedTasks = tasksByCustomerOrderId.get(row.id) ?? [];
       const openTasks = relatedTasks.filter(
         (task) => !isTerminalTaskStatus(task.status)
       );
-      const actionStates = getRetailCustomerOrderActionStates(status, pipeline);
+      const actionStates = getRetailCustomerOrderActionStates(
+        status,
+        pipeline,
+        shipment
+      );
       const workflowHealth = getRetailCustomerOrderWorkflowHealth({
         openTasks,
         pipeline,
@@ -3726,7 +3978,6 @@ export async function getAdminRetailStockData(
       const deliveredAt = isoDateTimeOrNull(row.delivered_at);
       const placedAt = isoDateTimeOrNull(row.placed_at);
       const shippedAt = isoDateTimeOrNull(row.shipped_at);
-      const shipment = shipmentFromMetadata(row.metadata);
       const updatedAt = isoDateTime(row.updated_at);
 
       return {
@@ -3769,7 +4020,9 @@ export async function getAdminRetailStockData(
           deliveredAt,
           events: relatedAuditEvents,
           placedAt,
-          pickupBookedAt: shipment?.pickupBookedAt ?? null,
+          pickupBookedAt:
+            shipment?.pickupBookedAt ??
+            (customerOrderPickupInProgress(status, shipment) ? updatedAt : null),
           shippedAt,
           status,
           updatedAt
@@ -6902,16 +7155,16 @@ export async function allocateRetailCustomerOrder(
 
     await queueRetailOperationTask({
       commandId: "advance_customer_order",
-      description: "Pack the allocated order and mark it shipped when handed over.",
+      description: "Pack the allocated order before booking courier pickup.",
       dueAt: order.due_at,
-      idempotencyKey: `${order.id}:ship`,
+      idempotencyKey: `${order.id}:pack`,
       organisationId: order.organisation_id,
-      priorityReason: "Order has allocated stock and is ready to ship.",
+      priorityReason: "Order has allocated stock and is ready to pack.",
       priorityScore: 720,
       sourceEntityId: order.id,
       sourceEntityType: "retail_customer_order",
-      taskType: "retail_order_ship",
-      title: "Ship customer order"
+      taskType: "retail_order_pack",
+      title: "Pack customer order"
     });
   }
 
@@ -6948,11 +7201,12 @@ export async function advanceRetailCustomerOrder(
   const orderRows = await sql<Array<{
     due_at: Date | string | null;
     id: string;
+    metadata: unknown;
     organisation_id: string;
     order_number: string;
     status: string;
   }>>`
-    select id::text, organisation_id::text, order_number, status, due_at
+    select id::text, organisation_id::text, order_number, status, due_at, metadata
     from public.retail_customer_orders
     where id = ${input.customerOrderId.trim()}::uuid
       and (
@@ -6971,15 +7225,31 @@ export async function advanceRetailCustomerOrder(
   const nextStatus = transition.nextStatus as RetailCustomerOrderStatus;
   const requiredTaskTypes = [...transition.requiredTaskTypes];
   const actionTaskType = workflowTaskTypeForAction(input.action);
+  const existingShipmentMetadata = objectRecord(
+    objectRecord(order.metadata).shipment
+  );
   const shipmentMetadata =
     input.action === "mark_shipped"
       ? {
-          carrierName: input.carrierName?.trim() || null,
+          ...existingShipmentMetadata,
+          carrierName:
+            input.carrierName?.trim() ||
+            stringMetadata(existingShipmentMetadata.carrierName) ||
+            null,
           shippedAt: new Date().toISOString(),
           shippedByPersonId: context.actorPerson.id,
-          shipmentNotes: input.shipmentNotes?.trim() || null,
-          trackingNumber: input.trackingNumber?.trim() || null,
-          trackingUrl: input.trackingUrl?.trim() || null
+          shipmentNotes:
+            input.shipmentNotes?.trim() ||
+            stringMetadata(existingShipmentMetadata.shipmentNotes) ||
+            null,
+          trackingNumber:
+            input.trackingNumber?.trim() ||
+            stringMetadata(existingShipmentMetadata.trackingNumber) ||
+            null,
+          trackingUrl:
+            input.trackingUrl?.trim() ||
+            stringMetadata(existingShipmentMetadata.trackingUrl) ||
+            null
         }
       : null;
 
@@ -7292,6 +7562,125 @@ export async function advanceRetailCustomerOrder(
   return order.id;
 }
 
+export async function recordRetailCustomerOrderPickupBooked(
+  context: AdminSessionContext,
+  input: Readonly<{
+    customerOrderId: string;
+    pickupProviderStatus?: string | null;
+    shipmentId?: string | null;
+  }>
+) {
+  const sql = getSql();
+
+  if (!sql || !(await retailOperationsTablesAvailable(sql))) {
+    throw new Error("Retail operations tables are not available");
+  }
+
+  const orderRows = await sql<Array<{
+    due_at: Date | string | null;
+    id: string;
+    organisation_id: string;
+    order_number: string;
+    status: string;
+  }>>`
+    select id::text, organisation_id::text, order_number, status, due_at
+    from public.retail_customer_orders
+    where id = ${input.customerOrderId.trim()}::uuid
+      and (
+        ${canReadAllRetailStock(context)}::boolean
+        or organisation_id = ${context.effectiveOrganisation.id}::uuid
+      )
+    limit 1
+  `;
+  const order = orderRows[0];
+
+  if (!order) {
+    throw new Error("Customer order not found");
+  }
+
+  const status = customerOrderStatus(order.status);
+
+  if (status !== "allocated" && status !== "picking" && status !== "packed") {
+    return order.id;
+  }
+
+  await ensureOrderWorkflowTask(sql, context, {
+    dueAt: order.due_at,
+    orderId: order.id,
+    organisationId: order.organisation_id,
+    taskType: "retail_order_ship"
+  });
+  await assertOrderWorkflowTaskClaimable(sql, context, {
+    orderId: order.id,
+    organisationId: order.organisation_id,
+    taskTypes: ["retail_order_ship"]
+  });
+  const shipTaskRows = await sql<Array<{ id: string }>>`
+    update public.tasks
+    set
+      context = coalesce(context, '{}'::jsonb) || ${sql.json({
+        action: "book_pickup",
+        pickupProviderStatus: input.pickupProviderStatus?.trim() || null,
+        shipmentId: input.shipmentId ?? null,
+        workflowAction: "book_pickup"
+      })}::jsonb,
+      updated_at = now()
+    where organisation_id = ${order.organisation_id}::uuid
+      and source_entity_type = 'retail_customer_order'
+      and source_entity_id = ${order.id}::uuid
+      and task_type = 'retail_order_ship'
+      and status not in ('completed', 'cancelled', 'skipped')
+    returning id::text
+  `;
+
+  for (const task of shipTaskRows) {
+    await addTaskEvent({
+      eventPayload: {
+        actorPersonId: context.actorPerson.id,
+        pickupProviderStatus: input.pickupProviderStatus?.trim() || null,
+        shipmentId: input.shipmentId ?? null,
+        source: "retail_order_workflow"
+      },
+      eventStatus: "succeeded",
+      eventType: "retail_order_pickup_booked",
+      severity: "low",
+      taskId: task.id
+    });
+  }
+
+  await recordAdminAudit({
+    action: "admin.retail_customer_order_pickup_booked",
+    actorPersonId: context.actorPerson.id,
+    assumedPersonId: context.assumedPerson?.id ?? null,
+    organisationId: order.organisation_id,
+    resourceId: order.id,
+    resourceType: "retail_customer_order",
+      metadata: {
+        action: "book_pickup",
+        fromStatus: status,
+        pickupProviderStatus: input.pickupProviderStatus?.trim() || null,
+        shipmentId: input.shipmentId ?? null,
+      workflowAction: "book_pickup"
+    }
+  });
+
+  await recordRetailOrderBpmEvent(sql, context, {
+    eventName: "retail_order_pickup_booked",
+    eventStatus: "pickup_booked",
+    metadata: {
+      action: "book_pickup",
+      fromStatus: status,
+      pickupProviderStatus: input.pickupProviderStatus?.trim() || null,
+      shipmentId: input.shipmentId ?? null,
+      workflowAction: "book_pickup"
+    },
+    orderId: order.id,
+    organisationId: order.organisation_id
+  });
+
+  return order.id;
+}
+
 export async function reconcileRetailOrderLifecycle(
   context: AdminSessionContext,
   input: Readonly<{ customerOrderId: string }>
@@ -7341,6 +7730,52 @@ export async function reconcileRetailOrderLifecycle(
     });
 
     if (!integrity.fullyBacked) {
+      return order.id;
+    }
+
+    if (await customerOrderPickupInProgressFromShipmentTable(sql, order.id)) {
+      await ensureOrderWorkflowTask(sql, context, {
+        dueAt: order.due_at,
+        orderId: order.id,
+        organisationId: order.organisation_id,
+        taskType: "retail_order_ship"
+      });
+      const staleCancelledCount = await cancelStaleOrderWorkflowTasks(sql, context, {
+        expectedTaskTypes: ["retail_order_ship"],
+        orderId: order.id,
+        organisationId: order.organisation_id,
+        reason: "pickup_in_progress",
+        status: order.status
+      });
+
+      await recordAdminAudit({
+        action: "admin.retail_order_lifecycle_reconciled",
+        actorPersonId: context.actorPerson.id,
+        assumedPersonId: context.assumedPerson?.id ?? null,
+        organisationId: order.organisation_id,
+        resourceId: order.id,
+        resourceType: "retail_customer_order",
+        metadata: {
+          pickupInProgress: true,
+          repaired: staleCancelledCount > 0,
+          staleCancelledCount,
+          status: order.status
+        }
+      });
+
+      await recordRetailOrderBpmEvent(sql, context, {
+        eventName: "retail_order_lifecycle_reconciled",
+        eventStatus: staleCancelledCount > 0 ? "repaired" : "on_track",
+        metadata: {
+          pickupInProgress: true,
+          repaired: staleCancelledCount > 0,
+          staleCancelledCount,
+          status: order.status
+        },
+        orderId: order.id,
+        organisationId: order.organisation_id
+      });
+
       return order.id;
     }
   }

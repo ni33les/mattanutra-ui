@@ -62,6 +62,7 @@ export type HealthScoreGapCard = Readonly<{
 
 export type HealthScoreMethodCard = Readonly<{
   body: string;
+  number?: number;
   title: string;
 }>;
 
@@ -103,8 +104,10 @@ export type HealthScoreSubtraction = Readonly<{
 }>;
 
 export type HealthScorePillarContent = Readonly<{
+  fillClass: "hi" | "lo";
   goalLinked: boolean;
   id: HealthScoreDomainId;
+  isHero: boolean;
   label: string;
   tag: string | null;
   value: number;
@@ -114,6 +117,7 @@ export type HealthScorePageContent = Readonly<{
   aiCopy?: HealthScorePageAiCopy;
   copySeeds: Readonly<{
     bandLine: string;
+    bandPill: string;
     findings: HealthScoreFinding[];
     findingsHeadline: string;
     findingsMode: "caught" | "strengths";
@@ -128,13 +132,19 @@ export type HealthScorePageContent = Readonly<{
     }>;
     methodCards: HealthScoreMethodCard[];
     methodHeadline: string;
+    opportunityPill: string;
     pillarHeadline: string;
     relativity: Readonly<{
       gap?: number;
       headline: string;
+      legendCaptions: readonly [string, string, string];
       mode: "gap" | "rank";
+      spectrumGapLeftPct: number;
+      spectrumGapWidthPct: number;
       spectrumMedian: number;
+      spectrumMedianPct: number;
       spectrumYou: number;
+      spectrumYouPct: number;
       sub: string;
     }>;
     strengthNote: string | null;

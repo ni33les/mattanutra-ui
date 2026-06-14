@@ -13,6 +13,7 @@ import {
 } from "@/lib/communications";
 import { getSql } from "@/lib/db";
 import { isLocale, type Locale } from "@/lib/i18n";
+import { buildReassessmentUrl } from "@/lib/site-url";
 
 type Db = postgres.Sql | postgres.TransactionSql;
 
@@ -29,6 +30,7 @@ export type PanyaConfig = Readonly<{
     questions: Record<Locale, string[]>;
   };
   guardrails: string;
+  protocolAdvice: Record<PanyaEntitlement, string>;
   quotas: Record<PanyaEntitlement, number>;
   soul: string;
   upsellTone: string;
@@ -69,6 +71,14 @@ export const DEFAULT_PANYA_CONFIG: PanyaConfig = {
     "Escalate medication, pregnancy, serious condition, refund, payment, identity, abuse, or safety-risk questions.",
     "Do not provide personalized dose or protocol changes unless the customer has Living Protocol entitlement."
   ].join("\n"),
+  protocolAdvice: {
+    living_protocol:
+      "Living Protocol customers can receive ongoing protocol support. Help them interpret changes in sleep, stress, travel, symptoms, food, and routines, and request refinement when they explicitly ask to adjust or regenerate their protocol.",
+    right_amount_formula:
+      "Right Amount Formula customers can ask about their generated formula, recommendations, order, food support, and how to follow the plan. Explain the plan clearly, but do not provide ongoing refinement or dose changes unless they upgrade to Living Protocol.",
+    unpaid:
+      "Unpaid customers can receive order, navigation, and general MattaNutra support. Keep nutrition advice general, explain what Living Protocol unlocks when relevant, and avoid personalized protocol refinement."
+  },
   quotas: {
     living_protocol: 32,
     right_amount_formula: 12,
@@ -117,6 +127,7 @@ function isoDate(value: Date | string | null | undefined) {
 function panyaConfigFromUnknown(value: unknown): PanyaConfig {
   const input = objectValue(value);
   const quotas = objectValue(input.quotas);
+  const protocolAdvice = objectValue(input.protocolAdvice);
   const checkIns = objectValue(input.checkIns);
   const questions = objectValue(checkIns.questions);
 
@@ -145,6 +156,20 @@ function panyaConfigFromUnknown(value: unknown): PanyaConfig {
       }
     },
     guardrails: text(input.guardrails, DEFAULT_PANYA_CONFIG.guardrails).slice(0, 6000),
+    protocolAdvice: {
+      living_protocol: text(
+        protocolAdvice.living_protocol,
+        DEFAULT_PANYA_CONFIG.protocolAdvice.living_protocol
+      ).slice(0, 5000),
+      right_amount_formula: text(
+        protocolAdvice.right_amount_formula,
+        DEFAULT_PANYA_CONFIG.protocolAdvice.right_amount_formula
+      ).slice(0, 5000),
+      unpaid: text(
+        protocolAdvice.unpaid,
+        DEFAULT_PANYA_CONFIG.protocolAdvice.unpaid
+      ).slice(0, 5000)
+    },
     quotas: {
       living_protocol: numberValue(
         quotas.living_protocol,
@@ -640,6 +665,38 @@ function panyaCheckInQuestion(
     DEFAULT_PANYA_CONFIG.checkIns.questions.en[0];
 }
 
+function panyaReorderCallbackBody(input: Readonly<{
+  locale: Locale;
+  planId: string;
+}>) {
+  const reassessmentUrl = buildReassessmentUrl(input.locale, input.planId);
+
+  if (input.locale === "th") {
+    return [
+      "ตอนนี้ใกล้ครบสามสัปดาห์หลังคำสั่งซื้อ MattaNutra ของคุณแล้ว",
+      "ถ้าสูตรนี้ยังเหมาะกับคุณ นี่เป็นช่วงเวลาที่ดีในการสั่งซ้ำ เพื่อไม่ให้หมดใกล้วันที่ 30",
+      `ถ้าการนอน ความเครียด ยา การเดินทาง อาหาร หรือเป้าหมายเปลี่ยนไป โปรดทำแบบประเมินอีกครั้งก่อนสั่งซ้ำ: ${reassessmentUrl}`,
+      "ตอบกลับที่นี่ได้เลยถ้าต้องการให้ Panya ช่วยเรื่องขั้นตอนถัดไป"
+    ].join("\n");
+  }
+
+  if (input.locale === "zh-CN") {
+    return [
+      "距离你的 MattaNutra 订单大约三周了。",
+      "如果当前配方仍然适合你，现在是安排续购的好时机，这样接近第 30 天时不容易断档。",
+      `如果睡眠、压力、用药、旅行、饮食或目标发生了变化，请先重新填写评估再续购：${reassessmentUrl}`,
+      "你可以直接回复这里，Panya 会帮你处理下一步。"
+    ].join("\n");
+  }
+
+  return [
+    "It has been about three weeks since your MattaNutra order.",
+    "If your current formula is still working for you, this is a good time to reorder so you do not run out around day 30.",
+    `If sleep, stress, medication, travel, diet, or goals have changed, take the assessment again before reordering: ${reassessmentUrl}`,
+    "Reply here if you want Panya to help with the next step."
+  ].join("\n");
+}
+
 export async function schedulePanyaCheckInForPlan(input: Readonly<{
   planId: string;
   source: string;
@@ -720,6 +777,89 @@ export async function schedulePanyaCheckInForPlan(input: Readonly<{
     eventType: "chat",
     planId: input.planId,
     properties: {
+      source: input.source
+    },
+    severity: "low",
+    sql
+  });
+
+  return cronId;
+}
+
+export async function schedulePanyaReorderCallbackForOrder(input: Readonly<{
+  locale: Locale;
+  orderId: string;
+  orderNumber?: string | null;
+  planId: string;
+  source: string;
+}>) {
+  const sql = getSql();
+
+  if (!sql || !isUuid(input.planId) || !isUuid(input.orderId)) {
+    return null;
+  }
+
+  const existing = await sql<Array<{ id: string }>>`
+    select id::text
+    from public.cron
+    where plan_id = ${input.planId}::uuid
+      and action_type = 'panya_reorder_callback'
+      and payload ->> 'retailCustomerOrderId' = ${input.orderId}
+      and status in ('scheduled', 'queued', 'complete')
+    order by scheduled_for asc
+    limit 1
+  `;
+
+  if (existing[0]?.id) {
+    return existing[0].id;
+  }
+
+  const cronId = randomUUID();
+  const locale: Locale = isLocale(input.locale) ? input.locale : "en";
+
+  await sql`
+    insert into public.cron (
+      id,
+      plan_id,
+      action_type,
+      recipient,
+      payload,
+      scheduled_for,
+      recurrence_days,
+      status,
+      created_at,
+      updated_at
+    )
+    values (
+      ${cronId}::uuid,
+      ${input.planId}::uuid,
+      'panya_reorder_callback',
+      ${sql.json(toJsonValue({ channelType: "line" }))}::jsonb,
+      ${sql.json(toJsonValue({
+        locale,
+        orderNumber: input.orderNumber ?? null,
+        retailCustomerOrderId: input.orderId,
+        source: input.source
+      }))}::jsonb,
+      now() + interval '21 days',
+      null,
+      'scheduled',
+      now(),
+      now()
+    )
+  `;
+
+  await writeBpmEvent({
+    actorType: "system",
+    cronId,
+    emittedBy: "panya_reorder_callback",
+    eventName: "panya_reorder_callback_scheduled",
+    eventStatus: "scheduled",
+    eventType: "chat",
+    planId: input.planId,
+    properties: {
+      orderNumber: input.orderNumber ?? null,
+      retailCustomerOrderId: input.orderId,
       source: input.source
     },
     severity: "low",
@@ -886,6 +1026,90 @@ export async function queueDuePanyaCheckIn(input: Readonly<{
       messageId: prepared.message.id
     },
     severity: "low",
+    sql
+  });
+
+  return {
+    messageId: prepared.message.id,
+    queued: prepared.message.status === "queued",
+    reason: prepared.message.status
+  };
+}
+
+export async function queueDuePanyaReorderCallback(input: Readonly<{
+  cronId: string;
+  planId: string;
+}>) {
+  const sql = getSql();
+
+  if (!sql || !isUuid(input.cronId) || !isUuid(input.planId)) {
+    return { queued: false, reason: "missing_identifiers" as const };
+  }
+
+  const rows = await sql<Array<{
+    payload: unknown;
+  }>>`
+    select payload
+    from public.cron
+    where id = ${input.cronId}::uuid
+      and plan_id = ${input.planId}::uuid
+      and action_type = 'panya_reorder_callback'
+    limit 1
+  `;
+  const payload = objectValue(rows[0]?.payload);
+  const locale: Locale = isLocale(payload.locale) ? payload.locale : "en";
+  const body = panyaReorderCallbackBody({ locale, planId: input.planId });
+  const prepared = await sendCommunication({
+    body,
+    channelType: "line",
+    messageType: "panya_reorder_callback",
+    metadata: {
+      cronId: input.cronId,
+      orderNumber: text(payload.orderNumber) || null,
+      retailCustomerOrderId: text(payload.retailCustomerOrderId) || null,
+      source: "panya_reorder_callback"
+    },
+    planId: input.planId,
+    subject: "Panya reorder callback"
+  });
+  const dispatchTask =
+    prepared.channel?.channelType === "line" && prepared.message.status === "queued"
+      ? await queueCustomerChatCommunicationDispatchTask({
+          messageId: prepared.message.id,
+          planId: input.planId
+        })
+      : null;
+
+  await sql`
+    update public.cron set
+      status = 'complete',
+      result_payload = coalesce(result_payload, '{}'::jsonb) || ${sql.json(
+        toJsonValue({
+          dispatchTaskId: dispatchTask ?? null,
+          messageId: prepared.message.id,
+          messageStatus: prepared.message.status
+        })
+      )}::jsonb,
+      error_message = null,
+      completed_at = now(),
+      updated_at = now()
+    where id = ${input.cronId}::uuid
+  `;
+
+  await writeBpmEvent({
+    actorType: "system",
+    cronId: input.cronId,
+    emittedBy: "panya_reorder_callback",
+    eventName: "panya_reorder_callback_queued",
+    eventStatus: prepared.message.status === "queued" ? "queued" : prepared.message.status,
+    eventType: "chat",
+    planId: input.planId,
+    properties: {
+      dispatchTaskId: dispatchTask ?? null,
+      messageId: prepared.message.id,
+      messageStatus: prepared.message.status
+    },
+    severity: prepared.message.status === "queued" ? "low" : "medium",
     sql
   });
 

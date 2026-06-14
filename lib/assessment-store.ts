@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type postgres from "postgres";
 import { healthScoreAnalysisStatusFromTaskStatuses } from "@/lib/assessment-status";
 import {
@@ -40,6 +41,7 @@ import {
   firstNameFromAssessmentAnswers,
   normalizeAssessmentFirstName
 } from "@/lib/assessment-first-name";
+import { normalizeAssessmentContactEmail } from "@/lib/assessment-contact";
 
 export type StoredAssessmentStatus =
   | "captured"
@@ -50,6 +52,7 @@ export type StoredAssessmentStatus =
 
 type PersistAssessmentInput = Readonly<{
   answers?: unknown;
+  contactEmail?: unknown;
   locale?: unknown;
   selectedPlan?: AssessmentPlan | null;
   snapshot: AssessmentSnapshot;
@@ -927,6 +930,8 @@ export async function ensureAssessmentSchema() {
       "answers",
       "answer_summary",
       "first_name",
+      "contact_email",
+      "contact_email_captured_at",
       "health_score",
       "queue_position",
       "error_message",
@@ -950,6 +955,20 @@ export async function ensureAssessmentSchema() {
     if (missing.length > 0) {
       throw new Error(
         `Assessment schema is incomplete. Apply db-schema.sql before using assessment APIs. Missing: ${missing.join(", ")}`
+      );
+    }
+
+    const resumeDraftRows = await sql<Array<{ table_name: string }>>`
+      select table_name
+      from information_schema.tables
+      where table_schema = 'public'
+        and table_name = 'assessment_resume_drafts'
+      limit 1
+    `;
+
+    if (!resumeDraftRows[0]) {
+      throw new Error(
+        "Assessment schema is incomplete. Apply db-schema.sql before using assessment APIs. Missing: public.assessment_resume_drafts"
       );
     }
   })().catch((error) => {
@@ -980,8 +999,105 @@ function toSnapshotStatus(status: unknown): AssessmentSnapshot["status"] {
   return "queued";
 }
 
+async function upsertAssessmentEmailChannel(input: Readonly<{
+  contactEmail: string;
+  displayName: string | null;
+  planId: string;
+}>) {
+  const sql = getSql();
+
+  if (!sql) {
+    return;
+  }
+
+  const existing = await sql<Array<{ identity_id: string }>>`
+    select identity_id::text
+    from public.plan_communication_identities
+    where plan_id = ${input.planId}::uuid
+      and is_primary
+    order by created_at asc
+    limit 1
+  `;
+  const identityId = existing[0]?.identity_id ?? randomUUID();
+
+  if (!existing[0]?.identity_id) {
+    await sql`
+      insert into public.communication_identities (
+        id,
+        source,
+        metadata,
+        created_at,
+        updated_at
+      )
+      values (
+        ${identityId}::uuid,
+        'plan',
+        ${sql.json(toJsonValue({ planId: input.planId, source: "questionnaire_resume" }))},
+        now(),
+        now()
+      )
+      on conflict (id) do nothing
+    `;
+    await sql`
+      insert into public.plan_communication_identities (
+        plan_id,
+        identity_id,
+        relationship,
+        is_primary,
+        metadata,
+        created_at
+      )
+      values (
+        ${input.planId}::uuid,
+        ${identityId}::uuid,
+        'client',
+        true,
+        ${sql.json(toJsonValue({ source: "questionnaire_resume" }))},
+        now()
+      )
+      on conflict do nothing
+    `;
+  }
+
+  await sql`
+    insert into public.communication_channels (
+      id,
+      identity_id,
+      channel_type,
+      address,
+      display_name,
+      status,
+      preference_rank,
+      actor_type,
+      metadata,
+      created_at,
+      updated_at
+    )
+    values (
+      ${randomUUID()}::uuid,
+      ${identityId}::uuid,
+      'email',
+      ${input.contactEmail},
+      ${input.displayName ?? "Questionnaire email"},
+      'active',
+      70,
+      'human',
+      ${sql.json(toJsonValue({ source: "questionnaire_resume" }))},
+      now(),
+      now()
+    )
+    on conflict (identity_id, channel_type, lower(address)) do update set
+      display_name = coalesce(excluded.display_name, communication_channels.display_name),
+      metadata = communication_channels.metadata || excluded.metadata,
+      preference_rank = least(communication_channels.preference_rank, excluded.preference_rank),
+      status = 'active',
+      updated_at = now()
+  `;
+}
+
 export async function persistAssessmentSubmission({
   answers,
+  contactEmail,
   locale,
   selectedPlan,
   snapshot,
@@ -1006,6 +1122,7 @@ export async function persistAssessmentSubmission({
   const storedPlan = toStoredPlan(selectedPlan);
   const storedAnswersRecord = buildStoredAssessmentAnswers(answers);
   const firstName = normalizeAssessmentFirstName(storedAnswersRecord.firstName);
+  const normalizedContactEmail = normalizeAssessmentContactEmail(contactEmail);
   const storedAnswers = toJsonValue(storedAnswersRecord);
   const storedAnswerSummary = toJsonValue(buildAnswerSummary(storedAnswersRecord));
   const storedHealthScore = toJsonValue(snapshot.healthScore);
@@ -1022,6 +1139,7 @@ export async function persistAssessmentSubmission({
       answers: storedAnswers,
       answerSummary: storedAnswerSummary,
       firstName,
+      contactEmail: normalizedContactEmail,
       healthScore: storedHealthScore,
       locale: normalizedLocale,
       queuePosition: snapshot.queuePosition,
@@ -1048,6 +1166,8 @@ export async function persistAssessmentSubmission({
       answers,
       answer_summary,
       first_name,
+      contact_email,
+      contact_email_captured_at,
       health_score,
       queue_position,
       plan_selected_at,
@@ -1063,6 +1183,8 @@ export async function persistAssessmentSubmission({
       ${sql.json(storedAnswers)},
       ${sql.json(storedAnswerSummary)},
       ${firstName},
+      ${normalizedContactEmail},
+      ${normalizedContactEmail ? sql`now()` : null},
       ${sql.json(storedHealthScore)},
       ${snapshot.queuePosition},
       ${selectedPlan ? sql`now()` : null},
@@ -1079,6 +1201,12 @@ export async function persistAssessmentSubmission({
       answers = excluded.answers,
       answer_summary = excluded.answer_summary,
       first_name = excluded.first_name,
+      contact_email = coalesce(excluded.contact_email, assessments.contact_email),
+      contact_email_captured_at = case
+        when excluded.contact_email is not null
+        then coalesce(assessments.contact_email_captured_at, excluded.contact_email_captured_at)
+        else assessments.contact_email_captured_at
+      end,
       health_score = excluded.health_score,
       queue_position = excluded.queue_position,
       error_message = case
@@ -1100,6 +1228,14 @@ export async function persistAssessmentSubmission({
       ),
       updated_at = now()
   `;
+
+  if (normalizedContactEmail) {
+    await upsertAssessmentEmailChannel({
+      contactEmail: normalizedContactEmail,
+      displayName: firstName,
+      planId: snapshot.planId
+    });
+  }
 }
 
 export async function getStoredAssessmentSnapshot(planId: string) {
@@ -1262,6 +1398,7 @@ export async function getStoredAssessmentPrefill(planId: string) {
   const rows = await sql`
     select
       answers,
+      contact_email,
       health_score,
       locale,
       selected_plan::text
@@ -1279,6 +1416,8 @@ export async function getStoredAssessmentPrefill(planId: string) {
 
   return {
     answers: asRecord(row.answers),
+    contactEmail:
+      typeof row.contact_email === "string" ? row.contact_email : null,
     healthScore:
       typeof healthScore.score === "number"
         ? (healthScore as AssessmentSnapshot["healthScore"])
@@ -1923,6 +2062,10 @@ export async function getStoredFormulationResult(
           currency:
             typeof retailerOption.currency === "string"
               ? retailerOption.currency
+              : null,
+          dispatchCity:
+            typeof retailerOption.dispatchCity === "string"
+              ? retailerOption.dispatchCity
               : null,
           etaDate:
             typeof retailerOption.etaDate === "string"
