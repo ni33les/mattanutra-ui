@@ -6,6 +6,9 @@ const targetBaseUrl = (
   process.env.UAT_SITE_URL || "https://uat.mattanutra.com"
 ).replace(/\/+$/, "");
 const expectCleanRuntime = process.env.UAT_EXPECT_CLEAN_RUNTIME === "true";
+const externalSecretChecksStrict =
+  process.env.MATTANUTRA_ENV === "uat" ||
+  process.env.UAT_SMOKE_REQUIRE_EXTERNAL_SECRETS === "true";
 const lineWebhookUrl = `${targetBaseUrl}/api/line/webhook`;
 const expectedLineWebhookUrl = "https://uat.mattanutra.com/api/line/webhook";
 const requiredTables = [
@@ -379,6 +382,22 @@ function configuredServiceEnvKeysFromAppSpec(spec, serviceName) {
 }
 
 async function checkLineWebhook() {
+  if (!externalSecretChecksStrict) {
+    record(
+      "LINE webhook endpoint",
+      false,
+      "external LINE validation skipped because local env is not explicitly UAT",
+      "warn",
+    );
+    record(
+      "LINE webhook signature",
+      false,
+      "external LINE validation skipped because local env is not explicitly UAT",
+      "warn",
+    );
+    return;
+  }
+
   const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN?.trim();
   const channelSecret = process.env.LINE_CHANNEL_SECRET?.trim();
 
@@ -559,21 +578,30 @@ async function checkDatabase() {
         : `stale=${staleWorkerProfiles.map((row) => row.mode).join(", ")}`,
     );
 
-    const doctor = await runWorkerDoctor(connection);
-    let doctorDetails = `exit=${doctor.code}`;
+    if (!externalSecretChecksStrict) {
+      record(
+        "worker auth doctor",
+        false,
+        "local worker credential hash validation skipped because local env is not explicitly UAT",
+        "warn",
+      );
+    } else {
+      const doctor = await runWorkerDoctor(connection);
+      let doctorDetails = `exit=${doctor.code}`;
 
-    try {
-      const payload = JSON.parse(doctor.stdout || "{}");
-      doctorDetails += ` failures=${payload.failureCount ?? "unknown"}`;
-    } catch {
-      if (doctor.error) {
-        doctorDetails += ` ${doctor.error}`;
-      } else if (doctor.stderr) {
-        doctorDetails += ` ${doctor.stderr.trim().slice(0, 180)}`;
+      try {
+        const payload = JSON.parse(doctor.stdout || "{}");
+        doctorDetails += ` failures=${payload.failureCount ?? "unknown"}`;
+      } catch {
+        if (doctor.error) {
+          doctorDetails += ` ${doctor.error}`;
+        } else if (doctor.stderr) {
+          doctorDetails += ` ${doctor.stderr.trim().slice(0, 180)}`;
+        }
       }
-    }
 
-    record("worker auth doctor", doctor.code === 0, doctorDetails);
+      record("worker auth doctor", doctor.code === 0, doctorDetails);
+    }
 
     const stuckRows = await sql`
       select count(*)::int as stuck_count

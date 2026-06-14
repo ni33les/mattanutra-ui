@@ -49,7 +49,7 @@ describe("worker auth doctor", () => {
     assert.match(accessSource, /agent credential rejected reason=/);
   });
 
-  it("keeps UAT smoke strict about worker auth and fresh worker sessions", () => {
+  it("keeps UAT smoke strict about worker auth when external UAT secrets are explicit", () => {
     const smokeSource = readFileSync(
       new URL("../scripts/uat-smoke.mjs", import.meta.url),
       "utf8",
@@ -57,6 +57,9 @@ describe("worker auth doctor", () => {
 
     assert.match(smokeSource, /scripts\/workers-doctor\.ts/);
     assert.match(smokeSource, /worker auth doctor/);
+    assert.match(smokeSource, /externalSecretChecksStrict/);
+    assert.match(smokeSource, /UAT_SMOKE_REQUIRE_EXTERNAL_SECRETS/);
+    assert.match(smokeSource, /local worker credential hash validation skipped/);
     assert.match(smokeSource, /DigitalOcean DB env/);
     assert.match(smokeSource, /DigitalOcean retired DB env/);
     assert.match(
