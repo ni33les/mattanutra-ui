@@ -165,7 +165,10 @@ describe("process runtime technical debt sweep", () => {
   it("repairs stale allocations before orders can be packed or shipped", async () => {
     const stock = await readFile("lib/admin-retail-stock.ts", "utf8");
     const carrier = await readFile("lib/retail-carrier-shipments.ts", "utf8");
-    const view = await readFile("components/admin/retail-stock-view.tsx", "utf8");
+    const customerOrderDisplay = await readFile(
+      "components/admin/retail-stock/customer-order-display-model.ts",
+      "utf8"
+    );
     const pipeline = functionBody(stock, "getRetailStockPipeline");
     const actionStates = functionBody(stock, "getRetailCustomerOrderActionStates");
     const stockRepair = functionBody(stock, "repairRetailStockAllocationIntegrity");
@@ -189,7 +192,7 @@ describe("process runtime technical debt sweep", () => {
     assert.match(actionStates, /pipeline\.backedAllocatedUnits >= pipeline\.customerDemandUnits/);
     assert.match(actionStates, /Allocated stock is no longer available\. Recheck workflow\./);
     assert.match(stock, /!orderPipelineFullyBacked\(pipeline\)[\s\S]*\? "awaiting_stock"/);
-    assert.match(view, /order\.workflowStage === "awaiting_stock"/);
+    assert.match(customerOrderDisplay, /order\.workflowStage === "awaiting_stock"/);
     assert.match(stockRepair, /retail_customer_orders\.status in \('placed', 'awaiting_stock', 'allocated', 'picking', 'packed'\)/);
     assert.match(stockRepair, /status = 'awaiting_stock'/);
     assert.match(stockRepair, /admin\.retail_stock_allocations_released/);

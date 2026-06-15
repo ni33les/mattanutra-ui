@@ -11,14 +11,11 @@ import {
 } from "lucide-react";
 import type {
   AdminRetailCustomerOrder,
-  AdminRetailCustomerOrderAddress,
-  AdminRetailCustomerOrderLine,
   AdminRetailShoppingList,
   AdminRetailStockData,
   AdminRetailStockMovement,
   AdminRetailStockProductOption,
   AdminRetailStockRow,
-  RetailCustomerOrderStatus,
   RetailStockMovementType,
   RetailStockStatus
 } from "@/lib/admin-retail-stock";
@@ -28,7 +25,6 @@ import type { Locale } from "@/lib/i18n";
 import type {
   BackorderPolicy,
   RegionalBasketAvailability,
-  RetailAvailabilityStatus,
   RetailRoutingPreference
 } from "@/lib/retail-cart-availability";
 import {
@@ -60,7 +56,56 @@ import {
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
 import { AdminButton, AdminModal } from "@/components/admin/ui";
-import { SafeImage } from "@/components/safe-image";
+import {
+  buildCustomerOrderWorkflowSteps,
+  customerOrderIncludedInAllMetric,
+  customerOrderMatchesFilter,
+  customerOrderMetricColor,
+  customerOrderRetailValue,
+  customerOrderStatusDisplay,
+  customerOrderStatusFilterLabel,
+  customerOrderStatusFilters,
+  customerOrderStatusMetricKey,
+  customerOrderStatusPillClass,
+  type CustomerOrderFilter,
+  type CustomerOrderMetricKey
+} from "@/components/admin/retail-stock/customer-order-display";
+import {
+  addressDisplayLines,
+  addressNoteLines,
+  billingAddressForOrder,
+  deliveryAddressForOrder,
+  emptyRetailField,
+  formatDate,
+  formatDateTime,
+  orderLineAwaitingStockUnits,
+  orderLineIdentifierParts,
+  printRetailOrderDocument,
+  printShipmentLabel
+} from "@/components/admin/retail-stock/order-documents";
+import {
+  activeShoppingListCoverageUnits,
+  activeShoppingListReturnedDemandUnits,
+  orgProductKey,
+  reorderRiskRank,
+  shoppingListIdFromResult,
+  type ReorderPurchaseItem
+} from "@/components/admin/retail-stock/shopping-list-view-model";
+import {
+  ProductThumbnail,
+  StockNumberInput,
+  backorderPolicyClass,
+  backorderPolicyLabel,
+  draftFromRow,
+  emptyStockDraft,
+  movementLabel,
+  numberOrNull,
+  retailAvailabilityLabel,
+  statusLabel,
+  stockAvailabilityStatus,
+  type RetailStockAvailabilityStatus,
+  type StockDraft
+} from "@/components/admin/retail-stock/stock-controls";
 
 type StockResponse = Readonly<{
   data?: AdminRetailStockData;
@@ -72,26 +117,6 @@ type StockResponse = Readonly<{
   }>;
   updated?: boolean;
 }>;
-
-type StockDraft = Readonly<{
-  backorderPolicy: BackorderPolicy;
-  leadTimeDays: string;
-  notes: string;
-  retailPriceAmount: string;
-  status: RetailStockStatus;
-  stockQuantity: string;
-  wholesalePriceAmount: string;
-}>;
-
-const emptyStockDraft: StockDraft = {
-  backorderPolicy: "allow",
-  leadTimeDays: "0",
-  notes: "",
-  retailPriceAmount: "",
-  status: "active",
-  stockQuantity: "0",
-  wholesalePriceAmount: ""
-};
 
 const kexCarrierName = "KEX Express (Thailand)";
 const grabCarrierName = "Grab";
@@ -108,41 +133,6 @@ type RetailStockPanel =
 
 type RetailStockFilter =
   | "all"
-  | "in_stock"
-  | "low_stock"
-  | "out_of_stock";
-
-type CustomerOrderMetricKey =
-  | "allocated"
-  | "awaiting_stock"
-  | "packed"
-  | "pickup_booked"
-  | "placed"
-  | "shipped";
-
-type CustomerOrderFilter = "all" | CustomerOrderMetricKey;
-
-const customerOrderStatusFilters: CustomerOrderMetricKey[] = [
-  "placed",
-  "awaiting_stock",
-  "allocated",
-  "packed",
-  "pickup_booked",
-  "shipped"
-];
-
-const customerOrderAllExcludedStatuses = new Set<RetailCustomerOrderStatus>([
-  "shipped",
-  "delivered",
-  "cancelled",
-  "returned"
-]);
-
-const customerOrderVisibleStatusSet = new Set<CustomerOrderMetricKey>(
-  customerOrderStatusFilters
-);
-
-type RetailStockAvailabilityStatus =
   | "in_stock"
   | "low_stock"
   | "out_of_stock";
@@ -181,22 +171,6 @@ type MovementEditor =
       mode: "void";
       movement: AdminRetailStockMovement;
     }>;
-
-type ReorderPurchaseItem = Readonly<{
-  assignedActiveUnits: number;
-  amountToBuyUnits: number;
-  brandName: string | null;
-  currentStockQuantity: number;
-  organisationId: string;
-  productId: string;
-  productTitle: string;
-  recommendationPressureCount: number;
-  riskLevel: AdminRetailStockData["reorderAdvice"][number]["riskLevel"] | null;
-  source: "backorder" | "recommendation";
-  unassignedDemandUnits: number;
-  unorderedNeedUnits: number;
-  wholesalePriceAmount: number | null;
-}>;
 
 type CustomerOrderMode = "direct" | "regional";
 
@@ -264,294 +238,6 @@ const emptyMovementDraft: MovementDraft = {
   unitCostAmount: ""
 };
 
-function draftFromRow(row: AdminRetailStockRow): StockDraft {
-  return {
-    backorderPolicy: row.backorderPolicy,
-    leadTimeDays: String(row.leadTimeDays),
-    notes: row.notes ?? "",
-    retailPriceAmount:
-      row.retailOverridePriceAmount === null
-        ? ""
-        : String(row.retailOverridePriceAmount),
-    status: row.status,
-    stockQuantity: String(row.stockQuantity),
-    wholesalePriceAmount:
-      row.wholesalePriceAmount === null ? "" : String(row.wholesalePriceAmount)
-  };
-}
-
-function numberOrNull(value: string) {
-  if (!value.trim()) {
-    return null;
-  }
-
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function statusLabel(labels: AdminContent, status: RetailStockStatus) {
-  if (status === "deleted") {
-    return labels.access.deleted;
-  }
-
-  if (status === "disabled") {
-    return labels.stock.disabled;
-  }
-
-  return labels.access.active;
-}
-
-function backorderPolicyLabel(labels: AdminContent, policy: BackorderPolicy) {
-  return policy === "deny"
-    ? labels.stock.backorderDisabled
-    : labels.stock.backorderAllowed;
-}
-
-function backorderPolicyClass(policy: BackorderPolicy) {
-  return policy === "deny"
-    ? "bg-red-50 text-red-700 ring-red-100"
-    : "bg-emerald-50 text-emerald-700 ring-emerald-100";
-}
-
-function movementLabel(labels: AdminContent, type: RetailStockMovementType) {
-  const labelsByType: Record<RetailStockMovementType, string> = {
-    adjustment: labels.stock.movementAdjustment,
-    expiry_write_off: labels.stock.movementExpiryWriteOff,
-    receive: labels.stock.movementReceive,
-    return: labels.stock.movementReturn,
-    sale: labels.stock.movementSale,
-    transfer_in: labels.stock.movementTransferIn,
-    transfer_out: labels.stock.movementTransferOut,
-    void: labels.stock.movementVoid
-  };
-
-  return labelsByType[type];
-}
-
-function stockAvailabilityStatus(
-  row: AdminRetailStockRow,
-  advice: AdminRetailStockData["reorderAdvice"][number] | undefined
-): RetailStockAvailabilityStatus | null {
-  if (row.status !== "active") {
-    return null;
-  }
-
-  if (row.stockQuantity === 0) {
-    return "out_of_stock";
-  }
-
-  const daysCover = advice?.daysCover ?? null;
-  const leadTimeDays = advice?.leadTimeDays ?? row.leadTimeDays;
-
-  if (
-    (daysCover !== null && daysCover <= leadTimeDays + 1) ||
-    (daysCover === null && row.stockQuantity < 3)
-  ) {
-    return "low_stock";
-  }
-
-  return "in_stock";
-}
-
-function retailAvailabilityLabel(status: RetailAvailabilityStatus) {
-  const labelsByStatus: Record<RetailAvailabilityStatus, string> = {
-    available_now: "Available now",
-    backorder: "Backorder",
-    unavailable: "Unavailable"
-  };
-
-  return labelsByStatus[status];
-}
-
-function reorderRiskRank(
-  riskLevel: AdminRetailStockData["reorderAdvice"][number]["riskLevel"] | null
-) {
-  if (riskLevel === "out_of_stock") {
-    return 0;
-  }
-
-  if (riskLevel === "reorder") {
-    return 1;
-  }
-
-  if (riskLevel === "watch") {
-    return 2;
-  }
-
-  return 3;
-}
-
-function orgProductKey(organisationId: string, productId: string | null | undefined) {
-  return `${organisationId}:${productId ?? "unknown"}`;
-}
-
-function activeShoppingListCoverageUnits(
-  line: AdminRetailStockData["shoppingListLines"][number]
-) {
-  const assignedDemand = Math.max(
-    line.assignedQuantity,
-    line.requiredQuantity,
-    line.unorderedNeedQuantity
-  );
-
-  if (assignedDemand < 1) {
-    return Math.max(0, line.actualQuantity - line.stockedQuantity);
-  }
-
-  if (line.actualQuantity < assignedDemand) {
-    return Math.max(0, line.actualQuantity - line.stockedQuantity);
-  }
-
-  return assignedDemand;
-}
-
-function activeShoppingListReturnedDemandUnits(
-  line: AdminRetailStockData["shoppingListLines"][number]
-) {
-  const assignedDemand = Math.max(
-    line.assignedQuantity,
-    line.requiredQuantity,
-    line.unorderedNeedQuantity
-  );
-
-  return Math.max(0, assignedDemand - line.actualQuantity);
-}
-
-function customerOrderRetailValue(order: AdminRetailCustomerOrder) {
-  return order.pricingSnapshot?.totalAmount ?? order.totalRetailAmount;
-}
-
-function customerOrderHasPickupBooked(order: AdminRetailCustomerOrder) {
-  const providerStatus = order.shipment?.pickupProviderStatus?.trim().toLowerCase();
-
-  if (
-    order.status === "shipped" ||
-    order.status === "delivered" ||
-    order.status === "cancelled" ||
-    order.status === "returned"
-  ) {
-    return false;
-  }
-
-  return Boolean(
-    order.shipment?.pickupBookedAt ||
-      (providerStatus && ["booked", "queued", "requested"].includes(providerStatus))
-  );
-}
-
-function customerOrderStatusFilterLabel(status: CustomerOrderMetricKey) {
-  if (status === "allocated") {
-    return "Ready to pack";
-  }
-
-  if (status === "packed") {
-    return "Ready to ship";
-  }
-
-  if (status === "pickup_booked") {
-    return "Pickup booked";
-  }
-
-  return readableToken(status);
-}
-
-function customerOrderStatusMetricKey(
-  orderOrStatus: AdminRetailCustomerOrder | RetailCustomerOrderStatus
-): CustomerOrderMetricKey | null {
-  const status =
-    typeof orderOrStatus === "string" ? orderOrStatus : orderOrStatus.status;
-
-  if (
-    typeof orderOrStatus !== "string" &&
-    customerOrderHasPickupBooked(orderOrStatus)
-  ) {
-    return "pickup_booked";
-  }
-
-  if (
-    typeof orderOrStatus !== "string" &&
-    orderOrStatus.workflowStage === "awaiting_stock"
-  ) {
-    return "awaiting_stock";
-  }
-
-  if (status === "picking") {
-    return "packed";
-  }
-
-  return customerOrderVisibleStatusSet.has(status as CustomerOrderMetricKey)
-    ? status as CustomerOrderMetricKey
-    : null;
-}
-
-function customerOrderIncludedInAllMetric(order: AdminRetailCustomerOrder) {
-  return !customerOrderAllExcludedStatuses.has(order.status);
-}
-
-function customerOrderMatchesFilter(
-  order: AdminRetailCustomerOrder,
-  filter: CustomerOrderFilter
-) {
-  if (filter === "all") {
-    return customerOrderIncludedInAllMetric(order);
-  }
-
-  return customerOrderStatusMetricKey(order) === filter;
-}
-
-function customerOrderStatusDisplay(order: AdminRetailCustomerOrder) {
-  if (customerOrderHasPickupBooked(order)) {
-    return "Pickup booked";
-  }
-
-  if (order.status === "awaiting_stock" || order.workflowStage === "awaiting_stock") {
-    return "Awaiting stock";
-  }
-
-  if (order.status === "allocated") {
-    return "Ready to pack";
-  }
-
-  if (order.status === "picking" || order.status === "packed") {
-    return "Ready to ship";
-  }
-
-  return readableToken(order.status);
-}
-
-function customerOrderStatusPillClass(order: AdminRetailCustomerOrder) {
-  if (
-    order.status === "awaiting_stock" ||
-    order.workflowStage === "awaiting_stock" ||
-    customerOrderHasPickupBooked(order)
-  ) {
-    return "bg-amber-50 text-amber-800 ring-amber-100";
-  }
-
-  return "bg-gray-100 text-gray-700 ring-gray-200";
-}
-
-function customerOrderMetricColor(status: CustomerOrderMetricKey) {
-  if (status === "awaiting_stock" || status === "pickup_booked") {
-    return businessMetricColors.medium;
-  }
-
-  if (status === "allocated") {
-    return businessMetricColors.active;
-  }
-
-  if (status === "packed") {
-    return businessMetricColors.processing;
-  }
-
-  if (status === "shipped") {
-    return businessMetricColors.succeeded;
-  }
-
-  return businessMetricColors.queued;
-}
-
 function shipmentCarrierSelectValue(carrierName: string) {
   if (!carrierName) {
     return kexCarrierName;
@@ -584,586 +270,6 @@ function shipmentLabelStatusText(
   }
 
   return "Official carrier label not requested";
-}
-
-function printShipmentLabel(input: Readonly<{
-  labels: AdminContent;
-  lines: readonly AdminRetailCustomerOrderLine[];
-  locale: Locale;
-  order: AdminRetailCustomerOrder;
-}>) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  if (input.order.shipment?.labelUrl) {
-    window.open(input.order.shipment.labelUrl, "_blank", "noopener,noreferrer");
-    return;
-  }
-
-  if (input.order.shipment?.labelContentBase64) {
-    const contentType =
-      input.order.shipment.labelContentType || "application/pdf";
-    window.open(
-      `data:${contentType};base64,${input.order.shipment.labelContentBase64}`,
-      "_blank",
-      "noopener,noreferrer"
-    );
-    return;
-  }
-
-  printRetailOrderDocument({
-    kind: "shipping-label",
-    labels: input.labels,
-    lines: input.lines,
-    locale: input.locale,
-    order: input.order
-  });
-}
-
-function formatDate(value: string | null, locale: Locale) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(value);
-
-  if (!Number.isFinite(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(locale, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(date);
-}
-
-function formatDateTime(value: string | null, locale: Locale) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(value);
-
-  if (!Number.isFinite(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(locale, {
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(date);
-}
-
-function buildCustomerOrderWorkflowSteps(
-  labels: AdminContent,
-  order: AdminRetailCustomerOrder
-) {
-  const current =
-    order.status === "shipped" || order.status === "delivered"
-      ? "sent"
-      : customerOrderHasPickupBooked(order)
-        ? "pickup_booked"
-        : order.status === "awaiting_stock" ||
-            order.workflowStage === "awaiting_stock"
-      ? "awaiting_stock"
-      : order.status === "allocated"
-        ? "ready_to_pack"
-        : order.status === "picking" || order.status === "packed"
-          ? "ready_to_ship"
-          : "ordered";
-
-  return [
-    {
-      active: current === "ordered",
-      at: order.workflowTimeline.orderedAt,
-      complete: Boolean(order.workflowTimeline.orderedAt),
-      key: "ordered",
-      label: labels.stock.ordered
-    },
-    {
-      active: current === "awaiting_stock",
-      at: order.workflowTimeline.awaitingStockAt,
-      complete:
-        Boolean(order.workflowTimeline.awaitingStockAt) ||
-        current === "awaiting_stock" ||
-        current === "ready_to_pack" ||
-        current === "ready_to_ship" ||
-        current === "pickup_booked" ||
-        current === "sent",
-      key: "awaiting_stock",
-      label: labels.stock.awaitingStock
-    },
-    {
-      active: current === "ready_to_pack",
-      at: order.workflowTimeline.allocatedAt,
-      complete:
-        Boolean(order.workflowTimeline.allocatedAt) ||
-        current === "ready_to_pack" ||
-        current === "ready_to_ship" ||
-        current === "pickup_booked" ||
-        current === "sent",
-      key: "ready_to_pack",
-      label: labels.stock.readyToPack
-    },
-    {
-      active: current === "ready_to_ship",
-      at: order.workflowTimeline.boxedAt ?? order.workflowTimeline.allocatedAt,
-      complete:
-        Boolean(order.workflowTimeline.boxedAt) ||
-        current === "ready_to_ship" ||
-        current === "pickup_booked" ||
-        current === "sent",
-      key: "ready_to_ship",
-      label: labels.stock.readyToShip
-    },
-    {
-      active: false,
-      at: order.workflowTimeline.pickupBookedAt,
-      complete:
-        Boolean(order.workflowTimeline.pickupBookedAt) ||
-        current === "pickup_booked" ||
-        current === "sent",
-      key: "pickup_booked",
-      label: labels.stock.pickupBooked
-    },
-    {
-      active: current === "pickup_booked",
-      at: order.workflowTimeline.sentAt,
-      complete: Boolean(order.workflowTimeline.sentAt) || current === "sent",
-      key: "sent",
-      label: labels.stock.sent
-    }
-  ] as const;
-}
-
-type RetailOrderDocumentKind =
-  | "invoice"
-  | "order"
-  | "order-pack"
-  | "packing-sheet"
-  | "shipping-label";
-
-function presentText(value: string | null | undefined): value is string {
-  return Boolean(value?.trim());
-}
-
-function escapeHtml(value: unknown) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function addressHasValue(address: AdminRetailCustomerOrderAddress | null) {
-  return Boolean(address && Object.values(address).some((value) => Boolean(value)));
-}
-
-function fallbackDeliveryAddressForOrder(
-  order: AdminRetailCustomerOrder
-): AdminRetailCustomerOrderAddress | null {
-  const address: AdminRetailCustomerOrderAddress = {
-    addressLine1: null,
-    addressLine2: null,
-    city: null,
-    country: order.routingSnapshot?.shippingCountry ?? null,
-    customerEmail: order.customerEmail,
-    customerName: order.customerName,
-    notes: order.notes,
-    phone: null,
-    postalCode: null,
-    province: null
-  };
-
-  return addressHasValue(address) ? address : null;
-}
-
-function deliveryAddressForOrder(order: AdminRetailCustomerOrder) {
-  return (
-    order.deliveryDetails?.shippingAddress ??
-    fallbackDeliveryAddressForOrder(order)
-  );
-}
-
-function billingAddressForOrder(order: AdminRetailCustomerOrder) {
-  if (order.deliveryDetails?.billingSameAsShipping) {
-    return null;
-  }
-
-  return order.deliveryDetails?.billingAddress ?? null;
-}
-
-function addressDisplayLines(address: AdminRetailCustomerOrderAddress | null) {
-  if (!address) {
-    return [];
-  }
-
-  const cityLine = [
-    address.city,
-    address.province,
-    address.postalCode
-  ].filter(presentText).join(", ");
-  const countryLine = address.country
-    ? productCountryLabel(address.country)
-    : null;
-
-  return [
-    address.customerName,
-    address.addressLine1,
-    address.addressLine2,
-    cityLine,
-    countryLine
-  ].filter(presentText);
-}
-
-function addressContactLines(
-  labels: AdminContent,
-  address: AdminRetailCustomerOrderAddress | null
-) {
-  if (!address) {
-    return [];
-  }
-
-  return [
-    address.phone ? `${labels.stock.phone}: ${address.phone}` : null,
-    address.customerEmail ? `${labels.stock.email}: ${address.customerEmail}` : null,
-    address.notes ? `${labels.stock.deliveryNotes}: ${address.notes}` : null
-  ].filter(presentText);
-}
-
-function addressNoteLines(
-  labels: AdminContent,
-  address: AdminRetailCustomerOrderAddress | null
-) {
-  return address?.notes ? [`${labels.stock.deliveryNotes}: ${address.notes}`] : [];
-}
-
-function addressBlockHtml(
-  title: string,
-  lines: readonly string[],
-  contactLines: readonly string[],
-  fallback: string
-) {
-  const body = [...lines, ...contactLines]
-    .map((line) => `<div>${escapeHtml(line)}</div>`)
-    .join("");
-
-  return `
-    <section class="panel">
-      <h2>${escapeHtml(title)}</h2>
-      <div class="address">${body || `<div class="muted">${escapeHtml(fallback)}</div>`}</div>
-    </section>
-  `;
-}
-
-function retailOrderDocumentTitle(
-  labels: AdminContent,
-  kind: RetailOrderDocumentKind
-) {
-  const titles: Record<RetailOrderDocumentKind, string> = {
-    invoice: labels.stock.invoice,
-    order: labels.stock.printOrder,
-    "order-pack": labels.stock.downloadPdf,
-    "packing-sheet": labels.stock.packingSheet,
-    "shipping-label": labels.stock.shippingLabel
-  };
-
-  return titles[kind];
-}
-
-function orderLineIdentifierParts(line: AdminRetailCustomerOrderLine) {
-  return [
-    `SKU: ${line.productId}`,
-    line.manufacturerSku ? `Manufacturer SKU: ${line.manufacturerSku}` : null,
-    line.ean13 ? `EAN-13: ${line.ean13}` : null
-  ].filter((value): value is string => Boolean(value));
-}
-
-function orderLineAwaitingStockUnits(line: AdminRetailCustomerOrderLine) {
-  return Math.max(0, line.pipeline?.unorderedNeedUnits ?? 0);
-}
-
-const emptyRetailField = "";
-
-function printRetailOrderDocument({
-  kind,
-  labels,
-  lines,
-  locale,
-  order
-}: Readonly<{
-  kind: RetailOrderDocumentKind;
-  labels: AdminContent;
-  lines: readonly AdminRetailCustomerOrderLine[];
-  locale: Locale;
-  order: AdminRetailCustomerOrder;
-}>) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const documentTitle = retailOrderDocumentTitle(labels, kind);
-  const includePrices = kind === "invoice" || kind === "order";
-  const shippingAddress = deliveryAddressForOrder(order);
-  const billingAddress = billingAddressForOrder(order);
-  const shippingLines = addressDisplayLines(shippingAddress);
-  const shippingContactLines = addressContactLines(labels, shippingAddress);
-  const billingLines = addressDisplayLines(billingAddress);
-  const billingContactLines = addressContactLines(labels, billingAddress);
-  const expectedDate =
-    formatDate(
-      order.fulfillmentPromise?.etaDate ??
-        order.routingSnapshot?.etaDate ??
-        order.dueAt,
-      locale
-    ) ?? emptyRetailField;
-  const placedAt = formatDateTime(order.placedAt, locale) ?? emptyRetailField;
-  const generatedAt =
-    formatDateTime(new Date().toISOString(), locale) ?? new Date().toISOString();
-  const orderTotal =
-    formatPrice(locale, order.currency, customerOrderRetailValue(order)) ??
-    emptyRetailField;
-  const deliverySection = addressBlockHtml(
-    labels.stock.deliveryAddress,
-    shippingLines,
-    shippingContactLines,
-    emptyRetailField
-  );
-  const billingSection = addressBlockHtml(
-    labels.stock.billingAddress,
-    billingLines,
-    billingContactLines,
-    order.deliveryDetails?.billingSameAsShipping
-      ? labels.stock.billingSameAsDelivery
-      : emptyRetailField
-  );
-  const summarySection = `
-    <section class="panel">
-      <h2>${escapeHtml(labels.stock.customerOrderDetails)}</h2>
-      <dl>
-        <dt>${escapeHtml(labels.stock.customerOrders)}</dt>
-        <dd>${escapeHtml(order.orderNumber)}</dd>
-        <dt>${escapeHtml(labels.stock.organisation)}</dt>
-        <dd>${escapeHtml(order.organisationName)}</dd>
-        <dt>${escapeHtml(labels.stock.status)}</dt>
-        <dd>${escapeHtml(readableToken(order.status))}</dd>
-        <dt>${escapeHtml(labels.stock.expectedAt)}</dt>
-        <dd>${escapeHtml(expectedDate)}</dd>
-        <dt>${escapeHtml(labels.stock.placedAt)}</dt>
-        <dd>${escapeHtml(placedAt)}</dd>
-        <dt>${escapeHtml(labels.stock.retailValue)}</dt>
-        <dd>${escapeHtml(orderTotal)}</dd>
-      </dl>
-    </section>
-  `;
-
-  const itemTableHtml = (showPrices: boolean) => {
-    const priceHeadings = showPrices
-      ? `<th>${escapeHtml(labels.stock.retailPrice)}</th><th>${escapeHtml(labels.stock.lineTotal)}</th>`
-      : "";
-    const itemRows = lines
-      .map((line) => {
-        const identifiers = orderLineIdentifierParts(line);
-        const unitPrice =
-          line.retailPriceAmount === null
-            ? emptyRetailField
-            : (formatPrice(locale, order.currency, line.retailPriceAmount) ??
-              emptyRetailField);
-        const lineTotal =
-          line.retailPriceAmount === null
-            ? emptyRetailField
-            : (formatPrice(
-                locale,
-                order.currency,
-                line.retailPriceAmount * line.quantityOrdered
-              ) ?? emptyRetailField);
-
-        return `
-          <tr>
-            <td>
-              <div class="product-title">${escapeHtml(line.productTitle)}</div>
-              ${
-                identifiers.length
-                  ? `<div class="identifiers">${identifiers.map(escapeHtml).join(" · ")}</div>`
-                  : ""
-              }
-            </td>
-            <td>${escapeHtml(line.quantityOrdered)}</td>
-            ${showPrices ? `<td>${escapeHtml(unitPrice)}</td><td>${escapeHtml(lineTotal)}</td>` : ""}
-          </tr>
-        `;
-      })
-      .join("");
-
-    return `
-      <table>
-        <thead>
-          <tr>
-            <th>${escapeHtml(labels.stock.product)}</th>
-            <th>${escapeHtml(labels.stock.quantity)}</th>
-            ${priceHeadings}
-          </tr>
-        </thead>
-        <tbody>
-          ${itemRows || `<tr><td colspan="${showPrices ? 4 : 2}">${escapeHtml(labels.stock.noItemsSelected)}</td></tr>`}
-        </tbody>
-      </table>
-    `;
-  };
-
-  const shippingLabelSheetHtml = () => {
-    const carrierName = order.shipment?.carrierName ?? "";
-    const isKexCarrier = /(?:\bkex\b|kerry)/i.test(carrierName);
-
-    return `
-    <main class="label ${isKexCarrier ? "label-kex" : ""}">
-      <div class="muted">${escapeHtml(labels.stock.shippingLabel)}</div>
-      <h1>${escapeHtml(labels.stock.deliveryAddress)}</h1>
-      <div class="label-address">
-        ${[...shippingLines, ...shippingContactLines]
-          .map((line) => `<div>${escapeHtml(line)}</div>`)
-          .join("") || `<div>${escapeHtml(emptyRetailField)}</div>`}
-      </div>
-      <div class="label-footer">
-        <div><strong>${escapeHtml(labels.stock.customerOrders)}:</strong> ${escapeHtml(order.orderNumber)}</div>
-        <div><strong>${escapeHtml(labels.stock.organisation)}:</strong> ${escapeHtml(order.organisationName)}</div>
-        ${
-          carrierName
-            ? `<div><strong>Carrier:</strong> ${escapeHtml(carrierName)}</div>`
-            : ""
-        }
-        ${
-          order.shipment?.trackingNumber
-            ? `<div><strong>Tracking:</strong> ${escapeHtml(order.shipment.trackingNumber)}</div>`
-            : ""
-        }
-        <div><strong>${escapeHtml(labels.stock.expectedAt)}:</strong> ${escapeHtml(expectedDate)}</div>
-      </div>
-      ${
-        isKexCarrier
-          ? `<section class="kex-note">
-              <strong>KEX QR/AWB:</strong> print the official KEX label or scan the KEX QR from the carrier system before handover. This sheet is not a carrier-issued AWB.
-            </section>`
-          : ""
-      }
-    </main>
-    `;
-  };
-
-  const standardSheetHtml = (
-    sheetTitle: string,
-    showPrices: boolean,
-    showBilling: boolean
-  ) => `
-    <main class="sheet">
-      <header>
-        <div>
-          <div class="eyebrow">${escapeHtml(sheetTitle)}</div>
-          <h1>${escapeHtml(order.orderNumber)}</h1>
-        </div>
-        <div class="generated">${escapeHtml(generatedAt)}</div>
-      </header>
-      <div class="grid">
-        ${summarySection}
-        ${deliverySection}
-        ${showBilling ? billingSection : ""}
-      </div>
-      <section class="panel">
-        <h2>${escapeHtml(labels.stock.orderItems)}</h2>
-        ${itemTableHtml(showPrices)}
-      </section>
-      ${
-        showPrices
-          ? `<section class="totals"><span>${escapeHtml(labels.stock.total)}</span><strong>${escapeHtml(orderTotal)}</strong></section>`
-          : ""
-      }
-    </main>
-  `;
-  const standardBody =
-    kind === "order-pack"
-      ? [
-          standardSheetHtml(labels.stock.printOrder, true, true),
-          standardSheetHtml(labels.stock.packingSheet, false, false),
-          shippingLabelSheetHtml(),
-          standardSheetHtml(labels.stock.invoice, true, true)
-        ].join("")
-      : kind === "shipping-label"
-        ? shippingLabelSheetHtml()
-        : standardSheetHtml(
-            documentTitle,
-            includePrices,
-            kind === "invoice" || kind === "order"
-          );
-  const html = `
-    <!doctype html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>${escapeHtml(documentTitle)} ${escapeHtml(order.orderNumber)}</title>
-        <style>
-          @page { margin: 18mm; }
-          * { box-sizing: border-box; }
-          body { color: #111827; font-family: Arial, sans-serif; margin: 0; }
-          main { padding: 24px; }
-          header { align-items: flex-start; border-bottom: 1px solid #d1d5db; display: flex; justify-content: space-between; margin-bottom: 20px; padding-bottom: 16px; }
-          h1 { font-size: 28px; margin: 4px 0 0; }
-          h2 { font-size: 14px; margin: 0 0 10px; text-transform: uppercase; }
-          table { border-collapse: collapse; width: 100%; }
-          th, td { border-bottom: 1px solid #e5e7eb; padding: 9px 8px; text-align: left; vertical-align: top; }
-          th { color: #4b5563; font-size: 11px; text-transform: uppercase; }
-          dl { display: grid; grid-template-columns: 150px 1fr; margin: 0; row-gap: 6px; }
-          dt { color: #6b7280; font-weight: 700; }
-          dd { margin: 0; }
-          .address { line-height: 1.45; }
-          .identifiers { color: #6b7280; font-size: 11px; margin-top: 4px; }
-          .product-title { font-weight: 700; }
-          .eyebrow, .generated, .muted { color: #6b7280; font-size: 12px; }
-          .grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
-          .panel { border: 1px solid #d1d5db; border-radius: 8px; margin-bottom: 12px; padding: 14px; }
-          .sheet + .sheet, .sheet + .label, .label + .sheet { border-top: 1px dashed #d1d5db; }
-          .totals { align-items: center; display: flex; font-size: 18px; gap: 16px; justify-content: flex-end; margin-top: 16px; }
-          .label { min-height: 70vh; padding: 32px; position: relative; }
-          .label h1 { border-bottom: 2px solid #111827; font-size: 22px; padding-bottom: 10px; }
-          .label-address { font-size: 28px; font-weight: 700; line-height: 1.35; margin-top: 28px; }
-          .label-footer { border-top: 1px solid #d1d5db; bottom: 32px; display: grid; gap: 8px; left: 32px; position: absolute; right: 32px; padding-top: 16px; }
-          .kex-note { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 10px; color: #92400e; font-size: 14px; line-height: 1.45; margin-top: 28px; padding: 12px; }
-          @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            main { padding: 0; }
-            .panel { break-inside: avoid; }
-            .sheet, .label { break-after: page; page-break-after: always; }
-            .sheet:last-child, .label:last-child { break-after: auto; page-break-after: auto; }
-            .sheet + .sheet, .sheet + .label, .label + .sheet { border-top: 0; }
-          }
-        </style>
-      </head>
-      <body>${standardBody}</body>
-    </html>
-  `;
-  const popup = window.open(
-    "",
-    "_blank",
-    "width=900,height=1200"
-  );
-
-  if (!popup) {
-    window.print();
-    return;
-  }
-
-  popup.document.open();
-  popup.document.write(html);
-  popup.document.close();
-  popup.focus();
-  window.setTimeout(() => {
-    popup.print();
-  }, 150);
 }
 
 function panelFromView(view: AdminDashboardView): RetailStockPanel {
@@ -1226,79 +332,6 @@ async function saveStockAction(body: Record<string, unknown>) {
 
 function actionErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
-}
-
-function shoppingListIdFromResult(result: unknown) {
-  if (!result || typeof result !== "object" || Array.isArray(result)) {
-    return "";
-  }
-
-  const shoppingListId = (result as Record<string, unknown>).shoppingListId;
-
-  return typeof shoppingListId === "string" ? shoppingListId : "";
-}
-
-function ProductThumbnail({
-  imageUrl,
-  title
-}: Readonly<{
-  imageUrl: string | null;
-  title: string;
-}>) {
-  const fallback = title.trim().slice(0, 2) || "MN";
-
-  return (
-    <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-gray-100 ring-1 ring-gray-200">
-      {imageUrl ? (
-        <SafeImage
-          alt=""
-          className="size-full object-cover"
-          height={56}
-          loading="lazy"
-          src={imageUrl}
-          width={56}
-        />
-      ) : (
-        <span className="px-1 text-center text-xs font-semibold text-gray-500">
-          {fallback}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function StockNumberInput({
-  disabled,
-  label,
-  max,
-  min = 0,
-  onChange,
-  step = "1",
-  value
-}: Readonly<{
-  disabled: boolean;
-  label: string;
-  max?: number;
-  min?: number;
-  onChange: (value: string) => void;
-  step?: string;
-  value: string;
-}>) {
-  return (
-    <label className="grid gap-1 text-xs font-semibold text-gray-500">
-      {label}
-      <input
-        className="w-full rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
-        disabled={disabled}
-        max={max}
-        min={min}
-        onChange={(event) => onChange(event.target.value)}
-        step={step}
-        type="number"
-        value={value}
-      />
-    </label>
-  );
 }
 
 export function AdminRetailStockView({

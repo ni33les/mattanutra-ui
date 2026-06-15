@@ -82,6 +82,28 @@ const adminRetailStockView = readFileSync(
   new URL("../components/admin/retail-stock-view.tsx", import.meta.url),
   "utf8"
 );
+const adminRetailStockCustomerOrderDisplay = readFileSync(
+  new URL(
+    "../components/admin/retail-stock/customer-order-display-model.ts",
+    import.meta.url
+  ),
+  "utf8"
+);
+const adminRetailStockOrderDocuments = readFileSync(
+  new URL("../components/admin/retail-stock/order-documents.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailStockShoppingListViewModel = readFileSync(
+  new URL(
+    "../components/admin/retail-stock/shopping-list-view-model.ts",
+    import.meta.url
+  ),
+  "utf8"
+);
+const adminRetailStockControls = readFileSync(
+  new URL("../components/admin/retail-stock/stock-controls.tsx", import.meta.url),
+  "utf8"
+);
 const retailOrderWorkflowRules = readFileSync(
   new URL("../lib/retail-order-workflow-rules.ts", import.meta.url),
   "utf8"
@@ -340,9 +362,59 @@ describe("codebase cleanup guardrails", () => {
       "admin retail stock service must not grow before it is decomposed"
     );
     assert.ok(
-      lineCount(adminRetailStockView) <= 5_600,
+      lineCount(adminRetailStockView) <= 4_700,
       "admin retail stock view must not grow before it is decomposed"
     );
+    assert.match(
+      adminRetailStockView,
+      /@\/components\/admin\/retail-stock\/customer-order-display/
+    );
+    assert.match(
+      adminRetailStockView,
+      /@\/components\/admin\/retail-stock\/order-documents/
+    );
+    assert.match(
+      adminRetailStockView,
+      /@\/components\/admin\/retail-stock\/shopping-list-view-model/
+    );
+    assert.match(
+      adminRetailStockView,
+      /@\/components\/admin\/retail-stock\/stock-controls/
+    );
+    for (const forbidden of [
+      /function activeShoppingListCoverageUnits/,
+      /function buildCustomerOrderWorkflowSteps/,
+      /function customerOrderStatusMetricKey/,
+      /function printRetailOrderDocument/,
+      /function ProductThumbnail/,
+      /function StockNumberInput/,
+      /type ReorderPurchaseItem\s*=/,
+      /type StockDraft\s*=/
+    ]) {
+      assert.doesNotMatch(
+        adminRetailStockView,
+        forbidden,
+        `retail stock view must not reintroduce ${forbidden}`
+      );
+    }
+    assert.match(
+      adminRetailStockCustomerOrderDisplay,
+      /export function customerOrderStatusMetricKey/
+    );
+    assert.match(
+      adminRetailStockCustomerOrderDisplay,
+      /export function buildCustomerOrderWorkflowSteps/
+    );
+    assert.match(
+      adminRetailStockOrderDocuments,
+      /export function printRetailOrderDocument/
+    );
+    assert.match(
+      adminRetailStockShoppingListViewModel,
+      /export function activeShoppingListCoverageUnits/
+    );
+    assert.match(adminRetailStockControls, /export function ProductThumbnail/);
+    assert.match(adminRetailStockControls, /export function StockNumberInput/);
     assert.match(adminRetailStockService, /\bexport async function getAdminRetailStockData\b/);
     assert.match(adminRetailStockService, /\bexport async function advanceRetailCustomerOrder\b/);
     assert.match(adminRetailStockService, /\bexport async function recordRetailCustomerOrderPickupBooked\b/);
