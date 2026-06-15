@@ -78,6 +78,14 @@ const adminRetailStockService = readFileSync(
   new URL("../lib/admin-retail-stock.ts", import.meta.url),
   "utf8"
 );
+const adminRetailStockCodecs = readFileSync(
+  new URL("../lib/admin-retail-stock-codecs.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailOrderReadModel = readFileSync(
+  new URL("../lib/admin-retail-order-read-model.ts", import.meta.url),
+  "utf8"
+);
 const adminRetailStockView = readFileSync(
   new URL("../components/admin/retail-stock-view.tsx", import.meta.url),
   "utf8"
@@ -358,7 +366,7 @@ describe("codebase cleanup guardrails", () => {
 
   it("keeps retail stock cleanup hotspots visible until they are split", () => {
     assert.ok(
-      lineCount(adminRetailStockService) <= 8_000,
+      lineCount(adminRetailStockService) <= 7_200,
       "admin retail stock service must not grow before it is decomposed"
     );
     assert.ok(
@@ -418,6 +426,42 @@ describe("codebase cleanup guardrails", () => {
     assert.match(adminRetailStockService, /\bexport async function getAdminRetailStockData\b/);
     assert.match(adminRetailStockService, /\bexport async function advanceRetailCustomerOrder\b/);
     assert.match(adminRetailStockService, /\bexport async function recordRetailCustomerOrderPickupBooked\b/);
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-codecs/);
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-order-read-model/);
+    assert.match(
+      adminRetailStockService,
+      /export \{ getRetailCustomerOrderActionStates \}/
+    );
+    for (const forbidden of [
+      /function routingSnapshotFromMetadata/,
+      /function pricingSnapshotFromMetadata/,
+      /function deliveryDetailsFromMetadata/,
+      /function shipmentFromMetadata/,
+      /function mergeCustomerOrderShipment/,
+      /function lineAvailabilityFromMetadata/,
+      /function getRetailCustomerOrderActionStates/,
+      /function getRetailCustomerOrderWorkflowHealth/,
+      /function customerOrderWorkflowTimeline/,
+      /function isTerminalTaskStatus/,
+      /function stockStatus/,
+      /function movementDelta/,
+      /function integerOrDefault/,
+      /function objectRecord/
+    ]) {
+      assert.doesNotMatch(
+        adminRetailStockService,
+        forbidden,
+        `retail stock service must not reintroduce ${forbidden}`
+      );
+    }
+    assert.match(adminRetailStockCodecs, /export function stockStatus/);
+    assert.match(adminRetailStockCodecs, /export function movementDelta/);
+    assert.match(adminRetailStockCodecs, /export function integerOrDefault/);
+    assert.match(adminRetailStockCodecs, /export function objectRecord/);
+    assert.match(adminRetailOrderReadModel, /export function deliveryDetailsFromMetadata/);
+    assert.match(adminRetailOrderReadModel, /export function lineAvailabilityFromMetadata/);
+    assert.match(adminRetailOrderReadModel, /export function getRetailCustomerOrderActionStates/);
+    assert.match(adminRetailOrderReadModel, /export function customerOrderWorkflowTimeline/);
     assert.match(adminRetailStockService, /@\/lib\/retail-order-workflow-rules/);
     assert.doesNotMatch(adminRetailStockService, /\bfunction workflowStageForStatus\b/);
     assert.doesNotMatch(adminRetailStockService, /\bfunction retailOrderWorkflowTaskDetails\b/);

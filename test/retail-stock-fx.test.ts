@@ -244,6 +244,14 @@ describe("retail stock and FX infrastructure", () => {
 	      "utf8"
 	    );
 	    const service = readFileSync("lib/admin-retail-stock.ts", "utf8");
+	    const orderReadModel = readFileSync(
+	      "lib/admin-retail-order-read-model.ts",
+	      "utf8"
+	    );
+	    const stockCodecs = readFileSync(
+	      "lib/admin-retail-stock-codecs.ts",
+	      "utf8"
+	    );
 	    const workflowRules = readFileSync(
 	      "lib/retail-order-workflow-rules.ts",
 	      "utf8"
@@ -360,10 +368,13 @@ describe("retail stock and FX infrastructure", () => {
 	      /runCustomerOrderAction\(customerOrderDetail, "mark_picking"\)/
 	    );
 	    assert.doesNotMatch(view, /package-insert|packageInsert|FileText/);
-	    assert.match(service, /function deliveryDetailsFromMetadata/);
-	    assert.match(service, /shippingAddress = orderAddressFromMetadata\(metadata\.shippingAddress\)/);
-	    assert.match(service, /billingAddress = billingSameAsShipping[\s\S]*orderAddressFromMetadata\(metadata\.billingAddress\)/);
+	    assert.match(orderReadModel, /function deliveryDetailsFromMetadata/);
+	    assert.match(orderReadModel, /shippingAddress = orderAddressFromMetadata\(metadata\.shippingAddress\)/);
+	    assert.match(orderReadModel, /billingAddress = billingSameAsShipping[\s\S]*orderAddressFromMetadata\(metadata\.billingAddress\)/);
 	    assert.match(service, /deliveryDetails: deliveryDetailsFromMetadata\(row\.metadata\)/);
+	    assert.match(stockCodecs, /export function stockStatus/);
+	    assert.match(stockCodecs, /export function movementDelta/);
+	    assert.match(stockCodecs, /export function integerOrDefault/);
 	    assert.match(retailProductCheckout, /billingAddress: paymentMetadata\.billingAddress \?\? null/);
 	    assert.match(retailProductCheckout, /billingSameAsShipping: paymentMetadata\.billingSameAsShipping !== false/);
 	    assert.doesNotMatch(view, /labels\.stock\.searchProducts/);
@@ -821,9 +832,10 @@ describe("retail stock and FX infrastructure", () => {
 		    assert.match(view, /item\.amountToBuyUnits < 1[\s\S]*return;/);
 		    assert.doesNotMatch(service, /export async function buildPurchaseOrderDraftFromBackorderTask/);
 		    assert.doesNotMatch(service, /retail_purchase_order_place_order/);
-	    assert.match(service, /No live stock is available to allocate/);
+	    assert.match(orderReadModel, /No live stock is available to allocate/);
 	    assert.match(service, /export type AdminRetailCustomerOrderActionStates/);
-	    assert.match(service, /export function getRetailCustomerOrderActionStates/);
+	    assert.match(orderReadModel, /export function getRetailCustomerOrderActionStates/);
+	    assert.match(service, /export \{ getRetailCustomerOrderActionStates \}/);
 	    assert.match(service, /export async function ensureOrderWorkflowTask/);
 	    assert.match(service, /admin\.retail_order_workflow_task_repaired/);
 	    assert.match(service, /retail_order_task_repaired/);
@@ -968,7 +980,7 @@ describe("retail stock and FX infrastructure", () => {
     assert.match(service, /retail_stock_reorder_advice/);
 	    assert.doesNotMatch(service, /createRetailPurchaseOrder/);
 	    assert.match(service, /createRetailCustomerOrder/);
-	    assert.match(service, /if \(value === null \|\| value === undefined \|\| value === ""\)/);
+	    assert.match(stockCodecs, /if \(value === null \|\| value === undefined \|\| value === ""\)/);
 	    assert.match(service, /resolveRegionalBasketAvailability/);
     assert.match(service, /regionalRouting/);
 	    assert.match(service, /selectedRetailerOrganisationId/);
@@ -991,9 +1003,9 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(service, /reconcileRetailOrderLifecycle/);
 	    assert.match(service, /admin\.retail_order_lifecycle_reconciled/);
 	    assert.match(service, /AdminRetailCustomerOrderWorkflowTimeline/);
-	    assert.match(service, /customerOrderWorkflowTimeline/);
+	    assert.match(orderReadModel, /customerOrderWorkflowTimeline/);
 	    assert.match(service, /workflowTimeline: customerOrderWorkflowTimeline/);
-	    assert.match(service, /workflowEventStatus/);
+	    assert.match(orderReadModel, /workflowEventStatus/);
 	    assert.match(service, /transitionRetailCustomerOrder/);
 	    assert.match(service, /recordRetailOrderWorkflowBpm/);
 	    assert.match(service, /sendRetailOrderWorkflowEmail/);

@@ -164,13 +164,20 @@ describe("process runtime technical debt sweep", () => {
 
   it("repairs stale allocations before orders can be packed or shipped", async () => {
     const stock = await readFile("lib/admin-retail-stock.ts", "utf8");
+    const orderReadModel = await readFile(
+      "lib/admin-retail-order-read-model.ts",
+      "utf8"
+    );
     const carrier = await readFile("lib/retail-carrier-shipments.ts", "utf8");
     const customerOrderDisplay = await readFile(
       "components/admin/retail-stock/customer-order-display-model.ts",
       "utf8"
     );
     const pipeline = functionBody(stock, "getRetailStockPipeline");
-    const actionStates = functionBody(stock, "getRetailCustomerOrderActionStates");
+    const actionStates = functionBody(
+      orderReadModel,
+      "getRetailCustomerOrderActionStates"
+    );
     const stockRepair = functionBody(stock, "repairRetailStockAllocationIntegrity");
     const orderRepair = functionBody(stock, "repairCustomerOrderAllocationIntegrity");
     const movementRecorder = functionBody(stock, "recordRetailStockMovement");
