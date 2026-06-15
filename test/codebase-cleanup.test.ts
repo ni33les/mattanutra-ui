@@ -70,6 +70,38 @@ const adminProductsService = readFileSync(
   new URL("../lib/admin-products.ts", import.meta.url),
   "utf8"
 );
+const adminRetailFinancialsService = readFileSync(
+  new URL("../lib/admin-retail-financials.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailStockService = readFileSync(
+  new URL("../lib/admin-retail-stock.ts", import.meta.url),
+  "utf8"
+);
+const adminRetailStockView = readFileSync(
+  new URL("../components/admin/retail-stock-view.tsx", import.meta.url),
+  "utf8"
+);
+const retailOrderWorkflowRules = readFileSync(
+  new URL("../lib/retail-order-workflow-rules.ts", import.meta.url),
+  "utf8"
+);
+const communicationsService = readFileSync(
+  new URL("../lib/communications.ts", import.meta.url),
+  "utf8"
+);
+const productCatalogueCsv = readFileSync(
+  new URL("../lib/product-catalogue-csv.ts", import.meta.url),
+  "utf8"
+);
+const productRecommendations = readFileSync(
+  new URL("../lib/product-recommendations.ts", import.meta.url),
+  "utf8"
+);
+const systemAgents = readFileSync(
+  new URL("../lib/system-agents.ts", import.meta.url),
+  "utf8"
+);
 const dbSchema = readFileSync(new URL("../db-schema.sql", import.meta.url), "utf8");
 const adminReviewQueueView = readFileSync(
   new URL("../components/admin/review-queue-view.tsx", import.meta.url),
@@ -279,6 +311,67 @@ describe("codebase cleanup guardrails", () => {
     assert.match(auditScript, /tableCounts/);
     assert.match(auditScript, /codeInventory/);
     assert.match(auditScript, /Direct SQL Write Hotspots/);
+    assert.doesNotMatch(auditScript, /legacyTerms,\s*\n\s*legacyTerms,/);
+  });
+
+  it("keeps the first cleanup package warning-free by removing confirmed dead symbols", () => {
+    const adminViewDatabaseAvailableSource = adminDashboardView.slice(
+      adminDashboardView.indexOf("function adminViewDatabaseAvailable"),
+      adminDashboardView.indexOf("export function AdminDashboard")
+    );
+
+    assert.doesNotMatch(adminViewDatabaseAvailableSource, /productDetailId/);
+
+    for (const [name, source, forbidden] of [
+      ["admin product detail route", adminProductDetailRoute, "emptyAdminProductsData"],
+      ["retail stock view", adminRetailStockView, "function stockAvailabilityLabel"],
+      ["retail financials service", adminRetailFinancialsService, "function objectValue"],
+      ["communications service", communicationsService, "function booleanValue"],
+      ["product catalogue CSV importer", productCatalogueCsv, "function lineApprovalText"],
+      ["system agents", systemAgents, "RETAIL_AGENT_EXECUTABLE_TASK_TYPES"]
+    ] as const) {
+      assert.equal(source.includes(forbidden), false, `${name} still contains ${forbidden}`);
+    }
+  });
+
+  it("keeps retail stock cleanup hotspots visible until they are split", () => {
+    assert.ok(
+      lineCount(adminRetailStockService) <= 8_000,
+      "admin retail stock service must not grow before it is decomposed"
+    );
+    assert.ok(
+      lineCount(adminRetailStockView) <= 5_600,
+      "admin retail stock view must not grow before it is decomposed"
+    );
+    assert.match(adminRetailStockService, /\bexport async function getAdminRetailStockData\b/);
+    assert.match(adminRetailStockService, /\bexport async function advanceRetailCustomerOrder\b/);
+    assert.match(adminRetailStockService, /\bexport async function recordRetailCustomerOrderPickupBooked\b/);
+    assert.match(adminRetailStockService, /@\/lib\/retail-order-workflow-rules/);
+    assert.doesNotMatch(adminRetailStockService, /\bfunction workflowStageForStatus\b/);
+    assert.doesNotMatch(adminRetailStockService, /\bfunction retailOrderWorkflowTaskDetails\b/);
+    assert.match(retailOrderWorkflowRules, /\bexport function workflowStageForStatus\b/);
+    assert.match(retailOrderWorkflowRules, /\bexport function retailOrderWorkflowTaskDetails\b/);
+  });
+
+  it("keeps legacy product matchers quarantined away from live callers", () => {
+    assert.match(productRecommendations, /return recommendProductStackFullBeam\(input\)/);
+
+    for (const root of ["../app/", "../components/", "../lib/", "../workers/"] as const) {
+      for (const file of trackedSourceFiles(new URL(root, import.meta.url))) {
+        const path = file.pathname;
+
+        if (path.endsWith("/lib/product-recommendations.ts")) {
+          continue;
+        }
+
+        const source = readFileSync(file, "utf8");
+        assert.equal(
+          source.includes("recommendProductStackV2"),
+          false,
+          `${path} imports or calls the legacy product matcher`
+        );
+      }
+    }
   });
 
   it("keeps admin safety views split by domain roots", () => {

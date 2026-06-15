@@ -168,12 +168,6 @@ function toJsonValue(value: unknown): postgres.JSONValue {
   return JSON.parse(serialized === undefined ? "{}" : serialized) as postgres.JSONValue;
 }
 
-function objectValue(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
-}
-
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }

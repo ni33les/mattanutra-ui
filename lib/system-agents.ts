@@ -1,5 +1,4 @@
 import type { AgentType } from "./task-service.ts";
-import { RETAIL_AGENT_EXECUTABLE_TASK_TYPES } from "./retail-task-policy.ts";
 import { normalizeCapabilities } from "./task-service-utils.ts";
 
 export const AGENT_CAPABILITIES = {

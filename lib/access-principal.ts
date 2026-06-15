@@ -353,7 +353,7 @@ async function logAgentAuthFailure(
     console.warn(
       `[worker-auth] agent credential rejected reason=${authFailureReason(rows[0])}`
     );
-  } catch (error) {
+  } catch {
     console.warn("[worker-auth] agent credential rejected reason=diagnostic_failed");
   }
 }

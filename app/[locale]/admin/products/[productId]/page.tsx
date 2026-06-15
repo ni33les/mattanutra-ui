@@ -28,10 +28,7 @@ import { emptyFlow } from "@/lib/admin-flow-data";
 import { emptyFinancials } from "@/lib/admin-financials";
 import { emptyAdminRetailFinancialsData } from "@/lib/admin-retail-financials";
 import { emptyAdminFoodsData } from "@/lib/admin-foods";
-import {
-  emptyAdminProductsData,
-  getAdminProductsData
-} from "@/lib/admin-products";
+import { getAdminProductsData } from "@/lib/admin-products";
 import { emptyAdminRetailStockData } from "@/lib/admin-retail-stock";
 import {
   emptyAdminRecommendationInsightsData

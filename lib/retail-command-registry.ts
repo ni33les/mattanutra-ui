@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import type postgres from "postgres";
 import {
   recordAdminAudit,
   type AdminSessionContext

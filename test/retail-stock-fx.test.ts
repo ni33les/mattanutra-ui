@@ -228,6 +228,10 @@ describe("retail stock and FX infrastructure", () => {
 	      "utf8"
 	    );
 	    const service = readFileSync("lib/admin-retail-stock.ts", "utf8");
+	    const workflowRules = readFileSync(
+	      "lib/retail-order-workflow-rules.ts",
+	      "utf8"
+	    );
     const route = readFileSync("app/api/admin/retail-stock/route.ts", "utf8");
     const basketRoute = readFileSync("app/api/retail/basket/availability/route.ts", "utf8");
     const cartService = readFileSync("lib/retail-cart-availability.ts", "utf8");
@@ -467,8 +471,6 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /current === metricId \? "all" : \(metricId as CustomerOrderFilter\)/);
 	    assert.match(view, /type RetailStockAvailabilityStatus/);
 	    assert.match(view, /function stockAvailabilityStatus/);
-	    assert.match(view, /function stockAvailabilityLabel/);
-	    assert.match(view, /low_stock: labels\.stock\.lowStock/);
 	    assert.match(view, /daysCover <= leadTimeDays \+ 1/);
 	    assert.match(view, /daysCover === null && row\.stockQuantity < 3/);
 		    assert.match(view, /row\.status !== "active"/);
@@ -998,16 +1000,17 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(retailStockRoute, /export async function GET/);
 	    assert.match(retailStockRoute, /hasAdminPermission\(context, "stock\.read"\)/);
 	    assert.match(service, /retailOrderWorkflowTaskDetails/);
-	    assert.match(service, /status === "shipped"[\s\S]*return "deliver"/);
+	    assert.match(service, /@\/lib\/retail-order-workflow-rules/);
+	    assert.match(workflowRules, /status === "shipped"[\s\S]*return "deliver"/);
 	    assert.match(service, /taskType: "retail_order_ship"/);
 	    assert.match(service, /taskType: actionTaskType/);
-	    assert.match(service, /retail_order_delivery_confirm/);
-	    assert.match(service, /retail_order_cancel_review/);
-	    assert.match(service, /retail_order_return_review/);
-	    assert.match(service, /title: "Ship customer order"/);
-	    assert.match(service, /title: "Confirm customer delivery"/);
-	    assert.match(service, /title: "Review customer order cancellation"/);
-	    assert.match(service, /title: "Review customer order return"/);
+	    assert.match(workflowRules, /retail_order_delivery_confirm/);
+	    assert.match(workflowRules, /retail_order_cancel_review/);
+	    assert.match(workflowRules, /retail_order_return_review/);
+	    assert.match(workflowRules, /title: "Ship customer order"/);
+	    assert.match(workflowRules, /title: "Confirm customer delivery"/);
+	    assert.match(workflowRules, /title: "Review customer order cancellation"/);
+	    assert.match(workflowRules, /title: "Review customer order return"/);
 	    assert.match(service, /source: "one_click_ship"/);
 	    assert.match(service, /shipmentMetadata/);
 	    assert.match(view, /const grabCarrierName = "Grab"/);

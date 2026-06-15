@@ -1,9 +1,6 @@
 import { toJsonValue } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
-import {
-  normalizeProductCountryCode,
-  type ProductCountryCode
-} from "@/lib/product-countries";
+import { normalizeProductCountryCode } from "@/lib/product-countries";
 
 type Db = NonNullable<ReturnType<typeof getSql>>;
 

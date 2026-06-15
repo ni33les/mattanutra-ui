@@ -216,7 +216,6 @@ function adminViewDatabaseAvailable({
   leadsData,
   panyaData,
   productsData,
-  productDetailId,
   retailFinancialsData,
   retailStockData,
   recommendationInsightsData,
@@ -238,7 +237,6 @@ function adminViewDatabaseAvailable({
   leadsData: AdminLeadsData;
   panyaData: AdminPanyaData;
   productsData: AdminProductsData;
-  productDetailId?: string | null;
   retailFinancialsData: AdminRetailFinancialsData;
   retailStockData: AdminRetailStockData;
   recommendationInsightsData: AdminRecommendationInsightsData;

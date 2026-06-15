@@ -385,7 +385,7 @@ export function AdminRetailFinancialsView({
     }
 
     return `/api/admin/retail-financials?${params.toString()}`;
-  }, [accessToken, range]);
+  }, [accessToken, locale, range]);
 
   async function submitSettlement(formData: FormData) {
     if (!editor || submitting) {

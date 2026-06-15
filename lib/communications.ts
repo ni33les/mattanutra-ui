@@ -263,10 +263,6 @@ function optionalText(value: unknown) {
   return trimmed || null;
 }
 
-function booleanValue(value: unknown, fallback = false) {
-  return typeof value === "boolean" ? value : fallback;
-}
-
 function normalizeAdminCommunicationEventKey(
   value: unknown
 ): AdminCommunicationEventKey | null {

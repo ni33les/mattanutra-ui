@@ -354,19 +354,6 @@ function stockAvailabilityStatus(
   return "in_stock";
 }
 
-function stockAvailabilityLabel(
-  labels: AdminContent,
-  status: RetailStockAvailabilityStatus
-) {
-  const labelsByStatus: Record<RetailStockAvailabilityStatus, string> = {
-    in_stock: labels.stock.inStock,
-    low_stock: labels.stock.lowStock,
-    out_of_stock: labels.stock.outOfStock
-  };
-
-  return labelsByStatus[status];
-}
-
 function retailAvailabilityLabel(status: RetailAvailabilityStatus) {
   const labelsByStatus: Record<RetailAvailabilityStatus, string> = {
     available_now: "Available now",

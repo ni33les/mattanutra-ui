@@ -252,20 +252,6 @@ function backorderPolicyFromColumn(value: string | null) {
     : "allow";
 }
 
-function lineApprovalText(
-  input: Readonly<{
-    agencyName: string | null;
-    approvalNumber: string | null;
-    scopeCode: string | null;
-  }>,
-) {
-  if (!input.agencyName || !input.approvalNumber) {
-    return "";
-  }
-
-  return `${input.agencyName}: ${input.approvalNumber}${input.scopeCode ? ` (${input.scopeCode})` : ""}`;
-}
-
 function generatedManualProductUrl(row: CsvRow) {
   const brand =
     column(row, ["brand", "manufacturer", "manufacturer name"]) ?? "product";

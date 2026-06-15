@@ -1,6 +1,6 @@
 # MattaNutra DB-Up Codebase Cleanup Assessment
 
-Last assessed: 2026-05-21 on local `dev`.
+Last assessed: 2026-06-15 on local `dev`.
 
 ## Executive Summary
 
@@ -16,6 +16,17 @@ The project is now broad enough that cleanup must start from the database and do
 Food, content, communications, finance, campaigns, and BPM exist and should not be deleted, but food should remain dormant in the active recommendation chain until the supplement/product system is clean.
 
 The immediate cleanup risk is not missing code; it is having too many overlapping state systems: mutable projections plus append-only version tables, `status` plus validation cache, `list_status` plus `is_active`, import evidence plus `source_snapshot`, product stack variants plus legacy matcher paths, and old marketplace naming inside catalogue-first code.
+
+## Current Cleanup Baseline
+
+The current `audit:codebase` baseline on 2026-06-15 shows the first cleanup package should stay focused on admin/catalogue and retail internals:
+
+- Total tracked source lines across the audited app/components/lib/scripts/workers/test set: about 200k.
+- Largest module: `lib/admin-retail-stock.ts` at about 7.7k lines, 94 named/exported functions, and 44 direct SQL write sites.
+- Largest UI surface: `components/admin/retail-stock-view.tsx` at about 5.6k lines and 85 named functions.
+- Other cleanup hotspots: `lib/admin-access.ts`, `lib/communications.ts`, `lib/product-recommendations.ts`, task runtime modules, `lib/stripe-payments.ts`, `components/admin/dashboard-content.tsx`, and `lib/retail-carrier-shipments.ts`.
+- First guardrail ceilings are intentionally conservative: retail stock service must not grow past 8k lines and retail stock view must not grow past 5.6k lines before they are split.
+- Product matcher cleanup remains quarantined: live callers must use the full-beam matcher path; the legacy V2 export is allowed only inside `lib/product-recommendations.ts` and comparison tests until fixture coverage is rewritten.
 
 ## Live DB Inventory
 

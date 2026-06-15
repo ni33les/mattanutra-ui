@@ -4,10 +4,7 @@ import type postgres from "postgres";
 import { isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
 import { FINANCE_ACCOUNT_IDS, recordFinanceTransaction } from "@/lib/finance-ledger";
-import {
-  createPendingRetailOrderSettlement,
-  type RetailSettlementQuoteLineInput
-} from "@/lib/admin-retail-financials";
+import { createPendingRetailOrderSettlement } from "@/lib/admin-retail-financials";
 import { resolveUsdRateForCurrency } from "@/lib/finance-fx";
 import { isLocale, type Locale } from "@/lib/i18n";
 import {
