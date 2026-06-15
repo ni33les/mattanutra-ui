@@ -252,6 +252,10 @@ describe("retail stock and FX infrastructure", () => {
 	      "lib/admin-retail-stock-read-model.ts",
 	      "utf8"
 	    );
+	    const stockPipeline = readFileSync(
+	      "lib/admin-retail-stock-pipeline.ts",
+	      "utf8"
+	    );
 	    const stockCodecs = readFileSync(
 	      "lib/admin-retail-stock-codecs.ts",
 	      "utf8"
@@ -822,8 +826,9 @@ describe("retail stock and FX infrastructure", () => {
 			    assert.doesNotMatch(route, /action === "mark_purchase_order_line_missing"/);
 		    assert.doesNotMatch(route, /action === "build_purchase_order_from_backorder_task"/);
 	    assert.match(service, /export type AdminRetailStockPipelineRow/);
-	    assert.match(service, /export async function getRetailStockPipeline/);
-		    assert.match(service, /customerDemandUnits[\s\S]*allocatedUnits[\s\S]*availableNowUnits[\s\S]*unorderedNeedUnits/);
+	    assert.match(service, /export \{ getRetailStockPipeline \}/);
+	    assert.match(stockPipeline, /export async function getRetailStockPipeline/);
+		    assert.match(stockPipeline, /customerDemandUnits[\s\S]*allocatedUnits[\s\S]*availableNowUnits[\s\S]*unorderedNeedUnits/);
 			    assert.match(view, /\.filter\(\(item\) => item\.unassignedDemandUnits > 0\)/);
 			    assert.match(view, /outstandingPurchaseItems\.filter\(\(item\) => item\.unassignedDemandUnits > 0\)/);
 		    assert.match(view, /setSelectedOutstandingPurchaseKeys\(null\)/);

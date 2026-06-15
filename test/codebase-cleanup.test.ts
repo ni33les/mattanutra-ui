@@ -90,6 +90,10 @@ const adminRetailStockReadModel = readFileSync(
   new URL("../lib/admin-retail-stock-read-model.ts", import.meta.url),
   "utf8"
 );
+const adminRetailStockPipeline = readFileSync(
+  new URL("../lib/admin-retail-stock-pipeline.ts", import.meta.url),
+  "utf8"
+);
 const adminRetailStockView = readFileSync(
   new URL("../components/admin/retail-stock-view.tsx", import.meta.url),
   "utf8"
@@ -370,7 +374,7 @@ describe("codebase cleanup guardrails", () => {
 
   it("keeps retail stock cleanup hotspots visible until they are split", () => {
     assert.ok(
-      lineCount(adminRetailStockService) <= 6_900,
+      lineCount(adminRetailStockService) <= 6_650,
       "admin retail stock service must not grow before it is decomposed"
     );
     assert.ok(
@@ -432,10 +436,15 @@ describe("codebase cleanup guardrails", () => {
     assert.match(adminRetailStockService, /\bexport async function recordRetailCustomerOrderPickupBooked\b/);
     assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-codecs/);
     assert.match(adminRetailStockService, /@\/lib\/admin-retail-order-read-model/);
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-pipeline/);
     assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-read-model/);
     assert.match(
       adminRetailStockService,
       /export \{ getRetailCustomerOrderActionStates \}/
+    );
+    assert.match(
+      adminRetailStockService,
+      /export \{ getRetailStockPipeline \}/
     );
     for (const forbidden of [
       /function routingSnapshotFromMetadata/,
@@ -448,6 +457,11 @@ describe("codebase cleanup guardrails", () => {
       /function getRetailCustomerOrderWorkflowHealth/,
       /function customerOrderWorkflowTimeline/,
       /function isTerminalTaskStatus/,
+      /function pipelineStatus/,
+      /function aggregatePipelineRows/,
+      /function pipelineKey/,
+      /function localizedProductTitleExpression/,
+      /export async function getRetailStockPipeline/,
       /function stockStatus/,
       /function movementDelta/,
       /function integerOrDefault/,
@@ -488,6 +502,11 @@ describe("codebase cleanup guardrails", () => {
     assert.match(adminRetailStockReadModel, /export function mapRetailCarrierAccountRow/);
     assert.match(adminRetailStockReadModel, /export function mapRetailStockRow/);
     assert.match(adminRetailStockReadModel, /export function mapRetailShoppingListRow/);
+    assert.match(adminRetailStockPipeline, /export function retailStockPipelineStatus/);
+    assert.match(adminRetailStockPipeline, /export function aggregateRetailStockPipelineRows/);
+    assert.match(adminRetailStockPipeline, /export function retailStockPipelineKey/);
+    assert.match(adminRetailStockPipeline, /export async function getRetailStockPipeline/);
+    assert.match(adminRetailStockPipeline, /export function localizedProductTitleExpression/);
     assert.match(adminRetailStockService, /@\/lib\/retail-order-workflow-rules/);
     assert.doesNotMatch(adminRetailStockService, /\bfunction workflowStageForStatus\b/);
     assert.doesNotMatch(adminRetailStockService, /\bfunction retailOrderWorkflowTaskDetails\b/);
