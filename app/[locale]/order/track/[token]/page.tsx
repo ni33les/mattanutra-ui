@@ -332,7 +332,6 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
                         className="size-14 rounded bg-[var(--mn-cream)] object-contain"
                         height={56}
                         src={line.imageUrl}
-                        unoptimized={true}
                         width={56}
                       />
                     ) : (

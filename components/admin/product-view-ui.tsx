@@ -741,7 +741,6 @@ export function ProductCard({
             className="size-20 rounded-lg object-cover ring-1 ring-gray-200"
             height={80}
             src={row.imageUrl}
-            unoptimized={true}
             width={80}
           />
         ) : (

@@ -10,6 +10,7 @@ function source(path: string) {
 
 const landingPage = source("../components/landing-page.tsx");
 const landingCopy = source("../components/landing-page-copy.ts");
+const customerCss = source("../app/customer.css");
 const titleBar = source("../components/title-bar.tsx");
 const footer = source("../components/site-footer.tsx");
 const homepage = source("../app/[locale]/page.tsx");
@@ -65,6 +66,29 @@ describe("landing page v15 rebuild", () => {
     const intermediateAssessmentLinks = landingPage.match(/href="#assessment"/g) ?? [];
     assert.equal(intermediateAssessmentLinks.length, 0);
     assert.match(landingPage, /<section className="mn-v15-final-cta" id="assessment">/);
+  });
+
+  it("keeps mobile hero ingredient pills visible and positioned", () => {
+    const defaultRule =
+      /\.mn-v15-float-pill\s*\{([\s\S]*?)\n  \}/.exec(customerCss)?.[1] ?? "";
+    const floatStart = customerCss.indexOf(".mn-v15-float-pill {");
+    const desktopStart = customerCss.indexOf(
+      "@media (min-width: 768px)",
+      customerCss.indexOf('.mn-v15-float-pill[data-pill-index="4"]')
+    );
+    const mobileRules = customerCss.slice(floatStart, desktopStart);
+
+    assert.match(defaultRule, /display:\s*inline-flex/);
+    assert.doesNotMatch(defaultRule, /display:\s*none/);
+    assert.match(defaultRule, /max-width:\s*min\(9\.5rem,\s*42vw\)/);
+
+    for (const index of ["0", "1", "2", "3", "4"]) {
+      assert.match(
+        mobileRules,
+        new RegExp(`\\.mn-v15-float-pill\\[data-pill-index="${index}"\\]`),
+        `mobile pill ${index} is positioned before desktop overrides`
+      );
+    }
   });
 
   it("keeps the English visible copy faithful to the uploaded v15 page", () => {

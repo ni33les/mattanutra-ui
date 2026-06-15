@@ -33,6 +33,7 @@ import {
   formatNumber,
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
+import { SafeImage } from "@/components/safe-image";
 import { ContentEditorModal } from "@/components/admin/content-editor-modal";
 
 function contentWorkflowStatusLabel(
@@ -566,16 +567,24 @@ function ContentThumbnail({ row }: Readonly<{ row: AdminContentInventoryRow }>) 
   return (
     <div
       className={classNames(
-        "flex size-20 shrink-0 items-center justify-center overflow-hidden bg-gray-50 text-sm font-semibold text-gray-500 ring-1 ring-gray-200 sm:size-24",
+        "relative flex size-20 shrink-0 items-center justify-center overflow-hidden bg-gray-50 text-sm font-semibold text-gray-500 ring-1 ring-gray-200 sm:size-24",
         row.contentType === "testimonial" ? "rounded-full" : "rounded-lg"
       )}
     >
       {row.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- Admin previews accept arbitrary image URLs.
-        <img
+        <SafeImage
           alt={row.imageAlt ?? row.title}
           className="size-full object-cover"
+          fill
+          sizes="6rem"
           src={row.imageUrl}
+          fallback={
+            row.contentType === "testimonial" && fallbackInitials ? (
+              <span aria-hidden="true">{fallbackInitials}</span>
+            ) : (
+              <PhotoIcon aria-hidden="true" className="size-7 text-gray-400" />
+            )
+          }
         />
       ) : row.contentType === "testimonial" && fallbackInitials ? (
         <span aria-hidden="true">{fallbackInitials}</span>

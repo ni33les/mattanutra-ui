@@ -27,6 +27,18 @@ export const assessmentUiCopy = {
         ? `${progress}% complete. ${remaining} essential signal${remaining === 1 ? "" : "s"} left before the precision layer.`
         : `${progress}% complete. Essentials are ready; optional precision data can refine the formula further.`,
     precisionMarks: ["Start", "Essentials -> 80%", "Precision -> 100%"],
+    privacyGate: {
+      acceptedPrompt: "Thanks — your answers are protected. You can begin.",
+      body:
+        "This assessment asks about your health — what you take, how you feel, anything you react to. We use it only to build and safety-check your formula, never to sell, and you can withdraw any time.",
+      checkbox: "Use my health answers to build and safety-check my formula",
+      eyebrow: "PRIVATE · ENCRYPTED",
+      helper: "This is what your personalised formula is built from.",
+      link: "Read the full privacy notice ->",
+      prompt: "Tick the box above to begin your assessment.",
+      required: "Required",
+      title: "Your answers stay between us."
+    },
     stagesAria: "Assessment stages",
     processingError: "We could not start processing at this time.",
     scoreProcessingSubtitle: "We are scoring your main wellness domains from your answers.",
@@ -69,6 +81,18 @@ export const assessmentUiCopy = {
         ? `เสร็จแล้ว ${progress}% ยังเหลือข้อมูลหลัก ${remaining} ข้อก่อนเข้าสู่ชั้นความแม่นยำ`
         : `เสร็จแล้ว ${progress}% ข้อมูลหลักพร้อมแล้ว ข้อมูลเสริมช่วยปรับสูตรให้ละเอียดขึ้น`,
     precisionMarks: ["เริ่มต้น", "ข้อมูลหลัก -> 80%", "ความแม่นยำ -> 100%"],
+    privacyGate: {
+      acceptedPrompt: "ขอบคุณ คำตอบของคุณได้รับการปกป้องแล้ว คุณเริ่มได้เลย",
+      body:
+        "แบบประเมินนี้ถามข้อมูลสุขภาพของคุณ เช่น สิ่งที่ทานอยู่ ความรู้สึก และสิ่งที่แพ้หรือมีปฏิกิริยา เราใช้ข้อมูลนี้เพื่อสร้างและตรวจความปลอดภัยของสูตรเท่านั้น ไม่ขายข้อมูล และคุณถอนความยินยอมได้ทุกเมื่อ",
+      checkbox: "ใช้คำตอบสุขภาพของฉันเพื่อสร้างและตรวจความปลอดภัยของสูตร",
+      eyebrow: "เป็นส่วนตัว · เข้ารหัส",
+      helper: "นี่คือข้อมูลที่ใช้สร้างสูตรเฉพาะบุคคลของคุณ",
+      link: "อ่านประกาศความเป็นส่วนตัวฉบับเต็ม ->",
+      prompt: "ติ๊กช่องด้านบนเพื่อเริ่มแบบประเมิน",
+      required: "จำเป็น",
+      title: "คำตอบของคุณอยู่ระหว่างเราเท่านั้น"
+    },
     stagesAria: "ขั้นตอนแบบประเมิน",
     processingError: "ไม่สามารถเริ่มการประมวลผลได้ในขณะนี้",
     scoreProcessingSubtitle: "เรากำลังประเมินภาพรวมสุขภาพจากคำตอบของคุณ",
@@ -111,6 +135,18 @@ export const assessmentUiCopy = {
         ? `已完成 ${progress}%。进入精准层前还剩 ${remaining} 项核心信息。`
         : `已完成 ${progress}%。核心信息已准备好；可选精准数据能进一步优化配方。`,
     precisionMarks: ["开始", "核心 -> 80%", "精准 -> 100%"],
+    privacyGate: {
+      acceptedPrompt: "谢谢，你的答案已受到保护。现在可以开始。",
+      body:
+        "这份评估会询问你的健康情况，包括正在服用的内容、身体感受以及过敏或不适反应。我们只用它来建立并安全检查你的配方，不会出售数据，你也可以随时撤回。",
+      checkbox: "使用我的健康答案来建立并安全检查我的配方",
+      eyebrow: "私密 · 加密",
+      helper: "你的个性化配方将基于这些信息建立。",
+      link: "阅读完整隐私声明 ->",
+      prompt: "勾选上方复选框即可开始评估。",
+      required: "必填",
+      title: "你的答案只留在我们之间。"
+    },
     stagesAria: "评估步骤",
     processingError: "目前无法开始处理。",
     scoreProcessingSubtitle: "我们正在根据你的回答评估主要健康维度。",
@@ -150,6 +186,17 @@ export const assessmentUiCopy = {
   nameGreeting: (name: string) => string;
   precisionHint: (progress: number, remaining: number) => string;
   precisionMarks: readonly [string, string, string];
+  privacyGate: {
+    acceptedPrompt: string;
+    body: string;
+    checkbox: string;
+    eyebrow: string;
+    helper: string;
+    link: string;
+    prompt: string;
+    required: string;
+    title: string;
+  };
   processingError: string;
   scoreProcessingSubtitle: string;
   scoreProcessingTitle: string;

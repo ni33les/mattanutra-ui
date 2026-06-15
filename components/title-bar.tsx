@@ -153,6 +153,7 @@ export function TitleBar({
                 priority
                 className="h-9 w-9 object-contain"
                 aria-hidden="true"
+                unoptimized={true}
               />
               <span className="inline-grid leading-none">
                 <span className="mn-logo-wordmark inline-flex items-baseline whitespace-nowrap text-[22px] font-medium tracking-normal">

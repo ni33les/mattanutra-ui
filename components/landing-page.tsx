@@ -202,6 +202,7 @@ export function LandingPage({
               priority
               sizes="(min-width: 768px) 230px, 140px"
               src={assets.heroFigure}
+              unoptimized={true}
               width={420}
             />
             {copy.hero.ingredientPills.map((pill, index) => (
@@ -267,6 +268,7 @@ export function LandingPage({
                   height={666}
                   sizes="(min-width: 768px) 25vw, 100vw"
                   src={card.image}
+                  unoptimized={true}
                   width={1000}
                 />
                 <div className="p-5">
@@ -476,6 +478,7 @@ export function LandingPage({
                   height={768}
                   sizes="(min-width: 1024px) 45vw, 100vw"
                   src={assets.foodBowl}
+                  unoptimized={true}
                   width={1024}
                 />
               </div>
@@ -582,6 +585,7 @@ export function LandingPage({
                       height={543}
                       sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
                       src={testimonial.image}
+                      unoptimized={true}
                       width={724}
                     />
                   ) : (
@@ -648,6 +652,7 @@ export function LandingPage({
                   loading="eager"
                   sizes="110px"
                   src={src}
+                  unoptimized={true}
                   width={280}
                 />
                 {index < assets.origin.length - 1 ? <i aria-hidden /> : null}

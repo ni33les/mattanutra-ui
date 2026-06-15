@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BeakerIcon } from "@heroicons/react/20/solid";
 import {
@@ -269,6 +270,12 @@ export function AssessmentFlow({
   async function sendResumeLink() {
     const email = normalizeAssessmentContactEmail(contactEmail);
 
+    if (!answers.disclosure) {
+      setResumeStatus("failed");
+      setResumeError(ui.privacyGate.prompt);
+      return;
+    }
+
     if (!email) {
       setResumeStatus("failed");
       setResumeError(ui.resume.invalid);
@@ -341,7 +348,7 @@ export function AssessmentFlow({
           <button
             type="button"
             className="mn-soft-action-button"
-            disabled={resumeStatus === "sending" || !normalizedContactEmail}
+            disabled={resumeStatus === "sending" || !normalizedContactEmail || !answers.disclosure}
             onClick={() => void sendResumeLink()}
           >
             {resumeStatus === "sending" ? ui.resume.sending : ui.resume.send}
@@ -357,6 +364,82 @@ export function AssessmentFlow({
         {resumeError ? (
           <p className="mt-2 text-sm font-semibold text-red-600">{resumeError}</p>
         ) : null}
+      </div>
+    );
+  }
+
+  function renderPrivacyGate() {
+    const privacy = ui.privacyGate;
+
+    return (
+      <div className="consent-wrap">
+        <section
+          aria-labelledby="consentTitle"
+          className="consent"
+        >
+          <span className="consent-eyebrow">
+            <svg
+              aria-hidden={true}
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <rect height="9" rx="2" width="14" x="5" y="11" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+            {privacy.eyebrow}
+          </span>
+          <h2 className="consent-title" id="consentTitle">
+            {privacy.title}
+          </h2>
+          <p className="consent-lede">{privacy.body}</p>
+
+          <label className="consent-check">
+            <input
+              checked={answers.disclosure}
+              id="consentFormula"
+              type="checkbox"
+              onChange={(event) =>
+                setAnswers((current) => ({
+                  ...current,
+                  disclosure: event.target.checked
+                }))
+              }
+            />
+            <span aria-hidden={true} className="consent-box">
+              <svg
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="3"
+                viewBox="0 0 24 24"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </span>
+            <span className="consent-text">
+              <span className="consent-label">
+                {privacy.checkbox}
+                <span className="tag">{privacy.required}</span>
+              </span>
+              <span className="consent-note">{privacy.helper}</span>
+            </span>
+          </label>
+
+          <p
+            className={`consent-gatehint${answers.disclosure ? " ok" : ""}`}
+            id="consentHint"
+          >
+            {answers.disclosure ? privacy.acceptedPrompt : privacy.prompt}
+          </p>
+          <Link className="consent-link" href={`/${locale}/privacy`}>
+            {privacy.link}
+          </Link>
+        </section>
       </div>
     );
   }
@@ -420,6 +503,55 @@ export function AssessmentFlow({
     }));
   }
 
+  const femaleContextQuestion: AssessmentQuestion | null =
+    answers.sex === "female"
+      ? {
+          content: (
+            <div className="space-y-5 rounded-lg border border-[color-mix(in_srgb,var(--mn-teal)_15%,transparent)] bg-[color-mix(in_srgb,var(--mn-teal)_5%,transparent)] p-4">
+              <Question
+                infoLabel={ui.infoLabel}
+                label={copy.about.reproStatus}
+                why={copy.coach.sex}
+              >
+                <PillGroup
+                  options={copy.about.reproStatusOptions}
+                  selected={answers.reproStatus}
+                  onSelect={(value) => setSingle("reproStatus", value)}
+                />
+              </Question>
+              <Question
+                infoLabel={ui.infoLabel}
+                label={copy.about.menopause}
+              >
+                <PillGroup
+                  options={copy.about.menopauseOptions}
+                  selected={answers.menopause}
+                  onSelect={(value) => setSingle("menopause", value)}
+                />
+              </Question>
+              {!isPregnantOrBreastfeeding(answers) ? (
+                <Question
+                  infoLabel={ui.infoLabel}
+                  label={copy.about.flow}
+                >
+                  <PillGroup
+                    options={copy.about.flowOptions}
+                    selected={answers.flow}
+                    onSelect={(value) => setSingle("flow", value)}
+                  />
+                </Question>
+              ) : null}
+            </div>
+          ),
+          id: "female-context",
+          isAnswered:
+            hasText(answers.reproStatus) &&
+            hasText(answers.menopause) &&
+            (isPregnantOrBreastfeeding(answers) || hasText(answers.flow)),
+          label: copy.about.femaleTitle
+        }
+      : null;
+
   const rawSections: Array<Omit<AssessmentSection, "complete">> = [
     {
       description: copy.about.subtitle,
@@ -467,6 +599,7 @@ export function AssessmentFlow({
           label: copy.about.sex,
           why: copy.coach.sex
         },
+        ...(femaleContextQuestion ? [femaleContextQuestion] : []),
         {
           content: (
             <PillGroup
@@ -607,56 +740,7 @@ export function AssessmentFlow({
           id: "country",
           isAnswered: hasText(answers.country),
           label: ""
-        },
-        ...(answers.sex === "female"
-          ? [
-              {
-                content: (
-                  <div className="space-y-5 rounded-lg border border-[color-mix(in_srgb,var(--mn-teal)_15%,transparent)] bg-[color-mix(in_srgb,var(--mn-teal)_5%,transparent)] p-4">
-                    <Question
-                      infoLabel={ui.infoLabel}
-                      label={copy.about.reproStatus}
-                      why={copy.coach.sex}
-                    >
-                      <PillGroup
-                        options={copy.about.reproStatusOptions}
-                        selected={answers.reproStatus}
-                        onSelect={(value) => setSingle("reproStatus", value)}
-                      />
-                    </Question>
-                    <Question
-                      infoLabel={ui.infoLabel}
-                      label={copy.about.menopause}
-                    >
-                      <PillGroup
-                        options={copy.about.menopauseOptions}
-                        selected={answers.menopause}
-                        onSelect={(value) => setSingle("menopause", value)}
-                      />
-                    </Question>
-                    {!isPregnantOrBreastfeeding(answers) ? (
-                      <Question
-                        infoLabel={ui.infoLabel}
-                        label={copy.about.flow}
-                      >
-                        <PillGroup
-                          options={copy.about.flowOptions}
-                          selected={answers.flow}
-                          onSelect={(value) => setSingle("flow", value)}
-                        />
-                      </Question>
-                    ) : null}
-                  </div>
-                ),
-                id: "female-context",
-                isAnswered:
-                  hasText(answers.reproStatus) &&
-                  hasText(answers.menopause) &&
-                  (isPregnantOrBreastfeeding(answers) || hasText(answers.flow)),
-                label: copy.about.femaleTitle
-              }
-            ]
-          : [])
+        }
       ],
       title: copy.about.title
     },
@@ -786,25 +870,6 @@ export function AssessmentFlow({
           isAnswered: hasAny(answers.allergies),
           label: copy.food.allergies,
           why: copy.coach.allergies
-        },
-        {
-          content: (
-            <label className="mn-disclosure-card">
-              <input
-                checked={answers.disclosure}
-                className="mt-1 size-4 rounded border-foreground/20 text-[var(--mn-teal)] focus:ring-[var(--mn-teal)]"
-                type="checkbox"
-                onChange={(event) => setAnswers((current) => ({ ...current, disclosure: event.target.checked }))}
-              />
-              <span>
-                <span className="block font-medium text-[var(--mn-ink)]">{copy.food.disclosureTitle}</span>
-                <span className="mt-1 block">{copy.food.disclosureBody}</span>
-              </span>
-            </label>
-          ),
-          id: "disclosure",
-          isAnswered: answers.disclosure,
-          label: copy.food.disclosureTitle
         }
       ],
       title: copy.food.title
@@ -1019,9 +1084,7 @@ export function AssessmentFlow({
   const currentSection = sections[Math.min(sectionIndex, sections.length - 1)];
   const renderedQuestions = currentSection.questions;
   const isFinalStep = sectionIndex === sections.length - 1;
-  const disclosureRequiredForAction = ["food", "safety", "precision"].includes(currentSection.id);
-  const primaryActionDisabled =
-    disclosureRequiredForAction && !answers.disclosure;
+  const primaryActionDisabled = !answers.disclosure;
 
   function goBack() {
     setProcessingError("");
@@ -1036,6 +1099,10 @@ export function AssessmentFlow({
 
   function goToSection(index: number) {
     setProcessingError("");
+    if (!answers.disclosure && index !== 0) {
+      return;
+    }
+
     setSectionIndex(Math.min(Math.max(index, 0), sections.length - 1));
     window.scrollTo({ behavior: "smooth", top: 0 });
   }
@@ -1237,6 +1304,7 @@ export function AssessmentFlow({
 	          />
 	        ) : (
 	          <div className="space-y-6">
+            {sectionIndex === 0 || !answers.disclosure ? renderPrivacyGate() : null}
             <QuestionnairePrecisionMeter precision={precision} ui={ui} />
             <div className="py-3">
               <AssessmentStepper

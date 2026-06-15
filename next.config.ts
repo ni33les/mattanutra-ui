@@ -24,6 +24,61 @@ const noStoreHeaders = [
   }
 ];
 
+const imageRemotePatterns = [
+  {
+    protocol: "https",
+    hostname: "dev.mattanutra.com"
+  },
+  {
+    protocol: "https",
+    hostname: "uat.mattanutra.com"
+  },
+  {
+    protocol: "https",
+    hostname: "mattanutra.com"
+  },
+  {
+    protocol: "https",
+    hostname: "www.mattanutra.com"
+  },
+  {
+    protocol: "http",
+    hostname: "localhost"
+  },
+  {
+    protocol: "http",
+    hostname: "127.0.0.1"
+  },
+  {
+    protocol: "https",
+    hostname: "images.contentstack.io"
+  },
+  {
+    protocol: "https",
+    hostname: "images.unsplash.com"
+  },
+  {
+    protocol: "https",
+    hostname: "swisse.co.th"
+  },
+  {
+    protocol: "https",
+    hostname: "www.blackmores.co.th"
+  },
+  {
+    protocol: "https",
+    hostname: "www.dhc.co.jp"
+  },
+  {
+    protocol: "https",
+    hostname: "www.megawecare.co.th"
+  },
+  {
+    protocol: "https",
+    hostname: "www.vistra.co.th"
+  }
+] satisfies NonNullable<NextConfig["images"]>["remotePatterns"];
+
 const securityHeaders = [
   {
     key: "Content-Security-Policy",
@@ -79,7 +134,12 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["localhost", "127.0.0.1", "dev.mattanutra.com"],
   devIndicators: false,
   images: {
-    unoptimized: true
+    localPatterns: [
+      {
+        pathname: "/**"
+      }
+    ],
+    remotePatterns: imageRemotePatterns
   },
   typescript: {
     ignoreBuildErrors: skipBuildTypecheck

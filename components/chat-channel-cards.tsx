@@ -1,5 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
-
 import Image from "next/image";
 import { ArrowTopRightOnSquareIcon } from "@heroicons/react/20/solid";
 import { buildChatChannels } from "@/lib/chat-links";
@@ -47,11 +45,12 @@ export function ChatChannelCards({
               )}
             >
               <div className="rounded-lg bg-white p-2 shadow-sm ring-1 ring-foreground/10">
-                <img
+                <Image
                   alt={`${qrAlt}: ${channel.name}`}
                   className="size-36"
                   height={144}
                   src={qrUrl}
+                  unoptimized={true}
                   width={144}
                 />
               </div>

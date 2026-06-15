@@ -586,6 +586,219 @@
     padding-left: 0.75rem;
   }
 
+  .consent-wrap {
+    max-width: 920px;
+    margin: 22px auto 0;
+    padding: 0 22px;
+  }
+
+  .consent {
+    border: 1.5px solid var(--mn-teal-glow);
+    border-radius: 22px;
+    background: var(--mn-mint);
+    padding: 24px 26px 22px;
+  }
+
+  .consent-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 10px;
+    color: var(--mn-teal-deep);
+    font-family: var(--mn-font-mono), ui-monospace, Menlo, monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    line-height: 1.1;
+    text-transform: uppercase;
+  }
+
+  .consent-eyebrow svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  :lang(th) .consent-eyebrow,
+  :lang(zh-CN) .consent-eyebrow {
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .consent-title {
+    margin: 0 0 6px;
+    color: var(--mn-ink);
+    font-family: var(--mn-font-display), Georgia, serif;
+    font-size: 23px;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.12;
+  }
+
+  .consent-lede {
+    max-width: 60ch;
+    margin: 0 0 18px;
+    color: var(--mn-ink-soft);
+    font-size: 14.5px;
+    line-height: 1.55;
+  }
+
+  .consent-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 0;
+    border: 1.5px solid var(--mn-line);
+    border-radius: 12px;
+    background: var(--mn-paper);
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: border-color 0.18s;
+  }
+
+  .consent-check:hover {
+    border-color: var(--mn-teal-light);
+  }
+
+  .consent-check input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+
+  .consent-box {
+    display: grid;
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin-top: 1px;
+    place-items: center;
+    border: 1.5px solid var(--mn-sand-deep);
+    border-radius: 7px;
+    background: #fff;
+    transition: 0.18s;
+  }
+
+  .consent-box svg {
+    width: 13px;
+    height: 13px;
+    color: #fff;
+    opacity: 0;
+    transform: scale(0.6);
+    transition: 0.18s;
+  }
+
+  .consent-check input:checked ~ .consent-box {
+    border-color: var(--mn-teal);
+    background: var(--mn-teal);
+  }
+
+  .consent-check input:checked ~ .consent-box svg {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .consent-check input:focus-visible ~ .consent-box {
+    outline: 3px solid var(--mn-teal-glow);
+    outline-offset: 2px;
+  }
+
+  .consent-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .consent-label {
+    color: var(--mn-ink);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .consent-note {
+    color: var(--mn-ash);
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+
+  .consent .tag {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    border: 1px solid var(--mn-sand-deep);
+    border-radius: 999px;
+    background: var(--mn-gold-tint);
+    padding: 2px 7px;
+    color: var(--mn-gold);
+    font-family: var(--mn-font-mono), ui-monospace, Menlo, monospace;
+    font-size: 8.5px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    line-height: 1.1;
+    text-transform: uppercase;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  :lang(th) .consent .tag,
+  :lang(zh-CN) .consent .tag {
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .consent-gatehint {
+    margin: 12px 0 0;
+    color: var(--mn-ash);
+    font-size: 12.5px;
+    line-height: 1.4;
+    transition: 0.18s;
+  }
+
+  .consent-gatehint.ok {
+    color: var(--mn-teal-deep);
+  }
+
+  .consent-link {
+    display: inline-block;
+    margin-top: 6px;
+    border-bottom: 1px solid var(--mn-teal-glow);
+    padding-bottom: 1px;
+    color: var(--mn-teal-deep);
+    font-family: var(--mn-font-mono), ui-monospace, Menlo, monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    line-height: 1.35;
+    text-decoration: none;
+  }
+
+  .consent-link:hover {
+    border-color: var(--mn-teal-deep);
+  }
+
+  :lang(th) .consent-link,
+  :lang(zh-CN) .consent-link {
+    letter-spacing: 0;
+  }
+
+  @media (max-width: 520px) {
+    .consent {
+      padding: 20px 18px;
+    }
+
+    .consent-title {
+      font-size: 21px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .consent *,
+    .mn-assessment-continue-button {
+      transition: none !important;
+    }
+  }
+
   .mn-processing-card {
     border-radius: var(--mn-radius-md, 0.5rem);
     background: var(--mn-paper, white);
@@ -2041,18 +2254,21 @@
   .mn-v15-float-pill {
     position: absolute;
     z-index: 3;
-    display: none;
+    display: inline-flex;
     align-items: center;
     gap: 0.125rem;
+    max-width: min(9.5rem, 42vw);
+    overflow: hidden;
     border: 1px solid rgb(220 213 195 / 0.7);
     border-radius: 999px;
     background: rgb(254 252 247 / 0.92);
-    padding: 0.5rem 1rem;
+    padding: 0.38rem 0.68rem;
     color: var(--mn-ink-soft);
     font-family: var(--mn-font-display), Georgia, serif;
-    font-size: 1rem;
+    font-size: 0.82rem;
     font-style: italic;
-    line-height: 1.25rem;
+    line-height: 1rem;
+    text-overflow: ellipsis;
     white-space: nowrap;
     box-shadow: 0 8px 22px -10px rgb(10 37 64 / 0.18);
     backdrop-filter: blur(6px);
@@ -2065,9 +2281,45 @@
     font-weight: 600;
   }
 
+  .mn-v15-float-pill[data-pill-index="0"] {
+    top: 5%;
+    left: 4%;
+    animation-delay: 0s;
+  }
+
+  .mn-v15-float-pill[data-pill-index="1"] {
+    top: 10%;
+    right: 0;
+    animation-delay: 1.4s;
+  }
+
+  .mn-v15-float-pill[data-pill-index="2"] {
+    top: 43%;
+    left: 0;
+    animation-delay: 2.8s;
+  }
+
+  .mn-v15-float-pill[data-pill-index="3"] {
+    right: 1%;
+    bottom: 25%;
+    animation-delay: 4.2s;
+  }
+
+  .mn-v15-float-pill[data-pill-index="4"] {
+    bottom: 7%;
+    left: 18%;
+    animation-delay: 5.6s;
+  }
+
   @media (min-width: 768px) {
     .mn-v15-float-pill {
       display: inline-flex;
+      max-width: none;
+      overflow: visible;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      line-height: 1.25rem;
+      text-overflow: clip;
     }
 
     .mn-v15-float-pill[data-pill-index="0"] {

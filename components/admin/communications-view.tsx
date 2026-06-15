@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   Mail,
   MessageCircle,
@@ -771,11 +772,12 @@ export function AdminCommunicationsView({
                     rel="noreferrer"
                     target="_blank"
                   >
-                    <img
+                    <Image
                       alt="MattaNutra LINE connect QR code"
                       className="size-44"
                       height={176}
                       src={`/api/qr?data=${encodeURIComponent(lineCode.lineUrl)}`}
+                      unoptimized={true}
                       width={176}
                     />
                   </a>

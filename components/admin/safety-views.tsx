@@ -248,6 +248,7 @@ export function AdminFoodsView({
                       fill
                       sizes="80px"
                       src={row.imagePath}
+                      unoptimized={row.imagePath.startsWith("/")}
                     />
                   ) : (
                     <div className="grid size-full place-items-center text-xs font-semibold text-gray-400">
@@ -450,6 +451,7 @@ function FoodDetailsModal({
                     fill
                     sizes="144px"
                     src={draft.imagePath}
+                    unoptimized={draft.imagePath.startsWith("/")}
                   />
                 ) : (
                   <div className="grid size-full place-items-center text-sm font-semibold text-gray-400">

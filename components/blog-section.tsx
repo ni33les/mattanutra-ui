@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { BlogPostSummary } from "@/lib/blog";
 
 type BlogSectionContent = Readonly<{
@@ -34,15 +35,13 @@ export function BlogSection({
               className="relative isolate flex flex-col justify-end overflow-hidden rounded-2xl bg-gray-900 px-8 pt-80 pb-8 sm:pt-48 lg:pt-80"
             >
               {post.imageUrl ? (
-                <>
-                  {/* External CMS images are intentionally rendered directly. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt={post.imageAlt}
-                    src={post.imageUrl}
-                    className="absolute inset-0 -z-10 size-full object-cover"
-                  />
-                </>
+                <Image
+                  alt={post.imageAlt}
+                  className="absolute inset-0 -z-10 object-cover"
+                  fill
+                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                  src={post.imageUrl}
+                />
               ) : (
                 <div className="absolute inset-0 -z-10 bg-linear-to-br from-[var(--brand-navy)] via-[var(--brand-blue)] to-[var(--brand-green)]" />
               )}

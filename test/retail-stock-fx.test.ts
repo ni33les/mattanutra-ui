@@ -363,6 +363,12 @@ describe("retail stock and FX infrastructure", () => {
 				    assert.match(view, /createShoppingListFromSelection/);
 				    assert.match(view, /shoppingListIdFromResult\(created\.result\)/);
 				    assert.match(view, /setSelectedShoppingListId\(createdShoppingListId\)/);
+				    assert.match(view, /if \(!activeShoppingList\) \{[\s\S]*return;[\s\S]*setShoppingListDraftLines\(nextLines\)/);
+				    assert.match(view, /if \(!activeShoppingList \|\| !pendingShoppingList\) \{[\s\S]*return;[\s\S]*setPendingShoppingList\(null\)/);
+				    assert.doesNotMatch(
+				      view,
+				      /if \(created\) \{[\s\S]*setSelectedShoppingListId\(createdShoppingListId\)[\s\S]*\}\s*setPendingShoppingList\(null\);/
+				    );
 				    assert.doesNotMatch(view, /applyShoppingListDraft/);
 				    assert.doesNotMatch(view, /apply_shopping_list/);
 				    assert.match(shoppingListModal, /downloadShoppingListCsv/);
@@ -561,9 +567,9 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(view, /current === "ready_to_pack"[\s\S]*current === "ready_to_ship"[\s\S]*current === "pickup_booked"[\s\S]*current === "sent"[\s\S]*key: "awaiting_stock"/);
 	    assert.match(view, /label: labels\.stock\.readyToPack/);
 	    assert.match(view, /label: labels\.stock\.readyToShip/);
-	    assert.match(view, /active: current === "ready_to_ship" \|\| current === "pickup_booked"/);
+	    assert.match(view, /active: current === "ready_to_ship"[\s\S]*key: "ready_to_ship"/);
 	    assert.match(view, /active: false,[\s\S]*key: "pickup_booked"/);
-	    assert.match(view, /active: false,[\s\S]*key: "sent"/);
+	    assert.match(view, /active: current === "pickup_booked"[\s\S]*key: "sent"/);
 	    assert.match(view, /label: labels\.stock\.pickupBooked/);
 	    assert.match(view, /order\.workflowTimeline\.boxedAt \?\? order\.workflowTimeline\.allocatedAt/);
 	    assert.match(view, /grid gap-3 md:grid-cols-6/);
@@ -695,6 +701,9 @@ describe("retail stock and FX infrastructure", () => {
 				    assert.match(view, /labels\.stock\.reorderRecommendations/);
 				    assert.match(view, /labels\.stock\.reorderBackordersDescription/);
 				    assert.match(view, /labels\.stock\.reorderRecommendationsDescription/);
+				    assert.match(view, /labels\.stock\.reorderBackorders[\s\S]*<p className="mt-1 text-sm font-normal leading-6 text-gray-600">[\s\S]*labels\.stock\.reorderBackordersDescription/);
+				    assert.match(view, /labels\.stock\.reorderRecommendations[\s\S]*<p className="mt-1 text-sm font-normal leading-6 text-gray-600">[\s\S]*labels\.stock\.reorderRecommendationsDescription/);
+				    assert.doesNotMatch(view, /<p className="mb-4 max-w-3xl text-sm leading-6 text-gray-600">/);
 				    assert.match(view, /defaultOutstandingPurchaseKeys[\s\S]*reorderPurchaseItems\[0\]\?\.organisationId/);
 				    assert.match(view, /return reorderPurchaseItems[\s\S]*orgProductKey\(item\.organisationId, item\.productId\)/);
 				    assert.doesNotMatch(view, /<th className="py-2 pl-3 pr-3" \/>[\s\S]*<th className="py-2 pr-3">\{labels\.stock\.product\}<\/th>[\s\S]*<th className="py-2 pr-3">Brand<\/th>[\s\S]*<th className="py-2 pr-3">\{labels\.stock\.quantity\}<\/th>/);

@@ -1201,6 +1201,7 @@ function PriceHeroIntro({
           alt={priceHero.alt}
           height={760}
           src="/healthscore/box-v7.jpg"
+          unoptimized={true}
           width={960}
         />
         <figcaption className="boxCaption">

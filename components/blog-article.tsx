@@ -7,6 +7,7 @@ import {
   ServerIcon
 } from "@heroicons/react/20/solid";
 import { HighlightedBrandText } from "@/components/highlighted-brand-text";
+import { SafeImage } from "@/components/safe-image";
 import type { ComponentType } from "react";
 import type { BlogPost } from "@/lib/blog";
 import type { LocaleCode } from "@/lib/i18n";
@@ -45,13 +46,15 @@ const markdownComponents: Components = {
   hr: () => <hr className="my-10 border-[var(--mn-line)]" />,
   img: ({ alt, src }) =>
     src ? (
-      // Markdown-authored images are intentionally rendered directly.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        alt={alt ?? ""}
-        className="my-10 aspect-video w-full rounded-[var(--mn-radius-lg)] bg-[var(--mn-cream)] object-cover outline-1 -outline-offset-1 outline-[var(--mn-line)]"
-        src={String(src)}
-      />
+      <span className="relative my-10 block aspect-video w-full overflow-hidden rounded-[var(--mn-radius-lg)] bg-[var(--mn-cream)] outline-1 -outline-offset-1 outline-[var(--mn-line)]">
+        <SafeImage
+          alt={alt ?? ""}
+          className="object-cover"
+          fill
+          sizes="(min-width: 1024px) 48rem, 100vw"
+          src={String(src)}
+        />
+      </span>
     ) : null,
   li: ({ children }) => <li className="pl-1">{children}</li>,
   ol: ({ children }) => (
@@ -240,12 +243,12 @@ export function BlogArticle({
             <div className="relative space-y-10 lg:order-last lg:col-span-5">
               {post.imageUrl ? (
                 <figure className="relative mx-auto aspect-video w-full max-w-xl overflow-hidden rounded-[var(--mn-radius-lg)] bg-[var(--mn-paper)] shadow-sm outline-1 -outline-offset-1 outline-[var(--mn-line)] sm:aspect-2/1 lg:aspect-[4/3] lg:max-w-none">
-                  {/* External CMS images are intentionally rendered directly. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <SafeImage
                     alt={post.imageAlt}
+                    className="object-cover"
+                    fill
+                    sizes="(min-width: 1024px) 40vw, 100vw"
                     src={post.imageUrl}
-                    className="absolute inset-0 size-full object-cover"
                   />
                 </figure>
               ) : null}
@@ -256,15 +259,13 @@ export function BlogArticle({
                   </blockquote>
                   <figcaption className="mt-8 flex gap-x-4">
                     {post.testimonial.authorImageUrl ? (
-                      <>
-                        {/* External CMS images are intentionally rendered directly. */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          alt={post.testimonial.authorImageAlt}
-                          src={post.testimonial.authorImageUrl}
-                          className="mt-1 size-10 flex-none rounded-full bg-[var(--mn-paper)] object-cover ring-1 ring-[var(--mn-line)]"
-                        />
-                      </>
+                      <SafeImage
+                        alt={post.testimonial.authorImageAlt}
+                        className="mt-1 size-10 flex-none rounded-full bg-[var(--mn-paper)] object-cover ring-1 ring-[var(--mn-line)]"
+                        height={40}
+                        src={post.testimonial.authorImageUrl}
+                        width={40}
+                      />
                     ) : (
                       <div className="mn-blog-avatar-fallback">
                         <span className="relative">

@@ -204,7 +204,7 @@ const retailStockRouteHandlers: Partial<Record<RetailCommandId, RetailStockRoute
       organisationId: text(body.organisationId) || null
     } satisfies CreateRetailShoppingListInput);
 
-    return { resourceId, result: null };
+    return { resourceId, result: { shoppingListId: resourceId } };
   },
   async update_shopping_list(context, body) {
     const result: UpdateRetailShoppingListResult = await updateRetailShoppingList(context, {

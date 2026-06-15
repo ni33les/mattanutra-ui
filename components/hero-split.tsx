@@ -95,6 +95,7 @@ export function HeroSplit({
             priority
             sizes="(min-width: 1024px) 560px, 100vw"
             className="object-cover object-center"
+            unoptimized={heroImageUrl.startsWith("/")}
           />
           <div
             aria-hidden="true"

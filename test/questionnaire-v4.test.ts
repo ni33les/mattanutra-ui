@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const assessmentFlow = readFileSync(new URL("../components/assessment-flow.tsx", import.meta.url), "utf8");
+const assessmentFlowCopy = readFileSync(new URL("../components/assessment-flow-copy.ts", import.meta.url), "utf8");
+const customerCss = readFileSync(new URL("../app/customer.css", import.meta.url), "utf8");
 const assessmentState = readFileSync(new URL("../components/assessment-flow-state.ts", import.meta.url), "utf8");
 const assessmentStore = readFileSync(new URL("../lib/assessment-store.ts", import.meta.url), "utf8");
 const assessmentResumeStore = readFileSync(new URL("../lib/assessment-resume-store.ts", import.meta.url), "utf8");
@@ -63,6 +65,55 @@ describe("questionnaire V4 first name capture", () => {
     assert.match(assessmentRoute, /contactEmail\?: unknown/);
     assert.match(assessmentStore, /\bcontact_email\b/);
     assert.match(assessmentStore, /normalizeAssessmentContactEmail\(contactEmail\)/);
+  });
+
+  it("renders the opening privacy gate before questionnaire controls", () => {
+    assert.match(assessmentFlowCopy, /privacyGate:\s*\{[\s\S]*Your answers stay between us\./);
+    assert.match(assessmentFlowCopy, /acceptedPrompt:\s*"Thanks — your answers are protected\. You can begin\."/);
+    assert.match(assessmentFlowCopy, /acceptedPrompt:\s*"ขอบคุณ คำตอบของคุณได้รับการปกป้องแล้ว คุณเริ่มได้เลย"/);
+    assert.match(assessmentFlowCopy, /acceptedPrompt:\s*"谢谢，你的答案已受到保护。现在可以开始。"/);
+    assert.match(assessmentFlowCopy, /privacyGate:\s*\{[\s\S]*คำตอบของคุณอยู่ระหว่างเราเท่านั้น/);
+    assert.match(assessmentFlowCopy, /privacyGate:\s*\{[\s\S]*你的答案只留在我们之间。/);
+    assert.match(assessmentFlow, /function renderPrivacyGate\(\)/);
+    assert.match(assessmentFlow, /className="consent-wrap"[\s\S]*className="consent"[\s\S]*className="consent-eyebrow"[\s\S]*className="consent-title"[\s\S]*className="consent-lede"/);
+    assert.match(assessmentFlow, /className="consent-check"[\s\S]*id="consentFormula"[\s\S]*type="checkbox"[\s\S]*className="consent-box"/);
+    assert.match(assessmentFlow, /className="consent-label"[\s\S]*className="tag"[\s\S]*className="consent-note"/);
+    assert.match(assessmentFlow, /className=\{`consent-gatehint\$\{answers\.disclosure \? " ok" : ""\}`\}/);
+    assert.match(assessmentFlow, /answers\.disclosure \? privacy\.acceptedPrompt : privacy\.prompt/);
+    assert.match(assessmentFlow, /className="consent-link" href=\{`\/\$\{locale\}\/privacy`\}/);
+    assert.match(assessmentFlow, /renderPrivacyGate\(\)[\s\S]*<QuestionnairePrecisionMeter/);
+    assert.match(assessmentFlow, /const primaryActionDisabled = !answers\.disclosure/);
+    assert.match(assessmentFlow, /!answers\.disclosure && index !== 0/);
+    assert.match(assessmentFlow, /if \(!answers\.disclosure\)[\s\S]*setResumeError\(ui\.privacyGate\.prompt\)/);
+    assert.match(assessmentFlow, /disabled=\{resumeStatus === "sending" \|\| !normalizedContactEmail \|\| !answers\.disclosure\}/);
+    assert.doesNotMatch(assessmentFlow, /mn-privacy-gate/);
+    assert.doesNotMatch(assessmentFlow, /id: "disclosure"/);
+    assert.doesNotMatch(assessmentFlow, /copy\.food\.disclosureTitle/);
+  });
+
+  it("ports the v5 consent notice CSS from the handoff", () => {
+    assert.match(customerCss, /\.consent-wrap\s*\{[\s\S]*max-width:\s*920px[\s\S]*margin:\s*22px auto 0[\s\S]*padding:\s*0 22px/);
+    assert.match(customerCss, /\.consent\s*\{[\s\S]*border:\s*1\.5px solid var\(--mn-teal-glow\)[\s\S]*border-radius:\s*22px[\s\S]*background:\s*var\(--mn-mint\)[\s\S]*padding:\s*24px 26px 22px/);
+    assert.match(customerCss, /\.consent-title\s*\{[\s\S]*font-family:\s*var\(--mn-font-display\)[\s\S]*font-size:\s*23px[\s\S]*font-weight:\s*600[\s\S]*line-height:\s*1\.12/);
+    assert.match(customerCss, /\.consent-lede\s*\{[\s\S]*font-size:\s*14\.5px[\s\S]*line-height:\s*1\.55/);
+    assert.match(customerCss, /\.consent-check input\s*\{[\s\S]*position:\s*absolute[\s\S]*opacity:\s*0/);
+    assert.match(customerCss, /\.consent-box\s*\{[\s\S]*width:\s*22px[\s\S]*height:\s*22px[\s\S]*border-radius:\s*7px/);
+    assert.match(customerCss, /\.consent-check input:checked ~ \.consent-box\s*\{[\s\S]*background:\s*var\(--mn-teal\)/);
+    assert.match(customerCss, /@media \(max-width:\s*520px\)\s*\{[\s\S]*\.consent\s*\{[\s\S]*padding:\s*20px 18px[\s\S]*\.consent-title\s*\{[\s\S]*font-size:\s*21px/);
+    assert.match(customerCss, /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.consent \*/);
+    assert.doesNotMatch(customerCss, /mn-privacy-gate/);
+    assert.doesNotMatch(customerCss, /accent-color/);
+  });
+
+  it("places female health context directly after sex before country and sun context", () => {
+    assert.match(
+      assessmentFlow,
+      /id: "firstName"[\s\S]*id: "resume-email"[\s\S]*id: "sex"[\s\S]*femaleContextQuestion \? \[femaleContextQuestion\] : \[\][\s\S]*id: "age"[\s\S]*id: "sunscreen-sun"[\s\S]*id: "country"/
+    );
+    assert.match(
+      assessmentFlow,
+      /const femaleContextQuestion: AssessmentQuestion \| null =[\s\S]*answers\.sex === "female"[\s\S]*id: "female-context"/
+    );
   });
 
   it("adds a private resume link flow with hashed reusable tokens", () => {

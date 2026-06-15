@@ -24,6 +24,7 @@ import type {
 } from "@/components/admin/dashboard-content";
 import { classNames } from "@/components/admin/dashboard-shared";
 import { AdminModal } from "@/components/admin/ui";
+import { SafeImage } from "@/components/safe-image";
 
 function slugFromTitle(value: string) {
   return value
@@ -363,13 +364,17 @@ export function ContentEditorModal({
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-[6rem_1fr]">
-            <div className="flex size-24 items-center justify-center overflow-hidden rounded-lg bg-gray-50 outline-1 -outline-offset-1 outline-gray-200">
+            <div className="relative flex size-24 items-center justify-center overflow-hidden rounded-lg bg-gray-50 outline-1 -outline-offset-1 outline-gray-200">
               {form.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- Admin previews accept arbitrary image URLs.
-                <img
+                <SafeImage
                   alt={form.imageAlt || labels.contentPages.imagePreview}
                   className="size-full object-cover"
+                  fill
+                  sizes="6rem"
                   src={form.imageUrl}
+                  fallback={
+                    <PhotoIcon aria-hidden="true" className="size-7 text-gray-400" />
+                  }
                 />
               ) : (
                 <PhotoIcon aria-hidden="true" className="size-7 text-gray-400" />

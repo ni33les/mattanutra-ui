@@ -46,7 +46,7 @@ export function HealthspanLogo({
           width={420}
           height={465}
           priority
-          unoptimized
+          unoptimized={true}
           className="mn-logo-mark-image"
           aria-hidden="true"
         />

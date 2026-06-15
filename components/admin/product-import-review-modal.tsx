@@ -135,7 +135,6 @@ export function ProductImportReviewModal({
               className="size-24 rounded-xl object-cover ring-1 ring-gray-200"
               height={96}
               src={imageUrl}
-              unoptimized={true}
               width={96}
             />
           ) : (

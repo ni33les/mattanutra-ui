@@ -1639,7 +1639,6 @@ function RevealProductsFinalSection({
                         height={260}
                         loading="eager"
                         src={product.imageUrl}
-                        unoptimized={true}
                         width={220}
                       />
                     ) : (
@@ -1805,7 +1804,9 @@ function KhunDreamSection({
               className="object-cover"
               fill={true}
               loading="eager"
+              sizes="(min-width: 768px) 280px, 220px"
               src="/reveal/khun_dream.webp"
+              unoptimized={true}
             />
             <div
               aria-hidden={true}
@@ -2084,7 +2085,9 @@ function RevealFoodSupportFinalSection({
                               className="object-cover"
                               fill={true}
                               loading="eager"
+                              sizes="28px"
                               src={food.imagePath}
+                              unoptimized={food.imagePath.startsWith("/")}
                             />
                           ) : (
                             <span className="grid h-full place-items-center mn-reveal-font-display text-sm italic text-[var(--mn-teal-deep)]">

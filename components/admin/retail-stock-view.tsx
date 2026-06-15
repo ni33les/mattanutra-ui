@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- Admin catalogue thumbnails use remote retailer images that are not all in the Next image allowlist. */
-
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -62,6 +60,7 @@ import {
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
 import { AdminButton, AdminModal } from "@/components/admin/ui";
+import { SafeImage } from "@/components/safe-image";
 
 type StockResponse = Readonly<{
   data?: AdminRetailStockData;
@@ -725,7 +724,7 @@ function buildCustomerOrderWorkflowSteps(
       label: labels.stock.readyToPack
     },
     {
-      active: current === "ready_to_ship" || current === "pickup_booked",
+      active: current === "ready_to_ship",
       at: order.workflowTimeline.boxedAt ?? order.workflowTimeline.allocatedAt,
       complete:
         Boolean(order.workflowTimeline.boxedAt) ||
@@ -746,7 +745,7 @@ function buildCustomerOrderWorkflowSteps(
       label: labels.stock.pickupBooked
     },
     {
-      active: false,
+      active: current === "pickup_booked",
       at: order.workflowTimeline.sentAt,
       complete: Boolean(order.workflowTimeline.sentAt) || current === "sent",
       key: "sent",
@@ -1264,11 +1263,13 @@ function ProductThumbnail({
   return (
     <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-gray-100 ring-1 ring-gray-200">
       {imageUrl ? (
-        <img
+        <SafeImage
           alt=""
           className="size-full object-cover"
+          height={56}
           loading="lazy"
           src={imageUrl}
+          width={56}
         />
       ) : (
         <span className="px-1 text-center text-xs font-semibold text-gray-500">
@@ -1967,6 +1968,10 @@ export function AdminRetailStockView({
   );
 
   useEffect(() => {
+    if (!activeShoppingList) {
+      return;
+    }
+
     const nextLines = activeShoppingListLines.map((line) => ({
         actualQuantity: String(line.actualQuantity),
         assignedQuantity: String(line.assignedQuantity),
@@ -1989,7 +1994,15 @@ export function AdminRetailStockView({
       }));
 
     queueMicrotask(() => setShoppingListDraftLines(nextLines));
-  }, [activeShoppingList?.id, activeShoppingListLines]);
+  }, [activeShoppingList, activeShoppingListLines]);
+
+  useEffect(() => {
+    if (!activeShoppingList || !pendingShoppingList) {
+      return;
+    }
+
+    queueMicrotask(() => setPendingShoppingList(null));
+  }, [activeShoppingList, pendingShoppingList]);
 
   useEffect(() => {
     const draft = customerOrderDraft;
@@ -2336,8 +2349,6 @@ export function AdminRetailStockView({
         setSelectedShoppingListId(createdShoppingListId);
       }
     }
-
-    setPendingShoppingList(null);
   }
 
   async function saveShoppingListDraft() {
@@ -4266,16 +4277,6 @@ export function AdminRetailStockView({
         {panel === "stock-advice" ? (
           <div className="mt-5 space-y-6">
             <section className="rounded-md bg-white p-4 ring-1 ring-gray-200">
-              <p className="mb-4 max-w-3xl text-sm leading-6 text-gray-600">
-                <span className="font-semibold text-gray-900">
-                  {labels.stock.reorderBackorders}
-                </span>{" "}
-                {labels.stock.reorderBackordersDescription}{" "}
-                <span className="font-semibold text-gray-900">
-                  {labels.stock.reorderRecommendations}
-                </span>{" "}
-                {labels.stock.reorderRecommendationsDescription}
-              </p>
               <div className="overflow-x-auto rounded-md ring-1 ring-gray-200">
                 <table className="min-w-[640px] w-full table-fixed text-left text-sm">
                   <colgroup>
@@ -4295,6 +4296,9 @@ export function AdminRetailStockView({
                         >
                           {labels.stock.reorderBackorders}
                         </h3>
+                        <p className="mt-1 text-sm font-normal leading-6 text-gray-600">
+                          {labels.stock.reorderBackordersDescription}
+                        </p>
                       </td>
                     </tr>
                     {reorderPurchaseItems.map((item) => {
@@ -4376,6 +4380,9 @@ export function AdminRetailStockView({
                             >
                               {labels.stock.reorderRecommendations}
                             </h3>
+                            <p className="mt-1 text-sm font-normal leading-6 text-gray-600">
+                              {labels.stock.reorderRecommendationsDescription}
+                            </p>
                           </td>
                         </tr>
                         {reorderRecommendationItems.map((item) => {

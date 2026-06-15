@@ -78,7 +78,6 @@ export function OrderSummary({
                   alt=""
                   className="size-12 rounded-lg bg-[var(--mn-cream)] object-contain"
                   height={48}
-                  unoptimized={true}
                   src={product.imageUrl}
                   width={48}
                 />
