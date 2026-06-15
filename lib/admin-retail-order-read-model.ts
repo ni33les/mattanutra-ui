@@ -1,10 +1,15 @@
 import {
   customerOrderPickupInProgress,
   expectedTaskTypeForStage,
-  workflowActionForStage
+  workflowActionForStage,
+  workflowStageForStatus
 } from "@/lib/retail-order-workflow-rules";
 import {
+  customerOrderSource,
+  customerOrderStatus,
   integerOrDefault,
+  isoDateTime,
+  isoDateTimeOrNull,
   numberMetadata,
   numberOrNull,
   objectRecord,
@@ -15,6 +20,7 @@ import type {
   AdminRetailCustomerOrderActionStates,
   AdminRetailCustomerOrderAddress,
   AdminRetailCustomerOrderDeliveryDetails,
+  AdminRetailCustomerOrder,
   AdminRetailCustomerOrderLine,
   AdminRetailCustomerOrderPricingSnapshot,
   AdminRetailCustomerOrderPromise,
@@ -27,6 +33,44 @@ import type {
   RetailCustomerOrderStatus,
   RetailOrderWorkflowStage
 } from "@/lib/admin-retail-stock";
+
+export type RetailCustomerOrderLineRow = Readonly<{
+  customer_order_id: string;
+  ean13: string | null;
+  id: string;
+  manufacturer_sku: string | null;
+  metadata: unknown;
+  notes: string | null;
+  product_id: string;
+  product_title: string;
+  quantity_allocated: number | string;
+  quantity_ordered: number | string;
+  quantity_shipped: number | string;
+  retail_price_amount: number | string | null;
+}>;
+
+export type RetailCustomerOrderRow = Readonly<{
+  currency: string;
+  customer_email: string | null;
+  customer_name: string | null;
+  delivered_at: Date | string | null;
+  due_at: Date | string | null;
+  id: string;
+  line_count: number | string;
+  metadata: unknown;
+  notes: string | null;
+  order_number: string;
+  ordered_units: number | string;
+  organisation_id: string;
+  organisation_name: string;
+  placed_at: Date | string | null;
+  shipped_at: Date | string | null;
+  shipped_units: number | string;
+  source: string;
+  status: string;
+  total_retail_amount: number | string | null;
+  updated_at: Date | string;
+}>;
 
 export function routingSnapshotFromMetadata(
   value: unknown
@@ -274,6 +318,143 @@ export function lineAvailabilityFromMetadata(value: unknown): Pick<
     reason: stringMetadata(metadata.reason),
     retailSellableProductId: stringMetadata(metadata.retailSellableProductId),
     usdRate: numberOrNull(metadata.usdRate)
+  };
+}
+
+export function mapCustomerOrderLineRow(
+  row: RetailCustomerOrderLineRow,
+  pipeline: AdminRetailStockPipelineRow | null
+): AdminRetailCustomerOrderLine {
+  return {
+    ...lineAvailabilityFromMetadata(row.metadata),
+    customerOrderId: row.customer_order_id,
+    ean13: row.ean13,
+    id: row.id,
+    manufacturerSku: row.manufacturer_sku,
+    notes: row.notes,
+    pipeline,
+    productId: row.product_id,
+    productTitle: row.product_title,
+    quantityAllocated: integerOrDefault(row.quantity_allocated, 0),
+    quantityOrdered: integerOrDefault(row.quantity_ordered, 0),
+    quantityShipped: integerOrDefault(row.quantity_shipped, 0),
+    retailPriceAmount: numberOrNull(row.retail_price_amount)
+  };
+}
+
+function orderPipelineFullyBackedForReadModel(
+  pipeline: AdminRetailStockPipelineRow | null
+) {
+  return Boolean(
+    pipeline &&
+      pipeline.customerDemandUnits > 0 &&
+      pipeline.backedAllocatedUnits >= pipeline.customerDemandUnits &&
+      pipeline.unorderedNeedUnits < 1
+  );
+}
+
+export function mapCustomerOrderRow(input: Readonly<{
+  auditEvents: readonly AdminRetailAuditEvent[];
+  latestShipment: AdminRetailCustomerOrderShipment | null;
+  pipeline: AdminRetailStockPipelineRow | null;
+  relatedTasks: readonly AdminRetailOperationsTask[];
+  row: RetailCustomerOrderRow;
+}>): AdminRetailCustomerOrder {
+  const { auditEvents, latestShipment, pipeline, relatedTasks, row } = input;
+  const status = customerOrderStatus(row.status);
+  const shipment = mergeCustomerOrderShipment(
+    shipmentFromMetadata(row.metadata),
+    latestShipment
+  );
+  const workflowStage =
+    customerOrderPickupInProgress(status, shipment)
+      ? "pickup_booked"
+      : (status === "allocated" ||
+          status === "picking" ||
+          status === "packed") &&
+        pipeline &&
+        !orderPipelineFullyBackedForReadModel(pipeline)
+      ? "awaiting_stock"
+      : workflowStageForStatus(status);
+  const openTasks = relatedTasks.filter(
+    (task) => !isTerminalTaskStatus(task.status)
+  );
+  const actionStates = getRetailCustomerOrderActionStates(
+    status,
+    pipeline,
+    shipment
+  );
+  const workflowHealth = getRetailCustomerOrderWorkflowHealth({
+    openTasks,
+    pipeline,
+    status,
+    workflowStage
+  });
+  const relatedAuditEvents = auditEvents.filter(
+    (event) =>
+      event.resourceId === row.id ||
+      event.details.sourceEntityId === row.id ||
+      event.details.customerOrderId === row.id ||
+      event.details.fulfillmentOrderId === row.id
+  );
+  const lastWorkflowEventAt = [
+    isoDateTime(row.updated_at),
+    ...relatedTasks.map((task) => task.updatedAt),
+    ...relatedAuditEvents.map((event) => event.occurredAt)
+  ].sort().at(-1) ?? null;
+  const deliveredAt = isoDateTimeOrNull(row.delivered_at);
+  const placedAt = isoDateTimeOrNull(row.placed_at);
+  const shippedAt = isoDateTimeOrNull(row.shipped_at);
+  const updatedAt = isoDateTime(row.updated_at);
+
+  return {
+    actionStates,
+    currency: row.currency,
+    customerEmail: row.customer_email,
+    customerName: row.customer_name,
+    deliveredAt,
+    deliveryDetails: deliveryDetailsFromMetadata(row.metadata),
+    dueAt: isoDateTimeOrNull(row.due_at),
+    fulfillmentPromise: fulfillmentPromiseFromMetadata(row.metadata),
+    id: row.id,
+    isStuck: workflowHealth.isStuck,
+    lineCount: integerOrDefault(row.line_count, 0),
+    lastWorkflowEventAt,
+    nextExpectedAction: workflowHealth.nextAction,
+    nextExpectedTaskType: workflowHealth.expectedTaskType,
+    notes: row.notes,
+    openTaskCount: openTasks.length,
+    orderNumber: row.order_number,
+    orderedUnits: integerOrDefault(row.ordered_units, 0),
+    organisationId: row.organisation_id,
+    organisationName: row.organisation_name,
+    placedAt,
+    pipeline,
+    pricingSnapshot: pricingSnapshotFromMetadata(row.metadata, row.currency),
+    routingSnapshot: routingSnapshotFromMetadata(row.metadata),
+    shippedAt,
+    shippedUnits: integerOrDefault(row.shipped_units, 0),
+    shipment,
+    source: customerOrderSource(row.source),
+    status,
+    stuckReason: workflowHealth.reason,
+    taskCount: relatedTasks.length,
+    totalRetailAmount: numberOrNull(row.total_retail_amount),
+    updatedAt,
+    workflowStage,
+    workflowHealth,
+    workflowTimeline: customerOrderWorkflowTimeline({
+      deliveredAt,
+      events: relatedAuditEvents,
+      placedAt,
+      pickupBookedAt:
+        shipment?.pickupBookedAt ??
+        (customerOrderPickupInProgress(status, shipment) ? updatedAt : null),
+      shippedAt,
+      status,
+      updatedAt
+    }),
+    workflowTaskIds: relatedTasks.map((task) => task.id)
   };
 }
 

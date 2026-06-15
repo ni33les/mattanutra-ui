@@ -21,6 +21,16 @@ import {
   routingSnapshotFromMetadata,
   shipmentFromMetadata
 } from "@/lib/admin-retail-order-read-model";
+import {
+  mapRetailCarrierAccountRow,
+  mapRetailProductOptionRow,
+  mapRetailShoppingListLineRow,
+  mapRetailShoppingListRow,
+  mapRetailStockLotRow,
+  mapRetailStockMovementRow,
+  mapRetailStockReorderAdviceRow,
+  mapRetailStockRow
+} from "@/lib/admin-retail-stock-read-model";
 import type {
   AdminRetailAuditEvent,
   AdminRetailCustomerOrderShipment,
@@ -336,6 +346,251 @@ describe("admin retail order read model", () => {
         pickupBookedAt: "2026-06-01T12:30:00.000Z",
         sentAt: "2026-06-01T13:00:00.000Z"
       }
+    );
+  });
+});
+
+describe("admin retail stock dashboard read model", () => {
+  it("maps carrier, product, stock, lot, and movement rows", () => {
+    assert.deepEqual(
+      mapRetailCarrierAccountRow({
+        capabilities: ["label", "pickup"],
+        carrier_id: "kex",
+        display_name: "KEX",
+        id: "carrier-1",
+        last_test_status: "ok",
+        last_tested_at: "2026-06-01T10:00:00.000Z",
+        organisation_id: "org-1",
+        status: "active",
+        updated_at: "2026-06-01T11:00:00.000Z"
+      }),
+      {
+        capabilities: ["label", "pickup"],
+        carrierId: "kex",
+        displayName: "KEX",
+        id: "carrier-1",
+        lastTestStatus: "ok",
+        lastTestedAt: "2026-06-01T10:00:00.000Z",
+        organisationId: "org-1",
+        status: "active",
+        updatedAt: "2026-06-01T11:00:00.000Z"
+      }
+    );
+    assert.deepEqual(
+      mapRetailProductOptionRow({
+        brand_name: "Brand",
+        id: "product-1",
+        image_url: "/product.webp",
+        product_kind: "supplement",
+        title: "Product"
+      }),
+      {
+        brandName: "Brand",
+        id: "product-1",
+        imageUrl: "/product.webp",
+        productKind: "supplement",
+        title: "Product"
+      }
+    );
+    assert.deepEqual(
+      mapRetailStockRow({
+        backorder_policy: "deny",
+        brand_name: "Brand",
+        currency: "THB",
+        id: "stock-1",
+        image_url: "/product.webp",
+        lead_time_days: "3",
+        notes: "Cold chain",
+        organisation_id: "org-1",
+        organisation_name: "Delight",
+        product_id: "product-1",
+        product_kind: "supplement",
+        product_status: "approved",
+        product_title: "Product",
+        retail_override_price_amount: "120",
+        retail_price_amount: "120",
+        retail_sellable_product_id: "sellable-1",
+        status: "disabled",
+        stock_quantity: "9",
+        updated_at: "2026-06-01T11:00:00.000Z",
+        wholesale_price_amount: "80"
+      }),
+      {
+        backorderPolicy: "deny",
+        brandName: "Brand",
+        currency: "THB",
+        id: "stock-1",
+        imageUrl: "/product.webp",
+        leadTimeDays: 3,
+        notes: "Cold chain",
+        organisationId: "org-1",
+        organisationName: "Delight",
+        productId: "product-1",
+        productKind: "supplement",
+        productStatus: "approved",
+        productTitle: "Product",
+        retailOverridePriceAmount: 120,
+        retailPriceAmount: 120,
+        retailSellableProductId: "sellable-1",
+        status: "disabled",
+        stockQuantity: 9,
+        updatedAt: "2026-06-01T11:00:00.000Z",
+        wholesalePriceAmount: 80
+      }
+    );
+    assert.equal(
+      mapRetailStockLotRow({
+        currency: "THB",
+        expires_at: "2026-12-31T00:00:00.000Z",
+        id: "lot-1",
+        notes: null,
+        organisation_id: "org-1",
+        product_id: "product-1",
+        product_title: "Product",
+        received_at: "2026-06-01T09:00:00.000Z",
+        received_quantity: "12",
+        remaining_quantity: "7",
+        retail_product_stock_id: "stock-1",
+        status: "depleted",
+        wholesale_price_amount: "75"
+      }).expiresAt,
+      "2026-12-31"
+    );
+    assert.deepEqual(
+      mapRetailStockMovementRow({
+        currency: "THB",
+        id: "movement-1",
+        is_voided: true,
+        lot_id: "lot-1",
+        movement_type: "sale",
+        notes: "Order",
+        occurred_at: "2026-06-01T10:00:00.000Z",
+        organisation_id: "org-1",
+        organisation_name: "Delight",
+        product_id: "product-1",
+        product_title: "Product",
+        quantity_delta: "2",
+        reason: "sale",
+        retail_price_amount: "120",
+        retail_product_stock_id: "stock-1",
+        unit_cost_amount: "80",
+        voids_movement_id: null
+      }),
+      {
+        currency: "THB",
+        id: "movement-1",
+        isVoided: true,
+        lotId: "lot-1",
+        movementType: "sale",
+        notes: "Order",
+        occurredAt: "2026-06-01T10:00:00.000Z",
+        organisationId: "org-1",
+        organisationName: "Delight",
+        productId: "product-1",
+        productTitle: "Product",
+        quantityDelta: 2,
+        reason: "sale",
+        retailPriceAmount: 120,
+        stockId: "stock-1",
+        unitCostAmount: 80,
+        voidsMovementId: null
+      }
+    );
+  });
+
+  it("maps reorder advice and shopping-list rows", () => {
+    assert.deepEqual(
+      mapRetailStockReorderAdviceRow({
+        calculated_at: "2026-06-01T10:00:00.000Z",
+        confidence: "unexpected",
+        current_stock_quantity: "1",
+        days_cover: "2.5",
+        id: "advice-1",
+        lead_time_days: "4",
+        organisation_id: "org-1",
+        organisation_name: "Delight",
+        outflow_units_30d: "20",
+        product_id: "product-1",
+        product_title: "Product",
+        recommendation_pressure_count: "3",
+        reorder_by: "2026-06-10T00:00:00.000Z",
+        retail_product_stock_id: "stock-1",
+        risk_level: "unexpected",
+        suggested_order_quantity: "12"
+      }),
+      {
+        calculatedAt: "2026-06-01T10:00:00.000Z",
+        confidence: "low",
+        currentStockQuantity: 1,
+        daysCover: 2.5,
+        id: "advice-1",
+        leadTimeDays: 4,
+        organisationId: "org-1",
+        organisationName: "Delight",
+        outflowUnits30d: 20,
+        productId: "product-1",
+        productTitle: "Product",
+        recommendationPressureCount: 3,
+        reorderBy: "2026-06-10",
+        riskLevel: "ok",
+        stockId: "stock-1",
+        suggestedOrderQuantity: 12
+      }
+    );
+    assert.deepEqual(
+      mapRetailShoppingListLineRow({
+        actual_quantity: "6",
+        assigned_quantity: "5",
+        brand_name: "Brand",
+        current_stock_quantity: "2",
+        ean13: "8851234567890",
+        id: "line-1",
+        manufacturer_sku: "SKU-1",
+        organisation_id: "org-1",
+        product_id: "product-1",
+        product_title: "Product",
+        required_quantity: "8",
+        retail_price_amount: "120",
+        shopping_list_id: "list-1",
+        stocked_quantity: "3",
+        unordered_need_quantity: "4",
+        wholesale_price_amount: "80"
+      }),
+      {
+        actualQuantity: 6,
+        assignedQuantity: 5,
+        brandName: "Brand",
+        currentStockQuantity: 2,
+        ean13: "8851234567890",
+        id: "line-1",
+        manufacturerSku: "SKU-1",
+        organisationId: "org-1",
+        productId: "product-1",
+        productTitle: "Product",
+        requiredQuantity: 8,
+        retailPriceAmount: 120,
+        shoppingListId: "list-1",
+        stockedQuantity: 3,
+        unorderedNeedQuantity: 4,
+        wholesalePriceAmount: 80
+      }
+    );
+    assert.equal(
+      mapRetailShoppingListRow({
+        actual_units: "3",
+        created_at: "2026-06-01T09:00:00.000Z",
+        currency: "THB",
+        id: "list-1",
+        line_count: "2",
+        list_number: "SL-1",
+        organisation_id: "org-1",
+        organisation_name: "Delight",
+        required_units: "5",
+        status: "closed",
+        stocked_units: "4",
+        updated_at: "2026-06-01T10:00:00.000Z"
+      }).status,
+      "closed"
     );
   });
 });

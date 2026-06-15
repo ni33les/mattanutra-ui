@@ -198,7 +198,7 @@ describe("process runtime technical debt sweep", () => {
     );
     assert.match(actionStates, /pipeline\.backedAllocatedUnits >= pipeline\.customerDemandUnits/);
     assert.match(actionStates, /Allocated stock is no longer available\. Recheck workflow\./);
-    assert.match(stock, /!orderPipelineFullyBacked\(pipeline\)[\s\S]*\? "awaiting_stock"/);
+    assert.match(orderReadModel, /!orderPipelineFullyBackedForReadModel\(pipeline\)[\s\S]*\? "awaiting_stock"/);
     assert.match(customerOrderDisplay, /order\.workflowStage === "awaiting_stock"/);
     assert.match(stockRepair, /retail_customer_orders\.status in \('placed', 'awaiting_stock', 'allocated', 'picking', 'packed'\)/);
     assert.match(stockRepair, /status = 'awaiting_stock'/);

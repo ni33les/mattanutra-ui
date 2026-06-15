@@ -33,12 +33,10 @@ import {
 } from "@/lib/product-countries";
 import {
   customerOrderStatus,
-  customerOrderSource,
   integerOrDefault,
   isoDateOrNull,
   isoDateTime,
   isoDateTimeOrNull,
-  lotStatus,
   movementDelta,
   movementType,
   normalizeCurrency,
@@ -52,18 +50,19 @@ import {
   stringMetadata
 } from "@/lib/admin-retail-stock-codecs";
 import {
-  customerOrderWorkflowTimeline,
-  deliveryDetailsFromMetadata,
-  fulfillmentPromiseFromMetadata,
-  getRetailCustomerOrderActionStates,
-  getRetailCustomerOrderWorkflowHealth,
-  isTerminalTaskStatus,
-  lineAvailabilityFromMetadata,
-  mergeCustomerOrderShipment,
-  pricingSnapshotFromMetadata,
-  routingSnapshotFromMetadata,
-  shipmentFromMetadata
+  mapCustomerOrderLineRow,
+  mapCustomerOrderRow
 } from "@/lib/admin-retail-order-read-model";
+import {
+  mapRetailCarrierAccountRow,
+  mapRetailProductOptionRow,
+  mapRetailShoppingListLineRow,
+  mapRetailShoppingListRow,
+  mapRetailStockLotRow,
+  mapRetailStockMovementRow,
+  mapRetailStockReorderAdviceRow,
+  mapRetailStockRow
+} from "@/lib/admin-retail-stock-read-model";
 import {
   recordRetailOrderWorkflowBpm,
   retailOrderStatusBpmEventName,
@@ -71,7 +70,6 @@ import {
   transitionRetailCustomerOrder
 } from "@/lib/retail-order-workflow";
 import {
-  customerOrderPickupInProgress,
   expectedTaskTypeForStage,
   retailOrderWorkflowTaskDetails,
   workflowStageForStatus,
@@ -3071,262 +3069,33 @@ export async function getAdminRetailStockData(
     canFilterOrganisation: canReadAllRetailStock(context),
     canRouteRegionalCheckout: canRouteRegionalCheckout(context),
     canWrite: canWriteRetailStock(context),
-    carrierAccounts: carrierAccountRows.map((row) => ({
-      capabilities: Array.isArray(row.capabilities) ? row.capabilities : [],
-      carrierId: row.carrier_id,
-      displayName: row.display_name,
-      id: row.id,
-      lastTestStatus: row.last_test_status,
-      lastTestedAt: isoDateTimeOrNull(row.last_tested_at),
-      organisationId: row.organisation_id,
-      status: row.status,
-      updatedAt: isoDateTime(row.updated_at)
-    })),
-    customerOrderLines: customerOrderLineRows.map((row) => ({
-      ...lineAvailabilityFromMetadata(row.metadata),
-      customerOrderId: row.customer_order_id,
-      ean13: row.ean13,
-      id: row.id,
-      manufacturerSku: row.manufacturer_sku,
-      notes: row.notes,
-      pipeline:
-        pipelineByLineKey.get(
-          pipelineKey(row.id, row.product_id)
-        ) ?? null,
-      productId: row.product_id,
-      productTitle: row.product_title,
-      quantityAllocated: integerOrDefault(row.quantity_allocated, 0),
-      quantityOrdered: integerOrDefault(row.quantity_ordered, 0),
-      quantityShipped: integerOrDefault(row.quantity_shipped, 0),
-      retailPriceAmount: numberOrNull(row.retail_price_amount)
-    })),
-    customerOrders: customerOrderRows.map((row) => {
-      const status = customerOrderStatus(row.status);
-      const pipeline = pipelineByOrderId.get(row.id) ?? null;
-      const shipment = mergeCustomerOrderShipment(
-        shipmentFromMetadata(row.metadata),
-        shipmentByOrderId.get(row.id) ?? null
-      );
-      const workflowStage =
-        customerOrderPickupInProgress(status, shipment)
-          ? "pickup_booked"
-          : (status === "allocated" ||
-              status === "picking" ||
-              status === "packed") &&
-            pipeline &&
-            !orderPipelineFullyBacked(pipeline)
-          ? "awaiting_stock"
-          : workflowStageForStatus(status);
-      const relatedTasks = tasksByCustomerOrderId.get(row.id) ?? [];
-      const openTasks = relatedTasks.filter(
-        (task) => !isTerminalTaskStatus(task.status)
-      );
-      const actionStates = getRetailCustomerOrderActionStates(
-        status,
-        pipeline,
-        shipment
-      );
-      const workflowHealth = getRetailCustomerOrderWorkflowHealth({
-        openTasks,
-        pipeline,
-        status,
-        workflowStage
-      });
-      const relatedAuditEvents = auditEvents.filter(
-        (event) =>
-          event.resourceId === row.id ||
-          event.details.sourceEntityId === row.id ||
-          event.details.customerOrderId === row.id ||
-          event.details.fulfillmentOrderId === row.id
-      );
-      const lastWorkflowEventAt = [
-        isoDateTime(row.updated_at),
-        ...relatedTasks.map((task) => task.updatedAt),
-        ...relatedAuditEvents.map((event) => event.occurredAt)
-      ].sort().at(-1) ?? null;
-      const deliveredAt = isoDateTimeOrNull(row.delivered_at);
-      const placedAt = isoDateTimeOrNull(row.placed_at);
-      const shippedAt = isoDateTimeOrNull(row.shipped_at);
-      const updatedAt = isoDateTime(row.updated_at);
-
-      return {
-        actionStates,
-        currency: row.currency,
-        customerEmail: row.customer_email,
-        customerName: row.customer_name,
-        deliveredAt,
-        deliveryDetails: deliveryDetailsFromMetadata(row.metadata),
-        dueAt: isoDateTimeOrNull(row.due_at),
-        fulfillmentPromise: fulfillmentPromiseFromMetadata(row.metadata),
-        id: row.id,
-        isStuck: workflowHealth.isStuck,
-        lineCount: integerOrDefault(row.line_count, 0),
-        lastWorkflowEventAt,
-        nextExpectedAction: workflowHealth.nextAction,
-        nextExpectedTaskType: workflowHealth.expectedTaskType,
-        notes: row.notes,
-        openTaskCount: openTasks.length,
-        orderNumber: row.order_number,
-        orderedUnits: integerOrDefault(row.ordered_units, 0),
-        organisationId: row.organisation_id,
-        organisationName: row.organisation_name,
-        placedAt,
-        pipeline,
-        pricingSnapshot: pricingSnapshotFromMetadata(row.metadata, row.currency),
-        routingSnapshot: routingSnapshotFromMetadata(row.metadata),
-        shippedAt,
-        shippedUnits: integerOrDefault(row.shipped_units, 0),
-        shipment,
-        source: customerOrderSource(row.source),
-        status,
-        stuckReason: workflowHealth.reason,
-        taskCount: relatedTasks.length,
-        totalRetailAmount: numberOrNull(row.total_retail_amount),
-        updatedAt,
-        workflowStage,
-        workflowHealth,
-        workflowTimeline: customerOrderWorkflowTimeline({
-          deliveredAt,
-          events: relatedAuditEvents,
-          placedAt,
-          pickupBookedAt:
-            shipment?.pickupBookedAt ??
-            (customerOrderPickupInProgress(status, shipment) ? updatedAt : null),
-          shippedAt,
-          status,
-          updatedAt
-        }),
-        workflowTaskIds: relatedTasks.map((task) => task.id)
-      };
-    }),
+    carrierAccounts: carrierAccountRows.map(mapRetailCarrierAccountRow),
+    customerOrderLines: customerOrderLineRows.map((row) =>
+      mapCustomerOrderLineRow(
+        row,
+        pipelineByLineKey.get(pipelineKey(row.id, row.product_id)) ?? null
+      )
+    ),
+    customerOrders: customerOrderRows.map((row) =>
+      mapCustomerOrderRow({
+        auditEvents,
+        latestShipment: shipmentByOrderId.get(row.id) ?? null,
+        pipeline: pipelineByOrderId.get(row.id) ?? null,
+        relatedTasks: tasksByCustomerOrderId.get(row.id) ?? [],
+        row
+      })
+    ),
     databaseAvailable: true,
     generatedAt: new Date().toISOString(),
-    lots: lotRows.map((row) => ({
-      currency: row.currency,
-      expiresAt: isoDateOrNull(row.expires_at),
-      id: row.id,
-      notes: row.notes,
-      organisationId: row.organisation_id,
-      productId: row.product_id,
-      productTitle: row.product_title,
-      receivedAt: isoDateTime(row.received_at),
-      receivedQuantity: integerOrDefault(row.received_quantity, 0),
-      remainingQuantity: integerOrDefault(row.remaining_quantity, 0),
-      status: lotStatus(row.status),
-      stockId: row.retail_product_stock_id,
-      wholesalePriceAmount: numberOrNull(row.wholesale_price_amount)
-    })),
-    movements: movementRows.map((row) => ({
-      currency: row.currency,
-      id: row.id,
-      isVoided: Boolean(row.is_voided),
-      lotId: row.lot_id,
-      movementType: movementType(row.movement_type),
-      notes: row.notes,
-      occurredAt: isoDateTime(row.occurred_at),
-      organisationId: row.organisation_id,
-      organisationName: row.organisation_name,
-      productId: row.product_id,
-      productTitle: row.product_title,
-      quantityDelta: integerOrDefault(row.quantity_delta, 0),
-      reason: row.reason,
-      retailPriceAmount: numberOrNull(row.retail_price_amount),
-      stockId: row.retail_product_stock_id,
-      unitCostAmount: numberOrNull(row.unit_cost_amount),
-      voidsMovementId: row.voids_movement_id
-    })),
+    lots: lotRows.map(mapRetailStockLotRow),
+    movements: movementRows.map(mapRetailStockMovementRow),
     organisations,
     pipeline: pipelineRows,
-    productOptions: productRows.map((row) => ({
-      brandName: row.brand_name,
-      id: row.id,
-      imageUrl: row.image_url,
-      productKind: row.product_kind,
-      title: row.title
-    })),
-    reorderAdvice: adviceRows.map((row) => ({
-      calculatedAt: isoDateTime(row.calculated_at),
-      confidence:
-        row.confidence === "high" || row.confidence === "medium"
-          ? row.confidence
-          : "low",
-      currentStockQuantity: integerOrDefault(row.current_stock_quantity, 0),
-      daysCover: numberOrNull(row.days_cover),
-      id: row.id,
-      leadTimeDays: integerOrDefault(row.lead_time_days, 0),
-      organisationId: row.organisation_id,
-      organisationName: row.organisation_name,
-      outflowUnits30d: integerOrDefault(row.outflow_units_30d, 0),
-      productId: row.product_id,
-      productTitle: row.product_title,
-      recommendationPressureCount: integerOrDefault(
-        row.recommendation_pressure_count,
-        0
-      ),
-      reorderBy: isoDateOrNull(row.reorder_by),
-      riskLevel:
-        row.risk_level === "out_of_stock" ||
-        row.risk_level === "reorder" ||
-        row.risk_level === "watch"
-          ? row.risk_level
-          : "ok",
-      stockId: row.retail_product_stock_id,
-      suggestedOrderQuantity: integerOrDefault(row.suggested_order_quantity, 0)
-    })),
-    rows: stockRows.map((row) => ({
-      backorderPolicy: stockBackorderPolicy(row.backorder_policy),
-      brandName: row.brand_name,
-      currency: row.currency,
-      id: row.id,
-      imageUrl: row.image_url,
-      leadTimeDays: integerOrDefault(row.lead_time_days, 0),
-      notes: row.notes,
-      organisationId: row.organisation_id,
-      organisationName: row.organisation_name,
-      productId: row.product_id,
-      productKind: row.product_kind,
-      productStatus: row.product_status,
-      productTitle: row.product_title,
-      retailPriceAmount: numberOrNull(row.retail_price_amount),
-      retailOverridePriceAmount: numberOrNull(row.retail_override_price_amount),
-      retailSellableProductId: row.retail_sellable_product_id,
-      status: stockStatus(row.status),
-      stockQuantity: integerOrDefault(row.stock_quantity, 0),
-      updatedAt: isoDateTime(row.updated_at),
-      wholesalePriceAmount: numberOrNull(row.wholesale_price_amount)
-	    })),
-	    shoppingListLines: shoppingListLineRows.map((row) => ({
-	      actualQuantity: integerOrDefault(row.actual_quantity, 0),
-	      assignedQuantity: integerOrDefault(row.assigned_quantity, 0),
-		      brandName: row.brand_name,
-		      currentStockQuantity: integerOrDefault(row.current_stock_quantity, 0),
-          ean13: row.ean13,
-		      id: row.id,
-          manufacturerSku: row.manufacturer_sku,
-	      organisationId: row.organisation_id,
-	      productId: row.product_id,
-	      productTitle: row.product_title,
-	      requiredQuantity: integerOrDefault(row.required_quantity, 0),
-	      retailPriceAmount: numberOrNull(row.retail_price_amount),
-	      shoppingListId: row.shopping_list_id,
-	      stockedQuantity: integerOrDefault(row.stocked_quantity, 0),
-	      unorderedNeedQuantity: integerOrDefault(row.unordered_need_quantity, 0),
-	      wholesalePriceAmount: numberOrNull(row.wholesale_price_amount)
-	    })),
-	    shoppingLists: shoppingListRows.map((row) => ({
-	      actualUnits: integerOrDefault(row.actual_units, 0),
-	      createdAt: isoDateTime(row.created_at),
-	      currency: row.currency,
-	      id: row.id,
-	      lineCount: integerOrDefault(row.line_count, 0),
-	      listNumber: row.list_number,
-	      organisationId: row.organisation_id,
-	      organisationName: row.organisation_name,
-	      requiredUnits: integerOrDefault(row.required_units, 0),
-	      status: shoppingListStatus(row.status),
-	      stockedUnits: integerOrDefault(row.stocked_units, 0),
-	      updatedAt: isoDateTime(row.updated_at)
-	    })),
+    productOptions: productRows.map(mapRetailProductOptionRow),
+    reorderAdvice: adviceRows.map(mapRetailStockReorderAdviceRow),
+    rows: stockRows.map(mapRetailStockRow),
+    shoppingListLines: shoppingListLineRows.map(mapRetailShoppingListLineRow),
+    shoppingLists: shoppingListRows.map(mapRetailShoppingListRow),
     tasks
   };
 }

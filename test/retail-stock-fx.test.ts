@@ -248,6 +248,10 @@ describe("retail stock and FX infrastructure", () => {
 	      "lib/admin-retail-order-read-model.ts",
 	      "utf8"
 	    );
+	    const stockReadModel = readFileSync(
+	      "lib/admin-retail-stock-read-model.ts",
+	      "utf8"
+	    );
 	    const stockCodecs = readFileSync(
 	      "lib/admin-retail-stock-codecs.ts",
 	      "utf8"
@@ -371,7 +375,7 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(orderReadModel, /function deliveryDetailsFromMetadata/);
 	    assert.match(orderReadModel, /shippingAddress = orderAddressFromMetadata\(metadata\.shippingAddress\)/);
 	    assert.match(orderReadModel, /billingAddress = billingSameAsShipping[\s\S]*orderAddressFromMetadata\(metadata\.billingAddress\)/);
-	    assert.match(service, /deliveryDetails: deliveryDetailsFromMetadata\(row\.metadata\)/);
+	    assert.match(orderReadModel, /deliveryDetails: deliveryDetailsFromMetadata\(row\.metadata\)/);
 	    assert.match(stockCodecs, /export function stockStatus/);
 	    assert.match(stockCodecs, /export function movementDelta/);
 	    assert.match(stockCodecs, /export function integerOrDefault/);
@@ -994,17 +998,17 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(service, /idempotencyKey: `\$\{order\.id\}:pack`/);
 	    assert.match(service, /expectedTaskTypes: \["retail_order_ship"\]/);
 	    assert.doesNotMatch(service, /action: "book_pickup"[\s\S]*completeOrderWorkflowTask/);
-	    assert.match(service, /customerOrderPickupInProgress\(status, shipment\)/);
+	    assert.match(orderReadModel, /customerOrderPickupInProgress\(status, shipment\)/);
 	    assert.match(service, /customerOrderPickupInProgressFromShipmentTable/);
 	    assert.match(service, /reason: "pickup_in_progress"/);
 	    assert.match(service, /pickupInProgress: true/);
-	    assert.match(service, /shipment\?\.pickupBookedAt \?\?[\s\S]*customerOrderPickupInProgress\(status, shipment\) \? updatedAt : null/);
+	    assert.match(orderReadModel, /shipment\?\.pickupBookedAt \?\?[\s\S]*customerOrderPickupInProgress\(status, shipment\) \? updatedAt : null/);
 	    assert.match(service, /assertOrderWorkflowTaskClaimable/);
 	    assert.match(service, /reconcileRetailOrderLifecycle/);
 	    assert.match(service, /admin\.retail_order_lifecycle_reconciled/);
 	    assert.match(service, /AdminRetailCustomerOrderWorkflowTimeline/);
 	    assert.match(orderReadModel, /customerOrderWorkflowTimeline/);
-	    assert.match(service, /workflowTimeline: customerOrderWorkflowTimeline/);
+	    assert.match(orderReadModel, /workflowTimeline: customerOrderWorkflowTimeline/);
 	    assert.match(orderReadModel, /workflowEventStatus/);
 	    assert.match(service, /transitionRetailCustomerOrder/);
 	    assert.match(service, /recordRetailOrderWorkflowBpm/);
@@ -1013,8 +1017,8 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.match(workflowService, /send_retail_order_workflow_email/);
 	    assert.match(workflowService, /RETAIL_ORDER_EMAIL_TASK_PRIORITY = 220/);
 	    assert.match(service, /workflowTaskTypeForAction/);
-	    assert.match(service, /ean13: row\.ean13/);
-	    assert.match(service, /manufacturerSku: row\.manufacturer_sku/);
+		    assert.match(stockReadModel, /ean13: row\.ean13/);
+		    assert.match(stockReadModel, /manufacturerSku: row\.manufacturer_sku/);
 	    assert.match(service, /product_identifiers\.identifier_type = 'ean13'/);
 	    assert.match(service, /product_identifiers\.identifier_type = 'manufacturer_sku'/);
 	    assert.doesNotMatch(service, /internalSku: row\.internal_sku/);

@@ -86,6 +86,10 @@ const adminRetailOrderReadModel = readFileSync(
   new URL("../lib/admin-retail-order-read-model.ts", import.meta.url),
   "utf8"
 );
+const adminRetailStockReadModel = readFileSync(
+  new URL("../lib/admin-retail-stock-read-model.ts", import.meta.url),
+  "utf8"
+);
 const adminRetailStockView = readFileSync(
   new URL("../components/admin/retail-stock-view.tsx", import.meta.url),
   "utf8"
@@ -366,7 +370,7 @@ describe("codebase cleanup guardrails", () => {
 
   it("keeps retail stock cleanup hotspots visible until they are split", () => {
     assert.ok(
-      lineCount(adminRetailStockService) <= 7_200,
+      lineCount(adminRetailStockService) <= 6_900,
       "admin retail stock service must not grow before it is decomposed"
     );
     assert.ok(
@@ -428,6 +432,7 @@ describe("codebase cleanup guardrails", () => {
     assert.match(adminRetailStockService, /\bexport async function recordRetailCustomerOrderPickupBooked\b/);
     assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-codecs/);
     assert.match(adminRetailStockService, /@\/lib\/admin-retail-order-read-model/);
+    assert.match(adminRetailStockService, /@\/lib\/admin-retail-stock-read-model/);
     assert.match(
       adminRetailStockService,
       /export \{ getRetailCustomerOrderActionStates \}/
@@ -462,6 +467,27 @@ describe("codebase cleanup guardrails", () => {
     assert.match(adminRetailOrderReadModel, /export function lineAvailabilityFromMetadata/);
     assert.match(adminRetailOrderReadModel, /export function getRetailCustomerOrderActionStates/);
     assert.match(adminRetailOrderReadModel, /export function customerOrderWorkflowTimeline/);
+    assert.match(adminRetailOrderReadModel, /export function mapCustomerOrderLineRow/);
+    assert.match(adminRetailOrderReadModel, /export function mapCustomerOrderRow/);
+    for (const forbiddenInlineMapper of [
+      /carrierAccounts: carrierAccountRows\.map\(\(row\) => \(\{/,
+      /customerOrders: customerOrderRows\.map\(\(row\) => \{/,
+      /lots: lotRows\.map\(\(row\) => \(\{/,
+      /movements: movementRows\.map\(\(row\) => \(\{/,
+      /productOptions: productRows\.map\(\(row\) => \(\{/,
+      /reorderAdvice: adviceRows\.map\(\(row\) => \(\{/,
+      /rows: stockRows\.map\(\(row\) => \(\{/,
+      /shoppingLists: shoppingListRows\.map\(\(row\) => \(\{/
+    ]) {
+      assert.doesNotMatch(
+        adminRetailStockService,
+        forbiddenInlineMapper,
+        `retail stock service must not reintroduce inline mapper ${forbiddenInlineMapper}`
+      );
+    }
+    assert.match(adminRetailStockReadModel, /export function mapRetailCarrierAccountRow/);
+    assert.match(adminRetailStockReadModel, /export function mapRetailStockRow/);
+    assert.match(adminRetailStockReadModel, /export function mapRetailShoppingListRow/);
     assert.match(adminRetailStockService, /@\/lib\/retail-order-workflow-rules/);
     assert.doesNotMatch(adminRetailStockService, /\bfunction workflowStageForStatus\b/);
     assert.doesNotMatch(adminRetailStockService, /\bfunction retailOrderWorkflowTaskDetails\b/);
