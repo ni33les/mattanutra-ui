@@ -46,6 +46,9 @@ describe("HealthScore panel static guardrails", () => {
     assert.match(panelSource, /page\?\.locked\.subtraction/);
     assert.match(panelSource, /subtractionSeed\?\.labelChosen/);
     assert.match(panelSource, /subtraction\.chosen/);
+    assert.match(panelSource, /const \[display, setDisplay\] = useState\(value\)/);
+    assert.match(panelSource, /let startedAt: number \| null = null;/);
+    assert.match(panelSource, /reducedMotion \|\| !active \? value : display/);
   });
 
   it("keeps V3 pricing labels and Thai static fallbacks in the panel", () => {

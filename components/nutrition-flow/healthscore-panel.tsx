@@ -136,7 +136,7 @@ function CountUpNumber({
   value: number;
 }>) {
   const reducedMotion = useReducedMotion();
-  const [display, setDisplay] = useState(0);
+  const [display, setDisplay] = useState(value);
 
   useEffect(() => {
     if (reducedMotion || !active) {
@@ -144,9 +144,14 @@ function CountUpNumber({
     }
 
     let frame = 0;
-    const startedAt = performance.now();
+    let startedAt: number | null = null;
 
     function tick(now: number) {
+      if (startedAt === null) {
+        startedAt = now;
+        setDisplay(0);
+      }
+
       const progress = clamp((now - startedAt) / duration);
       const eased = 1 - Math.pow(1 - progress, 3);
 
