@@ -265,7 +265,7 @@ describe("zh-CN localization guardrails", () => {
     const formulation = source("../components/reveal-final-results.tsx");
 
     assert.match(formulation, /locale === "zh-CN"[\s\S]*?食物层面支持/);
-    assert.match(formulation, /locale === "zh-CN"[\s\S]*?joinFoodSupportFormulaGapLabels/);
+    assert.match(formulation, /locale === "zh-CN"[\s\S]*?joinFoodSupportFormulaRequirementLabels/);
     assert.doesNotMatch(
       formulation,
       /locale === "en"[\s\S]{0,120}:[\s\n]*`\$\{copy\.formulaSignedPrefix\}สำหรับ/

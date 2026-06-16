@@ -668,6 +668,10 @@
   "retailSellingTitle": "订单",
   "insights": [
     {
+      "name": "客户洞察",
+      "view": "customer-insights"
+    },
+    {
       "name": "补充剂",
       "view": "supplement-insights"
     },
@@ -710,6 +714,7 @@
     "blogs": "博客",
     "campaigns": "营销活动",
     "content": "内容",
+    "customer-insights": "客户洞察",
     "communications": "通信",
     "financials": "财务",
     "foods": "食品",

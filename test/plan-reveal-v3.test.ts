@@ -245,20 +245,20 @@ describe("plan reveal V3 migration", () => {
     assert.match(assessmentStore, /foodGapSupport: storedFoodGapSupport/);
     assert.match(revealFinalResults, /<RevealProductsFinalSection/);
     assert.match(revealFinalResults, /<RevealFoodSupportFinalSection/);
-    assert.match(formulationRevealSources, /Food support, after the products/);
+    assert.match(formulationRevealSources, /Foods that support your full formula/);
     assert.match(revealFinalResults, /selectedNeedCoverage/);
     assert.match(revealFinalResults, /item\.imagePath/);
-    assert.match(formulationRevealSources, /foodSupportFormulaGapsForItem/);
+    assert.match(formulationRevealSources, /foodSupportFormulaRequirementsForItem/);
     assert.match(formulationSupportHelpers, /curcumin/);
     assert.match(formulationSupportHelpers, /green_tea", "holy_basil", "moringa_leaves", "turmeric", "papaya"/);
     assert.match(formulationRevealSources, /safeFoodSupportCopy/);
     assert.match(revealFinalResults, /copy\.foodSupportFormulaGapLabel/);
     assert.doesNotMatch(revealFinalResults, /foodSupportProductCoverage/);
-    assert.match(formulationRevealSources, /Foods do not change the product coverage score/);
+    assert.match(formulationRevealSources, /Products carry the measured supplement doses/);
     assert.match(revealFinalResults, /loading="eager"[\s\S]*src=\{food\.imagePath\}/);
     assert.match(formulationResults, /productCoveragePending=\{productCoveragePending\}/);
-    assert.match(revealFinalResults, /copy\.foodSupportPendingHeadline/);
-    assert.match(formulationRevealSources, /revealFoodSupportPendingCards/);
+    assert.doesNotMatch(revealFinalResults, /copy\.foodSupportPendingHeadline/);
+    assert.doesNotMatch(revealFinalResults, /revealFoodSupportPendingCards/);
     assert.match(formulationSupportHelpers, /items: fallbackItems\.length > 0 \? fallbackItems : variant\?\.items \?\? \[\]/);
   });
 

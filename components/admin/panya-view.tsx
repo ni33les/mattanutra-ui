@@ -95,7 +95,12 @@ function configFromState(state: ReturnType<typeof initialConfigState>): PanyaCon
       unpaid: Number(state.quotaUnpaid) || 12
     },
     soul: state.soul,
-    upsellTone: state.upsellTone
+    upsellTone: state.upsellTone,
+    welcomeBriefs: {
+      living_protocol: state.welcomeBriefLivingProtocol,
+      right_amount_formula: state.welcomeBriefRightAmountFormula,
+      unpaid: state.welcomeBriefUnpaid
+    }
   };
 }
 
@@ -118,7 +123,10 @@ function initialConfigState(config: PanyaConfig) {
     quotaRightAmountFormula: configNumber(config.quotas.right_amount_formula, 12),
     quotaUnpaid: configNumber(config.quotas.unpaid, 12),
     soul: config.soul,
-    upsellTone: config.upsellTone
+    upsellTone: config.upsellTone,
+    welcomeBriefLivingProtocol: config.welcomeBriefs.living_protocol,
+    welcomeBriefRightAmountFormula: config.welcomeBriefs.right_amount_formula,
+    welcomeBriefUnpaid: config.welcomeBriefs.unpaid
   };
 }
 
@@ -136,6 +144,42 @@ function conversationStatusClass(input: Readonly<{
 
   return "bg-[#ECFDF5] text-[#126B4F] ring-[#A7F3D0]";
 }
+
+type PanyaConfigState = ReturnType<typeof initialConfigState>;
+type PanyaConfigStateKey = keyof PanyaConfigState;
+
+const modalityControls: Array<{
+  adviceKey: PanyaConfigStateKey;
+  helper: string;
+  label: string;
+  quotaKey: PanyaConfigStateKey;
+  welcomeKey: PanyaConfigStateKey;
+}> = [
+  {
+    adviceKey: "adviceLivingProtocol",
+    helper:
+      "Subscription customers. Welcome can reference ongoing protocol support and changes over time.",
+    label: "Living Protocol",
+    quotaKey: "quotaLivingProtocol",
+    welcomeKey: "welcomeBriefLivingProtocol"
+  },
+  {
+    adviceKey: "adviceRightAmountFormula",
+    helper:
+      "Paid one-off formula customers. Welcome should orient them around their generated plan and next steps.",
+    label: "Right Amount Formula",
+    quotaKey: "quotaRightAmountFormula",
+    welcomeKey: "welcomeBriefRightAmountFormula"
+  },
+  {
+    adviceKey: "adviceUnpaid",
+    helper:
+      "Customers without a paid entitlement. Welcome should stay general and helpful, with gentle upgrade context.",
+    label: "Unpaid",
+    quotaKey: "quotaUnpaid",
+    welcomeKey: "welcomeBriefUnpaid"
+  }
+];
 
 export function AdminPanyaView({
   accessToken,
@@ -359,16 +403,17 @@ export function AdminPanyaView({
     <section className="mt-8 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-[#126B4F]">
-            Panya
-          </p>
           <h2 className="mt-1 text-2xl font-bold text-gray-900">
-            Customer agent control room
+            {activeSection === "configuration"
+              ? "Panya Configuration"
+              : "Panya Conversations"}
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
-            Configure Panya&apos;s voice, limits, check-ins, and review permanent
-            customer conversations across LINE and future chat channels.
-          </p>
+          {activeSection === "conversations" ? (
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
+              Review permanent customer conversations across LINE and future
+              chat channels.
+            </p>
+          ) : null}
         </div>
         {activeSection === "conversations" ? (
           <div className="flex flex-wrap gap-2">
@@ -403,160 +448,193 @@ export function AdminPanyaView({
             "xl:grid-cols-[minmax(18rem,0.42fr)_minmax(0,1fr)]"
         )}
       >
-        <section
+        <div
           className={classNames(
             activeSection !== "configuration" && "hidden",
-            "rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200"
+            "space-y-5"
           )}
         >
-          <div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                Soul and guardrails
-              </h3>
-              <p className="mt-1 text-sm text-gray-600">
-                Active version{" "}
-                {data.activeConfigVersion
-                  ? `v${data.activeConfigVersion.version}`
-                  : "uses defaults"}
-                .
-              </p>
-            </div>
-          </div>
-
-          {message ? (
-            <p className="mt-4 rounded-md bg-[#ECFDF5] px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-[#A7F3D0]">
-              {message}
-            </p>
-          ) : null}
-          {error ? (
-            <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-100">
-              {error}
-            </p>
-          ) : null}
-
-          <div className="mt-5 space-y-4">
-            <label className="block">
-              <span className="text-sm font-semibold text-gray-800">Soul</span>
-              <textarea
-                className="mt-1 min-h-28 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
-                onChange={(event) =>
-                  setConfigState((current) => ({
-                    ...current,
-                    soul: event.target.value
-                  }))
-                }
-                value={configState.soul}
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-semibold text-gray-800">
-                Guardrails
-              </span>
-              <textarea
-                className="mt-1 min-h-36 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
-                onChange={(event) =>
-                  setConfigState((current) => ({
-                    ...current,
-                    guardrails: event.target.value
-                  }))
-                }
-                value={configState.guardrails}
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-semibold text-gray-800">
-                Upsell tone
-              </span>
-              <textarea
-                className="mt-1 min-h-24 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
-                onChange={(event) =>
-                  setConfigState((current) => ({
-                    ...current,
-                    upsellTone: event.target.value
-                  }))
-                }
-                value={configState.upsellTone}
-              />
-            </label>
-
-            <div className="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-200">
+          <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h4 className="text-sm font-semibold text-gray-900">
-                  Protocol-specific AI advice
-                </h4>
-                <p className="mt-1 text-xs leading-5 text-gray-600">
-                  These instructions are injected into Panya&apos;s AI prompt for
-                  the customer&apos;s current protocol entitlement.
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Configuration status
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-gray-600">
+                  Active version{" "}
+                  {data.activeConfigVersion
+                    ? `v${data.activeConfigVersion.version}`
+                    : "uses defaults"}
+                  . Saving activates a new platform-wide Panya config.
                 </p>
               </div>
-              <div className="mt-3 grid gap-3">
-                {[
-                  [
-                    "Living Protocol advice",
-                    "adviceLivingProtocol",
-                    "Use for subscription customers who can receive ongoing protocol support."
-                  ],
-                  [
-                    "Right Amount Formula advice",
-                    "adviceRightAmountFormula",
-                    "Use for paid one-off formula customers."
-                  ],
-                  [
-                    "Unpaid advice",
-                    "adviceUnpaid",
-                    "Use for customers without a paid plan entitlement."
-                  ]
-                ].map(([label, key, helper]) => (
-                  <label className="block" key={key}>
+              <button
+                className="inline-flex w-full justify-center rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                disabled={busy}
+                onClick={saveConfig}
+                type="button"
+              >
+                {busy ? "Saving..." : "Save"}
+              </button>
+            </div>
+            {message ? (
+              <p className="mt-4 rounded-md bg-[#ECFDF5] px-3 py-2 text-sm font-semibold text-[#126B4F] ring-1 ring-[#A7F3D0]">
+                {message}
+              </p>
+            ) : null}
+            {error ? (
+              <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-100">
+                {error}
+              </p>
+            ) : null}
+          </section>
+
+          <section className="space-y-3">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Modality controls
+              </h3>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
+                Welcome briefs tell Panya what kind of first message to generate
+                when a customer connects LINE. AI advice is used later inside
+                ongoing Panya replies.
+              </p>
+            </div>
+            <div className="grid gap-4 xl:grid-cols-3">
+              {modalityControls.map((control) => (
+                <article
+                  className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200"
+                  key={control.label}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-base font-semibold text-gray-900">
+                        {control.label}
+                      </h4>
+                      <p className="mt-1 text-xs leading-5 text-gray-500">
+                        {control.helper}
+                      </p>
+                    </div>
+                  </div>
+
+                  <label className="mt-4 block">
                     <span className="text-xs font-semibold text-gray-700">
-                      {label}
+                      Daily message limit
                     </span>
-                    <textarea
-                      className="mt-1 min-h-24 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
+                    <input
+                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
+                      min={1}
                       onChange={(event) =>
                         setConfigState((current) => ({
                           ...current,
-                          [key]: event.target.value
+                          [control.quotaKey]: event.target.value
                         }))
                       }
-                      value={String(configState[key as keyof typeof configState])}
+                      type="number"
+                      value={String(configState[control.quotaKey])}
                     />
-                    <span className="mt-1 block text-xs text-gray-500">
-                      {helper}
-                    </span>
                   </label>
-                ))}
-              </div>
-            </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                ["Living Protocol", "quotaLivingProtocol"],
-                ["Right Amount Formula", "quotaRightAmountFormula"],
-                ["Unpaid", "quotaUnpaid"]
-              ].map(([label, key]) => (
-                <label className="block" key={key}>
-                  <span className="text-sm font-semibold text-gray-800">
-                    {label}
-                  </span>
-                  <input
-                    className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
-                    min={1}
-                    onChange={(event) =>
-                      setConfigState((current) => ({
-                        ...current,
-                        [key]: event.target.value
-                      }))
-                    }
-                    type="number"
-                    value={String(configState[key as keyof typeof configState])}
-                  />
-                </label>
+                  <label className="mt-4 block">
+                    <span className="text-xs font-semibold text-gray-700">
+                      Welcome brief
+                    </span>
+                    <textarea
+                      className="mt-1 min-h-32 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
+                      onChange={(event) =>
+                        setConfigState((current) => ({
+                          ...current,
+                          [control.welcomeKey]: event.target.value
+                        }))
+                      }
+                      value={String(configState[control.welcomeKey])}
+                    />
+                  </label>
+
+                  <label className="mt-4 block">
+                    <span className="text-xs font-semibold text-gray-700">
+                      Protocol-specific AI advice
+                    </span>
+                    <textarea
+                      className="mt-1 min-h-36 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
+                      onChange={(event) =>
+                        setConfigState((current) => ({
+                          ...current,
+                          [control.adviceKey]: event.target.value
+                        }))
+                      }
+                      value={String(configState[control.adviceKey])}
+                    />
+                  </label>
+                </article>
               ))}
             </div>
+          </section>
 
-            <div className="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-200">
+          <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Global behaviour
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-gray-600">
+              These controls shape Panya across all modalities.
+            </p>
+            <div className="mt-5 grid gap-4 lg:grid-cols-3">
+              <label className="block">
+                <span className="text-sm font-semibold text-gray-800">Soul</span>
+                <textarea
+                  className="mt-1 min-h-40 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
+                  onChange={(event) =>
+                    setConfigState((current) => ({
+                      ...current,
+                      soul: event.target.value
+                    }))
+                  }
+                  value={configState.soul}
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-gray-800">
+                  Guardrails
+                </span>
+                <textarea
+                  className="mt-1 min-h-40 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
+                  onChange={(event) =>
+                    setConfigState((current) => ({
+                      ...current,
+                      guardrails: event.target.value
+                    }))
+                  }
+                  value={configState.guardrails}
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-gray-800">
+                  Upsell tone
+                </span>
+                <textarea
+                  className="mt-1 min-h-40 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
+                  onChange={(event) =>
+                    setConfigState((current) => ({
+                      ...current,
+                      upsellTone: event.target.value
+                    }))
+                  }
+                  value={configState.upsellTone}
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Proactive check-ins
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-gray-600">
+                  Panya can send scheduled follow-ups after a LINE connection.
+                </p>
+              </div>
               <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
                 <input
                   checked={configState.checkInsEnabled}
@@ -568,81 +646,70 @@ export function AdminPanyaView({
                   }
                   type="checkbox"
                 />
-                Proactive check-ins enabled
+                Enabled
               </label>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="block">
+            </div>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-xs font-semibold text-gray-600">
+                  Minimum days between messages
+                </span>
+                <input
+                  className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
+                  min={1}
+                  onChange={(event) =>
+                    setConfigState((current) => ({
+                      ...current,
+                      minimumDaysBetweenMessages: event.target.value
+                    }))
+                  }
+                  type="number"
+                  value={configState.minimumDaysBetweenMessages}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-gray-600">
+                  Quiet days after inbound
+                </span>
+                <input
+                  className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
+                  min={0}
+                  onChange={(event) =>
+                    setConfigState((current) => ({
+                      ...current,
+                      quietDaysAfterInbound: event.target.value
+                    }))
+                  }
+                  type="number"
+                  value={configState.quietDaysAfterInbound}
+                />
+              </label>
+            </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              {[
+                ["English questions", "questionsEn"],
+                ["Thai questions", "questionsTh"],
+                ["Chinese questions", "questionsZh"]
+              ].map(([label, key]) => (
+                <label className="block" key={key}>
                   <span className="text-xs font-semibold text-gray-600">
-                    Minimum days between messages
+                    {label}
                   </span>
-                  <input
-                    className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
-                    min={1}
+                  <textarea
+                    className="mt-1 min-h-28 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
                     onChange={(event) =>
                       setConfigState((current) => ({
                         ...current,
-                        minimumDaysBetweenMessages: event.target.value
+                        [key]: event.target.value
                       }))
                     }
-                    type="number"
-                    value={configState.minimumDaysBetweenMessages}
+                    value={String(configState[key as PanyaConfigStateKey])}
                   />
                 </label>
-                <label className="block">
-                  <span className="text-xs font-semibold text-gray-600">
-                    Quiet days after inbound
-                  </span>
-                  <input
-                    className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
-                    min={0}
-                    onChange={(event) =>
-                      setConfigState((current) => ({
-                        ...current,
-                        quietDaysAfterInbound: event.target.value
-                      }))
-                    }
-                    type="number"
-                    value={configState.quietDaysAfterInbound}
-                  />
-                </label>
-              </div>
-              <div className="mt-3 grid gap-3">
-                {[
-                  ["English questions", "questionsEn"],
-                  ["Thai questions", "questionsTh"],
-                  ["Chinese questions", "questionsZh"]
-                ].map(([label, key]) => (
-                  <label className="block" key={key}>
-                    <span className="text-xs font-semibold text-gray-600">
-                      {label}
-                    </span>
-                    <textarea
-                      className="mt-1 min-h-20 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300"
-                      onChange={(event) =>
-                        setConfigState((current) => ({
-                          ...current,
-                          [key]: event.target.value
-                        }))
-                      }
-                      value={String(configState[key as keyof typeof configState])}
-                    />
-                  </label>
-                ))}
-              </div>
+              ))}
             </div>
-
-            <div className="flex justify-end border-t border-gray-100 pt-4">
-              <button
-                className="rounded-md bg-[#1FA77A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#188865] disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={busy}
-                onClick={saveConfig}
-                type="button"
-              >
-                {busy ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
 
         <section
           className={classNames(

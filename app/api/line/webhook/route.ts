@@ -8,7 +8,9 @@ import {
 import { getSql } from "@/lib/db";
 import { formatOutboundLineMessage } from "@/lib/line-message-format";
 import {
+  archivePanyaWelcomeMessage,
   checkAndRecordPanyaUserMessage,
+  preparePanyaWelcomeMessage,
   queuePanyaQuotaLimitReply,
   schedulePanyaCheckInForPlan
 } from "@/lib/panya";
@@ -124,32 +126,6 @@ function adminConnectedReply(localeValue: string | null | undefined) {
   }
 
   return "LINE is connected. MattaNutra can send this organisation's operational and order notifications to this chat. Chat commands are not enabled yet, but replies will be captured for follow-up.";
-}
-
-function customerConnectedReply(input: Readonly<{
-  locale?: string | null;
-  selectedPlan?: string | null;
-}>) {
-  const locale = replyLocale(input.locale);
-  const isSubscription =
-    input.selectedPlan?.trim().toLowerCase() === "pro" ||
-    input.selectedPlan?.trim().toLowerCase() === "living_protocol";
-
-  if (locale === "th") {
-    return isSubscription
-      ? "เชื่อมต่อกับ Panya แล้ว คุณสามารถถามเรื่องแผน อาหาร ผลิตภัณฑ์ คำสั่งซื้อ และการเปลี่ยนแปลงของร่างกายหรือกิจวัตรได้ Panya จะช่วยสนับสนุน Living Protocol ต่อเนื่อง และส่งต่อให้ทีมงานเมื่อจำเป็น"
-      : "เชื่อมต่อกับ Panya แล้ว คุณสามารถถามเรื่องแผนโภชนาการ ผลิตภัณฑ์ คำสั่งซื้อ และขั้นตอนถัดไปได้ สำหรับแผนแบบครั้งเดียว Panya จะช่วยอธิบายและแนะนำการใช้งาน แต่การปรับโปรโตคอลต่อเนื่องจะอยู่ในบริการ Living Protocol";
-  }
-
-  if (locale === "zh-CN") {
-    return isSubscription
-      ? "已连接 Panya。你可以询问方案、食物、产品、订单，以及身体状态或日常习惯的变化。Panya 会持续支持 Living Protocol，并在需要时转给人工团队。"
-      : "已连接 Panya。你可以询问营养方案、产品、订单和下一步。一次性方案中，Panya 可以解释和引导使用；持续方案调整属于 Living Protocol 服务。";
-  }
-
-  return isSubscription
-    ? "You are connected to Panya. You can ask about your plan, food, products, orders, and changes in your body or routine. Panya can support your Living Protocol over time and bring in the team when needed."
-    : "You are connected to Panya. You can ask about your nutrition plan, products, orders, and next steps. For one-off plans, Panya can explain and guide; ongoing protocol refinement is part of Living Protocol.";
 }
 
 function invalidLineConnectReply(scope: LineConnectCommand["scope"]) {
@@ -269,17 +245,26 @@ export async function POST(request: Request) {
           source: "customer_line_connected"
         });
 
+        const welcome = await preparePanyaWelcomeMessage({
+          locale: customerConnected.locale,
+          planId: customerConnected.planId,
+          selectedPlan: customerConnected.selectedPlan
+        });
         const replySent = await replyToLine({
           replyToken,
-          text: customerConnectedReply({
-            locale: customerConnected.locale,
-            selectedPlan: customerConnected.selectedPlan
-          })
+          text: welcome.body
+        });
+        const archivedWelcome = await archivePanyaWelcomeMessage({
+          identityId: customerConnected.channel.identityId,
+          message: welcome,
+          replySent
         });
 
         results.push({
           connected: true,
           connectionScope: "customer",
+          panyaWelcomeArchived: Boolean(archivedWelcome),
+          panyaWelcomeGenerated: welcome.generatedBy === "ai",
           planId: customerConnected.planId,
           replySent
         });

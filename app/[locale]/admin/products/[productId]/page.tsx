@@ -15,6 +15,7 @@ import {
   emptyAdminDashboardData,
   normalizeAdminDashboardRange
 } from "@/lib/admin-dashboard-data";
+import { emptyAdminCustomerInsightsData } from "@/lib/admin-customer-insights";
 import { normalizeAdminDashboardFilters } from "@/lib/admin-dashboard-filters";
 import {
   emptyCommunicationsData
@@ -153,6 +154,7 @@ export default async function ProductDetailPage({
       agentsData={emptyAgentsData()}
       campaignsData={emptyCampaignsData()}
       contentData={emptyContentData()}
+      customerInsightsData={emptyAdminCustomerInsightsData(range)}
       communicationsData={emptyCommunicationsData()}
       data={data}
       financialsData={emptyFinancials(range)}

@@ -207,12 +207,20 @@ describe("final reveal UX", () => {
     assert.match(reveal, /className="mn-reveal-panya border-t/);
     assert.match(reveal, /className="mn-reveal-panya-card/);
     assert.match(reveal, /className="mn-reveal-panya-connect/);
-    assert.match(reveal, /<div className="mn-reveal-final-label">\s*\{finalCopy\.panyaSection\}/);
+    assert.match(reveal, /src="\/v11\/brand-mark\.png"/);
+    assert.match(reveal, /finalCopy\.panyaSection/);
+    assert.match(reveal, /finalCopy\.panyaByline/);
+    assert.match(reveal, /finalCopy\.panyaWisdomBody/);
+    assert.match(reveal, /connect\?\.code/);
+    assert.match(copy, /panyaByline: "Your guide/);
+    assert.match(copy, /panyaWisdomBody:/);
     assert.doesNotMatch(reveal, /panyaSection\}\s*<\/div>[\s\S]{0,120}mn-reveal-final-label-number/);
     assert.match(reveal, /source: "reveal_panya_support"/);
     assert.match(reveal, /\/api\/assessment\/\$\{encodeURIComponent\(planId\)\}\/line-connect/);
     assert.match(reveal, /\/api\/qr\?data=/);
-    assert.match(reveal, /copyConnectCode/);
+    assert.doesNotMatch(reveal, /copyConnectCode/);
+    assert.doesNotMatch(reveal, /navigator\.clipboard/);
+    assert.doesNotMatch(reveal, /finalCopy\.panyaCopyCode/);
     assert.match(reveal, /void createConnectCode\(false, true\)/);
   });
 

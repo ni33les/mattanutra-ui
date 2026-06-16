@@ -8,6 +8,9 @@ import type {
   AdminDashboardData
 } from "@/lib/admin-dashboard-data";
 import type {
+  AdminCustomerInsightsData
+} from "@/lib/admin-customer-insights";
+import type {
   AdminAgentsData,
   AdminTaskVisibilityData
 } from "@/lib/admin-execution";
@@ -78,6 +81,7 @@ import { AdminFlowView } from "@/components/admin/flow-view";
 import { AdminAgentsView } from "@/components/admin/agents-view";
 import { AdminCampaignsView } from "@/components/admin/marketing-campaigns";
 import { AdminLeadsView } from "@/components/admin/marketing-leads";
+import { AdminCustomerInsightsView } from "@/components/admin/customer-insights-view";
 import { AdminCommunicationsView } from "@/components/admin/communications-view";
 import { AdminPanyaView } from "@/components/admin/panya-view";
 import { AdminTechnicalAlertsView } from "@/components/admin/technical-alerts-view";
@@ -208,6 +212,7 @@ function adminViewDatabaseAvailable({
   agentsData,
   campaignsData,
   contentData,
+  customerInsightsData,
   communicationsData,
   data,
   financialsData,
@@ -229,6 +234,7 @@ function adminViewDatabaseAvailable({
   agentsData: AdminAgentsData;
   campaignsData: AdminCampaignsData;
   contentData: AdminContentInventoryData;
+  customerInsightsData: AdminCustomerInsightsData;
   communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
   financialsData: AdminFinancialsData;
@@ -280,6 +286,10 @@ function adminViewDatabaseAvailable({
 
   if (view === "campaigns") {
     return campaignsData.databaseAvailable;
+  }
+
+  if (view === "customer-insights") {
+    return customerInsightsData.databaseAvailable;
   }
 
   if (view === "blogs" || view === "content" || view === "testimonials") {
@@ -361,6 +371,7 @@ export function AdminDashboard({
   agentsData,
   campaignsData,
   contentData,
+  customerInsightsData,
   communicationsData,
   data,
   financialsData,
@@ -392,6 +403,7 @@ export function AdminDashboard({
   agentsData: AdminAgentsData;
   campaignsData: AdminCampaignsData;
   contentData: AdminContentInventoryData;
+  customerInsightsData: AdminCustomerInsightsData;
   communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
   financialsData: AdminFinancialsData;
@@ -423,6 +435,25 @@ export function AdminDashboard({
   );
   const contentManagementView =
     view === "blogs" || view === "content" || view === "testimonials";
+  const showDashboardTimeframeControls =
+    !contentManagementView &&
+    !(view === "panya" && panyaSection === "configuration") &&
+    (view === "agents" ||
+      view === "alerts" ||
+      view === "campaigns" ||
+      view === "communications" ||
+      view === "customer-insights" ||
+      view === "financials" ||
+      view === "flow" ||
+      view === "glance" ||
+      view === "leads" ||
+      view === "panya" ||
+      view === "out-of-catalog-insights" ||
+      view === "product-insights" ||
+      view === "retail-financials" ||
+      view === "settlements" ||
+      view === "supplement-insights" ||
+      view === "visibility");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [visibilityHeartbeatAt, setVisibilityHeartbeatAt] = useState(0);
   const recordVisibilityHeartbeat = useCallback(() => {
@@ -467,6 +498,7 @@ export function AdminDashboard({
     agentsData: liveAgentsData,
     campaignsData,
     contentData,
+    customerInsightsData,
     communicationsData,
     data,
     financialsData,
@@ -598,22 +630,7 @@ export function AdminDashboard({
             </div>
           ) : null}
 
-          {!contentManagementView &&
-          (view === "agents" ||
-          view === "alerts" ||
-          view === "campaigns" ||
-          view === "communications" ||
-          view === "financials" ||
-          view === "flow" ||
-          view === "glance" ||
-          view === "leads" ||
-          view === "panya" ||
-          view === "out-of-catalog-insights" ||
-          view === "product-insights" ||
-          view === "retail-financials" ||
-          view === "settlements" ||
-          view === "supplement-insights" ||
-          view === "visibility") ? (
+          {showDashboardTimeframeControls ? (
             <>
               <div className="mt-6 flex flex-wrap items-center gap-4">
                 <TimeframeSelector
@@ -731,6 +748,11 @@ export function AdminDashboard({
             <AdminLeadsView
               data={leadsData}
               labels={labels}
+              locale={locale}
+            />
+          ) : view === "customer-insights" ? (
+            <AdminCustomerInsightsView
+              data={customerInsightsData}
               locale={locale}
             />
           ) : view === "agents" ? (

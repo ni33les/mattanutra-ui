@@ -25,6 +25,9 @@ export type ProductBasketQuotePreview = Readonly<{
     organisationId: string;
     organisationName: string;
   } | null;
+  shippingAmount: number;
+  shippingSource?: string | null;
   subtotalAmount: number;
+  totalAmount: number;
   unavailableLines: ProductBasketQuoteLine[];
 }>;

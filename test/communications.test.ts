@@ -205,7 +205,10 @@ describe("communications channel selection", () => {
     assert.match(webhook, /: "either";/);
     assert.match(webhook, /: "either";[\s\S]*return \{[\s\S]*scope/);
     assert.match(webhook, /adminConnectedReply/);
-    assert.match(webhook, /customerConnectedReply/);
+    assert.match(webhook, /preparePanyaWelcomeMessage/);
+    assert.match(webhook, /archivePanyaWelcomeMessage/);
+    assert.match(webhook, /panyaWelcomeArchived/);
+    assert.match(webhook, /panyaWelcomeGenerated/);
     assert.match(webhook, /enqueuePanyaCustomerChatReplyTask/);
     assert.match(webhook, /https:\/\/api\.line\.me\/v2\/bot\/message\/reply/);
     assert.match(webhook, /replySent/);

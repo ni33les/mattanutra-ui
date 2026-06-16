@@ -38,6 +38,7 @@ export type AdminDashboardView =
   | "blogs"
   | "campaigns"
   | "content"
+  | "customer-insights"
   | "communications"
   | "financials"
   | "foods"
@@ -1438,6 +1439,7 @@ const baseContent = {
     ],
     retailSellingTitle: "Orders",
     insights: [
+      { icon: UserGroupIcon, name: "Customer Intelligence", view: "customer-insights" },
       { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" },
       { icon: ExclamationTriangleIcon, name: "Out-of-catalog", view: "out-of-catalog-insights" },
       { icon: ShoppingBagIcon, name: "Products", view: "product-insights" }
@@ -1460,6 +1462,7 @@ const baseContent = {
       blogs: "Blogs",
       campaigns: "Campaigns",
       content: "Content",
+      "customer-insights": "Customer Intelligence",
       communications: "Communications",
       financials: "Financials",
       foods: "Foods",
@@ -2292,6 +2295,7 @@ const baseContent = {
     ],
     retailSellingTitle: "คำสั่งซื้อ",
     insights: [
+      { icon: UserGroupIcon, name: "ข้อมูลลูกค้า", view: "customer-insights" },
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplement-insights" },
       { icon: ExclamationTriangleIcon, name: "นอกแคตตาล็อก", view: "out-of-catalog-insights" },
       { icon: ShoppingBagIcon, name: "สินค้า", view: "product-insights" }
@@ -2314,6 +2318,7 @@ const baseContent = {
       blogs: "บทความ",
       campaigns: "แคมเปญ",
       content: "คอนเทนต์",
+      "customer-insights": "ข้อมูลลูกค้า",
       communications: "การสื่อสาร",
       financials: "การเงิน",
       foods: "อาหาร",

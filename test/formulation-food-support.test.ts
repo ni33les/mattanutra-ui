@@ -163,14 +163,15 @@ describe("formulation food support", () => {
     assert.doesNotMatch(reveal, /foodSupportEmpty/);
     assert.match(reveal, /finalCopy\.foodEmptyTitle/);
     assert.match(reveal, /finalCopy\.foodEmptyBody/);
-    assert.match(reveal, /\) : foodCards\.length > 0 \? \(/);
+    assert.match(reveal, /\{foodCards\.length > 0 \? \(/);
+    assert.doesNotMatch(reveal, /copy\.foodSupportPendingHeadline/);
     assert.doesNotMatch(
       reveal,
       /items\.length < 1 \? \([\s\S]*copy\.foodSupportNoGapsHeadline[\s\S]*copy\.foodSupportNoGapsBody[\s\S]*\) : \(/,
     );
   });
 
-  it("uses the active product stack gaps instead of stale stored food cards", () => {
+  it("uses active formula requirements instead of stale stored food cards", () => {
     const staleGreenTea = foodItem("green_tea", "Green tea", [
       "supplement:curcumin",
     ]);
@@ -192,7 +193,7 @@ describe("formulation food support", () => {
       },
     });
     const balancedCoverage = [
-      need("supplement:vitamin_d3", "Vitamin D3", 20),
+      need("supplement:vitamin_d3", "Vitamin D3", 100),
     ];
 
     const support = selectedFoodSupport(

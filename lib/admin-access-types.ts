@@ -13,6 +13,7 @@ export type AdminOrganisation = Readonly<{
   currency: string;
   defaultLocale: Locale;
   dispatchCity?: string | null;
+  flatRateShippingAmount?: number | null;
   id: string;
   name: string;
   slug: string;
@@ -144,6 +145,8 @@ export type AdminSettingsData = Readonly<{
   canEditCustomerPriceMargin: boolean;
   canEditOrganisation: boolean;
   customerPriceMarginPercent: number;
+  flatRateShippingAmount: number;
+  flatRateShippingSource: "platform_default" | "retail_override" | "system_default";
   organisation: AdminOrganisation;
   people: AdminSettingsPerson[];
 }>;

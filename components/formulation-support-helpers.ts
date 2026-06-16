@@ -13,11 +13,16 @@ import {
   localizedBenefitTagLabel,
   localizeKnownInlineTerms
 } from "@/components/formulation-reveal-copy";
-export {
+import {
   visibleFormulaIngredients,
   visibleSupplementIngredientCount,
   visibleSupplementRecommendationCount
 } from "@/lib/nutrition-journey-status";
+export {
+  visibleFormulaIngredients,
+  visibleSupplementIngredientCount,
+  visibleSupplementRecommendationCount
+};
 
 const supplementBenefitRules = [
   {
@@ -418,6 +423,54 @@ export function foodSupportableGaps(gaps: readonly ProductNeedCoverage[]) {
   );
 }
 
+export function foodSupportRequirements(
+  selectedNeedCoverage: readonly ProductNeedCoverage[],
+  ingredients: readonly FormulationIngredient[]
+) {
+  const supplementNeeds = selectedNeedCoverage.filter(
+    (need) => need.itemType === "supplement"
+  );
+  const requirements: ProductNeedCoverage[] = [];
+
+  for (const ingredient of ingredients) {
+    const matchedNeed = supplementNeeds.find((need) =>
+      productNeedMatchesIngredient(need, ingredient)
+    );
+
+    requirements.push(
+      matchedNeed ?? {
+        bestRejectedProductId: null,
+        bestRejectedReason: null,
+        coveragePercent: 100,
+        displayName: getLocalizedText(ingredient.supplement, "en") || ingredient.id,
+        id: ingredient.id,
+        itemType: "supplement"
+      }
+    );
+  }
+
+  supplementNeeds.forEach((need) => {
+    if (
+      !requirements.some((requirement) => requirement.id === need.id) &&
+      !ingredients.some((ingredient) => productNeedMatchesIngredient(need, ingredient))
+    ) {
+      requirements.push(need);
+    }
+  });
+
+  return requirements.filter(
+    (need, index, all) => index === all.findIndex((candidate) => candidate.id === need.id)
+  );
+}
+
+export function foodSupportableRequirements(
+  requirements: readonly ProductNeedCoverage[]
+) {
+  return requirements.filter((requirement) =>
+    managedFoodNeedRules.some((rule) => ruleMatchesNeed(rule, requirement))
+  );
+}
+
 function foodSupportNeedText(need: ProductNeedCoverage) {
   return normalizeFoodText(`${need.id} ${need.displayName}`);
 }
@@ -600,6 +653,43 @@ export function foodSupportFormulaGapsForItem(
     });
 }
 
+export function foodSupportFormulaRequirementsForItem(
+  item: FoodGapSupportItem,
+  selectedNeedCoverage: readonly ProductNeedCoverage[],
+  ingredients: readonly FormulationIngredient[],
+  locale: Locale
+): FoodSupportFormulaGap[] {
+  const seed = managedSeedForFoodSupportItem(item);
+  const supportableRequirements = seed
+    ? foodSupportableRequirements(
+        foodSupportRequirements(selectedNeedCoverage, ingredients)
+      ).filter((requirement) => managedFoodSeedMatchesGap(seed, requirement))
+    : [];
+  const explicitIds = new Set(item.gapNeedIds);
+  const inferredIds = new Set(
+    seed ? relatedFoodGapIds(seed, supportableRequirements) : []
+  );
+  const rowNumbers = formulaIngredientRowNumbers(ingredients);
+
+  return supportableRequirements
+    .filter((requirement) => explicitIds.has(requirement.id) || inferredIds.has(requirement.id))
+    .map((requirement) => {
+      const ingredient = ingredients.find((candidate) =>
+        productNeedMatchesIngredient(requirement, candidate)
+      );
+
+      return {
+        coveragePercent: Math.min(100, Math.max(0, Math.round(requirement.coveragePercent))),
+        dailyDose: ingredient ? localizedDoseText(ingredient.dailyDose, locale) : "",
+        id: requirement.id,
+        label: ingredient
+          ? localizedSupplementName(ingredient.supplement, ingredient.id, locale)
+          : foodSupportNeedLabel(requirement, locale),
+        rowNumber: ingredient ? rowNumbers.get(ingredient.id) ?? null : null
+      };
+    });
+}
+
 export function joinFoodSupportNeeds(
   needs: readonly ProductNeedCoverage[],
   locale: Locale
@@ -635,6 +725,29 @@ export function joinFoodSupportFormulaGapLabels(
       : locale === "zh-CN"
         ? "剩余缺口"
         : "the remaining gaps";
+  }
+
+  return labels.length === 1
+    ? labels[0]
+    : locale === "th"
+      ? labels.join(" และ ")
+      : locale === "zh-CN"
+        ? labels.join("和")
+        : `${labels[0]} and ${labels[1]}`;
+}
+
+export function joinFoodSupportFormulaRequirementLabels(
+  requirements: readonly FoodSupportFormulaGap[],
+  locale: Locale
+) {
+  const labels = requirements.map((requirement) => requirement.label).filter(Boolean).slice(0, 2);
+
+  if (labels.length < 1) {
+    return locale === "th"
+      ? "สารอาหารในสูตร"
+      : locale === "zh-CN"
+        ? "配方营养需求"
+        : "the formula requirements";
   }
 
   return labels.length === 1
@@ -717,19 +830,20 @@ function fallbackManagedFoodSupportItems(
   result: FormulationResult,
   selectedNeedCoverage: readonly ProductNeedCoverage[]
 ): FoodGapSupportItem[] {
-  const gaps = foodSupportGaps(selectedNeedCoverage);
-  const supportableGaps = foodSupportableGaps(gaps);
+  const ingredients = visibleFormulaIngredients(result.supplementBreakdown);
+  const requirements = foodSupportRequirements(selectedNeedCoverage, ingredients);
+  const supportableRequirements = foodSupportableRequirements(requirements);
 
-  if (supportableGaps.length < 1) {
+  if (supportableRequirements.length < 1) {
     return [];
   }
 
   const selectedSeeds: Array<(typeof managedFoodSeeds)[number]> = [];
-  for (const gap of supportableGaps) {
+  for (const requirement of supportableRequirements) {
     const matchingSeeds = managedFoodSeeds
-      .filter((seed) => managedFoodSeedMatchesGap(seed, gap))
+      .filter((seed) => managedFoodSeedMatchesGap(seed, requirement))
       .sort((first, second) => managedFoodPriority(first) - managedFoodPriority(second));
-    let addedForGap = 0;
+    let addedForRequirement = 0;
 
     for (const seed of matchingSeeds) {
       if (selectedSeeds.some((candidate) => candidate.normalizedName === seed.normalizedName)) {
@@ -737,9 +851,9 @@ function fallbackManagedFoodSupportItems(
       }
 
       selectedSeeds.push(seed);
-      addedForGap += 1;
+      addedForRequirement += 1;
 
-      if (addedForGap >= 2) {
+      if (addedForRequirement >= 2) {
         break;
       }
     }
@@ -748,7 +862,7 @@ function fallbackManagedFoodSupportItems(
     .map((seed, index) => ({
       index,
       previousRank: previousFoodGuidanceRank(seed, result),
-      score: scoreManagedFoodSeed(seed, gaps),
+      score: scoreManagedFoodSeed(seed, requirements),
       seed
     }))
     .sort((first, second) => {
@@ -756,7 +870,7 @@ function fallbackManagedFoodSupportItems(
         return second.score - first.score;
       }
 
-      if (gaps.length > 0) {
+      if (requirements.length > 0) {
         return managedFoodPriority(first.seed) - managedFoodPriority(second.seed) ||
           first.index - second.index;
       }
@@ -772,7 +886,7 @@ function fallbackManagedFoodSupportItems(
     ...selectedSeeds.map((seed) => ({
       index: managedFoodSeeds.findIndex((candidate) => candidate.normalizedName === seed.normalizedName),
       previousRank: previousFoodGuidanceRank(seed, result),
-      score: scoreManagedFoodSeed(seed, gaps),
+      score: scoreManagedFoodSeed(seed, requirements),
       seed
     })),
     ...scored.filter((item) =>
@@ -782,8 +896,10 @@ function fallbackManagedFoodSupportItems(
   ].slice(0, 6);
 
   return selected.map(({ seed }, index) => {
-    const gapNeedIds = relatedFoodGapIds(seed, gaps);
-    const relatedNeeds = gaps.filter((gap) => gapNeedIds.includes(gap.id));
+    const gapNeedIds = relatedFoodGapIds(seed, requirements);
+    const relatedNeeds = requirements.filter((requirement) =>
+      gapNeedIds.includes(requirement.id)
+    );
     const enNeedText = joinFoodSupportNeeds(relatedNeeds, "en");
     const thNeedText = joinFoodSupportNeeds(relatedNeeds, "th");
     const zhNeedText = joinFoodSupportNeeds(relatedNeeds, "zh-CN");
@@ -813,14 +929,14 @@ function fallbackManagedFoodSupportItems(
       position: index + 1,
       rationale: relatedNeeds.length > 0
         ? {
-            en: `${seed.name.en} gives food-level support around ${enNeedText} while products stay responsible for the formula math.`,
-            th: `${seed.name.th} ช่วยเสริมจากอาหารในส่วนของ${thNeedText} โดยไม่เปลี่ยนการคำนวณความครอบคลุมของผลิตภัณฑ์`,
-            "zh-CN": `${seed.name["zh-CN"]} 可通过食物层面支持 ${zhNeedText}，同时产品覆盖计算保持独立。`,
+            en: `${seed.name.en} gives food-level support around ${enNeedText} while the formula keeps its measured supplement doses.`,
+            th: `${seed.name.th} ช่วยเสริมจากอาหารสำหรับ${thNeedText} โดยสูตรยังคงใช้ขนาดสารอาหารที่คำนวณไว้`,
+            "zh-CN": `${seed.name["zh-CN"]} 可通过食物层面支持 ${zhNeedText}，同时配方仍保留已计算的补充剂剂量。`,
           }
         : {
-            en: `${seed.name.en} keeps the plan grounded in everyday food while the product stack handles the formula.`,
-            th: `${seed.name.th} ช่วยให้แผนยังยึดกับอาหารในชีวิตประจำวัน ขณะที่ชุดผลิตภัณฑ์ทำหน้าที่ตามสูตร`,
-            "zh-CN": `${seed.name["zh-CN"]} 让计划继续贴近日常饮食，同时产品组合负责配方覆盖。`,
+            en: `${seed.name.en} keeps the supplement plan grounded in everyday food.`,
+            th: `${seed.name.th} ช่วยให้แผนอาหารเสริมยังเชื่อมกับอาหารในชีวิตประจำวัน`,
+            "zh-CN": `${seed.name["zh-CN"]} 让补充剂方案继续贴近日常饮食。`,
           },
       serving:
         managedFoodServing[seed.normalizedName] ??

@@ -31,6 +31,7 @@ import {
   defaultProductCountryCode,
   normalizeProductCountryCode
 } from "@/lib/product-countries";
+import { resolveFlatRateShippingCharge } from "@/lib/shipping-fees";
 import {
   customerOrderStatus,
   integerOrDefault,
@@ -5055,7 +5056,11 @@ export async function createRetailCustomerOrder(
     0
   );
   const taxAmount = 0;
-  const shippingAmount = 0;
+  const shipping = await resolveFlatRateShippingCharge({
+    organisationId: organisation.id,
+    sql
+  });
+  const shippingAmount = shipping.amount;
   const totalAmount = subtotalAmount + taxAmount + shippingAmount;
   const fx = await resolveUsdRateForCurrency(orderCurrency, { sql });
   const latestEtaDate = preparedLines
@@ -5108,6 +5113,7 @@ export async function createRetailCustomerOrder(
           fxRateId: fx.fxRateId,
           fxSource: fx.source,
           shippingAmount,
+          shippingSource: shipping.source,
           subtotalAmount,
           taxAmount,
           totalAmount,
@@ -5182,7 +5188,8 @@ export async function createRetailCustomerOrder(
           quantityAvailableNow: preparedLine.quantityAvailableNow,
           reason: preparedLine.reason,
           retailSellableProductId: preparedLine.retailSellableProductId,
-          shippingAmount: 0,
+          shippingAmount,
+          shippingSource: shipping.source,
           source:
             orderSource === "checkout"
               ? "regional_checkout"

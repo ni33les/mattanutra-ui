@@ -2,9 +2,6 @@ import type { NextConfig } from "next";
 import { localeRoutePattern } from "./lib/i18n";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
-const isDevDeployment =
-  process.env.MATTANUTRA_ENV?.trim().toLowerCase() === "dev" ||
-  process.env.NEXT_PUBLIC_SITE_URL?.includes("dev.mattanutra.com") === true;
 const skipBuildTypecheck = process.env.NEXT_BUILD_SKIP_TYPECHECK === "1";
 // Registry-derived public locales currently include zh-CN.
 const publicLocaleRoutePattern = localeRoutePattern();
@@ -159,14 +156,6 @@ const nextConfig: NextConfig = {
         ],
         source: "/uploads/:path*"
       },
-      ...(isDevDeployment
-        ? [
-            {
-              headers: noStoreHeaders,
-              source: "/_next/static/:path*"
-            }
-          ]
-        : []),
       {
         headers: noStoreHeaders,
         source: `/:locale(${publicLocaleRoutePattern})`

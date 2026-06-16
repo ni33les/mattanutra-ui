@@ -91,7 +91,7 @@ const copy = {
     selectedItems: "Selected products",
     shipping: "Shipping",
     shippingMethod: "Shipping method",
-    shippingMethodName: "Free pharmacy delivery",
+    shippingMethodName: "Flat-rate pharmacy delivery",
     stripeLoading: "Loading secure payment...",
     subtotal: "Subtotal",
     tax: "Tax",
@@ -136,7 +136,7 @@ const copy = {
     selectedItems: "สินค้าที่เลือก",
     shipping: "ค่าจัดส่ง",
     shippingMethod: "วิธีจัดส่ง",
-    shippingMethodName: "จัดส่งฟรีโดยร้านขายยา",
+    shippingMethodName: "จัดส่งแบบเหมาจ่ายโดยร้านขายยา",
     stripeLoading: "กำลังโหลดหน้าชำระเงินที่ปลอดภัย...",
     subtotal: "ยอดรวมสินค้า",
     tax: "ภาษี",
@@ -181,7 +181,7 @@ const copy = {
     selectedItems: "已选产品",
     shipping: "配送费",
     shippingMethod: "配送方式",
-    shippingMethodName: "免费药房配送",
+    shippingMethodName: "药房固定运费配送",
     stripeLoading: "正在加载安全付款...",
     subtotal: "小计",
     tax: "税费",
@@ -409,8 +409,9 @@ export function ProductBasketCheckoutPanel({
     Object.keys(billingErrors).length === 0 &&
     selectedItemIds.length > 0;
   const subtotal = quotePreview?.subtotalAmount ?? 0;
+  const shippingAmount = quotePreview?.shippingAmount ?? 0;
   const currency = quotePreview?.currency || "THB";
-  const total = subtotal;
+  const total = quotePreview?.totalAmount ?? subtotal + shippingAmount;
   const selectedRetailerName =
     quotePreview?.selectedRetailer?.organisationName ??
     quotePreview?.lines.find((line) => line.selectedRetailerName)
@@ -543,7 +544,8 @@ export function ProductBasketCheckoutPanel({
           locale,
           planId,
           properties: {
-            method: "free_pharmacy_delivery",
+            method: "flat_rate_pharmacy_delivery",
+            shippingAmount: body.availability.shippingAmount ?? null,
             selectedRetailerOrganisationId:
               body.availability.selectedRetailer?.organisationId ?? null
           }
@@ -905,7 +907,13 @@ export function ProductBasketCheckoutPanel({
                     </p>
                   </div>
                 </div>
-                <span className="font-bold text-[var(--mn-ink)]">{labels.free}</span>
+                <span className="font-bold text-[var(--mn-ink)]">
+                  {quotePreview
+                    ? shippingAmount > 0
+                      ? formatCurrencyAmount(locale, shippingAmount, currency)
+                      : labels.free
+                    : "-"}
+                </span>
               </div>
               {!quotePreview?.canCheckout && quotePreview ? (
                 <div className="mt-4 rounded-lg bg-[var(--mn-error-soft)] p-3 text-sm text-[var(--mn-error)]">
@@ -1060,6 +1068,7 @@ export function ProductBasketCheckoutPanel({
             removedItemCount={removedItemIds.length}
             selectedProducts={selectedProducts}
             selectedRetailerName={selectedRetailerName}
+            shippingAmount={shippingAmount}
             subtotal={subtotal}
             total={total}
           />

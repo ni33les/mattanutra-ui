@@ -8,6 +8,12 @@ import {
   customerPriceFromRpp,
   getCustomerPriceMarginPercent
 } from "@/lib/customer-pricing";
+import {
+  DEFAULT_FLAT_RATE_SHIPPING_AMOUNT,
+  flatRateShippingAmountFromMetadata,
+  getPlatformFlatRateShippingAmount,
+  type FlatRateShippingSource
+} from "@/lib/shipping-fees";
 
 type RetailCartDb = postgres.Sql | postgres.TransactionSql;
 
@@ -65,7 +71,10 @@ export type RetailerRoutingCandidate = Readonly<{
   organisationId: string;
   organisationName: string;
   payableLineCount: number;
+  shippingAmount: number;
+  shippingSource: FlatRateShippingSource;
   subtotalAmount: number;
+  totalAmount: number;
 }>;
 
 export type RegionalBasketLineAvailability = Readonly<
@@ -86,7 +95,10 @@ export type RegionalBasketAvailability = Readonly<{
   preference: RetailRoutingPreference;
   selectedRetailer: RetailerRoutingCandidate | null;
   shippingCountry: string;
+  shippingAmount: number;
+  shippingSource: FlatRateShippingSource | null;
   subtotalAmount: number;
+  totalAmount: number;
   unavailableLines: RegionalBasketLineAvailability[];
 }>;
 
@@ -109,6 +121,7 @@ type RegionalRetailCartAvailabilityRow = RetailCartAvailabilityRow & Readonly<{
   organisation_country_code: string | null;
   organisation_currency: string | null;
   organisation_id: string;
+  organisation_metadata?: unknown;
   organisation_name: string;
 }>;
 
@@ -364,6 +377,7 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
   lines: readonly RegionalBasketLineInput[];
   marginPercent?: number;
   now?: Date;
+  platformShippingAmount?: number;
   preference?: RetailRoutingPreference;
   preferredRetailerOrganisationId?: string | null;
   rows: readonly RegionalRetailCartAvailabilityRow[];
@@ -383,6 +397,7 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
     {
       countryCode: string;
       currency: string;
+      metadata: unknown;
       name: string;
       rowsByProductId: Map<string, RegionalRetailCartAvailabilityRow>;
     }
@@ -400,6 +415,7 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
     const organisation = rowsByOrganisation.get(row.organisation_id) ?? {
       countryCode,
       currency: row.organisation_currency?.trim().toUpperCase() || "THB",
+      metadata: row.organisation_metadata,
       name: row.organisation_name,
       rowsByProductId: new Map<string, RegionalRetailCartAvailabilityRow>()
     };
@@ -438,6 +454,18 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
         payableLines.find((line) => line.currency)?.currency ??
         candidateLines.find((line) => line.currency)?.currency ??
         organisation.currency;
+      const retailShippingAmount =
+        flatRateShippingAmountFromMetadata(organisation.metadata);
+      const shippingAmount =
+        retailShippingAmount ??
+        input.platformShippingAmount ??
+        DEFAULT_FLAT_RATE_SHIPPING_AMOUNT;
+      const shippingSource: FlatRateShippingSource =
+        retailShippingAmount !== null
+          ? "retail_override"
+          : input.platformShippingAmount !== undefined
+            ? "platform_default"
+            : "system_default";
 
       return {
         backorderLineCount: payableLines.filter(
@@ -454,7 +482,10 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
         organisationId,
         organisationName: organisation.name,
         payableLineCount: payableLines.length,
-        subtotalAmount
+        shippingAmount,
+        shippingSource,
+        subtotalAmount,
+        totalAmount: subtotalAmount + (fullBasket ? shippingAmount : 0)
       } satisfies RetailerRoutingCandidate;
     }
   );
@@ -477,13 +508,13 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
             return (
               right.payableLineCount - left.payableLineCount ||
               right.fulfillableUnits - left.fulfillableUnits ||
-              left.subtotalAmount - right.subtotalAmount ||
+              left.totalAmount - right.totalAmount ||
               compareNullableEta(left.etaDate, right.etaDate)
             );
           }
 
           return (
-            left.subtotalAmount - right.subtotalAmount ||
+            left.totalAmount - right.totalAmount ||
             compareNullableEta(left.etaDate, right.etaDate)
           );
         })[0] ?? null;
@@ -545,7 +576,14 @@ export function resolveRegionalBasketAvailabilityFromRows(input: Readonly<{
     preference,
     selectedRetailer,
     shippingCountry,
+    shippingAmount: selectedRetailer?.fullBasket
+      ? selectedRetailer.shippingAmount
+      : 0,
+    shippingSource: selectedRetailer?.fullBasket
+      ? selectedRetailer.shippingSource
+      : null,
     subtotalAmount: selectedRetailer?.subtotalAmount ?? 0,
+    totalAmount: selectedRetailer?.fullBasket ? selectedRetailer.totalAmount : 0,
     unavailableLines
   };
 }
@@ -585,6 +623,7 @@ export async function resolveRegionalBasketAvailability(input: Readonly<{
     select
       organisations.id::text as organisation_id,
       organisations.name as organisation_name,
+      organisations.metadata as organisation_metadata,
       organisations.country_code as organisation_country_code,
       organisations.currency as organisation_currency,
       sellable.id::text,
@@ -628,6 +667,7 @@ export async function resolveRegionalBasketAvailability(input: Readonly<{
     lines: input.lines,
     marginPercent: await getCustomerPriceMarginPercent({ sql }),
     now: input.now,
+    platformShippingAmount: await getPlatformFlatRateShippingAmount({ sql }),
     preference: input.preference,
     preferredRetailerOrganisationId: input.preferredRetailerOrganisationId,
     rows,

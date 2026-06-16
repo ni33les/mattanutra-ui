@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Copy, ExternalLink, MessageCircle, X } from "lucide-react";
+import { ExternalLink, MessageCircle, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 
 type LivingProtocolLineCtaProps = Readonly<{
@@ -35,12 +35,10 @@ type ConnectState = Readonly<{
 const copy = {
   en: {
     close: "Close",
-    copied: "Copied",
-    copy: "Copy code",
     error: "Could not create a LINE code at this time.",
     expires: "Code expires soon",
     instructions:
-      "Scan the QR code or open LINE, then send the code below. It links this chat to your plan without putting private details in the message.",
+      "Scan the QR or open LINE. The connect message is prefilled; tap send in LINE and Panya will recognise this plan.",
     lineNote: "Opens LINE. The code expires shortly.",
     loading: "Creating code...",
     modes: {
@@ -73,12 +71,10 @@ const copy = {
   },
   th: {
     close: "ปิด",
-    copied: "คัดลอกแล้ว",
-    copy: "คัดลอกรหัส",
     error: "ไม่สามารถสร้างรหัส LINE ได้ในขณะนี้",
     expires: "รหัสจะหมดอายุเร็ว ๆ นี้",
     instructions:
-      "สแกน QR หรือเปิด LINE แล้วส่งรหัสด้านล่าง ระบบจะเชื่อมแชทนี้กับแผนของคุณโดยไม่ใส่ข้อมูลส่วนตัวในข้อความ",
+      "สแกน QR หรือเปิด LINE ข้อความเชื่อมต่อจะถูกใส่ไว้ให้แล้ว กดส่งใน LINE แล้ว Panya จะรู้ว่าเป็นแผนนี้",
     lineNote: "เปิด LINE รหัสจะหมดอายุในไม่ช้า",
     loading: "กำลังสร้างรหัส...",
     modes: {
@@ -111,12 +107,10 @@ const copy = {
   },
   "zh-CN": {
     close: "关闭",
-    copied: "已复制",
-    copy: "复制代码",
     error: "目前无法创建 LINE 代码。",
     expires: "代码即将过期",
     instructions:
-      "扫描二维码或打开 LINE，然后发送下方代码。它会把聊天连接到你的方案，但不会在消息中包含隐私信息。",
+      "扫描二维码或打开 LINE。连接消息会自动填好；在 LINE 中点发送后，Panya 会识别这份方案。",
     lineNote: "打开 LINE。代码会在短时间后过期。",
     loading: "正在创建代码...",
     modes: {
@@ -149,8 +143,6 @@ const copy = {
   }
 } satisfies Record<Locale, {
   close: string;
-  copied: string;
-  copy: string;
   error: string;
   expires: string;
   instructions: string;
@@ -201,7 +193,6 @@ export function LivingProtocolLineCta({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
   const qrUrl = useMemo(
     () =>
       connect?.lineUrl
@@ -281,16 +272,6 @@ export function LivingProtocolLineCta({
     await createConnectCode();
   }
 
-  async function copyCommand() {
-    if (!connect?.command) {
-      return;
-    }
-
-    await navigator.clipboard?.writeText(connect.command).catch(() => undefined);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
-  }
-
   const trigger = (
     <button
       className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-[#06C755] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#05B34D] focus:outline-none focus:ring-2 focus:ring-[#06C755]/40 focus:ring-offset-2"
@@ -305,52 +286,74 @@ export function LivingProtocolLineCta({
   return (
     <div className={className}>
       {presentation === "inline_qr" ? (
-        <div className="flow-root mn-font-body text-sm leading-6 text-[var(--mn-ink-soft)]">
-          <a
-            aria-label={modeLabels.dialogTitle}
-            className="mx-auto mb-4 grid size-36 place-items-center rounded-xl bg-white p-2 ring-1 ring-[var(--mn-line)] transition hover:ring-[var(--mn-teal)] sm:float-right sm:mb-3 sm:ml-4"
-            href={connect?.lineUrl ?? "#"}
-            rel="noreferrer"
-            target="_blank"
-          >
-            {qrUrl ? (
-              <Image
-                alt="MattaNutra LINE connect QR code"
-                className="size-32"
-                height={128}
-                src={qrUrl}
-                unoptimized={true}
-                width={128}
-              />
-            ) : (
-              <span className="px-3 text-center text-sm leading-6 text-[var(--mn-ash)]">
-                {loading ? labels.loading : "LINE"}
-              </span>
-            )}
-          </a>
-          {showEyebrow ? (
-            <p className="text-sm font-medium leading-6 text-[var(--mn-ink)]">
-              {modeLabels.eyebrow}
-            </p>
-          ) : null}
-          <h2 className="text-xl font-semibold leading-7 text-[var(--mn-ink)]">
-            {modeLabels.heading}
-          </h2>
-          <p className="mt-3">{modeLabels.body}</p>
-          <p className="mt-3">{labels.instructions}</p>
-          <div className="clear-both mt-4 rounded-lg bg-[var(--mn-cream)] px-3 py-2 ring-1 ring-[var(--mn-line)]">
-            <p className="text-sm font-semibold leading-6 text-[var(--mn-ink)]">
-              {connect?.command ?? (loading ? labels.loading : "MN")}
-            </p>
-            <p className="mt-1 text-xs leading-5 text-[var(--mn-ash)]">
-              {labels.expires}
-            </p>
+        <div className="mn-font-body text-sm leading-6 text-[var(--mn-ink-soft)]">
+          <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
+            <a
+              aria-label={modeLabels.dialogTitle}
+              className={`mx-auto grid size-44 place-items-center rounded-2xl bg-white p-3 ring-1 ring-[var(--mn-line)] transition hover:ring-[var(--mn-teal)] ${
+                connect?.lineUrl ? "" : "pointer-events-none"
+              }`}
+              href={connect?.lineUrl ?? "#"}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {qrUrl ? (
+                <Image
+                  alt="MattaNutra LINE connect QR code"
+                  className="size-36"
+                  height={144}
+                  src={qrUrl}
+                  unoptimized={true}
+                  width={144}
+                />
+              ) : (
+                <span className="px-3 text-center text-sm leading-6 text-[var(--mn-ash)]">
+                  {loading ? labels.loading : "LINE"}
+                </span>
+              )}
+            </a>
+            <div className="min-w-0">
+              {showEyebrow ? (
+                <p className="text-sm font-medium leading-6 text-[var(--mn-ink)]">
+                  {modeLabels.eyebrow}
+                </p>
+              ) : null}
+              <h2 className="text-xl font-semibold leading-7 text-[var(--mn-ink)]">
+                {modeLabels.heading}
+              </h2>
+              <p className="mt-3">{modeLabels.body}</p>
+              <p className="mt-3">{labels.instructions}</p>
+              <div className="mt-4 rounded-[14px] border border-[var(--mn-line)] bg-[var(--mn-cream)] px-4 py-3">
+                <p className="flex flex-wrap items-baseline gap-2">
+                  <span className="text-sm font-semibold text-[var(--mn-ink-soft)]">
+                    MN
+                  </span>
+                  <span className="font-mono text-lg font-semibold text-[var(--mn-ink)]">
+                    {connect?.code ?? (loading ? labels.loading : "")}
+                  </span>
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[var(--mn-ash)]">
+                  {labels.expires}
+                </p>
+              </div>
+              {error ? (
+                <p className="mt-3 text-sm font-semibold text-[var(--mn-error)]">
+                  {error}
+                </p>
+              ) : null}
+              {connect?.lineUrl ? (
+                <a
+                  className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#06C755] px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_18px_-8px_rgb(6_199_85_/_0.6)] hover:bg-[#05B34D]"
+                  href={connect.lineUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {labels.openLine}
+                  <ExternalLink aria-hidden className="size-4" />
+                </a>
+              ) : null}
+            </div>
           </div>
-          {error ? (
-            <p className="mt-3 text-sm font-semibold text-[var(--mn-error)]">
-              {error}
-            </p>
-          ) : null}
         </div>
       ) : presentation === "section" ? (
         <div className="overflow-hidden rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-soft)] sm:p-6">
@@ -407,9 +410,12 @@ export function LivingProtocolLineCta({
               </button>
             </div>
 
-            <div className="mt-5 grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
+            <div className="mt-5 grid gap-6 sm:grid-cols-[auto_minmax(0,1fr)]">
               <a
-                className="grid size-40 place-items-center rounded-xl bg-white p-2 ring-1 ring-[var(--mn-line)]"
+                aria-label="MattaNutra LINE connect QR code"
+                className={`grid size-48 place-items-center rounded-2xl bg-white p-3 ring-1 ring-[var(--mn-line)] ${
+                  connect?.lineUrl ? "" : "pointer-events-none"
+                }`}
                 href={connect?.lineUrl ?? "#"}
                 rel="noreferrer"
                 target="_blank"
@@ -417,11 +423,11 @@ export function LivingProtocolLineCta({
                 {qrUrl ? (
                   <Image
                     alt="MattaNutra LINE connect QR code"
-                    className="size-36"
-                    height={144}
+                    className="size-40"
+                    height={160}
                     src={qrUrl}
                     unoptimized={true}
-                    width={144}
+                    width={160}
                   />
                 ) : (
                   <span className="text-sm text-[var(--mn-ash)]">
@@ -430,11 +436,16 @@ export function LivingProtocolLineCta({
                 )}
               </a>
               <div className="min-w-0">
-                <div className="rounded-xl bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
-                  <p className="font-mono text-lg font-bold text-[var(--mn-ink)]">
-                    {connect?.command ?? (loading ? labels.loading : "MN")}
+                <div className="rounded-[14px] border border-[var(--mn-line)] bg-[var(--mn-cream)] px-4 py-3">
+                  <p className="flex flex-wrap items-baseline gap-2">
+                    <span className="text-sm font-semibold text-[var(--mn-ink-soft)]">
+                      MN
+                    </span>
+                    <span className="font-mono text-xl font-semibold text-[var(--mn-ink)]">
+                      {connect?.code ?? (loading ? labels.loading : "")}
+                    </span>
                   </p>
-                  <p className="mt-2 text-xs text-[var(--mn-ash)]">
+                  <p className="mt-1 text-xs text-[var(--mn-ash)]">
                     {labels.expires}
                   </p>
                 </div>
@@ -457,19 +468,6 @@ export function LivingProtocolLineCta({
                     {labels.openLine}
                     <ExternalLink aria-hidden className="size-4" />
                   </a>
-                  <button
-                    className="inline-flex items-center gap-2 rounded-full border border-[var(--mn-line)] px-4 py-2 text-sm font-bold text-[var(--mn-ink)] hover:bg-[var(--mn-cream)] disabled:opacity-50"
-                    disabled={!connect?.command}
-                    onClick={copyCommand}
-                    type="button"
-                  >
-                    {copied ? (
-                      <Check aria-hidden className="size-4" />
-                    ) : (
-                      <Copy aria-hidden className="size-4" />
-                    )}
-                    {copied ? labels.copied : labels.copy}
-                  </button>
                 </div>
               </div>
             </div>

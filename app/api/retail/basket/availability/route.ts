@@ -90,7 +90,9 @@ export async function POST(request: Request) {
       preference: availability.preference,
       selectedRetailerOrganisationId:
         availability.selectedRetailer?.organisationId ?? null,
+      shippingAmount: availability.shippingAmount,
       shippingCountry,
+      totalAmount: availability.totalAmount,
       unavailableLineCount: availability.unavailableLines.length
     }
   });

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Copy, ExternalLink, MessageCircle, Printer } from "lucide-react";
+import { Check, ExternalLink, MessageCircle, Printer } from "lucide-react";
 import { LandingReveal } from "@/components/landing-reveal";
 import { PreviewPaywallPanel } from "@/components/formulation-results-panels";
 import {
@@ -16,13 +16,10 @@ import {
   type PanelLabels,
 } from "@/components/formulation-results-helpers";
 import {
-  foodSupportFormulaGapsForItem,
-  foodSupportGaps,
-  foodSupportableGaps,
+  foodSupportFormulaRequirementsForItem,
   formulaIngredientRowNumbers,
   groupedFormulaIngredients,
-  joinFoodSupportFormulaGapLabels,
-  joinFoodSupportNeeds,
+  joinFoodSupportFormulaRequirementLabels,
   localizedDoseText,
   localizedIngredientRationale,
   localizedSupplementName,
@@ -47,7 +44,6 @@ import {
   localizedProductDescription,
   revealCopy,
   revealFinalCopy,
-  revealFoodSupportPendingCards,
   revealJoiners,
   revealProductPendingCards,
   revealSlotCopy,
@@ -666,7 +662,6 @@ export function RevealFinalResultsPage({
         copy={copy}
         finalCopy={finalCopy}
         locale={locale}
-        productCoveragePending={productCoveragePending}
         result={result}
         selectedNeedCoverage={selectedNeedCoverage}
         selectedProductStackPreference={
@@ -1639,6 +1634,10 @@ function RevealProductsFinalSection({
                         height={260}
                         loading="eager"
                         src={product.imageUrl}
+                        unoptimized={
+                          product.imageUrl.startsWith("http://") ||
+                          product.imageUrl.startsWith("https://")
+                        }
                         width={220}
                       />
                     ) : (
@@ -1849,7 +1848,6 @@ function RevealFoodSupportFinalSection({
   copy,
   finalCopy,
   locale,
-  productCoveragePending,
   result,
   selectedNeedCoverage,
   selectedProductStackPreference,
@@ -1857,12 +1855,11 @@ function RevealFoodSupportFinalSection({
   copy: typeof revealCopy.en;
   finalCopy: typeof revealFinalCopy.en;
   locale: Locale;
-  productCoveragePending: boolean;
   result: FormulationResult;
   selectedNeedCoverage: readonly ProductNeedCoverage[];
   selectedProductStackPreference?: ProductStackPreference | null;
 }>) {
-  const { items: selectedFoodItems, variant } = selectedFoodSupport(
+  const { items: selectedFoodItems } = selectedFoodSupport(
     result,
     selectedNeedCoverage,
     selectedProductStackPreference,
@@ -1870,65 +1867,23 @@ function RevealFoodSupportFinalSection({
   const visibleIngredients = visibleFormulaIngredients(
     result.supplementBreakdown,
   );
-  const fallbackGaps = foodSupportGaps(selectedNeedCoverage);
-  const fallbackSupportableGaps = foodSupportableGaps(fallbackGaps);
-  const items = productCoveragePending
-    ? []
-    : selectedFoodItems.filter(
-        (item) =>
-          foodSupportFormulaGapsForItem(
-            item,
-            selectedNeedCoverage,
-            visibleIngredients,
-            locale,
-          ).length > 0,
-      );
-  const fallbackGapText = joinFoodSupportNeeds(
-    fallbackSupportableGaps.length > 0 ? fallbackSupportableGaps : fallbackGaps,
-    locale,
+  const items = selectedFoodItems.filter(
+    (item) =>
+      foodSupportFormulaRequirementsForItem(
+        item,
+        selectedNeedCoverage,
+        visibleIngredients,
+        locale,
+      ).length > 0,
   );
-  const variantHeadline = variant
-    ? safeFoodSupportCopy(
-        variant.headline,
-        locale,
-        fallbackGaps.length > 0
-          ? formatTemplate(copy.foodSupportGapHeadlineTemplate, {
-              gaps: fallbackGapText,
-            })
-          : copy.foodSupportDefaultHeadline,
-      )
-    : fallbackGaps.length > 0
-      ? formatTemplate(copy.foodSupportGapHeadlineTemplate, {
-          gaps: fallbackGapText,
-        })
-      : copy.foodSupportDefaultHeadline;
-  const variantBody = variant
-    ? safeFoodSupportCopy(
-        variant.body,
-        locale,
-        fallbackGaps.length > 0
-          ? formatTemplate(copy.foodSupportGapBodyTemplate, {
-              gaps: fallbackGapText,
-            })
-          : copy.foodSupportDefaultBody,
-      )
-    : fallbackGaps.length > 0
-      ? formatTemplate(copy.foodSupportGapBodyTemplate, {
-          gaps: fallbackGapText,
-        })
-      : copy.foodSupportDefaultBody;
-  const headline = productCoveragePending
-    ? copy.foodSupportPendingHeadline
-    : items.length < 1
-      ? finalCopy.foodEmptyTitle
-      : variantHeadline;
-  const body = productCoveragePending
-    ? copy.foodSupportPendingBody
-    : items.length < 1
-      ? finalCopy.foodEmptyBody
-      : variantBody;
+  const headline = items.length < 1
+    ? finalCopy.foodEmptyTitle
+    : copy.foodSupportDefaultHeadline;
+  const body = items.length < 1
+    ? finalCopy.foodEmptyBody
+    : copy.foodSupportDefaultBody;
   const foodCards: Array<{
-    coveragePercent: number;
+    dailyDose: string;
     foods: Array<{
       imageAlt: string;
       imagePath?: string | null;
@@ -1952,13 +1907,13 @@ function RevealFoodSupportFinalSection({
       seed?.imageAlt[locale] ||
       seed?.imageAlt.en ||
       name;
-    const formulaGaps = foodSupportFormulaGapsForItem(
+    const formulaRequirements = foodSupportFormulaRequirementsForItem(
       item,
       selectedNeedCoverage,
       visibleIngredients,
       locale,
     ).slice(0, 3);
-    const primaryGap = formulaGaps[0];
+    const primaryRequirement = formulaRequirements[0];
     const serving =
       getLocalizedText(item.serving, locale) ||
       (seed ? managedFoodServing[seed.normalizedName]?.[locale] : "") ||
@@ -1973,21 +1928,21 @@ function RevealFoodSupportFinalSection({
         item.rationale,
         locale,
         locale === "th"
-          ? `${name} ช่วยเสริมจากอาหารในส่วนของ${joinFoodSupportFormulaGapLabels(
-              formulaGaps,
+          ? `${name} ช่วยเสริมจากอาหารสำหรับ${joinFoodSupportFormulaRequirementLabels(
+              formulaRequirements,
               "th",
             )}`
           : locale === "zh-CN"
-            ? `${name} 可通过食物层面支持 ${joinFoodSupportFormulaGapLabels(
-                formulaGaps,
+            ? `${name} 可通过食物层面支持 ${joinFoodSupportFormulaRequirementLabels(
+                formulaRequirements,
                 "zh-CN",
               )}`
-            : `${name} gives food-level support around ${joinFoodSupportFormulaGapLabels(
-                formulaGaps,
+            : `${name} gives food-level support around ${joinFoodSupportFormulaRequirementLabels(
+                formulaRequirements,
                 "en",
               )}.`,
       );
-    const cardId = primaryGap?.id ?? item.foodId;
+    const cardId = primaryRequirement?.id ?? item.foodId;
     const existing = foodCards.find((card) => card.id === cardId);
     const food = {
       imageAlt,
@@ -2002,11 +1957,11 @@ function RevealFoodSupportFinalSection({
     }
 
     foodCards.push({
-      coveragePercent: primaryGap?.coveragePercent ?? 0,
+      dailyDose: primaryRequirement?.dailyDose ?? "",
       foods: [food],
       id: cardId,
-      label: primaryGap?.label ?? name,
-      rowNumber: primaryGap?.rowNumber ?? undefined,
+      label: primaryRequirement?.label ?? name,
+      rowNumber: primaryRequirement?.rowNumber ?? undefined,
     });
   }
 
@@ -2028,23 +1983,7 @@ function RevealFoodSupportFinalSection({
           </p>
         </div>
 
-        {productCoveragePending ? (
-          <div className="mt-10 grid gap-5 md:grid-cols-3" data-reveal>
-            {revealFoodSupportPendingCards[locale].map((card) => (
-              <article
-                className="foodgap-card rounded-xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6"
-                key={card.title}
-              >
-                <h3 className="mn-reveal-font-display text-xl font-medium text-[var(--mn-ink)]">
-                  {card.title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-[var(--mn-ink-soft)]">
-                  {card.body}
-                </p>
-              </article>
-            ))}
-          </div>
-        ) : foodCards.length > 0 ? (
+        {foodCards.length > 0 ? (
           <>
             <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]" data-reveal>
               {foodCards.map((card) => (
@@ -2065,9 +2004,9 @@ function RevealFoodSupportFinalSection({
                           ? `${copy.foodSupportFormulaGapLabel} ${String(card.rowNumber).padStart(2, "0")}`
                           : copy.foodSupportFormulaGapLabel}
                       </div>
-                      {card.coveragePercent > 0 ? (
+                      {card.dailyDose ? (
                         <div className="mt-1 text-xs text-[var(--mn-ash)]">
-                          {Math.round(card.coveragePercent)}% {copy.tableCoverage}
+                          {card.dailyDose}
                         </div>
                       ) : null}
                     </div>
@@ -2142,7 +2081,6 @@ function RevealPanyaFinalSection({
   const [connect, setConnect] = useState<PanyaLineConnectState>(null);
   const [connectLoading, setConnectLoading] = useState(false);
   const [connectError, setConnectError] = useState("");
-  const [copied, setCopied] = useState(false);
   const connectRequestStartedRef = useRef(false);
   const qrUrl = useMemo(
     () =>
@@ -2157,7 +2095,6 @@ function RevealPanyaFinalSection({
     const timeout = window.setTimeout(() => {
       setConnect(null);
       setConnectError("");
-      setCopied(false);
       postRevealPanyaLineBpm({
         eventName: "customer_line_cta_viewed",
         locale,
@@ -2226,39 +2163,51 @@ function RevealPanyaFinalSection({
     }
   }
 
-  async function copyConnectCode() {
-    if (!connect?.command) {
-      return;
-    }
-
-    await navigator.clipboard?.writeText(connect.command).catch(() => undefined);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
-  }
-
   return (
     <section
-      className="mn-reveal-panya border-t border-[var(--mn-line)] py-16"
+      className="mn-reveal-panya border-t border-[var(--mn-line)] py-16 md:py-20"
       data-reveal
       id="panya-support"
     >
       <div className="mn-reveal-final-wrap">
-        <div className="mn-reveal-panya-card grid gap-8 rounded-2xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-soft)] md:grid-cols-[0.85fr_1.15fr] md:items-center md:p-8">
-          <div>
-            <div className="mn-reveal-final-label">
-              {finalCopy.panyaSection}
+        <div className="mn-reveal-panya-card grid gap-10 rounded-[28px] border border-[var(--mn-line)] bg-[var(--mn-paper)] p-6 shadow-[var(--mn-shadow-soft)] md:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] md:items-center md:p-12 lg:gap-[52px]">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full border border-[var(--mn-line)] bg-white p-1 shadow-[0_6px_16px_-8px_rgb(22_48_57_/_0.28)]">
+                <Image
+                  alt=""
+                  aria-hidden={true}
+                  className="size-full object-contain"
+                  height={465}
+                  src="/v11/brand-mark.png"
+                  unoptimized={true}
+                  width={420}
+                />
+              </span>
+              <span className="flex min-w-0 flex-col leading-tight">
+                <span className="text-xs font-semibold uppercase text-[var(--mn-teal-deep)]">
+                  {finalCopy.panyaSection}
+                </span>
+                <span className="mt-1 text-xs text-[var(--mn-ash)]">
+                  {finalCopy.panyaByline}
+                </span>
+              </span>
             </div>
-            <h2 className="mn-reveal-final-heading mt-4 text-[clamp(30px,3.8vw,48px)]">
+            <h2 className="mt-6 font-serif text-[clamp(34px,4.4vw,52px)] font-medium leading-[1.04] text-[var(--mn-ink)]">
               {heading}
             </h2>
-            <p className="mt-5 text-base leading-8 text-[var(--mn-ink-soft)]">
+            <p className="mt-6 max-w-[46ch] text-base leading-8 text-[var(--mn-ink-soft)]">
+              {finalCopy.panyaWisdomBody}
+            </p>
+            <p className="mt-5 max-w-[46ch] text-base font-semibold leading-8 text-[var(--mn-ink-soft)]">
               {body}
             </p>
           </div>
-          <div className="mn-reveal-panya-connect rounded-xl border border-[var(--mn-line)] bg-[var(--mn-paper)] p-5 shadow-[var(--mn-shadow-soft)]">
-            <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
+          <div className="mn-reveal-panya-connect rounded-[22px] border border-[var(--mn-line)] bg-white p-5 shadow-[var(--mn-shadow-soft)] sm:p-6">
+            <div className="grid gap-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start">
               <a
-                className={`grid size-40 place-items-center rounded-xl bg-white p-2 ring-1 ring-[var(--mn-line)] ${
+                aria-label={finalCopy.panyaQrAlt}
+                className={`mx-auto grid size-48 place-items-center rounded-2xl bg-white p-3 ring-1 ring-[var(--mn-line)] ${
                   connect?.lineUrl ? "" : "pointer-events-none"
                 }`}
                 href={connect?.lineUrl ?? "#"}
@@ -2268,11 +2217,11 @@ function RevealPanyaFinalSection({
                 {qrUrl ? (
                   <Image
                     alt={finalCopy.panyaQrAlt}
-                    className="size-36"
-                    height={144}
+                    className="size-40"
+                    height={160}
                     src={qrUrl}
                     unoptimized={true}
-                    width={144}
+                    width={160}
                   />
                 ) : (
                   <span className="px-3 text-center text-xs leading-5 text-[var(--mn-ash)]">
@@ -2280,15 +2229,20 @@ function RevealPanyaFinalSection({
                   </span>
                 )}
               </a>
-              <div className="min-w-0">
+              <div className="flex min-w-0 flex-col">
                 <p className="text-sm leading-6 text-[var(--mn-ink-soft)]">
                   {finalCopy.panyaButtonLead}
                 </p>
-                <div className="mt-3 rounded-xl bg-[var(--mn-cream)] p-4 ring-1 ring-[var(--mn-line)]">
-                  <p className="break-all mn-reveal-font-mono text-lg font-bold text-[var(--mn-ink)]">
-                    {connect?.command ?? (connectLoading ? finalCopy.panyaLoading : "MN")}
+                <div className="mt-4 rounded-[14px] border border-[var(--mn-line)] bg-[var(--mn-cream)] px-4 py-3">
+                  <p className="flex flex-wrap items-baseline gap-2">
+                    <span className="text-sm font-semibold text-[var(--mn-ink-soft)]">
+                      MN
+                    </span>
+                    <span className="mn-reveal-font-mono text-xl font-semibold text-[var(--mn-ink)]">
+                      {connect?.code ?? (connectLoading ? finalCopy.panyaLoading : "")}
+                    </span>
                   </p>
-                  <p className="mt-2 text-xs text-[var(--mn-ash)]">
+                  <p className="mt-1 text-xs text-[var(--mn-ash)]">
                     {connect ? finalCopy.panyaExpires : finalCopy.panyaQrPlaceholder}
                   </p>
                 </div>
@@ -2300,7 +2254,7 @@ function RevealPanyaFinalSection({
                 <div className="mt-4 flex flex-wrap gap-2">
                   {connect?.lineUrl ? (
                     <a
-                      className="inline-flex items-center gap-2 rounded-full bg-[#06C755] px-4 py-2 text-sm font-bold text-white hover:bg-[#05B34D]"
+                      className="inline-flex items-center gap-2 rounded-full bg-[#06C755] px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_18px_-8px_rgb(6_199_85_/_0.6)] hover:bg-[#05B34D]"
                       href={connect.lineUrl}
                       rel="noreferrer"
                       target="_blank"
@@ -2310,7 +2264,7 @@ function RevealPanyaFinalSection({
                     </a>
                   ) : (
                     <button
-                      className="inline-flex items-center gap-2 rounded-full bg-[#06C755] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#05B34D] disabled:opacity-60"
+                      className="inline-flex items-center gap-2 rounded-full bg-[#06C755] px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_18px_-8px_rgb(6_199_85_/_0.6)] transition hover:bg-[#05B34D] disabled:opacity-60"
                       disabled={connectLoading}
                       onClick={() => {
                         void createConnectCode();
@@ -2321,19 +2275,6 @@ function RevealPanyaFinalSection({
                       {connectLoading ? finalCopy.panyaLoading : finalCopy.panyaCreateCode}
                     </button>
                   )}
-                  <button
-                    className="inline-flex items-center gap-2 rounded-full border border-[var(--mn-line)] px-4 py-2 text-sm font-bold text-[var(--mn-ink)] hover:bg-[var(--mn-cream)] disabled:opacity-50"
-                    disabled={!connect?.command}
-                    onClick={copyConnectCode}
-                    type="button"
-                  >
-                    {copied ? (
-                      <Check aria-hidden className="size-4" />
-                    ) : (
-                      <Copy aria-hidden className="size-4" />
-                    )}
-                    {copied ? finalCopy.panyaCopied : finalCopy.panyaCopyCode}
-                  </button>
                 </div>
               </div>
             </div>

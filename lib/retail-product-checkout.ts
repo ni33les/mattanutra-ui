@@ -180,6 +180,13 @@ function amountMicros(amount: number) {
   return Math.max(1, Math.round(amount * AMOUNT_MICROS_PER_UNIT));
 }
 
+function quoteSubtotalAmount(lines: readonly QuoteLine[]) {
+  return lines.reduce(
+    (total, line) => total + line.unitPriceAmount * line.quantity,
+    0
+  );
+}
+
 function stripeMinorAmountFromMicros(micros: number) {
   return Math.round((micros / AMOUNT_MICROS_PER_UNIT) * STRIPE_MINOR_UNITS_PER_MAJOR);
 }
@@ -497,10 +504,9 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
       unitPriceAmount
     };
   });
-  const subtotalAmount = quoteLines.reduce(
-    (total, line) => total + line.unitPriceAmount * line.quantity,
-    0
-  );
+  const subtotalAmount = quoteSubtotalAmount(quoteLines);
+  const shippingAmount = availability.shippingAmount;
+  const totalAmount = availability.totalAmount || subtotalAmount + shippingAmount;
   const currency = quoteLines[0]?.currency ?? availability.currency ?? "THB";
   const idempotencyKey = idempotencyHash({
     address,
@@ -509,6 +515,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
     planId: input.planId,
     runId,
     selectedRetailerOrganisationId: input.selectedRetailerOrganisationId ?? null,
+    shippingAmount,
     selectedProductIds
   });
   const config = stripePaymentConfig(input.request);
@@ -556,7 +563,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
         ${retailerId}::uuid,
         ${input.locale},
         'created',
-        ${amountMicros(subtotalAmount)},
+        ${amountMicros(totalAmount)},
         'micros',
         ${currency},
         ${config.mode},
@@ -571,10 +578,13 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
         ${sql.json(toJsonValue({
           billingAddress,
           billingSameAsShipping,
-          freeShipping: true,
-          shippingAmount: 0,
+          freeShipping: shippingAmount <= 0,
+          shippingAmount,
+          shippingSource: availability.shippingSource,
+          subtotalAmount,
           taxAmount: 0,
-          taxDisplay: "included"
+          taxDisplay: "included",
+          totalAmount
         }))}::jsonb,
         ${idempotencyKey},
         now(),
@@ -606,9 +616,11 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
       lineCount: quoteLines.length,
       removedItemCount: removedItemIds.length,
       selectedRetailerOrganisationId: retailerId,
-      totalAmount: subtotalAmount
+      shippingAmount,
+      subtotalAmount,
+      totalAmount
     },
-    valueAmount: subtotalAmount,
+    valueAmount: totalAmount,
     valueCurrency: currency
   });
 
@@ -636,7 +648,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
         checkoutPaymentId: payment.id,
         stripeMode: config.mode
       },
-      valueAmount: subtotalAmount,
+      valueAmount: totalAmount,
       valueCurrency: currency
     });
 
@@ -651,17 +663,31 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
   const session = await stripe.checkout.sessions.create({
     client_reference_id: payment.id,
     customer_email: address.customerEmail,
-    line_items: quoteLines.map((line) => ({
-      price_data: {
-        currency: currency.toLowerCase(),
-        product_data: {
-          images: line.imageUrl ? [line.imageUrl] : undefined,
-          name: line.productTitle
+    line_items: [
+      ...quoteLines.map((line) => ({
+        price_data: {
+          currency: currency.toLowerCase(),
+          product_data: {
+            images: line.imageUrl ? [line.imageUrl] : undefined,
+            name: line.productTitle
+          },
+          unit_amount: stripeMinorAmountFromMicros(amountMicros(line.unitPriceAmount))
         },
-        unit_amount: stripeMinorAmountFromMicros(amountMicros(line.unitPriceAmount))
-      },
-      quantity: line.quantity
-    })),
+        quantity: line.quantity
+      })),
+      ...(shippingAmount > 0
+        ? [{
+            price_data: {
+              currency: currency.toLowerCase(),
+              product_data: {
+                name: "Flat-rate shipping"
+              },
+              unit_amount: stripeMinorAmountFromMicros(amountMicros(shippingAmount))
+            },
+            quantity: 1
+          }]
+        : [])
+    ],
     locale: stripeLocale(input.locale),
     metadata: {
       kind: "retail_product_checkout",
@@ -707,7 +733,7 @@ export async function createRetailCheckoutSession(input: RetailCheckoutQuoteInpu
       stripeMode: config.mode,
       stripeSessionId: session.id
     },
-    valueAmount: subtotalAmount,
+    valueAmount: totalAmount,
     valueCurrency: currency
   });
 
@@ -766,6 +792,14 @@ async function createRetailCustomerOrderFromPayment(
   const routing = objectValue(payment.routing_snapshot);
   const retailerId = payment.selected_retailer_organisation_id;
   const paymentMetadata = objectValue(payment.metadata);
+  const subtotalAmount = quoteSubtotalAmount(quoteLines);
+  const paidTotalAmount = Number(payment.amount) / AMOUNT_MICROS_PER_UNIT;
+  const metadataShippingAmount = money(paymentMetadata.shippingAmount);
+  const shippingAmount =
+    metadataShippingAmount ??
+    Math.max(0, paidTotalAmount - subtotalAmount);
+  const totalAmount =
+    money(paymentMetadata.totalAmount) ?? subtotalAmount + shippingAmount;
 
   if (!retailerId || quoteLines.length < 1) {
     throw new Error("Retail checkout quote is incomplete");
@@ -805,14 +839,15 @@ async function createRetailCustomerOrderFromPayment(
         checkoutPaymentId: payment.id,
         billingAddress: paymentMetadata.billingAddress ?? null,
         billingSameAsShipping: paymentMetadata.billingSameAsShipping !== false,
-        freeShipping: true,
+        freeShipping: shippingAmount <= 0,
         removedItemIds: payment.removed_item_ids,
         shippingAddress: payment.shipping_address,
         pricingSnapshot: {
           currency: payment.currency,
-          subtotalAmount: Number(payment.amount) / AMOUNT_MICROS_PER_UNIT,
-          shippingAmount: 0,
-          totalAmount: Number(payment.amount) / AMOUNT_MICROS_PER_UNIT
+          shippingAmount,
+          shippingSource: paymentMetadata.shippingSource ?? null,
+          subtotalAmount,
+          totalAmount
         },
         regionalRouting: routing
       }))}::jsonb,

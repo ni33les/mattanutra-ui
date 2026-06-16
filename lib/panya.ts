@@ -9,11 +9,23 @@ import {
 import { writeBpmEvent } from "@/lib/bpm";
 import {
   queueCustomerChatCommunicationDispatchTask,
-  sendCommunication
+  sendCommunication,
+  updateCommunicationMessageStatus,
+  type CommunicationMessage
 } from "@/lib/communications";
 import { getSql } from "@/lib/db";
+import {
+  callGrokChatCompletion,
+  configuredGrokModel,
+  configuredGrokValue,
+  getRequiredXaiApiKey
+} from "@/lib/grok-client";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { buildReassessmentUrl } from "@/lib/site-url";
+import {
+  buildAssessmentResultsUrl,
+  buildReassessmentUrl,
+  siteBaseUrl
+} from "@/lib/site-url";
 
 type Db = postgres.Sql | postgres.TransactionSql;
 
@@ -34,6 +46,7 @@ export type PanyaConfig = Readonly<{
   quotas: Record<PanyaEntitlement, number>;
   soul: string;
   upsellTone: string;
+  welcomeBriefs: Record<PanyaEntitlement, string>;
 }>;
 
 export type PanyaConfigVersion = Readonly<{
@@ -87,7 +100,15 @@ export const DEFAULT_PANYA_CONFIG: PanyaConfig = {
   soul:
     "Panya is warm, practical, concise, commercially helpful without being pushy, and always connected to MattaNutra's evidence-aware plan context.",
   upsellTone:
-    "For non-subscribers, explain the value of Living Protocol gently and only when it helps the customer's next step."
+    "For non-subscribers, explain the value of Living Protocol gently and only when it helps the customer's next step.",
+  welcomeBriefs: {
+    living_protocol:
+      "Welcome the customer into Panya and Living Protocol with a warm, human note. Make it clear Panya can help with their plan, product/order questions, and changes in their body or routine over time, while bringing in the team when needed.",
+    right_amount_formula:
+      "Welcome the customer into Panya for their Right Amount Formula. Make it feel connected to their generated plan and explain that Panya can help with their formula, products, order, food support, and next steps, while keeping ongoing protocol refinement as a Living Protocol benefit.",
+    unpaid:
+      "Welcome the customer into Panya as a helpful MattaNutra guide. Keep support general and practical: assessment navigation, plan access, orders, and next steps, with a gentle mention that Living Protocol unlocks deeper ongoing support when relevant."
+  }
 };
 
 const timezoneByLocale = {
@@ -128,6 +149,7 @@ function panyaConfigFromUnknown(value: unknown): PanyaConfig {
   const input = objectValue(value);
   const quotas = objectValue(input.quotas);
   const protocolAdvice = objectValue(input.protocolAdvice);
+  const welcomeBriefs = objectValue(input.welcomeBriefs);
   const checkIns = objectValue(input.checkIns);
   const questions = objectValue(checkIns.questions);
 
@@ -186,7 +208,21 @@ function panyaConfigFromUnknown(value: unknown): PanyaConfig {
       unpaid: numberValue(quotas.unpaid, DEFAULT_PANYA_CONFIG.quotas.unpaid, 1, 500)
     },
     soul: text(input.soul, DEFAULT_PANYA_CONFIG.soul).slice(0, 6000),
-    upsellTone: text(input.upsellTone, DEFAULT_PANYA_CONFIG.upsellTone).slice(0, 3000)
+    upsellTone: text(input.upsellTone, DEFAULT_PANYA_CONFIG.upsellTone).slice(0, 3000),
+    welcomeBriefs: {
+      living_protocol: text(
+        welcomeBriefs.living_protocol,
+        DEFAULT_PANYA_CONFIG.welcomeBriefs.living_protocol
+      ).slice(0, 3000),
+      right_amount_formula: text(
+        welcomeBriefs.right_amount_formula,
+        DEFAULT_PANYA_CONFIG.welcomeBriefs.right_amount_formula
+      ).slice(0, 3000),
+      unpaid: text(
+        welcomeBriefs.unpaid,
+        DEFAULT_PANYA_CONFIG.welcomeBriefs.unpaid
+      ).slice(0, 3000)
+    }
   };
 }
 
@@ -251,6 +287,629 @@ export function panyaUsageDay(locale: Locale, date = new Date()) {
   });
 
   return formatter.format(date);
+}
+
+function optionalText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function numberOrNull(value: unknown) {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function panyaLocaleFromUnknown(value: unknown): Locale {
+  const normalized = typeof value === "string" ? value.trim() : "";
+
+  if (isLocale(normalized)) {
+    return normalized;
+  }
+
+  if (normalized.toLowerCase() === "zh" || normalized.toLowerCase() === "zh-cn") {
+    return "zh-CN";
+  }
+
+  return "en";
+}
+
+function panyaSelectedPlanLabel(selectedPlan: string | null) {
+  if (selectedPlan === "pro" || selectedPlan === "living_protocol") {
+    return "Living Protocol";
+  }
+
+  if (selectedPlan === "precision") {
+    return "Right Amount Formula";
+  }
+
+  return selectedPlan ? selectedPlan : "Unpaid";
+}
+
+function localizedText(value: unknown, locale: Locale) {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  const record = objectValue(value);
+
+  return (
+    optionalText(record[locale]) ??
+    optionalText(record.en) ??
+    optionalText(Object.values(record).find((entry) => typeof entry === "string")) ??
+    ""
+  );
+}
+
+function compactStringList(value: unknown, locale: Locale, limit: number) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => localizedText(item, locale))
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function welcomeOrderStatusLabel(status: string | null) {
+  if (!status) {
+    return null;
+  }
+
+  if (status === "allocated" || status === "picking") {
+    return "Preparing";
+  }
+
+  if (status === "awaiting_stock") {
+    return "Order processing";
+  }
+
+  if (status === "packed") {
+    return "Ready to ship";
+  }
+
+  if (status === "shipped") {
+    return "Out for delivery";
+  }
+
+  if (status === "delivered") {
+    return "Delivered";
+  }
+
+  if (status === "pickup_booked") {
+    return "Pickup booked";
+  }
+
+  return status.replace(/_/g, " ");
+}
+
+type PanyaWelcomeHealthScore = Readonly<{
+  band: string | null;
+  focusAreas: string[];
+  score: number | null;
+}>;
+
+type PanyaWelcomeOrder = Readonly<{
+  orderNumber: string | null;
+  retailerName: string | null;
+  status: string | null;
+  statusLabel: string | null;
+  trackingUrl: string | null;
+}>;
+
+export type PanyaWelcomeContext = Readonly<{
+  customer: {
+    firstName: string | null;
+    locale: Locale;
+  };
+  order: PanyaWelcomeOrder | null;
+  plan: {
+    entitlement: PanyaEntitlement;
+    entitlementLabel: string;
+    formulaThemes: string[];
+    goals: string[];
+    healthScore: PanyaWelcomeHealthScore | null;
+    planUrl: string;
+    reassessmentUrl: string;
+    selectedPlan: string | null;
+    selectedPlanLabel: string;
+    status: string | null;
+  };
+  planId: string;
+}>;
+
+export type PreparedPanyaWelcome = Readonly<{
+  body: string;
+  configVersionId: string | null;
+  context: PanyaWelcomeContext;
+  fallbackReason: string | null;
+  generatedBy: "ai" | "fallback";
+  model: string | null;
+  responseId: string | null;
+}>;
+
+function healthScoreForWelcome(value: unknown): PanyaWelcomeHealthScore | null {
+  const record = objectValue(value);
+  const score = numberOrNull(record.score);
+  const band = optionalText(record.band);
+  const domains = Array.isArray(record.domains)
+    ? record.domains.flatMap((item) => {
+        const domain = objectValue(item);
+        const label =
+          optionalText(domain.label) ??
+          optionalText(domain.name) ??
+          optionalText(domain.id);
+        const domainScore = numberOrNull(domain.score);
+
+        return label ? [{ label, score: domainScore ?? 100 }] : [];
+      })
+    : [];
+  const focusAreas = domains
+    .sort((left, right) => left.score - right.score)
+    .map((domain) => domain.label)
+    .slice(0, 2);
+
+  if (score === null && !band && focusAreas.length < 1) {
+    return null;
+  }
+
+  return {
+    band,
+    focusAreas,
+    score
+  };
+}
+
+function formulaThemesForWelcome(value: unknown, locale: Locale) {
+  const formulation = objectValue(value);
+  const supplementBreakdown = Array.isArray(formulation.supplementBreakdown)
+    ? formulation.supplementBreakdown
+    : [];
+
+  return supplementBreakdown
+    .map((item) => {
+      const ingredient = objectValue(item);
+      const rank = numberOrNull(ingredient.effectivenessRank) ?? 99;
+      const supplement = localizedText(ingredient.supplement, locale);
+      const category = optionalText(ingredient.category);
+      const label = [supplement, category ? `(${category})` : ""]
+        .filter(Boolean)
+        .join(" ");
+
+      return label ? { label, rank } : null;
+    })
+    .filter((item): item is { label: string; rank: number } => Boolean(item))
+    .sort((left, right) => left.rank - right.rank)
+    .map((item) => item.label)
+    .slice(0, 4);
+}
+
+async function latestWelcomeFormulaThemes(
+  sql: Db,
+  planId: string,
+  locale: Locale
+) {
+  const readyRows = await sql<Array<{ ready: boolean }>>`
+    select to_regclass('public.formulations') is not null as ready
+  `;
+
+  if (readyRows[0]?.ready !== true) {
+    return [];
+  }
+
+  const rows = await sql<Array<{ formulation: unknown }>>`
+    select formulation
+    from public.formulations
+    where plan_id = ${planId}::uuid
+    order by version desc, generated_at desc
+    limit 1
+  `;
+
+  return formulaThemesForWelcome(rows[0]?.formulation, locale);
+}
+
+async function latestWelcomeOrder(
+  sql: Db,
+  planId: string,
+  locale: Locale
+): Promise<PanyaWelcomeOrder | null> {
+  const readyRows = await sql<Array<{ ready: boolean }>>`
+    select to_regclass('public.retail_checkout_payments') is not null as ready
+  `;
+
+  if (readyRows[0]?.ready !== true) {
+    return null;
+  }
+
+  const rows = await sql<Array<{
+    order_number: string | null;
+    retailer_name: string | null;
+    status: string | null;
+  }>>`
+    select
+      retail_customer_orders.order_number,
+      coalesce(retail_customer_orders.status, retail_checkout_payments.status) as status,
+      organisations.name as retailer_name
+    from public.retail_checkout_payments
+    left join public.retail_customer_orders
+      on retail_customer_orders.id = retail_checkout_payments.retail_customer_order_id
+    left join public.organisations
+      on organisations.id = retail_checkout_payments.selected_retailer_organisation_id
+    where retail_checkout_payments.plan_id = ${planId}::uuid
+    order by retail_checkout_payments.created_at desc
+    limit 1
+  `;
+  const row = rows[0];
+
+  if (!row) {
+    return null;
+  }
+
+  const trackingPath = row.order_number
+    ? `/${locale}/order/track/${encodeURIComponent(row.order_number)}`
+    : null;
+
+  return {
+    orderNumber: row.order_number,
+    retailerName: row.retailer_name,
+    status: row.status,
+    statusLabel: welcomeOrderStatusLabel(row.status),
+    trackingUrl: trackingPath ? `${siteBaseUrl()}${trackingPath}` : null
+  };
+}
+
+export async function buildPanyaWelcomeContext(input: Readonly<{
+  locale?: string | null;
+  planId: string;
+  selectedPlan?: string | null;
+  sql?: Db | null;
+}>): Promise<PanyaWelcomeContext> {
+  const sql = input.sql ?? getSql();
+  const fallbackLocale = panyaLocaleFromUnknown(input.locale);
+  const fallbackSelectedPlan = optionalText(input.selectedPlan);
+
+  if (!sql || !isUuid(input.planId)) {
+    const entitlement = resolvePanyaEntitlement(fallbackSelectedPlan);
+
+    return {
+      customer: {
+        firstName: null,
+        locale: fallbackLocale
+      },
+      order: null,
+      plan: {
+        entitlement,
+        entitlementLabel: panyaEntitlementLabel(entitlement),
+        formulaThemes: [],
+        goals: [],
+        healthScore: null,
+        planUrl: buildAssessmentResultsUrl(fallbackLocale, input.planId),
+        reassessmentUrl: buildReassessmentUrl(fallbackLocale, input.planId),
+        selectedPlan: fallbackSelectedPlan,
+        selectedPlanLabel: panyaSelectedPlanLabel(fallbackSelectedPlan),
+        status: null
+      },
+      planId: input.planId
+    };
+  }
+
+  const rows = await sql<Array<{
+    answer_summary: unknown;
+    first_name: string | null;
+    health_score: unknown;
+    locale: string | null;
+    selected_plan: string | null;
+    status: string | null;
+  }>>`
+    select
+      answer_summary,
+      first_name,
+      health_score,
+      locale,
+      selected_plan::text,
+      status::text
+    from public.assessments
+    where plan_id = ${input.planId}::uuid
+    limit 1
+  `;
+  const assessment = rows[0];
+  const locale = panyaLocaleFromUnknown(assessment?.locale ?? input.locale);
+  const selectedPlan = assessment?.selected_plan ?? fallbackSelectedPlan;
+  const entitlement = resolvePanyaEntitlement(selectedPlan);
+  const summary = objectValue(assessment?.answer_summary);
+  const [formulaThemes, order] = await Promise.all([
+    latestWelcomeFormulaThemes(sql, input.planId, locale).catch(() => []),
+    latestWelcomeOrder(sql, input.planId, locale).catch(() => null)
+  ]);
+
+  return {
+    customer: {
+      firstName: assessment?.first_name ?? null,
+      locale
+    },
+    order,
+    plan: {
+      entitlement,
+      entitlementLabel: panyaEntitlementLabel(entitlement),
+      formulaThemes,
+      goals: compactStringList(summary.goals, locale, 4),
+      healthScore: healthScoreForWelcome(assessment?.health_score),
+      planUrl: buildAssessmentResultsUrl(locale, input.planId),
+      reassessmentUrl: buildReassessmentUrl(locale, input.planId),
+      selectedPlan,
+      selectedPlanLabel: panyaSelectedPlanLabel(selectedPlan),
+      status: assessment?.status ?? null
+    },
+    planId: input.planId
+  };
+}
+
+export function panyaWelcomeGenerationInput(
+  config: PanyaConfig,
+  context: PanyaWelcomeContext
+) {
+  return {
+    adminConfig: {
+      guardrails: config.guardrails,
+      soul: config.soul,
+      upsellTone: config.upsellTone
+    },
+    context: {
+      customer: context.customer,
+      order: context.order,
+      plan: context.plan,
+      planId: context.planId
+    },
+    instructions: [
+      "Write in the customer's locale.",
+      "Use the customer's first name naturally when present.",
+      "Use plan, HealthScore, formula, and order context only when it makes the welcome more helpful.",
+      "Keep wellness detail subtle; do not name sensitive symptoms, medical conditions, medications, pregnancy, or diagnoses.",
+      "Do not diagnose, prescribe, or make medical claims.",
+      "Keep it to 2-3 short sentences.",
+      "Use plain text only. No markdown.",
+      "Never mention internal entitlement keys."
+    ],
+    welcomeBrief: config.welcomeBriefs[context.plan.entitlement]
+  };
+}
+
+export function panyaWelcomeReplyFromAiContent(content: string | null | undefined) {
+  if (!content) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(content.trim()) as unknown;
+    const reply = text(objectValue(parsed).reply);
+
+    return reply ? reply.slice(0, 1200) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function panyaWelcomeFallbackReply(context: PanyaWelcomeContext) {
+  const name = context.customer.firstName ? ` ${context.customer.firstName}` : "";
+  const planUrl = context.plan.planUrl;
+
+  if (context.customer.locale === "th") {
+    if (context.plan.entitlement === "living_protocol") {
+      return `เชื่อมต่อกับ Panya แล้ว${name} คุณถามเรื่อง Living Protocol แผน ผลิตภัณฑ์ คำสั่งซื้อ หรือการเปลี่ยนแปลงของกิจวัตรได้ที่นี่ ดูแผนของคุณได้ที่ ${planUrl}`;
+    }
+
+    if (context.plan.entitlement === "right_amount_formula") {
+      return `เชื่อมต่อกับ Panya แล้ว${name} ฉันช่วยอธิบาย Right Amount Formula ผลิตภัณฑ์ คำสั่งซื้อ และขั้นตอนถัดไปได้ ดูแผนของคุณได้ที่ ${planUrl}`;
+    }
+
+    return `เชื่อมต่อกับ Panya แล้ว${name} คุณถามเรื่อง MattaNutra แบบประเมิน คำสั่งซื้อ และขั้นตอนถัดไปได้ที่นี่`;
+  }
+
+  if (context.customer.locale === "zh-CN") {
+    if (context.plan.entitlement === "living_protocol") {
+      return `已连接 Panya${name}。你可以在这里询问 Living Protocol、方案、产品、订单，以及日常变化。你的方案在这里：${planUrl}`;
+    }
+
+    if (context.plan.entitlement === "right_amount_formula") {
+      return `已连接 Panya${name}。我可以帮你理解 Right Amount Formula、产品、订单和下一步。你的方案在这里：${planUrl}`;
+    }
+
+    return `已连接 Panya${name}。你可以在这里询问 MattaNutra、评估、订单和下一步。`;
+  }
+
+  if (context.plan.entitlement === "living_protocol") {
+    return `You are connected to Panya${name}. You can ask about your Living Protocol, plan, products, orders, or changes in your routine here. Your plan is here: ${planUrl}`;
+  }
+
+  if (context.plan.entitlement === "right_amount_formula") {
+    return `You are connected to Panya${name}. I can help explain your Right Amount Formula, products, order, and next steps. Your plan is here: ${planUrl}`;
+  }
+
+  return `You are connected to Panya${name}. You can ask about MattaNutra, your assessment, orders, and next steps here.`;
+}
+
+async function generatePanyaWelcome(input: Readonly<{
+  config: PanyaConfig;
+  context: PanyaWelcomeContext;
+}>) {
+  const model = configuredGrokModel(
+    process.env.PANYA_WELCOME_MODEL,
+    process.env.PANYA_MODEL,
+    process.env.GROK_MODEL
+  );
+  const completion = await callGrokChatCompletion({
+    apiKey: getRequiredXaiApiKey(),
+    maxTokens: 420,
+    messages: [
+      {
+        content: [
+          "You are Panya, MattaNutra's warm customer LINE welcome agent.",
+          "Return JSON only with exactly one key: reply.",
+          "The reply must be concise, human, context-aware, and safe."
+        ].join("\n"),
+        role: "system"
+      },
+      {
+        content: JSON.stringify(panyaWelcomeGenerationInput(input.config, input.context)),
+        role: "user"
+      }
+    ],
+    model,
+    purpose: "panya welcome greeting",
+    reasoningEffort:
+      configuredGrokValue(process.env.PANYA_WELCOME_REASONING_EFFORT) || "none",
+    temperature: 0.55,
+    timeoutMs: 8_000
+  });
+  const reply = panyaWelcomeReplyFromAiContent(
+    completion.choices?.[0]?.message?.content
+  );
+
+  if (!reply) {
+    throw new Error("Panya welcome reply was missing");
+  }
+
+  return {
+    body: reply,
+    model: completion.model ?? model,
+    responseId: completion.id ?? null
+  };
+}
+
+export async function preparePanyaWelcomeMessage(input: Readonly<{
+  locale?: string | null;
+  planId: string;
+  selectedPlan?: string | null;
+}>): Promise<PreparedPanyaWelcome> {
+  const sql = getSql();
+  const active = await getActivePanyaConfig(sql);
+  const context = await buildPanyaWelcomeContext({
+    locale: input.locale,
+    planId: input.planId,
+    selectedPlan: input.selectedPlan,
+    sql
+  });
+
+  try {
+    const generated = await generatePanyaWelcome({
+      config: active.config,
+      context
+    });
+
+    return {
+      body: generated.body,
+      configVersionId: active.version?.id ?? null,
+      context,
+      fallbackReason: null,
+      generatedBy: "ai",
+      model: generated.model,
+      responseId: generated.responseId
+    };
+  } catch (error) {
+    if (sql && isUuid(input.planId)) {
+      await writeBpmEvent({
+        actorType: "system",
+        emittedBy: "panya_welcome",
+        errorMessage:
+          error instanceof Error ? error.message : "Unknown welcome generation error",
+        eventName: "panya_welcome_generation_failed",
+        eventStatus: "failed",
+        eventType: "chat",
+        planId: input.planId,
+        properties: {
+          entitlement: context.plan.entitlement,
+          locale: context.customer.locale
+        },
+        severity: "low",
+        sql
+      }).catch(() => undefined);
+    }
+
+    return {
+      body: panyaWelcomeFallbackReply(context),
+      configVersionId: active.version?.id ?? null,
+      context,
+      fallbackReason:
+        error instanceof Error ? error.message : "Panya welcome generation failed",
+      generatedBy: "fallback",
+      model: null,
+      responseId: null
+    };
+  }
+}
+
+export async function archivePanyaWelcomeMessage(input: Readonly<{
+  configVersionId?: string | null;
+  identityId?: string | null;
+  message: PreparedPanyaWelcome;
+  replySent: boolean;
+}>) {
+  try {
+    const prepared = await sendCommunication({
+      body: input.message.body,
+      channelType: "line",
+      identityId: input.identityId,
+      messageType: "panya_welcome",
+      metadata: {
+        configVersionId: input.configVersionId ?? input.message.configVersionId,
+        entitlement: input.message.context.plan.entitlement,
+        generationSource: input.message.generatedBy,
+        locale: input.message.context.customer.locale,
+        model: input.message.model,
+        responseId: input.message.responseId,
+        source: "panya_welcome",
+        welcomeFallbackReason: input.message.fallbackReason
+      },
+      planId: input.message.context.planId,
+      subject: "Panya welcome"
+    });
+    let message: CommunicationMessage = prepared.message;
+
+    if (message.status === "queued") {
+      message = await updateCommunicationMessageStatus({
+        errorMessage: input.replySent ? null : "LINE welcome reply was not delivered",
+        messageId: message.id,
+        status: input.replySent ? "sent" : "failed"
+      });
+    }
+
+    await writeBpmEvent({
+      actorType: "system",
+      emittedBy: "panya_welcome",
+      eventName: "panya_welcome_archived",
+      eventStatus: input.replySent ? "succeeded" : "failed",
+      eventType: "chat",
+      planId: input.message.context.planId,
+      properties: {
+        communicationMessageId: message.id,
+        entitlement: input.message.context.plan.entitlement,
+        generationSource: input.message.generatedBy,
+        messageStatus: message.status
+      },
+      severity: input.replySent ? "low" : "medium"
+    });
+
+    return message;
+  } catch (error) {
+    const sql = getSql();
+
+    if (sql && isUuid(input.message.context.planId)) {
+      await writeBpmEvent({
+        actorType: "system",
+        emittedBy: "panya_welcome",
+        errorMessage:
+          error instanceof Error ? error.message : "Unknown welcome archive error",
+        eventName: "panya_welcome_archive_failed",
+        eventStatus: "failed",
+        eventType: "error",
+        planId: input.message.context.planId,
+        severity: "medium",
+        sql
+      }).catch(() => undefined);
+    }
+
+    return null;
+  }
 }
 
 export async function getActivePanyaConfig(sql: Db | null = getSql()) {

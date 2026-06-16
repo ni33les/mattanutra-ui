@@ -24,7 +24,7 @@ const copy = {
   en: {
     back: "Review recommendations",
     body:
-      "Review your selected products, confirm delivery, and secure your order with Delight Pharmacy. Delivery is free today.",
+      "Review your selected products, confirm delivery, and secure your order with Delight Pharmacy. Shipping is shown before payment.",
     empty: "Your basket has no selected products.",
     eyebrow: "Secure checkout",
     title: "Complete your order"
@@ -32,14 +32,14 @@ const copy = {
   th: {
     back: "ตรวจสอบคำแนะนำ",
     body:
-      "ตรวจสอบสินค้าที่เลือก ยืนยันที่อยู่จัดส่ง และชำระเงินเพื่อให้ Delight Pharmacy เตรียมคำสั่งซื้อของคุณ วันนี้จัดส่งฟรี",
+      "ตรวจสอบสินค้าที่เลือก ยืนยันที่อยู่จัดส่ง และชำระเงินเพื่อให้ Delight Pharmacy เตรียมคำสั่งซื้อของคุณ ค่าจัดส่งจะแสดงก่อนชำระเงิน",
     empty: "ตะกร้าของคุณยังไม่มีสินค้าที่เลือก",
     eyebrow: "ชำระเงินอย่างปลอดภัย",
     title: "ดำเนินการสั่งซื้อสินค้า"
   },
   "zh-CN": {
     back: "查看推荐",
-    body: "请核对已选择的产品，确认配送信息，并完成付款以便 Delight Pharmacy 准备订单。今日免配送费。",
+    body: "请核对已选择的产品，确认配送信息，并完成付款以便 Delight Pharmacy 准备订单。配送费会在付款前显示。",
     empty: "你的购物篮没有已选择的产品。",
     eyebrow: "安全结账",
     title: "完成你的产品订单"

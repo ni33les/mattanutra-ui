@@ -47,6 +47,12 @@ import {
   getCustomerPriceMarginPercent,
   normalizeCustomerPriceMarginPercent
 } from "@/lib/customer-pricing";
+import {
+  DEFAULT_FLAT_RATE_SHIPPING_AMOUNT,
+  flatRateShippingAmountFromMetadata,
+  normalizeFlatRateShippingAmount,
+  resolveFlatRateShippingCharge
+} from "@/lib/shipping-fees";
 import type {
   AdminAccessData,
   AdminAccessStatus,
@@ -397,6 +403,7 @@ function organisation(row: {
       name: row.name,
       slug: row.slug
     }),
+    flatRateShippingAmount: flatRateShippingAmountFromMetadata(row.metadata),
     id: row.id,
     name: row.name,
     slug: row.slug,
@@ -2041,6 +2048,11 @@ export async function getAdminSettingsData(
       context.effectiveMembership.role === "platform_admin"
     );
 
+  const shipping = await resolveFlatRateShippingCharge({
+    organisationId: currentOrganisation.id,
+    sql
+  });
+
   return {
     canEditCustomerPriceMargin,
     canEditOrganisation:
@@ -2054,6 +2066,8 @@ export async function getAdminSettingsData(
         )
       ),
     customerPriceMarginPercent: await getCustomerPriceMarginPercent({ sql }),
+    flatRateShippingAmount: shipping.amount,
+    flatRateShippingSource: shipping.source,
     organisation: currentOrganisation,
     people: peopleRows.map((row) => ({
       displayName: row.display_name,
@@ -3078,6 +3092,7 @@ export async function updateEffectiveOrganisationSettings({
   customerPriceMarginPercent,
   defaultLocale,
   dispatchCity,
+  flatRateShippingAmount,
   name
 }: Readonly<{
   context: AdminSessionContext;
@@ -3085,6 +3100,7 @@ export async function updateEffectiveOrganisationSettings({
   customerPriceMarginPercent?: number | null;
   defaultLocale: Locale;
   dispatchCity?: string | null;
+  flatRateShippingAmount?: number | null;
   name: string;
 }>) {
   if (
@@ -3130,6 +3146,7 @@ export async function updateEffectiveOrganisationSettings({
 
   const sql = await sqlOrThrow();
   const requestedCustomerPriceMargin = customerPriceMarginPercent !== undefined;
+  const requestedFlatRateShippingAmount = flatRateShippingAmount !== undefined;
   const normalizedDispatchCity = normalizeDispatchCity(dispatchCity);
 
   if (requestedCustomerPriceMargin && !canEditCustomerPriceMargin) {
@@ -3144,6 +3161,13 @@ export async function updateEffectiveOrganisationSettings({
           )
         }
       : {};
+  const shippingMetadataPatch = requestedFlatRateShippingAmount
+    ? {
+        flatRateShippingAmount:
+          normalizeFlatRateShippingAmount(flatRateShippingAmount) ??
+          DEFAULT_FLAT_RATE_SHIPPING_AMOUNT
+      }
+    : {};
   const rows = await sql<Array<{
     country_code: string | null;
     currency: string | null;
@@ -3163,17 +3187,19 @@ export async function updateEffectiveOrganisationSettings({
       metadata = case
         when ${normalizedDispatchCity ?? ""} <> '' then
           (
-            case
+            (case
               when organisation_type = 'platform' then coalesce(metadata, '{}'::jsonb) || ${sql.json(marginMetadataPatch)}::jsonb
               else coalesce(metadata, '{}'::jsonb) - 'customerPriceMarginPercent'
-            end
+            end)
+            || ${sql.json(shippingMetadataPatch)}::jsonb
           ) || jsonb_build_object('dispatchCity', ${normalizedDispatchCity ?? ""})
         else
           (
-            case
+            (case
               when organisation_type = 'platform' then coalesce(metadata, '{}'::jsonb) || ${sql.json(marginMetadataPatch)}::jsonb
               else coalesce(metadata, '{}'::jsonb) - 'customerPriceMarginPercent'
-            end
+            end)
+            || ${sql.json(shippingMetadataPatch)}::jsonb
           ) - 'dispatchCity'
       end,
       updated_at = now()

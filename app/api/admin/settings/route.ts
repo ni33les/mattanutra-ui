@@ -118,6 +118,9 @@ export async function POST(request: NextRequest) {
           : undefined,
         defaultLocale: localeValue(body.defaultLocale),
         dispatchCity: text(body.dispatchCity),
+        flatRateShippingAmount: Object.hasOwn(body, "flatRateShippingAmount")
+          ? numberValue(body.flatRateShippingAmount)
+          : undefined,
         name
       });
       const response = NextResponse.json({

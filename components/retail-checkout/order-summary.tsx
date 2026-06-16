@@ -26,6 +26,7 @@ export function OrderSummary({
   removedItemCount,
   selectedProducts,
   selectedRetailerName,
+  shippingAmount,
   subtotal,
   total
 }: Readonly<{
@@ -37,6 +38,7 @@ export function OrderSummary({
   removedItemCount: number;
   selectedProducts: readonly ProductBasketProduct[];
   selectedRetailerName: string | null;
+  shippingAmount: number;
   subtotal: number;
   total: number;
 }>) {
@@ -119,7 +121,13 @@ export function OrderSummary({
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-[var(--mn-ink-soft)]">{labels.shipping}</dt>
-          <dd className="font-bold text-[var(--mn-ink)]">{labels.free}</dd>
+          <dd className="font-bold text-[var(--mn-ink)]">
+            {quotePreview
+              ? shippingAmount > 0
+                ? formatCurrencyAmount(locale, shippingAmount, currency)
+                : labels.free
+              : "-"}
+          </dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-[var(--mn-ink-soft)]">{labels.tax}</dt>

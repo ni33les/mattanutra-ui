@@ -83,23 +83,23 @@ const baseRevealCopy = {
     formulaMetaFocus: "Focus",
     formulaSignedPrefix: "Composed",
     foodSupportDefaultBody:
-      "Foods do not change the product coverage score. They only appear when the product stack leaves a supplement gap that a managed food can credibly support.",
-    foodSupportDefaultHeadline: "Food support, after the products.",
+      "These foods are matched against the supplement requirements in your formula, not only the gaps left by a product stack. They keep the plan anchored in everyday meals while supplements carry the measured doses.",
+    foodSupportDefaultHeadline: "Foods that support your full formula.",
     foodSupportEyebrow: "Food support",
     foodSupportFrequency: "Frequency",
     foodSupportGapLabel: "Supports",
     foodSupportGapBodyTemplate:
-      "These foods come from the managed catalogue and are selected around {gaps}. They support the plan in everyday meals without changing product coverage numbers.",
+      "These foods come from the managed catalogue and are selected around {gaps} as part of the full formula food support.",
     foodSupportGapHeadlineTemplate: "Food support for {gaps}.",
     foodSupportNoGapsBody:
-      "The selected stack has no remaining supportable formula gaps for the managed food catalogue. Keep meals simple and use the products for the measured coverage.",
-    foodSupportNoGapsHeadline: "No extra food support needed for this stack.",
+      "The managed food catalogue does not yet have a strong match for this formula. Keep meals steady and use Panya if you want a food-first guide.",
+    foodSupportNoGapsHeadline: "No managed food match for this formula yet.",
     foodSupportPendingBody:
-      "Food support updates after product matching finishes because compact and balanced stacks can leave different formula gaps.",
-    foodSupportPendingHeadline: "Checking food support for this stack.",
+      "Food support is being prepared from the supplement requirements in your formula.",
+    foodSupportPendingHeadline: "Preparing food support for this formula.",
     foodSupportServing: "Serving",
-    foodSupportFormulaGapLabel: "Formula gap",
-    foodSupportTitle: "Foods chosen to support the gaps.",
+    foodSupportFormulaGapLabel: "Formula requirement",
+    foodSupportTitle: "Foods chosen to support the formula.",
     heroEyebrow: "Your Right Amount Has Arrived",
     heroFor: "For",
     heroTitle: "Your formula has arrived",
@@ -200,23 +200,23 @@ const baseRevealCopy = {
     formulaMetaFocus: "เป้าหมาย",
     formulaSignedPrefix: "จัดทำ",
     foodSupportDefaultBody:
-      "อาหารไม่เปลี่ยนคะแนนความครอบคลุมของผลิตภัณฑ์ และจะแสดงเฉพาะเมื่อชุดผลิตภัณฑ์ยังเหลือช่องว่างของสารอาหารที่อาหารในแคตตาล็อกช่วยเสริมได้อย่างน่าเชื่อถือ",
-    foodSupportDefaultHeadline: "อาหารสนับสนุนหลังจากชุดผลิตภัณฑ์",
+      "อาหารเหล่านี้จับคู่กับความต้องการสารอาหารในสูตรทั้งหมด ไม่ใช่เฉพาะช่องว่างที่ชุดผลิตภัณฑ์ยังเหลือไว้ เพื่อให้แผนยังเชื่อมกับมื้ออาหารจริง ขณะที่อาหารเสริมดูแลขนาดที่คำนวณไว้",
+    foodSupportDefaultHeadline: "อาหารที่ช่วยสนับสนุนสูตรทั้งหมดของคุณ",
     foodSupportEyebrow: "อาหารสนับสนุน",
     foodSupportFrequency: "ความถี่",
     foodSupportGapLabel: "สนับสนุน",
     foodSupportGapBodyTemplate:
-      "อาหารเหล่านี้มาจากแคตตาล็อกที่จัดการไว้ และเลือกโดยดูจาก {gaps} เพื่อช่วยให้แผนทำได้จริงในมื้ออาหาร โดยไม่เปลี่ยนตัวเลขความครอบคลุมของผลิตภัณฑ์",
+      "อาหารเหล่านี้มาจากแคตตาล็อกที่จัดการไว้ และเลือกโดยดูจาก {gaps} เป็นส่วนหนึ่งของอาหารที่ช่วยสนับสนุนสูตรทั้งหมด",
     foodSupportGapHeadlineTemplate: "อาหารสนับสนุนสำหรับ {gaps}",
     foodSupportNoGapsBody:
-      "ชุดที่เลือกตอนนี้ไม่มีช่องว่างในสูตรที่แคตตาล็อกอาหารช่วยเสริมได้อย่างเหมาะสม ให้มื้ออาหารเรียบง่าย และใช้ผลิตภัณฑ์สำหรับความครอบคลุมที่คำนวณไว้",
-    foodSupportNoGapsHeadline: "ชุดนี้ยังไม่ต้องมีอาหารเสริมช่องว่างเพิ่มเติม",
+      "แคตตาล็อกอาหารที่จัดการไว้ยังไม่มีรายการที่ตรงกับสูตรนี้อย่างชัดเจน ให้มื้ออาหารสม่ำเสมอ และคุยกับ Panya หากต้องการคู่มือที่เริ่มจากอาหาร",
+    foodSupportNoGapsHeadline: "ยังไม่มีอาหารในแคตตาล็อกที่ตรงกับสูตรนี้",
     foodSupportPendingBody:
-      "คำแนะนำอาหารจะอัปเดตหลังจับคู่ผลิตภัณฑ์เสร็จ เพราะชุดแบบ compact และ balanced อาจเหลือช่องว่างในสูตรต่างกัน",
-    foodSupportPendingHeadline: "กำลังตรวจอาหารที่เหมาะกับชุดนี้",
+      "กำลังเตรียมคำแนะนำอาหารจากความต้องการสารอาหารในสูตรของคุณ",
+    foodSupportPendingHeadline: "กำลังเตรียมอาหารสนับสนุนสูตรนี้",
     foodSupportServing: "ปริมาณ",
-    foodSupportFormulaGapLabel: "ช่องว่างในสูตร",
-    foodSupportTitle: "อาหารที่เลือกเพื่อช่วยเติมช่องว่าง",
+    foodSupportFormulaGapLabel: "ความต้องการในสูตร",
+    foodSupportTitle: "อาหารที่เลือกเพื่อช่วยสนับสนุนสูตร",
     heroEyebrow: "ปริมาณที่พอดีของคุณพร้อมแล้ว",
     heroFor: "สำหรับ",
     heroTitle: "สูตรของคุณพร้อมแล้ว",
@@ -315,20 +315,20 @@ export const revealCopy = {
     "formulaMetaProductFitPending": "产品匹配度 · 处理中",
     "formulaMetaFocus": "专注",
     "formulaSignedPrefix": "配制于",
-    "foodSupportDefaultBody": "食物不会改变产品覆盖评分。只有当产品配方留下补充剂缺口，且可通过管理食物合理支持时，它们才会出现。",
-    "foodSupportDefaultHeadline": "产品之后，食物支持。",
+    "foodSupportDefaultBody": "这些食物会根据你配方中的补充剂需求来匹配，而不只针对产品组合留下的缺口。它们让方案贴近日常饮食，同时补充剂负责已计算的剂量。",
+    "foodSupportDefaultHeadline": "支持完整配方的食物。",
     "foodSupportEyebrow": "食物支持",
     "foodSupportFrequency": "频率",
     "foodSupportGapLabel": "支持",
-    "foodSupportGapBodyTemplate": "这些食物来自管理目录，围绕 {gaps} 精选。它们在日常饮食中支持计划，而不改变产品覆盖数字。",
+    "foodSupportGapBodyTemplate": "这些食物来自管理目录，围绕 {gaps} 选择，并作为完整配方食物支持的一部分。",
     "foodSupportGapHeadlineTemplate": "针对 {gaps} 的食物支持。",
-    "foodSupportNoGapsBody": "所选组合目前没有可由管理食物目录合理支持的剩余配方缺口。日常饮食可保持简单，由产品负责已计算的覆盖。",
-    "foodSupportNoGapsHeadline": "此组合无需额外食物支持。",
-    "foodSupportPendingBody": "食物支持会在产品匹配完成后更新，因为精简和均衡组合可能留下不同的配方缺口。",
-    "foodSupportPendingHeadline": "正在检查此组合的食物支持。",
+    "foodSupportNoGapsBody": "管理食物目录目前还没有与此配方强匹配的食物。饮食保持稳定即可；如需食物优先指南，可联系 Panya。",
+    "foodSupportNoGapsHeadline": "此配方暂无管理食物匹配。",
+    "foodSupportPendingBody": "正在根据你配方中的补充剂需求准备食物支持。",
+    "foodSupportPendingHeadline": "正在准备此配方的食物支持。",
     "foodSupportServing": "份量",
-    "foodSupportFormulaGapLabel": "配方缺口",
-    "foodSupportTitle": "为缺口选择的食物。",
+    "foodSupportFormulaGapLabel": "配方需求",
+    "foodSupportTitle": "为支持配方选择的食物。",
     "heroEyebrow": "您的 Right Amount 已送达",
     "heroFor": "针对",
     "heroTitle": "您的配方已送达",
@@ -433,43 +433,43 @@ export const revealProductPendingCards = {
 export const revealFoodSupportPendingCards = {
   en: [
     {
-      body: "Reading the exact gaps left by the selected product stack.",
-      title: "Waiting for the stack",
+      body: "Reading the supplement requirements in your formula.",
+      title: "Reading your formula",
     },
     {
-      body: "Matching only managed foods that credibly support those gaps.",
+      body: "Matching managed foods that credibly support those requirements.",
       title: "Checking food fit",
     },
     {
-      body: "Keeping food support separate from the measured product coverage.",
+      body: "Keeping food support separate from measured supplement dosing.",
       title: "Keeping scores clean",
     },
   ],
   th: [
     {
-      body: "อ่านช่องว่างจริงที่ชุดผลิตภัณฑ์ที่เลือกยังเหลือไว้",
-      title: "รอชุดผลิตภัณฑ์",
+      body: "อ่านความต้องการสารอาหารในสูตรของคุณ",
+      title: "อ่านสูตรของคุณ",
     },
     {
-      body: "จับคู่เฉพาะอาหารในแคตตาล็อกที่ช่วยเสริมช่องว่างนั้นได้อย่างสมเหตุผล",
+      body: "จับคู่อาหารในแคตตาล็อกที่ช่วยสนับสนุนความต้องการเหล่านั้นได้อย่างเหมาะสม",
       title: "ตรวจความเหมาะของอาหาร",
     },
     {
-      body: "แยกอาหารสนับสนุนออกจากคะแนนความครอบคลุมของผลิตภัณฑ์",
+      body: "แยกอาหารสนับสนุนออกจากขนาดสารอาหารที่คำนวณไว้",
       title: "แยกคะแนนให้ชัด",
     },
   ],
   "zh-CN": [
     {
-      body: "读取所选产品组合留下的确切缺口。",
-      title: "等待产品组合",
+      body: "读取你配方中的补充剂需求。",
+      title: "读取您的配方",
     },
     {
-      body: "只匹配能够合理支持这些缺口的管理食物。",
+      body: "匹配能够合理支持这些需求的管理食物。",
       title: "检查食物匹配",
     },
     {
-      body: "将食物支持与产品覆盖评分保持分离。",
+      body: "将食物支持与已计算的补充剂剂量分开。",
       title: "保持评分清晰",
     },
   ],
@@ -496,12 +496,12 @@ export const revealFinalCopy = {
     deliveryNoteTemplate: "Express delivery · {dispatchCity} dispatch",
     fastest: "Fastest",
     foodEmptyBody:
-      "The selected stack covers the formula gaps we can currently support with products. Keep meals steady and use Panya if you want a food-first reinforcement guide.",
+      "The managed food catalogue does not yet have a strong match for this formula. Keep meals steady and use Panya if you want a food-first guide.",
     foodEmptyTitle:
-      "Your stack covers the formula. Food remains optional reinforcement.",
-    foodCoverageTitle: "Coverage built across both",
+      "No managed food match for this formula yet.",
+    foodCoverageTitle: "Food support is separate from product coverage",
     foodNote:
-      "Coverage is built across both: products handle measured formula coverage, foods reinforce the gaps without changing the basket score.",
+      "Products carry the measured supplement doses and basket math. Foods are shown as everyday support for those same formula requirements, not as a replacement for the formula.",
     formulaHint: "Tap any nutrient to see the reasoning",
     formulaMatch: "Formula match",
     formulaMatchTooltip:
@@ -522,24 +522,25 @@ export const revealFinalCopy = {
     nutrientSafety: "Safety",
     nutrientWhy: "Why this is for you",
     none: "None",
+    panyaByline: "Your guide · by MattaNutra",
     panyaButtonLead:
       "Scan the QR or open LINE. The connect message is prefilled; tap send in LINE and Panya will recognise this plan.",
-    panyaCopied: "Copied",
-    panyaCopyCode: "Copy code",
     panyaCreateCode: "Create new code",
     panyaError: "Could not create a LINE code at this time.",
     panyaExpires: "Code expires soon",
     panyaLivingBody:
-      "Your plan is not meant to sit still. Use LINE to keep the conversation going as sleep, stress, travel, food, or symptoms change.",
+      "Use LINE to ask Panya about your formula, and to check in throughout your protocol as your plan adapts.",
     panyaLivingHeading: "Ongoing nutrition support, connected to this plan.",
     panyaLoading: "Creating code...",
     panyaOpenLine: "Open LINE",
     panyaPlanBody:
-      "Use LINE to ask about your formula, why each nutrient was selected, and how to move from this plan into your daily routine.",
+      "Use LINE to ask Panya about your formula, why each nutrient was selected, and to revisit this plan anytime.",
     panyaPlanHeading: "Talk through your nutrition plan with Panya.",
     panyaQrAlt: "MattaNutra LINE connect QR code",
     panyaQrPlaceholder: "Preparing your LINE QR...",
     panyaSection: "Panya support",
+    panyaWisdomBody:
+      "The name comes from the Pali/Sanskrit Buddhist word paññā / prajñā — a deeper kind of wisdom. Not just being smart, but seeing things clearly and understanding truth. It is a fitting name for the guide behind your plan: designed by MattaNutra's team, including physicians, and supported by AI, with a person responding directly when your question needs one.",
     pharmacyBody:
       "All selected products are checked against your formula, stock data, serving burden, and the selected retailer before checkout.",
     pharmacyTitle: "Sourced through the best available pharmacy match.",
@@ -570,12 +571,12 @@ export const revealFinalCopy = {
     deliveryNoteTemplate: "จัดส่งด่วน · จัดส่งจาก{dispatchCity}",
     fastest: "เร็วที่สุด",
     foodEmptyBody:
-      "ชุดที่เลือกครอบคลุมช่องว่างของสูตรที่ผลิตภัณฑ์รองรับได้ในตอนนี้แล้ว ให้มื้ออาหารสม่ำเสมอ และคุยกับ Panya หากต้องการคู่มืออาหารเสริมเพิ่มเติม",
+      "แคตตาล็อกอาหารที่จัดการไว้ยังไม่มีรายการที่ตรงกับสูตรนี้อย่างชัดเจน ให้มื้ออาหารสม่ำเสมอ และคุยกับ Panya หากต้องการคู่มือที่เริ่มจากอาหาร",
     foodEmptyTitle:
-      "ชุดผลิตภัณฑ์ครอบคลุมสูตรแล้ว อาหารยังเป็นการเสริมทางเลือก",
-    foodCoverageTitle: "ความครอบคลุมเกิดจากทั้งสองด้าน",
+      "ยังไม่มีอาหารในแคตตาล็อกที่ตรงกับสูตรนี้",
+    foodCoverageTitle: "อาหารสนับสนุนแยกจากคะแนนสินค้า",
     foodNote:
-      "ความครอบคลุมเกิดจากทั้งสองด้าน: ผลิตภัณฑ์ดูแลตัวเลขสูตร ส่วนอาหารช่วยเสริมช่องว่างโดยไม่เปลี่ยนคะแนนตะกร้า",
+      "ผลิตภัณฑ์ดูแลขนาดสารอาหารและการคำนวณตะกร้า ส่วนอาหารแสดงเป็นการสนับสนุนในชีวิตประจำวันสำหรับความต้องการเดียวกันในสูตร ไม่ใช่สิ่งทดแทนสูตร",
     formulaHint: "แตะสารอาหารเพื่อดูเหตุผล",
     formulaMatch: "ความตรงกับสูตร",
     formulaMatchTooltip:
@@ -596,15 +597,14 @@ export const revealFinalCopy = {
     nutrientSafety: "ความปลอดภัย",
     nutrientWhy: "ทำไมสิ่งนี้จึงเหมาะกับคุณ",
     none: "ไม่มี",
+    panyaByline: "ไกด์ของคุณ · โดย MattaNutra",
     panyaButtonLead:
       "สแกน QR หรือเปิด LINE ข้อความเชื่อมต่อจะถูกใส่ไว้ให้แล้ว กดส่งใน LINE แล้ว Panya จะรู้ว่าเป็นแผนนี้",
-    panyaCopied: "คัดลอกแล้ว",
-    panyaCopyCode: "คัดลอกรหัส",
     panyaCreateCode: "สร้างรหัสใหม่",
     panyaError: "ไม่สามารถสร้างรหัส LINE ได้ในขณะนี้",
     panyaExpires: "รหัสจะหมดอายุเร็ว ๆ นี้",
     panyaLivingBody:
-      "แผนของคุณไม่ควรหยุดนิ่ง ใช้ LINE เพื่อคุยต่อเมื่อการนอน ความเครียด การเดินทาง อาหาร หรืออาการเปลี่ยนไป",
+      "ใช้ LINE เพื่อถาม Panya เกี่ยวกับสูตรของคุณ และเช็กอินระหว่างโปรโตคอลเมื่อแผนของคุณปรับต่อไป",
     panyaLivingHeading: "การดูแลโภชนาการต่อเนื่อง ที่เชื่อมกับแผนนี้",
     panyaLoading: "กำลังสร้างรหัส...",
     panyaOpenLine: "เปิด LINE",
@@ -614,6 +614,8 @@ export const revealFinalCopy = {
     panyaQrAlt: "คิวอาร์โค้ดเชื่อมต่อ LINE ของ MattaNutra",
     panyaQrPlaceholder: "กำลังเตรียมคิวอาร์ LINE ของคุณ...",
     panyaSection: "Panya support",
+    panyaWisdomBody:
+      "ชื่อ Panya มาจากคำบาลี/สันสกฤต paññā / prajñā หมายถึงปัญญาที่ลึกกว่า ไม่ใช่แค่ความฉลาด แต่คือการเห็นสิ่งต่าง ๆ ชัดเจนและเข้าใจความจริง จึงเหมาะกับไกด์ของแผนนี้ ซึ่งออกแบบโดยทีม MattaNutra รวมถึงแพทย์ รองรับด้วย AI และมีคนจริงเข้ามาตอบโดยตรงเมื่อคำถามของคุณต้องการการดูแลจากมนุษย์",
     pharmacyBody:
       "ผลิตภัณฑ์ที่เลือกถูกตรวจเทียบกับสูตร สต็อก จำนวนเสิร์ฟ และร้านค้าที่เลือกก่อนชำระเงิน",
     pharmacyTitle: "จัดจากร้านขายยาที่เหมาะที่สุดในข้อมูลปัจจุบัน",
@@ -644,12 +646,12 @@ export const revealFinalCopy = {
     deliveryNoteTemplate: "快速配送 · {dispatchCity}发货",
     fastest: "最快",
     foodEmptyBody:
-      "所选组合已覆盖目前可由产品支持的配方缺口。饮食保持稳定即可；如需食物优先的强化指南，可联系 Panya。",
+      "管理食物目录目前还没有与此配方强匹配的食物。饮食保持稳定即可；如需食物优先指南，可联系 Panya。",
     foodEmptyTitle:
-      "你的组合已覆盖配方。食物仍可作为可选强化。",
-    foodCoverageTitle: "覆盖来自两个层面",
+      "此配方暂无管理食物匹配。",
+    foodCoverageTitle: "食物支持与产品覆盖分开计算",
     foodNote:
-      "覆盖来自两个层面：产品负责可衡量的配方覆盖，食物强化缺口但不改变购物篮评分。",
+      "产品负责已计算的补充剂剂量和购物篮计算。食物作为同一配方需求的日常支持展示，并不替代配方。",
     formulaHint: "点开任一营养素查看理由",
     formulaMatch: "配方匹配",
     formulaMatchTooltip:
@@ -670,15 +672,14 @@ export const revealFinalCopy = {
     nutrientSafety: "安全",
     nutrientWhy: "为什么这适合你",
     none: "无",
+    panyaByline: "你的指导伙伴 · MattaNutra 出品",
     panyaButtonLead:
       "扫描二维码或打开 LINE。连接消息会自动填好；在 LINE 中点发送后，Panya 会识别这份方案。",
-    panyaCopied: "已复制",
-    panyaCopyCode: "复制代码",
     panyaCreateCode: "创建新代码",
     panyaError: "目前无法创建 LINE 代码。",
     panyaExpires: "代码即将过期",
     panyaLivingBody:
-      "你的方案不应该停在页面上。当睡眠、压力、旅行、饮食或症状变化时，可通过 LINE 持续沟通。",
+      "通过 LINE 向 Panya 询问你的配方，并在方案持续调整时随时跟进。",
     panyaLivingHeading: "与这份方案相连的持续营养支持。",
     panyaLoading: "正在创建代码...",
     panyaOpenLine: "打开 LINE",
@@ -688,6 +689,8 @@ export const revealFinalCopy = {
     panyaQrAlt: "MattaNutra LINE 连接二维码",
     panyaQrPlaceholder: "正在准备你的 LINE 二维码...",
     panyaSection: "Panya 支持",
+    panyaWisdomBody:
+      "Panya 这个名字来自巴利语/梵语 paññā / prajñā，指一种更深的智慧：不只是聪明，而是看清事物、理解真实。它很适合作为你方案背后的指导伙伴：由 MattaNutra 团队包括医生共同设计，由 AI 支持，并在问题需要人工判断时由真人直接回应。",
     pharmacyBody:
       "结账前，每件所选产品都会根据你的配方、库存、服用负担和所选零售方进行核对。",
     pharmacyTitle: "由当前最匹配的药房来源履约。",

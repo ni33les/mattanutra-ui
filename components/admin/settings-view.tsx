@@ -62,6 +62,21 @@ const dispatchCityLabels = {
   }
 } satisfies Record<Locale, { help: string; label: string }>;
 
+const flatRateShippingLabels = {
+  en: {
+    help: "Default platform shipping is used unless the retailer saves an override.",
+    label: "Flat-rate shipping"
+  },
+  th: {
+    help: "ใช้ค่าจัดส่งเริ่มต้นของแพลตฟอร์ม เว้นแต่ร้านค้าจะบันทึกค่าแทน",
+    label: "ค่าจัดส่งแบบเหมาจ่าย"
+  },
+  "zh-CN": {
+    help: "默认使用平台配送费，零售商保存后会覆盖该默认值。",
+    label: "固定配送费"
+  }
+} satisfies Record<Locale, { help: string; label: string }>;
+
 function statusLabel(labels: AdminContent, status: string) {
   if (status === "active") {
     return labels.access.active;
@@ -124,6 +139,9 @@ export function AdminSettingsView({
   const [customerPriceMarginPercent, setCustomerPriceMarginPercent] = useState(
     String(initialSettingsData?.customerPriceMarginPercent ?? 10)
   );
+  const [flatRateShippingAmount, setFlatRateShippingAmount] = useState(
+    String(initialSettingsData?.flatRateShippingAmount ?? 50)
+  );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -158,6 +176,9 @@ export function AdminSettingsView({
       );
       setCustomerPriceMarginPercent(
         String(result.settingsData.customerPriceMarginPercent)
+      );
+      setFlatRateShippingAmount(
+        String(result.settingsData.flatRateShippingAmount)
       );
     }
   }
@@ -207,6 +228,7 @@ export function AdminSettingsView({
         ...(canEditCustomerPriceMargin ? { customerPriceMarginPercent } : {}),
         defaultLocale: organisationLocale,
         dispatchCity: organisationDispatchCity,
+        flatRateShippingAmount,
         name: organisationName
       });
 
@@ -369,6 +391,22 @@ export function AdminSettingsView({
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-gray-500">
+              {flatRateShippingLabels[locale].label}
+              <input
+                className="rounded-md bg-white px-3 py-2 text-sm font-normal text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
+                disabled={!canEditOrganisation || busy}
+                inputMode="decimal"
+                min="0"
+                onChange={(event) => setFlatRateShippingAmount(event.target.value)}
+                step="0.01"
+                type="number"
+                value={flatRateShippingAmount}
+              />
+              <span className="text-[11px] font-normal leading-5 text-gray-400">
+                {flatRateShippingLabels[locale].help}
+              </span>
             </label>
             {canEditCustomerPriceMargin ? (
               <label className="grid gap-1 text-xs font-semibold text-gray-500">

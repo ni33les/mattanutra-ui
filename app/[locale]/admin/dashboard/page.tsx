@@ -19,6 +19,10 @@ import {
   normalizeAdminDashboardRange
 } from "@/lib/admin-dashboard-data";
 import {
+  emptyAdminCustomerInsightsData,
+  getAdminCustomerInsightsData
+} from "@/lib/admin-customer-insights";
+import {
   emptyCommunicationsData,
   getAdminCommunicationsData
 } from "@/lib/admin-communications";
@@ -201,6 +205,7 @@ export default async function LocalizedAdminDashboardPage({
   let agentsData = emptyAgentsData();
   let campaignsData = emptyCampaignsData();
   let contentData = emptyContentData();
+  let customerInsightsData = emptyAdminCustomerInsightsData(range);
   let communicationsData = emptyCommunicationsData();
   let data = emptyAdminDashboardData(range);
   let financialsData = emptyFinancials(range);
@@ -292,6 +297,8 @@ export default async function LocalizedAdminDashboardPage({
     );
     productsData = await getAdminProductsData(range);
     supplementsData = await getAdminSupplementsData(range);
+  } else if (view === "customer-insights") {
+    customerInsightsData = await getAdminCustomerInsightsData(range);
   } else if (view === "reviews") {
     foodsData = await getAdminFoodsData();
     reviewQueueData = await getAdminReviewQueueData();
@@ -312,6 +319,7 @@ export default async function LocalizedAdminDashboardPage({
       agentsData={agentsData}
       campaignsData={campaignsData}
       contentData={contentData}
+      customerInsightsData={customerInsightsData}
       communicationsData={communicationsData}
       data={data}
       financialsData={financialsData}
