@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { LivingProtocolLineCta } from "@/components/living-protocol-line-cta";
 import { BookmarkTrackingButton } from "@/components/retail-checkout/bookmark-tracking-button";
+import { SafeImage } from "@/components/safe-image";
 import { SiteFooter } from "@/components/site-footer";
 import { TitleBar } from "@/components/title-bar";
 import { formatCurrencyAmount } from "@/lib/currencies";
@@ -326,19 +326,18 @@ export default async function CustomerOrderTrackingPage({ params }: Props) {
                     className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg bg-white px-3 py-3 ring-1 ring-[var(--mn-line)]"
                     key={`${line.productId}:${line.retailSellableProductId ?? "line"}`}
                   >
-                    {line.imageUrl ? (
-                      <Image
-                        alt=""
-                        className="size-14 rounded bg-[var(--mn-cream)] object-contain"
-                        height={56}
-                        src={line.imageUrl}
-                        width={56}
-                      />
-                    ) : (
-                      <div className="grid size-14 place-items-center rounded bg-[var(--mn-cream)] font-serif text-lg text-[var(--mn-teal-deep)]">
-                        MN
-                      </div>
-                    )}
+                    <SafeImage
+                      alt=""
+                      className="size-14 rounded bg-[var(--mn-cream)] object-contain"
+                      fallback={
+                        <div className="grid size-14 place-items-center rounded bg-[var(--mn-cream)] font-serif text-lg text-[var(--mn-teal-deep)]">
+                          MN
+                        </div>
+                      }
+                      height={56}
+                      src={line.imageUrl}
+                      width={56}
+                    />
                     <div className="min-w-0">
                       <p className="font-semibold text-[var(--mn-ink)]">{line.productTitle}</p>
                       <p className="text-xs text-[var(--mn-ink-soft)]">

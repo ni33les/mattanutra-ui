@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { SafeImage } from "@/components/safe-image";
 import { formatCurrencyAmount } from "@/lib/currencies";
 import type { Locale } from "@/lib/i18n";
 import type {
@@ -75,19 +75,18 @@ export function OrderSummary({
               className="grid grid-cols-[auto_1fr_auto] gap-3 py-4"
               key={line.productId}
             >
-              {product?.imageUrl ? (
-                <Image
-                  alt=""
-                  className="size-12 rounded-lg bg-[var(--mn-cream)] object-contain"
-                  height={48}
-                  src={product.imageUrl}
-                  width={48}
-                />
-              ) : (
-                <div className="grid size-12 place-items-center rounded-lg bg-[var(--mn-cream)] font-serif text-base text-[var(--mn-teal-deep)]">
-                  MN
-                </div>
-              )}
+              <SafeImage
+                alt=""
+                className="size-12 rounded-lg bg-[var(--mn-cream)] object-contain"
+                fallback={
+                  <div className="grid size-12 place-items-center rounded-lg bg-[var(--mn-cream)] font-serif text-base text-[var(--mn-teal-deep)]">
+                    MN
+                  </div>
+                }
+                height={48}
+                src={product?.imageUrl}
+                width={48}
+              />
               <div className="min-w-0">
                 <p className="line-clamp-2 text-sm font-semibold text-[var(--mn-ink)]">
                   {product?.name ?? "Product"}

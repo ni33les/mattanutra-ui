@@ -120,6 +120,7 @@ type StockResponse = Readonly<{
 
 const kexCarrierName = "KEX Express (Thailand)";
 const grabCarrierName = "Grab";
+const showKexCarrierSetup = false;
 const shipmentCarrierOptions = [kexCarrierName, grabCarrierName] as const;
 
 type RetailStockPanel =
@@ -449,6 +450,10 @@ export function AdminRetailStockView({
             row.brandName,
             row.productKind,
             row.organisationName,
+            row.productId,
+            row.retailSellableProductId,
+            row.ean13,
+            row.manufacturerSku,
             row.currency,
             statusLabel(labels, row.status)
           ])
@@ -541,7 +546,13 @@ export function AdminRetailStockView({
             order.customerEmail,
             order.organisationName,
             order.status,
-            ...orderLines.flatMap((line) => [line.productTitle, line.notes])
+            ...orderLines.flatMap((line) => [
+              line.productId,
+              line.productTitle,
+              line.ean13,
+              line.manufacturerSku,
+              line.notes
+            ])
           ]);
         }),
     [
@@ -692,7 +703,10 @@ export function AdminRetailStockView({
         searchMatches(productSearch, [
           product.title,
           product.brandName,
-          product.productKind
+          product.productKind,
+          product.id,
+          product.ean13,
+          product.manufacturerSku
         ])
       )
       .slice(0, 60);
@@ -705,7 +719,10 @@ export function AdminRetailStockView({
           searchMatches(productSearch, [
             product.title,
             product.brandName,
-            product.productKind
+            product.productKind,
+            product.id,
+            product.ean13,
+            product.manufacturerSku
           ])
         )
         .slice(0, 80),
@@ -2002,8 +2019,10 @@ export function AdminRetailStockView({
     editor?.mode === "edit"
       ? {
           brandName: editor.row.brandName,
+          ean13: editor.row.ean13,
           id: editor.row.productId,
           imageUrl: editor.row.imageUrl,
+          manufacturerSku: editor.row.manufacturerSku,
           productKind: editor.row.productKind,
           title: editor.row.productTitle
         }
@@ -2207,6 +2226,7 @@ export function AdminRetailStockView({
 	            ) : null}
 	          </div>
 	        </div>
+	        {showKexCarrierSetup ? (
 	        <section className="mt-4 rounded-md bg-white p-4 shadow-sm ring-1 ring-gray-200">
 	          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 	            <div>
@@ -2324,6 +2344,7 @@ export function AdminRetailStockView({
 	            </div>
 	          )}
 	        </section>
+	        ) : null}
 	        <div className="mt-4 overflow-x-auto">
 	          <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead>
@@ -3112,6 +3133,17 @@ export function AdminRetailStockView({
               }
               selectedMetricId={selectedCustomerOrderFilter}
             />
+            <label className="block w-full max-w-md">
+              <span className="sr-only">{labels.stock.search}</span>
+              <input
+                aria-label={labels.stock.search}
+                className="w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1FA77A]"
+                onChange={(event) => setStockSearch(event.target.value)}
+                placeholder={labels.stock.search}
+                type="search"
+                value={stockSearch}
+              />
+            </label>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead>

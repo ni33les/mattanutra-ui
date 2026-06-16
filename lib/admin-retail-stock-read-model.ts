@@ -35,8 +35,10 @@ export type RetailCarrierAccountRow = Readonly<{
 
 export type RetailProductOptionRow = Readonly<{
   brand_name: string | null;
+  ean13: string | null;
   id: string;
   image_url: string | null;
+  manufacturer_sku: string | null;
   product_kind: string;
   title: string;
 }>;
@@ -100,9 +102,11 @@ export type RetailStockRow = Readonly<{
   backorder_policy: string | null;
   brand_name: string | null;
   currency: string;
+  ean13: string | null;
   id: string;
   image_url: string | null;
   lead_time_days: number | string;
+  manufacturer_sku: string | null;
   notes: string | null;
   organisation_id: string;
   organisation_name: string;
@@ -174,8 +178,10 @@ export function mapRetailProductOptionRow(
 ): AdminRetailStockProductOption {
   return {
     brandName: row.brand_name,
+    ean13: row.ean13,
     id: row.id,
     imageUrl: row.image_url,
+    manufacturerSku: row.manufacturer_sku,
     productKind: row.product_kind,
     title: row.title
   };
@@ -262,9 +268,11 @@ export function mapRetailStockRow(row: RetailStockRow): AdminRetailStockRow {
     backorderPolicy: stockBackorderPolicy(row.backorder_policy),
     brandName: row.brand_name,
     currency: row.currency,
+    ean13: row.ean13,
     id: row.id,
     imageUrl: row.image_url,
     leadTimeDays: integerOrDefault(row.lead_time_days, 0),
+    manufacturerSku: row.manufacturer_sku,
     notes: row.notes,
     organisationId: row.organisation_id,
     organisationName: row.organisation_name,

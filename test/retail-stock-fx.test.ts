@@ -313,6 +313,12 @@ describe("retail stock and FX infrastructure", () => {
 	    assert.doesNotMatch(view, /\n\s*\{labels\.stock\.search\}\s*\n\s*<input/);
 	    assert.doesNotMatch(view, /panel === "purchase-orders" \|\| panel === "receiving"/);
 	    assert.match(view, /placeholder=\{labels\.stock\.search\}/);
+	    assert.match(view, /const showKexCarrierSetup = false/);
+	    assert.match(view, /showKexCarrierSetup \? \(/);
+	    assert.match(view, /row\.ean13/);
+	    assert.match(view, /row\.manufacturerSku/);
+	    assert.match(view, /line\.ean13/);
+	    assert.match(view, /line\.manufacturerSku/);
 	    assert.match(view, /customerOrderLinesByOrderId/);
 	    assert.match(customerOrderDisplay, /function customerOrderRetailValue/);
 	    assert.match(view, /order\.orderNumber/);

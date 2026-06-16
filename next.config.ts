@@ -72,6 +72,14 @@ const imageRemotePatterns = [
   },
   {
     protocol: "https",
+    hostname: "cdn.megawecare.com"
+  },
+  {
+    protocol: "https",
+    hostname: "i0.wp.com"
+  },
+  {
+    protocol: "https",
     hostname: "www.vistra.co.th"
   }
 ] satisfies NonNullable<NextConfig["images"]>["remotePatterns"];

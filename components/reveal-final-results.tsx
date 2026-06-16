@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ExternalLink, MessageCircle, Printer } from "lucide-react";
 import { LandingReveal } from "@/components/landing-reveal";
 import { PreviewPaywallPanel } from "@/components/formulation-results-panels";
+import { SafeImage } from "@/components/safe-image";
 import {
   productCoveredNeedCount,
   replaceRevealStackUrl,
@@ -1627,24 +1628,20 @@ function RevealProductsFinalSection({
                     {selected ? copy.productVerified : finalCopy.productRemoved}
                   </span>
                   <div className="mt-11 mb-5 flex h-[130px] w-[110px] self-center">
-                    {product.imageUrl ? (
-                      <Image
-                        alt={product.name}
-                        className="h-full w-full object-contain"
-                        height={260}
-                        loading="eager"
-                        src={product.imageUrl}
-                        unoptimized={
-                          product.imageUrl.startsWith("http://") ||
-                          product.imageUrl.startsWith("https://")
-                        }
-                        width={220}
-                      />
-                    ) : (
+                    <SafeImage
+                      alt={product.name}
+                      className="h-full w-full object-contain"
+                      fallback={
                       <div className="grid h-full w-full place-items-center rounded bg-[var(--mn-mint-deep)] px-2 text-center mn-reveal-font-mono text-[9px] uppercase tracking-[0.14em] text-[var(--mn-teal-deep)]">
                         Product photo
                       </div>
-                    )}
+                      }
+                      height={260}
+                      loading="eager"
+                      src={product.imageUrl}
+                      unoptimized={true}
+                      width={220}
+                    />
                   </div>
                   <div className="flex flex-1 flex-col">
                     <p className="mn-reveal-font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--mn-ash)]">

@@ -379,15 +379,19 @@ describe("admin retail stock dashboard read model", () => {
     assert.deepEqual(
       mapRetailProductOptionRow({
         brand_name: "Brand",
+        ean13: "8850000000001",
         id: "product-1",
         image_url: "/product.webp",
+        manufacturer_sku: "SKU-1",
         product_kind: "supplement",
         title: "Product"
       }),
       {
         brandName: "Brand",
+        ean13: "8850000000001",
         id: "product-1",
         imageUrl: "/product.webp",
+        manufacturerSku: "SKU-1",
         productKind: "supplement",
         title: "Product"
       }
@@ -397,9 +401,11 @@ describe("admin retail stock dashboard read model", () => {
         backorder_policy: "deny",
         brand_name: "Brand",
         currency: "THB",
+        ean13: "8850000000001",
         id: "stock-1",
         image_url: "/product.webp",
         lead_time_days: "3",
+        manufacturer_sku: "SKU-1",
         notes: "Cold chain",
         organisation_id: "org-1",
         organisation_name: "Delight",
@@ -419,9 +425,11 @@ describe("admin retail stock dashboard read model", () => {
         backorderPolicy: "deny",
         brandName: "Brand",
         currency: "THB",
+        ean13: "8850000000001",
         id: "stock-1",
         imageUrl: "/product.webp",
         leadTimeDays: 3,
+        manufacturerSku: "SKU-1",
         notes: "Cold chain",
         organisationId: "org-1",
         organisationName: "Delight",

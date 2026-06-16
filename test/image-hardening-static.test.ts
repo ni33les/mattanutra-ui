@@ -176,6 +176,8 @@ describe("image hardening", () => {
       "www.blackmores.co.th",
       "www.dhc.co.jp",
       "www.megawecare.co.th",
+      "cdn.megawecare.com",
+      "i0.wp.com",
       "www.vistra.co.th"
     ]) {
       assert.match(config, new RegExp(`hostname:\\s*"${host.replace(/\./g, "\\.")}"`));
@@ -213,5 +215,20 @@ describe("image hardening", () => {
     }
 
     assert.deepEqual(offenders, []);
+  });
+
+  it("lets SafeImage recover from http, invalid, and failed product images", () => {
+    const source = readFileSync(
+      path.join(repoRoot, "components/safe-image.tsx"),
+      "utf8"
+    );
+
+    assert.match(source, /value\.startsWith\("http:\/\/"\)/);
+    assert.match(source, /`https:\/\/\$\{value\.slice\("http:\/\/"\.length\)\}`/);
+    assert.match(source, /www\.megawecare\.co\.th\/wp-content\/uploads/);
+    assert.match(source, /i0\.wp\.com\/www\.megawecare\.co\.th\/wp-content\/uploads/);
+    assert.match(source, /failedSrc === normalizedSrc/);
+    assert.match(source, /onError=\{\(event\) => \{/);
+    assert.match(source, /setFailedSrc\(normalizedSrc\)/);
   });
 });

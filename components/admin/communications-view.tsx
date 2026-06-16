@@ -8,7 +8,7 @@ import {
   Plus,
   type LucideIcon
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type {
   AdminCommunicationRow,
   AdminCommunicationsData,
@@ -128,6 +128,7 @@ export function AdminCommunicationsView({
   );
   const [emailContactName, setEmailContactName] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
+  const [lineContactName, setLineContactName] = useState("");
   const [lineCode, setLineCode] = useState<{
     code: string;
     command: string;
@@ -136,7 +137,6 @@ export function AdminCommunicationsView({
   } | null>(null);
   const [connectMethod, setConnectMethod] = useState<ConnectMethod>("line");
   const [connectModalOpen, setConnectModalOpen] = useState(false);
-  const [lineCodeAutoRequestKey, setLineCodeAutoRequestKey] = useState("");
   const [lineCodeBusy, setLineCodeBusy] = useState(false);
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [settingsError, setSettingsError] = useState("");
@@ -187,24 +187,17 @@ export function AdminCommunicationsView({
     }
   ];
 
-  const defaultLineContactName = useCallback(() => {
-    if (!settings) {
-      return "MattaNutra LINE";
-    }
-
-    return settings.scope === "platform"
-      ? "MattaNutra Platform"
-      : settings.selectedOrganisationName;
-  }, [settings]);
-
-  const startLineConnection = useCallback(async (displayNameOverride?: string) => {
+  const startLineConnection = useCallback(async () => {
     if (!settings) {
       return;
     }
 
-    const displayName =
-      displayNameOverride?.trim() ||
-      defaultLineContactName();
+    const displayName = lineContactName.trim();
+
+    if (!displayName) {
+      setSettingsError("Enter a contact name for this LINE channel.");
+      return;
+    }
 
     setLineCodeBusy(true);
     setSettingsError("");
@@ -237,43 +230,7 @@ export function AdminCommunicationsView({
     } finally {
       setLineCodeBusy(false);
     }
-  }, [defaultLineContactName, locale, settings]);
-
-  useEffect(() => {
-    const selectedOrganisationId = settings?.selectedOrganisationId;
-
-    if (
-      !connectModalOpen ||
-      connectMethod !== "line" ||
-      lineCode ||
-      !selectedOrganisationId ||
-      lineCodeAutoRequestKey === selectedOrganisationId ||
-      lineCodeBusy ||
-      !settings?.canManage
-    ) {
-      return;
-    }
-
-    const displayName = defaultLineContactName();
-    const timeout = window.setTimeout(() => {
-      setLineCodeAutoRequestKey(selectedOrganisationId);
-      void startLineConnection(displayName);
-    }, 0);
-
-    return () => window.clearTimeout(timeout);
-  }, [
-    connectMethod,
-    connectModalOpen,
-    defaultLineContactName,
-    lineCode,
-    lineCodeAutoRequestKey,
-    lineCodeBusy,
-    settings?.canManage,
-    settings?.scope,
-    settings?.selectedOrganisationId,
-    settings?.selectedOrganisationName,
-    startLineConnection
-  ]);
+  }, [lineContactName, locale, settings]);
 
   async function retryMessage(row: AdminCommunicationRow) {
     setRetryErrorId(null);
@@ -382,7 +339,7 @@ export function AdminCommunicationsView({
   function openConnectModal() {
     setSettingsError("");
     setLineCode(null);
-    setLineCodeAutoRequestKey("");
+    setLineContactName("");
     setConnectModalOpen(true);
   }
 
@@ -393,7 +350,6 @@ export function AdminCommunicationsView({
 
     setConnectMethod(provider.id);
     setLineCode(null);
-    setLineCodeAutoRequestKey("");
   }
 
   function closeConnectModal() {
@@ -764,6 +720,21 @@ export function AdminCommunicationsView({
             </div>
           ) : (
             <div className="space-y-5 px-6 py-5">
+              <label className="block">
+                <span className="text-sm font-semibold text-gray-800">Contact name</span>
+                <input
+                  className="mt-1 w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 disabled:bg-gray-50"
+                  disabled={!settings.canManage || lineCodeBusy || Boolean(lineCode)}
+                  onChange={(event) => setLineContactName(event.target.value)}
+                  placeholder={
+                    isPlatformScope
+                      ? "MattaNutra platform LINE"
+                      : "Pharmacy LINE contact"
+                  }
+                  type="text"
+                  value={lineContactName}
+                />
+              </label>
               <div className="grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)]">
                 {lineCode?.lineUrl ? (
                   <a
@@ -785,7 +756,7 @@ export function AdminCommunicationsView({
                   <div className="grid size-48 place-items-center rounded-md bg-gray-50 p-4 text-center text-sm leading-6 text-gray-500 ring-1 ring-gray-200">
                     {lineCodeBusy
                       ? "Preparing LINE QR..."
-                      : "LINE QR could not be prepared."}
+                      : "Enter a contact name to create a LINE QR."}
                   </div>
                 )}
                 <div className="text-sm leading-6 text-gray-600">
@@ -815,7 +786,7 @@ export function AdminCommunicationsView({
                   </div>
                 </div>
               ) : null}
-              <div className="flex justify-end border-t border-gray-100 pt-4">
+              <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
                 <button
                   className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 ring-1 ring-gray-300 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={settingsBusy}
@@ -823,6 +794,19 @@ export function AdminCommunicationsView({
                   type="button"
                 >
                   Close
+                </button>
+                <button
+                  className="rounded-md bg-[#20343A] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={
+                    !settings.canManage ||
+                    lineCodeBusy ||
+                    Boolean(lineCode) ||
+                    !lineContactName.trim()
+                  }
+                  onClick={() => void startLineConnection()}
+                  type="button"
+                >
+                  Create LINE QR
                 </button>
               </div>
             </div>

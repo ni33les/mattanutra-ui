@@ -68,6 +68,7 @@ import {
   aggregateRetailStockPipelineRows,
   getRetailStockPipeline,
   localizedProductTitleExpression,
+  productIdentifiersLateralJoin,
   retailStockPipelineKey
 } from "@/lib/admin-retail-stock-pipeline";
 import {
@@ -179,8 +180,10 @@ export type AdminRetailStockOrganisation = Readonly<{
 
 export type AdminRetailStockProductOption = Readonly<{
   brandName: string | null;
+  ean13: string | null;
   id: string;
   imageUrl: string | null;
+  manufacturerSku: string | null;
   productKind: string;
   title: string;
 }>;
@@ -189,9 +192,11 @@ export type AdminRetailStockRow = Readonly<{
   backorderPolicy: BackorderPolicy;
   brandName: string | null;
   currency: string;
+  ean13: string | null;
   id: string;
   imageUrl: string | null;
   leadTimeDays: number;
+  manufacturerSku: string | null;
   notes: string | null;
   organisationId: string;
   organisationName: string;
@@ -1947,8 +1952,10 @@ export async function getAdminRetailStockData(
   const [stockRows, productRows] = organisationIds.length === 0
     ? [[], await sql<Array<{
         brand_name: string | null;
+        ean13: string | null;
         id: string;
         image_url: string | null;
+        manufacturer_sku: string | null;
         product_kind: string;
         title: string;
       }>>`
@@ -1957,12 +1964,15 @@ export async function getAdminRetailStockData(
           ${productTitle} as title,
           products.brand_name,
           products.image_url,
+          identifiers.ean13,
+          identifiers.manufacturer_sku,
           products.product_kind
         from public.products
         left join public.product_translations
           on product_translations.product_id = products.id
           and product_translations.locale = ${locale}
           and product_translations.status <> 'missing'
+        ${productIdentifiersLateralJoin(sql)}
         where products.status = 'approved'
           and not (
             lower(coalesce(products.normalized_brand_name, products.brand_name, '')) in ('dhc', 'dmc')
@@ -1976,9 +1986,11 @@ export async function getAdminRetailStockData(
           backorder_policy: string | null;
           brand_name: string | null;
           currency: string;
+          ean13: string | null;
           id: string;
           image_url: string | null;
           lead_time_days: number | string;
+          manufacturer_sku: string | null;
           notes: string | null;
           organisation_id: string;
           organisation_name: string;
@@ -2003,6 +2015,8 @@ export async function getAdminRetailStockData(
             ${productTitle} as product_title,
             products.brand_name,
             products.image_url,
+            identifiers.ean13,
+            identifiers.manufacturer_sku,
             products.product_kind,
             products.status as product_status,
             coalesce(retail_sellable_products.status, retail_product_stock.status) as status,
@@ -2028,14 +2042,17 @@ export async function getAdminRetailStockData(
             on product_translations.product_id = products.id
             and product_translations.locale = ${locale}
             and product_translations.status <> 'missing'
+          ${productIdentifiersLateralJoin(sql)}
           where retail_product_stock.organisation_id = any(${organisationIds}::uuid[])
             and retail_product_stock.status <> 'deleted'
           order by lower(organisations.name), lower(${productTitle})
         `,
         sql<Array<{
           brand_name: string | null;
+          ean13: string | null;
           id: string;
           image_url: string | null;
+          manufacturer_sku: string | null;
           product_kind: string;
           title: string;
         }>>`
@@ -2044,12 +2061,15 @@ export async function getAdminRetailStockData(
             ${productTitle} as title,
             products.brand_name,
             products.image_url,
+            identifiers.ean13,
+            identifiers.manufacturer_sku,
             products.product_kind
           from public.products
           left join public.product_translations
             on product_translations.product_id = products.id
             and product_translations.locale = ${locale}
             and product_translations.status <> 'missing'
+          ${productIdentifiersLateralJoin(sql)}
           where products.status = 'approved'
             and not (
               lower(coalesce(products.normalized_brand_name, products.brand_name, '')) in ('dhc', 'dmc')

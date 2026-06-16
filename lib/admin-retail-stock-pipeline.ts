@@ -256,3 +256,21 @@ export function localizedProductTitleExpression(
     )
   `;
 }
+
+export function productIdentifiersLateralJoin(sql: StockDb) {
+  return sql`
+    left join lateral (
+      select
+        max(product_identifiers.identifier_value) filter (
+          where product_identifiers.identifier_type = 'ean13'
+        ) as ean13,
+        max(product_identifiers.identifier_value) filter (
+          where product_identifiers.identifier_type = 'manufacturer_sku'
+        ) as manufacturer_sku
+      from public.product_identifiers
+      where product_identifiers.product_id = products.id
+        and product_identifiers.status = 'active'
+        and product_identifiers.identifier_type in ('ean13', 'manufacturer_sku')
+    ) identifiers on true
+  `;
+}
