@@ -27,6 +27,27 @@ const productCountryCodes: ReadonlySet<string> =
 
 export type ProductCountryCode = (typeof productCountryOptions)[number]["code"];
 
+function countryLookupKey(value: string) {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "");
+}
+
+const productCountryLabelCodes: ReadonlyMap<string, ProductCountryCode> =
+  new Map(
+    productCountryOptions.flatMap((item) => [
+      [item.label.trim().toUpperCase(), item.code],
+      [countryLookupKey(item.label), item.code]
+    ])
+  );
+
+const productCountryAliases: ReadonlyMap<string, ProductCountryCode> = new Map([
+  ["USA", "US"],
+  ["UNITEDSTATESOFAMERICA", "US"],
+  ["UK", "GB"],
+  ["GREATBRITAIN", "GB"],
+  ["BRITAIN", "GB"],
+  ["BURMA", "MM"]
+]);
+
 export type ProductCountryPricing = Readonly<{
   countryCode: ProductCountryCode;
   currency: string;
@@ -38,7 +59,23 @@ export type ProductCountryPricing = Readonly<{
 export function normalizeProductCountryCode(value: unknown): ProductCountryCode | null {
   const code = typeof value === "string" ? value.trim().toUpperCase() : "";
 
-  return productCountryCodes.has(code) ? code as ProductCountryCode : null;
+  if (productCountryCodes.has(code)) {
+    return code as ProductCountryCode;
+  }
+
+  const lookupKey = countryLookupKey(code);
+
+  if (productCountryCodes.has(lookupKey)) {
+    return lookupKey as ProductCountryCode;
+  }
+
+  return (
+    productCountryLabelCodes.get(code) ??
+    productCountryLabelCodes.get(lookupKey) ??
+    productCountryAliases.get(code) ??
+    productCountryAliases.get(lookupKey) ??
+    null
+  );
 }
 
 export function normalizeProductCountryCodes(

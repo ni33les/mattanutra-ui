@@ -11,7 +11,15 @@ describe("product countries", () => {
   it("normalizes supported ISO market codes", () => {
     assert.equal(normalizeProductCountryCode("th"), "TH");
     assert.equal(normalizeProductCountryCode(" US "), "US");
-    assert.equal(normalizeProductCountryCode("Thailand"), null);
+    assert.equal(normalizeProductCountryCode("U.S."), "US");
+  });
+
+  it("normalizes supported country labels", () => {
+    assert.equal(normalizeProductCountryCode("Thailand"), "TH");
+    assert.equal(normalizeProductCountryCode(" thailand "), "TH");
+    assert.equal(normalizeProductCountryCode("United States"), "US");
+    assert.equal(normalizeProductCountryCode("United Kingdom"), "GB");
+    assert.equal(normalizeProductCountryCode("UK"), "GB");
   });
 
   it("defaults empty or unsupported country lists to Thailand", () => {

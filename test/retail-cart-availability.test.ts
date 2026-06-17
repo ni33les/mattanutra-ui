@@ -133,6 +133,28 @@ describe("retail cart availability", () => {
     assert.equal(availability.subtotalAmount, 132);
   });
 
+  it("routes Thailand label values to Thai retailers", () => {
+    const availability = resolveRegionalBasketAvailabilityFromRows({
+      lines: [{ productId: "product-1", quantity: 1 }],
+      now,
+      preference: "cheapest_price",
+      rows: [
+        regionalRow({
+          organisation_country_code: "TH",
+          organisation_id: "thai-retailer",
+          organisation_name: "Thai Retailer",
+          rrp_price_amount: 120
+        })
+      ],
+      shippingCountry: "Thailand"
+    });
+
+    assert.equal(availability.canCheckout, true);
+    assert.equal(availability.shippingCountry, "TH");
+    assert.equal(availability.selectedRetailer?.organisationId, "thai-retailer");
+    assert.equal(availability.lines[0]?.reason, "Stock is available now.");
+  });
+
   it("selects the cheapest full-basket retailer and uses ETA only as a tie-breaker", () => {
     const rows = [
       regionalRow({
