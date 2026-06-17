@@ -10,6 +10,22 @@ type SafeImageProps = Omit<ImageProps, "alt" | "src"> & Readonly<{
   src?: string | null;
 }>;
 
+const nextOptimizedImageHosts = new Set([
+  "dev.mattanutra.com",
+  "uat.mattanutra.com",
+  "mattanutra.com",
+  "www.mattanutra.com",
+  "images.contentstack.io",
+  "images.unsplash.com",
+  "swisse.co.th",
+  "www.blackmores.co.th",
+  "www.dhc.co.jp",
+  "www.megawecare.co.th",
+  "cdn.megawecare.com",
+  "i0.wp.com",
+  "www.vistra.co.th"
+]);
+
 function normalizeImageSrc(src: string | null | undefined) {
   const value = src?.trim();
 
@@ -41,6 +57,18 @@ function normalizeImageSrc(src: string | null | undefined) {
   return null;
 }
 
+function canUseNextImageOptimizer(src: string) {
+  if (src.startsWith("/")) {
+    return true;
+  }
+
+  try {
+    return nextOptimizedImageHosts.has(new URL(src).hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function SafeImage({
   alt,
   fallback = null,
@@ -68,7 +96,7 @@ export function SafeImage({
         setFailedSrc(normalizedSrc);
       }}
       src={normalizedSrc}
-      unoptimized={unoptimized ?? normalizedSrc.startsWith("/")}
+      unoptimized={unoptimized ?? !canUseNextImageOptimizer(normalizedSrc)}
       {...imageProps}
     />
   );

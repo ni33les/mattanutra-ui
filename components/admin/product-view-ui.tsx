@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import type { AdminProductRow } from "@/lib/admin-products";
 import {
   adminLocalizedFallbackLabel,
@@ -23,6 +22,7 @@ import {
   adminLocaleTextClass,
   classNames,
 } from "@/components/admin/dashboard-shared";
+import { SafeImage } from "@/components/safe-image";
 import {
   productBusinessState,
   productBusinessStateClass,
@@ -736,9 +736,14 @@ export function ProductCard({
     <>
       <div className="flex gap-4">
         {row.imageUrl ? (
-          <Image
+          <SafeImage
             alt=""
             className="size-20 rounded-lg object-cover ring-1 ring-gray-200"
+            fallback={
+              <div className="flex size-20 items-center justify-center rounded-lg bg-gray-50 text-xs font-semibold text-gray-400 ring-1 ring-gray-200">
+                {row.platform.toUpperCase()}
+              </div>
+            }
             height={80}
             src={row.imageUrl}
             width={80}

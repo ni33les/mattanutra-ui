@@ -227,6 +227,9 @@ describe("image hardening", () => {
     assert.match(source, /`https:\/\/\$\{value\.slice\("http:\/\/"\.length\)\}`/);
     assert.match(source, /www\.megawecare\.co\.th\/wp-content\/uploads/);
     assert.match(source, /i0\.wp\.com\/www\.megawecare\.co\.th\/wp-content\/uploads/);
+    assert.match(source, /nextOptimizedImageHosts/);
+    assert.match(source, /canUseNextImageOptimizer/);
+    assert.match(source, /unoptimized=\{unoptimized \?\? !canUseNextImageOptimizer\(normalizedSrc\)\}/);
     assert.match(source, /failedSrc === normalizedSrc/);
     assert.match(source, /onError=\{\(event\) => \{/);
     assert.match(source, /setFailedSrc\(normalizedSrc\)/);
