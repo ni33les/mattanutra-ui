@@ -60,8 +60,12 @@ import {
   getAdminRetailStockData
 } from "@/lib/admin-retail-stock";
 import {
-  emptyAdminRecommendationInsightsData,
-  getAdminRecommendationInsightsData
+  emptyAdminFoodImprovementInsightsData,
+  emptyAdminProductImprovementInsightsData,
+  emptyAdminSupplementImprovementInsightsData,
+  getAdminFoodImprovementInsightsData,
+  getAdminProductImprovementInsightsData,
+  getAdminSupplementImprovementInsightsData
 } from "@/lib/admin-recommendation-insights";
 import {
   emptyCampaignsData,
@@ -215,17 +219,21 @@ export default async function LocalizedAdminDashboardPage({
   let communicationsData = emptyCommunicationsData();
   let data = emptyAdminDashboardData(range);
   let financialsData = emptyFinancials(range);
+  let foodImprovementInsightsData = emptyAdminFoodImprovementInsightsData(range);
   let retailFinancialsData = emptyAdminRetailFinancialsData(range);
   let foodsData = emptyAdminFoodsData();
   let flowData = emptyFlow(range);
   let leadsData = emptyLeadsData();
   let productsData = emptyAdminProductsData();
+  let productImprovementInsightsData =
+    emptyAdminProductImprovementInsightsData(range);
   let panyaData = emptyAdminPanyaData();
   let retailStockData = emptyAdminRetailStockData();
-  let recommendationInsightsData = emptyAdminRecommendationInsightsData(range);
   let reviewQueueData = emptyAdminReviewQueueData();
   let settingsData: AdminSettingsData | null = null;
   let supplementsData = emptyAdminSupplementsData();
+  let supplementImprovementInsightsData =
+    emptyAdminSupplementImprovementInsightsData(range);
   let visibilityData = emptyVisibilityData();
 
   if (
@@ -292,17 +300,15 @@ export default async function LocalizedAdminDashboardPage({
     } else {
       retailStockData = await getAdminRetailStockData(adminContext, locale);
     }
-  } else if (
-    view === "out-of-catalog-insights" ||
-    view === "product-insights" ||
-    view === "supplement-insights"
-  ) {
-    recommendationInsightsData = await getAdminRecommendationInsightsData(
-      range,
-      locale
-    );
-    productsData = await getAdminProductsData(range);
-    supplementsData = await getAdminSupplementsData(range);
+  } else if (view === "food-insights") {
+    foodImprovementInsightsData =
+      await getAdminFoodImprovementInsightsData(range, locale);
+  } else if (view === "product-insights") {
+    productImprovementInsightsData =
+      await getAdminProductImprovementInsightsData(range, locale);
+  } else if (view === "supplement-insights") {
+    supplementImprovementInsightsData =
+      await getAdminSupplementImprovementInsightsData(range, locale);
   } else if (view === "coverage-improvement-insights") {
     coverageImprovementInsightsData =
       await getAdminCoverageImprovementInsightsData(range, locale);
@@ -333,23 +339,25 @@ export default async function LocalizedAdminDashboardPage({
       communicationsData={communicationsData}
       data={data}
       financialsData={financialsData}
+      foodImprovementInsightsData={foodImprovementInsightsData}
       foodsData={foodsData}
       filters={filters}
       flowData={flowData}
       leadsData={leadsData}
       locale={locale}
       productsData={productsData}
+      productImprovementInsightsData={productImprovementInsightsData}
       panyaData={panyaData}
       panyaSection={panyaSection}
       retailFinancialsData={retailFinancialsData}
       retailStockData={retailStockData}
-      recommendationInsightsData={recommendationInsightsData}
       reviewQueueData={reviewQueueData}
       selectedRetailCustomerOrderId={selectedRetailCustomerOrderId}
       selectedReviewTaskId={selectedReviewTaskId}
       selectedTaskId={selectedTaskId}
       settingsData={settingsData}
       supplementsData={supplementsData}
+      supplementImprovementInsightsData={supplementImprovementInsightsData}
       visibilityData={visibilityData}
       view={view}
     />

@@ -81,6 +81,36 @@ await sql`create index if not exists product_recommendation_decisions_product_id
 await sql`create index if not exists product_recommendation_decisions_run_idx on public.product_recommendation_decisions (run_id, outcome)`;
 
 await sql`
+  create table if not exists public.improvement_external_product_candidate_cache (
+    id uuid default gen_random_uuid() not null primary key,
+    query text not null check (btrim(query) <> ''),
+    country_code text default 'TH' not null check (country_code ~ '^[A-Z]{2}$'),
+    source text default 'marketplace_adapters' not null check (btrim(source) <> ''),
+    diagnostics jsonb default '[]'::jsonb not null,
+    products jsonb default '[]'::jsonb not null,
+    generated_at timestamptz default now() not null,
+    expires_at timestamptz not null,
+    created_at timestamptz default now() not null,
+    updated_at timestamptz default now() not null,
+    unique (query, country_code, source)
+  )
+`;
+await sql`create index if not exists improvement_external_product_candidate_cache_lookup_idx on public.improvement_external_product_candidate_cache (query, country_code, expires_at desc)`;
+await sql`create index if not exists improvement_external_product_candidate_cache_expiry_idx on public.improvement_external_product_candidate_cache (expires_at desc)`;
+
+await sql`
+  alter table public.product_recommendation_items
+    add column if not exists selected_retailer_organisation_id uuid,
+    add column if not exists retail_sellable_product_id uuid,
+    add column if not exists availability_status text,
+    add column if not exists unit_price_amount numeric,
+    add column if not exists price_source text,
+    add column if not exists eta_date date,
+    add column if not exists image_url text,
+    add column if not exists unknown_at_recommendation boolean default false not null
+`;
+
+await sql`
   alter table public.product_recommendation_decisions
     add column if not exists selected_retailer_organisation_id uuid,
     add column if not exists retail_sellable_product_id uuid,

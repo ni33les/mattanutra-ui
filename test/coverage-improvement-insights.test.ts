@@ -7,11 +7,8 @@ import {
   buildLeastMatchedSupplements,
   classifyMasterListOpportunity,
   coverageDistribution,
-  coverageImprovementAiPromptInput,
   emptyAdminCoverageImprovementInsightsData,
-  fallbackExternalCandidateSuggestions,
-  medianCoveragePercent,
-  parseCoverageCandidateSuggestions
+  medianCoveragePercent
 } from "../lib/admin-coverage-improvement-insights.ts";
 import { adminViewPermission } from "../lib/admin-rbac.ts";
 
@@ -201,49 +198,24 @@ describe("product coverage improvement insights", () => {
     );
   });
 
-  it("keeps AI input aggregate-only and falls back to deterministic search phrases", () => {
-    const gap = {
-      affectedPlanCount: 4,
-      blockerMix: [{ count: 4, reason: "No active Thai sellable" }],
-      country: "TH",
-      demandPlanCount: 8,
-      gapScore: 220,
-      id: "zinc",
-      lastSeenAt: timestamp,
-      lowCoveragePlanCount: 3,
-      matchRatePercent: 50,
-      matchedPlanCount: 4,
-      name: "Zinc",
-      nearMissProductTitles: ["Near Miss Zinc"],
-      unmatchedPlanCount: 4
-    };
-    const prompt = JSON.stringify(coverageImprovementAiPromptInput([gap]));
-    const fallback = fallbackExternalCandidateSuggestions([gap]);
-    const parsed = parseCoverageCandidateSuggestions(
-      JSON.stringify({
-        suggestions: [
-          {
-            candidateProductOrSearchPhrase: "Zinc picolinate Thailand",
-            confidence: "medium",
-            evidenceRequired: ["FDA registration"],
-            likelyBrandOrSource: "Manufacturer site",
-            reviewPriority: "high",
-            supplementId: "zinc",
-            supplementName: "Zinc",
-            whyItMayHelp: "May cover a common unmatched need."
-          }
-        ]
-      })
+  it("keeps superficial candidate suggestions out of the overview cockpit", () => {
+    const readModel = readFileSync(
+      "lib/admin-coverage-improvement-insights.ts",
+      "utf8"
+    );
+    const view = readFileSync(
+      "components/admin/coverage-improvement-insights-view.tsx",
+      "utf8"
     );
 
-    assert.doesNotMatch(prompt, /low@example\.com/i);
-    assert.doesNotMatch(prompt, /11111111-1111/);
-    assert.match(prompt, /No active Thai sellable/);
+    assert.doesNotMatch(readModel, /fallbackExternalCandidateSuggestions/);
+    assert.doesNotMatch(readModel, /candidateProductOrSearchPhrase/);
+    assert.doesNotMatch(readModel, /Thailand supplement product for/);
+    assert.doesNotMatch(view, /externalCandidateSuggestions/);
     assert.equal(
-      fallback[0]?.candidateProductOrSearchPhrase,
-      "Thailand supplement product for Zinc"
+      "aiStatus" in emptyAdminCoverageImprovementInsightsData("week"),
+      false
     );
-    assert.equal(parsed[0]?.reviewPriority, "high");
   });
 
   it("exposes CSV export fields for plans and least-matched supplements", () => {

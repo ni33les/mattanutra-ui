@@ -4,12 +4,6 @@ import {
 } from "@/lib/admin-dashboard-data";
 import { getSql } from "@/lib/db";
 import type { ProductRecommendationRefreshReason } from "@/lib/formulation-types";
-import {
-  callGrokChatCompletion,
-  configuredGrokModel,
-  configuredGrokValue,
-  getRequiredXaiApiKey
-} from "@/lib/grok-client";
 import type { Locale } from "@/lib/i18n";
 import {
   productRecommendationRefreshReason
@@ -18,12 +12,6 @@ import {
 export const LOW_COVERAGE_THRESHOLD_PERCENT = 75;
 
 export type CoverageFreshnessState = "fresh" | "missing" | "stale";
-
-export type CoverageImprovementAiStatus =
-  | "disabled"
-  | "fallback"
-  | "generated"
-  | "unavailable";
 
 export type MasterListOpportunityType =
   | "approved_not_sellable"
@@ -101,22 +89,9 @@ export type MasterListOpportunity = Readonly<{
   supplementSignals: string[];
 }>;
 
-export type ExternalCandidateSuggestion = Readonly<{
-  candidateProductOrSearchPhrase: string;
-  confidence: "fallback" | "high" | "low" | "medium";
-  evidenceRequired: string[];
-  likelyBrandOrSource: string;
-  reviewPriority: "high" | "low" | "medium";
-  supplementId: string;
-  supplementName: string;
-  whyItMayHelp: string;
-}>;
-
 export type AdminCoverageImprovementInsightsData = Readonly<{
-  aiStatus: CoverageImprovementAiStatus;
   coverageDistribution: CoverageDistributionBucket[];
   databaseAvailable: boolean;
-  externalCandidateSuggestions: ExternalCandidateSuggestion[];
   filters: {
     countries: string[];
     freshnessStates: CoverageFreshnessState[];
@@ -225,10 +200,8 @@ export function emptyAdminCoverageImprovementInsightsData(
   databaseAvailable = false
 ): AdminCoverageImprovementInsightsData {
   return {
-    aiStatus: "unavailable",
     coverageDistribution: coverageDistribution([]),
     databaseAvailable,
-    externalCandidateSuggestions: [],
     filters: {
       countries: [],
       freshnessStates: [],
@@ -1094,178 +1067,6 @@ async function loadMasterListOpportunities(
   });
 }
 
-export function coverageImprovementAiPromptInput(
-  gaps: readonly LeastMatchedSupplementInsight[]
-) {
-  return {
-    constraints: [
-      "Return JSON only with a suggestions array.",
-      "Use aggregate supplement gap signals only.",
-      "Do not include customer names, emails, plan IDs, or other PII.",
-      "Do not diagnose or make medical claims.",
-      "Suggest products or search phrases that an admin can review, not automatic actions."
-    ],
-    gaps: gaps.slice(0, 8).map((gap) => ({
-      affectedPlanCount: gap.affectedPlanCount,
-      blockerMix: gap.blockerMix,
-      country: gap.country,
-      currentNearMissProductTitles: gap.nearMissProductTitles,
-      demandPlanCount: gap.demandPlanCount,
-      matchRatePercent: gap.matchRatePercent,
-      supplementId: gap.id,
-      supplementName: gap.name
-    }))
-  };
-}
-
-export function fallbackExternalCandidateSuggestions(
-  gaps: readonly LeastMatchedSupplementInsight[]
-): ExternalCandidateSuggestion[] {
-  return gaps.slice(0, 8).map((gap) => ({
-    candidateProductOrSearchPhrase: `Thailand supplement product for ${gap.name}`,
-    confidence: "fallback",
-    evidenceRequired: [
-      "Thai FDA or manufacturer regulatory evidence",
-      "Pack size and dosage facts",
-      "Reliable product image and retail availability"
-    ],
-    likelyBrandOrSource: "Official manufacturer catalogue or Thai pharmacy listing",
-    reviewPriority:
-      gap.lowCoveragePlanCount >= 5 || gap.affectedPlanCount >= 10 ? "high" : "medium",
-    supplementId: gap.id,
-    supplementName: gap.name,
-    whyItMayHelp: `${gap.name} appears in ${gap.affectedPlanCount} unmatched plan${gap.affectedPlanCount === 1 ? "" : "s"}.`
-  }));
-}
-
-function safeAiText(value: unknown, maxLength = 180) {
-  const text = cleanText(value)
-    ?.replace(/[`*_#>]/g, "")
-    .replace(/\s+/g, " ");
-
-  if (!text) {
-    return null;
-  }
-
-  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}...` : text;
-}
-
-function safeConfidence(value: unknown): ExternalCandidateSuggestion["confidence"] {
-  return value === "high" || value === "medium" || value === "low"
-    ? value
-    : "fallback";
-}
-
-function safePriority(value: unknown): ExternalCandidateSuggestion["reviewPriority"] {
-  return value === "high" || value === "low" ? value : "medium";
-}
-
-export function parseCoverageCandidateSuggestions(
-  value: string | null | undefined
-): ExternalCandidateSuggestion[] {
-  if (!value) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    const suggestions = asArray(asRecord(parsed).suggestions);
-
-    return suggestions.flatMap((item): ExternalCandidateSuggestion[] => {
-      const record = asRecord(item);
-      const supplementId = safeAiText(record.supplementId, 80);
-      const supplementName = safeAiText(record.supplementName, 80);
-      const candidateProductOrSearchPhrase = safeAiText(
-        record.candidateProductOrSearchPhrase ?? record.candidate,
-        160
-      );
-
-      if (!supplementId || !supplementName || !candidateProductOrSearchPhrase) {
-        return [];
-      }
-
-      return [
-        {
-          candidateProductOrSearchPhrase,
-          confidence: safeConfidence(record.confidence),
-          evidenceRequired: uniqueStrings(
-            asArray(record.evidenceRequired)
-              .map((entry) => safeAiText(entry, 100))
-              .filter((entry): entry is string => Boolean(entry)),
-            4
-          ),
-          likelyBrandOrSource:
-            safeAiText(record.likelyBrandOrSource ?? record.source, 120) ??
-            "Review source",
-          reviewPriority: safePriority(record.reviewPriority),
-          supplementId,
-          supplementName,
-          whyItMayHelp:
-            safeAiText(record.whyItMayHelp ?? record.why, 180) ??
-            "Could improve product coverage after review."
-        }
-      ];
-    });
-  } catch {
-    return [];
-  }
-}
-
-async function generateCandidateSuggestions(
-  gaps: readonly LeastMatchedSupplementInsight[]
-): Promise<{
-  aiStatus: CoverageImprovementAiStatus;
-  suggestions: ExternalCandidateSuggestion[];
-}> {
-  const fallback = fallbackExternalCandidateSuggestions(gaps);
-
-  if (gaps.length < 1) {
-    return { aiStatus: "unavailable", suggestions: [] };
-  }
-
-  if (process.env.COVERAGE_IMPROVEMENT_AI_ENABLED === "false") {
-    return { aiStatus: "disabled", suggestions: fallback };
-  }
-
-  try {
-    const model = configuredGrokModel(
-      process.env.COVERAGE_IMPROVEMENT_AI_MODEL,
-      process.env.GROK_MODEL
-    );
-    const completion = await callGrokChatCompletion({
-      apiKey: getRequiredXaiApiKey(),
-      maxTokens: 1600,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You help pharmacy catalogue admins identify aggregate product sourcing opportunities from product coverage gaps. Return strict JSON."
-        },
-        {
-          role: "user",
-          content: coverageImprovementAiPromptInput(gaps)
-        }
-      ],
-      model,
-      purpose: "coverage improvement candidate suggestions",
-      reasoningEffort:
-        configuredGrokValue(process.env.COVERAGE_IMPROVEMENT_REASONING_EFFORT) ||
-        "none",
-      temperature: 0.25,
-      timeoutMs: 8_000
-    });
-    const suggestions = parseCoverageCandidateSuggestions(
-      completion.choices?.[0]?.message?.content
-    );
-
-    return suggestions.length > 0
-      ? { aiStatus: "generated", suggestions }
-      : { aiStatus: "fallback", suggestions: fallback };
-  } catch {
-    return { aiStatus: "fallback", suggestions: fallback };
-  }
-}
-
 function buildFilters(
   plans: readonly CoverageImprovementPlan[],
   supplements: readonly LeastMatchedSupplementInsight[]
@@ -1342,13 +1143,10 @@ export async function getAdminCoverageImprovementInsightsData(
           second.lastActivityAt.localeCompare(first.lastActivityAt)
       );
     const coverageValues = plans.map((plan) => plan.coveragePercent);
-    const ai = await generateCandidateSuggestions(leastMatchedSupplements);
 
     return {
-      aiStatus: ai.aiStatus,
       coverageDistribution: coverageDistribution(plans),
       databaseAvailable,
-      externalCandidateSuggestions: ai.suggestions,
       filters: buildFilters(plans, leastMatchedSupplements),
       generatedAt: new Date().toISOString(),
       leastMatchedSupplements,

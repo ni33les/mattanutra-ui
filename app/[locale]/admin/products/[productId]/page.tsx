@@ -35,7 +35,9 @@ import { emptyAdminFoodsData } from "@/lib/admin-foods";
 import { getAdminProductsData } from "@/lib/admin-products";
 import { emptyAdminRetailStockData } from "@/lib/admin-retail-stock";
 import {
-  emptyAdminRecommendationInsightsData
+  emptyAdminFoodImprovementInsightsData,
+  emptyAdminProductImprovementInsightsData,
+  emptyAdminSupplementImprovementInsightsData
 } from "@/lib/admin-recommendation-insights";
 import { emptyAdminReviewQueueData } from "@/lib/admin-review-queue";
 import { emptyAdminSupplementsData } from "@/lib/admin-supplements";
@@ -162,6 +164,7 @@ export default async function ProductDetailPage({
       communicationsData={emptyCommunicationsData()}
       data={data}
       financialsData={emptyFinancials(range)}
+      foodImprovementInsightsData={emptyAdminFoodImprovementInsightsData(range)}
       filters={filters}
       flowData={emptyFlow(range)}
       foodsData={emptyAdminFoodsData()}
@@ -170,16 +173,17 @@ export default async function ProductDetailPage({
       panyaData={emptyAdminPanyaData()}
       panyaSection="conversations"
       productsData={productsData}
+      productImprovementInsightsData={emptyAdminProductImprovementInsightsData(range)}
       productDetailId={productId}
       retailFinancialsData={emptyAdminRetailFinancialsData(range)}
       retailStockData={emptyAdminRetailStockData()}
-      recommendationInsightsData={emptyAdminRecommendationInsightsData(range)}
       reviewQueueData={emptyAdminReviewQueueData()}
       selectedRetailCustomerOrderId={null}
       selectedReviewTaskId={null}
       selectedTaskId={null}
       settingsData={settingsData}
       supplementsData={emptyAdminSupplementsData()}
+      supplementImprovementInsightsData={emptyAdminSupplementImprovementInsightsData(range)}
       visibilityData={emptyVisibilityData()}
       view="products"
     />

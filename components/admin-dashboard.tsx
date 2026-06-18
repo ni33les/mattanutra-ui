@@ -46,7 +46,9 @@ import type {
   AdminRetailStockData
 } from "@/lib/admin-retail-stock";
 import type {
-  AdminRecommendationInsightsData
+  AdminFoodImprovementInsightsData,
+  AdminProductImprovementInsightsData,
+  AdminSupplementImprovementInsightsData
 } from "@/lib/admin-recommendation-insights";
 import type {
   AdminCampaignsData,
@@ -105,7 +107,11 @@ import {
   AdminProductsView
 } from "@/components/admin/product-view";
 import { AdminVisibilityView } from "@/components/admin/visibility-view";
-import { AdminRecommendationInsightsView } from "@/components/admin/recommendation-insights-view";
+import {
+  AdminFoodImprovementInsightsView,
+  AdminProductImprovementInsightsView,
+  AdminSupplementImprovementInsightsView
+} from "@/components/admin/recommendation-insights-view";
 import { AdminDrawer } from "@/components/admin/ui";
 
 const sessionRoleLabels = {
@@ -221,16 +227,18 @@ function adminViewDatabaseAvailable({
   communicationsData,
   data,
   financialsData,
+  foodImprovementInsightsData,
   foodsData,
   flowData,
   leadsData,
   panyaData,
   productsData,
+  productImprovementInsightsData,
   retailFinancialsData,
   retailStockData,
-  recommendationInsightsData,
   reviewQueueData,
   supplementsData,
+  supplementImprovementInsightsData,
   visibilityData,
   view
 }: Readonly<{
@@ -244,16 +252,18 @@ function adminViewDatabaseAvailable({
   communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
   financialsData: AdminFinancialsData;
+  foodImprovementInsightsData: AdminFoodImprovementInsightsData;
   foodsData: AdminFoodsData;
   flowData: AdminFlowData;
   leadsData: AdminLeadsData;
   panyaData: AdminPanyaData;
   productsData: AdminProductsData;
+  productImprovementInsightsData: AdminProductImprovementInsightsData;
   retailFinancialsData: AdminRetailFinancialsData;
   retailStockData: AdminRetailStockData;
-  recommendationInsightsData: AdminRecommendationInsightsData;
   reviewQueueData: AdminReviewQueueData;
   supplementsData: AdminSupplementsData;
+  supplementImprovementInsightsData: AdminSupplementImprovementInsightsData;
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
 }>) {
@@ -350,12 +360,16 @@ function adminViewDatabaseAvailable({
     return retailStockData.databaseAvailable;
   }
 
-  if (
-    view === "out-of-catalog-insights" ||
-    view === "product-insights" ||
-    view === "supplement-insights"
-  ) {
-    return recommendationInsightsData.databaseAvailable;
+  if (view === "food-insights") {
+    return foodImprovementInsightsData.databaseAvailable;
+  }
+
+  if (view === "product-insights") {
+    return productImprovementInsightsData.databaseAvailable;
+  }
+
+  if (view === "supplement-insights") {
+    return supplementImprovementInsightsData.databaseAvailable;
   }
 
   if (view === "reviews") {
@@ -386,6 +400,7 @@ export function AdminDashboard({
   communicationsData,
   data,
   financialsData,
+  foodImprovementInsightsData,
   foodsData,
   filters,
   flowData,
@@ -395,15 +410,16 @@ export function AdminDashboard({
   panyaSection,
   productDetailId,
   productsData,
+  productImprovementInsightsData,
   retailFinancialsData,
   retailStockData,
-  recommendationInsightsData,
   reviewQueueData,
   selectedRetailCustomerOrderId,
   selectedReviewTaskId,
   selectedTaskId,
   settingsData,
   supplementsData,
+  supplementImprovementInsightsData,
   visibilityData,
   view
 }: Readonly<{
@@ -419,6 +435,7 @@ export function AdminDashboard({
   communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
   financialsData: AdminFinancialsData;
+  foodImprovementInsightsData: AdminFoodImprovementInsightsData;
   foodsData: AdminFoodsData;
   filters: AdminDashboardFilters;
   flowData: AdminFlowData;
@@ -428,15 +445,16 @@ export function AdminDashboard({
   panyaSection: "configuration" | "conversations";
   productDetailId?: string | null;
   productsData: AdminProductsData;
+  productImprovementInsightsData: AdminProductImprovementInsightsData;
   retailFinancialsData: AdminRetailFinancialsData;
   retailStockData: AdminRetailStockData;
-  recommendationInsightsData: AdminRecommendationInsightsData;
   reviewQueueData: AdminReviewQueueData;
   selectedRetailCustomerOrderId?: string | null;
   selectedReviewTaskId?: string | null;
   selectedTaskId?: string | null;
   settingsData: AdminSettingsData | null;
   supplementsData: AdminSupplementsData;
+  supplementImprovementInsightsData: AdminSupplementImprovementInsightsData;
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
 }>) {
@@ -461,7 +479,7 @@ export function AdminDashboard({
       view === "glance" ||
       view === "leads" ||
       view === "panya" ||
-      view === "out-of-catalog-insights" ||
+      view === "food-insights" ||
       view === "product-insights" ||
       view === "retail-financials" ||
       view === "settlements" ||
@@ -516,16 +534,18 @@ export function AdminDashboard({
     communicationsData,
     data,
     financialsData,
+    foodImprovementInsightsData,
     foodsData,
     flowData,
     leadsData,
     panyaData,
     productsData,
+    productImprovementInsightsData,
     retailFinancialsData,
     retailStockData,
-    recommendationInsightsData,
     reviewQueueData,
     supplementsData,
+    supplementImprovementInsightsData,
     visibilityData: liveVisibilityData,
     view
   });
@@ -850,19 +870,20 @@ export function AdminDashboard({
               selectedRetailCustomerOrderId={selectedRetailCustomerOrderId}
               view={view}
             />
-          ) : view === "out-of-catalog-insights" ||
-            view === "product-insights" ||
-            view === "supplement-insights" ? (
-            <AdminRecommendationInsightsView
-              data={recommendationInsightsData}
+          ) : view === "food-insights" ? (
+            <AdminFoodImprovementInsightsView
+              data={foodImprovementInsightsData}
               locale={locale}
-              mode={
-                view === "product-insights"
-                  ? "products"
-                  : view === "out-of-catalog-insights"
-                    ? "out-of-catalog"
-                    : "supplements"
-              }
+            />
+          ) : view === "product-insights" ? (
+            <AdminProductImprovementInsightsView
+              data={productImprovementInsightsData}
+              locale={locale}
+            />
+          ) : view === "supplement-insights" ? (
+            <AdminSupplementImprovementInsightsView
+              data={supplementImprovementInsightsData}
+              locale={locale}
             />
           ) : view === "supplements" ? (
             <AdminSupplementsView

@@ -84,6 +84,7 @@ drop table if exists
   public.product_facts,
   public.product_import_runs,
   public.product_imports,
+  public.improvement_external_product_candidate_cache,
   public.product_regulatory_approvals,
   public.product_recommendation_decisions,
   public.product_recommendation_items,
@@ -1916,6 +1917,22 @@ CREATE TABLE public.product_recommendation_runs (
     generated_at timestamp with time zone DEFAULT now() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT product_recommendation_runs_status_check CHECK ((status = ANY (ARRAY['completed'::text, 'failed'::text, 'partial'::text])))
+);
+
+CREATE TABLE public.improvement_external_product_candidate_cache (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    query text NOT NULL,
+    country_code text DEFAULT 'TH'::text NOT NULL,
+    source text DEFAULT 'marketplace_adapters'::text NOT NULL,
+    diagnostics jsonb DEFAULT '[]'::jsonb NOT NULL,
+    products jsonb DEFAULT '[]'::jsonb NOT NULL,
+    generated_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT improvement_external_product_candidate_cache_country_check CHECK ((country_code ~ '^[A-Z]{2}$'::text)),
+    CONSTRAINT improvement_external_product_candidate_cache_query_check CHECK ((btrim(query) <> ''::text)),
+    CONSTRAINT improvement_external_product_candidate_cache_source_check CHECK ((btrim(source) <> ''::text))
 );
 
 
@@ -3792,6 +3809,22 @@ ALTER TABLE ONLY public.product_recommendation_runs
 
 
 --
+-- Name: improvement_external_product_candidate_cache improvement_external_product_candidate_cache_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.improvement_external_product_candidate_cache
+    ADD CONSTRAINT improvement_external_product_candidate_cache_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: improvement_external_product_candidate_cache improvement_external_product_candidate_cache_query_country_source_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.improvement_external_product_candidate_cache
+    ADD CONSTRAINT improvement_external_product_candidate_cache_query_country_source_key UNIQUE (query, country_code, source);
+
+
+--
 -- Name: product_versions product_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5253,6 +5286,20 @@ CREATE INDEX product_recommendation_decisions_run_idx ON public.product_recommen
 --
 
 CREATE INDEX product_recommendation_runs_plan_idx ON public.product_recommendation_runs USING btree (plan_id, generated_at DESC);
+
+
+--
+-- Name: improvement_external_product_candidate_cache_expiry_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX improvement_external_product_candidate_cache_expiry_idx ON public.improvement_external_product_candidate_cache USING btree (expires_at DESC);
+
+
+--
+-- Name: improvement_external_product_candidate_cache_lookup_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX improvement_external_product_candidate_cache_lookup_idx ON public.improvement_external_product_candidate_cache USING btree (query, country_code, expires_at DESC);
 
 
 --

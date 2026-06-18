@@ -680,12 +680,12 @@
       "view": "supplement-insights"
     },
     {
-      "name": "目录外",
-      "view": "out-of-catalog-insights"
-    },
-    {
       "name": "产品",
       "view": "product-insights"
+    },
+    {
+      "name": "食品改进",
+      "view": "food-insights"
     }
   ],
   "insightsTitle": "洞察",
@@ -722,6 +722,7 @@
     "customer-insights": "客户洞察",
     "communications": "通信",
     "financials": "财务",
+    "food-insights": "食品改进",
     "foods": "食品",
     "flow": "转化",
     "glance": "仪表盘",
@@ -730,7 +731,6 @@
     "organisations": "组织",
     "people": "人员",
     "panya": "Panya",
-    "out-of-catalog-insights": "目录外洞察",
     "product-insights": "产品洞察",
     "products": "产品",
     "retail-customer-orders": "客户订单",

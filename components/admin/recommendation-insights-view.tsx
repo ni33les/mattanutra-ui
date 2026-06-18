@@ -1,86 +1,43 @@
 "use client";
 
+import {
+  useMemo,
+  useState
+} from "react";
+import type { ReactNode } from "react";
 import type { Locale } from "@/lib/i18n";
 import type {
-  AdminRecommendationInsightsData,
-  InsightBucketRow,
-  InsightRankRow
+  AdminFoodImprovementInsightsData,
+  AdminProductImprovementInsightsData,
+  AdminSupplementImprovementInsightsData,
+  ExternalProductCandidate,
+  FoodOpportunityInsight,
+  ImprovementListStatus,
+  PlanCoverageComparison,
+  ProductOpportunityInsight,
+  SupplementDemandInsight
 } from "@/lib/admin-recommendation-insights";
 import {
   BusinessStatsGrid,
-  BusinessTrendChart,
   businessMetricColors,
   type BusinessMetric
 } from "@/components/admin/dashboard-shared";
 
-type BaseLocale = Exclude<Locale, "zh-CN">;
+type TableColumn<T> = Readonly<{
+  label: string;
+  value: (row: T) => string;
+}>;
 
-const baseLabels = {
-  en: {
-    coverage: "Coverage",
-    doseBuckets: "Dose buckets",
-    empty: "No recommendation insight data is available for this timeframe.",
-    nearMisses: "Near misses",
-    noDoseBuckets: "No dose buckets are available for this timeframe.",
-    outOfCatalog: "Out-of-catalog",
-    outOfCatalogStatus: "Review status",
-    productOutcomes: "Product outcomes",
-    products: "Products",
-    rejectionReasons: "Rejection reasons",
-    safetyHidden: "Safety hidden",
-    servingBuckets: "Serving multipliers",
-    supplements: "Supplements",
-    topChosenProducts: "Top chosen products",
-    topSupplements: "Top supplement needs",
-    trendProducts: "Chosen products",
-    trendSupplements: "Supplement needs",
-    unmatched: "Unmatched supplements"
-  },
-  th: {
-    coverage: "ความครอบคลุม",
-    doseBuckets: "กลุ่มขนาดรับประทาน",
-    empty: "ยังไม่มีข้อมูลเชิงลึกของคำแนะนำในช่วงเวลานี้",
-    nearMisses: "สินค้าที่เกือบถูกเลือก",
-    noDoseBuckets: "ยังไม่มีกลุ่มขนาดรับประทานในช่วงเวลานี้",
-    outOfCatalog: "นอกแคตตาล็อก",
-    outOfCatalogStatus: "สถานะรีวิว",
-    productOutcomes: "ผลลัพธ์สินค้า",
-    products: "สินค้า",
-    rejectionReasons: "เหตุผลที่ไม่เลือก",
-    safetyHidden: "ซ่อนเพื่อความปลอดภัย",
-    servingBuckets: "จำนวนเสิร์ฟ",
-    supplements: "อาหารเสริม",
-    topChosenProducts: "สินค้าที่ถูกเลือกมากที่สุด",
-    topSupplements: "ความต้องการอาหารเสริมสูงสุด",
-    trendProducts: "สินค้าที่ถูกเลือก",
-    trendSupplements: "ความต้องการอาหารเสริม",
-    unmatched: "อาหารเสริมที่ยังไม่จับคู่"
-  }
-} satisfies Record<BaseLocale, Record<string, string>>;
-
-const labels = {
-  ...baseLabels,
-  "zh-CN": {
-    coverage: "覆盖率",
-    doseBuckets: "剂量分组",
-    empty: "此时间范围内没有推荐洞察数据。",
-    nearMisses: "接近入选",
-    noDoseBuckets: "此时间范围内没有剂量分组。",
-    outOfCatalog: "目录外补充剂",
-    outOfCatalogStatus: "审核状态",
-    productOutcomes: "产品结果",
-    products: "产品",
-    rejectionReasons: "未选原因",
-    safetyHidden: "因安全隐藏",
-    servingBuckets: "服用倍数",
-    supplements: "补充剂",
-    topChosenProducts: "最常入选产品",
-    topSupplements: "最高补充剂需求",
-    trendProducts: "入选产品",
-    trendSupplements: "补充剂需求",
-    unmatched: "未匹配补充剂"
-  }
-} satisfies Record<Locale, Record<string, string>>;
+const statusLabels: Record<ImprovementListStatus, string> = {
+  active: "Active",
+  banned: "Banned",
+  blocked: "Blocked",
+  ignored: "Ignored",
+  inactive: "Inactive",
+  missing: "Missing",
+  review_required: "Review",
+  unknown: "Unknown"
+};
 
 function formatNumber(value: number, locale: Locale) {
   return new Intl.NumberFormat(
@@ -88,400 +45,723 @@ function formatNumber(value: number, locale: Locale) {
   ).format(value);
 }
 
-function RankList({
-  emptyLabel,
-  locale,
-  rows,
+function formatPercent(value: number | null | undefined, locale: Locale) {
+  if (value === null || value === undefined) {
+    return "n/a";
+  }
+
+  return `${formatNumber(Math.round(value), locale)}%`;
+}
+
+function csvEscape(value: string) {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(filename: string, rows: readonly string[][]) {
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvRows<T>(columns: readonly TableColumn<T>[], rows: readonly T[]) {
+  return [
+    columns.map((column) => column.label),
+    ...rows.map((row) => columns.map((column) => column.value(row)))
+  ];
+}
+
+function Section({
+  action,
+  children,
+  eyebrow,
   title
 }: Readonly<{
-  emptyLabel: string;
-  locale: Locale;
-  rows: InsightRankRow[];
+  action?: ReactNode;
+  children: ReactNode;
+  eyebrow?: string;
   title: string;
 }>) {
-  const max = Math.max(1, ...rows.map((row) => row.count));
-
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-      <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-      <div className="mt-5 space-y-4">
-        {rows.length > 0 ? (
-          rows.map((row, index) => (
-            <div key={`${row.id}:${row.label}:${index}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-gray-900">
-                    {row.label}
-                  </p>
-                  {row.secondaryLabel ? (
-                    <p className="mt-0.5 truncate text-xs text-gray-500">
-                      {row.secondaryLabel}
-                    </p>
-                  ) : null}
-                </div>
-                <p className="text-sm font-semibold text-gray-900">
-                  {formatNumber(row.count, locale)}
-                </p>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
-                <div
-                  className="h-full rounded-full bg-[#1FA77A]"
-                  style={{ width: `${Math.max(4, (row.count / max) * 100)}%` }}
-                />
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-sm text-gray-500">{emptyLabel}</p>
-        )}
+    <section className="rounded-md bg-white p-4 shadow-sm ring-1 ring-gray-200 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          {eyebrow ? (
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#1FA77A]">
+              {eyebrow}
+            </p>
+          ) : null}
+          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+        </div>
+        {action}
       </div>
+      <div className="mt-4">{children}</div>
     </section>
   );
 }
 
-function BucketPanel({
-  emptyLabel,
-  locale,
-  rows,
-  title
+function CsvButton({
+  filename,
+  rows
 }: Readonly<{
-  emptyLabel: string;
-  locale: Locale;
-  rows: InsightBucketRow[];
-  title: string;
+  filename: string;
+  rows: readonly string[][];
 }>) {
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-      <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {rows.length > 0 ? (
-          rows.map((row) => (
-            <span
-              className="inline-flex max-w-full items-center gap-2 rounded-full bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200"
-              key={`${row.parentLabel ?? ""}:${row.label}`}
-            >
-              <span className="truncate">
-                {row.parentLabel ? `${row.parentLabel}: ` : ""}
-                {row.label}
-              </span>
-              <span className="text-gray-400">
-                {formatNumber(row.count, locale)}
-              </span>
-            </span>
-          ))
-        ) : (
-          <p className="text-sm text-gray-500">{emptyLabel}</p>
-        )}
-      </div>
-    </section>
+    <button
+      className="inline-flex items-center rounded-md bg-[#20343A] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#16252A]"
+      onClick={() => downloadCsv(filename, rows)}
+      type="button"
+    >
+      Export CSV
+    </button>
   );
 }
 
-function DoseBucketChart({
-  emptyLabel,
-  locale,
-  rows,
-  title
+function SelectFilter({
+  label,
+  onChange,
+  options,
+  value
 }: Readonly<{
-  emptyLabel: string;
-  locale: Locale;
-  rows: InsightBucketRow[];
-  title: string;
+  label: string;
+  onChange: (value: string) => void;
+  options: readonly string[];
+  value: string;
 }>) {
-  const grouped = rows.reduce<Map<string, InsightBucketRow[]>>((map, row) => {
-    const parent = row.parentLabel || "Other";
-    const list = map.get(parent) ?? [];
-
-    list.push(row);
-    map.set(parent, list);
-
-    return map;
-  }, new Map());
-  const groups = [...grouped.entries()]
-    .map(([supplement, buckets]) => ({
-      buckets: [...buckets].sort(
-        (first, second) =>
-          second.count - first.count || first.label.localeCompare(second.label)
-      ),
-      supplement,
-      total: buckets.reduce((sum, bucket) => sum + bucket.count, 0)
-    }))
-    .sort(
-      (first, second) =>
-        second.total - first.total ||
-        first.supplement.localeCompare(second.supplement)
-    );
-  const maxBucketCount = Math.max(
-    1,
-    ...groups.flatMap((group) => group.buckets.map((bucket) => bucket.count))
-  );
-
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-        {groups.length > 0 ? (
-          <p className="text-xs font-medium text-gray-400">
-            {formatNumber(rows.reduce((sum, row) => sum + row.count, 0), locale)}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="mt-5 space-y-6">
-        {groups.length > 0 ? (
-          groups.map((group) => (
-            <div key={group.supplement}>
-              <div className="flex items-center justify-between gap-3">
-                <p className="min-w-0 truncate text-sm font-semibold text-gray-900">
-                  {group.supplement}
-                </p>
-                <p className="shrink-0 text-xs font-semibold text-gray-400">
-                  {formatNumber(group.total, locale)}
-                </p>
-              </div>
-              <div className="mt-3 space-y-2">
-                {group.buckets.map((bucket) => (
-                  <div
-                    className="grid grid-cols-[minmax(5rem,9rem)_1fr_auto] items-center gap-3"
-                    key={`${group.supplement}:${bucket.label}`}
-                  >
-                    <p className="truncate text-xs font-medium text-gray-500">
-                      {bucket.label}
-                    </p>
-                    <div className="h-2.5 overflow-hidden rounded-full bg-gray-100">
-                      <div
-                        className="h-full rounded-full bg-[#1FA77A]"
-                        style={{
-                          width: `${Math.max(5, (bucket.count / maxBucketCount) * 100)}%`
-                        }}
-                      />
-                    </div>
-                    <p className="text-xs font-semibold tabular-nums text-gray-700">
-                      {formatNumber(bucket.count, locale)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-sm text-gray-500">{emptyLabel}</p>
-        )}
-      </div>
-    </section>
+    <label className="flex min-w-[12rem] flex-col gap-1 text-xs font-semibold text-gray-500">
+      {label}
+      <select
+        className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm"
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      >
+        <option value="all">All</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
-export function AdminRecommendationInsightsView({
-  data,
-  locale,
-  mode
+function StatusPill({
+  status
 }: Readonly<{
-  data: AdminRecommendationInsightsData;
-  locale: Locale;
-  mode: "out-of-catalog" | "products" | "supplements";
+  status: ImprovementListStatus;
 }>) {
-  const copy = labels[locale];
-  const supplementMode = mode === "supplements";
-  const outOfCatalogMode = mode === "out-of-catalog";
-  const hasRows = outOfCatalogMode
-    ? data.outOfCatalogSupplements.length > 0
-    : supplementMode
-      ? data.supplementTop.length > 0
-      : data.productTopChosen.length > 0 || data.productTopNearMisses.length > 0;
-  const metrics: BusinessMetric[] = outOfCatalogMode
-    ? [
-        {
-          color: businessMetricColors.failed,
-          id: "outOfCatalogSupplements",
-          label: copy.outOfCatalog,
-          series: [],
-          value: formatNumber(data.summary.outOfCatalogSupplements, locale)
-        },
-        {
-          color: businessMetricColors.medium,
-          id: "safetyHiddenSupplements",
-          label: copy.safetyHidden,
-          series: [],
-          value: formatNumber(data.summary.safetyHiddenSupplements, locale)
-        },
-        {
-          color: businessMetricColors.total,
-          id: "supplementNeeds",
-          label: copy.trendSupplements,
-          series: data.trend.supplementChosen,
-          value: formatNumber(data.summary.chosenSupplementPlans, locale)
-        }
-      ]
-    : supplementMode
-    ? [
-        {
-          color: businessMetricColors.total,
-          id: "supplementNeeds",
-          label: copy.trendSupplements,
-          series: data.trend.supplementChosen,
-          value: formatNumber(data.summary.chosenSupplementPlans, locale)
-        },
-        {
-          color: businessMetricColors.medium,
-          id: "safetyHiddenSupplements",
-          label: copy.safetyHidden,
-          series: [],
-          value: formatNumber(data.summary.safetyHiddenSupplements, locale)
-        },
-        {
-          color: businessMetricColors.failed,
-          id: "unmatchedSupplements",
-          label: copy.unmatched,
-          series: [],
-          value: formatNumber(data.summary.unmatchedSupplements, locale)
-        }
-      ]
-    : [
-        {
-          color: businessMetricColors.succeeded,
-          id: "chosenProducts",
-          label: copy.trendProducts,
-          series: data.trend.productChosen,
-          value: formatNumber(data.summary.chosenProductPlans, locale)
-        },
-        {
-          color: businessMetricColors.medium,
-          id: "nearMissProducts",
-          label: copy.nearMisses,
-          series: [],
-          value: formatNumber(data.summary.nearMissProducts, locale)
-        },
-        {
-          color: businessMetricColors.failed,
-          id: "rejectedProducts",
-          label: copy.rejectionReasons,
-          series: [],
-          value: formatNumber(data.summary.rejectedProducts, locale)
-        }
-      ];
-  const trendMetric: BusinessMetric = {
-    color:
-      supplementMode || outOfCatalogMode
-        ? businessMetricColors.total
-        : businessMetricColors.succeeded,
-    id: "trend",
-    label:
-      supplementMode || outOfCatalogMode
-        ? copy.trendSupplements
-        : copy.trendProducts,
-    series:
-      supplementMode || outOfCatalogMode
-        ? data.trend.supplementChosen
-        : data.trend.productChosen,
-    value: formatNumber(
-      supplementMode || outOfCatalogMode
-        ? data.summary.chosenSupplementPlans
-        : data.summary.chosenProductPlans,
-      locale
-    )
+  const colors: Record<ImprovementListStatus, string> = {
+    active: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    banned: "bg-red-50 text-red-700 ring-red-200",
+    blocked: "bg-amber-50 text-amber-800 ring-amber-200",
+    ignored: "bg-gray-100 text-gray-700 ring-gray-200",
+    inactive: "bg-gray-100 text-gray-700 ring-gray-200",
+    missing: "bg-rose-50 text-rose-700 ring-rose-200",
+    review_required: "bg-sky-50 text-sky-700 ring-sky-200",
+    unknown: "bg-gray-100 text-gray-700 ring-gray-200"
   };
 
   return (
-    <div className="mt-8">
+    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ring-1 ${colors[status]}`}>
+      {statusLabels[status]}
+    </span>
+  );
+}
+
+function EmptyState({ label }: Readonly<{ label: string }>) {
+  return (
+    <div className="rounded-md border border-dashed border-gray-300 p-6 text-sm text-gray-500">
+      {label}
+    </div>
+  );
+}
+
+function DistributionBars<T>({
+  labelFor,
+  locale,
+  rows,
+  valueFor
+}: Readonly<{
+  labelFor: (row: T) => string;
+  locale: Locale;
+  rows: readonly T[];
+  valueFor: (row: T) => number;
+}>) {
+  const max = Math.max(1, ...rows.map(valueFor));
+
+  return (
+    <div className="space-y-3">
+      {rows.length > 0 ? rows.map((row) => {
+        const value = valueFor(row);
+
+        return (
+          <div
+            className="grid grid-cols-[minmax(8rem,16rem)_1fr_auto] items-center gap-3"
+            key={labelFor(row)}
+          >
+            <p className="truncate text-sm font-semibold text-gray-800">
+              {labelFor(row)}
+            </p>
+            <div className="h-3 overflow-hidden rounded-full bg-gray-100">
+              <div
+                className="h-full rounded-full bg-[#1FA77A]"
+                style={{ width: `${Math.max(4, (value / max) * 100)}%` }}
+              />
+            </div>
+            <p className="text-sm font-semibold tabular-nums text-gray-700">
+              {formatNumber(value, locale)}
+            </p>
+          </div>
+        );
+      }) : (
+        <EmptyState label="No distribution data is available for this timeframe." />
+      )}
+    </div>
+  );
+}
+
+const supplementColumns: TableColumn<SupplementDemandInsight>[] = [
+  { label: "supplement", value: (row) => row.name },
+  { label: "status", value: (row) => row.listStatus },
+  { label: "category", value: (row) => row.category ?? "" },
+  { label: "recommendations", value: (row) => String(row.recommendationCount) },
+  { label: "add", value: (row) => String(row.addCount) },
+  { label: "review", value: (row) => String(row.reviewCount) },
+  { label: "covered", value: (row) => String(row.coveredCount) },
+  { label: "hidden", value: (row) => String(row.hiddenCount) },
+  { label: "last_recommended_at", value: (row) => row.lastRecommendedAt ?? "" }
+];
+
+export function AdminSupplementImprovementInsightsView({
+  data,
+  locale
+}: Readonly<{
+  data: AdminSupplementImprovementInsightsData;
+  locale: Locale;
+}>) {
+  const [status, setStatus] = useState("all");
+  const [category, setCategory] = useState("all");
+  const filtered = useMemo(
+    () =>
+      data.distribution.filter((row) =>
+        (status === "all" || row.listStatus === status) &&
+        (category === "all" || row.category === category)
+      ),
+    [category, data.distribution, status]
+  );
+  const metrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "recommendations",
+      label: "Recommendation demand",
+      series: [],
+      value: formatNumber(data.summary.totalRecommendations, locale)
+    },
+    {
+      color: businessMetricColors.succeeded,
+      id: "active",
+      label: "Active supplements",
+      series: [],
+      value: formatNumber(data.summary.activeSupplementsRecommended, locale)
+    },
+    {
+      color: businessMetricColors.failed,
+      id: "missing",
+      label: "Missing from list",
+      series: [],
+      value: formatNumber(data.summary.missingSupplements, locale)
+    },
+    {
+      color: businessMetricColors.medium,
+      id: "blocked",
+      label: "Blocked or hidden demand",
+      series: [],
+      value: formatNumber(data.summary.blockedOrHiddenRecommendations, locale)
+    }
+  ];
+
+  return (
+    <div className="mt-8 space-y-6">
       <BusinessStatsGrid metrics={metrics} />
 
-      {!hasRows ? (
-        <div className="mt-6 rounded-2xl bg-white p-6 text-sm text-gray-500 shadow-sm ring-1 ring-gray-200">
-          {copy.empty}
-        </div>
-      ) : null}
-
-      {data.trend.bucketLabels.length > 0 ? (
-        <BusinessTrendChart
-          bucketLabels={data.trend.bucketLabels}
-          locale={locale}
-          metric={trendMetric}
+      <div className="flex flex-wrap gap-3">
+        <SelectFilter
+          label="Status"
+          onChange={setStatus}
+          options={data.filters.listStatuses.map((item) => item)}
+          value={status}
         />
-      ) : null}
+        <SelectFilter
+          label="Category"
+          onChange={setCategory}
+          options={data.filters.categories}
+          value={category}
+        />
+      </div>
 
-      {outOfCatalogMode ? (
-        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <RankList
-            emptyLabel={copy.empty}
-            locale={locale}
-            rows={data.outOfCatalogSupplements}
-            title={copy.outOfCatalog}
+      <Section
+        action={
+          <CsvButton
+            filename="supplement-improvement-gaps.csv"
+            rows={csvRows(supplementColumns, filtered)}
           />
-          <BucketPanel
-            emptyLabel={copy.empty}
-            locale={locale}
-            rows={data.outOfCatalogSupplementStatusMix}
-            title={copy.outOfCatalogStatus}
+        }
+        eyebrow="AI demand"
+        title="Supplement Recommendations Across The Managed List"
+      >
+        <DistributionBars
+          labelFor={(row) => row.name}
+          locale={locale}
+          rows={filtered.slice(0, 30)}
+          valueFor={(row) => row.recommendationCount}
+        />
+      </Section>
+
+      <Section
+        action={
+          <CsvButton
+            filename="supplements-missing-blocked-review.csv"
+            rows={csvRows(supplementColumns, data.missingOrBlocked)}
           />
+        }
+        eyebrow="Action list"
+        title="Recommended By AI But Not Cleanly Usable"
+      >
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th className="py-2 pr-4">Supplement</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Demand</th>
+                <th className="py-2 pr-4">Add</th>
+                <th className="py-2 pr-4">Review</th>
+                <th className="py-2 pr-4">Hidden</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {data.missingOrBlocked.length > 0 ? data.missingOrBlocked.map((row) => (
+                <tr key={row.id}>
+                  <td className="py-3 pr-4 font-semibold text-gray-900">{row.name}</td>
+                  <td className="py-3 pr-4"><StatusPill status={row.listStatus} /></td>
+                  <td className="py-3 pr-4">{formatNumber(row.recommendationCount, locale)}</td>
+                  <td className="py-3 pr-4">{formatNumber(row.addCount, locale)}</td>
+                  <td className="py-3 pr-4">{formatNumber(row.reviewCount, locale)}</td>
+                  <td className="py-3 pr-4">{formatNumber(row.hiddenCount, locale)}</td>
+                </tr>
+              )) : (
+                <tr>
+                  <td className="py-4 text-gray-500" colSpan={6}>
+                    No missing, blocked, hidden, or review-only supplement demand.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      ) : supplementMode ? (
-        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <RankList
-            emptyLabel={copy.empty}
-            locale={locale}
-            rows={data.supplementTop}
-            title={copy.topSupplements}
-          />
-          <DoseBucketChart
-            emptyLabel={copy.noDoseBuckets}
-            locale={locale}
-            rows={data.supplementDoseBuckets}
-            title={copy.doseBuckets}
-          />
-          <BucketPanel
-            emptyLabel={copy.empty}
-            locale={locale}
-            rows={data.supplementStatusMix}
-            title={copy.supplements}
-          />
-          <RankList
-            emptyLabel={copy.empty}
-            locale={locale}
-            rows={data.unmatchedSupplements}
-            title={copy.unmatched}
-          />
+      </Section>
+    </div>
+  );
+}
+
+const productOpportunityColumns: TableColumn<ProductOpportunityInsight>[] = [
+  { label: "product", value: (row) => row.title },
+  { label: "type", value: (row) => row.opportunityType },
+  { label: "plan_count", value: (row) => String(row.planCount) },
+  { label: "recommendation_count", value: (row) => String(row.recommendationCount) },
+  { label: "retailer_count", value: (row) => String(row.retailerCount) },
+  { label: "average_coverage_percent", value: (row) => String(row.averageCoveragePercent ?? "") },
+  { label: "signals", value: (row) => row.supplementSignals.join("; ") },
+  { label: "blocker", value: (row) => row.blockerReason ?? "" },
+  { label: "action", value: (row) => row.action }
+];
+
+const planComparisonColumns: TableColumn<PlanCoverageComparison>[] = [
+  { label: "plan_id", value: (row) => row.planId },
+  { label: "first_name", value: (row) => row.firstName ?? "" },
+  { label: "email", value: (row) => row.contactEmail ?? "" },
+  { label: "selected_plan", value: (row) => row.selectedPlan ?? "" },
+  { label: "current_coverage_percent", value: (row) => String(row.currentCoveragePercent) },
+  { label: "optimum_coverage_percent", value: (row) => String(row.optimumCoveragePercent) },
+  { label: "optimum_delta_percent", value: (row) => String(row.optimumDeltaPercent) },
+  { label: "current_products", value: (row) => row.currentProducts.join("; ") },
+  { label: "optimum_products", value: (row) => row.optimumProducts.map((item) => item.title).join("; ") },
+  { label: "unmatched_supplements", value: (row) => row.unmatchedSupplements.join("; ") }
+];
+
+function ProductCandidateList({
+  candidates,
+  locale
+}: Readonly<{
+  candidates: readonly ExternalProductCandidate[];
+  locale: Locale;
+}>) {
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {candidates.length > 0 ? candidates.map((candidate, index) => (
+        <div
+          className="grid grid-cols-[4.5rem_1fr] gap-3 rounded-md border border-gray-200 p-3"
+          key={`${candidate.query}:${candidate.productUrl ?? index}`}
+        >
+          <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center overflow-hidden rounded-md bg-gray-100">
+            {candidate.imageUrl ? (
+              <img
+                alt=""
+                className="h-full w-full object-cover"
+                src={candidate.imageUrl}
+              />
+            ) : (
+              <span className="text-xs font-semibold text-gray-400">No image</span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#1FA77A]">
+                {candidate.matchedGapName}
+              </p>
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+                {candidate.searchStatus}
+              </span>
+            </div>
+            {candidate.title ? (
+              <a
+                className="mt-1 block text-sm font-semibold text-gray-900 hover:text-[#126B4F]"
+                href={candidate.productUrl ?? "#"}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {candidate.title}
+              </a>
+            ) : (
+              <p className="mt-1 text-sm font-semibold text-gray-900">
+                Search unavailable: {candidate.query}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              {[candidate.platform, candidate.brandName].filter(Boolean).join(" · ") ||
+                "Marketplace adapters returned no product snapshot."}
+            </p>
+            {candidate.priceAmount !== null ? (
+              <p className="mt-2 text-xs font-semibold text-gray-700">
+                THB {formatNumber(Math.round(candidate.priceAmount), locale)}
+              </p>
+            ) : null}
+          </div>
         </div>
-      ) : (
-        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <RankList
-            emptyLabel={copy.empty}
-            locale={locale}
-            rows={data.productTopChosen}
-            title={copy.topChosenProducts}
-          />
-          <BucketPanel
-            emptyLabel={copy.empty}
-            locale={locale}
-            rows={data.productServingBuckets}
-            title={copy.servingBuckets}
-          />
-          <RankList
-            emptyLabel={copy.empty}
-            locale={locale}
-            rows={data.productTopNearMisses}
-            title={copy.nearMisses}
-          />
-          <RankList
-            emptyLabel={copy.empty}
-            locale={locale}
-            rows={data.unmetOrCoveredNeeds}
-            title={copy.coverage}
-          />
-          <BucketPanel
-            emptyLabel={copy.empty}
-            locale={locale}
-            rows={data.productOutcomeMix}
-            title={copy.productOutcomes}
-          />
-          <BucketPanel
-            emptyLabel={copy.empty}
-            locale={locale}
-            rows={data.productRejectionReasons}
-            title={copy.rejectionReasons}
-          />
-        </div>
+      )) : (
+        <EmptyState label="No external candidate searches have been generated yet." />
       )}
+    </div>
+  );
+}
+
+export function AdminProductImprovementInsightsView({
+  data,
+  locale
+}: Readonly<{
+  data: AdminProductImprovementInsightsData;
+  locale: Locale;
+}>) {
+  const [type, setType] = useState("all");
+  const types = [...new Set(data.masterListOpportunities.map((row) => row.opportunityType))];
+  const filtered = data.masterListOpportunities.filter((row) =>
+    type === "all" || row.opportunityType === type
+  );
+  const metrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "opportunities",
+      label: "Master-list opportunities",
+      series: [],
+      value: formatNumber(data.summary.masterListOpportunityCount, locale)
+    },
+    {
+      color: businessMetricColors.medium,
+      id: "retailBlockers",
+      label: "Retail blockers",
+      series: [],
+      value: formatNumber(data.summary.retailBlockerCount, locale)
+    },
+    {
+      color: businessMetricColors.failed,
+      id: "lowCoverage",
+      label: "Low coverage plans",
+      series: [],
+      value: formatNumber(data.summary.lowCoveragePlans, locale)
+    },
+    {
+      color: businessMetricColors.succeeded,
+      id: "optimumDelta",
+      label: "Avg optimum delta",
+      series: [],
+      value: formatPercent(data.summary.optimumAverageDeltaPercent, locale)
+    }
+  ];
+
+  return (
+    <div className="mt-8 space-y-6">
+      <BusinessStatsGrid metrics={metrics} />
+
+      <div className="flex flex-wrap gap-3">
+        <SelectFilter
+          label="Opportunity"
+          onChange={setType}
+          options={types}
+          value={type}
+        />
+      </div>
+
+      <Section
+        action={
+          <CsvButton
+            filename="product-master-list-opportunities.csv"
+            rows={csvRows(productOpportunityColumns, filtered)}
+          />
+        }
+        eyebrow="Retail coverage"
+        title="Products That Would Best Fill Recommendation Gaps"
+      >
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th className="py-2 pr-4">Product</th>
+                <th className="py-2 pr-4">Type</th>
+                <th className="py-2 pr-4">Plans</th>
+                <th className="py-2 pr-4">Avg fit</th>
+                <th className="py-2 pr-4">Signals</th>
+                <th className="py-2 pr-4">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.length > 0 ? filtered.map((row) => (
+                <tr key={`${row.productId}:${row.opportunityType}`}>
+                  <td className="max-w-sm py-3 pr-4 font-semibold text-gray-900">{row.title}</td>
+                  <td className="py-3 pr-4 text-xs font-semibold text-gray-600">{row.opportunityType}</td>
+                  <td className="py-3 pr-4">{formatNumber(row.planCount, locale)}</td>
+                  <td className="py-3 pr-4">{formatPercent(row.averageCoveragePercent, locale)}</td>
+                  <td className="py-3 pr-4 text-gray-600">{row.supplementSignals.join(", ") || "n/a"}</td>
+                  <td className="max-w-sm py-3 pr-4 text-gray-600">{row.action}</td>
+                </tr>
+              )) : (
+                <tr>
+                  <td className="py-4 text-gray-500" colSpan={6}>
+                    No product opportunities are available for this timeframe.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      <Section
+        eyebrow="Wider search"
+        title="Real External Product Candidates Not Yet In The Master List"
+      >
+        <ProductCandidateList candidates={data.externalCandidates} locale={locale} />
+      </Section>
+
+      <Section
+        action={
+          <CsvButton
+            filename="product-plan-current-vs-optimum.csv"
+            rows={csvRows(planComparisonColumns, data.planComparisons)}
+          />
+        }
+        eyebrow="Exact plans"
+        title="Available Recommendation Vs Best Master-List Candidate"
+      >
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th className="py-2 pr-4">Customer / plan</th>
+                <th className="py-2 pr-4">Current</th>
+                <th className="py-2 pr-4">Optimum</th>
+                <th className="py-2 pr-4">Delta</th>
+                <th className="py-2 pr-4">Optimum candidates</th>
+                <th className="py-2 pr-4">Unmatched</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {data.planComparisons.length > 0 ? data.planComparisons.map((row) => (
+                <tr key={row.planId}>
+                  <td className="max-w-xs py-3 pr-4">
+                    <p className="font-semibold text-gray-900">{row.firstName ?? "Unknown"}</p>
+                    <p className="text-xs text-gray-500">{row.contactEmail ?? row.planId}</p>
+                  </td>
+                  <td className="py-3 pr-4">{formatPercent(row.currentCoveragePercent, locale)}</td>
+                  <td className="py-3 pr-4">{formatPercent(row.optimumCoveragePercent, locale)}</td>
+                  <td className="py-3 pr-4 font-semibold text-[#126B4F]">{formatPercent(row.optimumDeltaPercent, locale)}</td>
+                  <td className="max-w-md py-3 pr-4 text-gray-600">
+                    {row.optimumProducts.map((item) => item.title).join(", ") || "n/a"}
+                  </td>
+                  <td className="max-w-md py-3 pr-4 text-gray-600">
+                    {row.unmatchedSupplements.join(", ") || "n/a"}
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td className="py-4 text-gray-500" colSpan={6}>
+                    No current-vs-optimum plan comparisons are available.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+const foodColumns: TableColumn<FoodOpportunityInsight>[] = [
+  { label: "food", value: (row) => row.foodName },
+  { label: "status", value: (row) => row.listStatus },
+  { label: "recommendations", value: (row) => String(row.recommendationCount) },
+  { label: "plans", value: (row) => String(row.planCount) },
+  { label: "blocked_plans", value: (row) => String(row.blockedPlanCount) },
+  { label: "missing_profile", value: (row) => String(row.missingProfile) },
+  { label: "gap_signals", value: (row) => row.gapSignals.join("; ") }
+];
+
+export function AdminFoodImprovementInsightsView({
+  data,
+  locale
+}: Readonly<{
+  data: AdminFoodImprovementInsightsData;
+  locale: Locale;
+}>) {
+  const metrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "foodsRecommended",
+      label: "Food recommendations",
+      series: [],
+      value: formatNumber(data.summary.foodsRecommended, locale)
+    },
+    {
+      color: businessMetricColors.succeeded,
+      id: "uniqueFoods",
+      label: "Unique foods",
+      series: [],
+      value: formatNumber(data.summary.uniqueFoods, locale)
+    },
+    {
+      color: businessMetricColors.medium,
+      id: "missingProfiles",
+      label: "Missing nutrient profiles",
+      series: [],
+      value: formatNumber(data.summary.missingNutrientProfiles, locale)
+    },
+    {
+      color: businessMetricColors.failed,
+      id: "unknownFoods",
+      label: "Unknown foods",
+      series: [],
+      value: formatNumber(data.summary.unknownFoods, locale)
+    }
+  ];
+
+  return (
+    <div className="mt-8 space-y-6">
+      <BusinessStatsGrid metrics={metrics} />
+
+      <Section
+        action={
+          <CsvButton
+            filename="food-improvement-opportunities.csv"
+            rows={csvRows(foodColumns, data.foodOpportunities)}
+          />
+        }
+        eyebrow="Food support"
+        title="Foods To Improve Formula Outcomes"
+      >
+        <DistributionBars
+          labelFor={(row) => row.foodName}
+          locale={locale}
+          rows={data.foodOpportunities.slice(0, 30)}
+          valueFor={(row) => row.recommendationCount}
+        />
+      </Section>
+
+      <Section
+        title="Blocked, Missing Profile, Or Review-Needed Foods"
+      >
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th className="py-2 pr-4">Food</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Demand</th>
+                <th className="py-2 pr-4">Missing profile</th>
+                <th className="py-2 pr-4">Gap signals</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {data.foodOpportunities
+                .filter((row) => row.listStatus !== "active" || row.missingProfile)
+                .map((row) => (
+                  <tr key={row.foodId}>
+                    <td className="py-3 pr-4 font-semibold text-gray-900">{row.foodName}</td>
+                    <td className="py-3 pr-4"><StatusPill status={row.listStatus} /></td>
+                    <td className="py-3 pr-4">{formatNumber(row.recommendationCount, locale)}</td>
+                    <td className="py-3 pr-4">{row.missingProfile ? "Yes" : "No"}</td>
+                    <td className="max-w-lg py-3 pr-4 text-gray-600">{row.gapSignals.join(", ") || "n/a"}</td>
+                  </tr>
+                ))}
+              {data.foodOpportunities.filter((row) => row.listStatus !== "active" || row.missingProfile).length < 1 ? (
+                <tr>
+                  <td className="py-4 text-gray-500" colSpan={5}>
+                    No blocked or nutrient-profile food opportunities found.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      <Section title="Unknown Foods From Review Tasks">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th className="py-2 pr-4">Food</th>
+                <th className="py-2 pr-4">Count</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Last seen</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {data.unknownFoods.length > 0 ? data.unknownFoods.map((row) => (
+                <tr key={`${row.name}:${row.reviewStatus}`}>
+                  <td className="py-3 pr-4 font-semibold text-gray-900">{row.name}</td>
+                  <td className="py-3 pr-4">{formatNumber(row.count, locale)}</td>
+                  <td className="py-3 pr-4 text-gray-600">{row.reviewStatus}</td>
+                  <td className="py-3 pr-4 text-gray-600">{row.lastSeenAt ?? "n/a"}</td>
+                </tr>
+              )) : (
+                <tr>
+                  <td className="py-4 text-gray-500" colSpan={4}>
+                    No unknown food review tasks are visible for this timeframe.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Section>
     </div>
   );
 }

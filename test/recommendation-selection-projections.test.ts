@@ -40,36 +40,35 @@ describe("recommendation selection projections", () => {
     assert.match(schema, /price_source text/);
     assert.match(schema, /eta_date date/);
     assert.match(schema, /supplement_recommendation_selections/);
+    assert.match(schema, /improvement_external_product_candidate_cache/);
     assert.match(packageJson, /recommendation-insights:schema:apply/);
     assert.match(applyScript, /projectSupplementRecommendationSelections/);
     assert.match(applyScript, /productDecisionRowsFromStoredRun/);
+    assert.match(applyScript, /improvement_external_product_candidate_cache/);
     assert.match(applyScript, /add column if not exists selected_retailer_organisation_id uuid/);
     assert.match(dashboardContent, /insightsTitle/);
     assert.match(dashboardContent, /supplement-insights/);
-    assert.match(dashboardContent, /out-of-catalog-insights/);
     assert.match(dashboardContent, /product-insights/);
-    assert.match(adminDashboard, /AdminRecommendationInsightsView/);
-    assert.match(adminDashboard, /out-of-catalog/);
-    assert.match(recommendationInsights, /outOfCatalogSupplements/);
+    assert.match(dashboardContent, /food-insights/);
+    assert.match(adminDashboard, /AdminSupplementImprovementInsightsView/);
+    assert.match(adminDashboard, /AdminProductImprovementInsightsView/);
+    assert.match(adminDashboard, /AdminFoodImprovementInsightsView/);
+    assert.doesNotMatch(dashboardContent, /out-of-catalog-insights/);
+    assert.doesNotMatch(adminDashboard, /AdminRecommendationInsightsView/);
+    assert.doesNotMatch(recommendationInsights, /outOfCatalogSupplements/);
     assert.match(
       recommendationInsights,
       /supplement_recommendation_selections\.supplement_id is null/
     );
     assert.match(recommendationInsights, /left join public\.supplements/);
     assert.match(recommendationInsights, /supplements\.source_status/);
-    assert.match(recommendationInsights, /Non-core active/);
-    assert.match(recommendationInsights, /Missing catalogue match/);
-    assert.match(recommendationInsights, /Blocked or inactive/);
-    assert.match(recommendationInsights, /Hidden for review/);
+    assert.match(recommendationInsights, /review_required/);
+    assert.match(recommendationInsights, /missing/);
+    assert.match(recommendationInsights, /blocked/);
+    assert.match(recommendationInsights, /banned/);
     assert.match(recommendationInsights, /unknown_supplement/);
-    assert.match(
-      recommendationInsights,
-      /coalesce\(supplements\.source_status, 'core'\) <> 'core'/
-    );
-    assert.match(
-      recommendationInsights,
-      /coalesce\(supplements\.list_status, 'active'\) <> 'active'/
-    );
+    assert.match(recommendationInsights, /row\.source_status && row\.source_status !== "core"/);
+    assert.match(recommendationInsights, /row\.list_status === "blocked"/);
     assert.match(productSearch, /getRetailerAwareProductRecommendationCandidateSets/);
     assert.match(productSearch, /sellable\.status = 'active'/);
     assert.match(productSearch, /availableNow <= 0 && !backorderAllowed/);

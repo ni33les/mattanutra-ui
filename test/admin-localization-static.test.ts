@@ -551,9 +551,13 @@ test("admin DB object titles are rendered through localized translation helpers"
   assert.match(reviewQueueHelpers, /adminLocalizedFoodText\(food, locale\)/);
   assert.match(dashboard, /foodsData=\{foodsData\}/);
 
-  assert.match(dashboardPage, /getAdminRecommendationInsightsData\(\s*range,\s*locale\s*\)/);
+  assert.match(dashboardPage, /getAdminSupplementImprovementInsightsData\(range,\s*locale\)/);
+  assert.match(dashboardPage, /getAdminProductImprovementInsightsData\(range,\s*locale\)/);
+  assert.match(dashboardPage, /getAdminFoodImprovementInsightsData\(range,\s*locale\)/);
   assert.match(insights, /left join public\.product_translations/);
   assert.match(insights, /left join public\.supplement_translations/);
+  assert.match(insights, /left join public\.food_translations/);
   assert.match(insights, /product_translations\.locale = \$\{locale\}/);
   assert.match(insights, /supplement_translations\.locale = \$\{locale\}/);
+  assert.match(insights, /food_translations\.locale = \$\{locale\}/);
 });

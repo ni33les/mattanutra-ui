@@ -239,7 +239,7 @@ const adminViews = [
   "content",
   "coverage-improvement-insights",
   "customer-insights",
-  "out-of-catalog-insights",
+  "food-insights",
   "product-insights",
   "supplement-insights",
   "visibility",
@@ -350,6 +350,9 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
     view === "campaigns" ||
     view === "coverage-improvement-insights" ||
     view === "customer-insights" ||
+    view === "food-insights" ||
+    view === "product-insights" ||
+    view === "supplement-insights" ||
     view === "leads"
   ) {
     return "marketing.read";
@@ -373,10 +376,7 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
 
   if (
     view === "foods" ||
-    view === "out-of-catalog-insights" ||
-    view === "product-insights" ||
     view === "products" ||
-    view === "supplement-insights" ||
     view === "supplements"
   ) {
     return "catalogue.read";

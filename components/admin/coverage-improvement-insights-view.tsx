@@ -28,13 +28,9 @@ type FilterState = Readonly<{
 
 const labels = {
   en: {
-    aiFallback: "AI fallback",
-    aiGenerated: "AI generated",
-    aiUnavailable: "AI unavailable",
     all: "All",
     averageCoverage: "Average coverage",
     blockers: "Blockers",
-    candidates: "External candidate suggestions",
     coverage: "Coverage",
     coverageBand: "Coverage band",
     distribution: "Coverage distribution",
@@ -56,13 +52,9 @@ const labels = {
     underThreshold: "Plans below threshold"
   },
   th: {
-    aiFallback: "ใช้ข้อความสำรอง AI",
-    aiGenerated: "สร้างด้วย AI",
-    aiUnavailable: "AI ไม่พร้อมใช้งาน",
     all: "ทั้งหมด",
     averageCoverage: "ความครอบคลุมเฉลี่ย",
     blockers: "สาเหตุที่ติดขัด",
-    candidates: "คำแนะนำสินค้าภายนอก",
     coverage: "ความครอบคลุม",
     coverageBand: "ช่วงความครอบคลุม",
     distribution: "การกระจายความครอบคลุม",
@@ -84,13 +76,9 @@ const labels = {
     underThreshold: "แผนต่ำกว่าเกณฑ์"
   },
   "zh-CN": {
-    aiFallback: "AI 后备",
-    aiGenerated: "AI 已生成",
-    aiUnavailable: "AI 不可用",
     all: "全部",
     averageCoverage: "平均覆盖率",
     blockers: "阻碍",
-    candidates: "外部候选建议",
     coverage: "覆盖率",
     coverageBand: "覆盖区间",
     distribution: "覆盖率分布",
@@ -277,12 +265,6 @@ export function AdminCoverageImprovementInsightsView({
       value: formatNumber(data.summary.staleRecommendationRuns, locale)
     }
   ];
-  const aiStatus =
-    data.aiStatus === "generated"
-      ? copy.aiGenerated
-      : data.aiStatus === "fallback"
-        ? copy.aiFallback
-        : copy.aiUnavailable;
   const allOption = copy.all;
   const selectAllOption = "All";
   const freshnessOptions = [
@@ -308,7 +290,7 @@ export function AdminCoverageImprovementInsightsView({
             {copy.generated}: {formatGeneratedAt(data.generatedAt, locale)}
           </p>
           <p className="mt-1 text-sm text-gray-500">
-            {aiStatus} · {formatNumber(data.summary.totalPlans, locale)} plans
+            {formatNumber(data.summary.totalPlans, locale)} plans
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -463,7 +445,7 @@ export function AdminCoverageImprovementInsightsView({
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+      <div className="grid gap-6">
         <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
           <h2 className="text-base font-semibold text-gray-900">
             {copy.leastMatched}
@@ -505,34 +487,6 @@ export function AdminCoverageImprovementInsightsView({
           </div>
         </section>
 
-        <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-          <h2 className="text-base font-semibold text-gray-900">
-            {copy.candidates}
-          </h2>
-          <div className="mt-4 space-y-3">
-            {data.externalCandidateSuggestions.slice(0, 8).map((candidate) => (
-              <div
-                className="rounded-lg border border-gray-200 p-3"
-                key={`${candidate.supplementId}:${candidate.candidateProductOrSearchPhrase}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-900">
-                      {candidate.candidateProductOrSearchPhrase}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {candidate.supplementName} · {candidate.likelyBrandOrSource}
-                    </p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
-                    {candidate.reviewPriority}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-gray-600">{candidate.whyItMayHelp}</p>
-              </div>
-            ))}
-          </div>
-        </section>
       </div>
 
       <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
