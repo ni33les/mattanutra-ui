@@ -13,8 +13,10 @@ import type {
   ExternalProductCandidate,
   FoodOpportunityInsight,
   ImprovementListStatus,
+  MasterSupplementAvailabilityInsight,
   PlanCoverageComparison,
   ProductOpportunityInsight,
+  SupplementAvailabilityState,
   SupplementDemandInsight
 } from "@/lib/admin-recommendation-insights";
 import {
@@ -47,7 +49,7 @@ function formatNumber(value: number, locale: Locale) {
 
 function formatPercent(value: number | null | undefined, locale: Locale) {
   if (value === null || value === undefined) {
-    return "n/a";
+    return "No score";
   }
 
   return `${formatNumber(Math.round(value), locale)}%`;
@@ -180,6 +182,104 @@ function EmptyState({ label }: Readonly<{ label: string }>) {
   return (
     <div className="rounded-md border border-dashed border-gray-300 p-6 text-sm text-gray-500">
       {label}
+    </div>
+  );
+}
+
+const supplementAvailabilityLabels: Record<SupplementAvailabilityState, string> = {
+  covered: "Covered",
+  missing_master_product: "Find/import product",
+  missing_retail_product: "Retailers add product",
+  weak_master_product: "Weak master coverage",
+  weak_retail_product: "Weak retail coverage"
+};
+
+const supplementAvailabilityColors: Record<SupplementAvailabilityState, string> = {
+  covered: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  missing_master_product: "bg-rose-50 text-rose-700 ring-rose-200",
+  missing_retail_product: "bg-amber-50 text-amber-800 ring-amber-200",
+  weak_master_product: "bg-orange-50 text-orange-800 ring-orange-200",
+  weak_retail_product: "bg-yellow-50 text-yellow-800 ring-yellow-200"
+};
+
+function doseText(labels: readonly string[]) {
+  const usable = labels.filter((label) => label && label !== "Unparsed");
+
+  return usable.length > 0 ? usable.join(", ") : "Dose not captured";
+}
+
+function availabilityPill(state: SupplementAvailabilityState) {
+  return (
+    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ring-1 ${supplementAvailabilityColors[state]}`}>
+      {supplementAvailabilityLabels[state]}
+    </span>
+  );
+}
+
+function SupplementAvailabilityTable({
+  rows,
+  locale
+}: Readonly<{
+  rows: readonly MasterSupplementAvailabilityInsight[];
+  locale: Locale;
+}>) {
+  const gaps = rows.filter((row) => row.availabilityState !== "covered");
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200 text-sm">
+        <thead>
+          <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <th className="py-2 pr-4">Supplement</th>
+            <th className="py-2 pr-4">Status</th>
+            <th className="py-2 pr-4">Demand</th>
+            <th className="py-2 pr-4">Master list</th>
+            <th className="py-2 pr-4">Retail list</th>
+            <th className="py-2 pr-4">Action</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {gaps.length > 0 ? gaps.slice(0, 40).map((row) => (
+            <tr key={row.supplementId}>
+              <td className="max-w-xs py-3 pr-4">
+                <p className="font-semibold text-gray-900">{row.supplementName}</p>
+                <p className="mt-1 text-xs text-gray-500">{doseText(row.topDoseLabels)}</p>
+              </td>
+              <td className="py-3 pr-4">{availabilityPill(row.availabilityState)}</td>
+              <td className="py-3 pr-4 text-gray-600">
+                {formatNumber(row.affectedPlanCount, locale)} plans
+                {row.lowCoveragePlanCount > 0 ? (
+                  <span className="block text-xs text-rose-700">
+                    {formatNumber(row.lowCoveragePlanCount, locale)} low coverage
+                  </span>
+                ) : null}
+              </td>
+              <td className="py-3 pr-4 text-gray-600">
+                {formatNumber(row.masterProductCount, locale)} products
+                <span className="block text-xs text-gray-500">
+                  {formatNumber(row.masterProductsWithDoseCount, locale)} with dose facts
+                </span>
+              </td>
+              <td className="py-3 pr-4 text-gray-600">
+                {formatNumber(row.activeRetailerCount, locale)} retailers
+                <span className="block text-xs text-gray-500">
+                  {formatNumber(row.availableRetailerCount, locale)} stocked now
+                </span>
+              </td>
+              <td className="max-w-md py-3 pr-4 text-gray-600">
+                <p>{row.action}</p>
+                <p className="mt-1 text-xs text-gray-500">{row.rationale}</p>
+              </td>
+            </tr>
+          )) : (
+            <tr>
+              <td className="py-4 text-gray-500" colSpan={6}>
+                Master supplement coverage is resilient across the current Thailand retail catalogue.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -374,14 +474,16 @@ export function AdminSupplementImprovementInsightsView({
 
 const productOpportunityColumns: TableColumn<ProductOpportunityInsight>[] = [
   { label: "product", value: (row) => row.title },
-  { label: "type", value: (row) => row.opportunityType },
+  { label: "action_type", value: (row) => row.opportunityLabel },
   { label: "plan_count", value: (row) => String(row.planCount) },
   { label: "recommendation_count", value: (row) => String(row.recommendationCount) },
   { label: "retailer_count", value: (row) => String(row.retailerCount) },
   { label: "average_coverage_percent", value: (row) => String(row.averageCoveragePercent ?? "") },
   { label: "signals", value: (row) => row.supplementSignals.join("; ") },
+  { label: "top_doses", value: (row) => row.topDoseLabels.join("; ") },
   { label: "blocker", value: (row) => row.blockerReason ?? "" },
-  { label: "action", value: (row) => row.action }
+  { label: "action", value: (row) => row.action },
+  { label: "rationale", value: (row) => row.rationale }
 ];
 
 const planComparisonColumns: TableColumn<PlanCoverageComparison>[] = [
@@ -431,24 +533,32 @@ function ProductCandidateList({
                 {candidate.searchStatus}
               </span>
             </div>
-            {candidate.title ? (
-              <a
-                className="mt-1 block text-sm font-semibold text-gray-900 hover:text-[#126B4F]"
-                href={candidate.productUrl ?? "#"}
-                rel="noreferrer"
-                target="_blank"
-              >
-                {candidate.title}
-              </a>
-            ) : (
-              <p className="mt-1 text-sm font-semibold text-gray-900">
-                Search unavailable: {candidate.query}
-              </p>
-            )}
+            <a
+              className="mt-1 block text-sm font-semibold text-gray-900 hover:text-[#126B4F]"
+              href={candidate.productUrl ?? "#"}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {candidate.title ?? "Marketplace product for review"}
+            </a>
             <p className="mt-1 text-xs text-gray-500">
               {[candidate.platform, candidate.brandName].filter(Boolean).join(" · ") ||
                 "Marketplace adapters returned no product snapshot."}
             </p>
+            <p className="mt-2 text-xs text-gray-600">
+              {candidate.rationale}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              Gap: {candidate.matchedGapName}
+              {candidate.matchedDoseLabel ? ` · ${candidate.matchedDoseLabel}` : ""}
+              {" · "}
+              {formatNumber(candidate.affectedPlanCount, locale)} affected plans
+            </p>
+            {candidate.evidenceRequired.length > 0 ? (
+              <p className="mt-1 text-xs text-gray-500">
+                Evidence needed: {candidate.evidenceRequired.join(", ")}
+              </p>
+            ) : null}
             {candidate.priceAmount !== null ? (
               <p className="mt-2 text-xs font-semibold text-gray-700">
                 THB {formatNumber(Math.round(candidate.priceAmount), locale)}
@@ -479,7 +589,7 @@ export function AdminProductImprovementInsightsView({
     {
       color: businessMetricColors.total,
       id: "opportunities",
-      label: "Master-list opportunities",
+      label: "Retail add/restock actions",
       series: [],
       value: formatNumber(data.summary.masterListOpportunityCount, locale)
     },
@@ -498,6 +608,13 @@ export function AdminProductImprovementInsightsView({
       value: formatNumber(data.summary.lowCoveragePlans, locale)
     },
     {
+      color: businessMetricColors.failed,
+      id: "weakSupplements",
+      label: "Weak supplement coverage",
+      series: [],
+      value: formatNumber(data.summary.weakSupplementCount, locale)
+    },
+    {
       color: businessMetricColors.succeeded,
       id: "optimumDelta",
       label: "Avg optimum delta",
@@ -510,6 +627,32 @@ export function AdminProductImprovementInsightsView({
     <div className="mt-8 space-y-6">
       <BusinessStatsGrid metrics={metrics} />
 
+      <Section
+        action={
+          <CsvButton
+            filename="master-supplement-availability.csv"
+            rows={csvRows([
+              { label: "supplement", value: (row: MasterSupplementAvailabilityInsight) => row.supplementName },
+              { label: "status", value: (row) => row.availabilityState },
+              { label: "affected_plans", value: (row) => String(row.affectedPlanCount) },
+              { label: "low_coverage_plans", value: (row) => String(row.lowCoveragePlanCount) },
+              { label: "top_doses", value: (row) => row.topDoseLabels.join("; ") },
+              { label: "master_products", value: (row) => String(row.masterProductCount) },
+              { label: "dose_fact_products", value: (row) => String(row.masterProductsWithDoseCount) },
+              { label: "active_retailers", value: (row) => String(row.activeRetailerCount) },
+              { label: "stocked_retailers", value: (row) => String(row.availableRetailerCount) },
+              { label: "action", value: (row) => row.action },
+              { label: "rationale", value: (row) => row.rationale },
+              { label: "search_query", value: (row) => row.recommendedSearchQuery }
+            ], data.supplementAvailability)}
+          />
+        }
+        eyebrow="Master supplement coverage"
+        title="Master Supplement Availability Matrix"
+      >
+        <SupplementAvailabilityTable rows={data.supplementAvailability} locale={locale} />
+      </Section>
+
       <div className="flex flex-wrap gap-3">
         <SelectFilter
           label="Opportunity"
@@ -521,40 +664,52 @@ export function AdminProductImprovementInsightsView({
 
       <Section
         action={
-          <CsvButton
-            filename="product-master-list-opportunities.csv"
-            rows={csvRows(productOpportunityColumns, filtered)}
-          />
+          <div className="flex flex-wrap gap-2">
+            <CsvButton
+              filename="product-retail-add-restock-actions.csv"
+              rows={csvRows(productOpportunityColumns, filtered)}
+            />
+            <CsvButton
+              filename="product-secondary-review-blockers.csv"
+              rows={csvRows(productOpportunityColumns, data.reviewOpportunities)}
+            />
+          </div>
         }
         eyebrow="Retail coverage"
-        title="Products That Would Best Fill Recommendation Gaps"
+        title="Retail Products To Add Or Restock"
       >
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead>
               <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <th className="py-2 pr-4">Product</th>
-                <th className="py-2 pr-4">Type</th>
+                <th className="py-2 pr-4">Action</th>
                 <th className="py-2 pr-4">Plans</th>
                 <th className="py-2 pr-4">Avg fit</th>
-                <th className="py-2 pr-4">Signals</th>
-                <th className="py-2 pr-4">Action</th>
+                <th className="py-2 pr-4">Supplement / dose</th>
+                <th className="py-2 pr-4">Rationale</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.length > 0 ? filtered.map((row) => (
                 <tr key={`${row.productId}:${row.opportunityType}`}>
                   <td className="max-w-sm py-3 pr-4 font-semibold text-gray-900">{row.title}</td>
-                  <td className="py-3 pr-4 text-xs font-semibold text-gray-600">{row.opportunityType}</td>
+                  <td className="py-3 pr-4 text-xs font-semibold text-gray-600">{row.opportunityLabel}</td>
                   <td className="py-3 pr-4">{formatNumber(row.planCount, locale)}</td>
                   <td className="py-3 pr-4">{formatPercent(row.averageCoveragePercent, locale)}</td>
-                  <td className="py-3 pr-4 text-gray-600">{row.supplementSignals.join(", ") || "n/a"}</td>
-                  <td className="max-w-sm py-3 pr-4 text-gray-600">{row.action}</td>
+                  <td className="py-3 pr-4 text-gray-600">
+                    <p>{row.supplementSignals.join(", ") || "Supplement not recorded"}</p>
+                    <p className="mt-1 text-xs text-gray-500">{doseText(row.topDoseLabels)}</p>
+                  </td>
+                  <td className="max-w-md py-3 pr-4 text-gray-600">
+                    <p>{row.action}</p>
+                    <p className="mt-1 text-xs text-gray-500">{row.rationale}</p>
+                  </td>
                 </tr>
               )) : (
                 <tr>
                   <td className="py-4 text-gray-500" colSpan={6}>
-                    No product opportunities are available for this timeframe.
+                    No approved master-list products currently need retail add, reactivation, or restock action.
                   </td>
                 </tr>
               )}
@@ -565,7 +720,7 @@ export function AdminProductImprovementInsightsView({
 
       <Section
         eyebrow="Wider search"
-        title="Real External Product Candidates Not Yet In The Master List"
+        title="External Products To Review For Master List"
       >
         <ProductCandidateList candidates={data.externalCandidates} locale={locale} />
       </Section>
@@ -603,10 +758,10 @@ export function AdminProductImprovementInsightsView({
                   <td className="py-3 pr-4">{formatPercent(row.optimumCoveragePercent, locale)}</td>
                   <td className="py-3 pr-4 font-semibold text-[#126B4F]">{formatPercent(row.optimumDeltaPercent, locale)}</td>
                   <td className="max-w-md py-3 pr-4 text-gray-600">
-                    {row.optimumProducts.map((item) => item.title).join(", ") || "n/a"}
+                    {row.optimumProducts.map((item) => item.title).join(", ") || "No master-list candidate recorded"}
                   </td>
                   <td className="max-w-md py-3 pr-4 text-gray-600">
-                    {row.unmatchedSupplements.join(", ") || "n/a"}
+                    {row.unmatchedSupplements.join(", ") || "No unmatched supplements recorded"}
                   </td>
                 </tr>
               )) : (
@@ -717,7 +872,7 @@ export function AdminFoodImprovementInsightsView({
                     <td className="py-3 pr-4"><StatusPill status={row.listStatus} /></td>
                     <td className="py-3 pr-4">{formatNumber(row.recommendationCount, locale)}</td>
                     <td className="py-3 pr-4">{row.missingProfile ? "Yes" : "No"}</td>
-                    <td className="max-w-lg py-3 pr-4 text-gray-600">{row.gapSignals.join(", ") || "n/a"}</td>
+                    <td className="max-w-lg py-3 pr-4 text-gray-600">{row.gapSignals.join(", ") || "No gap signals recorded"}</td>
                   </tr>
                 ))}
               {data.foodOpportunities.filter((row) => row.listStatus !== "active" || row.missingProfile).length < 1 ? (
@@ -749,7 +904,7 @@ export function AdminFoodImprovementInsightsView({
                   <td className="py-3 pr-4 font-semibold text-gray-900">{row.name}</td>
                   <td className="py-3 pr-4">{formatNumber(row.count, locale)}</td>
                   <td className="py-3 pr-4 text-gray-600">{row.reviewStatus}</td>
-                  <td className="py-3 pr-4 text-gray-600">{row.lastSeenAt ?? "n/a"}</td>
+                  <td className="py-3 pr-4 text-gray-600">{row.lastSeenAt ?? "Not recorded"}</td>
                 </tr>
               )) : (
                 <tr>

@@ -6,6 +6,10 @@ import { getSql } from "@/lib/db";
 import type { ProductRecommendationRefreshReason } from "@/lib/formulation-types";
 import type { Locale } from "@/lib/i18n";
 import {
+  loadMasterSupplementAvailabilityInsights,
+  type MasterSupplementAvailabilityInsight
+} from "@/lib/admin-recommendation-insights";
+import {
   productRecommendationRefreshReason
 } from "@/lib/product-recommendation-freshness";
 
@@ -115,8 +119,10 @@ export type AdminCoverageImprovementInsightsData = Readonly<{
     medianCoveragePercent: number;
     missingRecommendationRuns: number;
     staleRecommendationRuns: number;
+    supplementAvailabilityGaps: number;
     totalPlans: number;
   };
+  supplementAvailability: MasterSupplementAvailabilityInsight[];
   thresholdPercent: number;
 }>;
 
@@ -126,6 +132,7 @@ type SchemaAvailability = Readonly<{
   organisations: boolean;
   productCountries: boolean;
   productDecisions: boolean;
+  productFacts: boolean;
   productItems: boolean;
   productRuns: boolean;
   products: boolean;
@@ -135,6 +142,7 @@ type SchemaAvailability = Readonly<{
   retailProductStock: boolean;
   retailSellableProducts: boolean;
   supplementSelections: boolean;
+  supplements: boolean;
 }>;
 
 type PlanCoverageRow = Readonly<{
@@ -192,6 +200,7 @@ const emptySummary = {
   medianCoveragePercent: 0,
   missingRecommendationRuns: 0,
   staleRecommendationRuns: 0,
+  supplementAvailabilityGaps: 0,
   totalPlans: 0
 };
 
@@ -217,6 +226,7 @@ export function emptyAdminCoverageImprovementInsightsData(
     plans: [],
     range,
     summary: emptySummary,
+    supplementAvailability: [],
     thresholdPercent: LOW_COVERAGE_THRESHOLD_PERCENT
   };
 }
@@ -398,6 +408,7 @@ async function coverageInsightsSchemaAvailable(
     organisations: boolean;
     product_countries: boolean;
     product_decisions: boolean;
+    product_facts: boolean;
     product_items: boolean;
     product_runs: boolean;
     products: boolean;
@@ -407,6 +418,7 @@ async function coverageInsightsSchemaAvailable(
     retail_product_stock: boolean;
     retail_sellable_products: boolean;
     supplement_selections: boolean;
+    supplements: boolean;
   }>>`
     select
       to_regclass('public.assessments') is not null as assessments,
@@ -414,6 +426,7 @@ async function coverageInsightsSchemaAvailable(
       to_regclass('public.organisations') is not null as organisations,
       to_regclass('public.product_countries') is not null as product_countries,
       to_regclass('public.product_recommendation_decisions') is not null as product_decisions,
+      to_regclass('public.product_facts') is not null as product_facts,
       to_regclass('public.product_recommendation_items') is not null as product_items,
       to_regclass('public.product_recommendation_runs') is not null as product_runs,
       to_regclass('public.products') is not null as products,
@@ -422,7 +435,8 @@ async function coverageInsightsSchemaAvailable(
       to_regclass('public.retail_order_allocations') is not null as retail_order_allocations,
       to_regclass('public.retail_product_stock') is not null as retail_product_stock,
       to_regclass('public.retail_sellable_products') is not null as retail_sellable_products,
-      to_regclass('public.supplement_recommendation_selections') is not null as supplement_selections
+      to_regclass('public.supplement_recommendation_selections') is not null as supplement_selections,
+      to_regclass('public.supplements') is not null as supplements
   `;
   const row = rows[0];
 
@@ -432,6 +446,7 @@ async function coverageInsightsSchemaAvailable(
     organisations: row?.organisations === true,
     productCountries: row?.product_countries === true,
     productDecisions: row?.product_decisions === true,
+    productFacts: row?.product_facts === true,
     productItems: row?.product_items === true,
     productRuns: row?.product_runs === true,
     products: row?.products === true,
@@ -440,7 +455,8 @@ async function coverageInsightsSchemaAvailable(
     retailOrderAllocations: row?.retail_order_allocations === true,
     retailProductStock: row?.retail_product_stock === true,
     retailSellableProducts: row?.retail_sellable_products === true,
-    supplementSelections: row?.supplement_selections === true
+    supplementSelections: row?.supplement_selections === true,
+    supplements: row?.supplements === true
   };
 }
 
@@ -1113,12 +1129,23 @@ export async function getAdminCoverageImprovementInsightsData(
       return emptyAdminCoverageImprovementInsightsData(range, false);
     }
 
-    const [freshnessClock, planRows, demandRows, opportunities] =
+    const [freshnessClock, planRows, demandRows, opportunities, supplementAvailability] =
       await Promise.all([
         loadFreshnessClock(sql, availability),
         loadPlanCoverageRows(sql, range),
         loadSupplementDemandRows(sql, range, availability),
-        loadMasterListOpportunities(sql, range, availability)
+        loadMasterListOpportunities(sql, range, availability),
+        availability.productFacts &&
+          availability.productCountries &&
+          availability.productRuns &&
+          availability.products &&
+          availability.retailOrderAllocations &&
+          availability.retailProductStock &&
+          availability.retailSellableProducts &&
+          availability.supplementSelections &&
+          availability.supplements
+          ? loadMasterSupplementAvailabilityInsights(sql, adminDashboardRangeStart(range), _locale)
+          : Promise.resolve([])
       ]);
     const orders = await loadOrderInsights(
       sql,
@@ -1167,8 +1194,12 @@ export async function getAdminCoverageImprovementInsightsData(
         staleRecommendationRuns: plans.filter(
           (plan) => plan.freshnessState === "stale"
         ).length,
+        supplementAvailabilityGaps: supplementAvailability.filter(
+          (row) => row.availabilityState !== "covered"
+        ).length,
         totalPlans: plans.length
       },
+      supplementAvailability,
       thresholdPercent: LOW_COVERAGE_THRESHOLD_PERCENT
     };
   } catch (error) {

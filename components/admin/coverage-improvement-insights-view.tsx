@@ -6,6 +6,7 @@ import type {
   CoverageFreshnessState,
   CoverageImprovementPlan
 } from "@/lib/admin-coverage-improvement-insights";
+import type { SupplementAvailabilityState } from "@/lib/admin-recommendation-insights";
 import type { Locale } from "@/lib/i18n";
 import {
   BusinessStatsGrid,
@@ -42,7 +43,7 @@ const labels = {
     generated: "Generated",
     leastMatched: "Least-matched supplements",
     locale: "Locale",
-    masterOpportunities: "Master-list opportunities",
+    masterOpportunities: "Actionable supplement and product coverage gaps",
     medianCoverage: "Median coverage",
     planType: "Plan",
     refreshing: "stale",
@@ -66,7 +67,7 @@ const labels = {
     generated: "สร้างเมื่อ",
     leastMatched: "อาหารเสริมที่จับคู่ได้น้อย",
     locale: "ภาษา",
-    masterOpportunities: "โอกาสใน master list",
+    masterOpportunities: "ช่องว่างอาหารเสริมและสินค้าที่ควรแก้",
     medianCoverage: "ค่ากลางความครอบคลุม",
     planType: "แผน",
     refreshing: "ข้อมูลเก่า",
@@ -90,7 +91,7 @@ const labels = {
     generated: "生成时间",
     leastMatched: "最低匹配补充剂",
     locale: "语言",
-    masterOpportunities: "主清单机会",
+    masterOpportunities: "可执行的补充剂和产品覆盖缺口",
     medianCoverage: "覆盖率中位数",
     planType: "计划",
     refreshing: "过期",
@@ -191,6 +192,28 @@ function coverageBand(value: number) {
   }
 
   return "90-100%";
+}
+
+const availabilityLabels: Record<SupplementAvailabilityState, string> = {
+  covered: "Covered",
+  missing_master_product: "Find/import product",
+  missing_retail_product: "Retailers add product",
+  weak_master_product: "Weak master",
+  weak_retail_product: "Weak retail"
+};
+
+const availabilityColors: Record<SupplementAvailabilityState, string> = {
+  covered: "bg-emerald-50 text-emerald-700",
+  missing_master_product: "bg-rose-50 text-rose-700",
+  missing_retail_product: "bg-amber-50 text-amber-800",
+  weak_master_product: "bg-orange-50 text-orange-800",
+  weak_retail_product: "bg-yellow-50 text-yellow-800"
+};
+
+function availabilityDose(labels: readonly string[]) {
+  const usable = labels.filter((label) => label && label !== "Unparsed");
+
+  return usable.length > 0 ? usable.join(", ") : "Dose not captured";
 }
 
 function planMatchesFilters(plan: CoverageImprovementPlan, filters: FilterState) {
@@ -555,33 +578,47 @@ export function AdminCoverageImprovementInsightsView({
           {copy.masterOpportunities}
         </h2>
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {data.masterListOpportunities.slice(0, 20).map((opportunity) => (
+          {data.supplementAvailability
+            .filter((opportunity) => opportunity.availabilityState !== "covered")
+            .slice(0, 20)
+            .map((opportunity) => (
             <div
               className="rounded-lg border border-gray-200 p-4"
-              key={opportunity.productId}
+              key={opportunity.supplementId}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-gray-900">
-                    {opportunity.productTitle}
+                    {opportunity.supplementName}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
-                    {opportunity.opportunityType.replace(/_/g, " ")} ·{" "}
+                    {availabilityDose(opportunity.topDoseLabels)} ·{" "}
                     {formatNumber(opportunity.affectedPlanCount, locale)} plans
                   </p>
                 </div>
-                <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
-                  {opportunity.retailerCount} retailers
+                <span
+                  className={classNames(
+                    "shrink-0 rounded-full px-2 py-1 text-xs font-semibold",
+                    availabilityColors[opportunity.availabilityState]
+                  )}
+                >
+                  {availabilityLabels[opportunity.availabilityState]}
                 </span>
               </div>
               <p className="mt-3 text-sm text-gray-600">{opportunity.action}</p>
-              {opportunity.blockerReason ? (
-                <p className="mt-2 text-xs text-gray-500">
-                  {opportunity.blockerReason}
-                </p>
-              ) : null}
+              <p className="mt-2 text-xs text-gray-500">{opportunity.rationale}</p>
+              <p className="mt-2 text-xs text-gray-500">
+                Master products: {formatNumber(opportunity.masterProductCount, locale)} ·{" "}
+                Retailers: {formatNumber(opportunity.activeRetailerCount, locale)} ·{" "}
+                Stocked now: {formatNumber(opportunity.availableRetailerCount, locale)}
+              </p>
             </div>
           ))}
+          {data.supplementAvailability.filter((row) => row.availabilityState !== "covered").length < 1 ? (
+            <div className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500 lg:col-span-2">
+              No master supplement availability gaps are visible for this timeframe.
+            </div>
+          ) : null}
         </div>
       </section>
     </div>

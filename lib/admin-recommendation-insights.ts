@@ -73,16 +73,46 @@ export type ProductOpportunityType =
   | "stock_or_backorder"
   | "validation_issue";
 
+export type SupplementAvailabilityState =
+  | "covered"
+  | "missing_master_product"
+  | "missing_retail_product"
+  | "weak_master_product"
+  | "weak_retail_product";
+
+export type MasterSupplementAvailabilityInsight = Readonly<{
+  action: string;
+  activeRetailerCount: number;
+  affectedPlanCount: number;
+  availableRetailerCount: number;
+  availabilityState: SupplementAvailabilityState;
+  backorderRetailerCount: number;
+  category: string | null;
+  latestRecommendedAt: string | null;
+  lowCoveragePlanCount: number;
+  masterProductCount: number;
+  masterProductsWithDoseCount: number;
+  rationale: string;
+  recommendedSearchQuery: string;
+  retailProductCount: number;
+  supplementId: string;
+  supplementName: string;
+  topDoseLabels: string[];
+}>;
+
 export type ProductOpportunityInsight = Readonly<{
   action: string;
   averageCoveragePercent: number | null;
   blockerReason: string | null;
+  opportunityLabel: string;
   opportunityType: ProductOpportunityType;
   planCount: number;
   productId: string;
   recommendationCount: number;
   retailerCount: number;
+  rationale: string;
   supplementSignals: string[];
+  topDoseLabels: string[];
   title: string;
 }>;
 
@@ -92,13 +122,17 @@ export type ExternalProductCandidate = Readonly<{
   diagnostics: MarketplaceSearchDiagnostic[];
   evidenceRequired: string[];
   externalProductId: string | null;
+  affectedPlanCount: number;
+  blockerSolved: string;
   imageUrl: string | null;
   matchedGapId: string;
+  matchedDoseLabel: string | null;
   matchedGapName: string;
   platform: string | null;
   priceAmount: number | null;
   productUrl: string | null;
   query: string;
+  rationale: string;
   searchStatus: "cached" | "error" | "generated" | "unavailable";
   title: string | null;
 }>;
@@ -166,13 +200,16 @@ export type AdminProductImprovementInsightsData = Readonly<{
   masterListOpportunities: ProductOpportunityInsight[];
   planComparisons: PlanCoverageComparison[];
   range: AdminDashboardRange;
+  reviewOpportunities: ProductOpportunityInsight[];
   summary: {
     externalCandidateCount: number;
     lowCoveragePlans: number;
     masterListOpportunityCount: number;
     optimumAverageDeltaPercent: number;
     retailBlockerCount: number;
+    weakSupplementCount: number;
   };
+  supplementAvailability: MasterSupplementAvailabilityInsight[];
 }>;
 
 export type AdminFoodImprovementInsightsData = Readonly<{
@@ -198,6 +235,7 @@ type SchemaAvailability = Readonly<{
   foods: boolean;
   productCountries: boolean;
   productDecisions: boolean;
+  productFacts: boolean;
   productRuns: boolean;
   products: boolean;
   retailOrderAllocations: boolean;
@@ -221,7 +259,8 @@ const emptyProductSummary = {
   lowCoveragePlans: 0,
   masterListOpportunityCount: 0,
   optimumAverageDeltaPercent: 0,
-  retailBlockerCount: 0
+  retailBlockerCount: 0,
+  weakSupplementCount: 0
 };
 
 const emptyFoodSummary = {
@@ -261,7 +300,9 @@ export function emptyAdminProductImprovementInsightsData(
     masterListOpportunities: [],
     planComparisons: [],
     range,
-    summary: emptyProductSummary
+    reviewOpportunities: [],
+    summary: emptyProductSummary,
+    supplementAvailability: []
   };
 }
 
@@ -291,6 +332,7 @@ export async function recommendationInsightsSchemaAvailable(
       foods: false,
       productCountries: false,
       productDecisions: false,
+      productFacts: false,
       productRuns: false,
       products: false,
       retailOrderAllocations: false,
@@ -310,6 +352,7 @@ export async function recommendationInsightsSchemaAvailable(
     foods: string | null;
     product_countries: string | null;
     product_decisions: string | null;
+    product_facts: string | null;
     product_runs: string | null;
     products: string | null;
     retail_order_allocations: string | null;
@@ -327,6 +370,7 @@ export async function recommendationInsightsSchemaAvailable(
       to_regclass('public.foods')::text as foods,
       to_regclass('public.product_countries')::text as product_countries,
       to_regclass('public.product_recommendation_decisions')::text as product_decisions,
+      to_regclass('public.product_facts')::text as product_facts,
       to_regclass('public.product_recommendation_runs')::text as product_runs,
       to_regclass('public.products')::text as products,
       to_regclass('public.retail_order_allocations')::text as retail_order_allocations,
@@ -346,6 +390,7 @@ export async function recommendationInsightsSchemaAvailable(
     foods: Boolean(row?.foods),
     productCountries: Boolean(row?.product_countries),
     productDecisions: Boolean(row?.product_decisions),
+    productFacts: Boolean(row?.product_facts),
     productRuns: Boolean(row?.product_runs),
     products: Boolean(row?.products),
     retailOrderAllocations: Boolean(row?.retail_order_allocations),
@@ -431,6 +476,20 @@ function doseLabel(row: {
   return row.daily_dose_text || "Unparsed";
 }
 
+function displayDoseLabels(labels: readonly string[]) {
+  return labels.filter((label) => label !== "Unparsed").slice(0, 2);
+}
+
+function primaryDoseLabel(labels: readonly string[]) {
+  return displayDoseLabels(labels)[0] ?? null;
+}
+
+function gapWithDose(name: string, doseLabels: readonly string[]) {
+  const dose = primaryDoseLabel(doseLabels);
+
+  return dose ? `${name} at ${dose}` : name;
+}
+
 function asProductSnapshots(value: unknown): ProductSnapshot[] {
   return Array.isArray(value)
     ? value.filter((item): item is ProductSnapshot =>
@@ -482,7 +541,7 @@ function statusFromSupplementRow(row: {
 
 function productOpportunityAction(type: ProductOpportunityType) {
   if (type === "approved_master_not_retail") {
-    return "Ask retailers to add this approved master product.";
+    return "Retailers should add this approved master product.";
   }
 
   if (type === "inactive_retail_listing") {
@@ -502,6 +561,202 @@ function productOpportunityAction(type: ProductOpportunityType) {
   }
 
   return "Review why the matcher rejected or nearly selected this product.";
+}
+
+function productOpportunityLabel(type: ProductOpportunityType) {
+  if (type === "approved_master_not_retail") {
+    return "Retailer add";
+  }
+
+  if (type === "inactive_retail_listing") {
+    return "Reactivate listing";
+  }
+
+  if (type === "stock_or_backorder") {
+    return "Restock/backorder";
+  }
+
+  if (type === "country_restriction") {
+    return "Thailand availability";
+  }
+
+  if (type === "validation_issue") {
+    return "Master validation";
+  }
+
+  return "Matcher review";
+}
+
+function actionableProductOpportunity(type: ProductOpportunityType) {
+  return (
+    type === "approved_master_not_retail" ||
+    type === "inactive_retail_listing" ||
+    type === "stock_or_backorder"
+  );
+}
+
+function productOpportunitySupplementContext(
+  signals: readonly string[],
+  byName: ReadonlyMap<string, MasterSupplementAvailabilityInsight>
+) {
+  for (const signal of signals) {
+    const context = byName.get(normalizeSearchText(signal));
+
+    if (context) {
+      return context;
+    }
+  }
+
+  return null;
+}
+
+function productOpportunityActionWithContext(
+  row: ProductOpportunityInsight,
+  context: MasterSupplementAvailabilityInsight | null
+) {
+  const signal = row.supplementSignals[0] ?? "the supplement gap";
+  const target = gapWithDose(signal, context?.topDoseLabels ?? row.topDoseLabels);
+
+  if (row.opportunityType === "approved_master_not_retail") {
+    return `Retailers should add ${row.title} to cover ${target}.`;
+  }
+
+  if (row.opportunityType === "inactive_retail_listing") {
+    return `Reactivate ${row.title} so it can cover ${target}.`;
+  }
+
+  if (row.opportunityType === "stock_or_backorder") {
+    return `Restock or allow clear backorder for ${row.title} to cover ${target}.`;
+  }
+
+  return productOpportunityAction(row.opportunityType);
+}
+
+function productOpportunityRationale(
+  row: ProductOpportunityInsight,
+  context: MasterSupplementAvailabilityInsight | null
+) {
+  const signal = row.supplementSignals[0] ?? "unknown supplement";
+  const target = gapWithDose(signal, context?.topDoseLabels ?? row.topDoseLabels);
+  const demand = context?.affectedPlanCount
+    ? `${context.affectedPlanCount} plans recently needed ${target}`
+    : `${row.planCount} plans surfaced ${target}`;
+  const fit = row.averageCoveragePercent !== null
+    ? `average product fit was ${Math.round(row.averageCoveragePercent)}%`
+    : "fit score was not captured";
+
+  return `${demand}; ${fit}. ${row.blockerReason ?? productOpportunityAction(row.opportunityType)}`;
+}
+
+function enrichProductOpportunity(
+  row: ProductOpportunityInsight,
+  supplementContextByName: ReadonlyMap<string, MasterSupplementAvailabilityInsight>
+): ProductOpportunityInsight {
+  const context = productOpportunitySupplementContext(
+    row.supplementSignals,
+    supplementContextByName
+  );
+  const topDoseLabels = context?.topDoseLabels ?? row.topDoseLabels;
+  const hydrated = { ...row, topDoseLabels };
+
+  return {
+    ...hydrated,
+    action: productOpportunityActionWithContext(hydrated, context),
+    opportunityLabel: productOpportunityLabel(row.opportunityType),
+    rationale: productOpportunityRationale(hydrated, context)
+  };
+}
+
+export function classifySupplementAvailability(input: Readonly<{
+  activeRetailerCount: number;
+  availableRetailerCount: number;
+  masterProductCount: number;
+  masterProductsWithDoseCount: number;
+  retailProductCount: number;
+}>): SupplementAvailabilityState {
+  if (input.masterProductCount < 1) {
+    return "missing_master_product";
+  }
+
+  if (input.masterProductCount < 2 || input.masterProductsWithDoseCount < 1) {
+    return "weak_master_product";
+  }
+
+  if (input.retailProductCount < 1 || input.activeRetailerCount < 1) {
+    return "missing_retail_product";
+  }
+
+  if (input.activeRetailerCount < 2 || input.availableRetailerCount < 2) {
+    return "weak_retail_product";
+  }
+
+  return "covered";
+}
+
+function supplementAvailabilityAction(input: Readonly<{
+  availabilityState: SupplementAvailabilityState;
+  supplementName: string;
+  topDoseLabels: readonly string[];
+}>) {
+  const target = gapWithDose(input.supplementName, input.topDoseLabels);
+
+  if (
+    input.availabilityState === "missing_master_product" ||
+    input.availabilityState === "weak_master_product"
+  ) {
+    return `Find or import a master-list product for ${target}.`;
+  }
+
+  if (input.availabilityState === "missing_retail_product") {
+    return `Retailers should add an approved master product covering ${target}.`;
+  }
+
+  if (input.availabilityState === "weak_retail_product") {
+    return `Add another retailer or restock products covering ${target}.`;
+  }
+
+  return `Coverage for ${target} is resilient enough for now.`;
+}
+
+function supplementAvailabilityRationale(input: Readonly<{
+  activeRetailerCount: number;
+  affectedPlanCount: number;
+  availabilityState: SupplementAvailabilityState;
+  availableRetailerCount: number;
+  backorderRetailerCount: number;
+  lowCoveragePlanCount: number;
+  masterProductCount: number;
+  masterProductsWithDoseCount: number;
+  retailProductCount: number;
+}>) {
+  if (input.availabilityState === "missing_master_product") {
+    return `${input.affectedPlanCount} plans recommended this supplement, but no approved Thailand master product has a linked supplement fact.`;
+  }
+
+  if (input.availabilityState === "weak_master_product") {
+    return `${input.masterProductCount} master product(s) cover this supplement and ${input.masterProductsWithDoseCount} have usable dose facts, so master coverage is fragile.`;
+  }
+
+  if (input.availabilityState === "missing_retail_product") {
+    return `${input.masterProductCount} master product(s) exist, but none are currently sellable through active Thailand retailers.`;
+  }
+
+  if (input.availabilityState === "weak_retail_product") {
+    return `${input.retailProductCount} retail product(s) are sellable across ${input.activeRetailerCount} retailer(s); ${input.availableRetailerCount} retailer(s) have stock now and ${input.backorderRetailerCount} rely on backorder.`;
+  }
+
+  return `${input.masterProductCount} master products and ${input.activeRetailerCount} active retailers cover this supplement.`;
+}
+
+export function supplementAvailabilitySearchPhrase(
+  insight: Pick<MasterSupplementAvailabilityInsight, "supplementName" | "topDoseLabels">
+) {
+  return [
+    "Thailand",
+    insight.supplementName,
+    primaryDoseLabel(insight.topDoseLabels),
+    "supplement product"
+  ].filter(Boolean).join(" ");
 }
 
 function classifyProductOpportunity(row: {
@@ -909,6 +1164,238 @@ export async function getAdminSupplementImprovementInsightsData(
   }
 }
 
+export async function loadMasterSupplementAvailabilityInsights(
+  sql: InsightsDb,
+  start: Date | null,
+  _locale: Locale = "en"
+): Promise<MasterSupplementAvailabilityInsight[]> {
+  const rows = await sql<Array<{
+    active_retailer_count: number | string;
+    affected_plan_count: number | string | null;
+    available_retailer_count: number | string;
+    backorder_retailer_count: number | string;
+    category: string | null;
+    latest_recommended_at: Date | string | null;
+    low_coverage_plan_count: number | string | null;
+    master_product_count: number | string;
+    master_products_with_dose_count: number | string;
+    retail_product_count: number | string;
+    supplement_id: string;
+    supplement_name: string;
+  }>>`
+    with latest_runs as (
+      select distinct on (product_recommendation_runs.plan_id)
+        product_recommendation_runs.plan_id,
+        product_recommendation_runs.supplement_product_coverage_percent
+      from public.product_recommendation_runs
+      where product_recommendation_runs.status in ('completed', 'partial')
+      order by product_recommendation_runs.plan_id, product_recommendation_runs.generated_at desc
+    )
+    select
+      supplements.id::text as supplement_id,
+      supplements.name as supplement_name,
+      supplements.category,
+      coalesce(demand_state.affected_plan_count, 0)::int as affected_plan_count,
+      coalesce(demand_state.low_coverage_plan_count, 0)::int as low_coverage_plan_count,
+      demand_state.latest_recommended_at,
+      count(distinct products.id) filter (
+        where products.status = 'approved'
+          and products.validation_status = 'pass'
+          and product_countries.product_id is not null
+      )::int as master_product_count,
+      count(distinct products.id) filter (
+        where products.status = 'approved'
+          and products.validation_status = 'pass'
+          and product_countries.product_id is not null
+          and product_facts.amount is not null
+          and nullif(product_facts.unit, '') is not null
+      )::int as master_products_with_dose_count,
+      count(distinct retail_sellable_products.id) filter (
+        where products.status = 'approved'
+          and products.validation_status = 'pass'
+          and product_countries.product_id is not null
+          and organisations.id is not null
+          and retail_sellable_products.status = 'active'
+          and coalesce(
+            retail_sellable_products.rrp_price_amount,
+            product_countries.rrp_price_amount,
+            products.price_amount
+          ) is not null
+          and (
+            coalesce(retail_product_stock.stock_quantity, 0) > coalesce(allocation_state.allocated_quantity, 0)
+            or retail_sellable_products.backorder_policy = 'allow'
+          )
+      )::int as retail_product_count,
+      count(distinct organisations.id) filter (
+        where products.status = 'approved'
+          and products.validation_status = 'pass'
+          and product_countries.product_id is not null
+          and retail_sellable_products.status = 'active'
+          and coalesce(
+            retail_sellable_products.rrp_price_amount,
+            product_countries.rrp_price_amount,
+            products.price_amount
+          ) is not null
+      )::int as active_retailer_count,
+      count(distinct organisations.id) filter (
+        where products.status = 'approved'
+          and products.validation_status = 'pass'
+          and product_countries.product_id is not null
+          and retail_sellable_products.status = 'active'
+          and coalesce(
+            retail_sellable_products.rrp_price_amount,
+            product_countries.rrp_price_amount,
+            products.price_amount
+          ) is not null
+          and coalesce(retail_product_stock.stock_quantity, 0) > coalesce(allocation_state.allocated_quantity, 0)
+      )::int as available_retailer_count,
+      count(distinct organisations.id) filter (
+        where products.status = 'approved'
+          and products.validation_status = 'pass'
+          and product_countries.product_id is not null
+          and retail_sellable_products.status = 'active'
+          and coalesce(
+            retail_sellable_products.rrp_price_amount,
+            product_countries.rrp_price_amount,
+            products.price_amount
+          ) is not null
+          and coalesce(retail_product_stock.stock_quantity, 0) <= coalesce(allocation_state.allocated_quantity, 0)
+          and retail_sellable_products.backorder_policy = 'allow'
+      )::int as backorder_retailer_count
+    from public.supplements
+    left join public.product_facts
+      on product_facts.supplement_id = supplements.id
+      and product_facts.item_type = 'supplement'
+    left join public.products
+      on products.id = product_facts.product_id
+    left join public.product_countries
+      on product_countries.product_id = products.id
+      and product_countries.country_code = 'TH'
+    left join public.retail_sellable_products
+      on retail_sellable_products.product_id = products.id
+      and retail_sellable_products.status <> 'deleted'
+    left join public.organisations
+      on organisations.id = retail_sellable_products.organisation_id
+      and organisations.organisation_type = 'tenant'
+      and organisations.status = 'active'
+      and organisations.country_code = 'TH'
+    left join public.retail_product_stock
+      on retail_product_stock.product_id = products.id
+      and retail_product_stock.organisation_id = organisations.id
+      and retail_product_stock.status <> 'deleted'
+    left join lateral (
+      select coalesce(sum(retail_order_allocations.quantity_allocated), 0)::int as allocated_quantity
+      from public.retail_order_allocations
+      where retail_order_allocations.product_id = products.id
+        and retail_order_allocations.organisation_id = organisations.id
+        and retail_order_allocations.status in ('active', 'picked')
+    ) allocation_state on true
+    left join lateral (
+      select
+        count(distinct supplement_recommendation_selections.plan_id)::int as affected_plan_count,
+        count(distinct supplement_recommendation_selections.plan_id) filter (
+          where coalesce(latest_runs.supplement_product_coverage_percent, 0) < 75
+        )::int as low_coverage_plan_count,
+        max(supplement_recommendation_selections.generated_at) as latest_recommended_at
+      from public.supplement_recommendation_selections
+      left join latest_runs
+        on latest_runs.plan_id = supplement_recommendation_selections.plan_id
+      where supplement_recommendation_selections.supplement_id = supplements.id
+        and supplement_recommendation_selections.is_current = true
+        and (${start}::timestamptz is null or supplement_recommendation_selections.generated_at >= ${start})
+    ) demand_state on true
+    where supplements.is_active = true
+      and supplements.list_status = 'active'
+    group by supplements.id, supplements.name, supplements.category, demand_state.affected_plan_count, demand_state.low_coverage_plan_count, demand_state.latest_recommended_at
+  `;
+  const doseRows = await sql<Array<{
+    count: number | string;
+    daily_dose_text: string | null;
+    dose_amount: number | string | null;
+    dose_unit: string | null;
+    supplement_id: string;
+  }>>`
+    select
+      supplement_recommendation_selections.supplement_id::text,
+      supplement_recommendation_selections.dose_amount,
+      supplement_recommendation_selections.dose_unit,
+      supplement_recommendation_selections.daily_dose_text,
+      count(distinct supplement_recommendation_selections.plan_id)::int as count
+    from public.supplement_recommendation_selections
+    join public.supplements
+      on supplements.id = supplement_recommendation_selections.supplement_id
+    where supplement_recommendation_selections.is_current = true
+      and supplement_recommendation_selections.supplement_id is not null
+      and supplements.is_active = true
+      and supplements.list_status = 'active'
+      and (${start}::timestamptz is null or supplement_recommendation_selections.generated_at >= ${start})
+    group by
+      supplement_recommendation_selections.supplement_id,
+      supplement_recommendation_selections.dose_amount,
+      supplement_recommendation_selections.dose_unit,
+      supplement_recommendation_selections.daily_dose_text
+    order by count desc
+  `;
+  const dosesBySupplement = new Map<string, string[]>();
+
+  for (const row of doseRows) {
+    const label = doseLabel(row);
+    const list = dosesBySupplement.get(row.supplement_id) ?? [];
+
+    if (!list.includes(label)) {
+      list.push(label);
+    }
+
+    dosesBySupplement.set(row.supplement_id, list.slice(0, 3));
+  }
+
+  return rows.map((row) => {
+    const counts = {
+      activeRetailerCount: numberValue(row.active_retailer_count),
+      availableRetailerCount: numberValue(row.available_retailer_count),
+      masterProductCount: numberValue(row.master_product_count),
+      masterProductsWithDoseCount: numberValue(row.master_products_with_dose_count),
+      retailProductCount: numberValue(row.retail_product_count)
+    };
+    const availabilityState = classifySupplementAvailability(counts);
+    const topDoseLabels = dosesBySupplement.get(row.supplement_id) ?? [];
+    const insight = {
+      action: "",
+      activeRetailerCount: counts.activeRetailerCount,
+      affectedPlanCount: numberValue(row.affected_plan_count),
+      availableRetailerCount: counts.availableRetailerCount,
+      availabilityState,
+      backorderRetailerCount: numberValue(row.backorder_retailer_count),
+      category: row.category,
+      latestRecommendedAt: isoOrNull(row.latest_recommended_at),
+      lowCoveragePlanCount: numberValue(row.low_coverage_plan_count),
+      masterProductCount: counts.masterProductCount,
+      masterProductsWithDoseCount: counts.masterProductsWithDoseCount,
+      rationale: "",
+      recommendedSearchQuery: "",
+      retailProductCount: counts.retailProductCount,
+      supplementId: row.supplement_id,
+      supplementName: row.supplement_name,
+      topDoseLabels
+    } satisfies MasterSupplementAvailabilityInsight;
+
+    return {
+      ...insight,
+      action: supplementAvailabilityAction(insight),
+      rationale: supplementAvailabilityRationale(insight),
+      recommendedSearchQuery: supplementAvailabilitySearchPhrase(insight)
+    };
+  }).sort(
+    (first, second) =>
+      Number(first.availabilityState === "covered") - Number(second.availabilityState === "covered") ||
+      second.lowCoveragePlanCount - first.lowCoveragePlanCount ||
+      second.affectedPlanCount - first.affectedPlanCount ||
+      first.masterProductCount - second.masterProductCount ||
+      first.activeRetailerCount - second.activeRetailerCount ||
+      first.supplementName.localeCompare(second.supplementName)
+  );
+}
+
 export async function getAdminProductImprovementInsightsData(
   range: AdminDashboardRange,
   locale: Locale = "en"
@@ -926,23 +1413,40 @@ export async function getAdminProductImprovementInsightsData(
       !availability.assessments ||
       !availability.productCountries ||
       !availability.productDecisions ||
+      !availability.productFacts ||
       !availability.productRuns ||
       !availability.products ||
+      !availability.retailOrderAllocations ||
       !availability.retailProductStock ||
-      !availability.retailSellableProducts
+      !availability.retailSellableProducts ||
+      !availability.supplementSelections ||
+      !availability.supplements
     ) {
       return emptyAdminProductImprovementInsightsData(range, true);
     }
 
     const start = rangeStartParam(range);
-    const [opportunities, planComparisons] = await Promise.all([
+    const [rawOpportunities, planComparisons, supplementAvailability] = await Promise.all([
       loadMasterListOpportunities(sql, range, locale, start),
-      loadPlanCoverageComparisons(sql, start)
+      loadPlanCoverageComparisons(sql, start),
+      loadMasterSupplementAvailabilityInsights(sql, start, locale)
     ]);
+    const doseContextByName = new Map(
+      supplementAvailability.map((insight) => [
+        normalizeSearchText(insight.supplementName),
+        insight
+      ])
+    );
+    const opportunities = rawOpportunities
+      .map((row) => enrichProductOpportunity(row, doseContextByName))
+      .filter((row) => actionableProductOpportunity(row.opportunityType));
+    const reviewOpportunities = rawOpportunities
+      .map((row) => enrichProductOpportunity(row, doseContextByName))
+      .filter((row) => !actionableProductOpportunity(row.opportunityType));
     const externalCandidates = await loadExternalProductCandidates(
       sql,
       availability,
-      opportunities.slice(0, 6)
+      supplementAvailability.filter((row) => row.availabilityState !== "covered")
     );
     const deltas = planComparisons.map((row) => row.optimumDeltaPercent);
     const averageDelta = deltas.length > 0
@@ -956,6 +1460,7 @@ export async function getAdminProductImprovementInsightsData(
       masterListOpportunities: opportunities,
       planComparisons,
       range,
+      reviewOpportunities,
       summary: {
         externalCandidateCount: externalCandidates.filter((row) => row.title).length,
         lowCoveragePlans: planComparisons.filter(
@@ -968,8 +1473,12 @@ export async function getAdminProductImprovementInsightsData(
             row.opportunityType === "approved_master_not_retail" ||
             row.opportunityType === "inactive_retail_listing" ||
             row.opportunityType === "stock_or_backorder"
+        ).length,
+        weakSupplementCount: supplementAvailability.filter(
+          (row) => row.availabilityState !== "covered"
         ).length
-      }
+      },
+      supplementAvailability
     };
   } catch (error) {
     console.error("Unable to load product improvement insights", error);
@@ -1046,12 +1555,15 @@ async function loadMasterListOpportunities(
       action: productOpportunityAction(opportunityType),
       averageCoveragePercent: optionalNumber(row.average_coverage_percent),
       blockerReason: row.rejection_reason,
+      opportunityLabel: productOpportunityLabel(opportunityType),
       opportunityType,
       planCount: numberValue(row.plan_count),
       productId: row.product_id,
       recommendationCount: numberValue(row.recommendation_count),
       retailerCount: numberValue(row.active_retailer_count),
+      rationale: productOpportunityAction(opportunityType),
       supplementSignals: uniqueStrings(row.signals ?? [], 6),
+      topDoseLabels: [],
       title: row.title
     } satisfies ProductOpportunityInsight;
   });
@@ -1202,23 +1714,24 @@ async function loadPlanCoverageComparisons(sql: InsightsDb, start: Date | null) 
 async function loadExternalProductCandidates(
   sql: InsightsDb,
   availability: SchemaAvailability,
-  opportunities: readonly ProductOpportunityInsight[]
+  supplementGaps: readonly MasterSupplementAvailabilityInsight[]
 ) {
-  if (!availability.externalCandidateCache || opportunities.length < 1) {
-    return opportunities.slice(0, 6).map((opportunity) =>
-      unavailableExternalCandidate(opportunity, [])
-    );
+  if (!availability.externalCandidateCache || supplementGaps.length < 1) {
+    return [];
   }
 
   const candidates: ExternalProductCandidate[] = [];
+  const gaps = supplementGaps
+    .filter((gap) => gap.availabilityState !== "covered")
+    .slice(0, 8);
 
-  for (const opportunity of opportunities.slice(0, 6)) {
-    const query = externalCandidateQuery(opportunity);
+  for (const gap of gaps) {
+    const query = externalCandidateQuery(gap);
     const cached = await loadCachedExternalCandidate(sql, query);
 
     if (cached) {
       candidates.push(...externalCandidateRowsFromSnapshots(
-        opportunity,
+        gap,
         query,
         cached.products,
         cached.diagnostics,
@@ -1245,7 +1758,7 @@ async function loadExternalProductCandidates(
 
       await writeExternalCandidateCache(sql, query, search.products, search.diagnostics);
       candidates.push(...externalCandidateRowsFromSnapshots(
-        opportunity,
+        gap,
         query,
         search.products,
         search.diagnostics,
@@ -1253,66 +1766,76 @@ async function loadExternalProductCandidates(
       ));
     } catch (error) {
       console.error("Unable to refresh external product candidate cache", error);
-      candidates.push(unavailableExternalCandidate(opportunity, [], "error"));
     }
   }
 
   return candidates.slice(0, 24);
 }
 
-function externalCandidateQuery(opportunity: ProductOpportunityInsight) {
-  const signal = opportunity.supplementSignals[0] ?? opportunity.title;
-
-  return `Thailand ${signal} supplement product`;
+function externalCandidateQuery(
+  gap: Pick<MasterSupplementAvailabilityInsight, "supplementName" | "topDoseLabels">
+) {
+  return supplementAvailabilitySearchPhrase(gap);
 }
 
 function unavailableExternalCandidate(
-  opportunity: ProductOpportunityInsight,
+  gap: MasterSupplementAvailabilityInsight,
   diagnostics: MarketplaceSearchDiagnostic[],
   status: ExternalProductCandidate["searchStatus"] = "unavailable"
 ): ExternalProductCandidate {
   return {
+    affectedPlanCount: gap.affectedPlanCount,
     brandName: null,
+    blockerSolved: gap.availabilityState,
     confidence: "unavailable",
     diagnostics,
     evidenceRequired: ["Marketplace adapter result", "FDA registration", "Ingredient facts"],
     externalProductId: null,
     imageUrl: null,
-    matchedGapId: opportunity.productId,
-    matchedGapName: opportunity.supplementSignals[0] ?? opportunity.title,
+    matchedDoseLabel: primaryDoseLabel(gap.topDoseLabels),
+    matchedGapId: gap.supplementId,
+    matchedGapName: gap.supplementName,
     platform: null,
     priceAmount: null,
     productUrl: null,
-    query: externalCandidateQuery(opportunity),
+    query: externalCandidateQuery(gap),
+    rationale: gap.rationale,
     searchStatus: status,
     title: null
   };
 }
 
 function externalCandidateRowsFromSnapshots(
-  opportunity: ProductOpportunityInsight,
+  gap: MasterSupplementAvailabilityInsight,
   query: string,
   products: readonly ProductSnapshot[],
   diagnostics: readonly MarketplaceSearchDiagnostic[],
   confidence: ExternalProductCandidate["confidence"]
 ): ExternalProductCandidate[] {
   if (products.length < 1) {
-    return [unavailableExternalCandidate(opportunity, [...diagnostics])];
+    return [];
   }
 
-  return products.slice(0, 4).map((product) => ({
+  return products
+    .filter((product) => candidateSnapshotMatchesText(product.title, gap.supplementName))
+    .slice(0, 4)
+    .map((product) => ({
+    affectedPlanCount: gap.affectedPlanCount,
     brandName: product.brandName ?? null,
+    blockerSolved: gap.availabilityState,
     confidence,
     diagnostics: [...diagnostics],
     evidenceRequired: ["FDA registration", "Ingredient facts", "Image/source review"],
     externalProductId: product.externalProductId ?? null,
     imageUrl: product.imageUrl ?? null,
-    matchedGapId: opportunity.productId,
-    matchedGapName: opportunity.supplementSignals[0] ?? opportunity.title,
+    matchedDoseLabel: primaryDoseLabel(gap.topDoseLabels),
+    matchedGapId: gap.supplementId,
+    matchedGapName: gap.supplementName,
     platform: product.platform,
     priceAmount: product.priceAmount ?? null,
     productUrl: product.productUrl,
     query,
+    rationale: `${gap.action} This marketplace product matched the ${gap.supplementName} search and needs FDA, ingredient, and dose review before it can enter the master list.`,
     searchStatus: confidence === "cached" ? "cached" : "generated",
     title: product.title
   }));
@@ -1599,15 +2122,22 @@ async function loadUnknownFoods(sql: InsightsDb, start: Date | null) {
 }
 
 export function productOpportunitySearchPhrase(opportunity: ProductOpportunityInsight) {
-  return externalCandidateQuery(opportunity);
+  return externalCandidateQuery({
+    supplementName: opportunity.supplementSignals[0] ?? opportunity.title,
+    topDoseLabels: opportunity.topDoseLabels
+  });
+}
+
+function candidateSnapshotMatchesText(title: unknown, gapName: string) {
+  const normalizedTitle = normalizeSearchText(title);
+  const gap = normalizeSearchText(gapName);
+
+  return Boolean(normalizedTitle && gap && normalizedTitle.includes(gap));
 }
 
 export function candidateSnapshotMatchesGap(
   candidate: ExternalProductCandidate,
   gapName: string
 ) {
-  const title = normalizeSearchText(candidate.title);
-  const gap = normalizeSearchText(gapName);
-
-  return Boolean(title && gap && title.includes(gap));
+  return candidateSnapshotMatchesText(candidate.title, gapName);
 }

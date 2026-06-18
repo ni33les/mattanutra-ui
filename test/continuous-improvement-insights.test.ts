@@ -3,10 +3,12 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   candidateSnapshotMatchesGap,
+  classifySupplementAvailability,
   emptyAdminFoodImprovementInsightsData,
   emptyAdminProductImprovementInsightsData,
   emptyAdminSupplementImprovementInsightsData,
   productOpportunitySearchPhrase,
+  supplementAvailabilitySearchPhrase,
   type ProductOpportunityInsight
 } from "../lib/admin-recommendation-insights.ts";
 import { adminViewPermission } from "../lib/admin-rbac.ts";
@@ -15,12 +17,15 @@ const opportunity: ProductOpportunityInsight = {
   action: "Ask retailers to add this approved master product.",
   averageCoveragePercent: 82,
   blockerReason: null,
+  opportunityLabel: "Retailer add",
   opportunityType: "approved_master_not_retail",
   planCount: 4,
   productId: "product-zinc",
   recommendationCount: 6,
   retailerCount: 0,
+  rationale: "4 plans recently needed Zinc at 30 mg.",
   supplementSignals: ["Zinc"],
+  topDoseLabels: ["30 mg"],
   title: "Strong Zinc"
 };
 
@@ -78,17 +83,80 @@ describe("continuous improvement insights", () => {
     assert.match(readModel, /searchMarketplaceProducts/);
     assert.match(readModel, /ProductSnapshot/);
     assert.match(readModel, /loadExternalProductCandidates/);
-    assert.match(view, /Real External Product Candidates Not Yet In The Master List/);
+    assert.match(view, /External Products To Review For Master List/);
+    assert.match(view, /candidate\.rationale/);
+    assert.match(view, /Evidence needed/);
     assert.match(view, /candidate\.imageUrl/);
     assert.match(view, /candidate\.productUrl/);
+    assert.doesNotMatch(view, /Search unavailable/);
     assert.doesNotMatch(`${readModel}\n${view}`, /candidateProductOrSearchPhrase/);
     assert.doesNotMatch(`${readModel}\n${view}`, /Thailand supplement product for/);
+  });
+
+  it("classifies master supplement availability across master and retailer lists", () => {
+    assert.equal(
+      classifySupplementAvailability({
+        activeRetailerCount: 0,
+        availableRetailerCount: 0,
+        masterProductCount: 0,
+        masterProductsWithDoseCount: 0,
+        retailProductCount: 0
+      }),
+      "missing_master_product"
+    );
+    assert.equal(
+      classifySupplementAvailability({
+        activeRetailerCount: 0,
+        availableRetailerCount: 0,
+        masterProductCount: 1,
+        masterProductsWithDoseCount: 1,
+        retailProductCount: 0
+      }),
+      "weak_master_product"
+    );
+    assert.equal(
+      classifySupplementAvailability({
+        activeRetailerCount: 0,
+        availableRetailerCount: 0,
+        masterProductCount: 2,
+        masterProductsWithDoseCount: 2,
+        retailProductCount: 0
+      }),
+      "missing_retail_product"
+    );
+    assert.equal(
+      classifySupplementAvailability({
+        activeRetailerCount: 1,
+        availableRetailerCount: 1,
+        masterProductCount: 2,
+        masterProductsWithDoseCount: 2,
+        retailProductCount: 1
+      }),
+      "weak_retail_product"
+    );
+    assert.equal(
+      classifySupplementAvailability({
+        activeRetailerCount: 2,
+        availableRetailerCount: 2,
+        masterProductCount: 2,
+        masterProductsWithDoseCount: 2,
+        retailProductCount: 2
+      }),
+      "covered"
+    );
   });
 
   it("builds deterministic marketplace search phrases and gap checks", () => {
     assert.equal(
       productOpportunitySearchPhrase(opportunity),
-      "Thailand Zinc supplement product"
+      "Thailand Zinc 30 mg supplement product"
+    );
+    assert.equal(
+      supplementAvailabilitySearchPhrase({
+        supplementName: "Magnesium",
+        topDoseLabels: ["200 mg"]
+      }),
+      "Thailand Magnesium 200 mg supplement product"
     );
     assert.equal(
       candidateSnapshotMatchesGap(
@@ -98,13 +166,17 @@ describe("continuous improvement insights", () => {
           diagnostics: [],
           evidenceRequired: [],
           externalProductId: "ext",
+          affectedPlanCount: 4,
+          blockerSolved: "missing_master_product",
           imageUrl: "https://example.com/zinc.webp",
           matchedGapId: "zinc",
+          matchedDoseLabel: "30 mg",
           matchedGapName: "Zinc",
           platform: "shopee",
           priceAmount: 120,
           productUrl: "https://example.com/zinc",
           query: "Thailand Zinc supplement product",
+          rationale: "Matched Zinc search.",
           searchStatus: "generated",
           title: "Example Zinc 30 tablets"
         },
@@ -127,7 +199,11 @@ describe("continuous improvement insights", () => {
     assert.match(readModel, /current_products/);
     assert.match(readModel, /optimum_products/);
     assert.match(readModel, /optimumDeltaPercent/);
+    assert.match(readModel, /loadMasterSupplementAvailabilityInsights/);
     assert.match(view, /product-plan-current-vs-optimum\.csv/);
+    assert.match(view, /master-supplement-availability\.csv/);
+    assert.match(view, /Retail Products To Add Or Restock/);
+    assert.doesNotMatch(view, /\|\| "n\/a"/);
     assert.match(view, /supplement-improvement-gaps\.csv/);
     assert.match(view, /food-improvement-opportunities\.csv/);
   });

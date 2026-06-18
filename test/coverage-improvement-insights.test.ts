@@ -76,6 +76,7 @@ describe("product coverage improvement insights", () => {
 
     assert.match(readModel, /to_regclass\('public\.product_recommendation_runs'\)/);
     assert.match(readModel, /to_regclass\('public\.product_recommendation_decisions'\)/);
+    assert.match(readModel, /to_regclass\('public\.product_facts'\)/);
     assert.match(readModel, /to_regclass\('public\.retail_checkout_payments'\)/);
     assert.match(readModel, /to_regclass\('public\.retail_order_allocations'\)/);
     assert.match(readModel, /!availability\.productDecisions/);
@@ -212,6 +213,9 @@ describe("product coverage improvement insights", () => {
     assert.doesNotMatch(readModel, /candidateProductOrSearchPhrase/);
     assert.doesNotMatch(readModel, /Thailand supplement product for/);
     assert.doesNotMatch(view, /externalCandidateSuggestions/);
+    assert.match(view, /Actionable supplement and product coverage gaps/);
+    assert.match(view, /availabilityDose/);
+    assert.match(view, /supplementAvailability/);
     assert.equal(
       "aiStatus" in emptyAdminCoverageImprovementInsightsData("week"),
       false
