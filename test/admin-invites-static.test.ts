@@ -24,3 +24,15 @@ test("admin invites do not silently overwrite existing membership roles", () => 
   assert.match(view, /labels\.access\.alreadyMember/);
   assert.match(view, /labels\.access\.membershipAdded/);
 });
+
+test("admin invites can recover existing members who still need a passkey", () => {
+  const access = source("lib/admin-access.ts");
+
+  assert.match(access, /admin_passkey_credentials credentials/);
+  assert.match(access, /passkeyCount < 1/);
+  assert.match(access, /shouldCreatePasskeyInviteForExistingMember = true/);
+  assert.match(access, /admin\.invite_existing_member_passkey/);
+  assert.match(access, /when public\.organisation_memberships\.status = 'invited' then excluded\.role/);
+  assert.match(access, /when public\.organisation_memberships\.status = 'invited' then 'active'/);
+  assert.doesNotMatch(access, /role\s*=\s*excluded\.role/);
+});

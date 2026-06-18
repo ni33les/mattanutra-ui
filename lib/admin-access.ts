@@ -965,6 +965,14 @@ async function upsertPersonAndMembership({
     on conflict (person_id, organisation_id)
       where principal_type = 'person' and status <> 'deleted'
     do update set
+      role = case
+        when public.organisation_memberships.status = 'invited' then excluded.role
+        else public.organisation_memberships.role
+      end,
+      status = case
+        when public.organisation_memberships.status = 'invited' then 'active'
+        else public.organisation_memberships.status
+      end,
       updated_at = now()
     returning id::text, organisation_id::text, person_id::text, role, status, title
   `;
@@ -3258,6 +3266,7 @@ export async function createAdminInvitation({
     membership_id: string | null;
     membership_metadata: unknown;
     membership_status: string | null;
+    passkey_count: number | string;
     name: string;
     organisation_id: string;
     organisation_status: string;
@@ -3285,7 +3294,8 @@ export async function createAdminInvitation({
       organisation_memberships.metadata as membership_metadata,
       organisation_memberships.role,
       organisation_memberships.status as membership_status,
-      organisation_memberships.title
+      organisation_memberships.title,
+      coalesce(passkeys.passkey_count, 0) as passkey_count
     from public.organisations
     left join public.people on lower(people.email) = ${normalizedEmail}
     left join public.organisation_memberships
@@ -3293,6 +3303,11 @@ export async function createAdminInvitation({
       and organisation_memberships.person_id = people.id
       and organisation_memberships.principal_type = 'person'
       and organisation_memberships.principal_type = 'person'
+    left join lateral (
+      select count(*)::int as passkey_count
+      from public.admin_passkey_credentials credentials
+      where credentials.person_id = people.id
+    ) passkeys on true
     where organisations.id = ${organisationId}::uuid
     limit 1
   `;
@@ -3323,6 +3338,8 @@ export async function createAdminInvitation({
     throw new Error("Platform Admin cannot grant Platform Owner access");
   }
 
+  let shouldCreatePasskeyInviteForExistingMember = false;
+
   if (existing.person_id && existing.email && existing.display_name) {
     const existingPerson = person({
       display_name: existing.display_name,
@@ -3341,6 +3358,7 @@ export async function createAdminInvitation({
 
     if (existing.membership_id && existing.role && existing.membership_status) {
       const existingMembershipMetadata = metadataRecord(existing.membership_metadata);
+      const passkeyCount = Number(existing.passkey_count ?? 0);
 
       if (existing.membership_status === "deleted" || existingMembershipMetadata.deletedAt) {
         const restoredRows = await sql<Array<{
@@ -3392,37 +3410,48 @@ export async function createAdminInvitation({
         };
       }
 
-      const existingMembership = membership({
-        id: existing.membership_id,
-        organisation_id: existing.organisation_id,
-        organisation_type: existing.organisation_type,
-        person_id: existing.person_id,
-        role: existing.role,
-        status: existing.membership_status,
-        title: existing.title
-      });
+      if (
+        passkeyCount < 1 &&
+        (existing.membership_status === "active" ||
+          existing.membership_status === "invited")
+      ) {
+        shouldCreatePasskeyInviteForExistingMember = true;
+      } else {
+        const existingMembership = membership({
+          id: existing.membership_id,
+          organisation_id: existing.organisation_id,
+          organisation_type: existing.organisation_type,
+          person_id: existing.person_id,
+          role: existing.role,
+          status: existing.membership_status,
+          title: existing.title
+        });
 
-      await recordAdminAudit({
-        action: "admin.invite_existing_member_blocked",
-        actorPersonId: actor.actorPerson.id,
-        assumedPersonId: actor.assumedPerson?.id ?? null,
-        organisationId,
-        resourceId: existingMembership.id,
-        resourceType: "organisation_membership",
-        metadata: { email: normalizedEmail, requestedRole: role }
-      });
+        await recordAdminAudit({
+          action: "admin.invite_existing_member_blocked",
+          actorPersonId: actor.actorPerson.id,
+          assumedPersonId: actor.assumedPerson?.id ?? null,
+          organisationId,
+          resourceId: existingMembership.id,
+          resourceType: "organisation_membership",
+          metadata: { email: normalizedEmail, requestedRole: role }
+        });
 
-      return {
-        existingAccess: {
-          membership: existingMembership,
-          organisation: existingOrganisation,
-          person: existingPerson,
-          reason: "existing_membership" as const
-        }
-      };
+        return {
+          existingAccess: {
+            membership: existingMembership,
+            organisation: existingOrganisation,
+            person: existingPerson,
+            reason: "existing_membership" as const
+          }
+        };
+      }
     }
 
-    if (existingPerson.status !== "active") {
+    if (
+      existingPerson.status !== "active" &&
+      !(shouldCreatePasskeyInviteForExistingMember && existingPerson.status === "invited")
+    ) {
       await recordAdminAudit({
         action: "admin.invite_inactive_person_blocked",
         actorPersonId: actor.actorPerson.id,
@@ -3443,63 +3472,75 @@ export async function createAdminInvitation({
       };
     }
 
-    const membershipRows = await sql<Array<{
-      id: string;
-      organisation_id: string;
-      person_id: string;
-      role: string;
-      status: string;
-      title: string | null;
-    }>>`
-      insert into public.organisation_memberships (
-        organisation_id,
-        principal_type,
-        person_id,
-        role,
-        status
-      )
-      values (
-        ${organisationId}::uuid,
-        'person',
-        ${existingPerson.id}::uuid,
-        ${role},
-        'active'
-      )
-      on conflict (person_id, organisation_id)
-        where principal_type = 'person' and status <> 'deleted'
-      do nothing
-      returning id::text, organisation_id::text, person_id::text, role, status, title
-    `;
-    const addedMembership = membershipRows[0] ? membership(membershipRows[0]) : null;
+    if (shouldCreatePasskeyInviteForExistingMember) {
+      await recordAdminAudit({
+        action: "admin.invite_existing_member_passkey",
+        actorPersonId: actor.actorPerson.id,
+        assumedPersonId: actor.assumedPerson?.id ?? null,
+        organisationId,
+        resourceId: existing.membership_id,
+        resourceType: "organisation_membership",
+        metadata: { email: normalizedEmail, requestedRole: role }
+      });
+    } else {
+      const membershipRows = await sql<Array<{
+        id: string;
+        organisation_id: string;
+        person_id: string;
+        role: string;
+        status: string;
+        title: string | null;
+      }>>`
+        insert into public.organisation_memberships (
+          organisation_id,
+          principal_type,
+          person_id,
+          role,
+          status
+        )
+        values (
+          ${organisationId}::uuid,
+          'person',
+          ${existingPerson.id}::uuid,
+          ${role},
+          'active'
+        )
+        on conflict (person_id, organisation_id)
+          where principal_type = 'person' and status <> 'deleted'
+        do nothing
+        returning id::text, organisation_id::text, person_id::text, role, status, title
+      `;
+      const addedMembership = membershipRows[0] ? membership(membershipRows[0]) : null;
 
-    if (!addedMembership) {
+      if (!addedMembership) {
+        return {
+          existingAccess: {
+            membership: null,
+            organisation: existingOrganisation,
+            person: existingPerson,
+            reason: "existing_membership" as const
+          }
+        };
+      }
+
+      await recordAdminAudit({
+        action: "admin.membership_added",
+        actorPersonId: actor.actorPerson.id,
+        assumedPersonId: actor.assumedPerson?.id ?? null,
+        organisationId,
+        resourceId: addedMembership.id,
+        resourceType: "organisation_membership",
+        metadata: { email: normalizedEmail, role }
+      });
+
       return {
-        existingAccess: {
-          membership: null,
+        membershipAdded: {
+          membership: addedMembership,
           organisation: existingOrganisation,
-          person: existingPerson,
-          reason: "existing_membership" as const
+          person: existingPerson
         }
       };
     }
-
-    await recordAdminAudit({
-      action: "admin.membership_added",
-      actorPersonId: actor.actorPerson.id,
-      assumedPersonId: actor.assumedPerson?.id ?? null,
-      organisationId,
-      resourceId: addedMembership.id,
-      resourceType: "organisation_membership",
-      metadata: { email: normalizedEmail, role }
-    });
-
-    return {
-      membershipAdded: {
-        membership: addedMembership,
-        organisation: existingOrganisation,
-        person: existingPerson
-      }
-    };
   }
 
   const rows = await sql<Array<{
