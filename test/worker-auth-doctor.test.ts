@@ -73,4 +73,36 @@ describe("worker auth doctor", () => {
     assert.match(smokeSource, /last_seen_at >= now\(\) - interval '2 minutes'/);
     assert.match(smokeSource, /Worker API access is not authorized/);
   });
+
+  it("keeps PRD smoke live-safe while preserving strict external secret checks", () => {
+    const smokeSource = readFileSync(
+      new URL("../scripts/prd-smoke.mjs", import.meta.url),
+      "utf8",
+    );
+
+    assert.match(smokeSource, /scripts\/workers-doctor\.ts/);
+    assert.match(smokeSource, /worker auth doctor/);
+    assert.match(smokeSource, /externalSecretChecksStrict/);
+    assert.match(smokeSource, /PRD_SMOKE_REQUIRE_EXTERNAL_SECRETS/);
+    assert.match(smokeSource, /PRD_EXPECT_CLEAN_RUNTIME/);
+    assert.match(smokeSource, /mattanutra-ui-prd/);
+    assert.match(
+      smokeSource,
+      /local worker credential hash validation skipped because local env is not explicitly PRD/,
+    );
+    assert.match(smokeSource, /DigitalOcean DB env/);
+    assert.match(smokeSource, /DigitalOcean retired DB env/);
+    assert.match(
+      smokeSource,
+      /retiredDatabaseUrlKey = \["DATABASE", "URL"\]\.join\("_"\)/,
+    );
+    assert.match(
+      smokeSource,
+      /runtime logs show DB_URL is not visible to start:platform/,
+    );
+    assert.match(smokeSource, /last_seen_at >= now\(\) - interval '2 minutes'/);
+    assert.match(smokeSource, /if \(expectCleanRuntime\)/);
+    assert.match(smokeSource, /clean operational runtime/);
+    assert.match(smokeSource, /Worker API access is not authorized/);
+  });
 });

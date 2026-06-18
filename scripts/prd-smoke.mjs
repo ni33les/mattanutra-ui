@@ -7,6 +7,7 @@ import postgres from "postgres";
 const targetBaseUrl = (
   process.env.PRD_SITE_URL || "https://mattanutra.com"
 ).replace(/\/+$/, "");
+const expectCleanRuntime = process.env.PRD_EXPECT_CLEAN_RUNTIME === "true";
 const lineWebhookUrl = `${targetBaseUrl}/api/line/webhook`;
 const expectedLineWebhookUrl = "https://mattanutra.com/api/line/webhook";
 const externalSecretChecksStrict =
@@ -161,7 +162,7 @@ async function checkDigitalOceanDeployment() {
 
   const configuredAppId = process.env.PRD_DIGITALOCEAN_APP_ID?.trim();
   const appName =
-    process.env.PRD_DIGITALOCEAN_APP_NAME?.trim() || "mattanutra-ui";
+    process.env.PRD_DIGITALOCEAN_APP_NAME?.trim() || "mattanutra-ui-prd";
   let appId = configuredAppId;
 
   try {
@@ -506,25 +507,9 @@ async function checkDatabase() {
     record(
       "Delight sellable catalogue",
       Number(delight?.sellable_count ?? 0) > 0 &&
-        Number(delight?.stock_quantity_sum ?? 0) === 0,
+        (!expectCleanRuntime || Number(delight?.stock_quantity_sum ?? 0) === 0),
       `sellable=${delight?.sellable_count ?? 0} stock_rows=${delight?.stock_count ?? 0} stock_sum=${delight?.stock_quantity_sum ?? 0}`
     );
-
-    const doctor = await runWorkerDoctor(connection);
-    let doctorDetails = `exit=${doctor.code}`;
-
-    try {
-      const payload = JSON.parse(doctor.stdout || "{}");
-      doctorDetails += ` failures=${payload.failureCount ?? "unknown"}`;
-    } catch {
-      if (doctor.error) {
-        doctorDetails += ` ${doctor.error}`;
-      } else if (doctor.stderr) {
-        doctorDetails += ` ${doctor.stderr.trim().slice(0, 180)}`;
-      }
-    }
-
-    record("worker auth doctor", doctor.code === 0, doctorDetails);
 
     const workerRows = await sql`
       select
@@ -565,6 +550,31 @@ async function checkDatabase() {
         : `stale=${staleWorkerProfiles.map((row) => row.mode).join(", ")}`
     );
 
+    if (!externalSecretChecksStrict) {
+      record(
+        "worker auth doctor",
+        false,
+        "local worker credential hash validation skipped because local env is not explicitly PRD",
+        "warn"
+      );
+    } else {
+      const doctor = await runWorkerDoctor(connection);
+      let doctorDetails = `exit=${doctor.code}`;
+
+      try {
+        const payload = JSON.parse(doctor.stdout || "{}");
+        doctorDetails += ` failures=${payload.failureCount ?? "unknown"}`;
+      } catch {
+        if (doctor.error) {
+          doctorDetails += ` ${doctor.error}`;
+        } else if (doctor.stderr) {
+          doctorDetails += ` ${doctor.stderr.trim().slice(0, 180)}`;
+        }
+      }
+
+      record("worker auth doctor", doctor.code === 0, doctorDetails);
+    }
+
     const stuckRows = await sql`
       select count(*)::int as stuck_count
       from public.tasks
@@ -579,34 +589,70 @@ async function checkDatabase() {
       `stuck=${stuckRows[0]?.stuck_count ?? 0}`
     );
 
-    const runtimeRows = await sql`
-      select table_name, row_count::int
-      from (
-        select 'assessments' as table_name, count(*) as row_count from public.assessments
-        union all
-        select 'communication_messages', count(*) from public.communication_messages
-        union all
-        select 'payments', count(*) from public.payments
-        union all
-        select 'retail_customer_orders', count(*) from public.retail_customer_orders
-        union all
-        select 'retail_shopping_lists', count(*) from public.retail_shopping_lists
-        union all
-        select 'retail_stock_movements', count(*) from public.retail_stock_movements
-        union all
-        select 'tasks', count(*) from public.tasks
-      ) counts
-      order by table_name
+    const channelRows = await sql`
+      select
+        count(*) filter (where communication_channels.channel_type = 'line')::int as line_channels,
+        count(*) filter (where communication_channels.channel_type = 'email')::int as email_channels
+      from public.organisations
+      join public.organisation_communication_identities
+        on organisation_communication_identities.organisation_id = organisations.id
+      join public.communication_channels
+        on communication_channels.identity_id = organisation_communication_identities.identity_id
+      where organisations.slug = 'delight-pharmacy'
+        and communication_channels.status = 'active'
     `;
-    const nonEmpty = runtimeRows.filter((row) => Number(row.row_count ?? 0) > 0);
+    const channels = channelRows[0];
 
     record(
-      "clean operational runtime",
-      nonEmpty.length === 0,
-      nonEmpty.length === 0
-        ? "7 operational tables empty"
-        : nonEmpty.map((row) => `${row.table_name}=${row.row_count}`).join(", ")
+      "Delight communication channels",
+      Number(channels?.line_channels ?? 0) +
+        Number(channels?.email_channels ?? 0) >
+        0,
+      `line=${channels?.line_channels ?? 0} email=${channels?.email_channels ?? 0}`,
+      expectCleanRuntime ? "error" : "warn"
     );
+
+    if (expectCleanRuntime) {
+      const operationalTables = [
+        "assessments",
+        "communication_messages",
+        "payments",
+        "retail_customer_orders",
+        "retail_shopping_lists",
+        "retail_stock_movements",
+        "tasks"
+      ];
+      const runtimeRows = await sql`
+        select table_name, row_count::int
+        from (
+          select 'assessments' as table_name, count(*) as row_count from public.assessments
+          union all
+          select 'communication_messages', count(*) from public.communication_messages
+          union all
+          select 'payments', count(*) from public.payments
+          union all
+          select 'retail_customer_orders', count(*) from public.retail_customer_orders
+          union all
+          select 'retail_shopping_lists', count(*) from public.retail_shopping_lists
+          union all
+          select 'retail_stock_movements', count(*) from public.retail_stock_movements
+          union all
+          select 'tasks', count(*) from public.tasks
+        ) counts
+        order by table_name
+      `;
+      const nonEmpty = runtimeRows.filter(
+        (row) => Number(row.row_count ?? 0) > 0
+      );
+
+      record(
+        "clean operational runtime",
+        nonEmpty.length === 0,
+        nonEmpty.length === 0
+          ? `${operationalTables.length} operational tables empty`
+          : nonEmpty.map((row) => `${row.table_name}=${row.row_count}`).join(", ")
+      );
+    }
   } finally {
     await sql.end({ timeout: 5 });
   }
