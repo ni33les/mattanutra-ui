@@ -100,7 +100,7 @@ export function normalizeAdminDashboardRange(
 
   return range && ranges.has(range as AdminDashboardRange)
     ? (range as AdminDashboardRange)
-    : "day";
+    : "month";
 }
 
 function addMinutes(date: Date, minutes: number) {

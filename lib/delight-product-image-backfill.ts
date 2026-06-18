@@ -223,7 +223,7 @@ async function duckDuckGoImageResults(query: string) {
     : [];
 }
 
-function imageHostPriority(value: string | null | undefined) {
+export function imageHostPriority(value: string | null | undefined) {
   const url = cleanText(value, 2000)?.toLowerCase() ?? "";
 
   if (/blackmores|megawecare|vistra|centrum|caltrate|maxxlife|berocca|alinamin|healthaid|unilab/.test(url)) {
@@ -256,7 +256,7 @@ function compactProductKey(value: string) {
   return normalizeProductKey(value).replace(/_/g, "");
 }
 
-function brandEvidenceMatches(brandName: string | null | undefined, text: string) {
+export function brandEvidenceMatches(brandName: string | null | undefined, text: string) {
   const brandKey = normalizeProductKey(brandName ?? "");
 
   if (!brandKey) {
@@ -287,7 +287,7 @@ function brandEvidenceMatches(brandName: string | null | undefined, text: string
   });
 }
 
-function minimumSearchScore(input: Readonly<{
+export function minimumSearchScore(input: Readonly<{
   brandMatches: boolean;
   hostPriority: number;
   text: string;
@@ -307,7 +307,7 @@ function minimumSearchScore(input: Readonly<{
   return HEALTH_IMAGE_RESULT_PATTERN.test(input.text) ? 0.76 : 0.82;
 }
 
-function viableImageUrl(value: unknown) {
+export function viableImageUrl(value: unknown) {
   const url = cleanText(value, 3000);
 
   if (!url || !/^https?:\/\//i.test(url)) {
