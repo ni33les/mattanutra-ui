@@ -13,6 +13,12 @@ const expectedLineWebhookUrl = "https://mattanutra.com/api/line/webhook";
 const externalSecretChecksStrict =
   process.env.MATTANUTRA_ENV === "prd" ||
   process.env.PRD_SMOKE_REQUIRE_EXTERNAL_SECRETS === "true";
+const validateLine =
+  externalSecretChecksStrict || process.env.PRD_SMOKE_VALIDATE_LINE === "true";
+const validateDatabase = process.env.PRD_SMOKE_VALIDATE_DB === "true";
+const validateWorkerCredentials =
+  externalSecretChecksStrict ||
+  process.env.PRD_SMOKE_VALIDATE_WORKER_CREDENTIALS === "true";
 const requiredTables = [
   "communication_channels",
   "communication_messages",
@@ -64,10 +70,17 @@ const retiredDatabaseUrlKey = ["DATABASE", "URL"].join("_");
 const checks = [];
 let digitalOceanAppId = null;
 let digitalOceanDeploymentId = null;
+let digitalOceanAppSpec = null;
 
 function record(name, ok, details = "", severity = "error") {
   checks.push({ details, name, ok, severity });
-  const prefix = ok ? "[ok]" : severity === "warn" ? "[warn]" : "[fail]";
+  const prefix = ok
+    ? "[ok]"
+    : severity === "skip"
+      ? "[skip]"
+      : severity === "warn"
+        ? "[warn]"
+        : "[fail]";
 
   console.log(`${prefix} ${name}${details ? ` - ${details}` : ""}`);
 }
@@ -147,6 +160,26 @@ function configuredServiceEnvKeysFromAppSpec(spec, serviceName) {
   return new Set((service?.envs ?? []).map((envVar) => envVar?.key).filter(Boolean));
 }
 
+function prdDigitalOceanComponentName(spec) {
+  const explicit =
+    process.env.PRD_DIGITALOCEAN_COMPONENT_NAME?.trim() ||
+    process.env.PRD_DIGITALOCEAN_SERVICE_NAME?.trim();
+
+  if (explicit) {
+    return explicit;
+  }
+
+  const serviceNames = (spec?.services ?? [])
+    .map((service) => service?.name)
+    .filter(Boolean);
+
+  if (serviceNames.includes("mattanutra-ui-prd")) {
+    return "mattanutra-ui-prd";
+  }
+
+  return serviceNames[0] || "mattanutra-ui-prd";
+}
+
 async function checkDigitalOceanDeployment() {
   const token = process.env.DIGITALOCEAN_ACCESS_TOKEN?.trim();
 
@@ -188,12 +221,12 @@ async function checkDigitalOceanDeployment() {
       { headers: { Authorization: `Bearer ${token}` } }
     );
     const appData = await appResponse.json();
-    const envKeys = configuredEnvKeysFromAppSpec(appData.app?.spec);
+    digitalOceanAppSpec = appData.app?.spec ?? null;
+    const componentName = prdDigitalOceanComponentName(digitalOceanAppSpec);
+    const envKeys = configuredEnvKeysFromAppSpec(digitalOceanAppSpec);
     const serviceEnvKeys = configuredServiceEnvKeysFromAppSpec(
-      appData.app?.spec,
-      process.env.PRD_DIGITALOCEAN_COMPONENT_NAME?.trim() ||
-        process.env.PRD_DIGITALOCEAN_SERVICE_NAME?.trim() ||
-        "mattanutra-ui"
+      digitalOceanAppSpec,
+      componentName
     );
     const missingEnvKeys = requiredPrdAppEnvKeys.filter((key) => !envKeys.has(key));
 
@@ -261,9 +294,7 @@ async function checkRecentRuntimeLogs() {
   }
 
   const componentName =
-    process.env.PRD_DIGITALOCEAN_COMPONENT_NAME?.trim() ||
-    process.env.PRD_DIGITALOCEAN_SERVICE_NAME?.trim() ||
-    "mattanutra-ui";
+    prdDigitalOceanComponentName(digitalOceanAppSpec);
 
   try {
     const response = await fetch(
@@ -364,18 +395,18 @@ function runWorkerDoctor(connection) {
 }
 
 async function checkLineWebhook() {
-  if (!externalSecretChecksStrict) {
+  if (!validateLine) {
     record(
       "LINE webhook endpoint",
       false,
-      "external LINE validation skipped because local env is not explicitly PRD",
-      "warn"
+      "set PRD_SMOKE_VALIDATE_LINE=true to validate PRD LINE endpoint",
+      "skip"
     );
     record(
       "LINE webhook signature",
       false,
-      "external LINE validation skipped because local env is not explicitly PRD",
-      "warn"
+      "set PRD_SMOKE_VALIDATE_LINE=true to validate signed PRD webhook",
+      "skip"
     );
     return;
   }
@@ -441,11 +472,14 @@ async function checkDatabase() {
   const connection = prdDbConnection();
 
   if (!connection) {
+    const severity = validateDatabase ? "error" : "skip";
     record(
       "PRD database",
       false,
-      "Set PRD_DB_URL, or DB_URL containing prd, to run DB checks",
-      "warn"
+      validateDatabase
+        ? "PRD_SMOKE_VALIDATE_DB=true requires PRD_DB_URL, or DB_URL containing prd"
+        : "set PRD_DB_URL, or DB_URL containing prd, to run DB checks",
+      severity
     );
     return;
   }
@@ -550,12 +584,12 @@ async function checkDatabase() {
         : `stale=${staleWorkerProfiles.map((row) => row.mode).join(", ")}`
     );
 
-    if (!externalSecretChecksStrict) {
+    if (!validateWorkerCredentials) {
       record(
         "worker auth doctor",
         false,
-        "local worker credential hash validation skipped because local env is not explicitly PRD",
-        "warn"
+        "set PRD_SMOKE_VALIDATE_WORKER_CREDENTIALS=true for local worker token hash validation",
+        "skip"
       );
     } else {
       const doctor = await runWorkerDoctor(connection);
@@ -671,15 +705,19 @@ async function main() {
   await checkRecentRuntimeLogs();
 
   const failures = checks.filter(
-    (check) => !check.ok && check.severity !== "warn"
+    (check) => !check.ok && check.severity === "error"
   );
   const warnings = checks.filter(
     (check) => !check.ok && check.severity === "warn"
+  );
+  const skipped = checks.filter(
+    (check) => !check.ok && check.severity === "skip"
   );
 
   console.log(JSON.stringify({
     checkedAt: new Date().toISOString(),
     failureCount: failures.length,
+    skippedCount: skipped.length,
     targetBaseUrl,
     warningCount: warnings.length
   }, null, 2));

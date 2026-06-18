@@ -16,6 +16,7 @@ public/uploads/*
 .env
 .env.local
 .env.*.local
+.env.prd-smoke
 
 # logs
 npm-debug.log*

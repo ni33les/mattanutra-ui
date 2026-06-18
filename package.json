@@ -25,6 +25,7 @@
     "prd:rebuild": "node --env-file-if-exists=.env.local scripts/rebuild-prd-db.mjs",
     "prd:seed:minimal-runtime": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/seed-prd-minimal-runtime.ts",
     "prd:smoke": "node --env-file-if-exists=.env.local scripts/prd-smoke.mjs",
+    "prd:smoke:strict": "PRD_SMOKE_VALIDATE_LINE=true PRD_SMOKE_VALIDATE_DB=true PRD_SMOKE_VALIDATE_WORKER_CREDENTIALS=true node --env-file-if-exists=.env.local --env-file-if-exists=.env.prd-smoke scripts/prd-smoke.mjs",
     "audit:codebase": "node --env-file-if-exists=.env.local --experimental-strip-types --import ./scripts/register-ts-path-loader.mjs scripts/audit-codebase.ts",
     "lint": "eslint .",
     "lint:cached": "eslint . --cache --cache-location .next/cache/eslint",

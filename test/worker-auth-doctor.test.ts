@@ -79,16 +79,48 @@ describe("worker auth doctor", () => {
       new URL("../scripts/prd-smoke.mjs", import.meta.url),
       "utf8",
     );
+    const gitignore = readFileSync(
+      new URL("../.gitignore", import.meta.url),
+      "utf8",
+    );
+    const prdSmokeExample = readFileSync(
+      new URL("../.env.prd-smoke.example", import.meta.url),
+      "utf8",
+    );
 
     assert.match(smokeSource, /scripts\/workers-doctor\.ts/);
     assert.match(smokeSource, /worker auth doctor/);
     assert.match(smokeSource, /externalSecretChecksStrict/);
     assert.match(smokeSource, /PRD_SMOKE_REQUIRE_EXTERNAL_SECRETS/);
+    assert.match(smokeSource, /PRD_SMOKE_VALIDATE_LINE/);
+    assert.match(smokeSource, /PRD_SMOKE_VALIDATE_DB/);
+    assert.match(smokeSource, /PRD_SMOKE_VALIDATE_WORKER_CREDENTIALS/);
     assert.match(smokeSource, /PRD_EXPECT_CLEAN_RUNTIME/);
     assert.match(smokeSource, /mattanutra-ui-prd/);
+    assert.match(smokeSource, /function prdDigitalOceanComponentName/);
+    assert.match(
+      packageJson.scripts?.["prd:smoke:strict"] ?? "",
+      /PRD_SMOKE_VALIDATE_LINE=true/,
+    );
+    assert.match(
+      packageJson.scripts?.["prd:smoke:strict"] ?? "",
+      /--env-file-if-exists=\.env\.prd-smoke/,
+    );
     assert.match(
       smokeSource,
-      /local worker credential hash validation skipped because local env is not explicitly PRD/,
+      /set PRD_SMOKE_VALIDATE_LINE=true to validate PRD LINE endpoint/,
+    );
+    assert.match(
+      smokeSource,
+      /set PRD_DB_URL, or DB_URL containing prd, to run DB checks/,
+    );
+    assert.match(
+      smokeSource,
+      /PRD_SMOKE_VALIDATE_DB=true requires PRD_DB_URL, or DB_URL containing prd/,
+    );
+    assert.match(
+      smokeSource,
+      /set PRD_SMOKE_VALIDATE_WORKER_CREDENTIALS=true for local worker token hash validation/,
     );
     assert.match(smokeSource, /DigitalOcean DB env/);
     assert.match(smokeSource, /DigitalOcean retired DB env/);
@@ -104,5 +136,11 @@ describe("worker auth doctor", () => {
     assert.match(smokeSource, /if \(expectCleanRuntime\)/);
     assert.match(smokeSource, /clean operational runtime/);
     assert.match(smokeSource, /Worker API access is not authorized/);
+    assert.match(smokeSource, /severity === "skip"/);
+    assert.match(smokeSource, /skippedCount/);
+    assert.match(gitignore, /^\.env\.prd-smoke$/m);
+    assert.match(prdSmokeExample, /^PRD_DB_URL=$/m);
+    assert.match(prdSmokeExample, /^LINE_CHANNEL_ACCESS_TOKEN=$/m);
+    assert.match(prdSmokeExample, /^WORKER_PANYA_AGENT_API_KEY=$/m);
   });
 });
