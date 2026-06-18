@@ -9,6 +9,7 @@ import type { Locale } from "@/lib/i18n";
 import type {
   AdminFoodImprovementInsightsData,
   AdminProductImprovementInsightsData,
+  AdminSupplementAvailabilityMatrixData,
   AdminSupplementImprovementInsightsData,
   ExternalProductCandidate,
   FoodOpportunityInsight,
@@ -333,10 +334,8 @@ const supplementColumns: TableColumn<SupplementDemandInsight>[] = [
   { label: "status", value: (row) => row.listStatus },
   { label: "category", value: (row) => row.category ?? "" },
   { label: "recommendations", value: (row) => String(row.recommendationCount) },
-  { label: "add", value: (row) => String(row.addCount) },
-  { label: "review", value: (row) => String(row.reviewCount) },
   { label: "covered", value: (row) => String(row.coveredCount) },
-  { label: "hidden", value: (row) => String(row.hiddenCount) },
+  { label: "reason", value: (row) => row.rationale },
   { label: "last_recommended_at", value: (row) => row.lastRecommendedAt ?? "" }
 ];
 
@@ -442,9 +441,7 @@ export function AdminSupplementImprovementInsightsView({
                 <th className="py-2 pr-4">Supplement</th>
                 <th className="py-2 pr-4">Status</th>
                 <th className="py-2 pr-4">Demand</th>
-                <th className="py-2 pr-4">Add</th>
-                <th className="py-2 pr-4">Review</th>
-                <th className="py-2 pr-4">Hidden</th>
+                <th className="py-2 pr-4">Reason</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -453,13 +450,11 @@ export function AdminSupplementImprovementInsightsView({
                   <td className="py-3 pr-4 font-semibold text-gray-900">{row.name}</td>
                   <td className="py-3 pr-4"><StatusPill status={row.listStatus} /></td>
                   <td className="py-3 pr-4">{formatNumber(row.recommendationCount, locale)}</td>
-                  <td className="py-3 pr-4">{formatNumber(row.addCount, locale)}</td>
-                  <td className="py-3 pr-4">{formatNumber(row.reviewCount, locale)}</td>
-                  <td className="py-3 pr-4">{formatNumber(row.hiddenCount, locale)}</td>
+                  <td className="max-w-xl py-3 pr-4 text-gray-600">{row.rationale}</td>
                 </tr>
               )) : (
                 <tr>
-                  <td className="py-4 text-gray-500" colSpan={6}>
+                  <td className="py-4 text-gray-500" colSpan={4}>
                     No missing, blocked, hidden, or review-only supplement demand.
                   </td>
                 </tr>
@@ -472,18 +467,20 @@ export function AdminSupplementImprovementInsightsView({
   );
 }
 
-const productOpportunityColumns: TableColumn<ProductOpportunityInsight>[] = [
-  { label: "product", value: (row) => row.title },
-  { label: "action_type", value: (row) => row.opportunityLabel },
-  { label: "plan_count", value: (row) => String(row.planCount) },
-  { label: "recommendation_count", value: (row) => String(row.recommendationCount) },
-  { label: "retailer_count", value: (row) => String(row.retailerCount) },
-  { label: "average_coverage_percent", value: (row) => String(row.averageCoveragePercent ?? "") },
-  { label: "signals", value: (row) => row.supplementSignals.join("; ") },
+const supplementAvailabilityColumns: TableColumn<MasterSupplementAvailabilityInsight>[] = [
+  { label: "supplement", value: (row) => row.supplementName },
+  { label: "status", value: (row) => row.availabilityState },
+  { label: "affected_plans", value: (row) => String(row.affectedPlanCount) },
+  { label: "low_coverage_plans", value: (row) => String(row.lowCoveragePlanCount) },
   { label: "top_doses", value: (row) => row.topDoseLabels.join("; ") },
-  { label: "blocker", value: (row) => row.blockerReason ?? "" },
+  { label: "master_products", value: (row) => String(row.masterProductCount) },
+  { label: "dose_fact_products", value: (row) => String(row.masterProductsWithDoseCount) },
+  { label: "active_retailers", value: (row) => String(row.activeRetailerCount) },
+  { label: "stocked_retailers", value: (row) => String(row.availableRetailerCount) },
+  { label: "backorder_retailers", value: (row) => String(row.backorderRetailerCount) },
   { label: "action", value: (row) => row.action },
-  { label: "rationale", value: (row) => row.rationale }
+  { label: "rationale", value: (row) => row.rationale },
+  { label: "search_query", value: (row) => row.recommendedSearchQuery }
 ];
 
 const planComparisonColumns: TableColumn<PlanCoverageComparison>[] = [
@@ -573,6 +570,64 @@ function ProductCandidateList({
   );
 }
 
+export function AdminSupplementAvailabilityMatrixView({
+  data,
+  locale
+}: Readonly<{
+  data: AdminSupplementAvailabilityMatrixData;
+  locale: Locale;
+}>) {
+  const metrics: BusinessMetric[] = [
+    {
+      color: businessMetricColors.total,
+      id: "totalSupplements",
+      label: "Active supplements",
+      series: [],
+      value: formatNumber(data.summary.totalSupplements, locale)
+    },
+    {
+      color: businessMetricColors.failed,
+      id: "missingMaster",
+      label: "Missing master product",
+      series: [],
+      value: formatNumber(data.summary.missingMasterProduct, locale)
+    },
+    {
+      color: businessMetricColors.medium,
+      id: "missingRetail",
+      label: "Missing retail product",
+      series: [],
+      value: formatNumber(data.summary.missingRetailProduct, locale)
+    },
+    {
+      color: businessMetricColors.succeeded,
+      id: "covered",
+      label: "Covered",
+      series: [],
+      value: formatNumber(data.summary.covered, locale)
+    }
+  ];
+
+  return (
+    <div className="mt-8 space-y-6">
+      <BusinessStatsGrid metrics={metrics} />
+
+      <Section
+        action={
+          <CsvButton
+            filename="supplement-availability-matrix.csv"
+            rows={csvRows(supplementAvailabilityColumns, data.supplementAvailability)}
+          />
+        }
+        eyebrow="Master supplement coverage"
+        title="Supplement Availability Matrix"
+      >
+        <SupplementAvailabilityTable rows={data.supplementAvailability} locale={locale} />
+      </Section>
+    </div>
+  );
+}
+
 export function AdminProductImprovementInsightsView({
   data,
   locale
@@ -580,25 +635,20 @@ export function AdminProductImprovementInsightsView({
   data: AdminProductImprovementInsightsData;
   locale: Locale;
 }>) {
-  const [type, setType] = useState("all");
-  const types = [...new Set(data.masterListOpportunities.map((row) => row.opportunityType))];
-  const filtered = data.masterListOpportunities.filter((row) =>
-    type === "all" || row.opportunityType === type
-  );
   const metrics: BusinessMetric[] = [
     {
       color: businessMetricColors.total,
-      id: "opportunities",
-      label: "Retail add/restock actions",
+      id: "externalCandidates",
+      label: "External candidates",
       series: [],
-      value: formatNumber(data.summary.masterListOpportunityCount, locale)
+      value: formatNumber(data.summary.externalCandidateCount, locale)
     },
     {
       color: businessMetricColors.medium,
-      id: "retailBlockers",
-      label: "Retail blockers",
+      id: "reviewBlockers",
+      label: "Secondary review blockers",
       series: [],
-      value: formatNumber(data.summary.retailBlockerCount, locale)
+      value: formatNumber(data.reviewOpportunities.length, locale)
     },
     {
       color: businessMetricColors.failed,
@@ -606,13 +656,6 @@ export function AdminProductImprovementInsightsView({
       label: "Low coverage plans",
       series: [],
       value: formatNumber(data.summary.lowCoveragePlans, locale)
-    },
-    {
-      color: businessMetricColors.failed,
-      id: "weakSupplements",
-      label: "Weak supplement coverage",
-      series: [],
-      value: formatNumber(data.summary.weakSupplementCount, locale)
     },
     {
       color: businessMetricColors.succeeded,
@@ -626,97 +669,6 @@ export function AdminProductImprovementInsightsView({
   return (
     <div className="mt-8 space-y-6">
       <BusinessStatsGrid metrics={metrics} />
-
-      <Section
-        action={
-          <CsvButton
-            filename="master-supplement-availability.csv"
-            rows={csvRows([
-              { label: "supplement", value: (row: MasterSupplementAvailabilityInsight) => row.supplementName },
-              { label: "status", value: (row) => row.availabilityState },
-              { label: "affected_plans", value: (row) => String(row.affectedPlanCount) },
-              { label: "low_coverage_plans", value: (row) => String(row.lowCoveragePlanCount) },
-              { label: "top_doses", value: (row) => row.topDoseLabels.join("; ") },
-              { label: "master_products", value: (row) => String(row.masterProductCount) },
-              { label: "dose_fact_products", value: (row) => String(row.masterProductsWithDoseCount) },
-              { label: "active_retailers", value: (row) => String(row.activeRetailerCount) },
-              { label: "stocked_retailers", value: (row) => String(row.availableRetailerCount) },
-              { label: "action", value: (row) => row.action },
-              { label: "rationale", value: (row) => row.rationale },
-              { label: "search_query", value: (row) => row.recommendedSearchQuery }
-            ], data.supplementAvailability)}
-          />
-        }
-        eyebrow="Master supplement coverage"
-        title="Master Supplement Availability Matrix"
-      >
-        <SupplementAvailabilityTable rows={data.supplementAvailability} locale={locale} />
-      </Section>
-
-      <div className="flex flex-wrap gap-3">
-        <SelectFilter
-          label="Opportunity"
-          onChange={setType}
-          options={types}
-          value={type}
-        />
-      </div>
-
-      <Section
-        action={
-          <div className="flex flex-wrap gap-2">
-            <CsvButton
-              filename="product-retail-add-restock-actions.csv"
-              rows={csvRows(productOpportunityColumns, filtered)}
-            />
-            <CsvButton
-              filename="product-secondary-review-blockers.csv"
-              rows={csvRows(productOpportunityColumns, data.reviewOpportunities)}
-            />
-          </div>
-        }
-        eyebrow="Retail coverage"
-        title="Retail Products To Add Or Restock"
-      >
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead>
-              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <th className="py-2 pr-4">Product</th>
-                <th className="py-2 pr-4">Action</th>
-                <th className="py-2 pr-4">Plans</th>
-                <th className="py-2 pr-4">Avg fit</th>
-                <th className="py-2 pr-4">Supplement / dose</th>
-                <th className="py-2 pr-4">Rationale</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.length > 0 ? filtered.map((row) => (
-                <tr key={`${row.productId}:${row.opportunityType}`}>
-                  <td className="max-w-sm py-3 pr-4 font-semibold text-gray-900">{row.title}</td>
-                  <td className="py-3 pr-4 text-xs font-semibold text-gray-600">{row.opportunityLabel}</td>
-                  <td className="py-3 pr-4">{formatNumber(row.planCount, locale)}</td>
-                  <td className="py-3 pr-4">{formatPercent(row.averageCoveragePercent, locale)}</td>
-                  <td className="py-3 pr-4 text-gray-600">
-                    <p>{row.supplementSignals.join(", ") || "Supplement not recorded"}</p>
-                    <p className="mt-1 text-xs text-gray-500">{doseText(row.topDoseLabels)}</p>
-                  </td>
-                  <td className="max-w-md py-3 pr-4 text-gray-600">
-                    <p>{row.action}</p>
-                    <p className="mt-1 text-xs text-gray-500">{row.rationale}</p>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td className="py-4 text-gray-500" colSpan={6}>
-                    No approved master-list products currently need retail add, reactivation, or restock action.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Section>
 
       <Section
         eyebrow="Wider search"

@@ -61,6 +61,7 @@ export type SupplementDemandInsight = Readonly<{
   listStatus: ImprovementListStatus;
   name: string;
   recommendationCount: number;
+  rationale: string;
   reviewCount: number;
 }>;
 
@@ -212,6 +213,21 @@ export type AdminProductImprovementInsightsData = Readonly<{
   supplementAvailability: MasterSupplementAvailabilityInsight[];
 }>;
 
+export type AdminSupplementAvailabilityMatrixData = Readonly<{
+  databaseAvailable: boolean;
+  generatedAt: string;
+  range: AdminDashboardRange;
+  summary: {
+    covered: number;
+    missingMasterProduct: number;
+    missingRetailProduct: number;
+    totalSupplements: number;
+    weakMasterProduct: number;
+    weakRetailProduct: number;
+  };
+  supplementAvailability: MasterSupplementAvailabilityInsight[];
+}>;
+
 export type AdminFoodImprovementInsightsData = Readonly<{
   databaseAvailable: boolean;
   foodOpportunities: FoodOpportunityInsight[];
@@ -263,6 +279,15 @@ const emptyProductSummary = {
   weakSupplementCount: 0
 };
 
+const emptySupplementAvailabilitySummary = {
+  covered: 0,
+  missingMasterProduct: 0,
+  missingRetailProduct: 0,
+  totalSupplements: 0,
+  weakMasterProduct: 0,
+  weakRetailProduct: 0
+};
+
 const emptyFoodSummary = {
   blockedFoodRecommendations: 0,
   foodsRecommended: 0,
@@ -302,6 +327,19 @@ export function emptyAdminProductImprovementInsightsData(
     range,
     reviewOpportunities: [],
     summary: emptyProductSummary,
+    supplementAvailability: []
+  };
+}
+
+export function emptyAdminSupplementAvailabilityMatrixData(
+  range: AdminDashboardRange,
+  databaseAvailable = false
+): AdminSupplementAvailabilityMatrixData {
+  return {
+    databaseAvailable,
+    generatedAt: new Date().toISOString(),
+    range,
+    summary: emptySupplementAvailabilitySummary,
     supplementAvailability: []
   };
 }
@@ -537,6 +575,45 @@ function statusFromSupplementRow(row: {
   }
 
   return "active";
+}
+
+function supplementDemandRationale(row: {
+  add_count: number | string;
+  hidden_count: number | string;
+  is_active: boolean | null;
+  list_status: string | null;
+  review_count: number | string;
+  safety_action: string | null;
+  safety_visibility: string | null;
+  source_status: string | null;
+  supplement_id: string | null;
+  supplement_exists: boolean | null;
+}) {
+  if (!row.supplement_id || row.supplement_exists === false || row.safety_action === "unknown_supplement") {
+    return "AI recommended this supplement, but it is not yet a clean active item in the managed supplement list.";
+  }
+
+  if (row.safety_visibility === "hidden" || numberValue(row.hidden_count) > 0) {
+    return "This recommendation is hidden by safety policy or customer-specific safety handling.";
+  }
+
+  if (row.is_active === false || row.list_status === "blocked") {
+    return "The supplement exists, but it is blocked or inactive and should not be used until reviewed.";
+  }
+
+  if (row.source_status && row.source_status !== "core") {
+    return "The supplement is in the list as a proposed addition, but it still needs source and safety review.";
+  }
+
+  if (numberValue(row.review_count) > 0) {
+    return "AI recommended it with review status, so an admin should confirm suitability before treating it as cleanly usable.";
+  }
+
+  if (numberValue(row.add_count) > 0) {
+    return "AI recommended adding this supplement for at least one plan, but it is not yet fully resolved as covered.";
+  }
+
+  return "This supplement is not cleanly usable for at least one current recommendation.";
 }
 
 function productOpportunityAction(type: ProductOpportunityType) {
@@ -1121,6 +1198,7 @@ export async function getAdminSupplementImprovementInsightsData(
       listStatus: statusFromSupplementRow(row),
       name: row.name,
       recommendationCount: numberValue(row.recommendation_count),
+      rationale: supplementDemandRationale(row),
       reviewCount: numberValue(row.review_count)
     }));
     const missingOrBlocked = distribution
@@ -1161,6 +1239,59 @@ export async function getAdminSupplementImprovementInsightsData(
   } catch (error) {
     console.error("Unable to load supplement improvement insights", error);
     return emptyAdminSupplementImprovementInsightsData(range);
+  }
+}
+
+export async function getAdminSupplementAvailabilityMatrixData(
+  range: AdminDashboardRange,
+  locale: Locale = "en"
+): Promise<AdminSupplementAvailabilityMatrixData> {
+  const sql = getSql();
+
+  if (!sql) {
+    return emptyAdminSupplementAvailabilityMatrixData(range);
+  }
+
+  try {
+    const availability = await recommendationInsightsSchemaAvailable(sql);
+
+    if (
+      !availability.productCountries ||
+      !availability.productFacts ||
+      !availability.productRuns ||
+      !availability.products ||
+      !availability.retailOrderAllocations ||
+      !availability.retailProductStock ||
+      !availability.retailSellableProducts ||
+      !availability.supplementSelections ||
+      !availability.supplements
+    ) {
+      return emptyAdminSupplementAvailabilityMatrixData(range, true);
+    }
+
+    const supplementAvailability = await loadMasterSupplementAvailabilityInsights(
+      sql,
+      rangeStartParam(range),
+      locale
+    );
+
+    return {
+      databaseAvailable: true,
+      generatedAt: new Date().toISOString(),
+      range,
+      summary: {
+        covered: supplementAvailability.filter((row) => row.availabilityState === "covered").length,
+        missingMasterProduct: supplementAvailability.filter((row) => row.availabilityState === "missing_master_product").length,
+        missingRetailProduct: supplementAvailability.filter((row) => row.availabilityState === "missing_retail_product").length,
+        totalSupplements: supplementAvailability.length,
+        weakMasterProduct: supplementAvailability.filter((row) => row.availabilityState === "weak_master_product").length,
+        weakRetailProduct: supplementAvailability.filter((row) => row.availabilityState === "weak_retail_product").length
+      },
+      supplementAvailability
+    };
+  } catch (error) {
+    console.error("Unable to load supplement availability matrix", error);
+    return emptyAdminSupplementAvailabilityMatrixData(range);
   }
 }
 

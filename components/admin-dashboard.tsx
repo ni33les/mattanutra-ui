@@ -48,6 +48,7 @@ import type {
 import type {
   AdminFoodImprovementInsightsData,
   AdminProductImprovementInsightsData,
+  AdminSupplementAvailabilityMatrixData,
   AdminSupplementImprovementInsightsData
 } from "@/lib/admin-recommendation-insights";
 import type {
@@ -110,6 +111,7 @@ import { AdminVisibilityView } from "@/components/admin/visibility-view";
 import {
   AdminFoodImprovementInsightsView,
   AdminProductImprovementInsightsView,
+  AdminSupplementAvailabilityMatrixView,
   AdminSupplementImprovementInsightsView
 } from "@/components/admin/recommendation-insights-view";
 import { AdminDrawer } from "@/components/admin/ui";
@@ -238,6 +240,7 @@ function adminViewDatabaseAvailable({
   retailStockData,
   reviewQueueData,
   supplementsData,
+  supplementAvailabilityMatrixData,
   supplementImprovementInsightsData,
   visibilityData,
   view
@@ -263,6 +266,7 @@ function adminViewDatabaseAvailable({
   retailStockData: AdminRetailStockData;
   reviewQueueData: AdminReviewQueueData;
   supplementsData: AdminSupplementsData;
+  supplementAvailabilityMatrixData: AdminSupplementAvailabilityMatrixData;
   supplementImprovementInsightsData: AdminSupplementImprovementInsightsData;
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
@@ -368,6 +372,10 @@ function adminViewDatabaseAvailable({
     return productImprovementInsightsData.databaseAvailable;
   }
 
+  if (view === "supplement-availability-matrix") {
+    return supplementAvailabilityMatrixData.databaseAvailable;
+  }
+
   if (view === "supplement-insights") {
     return supplementImprovementInsightsData.databaseAvailable;
   }
@@ -419,6 +427,7 @@ export function AdminDashboard({
   selectedTaskId,
   settingsData,
   supplementsData,
+  supplementAvailabilityMatrixData,
   supplementImprovementInsightsData,
   visibilityData,
   view
@@ -454,6 +463,7 @@ export function AdminDashboard({
   selectedTaskId?: string | null;
   settingsData: AdminSettingsData | null;
   supplementsData: AdminSupplementsData;
+  supplementAvailabilityMatrixData: AdminSupplementAvailabilityMatrixData;
   supplementImprovementInsightsData: AdminSupplementImprovementInsightsData;
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
@@ -483,6 +493,7 @@ export function AdminDashboard({
       view === "product-insights" ||
       view === "retail-financials" ||
       view === "settlements" ||
+      view === "supplement-availability-matrix" ||
       view === "supplement-insights" ||
       view === "visibility");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -545,6 +556,7 @@ export function AdminDashboard({
     retailStockData,
     reviewQueueData,
     supplementsData,
+    supplementAvailabilityMatrixData,
     supplementImprovementInsightsData,
     visibilityData: liveVisibilityData,
     view
@@ -878,6 +890,11 @@ export function AdminDashboard({
           ) : view === "product-insights" ? (
             <AdminProductImprovementInsightsView
               data={productImprovementInsightsData}
+              locale={locale}
+            />
+          ) : view === "supplement-availability-matrix" ? (
+            <AdminSupplementAvailabilityMatrixView
+              data={supplementAvailabilityMatrixData}
               locale={locale}
             />
           ) : view === "supplement-insights" ? (

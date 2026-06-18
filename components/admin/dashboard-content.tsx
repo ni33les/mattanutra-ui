@@ -64,6 +64,7 @@ export type AdminDashboardView =
   | "settings"
   | "settlements"
   | "stock"
+  | "supplement-availability-matrix"
   | "supplement-insights"
   | "supplements"
   | "testimonials"
@@ -1440,6 +1441,7 @@ const baseContent = {
     ],
     retailSellingTitle: "Orders",
     insights: [
+      { icon: BeakerIcon, name: "Supplement Availability Matrix", view: "supplement-availability-matrix" },
       { icon: UserGroupIcon, name: "Customer Intelligence", view: "customer-insights" },
       { icon: FunnelIcon, name: "Coverage Improvement", view: "coverage-improvement-insights" },
       { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" },
@@ -1490,6 +1492,7 @@ const baseContent = {
       settings: "Settings",
       settlements: "Settlements",
       stock: "Stock",
+      "supplement-availability-matrix": "Supplement Availability Matrix",
       "supplement-insights": "Supplement Insights",
       supplements: "Supplements",
       testimonials: "Testimonials",
@@ -2298,6 +2301,7 @@ const baseContent = {
     ],
     retailSellingTitle: "คำสั่งซื้อ",
     insights: [
+      { icon: BeakerIcon, name: "ตารางความพร้อมอาหารเสริม", view: "supplement-availability-matrix" },
       { icon: UserGroupIcon, name: "ข้อมูลลูกค้า", view: "customer-insights" },
       { icon: FunnelIcon, name: "ปรับปรุงความครอบคลุม", view: "coverage-improvement-insights" },
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplement-insights" },
@@ -2348,6 +2352,7 @@ const baseContent = {
       settings: "การตั้งค่า",
       settlements: "การชำระร้านค้า",
       stock: "สต็อก",
+      "supplement-availability-matrix": "ตารางความพร้อมอาหารเสริม",
       "supplement-insights": "ข้อมูลอาหารเสริม",
       supplements: "อาหารเสริม",
       testimonials: "คำรับรอง",

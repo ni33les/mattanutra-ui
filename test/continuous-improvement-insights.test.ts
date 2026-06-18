@@ -6,6 +6,7 @@ import {
   classifySupplementAvailability,
   emptyAdminFoodImprovementInsightsData,
   emptyAdminProductImprovementInsightsData,
+  emptyAdminSupplementAvailabilityMatrixData,
   emptyAdminSupplementImprovementInsightsData,
   productOpportunitySearchPhrase,
   supplementAvailabilitySearchPhrase,
@@ -30,7 +31,7 @@ const opportunity: ProductOpportunityInsight = {
 };
 
 describe("continuous improvement insights", () => {
-  it("wires supplement, product, and food improvement pages to marketing permission", () => {
+  it("wires supplement availability, supplement, product, and food improvement pages to marketing permission", () => {
     const dashboardContent = readFileSync(
       "components/admin/dashboard-content.tsx",
       "utf8"
@@ -38,16 +39,24 @@ describe("continuous improvement insights", () => {
     const dashboard = readFileSync("components/admin-dashboard.tsx", "utf8");
     const page = readFileSync("app/[locale]/admin/dashboard/page.tsx", "utf8");
 
+    assert.match(dashboardContent, /"supplement-availability-matrix"/);
+    assert.match(
+      dashboardContent,
+      /insights: \[\s*\{ icon: BeakerIcon, name: "Supplement Availability Matrix", view: "supplement-availability-matrix" \}/
+    );
     assert.match(dashboardContent, /"supplement-insights"/);
     assert.match(dashboardContent, /"product-insights"/);
     assert.match(dashboardContent, /"food-insights"/);
     assert.doesNotMatch(dashboardContent, /"out-of-catalog-insights"/);
+    assert.match(dashboard, /AdminSupplementAvailabilityMatrixView/);
     assert.match(dashboard, /AdminSupplementImprovementInsightsView/);
     assert.match(dashboard, /AdminProductImprovementInsightsView/);
     assert.match(dashboard, /AdminFoodImprovementInsightsView/);
+    assert.match(page, /getAdminSupplementAvailabilityMatrixData/);
     assert.match(page, /getAdminSupplementImprovementInsightsData/);
     assert.match(page, /getAdminProductImprovementInsightsData/);
     assert.match(page, /getAdminFoodImprovementInsightsData/);
+    assert.equal(adminViewPermission("supplement-availability-matrix"), "marketing.read");
     assert.equal(adminViewPermission("supplement-insights"), "marketing.read");
     assert.equal(adminViewPermission("product-insights"), "marketing.read");
     assert.equal(adminViewPermission("food-insights"), "marketing.read");
@@ -60,6 +69,10 @@ describe("continuous improvement insights", () => {
     );
     assert.equal(
       emptyAdminProductImprovementInsightsData("week").summary.externalCandidateCount,
+      0
+    );
+    assert.equal(
+      emptyAdminSupplementAvailabilityMatrixData("week").summary.totalSupplements,
       0
     );
     assert.equal(
@@ -201,8 +214,15 @@ describe("continuous improvement insights", () => {
     assert.match(readModel, /optimumDeltaPercent/);
     assert.match(readModel, /loadMasterSupplementAvailabilityInsights/);
     assert.match(view, /product-plan-current-vs-optimum\.csv/);
-    assert.match(view, /master-supplement-availability\.csv/);
-    assert.match(view, /Retail Products To Add Or Restock/);
+    assert.match(view, /supplement-availability-matrix\.csv/);
+    assert.match(view, /Supplement Availability Matrix/);
+    assert.match(view, /Recommended By AI But Not Cleanly Usable/);
+    assert.match(view, />Reason</);
+    assert.doesNotMatch(view, />Add</);
+    assert.doesNotMatch(view, />Review</);
+    assert.doesNotMatch(view, />Hidden</);
+    assert.doesNotMatch(view, /Retail Products To Add Or Restock/);
+    assert.doesNotMatch(view, /product-retail-add-restock-actions\.csv/);
     assert.doesNotMatch(view, /\|\| "n\/a"/);
     assert.match(view, /supplement-improvement-gaps\.csv/);
     assert.match(view, /food-improvement-opportunities\.csv/);

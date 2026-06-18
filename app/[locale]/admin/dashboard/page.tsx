@@ -62,9 +62,11 @@ import {
 import {
   emptyAdminFoodImprovementInsightsData,
   emptyAdminProductImprovementInsightsData,
+  emptyAdminSupplementAvailabilityMatrixData,
   emptyAdminSupplementImprovementInsightsData,
   getAdminFoodImprovementInsightsData,
   getAdminProductImprovementInsightsData,
+  getAdminSupplementAvailabilityMatrixData,
   getAdminSupplementImprovementInsightsData
 } from "@/lib/admin-recommendation-insights";
 import {
@@ -227,6 +229,8 @@ export default async function LocalizedAdminDashboardPage({
   let productsData = emptyAdminProductsData();
   let productImprovementInsightsData =
     emptyAdminProductImprovementInsightsData(range);
+  let supplementAvailabilityMatrixData =
+    emptyAdminSupplementAvailabilityMatrixData(range);
   let panyaData = emptyAdminPanyaData();
   let retailStockData = emptyAdminRetailStockData();
   let reviewQueueData = emptyAdminReviewQueueData();
@@ -306,6 +310,9 @@ export default async function LocalizedAdminDashboardPage({
   } else if (view === "product-insights") {
     productImprovementInsightsData =
       await getAdminProductImprovementInsightsData(range, locale);
+  } else if (view === "supplement-availability-matrix") {
+    supplementAvailabilityMatrixData =
+      await getAdminSupplementAvailabilityMatrixData(range, locale);
   } else if (view === "supplement-insights") {
     supplementImprovementInsightsData =
       await getAdminSupplementImprovementInsightsData(range, locale);
@@ -357,6 +364,7 @@ export default async function LocalizedAdminDashboardPage({
       selectedTaskId={selectedTaskId}
       settingsData={settingsData}
       supplementsData={supplementsData}
+      supplementAvailabilityMatrixData={supplementAvailabilityMatrixData}
       supplementImprovementInsightsData={supplementImprovementInsightsData}
       visibilityData={visibilityData}
       view={view}
