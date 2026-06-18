@@ -4,15 +4,12 @@ import { describe, it } from "node:test";
 import {
   candidateSnapshotMatchesGap,
   classifySupplementAvailability,
-  emptyAdminFoodImprovementInsightsData,
-  emptyAdminProductImprovementInsightsData,
-  emptyAdminSupplementAvailabilityMatrixData,
   emptyAdminSupplementImprovementInsightsData,
   productOpportunitySearchPhrase,
   supplementAvailabilitySearchPhrase,
   type ProductOpportunityInsight
 } from "../lib/admin-recommendation-insights.ts";
-import { adminViewPermission } from "../lib/admin-rbac.ts";
+import { adminViewPermission, isAdminDashboardView } from "../lib/admin-rbac.ts";
 
 const opportunity: ProductOpportunityInsight = {
   action: "Ask retailers to add this approved master product.",
@@ -31,7 +28,7 @@ const opportunity: ProductOpportunityInsight = {
 };
 
 describe("continuous improvement insights", () => {
-  it("wires supplement availability, supplement, product, and food improvement pages to marketing permission", () => {
+  it("keeps the Insights menu focused on customer, coverage, and supplement pages", () => {
     const dashboardContent = readFileSync(
       "components/admin/dashboard-content.tsx",
       "utf8"
@@ -39,49 +36,35 @@ describe("continuous improvement insights", () => {
     const dashboard = readFileSync("components/admin-dashboard.tsx", "utf8");
     const page = readFileSync("app/[locale]/admin/dashboard/page.tsx", "utf8");
 
-    assert.match(dashboardContent, /"supplement-availability-matrix"/);
-    assert.match(
-      dashboardContent,
-      /insights: \[\s*\{ icon: BeakerIcon, name: "Supplement Availability Matrix", view: "supplement-availability-matrix" \}/
-    );
+    assert.match(dashboardContent, /"customer-insights"/);
+    assert.match(dashboardContent, /"coverage-improvement-insights"/);
     assert.match(dashboardContent, /"supplement-insights"/);
-    assert.match(dashboardContent, /"product-insights"/);
-    assert.match(dashboardContent, /"food-insights"/);
+    assert.doesNotMatch(dashboardContent, /"supplement-availability-matrix"/);
+    assert.doesNotMatch(dashboardContent, /"product-insights"/);
+    assert.doesNotMatch(dashboardContent, /"food-insights"/);
     assert.doesNotMatch(dashboardContent, /"out-of-catalog-insights"/);
-    assert.match(dashboard, /AdminSupplementAvailabilityMatrixView/);
     assert.match(dashboard, /AdminSupplementImprovementInsightsView/);
-    assert.match(dashboard, /AdminProductImprovementInsightsView/);
-    assert.match(dashboard, /AdminFoodImprovementInsightsView/);
-    assert.match(page, /getAdminSupplementAvailabilityMatrixData/);
+    assert.doesNotMatch(dashboard, /AdminSupplementAvailabilityMatrixView/);
+    assert.doesNotMatch(dashboard, /AdminProductImprovementInsightsView/);
+    assert.doesNotMatch(dashboard, /AdminFoodImprovementInsightsView/);
+    assert.doesNotMatch(page, /getAdminSupplementAvailabilityMatrixData/);
     assert.match(page, /getAdminSupplementImprovementInsightsData/);
-    assert.match(page, /getAdminProductImprovementInsightsData/);
-    assert.match(page, /getAdminFoodImprovementInsightsData/);
-    assert.equal(adminViewPermission("supplement-availability-matrix"), "marketing.read");
+    assert.doesNotMatch(page, /getAdminProductImprovementInsightsData/);
+    assert.doesNotMatch(page, /getAdminFoodImprovementInsightsData/);
     assert.equal(adminViewPermission("supplement-insights"), "marketing.read");
-    assert.equal(adminViewPermission("product-insights"), "marketing.read");
-    assert.equal(adminViewPermission("food-insights"), "marketing.read");
+    assert.equal(isAdminDashboardView("supplement-availability-matrix"), false);
+    assert.equal(isAdminDashboardView("product-insights"), false);
+    assert.equal(isAdminDashboardView("food-insights"), false);
   });
 
-  it("keeps safe empty data for all new pages", () => {
-    assert.equal(
-      emptyAdminSupplementImprovementInsightsData("week").databaseAvailable,
-      false
-    );
-    assert.equal(
-      emptyAdminProductImprovementInsightsData("week").summary.externalCandidateCount,
-      0
-    );
-    assert.equal(
-      emptyAdminSupplementAvailabilityMatrixData("week").summary.totalSupplements,
-      0
-    );
-    assert.equal(
-      emptyAdminFoodImprovementInsightsData("week").summary.unknownFoods,
-      0
-    );
+  it("keeps safe empty data for supplement improvement", () => {
+    const data = emptyAdminSupplementImprovementInsightsData("week");
+
+    assert.equal(data.databaseAvailable, false);
+    assert.deepEqual(data.outsideMasterList, []);
   });
 
-  it("uses real marketplace snapshots instead of fake external product names", () => {
+  it("renders managed-list and outside-master-list supplement sections", () => {
     const readModel = readFileSync(
       "lib/admin-recommendation-insights.ts",
       "utf8"
@@ -90,20 +73,22 @@ describe("continuous improvement insights", () => {
       "components/admin/recommendation-insights-view.tsx",
       "utf8"
     );
-    const schema = readFileSync("db-schema.sql", "utf8");
 
-    assert.match(schema, /improvement_external_product_candidate_cache/);
-    assert.match(readModel, /searchMarketplaceProducts/);
-    assert.match(readModel, /ProductSnapshot/);
-    assert.match(readModel, /loadExternalProductCandidates/);
-    assert.match(view, /External Products To Review For Master List/);
-    assert.match(view, /candidate\.rationale/);
-    assert.match(view, /Evidence needed/);
-    assert.match(view, /candidate\.imageUrl/);
-    assert.match(view, /candidate\.productUrl/);
-    assert.doesNotMatch(view, /Search unavailable/);
-    assert.doesNotMatch(`${readModel}\n${view}`, /candidateProductOrSearchPhrase/);
-    assert.doesNotMatch(`${readModel}\n${view}`, /Thailand supplement product for/);
+    assert.match(readModel, /outsideMasterList/);
+    assert.match(readModel, /row\.listStatus === "missing" && row\.hiddenCount < 1/);
+    assert.match(view, /Managed list recommendations/);
+    assert.match(view, /AI Recommendations Outside The Master List/);
+    assert.match(view, /ai-recommendations-outside-master-list\.csv/);
+    assert.match(view, /Recommended By AI But Not Cleanly Usable/);
+    assert.match(view, />Reason</);
+    assert.doesNotMatch(view, /Supplement Recommendations Across The Master List/);
+    assert.doesNotMatch(view, /Supplement Recommendations Across The Managed List/);
+    assert.doesNotMatch(view, />Add</);
+    assert.doesNotMatch(view, />Hidden</);
+    assert.doesNotMatch(view, /Retail Products To Add Or Restock/);
+    assert.doesNotMatch(view, /External Products To Review For Master List/);
+    assert.doesNotMatch(view, /Foods To Improve Formula Outcomes/);
+    assert.doesNotMatch(view, /Supplement Availability Matrix/);
   });
 
   it("classifies master supplement availability across master and retailer lists", () => {
@@ -199,32 +184,14 @@ describe("continuous improvement insights", () => {
     );
   });
 
-  it("exposes current versus optimum plan comparison and CSV exports", () => {
+  it("keeps coverage helper exports without the retired page exports", () => {
     const readModel = readFileSync(
       "lib/admin-recommendation-insights.ts",
       "utf8"
     );
-    const view = readFileSync(
-      "components/admin/recommendation-insights-view.tsx",
-      "utf8"
-    );
 
-    assert.match(readModel, /current_products/);
-    assert.match(readModel, /optimum_products/);
-    assert.match(readModel, /optimumDeltaPercent/);
     assert.match(readModel, /loadMasterSupplementAvailabilityInsights/);
-    assert.match(view, /product-plan-current-vs-optimum\.csv/);
-    assert.match(view, /supplement-availability-matrix\.csv/);
-    assert.match(view, /Supplement Availability Matrix/);
-    assert.match(view, /Recommended By AI But Not Cleanly Usable/);
-    assert.match(view, />Reason</);
-    assert.doesNotMatch(view, />Add</);
-    assert.doesNotMatch(view, />Review</);
-    assert.doesNotMatch(view, />Hidden</);
-    assert.doesNotMatch(view, /Retail Products To Add Or Restock/);
-    assert.doesNotMatch(view, /product-retail-add-restock-actions\.csv/);
-    assert.doesNotMatch(view, /\|\| "n\/a"/);
-    assert.match(view, /supplement-improvement-gaps\.csv/);
-    assert.match(view, /food-improvement-opportunities\.csv/);
+    assert.doesNotMatch(readModel, /AdminSupplementAvailabilityMatrixData/);
+    assert.doesNotMatch(readModel, /getAdminSupplementAvailabilityMatrixData/);
   });
 });

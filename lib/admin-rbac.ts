@@ -228,7 +228,6 @@ const adminViews = [
   "retail-customer-orders",
   "retail-financials",
   "stock",
-  "supplement-availability-matrix",
   "retail-stock-advice",
   "retail-reorder",
   "retail-fulfillment",
@@ -240,8 +239,6 @@ const adminViews = [
   "content",
   "coverage-improvement-insights",
   "customer-insights",
-  "food-insights",
-  "product-insights",
   "supplement-insights",
   "visibility",
   "people",
@@ -351,9 +348,6 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
     view === "campaigns" ||
     view === "coverage-improvement-insights" ||
     view === "customer-insights" ||
-    view === "food-insights" ||
-    view === "product-insights" ||
-    view === "supplement-availability-matrix" ||
     view === "supplement-insights" ||
     view === "leads"
   ) {

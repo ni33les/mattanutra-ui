@@ -42,7 +42,6 @@ export type AdminDashboardView =
   | "customer-insights"
   | "communications"
   | "financials"
-  | "food-insights"
   | "foods"
   | "flow"
   | "glance"
@@ -51,7 +50,6 @@ export type AdminDashboardView =
   | "organisations"
   | "people"
   | "panya"
-  | "product-insights"
   | "products"
   | "reviews"
   | "retail-customer-orders"
@@ -64,7 +62,6 @@ export type AdminDashboardView =
   | "settings"
   | "settlements"
   | "stock"
-  | "supplement-availability-matrix"
   | "supplement-insights"
   | "supplements"
   | "testimonials"
@@ -1441,12 +1438,9 @@ const baseContent = {
     ],
     retailSellingTitle: "Orders",
     insights: [
-      { icon: BeakerIcon, name: "Supplement Availability Matrix", view: "supplement-availability-matrix" },
       { icon: UserGroupIcon, name: "Customer Intelligence", view: "customer-insights" },
       { icon: FunnelIcon, name: "Coverage Improvement", view: "coverage-improvement-insights" },
-      { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" },
-      { icon: ShoppingBagIcon, name: "Products", view: "product-insights" },
-      { icon: SparklesIcon, name: "Food Improvement", view: "food-insights" }
+      { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" }
     ],
     insightsTitle: "Insights",
     openSidebar: "Open sidebar",
@@ -1470,7 +1464,6 @@ const baseContent = {
       "customer-insights": "Customer Intelligence",
       communications: "Communications",
       financials: "Financials",
-      "food-insights": "Food Improvement",
       foods: "Foods",
       flow: "Conversions",
       glance: "Dashboard",
@@ -1479,7 +1472,6 @@ const baseContent = {
       organisations: "Organisations",
       people: "People",
       panya: "Panya",
-      "product-insights": "Product Insights",
       products: "Products",
       "retail-customer-orders": "Customer Orders",
       "retail-audit": "Audit",
@@ -1492,7 +1484,6 @@ const baseContent = {
       settings: "Settings",
       settlements: "Settlements",
       stock: "Stock",
-      "supplement-availability-matrix": "Supplement Availability Matrix",
       "supplement-insights": "Supplement Insights",
       supplements: "Supplements",
       testimonials: "Testimonials",
@@ -2301,12 +2292,9 @@ const baseContent = {
     ],
     retailSellingTitle: "คำสั่งซื้อ",
     insights: [
-      { icon: BeakerIcon, name: "ตารางความพร้อมอาหารเสริม", view: "supplement-availability-matrix" },
       { icon: UserGroupIcon, name: "ข้อมูลลูกค้า", view: "customer-insights" },
       { icon: FunnelIcon, name: "ปรับปรุงความครอบคลุม", view: "coverage-improvement-insights" },
-      { icon: BeakerIcon, name: "อาหารเสริม", view: "supplement-insights" },
-      { icon: ShoppingBagIcon, name: "สินค้า", view: "product-insights" },
-      { icon: SparklesIcon, name: "ปรับปรุงอาหาร", view: "food-insights" }
+      { icon: BeakerIcon, name: "อาหารเสริม", view: "supplement-insights" }
     ],
     insightsTitle: "อินไซต์",
     openSidebar: "เปิดแถบเมนู",
@@ -2330,7 +2318,6 @@ const baseContent = {
       "customer-insights": "ข้อมูลลูกค้า",
       communications: "การสื่อสาร",
       financials: "การเงิน",
-      "food-insights": "ปรับปรุงอาหาร",
       foods: "อาหาร",
       flow: "คอนเวอร์ชัน",
       glance: "แดชบอร์ด",
@@ -2339,7 +2326,6 @@ const baseContent = {
       organisations: "องค์กร",
       people: "ผู้ใช้",
       panya: "Panya",
-      "product-insights": "ข้อมูลสินค้า",
       products: "สินค้า",
       "retail-customer-orders": "คำสั่งซื้อลูกค้า",
       "retail-audit": "บันทึกเหตุการณ์",
@@ -2352,7 +2338,6 @@ const baseContent = {
       settings: "การตั้งค่า",
       settlements: "การชำระร้านค้า",
       stock: "สต็อก",
-      "supplement-availability-matrix": "ตารางความพร้อมอาหารเสริม",
       "supplement-insights": "ข้อมูลอาหารเสริม",
       supplements: "อาหารเสริม",
       testimonials: "คำรับรอง",

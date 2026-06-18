@@ -668,10 +668,6 @@
   "retailSellingTitle": "订单",
   "insights": [
     {
-      "name": "补充剂可用性矩阵",
-      "view": "supplement-availability-matrix"
-    },
-    {
       "name": "客户洞察",
       "view": "customer-insights"
     },
@@ -682,14 +678,6 @@
     {
       "name": "补充剂",
       "view": "supplement-insights"
-    },
-    {
-      "name": "产品",
-      "view": "product-insights"
-    },
-    {
-      "name": "食品改进",
-      "view": "food-insights"
     }
   ],
   "insightsTitle": "洞察",
@@ -726,7 +714,6 @@
     "customer-insights": "客户洞察",
     "communications": "通信",
     "financials": "财务",
-    "food-insights": "食品改进",
     "foods": "食品",
     "flow": "转化",
     "glance": "仪表盘",
@@ -735,7 +722,6 @@
     "organisations": "组织",
     "people": "人员",
     "panya": "Panya",
-    "product-insights": "产品洞察",
     "products": "产品",
     "retail-customer-orders": "客户订单",
     "retail-audit": "审计",
@@ -748,7 +734,6 @@
     "settlements": "结算",
     "settings": "设置",
     "stock": "库存",
-    "supplement-availability-matrix": "补充剂可用性矩阵",
     "supplement-insights": "补充剂洞察",
     "supplements": "补充剂",
     "testimonials": "见证",

@@ -35,9 +35,6 @@ import { emptyAdminFoodsData } from "@/lib/admin-foods";
 import { getAdminProductsData } from "@/lib/admin-products";
 import { emptyAdminRetailStockData } from "@/lib/admin-retail-stock";
 import {
-  emptyAdminFoodImprovementInsightsData,
-  emptyAdminProductImprovementInsightsData,
-  emptyAdminSupplementAvailabilityMatrixData,
   emptyAdminSupplementImprovementInsightsData
 } from "@/lib/admin-recommendation-insights";
 import { emptyAdminReviewQueueData } from "@/lib/admin-review-queue";
@@ -165,7 +162,6 @@ export default async function ProductDetailPage({
       communicationsData={emptyCommunicationsData()}
       data={data}
       financialsData={emptyFinancials(range)}
-      foodImprovementInsightsData={emptyAdminFoodImprovementInsightsData(range)}
       filters={filters}
       flowData={emptyFlow(range)}
       foodsData={emptyAdminFoodsData()}
@@ -174,7 +170,6 @@ export default async function ProductDetailPage({
       panyaData={emptyAdminPanyaData()}
       panyaSection="conversations"
       productsData={productsData}
-      productImprovementInsightsData={emptyAdminProductImprovementInsightsData(range)}
       productDetailId={productId}
       retailFinancialsData={emptyAdminRetailFinancialsData(range)}
       retailStockData={emptyAdminRetailStockData()}
@@ -184,7 +179,6 @@ export default async function ProductDetailPage({
       selectedTaskId={null}
       settingsData={settingsData}
       supplementsData={emptyAdminSupplementsData()}
-      supplementAvailabilityMatrixData={emptyAdminSupplementAvailabilityMatrixData(range)}
       supplementImprovementInsightsData={emptyAdminSupplementImprovementInsightsData(range)}
       visibilityData={emptyVisibilityData()}
       view="products"

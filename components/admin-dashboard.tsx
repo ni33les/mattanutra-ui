@@ -46,9 +46,6 @@ import type {
   AdminRetailStockData
 } from "@/lib/admin-retail-stock";
 import type {
-  AdminFoodImprovementInsightsData,
-  AdminProductImprovementInsightsData,
-  AdminSupplementAvailabilityMatrixData,
   AdminSupplementImprovementInsightsData
 } from "@/lib/admin-recommendation-insights";
 import type {
@@ -109,9 +106,6 @@ import {
 } from "@/components/admin/product-view";
 import { AdminVisibilityView } from "@/components/admin/visibility-view";
 import {
-  AdminFoodImprovementInsightsView,
-  AdminProductImprovementInsightsView,
-  AdminSupplementAvailabilityMatrixView,
   AdminSupplementImprovementInsightsView
 } from "@/components/admin/recommendation-insights-view";
 import { AdminDrawer } from "@/components/admin/ui";
@@ -229,18 +223,15 @@ function adminViewDatabaseAvailable({
   communicationsData,
   data,
   financialsData,
-  foodImprovementInsightsData,
   foodsData,
   flowData,
   leadsData,
   panyaData,
   productsData,
-  productImprovementInsightsData,
   retailFinancialsData,
   retailStockData,
   reviewQueueData,
   supplementsData,
-  supplementAvailabilityMatrixData,
   supplementImprovementInsightsData,
   visibilityData,
   view
@@ -255,18 +246,15 @@ function adminViewDatabaseAvailable({
   communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
   financialsData: AdminFinancialsData;
-  foodImprovementInsightsData: AdminFoodImprovementInsightsData;
   foodsData: AdminFoodsData;
   flowData: AdminFlowData;
   leadsData: AdminLeadsData;
   panyaData: AdminPanyaData;
   productsData: AdminProductsData;
-  productImprovementInsightsData: AdminProductImprovementInsightsData;
   retailFinancialsData: AdminRetailFinancialsData;
   retailStockData: AdminRetailStockData;
   reviewQueueData: AdminReviewQueueData;
   supplementsData: AdminSupplementsData;
-  supplementAvailabilityMatrixData: AdminSupplementAvailabilityMatrixData;
   supplementImprovementInsightsData: AdminSupplementImprovementInsightsData;
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
@@ -364,18 +352,6 @@ function adminViewDatabaseAvailable({
     return retailStockData.databaseAvailable;
   }
 
-  if (view === "food-insights") {
-    return foodImprovementInsightsData.databaseAvailable;
-  }
-
-  if (view === "product-insights") {
-    return productImprovementInsightsData.databaseAvailable;
-  }
-
-  if (view === "supplement-availability-matrix") {
-    return supplementAvailabilityMatrixData.databaseAvailable;
-  }
-
   if (view === "supplement-insights") {
     return supplementImprovementInsightsData.databaseAvailable;
   }
@@ -408,7 +384,6 @@ export function AdminDashboard({
   communicationsData,
   data,
   financialsData,
-  foodImprovementInsightsData,
   foodsData,
   filters,
   flowData,
@@ -418,7 +393,6 @@ export function AdminDashboard({
   panyaSection,
   productDetailId,
   productsData,
-  productImprovementInsightsData,
   retailFinancialsData,
   retailStockData,
   reviewQueueData,
@@ -427,7 +401,6 @@ export function AdminDashboard({
   selectedTaskId,
   settingsData,
   supplementsData,
-  supplementAvailabilityMatrixData,
   supplementImprovementInsightsData,
   visibilityData,
   view
@@ -444,7 +417,6 @@ export function AdminDashboard({
   communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
   financialsData: AdminFinancialsData;
-  foodImprovementInsightsData: AdminFoodImprovementInsightsData;
   foodsData: AdminFoodsData;
   filters: AdminDashboardFilters;
   flowData: AdminFlowData;
@@ -454,7 +426,6 @@ export function AdminDashboard({
   panyaSection: "configuration" | "conversations";
   productDetailId?: string | null;
   productsData: AdminProductsData;
-  productImprovementInsightsData: AdminProductImprovementInsightsData;
   retailFinancialsData: AdminRetailFinancialsData;
   retailStockData: AdminRetailStockData;
   reviewQueueData: AdminReviewQueueData;
@@ -463,7 +434,6 @@ export function AdminDashboard({
   selectedTaskId?: string | null;
   settingsData: AdminSettingsData | null;
   supplementsData: AdminSupplementsData;
-  supplementAvailabilityMatrixData: AdminSupplementAvailabilityMatrixData;
   supplementImprovementInsightsData: AdminSupplementImprovementInsightsData;
   visibilityData: AdminTaskVisibilityData;
   view: AdminDashboardView;
@@ -489,11 +459,8 @@ export function AdminDashboard({
       view === "glance" ||
       view === "leads" ||
       view === "panya" ||
-      view === "food-insights" ||
-      view === "product-insights" ||
       view === "retail-financials" ||
       view === "settlements" ||
-      view === "supplement-availability-matrix" ||
       view === "supplement-insights" ||
       view === "visibility");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -545,18 +512,15 @@ export function AdminDashboard({
     communicationsData,
     data,
     financialsData,
-    foodImprovementInsightsData,
     foodsData,
     flowData,
     leadsData,
     panyaData,
     productsData,
-    productImprovementInsightsData,
     retailFinancialsData,
     retailStockData,
     reviewQueueData,
     supplementsData,
-    supplementAvailabilityMatrixData,
     supplementImprovementInsightsData,
     visibilityData: liveVisibilityData,
     view
@@ -881,21 +845,6 @@ export function AdminDashboard({
               range={data.range}
               selectedRetailCustomerOrderId={selectedRetailCustomerOrderId}
               view={view}
-            />
-          ) : view === "food-insights" ? (
-            <AdminFoodImprovementInsightsView
-              data={foodImprovementInsightsData}
-              locale={locale}
-            />
-          ) : view === "product-insights" ? (
-            <AdminProductImprovementInsightsView
-              data={productImprovementInsightsData}
-              locale={locale}
-            />
-          ) : view === "supplement-availability-matrix" ? (
-            <AdminSupplementAvailabilityMatrixView
-              data={supplementAvailabilityMatrixData}
-              locale={locale}
             />
           ) : view === "supplement-insights" ? (
             <AdminSupplementImprovementInsightsView

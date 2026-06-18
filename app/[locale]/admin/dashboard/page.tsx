@@ -60,13 +60,7 @@ import {
   getAdminRetailStockData
 } from "@/lib/admin-retail-stock";
 import {
-  emptyAdminFoodImprovementInsightsData,
-  emptyAdminProductImprovementInsightsData,
-  emptyAdminSupplementAvailabilityMatrixData,
   emptyAdminSupplementImprovementInsightsData,
-  getAdminFoodImprovementInsightsData,
-  getAdminProductImprovementInsightsData,
-  getAdminSupplementAvailabilityMatrixData,
   getAdminSupplementImprovementInsightsData
 } from "@/lib/admin-recommendation-insights";
 import {
@@ -221,16 +215,11 @@ export default async function LocalizedAdminDashboardPage({
   let communicationsData = emptyCommunicationsData();
   let data = emptyAdminDashboardData(range);
   let financialsData = emptyFinancials(range);
-  let foodImprovementInsightsData = emptyAdminFoodImprovementInsightsData(range);
   let retailFinancialsData = emptyAdminRetailFinancialsData(range);
   let foodsData = emptyAdminFoodsData();
   let flowData = emptyFlow(range);
   let leadsData = emptyLeadsData();
   let productsData = emptyAdminProductsData();
-  let productImprovementInsightsData =
-    emptyAdminProductImprovementInsightsData(range);
-  let supplementAvailabilityMatrixData =
-    emptyAdminSupplementAvailabilityMatrixData(range);
   let panyaData = emptyAdminPanyaData();
   let retailStockData = emptyAdminRetailStockData();
   let reviewQueueData = emptyAdminReviewQueueData();
@@ -304,15 +293,6 @@ export default async function LocalizedAdminDashboardPage({
     } else {
       retailStockData = await getAdminRetailStockData(adminContext, locale);
     }
-  } else if (view === "food-insights") {
-    foodImprovementInsightsData =
-      await getAdminFoodImprovementInsightsData(range, locale);
-  } else if (view === "product-insights") {
-    productImprovementInsightsData =
-      await getAdminProductImprovementInsightsData(range, locale);
-  } else if (view === "supplement-availability-matrix") {
-    supplementAvailabilityMatrixData =
-      await getAdminSupplementAvailabilityMatrixData(range, locale);
   } else if (view === "supplement-insights") {
     supplementImprovementInsightsData =
       await getAdminSupplementImprovementInsightsData(range, locale);
@@ -346,14 +326,12 @@ export default async function LocalizedAdminDashboardPage({
       communicationsData={communicationsData}
       data={data}
       financialsData={financialsData}
-      foodImprovementInsightsData={foodImprovementInsightsData}
       foodsData={foodsData}
       filters={filters}
       flowData={flowData}
       leadsData={leadsData}
       locale={locale}
       productsData={productsData}
-      productImprovementInsightsData={productImprovementInsightsData}
       panyaData={panyaData}
       panyaSection={panyaSection}
       retailFinancialsData={retailFinancialsData}
@@ -364,7 +342,6 @@ export default async function LocalizedAdminDashboardPage({
       selectedTaskId={selectedTaskId}
       settingsData={settingsData}
       supplementsData={supplementsData}
-      supplementAvailabilityMatrixData={supplementAvailabilityMatrixData}
       supplementImprovementInsightsData={supplementImprovementInsightsData}
       visibilityData={visibilityData}
       view={view}

@@ -7,17 +7,8 @@ import {
 import type { ReactNode } from "react";
 import type { Locale } from "@/lib/i18n";
 import type {
-  AdminFoodImprovementInsightsData,
-  AdminProductImprovementInsightsData,
-  AdminSupplementAvailabilityMatrixData,
   AdminSupplementImprovementInsightsData,
-  ExternalProductCandidate,
-  FoodOpportunityInsight,
   ImprovementListStatus,
-  MasterSupplementAvailabilityInsight,
-  PlanCoverageComparison,
-  ProductOpportunityInsight,
-  SupplementAvailabilityState,
   SupplementDemandInsight
 } from "@/lib/admin-recommendation-insights";
 import {
@@ -46,14 +37,6 @@ function formatNumber(value: number, locale: Locale) {
   return new Intl.NumberFormat(
     locale === "th" ? "th-TH" : locale === "zh-CN" ? "zh-CN" : "en"
   ).format(value);
-}
-
-function formatPercent(value: number | null | undefined, locale: Locale) {
-  if (value === null || value === undefined) {
-    return "No score";
-  }
-
-  return `${formatNumber(Math.round(value), locale)}%`;
 }
 
 function csvEscape(value: string) {
@@ -187,104 +170,6 @@ function EmptyState({ label }: Readonly<{ label: string }>) {
   );
 }
 
-const supplementAvailabilityLabels: Record<SupplementAvailabilityState, string> = {
-  covered: "Covered",
-  missing_master_product: "Find/import product",
-  missing_retail_product: "Retailers add product",
-  weak_master_product: "Weak master coverage",
-  weak_retail_product: "Weak retail coverage"
-};
-
-const supplementAvailabilityColors: Record<SupplementAvailabilityState, string> = {
-  covered: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  missing_master_product: "bg-rose-50 text-rose-700 ring-rose-200",
-  missing_retail_product: "bg-amber-50 text-amber-800 ring-amber-200",
-  weak_master_product: "bg-orange-50 text-orange-800 ring-orange-200",
-  weak_retail_product: "bg-yellow-50 text-yellow-800 ring-yellow-200"
-};
-
-function doseText(labels: readonly string[]) {
-  const usable = labels.filter((label) => label && label !== "Unparsed");
-
-  return usable.length > 0 ? usable.join(", ") : "Dose not captured";
-}
-
-function availabilityPill(state: SupplementAvailabilityState) {
-  return (
-    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ring-1 ${supplementAvailabilityColors[state]}`}>
-      {supplementAvailabilityLabels[state]}
-    </span>
-  );
-}
-
-function SupplementAvailabilityTable({
-  rows,
-  locale
-}: Readonly<{
-  rows: readonly MasterSupplementAvailabilityInsight[];
-  locale: Locale;
-}>) {
-  const gaps = rows.filter((row) => row.availabilityState !== "covered");
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200 text-sm">
-        <thead>
-          <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-            <th className="py-2 pr-4">Supplement</th>
-            <th className="py-2 pr-4">Status</th>
-            <th className="py-2 pr-4">Demand</th>
-            <th className="py-2 pr-4">Master list</th>
-            <th className="py-2 pr-4">Retail list</th>
-            <th className="py-2 pr-4">Action</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {gaps.length > 0 ? gaps.slice(0, 40).map((row) => (
-            <tr key={row.supplementId}>
-              <td className="max-w-xs py-3 pr-4">
-                <p className="font-semibold text-gray-900">{row.supplementName}</p>
-                <p className="mt-1 text-xs text-gray-500">{doseText(row.topDoseLabels)}</p>
-              </td>
-              <td className="py-3 pr-4">{availabilityPill(row.availabilityState)}</td>
-              <td className="py-3 pr-4 text-gray-600">
-                {formatNumber(row.affectedPlanCount, locale)} plans
-                {row.lowCoveragePlanCount > 0 ? (
-                  <span className="block text-xs text-rose-700">
-                    {formatNumber(row.lowCoveragePlanCount, locale)} low coverage
-                  </span>
-                ) : null}
-              </td>
-              <td className="py-3 pr-4 text-gray-600">
-                {formatNumber(row.masterProductCount, locale)} products
-                <span className="block text-xs text-gray-500">
-                  {formatNumber(row.masterProductsWithDoseCount, locale)} with dose facts
-                </span>
-              </td>
-              <td className="py-3 pr-4 text-gray-600">
-                {formatNumber(row.activeRetailerCount, locale)} retailers
-                <span className="block text-xs text-gray-500">
-                  {formatNumber(row.availableRetailerCount, locale)} stocked now
-                </span>
-              </td>
-              <td className="max-w-md py-3 pr-4 text-gray-600">
-                <p>{row.action}</p>
-                <p className="mt-1 text-xs text-gray-500">{row.rationale}</p>
-              </td>
-            </tr>
-          )) : (
-            <tr>
-              <td className="py-4 text-gray-500" colSpan={6}>
-                Master supplement coverage is resilient across the current Thailand retail catalogue.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 function DistributionBars<T>({
   labelFor,
   locale,
@@ -348,14 +233,23 @@ export function AdminSupplementImprovementInsightsView({
 }>) {
   const [status, setStatus] = useState("all");
   const [category, setCategory] = useState("all");
+  const managedDistribution = useMemo(
+    () => data.distribution.filter((row) => row.listStatus !== "missing"),
+    [data.distribution]
+  );
   const filtered = useMemo(
     () =>
-      data.distribution.filter((row) =>
+      managedDistribution.filter((row) =>
         (status === "all" || row.listStatus === status) &&
         (category === "all" || row.category === category)
       ),
-    [category, data.distribution, status]
+    [category, managedDistribution, status]
   );
+  const managedListStatuses = useMemo(
+    () => [...new Set(managedDistribution.map((row) => row.listStatus))],
+    [managedDistribution]
+  );
+  const outsideMasterList = data.outsideMasterList;
   const metrics: BusinessMetric[] = [
     {
       color: businessMetricColors.total,
@@ -381,7 +275,7 @@ export function AdminSupplementImprovementInsightsView({
     {
       color: businessMetricColors.medium,
       id: "blocked",
-      label: "Blocked or hidden demand",
+      label: "Blocked demand",
       series: [],
       value: formatNumber(data.summary.blockedOrHiddenRecommendations, locale)
     }
@@ -395,7 +289,7 @@ export function AdminSupplementImprovementInsightsView({
         <SelectFilter
           label="Status"
           onChange={setStatus}
-          options={data.filters.listStatuses.map((item) => item)}
+          options={managedListStatuses}
           value={status}
         />
         <SelectFilter
@@ -409,12 +303,12 @@ export function AdminSupplementImprovementInsightsView({
       <Section
         action={
           <CsvButton
-            filename="supplement-improvement-gaps.csv"
+            filename="managed-list-recommendations.csv"
             rows={csvRows(supplementColumns, filtered)}
           />
         }
-        eyebrow="AI demand"
-        title="Supplement Recommendations Across The Managed List"
+        eyebrow="Managed list"
+        title="Managed list recommendations"
       >
         <DistributionBars
           labelFor={(row) => row.name}
@@ -422,6 +316,46 @@ export function AdminSupplementImprovementInsightsView({
           rows={filtered.slice(0, 30)}
           valueFor={(row) => row.recommendationCount}
         />
+      </Section>
+
+      <Section
+        action={
+          <CsvButton
+            filename="ai-recommendations-outside-master-list.csv"
+            rows={csvRows(supplementColumns, outsideMasterList)}
+          />
+        }
+        eyebrow="Outside master list"
+        title="AI Recommendations Outside The Master List"
+      >
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th className="py-2 pr-4">Supplement</th>
+                <th className="py-2 pr-4">Category</th>
+                <th className="py-2 pr-4">Demand</th>
+                <th className="py-2 pr-4">Reason</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {outsideMasterList.length > 0 ? outsideMasterList.map((row) => (
+                <tr key={row.id}>
+                  <td className="py-3 pr-4 font-semibold text-gray-900">{row.name}</td>
+                  <td className="py-3 pr-4 text-gray-600">{row.category ?? "Uncategorised"}</td>
+                  <td className="py-3 pr-4">{formatNumber(row.recommendationCount, locale)}</td>
+                  <td className="max-w-xl py-3 pr-4 text-gray-600">{row.rationale}</td>
+                </tr>
+              )) : (
+                <tr>
+                  <td className="py-4 text-gray-500" colSpan={4}>
+                    No unignored AI supplement recommendations are outside the master list.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </Section>
 
       <Section
@@ -455,413 +389,7 @@ export function AdminSupplementImprovementInsightsView({
               )) : (
                 <tr>
                   <td className="py-4 text-gray-500" colSpan={4}>
-                    No missing, blocked, hidden, or review-only supplement demand.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Section>
-    </div>
-  );
-}
-
-const supplementAvailabilityColumns: TableColumn<MasterSupplementAvailabilityInsight>[] = [
-  { label: "supplement", value: (row) => row.supplementName },
-  { label: "status", value: (row) => row.availabilityState },
-  { label: "affected_plans", value: (row) => String(row.affectedPlanCount) },
-  { label: "low_coverage_plans", value: (row) => String(row.lowCoveragePlanCount) },
-  { label: "top_doses", value: (row) => row.topDoseLabels.join("; ") },
-  { label: "master_products", value: (row) => String(row.masterProductCount) },
-  { label: "dose_fact_products", value: (row) => String(row.masterProductsWithDoseCount) },
-  { label: "active_retailers", value: (row) => String(row.activeRetailerCount) },
-  { label: "stocked_retailers", value: (row) => String(row.availableRetailerCount) },
-  { label: "backorder_retailers", value: (row) => String(row.backorderRetailerCount) },
-  { label: "action", value: (row) => row.action },
-  { label: "rationale", value: (row) => row.rationale },
-  { label: "search_query", value: (row) => row.recommendedSearchQuery }
-];
-
-const planComparisonColumns: TableColumn<PlanCoverageComparison>[] = [
-  { label: "plan_id", value: (row) => row.planId },
-  { label: "first_name", value: (row) => row.firstName ?? "" },
-  { label: "email", value: (row) => row.contactEmail ?? "" },
-  { label: "selected_plan", value: (row) => row.selectedPlan ?? "" },
-  { label: "current_coverage_percent", value: (row) => String(row.currentCoveragePercent) },
-  { label: "optimum_coverage_percent", value: (row) => String(row.optimumCoveragePercent) },
-  { label: "optimum_delta_percent", value: (row) => String(row.optimumDeltaPercent) },
-  { label: "current_products", value: (row) => row.currentProducts.join("; ") },
-  { label: "optimum_products", value: (row) => row.optimumProducts.map((item) => item.title).join("; ") },
-  { label: "unmatched_supplements", value: (row) => row.unmatchedSupplements.join("; ") }
-];
-
-function ProductCandidateList({
-  candidates,
-  locale
-}: Readonly<{
-  candidates: readonly ExternalProductCandidate[];
-  locale: Locale;
-}>) {
-  return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      {candidates.length > 0 ? candidates.map((candidate, index) => (
-        <div
-          className="grid grid-cols-[4.5rem_1fr] gap-3 rounded-md border border-gray-200 p-3"
-          key={`${candidate.query}:${candidate.productUrl ?? index}`}
-        >
-          <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center overflow-hidden rounded-md bg-gray-100">
-            {candidate.imageUrl ? (
-              <img
-                alt=""
-                className="h-full w-full object-cover"
-                src={candidate.imageUrl}
-              />
-            ) : (
-              <span className="text-xs font-semibold text-gray-400">No image</span>
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#1FA77A]">
-                {candidate.matchedGapName}
-              </p>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
-                {candidate.searchStatus}
-              </span>
-            </div>
-            <a
-              className="mt-1 block text-sm font-semibold text-gray-900 hover:text-[#126B4F]"
-              href={candidate.productUrl ?? "#"}
-              rel="noreferrer"
-              target="_blank"
-            >
-              {candidate.title ?? "Marketplace product for review"}
-            </a>
-            <p className="mt-1 text-xs text-gray-500">
-              {[candidate.platform, candidate.brandName].filter(Boolean).join(" · ") ||
-                "Marketplace adapters returned no product snapshot."}
-            </p>
-            <p className="mt-2 text-xs text-gray-600">
-              {candidate.rationale}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              Gap: {candidate.matchedGapName}
-              {candidate.matchedDoseLabel ? ` · ${candidate.matchedDoseLabel}` : ""}
-              {" · "}
-              {formatNumber(candidate.affectedPlanCount, locale)} affected plans
-            </p>
-            {candidate.evidenceRequired.length > 0 ? (
-              <p className="mt-1 text-xs text-gray-500">
-                Evidence needed: {candidate.evidenceRequired.join(", ")}
-              </p>
-            ) : null}
-            {candidate.priceAmount !== null ? (
-              <p className="mt-2 text-xs font-semibold text-gray-700">
-                THB {formatNumber(Math.round(candidate.priceAmount), locale)}
-              </p>
-            ) : null}
-          </div>
-        </div>
-      )) : (
-        <EmptyState label="No external candidate searches have been generated yet." />
-      )}
-    </div>
-  );
-}
-
-export function AdminSupplementAvailabilityMatrixView({
-  data,
-  locale
-}: Readonly<{
-  data: AdminSupplementAvailabilityMatrixData;
-  locale: Locale;
-}>) {
-  const metrics: BusinessMetric[] = [
-    {
-      color: businessMetricColors.total,
-      id: "totalSupplements",
-      label: "Active supplements",
-      series: [],
-      value: formatNumber(data.summary.totalSupplements, locale)
-    },
-    {
-      color: businessMetricColors.failed,
-      id: "missingMaster",
-      label: "Missing master product",
-      series: [],
-      value: formatNumber(data.summary.missingMasterProduct, locale)
-    },
-    {
-      color: businessMetricColors.medium,
-      id: "missingRetail",
-      label: "Missing retail product",
-      series: [],
-      value: formatNumber(data.summary.missingRetailProduct, locale)
-    },
-    {
-      color: businessMetricColors.succeeded,
-      id: "covered",
-      label: "Covered",
-      series: [],
-      value: formatNumber(data.summary.covered, locale)
-    }
-  ];
-
-  return (
-    <div className="mt-8 space-y-6">
-      <BusinessStatsGrid metrics={metrics} />
-
-      <Section
-        action={
-          <CsvButton
-            filename="supplement-availability-matrix.csv"
-            rows={csvRows(supplementAvailabilityColumns, data.supplementAvailability)}
-          />
-        }
-        eyebrow="Master supplement coverage"
-        title="Supplement Availability Matrix"
-      >
-        <SupplementAvailabilityTable rows={data.supplementAvailability} locale={locale} />
-      </Section>
-    </div>
-  );
-}
-
-export function AdminProductImprovementInsightsView({
-  data,
-  locale
-}: Readonly<{
-  data: AdminProductImprovementInsightsData;
-  locale: Locale;
-}>) {
-  const metrics: BusinessMetric[] = [
-    {
-      color: businessMetricColors.total,
-      id: "externalCandidates",
-      label: "External candidates",
-      series: [],
-      value: formatNumber(data.summary.externalCandidateCount, locale)
-    },
-    {
-      color: businessMetricColors.medium,
-      id: "reviewBlockers",
-      label: "Secondary review blockers",
-      series: [],
-      value: formatNumber(data.reviewOpportunities.length, locale)
-    },
-    {
-      color: businessMetricColors.failed,
-      id: "lowCoverage",
-      label: "Low coverage plans",
-      series: [],
-      value: formatNumber(data.summary.lowCoveragePlans, locale)
-    },
-    {
-      color: businessMetricColors.succeeded,
-      id: "optimumDelta",
-      label: "Avg optimum delta",
-      series: [],
-      value: formatPercent(data.summary.optimumAverageDeltaPercent, locale)
-    }
-  ];
-
-  return (
-    <div className="mt-8 space-y-6">
-      <BusinessStatsGrid metrics={metrics} />
-
-      <Section
-        eyebrow="Wider search"
-        title="External Products To Review For Master List"
-      >
-        <ProductCandidateList candidates={data.externalCandidates} locale={locale} />
-      </Section>
-
-      <Section
-        action={
-          <CsvButton
-            filename="product-plan-current-vs-optimum.csv"
-            rows={csvRows(planComparisonColumns, data.planComparisons)}
-          />
-        }
-        eyebrow="Exact plans"
-        title="Available Recommendation Vs Best Master-List Candidate"
-      >
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead>
-              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <th className="py-2 pr-4">Customer / plan</th>
-                <th className="py-2 pr-4">Current</th>
-                <th className="py-2 pr-4">Optimum</th>
-                <th className="py-2 pr-4">Delta</th>
-                <th className="py-2 pr-4">Optimum candidates</th>
-                <th className="py-2 pr-4">Unmatched</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {data.planComparisons.length > 0 ? data.planComparisons.map((row) => (
-                <tr key={row.planId}>
-                  <td className="max-w-xs py-3 pr-4">
-                    <p className="font-semibold text-gray-900">{row.firstName ?? "Unknown"}</p>
-                    <p className="text-xs text-gray-500">{row.contactEmail ?? row.planId}</p>
-                  </td>
-                  <td className="py-3 pr-4">{formatPercent(row.currentCoveragePercent, locale)}</td>
-                  <td className="py-3 pr-4">{formatPercent(row.optimumCoveragePercent, locale)}</td>
-                  <td className="py-3 pr-4 font-semibold text-[#126B4F]">{formatPercent(row.optimumDeltaPercent, locale)}</td>
-                  <td className="max-w-md py-3 pr-4 text-gray-600">
-                    {row.optimumProducts.map((item) => item.title).join(", ") || "No master-list candidate recorded"}
-                  </td>
-                  <td className="max-w-md py-3 pr-4 text-gray-600">
-                    {row.unmatchedSupplements.join(", ") || "No unmatched supplements recorded"}
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td className="py-4 text-gray-500" colSpan={6}>
-                    No current-vs-optimum plan comparisons are available.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Section>
-    </div>
-  );
-}
-
-const foodColumns: TableColumn<FoodOpportunityInsight>[] = [
-  { label: "food", value: (row) => row.foodName },
-  { label: "status", value: (row) => row.listStatus },
-  { label: "recommendations", value: (row) => String(row.recommendationCount) },
-  { label: "plans", value: (row) => String(row.planCount) },
-  { label: "blocked_plans", value: (row) => String(row.blockedPlanCount) },
-  { label: "missing_profile", value: (row) => String(row.missingProfile) },
-  { label: "gap_signals", value: (row) => row.gapSignals.join("; ") }
-];
-
-export function AdminFoodImprovementInsightsView({
-  data,
-  locale
-}: Readonly<{
-  data: AdminFoodImprovementInsightsData;
-  locale: Locale;
-}>) {
-  const metrics: BusinessMetric[] = [
-    {
-      color: businessMetricColors.total,
-      id: "foodsRecommended",
-      label: "Food recommendations",
-      series: [],
-      value: formatNumber(data.summary.foodsRecommended, locale)
-    },
-    {
-      color: businessMetricColors.succeeded,
-      id: "uniqueFoods",
-      label: "Unique foods",
-      series: [],
-      value: formatNumber(data.summary.uniqueFoods, locale)
-    },
-    {
-      color: businessMetricColors.medium,
-      id: "missingProfiles",
-      label: "Missing nutrient profiles",
-      series: [],
-      value: formatNumber(data.summary.missingNutrientProfiles, locale)
-    },
-    {
-      color: businessMetricColors.failed,
-      id: "unknownFoods",
-      label: "Unknown foods",
-      series: [],
-      value: formatNumber(data.summary.unknownFoods, locale)
-    }
-  ];
-
-  return (
-    <div className="mt-8 space-y-6">
-      <BusinessStatsGrid metrics={metrics} />
-
-      <Section
-        action={
-          <CsvButton
-            filename="food-improvement-opportunities.csv"
-            rows={csvRows(foodColumns, data.foodOpportunities)}
-          />
-        }
-        eyebrow="Food support"
-        title="Foods To Improve Formula Outcomes"
-      >
-        <DistributionBars
-          labelFor={(row) => row.foodName}
-          locale={locale}
-          rows={data.foodOpportunities.slice(0, 30)}
-          valueFor={(row) => row.recommendationCount}
-        />
-      </Section>
-
-      <Section
-        title="Blocked, Missing Profile, Or Review-Needed Foods"
-      >
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead>
-              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <th className="py-2 pr-4">Food</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Demand</th>
-                <th className="py-2 pr-4">Missing profile</th>
-                <th className="py-2 pr-4">Gap signals</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {data.foodOpportunities
-                .filter((row) => row.listStatus !== "active" || row.missingProfile)
-                .map((row) => (
-                  <tr key={row.foodId}>
-                    <td className="py-3 pr-4 font-semibold text-gray-900">{row.foodName}</td>
-                    <td className="py-3 pr-4"><StatusPill status={row.listStatus} /></td>
-                    <td className="py-3 pr-4">{formatNumber(row.recommendationCount, locale)}</td>
-                    <td className="py-3 pr-4">{row.missingProfile ? "Yes" : "No"}</td>
-                    <td className="max-w-lg py-3 pr-4 text-gray-600">{row.gapSignals.join(", ") || "No gap signals recorded"}</td>
-                  </tr>
-                ))}
-              {data.foodOpportunities.filter((row) => row.listStatus !== "active" || row.missingProfile).length < 1 ? (
-                <tr>
-                  <td className="py-4 text-gray-500" colSpan={5}>
-                    No blocked or nutrient-profile food opportunities found.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </Section>
-
-      <Section title="Unknown Foods From Review Tasks">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead>
-              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <th className="py-2 pr-4">Food</th>
-                <th className="py-2 pr-4">Count</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Last seen</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {data.unknownFoods.length > 0 ? data.unknownFoods.map((row) => (
-                <tr key={`${row.name}:${row.reviewStatus}`}>
-                  <td className="py-3 pr-4 font-semibold text-gray-900">{row.name}</td>
-                  <td className="py-3 pr-4">{formatNumber(row.count, locale)}</td>
-                  <td className="py-3 pr-4 text-gray-600">{row.reviewStatus}</td>
-                  <td className="py-3 pr-4 text-gray-600">{row.lastSeenAt ?? "Not recorded"}</td>
-                </tr>
-              )) : (
-                <tr>
-                  <td className="py-4 text-gray-500" colSpan={4}>
-                    No unknown food review tasks are visible for this timeframe.
+                    No blocked or review-only supplement demand.
                   </td>
                 </tr>
               )}
