@@ -6,7 +6,11 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const assessmentFlow = readFileSync(new URL("../components/assessment-flow.tsx", import.meta.url), "utf8");
+const assessmentFlowPanels = readFileSync(new URL("../components/assessment-flow-panels.tsx", import.meta.url), "utf8");
 const assessmentFlowCopy = readFileSync(new URL("../components/assessment-flow-copy.ts", import.meta.url), "utf8");
+const assessmentFlowCopyEn = readFileSync(new URL("../components/assessment-flow-copy-en.ts", import.meta.url), "utf8");
+const assessmentFlowCopyTh = readFileSync(new URL("../components/assessment-flow-copy-th.ts", import.meta.url), "utf8");
+const assessmentFlowCopyZhCn = readFileSync(new URL("../components/assessment-flow-copy-zh-cn.ts", import.meta.url), "utf8");
 const customerCss = readFileSync(new URL("../app/customer.css", import.meta.url), "utf8");
 const assessmentState = readFileSync(new URL("../components/assessment-flow-state.ts", import.meta.url), "utf8");
 const assessmentStore = readFileSync(new URL("../lib/assessment-store.ts", import.meta.url), "utf8");
@@ -89,6 +93,24 @@ describe("questionnaire V4 first name capture", () => {
     assert.doesNotMatch(assessmentFlow, /mn-privacy-gate/);
     assert.doesNotMatch(assessmentFlow, /id: "disclosure"/);
     assert.doesNotMatch(assessmentFlow, /copy\.food\.disclosureTitle/);
+  });
+
+  it("keeps questionnaire stepper labels visible on mobile", () => {
+    assert.doesNotMatch(assessmentFlowPanels, /hidden\s+sm:(?:inline|block)/);
+    assert.match(assessmentFlowPanels, /const stageLabel = stages\[index\] \?\? section\.title/);
+    assert.match(assessmentFlowPanels, /aria-label=\{`\$\{index \+ 1\}\. \$\{stageLabel\}`\}/);
+    assert.match(assessmentFlowPanels, /min-h-\[5\.75rem\]/);
+    assert.match(assessmentFlowPanels, /line-clamp-2 text-xs/);
+
+    for (const label of ["About you", "Goals", "Daily life", "Food", "Safety", "Precision"]) {
+      assert.match(assessmentFlowCopyEn, new RegExp(label));
+    }
+    for (const label of ["เกี่ยวกับคุณ", "เป้าหมาย", "ชีวิตประจำวัน", "อาหาร", "ความปลอดภัย", "ความแม่นยำ"]) {
+      assert.match(assessmentFlowCopyTh, new RegExp(label));
+    }
+    for (const label of ["关于您", "目标", "日常生活", "饮食", "安全", "精准"]) {
+      assert.match(assessmentFlowCopyZhCn, new RegExp(label));
+    }
   });
 
   it("ports the v5 consent notice CSS from the handoff", () => {

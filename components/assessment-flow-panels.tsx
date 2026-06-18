@@ -158,14 +158,17 @@ export function AssessmentStepper({
         {sections.map((section, index) => {
           const active = index === currentIndex;
           const done = index < currentIndex || section.complete;
+          const phaseLabel = phases[index] ?? phases[0] ?? "";
+          const stageLabel = stages[index] ?? section.title;
 
           return (
             <li key={section.id}>
               <button
                 type="button"
+                aria-label={`${index + 1}. ${stageLabel}`}
                 aria-current={active ? "step" : undefined}
                 className={cx(
-                  "flex h-full w-full flex-col gap-1 rounded-[0.85rem] border px-3 py-3 text-left shadow-sm transition",
+                  "flex h-full min-h-[5.75rem] w-full flex-col justify-between gap-2 rounded-[0.85rem] border px-3 py-3 text-left shadow-sm transition",
                   active
                     ? "border-[var(--mn-teal)] bg-[linear-gradient(180deg,#fff,var(--mn-mint))] text-[var(--mn-ink)] shadow-[0_14px_34px_-26px_rgba(45,143,114,0.6)]"
                     : done
@@ -176,7 +179,7 @@ export function AssessmentStepper({
               >
                 <span
                   className={cx(
-                    "flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]",
+                    "flex min-w-0 items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.1em] sm:text-[10px] sm:tracking-[0.12em]",
                     active || done ? "text-[var(--mn-teal-deep)]" : "text-muted-foreground"
                   )}
                 >
@@ -196,17 +199,17 @@ export function AssessmentStepper({
                       index + 1
                     )}
                   </span>
-                  <span className="hidden sm:inline">
-                    {phases[index] ?? phases[0] ?? ""}
+                  <span className="sr-only sm:not-sr-only sm:min-w-0 sm:truncate">
+                    {phaseLabel}
                   </span>
                 </span>
                 <span
                   className={cx(
-                    "hidden text-sm font-semibold tracking-normal sm:block",
+                    "line-clamp-2 text-xs font-semibold leading-snug tracking-normal sm:text-sm",
                     active || done ? "text-[var(--mn-ink)]" : "text-muted-foreground"
                   )}
                 >
-                  {stages[index] ?? section.title}
+                  {stageLabel}
                 </span>
               </button>
             </li>
