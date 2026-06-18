@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Check,
   FileDown,
+  FileText,
   PackageCheck,
   ReceiptText,
   Truck
@@ -80,6 +81,7 @@ import {
   formatDateTime,
   orderLineAwaitingStockUnits,
   orderLineIdentifierParts,
+  openRetailPlanInsert,
   printRetailOrderDocument,
   printShipmentLabel
 } from "@/components/admin/retail-stock/order-documents";
@@ -2558,6 +2560,18 @@ export function AdminRetailStockView({
                     <FileDown aria-hidden="true" className="size-4" />
                     {labels.stock.downloadPdf}
                   </AdminButton>
+                  {customerOrderDetail.planInsertAvailable ? (
+                    <AdminButton
+                      className="gap-2"
+                      onClick={() =>
+                        openRetailPlanInsert(customerOrderDetail, locale)
+                      }
+                      variant="secondary"
+                    >
+                      <FileText aria-hidden="true" className="size-4" />
+                      {labels.stock.planInsert}
+                    </AdminButton>
+                  ) : null}
                   <AdminButton
                     className="gap-2"
                     onClick={() =>

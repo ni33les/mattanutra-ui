@@ -12,7 +12,10 @@ import {
 import { formatOutboundLineMessage } from "@/lib/line-message-format";
 import { getSql } from "@/lib/db";
 import { validateLeadEmail } from "@/lib/email-validation";
-import { sendTransactionalEmail } from "@/lib/smtp-email";
+import {
+  sendTransactionalEmail,
+  type TransactionalEmailAttachment
+} from "@/lib/smtp-email";
 import { AGENT_CAPABILITIES } from "@/lib/system-agents";
 import { createTask } from "@/lib/task-service";
 import type { ReservedTask } from "@/lib/task-service";
@@ -1419,6 +1422,7 @@ export async function consumeOrganisationLineConnectCode(input: Readonly<{
 }
 
 export async function createCustomerLineConnectToken(input: Readonly<{
+  expiresInMinutes?: number | null;
   planId: string;
   retailCustomerOrderId?: string | null;
   source?: string | null;
@@ -1432,6 +1436,10 @@ export async function createCustomerLineConnectToken(input: Readonly<{
   const orderId = isUuid(input.retailCustomerOrderId ?? "")
     ? input.retailCustomerOrderId!
     : null;
+  const expiresInMinutes = Math.min(
+    90 * 24 * 60,
+    Math.max(1, Math.round(Number(input.expiresInMinutes) || 15))
+  );
 
   await ensureCommunicationSchema(sql);
 
@@ -1457,7 +1465,7 @@ export async function createCustomerLineConnectToken(input: Readonly<{
   const retailCustomerOrderId = orderRows[0]?.id ?? null;
   const code = newLineConnectCode();
   const tokenHash = hashLineConnectCode(code);
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
 
   await ensurePlanIdentity(sql, input.planId);
 
@@ -1484,6 +1492,7 @@ export async function createCustomerLineConnectToken(input: Readonly<{
       'active',
       ${expiresAt},
       ${sql.json(toJsonValue({
+        expiresInMinutes,
         retailCustomerOrderId,
         source
       }))},
@@ -2943,11 +2952,72 @@ export async function updateCommunicationMessageStatus(input: Readonly<{
   return message;
 }
 
+async function attachmentsForPreparedEmailMessage(
+  message: CommunicationMessage
+): Promise<{
+  attachments: TransactionalEmailAttachment[];
+  warning: string | null;
+}> {
+  const metadata = objectValue(message.metadata);
+  const orderId = cleanText(metadata.planInsertOrderId);
+
+  if (!isUuid(orderId)) {
+    return { attachments: [], warning: null };
+  }
+
+  try {
+    const { renderRetailPlanInsertPdfForOrder } = await import(
+      "@/lib/retail-plan-insert"
+    );
+    const rendered = await renderRetailPlanInsertPdfForOrder({ orderId });
+
+    if (!rendered) {
+      return {
+        attachments: [],
+        warning: "plan_insert_not_available"
+      };
+    }
+
+    return {
+      attachments: [{
+        content: rendered.buffer,
+        contentType: "application/pdf",
+        filename: rendered.filename
+      }],
+      warning: null
+    };
+  } catch (error) {
+    return {
+      attachments: [],
+      warning: error instanceof Error ? error.message : "plan_insert_failed"
+    };
+  }
+}
+
 async function sendPreparedEmailMessage(
   message: CommunicationMessage,
   channel: CommunicationChannel
 ): Promise<CommunicationDispatchResult> {
+  const attachmentResult = await attachmentsForPreparedEmailMessage(message);
+
+  if (attachmentResult.warning) {
+    await writeBpmEvent({
+      actorType: "worker",
+      emittedBy: "admin_communications",
+      eventName: "communication_attachment_failed",
+      eventStatus: "warning",
+      eventType: "email",
+      properties: {
+        messageId: message.id,
+        messageType: message.messageType,
+        reason: attachmentResult.warning
+      },
+      severity: "medium"
+    });
+  }
+
   const delivery = await sendTransactionalEmail({
+    attachments: attachmentResult.attachments,
     html:
       message.html ??
       plainTextEmailHtml(message.subject ?? "MattaNutra update", message.body),

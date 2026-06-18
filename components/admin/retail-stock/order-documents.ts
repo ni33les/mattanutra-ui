@@ -243,6 +243,28 @@ export function printShipmentLabel(input: Readonly<{
   });
 }
 
+export function retailPlanInsertHref(
+  order: AdminRetailCustomerOrder,
+  locale: Locale
+) {
+  const params = new URLSearchParams({ locale });
+
+  return `/api/admin/retail-stock/customer-orders/${encodeURIComponent(
+    order.id
+  )}/plan-insert?${params.toString()}`;
+}
+
+export function openRetailPlanInsert(
+  order: AdminRetailCustomerOrder,
+  locale: Locale
+) {
+  if (typeof window === "undefined" || !order.planInsertAvailable) {
+    return;
+  }
+
+  window.open(retailPlanInsertHref(order, locale), "_blank", "noopener,noreferrer");
+}
+
 export function printRetailOrderDocument({
   kind,
   labels,
@@ -258,6 +280,10 @@ export function printRetailOrderDocument({
 }>) {
   if (typeof window === "undefined") {
     return;
+  }
+
+  if (kind === "order-pack") {
+    openRetailPlanInsert(order, locale);
   }
 
   const documentTitle = retailOrderDocumentTitle(labels, kind);

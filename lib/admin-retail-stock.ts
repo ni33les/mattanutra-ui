@@ -482,6 +482,8 @@ export type AdminRetailCustomerOrder = Readonly<{
   orderedUnits: number;
   organisationId: string;
   organisationName: string;
+  planId: string | null;
+  planInsertAvailable: boolean;
   placedAt: string | null;
   pipeline: AdminRetailStockPipelineRow | null;
   pricingSnapshot: AdminRetailCustomerOrderPricingSnapshot | null;
@@ -694,6 +696,14 @@ async function retailOperationsTablesAvailable(sql: StockDb) {
       and to_regclass('public.retail_customer_order_lines') is not null
       and to_regclass('public.retail_order_allocations') is not null
     ) as available
+  `;
+
+  return Boolean(rows[0]?.available);
+}
+
+async function retailCheckoutPaymentsTableAvailable(sql: StockDb) {
+  const rows = await sql<Array<{ available: boolean }>>`
+    select to_regclass('public.retail_checkout_payments') is not null as available
   `;
 
   return Boolean(rows[0]?.available);
@@ -2245,6 +2255,27 @@ export async function getAdminRetailStockData(
   const operationsTablesAvailable = organisationIds.length > 0
     ? await retailOperationsTablesAvailable(sql)
     : false;
+  const checkoutPaymentsTableReady = operationsTablesAvailable
+    ? await retailCheckoutPaymentsTableAvailable(sql)
+    : false;
+  const checkoutPaymentPlanSelect = checkoutPaymentsTableReady
+    ? sql`checkout_payment.plan_id`
+    : sql`null::text as plan_id`;
+  const checkoutPaymentJoin = checkoutPaymentsTableReady
+    ? sql`
+        left join lateral (
+          select retail_checkout_payments.plan_id::text
+          from public.retail_checkout_payments
+          where retail_checkout_payments.retail_customer_order_id = retail_customer_orders.id
+            or retail_checkout_payments.id::text = retail_customer_orders.metadata ->> 'checkoutPaymentId'
+          order by retail_checkout_payments.updated_at desc
+          limit 1
+        ) checkout_payment on true
+      `
+    : sql``;
+  const checkoutPaymentGroupBy = checkoutPaymentsTableReady
+    ? sql`, checkout_payment.plan_id`
+    : sql``;
   const shipmentTablesReady = organisationIds.length > 0
     ? (await sql<Array<{ ready: boolean }>>`
         select to_regclass('public.retail_order_shipments') is not null as ready
@@ -2376,6 +2407,7 @@ export async function getAdminRetailStockData(
           ordered_units: number | string;
           organisation_id: string;
           organisation_name: string;
+          plan_id: string | null;
           placed_at: Date | string | null;
           shipped_at: Date | string | null;
           shipped_units: number | string;
@@ -2401,6 +2433,7 @@ export async function getAdminRetailStockData(
             retail_customer_orders.notes,
             retail_customer_orders.metadata,
             retail_customer_orders.updated_at,
+            ${checkoutPaymentPlanSelect},
             count(retail_customer_order_lines.id)::int as line_count,
             coalesce(sum(retail_customer_order_lines.quantity_ordered), 0)::int as ordered_units,
             coalesce(sum(retail_customer_order_lines.quantity_shipped), 0)::int as shipped_units,
@@ -2410,8 +2443,9 @@ export async function getAdminRetailStockData(
             on organisations.id = retail_customer_orders.organisation_id
           left join public.retail_customer_order_lines
             on retail_customer_order_lines.customer_order_id = retail_customer_orders.id
+          ${checkoutPaymentJoin}
           where retail_customer_orders.organisation_id = any(${organisationIds}::uuid[])
-          group by retail_customer_orders.id, organisations.name
+          group by retail_customer_orders.id, organisations.name${checkoutPaymentGroupBy}
           order by retail_customer_orders.updated_at desc
           limit 200
         `,

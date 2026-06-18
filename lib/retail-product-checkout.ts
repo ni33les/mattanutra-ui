@@ -937,6 +937,8 @@ async function createRetailCustomerOrderFromPayment(
       metadata: {
         checkoutPaymentId: payment.id,
         orderNumber: order.order_number,
+        planId: payment.plan_id,
+        planInsertOrderId: order.id,
         source: "retail_product_checkout"
       },
       organisationId: retailerId,

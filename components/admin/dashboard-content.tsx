@@ -456,6 +456,7 @@ export type AdminContent = Readonly<{
     lineTotal: string;
     packingSheet: string;
     phone: string;
+    planInsert: string;
     pickupBooked: string;
     printOrder: string;
     readyToPack: string;
@@ -1162,6 +1163,7 @@ const baseContent = {
       lineTotal: "Line total",
       packingSheet: "Packing sheet",
       phone: "Phone",
+      planInsert: "Plan insert",
       pickupBooked: "Pickup booked",
       printOrder: "Print order",
       readyToPack: "Ready to pack",
@@ -2016,6 +2018,7 @@ const baseContent = {
       lineTotal: "รวมรายการ",
       packingSheet: "ใบจัดสินค้า",
       phone: "โทรศัพท์",
+      planInsert: "เอกสารแผน",
       pickupBooked: "จองรับพัสดุแล้ว",
       printOrder: "พิมพ์คำสั่งซื้อ",
       readyToPack: "พร้อมแพ็ก",

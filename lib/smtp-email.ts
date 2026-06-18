@@ -1,6 +1,13 @@
 import nodemailer from "nodemailer";
 
+export type TransactionalEmailAttachment = Readonly<{
+  content: Buffer | string;
+  contentType?: string;
+  filename: string;
+}>;
+
 type SendTransactionalEmailInput = Readonly<{
+  attachments?: readonly TransactionalEmailAttachment[];
   html: string;
   subject: string;
   to: string;
@@ -46,6 +53,7 @@ export function isSmtpConfigured() {
 }
 
 export async function sendTransactionalEmail({
+  attachments,
   html,
   subject,
   to
@@ -67,6 +75,11 @@ export async function sendTransactionalEmail({
     secure
   });
   const result = await transporter.sendMail({
+    attachments: attachments?.map((attachment) => ({
+      content: attachment.content,
+      contentType: attachment.contentType,
+      filename: attachment.filename
+    })),
     from: envText("SMTP_FROM"),
     html,
     replyTo: envText("SMTP_REPLY_TO") || undefined,

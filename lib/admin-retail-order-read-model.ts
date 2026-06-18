@@ -63,6 +63,7 @@ export type RetailCustomerOrderRow = Readonly<{
   ordered_units: number | string;
   organisation_id: string;
   organisation_name: string;
+  plan_id: string | null;
   placed_at: Date | string | null;
   shipped_at: Date | string | null;
   shipped_units: number | string;
@@ -428,6 +429,8 @@ export function mapCustomerOrderRow(input: Readonly<{
     orderedUnits: integerOrDefault(row.ordered_units, 0),
     organisationId: row.organisation_id,
     organisationName: row.organisation_name,
+    planId: stringMetadata(row.plan_id),
+    planInsertAvailable: Boolean(stringMetadata(row.plan_id)),
     placedAt,
     pipeline,
     pricingSnapshot: pricingSnapshotFromMetadata(row.metadata, row.currency),

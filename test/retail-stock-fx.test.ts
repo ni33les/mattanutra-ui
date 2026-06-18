@@ -381,7 +381,11 @@ describe("retail stock and FX infrastructure", () => {
 	      view,
 	      /runCustomerOrderAction\(customerOrderDetail, "mark_picking"\)/
 	    );
-	    assert.doesNotMatch(view, /package-insert|packageInsert|FileText/);
+	    assert.match(view, /customerOrderDetail\.planInsertAvailable/);
+	    assert.match(view, /openRetailPlanInsert\(customerOrderDetail, locale\)/);
+	    assert.match(view, /<FileText aria-hidden="true"/);
+	    assert.match(view, /labels\.stock\.planInsert/);
+	    assert.doesNotMatch(view, /package-insert|packageInsert/);
 	    assert.match(orderReadModel, /function deliveryDetailsFromMetadata/);
 	    assert.match(orderReadModel, /shippingAddress = orderAddressFromMetadata\(metadata\.shippingAddress\)/);
 	    assert.match(orderReadModel, /billingAddress = billingSameAsShipping[\s\S]*orderAddressFromMetadata\(metadata\.billingAddress\)/);
