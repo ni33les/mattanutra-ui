@@ -38,6 +38,7 @@ export type AdminDashboardView =
   | "blogs"
   | "campaigns"
   | "content"
+  | "coverage-improvement-insights"
   | "customer-insights"
   | "communications"
   | "financials"
@@ -1440,6 +1441,7 @@ const baseContent = {
     retailSellingTitle: "Orders",
     insights: [
       { icon: UserGroupIcon, name: "Customer Intelligence", view: "customer-insights" },
+      { icon: FunnelIcon, name: "Coverage Improvement", view: "coverage-improvement-insights" },
       { icon: BeakerIcon, name: "Supplements", view: "supplement-insights" },
       { icon: ExclamationTriangleIcon, name: "Out-of-catalog", view: "out-of-catalog-insights" },
       { icon: ShoppingBagIcon, name: "Products", view: "product-insights" }
@@ -1462,6 +1464,7 @@ const baseContent = {
       blogs: "Blogs",
       campaigns: "Campaigns",
       content: "Content",
+      "coverage-improvement-insights": "Coverage Improvement",
       "customer-insights": "Customer Intelligence",
       communications: "Communications",
       financials: "Financials",
@@ -2296,6 +2299,7 @@ const baseContent = {
     retailSellingTitle: "คำสั่งซื้อ",
     insights: [
       { icon: UserGroupIcon, name: "ข้อมูลลูกค้า", view: "customer-insights" },
+      { icon: FunnelIcon, name: "ปรับปรุงความครอบคลุม", view: "coverage-improvement-insights" },
       { icon: BeakerIcon, name: "อาหารเสริม", view: "supplement-insights" },
       { icon: ExclamationTriangleIcon, name: "นอกแคตตาล็อก", view: "out-of-catalog-insights" },
       { icon: ShoppingBagIcon, name: "สินค้า", view: "product-insights" }
@@ -2318,6 +2322,7 @@ const baseContent = {
       blogs: "บทความ",
       campaigns: "แคมเปญ",
       content: "คอนเทนต์",
+      "coverage-improvement-insights": "ปรับปรุงความครอบคลุม",
       "customer-insights": "ข้อมูลลูกค้า",
       communications: "การสื่อสาร",
       financials: "การเงิน",

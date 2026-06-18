@@ -672,6 +672,10 @@
       "view": "customer-insights"
     },
     {
+      "name": "覆盖改进",
+      "view": "coverage-improvement-insights"
+    },
+    {
       "name": "补充剂",
       "view": "supplement-insights"
     },
@@ -714,6 +718,7 @@
     "blogs": "博客",
     "campaigns": "营销活动",
     "content": "内容",
+    "coverage-improvement-insights": "覆盖改进",
     "customer-insights": "客户洞察",
     "communications": "通信",
     "financials": "财务",

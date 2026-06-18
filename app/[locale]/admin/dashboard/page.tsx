@@ -23,6 +23,10 @@ import {
   getAdminCustomerInsightsData
 } from "@/lib/admin-customer-insights";
 import {
+  emptyAdminCoverageImprovementInsightsData,
+  getAdminCoverageImprovementInsightsData
+} from "@/lib/admin-coverage-improvement-insights";
+import {
   emptyCommunicationsData,
   getAdminCommunicationsData
 } from "@/lib/admin-communications";
@@ -205,6 +209,8 @@ export default async function LocalizedAdminDashboardPage({
   let agentsData = emptyAgentsData();
   let campaignsData = emptyCampaignsData();
   let contentData = emptyContentData();
+  let coverageImprovementInsightsData =
+    emptyAdminCoverageImprovementInsightsData(range);
   let customerInsightsData = emptyAdminCustomerInsightsData(range);
   let communicationsData = emptyCommunicationsData();
   let data = emptyAdminDashboardData(range);
@@ -297,6 +303,9 @@ export default async function LocalizedAdminDashboardPage({
     );
     productsData = await getAdminProductsData(range);
     supplementsData = await getAdminSupplementsData(range);
+  } else if (view === "coverage-improvement-insights") {
+    coverageImprovementInsightsData =
+      await getAdminCoverageImprovementInsightsData(range, locale);
   } else if (view === "customer-insights") {
     customerInsightsData = await getAdminCustomerInsightsData(range);
   } else if (view === "reviews") {
@@ -319,6 +328,7 @@ export default async function LocalizedAdminDashboardPage({
       agentsData={agentsData}
       campaignsData={campaignsData}
       contentData={contentData}
+      coverageImprovementInsightsData={coverageImprovementInsightsData}
       customerInsightsData={customerInsightsData}
       communicationsData={communicationsData}
       data={data}

@@ -11,6 +11,9 @@ import type {
   AdminCustomerInsightsData
 } from "@/lib/admin-customer-insights";
 import type {
+  AdminCoverageImprovementInsightsData
+} from "@/lib/admin-coverage-improvement-insights";
+import type {
   AdminAgentsData,
   AdminTaskVisibilityData
 } from "@/lib/admin-execution";
@@ -82,6 +85,7 @@ import { AdminAgentsView } from "@/components/admin/agents-view";
 import { AdminCampaignsView } from "@/components/admin/marketing-campaigns";
 import { AdminLeadsView } from "@/components/admin/marketing-leads";
 import { AdminCustomerInsightsView } from "@/components/admin/customer-insights-view";
+import { AdminCoverageImprovementInsightsView } from "@/components/admin/coverage-improvement-insights-view";
 import { AdminCommunicationsView } from "@/components/admin/communications-view";
 import { AdminPanyaView } from "@/components/admin/panya-view";
 import { AdminTechnicalAlertsView } from "@/components/admin/technical-alerts-view";
@@ -212,6 +216,7 @@ function adminViewDatabaseAvailable({
   agentsData,
   campaignsData,
   contentData,
+  coverageImprovementInsightsData,
   customerInsightsData,
   communicationsData,
   data,
@@ -234,6 +239,7 @@ function adminViewDatabaseAvailable({
   agentsData: AdminAgentsData;
   campaignsData: AdminCampaignsData;
   contentData: AdminContentInventoryData;
+  coverageImprovementInsightsData: AdminCoverageImprovementInsightsData;
   customerInsightsData: AdminCustomerInsightsData;
   communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
@@ -290,6 +296,10 @@ function adminViewDatabaseAvailable({
 
   if (view === "customer-insights") {
     return customerInsightsData.databaseAvailable;
+  }
+
+  if (view === "coverage-improvement-insights") {
+    return coverageImprovementInsightsData.databaseAvailable;
   }
 
   if (view === "blogs" || view === "content" || view === "testimonials") {
@@ -371,6 +381,7 @@ export function AdminDashboard({
   agentsData,
   campaignsData,
   contentData,
+  coverageImprovementInsightsData,
   customerInsightsData,
   communicationsData,
   data,
@@ -403,6 +414,7 @@ export function AdminDashboard({
   agentsData: AdminAgentsData;
   campaignsData: AdminCampaignsData;
   contentData: AdminContentInventoryData;
+  coverageImprovementInsightsData: AdminCoverageImprovementInsightsData;
   customerInsightsData: AdminCustomerInsightsData;
   communicationsData: AdminCommunicationsData;
   data: AdminDashboardData;
@@ -442,6 +454,7 @@ export function AdminDashboard({
       view === "alerts" ||
       view === "campaigns" ||
       view === "communications" ||
+      view === "coverage-improvement-insights" ||
       view === "customer-insights" ||
       view === "financials" ||
       view === "flow" ||
@@ -498,6 +511,7 @@ export function AdminDashboard({
     agentsData: liveAgentsData,
     campaignsData,
     contentData,
+    coverageImprovementInsightsData,
     customerInsightsData,
     communicationsData,
     data,
@@ -753,6 +767,11 @@ export function AdminDashboard({
           ) : view === "customer-insights" ? (
             <AdminCustomerInsightsView
               data={customerInsightsData}
+              locale={locale}
+            />
+          ) : view === "coverage-improvement-insights" ? (
+            <AdminCoverageImprovementInsightsView
+              data={coverageImprovementInsightsData}
               locale={locale}
             />
           ) : view === "agents" ? (

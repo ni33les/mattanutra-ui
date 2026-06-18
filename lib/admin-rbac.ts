@@ -237,6 +237,7 @@ const adminViews = [
   "agents",
   "alerts",
   "content",
+  "coverage-improvement-insights",
   "customer-insights",
   "out-of-catalog-insights",
   "product-insights",
@@ -345,7 +346,12 @@ export function adminViewPermission(view: AdminDashboardView): AdminPermission {
     return "content.read";
   }
 
-  if (view === "campaigns" || view === "customer-insights" || view === "leads") {
+  if (
+    view === "campaigns" ||
+    view === "coverage-improvement-insights" ||
+    view === "customer-insights" ||
+    view === "leads"
+  ) {
     return "marketing.read";
   }
 
