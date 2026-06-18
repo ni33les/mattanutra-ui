@@ -27,6 +27,10 @@ describe("recommendation selection projections", () => {
     const productSearch = readFileSync("lib/admin-product-search.ts", "utf8");
     const taskExecution = readFileSync("lib/task-execution.ts", "utf8");
     const taskWorker = readFileSync("lib/task-worker.ts", "utf8");
+    const freshness = readFileSync(
+      "lib/product-recommendation-freshness.ts",
+      "utf8"
+    );
 
     assert.match(schema, /product_recommendation_decisions/);
     assert.match(schema, /selected_retailer_organisation_id uuid/);
@@ -73,8 +77,9 @@ describe("recommendation selection projections", () => {
     assert.match(taskExecution, /retailerCandidateSets\.map/);
     assert.match(taskExecution, /selectRetailerRecommendationOption/);
     assert.match(taskExecution, /retailerOptions: retailerOptions\.map/);
-    assert.match(taskWorker, /retail_catalogue_revision/);
-    assert.match(taskWorker, /retail_catalogue_updated_at/);
+    assert.match(taskWorker, /loadProductRecommendationFreshnessSnapshot/);
+    assert.match(freshness, /retail_catalogue_revision/);
+    assert.match(freshness, /retail_catalogue_updated_at/);
   });
 
   it("projects supplement selections with parsed dose and safety visibility", () => {

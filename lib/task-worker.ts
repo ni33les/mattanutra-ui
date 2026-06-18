@@ -21,6 +21,9 @@ import {
   type ProductStackPreference
 } from "@/lib/product-recommendations";
 import {
+  loadProductRecommendationFreshnessSnapshot
+} from "@/lib/product-recommendation-freshness";
+import {
   queueDuePanyaCheckIn,
   queueDuePanyaReorderCallback
 } from "@/lib/panya";
@@ -1409,151 +1412,25 @@ export async function enqueueProductRecommendationsTask({
     }
   }
 
-  const rows = await sql<Array<{
-    formulation_generated_at: string | null;
-    formulation_version: number;
-    product_catalog_count: number;
-    product_catalog_updated_at: string | null;
-    report_version: number;
-    safety_review_state: unknown;
-    retail_catalogue_revision: unknown;
-    retail_catalogue_updated_at: string | null;
-  }>>`
-    select
-      coalesce((
-        select max(version)
-        from public.formulations
-        where plan_id = ${planId}::uuid
-          and (
-            model_version is null
-            or model_version not like '%:example'
-          )
-      ), 0) as formulation_version,
-      (
-        select max(generated_at)::text
-        from public.formulations
-        where plan_id = ${planId}::uuid
-          and (
-            model_version is null
-            or model_version not like '%:example'
-          )
-      ) as formulation_generated_at,
-      coalesce((
-        select max(version)
-        from public.nutrition_reports
-        where plan_id = ${planId}::uuid
-      ), 0) as report_version,
-      coalesce((
-        select count(*)
-        from public.products
-        where status = 'approved'
-          and availability_status <> 'unavailable'
-      ), 0)::int as product_catalog_count,
-      (
-        select max(updated_at)::text
-        from public.products
-        where status = 'approved'
-          and availability_status <> 'unavailable'
-      ) as product_catalog_updated_at,
-      coalesce((
-        select jsonb_build_object(
-          'sellableCount', count(distinct retail_sellable_products.id),
-          'stockCount', count(distinct retail_product_stock.id),
-          'updatedAt', max(greatest(
-            retail_sellable_products.updated_at,
-            coalesce(retail_product_stock.updated_at, retail_sellable_products.updated_at),
-            coalesce(product_countries.updated_at, retail_sellable_products.updated_at),
-            coalesce(platform_organisation.updated_at, retail_sellable_products.updated_at)
-          ))
-        )
-        from public.retail_sellable_products
-        join public.organisations
-          on organisations.id = retail_sellable_products.organisation_id
-          and organisations.status = 'active'
-        left join public.retail_product_stock
-          on retail_product_stock.organisation_id = retail_sellable_products.organisation_id
-          and retail_product_stock.product_id = retail_sellable_products.product_id
-          and retail_product_stock.status <> 'deleted'
-        left join public.product_countries
-          on product_countries.product_id = retail_sellable_products.product_id
-          and product_countries.country_code = organisations.country_code
-        left join public.organisations platform_organisation
-          on lower(platform_organisation.slug) = 'mattanutra'
-          and platform_organisation.organisation_type = 'platform'
-        where retail_sellable_products.status <> 'deleted'
-      ), '{"sellableCount":0,"stockCount":0}'::jsonb) as retail_catalogue_revision,
-      (
-        select max(greatest(
-          retail_sellable_products.updated_at,
-          coalesce(retail_product_stock.updated_at, retail_sellable_products.updated_at),
-          coalesce(product_countries.updated_at, retail_sellable_products.updated_at),
-          coalesce(platform_organisation.updated_at, retail_sellable_products.updated_at)
-        ))::text
-        from public.retail_sellable_products
-        join public.organisations
-          on organisations.id = retail_sellable_products.organisation_id
-          and organisations.status = 'active'
-        left join public.retail_product_stock
-          on retail_product_stock.organisation_id = retail_sellable_products.organisation_id
-          and retail_product_stock.product_id = retail_sellable_products.product_id
-          and retail_product_stock.status <> 'deleted'
-        left join public.product_countries
-          on product_countries.product_id = retail_sellable_products.product_id
-          and product_countries.country_code = organisations.country_code
-        left join public.organisations platform_organisation
-          on lower(platform_organisation.slug) = 'mattanutra'
-          and platform_organisation.organisation_type = 'platform'
-        where retail_sellable_products.status <> 'deleted'
-      ) as retail_catalogue_updated_at,
-      coalesce((
-        select jsonb_agg(
-          jsonb_build_object(
-            'closedAt', closed_at,
-            'id', id,
-            'reviewedAt', reviewed_at,
-            'status', status,
-            'updatedAt', updated_at
-          )
-          order by id
-        )
-        from public.safety_reviews
-        where plan_id = ${planId}::uuid
-          and status in ('accepted', 'closed', 'rejected')
-      ), '[]'::jsonb) as safety_review_state
-  `;
-  const row = rows[0];
+  const row = await loadProductRecommendationFreshnessSnapshot(sql, {
+    algorithmVersion: matcherAlgorithmVersion,
+    planId,
+    stackPreference: normalizedStackPreference
+  });
 
   if (
     !row ||
-    (row.formulation_version < 1 && !dependencyTaskId)
+    (row.formulationVersion < 1 && !dependencyTaskId)
   ) {
     return null;
   }
 
-  if (!forceNew && row.formulation_version >= 1) {
-    const readyRows = await sql<Array<{ id: string }>>`
-      select id::text
-      from public.product_recommendation_runs
-      where plan_id = ${planId}::uuid
-        and status in ('completed', 'partial')
-        and coalesce(diagnostics ->> 'stackPreference', 'balanced') = ${normalizedStackPreference}
-        and coalesce(diagnostics ->> 'algorithmVersion', '') = ${matcherAlgorithmVersion}
-        and generated_at >= greatest(
-          coalesce(${row.formulation_generated_at}::timestamptz, '-infinity'::timestamptz),
-          coalesce(${row.product_catalog_updated_at}::timestamptz, '-infinity'::timestamptz),
-          coalesce(${row.retail_catalogue_updated_at}::timestamptz, '-infinity'::timestamptz)
-        )
-      order by generated_at desc
-      limit 1
-    `;
-
-    if (readyRows[0]?.id) {
-      return null;
-    }
+  if (!forceNew && row.formulationVersion >= 1 && !row.reason) {
+    return null;
   }
 
   const inputHash = stableHash({
-    dependencyTaskId: row.formulation_version < 1 ? dependencyTaskId : null,
+    dependencyTaskId: row.formulationVersion < 1 ? dependencyTaskId : null,
     matcherAlgorithmVersion,
     matcherImplementationVersion,
     normalizedStackPreference,
@@ -1587,11 +1464,12 @@ export async function enqueueProductRecommendationsTask({
     payload: {
       inputHash,
       dependsOnTaskId: dependencyTaskId,
+      refreshReason: row.reason,
       matcherAlgorithmVersion,
       matcherImplementationVersion,
       parentTaskId,
       paymentId,
-      pendingFormulation: row.formulation_version < 1,
+      pendingFormulation: row.formulationVersion < 1,
       plan,
       row,
       stackPreference: normalizedStackPreference
@@ -1603,6 +1481,28 @@ export async function enqueueProductRecommendationsTask({
     taskTitle: "Match product catalogue",
     taskType: "generate_product_recommendations"
   });
+}
+
+export async function ensureFreshProductRecommendationsForReveal(
+  planId: string,
+  stackPreference: ProductStackPreference = "balanced"
+) {
+  const taskId = await enqueueProductRecommendationsTask({
+    planId,
+    source: "reveal_product_recommendation_refresh",
+    stackPreference
+  });
+
+  if (taskId) {
+    await enqueueFoodGapSupportTask({
+      dependsOnTaskId: taskId,
+      parentTaskId: taskId,
+      planId,
+      source: "reveal_product_recommendation_refresh"
+    });
+  }
+
+  return { taskId };
 }
 
 export async function enqueueFoodGapSupportTask({

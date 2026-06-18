@@ -10,13 +10,24 @@ type FormulationRouteProps = Readonly<{
   }>;
 }>;
 
+function jsonNoStore(body: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+
+  headers.set("Cache-Control", "no-store, max-age=0");
+
+  return NextResponse.json(body, {
+    ...init,
+    headers
+  });
+}
+
 export async function GET(request: Request, { params }: FormulationRouteProps) {
   const { planId } = await params;
   const locale = new URL(request.url).searchParams.get("locale");
   const snapshot = await getStoredAssessmentSnapshot(planId);
 
   if (!snapshot) {
-    return NextResponse.json({ message: "Plan not found" }, { status: 404 });
+    return jsonNoStore({ message: "Plan not found" }, { status: 404 });
   }
 
   const storedResult = await getStoredFormulationResult(planId, {
@@ -25,11 +36,11 @@ export async function GET(request: Request, { params }: FormulationRouteProps) {
   });
 
   if (storedResult) {
-    return NextResponse.json(storedResult);
+    return jsonNoStore(storedResult);
   }
 
   if (snapshot.status === "ready") {
-    return NextResponse.json(
+    return jsonNoStore(
       {
         message: "Formulation result is missing or invalid",
         status: snapshot.status,
@@ -45,11 +56,11 @@ export async function GET(request: Request, { params }: FormulationRouteProps) {
   });
 
   if (previewResult) {
-    return NextResponse.json(previewResult);
+    return jsonNoStore(previewResult);
   }
 
   if (snapshot.status === "failed") {
-    return NextResponse.json(
+    return jsonNoStore(
       {
         message: "Formulation processing failed",
         status: snapshot.status,
@@ -59,7 +70,7 @@ export async function GET(request: Request, { params }: FormulationRouteProps) {
     );
   }
 
-  return NextResponse.json(
+  return jsonNoStore(
     {
       message: "Formulation is still being prepared",
       status: snapshot.status,

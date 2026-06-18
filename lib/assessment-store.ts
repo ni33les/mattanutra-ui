@@ -23,6 +23,7 @@ import {
   type NutritionReport,
   type ProductNeedCoverage,
   type ProductRecommendationOption,
+  type ProductRecommendationRefreshReason,
   type ProductStackPreference,
   type RecommendedProduct
 } from "@/lib/formulation-types";
@@ -120,8 +121,32 @@ function numberFromUnknown(value: unknown) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function dateMsFromUnknown(value: unknown) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(String(value));
+  const ms = date.getTime();
+
+  return Number.isFinite(ms) ? ms : null;
+}
+
 function asProductStackPreference(value: unknown): ProductStackPreference | undefined {
   return value === "compact" || value === "balanced"
+    ? value
+    : undefined;
+}
+
+function asProductRecommendationRefreshReason(
+  value: unknown
+): ProductRecommendationRefreshReason | undefined {
+  return value === "missing_run" ||
+    value === "ttl_expired" ||
+    value === "product_catalogue_changed" ||
+    value === "retail_catalogue_changed" ||
+    value === "stock_or_allocation_changed" ||
+    value === "formulation_changed"
     ? value
     : undefined;
 }
@@ -1492,6 +1517,9 @@ export async function getStoredFormulationResult(
       product_recommendation_run.stack_preference as product_recommendation_stack_preference,
       product_recommendation_items_payload.recommendations as product_recommendation_items_payload,
       product_recommendation_options_payload.options as product_recommendation_options_payload,
+      product_recommendation_task.created_at as product_recommendation_task_created_at,
+      product_recommendation_task.payload ->> 'refreshReason' as product_recommendation_task_refresh_reason,
+      product_recommendation_task.payload ->> 'stackPreference' as product_recommendation_task_stack_preference,
       product_recommendation_task.status as product_recommendation_task_status,
       food_gap_support_task.status as food_gap_support_task_status,
       supplement_catalogue.active_supplement_count,
@@ -1836,11 +1864,17 @@ export async function getStoredFormulationResult(
       ) option_items on true
     ) product_recommendation_options_payload on true
     left join lateral (
-      select status
+      select created_at, payload, status
       from tasks
       where tasks.plan_id = assessments.plan_id
         and task_type = 'generate_product_recommendations'
-      order by created_at desc
+      order by
+        case
+          when status in ('queued', 'reserved', 'running', 'needs_review', 'waiting_approval')
+            then 0
+          else 1
+        end,
+        created_at desc
       limit 1
     ) product_recommendation_task on true
     left join lateral (
@@ -1989,6 +2023,45 @@ export async function getStoredFormulationResult(
         : undefined;
   const productRecommendationStackPreference =
     asProductStackPreference(row.product_recommendation_stack_preference);
+  const productRecommendationTaskStackPreference =
+    asProductStackPreference(row.product_recommendation_task_stack_preference);
+  const productRecommendationTaskRefreshReason =
+    asProductRecommendationRefreshReason(
+      row.product_recommendation_task_refresh_reason
+    );
+  const productRecommendationTaskCreatedMs = dateMsFromUnknown(
+    row.product_recommendation_task_created_at
+  );
+  const productRecommendationRefreshActiveFor = (
+    stackPreference: ProductStackPreference,
+    generatedAt: unknown
+  ) => {
+    if (!productRecommendationPending) {
+      return false;
+    }
+
+    if (
+      productRecommendationTaskStackPreference &&
+      productRecommendationTaskStackPreference !== stackPreference
+    ) {
+      return false;
+    }
+
+    const generatedMs = dateMsFromUnknown(generatedAt);
+
+    return (
+      generatedMs === null ||
+      productRecommendationTaskCreatedMs === null ||
+      productRecommendationTaskCreatedMs >= generatedMs
+    );
+  };
+  const productRecommendationRefreshing =
+    productRecommendationStatus
+      ? productRecommendationRefreshActiveFor(
+          productRecommendationStackPreference ?? "balanced",
+          productRecommendationGeneratedAt
+        )
+      : false;
   const productRecommendationOptions = asArray<Record<string, unknown>>(
     row.product_recommendation_options_payload
   )
@@ -2029,6 +2102,10 @@ export async function getStoredFormulationResult(
             ? new Date(option.generatedAt as string).toISOString()
             : undefined;
       const maxProducts = Number(option.maxProducts);
+      const optionRefreshing = productRecommendationRefreshActiveFor(
+        stackPreference,
+        generatedAt
+      );
 
       return [{
         id: stackPreference,
@@ -2046,6 +2123,14 @@ export async function getStoredFormulationResult(
             ? { notes: option.notes.trim() }
             : {}),
           ...(typeof option.runId === "string" ? { runId: option.runId } : {}),
+          ...(optionRefreshing
+            ? {
+                refreshing: true,
+                ...(productRecommendationTaskRefreshReason
+                  ? { refreshReason: productRecommendationTaskRefreshReason }
+                  : {})
+              }
+            : {}),
           ...(coverage.needCoverage.length > 0
             ? { needCoverage: coverage.needCoverage }
             : {}),
@@ -2194,6 +2279,14 @@ export async function getStoredFormulationResult(
               : {}),
             ...(productRecommendationStackPreference
               ? { stackPreference: productRecommendationStackPreference }
+              : {}),
+            ...(productRecommendationRefreshing
+              ? {
+                  refreshing: true,
+                  ...(productRecommendationTaskRefreshReason
+                    ? { refreshReason: productRecommendationTaskRefreshReason }
+                    : {})
+                }
               : {}),
             ...(productNeedCoverage.length > 0
               ? { needCoverage: productNeedCoverage }

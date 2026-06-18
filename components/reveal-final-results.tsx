@@ -1314,6 +1314,10 @@ function RevealProductsFinalSection({
       productStackLoading ||
       result.productRecommendations?.status === "pending" ||
       productOptions.some((option) => option.productRecommendations.status === "pending"));
+  const productAvailabilityRefreshing = Boolean(
+    activeProductRecommendations?.refreshing ||
+      selectedProductOption?.productRecommendations.refreshing,
+  );
   const coveredProductNeedCount = Math.min(
     Math.max(0, productNeedCount),
     Math.max(0, supplementSelectedCount),
@@ -1422,6 +1426,14 @@ function RevealProductsFinalSection({
               ? copy.productsPending
               : revealSlotCopy(result, "productsLead", locale, copy.productsLead)}
           </p>
+          {productAvailabilityRefreshing && !productMatchingPending ? (
+            <p
+              aria-live="polite"
+              className="mt-3 mn-reveal-font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--mn-teal)]"
+            >
+              {labels.refreshingAvailability}
+            </p>
+          ) : null}
         </div>
 
         <div className="mn-reveal-concierge-banner mx-auto my-10 grid max-w-[880px] grid-cols-[auto_minmax(0,1fr)] items-center gap-5 rounded-2xl bg-[var(--mn-teal-deep)] px-7 py-6 text-[var(--mn-cream)]" data-reveal>

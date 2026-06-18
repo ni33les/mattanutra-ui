@@ -7,6 +7,7 @@ import { getStoredFormulationResult, isUuid } from "@/lib/assessment-store";
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath, nutritionRevealPath } from "@/lib/nutrition-paths";
+import { ensureFreshProductRecommendationsForReveal } from "@/lib/task-worker";
 
 type NutritionRevealPageProps = Readonly<{
   params: Promise<{
@@ -20,6 +21,10 @@ type NutritionRevealPageProps = Readonly<{
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
+
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+export const revalidate = 0;
 
 export default async function NutritionRevealPage({
   params,
@@ -57,6 +62,16 @@ export default async function NutritionRevealPage({
       </main>
     );
   }
+
+  await ensureFreshProductRecommendationsForReveal(
+    planId,
+    initialStackPreference
+  ).catch((error) => {
+    console.warn("Unable to ensure fresh reveal product recommendations", {
+      error: error instanceof Error ? error.message : String(error),
+      planId
+    });
+  });
 
   const initialResult = await getStoredFormulationResult(planId, {
     locale,

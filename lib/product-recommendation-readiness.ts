@@ -76,6 +76,18 @@ export function resultHasPendingProductRecommendations(
 
   const productStatus = result.productRecommendations?.status;
 
+  if (result.productRecommendations?.refreshing) {
+    return true;
+  }
+
+  if (
+    result.productRecommendationOptions?.some(
+      (option) => option.productRecommendations.refreshing,
+    )
+  ) {
+    return true;
+  }
+
   if (productStatus === "pending") {
     return true;
   }

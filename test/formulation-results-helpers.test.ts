@@ -117,6 +117,24 @@ describe("formulation results product recommendation readiness", () => {
     assert.equal(resultHasPendingProductRecommendations(payload), false);
   });
 
+  it("keeps polling when existing product rows are visible but availability is refreshing", () => {
+    const payload = result({
+      productRecommendations: {
+        matchedCount: 1,
+        needsCount: 1,
+        refreshReason: "retail_catalogue_changed",
+        refreshing: true,
+        stackCoveragePercent: 100,
+        stackPreference: "balanced",
+        status: "ready",
+      },
+      recommendations: [product()],
+    });
+
+    assert.equal(resultHasTransientEmptyProductRecommendations(payload), false);
+    assert.equal(resultHasPendingProductRecommendations(payload), true);
+  });
+
   it("knows when a requested stack has rows instead of falling back to another stack", () => {
     const payload = result({
       productRecommendationOptions: [

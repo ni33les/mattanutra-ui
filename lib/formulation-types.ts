@@ -247,6 +247,13 @@ export type RevealPageCopy = Readonly<{
   >>;
 
 export type ProductRecommendationStatus = "failed" | "partial" | "pending" | "ready";
+export type ProductRecommendationRefreshReason =
+  | "missing_run"
+  | "ttl_expired"
+  | "product_catalogue_changed"
+  | "retail_catalogue_changed"
+  | "stock_or_allocation_changed"
+  | "formulation_changed";
 export type ProductStackPreference = "balanced" | "compact";
 
 export type ProductNeedCoverage = {
@@ -264,6 +271,8 @@ export type ProductRecommendationSummary = {
   needCoverage?: ProductNeedCoverage[];
   needsCount: number;
   notes?: string;
+  refreshing?: boolean;
+  refreshReason?: ProductRecommendationRefreshReason;
   runId?: string;
   stackCoveragePercent: number;
   stackPreference?: ProductStackPreference;
