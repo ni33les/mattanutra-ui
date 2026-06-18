@@ -61,10 +61,9 @@ describe("continuous improvement insights", () => {
     const data = emptyAdminSupplementImprovementInsightsData("week");
 
     assert.equal(data.databaseAvailable, false);
-    assert.deepEqual(data.outsideMasterList, []);
   });
 
-  it("renders managed-list and outside-master-list supplement sections", () => {
+  it("renders managed-list supplement sections without the outside-master-list empty section", () => {
     const readModel = readFileSync(
       "lib/admin-recommendation-insights.ts",
       "utf8"
@@ -74,13 +73,13 @@ describe("continuous improvement insights", () => {
       "utf8"
     );
 
-    assert.match(readModel, /outsideMasterList/);
-    assert.match(readModel, /row\.listStatus === "missing" && row\.hiddenCount < 1/);
+    assert.doesNotMatch(readModel, /outsideMasterList/);
     assert.match(view, /Managed list recommendations/);
-    assert.match(view, /AI Recommendations Outside The Master List/);
-    assert.match(view, /ai-recommendations-outside-master-list\.csv/);
     assert.match(view, /Recommended By AI But Not Cleanly Usable/);
     assert.match(view, />Reason</);
+    assert.doesNotMatch(view, /AI Recommendations Outside The Master List/);
+    assert.doesNotMatch(view, /ai-recommendations-outside-master-list\.csv/);
+    assert.doesNotMatch(view, /No unignored AI supplement recommendations are outside the master list/);
     assert.doesNotMatch(view, /Supplement Recommendations Across The Master List/);
     assert.doesNotMatch(view, /Supplement Recommendations Across The Managed List/);
     assert.doesNotMatch(view, />Add</);

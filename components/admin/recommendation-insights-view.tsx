@@ -249,7 +249,6 @@ export function AdminSupplementImprovementInsightsView({
     () => [...new Set(managedDistribution.map((row) => row.listStatus))],
     [managedDistribution]
   );
-  const outsideMasterList = data.outsideMasterList;
   const metrics: BusinessMetric[] = [
     {
       color: businessMetricColors.total,
@@ -316,46 +315,6 @@ export function AdminSupplementImprovementInsightsView({
           rows={filtered.slice(0, 30)}
           valueFor={(row) => row.recommendationCount}
         />
-      </Section>
-
-      <Section
-        action={
-          <CsvButton
-            filename="ai-recommendations-outside-master-list.csv"
-            rows={csvRows(supplementColumns, outsideMasterList)}
-          />
-        }
-        eyebrow="Outside master list"
-        title="AI Recommendations Outside The Master List"
-      >
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead>
-              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <th className="py-2 pr-4">Supplement</th>
-                <th className="py-2 pr-4">Category</th>
-                <th className="py-2 pr-4">Demand</th>
-                <th className="py-2 pr-4">Reason</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {outsideMasterList.length > 0 ? outsideMasterList.map((row) => (
-                <tr key={row.id}>
-                  <td className="py-3 pr-4 font-semibold text-gray-900">{row.name}</td>
-                  <td className="py-3 pr-4 text-gray-600">{row.category ?? "Uncategorised"}</td>
-                  <td className="py-3 pr-4">{formatNumber(row.recommendationCount, locale)}</td>
-                  <td className="max-w-xl py-3 pr-4 text-gray-600">{row.rationale}</td>
-                </tr>
-              )) : (
-                <tr>
-                  <td className="py-4 text-gray-500" colSpan={4}>
-                    No unignored AI supplement recommendations are outside the master list.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
       </Section>
 
       <Section

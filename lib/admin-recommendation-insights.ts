@@ -184,7 +184,6 @@ export type AdminSupplementImprovementInsightsData = Readonly<{
   };
   generatedAt: string;
   missingOrBlocked: SupplementDemandInsight[];
-  outsideMasterList: SupplementDemandInsight[];
   range: AdminDashboardRange;
   summary: {
     activeSupplementsRecommended: number;
@@ -286,7 +285,6 @@ export function emptyAdminSupplementImprovementInsightsData(
     },
     generatedAt: new Date().toISOString(),
     missingOrBlocked: [],
-    outsideMasterList: [],
     range,
     summary: emptySupplementSummary
   };
@@ -1182,14 +1180,6 @@ export async function getAdminSupplementImprovementInsightsData(
       rationale: supplementDemandRationale(row),
       reviewCount: numberValue(row.review_count)
     }));
-    const outsideMasterList = distribution
-      .filter((row) => row.listStatus === "missing" && row.hiddenCount < 1)
-      .sort(
-        (first, second) =>
-          second.recommendationCount - first.recommendationCount ||
-          first.name.localeCompare(second.name)
-      )
-      .slice(0, 40);
     const missingOrBlocked = distribution
       .filter((row) => row.listStatus !== "active" && row.listStatus !== "missing")
       .sort(
@@ -1212,7 +1202,6 @@ export async function getAdminSupplementImprovementInsightsData(
       },
       generatedAt: new Date().toISOString(),
       missingOrBlocked,
-      outsideMasterList,
       range,
       summary: {
         activeSupplementsRecommended: distribution.filter(
