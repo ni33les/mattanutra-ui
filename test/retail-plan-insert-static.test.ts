@@ -46,6 +46,24 @@ describe("retail plan insert static wiring", () => {
     assert.doesNotMatch(insert, /symptom|diagnosis|medical claim/i);
   });
 
+  it("keeps product panel text printable inside the right-side PDF panel", () => {
+    const insert = read("lib/retail-plan-insert.tsx");
+
+    assert.match(insert, /const noHyphenation = \(word: string \| null\)/);
+    assert.match(insert, /hyphenationCallback=\{noHyphenation\}/);
+    assert.match(insert, /function splitProductRecommendationText/);
+    assert.match(insert, /function servingDoseText/);
+    assert.match(insert, /replace\(\s*\/\^use\\s\+\\d\+\(\?:\\\.\\d\+\)\?\\s\+servings\?/);
+    assert.match(insert, /productSectionTitle/);
+    assert.match(insert, /fontSize: 20/);
+    assert.match(insert, /doseRow: \{[\s\S]*minHeight: 78[\s\S]*paddingRight: 8/);
+    assert.match(insert, /productBody: \{[\s\S]*paddingRight: 8[\s\S]*width: 286/);
+    assert.match(insert, /compactText\([\s\S]*product\.covers\.join\(" - "\)[\s\S]*58/);
+    assert.match(insert, /return splitProductRecommendationText\(recommendation\)\.take/);
+    assert.match(insert, /return splitProductRecommendationText\(recommendation\)\.why/);
+    assert.doesNotMatch(insert, /return explicit;/);
+  });
+
   it("keeps reveal LINE codes short but makes shipping insert codes last 90 days", () => {
     const communications = read("lib/communications.ts");
     const revealRoute = read("app/api/assessment/[planId]/line-connect/route.ts");

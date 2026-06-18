@@ -10,6 +10,7 @@ import {
   View,
   renderToBuffer
 } from "@react-pdf/renderer";
+import type { Style } from "@react-pdf/types";
 import QRCode from "qrcode";
 import sharp from "sharp";
 import { buildLineOfficialAccountMessageUrl } from "@/lib/chat-links";
@@ -38,6 +39,19 @@ const panyaInsertExpiryMinutes = 90 * 24 * 60;
 const maxProductCards = 4;
 const maxFoodCards = 2;
 const imageCache = new Map<string, Promise<string | null>>();
+const noHyphenation = (word: string | null) => [word ?? ""];
+
+type InsertTextProps = React.PropsWithChildren<{
+  style?: Style | Style[];
+}>;
+
+function InsertText({ children, ...props }: InsertTextProps) {
+  return (
+    <Text {...props} hyphenationCallback={noHyphenation}>
+      {children}
+    </Text>
+  );
+}
 
 export type RetailPlanInsertProduct = Readonly<{
   brandName: string | null;
@@ -421,28 +435,81 @@ function sentence(value: string) {
   return value.trim().split(/(?<=[.!?])\s+/)[0]?.trim() ?? "";
 }
 
-function dosingText(recommendation: RecommendedProduct | null) {
-  const explicit = sentence(recommendation?.description ?? "");
+function compactText(value: string, maxLength: number) {
+  const cleaned = value.replace(/\s+/g, " ").trim();
 
-  if (/^use\s+\d+/i.test(explicit)) {
-    return explicit;
+  if (cleaned.length <= maxLength) {
+    return cleaned;
   }
 
-  const servings = Math.max(1, Math.round(recommendation?.servingMultiplier ?? 1));
+  const clipped = cleaned.slice(0, maxLength - 1);
+  const boundary = Math.max(
+    clipped.lastIndexOf(";"),
+    clipped.lastIndexOf(","),
+    clipped.lastIndexOf(" ")
+  );
 
+  return `${clipped.slice(0, boundary > 60 ? boundary : maxLength - 1).trim()}...`;
+}
+
+function dosingServingsFromText(value: string) {
+  const match = value.match(/^use\s+(\d+(?:\.\d+)?)\s+servings?/i);
+
+  if (!match) {
+    return null;
+  }
+
+  const servings = Math.max(1, Math.round(Number(match[1]) || 1));
+
+  return servings;
+}
+
+function servingDoseText(servings: number) {
   return servings === 1
     ? "Take 1 serving daily with food."
     : `Take ${servings} servings daily with food.`;
 }
 
-function productWhy(recommendation: RecommendedProduct | null) {
-  const description = sentence(recommendation?.description ?? "");
+function splitProductRecommendationText(
+  recommendation: RecommendedProduct | null
+) {
+  const explicit = sentence(recommendation?.description ?? "");
+  const servingsFromDescription = dosingServingsFromText(explicit);
+  const servings = servingsFromDescription ??
+    Math.max(1, Math.round(recommendation?.servingMultiplier ?? 1));
+  const take = servingDoseText(servings);
 
-  if (description && !/^use\s+\d+/i.test(description)) {
-    return description;
+  if (!explicit) {
+    return {
+      take,
+      why: "Matched to your Right Amount formula and packed in this order."
+    };
   }
 
-  return "Matched to your Right Amount formula and packed in this order.";
+  if (servingsFromDescription) {
+    const rationale = explicit.replace(/^use\s+\d+(?:\.\d+)?\s+servings?\s*;?\s*/i, "");
+
+    return {
+      take,
+      why: compactText(
+        rationale || "Matched to your Right Amount formula and packed in this order.",
+        126
+      )
+    };
+  }
+
+  return {
+    take,
+    why: compactText(explicit, 126)
+  };
+}
+
+function dosingText(recommendation: RecommendedProduct | null) {
+  return splitProductRecommendationText(recommendation).take;
+}
+
+function productWhy(recommendation: RecommendedProduct | null) {
+  return splitProductRecommendationText(recommendation).why;
 }
 
 async function productRows(input: Readonly<{
@@ -788,6 +855,14 @@ const styles = StyleSheet.create({
     lineHeight: 1.08,
     marginBottom: 10
   },
+  productSectionTitle: {
+    color: colors.ink,
+    fontSize: 20,
+    fontWeight: 700,
+    lineHeight: 1.1,
+    marginBottom: 8,
+    maxWidth: 292
+  },
   lede: {
     color: colors.soft,
     fontSize: 10,
@@ -830,26 +905,29 @@ const styles = StyleSheet.create({
     marginTop: 4
   },
   doseList: {
-    flexGrow: 1
+    flexGrow: 1,
+    flexShrink: 1
   },
   doseRow: {
     borderBottomColor: colors.line,
     borderBottomWidth: 1,
     flexDirection: "row",
-    gap: 10,
-    paddingBottom: 10,
-    paddingTop: 10
+    gap: 12,
+    minHeight: 78,
+    paddingBottom: 8,
+    paddingRight: 8,
+    paddingTop: 8
   },
   thumb: {
     alignItems: "center",
     backgroundColor: "#ffffff",
     borderColor: colors.line,
-    borderRadius: 6,
+    borderRadius: 7,
     borderWidth: 1,
-    height: 40,
+    height: 46,
     justifyContent: "center",
     overflow: "hidden",
-    width: 40
+    width: 46
   },
   thumbImage: {
     height: "100%",
@@ -863,39 +941,42 @@ const styles = StyleSheet.create({
     fontWeight: 700
   },
   productBody: {
-    flexGrow: 1,
-    minWidth: 0
+    flexShrink: 1,
+    paddingRight: 8,
+    width: 286
   },
   productName: {
     color: colors.ink,
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: 700,
-    lineHeight: 1.2
+    lineHeight: 1.18
   },
   covers: {
     color: colors.green,
-    fontSize: 8,
+    fontSize: 7.4,
     fontWeight: 700,
+    lineHeight: 1.25,
     marginTop: 3,
     textTransform: "uppercase"
   },
   take: {
     color: colors.ink,
-    fontSize: 9.5,
+    fontSize: 8.8,
     fontWeight: 700,
-    marginTop: 5
+    lineHeight: 1.22,
+    marginTop: 4
   },
   why: {
     color: "#8a7f63",
-    fontSize: 8,
-    lineHeight: 1.35,
+    fontSize: 7.4,
+    lineHeight: 1.28,
     marginTop: 3
   },
   doseFoot: {
     borderTopColor: colors.gold,
     borderTopWidth: 1,
     color: "#786d53",
-    fontSize: 8,
+    fontSize: 7.6,
     lineHeight: 1.4,
     marginTop: 10,
     paddingTop: 8
@@ -927,22 +1008,22 @@ function FrontCover({ data }: { data: RetailPlanInsertData }) {
       {data.brandMarkDataUri ? (
         <Image src={data.brandMarkDataUri} style={styles.brandMark} />
       ) : null}
-      <Text style={styles.wordmark}>MattaNutra</Text>
-      <Text style={styles.tagline}>Knowing the Right Amount</Text>
+      <InsertText style={styles.wordmark}>MattaNutra</InsertText>
+      <InsertText style={styles.tagline}>Knowing the Right Amount</InsertText>
       <View style={styles.spacer} />
-      <Text style={[styles.eyebrow, { marginBottom: 10 }]}>Mattannuta</Text>
-      <Text style={styles.frontTitle}>Your Right Amount{"\n"}has arrived.</Text>
-      <Text>Thank you for choosing MattaNutra.</Text>
-      <Text style={styles.preparedLabel}>Prepared for</Text>
-      <Text style={styles.preparedName}>Khun {data.customerFirstName}</Text>
-      <Text style={styles.preparedMeta}>
+      <InsertText style={[styles.eyebrow, { marginBottom: 10 }]}>Mattannuta</InsertText>
+      <InsertText style={styles.frontTitle}>Your Right Amount{"\n"}has arrived.</InsertText>
+      <InsertText>Thank you for choosing MattaNutra.</InsertText>
+      <InsertText style={styles.preparedLabel}>Prepared for</InsertText>
+      <InsertText style={styles.preparedName}>Khun {data.customerFirstName}</InsertText>
+      <InsertText style={styles.preparedMeta}>
         Order {data.orderNumber} - {data.orderDateLabel}
-      </Text>
+      </InsertText>
       <View style={styles.spacer} />
-      <Text style={styles.pharmacist}>
+      <InsertText style={styles.pharmacist}>
         Hand-checked and packed by Khun Dream, Licensed Pharmacist - Delight
         Pharmacy, Chiang Mai
-      </Text>
+      </InsertText>
     </View>
   );
 }
@@ -950,40 +1031,40 @@ function FrontCover({ data }: { data: RetailPlanInsertData }) {
 function BackCover({ data }: { data: RetailPlanInsertData }) {
   return (
     <View style={[styles.panel, styles.center]}>
-      <Text style={styles.eyebrow}>Stay connected</Text>
+      <InsertText style={styles.eyebrow}>Stay connected</InsertText>
       <View style={styles.spacer} />
       <View style={styles.qrWrap}>
         <View style={styles.qrCard}>
           <View style={styles.qrTile}>
             <Image src={data.panyaQrDataUri} style={styles.qrImage} />
           </View>
-          <Text style={styles.qrTitle}>Ask Panya on LINE</Text>
-          <Text style={styles.qrSub}>
+          <InsertText style={styles.qrTitle}>Ask Panya on LINE</InsertText>
+          <InsertText style={styles.qrSub}>
             Your plan, explained anytime. Code {data.panyaCode}
-          </Text>
+          </InsertText>
         </View>
         <View style={styles.qrCard}>
           <View style={styles.qrTile}>
             <Image src={data.revealQrDataUri} style={styles.qrImage} />
           </View>
-          <Text style={styles.qrTitle}>Open your plan</Text>
-          <Text style={styles.qrSub}>
+          <InsertText style={styles.qrTitle}>Open your plan</InsertText>
+          <InsertText style={styles.qrSub}>
             Revisit your personalized Right Amount on the web
-          </Text>
+          </InsertText>
         </View>
       </View>
-      <Text style={[styles.lede, { marginTop: 18, textAlign: "center" }]}>
+      <InsertText style={[styles.lede, { marginTop: 18, textAlign: "center" }]}>
         Bodies change. Re-check your Right Amount in 60 days.
-      </Text>
+      </InsertText>
       <View style={styles.spacer} />
-      <Text style={styles.safetyBox}>
+      <InsertText style={styles.safetyBox}>
         Wellness information only. Share this plan with a physician or
         pharmacist if you use medication, are pregnant or breastfeeding, have a
         medical condition, or your situation changes.
-      </Text>
-      <Text style={styles.trust}>
+      </InsertText>
+      <InsertText style={styles.trust}>
         Thai FDA registered - Every batch verified - Chiang Mai
-      </Text>
+      </InsertText>
     </View>
   );
 }
@@ -991,45 +1072,45 @@ function BackCover({ data }: { data: RetailPlanInsertData }) {
 function FoodPanel({ data }: { data: RetailPlanInsertData }) {
   return (
     <View style={styles.panel}>
-      <Text style={styles.eyebrow}>Food and supplements, together</Text>
-      <Text style={[styles.sectionTitle, { marginTop: 12 }]}>
+      <InsertText style={styles.eyebrow}>Food and supplements, together</InsertText>
+      <InsertText style={[styles.sectionTitle, { marginTop: 12 }]}>
         The best source is sometimes on your plate.
-      </Text>
-      <Text style={styles.lede}>
+      </InsertText>
+      <InsertText style={styles.lede}>
         Some of what your plan needs is already at the table. Top up at dinner,
         or top up from the bottle - either way, you are knowing, not guessing.
-      </Text>
+      </InsertText>
       {data.foodRows.length > 0 ? data.foodRows.map((food) => (
         <View key={food.foodId} style={styles.foodCard}>
           {food.imageDataUri ? (
             <Image src={food.imageDataUri} style={styles.foodImage} />
           ) : (
             <View style={[styles.foodImage, styles.center]}>
-              <Text style={styles.thumbFallback}>{initials(food.name)}</Text>
+              <InsertText style={styles.thumbFallback}>{initials(food.name)}</InsertText>
             </View>
           )}
           <View style={styles.foodBody}>
-            <Text style={styles.foodName}>{food.name}</Text>
-            <Text style={styles.foodReason}>
+            <InsertText style={styles.foodName}>{food.name}</InsertText>
+            <InsertText style={styles.foodReason}>
               {food.supports.length
                 ? food.supports.join(" - ")
                 : food.category || "Food-level support"}
-            </Text>
-            <Text style={styles.foodRationale}>
+            </InsertText>
+            <InsertText style={styles.foodRationale}>
               {food.serving ? `${food.serving}. ` : ""}{food.rationale}
-            </Text>
+            </InsertText>
           </View>
         </View>
       )) : (
-        <Text style={styles.emptyState}>
+        <InsertText style={styles.emptyState}>
           Your full plan remains available online. Food support can be reviewed
           with Panya whenever you need a practical meal idea.
-        </Text>
+        </InsertText>
       )}
-      <Text style={[styles.foodRationale, { marginTop: "auto" }]}>
+      <InsertText style={[styles.foodRationale, { marginTop: "auto" }]}>
         Foods matched to your plan and shown as gentle support beside measured
         supplement dosing.
-      </Text>
+      </InsertText>
     </View>
   );
 }
@@ -1037,10 +1118,10 @@ function FoodPanel({ data }: { data: RetailPlanInsertData }) {
 function ProductPanel({ data }: { data: RetailPlanInsertData }) {
   return (
     <View style={[styles.panel, styles.panelDivider]}>
-      <Text style={styles.eyebrow}>Your packed Right Amount</Text>
-      <Text style={[styles.sectionTitle, { marginTop: 12 }]}>
+      <InsertText style={styles.eyebrow}>Your packed Right Amount</InsertText>
+      <InsertText style={[styles.productSectionTitle, { marginTop: 12 }]}>
         How these products fit your formula.
-      </Text>
+      </InsertText>
       <View style={styles.doseList}>
         {data.productRows.length > 0 ? data.productRows.map((product) => (
           <View key={product.productId} style={styles.doseRow}>
@@ -1048,36 +1129,39 @@ function ProductPanel({ data }: { data: RetailPlanInsertData }) {
               {product.imageDataUri ? (
                 <Image src={product.imageDataUri} style={styles.thumbImage} />
               ) : (
-                <Text style={styles.thumbFallback}>
+                <InsertText style={styles.thumbFallback}>
                   {initials(product.title)}
-                </Text>
+                </InsertText>
               )}
             </View>
             <View style={styles.productBody}>
-              <Text style={styles.productName}>
+              <InsertText style={styles.productName}>
                 {product.quantity > 1 ? `${product.quantity} x ` : ""}
                 {product.title}
-              </Text>
-              <Text style={styles.covers}>
-                {product.covers.length
-                  ? product.covers.join(" - ")
-                  : product.brandName || "Matched product"}
-              </Text>
-              <Text style={styles.take}>{product.take}</Text>
-              <Text style={styles.why}>{product.why}</Text>
+              </InsertText>
+              <InsertText style={styles.covers}>
+                {compactText(
+                  product.covers.length
+                    ? product.covers.join(" - ")
+                    : product.brandName || "Matched product",
+                  58
+                )}
+              </InsertText>
+              <InsertText style={styles.take}>{product.take}</InsertText>
+              <InsertText style={styles.why}>{product.why}</InsertText>
             </View>
           </View>
         )) : (
-          <Text style={styles.emptyState}>
+          <InsertText style={styles.emptyState}>
             Product dosing is available in your online reveal page. Ask Panya if
             you want help reading the product labels.
-          </Text>
+          </InsertText>
         )}
       </View>
-      <Text style={styles.doseFoot}>
+      <InsertText style={styles.doseFoot}>
         Follow product labels and pharmacist advice. Do not combine with other
         supplements containing the same ingredients unless advised.
-      </Text>
+      </InsertText>
     </View>
   );
 }
