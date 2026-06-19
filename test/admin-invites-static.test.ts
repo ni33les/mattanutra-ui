@@ -36,3 +36,21 @@ test("admin invites can recover existing members who still need a passkey", () =
   assert.match(access, /when public\.organisation_memberships\.status = 'invited' then 'active'/);
   assert.doesNotMatch(access, /role\s*=\s*excluded\.role/);
 });
+
+test("admin invite login renders setup and sign-in as exclusive modes", () => {
+  const login = source("components/admin-login.tsx");
+
+  assert.match(login, /const \[setupComplete, setSetupComplete\] = useState\(false\)/);
+  assert.match(
+    login,
+    /Boolean\(inviteToken \|\| accessToken \|\| setupMode\) && !setupComplete/
+  );
+  assert.match(login, /\{!registrationMode \? \([\s\S]*?<form onSubmit=\{login\}/);
+  assert.match(
+    login,
+    /\{registrationMode \? \([\s\S]*?<form onSubmit=\{register\} className="space-y-4">/
+  );
+  assert.match(login, /replaceSetupUrlWithLoginUrl\(email\);/);
+  assert.match(login, /url\.searchParams\.delete\("invite"\)/);
+  assert.doesNotMatch(login, /showRegistration/);
+});

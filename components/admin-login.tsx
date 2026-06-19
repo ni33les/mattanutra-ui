@@ -109,6 +109,20 @@ async function postJson<T>(url: string, body: Record<string, unknown>) {
   return json;
 }
 
+function replaceSetupUrlWithLoginUrl(email: string) {
+  const url = new URL(window.location.href);
+
+  url.searchParams.delete("access_token");
+  url.searchParams.delete("invite");
+  url.searchParams.delete("setup");
+
+  if (email.trim()) {
+    url.searchParams.set("email", email.trim());
+  }
+
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 export function AdminLogin({
   accessToken,
   email: initialEmail,
@@ -123,12 +137,14 @@ export function AdminLogin({
   const [setupToken, setSetupToken] = useState(accessToken);
   const [busy, setBusy] = useState<"login" | "register" | null>(null);
   const [error, setError] = useState("");
-  const showRegistration = Boolean(inviteToken || accessToken || setupMode);
+  const [setupComplete, setSetupComplete] = useState(false);
+  const registrationMode =
+    Boolean(inviteToken || accessToken || setupMode) && !setupComplete;
 
   function loginHref(targetLocale: Locale) {
     const params = new URLSearchParams();
 
-    if (accessToken) {
+    if (accessToken && registrationMode) {
       params.set("access_token", accessToken);
     }
 
@@ -136,11 +152,11 @@ export function AdminLogin({
       params.set("email", email);
     }
 
-    if (inviteToken) {
+    if (inviteToken && registrationMode) {
       params.set("invite", inviteToken);
     }
 
-    if (setupMode) {
+    if (setupMode && registrationMode) {
       params.set("setup", "1");
     }
 
@@ -196,7 +212,7 @@ export function AdminLogin({
         locale
       });
       const response = await startRegistration({ optionsJSON: options });
-      const verified = await postJson<{ redirectTo?: string }>(
+      await postJson<{ redirectTo?: string }>(
         "/api/admin/auth/passkey/register/verify",
         {
           challengeId,
@@ -205,7 +221,9 @@ export function AdminLogin({
         }
       );
 
-      window.location.assign(verified.redirectTo || nextPath);
+      replaceSetupUrlWithLoginUrl(email);
+      setSetupComplete(true);
+      setBusy(null);
     } catch (registerError) {
       setError(registerError instanceof Error ? registerError.message : "Passkey registration failed");
       setBusy(null);
@@ -252,37 +270,39 @@ export function AdminLogin({
             </div>
           </div>
           <div className="grid gap-8 p-6 sm:p-8">
-            <form onSubmit={login} className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  {labels.login}
-                </h2>
-                <p className="mt-1 text-sm text-gray-500">{labels.loginHint}</p>
-              </div>
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">
-                  {labels.email}
-                </span>
-                <input
-                  autoComplete="email webauthn"
-                  className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-[#1FA77A]"
-                  onChange={(event) => setEmail(event.target.value)}
-                  required={true}
-                  type="email"
-                  value={email}
-                />
-              </label>
-              <button
-                className="inline-flex w-full justify-center rounded-md bg-[#1FA77A] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#188B66] disabled:cursor-wait disabled:opacity-70"
-                disabled={busy !== null}
-                type="submit"
-              >
-                {busy === "login" ? labels.signingIn : labels.login}
-              </button>
-            </form>
+            {!registrationMode ? (
+              <form onSubmit={login} className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {labels.login}
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500">{labels.loginHint}</p>
+                </div>
+                <label className="block">
+                  <span className="text-sm font-medium text-gray-700">
+                    {labels.email}
+                  </span>
+                  <input
+                    autoComplete="email webauthn"
+                    className="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-[#1FA77A]"
+                    onChange={(event) => setEmail(event.target.value)}
+                    required={true}
+                    type="email"
+                    value={email}
+                  />
+                </label>
+                <button
+                  className="inline-flex w-full justify-center rounded-md bg-[#1FA77A] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#188B66] disabled:cursor-wait disabled:opacity-70"
+                  disabled={busy !== null}
+                  type="submit"
+                >
+                  {busy === "login" ? labels.signingIn : labels.login}
+                </button>
+              </form>
+            ) : null}
 
-            {showRegistration ? (
-              <form onSubmit={register} className="space-y-4 border-t border-gray-100 pt-8">
+            {registrationMode ? (
+              <form onSubmit={register} className="space-y-4">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">
                     {labels.setupHeading}
