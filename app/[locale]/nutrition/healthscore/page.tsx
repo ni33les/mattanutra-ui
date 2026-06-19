@@ -1,4 +1,6 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { PublicNutritionShell } from "@/components/nutrition-flow/public-nutrition-shell";
 import { HealthScorePaymentPanel } from "@/components/nutrition-flow/healthscore-panel";
 import { ServiceIssue } from "@/components/service-issue";
 import { SiteFooter } from "@/components/site-footer";
@@ -12,6 +14,7 @@ import {
   nutritionHealthScorePath,
   nutritionQuizPath
 } from "@/lib/nutrition-paths";
+import { localizedRouteMetadata } from "@/lib/seo";
 import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
 type NutritionHealthScorePageProps = Readonly<{
@@ -28,6 +31,21 @@ export function generateStaticParams() {
 }
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+  searchParams
+}: NutritionHealthScorePageProps): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const { plan } = await searchParams;
+  const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
+
+  return localizedRouteMetadata({
+    indexable: !plan,
+    locale,
+    routeKey: "nutritionHealthScore"
+  });
+}
 
 function refreshedHealthScore(
   answers: unknown,
@@ -75,7 +93,19 @@ export default async function NutritionHealthScorePage({
   const planId = typeof plan === "string" && isUuid(plan) ? plan : "";
 
   if (!planId) {
-    redirect(nutritionQuizPath(locale));
+    const currentPath = nutritionHealthScorePath(locale);
+
+    return (
+      <main className="mn-customer-shell flex min-h-screen flex-col bg-background text-foreground">
+        <TitleBar
+          currentLocale={locale}
+          currentPath={currentPath}
+          title={dictionary.hero.eyebrow}
+        />
+        <PublicNutritionShell kind="healthScore" locale={locale} />
+        <SiteFooter content={dictionary.footer} locale={locale} />
+      </main>
+    );
   }
 
   const currentPath = nutritionHealthScorePath(locale, planId);

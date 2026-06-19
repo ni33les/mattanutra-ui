@@ -4,6 +4,7 @@ import { Menu } from "lucide-react";
 import { HealthspanLogo } from "@/components/healthspan-logo";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import type { Locale, LocaleCode } from "@/lib/i18n";
+import { getNamespace } from "@/lib/i18n-messages";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
 
 type TitleBarProps = Readonly<{
@@ -14,68 +15,18 @@ type TitleBarProps = Readonly<{
   variant?: "default" | "landing";
 }>;
 
-const titleBarCopy = {
-  en: {
-    assessment: "Design your Right Amount",
-    availability: "Now available in",
-    availableCountries: [["🇹🇭", "Thailand"]],
-    comingSoon: "Coming soon",
-    comingSoonCountries: [
-      ["🇸🇬", "Singapore"],
-      ["🇲🇾", "Malaysia"],
-      ["🇵🇭", "Philippines"]
-    ],
-    homeAria: (title: string) => `${title} home`,
-    links: [
-      ["#living-protocol", "Living Protocol"],
-      ["#how-it-works", "How it works"],
-      ["#promises", "Promises"],
-      ["#journal", "Journal"]
-    ],
-    menu: "Open menu",
-    navAria: "Primary"
-  },
-  th: {
-    assessment: "ออกแบบปริมาณที่พอดีของคุณ",
-    availability: "พร้อมให้บริการใน",
-    availableCountries: [["🇹🇭", "ไทย"]],
-    comingSoon: "เร็ว ๆ นี้",
-    comingSoonCountries: [
-      ["🇸🇬", "สิงคโปร์"],
-      ["🇲🇾", "มาเลเซีย"],
-      ["🇵🇭", "ฟิลิปปินส์"]
-    ],
-    homeAria: (title: string) => `${title} หน้าแรก`,
-    links: [
-      ["#living-protocol", "โปรโตคอลชีวิต"],
-      ["#how-it-works", "วิธีทำงาน"],
-      ["#promises", "คำมั่น"],
-      ["#journal", "บทความ"]
-    ],
-    menu: "เปิดเมนู",
-    navAria: "เมนูหลัก"
-  },
-  "zh-CN": {
-    assessment: "设计您的适量",
-    availability: "现已覆盖",
-    availableCountries: [["🇹🇭", "泰国"]],
-    comingSoon: "即将推出",
-    comingSoonCountries: [
-      ["🇸🇬", "新加坡"],
-      ["🇲🇾", "马来西亚"],
-      ["🇵🇭", "菲律宾"]
-    ],
-    homeAria: (title: string) => `${title} 首页`,
-    links: [
-      ["#living-protocol", "生活协议"],
-      ["#how-it-works", "如何运作"],
-      ["#promises", "承诺"],
-      ["#journal", "文章"]
-    ],
-    menu: "打开菜单",
-    navAria: "主导航"
-  }
-} as const;
+type TitleBarCopy = Readonly<{
+  assessment: string;
+  availability: string;
+  availableCountries: readonly (readonly [string, string])[];
+  comingSoon: string;
+  comingSoonCountries: readonly (readonly [string, string])[];
+  homeAria: string;
+  links: readonly (readonly [string, string])[];
+  logoTagline: string;
+  menu: string;
+  navAria: string;
+}>;
 
 function homeAnchor(locale: Locale, href: string) {
   return href.startsWith("#") ? `/${locale}${href}` : href;
@@ -100,7 +51,9 @@ export function TitleBar({
   title,
   variant = "default"
 }: TitleBarProps) {
-  const copy = titleBarCopy[currentLocale];
+  const copy = getNamespace<TitleBarCopy>(currentLocale, "customer.titleBar", {
+    "customer.titleBar.homeAria": { title }
+  });
   const assessmentPath = nutritionQuizPath(currentLocale);
   const titleCtaHref = assessmentPath;
   const showAssessmentCta = !isAssessmentStartedPath(currentPath, currentLocale);
@@ -140,7 +93,7 @@ export function TitleBar({
           data-bpm-label="MattaNutra"
           data-bpm-target={`/${currentLocale}`}
           data-bpm-type="traffic"
-          aria-label={copy.homeAria(title)}
+          aria-label={copy.homeAria}
           className="flex min-w-0 items-center text-foreground transition hover:text-[var(--mn-teal-deep)]"
         >
           {isLanding ? (
@@ -167,11 +120,7 @@ export function TitleBar({
                       : "mn-logo-tagline mt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--mn-logo-tagline,var(--muted-foreground))]"
                   }
                 >
-                  {currentLocale === "th"
-                    ? "รู้ปริมาณที่พอดี"
-                    : currentLocale === "zh-CN"
-                      ? "了解合适的剂量"
-                      : "Knowing the right amount"}
+                  {copy.logoTagline}
                 </span>
               </span>
             </span>

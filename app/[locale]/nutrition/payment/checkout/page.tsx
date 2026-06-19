@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -7,7 +8,9 @@ import { TitleBar } from "@/components/title-bar";
 import type { AssessmentPlan } from "@/lib/assessment-snapshot";
 import { isUuid } from "@/lib/assessment-store";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
+import { getNamespace } from "@/lib/i18n-messages";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
+import { localizedRouteMetadata } from "@/lib/seo";
 import {
   normalizePaymentPlan,
   normalizePaymentSourceSurface,
@@ -26,53 +29,42 @@ type CheckoutPageProps = Readonly<{
   }>;
 }>;
 
-const copy = {
-  en: {
-    back: "Back to assessment",
-    body:
-      "Your payment is handled securely by Stripe. We only store the payment status, selected plan, and transactional contact details.",
-    eyebrow: "Secure checkout",
-    price: (amount: number) =>
-      new Intl.NumberFormat("en-US", {
-        currency: "THB",
-        maximumFractionDigits: 0,
-        style: "currency"
-      }).format(amount),
-    title: "Complete your payment"
-  },
-  th: {
-    back: "กลับไปที่แบบประเมิน",
-    body:
-      "การชำระเงินดำเนินการอย่างปลอดภัยโดย Stripe เราเก็บเฉพาะสถานะการชำระเงิน แผนที่เลือก และข้อมูลติดต่อเพื่อธุรกรรม",
-    eyebrow: "ชำระเงินอย่างปลอดภัย",
-    price: (amount: number) =>
-      new Intl.NumberFormat("th-TH", {
-        currency: "THB",
-        maximumFractionDigits: 0,
-        style: "currency"
-      }).format(amount),
-    title: "ชำระเงินให้เสร็จสมบูรณ์"
-  },
-  "zh-CN": {
-    back: "返回评估",
-    body:
-      "你的付款由 Stripe 安全处理。我们只保存付款状态、所选计划和交易联系信息。",
-    eyebrow: "安全结账",
-    price: (amount: number) =>
-      new Intl.NumberFormat("zh-CN", {
-        currency: "THB",
-        maximumFractionDigits: 0,
-        style: "currency"
-      }).format(amount),
-    title: "完成付款"
-  }
-};
+type PaymentCheckoutCopy = Readonly<{
+  back: string;
+  body: string;
+  eyebrow: string;
+  title: string;
+}>;
+
+function formatPaymentAmount(locale: Locale, amount: number) {
+  return new Intl.NumberFormat(
+    locale === "th" ? "th-TH" : locale === "zh-CN" ? "zh-CN" : "en-US",
+    {
+      currency: "THB",
+      maximumFractionDigits: 0,
+      style: "currency"
+    }
+  ).format(amount);
+}
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params
+}: CheckoutPageProps): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
+
+  return localizedRouteMetadata({
+    indexable: false,
+    locale,
+    routeKey: "paymentCheckout"
+  });
+}
 
 export default async function PaymentCheckoutPage({
   params,
@@ -98,7 +90,7 @@ export default async function PaymentCheckoutPage({
   }
 
   const dictionary = getDictionary(locale);
-  const labels = copy[locale];
+  const labels = getNamespace<PaymentCheckoutCopy>(locale, "customer.paymentCheckout");
   const plan = paymentPlan(selectedPlan as AssessmentPlan);
   const currentPath = `/${locale}/nutrition/payment/checkout`;
 
@@ -134,7 +126,7 @@ export default async function PaymentCheckoutPage({
               {plan.name[locale]}
             </p>
             <p className="mt-2 font-serif text-4xl font-medium text-[var(--mn-ink)]">
-              {labels.price(plan.amountMicros / 1_000_000)}
+              {formatPaymentAmount(locale, plan.amountMicros / 1_000_000)}
             </p>
           </div>
         </div>

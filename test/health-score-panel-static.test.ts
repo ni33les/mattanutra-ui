@@ -60,6 +60,10 @@ describe("HealthScore panel static guardrails", () => {
 
   it("renders the successful localized route as a direct v7 HealthScore page", () => {
     assert.match(routeSource, /HealthScorePaymentPanel/);
+    assert.match(routeSource, /PublicNutritionShell/);
+    assert.match(routeSource, /localizedRouteMetadata/);
+    assert.match(routeSource, /routeKey: "nutritionHealthScore"/);
+    assert.match(routeSource, /indexable: !plan/);
     assert.doesNotMatch(routeSource, /AssessmentFlow/);
     assert.match(routeSource, /TitleBar/);
     assert.match(routeSource, /SiteFooter/);
@@ -67,7 +71,7 @@ describe("HealthScore panel static guardrails", () => {
       routeSource,
       /<TitleBar[\s\S]*?<HealthScorePaymentPanel[\s\S]*?<SiteFooter/
     );
-    assert.match(routeSource, /nutritionQuizPath\(locale\)/);
+    assert.match(routeSource, /nutritionQuizPath\(locale, planId\)/);
   });
 
   it("loads the exact HealthScore reference font families and weights", () => {

@@ -11,6 +11,7 @@ import type {
   LocalizedHealthScoreText
 } from "@/lib/health-score";
 import { resolveLocalizedText, type Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n-messages";
 import { buildAssessmentResultsUrl, buildUnsubscribeUrl } from "@/lib/site-url";
 
 function escapeHtml(value: string) {
@@ -59,21 +60,16 @@ function personalisedIntro({
   locale: Locale;
   lowest?: HealthScoreDomain;
 }>) {
-  if (locale === "th") {
-    return lowest
-      ? `HealthScore ของคุณคือ ${healthScore.score}/100 และจุดที่ควรโฟกัสที่สุดคือ ${lowest.label} ตัวอย่างด้านล่างคือ 3 รายการที่ถูกจัดอันดับสูงสุดจากสูตรของคุณ เพื่อให้เห็นว่า MattaNutra แปลงผลประเมินเป็นแผนเริ่มต้นที่ใช้งานได้อย่างไร`
-      : `HealthScore ของคุณคือ ${healthScore.score}/100 ตัวอย่างด้านล่างคือ 3 รายการที่ถูกจัดอันดับสูงสุดจากสูตรของคุณ เพื่อให้เห็นว่า MattaNutra แปลงผลประเมินเป็นแผนเริ่มต้นที่ใช้งานได้อย่างไร`;
-  }
+  const focus = locale === "en" ? lowest?.label.toLowerCase() : lowest?.label;
 
-  if (locale === "zh-CN") {
-    return lowest
-      ? `您的 HealthScore 是 ${healthScore.score}/100，最清晰的改善重点是 ${lowest.label}。下面是您生成计划中排名最高的 3 个项目，帮助您了解 MattaNutra 如何把评估结果转化为可执行的起点。`
-      : `您的 HealthScore 是 ${healthScore.score}/100。下面是您生成计划中排名最高的 3 个项目，帮助您了解 MattaNutra 如何把评估结果转化为可执行的起点。`;
-  }
-
-  return lowest
-    ? `Your HealthScore is ${healthScore.score}/100, with ${lowest.label.toLowerCase()} as the clearest area to improve. Below are the three highest-ranked items from your generated plan, so you can see how MattaNutra turns your result into a practical starting point.`
-    : `Your HealthScore is ${healthScore.score}/100. Below are the three highest-ranked items from your generated plan, so you can see how MattaNutra turns your result into a practical starting point.`;
+  return focus
+    ? t(locale, "outbound.exampleEmail.introWithFocus", {
+        focus,
+        score: healthScore.score
+      })
+    : t(locale, "outbound.exampleEmail.intro", {
+        score: healthScore.score
+      });
 }
 
 function fallbackMarketingPoints(
@@ -87,7 +83,7 @@ function fallbackMarketingPoints(
       body: {
         en: `Your full plan is ordered around your ${healthScore.score}/100 HealthScore, starting with the items most likely to matter for ${focus}.`,
         th: `แผนฉบับเต็มจะเรียงลำดับจาก HealthScore ${healthScore.score}/100 ของคุณ โดยเริ่มจากรายการที่น่าจะเกี่ยวข้องกับจุดโฟกัสสำคัญที่สุด`,
-        "zh-CN": `完整计划会围绕您的 ${healthScore.score}/100 HealthScore 排序，并从最可能影响${lowest?.label ?? "您的健康优先事项"}的项目开始。`
+        "zh-CN": `完整知量方案会围绕你的 ${healthScore.score}/100 健康评分排序，并从最可能影响${lowest?.label ?? "你的健康优先事项"}的项目开始。`
       },
       id: "personal-priority",
       title: {
@@ -100,20 +96,20 @@ function fallbackMarketingPoints(
       body: {
         en: "The full plan brings foods and supplements together so the suggestions feel practical, not like a disconnected shopping list.",
         th: "แผนฉบับเต็มรวมทั้งอาหารและอาหารเสริมเข้าด้วยกัน เพื่อให้คำแนะนำใช้งานได้จริง ไม่ใช่แค่รายการแยกส่วน",
-        "zh-CN": "完整计划会把食物和补充剂放在一起，让建议更容易执行，而不是一张割裂的购物清单。"
+        "zh-CN": "完整知量方案会把食物和保健品放在一起，让建议更容易执行，而不是一张割裂的购物清单。"
       },
       id: "food-supplement-fit",
       title: {
         en: "Foods plus supplements",
         th: "อาหารร่วมกับอาหารเสริม",
-        "zh-CN": "食物加补充剂"
+        "zh-CN": "食物加保健品"
       }
     },
     {
       body: {
         en: "Safety checks help hide or flag items that need extra care before they appear in your full plan.",
         th: "ระบบตรวจความปลอดภัยช่วยซ่อนหรือแจ้งเตือนรายการที่ควรระวังก่อนแสดงในแผนฉบับเต็ม",
-        "zh-CN": "安全检查会在完整计划显示前隐藏或标记需要额外谨慎的项目。"
+        "zh-CN": "安全检查会在完整方案显示前隐藏或标记需要额外谨慎的项目。"
       },
       id: "safety-screened",
       title: {
@@ -325,64 +321,21 @@ export function buildExampleEmailSubject(
   const score =
     typeof healthScore?.score === "number" ? healthScore.score : null;
 
-  if (locale === "th") {
-    return score
-      ? `ตัวอย่างแผน MattaNutra จาก HealthScore ${score}/100`
-      : "ตัวอย่างแผน MattaNutra ของคุณ";
-  }
-
-  if (locale === "zh-CN") {
-    return score
-      ? `您的 ${score}/100 HealthScore 预览`
-      : "您的 MattaNutra 计划预览";
-  }
-
   return score
-    ? `Your ${score}/100 HealthScore preview`
-    : "Your MattaNutra plan preview";
+    ? t(locale, "outbound.exampleEmail.subjectWithScore", { score })
+    : t(locale, "outbound.exampleEmail.subject");
 }
 
 function exampleEmailLabels(locale: Locale, healthScore: HealthScoreResult) {
-  if (locale === "th") {
-    return {
-      cta: "ดูแผนฉบับเต็ม",
-      plan: "แผน",
-      foodPreview: "3 อาหารเริ่มต้นจากแผนของคุณ",
-      marketingHeading: "เหตุผลที่ควรเปิดแผนฉบับเต็ม",
-      preview: "3 รายการเริ่มต้นจากแผนของคุณ",
-      previewUnavailable:
-        "คำแนะนำอาหารเสริมต้องผ่านการตรวจสอบด้านความปลอดภัยก่อนแสดง ทีมงานได้รับรายการแล้ว",
-      score: "HealthScore ของคุณ",
-      subject: buildExampleEmailSubject(locale, healthScore),
-      unsubscribe: "ยกเลิกอีเมลการประเมินซ้ำ"
-    };
-  }
-
-  if (locale === "zh-CN") {
-    return {
-      cta: "查看完整计划",
-      plan: "计划",
-      foodPreview: "计划中的 3 个食物起点",
-      marketingHeading: "为什么打开完整计划",
-      preview: "计划中的 3 个起点",
-      previewUnavailable:
-        "您的补充剂建议需要先完成安全审核才能显示。审核队列已收到通知。",
-      score: "您的 HealthScore",
-      subject: buildExampleEmailSubject(locale, healthScore),
-      unsubscribe: "取消订阅复评邮件"
-    };
-  }
-
   return {
-    cta: "View the full plan",
-    plan: "Plan",
-    foodPreview: "3 food starting points from your plan",
-    marketingHeading: "Why open the full plan",
-    preview: "3 starting points from your plan",
-    previewUnavailable:
-      "Your supplement suggestions need a safety review before we show them. The review queue has been notified.",
-    score: "Your HealthScore",
+    cta: t(locale, "outbound.exampleEmail.labels.cta"),
+    foodPreview: t(locale, "outbound.exampleEmail.labels.foodPreview"),
+    marketingHeading: t(locale, "outbound.exampleEmail.labels.marketingHeading"),
+    plan: t(locale, "outbound.exampleEmail.labels.plan"),
+    preview: t(locale, "outbound.exampleEmail.labels.preview"),
+    previewUnavailable: t(locale, "outbound.exampleEmail.labels.previewUnavailable"),
+    score: t(locale, "outbound.exampleEmail.labels.score"),
     subject: buildExampleEmailSubject(locale, healthScore),
-    unsubscribe: "Unsubscribe from reassessment emails"
+    unsubscribe: t(locale, "outbound.exampleEmail.labels.unsubscribe")
   };
 }

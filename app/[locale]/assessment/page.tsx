@@ -1,7 +1,9 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { isUuid } from "@/lib/assessment-store";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
+import { localizedRouteMetadata } from "@/lib/seo";
 
 type AssessmentRedirectPageProps = Readonly<{
   params: Promise<{
@@ -12,6 +14,20 @@ type AssessmentRedirectPageProps = Readonly<{
     reassessment?: string;
   }>;
 }>;
+
+export async function generateMetadata({
+  params
+}: Pick<AssessmentRedirectPageProps, "params">): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
+
+  return localizedRouteMetadata({
+    indexable: false,
+    locale,
+    path: "/assessment",
+    routeKey: "nutritionQuiz"
+  });
+}
 
 export default async function AssessmentRedirectPage({
   params,

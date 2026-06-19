@@ -5,6 +5,7 @@ import {
   type Locale,
   type LocaleCode
 } from "@/lib/i18n";
+import { t } from "@/lib/i18n-messages";
 import { cn } from "@/lib/utils";
 
 type LanguageSwitcherProps = Readonly<{
@@ -24,28 +25,14 @@ function getLocalizedPath(currentPath: string, locale: Locale) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-const languageSwitcherCopy = {
-  en: {
-    aria: "Language"
-  },
-  th: {
-    aria: "ภาษา"
-  },
-  "zh-CN": {
-    aria: "语言"
-  }
-} satisfies Record<Locale, { aria: string }>;
-
 export function LanguageSwitcher({
   currentLocale,
   currentPath,
   localizedPaths
 }: LanguageSwitcherProps) {
-  const copy = languageSwitcherCopy[currentLocale];
-
   return (
     <nav
-      aria-label={copy.aria}
+      aria-label={t(currentLocale, "customer.languageSwitcher.aria")}
       className="mn-language-switcher flex items-center overflow-hidden rounded-full border border-[var(--mn-line)] bg-[var(--mn-paper)] text-[13px] shadow-sm"
     >
       {publicLocales.map((locale) => {

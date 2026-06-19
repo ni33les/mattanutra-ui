@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -7,7 +8,9 @@ import { TitleBar } from "@/components/title-bar";
 import { isUuid } from "@/lib/assessment-store";
 import { getSql } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
+import { getNamespace } from "@/lib/i18n-messages";
 import { nutritionRevealPath } from "@/lib/nutrition-paths";
+import { localizedRouteMetadata } from "@/lib/seo";
 import { stripePublishableKey } from "@/lib/stripe-payments";
 
 type BasketCheckoutPageProps = Readonly<{
@@ -20,31 +23,13 @@ type BasketCheckoutPageProps = Readonly<{
   }>;
 }>;
 
-const copy = {
-  en: {
-    back: "Review recommendations",
-    body:
-      "Review your selected products, confirm delivery, and secure your order with Delight Pharmacy. Shipping is shown before payment.",
-    empty: "Your basket has no selected products.",
-    eyebrow: "Secure checkout",
-    title: "Complete your order"
-  },
-  th: {
-    back: "ตรวจสอบคำแนะนำ",
-    body:
-      "ตรวจสอบสินค้าที่เลือก ยืนยันที่อยู่จัดส่ง และชำระเงินเพื่อให้ Delight Pharmacy เตรียมคำสั่งซื้อของคุณ ค่าจัดส่งจะแสดงก่อนชำระเงิน",
-    empty: "ตะกร้าของคุณยังไม่มีสินค้าที่เลือก",
-    eyebrow: "ชำระเงินอย่างปลอดภัย",
-    title: "ดำเนินการสั่งซื้อสินค้า"
-  },
-  "zh-CN": {
-    back: "查看推荐",
-    body: "请核对已选择的产品，确认配送信息，并完成付款以便 Delight Pharmacy 准备订单。配送费会在付款前显示。",
-    empty: "你的购物篮没有已选择的产品。",
-    eyebrow: "安全结账",
-    title: "完成你的产品订单"
-  }
-};
+type BasketCheckoutCopy = Readonly<{
+  back: string;
+  body: string;
+  empty: string;
+  eyebrow: string;
+  title: string;
+}>;
 
 function parseIds(value: unknown) {
   if (typeof value !== "string") {
@@ -106,6 +91,19 @@ export function generateStaticParams() {
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata({
+  params
+}: BasketCheckoutPageProps): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
+
+  return localizedRouteMetadata({
+    indexable: false,
+    locale,
+    routeKey: "basketCheckout"
+  });
+}
+
 export default async function BasketCheckoutPage({
   params,
   searchParams
@@ -132,7 +130,7 @@ export default async function BasketCheckoutPage({
   }
 
   const dictionary = getDictionary(locale);
-  const labels = copy[locale];
+  const labels = getNamespace<BasketCheckoutCopy>(locale, "customer.basketCheckout");
   const currentPath = `/${locale}/basket/checkout`;
   const selectedProducts = await selectedProductsForCheckout(
     planId,

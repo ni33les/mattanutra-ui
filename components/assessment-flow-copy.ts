@@ -158,7 +158,7 @@ export const assessmentUiCopy = {
     retry: "重试",
     resume: {
       body:
-        "留下邮箱，我们会发送一个私人链接，让你回到当前这一步。仅用于恢复评估进度。",
+        "留下邮箱，我们会发送专属链接，方便你随时回来继续（仅用于此目的）。",
       error: "目前无法发送私人链接。",
       inputLabel: "邮箱地址",
       invalid: "请输入有效邮箱，或留空此可选项。",

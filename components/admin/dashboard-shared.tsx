@@ -14,6 +14,8 @@ import type {
   SupplementListStatus
 } from "@/lib/admin-supplements";
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n-messages";
+import type { MessageId } from "@/content/i18n/generated";
 import type { AdminContent, AdminDashboardView, AdminNavItem } from "@/components/admin/dashboard-content";
 
 const ADMIN_SIDEBAR_SCROLL_KEY = "mattanutra:admin-sidebar-scroll";
@@ -1113,24 +1115,22 @@ export function PlanIdLink({
   );
 }
 
+type TaskValueBand = "critical" | "high" | "expedited" | "normal" | "low";
+
+function taskValueBand(value: number): TaskValueBand {
+  if (value >= 500) return "critical";
+  if (value >= 400) return "high";
+  if (value >= 300) return "expedited";
+  if (value >= 200) return "normal";
+
+  return "low";
+}
+
 export function taskValueLabel(value: number, locale: Locale) {
-  if (value >= 500) {
-    return locale === "th" ? "วิกฤต" : locale === "zh-CN" ? "严重" : "Critical";
-  }
-
-  if (value >= 400) {
-    return locale === "th" ? "สูง" : locale === "zh-CN" ? "高" : "High";
-  }
-
-  if (value >= 300) {
-    return locale === "th" ? "เร่งด่วน" : locale === "zh-CN" ? "加急" : "Expedited";
-  }
-
-  if (value >= 200) {
-    return locale === "th" ? "ปกติ" : locale === "zh-CN" ? "正常" : "Normal";
-  }
-
-  return locale === "th" ? "ต่ำ" : locale === "zh-CN" ? "低" : "Low";
+  return t(
+    locale,
+    `admin.dashboard.taskValueLabels.${taskValueBand(value)}` as MessageId
+  );
 }
 
 export function taskValueClass(value: number) {

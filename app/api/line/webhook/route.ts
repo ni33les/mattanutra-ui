@@ -16,6 +16,7 @@ import {
 } from "@/lib/panya";
 import { appendPlanChatMessage } from "@/lib/plan-concierge";
 import { enqueuePanyaCustomerChatReplyTask } from "@/lib/task-worker";
+import { t } from "@/lib/i18n-messages";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -117,27 +118,19 @@ function replyLocale(value: string | null | undefined): ReplyLocale {
 function adminConnectedReply(localeValue: string | null | undefined) {
   const locale = replyLocale(localeValue);
 
-  if (locale === "th") {
-    return "เชื่อมต่อ LINE แล้ว MattaNutra สามารถส่งการแจ้งเตือนงานและคำสั่งซื้อขององค์กรนี้มาที่แชทนี้ได้ ตอนนี้ระบบยังไม่เปิดใช้คำสั่งจากแชท แต่ข้อความตอบกลับจะถูกเก็บไว้เพื่อการทำงานต่อไป";
-  }
-
-  if (locale === "zh-CN") {
-    return "LINE 已连接。MattaNutra 可以把该组织的运营和订单通知发送到此聊天。目前尚未启用聊天指令，但回复会被记录，供后续跟进。";
-  }
-
-  return "LINE is connected. MattaNutra can send this organisation's operational and order notifications to this chat. Chat commands are not enabled yet, but replies will be captured for follow-up.";
+  return t(locale, "outbound.lineWebhook.adminConnected");
 }
 
 function invalidLineConnectReply(scope: LineConnectCommand["scope"]) {
   if (scope === "admin") {
-    return "That MattaNutra code is invalid or expired. Create a fresh LINE code in Admin Communications, then send MN <code> again.";
+    return t("en", "outbound.lineWebhook.invalidAdmin");
   }
 
   if (scope === "customer") {
-    return "That MattaNutra code is invalid or expired. Open your MattaNutra page for a fresh LINE code, then send MN <code> again.";
+    return t("en", "outbound.lineWebhook.invalidCustomer");
   }
 
-  return "That MattaNutra code is invalid or expired. Please create a fresh LINE code and send MN <code> again.";
+  return t("en", "outbound.lineWebhook.invalidEither");
 }
 
 async function replyToLine(input: Readonly<{

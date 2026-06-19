@@ -2,12 +2,12 @@ import type { Copy } from "@/components/assessment-flow-copy-types";
 
 export const zhCn: Copy = {
     "about": {
-      "title": "首先，关于您的基本信息",
-      "subtitle": "只需快速点击几下即可开始。这将为您的配方奠定基础。",
+      "title": "全是关于你",
+      "subtitle": "先了解你的基本情况。几步轻触即可开始。这将为你的知量方案奠定基础。",
       "firstName": "名字",
       "firstNameHint": "以便我们为您个性化合适的剂量。",
       "firstNameOptional": "选填",
-      "honestyBody": "这里没有对错之分，只有真实与否。回答越诚实，您的配方就越精准，与您正在服用的任何产品搭配也越安全。",
+      "honestyBody": "没有对错之分，只有真实的答案。回答越诚实，你的知量方案就越精准，也越能安全地配合你正在服用的产品。",
       "sex": "性别",
       "sexOptions": [
         {
@@ -244,15 +244,15 @@ export const zhCn: Copy = {
       ],
       "trustItems": [
         {
-          "body": "每份配方都会根据您的药物、化验结果和泰国 FDA 注册情况进行安全筛查。",
-          "title": "安全审核"
+          "body": "每份方案均与你的用药、化验结果及合规产品进行安全交叉检查。",
+          "title": "安全加密"
         },
         {
-          "body": "您的回答仅与您的计划绑定。我们不会出售或与广告商分享这些信息。",
-          "title": "默认隐私保护"
+          "body": "你的回答仅与你的方案绑定。我们不会出售，也不会与广告商共享。",
+          "title": "默认私密"
         },
         {
-          "body": "指导旨在支持您的目标，始终可与医生分享。",
+          "body": "MattaNutra 提供健康指导，不替代医疗诊断。",
           "title": "健康指导，非诊断"
         }
       ]

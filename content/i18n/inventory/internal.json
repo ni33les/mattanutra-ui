@@ -1,0 +1,50 @@
+[
+  {
+    "id": "internal.machine.routePaths",
+    "category": "route_path",
+    "surface": "routing",
+    "description": "Next.js route path segments and canonical URL paths.",
+    "examples": ["/nutrition/quiz", "/basket/checkout", "/order/track"],
+    "translatable": false
+  },
+  {
+    "id": "internal.machine.apiCodes",
+    "category": "api_code",
+    "surface": "api",
+    "description": "Stable machine-readable API codes and enum values.",
+    "examples": ["missing_plan", "validation_error", "living_protocol"],
+    "translatable": false
+  },
+  {
+    "id": "internal.machine.logs",
+    "category": "log",
+    "surface": "observability",
+    "description": "Developer/operator logs that are not rendered to customers or admins as copy.",
+    "examples": ["Task completion result is missing nutrition report analysis"],
+    "translatable": false
+  },
+  {
+    "id": "internal.machine.sql",
+    "category": "sql_identifier",
+    "surface": "database",
+    "description": "Table names, column names, SQL identifiers, and migration object names.",
+    "examples": ["site_locales", "blog_posts", "locale_code"],
+    "translatable": false
+  },
+  {
+    "id": "internal.machine.tests",
+    "category": "test_name",
+    "surface": "tests",
+    "description": "Test titles and assertions that describe expected behavior for developers.",
+    "examples": ["localized metadata includes hreflang alternates"],
+    "translatable": false
+  },
+  {
+    "id": "internal.machine.modelInstructions",
+    "category": "model_prompt_instruction",
+    "surface": "ai",
+    "description": "Internal prompt instructions that guide model behavior and are not sent as localized customer copy.",
+    "examples": ["Do not diagnose, treat, cure, prescribe, or replace clinician advice."],
+    "translatable": false
+  }
+]

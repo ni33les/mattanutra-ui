@@ -63,6 +63,7 @@ import type {
   RecommendedProduct,
 } from "@/lib/formulation-types";
 import { localeHtmlLang, type Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n-messages";
 import { organisationDispatchCity } from "@/lib/organisation-dispatch";
 
 type RevealFinalResultsPageProps = Readonly<{
@@ -389,27 +390,15 @@ function fallbackForYouCopy(
     .filter(Boolean);
   const primaryGoal = goals[0] ?? "";
 
-  if (locale === "th") {
-    if (primaryGoal && benefitLabel) {
-      return `${supplement} เชื่อมกับเป้าหมาย ${primaryGoal} และสัญญาณด้าน${benefitLabel}ที่พบจากคำตอบของคุณ`;
-    }
-
-    return `${supplement} ถูกเก็บไว้เพราะสอดคล้องกับเป้าหมายและบริบทที่คุณให้ไว้`;
-  }
-
-  if (locale === "zh-CN") {
-    if (primaryGoal && benefitLabel) {
-      return `${supplement} 对应你的${primaryGoal}目标，并结合问卷中出现的${benefitLabel}信号。`;
-    }
-
-    return `${supplement} 保留下来，是因为它符合你的目标和安全背景。`;
-  }
-
   if (primaryGoal && benefitLabel) {
-    return `${supplement} maps to your ${primaryGoal} goal and the ${benefitLabel} signal in your assessment.`;
+    return t(locale, "customer.revealFallbacks.forYouWithGoal", {
+      benefit: benefitLabel,
+      goal: primaryGoal,
+      supplement
+    });
   }
 
-  return `${supplement} stayed in because it fits the goals, routines, and safety context you shared.`;
+  return t(locale, "customer.revealFallbacks.forYou", { supplement });
 }
 
 function fallbackDecisionCopy(
@@ -417,21 +406,12 @@ function fallbackDecisionCopy(
   dailyDose: string,
   benefitLabel: string,
 ) {
-  if (locale === "th") {
-    return benefitLabel
-      ? `${dailyDose} เพื่อสนับสนุนด้าน${benefitLabel}โดยไม่เพิ่มสิ่งที่ไม่จำเป็น`
-      : `${dailyDose} เป็นปริมาณใช้งานจริงที่คงไว้หลังการคัดกรอง`;
-  }
-
-  if (locale === "zh-CN") {
-    return benefitLabel
-      ? `${dailyDose}，用于支持${benefitLabel}，同时避免不必要的添加。`
-      : `${dailyDose} 是筛选后保留的实用每日剂量。`;
-  }
-
   return benefitLabel
-    ? `${dailyDose} for ${benefitLabel}, without adding unnecessary extras.`
-    : `${dailyDose} is the practical daily dose kept after screening.`;
+    ? t(locale, "customer.revealFallbacks.decisionWithBenefit", {
+        benefit: benefitLabel,
+        dailyDose
+      })
+    : t(locale, "customer.revealFallbacks.decision", { dailyDose });
 }
 
 export function RevealFinalResultsPage({
@@ -1936,20 +1916,10 @@ function RevealFoodSupportFinalSection({
       safeFoodSupportCopy(
         item.rationale,
         locale,
-        locale === "th"
-          ? `${name} ช่วยเสริมจากอาหารสำหรับ${joinFoodSupportFormulaRequirementLabels(
-              formulaRequirements,
-              "th",
-            )}`
-          : locale === "zh-CN"
-            ? `${name} 可通过食物层面支持 ${joinFoodSupportFormulaRequirementLabels(
-                formulaRequirements,
-                "zh-CN",
-              )}`
-            : `${name} gives food-level support around ${joinFoodSupportFormulaRequirementLabels(
-                formulaRequirements,
-                "en",
-              )}.`,
+        t(locale, "customer.revealFallbacks.foodSupportNote", {
+          name,
+          requirements: joinFoodSupportFormulaRequirementLabels(formulaRequirements, locale)
+        }),
       );
     const cardId = primaryRequirement?.id ?? item.foodId;
     const existing = foodCards.find((card) => card.id === cardId);

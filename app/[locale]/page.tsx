@@ -11,7 +11,7 @@ import {
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
-import { localizedMetadata } from "@/lib/seo";
+import { localizedRouteMetadata } from "@/lib/seo";
 import { siteBaseUrl } from "@/lib/site-url";
 
 type HomeProps = Readonly<{
@@ -35,13 +35,10 @@ export async function generateMetadata({
 }: HomeProps): Promise<Metadata> {
   const { locale: rawLocale } = await params;
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
-  const dictionary = getDictionary(locale);
 
-  return localizedMetadata({
-    description: dictionary.meta.description,
+  return localizedRouteMetadata({
     locale,
-    path: "/",
-    title: dictionary.meta.title
+    routeKey: "home"
   });
 }
 

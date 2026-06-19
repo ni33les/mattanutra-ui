@@ -11,6 +11,7 @@ import {
   parseDoseLimit,
 } from "@/lib/dose-conversion";
 import { siteLocaleRegistry, type Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n-messages";
 import { productFactObservableIssueMessages } from "@/lib/product-validation";
 import { supplementDoseUnits } from "@/lib/supplement-dose-units";
 import {
@@ -500,21 +501,17 @@ export function productDecisionSummary(row: AdminProductRow, locale: Locale) {
     row.decisionStats?.chosenPlanCount ?? row.recommendationHistory.chosenCount;
   const nearMisses = row.decisionStats?.nearMissCount ?? 0;
 
-  if (locale === "th") {
-    return nearMisses > 0
-      ? `ถูกเลือก ${formatter.format(chosen)} ครั้ง · เกือบถูกเลือก ${formatter.format(nearMisses)}`
-      : `ถูกเลือก ${formatter.format(chosen)} ครั้ง`;
-  }
-
-  if (locale === "zh-CN") {
-    return nearMisses > 0
-      ? `已选择 ${formatter.format(chosen)} 次 · 接近入选 ${formatter.format(nearMisses)} 次`
-      : `已选择 ${formatter.format(chosen)} 次`;
-  }
+  const formattedChosen = formatter.format(chosen);
+  const formattedNearMisses = formatter.format(nearMisses);
 
   return nearMisses > 0
-    ? `Chosen ${formatter.format(chosen)} times · ${formatter.format(nearMisses)} near misses`
-    : `Chosen ${formatter.format(chosen)} times`;
+    ? t(locale, "admin.productDecisionSummary.chosenNearMisses", {
+        chosen: formattedChosen,
+        nearMisses: formattedNearMisses
+      })
+    : t(locale, "admin.productDecisionSummary.chosen", {
+        chosen: formattedChosen
+      });
 }
 
 export function productMatchesMetricFilter(

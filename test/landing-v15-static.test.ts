@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { content } from "../components/landing-page-copy.ts";
+import { content, getLandingPageCopy } from "../components/landing-page-copy.ts";
 import { publicLocales } from "../lib/i18n.ts";
+import { getNamespace } from "../lib/i18n-messages.ts";
 
 function source(path: string) {
   return readFileSync(new URL(path, import.meta.url), "utf8");
@@ -48,15 +49,27 @@ describe("landing page v15 rebuild", () => {
     );
     assert.match(titleBar, /mn-titlebar--landing/);
     assert.match(titleBar, /\/v15\/logo\.png/);
-    assert.match(titleBar, /#living-protocol/);
-    assert.match(titleBar, /#how-it-works/);
-    assert.match(titleBar, /#promises/);
-    assert.match(titleBar, /#journal/);
+    const titleBarCopy = getNamespace<{
+      links: readonly (readonly [string, string])[];
+    }>("en", "customer.titleBar");
+    assert.deepEqual(
+      titleBarCopy.links.map(([href]) => href),
+      ["#living-protocol", "#how-it-works", "#promises", "#journal"]
+    );
     assert.match(titleBar, /const titleCtaHref = assessmentPath/);
     assert.doesNotMatch(titleBar, /Free questionnaire/);
-    assert.match(footer, /#start-free/);
+    const footerCopy = getNamespace<{
+      columns: readonly Readonly<{ links: readonly (readonly [string, string])[] }>[];
+    }>("en", "customer.footer");
+    assert.ok(
+      footerCopy.columns.some((column) =>
+        column.links.some(([, href]) => href === "/#start-free")
+      )
+    );
     assert.doesNotMatch(titleBar, /#pricing/);
     assert.doesNotMatch(footer, /#pricing/);
+    assert.doesNotMatch(JSON.stringify(titleBarCopy), /#pricing/);
+    assert.doesNotMatch(JSON.stringify(footerCopy), /#pricing/);
   });
 
   it("sends primary homepage CTAs straight to the questionnaire", () => {
@@ -187,5 +200,13 @@ describe("landing page v15 rebuild", () => {
     assert.match(seedScript, /public\.testimonials/);
     assert.match(seedScript, /public\.blog_posts/);
     assert.match(seedScript, /for \(const locale of publicLocales\)/);
+    assert.match(seedScript, /getLandingPageCopy\(locale\)/);
+  });
+
+  it("shares resolved landing copy between the app and DB seed", () => {
+    assert.deepEqual(getLandingPageCopy("zh-CN"), content["zh-CN"]);
+    assert.equal(content["zh-CN"].hero.title, "停止猜测，");
+    assert.equal(content["zh-CN"].questionnaire.cta, "免费测我的健康评分");
+    assert.equal(content["zh-CN"].final.accent, "开始知量。");
   });
 });

@@ -3,6 +3,7 @@ import type { SVGProps } from "react";
 import { HealthspanLogo } from "@/components/healthspan-logo";
 import { lineOfficialAccountUrl } from "@/lib/chat-links";
 import { localeLabels, publicLocales, type Locale } from "@/lib/i18n";
+import { getNamespace } from "@/lib/i18n-messages";
 
 const socialLinks = [
   {
@@ -61,113 +62,15 @@ const socialLinks = [
   }
 ] as const;
 
-const footerCopy = {
-  en: {
-    body:
-      "AI-powered personalised wellness plans, designed in Chiang Mai for Southeast Asian lives. Ancient wisdom · modern science.",
-    columns: [
-      {
-        title: "Product",
-        links: [
-          ["Living Protocol", "/#living-protocol"],
-          ["How it works", "/#how-it-works"],
-          ["The free questionnaire", "/#start-free"],
-          ["Design your Right Amount", "/nutrition/quiz"]
-        ]
-      },
-      {
-        title: "Learn",
-        links: [
-          ["Journal", "/#journal"],
-          ["Our promises", "/#promises"],
-          ["Our origin", "/#origin"]
-        ]
-      },
-      {
-        title: "Company",
-        links: [
-          ["Contact", "mailto:hello@mattanutra.com"],
-          ["Terms of Service", "/terms"],
-          ["Privacy Policy", "/privacy"]
-        ]
-      }
-    ],
-    disclaimer:
-      "MattaNutra supports your supplement and everyday-nutrition decisions — it is a wellness guidance platform, not a medical diagnosis, treatment plan, or personalised dietary therapy. Food guidance is general nutrition education. All recommendations are organised around your goals, routine and current stack, and flagged against your medications and labs for safety. Users who are pregnant, nursing, taking medication, or managing a medical condition should consult a qualified healthcare professional before beginning any supplement programme.",
-    copyright:
-      "© 2026 MattaNutra · AI-powered personalised wellness plans · Chiang Mai, Thailand"
-  },
-  th: {
-    body:
-      "แผนสุขภาพเฉพาะบุคคลที่ใช้ AI ช่วยออกแบบจากเชียงใหม่ เพื่อชีวิตในเอเชียตะวันออกเฉียงใต้ ภูมิปัญญาเดิม · วิทยาศาสตร์สมัยใหม่",
-    columns: [
-      {
-        title: "ผลิตภัณฑ์",
-        links: [
-          ["โปรโตคอลชีวิต", "/#living-protocol"],
-          ["วิธีทำงาน", "/#how-it-works"],
-          ["แบบสอบถามฟรี", "/#start-free"],
-          ["ออกแบบปริมาณที่พอดี", "/nutrition/quiz"]
-        ]
-      },
-      {
-        title: "เรียนรู้",
-        links: [
-          ["บทความ", "/#journal"],
-          ["คำมั่นของเรา", "/#promises"],
-          ["จุดเริ่มต้นของเรา", "/#origin"]
-        ]
-      },
-      {
-        title: "บริษัท",
-        links: [
-          ["ติดต่อ", "mailto:hello@mattanutra.com"],
-          ["เงื่อนไขการใช้บริการ", "/terms"],
-          ["นโยบายความเป็นส่วนตัว", "/privacy"]
-        ]
-      }
-    ],
-    disclaimer:
-      "MattaNutra เป็นแพลตฟอร์มแนะแนวสุขภาพ ไม่ใช่การวินิจฉัยหรือการรักษาทางการแพทย์ หากคุณตั้งครรภ์ ให้นมบุตร ใช้ยา หรือมีโรคประจำตัว ควรปรึกษาผู้เชี่ยวชาญก่อนเริ่มใช้อาหารเสริม",
-    copyright:
-      "© 2026 MattaNutra · แผนสุขภาพเฉพาะบุคคลด้วย AI · เชียงใหม่ ประเทศไทย"
-  },
-  "zh-CN": {
-    body:
-      "由 AI 驱动的个性化健康计划，在清迈设计，贴合东南亚生活。古老智慧 · 现代科学。",
-    columns: [
-      {
-        title: "产品",
-        links: [
-          ["Living Protocol", "/#living-protocol"],
-          ["如何运作", "/#how-it-works"],
-          ["免费问卷", "/#start-free"],
-          ["设计您的适量", "/nutrition/quiz"]
-        ]
-      },
-      {
-        title: "了解",
-        links: [
-          ["文章", "/#journal"],
-          ["我们的承诺", "/#promises"],
-          ["我们的起源", "/#origin"]
-        ]
-      },
-      {
-        title: "公司",
-        links: [
-          ["联系", "mailto:hello@mattanutra.com"],
-          ["服务条款", "/terms"],
-          ["隐私政策", "/privacy"]
-        ]
-      }
-    ],
-    disclaimer:
-      "MattaNutra 是健康指导平台，不提供医学诊断或治疗方案。孕期、哺乳期、正在用药或管理疾病的用户，在开始任何补充剂计划前应咨询合格医疗专业人士。",
-    copyright:
-      "© 2026 MattaNutra · AI 个性化健康计划 · 泰国清迈"
-  }
-} as const;
+type FooterCopy = Readonly<{
+  body: string;
+  columns: readonly Readonly<{
+    links: readonly (readonly [string, string])[];
+    title: string;
+  }>[];
+  copyright: string;
+  disclaimer: string;
+}>;
 
 type FooterContent = Readonly<{
   copyright: string;
@@ -188,7 +91,7 @@ function localizedHref(locale: Locale, href: string) {
 export function SiteFooter({
   locale
 }: Readonly<{ content: FooterContent; locale: Locale }>) {
-  const copy = footerCopy[locale];
+  const copy = getNamespace<FooterCopy>(locale, "customer.footer");
 
   return (
     <footer className="mn-site-footer">

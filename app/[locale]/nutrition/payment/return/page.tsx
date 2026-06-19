@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -27,6 +28,7 @@ import {
   fulfillCheckoutSession,
   paymentReturnDestination
 } from "@/lib/stripe-payments";
+import { localizedRouteMetadata } from "@/lib/seo";
 import { getEvaluatedIngredientCatalogueCount } from "@/lib/supplement-catalogue-count";
 
 type PaymentReturnPageProps = Readonly<{
@@ -387,6 +389,19 @@ export function generateStaticParams() {
 }
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params
+}: PaymentReturnPageProps): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
+
+  return localizedRouteMetadata({
+    indexable: false,
+    locale,
+    routeKey: "paymentReturn"
+  });
+}
 
 function replaceTokens(
   template: string,

@@ -1,4 +1,5 @@
-import type { Locale } from "@/lib/i18n";
+import { publicLocales, type Locale } from "@/lib/i18n";
+import { getNamespace } from "@/lib/i18n-messages";
 
 export const assets = {
   heroFigure: "/v15/hero-emblem.png",
@@ -25,1430 +26,238 @@ export const assets = {
   ],
 } as const;
 
-const baseContent = {
-  en: {
-    hero: {
-      eyebrow: "Ancient wisdom · Modern science",
-      title: "Stop guessing.",
-      accent: "Start knowing.",
-      intro:
-        "AI-powered supplement and wellness plans built around your body, your lifestyle, and the goals that actually matter to you — and that adapt as your life does.",
-      paliTitle: "Mattaññutā",
-      pali: "Pāli for the wisdom of knowing the right amount — that wellbeing comes not from more, but from exactly enough.",
-      primary: "Start designing your Right Amount",
-      secondary: "How it works",
-      microcopy:
-        "Start with a free Health Score that shows where you stand. Your personalised Right Amount Formula is ready when you are.",
-      checks: [
-        "No credit card required",
-        "120+ ingredients evaluated",
-        "Safety checks included",
-      ],
-      ingredientPills: [
-        "Magnesium",
-        "Vitamin D3",
-        "Omega-3",
-        "Ashwagandha",
-        "Zinc",
-      ],
-    },
-    proof: [
-      {
-        title: "Founders with 100+ years’ combined experience",
-        body: "Medicine · Science · Technology",
-      },
-      {
-        title: "Formal education & training",
-        body: "Mahidol · Princeton · Stanford · Harvard",
-      },
-      {
-        title: "Dispensed by local pharmacists",
-        body: "Through licensed Thai pharmacy partners",
-      },
-    ],
-    clarity: {
-      eyebrow: "From overwhelm to clarity",
-      title: "Too many choices.",
-      accent: "Let MattaNutra give you clarity.",
-      body:
-        "Walk into a drugstore or look online and it’s overwhelming. MattaNutra guides you from hundreds of options down to the few that are right and personalised for you. Knowing the Right Amount.",
-      cards: [
-        {
-          title: "Overwhelmed",
-          body: "Hundreds of options, no clear answer.",
-          image: assets.clarity[0],
-          imageAlt: "Overwhelmed at the supplement shelves",
-        },
-        {
-          title: "A clear path appears",
-          body: "Guidance built around you.",
-          image: assets.clarity[1],
-          imageAlt: "A clear path appears",
-        },
-        {
-          title: "Narrowed down",
-          body: "Only what your body actually needs.",
-          image: assets.clarity[2],
-          imageAlt: "Narrowing down to what matters",
-        },
-        {
-          title: "Exactly enough",
-          body: "The Right Amount — in hand.",
-          image: assets.clarity[3],
-          imageAlt: "Exactly what you need, in hand",
-        },
-      ],
-    },
-    problem: {
-      eyebrow: "The problem",
-      title: "Too many bottles.",
-      accent: "Too little certainty.",
-      body: "Walk into any pharmacy and the wall of supplements is overwhelming. Hundreds of options, conflicting advice, and no clear answer to the only question that matters: what does my body actually need?",
-      body2:
-        "Most people end up guessing — buying too much of what they don't need, missing what they do, and quietly wondering if any of it is working.",
-      imageAlt: "Shopper overwhelmed by supplement choices",
-    },
-    promises: {
-      eyebrow: "What you can expect",
-      title: "Four promises.",
-      accent: "One simple plan.",
-      intro: "What every MattaNutra plan is designed to deliver.",
-      cards: [
-        ["Clarity", "from confusion"],
-        ["Guidance", "you can trust"],
-        ["Personalised", "just for you"],
-        ["Confidence", "in every choice"],
-      ],
-    },
-    how: {
-      eyebrow: "How it works",
-      title: "The right amount of questions.",
-      accent: "Nothing more, nothing missed.",
-      intro:
-        "From a short, focused questionnaire to recommendations you can trust — in four steps.",
-      steps: [
-        [
-          "Answer",
-          "Detailed, not tedious",
-          "A genuinely detailed set of questions — your goals & health priorities, lifestyle & activity, current medications, budget, and what you truly care about. Thorough enough to personalise your formula, with no jargon and no fluff.",
-        ],
-        [
-          "Analyse",
-          "120+ ingredients",
-          "A proprietary algorithm — grounded in published clinical research — designed to closely match the supplement priorities a blood panel would surface, with dosage ranges and safety checks.",
-        ],
-        [
-          "Match",
-          "Dispensed by pharmacists",
-          "Your formula is dispensed through a partner pharmacy with registered pharmacists — real people you can ask, not a guess in the aisle.",
-        ],
-        [
-          "Refine",
-          "Part of Living Protocol",
-          "With Living Protocol, your plan keeps adjusting as your goals, symptoms and lifestyle change over time.",
-        ],
-      ],
-    },
-    protocol: {
-      active: "Living Protocol active",
-      channel: "Line / WhatsApp",
-      eyebrow: "Living Protocol · 90-day support",
-      title: "Life changes constantly.",
-      accent: "Your protocol can keep up.",
-      intro:
-        "Sleep, stress, travel and shifting routines all change what your body needs. Living Protocol keeps your supplements — and the everyday foods behind them — aligned with real life, so the right amount today stays the right amount next week.",
-      primary: "Explore Living Protocol",
-      secondary: "See how it works",
-      ticks: [
-        "Built by physicians — every adjustment checked against your medications and labs",
-        "Stays aligned through travel, stress and poor sleep",
-        "Less second-guessing when life shifts",
-      ],
-      chat: [
-        "Anything different this week — sleep, stress, travel or routine?",
-        "I'm travelling to Tokyo tomorrow. Probably going to sleep badly this week.",
-        "Got it — six days in Tokyo with some sleep disruption. I've made three small adjustments and kept everything else steady. Here's your plan for the trip.",
-      ],
-      updateLabel: "Updated protocol",
-      tripTitle: "Your Tokyo trip — 3 small changes",
-      updates: [
-        "Take magnesium a little earlier — 7:30pm local instead of 9:30pm",
-        "Add electrolytes on your flight and each morning while you're away",
-        "Everything else stays exactly the same",
-      ],
-      basedOn:
-        "Based on: 6-day trip · sleep disruption likely · meetings-heavy · more walking",
-      reasoningLabel: "See the reasoning",
-      reasoning: [
-        "Magnesium earlier — helps move your wind-down forward as you adjust to the timezone.",
-        "Electrolytes added — supports hydration through the flight and your higher walking load in the city.",
-        "Adaptogen held steady — your stress is rising, but your sleep's been unsettled lately, so we're holding the dose rather than stacking changes.",
-      ],
-      foodNudge:
-        "One more thing — your last check showed your magnesium sitting a little low. I've got it in your plan, but you can top it up naturally too:",
-      foodTags: ["pumpkin seeds", "spinach", "black beans"],
-      vitaminQuestion:
-        "Oh nice, didn't know that. What about my vitamin C — should I add a supplement?",
-      vitaminAnswer:
-        "Honestly? You probably don't need to. With the fruit and veg already in your week, you're comfortably covered. I'd save that one — food's doing the job.",
-    },
-    protocolBand: {
-      title: "Your Right Amount Formula is the foundation.",
-      accent: "Your Living Protocol keeps it aligned with real life.",
-      body: "Travel, stress, poor sleep and changing routines all shift what your body needs. Your foundation doesn't change — but the small adjustments around it do.",
-    },
-    practice: {
-      eyebrow: "Living Protocol in practice",
-      title: "Three steps.",
-      accent: "No apps to learn.",
-      intro:
-        "Living Protocol fits into the messaging you already use. You tell it what changed; it does the rest.",
-      steps: [
-        [
-          "Tell MattaNutra what changed",
-          "A quick message through Line or WhatsApp is all it takes — no forms, no tracking, no apps to learn.",
-          [
-            "Sleeping badly this week.",
-            "Travelling for work tomorrow.",
-            "Started training harder lately.",
-          ],
-        ],
-        [
-          "Your protocol adapts around you",
-          "Working from your current stack, your goals and your safety flags, MattaNutra turns that update into a few precise adjustments — timing, dosage, or a temporary addition — and points you to the everyday foods that support what your body needs.",
-          [
-            "Move magnesium slightly earlier this week.",
-            "Pumpkin seeds are a great natural source of magnesium.",
-            "Hold your adaptogen steady until sleep settles.",
-          ],
-        ],
-        [
-          "Stay consistent without overthinking it",
-          "You don't have to research, second-guess, or restart from scratch every time life gets busy. You just get a few simple things to do — and the confidence they're right for you.",
-          [
-            "No need to rethink your routine every time life shifts.",
-            "Small adjustments keep your plan realistic.",
-            "Your right amount stays right.",
-          ],
-        ],
-      ],
-    },
-    food: {
-      eyebrow: "Food & supplements, together",
-      title: "The best source is sometimes",
-      accent: "on your plate.",
-      imageAlt:
-        "A nourishing bowl with fish, greens, broccoli, black beans, brown rice and pumpkin seeds",
-      intro:
-        "Supplements fill the gaps — but food fills them first. When Living Protocol spots something your body needs, it doesn't just reach for a capsule. It tells you which everyday foods are naturally rich in it, so you can choose: top up at dinner, or top up from the bottle. Either way, you're finally knowing, not guessing.",
-      cards: [
-        [
-          "Low on magnesium?",
-          "Pumpkin seeds, spinach and black beans are some of the richest natural sources.",
-          ["pumpkin seeds", "spinach", "black beans"],
-        ],
-        [
-          "Need more chromium?",
-          "It turns up in unexpected places — grape juice, broccoli and whole grains.",
-          ["grape juice", "broccoli", "whole grains"],
-        ],
-        [
-          "Already covered?",
-          "If your meals are doing the job, Living Protocol will tell you to skip the supplement — and save your money.",
-          ["food's got it"],
-        ],
-      ],
-      note: "No food diary. No calorie counting. Just a quick answer when you want one, and a nudge toward the right plate when it helps.",
-    },
-    difference: {
-      eyebrow: "Why it's different",
-      title: "More than an answer.",
-      accent: "A protocol that knows you.",
-      paragraphs: [
-        "Anyone can look up whether travel affects magnesium. The hard part is knowing how it affects your plan — your stack, your medications, the weeks you've just had — and what to actually do about it. That's the part Living Protocol handles for you.",
-        "It already knows everything you take, so there's nothing to re-explain each time something changes. Every adjustment it suggests is checked against your medications and lab flags — the kind of safety net that only works when the guidance is built around you. Over 90 days it comes to recognise your patterns, so its advice reflects not just this week but the trend behind it. And you never have to know the right question to ask — you simply say what's going on, and Living Protocol does the thinking.",
-        "You don't need to become your own pharmacist. You just tell MattaNutra what's changed, and it keeps your protocol right.",
-      ],
-    },
-    bridge: {
-      title: "Ready to design your Right Amount?",
-      body: "Start with a short, detailed questionnaire and your free Health Score. Your personalised plan — and the option to add Living Protocol — is one step away.",
-      cta: "Start designing your Right Amount",
-      note: "Free to start — no credit card required.",
-    },
-    questionnaire: {
-      eyebrow: "The free questionnaire",
-      title: "A glimpse inside the questionnaire.",
-      body:
-        "Here’s how the questionnaire estimates just your vitamin D — one of 120+ ingredients the algorithm weighs — drawing on several answers at once. The full version spans six short sections.",
-      cardLabel: "Formula Precision",
-      privateLabel: "Private & encrypted",
-      sampleLabel: "A sample",
-      sampleBody: "estimating just one ingredient",
-      progressPath: "Start → Essentials → Precision",
-      progress: "8%",
-      progressNote: "You’re at 8% — keep going to complete the essentials.",
-      quote:
-        "There are no right or wrong answers here, only true ones. The more honestly you answer, the more exactly your formula fits — and the safer it is alongside anything you already take.",
-      skinTone: "Skin tone",
-      foundation: "Foundation",
-      skinBody: "Helps model your vitamin D synthesis alongside sun exposure.",
-      sunExposure: "Daily sun exposure",
-      sunOptions: ["Under 15m", "15–30", "30–60", "60m+"],
-      sunscreen: "Sunscreen use",
-      sunscreenOptions: ["Rarely", "Sometimes", "Daily"],
-      insight:
-        "Skin tone, sun and sunscreen are weighed together — so your vitamin D isn’t a guess, it’s an estimate built for your life.",
-      sectionsLabel: "One question, from six sections:",
-      sections: ["Foundation", "Goals", "Daily life", "Food", "Safety", "Precision"],
-      bottom: "Vitamin D is one of 120+ ingredients our algorithm evaluates.",
-      reassurance: "✓ Free to start ✓ No credit card ✓ About 3 minutes",
-    },
-    results: {
-      eyebrow: "Stories like these",
-      title: "Different lives. The same first step.",
-      intro:
-        "Different lifestyles. Same goal: better health, more clarity, and a routine that feels possible.",
-      cta: "Start designing your Right Amount",
-      join: "Make smarter, more confident choices for your health.",
-      fallback: [
-        {
-          id: "daniel",
-          image: assets.testimonials[0],
-          imageAlt: "Daniel L. sitting by a window",
-          name: "Daniel L.",
-          place: "40, Bangkok",
-          role: "Project Manager",
-          quote:
-            "I turned 40 and realised I kept saying I wanted to make changes, but I didn't know where to start. I had a drawer full of random vitamins and no real plan. MattaNutra gave me a clear first step, without making the whole process feel overwhelming.",
-        },
-        {
-          id: "meilin",
-          image: assets.testimonials[1],
-          imageAlt: "Mei Lin T. smiling on a school walkway",
-          name: "Mei Lin T.",
-          place: "45, Singapore",
-          role: "Operations Lead",
-          quote:
-            "Between work, travel, and caring for my family, my health routine became whatever I could remember to do that day. MattaNutra helped me turn a messy supplement shelf into a simple plan that fits real life in Singapore.",
-        },
-        {
-          id: "wanida",
-          image: assets.testimonials[2],
-          imageAlt: "Wanida P. in her shop",
-          name: "Wanida P. (วนิดา)",
-          place: "43, Khon Kaen",
-          role: "Shop Owner",
-          quote:
-            "My doctor told me my blood pressure was creeping up and I needed to make changes. I spent hours researching supplements online and ended up more confused than when I started. MattaNutra cut through all the noise and built me something that actually fits my life.",
-        },
-        {
-          id: "malee",
-          image: assets.testimonials[3],
-          imageAlt: "Malee S. seated in a garden courtyard",
-          name: "Malee S. (มาลี)",
-          place: "41, Phuket",
-          role: "Nurse Aide",
-          quote:
-            "I work in a clinic, so everyone assumes I know exactly what supplements to take. The honest truth was the more I read, the less sure I felt. MattaNutra finally gave me a clear, sensible plan I could trust — for myself this time, not just my patients.",
-        },
-      ],
-    },
-    origin: {
-      eyebrow: "Our origin",
-      title: "Designed in Chiang Mai,",
-      accent: "where the right amount is a way of life.",
-      body: "MattaNutra began in northern Thailand, where traditions of moderation — eating just enough, resting at the right hour, working with the body's own rhythms — have been quietly refined over centuries.",
-      body2:
-        "We built MattaNutra to translate that quiet wisdom into something modern, measurable, and personal: a plan that learns your body, adjusts when life shifts, and never asks you to become someone you're not.",
-      buildAlt:
-        "The MattaNutra logo, built in five stages from outline to finished mark",
-      founders:
-        "Founded by physicians, scientists, and innovative AI thinkers.",
-      founderParagraphs: [
-        "What goes into your body should be designed by people who understand what's actually in it.",
-        "MattaNutra was founded by an international group with an unusually broad foundation: two physicians with MD–PhD training from leading research institutions (including Mahidol, Princeton, Stanford and Harvard Universities), a software engineer whose career began at CERN and now spans AI and decentralised systems for institutions including Goldman Sachs and UBS, a PhD economist with global enterprise experience across public markets and frontier ventures, and a younger founder whose perspective keeps us close to the generation we're building for.",
-        "Between us, more than a hundred years of professional practice — in medicine, in science, in technology, and in the rewarding work of building things that last.",
-      ],
-      signoff: "From Chiang Mai, with care.",
-      tagline: "Ancient wisdom · Modern science",
-    },
-    pricing: {
-      eyebrow: "Simple pricing",
-      title: "Start free.",
-      accent: "Upgrade when ready.",
-      intro:
-        "Take the free questionnaire to get a starting plan. Upgrade only when you want deeper precision or ongoing AI support.",
-      offer: "Limited time offer",
-      plans: [
-        {
-          badge: "One-time plan",
-          name: "Right Amount Formula",
-          desc: "Your personalised supplement formula with precise dosing, timing, and product guidance.",
-          originalPrice: "THB 990",
-          saving: "Save 30%",
-          currency: "THB",
-          price: "690",
-          termLabel: "One-time",
-          term: "One-time payment · Lifetime access",
-          cta: "Get the Right Amount Formula",
-          plan: "precision" as const,
-          best: "People who want a clear, confident starting point — the right amount, made for them.",
-          features: [
-            "Personalised supplement formula",
-            "Body-size adjusted dose ranges",
-            "Timing and usage instructions",
-            "Medication and lab safety flags",
-            "Recommended products and alternatives",
-            "60-day reassessment prompt",
-          ],
-          guaranteeTitle: "Clarity Guarantee.",
-          guarantee:
-            "If your plan doesn't feel clear and useful, we'll make it right or refund you within 7 days.",
-        },
-        {
-          badge: "Premium · 90-day support",
-          popular: "Most popular",
-          name: "Living Protocol",
-          desc: "Keep your right amount right as life changes. Everything in the Right Amount Formula, plus ongoing adjustments whenever your sleep, stress, travel, training or diet shifts.",
-          originalPrice: "THB 1,890",
-          saving: "Save 16%",
-          currency: "THB",
-          price: "1,590",
-          termLabel: "For 90 days",
-          term: "One payment · 90 days of support · Renew anytime",
-          cta: "Start Living Protocol",
-          plan: "pro" as const,
-          best: "People who want their plan to keep up with the reality of everyday life.",
-          features: [
-            "Includes your full Right Amount Formula",
-            "Learn which everyday foods give you what you need",
-            "Adjusts timing and dosage as life changes",
-            "Every change checked against your medications and labs",
-            "Remembers your patterns over 90 days",
-            "Just message when something changes — no apps, no tracking",
-            "Stay consistent through travel, stress and disrupted sleep",
-          ],
-          guaranteeTitle: "7-Day Satisfaction Guarantee.",
-          guarantee:
-            "Give Living Protocol a real try. If anything's not right, tell us — we'll fix it, or refund you in full within 7 days. No fuss.",
-        },
-      ],
-      trust: [
-        ["Secure & private", "Your data is encrypted and never shared."],
-        [
-          "Science-backed",
-          "Personalised recommendations based on trusted evidence.",
-        ],
-        ["Adapt & improve", "Plans evolve as your body and goals change."],
-        [
-          "AI + human oversight",
-          "AI-powered guidance with human-reviewed safeguards.",
-        ],
-      ],
-    },
-    journal: {
-      eyebrow: "From the Journal",
-      title: "Learn the",
-      accent: "right amount.",
-      browse: "Browse all articles",
-      tag: "Journal",
-      readMore: "Read article",
-      fallback: [
-        [
-          "Foundations",
-          'Why "more" is rarely the answer with supplements',
-          "The science of sufficiency — and why your body often needs less than the label suggests.",
-        ],
-        [
-          "Nutrition",
-          "Eight everyday foods richer in magnesium than you'd think",
-          "Before you reach for a capsule, check your plate — these staples do a lot of quiet work.",
-        ],
-        [
-          "Living well",
-          "How travel quietly changes what your body needs",
-          "Timezones, sleep and hydration all shift the maths — here's how to adjust without overthinking.",
-        ],
-      ],
-    },
-    faq: {
-      eyebrow: "Questions",
-      title: "Good questions,",
-      accent: "honest answers.",
-      items: [
-        [
-          "Is my data private?",
-          "Yes. Your assessment is yours. We don't sell answers, we don't share with advertisers, and you can request deletion at any time. Living Protocol conversations are stored only to maintain continuity in your plan.",
-        ],
-        [
-          "I'm on medication — is this safe for me?",
-          "MattaNutra screens for the most common medication–supplement considerations and flags them in your plan. It is wellness guidance, not medical advice. If you are taking prescription medication, pregnant, nursing, or managing a medical condition, please consult a qualified healthcare professional before beginning any supplement programme.",
-        ],
-        [
-          "Where do the recommended products come from?",
-          "Your formula is dispensed through a partner pharmacy network with registered pharmacists, so you collect exactly what your plan calls for — with no guessing in the aisle. We don't manufacture supplements ourselves; we match you to trusted products and a pharmacist who can answer your questions.",
-        ],
-        [
-          "Is the free assessment really free?",
-          "Yes. The questionnaire and your Health Score are free, and no credit card is required. After you complete it, you'll see where you stand and a starting direction. The full personalised Right Amount Formula — and optional Living Protocol support — are available if you choose to go further.",
-        ],
-        [
-          "Why the Pāli name?",
-          "“Mattaññutā” means knowing the right amount. It comes from a 2,500-year-old tradition of practical wisdom about moderation and balance — the idea that flourishing comes not from more, but from exactly enough. The name is our promise: we'll help you find your right amount, not sell you more of what you don't need.",
-        ],
-      ],
-    },
-    final: {
-      title: "Stop guessing.",
-      accent: "Start knowing.",
-      body: "Answer a focused set of questions, get your free Health Score, and receive your personalised starting plan — built around your body, your goals, and your day.",
-      primary: "Start designing your Right Amount",
-      secondary: "How it works",
-      quote: "Mattaññutā — knowing the right amount.",
-    },
-  },
-  th: {
-    hero: {
-      eyebrow: "ภูมิปัญญาเดิม · วิทยาศาสตร์สมัยใหม่",
-      title: "เลิกเดา.",
-      accent: "เริ่มรู้.",
-      intro:
-        "แผนอาหารเสริมและสุขภาพที่ใช้ AI ช่วยออกแบบให้เข้ากับร่างกาย ไลฟ์สไตล์ และเป้าหมายที่สำคัญกับคุณจริง ๆ และปรับตามชีวิตที่เปลี่ยนไป",
-      paliTitle: "Mattaññutā",
-      pali: "ภาษาบาลีที่หมายถึงปัญญาในการรู้ปริมาณที่พอดี สุขภาพที่ดีไม่ได้มาจากการเพิ่มให้มากขึ้น แต่มาจากความพอดีอย่างแม่นยำ",
-      primary: "ออกแบบปริมาณที่พอดีของคุณ",
-      secondary: "ดูวิธีทำงาน",
-      microcopy:
-        "เริ่มจาก Health Score ฟรีเพื่อดูว่าคุณอยู่ตรงไหน สูตรปริมาณที่พอดีเฉพาะบุคคลพร้อมเมื่อคุณต้องการ",
-      checks: [
-        "ไม่ต้องใช้บัตรเครดิต",
-        "ประเมินส่วนผสมกว่า 120 รายการ",
-        "มีการตรวจความเหมาะสม",
-      ],
-      ingredientPills: [
-        "แมกนีเซียม",
-        "วิตามิน D3",
-        "โอเมก้า-3",
-        "อัชวกันธา",
-        "สังกะสี",
-      ],
-    },
-    proof: [
-      {
-        title: "ผู้ก่อตั้งมีประสบการณ์รวมกว่า 100 ปี",
-        body: "การแพทย์ · วิทยาศาสตร์ · เทคโนโลยี",
-      },
-      {
-        title: "การศึกษาและการฝึกอบรมอย่างเป็นทางการ",
-        body: "Mahidol · Princeton · Stanford · Harvard",
-      },
-      {
-        title: "จัดจ่ายโดยเภสัชกรท้องถิ่น",
-        body: "ผ่านพาร์ทเนอร์ร้านขายยาที่ได้รับอนุญาตในไทย",
-      },
-    ],
-    clarity: {
-      eyebrow: "จากความสับสนสู่ความชัดเจน",
-      title: "ตัวเลือกมากเกินไป.",
-      accent: "ให้ MattaNutra ช่วยทำให้ชัดเจน.",
-      body:
-        "เดินเข้าร้านขายยาหรือดูออนไลน์แล้วมักสับสน MattaNutra ช่วยพาคุณจากตัวเลือกนับร้อย เหลือเพียงไม่กี่ตัวที่เหมาะและเฉพาะกับคุณ นี่คือการรู้ปริมาณที่พอดี",
-      cards: [
-        {
-          title: "สับสน",
-          body: "ตัวเลือกมากมาย แต่ไม่มีคำตอบชัดเจน",
-          image: assets.clarity[0],
-          imageAlt: "สับสนกับชั้นวางอาหารเสริม",
-        },
-        {
-          title: "ทางที่ชัดเริ่มปรากฏ",
-          body: "คำแนะนำที่สร้างรอบตัวคุณ",
-          image: assets.clarity[1],
-          imageAlt: "ทางเลือกที่ชัดเจนเริ่มปรากฏ",
-        },
-        {
-          title: "เหลือสิ่งที่สำคัญ",
-          body: "เหลือเฉพาะสิ่งที่ร่างกายคุณต้องการจริง ๆ",
-          image: assets.clarity[2],
-          imageAlt: "คัดให้เหลือสิ่งที่สำคัญ",
-        },
-        {
-          title: "พอดีอย่างแม่นยำ",
-          body: "ปริมาณที่พอดีอยู่ในมือ",
-          image: assets.clarity[3],
-          imageAlt: "สิ่งที่ต้องการอย่างพอดี",
-        },
-      ],
-    },
-    problem: {
-      eyebrow: "ปัญหา",
-      title: "ขวดเยอะเกินไป.",
-      accent: "ความมั่นใจกลับน้อยเกิน.",
-      body: "เดินเข้าร้านขายยาแล้วเจออาหารเสริมเต็มชั้น ตัวเลือกมากมาย คำแนะนำขัดกัน และไม่มีคำตอบชัดเจนต่อคำถามเดียวที่สำคัญ: ร่างกายของฉันต้องการอะไรจริง ๆ",
-      body2:
-        "หลายคนจึงต้องเดา ซื้อสิ่งที่อาจไม่จำเป็น พลาดสิ่งที่ควรได้ และยังไม่แน่ใจว่าสิ่งที่กินอยู่ช่วยจริงหรือไม่",
-      imageAlt: "ผู้ซื้อที่สับสนกับตัวเลือกอาหารเสริมจำนวนมาก",
-    },
-    promises: {
-      eyebrow: "สิ่งที่คุณคาดหวังได้",
-      title: "สี่คำมั่น.",
-      accent: "หนึ่งแผนที่เรียบง่าย.",
-      intro: "สิ่งที่ทุกแผน MattaNutra ถูกออกแบบมาเพื่อส่งมอบ",
-      cards: [
-        ["ชัดเจน", "จากความสับสน"],
-        ["มีหลักยึด", "ที่เชื่อถือได้"],
-        ["เฉพาะคุณ", "ไม่ใช่สูตรเดียวกันทุกคน"],
-        ["มั่นใจ", "ในการเลือกทุกครั้ง"],
-      ],
-    },
-    how: {
-      eyebrow: "วิธีทำงาน",
-      title: "คำถามในปริมาณที่พอดี.",
-      accent: "ไม่มากเกิน ไม่ตกหล่น.",
-      intro: "จากแบบประเมินสั้น ๆ สู่คำแนะนำที่เข้าใจได้ในสี่ขั้นตอน",
-      steps: [
-        [
-          "ตอบ",
-          "ละเอียดแต่ไม่น่าเบื่อ",
-          "ตอบคำถามที่จำเป็นเกี่ยวกับเป้าหมาย สุขภาพ ไลฟ์สไตล์ ยาที่ใช้อยู่ งบประมาณ และสิ่งที่คุณให้ความสำคัญ",
-        ],
-        [
-          "วิเคราะห์",
-          "120+ ส่วนผสม",
-          "คำตอบถูกจับคู่กับลำดับความสำคัญ ช่วงปริมาณ และข้อควรระวัง",
-        ],
-        [
-          "จับคู่",
-          "จัดจ่ายโดยเภสัชกร",
-          "สูตรของคุณจัดจ่ายผ่านร้านขายยาพาร์ทเนอร์ที่มีเภสัชกรขึ้นทะเบียน — คนจริงที่คุณถามได้ ไม่ใช่การเดาในร้าน",
-        ],
-        [
-          "ปรับ",
-          "ส่วนหนึ่งของโปรโตคอลชีวิต",
-          "ด้วยโปรโตคอลชีวิต แผนของคุณจะปรับต่อเนื่องเมื่อเป้าหมาย อาการ และไลฟ์สไตล์เปลี่ยนไป",
-        ],
-      ],
-    },
-    protocol: {
-      active: "โปรโตคอลชีวิตกำลังทำงาน",
-      channel: "LINE / WhatsApp",
-      eyebrow: "โปรโตคอลชีวิต · สนับสนุน 90 วัน",
-      title: "ชีวิตเปลี่ยนตลอด.",
-      accent: "โปรโตคอลของคุณก็ตามทันได้.",
-      intro:
-        "การนอน ความเครียด การเดินทาง และกิจวัตรที่เปลี่ยน ล้วนเปลี่ยนสิ่งที่ร่างกายต้องการ โปรโตคอลชีวิตช่วยให้แผนอาหารเสริมและอาหารประจำวันที่อยู่เบื้องหลังสอดคล้องกับชีวิตจริง",
-      primary: "ดูโปรโตคอลชีวิต",
-      secondary: "ดูวิธีทำงาน",
-      ticks: [
-        "ออกแบบโดยทีมแพทย์ และตรวจเทียบกับยาและข้อมูลแล็บ",
-        "ปรับตามการเดินทาง ความเครียด และการนอนไม่ดี",
-        "ลดการเดาเมื่อชีวิตเปลี่ยน",
-      ],
-      chat: [
-        "สัปดาห์นี้มีอะไรเปลี่ยนไหม เช่น การนอน ความเครียด การเดินทาง หรือกิจวัตร?",
-        "พรุ่งนี้เดินทางไปโตเกียว น่าจะนอนไม่ค่อยดีทั้งสัปดาห์",
-        "รับทราบ เดินทาง 6 วันและอาจนอนแย่ลง ฉันปรับเล็กน้อย 3 จุด และคงส่วนที่เหลือไว้เหมือนเดิม",
-      ],
-      updateLabel: "แผนอัปเดต",
-      tripTitle: "ทริปโตเกียวของคุณ — 3 จุดเล็ก ๆ",
-      updates: [
-        "ทานแมกนีเซียมเร็วขึ้นเล็กน้อย เป็น 19:30 น. ตามเวลาท้องถิ่น",
-        "เพิ่มอิเล็กโทรไลต์ระหว่างเที่ยวบินและทุกเช้าระหว่างเดินทาง",
-        "อย่างอื่นคงไว้เหมือนเดิม",
-      ],
-      basedOn:
-        "อิงจาก: เดินทาง 6 วัน · อาจนอนสะดุด · มีประชุมมาก · เดินมากขึ้น",
-      reasoningLabel: "ดูเหตุผล",
-      reasoning: [
-        "แมกนีเซียมเร็วขึ้น — ช่วยเลื่อนจังหวะผ่อนคลายให้เข้ากับเขตเวลา",
-        "เพิ่มอิเล็กโทรไลต์ — ช่วยเรื่องน้ำในร่างกายจากเที่ยวบินและการเดินมากขึ้น",
-        "คงกลุ่มสมุนไพรช่วยปรับสมดุลไว้ — เพราะการนอนยังไม่นิ่ง จึงไม่ควรเปลี่ยนหลายอย่างพร้อมกัน",
-      ],
-      foodNudge:
-        "อีกอย่างหนึ่ง ผลเช็กล่าสุดบอกว่าแมกนีเซียมของคุณค่อนข้างต่ำ แผนมีอยู่แล้ว แต่เติมจากอาหารได้ด้วย:",
-      foodTags: ["เมล็ดฟักทอง", "ผักโขม", "ถั่วดำ"],
-      vitaminQuestion: "ดีเลย ไม่เคยรู้ แล้ววิตามิน C ต้องเพิ่มอาหารเสริมไหม?",
-      vitaminAnswer:
-        "ตามจริงน่าจะไม่จำเป็น ผลไม้และผักในสัปดาห์ของคุณครอบคลุมดีแล้ว ข้ามตัวนี้ได้ อาหารทำหน้าที่อยู่",
-    },
-    protocolBand: {
-      title: "สูตรปริมาณที่พอดีคือฐานของคุณ.",
-      accent: "โปรโตคอลชีวิตช่วยให้ฐานนั้นเข้ากับชีวิตจริง.",
-      body: "การเดินทาง ความเครียด การนอนไม่ดี และกิจวัตรที่เปลี่ยน ล้วนเปลี่ยนสิ่งที่ร่างกายต้องการ ฐานหลักไม่ต้องเปลี่ยน แต่รายละเอียดเล็ก ๆ รอบ ๆ ฐานนั้นควรปรับได้",
-    },
-    practice: {
-      eyebrow: "โปรโตคอลชีวิตในชีวิตจริง",
-      title: "สามขั้นตอน.",
-      accent: "ไม่ต้องเรียนรู้แอปใหม่.",
-      intro:
-        "โปรโตคอลชีวิตอยู่ในช่องทางข้อความที่คุณใช้อยู่แล้ว คุณบอกว่าอะไรเปลี่ยน แล้วระบบช่วยจัดการต่อ",
-      steps: [
-        [
-          "บอก MattaNutra ว่าอะไรเปลี่ยน",
-          "ส่งข้อความสั้น ๆ ผ่าน LINE หรือ WhatsApp ก็พอ ไม่ต้องกรอกฟอร์มหรือเรียนรู้แอปใหม่",
-          ["ช่วงนี้นอนไม่ดี", "พรุ่งนี้เดินทางไปทำงาน", "ช่วงนี้ซ้อมหนักขึ้น"],
-        ],
-        [
-          "โปรโตคอลปรับรอบตัวคุณ",
-          "จากชุดที่ใช้อยู่ เป้าหมาย และข้อควรระวังของคุณ MattaNutra แปลงข้อมูลนั้นเป็นการปรับที่ชัดเจน เช่น เวลา ปริมาณ หรือการเสริมชั่วคราว และแนะนำอาหารประจำวันที่ช่วยสนับสนุนสิ่งที่ร่างกายต้องการ",
-          [
-            "เลื่อนแมกนีเซียมให้เร็วขึ้นเล็กน้อย",
-            "เมล็ดฟักทองเป็นแหล่งแมกนีเซียมที่ดี",
-            "คงกลุ่มสมุนไพรช่วยปรับสมดุลไว้จนกว่าการนอนจะนิ่ง",
-          ],
-        ],
-        [
-          "ทำต่อได้โดยไม่ต้องคิดเยอะ",
-          "คุณไม่ต้องค้นคว้าหรือเริ่มใหม่ทุกครั้งที่ชีวิตยุ่ง แค่ได้สิ่งที่ควรทำไม่กี่อย่างและความมั่นใจว่ามันเหมาะกับคุณ",
-          [
-            "ไม่ต้องคิดใหม่ทุกครั้งที่ชีวิตเปลี่ยน",
-            "ปรับเล็กน้อยให้แผนยังใช้ได้จริง",
-            "ปริมาณที่พอดียังคงพอดี",
-          ],
-        ],
-      ],
-    },
-    food: {
-      eyebrow: "อาหารและอาหารเสริมไปด้วยกัน",
-      title: "บางครั้งแหล่งที่ดีที่สุดอยู่",
-      accent: "บนจานของคุณ",
-      imageAlt:
-        "ชามอาหารที่มีปลา ผักใบเขียว บรอกโคลี ถั่วดำ ข้าวกล้อง และเมล็ดฟักทอง",
-      intro:
-        "อาหารเสริมเติมช่องว่าง แต่อาหารควรมาก่อน เมื่อโปรโตคอลชีวิตเห็นสิ่งที่ร่างกายต้องการ ระบบไม่ได้มองหาแคปซูลทันที แต่บอกอาหารประจำวันที่มีสารนั้นตามธรรมชาติ เพื่อให้คุณเลือกได้ว่าจะเติมจากมื้ออาหารหรือจากขวด",
-      cards: [
-        [
-          "แมกนีเซียมต่ำ?",
-          "เมล็ดฟักทอง ผักโขม และถั่วดำเป็นแหล่งธรรมชาติที่เข้มข้น",
-          ["เมล็ดฟักทอง", "ผักโขม", "ถั่วดำ"],
-        ],
-        [
-          "ต้องการโครเมียมเพิ่ม?",
-          "พบได้ในอาหารที่หลายคนไม่คาดคิด เช่น น้ำองุ่น บรอกโคลี และธัญพืชเต็มเมล็ด",
-          ["น้ำองุ่น", "บรอกโคลี", "ธัญพืชเต็มเมล็ด"],
-        ],
-        [
-          "อาหารครอบคลุมแล้ว?",
-          "ถ้ามื้ออาหารทำหน้าที่ได้ดี โปรโตคอลชีวิตจะบอกให้ข้ามอาหารเสริมนั้นและประหยัดเงิน",
-          ["อาหารพอแล้ว"],
-        ],
-      ],
-      note: "ไม่ต้องจดอาหาร ไม่ต้องนับแคลอรี แค่ถามเมื่ออยากรู้ และได้คำแนะนำกลับไปสู่จานที่เหมาะกว่า",
-    },
-    difference: {
-      eyebrow: "สิ่งที่ต่าง",
-      title: "มากกว่าคำตอบ.",
-      accent: "คือโปรโตคอลที่รู้จักคุณ.",
-      paragraphs: [
-        "ใครก็ค้นได้ว่าการเดินทางส่งผลต่อแมกนีเซียมหรือไม่ แต่ส่วนที่ยากคือมันส่งผลต่อแผนของคุณอย่างไร ทั้งชุดที่คุณใช้อยู่ ยาของคุณ และสัปดาห์ที่ผ่านมา",
-        "ระบบรู้สิ่งที่คุณใช้อยู่แล้ว จึงไม่ต้องอธิบายใหม่ทุกครั้ง ทุกการปรับตรวจเทียบกับยาและข้อมูลแล็บของคุณ และตลอด 90 วัน ระบบเริ่มเห็นรูปแบบของคุณ ไม่ใช่แค่สัปดาห์นี้ และคุณไม่จำเป็นต้องรู้ว่าควรถามคำถามอะไร แค่บอกว่าเกิดอะไรขึ้น แล้วโปรโตคอลชีวิตจะคิดต่อให้",
-        "คุณไม่ต้องเป็นเภสัชกรของตัวเอง แค่บอก MattaNutra ว่าอะไรเปลี่ยน แล้วระบบช่วยรักษาแผนให้พอดี",
-      ],
-    },
-    bridge: {
-      title: "พร้อมออกแบบปริมาณที่พอดีของคุณไหม?",
-      body: "เริ่มด้วยแบบสอบถามสั้น ๆ ที่ละเอียดและ Health Score ฟรี แผนเฉพาะบุคคลของคุณ รวมถึงตัวเลือกโปรโตคอลชีวิต อยู่ห่างออกไปอีกขั้นเดียว",
-      cta: "ออกแบบปริมาณที่พอดีของคุณ",
-      note: "เริ่มฟรี — ไม่ต้องใช้บัตรเครดิต",
-    },
-    questionnaire: {
-      eyebrow: "แบบสอบถามฟรี",
-      title: "ตัวอย่างภายในแบบสอบถาม.",
-      body:
-        "นี่คือตัวอย่างว่าแบบสอบถามประเมินวิตามิน D เพียงตัวเดียวอย่างไร ซึ่งเป็นหนึ่งในส่วนผสมกว่า 120 รายการที่อัลกอริทึมชั่งน้ำหนัก โดยใช้คำตอบหลายข้อร่วมกัน เวอร์ชันเต็มมีหกส่วนสั้น ๆ",
-      cardLabel: "Formula Precision",
-      privateLabel: "เป็นส่วนตัวและเข้ารหัส",
-      sampleLabel: "ตัวอย่าง",
-      sampleBody: "ประเมินเพียงหนึ่งส่วนผสม",
-      progressPath: "เริ่ม → พื้นฐาน → ความแม่นยำ",
-      progress: "8%",
-      progressNote: "คุณอยู่ที่ 8% — ทำต่อเพื่อจบส่วนสำคัญ",
-      quote:
-        "ไม่มีคำตอบถูกหรือผิด มีแต่คำตอบที่เป็นจริง ยิ่งคุณตอบอย่างตรงไปตรงมา สูตรของคุณก็ยิ่งพอดี และปลอดภัยขึ้นเมื่อเทียบกับสิ่งที่คุณใช้อยู่",
-      skinTone: "สีผิว",
-      foundation: "พื้นฐาน",
-      skinBody: "ช่วยประเมินการสร้างวิตามิน D ร่วมกับการโดนแดด",
-      sunExposure: "เวลาโดนแดดต่อวัน",
-      sunOptions: ["น้อยกว่า 15 นาที", "15–30", "30–60", "60 นาที+"],
-      sunscreen: "การใช้กันแดด",
-      sunscreenOptions: ["แทบไม่ใช้", "บางครั้ง", "ทุกวัน"],
-      insight:
-        "สีผิว แสงแดด และกันแดดถูกชั่งน้ำหนักร่วมกัน วิตามิน D ของคุณจึงไม่ใช่การเดา แต่เป็นการประเมินจากชีวิตจริง",
-      sectionsLabel: "หนึ่งคำถาม จากหกส่วน:",
-      sections: ["พื้นฐาน", "เป้าหมาย", "ชีวิตประจำวัน", "อาหาร", "ความปลอดภัย", "ความแม่นยำ"],
-      bottom: "วิตามิน D เป็นหนึ่งในส่วนผสมกว่า 120 รายการที่อัลกอริทึมประเมิน",
-      reassurance: "✓ เริ่มฟรี ✓ ไม่ต้องใช้บัตรเครดิต ✓ ประมาณ 3 นาที",
-    },
-    results: {
-      eyebrow: "เรื่องราวแบบนี้",
-      title: "ชีวิตต่างกัน. จุดเริ่มต้นเดียวกัน.",
-      intro:
-        "เป้าหมายเดียวกันคือสุขภาพที่ดีขึ้น ความชัดเจนมากขึ้น และกิจวัตรที่ทำได้จริง",
-      cta: "ออกแบบปริมาณที่พอดีของคุณ",
-      join: "เลือกดูแลสุขภาพอย่างฉลาดและมั่นใจมากขึ้น",
-      fallback: [
-        {
-          id: "daniel",
-          image: assets.testimonials[0],
-          imageAlt: "Daniel L. นั่งอยู่ริมหน้าต่าง",
-          name: "Daniel L.",
-          place: "40, Bangkok",
-          role: "Project Manager",
-          quote:
-            "ฉันอายุ 40 แล้วรู้ว่าพูดอยู่นานว่าอยากเปลี่ยนแปลง แต่ไม่รู้จะเริ่มจากตรงไหน MattaNutra ให้ก้าวแรกที่ชัดเจนโดยไม่ทำให้รู้สึกหนักเกินไป",
-        },
-        {
-          id: "meilin",
-          image: assets.testimonials[1],
-          imageAlt: "Mei Lin T. ยิ้มบนทางเดินโรงเรียน",
-          name: "Mei Lin T.",
-          place: "45, Singapore",
-          role: "Operations Lead",
-          quote:
-            "งาน การเดินทาง และครอบครัวทำให้กิจวัตรสุขภาพกลายเป็นสิ่งที่จำได้วันนั้น MattaNutra ช่วยเปลี่ยนชั้นอาหารเสริมที่ยุ่งเหยิงให้เป็นแผนง่าย ๆ ที่เข้ากับชีวิตจริง",
-        },
-        {
-          id: "wanida",
-          image: assets.testimonials[2],
-          imageAlt: "Wanida P. อยู่ในร้านของเธอ",
-          name: "Wanida P. (วนิดา)",
-          place: "43, Khon Kaen",
-          role: "Shop Owner",
-          quote:
-            "หมอบอกว่าความดันเริ่มสูงและต้องปรับบางอย่าง ฉันค้นข้อมูลออนไลน์หลายชั่วโมงแล้วยิ่งสับสน MattaNutra ช่วยตัดเสียงรบกวนและสร้างสิ่งที่เข้ากับชีวิตจริง",
-        },
-        {
-          id: "malee",
-          image: assets.testimonials[3],
-          imageAlt: "Malee S. นั่งอยู่ในสวน",
-          name: "Malee S. (มาลี)",
-          place: "41, Phuket",
-          role: "Nurse Aide",
-          quote:
-            "ทำงานในคลินิกทุกคนเลยคิดว่าฉันรู้ว่าจะกินอะไร แต่จริง ๆ ยิ่งอ่านยิ่งไม่มั่นใจ MattaNutra ให้แผนที่ชัดและสมเหตุสมผลสำหรับตัวฉันเอง",
-        },
-      ],
-    },
-    origin: {
-      eyebrow: "จุดเริ่มต้น",
-      title: "ออกแบบในเชียงใหม่,",
-      accent: "ที่ซึ่งความพอดีเป็นวิถีชีวิต",
-      body: "MattaNutra เริ่มต้นในภาคเหนือของไทย ที่ประเพณีเรื่องความพอดี การกินแต่พอเหมาะ การพักในเวลาที่ควร และการทำงานกับจังหวะของร่างกาย ถูกสั่งสมอย่างเงียบ ๆ มาหลายศตวรรษ",
-      body2:
-        "เราสร้าง MattaNutra เพื่อแปลภูมิปัญญานั้นให้ทันสมัย วัดได้ และเป็นส่วนตัว แผนที่เรียนรู้ร่างกายคุณ ปรับเมื่อชีวิตเปลี่ยน และไม่บังคับให้คุณกลายเป็นคนอื่น",
-      buildAlt: "โลโก้ MattaNutra ที่สร้างขึ้นเป็นห้าขั้นตอน",
-      founders: "ก่อตั้งโดยแพทย์ นักวิทยาศาสตร์ และนักคิดด้าน AI",
-      founderParagraphs: [
-        "สิ่งที่เข้าสู่ร่างกายควรถูกออกแบบโดยคนที่เข้าใจว่าข้างในนั้นเกิดอะไรขึ้น",
-        "ทีมของเรามีพื้นฐานหลากหลายทั้งแพทยศาสตร์ วิทยาศาสตร์ เทคโนโลยี เศรษฐศาสตร์ และการสร้างสิ่งที่อยู่ได้นาน",
-        "รวมกันแล้วมีประสบการณ์มากกว่าร้อยปีในงานแพทย์ วิทยาศาสตร์ เทคโนโลยี และการสร้างสิ่งที่ใช้งานได้จริง",
-      ],
-      signoff: "จากเชียงใหม่ ด้วยความใส่ใจ",
-      tagline: "ภูมิปัญญาเดิม · วิทยาศาสตร์สมัยใหม่",
-    },
-    pricing: {
-      eyebrow: "ราคาที่เรียบง่าย",
-      title: "เริ่มฟรี.",
-      accent: "อัปเกรดเมื่อพร้อม.",
-      intro:
-        "ทำแบบประเมินฟรีเพื่อรับแผนตั้งต้น แล้วอัปเกรดเมื่อคุณต้องการความแม่นยำหรือการสนับสนุนต่อเนื่องมากขึ้น",
-      offer: "ข้อเสนอช่วงเปิดตัว",
-      plans: [
-        {
-          badge: "แผนครั้งเดียว",
-          name: "สูตรปริมาณที่พอดี",
-          desc: "สูตรอาหารเสริมเฉพาะบุคคล พร้อมปริมาณ เวลาใช้ และคำแนะนำผลิตภัณฑ์ที่ชัดเจน",
-          originalPrice: "THB 990",
-          saving: "ประหยัด 30%",
-          currency: "THB",
-          price: "690",
-          termLabel: "จ่ายครั้งเดียว",
-          term: "จ่ายครั้งเดียว · เข้าถึงได้ตลอด",
-          cta: "รับสูตรปริมาณที่พอดี",
-          plan: "precision" as const,
-          best: "คนที่ต้องการจุดเริ่มต้นที่ชัดเจนและมั่นใจ",
-          features: [
-            "สูตรอาหารเสริมเฉพาะบุคคล",
-            "ช่วงโดสที่ปรับตามขนาดร่างกาย",
-            "คำแนะนำเวลาและวิธีใช้",
-            "ข้อควรระวังเรื่องยาและข้อมูลแล็บ",
-            "ผลิตภัณฑ์แนะนำและทางเลือก",
-            "เตือนทบทวนใน 60 วัน",
-          ],
-          guaranteeTitle: "รับประกันความชัดเจน.",
-          guarantee:
-            "ถ้าแผนยังไม่ชัดเจนหรือใช้ประโยชน์ไม่ได้ เราจะปรับให้หรือคืนเงินภายใน 7 วัน",
-        },
-        {
-          badge: "พรีเมียม · สนับสนุน 90 วัน",
-          popular: "นิยมที่สุด",
-          name: "โปรโตคอลชีวิต",
-          desc: "รักษาปริมาณที่พอดีให้เหมาะกับชีวิตที่เปลี่ยน รวมทุกอย่างในสูตรปริมาณที่พอดี พร้อมการปรับต่อเนื่อง",
-          originalPrice: "THB 1,890",
-          saving: "ประหยัด 16%",
-          currency: "THB",
-          price: "1,590",
-          termLabel: "สำหรับ 90 วัน",
-          term: "จ่ายครั้งเดียว · สนับสนุน 90 วัน · ต่ออายุได้",
-          cta: "เริ่มโปรโตคอลชีวิต",
-          plan: "pro" as const,
-          best: "คนที่อยากให้แผนตามทันชีวิตประจำวันจริง",
-          features: [
-            "รวมสูตรปริมาณที่พอดี",
-            "เรียนรู้อาหารประจำวันที่ให้สิ่งที่คุณต้องการ",
-            "ปรับเวลาและปริมาณเมื่อชีวิตเปลี่ยน",
-            "ทุกการเปลี่ยนตรวจกับยาและแล็บ",
-            "จำรูปแบบของคุณใน 90 วัน",
-            "แค่ส่งข้อความเมื่อมีอะไรเปลี่ยน ไม่ต้องเรียนรู้แอปใหม่",
-            "ทำต่อได้แม้เดินทาง เครียด หรือนอนสะดุด",
-          ],
-          guaranteeTitle: "รับประกันความพึงพอใจ 7 วัน.",
-          guarantee:
-            "ลองโปรโตคอลชีวิตอย่างจริงจัง หากมีอะไรไม่ตรง เราจะแก้ไขหรือคืนเงินเต็มจำนวนภายใน 7 วัน",
-        },
-      ],
-      trust: [
-        ["ปลอดภัยและเป็นส่วนตัว", "ข้อมูลถูกเข้ารหัสและไม่แบ่งปัน"],
-        ["อิงหลักฐาน", "คำแนะนำเฉพาะบุคคลจากหลักฐานที่เชื่อถือได้"],
-        ["ปรับและดีขึ้น", "แผนเปลี่ยนตามร่างกายและเป้าหมาย"],
-        ["AI + คนดูแล", "คำแนะนำด้วย AI พร้อมระบบตรวจทานโดยคน"],
-      ],
-    },
-    journal: {
-      eyebrow: "จากบทความ",
-      title: "เรียนรู้",
-      accent: "ปริมาณที่พอดี",
-      browse: "ดูบทความทั้งหมด",
-      tag: "บทความ",
-      readMore: "อ่านบทความ",
-      fallback: [
-        [
-          "พื้นฐาน",
-          "ทำไมอาหารเสริมไม่ใช่ยิ่งมากยิ่งดี",
-          "แนวคิดเรื่องความพอเพียง และเหตุผลที่ร่างกายมักต้องการน้อยกว่าที่ฉลากชวนให้เชื่อ",
-        ],
-        [
-          "โภชนาการ",
-          "อาหารประจำวันแปดอย่างที่มีแมกนีเซียมมากกว่าที่คิด",
-          "ก่อนหยิบแคปซูล ลองดูในจานของคุณ อาหารพื้นฐานบางอย่างช่วยได้มาก",
-        ],
-        [
-          "อยู่ให้ดี",
-          "การเดินทางเปลี่ยนสิ่งที่ร่างกายต้องการอย่างไร",
-          "เขตเวลา การนอน และน้ำในร่างกายเปลี่ยนสมการได้ โดยไม่ต้องคิดให้ซับซ้อน",
-        ],
-      ],
-    },
-    faq: {
-      eyebrow: "คำถาม",
-      title: "คำถามดี ๆ,",
-      accent: "คำตอบตรงไปตรงมา",
-      items: [
-        [
-          "ข้อมูลเป็นส่วนตัวไหม?",
-          "ใช่ แบบประเมินเป็นของคุณ เราไม่ขายคำตอบ ไม่แบ่งปันกับผู้ลงโฆษณา และคุณสามารถขอลบข้อมูลได้ การสนทนาในโปรโตคอลชีวิตถูกเก็บเพื่อให้แผนต่อเนื่องเท่านั้น",
-        ],
-        [
-          "ถ้ากินยาอยู่ ปลอดภัยไหม?",
-          "MattaNutra คัดกรองข้อควรระวังที่พบบ่อยระหว่างยาและอาหารเสริม และแสดงเป็นธงในแผน แต่เป็นคำแนะนำเพื่อสุขภาพ ไม่ใช่คำแนะนำทางการแพทย์",
-        ],
-        [
-          "ผลิตภัณฑ์แนะนำมาจากไหน?",
-          "เราแนะนำผลิตภัณฑ์ที่มีในแพลตฟอร์มที่ผู้ซื้อเอเชียตะวันออกเฉียงใต้ใช้จริง และเลือกให้เข้ากับสูตรของคุณ",
-        ],
-        [
-          "แบบประเมินฟรีจริงไหม?",
-          "ฟรีจริง แบบประเมินและ Health Score ไม่ต้องใช้บัตรเครดิต หลังทำเสร็จคุณเลือกได้ว่าจะไปต่อด้วยสูตรเฉพาะบุคคลหรือโปรโตคอลชีวิตหรือไม่",
-        ],
-        [
-          "ทำไมใช้ชื่อภาษาบาลี?",
-          "Mattaññutā หมายถึงการรู้ปริมาณที่พอดี ชื่อนี้คือคำมั่นว่าเราจะช่วยหาความพอดีของคุณ ไม่ใช่ขายให้มากขึ้น",
-        ],
-      ],
-    },
-    final: {
-      title: "เลิกเดา.",
-      accent: "เริ่มรู้.",
-      body: "ตอบคำถามที่จำเป็นไม่กี่ข้อ รับ Health Score ฟรี และได้แผนตั้งต้นเฉพาะบุคคลที่สร้างจากร่างกาย เป้าหมาย และวันจริงของคุณ",
-      primary: "ออกแบบปริมาณที่พอดีของคุณ",
-      secondary: "ดูวิธีทำงาน",
-      quote: "Mattaññutā — การรู้ปริมาณที่พอดี",
-    },
-  },
-} as const;
+type LandingContent = Readonly<{
+  readonly bridge: Readonly<{
+    readonly body: string;
+    readonly cta: string;
+    readonly note: string;
+    readonly title: string;
+  }>;
+  readonly clarity: Readonly<{
+    readonly accent: string;
+    readonly body: string;
+    readonly cards: readonly (Readonly<{
+      readonly body: string;
+      readonly image: string;
+      readonly imageAlt: string;
+      readonly title: string;
+    }>)[];
+    readonly eyebrow: string;
+    readonly title: string;
+  }>;
+  readonly difference: Readonly<{
+    readonly accent: string;
+    readonly eyebrow: string;
+    readonly paragraphs: readonly string[];
+    readonly title: string;
+  }>;
+  readonly faq: Readonly<{
+    readonly accent: string;
+    readonly eyebrow: string;
+    readonly items: readonly (readonly [string, string])[];
+    readonly title: string;
+  }>;
+  readonly final: Readonly<{
+    readonly accent: string;
+    readonly body: string;
+    readonly primary: string;
+    readonly quote: string;
+    readonly secondary: string;
+    readonly title: string;
+  }>;
+  readonly food: Readonly<{
+    readonly accent: string;
+    readonly cards: readonly (readonly [string, string, readonly string[]])[];
+    readonly eyebrow: string;
+    readonly imageAlt: string;
+    readonly intro: string;
+    readonly note: string;
+    readonly title: string;
+  }>;
+  readonly hero: Readonly<{
+    readonly accent: string;
+    readonly checks: readonly string[];
+    readonly eyebrow: string;
+    readonly ingredientPills: readonly string[];
+    readonly intro: string;
+    readonly microcopy: string;
+    readonly pali: string;
+    readonly paliTitle: string;
+    readonly primary: string;
+    readonly secondary: string;
+    readonly title: string;
+  }>;
+  readonly how: Readonly<{
+    readonly accent: string;
+    readonly eyebrow: string;
+    readonly intro: string;
+    readonly steps: readonly (readonly string[])[];
+    readonly title: string;
+  }>;
+  readonly journal: Readonly<{
+    readonly accent: string;
+    readonly browse: string;
+    readonly eyebrow: string;
+    readonly fallback: readonly (readonly string[])[];
+    readonly readMore: string;
+    readonly tag: string;
+    readonly title: string;
+  }>;
+  readonly origin: Readonly<{
+    readonly accent: string;
+    readonly body: string;
+    readonly body2: string;
+    readonly buildAlt: string;
+    readonly eyebrow: string;
+    readonly founderParagraphs: readonly string[];
+    readonly founders: string;
+    readonly signoff: string;
+    readonly tagline: string;
+    readonly title: string;
+  }>;
+  readonly practice: Readonly<{
+    readonly accent: string;
+    readonly eyebrow: string;
+    readonly intro: string;
+    readonly steps: readonly (readonly [string, string, readonly string[]])[];
+    readonly title: string;
+  }>;
+  readonly pricing: Readonly<{
+    readonly accent: string;
+    readonly eyebrow: string;
+    readonly intro: string;
+    readonly offer: string;
+    readonly plans: readonly [Readonly<{
+      readonly badge: string;
+      readonly best: string;
+      readonly cta: string;
+      readonly currency: string;
+      readonly desc: string;
+      readonly features: readonly string[];
+      readonly guarantee: string;
+      readonly guaranteeTitle: string;
+      readonly name: string;
+      readonly originalPrice: string;
+      readonly plan: string;
+      readonly price: string;
+      readonly saving: string;
+      readonly term: string;
+      readonly termLabel: string;
+    }>, Readonly<{
+      readonly badge: string;
+      readonly best: string;
+      readonly cta: string;
+      readonly currency: string;
+      readonly desc: string;
+      readonly features: readonly string[];
+      readonly guarantee: string;
+      readonly guaranteeTitle: string;
+      readonly name: string;
+      readonly originalPrice: string;
+      readonly plan: string;
+      readonly popular: string;
+      readonly price: string;
+      readonly saving: string;
+      readonly term: string;
+      readonly termLabel: string;
+    }>];
+    readonly title: string;
+    readonly trust: readonly (readonly [string, string])[];
+  }>;
+  readonly problem: Readonly<{
+    readonly accent: string;
+    readonly body: string;
+    readonly body2: string;
+    readonly eyebrow: string;
+    readonly imageAlt: string;
+    readonly title: string;
+  }>;
+  readonly promises: Readonly<{
+    readonly accent: string;
+    readonly cards: readonly (readonly [string, string])[];
+    readonly eyebrow: string;
+    readonly intro: string;
+    readonly title: string;
+  }>;
+  readonly proof: readonly (Readonly<{
+    readonly body: string;
+    readonly title: string;
+  }>)[];
+  readonly protocol: Readonly<{
+    readonly accent: string;
+    readonly active: string;
+    readonly basedOn: string;
+    readonly channel: string;
+    readonly chat: readonly string[];
+    readonly eyebrow: string;
+    readonly foodNudge: string;
+    readonly foodTags: readonly string[];
+    readonly intro: string;
+    readonly primary: string;
+    readonly reasoning: readonly string[];
+    readonly reasoningLabel: string;
+    readonly secondary: string;
+    readonly ticks: readonly string[];
+    readonly title: string;
+    readonly tripTitle: string;
+    readonly updateLabel: string;
+    readonly updates: readonly string[];
+    readonly vitaminAnswer: string;
+    readonly vitaminQuestion: string;
+  }>;
+  readonly protocolBand: Readonly<{
+    readonly accent: string;
+    readonly body: string;
+    readonly title: string;
+  }>;
+  readonly questionnaire: Readonly<{
+    readonly body: string;
+    readonly bottom: string;
+    readonly cardLabel: string;
+    readonly cta: string;
+    readonly eyebrow: string;
+    readonly foundation: string;
+    readonly insight: string;
+    readonly privateLabel: string;
+    readonly progress: string;
+    readonly progressNote: string;
+    readonly progressPath: string;
+    readonly quote: string;
+    readonly reassurance: string;
+    readonly sampleBody: string;
+    readonly sampleLabel: string;
+    readonly sections: readonly string[];
+    readonly sectionsLabel: string;
+    readonly skinBody: string;
+    readonly skinTone: string;
+    readonly sunExposure: string;
+    readonly sunOptions: readonly string[];
+    readonly sunscreen: string;
+    readonly sunscreenOptions: readonly string[];
+    readonly title: string;
+  }>;
+  readonly results: Readonly<{
+    readonly cta: string;
+    readonly eyebrow: string;
+    readonly fallback: readonly (Readonly<{
+      readonly id: string;
+      readonly image: string;
+      readonly imageAlt: string;
+      readonly name: string;
+      readonly place: string;
+      readonly quote: string;
+      readonly role: string;
+    }>)[];
+    readonly intro: string;
+    readonly join: string;
+    readonly title: string;
+  }>;
+}>;
 
-type WidenLandingContent<T> = T extends string
-  ? string
-  : T extends number
-    ? number
-    : T extends boolean
-      ? boolean
-      : T extends readonly (infer Item)[]
-        ? readonly WidenLandingContent<Item>[]
-        : T extends object
-          ? { readonly [Key in keyof T]: WidenLandingContent<T[Key]> }
-          : T;
+export function getLandingPageCopy(locale: Locale): LandingContent {
+  return getNamespace<LandingContent>(locale, "customer.landing");
+}
 
-type LandingContent = WidenLandingContent<typeof baseContent.en>;
-
-export const content = {
-  ...baseContent,
-  "zh-CN": {
-    hero: {
-      eyebrow: "古老智慧 · 现代科学",
-      title: "停止猜测。",
-      accent: "开始了解。",
-      intro:
-        "AI 驱动的补充剂与健康计划，围绕您的身体、生活方式以及对您真正重要的目标构建，并随生活变化而适应。",
-      paliTitle: "Mattaññutā",
-      pali: "Pāli 语，意为“知道适量的智慧”——健康并非来自更多，而是来自恰到好处。",
-      primary: "开始设计您的适量方案",
-      secondary: "如何运作",
-      microcopy:
-        "从免费的 Health Score 开始，了解您的状态。您的个性化 Right Amount Formula 会在您准备好时呈现。",
-      checks: ["无需信用卡", "评估 120+ 种成分", "包含安全检查"],
-      ingredientPills: ["镁", "维生素 D3", "Omega-3", "南非醉茄", "锌"],
-    },
-    proof: [
-      {
-        title: "创始团队拥有 100+ 年综合经验",
-        body: "医学 · 科学 · 技术",
-      },
-      {
-        title: "正规教育与训练",
-        body: "Mahidol · Princeton · Stanford · Harvard",
-      },
-      {
-        title: "由本地药师调配",
-        body: "通过持牌泰国药房合作伙伴",
-      },
-    ],
-    clarity: {
-      eyebrow: "从不知所措到清晰",
-      title: "选择太多。",
-      accent: "让 MattaNutra 带来清晰。",
-      body:
-        "走进药房或在线浏览都会令人不知所措。MattaNutra 帮您从数百个选择缩小到真正适合、且为您个性化的少数选择。知道适量。",
-      cards: [
-        {
-          title: "不知所措",
-          body: "选择太多，没有清晰答案。",
-          image: assets.clarity[0],
-          imageAlt: "面对补充剂货架感到不知所措",
-        },
-        {
-          title: "清晰路径出现",
-          body: "围绕您建立的指导。",
-          image: assets.clarity[1],
-          imageAlt: "清晰路径出现",
-        },
-        {
-          title: "范围缩小",
-          body: "只留下身体真正需要的内容。",
-          image: assets.clarity[2],
-          imageAlt: "缩小到真正重要的选择",
-        },
-        {
-          title: "刚刚好",
-          body: "Right Amount 已在手中。",
-          image: assets.clarity[3],
-          imageAlt: "手中恰好需要的选择",
-        },
-      ],
-    },
-    problem: {
-      eyebrow: "问题所在",
-      title: "太多瓶瓶罐罐。",
-      accent: "太少确定性。",
-      body: "走进任何药房，补充剂货架都令人眼花缭乱。数百种选择、相互矛盾的建议，却没有明确答案回答唯一重要的问题：我的身体真正需要什么？",
-      body2:
-        "大多数人最终只能猜测——买了太多不需要的东西，错过了真正需要的，默默怀疑是否有效。",
-      imageAlt: "面对补充剂选择感到困惑的购物者",
-    },
-    promises: {
-      eyebrow: "您可以期待",
-      title: "四个承诺。",
-      accent: "一个简单计划。",
-      intro: "每个 MattaNutra 计划都旨在实现这些目标。",
-      cards: [
-        ["清晰", "告别困惑"],
-        ["可信", "值得信赖的指导"],
-        ["个性化", "专属为您"],
-        ["自信", "每一次选择都安心"],
-      ],
-    },
-    how: {
-      eyebrow: "如何运作",
-      title: "适量的问题。",
-      accent: "不多不少，恰到好处。",
-      intro: "从简短聚焦的问卷到值得信赖的推荐，仅需四步。",
-      steps: [
-        [
-          "回答",
-          "详细，而不繁琐",
-          "几个聚焦问题，涵盖您的目标、健康优先事项、生活方式、用药、预算以及您真正关心的事。没有术语，没有冗余。",
-        ],
-        [
-          "分析",
-          "120+ 种成分",
-          "您的回答将被映射到补充剂优先级、剂量范围和安全考量。",
-        ],
-        [
-          "匹配",
-          "由药师调配",
-          "您的配方通过合作药房和注册药师调配——是真实可以询问的人，而不是在货架前猜测。",
-        ],
-        [
-          "优化",
-          "Living Protocol 的一部分",
-          "借助 Living Protocol，您的计划会随着目标、症状和生活方式变化持续调整。",
-        ],
-      ],
-    },
-    protocol: {
-      active: "Living Protocol 已激活",
-      channel: "Line / WhatsApp",
-      eyebrow: "Living Protocol · 90 天支持",
-      title: "生活不断变化。",
-      accent: "您的方案也能跟上。",
-      intro:
-        "睡眠、压力、旅行和日常作息变化都会改变身体需求。Living Protocol 让您的补充剂以及背后的日常饮食与真实生活保持一致，让今天的适量在下周依然适量。",
-      primary: "探索 Living Protocol",
-      secondary: "了解如何运作",
-      ticks: [
-        "由医师打造——每次调整均对照您的用药和化验结果",
-        "随旅行、压力和睡眠不佳保持一致",
-        "生活变化时减少反复猜测",
-      ],
-      chat: [
-        "本周有什么不同吗——睡眠、压力、旅行还是作息？",
-        "我明天要去 Tokyo，可能会睡不好。",
-        "收到——Tokyo 六天，预计有睡眠干扰。我已做了三处小调整，其余保持不变。以下是您旅途期间的方案。",
-      ],
-      updateLabel: "已更新方案",
-      tripTitle: "您的 Tokyo 之旅——3 处小调整",
-      updates: [
-        "镁稍早服用——当地时间晚上 7:30 而非 9:30",
-        "飞行途中及每天早晨补充电解质",
-        "其余保持不变",
-      ],
-      basedOn: "基于：6 天行程 · 预计睡眠干扰 · 会议密集 · 步行增加",
-      reasoningLabel: "查看推理",
-      reasoning: [
-        "镁提前服用——帮助您随时差调整，提前进入放松状态。",
-        "增加电解质——支持飞行途中及城市步行增加时的水分平衡。",
-        "适应原保持不变——您的压力虽有上升，但近期睡眠已不稳定，因此暂不叠加调整。",
-      ],
-      foodNudge:
-        "还有一件事——您上次检查显示镁水平略低。我已纳入计划，您也可以通过天然方式补充：",
-      foodTags: ["南瓜子", "菠菜", "黑豆"],
-      vitaminQuestion: "哦，没想到。关于我的维生素 C——需要补充吗？",
-      vitaminAnswer:
-        "老实说？您可能不需要。本周水果和蔬菜已足够覆盖。我建议省下这一项——食物已能满足需求。",
-    },
-    protocolBand: {
-      title: "您的 Right Amount Formula 是基础。",
-      accent: "Living Protocol 让它与真实生活保持一致。",
-      body: "旅行、压力、睡眠不佳和作息变化都会改变身体需求。您的基础不变，但围绕它的微小调整会随之变化。",
-    },
-    practice: {
-      eyebrow: "Living Protocol 实践",
-      title: "三个步骤。",
-      accent: "无需学习新应用。",
-      intro:
-        "Living Protocol 融入您已使用的即时通讯。您只需告知变化，其余交给它。",
-      steps: [
-        [
-          "告诉 MattaNutra 发生了什么变化",
-          "通过 Line 或 WhatsApp 发送简短消息即可——无需表格、无需追踪、无需学习新应用。",
-          ["本周睡眠不好。", "明天出差。", "最近训练强度增加了。"],
-        ],
-        [
-          "您的方案随您调整",
-          "基于您当前的补充剂组合、您的目标和您的安全标记，MattaNutra 将更新转化为几处精准调整——时间、剂量或临时添加——并推荐支持身体需求的日常食物。",
-          [
-            "本周将镁稍早服用。",
-            "南瓜子是镁的优质天然来源。",
-            "在睡眠恢复前保持适应原剂量不变。",
-          ],
-        ],
-        [
-          "保持一致，无需过度思考",
-          "您无需每次生活忙碌时都重新研究、反复猜测或从头开始。只需做几件简单的事——并确信它们适合您。",
-          [
-            "无需每次生活变化都重新思考日常。",
-            "小调整让计划更现实。",
-            "您的适量始终保持正确。",
-          ],
-        ],
-      ],
-    },
-    food: {
-      eyebrow: "食物与补充剂，相辅相成",
-      title: "最佳来源有时",
-      accent: "就在您的餐盘上。",
-      imageAlt:
-        "一碗含鱼、绿叶菜、西兰花、黑豆、糙米和南瓜子的营养餐",
-      intro:
-        "补充剂填补缺口——但食物优先填补。当 Living Protocol 发现身体需要某物时，它不会只推荐胶囊。它会告诉您哪些日常食物天然富含该成分，让您选择：在晚餐中补充，还是从瓶中补充。无论哪种方式，您都在真正了解，而非猜测。",
-      cards: [
-        [
-          "镁不足？",
-          "南瓜子、菠菜和黑豆是天然最丰富的来源之一。",
-          ["南瓜子", "菠菜", "黑豆"],
-        ],
-        [
-          "需要更多铬？",
-          "它出现在意想不到的地方——葡萄汁、西兰花和全谷物。",
-          ["葡萄汁", "西兰花", "全谷物"],
-        ],
-        [
-          "已经足够？",
-          "如果您的饮食已能满足，Living Protocol 会建议您跳过补充剂——并节省开支。",
-          ["食物已经足够"],
-        ],
-      ],
-      note: "无需食物日记。无需计算热量。只需在需要时快速回答，并在有帮助时引导您选择正确的餐盘。",
-    },
-    difference: {
-      eyebrow: "为何不同",
-      title: "不止一个答案。",
-      accent: "一个了解您的方案。",
-      paragraphs: [
-        "任何人都能查到旅行如何影响镁。难点在于了解它如何影响您的计划——您的补充剂组合、用药、过去几周的情况——以及实际该怎么做。这正是 Living Protocol 为您处理的。",
-        "它已经知道您服用的一切，因此无需每次变化时重复解释。每次建议的调整都会对照您的用药和化验标记——这种安全保障只有当指导完全围绕您构建时才有效。90 天内，它会逐渐识别您的模式，因此建议不仅反映本周，还反映背后的趋势。您也无需知道该问什么问题——只要说出正在发生什么，Living Protocol 会替您思考。",
-        "您无需成为自己的药剂师。只需告诉 MattaNutra 发生了什么变化，它就会让您的方案保持正确。",
-      ],
-    },
-    bridge: {
-      title: "准备好设计您的 Right Amount 了吗？",
-      body: "从一份简短而详细的问卷和免费的 Health Score 开始。您的个性化计划——以及添加 Living Protocol 的选项——仅一步之遥。",
-      cta: "开始设计您的 Right Amount",
-      note: "免费开始——无需信用卡。",
-    },
-    questionnaire: {
-      eyebrow: "免费问卷",
-      title: "问卷内部的一瞥。",
-      body:
-        "以下展示问卷如何仅估算您的维生素 D——这是算法权衡的 120+ 种成分之一——它会同时参考多项回答。完整版本包含六个简短部分。",
-      cardLabel: "Formula Precision",
-      privateLabel: "私密且加密",
-      sampleLabel: "示例",
-      sampleBody: "仅估算一种成分",
-      progressPath: "开始 → 基础 → 精准",
-      progress: "8%",
-      progressNote: "您已完成 8%——继续完成基础部分。",
-      quote:
-        "这里没有对错答案，只有真实答案。您回答得越诚实，配方就越精准，也越能安全地配合您已经在使用的东西。",
-      skinTone: "肤色",
-      foundation: "基础",
-      skinBody: "帮助结合日晒情况估算您的维生素 D 合成。",
-      sunExposure: "每日日晒时间",
-      sunOptions: ["少于 15 分钟", "15–30", "30–60", "60 分钟+"],
-      sunscreen: "防晒使用",
-      sunscreenOptions: ["很少", "有时", "每天"],
-      insight:
-        "肤色、日晒和防晒会一起权衡——因此您的维生素 D 不是猜测，而是为您的生活建立的估算。",
-      sectionsLabel: "一个问题，来自六个部分：",
-      sections: ["基础", "目标", "日常生活", "食物", "安全", "精准"],
-      bottom: "维生素 D 是算法评估的 120+ 种成分之一。",
-      reassurance: "✓ 免费开始 ✓ 无需信用卡 ✓ 大约 3 分钟",
-    },
-    results: {
-      eyebrow: "这样的故事",
-      title: "不同生活。同一个第一步。",
-      intro:
-        "不同的生活方式。同一个目标：更好的健康、更清晰的方向，以及可行的日常。",
-      cta: "开始设计您的 Right Amount",
-      join: "为您的健康做出更明智、更自信的选择。",
-      fallback: [
-        {
-          id: "daniel",
-          image: assets.testimonials[0],
-          imageAlt: "Daniel L. 坐在窗边",
-          name: "Daniel L.",
-          place: "40, 曼谷",
-          role: "项目经理",
-          quote:
-            "我到了 40 岁，意识到自己一直说想改变，却不知道从哪里开始。我抽屉里塞满随机维生素，却没有真正计划。MattaNutra 给了我清晰的第一步，而没有让整个过程显得压倒性。",
-        },
-        {
-          id: "meilin",
-          image: assets.testimonials[1],
-          imageAlt: "Mei Lin T. 在学校走廊微笑",
-          name: "Mei Lin T.",
-          place: "45, 新加坡",
-          role: "运营负责人",
-          quote:
-            "在工作、旅行和照顾家庭之间，我的健康日常变成了能记住就做的事。MattaNutra 帮助我把杂乱的补充剂架变成适合新加坡真实生活的简单计划。",
-        },
-        {
-          id: "wanida",
-          image: assets.testimonials[2],
-          imageAlt: "Wanida P. 在自己的店里",
-          name: "Wanida P.",
-          place: "43, 孔敬",
-          role: "店主",
-          quote:
-            "医生告诉我血压在上升，需要做出改变。我花了几个小时在网上研究补充剂，结果比开始时更困惑。MattaNutra 穿透所有噪音，为我打造了真正适合我生活的方案。",
-        },
-        {
-          id: "malee",
-          image: assets.testimonials[3],
-          imageAlt: "Malee S. 坐在花园庭院里",
-          name: "Malee S.",
-          place: "41, 普吉",
-          role: "护理助理",
-          quote:
-            "我在诊所工作，所以大家都以为我确切知道该吃什么补充剂。诚实的真相是，我读得越多，越不确定。MattaNutra 终于给了我一个清晰、合理的计划——这次是为我自己，而不是我的病人。",
-        },
-      ],
-    },
-    origin: {
-      eyebrow: "我们的起源",
-      title: "设计于清迈，",
-      accent: "适量是一种生活方式。",
-      body: "MattaNutra 始于泰国北部，那里适度的传统——吃得恰到好处、在正确的时间休息、顺应身体节奏——已悄然精炼了几个世纪。",
-      body2:
-        "我们打造 MattaNutra，是为了将这种安静的智慧转化为现代、可衡量且个性化的东西：一个了解您身体、随生活变化调整、从不要求您成为别人的计划。",
-      buildAlt: "MattaNutra 标志从轮廓到完成标记的五个阶段",
-      founders: "由医师、科学家和创新 AI 思想家共同创立。",
-      founderParagraphs: [
-        "进入您身体的东西，应该由真正了解其成分的人设计。",
-        "MattaNutra 由一个国际团队创立，团队背景横跨医学、科学、技术、经济学，以及打造长期可用产品的实践。",
-        "我们共同拥有超过一百年的专业实践——在医学、科学、技术以及打造持久事物方面。",
-      ],
-      signoff: "来自清迈，带着关怀。",
-      tagline: "古老智慧 · 现代科学",
-    },
-    pricing: {
-      eyebrow: "简单定价",
-      title: "免费开始。",
-      accent: "准备好时再升级。",
-      intro:
-        "完成免费问卷即可获得起始计划。仅在需要更精准或持续 AI 支持时升级。",
-      offer: "限时优惠",
-      plans: [
-        {
-          badge: "一次性计划",
-          name: "Right Amount Formula",
-          desc: "您的个性化补充剂配方，包含精准剂量、时间和产品指导。",
-          originalPrice: "THB 990",
-          saving: "节省 30%",
-          currency: "THB",
-          price: "690",
-          termLabel: "一次性",
-          term: "一次性付款 · 终身访问",
-          cta: "获取 Right Amount Formula",
-          plan: "precision",
-          best: "想要清晰、自信起点的人——专属的适量。",
-          features: [
-            "个性化补充剂配方",
-            "按体型调整的剂量范围",
-            "服用时间和使用说明",
-            "用药和化验安全标记",
-            "推荐产品及替代选择",
-            "60 天重新评估提示",
-          ],
-          guaranteeTitle: "清晰保证。",
-          guarantee:
-            "如果您的计划感觉不够清晰实用，我们将在 7 天内为您修正或退款。",
-        },
-        {
-          badge: "高级 · 90 天支持",
-          popular: "最受欢迎",
-          name: "Living Protocol",
-          desc: "让您的适量在生活变化时保持正确。包含 Right Amount Formula 的全部内容，以及生活变化时的持续调整。",
-          originalPrice: "THB 1,890",
-          saving: "节省 16%",
-          currency: "THB",
-          price: "1,590",
-          termLabel: "90 天",
-          term: "一次性付款 · 90 天支持 · 随时续订",
-          cta: "开始 Living Protocol",
-          plan: "pro",
-          best: "希望计划跟上日常生活现实的人。",
-          features: [
-            "包含完整 Right Amount Formula",
-            "了解哪些日常食物能提供所需",
-            "随生活变化调整时间和剂量",
-            "每次变化均对照用药和化验结果",
-            "90 天内记住您的模式",
-            "只需发送消息告知变化——无需应用、无需追踪",
-            "在旅行、压力和睡眠干扰中保持一致",
-          ],
-          guaranteeTitle: "7 天满意保证。",
-          guarantee:
-            "真正试用 Living Protocol。如果有任何不妥，请告诉我们——我们将在 7 天内修复或全额退款。无麻烦。",
-        },
-      ],
-      trust: [
-        ["安全私密", "您的数据已加密且绝不共享。"],
-        ["有科学依据", "个性化推荐基于可信证据。"],
-        ["适应与改进", "计划随身体和目标变化而演进。"],
-        ["AI + 人工监督", "AI 驱动指导配合人工审核保障。"],
-      ],
-    },
-    journal: {
-      eyebrow: "来自文章",
-      title: "了解",
-      accent: "适量。",
-      browse: "浏览所有文章",
-      tag: "文章",
-      readMore: "阅读文章",
-      fallback: [
-        [
-          "基础",
-          "为什么补充剂“更多”很少是答案",
-          "充足的科学——以及为什么您的身体通常需要少于标签所示。",
-        ],
-        [
-          "营养",
-          "八种比您想象中更富含镁的日常食物",
-          "在伸手拿胶囊前，先看看您的餐盘——这些日常食物在默默发挥作用。",
-        ],
-        [
-          "生活方式",
-          "旅行如何悄然改变身体需求",
-          "时差、睡眠和水分都会改变计算——以下是如何调整而无需过度思考。",
-        ],
-      ],
-    },
-    faq: {
-      eyebrow: "问题",
-      title: "好问题，",
-      accent: "诚实回答。",
-      items: [
-        [
-          "我的数据私密吗？",
-          "是的。您的评估属于您自己。我们不销售答案，不与广告商共享，您可随时请求删除。Living Protocol 的对话仅存储以维持计划连续性。",
-        ],
-        [
-          "我在服药——这对我安全吗？",
-          "MattaNutra 会筛查最常见的药物-补充剂相互作用，并在计划中标记。这是健康指导，而非医疗建议。如果您正在服用处方药、怀孕、哺乳或管理医疗状况，请在开始任何补充剂计划前咨询合格的医疗专业人士。",
-        ],
-        [
-          "推荐产品来自哪里？",
-          "您的配方通过合作药房网络由注册药师调配，因此您拿到的正是计划所需的内容——无需在货架前猜测。我们不生产补充剂；我们会把您匹配到可信产品和能回答问题的药师。",
-        ],
-        [
-          "免费评估真的免费吗？",
-          "是的。问卷和 Health Score 免费，无需信用卡。完成后，您将看到自己的状况和起始方向。如果您选择继续，完整的个性化 Right Amount Formula 和可选 Living Protocol 支持将可用。",
-        ],
-        [
-          "为什么用 Pāli 名称？",
-          "“Mattaññutā” 意为知道适量。它来自 2,500 年关于节制与平衡的实用智慧传统——健康兴盛并非来自更多，而是来自恰到好处。这个名字是我们的承诺：帮助您找到自己的适量，而不是卖给您不需要的更多东西。",
-        ],
-      ],
-    },
-    final: {
-      title: "停止猜测。",
-      accent: "开始了解。",
-      body: "回答几个聚焦问题，获取免费 Health Score，并收到您的个性化起始计划——围绕您的身体、目标和日常生活构建。",
-      primary: "开始设计您的 Right Amount",
-      secondary: "如何运作",
-      quote: "Mattaññutā — 知道适量。",
-    },
-  },
-} as const satisfies Record<Locale, LandingContent>;
+export const content = Object.fromEntries(
+  publicLocales.map((locale) => [locale, getLandingPageCopy(locale)])
+) as Record<Locale, LandingContent>;

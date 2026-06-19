@@ -10,6 +10,7 @@ import {
 } from "@/lib/blog";
 import { checkDatabaseConnection } from "@/lib/db";
 import { getDictionary, isLocale, type Locale, type LocaleCode } from "@/lib/i18n";
+import { getNamespace } from "@/lib/i18n-messages";
 import { localizedMetadata } from "@/lib/seo";
 
 type BlogArticlePageProps = Readonly<{
@@ -44,41 +45,15 @@ type ArticleCta = {
   title: string;
 };
 
-const articleCtas: Partial<Record<LocaleCode, ArticleCta>> = {
-  en: {
-    body:
-      "Take a few minutes to discover your HealthScore and begin a more personal conversation about your energy, sleep, diet, budget, and what support actually fits your day.",
-    eyebrow: "Your next step",
-    href: "/en/nutrition/quiz",
-    primaryLabel: "Start the assessment",
-    secondaryHref: "/en",
-    secondaryLabel: "Back to home",
-    title: "Start with your HealthScore, then build from there"
-  },
-  th: {
-      body:
-        "ใช้เวลาเพียงไม่กี่นาทีเพื่อดูคะแนนสุขภาพของคุณ และเริ่มบทสนทนาที่เป็นส่วนตัวมากขึ้นเกี่ยวกับพลังงาน การนอน อาหาร งบประมาณ และสิ่งที่เหมาะกับชีวิตประจำวันของคุณจริงๆ",
-      eyebrow: "ขั้นตอนถัดไป",
-      href: "/th/nutrition/quiz",
-      primaryLabel: "เริ่มทำแบบประเมิน",
-      secondaryHref: "/th",
-      secondaryLabel: "กลับหน้าหลัก",
-      title: "เริ่มจากคะแนนสุขภาพของคุณ แล้วค่อยๆ สร้างแผนที่เหมาะกับคุณ"
-  },
-  "zh-CN": {
-    body:
-      "花几分钟了解你的 HealthScore，并围绕精力、睡眠、饮食、预算以及真正适合日常生活的支持，开始更个性化的对话。",
-    eyebrow: "下一步",
-    href: "/zh-CN/nutrition/quiz",
-    primaryLabel: "开始评估",
-    secondaryHref: "/zh-CN",
-    secondaryLabel: "返回首页",
-    title: "从 HealthScore 开始，再逐步建立适合你的方案"
-  }
-};
-
 function getArticleCta(locale: LocaleCode) {
-  return articleCtas[locale] ?? articleCtas.en!;
+  return {
+    ...getNamespace<Omit<ArticleCta, "href" | "secondaryHref">>(
+      locale,
+      "customer.blogArticleCta"
+    ),
+    href: `/${locale}/nutrition/quiz`,
+    secondaryHref: `/${locale}`
+  };
 }
 
 export async function generateMetadata({

@@ -12,6 +12,7 @@ import type {
 } from "@/lib/formulation-types";
 import { foodGapSupportVersion } from "@/lib/managed-foods";
 import { publicLocales, type Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n-messages";
 
 type AnalysisAuditEvent = {
   eventType: string;
@@ -309,22 +310,15 @@ function localizedNeedNames(needs: readonly ProductNeedCoverage[], locale: Local
     .slice(0, 2);
 
   if (names.length < 1) {
-    return locale === "th"
-      ? "ช่องว่างของแผน"
-      : locale === "zh-CN"
-        ? "剩余计划缺口"
-        : "the remaining plan gaps";
+    return t(locale, "outbound.foodGapSupport.remainingPlanGaps");
   }
 
-  if (locale === "th") {
-    return names.join(" และ ");
-  }
-
-  if (locale === "zh-CN") {
-    return names.join(" 和 ");
-  }
-
-  return names.length === 1 ? names[0] : `${names[0]} and ${names[1]}`;
+  return names.length === 1
+    ? names[0]
+    : t(locale, "outbound.foodGapSupport.joinPair", {
+        first: names[0] ?? "",
+        second: names[1] ?? ""
+      });
 }
 
 function englishFoodSupportVerb(foodName: string) {

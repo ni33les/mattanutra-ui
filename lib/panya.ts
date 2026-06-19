@@ -21,6 +21,7 @@ import {
   getRequiredXaiApiKey
 } from "@/lib/grok-client";
 import { isLocale, type Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n-messages";
 import {
   buildAssessmentResultsUrl,
   buildReassessmentUrl,
@@ -693,39 +694,21 @@ export function panyaWelcomeFallbackReply(context: PanyaWelcomeContext) {
   const name = context.customer.firstName ? ` ${context.customer.firstName}` : "";
   const planUrl = context.plan.planUrl;
 
-  if (context.customer.locale === "th") {
-    if (context.plan.entitlement === "living_protocol") {
-      return `เชื่อมต่อกับ Panya แล้ว${name} คุณถามเรื่อง Living Protocol แผน ผลิตภัณฑ์ คำสั่งซื้อ หรือการเปลี่ยนแปลงของกิจวัตรได้ที่นี่ ดูแผนของคุณได้ที่ ${planUrl}`;
-    }
-
-    if (context.plan.entitlement === "right_amount_formula") {
-      return `เชื่อมต่อกับ Panya แล้ว${name} ฉันช่วยอธิบาย Right Amount Formula ผลิตภัณฑ์ คำสั่งซื้อ และขั้นตอนถัดไปได้ ดูแผนของคุณได้ที่ ${planUrl}`;
-    }
-
-    return `เชื่อมต่อกับ Panya แล้ว${name} คุณถามเรื่อง MattaNutra แบบประเมิน คำสั่งซื้อ และขั้นตอนถัดไปได้ที่นี่`;
-  }
-
-  if (context.customer.locale === "zh-CN") {
-    if (context.plan.entitlement === "living_protocol") {
-      return `已连接 Panya${name}。你可以在这里询问 Living Protocol、方案、产品、订单，以及日常变化。你的方案在这里：${planUrl}`;
-    }
-
-    if (context.plan.entitlement === "right_amount_formula") {
-      return `已连接 Panya${name}。我可以帮你理解 Right Amount Formula、产品、订单和下一步。你的方案在这里：${planUrl}`;
-    }
-
-    return `已连接 Panya${name}。你可以在这里询问 MattaNutra、评估、订单和下一步。`;
-  }
-
   if (context.plan.entitlement === "living_protocol") {
-    return `You are connected to Panya${name}. You can ask about your Living Protocol, plan, products, orders, or changes in your routine here. Your plan is here: ${planUrl}`;
+    return t(context.customer.locale, "outbound.panya.welcome.livingProtocol", {
+      name,
+      planUrl
+    });
   }
 
   if (context.plan.entitlement === "right_amount_formula") {
-    return `You are connected to Panya${name}. I can help explain your Right Amount Formula, products, order, and next steps. Your plan is here: ${planUrl}`;
+    return t(context.customer.locale, "outbound.panya.welcome.rightAmountFormula", {
+      name,
+      planUrl
+    });
   }
 
-  return `You are connected to Panya${name}. You can ask about MattaNutra, your assessment, orders, and next steps here.`;
+  return t(context.customer.locale, "outbound.panya.welcome.unpaid", { name });
 }
 
 async function generatePanyaWelcome(input: Readonly<{
@@ -1240,21 +1223,13 @@ export async function checkAndRecordPanyaUserMessage(input: Readonly<{
 function quotaReplyCopy(result: PanyaQuotaResult) {
   const subscription = result.entitlement === "living_protocol";
 
-  if (result.locale === "th") {
-    return subscription
-      ? `วันนี้คุณใช้ข้อความ Panya ครบ ${result.limit} ข้อความแล้ว พรุ่งนี้กลับมาคุยต่อได้ หรือหากเป็นเรื่องเร่งด่วน ทีม MattaNutra จะช่วยตรวจสอบให้`
-      : `วันนี้คุณใช้ข้อความ Panya ครบ ${result.limit} ข้อความแล้ว คุณยังดูแผนและคำสั่งซื้อได้ตามปกติ หากต้องการการดูแลและปรับแผนต่อเนื่อง Living Protocol จะปลดล็อกการสนับสนุนที่ลึกขึ้น`;
-  }
-
-  if (result.locale === "zh-CN") {
-    return subscription
-      ? `你今天已用完 ${result.limit} 条 Panya 消息。明天可以继续沟通；如有紧急问题，MattaNutra 团队会协助跟进。`
-      : `你今天已用完 ${result.limit} 条 Panya 消息。你仍可查看方案和订单；如果需要持续跟进和调整，Living Protocol 会解锁更深入的支持。`;
-  }
-
   return subscription
-    ? `You have used today's ${result.limit} Panya messages. You can continue tomorrow, and the MattaNutra team can still review anything urgent.`
-    : `You have used today's ${result.limit} Panya messages. You can still view your plan and orders. Living Protocol unlocks deeper ongoing support and plan refinement.`;
+    ? t(result.locale, "outbound.panya.quota.livingProtocol", {
+        limit: result.limit
+      })
+    : t(result.locale, "outbound.panya.quota.standard", {
+        limit: result.limit
+      });
 }
 
 export async function queuePanyaQuotaLimitReply(input: Readonly<{
@@ -1330,30 +1305,7 @@ function panyaReorderCallbackBody(input: Readonly<{
 }>) {
   const reassessmentUrl = buildReassessmentUrl(input.locale, input.planId);
 
-  if (input.locale === "th") {
-    return [
-      "ตอนนี้ใกล้ครบสามสัปดาห์หลังคำสั่งซื้อ MattaNutra ของคุณแล้ว",
-      "ถ้าสูตรนี้ยังเหมาะกับคุณ นี่เป็นช่วงเวลาที่ดีในการสั่งซ้ำ เพื่อไม่ให้หมดใกล้วันที่ 30",
-      `ถ้าการนอน ความเครียด ยา การเดินทาง อาหาร หรือเป้าหมายเปลี่ยนไป โปรดทำแบบประเมินอีกครั้งก่อนสั่งซ้ำ: ${reassessmentUrl}`,
-      "ตอบกลับที่นี่ได้เลยถ้าต้องการให้ Panya ช่วยเรื่องขั้นตอนถัดไป"
-    ].join("\n");
-  }
-
-  if (input.locale === "zh-CN") {
-    return [
-      "距离你的 MattaNutra 订单大约三周了。",
-      "如果当前配方仍然适合你，现在是安排续购的好时机，这样接近第 30 天时不容易断档。",
-      `如果睡眠、压力、用药、旅行、饮食或目标发生了变化，请先重新填写评估再续购：${reassessmentUrl}`,
-      "你可以直接回复这里，Panya 会帮你处理下一步。"
-    ].join("\n");
-  }
-
-  return [
-    "It has been about three weeks since your MattaNutra order.",
-    "If your current formula is still working for you, this is a good time to reorder so you do not run out around day 30.",
-    `If sleep, stress, medication, travel, diet, or goals have changed, take the assessment again before reordering: ${reassessmentUrl}`,
-    "Reply here if you want Panya to help with the next step."
-  ].join("\n");
+  return t(input.locale, "outbound.panya.reorderNudge", { reassessmentUrl });
 }
 
 export async function schedulePanyaCheckInForPlan(input: Readonly<{

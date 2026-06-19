@@ -849,7 +849,7 @@ export function LandingPage({
           </div>
           <div className="mt-9 text-center" data-reveal>
             <Link className="mn-v15-button" href={assessmentPath}>
-              {copy.hero.primary}
+              {copy.questionnaire.cta}
               <ArrowRight aria-hidden className="size-4" />
             </Link>
             <p className="mt-4 text-sm text-[var(--mn-ash)]">

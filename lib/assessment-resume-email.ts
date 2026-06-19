@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n";
+import { getNamespace } from "@/lib/i18n-messages";
 import { siteBaseUrl } from "@/lib/site-url";
 
 function escapeHtml(value: string) {
@@ -10,34 +11,18 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
+type AssessmentResumeEmailCopy = Readonly<{
+  body: string;
+  cta: string;
+  subject: string;
+  title: string;
+}>;
+
 function labels(locale: Locale) {
-  if (locale === "th") {
-    return {
-      body:
-        "ใช้ลิงก์ส่วนตัวนี้เพื่อกลับไปยังแบบประเมิน MattaNutra ตรงจุดที่คุณค้างไว้ อีเมลนี้ใช้เพื่อกลับมาทำแบบประเมินเท่านั้น",
-      cta: "กลับไปทำแบบประเมินต่อ",
-      subject: "ลิงก์กลับไปยังแบบประเมิน MattaNutra ของคุณ",
-      title: "กลับมาต่อจากจุดเดิม"
-    };
-  }
-
-  if (locale === "zh-CN") {
-    return {
-      body:
-        "使用这个私人链接回到你刚才停留的 MattaNutra 问卷位置。此邮件只用于恢复你的评估进度。",
-      cta: "继续评估",
-      subject: "返回你的 MattaNutra 评估",
-      title: "从刚才的位置继续"
-    };
-  }
-
-  return {
-    body:
-      "Use this private link to return to the exact place you left your MattaNutra assessment. This email is only for resuming your assessment.",
-    cta: "Resume assessment",
-    subject: "Resume your MattaNutra assessment",
-    title: "Pick up where you left off"
-  };
+  return getNamespace<AssessmentResumeEmailCopy>(
+    locale,
+    "outbound.assessmentResumeEmail"
+  );
 }
 
 export function buildAssessmentResumeUrl(locale: Locale, token: string) {

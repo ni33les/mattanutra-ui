@@ -7,6 +7,7 @@ import { TitleBar } from "@/components/title-bar";
 import { formatCurrencyAmount } from "@/lib/currencies";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { getTrackingOrderByReference } from "@/lib/retail-product-checkout";
+import { localizedRouteMetadata } from "@/lib/seo";
 
 type Props = {
   params: Promise<{ locale: string; token: string }>;
@@ -211,12 +212,12 @@ function latestEta(lines: readonly { etaDate: string | null }[]) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale: raw } = await params;
   const locale: Locale = isLocale(raw) ? raw : "en";
-  const copy = orderTrackingCopy[locale];
 
-  return {
-    title: copy.metadataTitle,
-    robots: { index: false, follow: false }
-  };
+  return localizedRouteMetadata({
+    indexable: false,
+    locale,
+    routeKey: "orderTracking"
+  });
 }
 
 export default async function CustomerOrderTrackingPage({ params }: Props) {

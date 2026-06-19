@@ -1,7 +1,9 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { isUuid } from "@/lib/assessment-store";
 import { isLocale, locales, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath, nutritionRevealPath } from "@/lib/nutrition-paths";
+import { localizedRouteMetadata } from "@/lib/seo";
 
 type LegacyNutritionRevealRedirectPageProps = Readonly<{
   params: Promise<{
@@ -14,6 +16,20 @@ type LegacyNutritionRevealRedirectPageProps = Readonly<{
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
+}
+
+export async function generateMetadata({
+  params
+}: Pick<LegacyNutritionRevealRedirectPageProps, "params">): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
+
+  return localizedRouteMetadata({
+    indexable: false,
+    locale,
+    path: "/nutrition/refine",
+    routeKey: "nutritionReveal"
+  });
 }
 
 export default async function LegacyNutritionRevealRedirectPage({

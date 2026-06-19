@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { content } from "@/components/landing-page-copy";
+import { getLandingPageCopy } from "@/components/landing-page-copy";
 import { getSql } from "@/lib/db";
 import { publicLocales, type Locale } from "@/lib/i18n";
 
@@ -253,7 +253,7 @@ async function main() {
   let blogsWritten = 0;
 
   for (const locale of publicLocales) {
-    const landing = content[locale];
+    const landing = getLandingPageCopy(locale);
     const testimonialIds: string[] = [];
 
     for (const [index, testimonial] of landing.results.fallback.entries()) {

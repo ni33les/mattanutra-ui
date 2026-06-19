@@ -1,0 +1,72 @@
+[
+  {
+    "term": "MattaNutra",
+    "protected": true,
+    "translations": {
+      "en": "MattaNutra",
+      "th": "MattaNutra",
+      "zh-CN": "MattaNutra"
+    },
+    "notes": "Primary brand name. Do not translate."
+  },
+  {
+    "term": "Mattaññutā",
+    "protected": true,
+    "translations": {
+      "en": "Mattaññutā",
+      "th": "Mattaññutā",
+      "zh-CN": "Mattaññutā"
+    },
+    "notes": "Formal brand spelling when explicitly used. Preserve diacritics."
+  },
+  {
+    "term": "HealthScore",
+    "protected": false,
+    "translations": {
+      "en": "HealthScore",
+      "th": "HealthScore",
+      "zh-CN": "健康评分"
+    },
+    "notes": "Customer-facing score product. Keep English where already used as product mark."
+  },
+  {
+    "term": "Right Amount",
+    "protected": false,
+    "translations": {
+      "en": "Right Amount",
+      "th": "ปริมาณที่พอดี",
+      "zh-CN": "知量"
+    },
+    "notes": "Mandarin glossary choice supplied for the conversion-optimized refresh."
+  },
+  {
+    "term": "Right Amount Formula",
+    "protected": false,
+    "translations": {
+      "en": "Right Amount Formula",
+      "th": "สูตรปริมาณที่พอดี",
+      "zh-CN": "知量方案"
+    },
+    "notes": "Also used for Right Amount Plan in Mandarin-facing copy."
+  },
+  {
+    "term": "Living Protocol",
+    "protected": false,
+    "translations": {
+      "en": "Living Protocol",
+      "th": "Living Protocol",
+      "zh-CN": "动态健康方案"
+    },
+    "notes": "Mandarin glossary choice supplied by the conversion-optimized refresh. Use Living Protocol with a Chinese gloss only where product context needs the English mark."
+  },
+  {
+    "term": "Journal",
+    "protected": false,
+    "translations": {
+      "en": "Journal",
+      "th": "บันทึกสุขภาพ",
+      "zh-CN": "健康日志"
+    },
+    "notes": "Mandarin glossary choice supplied for journal surfaces."
+  }
+]

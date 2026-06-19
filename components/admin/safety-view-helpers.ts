@@ -17,6 +17,7 @@ import type {
   SupplementListStatus
 } from "@/lib/admin-supplements";
 import type { Locale } from "@/lib/i18n";
+import { getNamespace } from "@/lib/i18n-messages";
 import type { SupplementSafetyFlag } from "@/lib/supplement-safety-flags";
 import type {
   FoodNutrientId,
@@ -24,112 +25,42 @@ import type {
 } from "@/lib/food-nutrients";
 import { foodTagLabel } from "@/lib/food-tags";
 
+type FoodAdminLabels = Readonly<{
+  allCategories: string;
+  allStatuses: string;
+  aliases: string;
+  allergenFlags: string;
+  benefits: string;
+  blacklisted: string;
+  category: string;
+  close: string;
+  conditionFlags: string;
+  confidence: string;
+  defaultServing: string;
+  details: string;
+  empty: string;
+  grams: string;
+  image: string;
+  imageAlt: string;
+  imagePath: string;
+  imageSource: string;
+  inactive: string;
+  nutrientProfile: string;
+  nutrients: string;
+  primaryUseCase: string;
+  reviewRequired: string;
+  safetyNotes: string;
+  save: string;
+  search: string;
+  status: string;
+  translations: string;
+  total: string;
+  updateError: string;
+  whitelisted: string;
+}>;
+
 export function foodAdminLabels(locale: Locale) {
-  if (locale === "th") {
-    return {
-      allCategories: "ทุกหมวดหมู่",
-      allStatuses: "ทุกสถานะ",
-      aliases: "ชื่อเรียก",
-      allergenFlags: "สารก่อภูมิแพ้",
-      benefits: "ประโยชน์",
-      blacklisted: "บัญชีดำ",
-      category: "หมวดหมู่",
-      close: "ปิด",
-      conditionFlags: "เงื่อนไขความปลอดภัย",
-      confidence: "ความมั่นใจ",
-      defaultServing: "ปริมาณเริ่มต้น",
-      details: "รายละเอียด",
-      empty: "ไม่พบอาหารตามตัวกรองนี้",
-      grams: "กรัม",
-      image: "รูปภาพ",
-      imageAlt: "คำอธิบายรูปภาพ",
-      imagePath: "ไฟล์รูปภาพ",
-      imageSource: "แหล่งที่มารูปภาพ",
-      inactive: "ปิดใช้",
-      nutrientProfile: "ข้อมูลสารอาหารต่อ 100 กรัม",
-      nutrients: "สารอาหาร",
-      primaryUseCase: "การใช้งานหลัก",
-      reviewRequired: "ต้องรีวิว",
-      safetyNotes: "หมายเหตุความปลอดภัย",
-      save: "บันทึก",
-      search: "ค้นหาอาหาร",
-      status: "สถานะ",
-      translations: "ภาษา",
-      total: "ทั้งหมด",
-      updateError: "ไม่สามารถบันทึกอาหารนี้ได้",
-      whitelisted: "อนุญาต"
-    };
-  }
-
-  if (locale === "zh-CN") {
-    return {
-      allCategories: "所有类别",
-      allStatuses: "所有状态",
-      aliases: "别名",
-      allergenFlags: "过敏原标记",
-      benefits: "益处",
-      blacklisted: "黑名单",
-      category: "类别",
-      close: "关闭",
-      conditionFlags: "安全条件",
-      confidence: "置信度",
-      defaultServing: "默认份量",
-      details: "详情",
-      empty: "没有符合筛选条件的食物。",
-      grams: "克",
-      image: "图片",
-      imageAlt: "图片替代文本",
-      imagePath: "图片文件",
-      imageSource: "图片来源",
-      inactive: "未启用",
-      nutrientProfile: "每 100 克营养信息",
-      nutrients: "营养素",
-      primaryUseCase: "主要用途",
-      reviewRequired: "需要审核",
-      safetyNotes: "安全说明",
-      save: "保存",
-      search: "搜索食物",
-      status: "状态",
-      translations: "翻译",
-      total: "总计",
-      updateError: "无法保存此食物。",
-      whitelisted: "已允许"
-    };
-  }
-
-  return {
-    allCategories: "All categories",
-    allStatuses: "All statuses",
-    aliases: "Aliases",
-    allergenFlags: "Allergen flags",
-    benefits: "Benefits",
-    blacklisted: "Blacklisted",
-    category: "Category",
-    close: "Close",
-    conditionFlags: "Condition flags",
-    confidence: "Confidence",
-    defaultServing: "Default serving",
-    details: "Details",
-    empty: "No foods match these filters.",
-    grams: "Grams",
-    image: "Image",
-    imageAlt: "Image alt text",
-    imagePath: "Image file",
-    imageSource: "Image source",
-    inactive: "Inactive",
-    nutrientProfile: "Nutrient facts per 100g",
-    nutrients: "Nutrients",
-    primaryUseCase: "Primary use",
-    reviewRequired: "Review required",
-    safetyNotes: "Safety notes",
-    save: "Save",
-    search: "Search foods",
-    status: "Status",
-    translations: "Translations",
-    total: "Total",
-    updateError: "Could not save this food.",
-    whitelisted: "Whitelisted"
-  };
+  return getNamespace<FoodAdminLabels>(locale, "admin.foodSafety");
 }
 
 export function supplementStatusLabel(

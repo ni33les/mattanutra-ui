@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { AssessmentFlow } from "@/components/assessment-flow";
@@ -10,6 +11,7 @@ import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { nutritionQuizPath } from "@/lib/nutrition-paths";
 import { getStoredAssessmentPrefill, isUuid } from "@/lib/assessment-store";
 import { getAssessmentResumeDraft } from "@/lib/assessment-resume-store";
+import { localizedRouteMetadata } from "@/lib/seo";
 
 type NutritionQuizPageProps = Readonly<{
   params: Promise<{
@@ -27,6 +29,22 @@ export function generateStaticParams() {
 }
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+  searchParams
+}: NutritionQuizPageProps): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const query = (await searchParams) ?? {};
+  const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
+  const hasPrivateState = Boolean(query.plan || query.resume || query.payment);
+
+  return localizedRouteMetadata({
+    indexable: !hasPrivateState,
+    locale,
+    routeKey: "nutritionQuiz"
+  });
+}
 
 export default async function NutritionQuizPage({
   params,

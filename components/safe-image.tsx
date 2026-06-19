@@ -2,7 +2,7 @@
 
 import Image, { type ImageProps } from "next/image";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type SafeImageProps = Omit<ImageProps, "alt" | "src"> & Readonly<{
   alt: string;
@@ -79,10 +79,6 @@ export function SafeImage({
 }: SafeImageProps) {
   const normalizedSrc = normalizeImageSrc(src);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    setFailedSrc(null);
-  }, [normalizedSrc]);
 
   if (!normalizedSrc || failedSrc === normalizedSrc) {
     return fallback;

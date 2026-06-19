@@ -1,0 +1,2767 @@
+{
+  "generatedFrom": "mattanutra-zh-CN market optimised for conversion_DS.rtf",
+  "locale": "zh-CN",
+  "rows": [
+    {
+      "rowHash": "315324789d490bdf",
+      "section": "术语表",
+      "label": "Term",
+      "english": "Mattaññutā",
+      "zhCN": "知量之慧（Mattaññutā）",
+      "status": "not_in_product",
+      "reason": "Glossary-only reference row; enforced by content/i18n/glossary.json and mapped surface rows."
+    },
+    {
+      "rowHash": "c10565789d408f20",
+      "section": "术语表",
+      "label": "Term",
+      "english": "Right Amount",
+      "zhCN": "知量",
+      "status": "not_in_product",
+      "reason": "Glossary-only reference row; enforced by content/i18n/glossary.json and mapped surface rows."
+    },
+    {
+      "rowHash": "ca583cf9b2598a59",
+      "section": "术语表",
+      "label": "Term",
+      "english": "Right Amount Formula / Plan",
+      "zhCN": "知量方案",
+      "status": "not_in_product",
+      "reason": "Glossary-only reference row; enforced by content/i18n/glossary.json and mapped surface rows."
+    },
+    {
+      "rowHash": "e30039e89ace2ec8",
+      "section": "术语表",
+      "label": "Term",
+      "english": "Health Score",
+      "zhCN": "健康评分",
+      "status": "not_in_product",
+      "reason": "Glossary-only reference row; enforced by content/i18n/glossary.json and mapped surface rows."
+    },
+    {
+      "rowHash": "9f5309a694dec34d",
+      "section": "术语表",
+      "label": "Term",
+      "english": "Living Protocol",
+      "zhCN": "动态健康方案",
+      "status": "not_in_product",
+      "reason": "Glossary-only reference row; enforced by content/i18n/glossary.json and mapped surface rows."
+    },
+    {
+      "rowHash": "ad4aae56fb66f0b0",
+      "section": "术语表",
+      "label": "Term",
+      "english": "Supplement",
+      "zhCN": "保健品",
+      "status": "not_in_product",
+      "reason": "Glossary-only reference row; enforced by content/i18n/glossary.json and mapped surface rows."
+    },
+    {
+      "rowHash": "adb33321ead6999f",
+      "section": "术语表",
+      "label": "Term",
+      "english": "Line / WhatsApp",
+      "zhCN": "Line / WhatsApp （微信即将支持）",
+      "status": "not_in_product",
+      "reason": "Glossary-only reference row; enforced by content/i18n/glossary.json and mapped surface rows."
+    },
+    {
+      "rowHash": "369c2128700f636c",
+      "section": "术语表",
+      "label": "Term",
+      "english": "Journal",
+      "zhCN": "健康日志",
+      "status": "not_in_product",
+      "reason": "Glossary-only reference row; enforced by content/i18n/glossary.json and mapped surface rows."
+    },
+    {
+      "rowHash": "605ecc87b3d52ad4",
+      "section": "术语表",
+      "label": "Term",
+      "english": "Knowing the right amount",
+      "zhCN": "知量之道",
+      "status": "not_in_product",
+      "reason": "Glossary-only reference row; enforced by content/i18n/glossary.json and mapped surface rows."
+    },
+    {
+      "rowHash": "ee6edc4e5f8159be",
+      "section": "术语表",
+      "label": "Term",
+      "english": "Now available in 🇹🇭 Thailand Coming soon 🇸🇬 Singapore 🇲🇾 Malaysia 🇵🇭 Philippines",
+      "zhCN": "现已覆盖 🇹🇭 泰国 即将推出 🇸🇬 新加坡 🇲🇾 马来西亚 🇵🇭 菲律宾",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.titleBar.availability",
+          "zhCN": "现已覆盖"
+        },
+        {
+          "id": "customer.titleBar.availableCountries.0.1",
+          "zhCN": "泰国"
+        },
+        {
+          "id": "customer.titleBar.comingSoon",
+          "zhCN": "即将推出"
+        },
+        {
+          "id": "customer.titleBar.comingSoonCountries.0.1",
+          "zhCN": "新加坡"
+        },
+        {
+          "id": "customer.titleBar.comingSoonCountries.1.1",
+          "zhCN": "马来西亚"
+        },
+        {
+          "id": "customer.titleBar.comingSoonCountries.2.1",
+          "zhCN": "菲律宾"
+        }
+      ]
+    },
+    {
+      "rowHash": "0337abf7177452e2",
+      "section": "导航栏",
+      "label": "Brand tagline",
+      "english": "Knowing the right amount",
+      "zhCN": "知量之道",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.titleBar.logoTagline"
+      ]
+    },
+    {
+      "rowHash": "845b84f868e05b31",
+      "section": "导航栏",
+      "label": "Nav item 1",
+      "english": "Living Protocol",
+      "zhCN": "动态健康方案",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.titleBar.links.0.1",
+          "zhCN": "动态健康方案"
+        },
+        {
+          "id": "customer.footer.columns.0.links.0.0",
+          "zhCN": "动态健康方案"
+        },
+        {
+          "id": "customer.landing.pricing.plans.1.name",
+          "zhCN": "动态健康方案"
+        }
+      ]
+    },
+    {
+      "rowHash": "1ccdf0ec0118f13d",
+      "section": "导航栏",
+      "label": "Nav item 2",
+      "english": "How it works",
+      "zhCN": "使用流程",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.titleBar.links.1.1",
+          "zhCN": "使用流程"
+        },
+        {
+          "id": "customer.footer.columns.0.links.1.0",
+          "zhCN": "使用流程"
+        }
+      ]
+    },
+    {
+      "rowHash": "b9284cd77ce344c6",
+      "section": "导航栏",
+      "label": "Nav item 3",
+      "english": "Promises",
+      "zhCN": "我们的承诺",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.titleBar.links.2.1",
+          "zhCN": "我们的承诺"
+        },
+        {
+          "id": "customer.footer.columns.1.links.1.0",
+          "zhCN": "我们的承诺"
+        }
+      ]
+    },
+    {
+      "rowHash": "cb44d3987dbe03be",
+      "section": "导航栏",
+      "label": "Nav item 4",
+      "english": "Journal",
+      "zhCN": "健康日志",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.titleBar.links.3.1",
+          "zhCN": "健康日志"
+        },
+        {
+          "id": "customer.footer.columns.1.links.0.0",
+          "zhCN": "健康日志"
+        }
+      ]
+    },
+    {
+      "rowHash": "c16608a72624313a",
+      "section": "导航栏",
+      "label": "Nav CTA",
+      "english": "Design your Right Amount",
+      "zhCN": "免费测健康评分",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.titleBar.assessment",
+          "zhCN": "免费测健康评分"
+        },
+        {
+          "id": "customer.footer.columns.0.links.3.0",
+          "zhCN": "免费测健康评分"
+        }
+      ]
+    },
+    {
+      "rowHash": "bce46cddf4161e45",
+      "section": "主视觉区（Hero）",
+      "label": "Section label",
+      "english": "Ancient wisdom Modern science",
+      "zhCN": "古老智慧 现代科学",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.hero.eyebrow"
+      ]
+    },
+    {
+      "rowHash": "94ce576f85c6afcc",
+      "section": "主视觉区（Hero）",
+      "label": "H1",
+      "english": "Stop guessing. Start knowing.",
+      "zhCN": "停止猜测，开始知量。",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.hero.title",
+          "zhCN": "停止猜测，"
+        },
+        {
+          "id": "customer.landing.hero.accent",
+          "zhCN": "开始知量。"
+        }
+      ]
+    },
+    {
+      "rowHash": "81c52dcc24e55930",
+      "section": "主视觉区（Hero）",
+      "label": "Subtitle",
+      "english": "AI-powered supplement and wellness plans built around your body, your lifestyle, and the goals that actually matter to you and that adapt as your life does.",
+      "zhCN": "你的身体，你的生活，你的目标。 AI 为你量身定制保健品方案，随你而变，始终合身。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.hero.intro"
+      ]
+    },
+    {
+      "rowHash": "b7e1474e0009acad",
+      "section": "主视觉区（Hero）",
+      "label": "Brand word",
+      "english": "Mattaññutā",
+      "zhCN": "Mattaññutā （知量）",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.hero.paliTitle"
+      ]
+    },
+    {
+      "rowHash": "6b963cd1652e05c6",
+      "section": "主视觉区（Hero）",
+      "label": "Brand word explanation",
+      "english": "Pāli for the wisdom of knowing the right amount that wellbeing comes not from more, but from exactly enough.",
+      "zhCN": "适量之道 — 健康，不在多，在恰到好处。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.hero.pali"
+      ]
+    },
+    {
+      "rowHash": "fe23a6bf9114c63d",
+      "section": "主视觉区（Hero）",
+      "label": "CTA intro",
+      "english": "Start with a free Health Score that shows where you stand. Your personalised Right Amount Formula is ready when you are.",
+      "zhCN": "先免费测一测健康评分，看清你当下的状态。你的专属知量方案，已备好，只等你来。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.hero.microcopy"
+      ]
+    },
+    {
+      "rowHash": "d386190b4f1f8283",
+      "section": "主视觉区（Hero）",
+      "label": "Trust bullet 1",
+      "english": "No credit card required",
+      "zhCN": "无需绑定信用卡",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.hero.checks.0"
+      ]
+    },
+    {
+      "rowHash": "918bf329c6dd83c7",
+      "section": "主视觉区（Hero）",
+      "label": "Trust bullet 2",
+      "english": "120+ ingredients evaluated",
+      "zhCN": "评估 120+ 种营养成分",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.hero.checks.1"
+      ]
+    },
+    {
+      "rowHash": "6d4ee84fe6235345",
+      "section": "主视觉区（Hero）",
+      "label": "Trust bullet 3",
+      "english": "Safety checks included",
+      "zhCN": "安全交叉检查",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.hero.checks.2"
+      ]
+    },
+    {
+      "rowHash": "8d0ccbe840424b3e",
+      "section": "主视觉区（Hero）",
+      "label": "Primary CTA",
+      "english": "Start designing your Right Amount",
+      "zhCN": "免费测健康评分",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.hero.primary"
+      ]
+    },
+    {
+      "rowHash": "2b5bd48ced6a119f",
+      "section": "主视觉区（Hero）",
+      "label": "Secondary CTA",
+      "english": "How it works",
+      "zhCN": "了解怎么运作",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.hero.secondary"
+      ]
+    },
+    {
+      "rowHash": "2a5700cad974017d",
+      "section": "信任背书条",
+      "label": "Col 1 main",
+      "english": "Founders with 100+ years' combined experience",
+      "zhCN": "创始团队百年累计经验",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.proof.0.title"
+      ]
+    },
+    {
+      "rowHash": "eec2f1b759231e6c",
+      "section": "信任背书条",
+      "label": "Col 1 sub",
+      "english": "Medicine Science Technology",
+      "zhCN": "医学 科学 技术",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.proof.0.body"
+      ]
+    },
+    {
+      "rowHash": "995da35345467cf1",
+      "section": "信任背书条",
+      "label": "Col 2 main",
+      "english": "Formal education & training",
+      "zhCN": "顶尖名校专业背景",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.proof.1.title"
+      ]
+    },
+    {
+      "rowHash": "2ad3c25ea559ca5a",
+      "section": "信任背书条",
+      "label": "Col 2 sub",
+      "english": "Mahidol Princeton Stanford Harvard",
+      "zhCN": "Mahidol Princeton Stanford Harvard",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.proof.1.body"
+      ]
+    },
+    {
+      "rowHash": "3cd4bad2eddc7b2e",
+      "section": "信任背书条",
+      "label": "Col 3 main",
+      "english": "Dispensed by local pharmacists",
+      "zhCN": "资质药师驻场把关",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.proof.2.title"
+      ]
+    },
+    {
+      "rowHash": "1f04b61aaa0e8014",
+      "section": "信任背书条",
+      "label": "Col 3 sub",
+      "english": "Through licensed Thai pharmacy partners",
+      "zhCN": "通过持牌合规药房调配",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.proof.2.body"
+      ]
+    },
+    {
+      "rowHash": "e8a96917f3ec42f1",
+      "section": "从迷茫到清晰",
+      "label": "Section label",
+      "english": "From overwhelm to clarity",
+      "zhCN": "从迷茫到清晰",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.clarity.eyebrow"
+      ]
+    },
+    {
+      "rowHash": "1eeee5a2de72b386",
+      "section": "从迷茫到清晰",
+      "label": "H2",
+      "english": "Too many choices. Let MattaNutra give you clarity.",
+      "zhCN": "眼花缭乱，无从下手？ MattaNutra 为你化繁为简。",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.clarity.title",
+          "zhCN": "眼花缭乱，无从下手？"
+        },
+        {
+          "id": "customer.landing.clarity.accent",
+          "zhCN": "MattaNutra 为你化繁为简。"
+        }
+      ]
+    },
+    {
+      "rowHash": "85459d4ca96a3151",
+      "section": "从迷茫到清晰",
+      "label": "Body",
+      "english": "Walk into a drugstore or look online and it's overwhelming. MattaNutra narrows hundreds of choices down to the few that are right for you, personalised and exactly enough.",
+      "zhCN": "走进药店或上网一搜，满目琳琅，却让人无从下手。 MattaNutra 从上百种产品里，精准筛选出真正适合你的那几样 — 量身定制，恰到好处。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.clarity.body"
+      ]
+    },
+    {
+      "rowHash": "78f0201e5ffe0934",
+      "section": "从迷茫到清晰",
+      "label": "Journey label 1",
+      "english": "Overwhelmed",
+      "zhCN": "茫然无措",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.clarity.cards.0.title"
+      ]
+    },
+    {
+      "rowHash": "46d418cb2442c66d",
+      "section": "从迷茫到清晰",
+      "label": "Journey label 2",
+      "english": "A clear path appears",
+      "zhCN": "豁然开朗",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.clarity.cards.1.title"
+      ]
+    },
+    {
+      "rowHash": "935a0dcafb254e12",
+      "section": "从迷茫到清晰",
+      "label": "Journey label 3",
+      "english": "Narrowed down",
+      "zhCN": "精准筛选",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.clarity.cards.2.title"
+      ]
+    },
+    {
+      "rowHash": "f7099969ce3af67e",
+      "section": "从迷茫到清晰",
+      "label": "Journey label 4",
+      "english": "Exactly enough",
+      "zhCN": "恰到好处",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.clarity.cards.3.title"
+      ]
+    },
+    {
+      "rowHash": "662111bf57259953",
+      "section": "四大承诺",
+      "label": "Section heading",
+      "english": "Four promises. One simple plan.",
+      "zhCN": "四大承诺 一个简单方案",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.promises.title",
+          "zhCN": "四大承诺"
+        },
+        {
+          "id": "customer.landing.promises.accent",
+          "zhCN": "一个简单方案"
+        }
+      ]
+    },
+    {
+      "rowHash": "2df9d6e90a90d631",
+      "section": "四大承诺",
+      "label": "Promise 1 title",
+      "english": "Clarity",
+      "zhCN": "化繁为简",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.promises.cards.0.0"
+      ]
+    },
+    {
+      "rowHash": "15cded9f42435aa8",
+      "section": "四大承诺",
+      "label": "Promise 1 sub",
+      "english": "from confusion",
+      "zhCN": "告别困惑",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.promises.cards.0.1"
+      ]
+    },
+    {
+      "rowHash": "743f9a0efd0cf04b",
+      "section": "四大承诺",
+      "label": "Promise 2 title",
+      "english": "Guidance",
+      "zhCN": "科学有据",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.promises.cards.1.0"
+      ]
+    },
+    {
+      "rowHash": "037c1f6573ba9477",
+      "section": "四大承诺",
+      "label": "Promise 2 sub",
+      "english": "you can trust",
+      "zhCN": "专业可信",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.promises.cards.1.1"
+      ]
+    },
+    {
+      "rowHash": "b48eebe977b864e3",
+      "section": "四大承诺",
+      "label": "Promise 3 title",
+      "english": "Personalised",
+      "zhCN": "量身定制",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.promises.cards.2.0"
+      ]
+    },
+    {
+      "rowHash": "049b615dcc3e8810",
+      "section": "四大承诺",
+      "label": "Promise 3 sub",
+      "english": "just for you",
+      "zhCN": "精准匹配",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.promises.cards.2.1"
+      ]
+    },
+    {
+      "rowHash": "1a1f876bc5c793b2",
+      "section": "四大承诺",
+      "label": "Promise 4 title",
+      "english": "Confidence",
+      "zhCN": "胸有成竹",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.promises.cards.3.0"
+      ]
+    },
+    {
+      "rowHash": "eba87a55ceba68a1",
+      "section": "四大承诺",
+      "label": "Promise 4 sub",
+      "english": "in every choice",
+      "zhCN": "每次选择安心",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.promises.cards.3.1"
+      ]
+    },
+    {
+      "rowHash": "6aba35b485a6ccde",
+      "section": "如何运作（四步流程）",
+      "label": "Section label",
+      "english": "How it works",
+      "zhCN": "如何运作",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.eyebrow"
+      ]
+    },
+    {
+      "rowHash": "6a68a4c16322613a",
+      "section": "如何运作（四步流程）",
+      "label": "H2",
+      "english": "The right amount of questions. Nothing more, nothing missed.",
+      "zhCN": "适量提问，不多不少，不遗不漏。",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.how.title",
+          "zhCN": "适量提问，"
+        },
+        {
+          "id": "customer.landing.how.accent",
+          "zhCN": "不多不少，不遗不漏。"
+        }
+      ]
+    },
+    {
+      "rowHash": "cf46ee0a0de564e8",
+      "section": "如何运作（四步流程）",
+      "label": "Subtitle",
+      "english": "From a short, focused questionnaire to a recommendation you can trust. Four steps.",
+      "zhCN": "从简短聚焦的问卷到可信赖的推荐，四步即达。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.intro"
+      ]
+    },
+    {
+      "rowHash": "0d4976ad02f219ed",
+      "section": "如何运作（四步流程）",
+      "label": "Step 1 title",
+      "english": "Answer",
+      "zhCN": "回答",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.steps.0.0"
+      ]
+    },
+    {
+      "rowHash": "a4242ae3b354e6e5",
+      "section": "如何运作（四步流程）",
+      "label": "Step 1 body",
+      "english": "A genuinely detailed set of questions your goals & health priorities, lifestyle & activity, current medications, budget, and what you truly care about. Thorough enough to personalise your formula, with no jargon and no fluff.",
+      "zhCN": "一组真正有深度的问题 — 涵盖你的健康目标与优先事项、生活方式与运动习惯、当前用药、预算，以及你真正在意的事。足够深入，才能精准定制你的知量方案；没有术语，没有废话。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.steps.0.2"
+      ]
+    },
+    {
+      "rowHash": "f5a8471176305348",
+      "section": "如何运作（四步流程）",
+      "label": "Step 1 tag",
+      "english": "Thorough but not tedious",
+      "zhCN": "深度提问，拒绝繁琐",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.steps.0.1"
+      ]
+    },
+    {
+      "rowHash": "b90d240ddd33d341",
+      "section": "如何运作（四步流程）",
+      "label": "Step 2 title",
+      "english": "Analyse",
+      "zhCN": "分析",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.steps.1.0"
+      ]
+    },
+    {
+      "rowHash": "48afd2985ef3820f",
+      "section": "如何运作（四步流程）",
+      "label": "Step 2 body",
+      "english": "A proprietary algorithm grounded in published clinical research designed to closely match the supplement priorities a blood panel would surface, with dosage ranges and safety checks.",
+      "zhCN": "专有算法基于已发表的临床研究，精准匹配血液检测所能揭示的营养优先级，同步评估剂量范围与安全交叉检查。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.steps.1.2"
+      ]
+    },
+    {
+      "rowHash": "cea938a5716827b5",
+      "section": "如何运作（四步流程）",
+      "label": "Step 2 tag",
+      "english": "120+ ingredients evaluated",
+      "zhCN": "评估 120+ 种营养成分",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.steps.1.1"
+      ]
+    },
+    {
+      "rowHash": "14adf32fb1858f92",
+      "section": "如何运作（四步流程）",
+      "label": "Step 3 title",
+      "english": "Match",
+      "zhCN": "匹配",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.steps.2.0"
+      ]
+    },
+    {
+      "rowHash": "4d84c3e723fc4166",
+      "section": "如何运作（四步流程）",
+      "label": "Step 3 body",
+      "english": "Your formula is dispensed through a partner pharmacy with registered pharmacists real people you can ask, not a guess in the aisle.",
+      "zhCN": "你的知量方案由合作药房的持证药师亲手调配 — 是真实可咨询的专业人士，而不是在货架前自己摸索。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.steps.2.2"
+      ]
+    },
+    {
+      "rowHash": "ebd816043ddba099",
+      "section": "如何运作（四步流程）",
+      "label": "Step 3 tag",
+      "english": "Dispensed by a pharmacist",
+      "zhCN": "专业药师驻场，精准调配",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.steps.2.1"
+      ]
+    },
+    {
+      "rowHash": "a34997651806ab1b",
+      "section": "如何运作（四步流程）",
+      "label": "Step 4 title",
+      "english": "Refine",
+      "zhCN": "持续优化",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.steps.3.0"
+      ]
+    },
+    {
+      "rowHash": "b51f433976f86e52",
+      "section": "如何运作（四步流程）",
+      "label": "Step 4 body",
+      "english": "With Living Protocol, your plan adapts as your goals, symptoms and lifestyle change.",
+      "zhCN": "借助 Living Protocol （动态健康方案），你的配方会随目标、症状和生活方式的变化，持续优化调整。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.steps.3.2"
+      ]
+    },
+    {
+      "rowHash": "d6f1fde9782b3916",
+      "section": "如何运作（四步流程）",
+      "label": "Step 4 tag",
+      "english": "Part of Living Protocol",
+      "zhCN": "动态健康方案的核心",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.how.steps.3.1"
+      ]
+    },
+    {
+      "rowHash": "d36d14e89569eda7",
+      "section": "动态健康方案主模块",
+      "label": "Section label",
+      "english": "Living Protocol 90-day support",
+      "zhCN": "Living Protocol （动态健康方案） 90 天持续支持",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.eyebrow"
+      ]
+    },
+    {
+      "rowHash": "1ce221c0301b858b",
+      "section": "动态健康方案主模块",
+      "label": "H2",
+      "english": "Life changes constantly. Your protocol can keep up.",
+      "zhCN": "生活时刻在变，你的健康方案也能跟上节奏",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.title",
+          "zhCN": "生活时刻在变，"
+        },
+        {
+          "id": "customer.landing.protocol.accent",
+          "zhCN": "你的健康方案也能跟上节奏"
+        }
+      ]
+    },
+    {
+      "rowHash": "45dcc27044505db8",
+      "section": "动态健康方案主模块",
+      "label": "Subtitle",
+      "english": "Living Protocol works through the messaging app you already use. You just tell it what changed. It handles the rest.",
+      "zhCN": "动态健康方案融入你已在使用的即时通讯。微信版本即将推出。你只需告诉它变化了什么，其余交给它来完成。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.practice.intro"
+      ]
+    },
+    {
+      "rowHash": "f0634dbcbaebef7b",
+      "section": "动态健康方案主模块",
+      "label": "Body",
+      "english": "Sleep, stress, travel and shifting routines all change what your body needs. Living Protocol keeps your supplements and the food behind them aligned with real life, so what's right today is still right next week.",
+      "zhCN": "睡眠、压力、出差、作息变化 — 生活一乱，身体需求就变。 Living Protocol （动态健康方案）让你的保健品 — 以及背后的日常饮食 — 始终与真实生活同步。今天的知量，下周依然精准。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.intro"
+      ]
+    },
+    {
+      "rowHash": "1c5b08e92bd758af",
+      "section": "动态健康方案主模块",
+      "label": "Benefit 1",
+      "english": "Built by physicians every adjustment is checked against your medications and labs",
+      "zhCN": "由医师团队主导构建 — 每次调整都对照你的用药记录与化验数据",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.ticks.0"
+      ]
+    },
+    {
+      "rowHash": "202d27ff345b6fe6",
+      "section": "动态健康方案主模块",
+      "label": "Benefit 2",
+      "english": "Stays aligned through travel, stress and poor sleep",
+      "zhCN": "自动适应出行、压力、睡眠不足等各种真实场景",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.ticks.1"
+      ]
+    },
+    {
+      "rowHash": "9933edcba07b9229",
+      "section": "动态健康方案主模块",
+      "label": "Benefit 3",
+      "english": "Reduces the guesswork when life shifts",
+      "zhCN": "生活节奏一变，告别反复猜测",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.ticks.2"
+      ]
+    },
+    {
+      "rowHash": "abde428ea4fc5659",
+      "section": "动态健康方案主模块",
+      "label": "Primary CTA",
+      "english": "Explore Living Protocol",
+      "zhCN": "了解动态健康方案怎么运作",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.primary"
+      ]
+    },
+    {
+      "rowHash": "0554611a2d893863",
+      "section": "动态健康方案主模块",
+      "label": "Secondary CTA",
+      "english": "See how it works",
+      "zhCN": "查看真实调整案例",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.secondary"
+      ]
+    },
+    {
+      "rowHash": "f107cc6e5482245e",
+      "section": "聊天示例对话",
+      "label": "Interface label",
+      "english": "Line / WhatsApp",
+      "zhCN": "Line / WhatsApp",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.channel"
+      ]
+    },
+    {
+      "rowHash": "d3127676df289372",
+      "section": "聊天示例对话",
+      "label": "Widget title",
+      "english": "MattaNutra Living Protocol active",
+      "zhCN": "MattaNutra Living Protocol 已激活",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.active",
+          "zhCN": "Living Protocol 已激活"
+        }
+      ]
+    },
+    {
+      "rowHash": "dce522a662494140",
+      "section": "聊天示例对话",
+      "label": "Platform note",
+      "english": "Currently available on Line / WhatsApp. WeChat coming soon.",
+      "zhCN": "目前通过 Line / WhatsApp 使用。微信版本即将推出。",
+      "status": "not_in_product",
+      "reason": "The current phone mockup has no separate platform-note row; channel availability is covered by the channel label and Living Protocol practice copy."
+    },
+    {
+      "rowHash": "bd8b437d320c28fe",
+      "section": "聊天示例对话",
+      "label": "AI question",
+      "english": "Anything different this week sleep, stress, travel or routine?",
+      "zhCN": "这周有什么变化吗 — 睡眠、压力、出行或者日常作息？",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.chat.0"
+      ]
+    },
+    {
+      "rowHash": "11e835c5af01c73c",
+      "section": "聊天示例对话",
+      "label": "User reply",
+      "english": "I'm going to Tokyo tomorrow. Probably won't sleep great.",
+      "zhCN": "我明天飞东京，估计睡不好。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.chat.1"
+      ]
+    },
+    {
+      "rowHash": "3fb0dd980954ec84",
+      "section": "聊天示例对话",
+      "label": "AI response",
+      "english": "Got it Tokyo, 6 days, expecting sleep disruption. I've made 3 small adjustments. Everything else stays the same. Here's your plan for the trip.",
+      "zhCN": "收到 — 东京六天，预计有睡眠干扰。帮你做了三处小调整，其余不变。以下是你此行的方案。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.chat.2"
+      ]
+    },
+    {
+      "rowHash": "4956f5c3d2a46f70",
+      "section": "聊天示例对话",
+      "label": "Card title",
+      "english": "Your Tokyo trip 3 small adjustments",
+      "zhCN": "你的东京行程 —3 处小调整",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.tripTitle"
+      ]
+    },
+    {
+      "rowHash": "4d18a764cbf540f9",
+      "section": "聊天示例对话",
+      "label": "Adjustment 1",
+      "english": "✓ Magnesium slightly earlier 19:30 local time, not 21:30",
+      "zhCN": "✓ 镁剂稍早服用 — 当地时间 19:30，而非 21:30",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.updates.0",
+          "zhCN": "镁剂稍早服用 — 当地时间 19:30，而非 21:30"
+        }
+      ]
+    },
+    {
+      "rowHash": "72b5ff9763b9dc9a",
+      "section": "聊天示例对话",
+      "label": "Adjustment 2",
+      "english": "✓ Electrolytes on the flight and each morning",
+      "zhCN": "✓ 飞行途中及每天早晨补充电解质",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.updates.1",
+          "zhCN": "飞行途中及每天早晨补充电解质"
+        }
+      ]
+    },
+    {
+      "rowHash": "4677378376571ff4",
+      "section": "聊天示例对话",
+      "label": "Adjustment 3",
+      "english": "Everything else unchanged",
+      "zhCN": "其余不变",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.updates.2"
+      ]
+    },
+    {
+      "rowHash": "e79bb5b2d82458f6",
+      "section": "聊天示例对话",
+      "label": "Reasoning label",
+      "english": "Based on",
+      "zhCN": "依据",
+      "status": "superseded_by_current_copy",
+      "reason": "The UI combines the label and summary into customer.landing.protocol.basedOn."
+    },
+    {
+      "rowHash": "5a1000f2bbf6e241",
+      "section": "聊天示例对话",
+      "label": "Reasoning summary",
+      "english": "6-day trip Expected sleep disruption Meetings More walking",
+      "zhCN": "6 天行程 预计睡眠干扰 会议密集 步行增加",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.basedOn",
+          "zhCN": "依据：6 天行程 · 预计睡眠干扰 · 会议密集 · 步行增加"
+        }
+      ]
+    },
+    {
+      "rowHash": "7bc77071d5a16ff0",
+      "section": "聊天示例对话",
+      "label": "Expand link",
+      "english": "See the reasoning",
+      "zhCN": "查看推理",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.reasoningLabel"
+      ]
+    },
+    {
+      "rowHash": "922563f1bd221588",
+      "section": "聊天示例对话",
+      "label": "Reasoning 1",
+      "english": "Earlier magnesium helps you shift with the time zone and wind down earlier.",
+      "zhCN": "镁剂提前 — 帮助你随时差调整，提前进入放松状态。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.reasoning.0"
+      ]
+    },
+    {
+      "rowHash": "756ca2749fd5205b",
+      "section": "聊天示例对话",
+      "label": "Reasoning 2",
+      "english": "Added electrolytes supports hydration during the flight and increased walking in the city.",
+      "zhCN": "增加电解质 — 支持飞行途中及城市步行增加时的水分平衡。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.reasoning.1"
+      ]
+    },
+    {
+      "rowHash": "f8b6e0fd1f0a5cbf",
+      "section": "聊天示例对话",
+      "label": "Reasoning 3",
+      "english": "Adaptogen unchanged your stress is elevated but sleep has been inconsistent recently, so no stacking adjustments yet.",
+      "zhCN": "适应原保持不变 — 你的压力虽有上升，但近期睡眠已不稳定，因此暂不叠加调整。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.reasoning.2"
+      ]
+    },
+    {
+      "rowHash": "799c66f560ce62ed",
+      "section": "聊天示例对话",
+      "label": "Food note",
+      "english": "One more thing your last check showed magnesium slightly low. It's already in your plan, but you can also get it from food:",
+      "zhCN": "还有一件事 — 你上次检查显示镁水平略低。我已纳入你的方案，你也可以通过天然食物补充：",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.foodNudge"
+      ]
+    },
+    {
+      "rowHash": "83b0632e6a62b656",
+      "section": "聊天示例对话",
+      "label": "Food items",
+      "english": "Pumpkin seeds Spinach Black beans",
+      "zhCN": "南瓜子 菠菜 黑豆",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocol.foodTags.0",
+          "zhCN": "南瓜子"
+        },
+        {
+          "id": "customer.landing.protocol.foodTags.1",
+          "zhCN": "菠菜"
+        },
+        {
+          "id": "customer.landing.protocol.foodTags.2",
+          "zhCN": "黑豆"
+        }
+      ]
+    },
+    {
+      "rowHash": "59a4b68cc2271754",
+      "section": "聊天示例对话",
+      "label": "User follow-up",
+      "english": "Oh, I didn't know that. What about my Vitamin C should I take extra?",
+      "zhCN": "哦，这个我还真不知道。那我的维生素 C— 需要额外补充吗？",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.vitaminQuestion"
+      ]
+    },
+    {
+      "rowHash": "e7a61ebf74303645",
+      "section": "聊天示例对话",
+      "label": "AI final reply",
+      "english": "Honestly? You probably don't need to. Your fruit and veg this week already covers it. Save this one food's got it.",
+      "zhCN": "说实话？你可能不需要。这周的水果蔬菜已经够了。省着 — 食物帮你搞定了。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocol.vitaminAnswer"
+      ]
+    },
+    {
+      "rowHash": "b6a1b7ab795d0a58",
+      "section": "知量方案与动态健康方案关系说明",
+      "label": "H2",
+      "english": "Your Right Amount is the foundation. Living Protocol keeps it aligned with real life.",
+      "zhCN": "你的知量方案是基础，动态健康方案让它与真实生活持续同步。",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.protocolBand.title",
+          "zhCN": "你的知量方案是基础，"
+        },
+        {
+          "id": "customer.landing.protocolBand.accent",
+          "zhCN": "动态健康方案让它与真实生活持续同步。"
+        }
+      ]
+    },
+    {
+      "rowHash": "ded9b296b66dc057",
+      "section": "知量方案与动态健康方案关系说明",
+      "label": "Body",
+      "english": "Travel, stress, poor sleep and shifting routines all change what your body needs. Your foundation stays the same but small adjustments around it move with you.",
+      "zhCN": "出行、压力、睡眠不足和作息变化，都会影响身体营养需求。你的基础配方不变 — 但围绕它的微小调整，会随之而动。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.protocolBand.body"
+      ]
+    },
+    {
+      "rowHash": "e1068394d2f3216a",
+      "section": "动态健康方案三步使用",
+      "label": "Section label",
+      "english": "Living Protocol in practice",
+      "zhCN": "动态健康方案 实践",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.practice.eyebrow"
+      ]
+    },
+    {
+      "rowHash": "40aa25e08853723f",
+      "section": "动态健康方案三步使用",
+      "label": "H2",
+      "english": "Three steps. No new app to learn.",
+      "zhCN": "三步搞定，不用下载新应用。",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.title",
+          "zhCN": "三步搞定，"
+        },
+        {
+          "id": "customer.landing.practice.accent",
+          "zhCN": "不用下载新应用。"
+        }
+      ]
+    },
+    {
+      "rowHash": "782844a634556175",
+      "section": "动态健康方案三步使用",
+      "label": "Subtitle",
+      "english": "Living Protocol works through the messaging app you already use. You just tell it what changed. It handles the rest.",
+      "zhCN": "动态健康方案融入你已在使用的即时通讯。微信版本即将推出。你只需告诉它变化了什么，其余交给它来完成。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.practice.intro"
+      ]
+    },
+    {
+      "rowHash": "5e653c36200a2dd8",
+      "section": "动态健康方案三步使用",
+      "label": "Step 01 title",
+      "english": "Tell MattaNutra what changed",
+      "zhCN": "告诉我们，你的生活有什么变化",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.practice.steps.0.0"
+      ]
+    },
+    {
+      "rowHash": "ef861556264493b0",
+      "section": "动态健康方案三步使用",
+      "label": "Step 01 body",
+      "english": "Send a short message on Line or WhatsApp no forms, no tracking, no new app to learn.",
+      "zhCN": "通过 Line / WhatsApp 发一条简短消息即可 — 无需填表，无需打卡，无需下载新应用。微信版本即将推出。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.practice.steps.0.1"
+      ]
+    },
+    {
+      "rowHash": "5baa62f0299e2aa1",
+      "section": "动态健康方案三步使用",
+      "label": "Step 01 example 1",
+      "english": "\"Sleep's been rough this week.\"",
+      "zhCN": "\" 这周睡眠很差。 \"",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.steps.0.2.0",
+          "zhCN": "这周睡眠很差。"
+        }
+      ]
+    },
+    {
+      "rowHash": "7c10e0c8be6e7a53",
+      "section": "动态健康方案三步使用",
+      "label": "Step 01 example 2",
+      "english": "\"Travelling tomorrow.\"",
+      "zhCN": "\" 明天出差。 \"",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.steps.0.2.1",
+          "zhCN": "明天出差。"
+        }
+      ]
+    },
+    {
+      "rowHash": "2889a88c5e56e215",
+      "section": "动态健康方案三步使用",
+      "label": "Step 01 example 3",
+      "english": "\"Big training week.\"",
+      "zhCN": "\" 最近训练强度加大了。 \"",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.steps.0.2.2",
+          "zhCN": "最近训练强度加大了。"
+        }
+      ]
+    },
+    {
+      "rowHash": "c7a3bce2b5753f94",
+      "section": "动态健康方案三步使用",
+      "label": "Step 02 title",
+      "english": "Your plan adjusts to you",
+      "zhCN": "你的方案，随你的生活而动",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.practice.steps.1.0"
+      ]
+    },
+    {
+      "rowHash": "d9643f8f5cb579bf",
+      "section": "动态健康方案三步使用",
+      "label": "Step 02 body",
+      "english": "Based on your current formula, goals and safety flags, it turns what you shared into a few precise changes timing, dosage, or a temporary addition and tells you which everyday foods support what your body needs right now.",
+      "zhCN": "基于你当前的营养方案、健康目标与安全标记， MattaNutra 将你的消息转化为几处精准调整 — 服用时间、剂量调整，或临时增项 — 并同步推荐能支持当下身体需求的日常食物。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.practice.steps.1.1"
+      ]
+    },
+    {
+      "rowHash": "7b5fff81389ddadd",
+      "section": "动态健康方案三步使用",
+      "label": "Step 02 example 1",
+      "english": "\"Move magnesium slightly earlier this week.\"",
+      "zhCN": "\" 这周镁稍微早点吃。 \"",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.steps.1.2.0",
+          "zhCN": "这周镁稍微早点吃。"
+        }
+      ]
+    },
+    {
+      "rowHash": "cbee546736020523",
+      "section": "动态健康方案三步使用",
+      "label": "Step 02 example 2",
+      "english": "\"Pumpkin seeds are a strong natural source of magnesium.\"",
+      "zhCN": "\" 南瓜子是镁的优质天然来源。 \"",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.steps.1.2.1",
+          "zhCN": "南瓜子是镁的优质天然来源。"
+        }
+      ]
+    },
+    {
+      "rowHash": "2c1392066bab0ad0",
+      "section": "动态健康方案三步使用",
+      "label": "Step 02 example 3",
+      "english": "\"Keep adaptogen dose unchanged until sleep stabilises.\"",
+      "zhCN": "\" 睡眠稳定前，保持适应原剂量不变。 \"",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.steps.1.2.2",
+          "zhCN": "睡眠稳定前，保持适应原剂量不变。"
+        }
+      ]
+    },
+    {
+      "rowHash": "aeb4d1ba5e8c9657",
+      "section": "动态健康方案三步使用",
+      "label": "Step 03 title",
+      "english": "Stay consistent without overthinking it",
+      "zhCN": "安心维持，不必过度纠结",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.practice.steps.2.0"
+      ]
+    },
+    {
+      "rowHash": "d8dcf004d0cd3a56",
+      "section": "动态健康方案三步使用",
+      "label": "Step 03 body",
+      "english": "When life gets busy, you don't need to research, second-guess or start over. You just do a few simple things and trust they're right for you.",
+      "zhCN": "生活一忙，你不需要重新研究、反复纠结，也不需要从头开始。只需做几件简单的事 — 并相信，它们就是专为你准备的。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.practice.steps.2.1"
+      ]
+    },
+    {
+      "rowHash": "788098777a97dcc9",
+      "section": "动态健康方案三步使用",
+      "label": "Step 03 example 1",
+      "english": "\"No need to reinvent your routine every time life shifts.\"",
+      "zhCN": "\" 无需每次生活变化都重新规划日常。 \"",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.steps.2.2.0",
+          "zhCN": "无需每次生活变化都重新规划日常。"
+        }
+      ]
+    },
+    {
+      "rowHash": "5032a21d4f3f371d",
+      "section": "动态健康方案三步使用",
+      "label": "Step 03 example 2",
+      "english": "\"Small adjustments make the plan more sustainable.\"",
+      "zhCN": "\" 小调整让计划更可持续。 \"",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.steps.2.2.1",
+          "zhCN": "小调整让计划更可持续。"
+        }
+      ]
+    },
+    {
+      "rowHash": "c55cb989e3b74722",
+      "section": "动态健康方案三步使用",
+      "label": "Step 03 example 3",
+      "english": "\"Your Right Amount stays right.\"",
+      "zhCN": "\" 你的知量方案，始终精准。 \"",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.practice.steps.2.2.2",
+          "zhCN": "你的知量方案，始终精准。"
+        }
+      ]
+    },
+    {
+      "rowHash": "c57a243075c58239",
+      "section": "食物与保健品",
+      "label": "Section label",
+      "english": "Food and supplements, working together",
+      "zhCN": "食物与保健品，相辅相成",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.food.eyebrow"
+      ]
+    },
+    {
+      "rowHash": "aac3aa07d3abd1e5",
+      "section": "食物与保健品",
+      "label": "H2",
+      "english": "The best source is sometimes on your plate.",
+      "zhCN": "有时候，最好的营养来源就在你的餐盘里。",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.food.title",
+          "zhCN": "有时候，最好的营养来源"
+        },
+        {
+          "id": "customer.landing.food.accent",
+          "zhCN": "就在你的餐盘里。"
+        }
+      ]
+    },
+    {
+      "rowHash": "14dc3c9607d1a3e6",
+      "section": "食物与保健品",
+      "label": "Body",
+      "english": "Supplements fill the gaps but food fills them first. When Living Protocol identifies something your body needs, it doesn't just recommend a capsule. It tells you which everyday foods naturally contain it, so you can choose: add it at dinner, or take it from a bottle. Either way, you're knowing, not guessing.",
+      "zhCN": "保健品填补缺口 — 但食物才是第一道防线。当动态健康方案发现你的身体需要某种营养素时，它不会只推荐胶囊。它会告诉你哪些日常食物天然富含该成分，让你自己选择：在饭桌上补，还是从瓶子里补。无论哪种方式，你都在真正知量，而不是瞎猜。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.food.intro"
+      ]
+    },
+    {
+      "rowHash": "62979d6e5d69f983",
+      "section": "食物与保健品",
+      "label": "Scenario 1 label",
+      "english": "Low on magnesium?",
+      "zhCN": "镁摄入不足？",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.food.cards.0.0"
+      ]
+    },
+    {
+      "rowHash": "39940ed041b4abeb",
+      "section": "食物与保健品",
+      "label": "Scenario 1 body",
+      "english": "Pumpkin seeds, spinach and black beans are among the richest natural sources.",
+      "zhCN": "南瓜子、菠菜和黑豆，是天然最丰富的来源之一。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.food.cards.0.1"
+      ]
+    },
+    {
+      "rowHash": "1d2238c7c0973265",
+      "section": "食物与保健品",
+      "label": "Scenario 1 tags",
+      "english": "Pumpkin seeds Spinach Black beans",
+      "zhCN": "南瓜子 菠菜 黑豆",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.food.cards.0.2.0",
+          "zhCN": "南瓜子"
+        },
+        {
+          "id": "customer.landing.food.cards.0.2.1",
+          "zhCN": "菠菜"
+        },
+        {
+          "id": "customer.landing.food.cards.0.2.2",
+          "zhCN": "黑豆"
+        }
+      ]
+    },
+    {
+      "rowHash": "213cff1c42ab420c",
+      "section": "食物与保健品",
+      "label": "Scenario 2 label",
+      "english": "Need more chromium?",
+      "zhCN": "需要补充更多铬？",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.food.cards.1.0"
+      ]
+    },
+    {
+      "rowHash": "4486d0b6785c23b7",
+      "section": "食物与保健品",
+      "label": "Scenario 2 body",
+      "english": "It shows up in unexpected places grape juice, broccoli, and whole grains.",
+      "zhCN": "它出现在意想不到的地方 — 葡萄汁、西兰花和全谷物。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.food.cards.1.1"
+      ]
+    },
+    {
+      "rowHash": "5481a22ccdd84e75",
+      "section": "食物与保健品",
+      "label": "Scenario 2 tags",
+      "english": "Grape juice Broccoli Whole grains",
+      "zhCN": "葡萄汁 西兰花 全谷物",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.food.cards.1.2.0",
+          "zhCN": "葡萄汁"
+        },
+        {
+          "id": "customer.landing.food.cards.1.2.1",
+          "zhCN": "西兰花"
+        },
+        {
+          "id": "customer.landing.food.cards.1.2.2",
+          "zhCN": "全谷物"
+        }
+      ]
+    },
+    {
+      "rowHash": "c22d30d43c6678f2",
+      "section": "食物与保健品",
+      "label": "Scenario 3 label",
+      "english": "Already covered?",
+      "zhCN": "已经够了？",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.food.cards.2.0"
+      ]
+    },
+    {
+      "rowHash": "0e44e301db350742",
+      "section": "食物与保健品",
+      "label": "Scenario 3 body",
+      "english": "If your regular diet already covers what you need, Living Protocol will tell you to skip it saving you time and money.",
+      "zhCN": "如果你的日常饮食已能满足需求，动态健康方案会直接告诉你省掉这一项 — 省时也省钱。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.food.cards.2.1"
+      ]
+    },
+    {
+      "rowHash": "e1b8bd190c91463c",
+      "section": "食物与保健品",
+      "label": "Scenario 3 tag",
+      "english": "food's got it",
+      "zhCN": "饮食已经帮你搞定了",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.food.cards.2.2.0"
+      ]
+    },
+    {
+      "rowHash": "947af10c0a41a6a2",
+      "section": "食物与保健品",
+      "label": "Footer note",
+      "english": "No food diary. No calorie counting. Just quick answers when there's a question, and a small nudge toward food when it helps.",
+      "zhCN": "无需写食物日记，无需计算热量。只需在有疑问时给你快速解答，需要时轻轻推你一把 — 往餐桌那边。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.food.note"
+      ]
+    },
+    {
+      "rowHash": "0f3348f502521f05",
+      "section": "为何不同",
+      "label": "Section label",
+      "english": "Why it's different",
+      "zhCN": "为何不同",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.difference.eyebrow"
+      ]
+    },
+    {
+      "rowHash": "96dabe80e1e17a3f",
+      "section": "为何不同",
+      "label": "H2",
+      "english": "Not just an answer. A plan that actually knows you.",
+      "zhCN": "不只是一个答案，而是一套真正了解你的方案。",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.difference.title",
+          "zhCN": "不只是一个答案，"
+        },
+        {
+          "id": "customer.landing.difference.accent",
+          "zhCN": "而是一套真正了解你的方案。"
+        }
+      ]
+    },
+    {
+      "rowHash": "d41cb116f73abec1",
+      "section": "为何不同",
+      "label": "Paragraph 1",
+      "english": "Anyone can look up whether travel affects magnesium. The hard part is knowing how it affects your plan your stack, your medications, what your past few weeks looked like and what you should actually do about it. That's what Living Protocol handles.",
+      "zhCN": "旅行会影响镁的吸收 — 这个答案网上随手可查。真正的难点在于：了解这件事具体如何影响你的方案 — 你的营养组合、用药情况、过去几周的状态 — 以及你实际应该怎么做。这正是动态健康方案为你处理的。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.difference.paragraphs.0"
+      ]
+    },
+    {
+      "rowHash": "a6b391588450d037",
+      "section": "为何不同",
+      "label": "Paragraph 2",
+      "english": "It already knows your full stack, so you never have to re-explain when something changes. Every adjustment recommendation is safety-checked against your medication list and lab flags a safeguard that only works when the guidance is built entirely around you. Over 90 days, it starts to recognise your patterns, and suggestions reflect what's been happening over weeks, not just today. You also don't need to know the right questions to ask you just tell it what happened, and Living Protocol does the thinking.",
+      "zhCN": "它已掌握你所有的营养信息，因此每次变化发生时，你无需从头解释。每次调整建议都会对照你的用药记录与化验标记进行安全核查 — 这种保障，只有在指导方案完全围绕你构建时才能奏效。 90 天内，系统逐渐识别你的健康规律，给出的建议不只反映本周状况，更折射出背后的整体趋势。你也无需思考该问什么 — 只要告诉它发生了什么，动态健康方案就会替你思考。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.difference.paragraphs.1"
+      ]
+    },
+    {
+      "rowHash": "0390af83d978e50d",
+      "section": "为何不同",
+      "label": "Closing line",
+      "english": "You don't need to become your own nutritionist. You just need to tell MattaNutra what changed and it keeps your Right Amount right.",
+      "zhCN": "你不需要成为自己的营养师。只需告诉 MattaNutra 你有什么变化，它就会让你的知量方案始终精准。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.difference.paragraphs.2"
+      ]
+    },
+    {
+      "rowHash": "46ffed0aac8bfa57",
+      "section": "中段 CTA 区",
+      "label": "H2",
+      "english": "Ready to design your Right Amount?",
+      "zhCN": "想知道自己身体到底缺什么吗？",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.bridge.title"
+      ]
+    },
+    {
+      "rowHash": "d2aa1bda16cd91d6",
+      "section": "中段 CTA 区",
+      "label": "Body",
+      "english": "Start with a short, detailed questionnaire and your free Health Score. Your personalised Right Amount Formula and optional Living Protocol support is ready when you are.",
+      "zhCN": "只需几分钟回答几个问题，免费拿到健康评分和初步方向。你的个性化知量方案 — 以及可选的动态健康方案支持 — 随时为你开启。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.bridge.body"
+      ]
+    },
+    {
+      "rowHash": "df37735724cbc4fc",
+      "section": "中段 CTA 区",
+      "label": "Primary CTA",
+      "english": "Start designing your Right Amount",
+      "zhCN": "免费测我的健康评分",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.bridge.cta"
+      ]
+    },
+    {
+      "rowHash": "c099cb984c985b91",
+      "section": "中段 CTA 区",
+      "label": "Trust tags",
+      "english": "Completely free No credit card",
+      "zhCN": "完全免费 无需绑定信用卡 约 3 分钟",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.bridge.note"
+      ]
+    },
+    {
+      "rowHash": "c83c53514f84a976",
+      "section": "用户故事",
+      "label": "Section label",
+      "english": "Stories like these",
+      "zhCN": "他们的故事",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.results.eyebrow"
+      ]
+    },
+    {
+      "rowHash": "7bd9219527f4112f",
+      "section": "用户故事",
+      "label": "H2",
+      "english": "Different lives. The same first step.",
+      "zhCN": "不同的人生轨迹，同一个开始。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.results.title"
+      ]
+    },
+    {
+      "rowHash": "9a5d60d0974f88b6",
+      "section": "用户故事",
+      "label": "Subtitle",
+      "english": "Different lifestyles. One shared goal: better health, more clarity, and a daily routine that actually works.",
+      "zhCN": "生活方式各不相同。共同目标只有一个：更好的健康状态、更清晰的方向，以及真正可行的日常。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.results.intro"
+      ]
+    },
+    {
+      "rowHash": "752ed149ae6c0b4e",
+      "section": "用户故事",
+      "label": "Daniel quote",
+      "english": "\"I was nearly 40 and kept saying I wanted to change things, but never knew where to start. A drawer full of vitamins I bought randomly, no real plan. MattaNutra gave me a clear starting point and it didn't feel overwhelming.\"",
+      "zhCN": "\" 快四十岁的时候，我一直说想改变，却始终不知从何下手。抽屉里塞满了随手买的维生素，根本没有真正的计划。 MattaNutra 给了我一个清晰的起点，整个过程一点也不让人觉得负担。 \"",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.testimonials.daniel.quote"
+      ],
+      "catalogChecks": [
+        {
+          "id": "customer.landing.results.fallback.0.quote",
+          "zhCN": "快四十岁的时候，我一直说想改变，却始终不知从何下手。抽屉里塞满了随手买的维生素，根本没有真正的计划。 MattaNutra 给了我一个清晰的起点，整个过程一点也不让人觉得负担。"
+        }
+      ]
+    },
+    {
+      "rowHash": "f8bbd233b703fea0",
+      "section": "用户故事",
+      "label": "Daniel attribution",
+      "english": "Daniel L. 40, Bangkok Project Manager",
+      "zhCN": "Daniel L. 40 岁，曼谷 项目经理",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.testimonials.daniel.author"
+      ],
+      "catalogChecks": [
+        {
+          "id": "customer.landing.results.fallback.0.name",
+          "zhCN": "Daniel L."
+        },
+        {
+          "id": "customer.landing.results.fallback.0.place",
+          "zhCN": "40 岁，曼谷"
+        },
+        {
+          "id": "customer.landing.results.fallback.0.role",
+          "zhCN": "项目经理"
+        }
+      ]
+    },
+    {
+      "rowHash": "6bd66c71148e6e80",
+      "section": "用户故事",
+      "label": "Mei Lin quote",
+      "english": "\"Work, travel, family my health habits had basically become 'whenever I remember'. MattaNutra turned a messy pile of supplements into a simple plan that actually fits a busy life.\"",
+      "zhCN": "\" 工作、出差、顾家，我的健康习惯早就变成了 ' 记得就做 '。 MattaNutra 帮我把那一堆乱七八糟的保健品，变成了一个真正适合忙碌生活的简单计划。 \"",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.testimonials.meilin.quote"
+      ],
+      "catalogChecks": [
+        {
+          "id": "customer.landing.results.fallback.1.quote",
+          "zhCN": "工作、出差、顾家，我的健康习惯早就变成了 ' 记得就做 '。 MattaNutra 帮我把那一堆乱七八糟的保健品，变成了一个真正适合忙碌生活的简单计划。"
+        }
+      ]
+    },
+    {
+      "rowHash": "dd9210ec4630d331",
+      "section": "用户故事",
+      "label": "Mei Lin attribution",
+      "english": "Mei Lin T. 45, Singapore Operations Lead",
+      "zhCN": "Mei Lin T. 45 岁，新加坡 运营负责人",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.testimonials.meilin.author"
+      ],
+      "catalogChecks": [
+        {
+          "id": "customer.landing.results.fallback.1.name",
+          "zhCN": "Mei Lin T."
+        },
+        {
+          "id": "customer.landing.results.fallback.1.place",
+          "zhCN": "45 岁，新加坡"
+        },
+        {
+          "id": "customer.landing.results.fallback.1.role",
+          "zhCN": "运营负责人"
+        }
+      ]
+    },
+    {
+      "rowHash": "73693b7474f85adf",
+      "section": "用户故事",
+      "label": "Wanida quote",
+      "english": "\"My doctor said my blood pressure was creeping up and I needed to make changes. I spent hours reading online and just got more confused. MattaNutra cut through all of it and gave me a plan that actually fit my life.\"",
+      "zhCN": "\" 医生说我的血压开始偏高，需要做出改变。我在网上查了好几个小时的资料，结果越查越迷糊。 MattaNutra 帮我过滤掉所有噪音，给我做了一套真正适合自己生活的方案。 \"",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.testimonials.wanida.quote"
+      ],
+      "catalogChecks": [
+        {
+          "id": "customer.landing.results.fallback.2.quote",
+          "zhCN": "医生说我的血压开始偏高，需要做出改变。我在网上查了好几个小时的资料，结果越查越迷糊。 MattaNutra 帮我过滤掉所有噪音，给我做了一套真正适合自己生活的方案。"
+        }
+      ]
+    },
+    {
+      "rowHash": "46823338b35cd688",
+      "section": "用户故事",
+      "label": "Wanida attribution",
+      "english": "Wanida P. ( วนิดา ) 43, Khon Kaen Shop owner",
+      "zhCN": "Wanida P. （วนิดา） 43 岁，孔敬 店主",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.testimonials.wanida.author"
+      ],
+      "catalogChecks": [
+        {
+          "id": "customer.landing.results.fallback.2.name",
+          "zhCN": "Wanida P.（วนิดา）"
+        },
+        {
+          "id": "customer.landing.results.fallback.2.place",
+          "zhCN": "43 岁，孔敬"
+        },
+        {
+          "id": "customer.landing.results.fallback.2.role",
+          "zhCN": "店主"
+        }
+      ]
+    },
+    {
+      "rowHash": "b1d54eaebe60ddd0",
+      "section": "用户故事",
+      "label": "Malee quote",
+      "english": "\"I work in a clinic and everyone assumes I know what I'm doing when it comes to supplements. Honestly, the more I read, the less certain I was. MattaNutra finally gave me something clear and trustworthy for myself, not my patients.\"",
+      "zhCN": "\" 我在诊所工作，大家都默认我知道该怎么补。可说实话，我读的资料越多，越不确定该怎么做。 MattaNutra 终于给了我一套清晰、靠谱的方案 — 这次是为我自己，不是为我的病人。 \"",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.testimonials.malee.quote"
+      ],
+      "catalogChecks": [
+        {
+          "id": "customer.landing.results.fallback.3.quote",
+          "zhCN": "我在诊所工作，大家都默认我知道该怎么补。可说实话，我读的资料越多，越不确定该怎么做。 MattaNutra 终于给了我一套清晰、靠谱的方案 — 这次是为我自己，不是为我的病人。"
+        }
+      ]
+    },
+    {
+      "rowHash": "c3a6c18b935888f4",
+      "section": "用户故事",
+      "label": "Malee attribution",
+      "english": "Malee S. ( มาลี ) 41, Phuket Nursing Assistant",
+      "zhCN": "Malee S. （มาลี） 41 岁，普吉岛 护理助理",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.testimonials.malee.author"
+      ],
+      "catalogChecks": [
+        {
+          "id": "customer.landing.results.fallback.3.name",
+          "zhCN": "Malee S.（มาลี）"
+        },
+        {
+          "id": "customer.landing.results.fallback.3.place",
+          "zhCN": "41 岁，普吉岛"
+        },
+        {
+          "id": "customer.landing.results.fallback.3.role",
+          "zhCN": "护理助理"
+        }
+      ]
+    },
+    {
+      "rowHash": "094665685c52d21d",
+      "section": "用户故事",
+      "label": "Below-story CTA line",
+      "english": "Make a smarter, more confident choice for your health.",
+      "zhCN": "为你的健康做出更明智、更自信的选择。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.results.join"
+      ]
+    },
+    {
+      "rowHash": "ed1301c3f62038f7",
+      "section": "用户故事",
+      "label": "Below-story CTA button",
+      "english": "Start designing your Right Amount",
+      "zhCN": "免费测我的健康评分",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.results.cta"
+      ]
+    },
+    {
+      "rowHash": "90f27818dc198e4e",
+      "section": "品牌起源",
+      "label": "Section label",
+      "english": "Our origin",
+      "zhCN": "品牌起源",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.origin.eyebrow"
+      ]
+    },
+    {
+      "rowHash": "12b15e52078b212f",
+      "section": "品牌起源",
+      "label": "H2",
+      "english": "Designed in Chiang Mai, where the right amount is a way of life.",
+      "zhCN": "诞生于清迈，适量是这里的生活哲学。",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.origin.title",
+          "zhCN": "诞生于清迈，"
+        },
+        {
+          "id": "customer.landing.origin.accent",
+          "zhCN": "适量是这里的生活哲学。"
+        }
+      ]
+    },
+    {
+      "rowHash": "3724a6a97a358283",
+      "section": "品牌起源",
+      "label": "Paragraph 1",
+      "english": "MattaNutra was born in northern Thailand. For centuries, this part of the world has quietly practised a philosophy of the right amount eating just enough, resting at the right moment, moving with the body's natural rhythms. A wisdom refined over generations.",
+      "zhCN": "MattaNutra 发源于泰国北部清迈。几个世纪以来，这片土地上静静流传着一种适度的生活哲学 — 吃得恰到好处、在正确的时刻休息、顺应身体的自然节律。这份智慧，在岁月中被一点一点地打磨与传承。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.origin.body"
+      ]
+    },
+    {
+      "rowHash": "d6ed9fe134a083eb",
+      "section": "品牌起源",
+      "label": "Paragraph 2",
+      "english": "We built MattaNutra to turn that quiet wisdom into something modern, measurable and genuinely personal a plan that knows your body, adjusts as your life does, and never asks you to become someone else.",
+      "zhCN": "我们创建 MattaNutra，正是为了将这份宁静的智慧，转化为现代、可量化且真正个性化的健康方案：一个真正了解你的身体、随生活变化持续调整、从不要求你做一个 \" 别人 \" 的方案。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.origin.body2"
+      ]
+    },
+    {
+      "rowHash": "6d49e48ecdc86da7",
+      "section": "品牌起源",
+      "label": "Founders H3",
+      "english": "Founded by physicians, scientists, and AI innovators.",
+      "zhCN": "由医师、科学家与 AI 创新者共同创立。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.origin.founders"
+      ]
+    },
+    {
+      "rowHash": "d7875d2dec4bb15c",
+      "section": "品牌起源",
+      "label": "Founders intro",
+      "english": "What goes into your body should be designed by people who truly understand what happens inside it.",
+      "zhCN": "为你身体摄入的每一份营养，都源于真正洞悉其内在机理的专业团队。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.origin.founderParagraphs.0"
+      ]
+    },
+    {
+      "rowHash": "d83c6a6d7066fa37",
+      "section": "品牌起源",
+      "label": "Founders body",
+      "english": "MattaNutra was founded by an international, multidisciplinary team with an unusually broad depth of background: two physician-scientists with MD–PhD qualifications from Mahidol, Princeton, Stanford and Harvard; a software engineer whose career began at CERN and now focuses on AI and decentralised systems, with experience at Goldman Sachs and UBS; a PhD economist with a global corporate background spanning public markets and early-stage ventures; and a younger founder who keeps us closely connected to the generation we serve.",
+      "zhCN": "MattaNutra 由一支国际跨学科团队创立，团队拥有罕见的深度与广度：两位拥有 MD–PhD 双料学位的医师，毕业于 Mahidol、 Princeton、 Stanford 和 Harvard 等顶尖研究机构；一位软件工程师，职业起点是欧洲核子研究组织（CERN），现专注于 AI 与去中心化系统，曾服务于高盛、瑞银等顶级金融机构；一位经济学博士，深耕公开市场与前沿创业；以及一位年轻创始人，让我们始终与自己所服务的那一代人保持紧密连接。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.origin.founderParagraphs.1"
+      ]
+    },
+    {
+      "rowHash": "414ae6dae0bdf408",
+      "section": "品牌起源",
+      "label": "Founders closing",
+      "english": "Between us, we've accumulated more than a hundred years of professional practice in medicine, science, technology, and building products that stand up over time.",
+      "zhCN": "我们之间，积累了超过百年的专业实践 — 在医学、科学、技术领域，以及打造经得起时间考验的产品这件事上。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.origin.founderParagraphs.2"
+      ]
+    },
+    {
+      "rowHash": "84590662af76ccdc",
+      "section": "品牌起源",
+      "label": "Closing tag",
+      "english": "Made in Chiang Mai, with care. Ancient wisdom Modern science",
+      "zhCN": "来自清迈，用心而为。古老智慧 现代科学",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.origin.signoff",
+          "zhCN": "来自清迈，用心而为。"
+        },
+        {
+          "id": "customer.landing.origin.tagline",
+          "zhCN": "古老智慧 现代科学"
+        }
+      ]
+    },
+    {
+      "rowHash": "055d9d20bca5d507",
+      "section": "问卷预览模块",
+      "label": "Section label",
+      "english": "Free questionnaire",
+      "zhCN": "免费问卷",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.questionnaire.eyebrow",
+          "zhCN": "免费问卷"
+        },
+        {
+          "id": "customer.footer.columns.0.links.2.0",
+          "zhCN": "免费问卷"
+        }
+      ]
+    },
+    {
+      "rowHash": "04dead33fb89edd0",
+      "section": "问卷预览模块",
+      "label": "H2",
+      "english": "A look inside the questionnaire.",
+      "zhCN": "问卷内部预览。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.questionnaire.title"
+      ]
+    },
+    {
+      "rowHash": "f4cc711d92d9dac5",
+      "section": "问卷预览模块",
+      "label": "Body",
+      "english": "Here's how the questionnaire estimates just one ingredient Vitamin D, one of 120+ the algorithm evaluates by combining several answers. The full questionnaire runs across six short modules.",
+      "zhCN": "下面展示问卷如何通过综合多项回答，估算单一营养素 — 维生素 D，这只是算法评估的 120+ 种营养成分之一。完整版问卷共分六个简短模块。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.questionnaire.body"
+      ]
+    },
+    {
+      "rowHash": "840d32526219464b",
+      "section": "问卷预览模块",
+      "label": "Widget badge",
+      "english": "M Private & encrypted",
+      "zhCN": "M 精准方案 私密加密",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.questionnaire.cardLabel",
+          "zhCN": "精准方案"
+        },
+        {
+          "id": "customer.landing.questionnaire.privateLabel",
+          "zhCN": "私密加密"
+        }
+      ]
+    },
+    {
+      "rowHash": "433dc52d1dd4a6eb",
+      "section": "问卷预览模块",
+      "label": "Progress label",
+      "english": "Preview only One ingredient",
+      "zhCN": "预览示例 仅估算单一营养成分",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.questionnaire.sampleLabel",
+          "zhCN": "预览示例"
+        },
+        {
+          "id": "customer.landing.questionnaire.sampleBody",
+          "zhCN": "仅估算单一营养成分"
+        }
+      ]
+    },
+    {
+      "rowHash": "067dcceb01ef0b88",
+      "section": "问卷预览模块",
+      "label": "Progress bar",
+      "english": "Start → Foundations → Precision analysis 8%",
+      "zhCN": "开始 → 基础信息 → 精准分析 8%",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.questionnaire.progressPath",
+          "zhCN": "开始 → 基础信息 → 精准分析"
+        },
+        {
+          "id": "customer.landing.questionnaire.progress",
+          "zhCN": "8%"
+        }
+      ]
+    },
+    {
+      "rowHash": "3ed56458514a70da",
+      "section": "问卷预览模块",
+      "label": "Progress note",
+      "english": "You're 8% through keep going through Foundations.",
+      "zhCN": "你已完成 8%— 继续填写基础信息。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.questionnaire.progressNote"
+      ]
+    },
+    {
+      "rowHash": "f3165f99eeda8765",
+      "section": "问卷预览模块",
+      "label": "Trust note",
+      "english": "There are no right or wrong answers here just honest ones. The more truthful you are, the more precise your formula, and the safer it'll be alongside anything you're already taking.",
+      "zhCN": "这里没有对错之分，只有真实的答案。回答越诚实，知量方案越精准，与你正在服用的产品搭配也越安全。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.questionnaire.quote"
+      ]
+    },
+    {
+      "rowHash": "de1cea2adfe15fce",
+      "section": "问卷预览模块",
+      "label": "Question label",
+      "english": "Skin tone Foundations",
+      "zhCN": "肤色 基础信息",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.questionnaire.skinTone",
+          "zhCN": "肤色"
+        },
+        {
+          "id": "customer.landing.questionnaire.foundation",
+          "zhCN": "基础信息"
+        }
+      ]
+    },
+    {
+      "rowHash": "5c6b35475eb358b2",
+      "section": "问卷预览模块",
+      "label": "Question help",
+      "english": "Helps estimate your Vitamin D synthesis in combination with your sun exposure.",
+      "zhCN": "结合日晒情况，帮助估算你的维生素 D 合成量。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.questionnaire.skinBody"
+      ]
+    },
+    {
+      "rowHash": "3b7908a257cf77e3",
+      "section": "问卷预览模块",
+      "label": "Sun question",
+      "english": "Daily sun exposure",
+      "zhCN": "每日日晒时长",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.questionnaire.sunExposure"
+      ]
+    },
+    {
+      "rowHash": "98d754586357eec0",
+      "section": "问卷预览模块",
+      "label": "Sun options",
+      "english": "Less than 15 min 15–30 min 30–60 min More than 60 min",
+      "zhCN": "少于 15 分钟 15–30 分钟 30–60 分钟 60 分钟以上",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.questionnaire.sunOptions.0",
+          "zhCN": "少于 15 分钟"
+        },
+        {
+          "id": "customer.landing.questionnaire.sunOptions.1",
+          "zhCN": "15–30 分钟"
+        },
+        {
+          "id": "customer.landing.questionnaire.sunOptions.2",
+          "zhCN": "30–60 分钟"
+        },
+        {
+          "id": "customer.landing.questionnaire.sunOptions.3",
+          "zhCN": "60 分钟以上"
+        }
+      ]
+    },
+    {
+      "rowHash": "49782796baaf4368",
+      "section": "问卷预览模块",
+      "label": "Sunscreen question",
+      "english": "Sunscreen use",
+      "zhCN": "防晒使用频率",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.questionnaire.sunscreen"
+      ]
+    },
+    {
+      "rowHash": "5890373566fc217f",
+      "section": "问卷预览模块",
+      "label": "Sunscreen options",
+      "english": "Rarely Sometimes Daily",
+      "zhCN": "极少 有时 每天",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.questionnaire.sunscreenOptions.0",
+          "zhCN": "极少"
+        },
+        {
+          "id": "customer.landing.questionnaire.sunscreenOptions.1",
+          "zhCN": "有时"
+        },
+        {
+          "id": "customer.landing.questionnaire.sunscreenOptions.2",
+          "zhCN": "每天"
+        }
+      ]
+    },
+    {
+      "rowHash": "63e33f6cba9d5579",
+      "section": "问卷预览模块",
+      "label": "Explanation",
+      "english": "Skin tone, sun exposure and sunscreen together your Vitamin D isn't guessed. It's estimated for your life.",
+      "zhCN": "肤色、日晒与防晒三者综合考量 — 你的维生素 D 不是猜出来的，而是为你的生活量身估算的。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.questionnaire.insight"
+      ]
+    },
+    {
+      "rowHash": "8a8ac197bad96d55",
+      "section": "问卷预览模块",
+      "label": "Module footnote",
+      "english": "One question from six sections 1 Foundations 2 Health goals 3 Daily life 4 Diet 5 Safety 6 Precision",
+      "zhCN": "六个模块中的一个示例问题 1 基础信息 2 健康目标 3 日常生活 4 饮食习惯 5 安全核查 6 精准分析",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.questionnaire.sectionsLabel",
+          "zhCN": "六个模块中的一个示例问题"
+        },
+        {
+          "id": "customer.landing.questionnaire.sections.0",
+          "zhCN": "基础信息"
+        },
+        {
+          "id": "customer.landing.questionnaire.sections.1",
+          "zhCN": "健康目标"
+        },
+        {
+          "id": "customer.landing.questionnaire.sections.2",
+          "zhCN": "日常生活"
+        },
+        {
+          "id": "customer.landing.questionnaire.sections.3",
+          "zhCN": "饮食习惯"
+        },
+        {
+          "id": "customer.landing.questionnaire.sections.4",
+          "zhCN": "安全核查"
+        },
+        {
+          "id": "customer.landing.questionnaire.sections.5",
+          "zhCN": "精准分析"
+        }
+      ]
+    },
+    {
+      "rowHash": "12c3d9d7584554c7",
+      "section": "问卷预览模块",
+      "label": "Module closing",
+      "english": "Vitamin D is one of 120+ ingredients the algorithm evaluates.",
+      "zhCN": "维生素 D 是算法评估的 120+ 种营养成分之一。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.questionnaire.bottom"
+      ]
+    },
+    {
+      "rowHash": "8d73239c8d2e1b52",
+      "section": "问卷预览模块",
+      "label": "CTA button",
+      "english": "Start designing your Right Amount",
+      "zhCN": "免费测我的健康评分",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.questionnaire.cta"
+      ]
+    },
+    {
+      "rowHash": "a89407c591fa7fbf",
+      "section": "问卷预览模块",
+      "label": "Trust tags",
+      "english": "✓ Completely free ✓ No credit card ✓ Takes about 3 minutes",
+      "zhCN": "✓ 完全免费 ✓ 无需绑定信用卡 ✓ 约需 3 分钟",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.questionnaire.reassurance"
+      ]
+    },
+    {
+      "rowHash": "81825c46b10c860e",
+      "section": "问卷独立页面",
+      "label": "H2",
+      "english": "It's all about you",
+      "zhCN": "全是关于你",
+      "status": "superseded_by_current_copy",
+      "reason": "The live questionnaire intro is still served from components/assessment-flow-copy*. The zh-CN copy has been refreshed there, and this legacy surface remains documented until the full assessment-flow catalog migration."
+    },
+    {
+      "rowHash": "5e1a103adc9bdcc3",
+      "section": "问卷独立页面",
+      "label": "Subtitle",
+      "english": "Start with the basics",
+      "zhCN": "先了解你的基本情况",
+      "status": "superseded_by_current_copy",
+      "reason": "The live questionnaire intro is still served from components/assessment-flow-copy*. The zh-CN copy has been refreshed there, and this legacy surface remains documented until the full assessment-flow catalog migration."
+    },
+    {
+      "rowHash": "ce634aa1aa03e10c",
+      "section": "问卷独立页面",
+      "label": "Intro",
+      "english": "A few taps to begin. This will form the foundation of your Right Amount Formula.",
+      "zhCN": "几步轻触即可开始。这将为你的知量方案奠定基础。",
+      "status": "superseded_by_current_copy",
+      "reason": "The live questionnaire intro is still served from components/assessment-flow-copy*. The zh-CN copy has been refreshed there, and this legacy surface remains documented until the full assessment-flow catalog migration."
+    },
+    {
+      "rowHash": "546e2c051a8fe6eb",
+      "section": "问卷独立页面",
+      "label": "Trust note",
+      "english": "There are no right or wrong answers just honest ones. The more truthful you are, the more precise your formula, and the safer it'll be alongside anything you're already taking.",
+      "zhCN": "没有对错之分，只有真实的答案。回答越诚实，你的知量方案就越精准，也越能安全地配合你正在服用的产品。",
+      "status": "superseded_by_current_copy",
+      "reason": "The live questionnaire intro is still served from components/assessment-flow-copy*. The zh-CN copy has been refreshed there, and this legacy surface remains documented until the full assessment-flow catalog migration."
+    },
+    {
+      "rowHash": "c91ac9b3f7d252ff",
+      "section": "问卷独立页面",
+      "label": "Email opt-in",
+      "english": "Leave your email and we'll send a private link so you can come back anytime (used only for this).",
+      "zhCN": "留下邮箱，我们会发送专属链接，方便你随时回来继续（仅用于此目的）。",
+      "status": "superseded_by_current_copy",
+      "reason": "The live questionnaire intro is still served from components/assessment-flow-copy*. The zh-CN copy has been refreshed there, and this legacy surface remains documented until the full assessment-flow catalog migration."
+    },
+    {
+      "rowHash": "d2493d7567580617",
+      "section": "问卷独立页面",
+      "label": "Button",
+      "english": "Continue",
+      "zhCN": "继续",
+      "status": "superseded_by_current_copy",
+      "reason": "The live questionnaire intro is still served from components/assessment-flow-copy*. The zh-CN copy has been refreshed there, and this legacy surface remains documented until the full assessment-flow catalog migration."
+    },
+    {
+      "rowHash": "dfdc6c0b6f28314f",
+      "section": "问卷独立页面",
+      "label": "Trust signal 1",
+      "english": "Securely encrypted",
+      "zhCN": "安全加密",
+      "status": "superseded_by_current_copy",
+      "reason": "The live questionnaire intro is still served from components/assessment-flow-copy*. The zh-CN copy has been refreshed there, and this legacy surface remains documented until the full assessment-flow catalog migration."
+    },
+    {
+      "rowHash": "bf7b0218d3d8e164",
+      "section": "问卷独立页面",
+      "label": "Trust signal 2",
+      "english": "Private by default",
+      "zhCN": "默认私密",
+      "status": "superseded_by_current_copy",
+      "reason": "The live questionnaire intro is still served from components/assessment-flow-copy*. The zh-CN copy has been refreshed there, and this legacy surface remains documented until the full assessment-flow catalog migration."
+    },
+    {
+      "rowHash": "c738aeae245897e4",
+      "section": "问卷独立页面",
+      "label": "Trust signal 3",
+      "english": "Wellness guidance, not diagnosis",
+      "zhCN": "健康指导，非诊断",
+      "status": "superseded_by_current_copy",
+      "reason": "The live questionnaire intro is still served from components/assessment-flow-copy*. The zh-CN copy has been refreshed there, and this legacy surface remains documented until the full assessment-flow catalog migration."
+    },
+    {
+      "rowHash": "678cf3479b1504b6",
+      "section": "问卷独立页面",
+      "label": "Trust signal 4",
+      "english": "Every formula is cross-checked against your medications, lab markers, and compliant products",
+      "zhCN": "每份方案均与你的用药、化验结果及合规产品进行安全交叉检查",
+      "status": "superseded_by_current_copy",
+      "reason": "The live questionnaire intro is still served from components/assessment-flow-copy*. The zh-CN copy has been refreshed there, and this legacy surface remains documented until the full assessment-flow catalog migration."
+    },
+    {
+      "rowHash": "f69ab9f136f86e33",
+      "section": "健康日志",
+      "label": "Section label",
+      "english": "Journal",
+      "zhCN": "健康日志",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.journal.tag",
+          "zhCN": "健康日志"
+        },
+        {
+          "id": "customer.titleBar.links.3.1",
+          "zhCN": "健康日志"
+        },
+        {
+          "id": "customer.footer.columns.1.links.0.0",
+          "zhCN": "健康日志"
+        }
+      ]
+    },
+    {
+      "rowHash": "8db98b99edcc6ad5",
+      "section": "健康日志",
+      "label": "H2",
+      "english": "Learn the right amount.",
+      "zhCN": "学习知量之道。",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.journal.title",
+          "zhCN": "学习"
+        },
+        {
+          "id": "customer.landing.journal.accent",
+          "zhCN": "知量之道。"
+        }
+      ]
+    },
+    {
+      "rowHash": "e63eddc7cd62fffc",
+      "section": "健康日志",
+      "label": "CTA link",
+      "english": "Browse all articles",
+      "zhCN": "查看全部健康日志",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.journal.browse"
+      ]
+    },
+    {
+      "rowHash": "d63a5f1bd67750a5",
+      "section": "健康日志",
+      "label": "Article 1 label",
+      "english": "Foundations",
+      "zhCN": "基础知识",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.blogs.0.primaryTag"
+      ],
+      "catalogIds": [
+        "customer.landing.journal.fallback.0.0"
+      ]
+    },
+    {
+      "rowHash": "38f383a35c842b47",
+      "section": "健康日志",
+      "label": "Article 1 title",
+      "english": "Why \"more\" is rarely the answer with supplements",
+      "zhCN": "补得越多，真的越好吗？",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.blogs.0.title"
+      ],
+      "catalogIds": [
+        "customer.landing.journal.fallback.0.1"
+      ]
+    },
+    {
+      "rowHash": "6b5f8261e3acd03d",
+      "section": "健康日志",
+      "label": "Article 1 subtitle",
+      "english": "The science behind sufficiency and why your body often needs less than the label suggests.",
+      "zhCN": "适量摄入的科学逻辑 — 你的身体往往比标签建议的需要更少。",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.blogs.0.excerpt"
+      ],
+      "catalogIds": [
+        "customer.landing.journal.fallback.0.2"
+      ]
+    },
+    {
+      "rowHash": "dc350eae9670ecc4",
+      "section": "健康日志",
+      "label": "Article 2 label",
+      "english": "Nutrition",
+      "zhCN": "营养饮食",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.blogs.1.primaryTag"
+      ],
+      "catalogIds": [
+        "customer.landing.journal.fallback.1.0"
+      ]
+    },
+    {
+      "rowHash": "4a8138e3c731265b",
+      "section": "健康日志",
+      "label": "Article 2 title",
+      "english": "Eight everyday foods higher in magnesium than you'd expect",
+      "zhCN": "这 8 种日常食物，镁含量出乎意料地高",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.blogs.1.title"
+      ],
+      "catalogIds": [
+        "customer.landing.journal.fallback.1.1"
+      ]
+    },
+    {
+      "rowHash": "d181602df86a6136",
+      "section": "健康日志",
+      "label": "Article 2 subtitle",
+      "english": "Look at your plate before you reach for a capsule these foods are quietly doing a lot.",
+      "zhCN": "先看看你的餐盘，再伸手拿胶囊 — 这些日常食物在默默发挥着大作用。",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.blogs.1.excerpt"
+      ],
+      "catalogIds": [
+        "customer.landing.journal.fallback.1.2"
+      ]
+    },
+    {
+      "rowHash": "9c57b88c3a464d5e",
+      "section": "健康日志",
+      "label": "Article 3 label",
+      "english": "Living well",
+      "zhCN": "健康生活",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.blogs.2.primaryTag"
+      ],
+      "catalogIds": [
+        "customer.landing.journal.fallback.2.0"
+      ]
+    },
+    {
+      "rowHash": "0bb17286e4d7a01c",
+      "section": "健康日志",
+      "label": "Article 3 title",
+      "english": "How travel quietly changes what your body needs",
+      "zhCN": "出行会悄悄改变你的营养需求",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.blogs.2.title"
+      ],
+      "catalogIds": [
+        "customer.landing.journal.fallback.2.1"
+      ]
+    },
+    {
+      "rowHash": "5f9fcdfc6258fcdd",
+      "section": "健康日志",
+      "label": "Article 3 subtitle",
+      "english": "Jet lag, sleep and hydration all shift the calculation here's how to adjust without overthinking it.",
+      "zhCN": "时差、睡眠与水分平衡都会影响营养需求 — 教你轻松应对，无需过度纠结。",
+      "status": "implemented_db_seed",
+      "dbSeedRefs": [
+        "landing.blogs.2.excerpt"
+      ],
+      "catalogIds": [
+        "customer.landing.journal.fallback.2.2"
+      ]
+    },
+    {
+      "rowHash": "3c3a1c9114d4619c",
+      "section": "常见问题",
+      "label": "Section label",
+      "english": "FAQ",
+      "zhCN": "常见问题",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.faq.eyebrow"
+      ]
+    },
+    {
+      "rowHash": "90daf6321e31ade4",
+      "section": "常见问题",
+      "label": "H2",
+      "english": "Good questions. Honest answers.",
+      "zhCN": "好问题，真诚回答。",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.faq.title",
+          "zhCN": "好问题，"
+        },
+        {
+          "id": "customer.landing.faq.accent",
+          "zhCN": "真诚回答。"
+        }
+      ]
+    },
+    {
+      "rowHash": "28396a51f9841e1e",
+      "section": "常见问题",
+      "label": "Q1",
+      "english": "Is my data safe?",
+      "zhCN": "我的数据隐私安全吗？",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.faq.items.0.0"
+      ]
+    },
+    {
+      "rowHash": "a768cfd4499e8b55",
+      "section": "常见问题",
+      "label": "A1",
+      "english": "Yes. Your assessment is yours. We don't sell it, share it with advertisers, and you can request deletion any time. Living Protocol conversations are stored only to maintain continuity of your plan.",
+      "zhCN": "是的。你的评估数据只属于你。我们不出售答案，不与广告商共享，你可以随时要求删除数据。动态健康方案中的对话记录，仅用于维持你方案的连续性和一致性。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.faq.items.0.1"
+      ]
+    },
+    {
+      "rowHash": "7e19cd3ffb71586d",
+      "section": "常见问题",
+      "label": "Q2",
+      "english": "I'm on medication is this safe for me?",
+      "zhCN": "我正在服药，使用这个安全吗？",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.faq.items.1.0"
+      ]
+    },
+    {
+      "rowHash": "330f654d6ea3d923",
+      "section": "常见问题",
+      "label": "A2",
+      "english": "MattaNutra automatically screens for the most common medication-supplement interactions and flags them in your plan. This is wellness guidance, not medical advice. If you're on prescription medication, pregnant, breastfeeding, or managing a health condition, please consult a qualified healthcare professional before starting any supplement plan.",
+      "zhCN": "MattaNutra 会自动筛查最常见的药物与保健品之间的相互作用，并在你的方案中做出标记。这属于健康指导，而非医疗建议。如果你正在服用处方药、怀孕、哺乳，或正在管理某种健康状况，请在开始任何保健品计划前，咨询具备资质的医疗专业人士。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.faq.items.1.1"
+      ]
+    },
+    {
+      "rowHash": "b868cb4cfbe2f003",
+      "section": "常见问题",
+      "label": "Q3",
+      "english": "Where do the recommended products come from?",
+      "zhCN": "推荐的产品从哪里来？",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.faq.items.2.0"
+      ]
+    },
+    {
+      "rowHash": "d9aab637ad60a2bb",
+      "section": "常见问题",
+      "label": "A3",
+      "english": "Your formula is dispensed through a network of partner pharmacies with registered pharmacists so you get exactly what your plan calls for, without guessing in the aisle. We don't manufacture supplements. We match you to products worth trusting and pharmacists worth asking.",
+      "zhCN": "你的知量方案由合作药房网络中的持证药师进行调配 — 你拿到的正是你方案所需的产品，无需在货架前盲目猜测。我们不自行生产保健品；我们为你匹配可信赖的产品和可以为你答疑的药剂师。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.faq.items.2.1"
+      ]
+    },
+    {
+      "rowHash": "4b721c9b4926afd7",
+      "section": "常见问题",
+      "label": "Q4",
+      "english": "Is the free assessment actually free?",
+      "zhCN": "免费评估真的免费吗？",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.faq.items.3.0"
+      ]
+    },
+    {
+      "rowHash": "a77124b0a380a2fc",
+      "section": "常见问题",
+      "label": "A4",
+      "english": "Yes. The questionnaire and Health Score are completely free with no credit card required. You'll see where you stand and an initial sense of direction. If you choose to go further, your full personalised Right Amount Formula and optional Living Protocol support is there when you're ready.",
+      "zhCN": "是的。问卷和健康评分完全免费，无需绑定信用卡。完成评估后，你会看到自己的健康状况概览和初步方向。完整的个性化知量方案 — 以及可选的动态健康方案支持 — 随时可以开启。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.faq.items.3.1"
+      ]
+    },
+    {
+      "rowHash": "022161f4d981a5d1",
+      "section": "常见问题",
+      "label": "Q5",
+      "english": "Why the Pāli name?",
+      "zhCN": "为什么用巴利语命名？",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.faq.items.4.0"
+      ]
+    },
+    {
+      "rowHash": "8f410baac20956da",
+      "section": "常见问题",
+      "label": "A5",
+      "english": "Mattaññutā means the wisdom of knowing the right amount. It comes from a 2,500-year-old tradition of practical wisdom about moderation and balance that real flourishing comes not from more, but from exactly enough. The name is our promise: we help you find your right amount, not sell you more than you need.",
+      "zhCN": "Mattaññutā，意为「知量之慧」 — 知晓适量的智慧。它源自两千五百年来关于适度与平衡的生活哲思：真正的活力，从不在于「更多」，而在于「恰好」。这个名字是我们的承诺：帮助你找到属于自己的知量，而不是卖给你不需要的。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.faq.items.4.1"
+      ]
+    },
+    {
+      "rowHash": "72d21607f67d8936",
+      "section": "页面底部最终 CTA",
+      "label": "H2",
+      "english": "Stop guessing. Start knowing.",
+      "zhCN": "停止猜测，开始知量。",
+      "status": "implemented_catalog",
+      "catalogChecks": [
+        {
+          "id": "customer.landing.final.title",
+          "zhCN": "停止猜测，"
+        },
+        {
+          "id": "customer.landing.final.accent",
+          "zhCN": "开始知量。"
+        }
+      ]
+    },
+    {
+      "rowHash": "e1d4f86afebb4826",
+      "section": "页面底部最终 CTA",
+      "label": "Body",
+      "english": "Answer a focused set of questions, get a free Health Score, and receive a personalised starting point built around your body, your goals and your daily life.",
+      "zhCN": "回答一套精准的问卷，获取免费健康评分，收到你的个性化起始方案 — 围绕你的身体、你的目标、你的每一天而设计。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.final.body"
+      ]
+    },
+    {
+      "rowHash": "158017909977124c",
+      "section": "页面底部最终 CTA",
+      "label": "Primary CTA",
+      "english": "Start designing your Right Amount",
+      "zhCN": "免费测我的健康评分",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.final.primary"
+      ]
+    },
+    {
+      "rowHash": "b2cda67b0e622423",
+      "section": "页面底部最终 CTA",
+      "label": "Secondary CTA",
+      "english": "How it works",
+      "zhCN": "了解怎么运作",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.final.secondary"
+      ]
+    },
+    {
+      "rowHash": "e4d6fadc5bf8de5d",
+      "section": "页面底部最终 CTA",
+      "label": "Brand sign-off",
+      "english": "Mattaññutā knowing the right amount.",
+      "zhCN": "Mattaññutā 知量，知健康。",
+      "status": "implemented_catalog",
+      "catalogIds": [
+        "customer.landing.final.quote"
+      ]
+    }
+  ]
+}

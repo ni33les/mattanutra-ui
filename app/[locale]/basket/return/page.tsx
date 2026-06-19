@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { isLocale, locales, type Locale } from "@/lib/i18n";
 import { fulfillRetailCheckoutSession } from "@/lib/retail-product-checkout";
+import { localizedRouteMetadata } from "@/lib/seo";
 
 type RetailCheckoutReturnResult = Awaited<ReturnType<typeof fulfillRetailCheckoutSession>>;
 
@@ -17,6 +19,19 @@ export function generateStaticParams() {
 }
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params
+}: BasketReturnPageProps): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale: Locale = isLocale(rawLocale) ? rawLocale : "en";
+
+  return localizedRouteMetadata({
+    indexable: false,
+    locale,
+    routeKey: "basketReturn"
+  });
+}
 
 function fallbackDestination(locale: Locale, planId?: string | null) {
   return planId

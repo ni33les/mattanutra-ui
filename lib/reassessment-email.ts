@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n";
+import { getNamespace } from "@/lib/i18n-messages";
 import { buildReassessmentUrl, buildUnsubscribeUrl } from "@/lib/site-url";
 
 function escapeHtml(value: string) {
@@ -9,6 +10,16 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+type ReassessmentEmailCopy = Readonly<{
+  body: string;
+  cta: string;
+  eyebrow: string;
+  plan: string;
+  subject: string;
+  title: string;
+  unsubscribe: string;
+}>;
 
 export function buildReassessmentEmailHtml({
   locale,
@@ -59,40 +70,5 @@ export function buildReassessmentEmailSubject(locale: Locale) {
 }
 
 function reassessmentEmailLabels(locale: Locale) {
-  if (locale === "th") {
-    return {
-      body:
-        "HealthScore ของคุณเปลี่ยนได้ตามการนอน อาหาร การฝึก ความเครียด และข้อมูลใหม่ๆ กลับมาทำแบบประเมินอีกครั้งเพื่อดูว่าคะแนนเปลี่ยนไปอย่างไร และสร้างสูตรเวอร์ชันใหม่จากข้อมูลล่าสุดของคุณ",
-      cta: "ทำแบบประเมินอีกครั้ง",
-      eyebrow: "ถึงเวลาทบทวน HealthScore",
-      plan: "แผน",
-      subject: "กลับมาทบทวน HealthScore ของคุณ",
-      title: "ดูว่าอะไรเปลี่ยนไปใน 60 วันที่ผ่านมา",
-      unsubscribe: "ยกเลิกอีเมลการประเมินซ้ำ"
-    };
-  }
-
-  if (locale === "zh-CN") {
-    return {
-      body:
-        "您的 HealthScore 会随着睡眠、饮食、训练、压力和新数据而变化。回来做一次快速复评，我们会显示哪些部分发生了变化，并根据您的最新答案准备新版配方。",
-      cta: "重新评估",
-      eyebrow: "您的 HealthScore 复评已准备好",
-      plan: "计划",
-      subject: "复评您的 MattaNutra HealthScore",
-      title: "查看过去 60 天发生了什么变化",
-      unsubscribe: "取消订阅复评邮件"
-    };
-  }
-
-  return {
-    body:
-      "Your HealthScore changes as sleep, food, training, stress, and new data change. Come back for a quick reassessment so we can show what moved and prepare a new formulation version from your latest answers.",
-    cta: "Take the reassessment",
-    eyebrow: "Your HealthScore review is ready",
-    plan: "Plan",
-    subject: "Review your MattaNutra HealthScore",
-    title: "See what changed over the last 60 days",
-    unsubscribe: "Unsubscribe from reassessment emails"
-  };
+  return getNamespace<ReassessmentEmailCopy>(locale, "outbound.reassessmentEmail");
 }

@@ -7,6 +7,7 @@ import type {
   ProductStackPreference
 } from "@/lib/formulation-types";
 import { localizedTextSearchValue, resolveLocalizedText, type Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n-messages";
 import { managedFoodSeeds } from "@/lib/managed-foods";
 import {
   getLocalizedText,
@@ -23,6 +24,15 @@ export {
   visibleSupplementIngredientCount,
   visibleSupplementRecommendationCount
 };
+
+function joinLocalizedPair(labels: readonly string[], locale: Locale) {
+  return labels.length === 1
+    ? labels[0]
+    : t(locale, "customer.formulation.foodSupport.joinPair", {
+        first: labels[0] ?? "",
+        second: labels[1] ?? ""
+      });
+}
 
 const supplementBenefitRules = [
   {
@@ -207,22 +217,14 @@ export function localizedIngredientRationale(
   const supplement = localizedSupplementName(ingredient.supplement, ingredient.id, locale);
   const benefit = supplementBenefitTags(ingredient)[0];
   const benefitLabel = benefit ? localizedBenefitTagLabel(benefit, locale) : "";
-
-  if (locale === "th") {
-    return benefitLabel
-      ? `${supplement} อยู่ในแผนนี้เพื่อช่วยด้าน${benefitLabel}ตามลำดับความสำคัญของคุณ`
-      : `${supplement} อยู่ในแผนนี้ตามเป้าหมายและบริบทด้านความปลอดภัยของคุณ`;
-  }
-
-  if (locale === "zh-CN") {
-    return benefitLabel
-      ? `${supplement} 被纳入本方案，用于围绕${benefitLabel}提供有针对性的支持。`
-      : `${supplement} 被纳入本方案，以匹配您的目标、偏好和安全背景。`;
-  }
-
   return benefitLabel
-    ? `${supplement} is included for targeted support around ${benefitLabel}.`
-    : `${supplement} is included because it fits your goals, preferences, and safety context.`;
+    ? t(locale, "customer.formulation.ingredientRationale.withBenefit", {
+        benefit: benefitLabel,
+        supplement
+      })
+    : t(locale, "customer.formulation.ingredientRationale.noBenefit", {
+        supplement
+      });
 }
 
 function normalizeFoodText(value: string) {
@@ -697,20 +699,10 @@ export function joinFoodSupportNeeds(
   const labels = needs.map((need) => foodSupportNeedLabel(need, locale)).slice(0, 2);
 
   if (labels.length < 1) {
-    return locale === "th"
-      ? "ช่องว่างที่เหลือ"
-      : locale === "zh-CN"
-        ? "剩余缺口"
-        : "the remaining gaps";
+    return t(locale, "customer.formulation.foodSupport.remainingGaps");
   }
 
-  return labels.length === 1
-    ? labels[0]
-    : locale === "th"
-      ? labels.join(" และ ")
-      : locale === "zh-CN"
-        ? labels.join("和")
-        : `${labels[0]} and ${labels[1]}`;
+  return joinLocalizedPair(labels, locale);
 }
 
 export function joinFoodSupportFormulaGapLabels(
@@ -720,20 +712,10 @@ export function joinFoodSupportFormulaGapLabels(
   const labels = gaps.map((gap) => gap.label).filter(Boolean).slice(0, 2);
 
   if (labels.length < 1) {
-    return locale === "th"
-      ? "ช่องว่างที่เหลือ"
-      : locale === "zh-CN"
-        ? "剩余缺口"
-        : "the remaining gaps";
+    return t(locale, "customer.formulation.foodSupport.remainingGaps");
   }
 
-  return labels.length === 1
-    ? labels[0]
-    : locale === "th"
-      ? labels.join(" และ ")
-      : locale === "zh-CN"
-        ? labels.join("和")
-        : `${labels[0]} and ${labels[1]}`;
+  return joinLocalizedPair(labels, locale);
 }
 
 export function joinFoodSupportFormulaRequirementLabels(
@@ -743,20 +725,10 @@ export function joinFoodSupportFormulaRequirementLabels(
   const labels = requirements.map((requirement) => requirement.label).filter(Boolean).slice(0, 2);
 
   if (labels.length < 1) {
-    return locale === "th"
-      ? "สารอาหารในสูตร"
-      : locale === "zh-CN"
-        ? "配方营养需求"
-        : "the formula requirements";
+    return t(locale, "customer.formulation.foodSupport.formulaRequirements");
   }
 
-  return labels.length === 1
-    ? labels[0]
-    : locale === "th"
-      ? labels.join(" และ ")
-      : locale === "zh-CN"
-        ? labels.join("和")
-        : `${labels[0]} and ${labels[1]}`;
+  return joinLocalizedPair(labels, locale);
 }
 
 function isFoodSupportPlaceholderCopy(value: string) {
@@ -779,19 +751,11 @@ export function localizedReportText(value: LocalizedText, locale: Locale, fallba
 }
 
 export function localizedReportFallbackTitle(locale: Locale) {
-  return locale === "th"
-    ? "แผนโภชนาการฉบับสุดท้าย"
-    : locale === "zh-CN"
-      ? "您的最终营养计划"
-      : "Your final nutrition plan";
+  return t(locale, "customer.formulation.foodSupport.finalReportTitle");
 }
 
 export function localizedReportFallbackBody(locale: Locale) {
-  return locale === "th"
-    ? "แผนนี้สรุปอาหาร อาหารเสริม ขั้นตอนถัดไป และข้อควรระวังจากข้อมูลที่คุณให้ไว้"
-    : locale === "zh-CN"
-      ? "这份计划汇总了根据您提供的信息生成的食物、补充剂、下一步行动和安全提醒。"
-      : "This plan summarizes food, supplement, next-step, and safety guidance from your answers.";
+  return t(locale, "customer.formulation.foodSupport.finalReportBody");
 }
 
 function managedSeedForFoodItem(item: FormulationResult["foodGuidance"][number]) {

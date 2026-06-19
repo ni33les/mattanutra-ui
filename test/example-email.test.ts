@@ -90,9 +90,9 @@ describe("example email", () => {
       planId: "11111111-1111-4111-8111-111111111111"
     });
 
-    assert.equal(buildExampleEmailSubject("zh-CN", healthScore), "您的 74/100 HealthScore 预览");
-    assert.match(html, /为什么打开完整计划/);
-    assert.match(html, /查看完整计划/);
+    assert.equal(buildExampleEmailSubject("zh-CN", healthScore), "你的 74/100 健康评分预览");
+    assert.match(html, /为什么打开完整方案/);
+    assert.match(html, /查看完整知量方案/);
     assert.match(html, /为您优先排序/);
     assert.match(html, /letter-spacing:0;text-transform:none/);
     assert.doesNotMatch(html, /Why open the full plan/);
@@ -108,7 +108,7 @@ describe("example email", () => {
       unsubscribeToken: "token"
     });
 
-    assert.equal(buildReassessmentEmailSubject("zh-CN"), "复评您的 MattaNutra HealthScore");
+    assert.equal(buildReassessmentEmailSubject("zh-CN"), "复评你的 MattaNutra 健康评分");
     assert.match(html, /查看过去 60 天发生了什么变化/);
     assert.match(html, /重新评估/);
     assert.match(html, /letter-spacing:0;text-transform:none/);

@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n";
+import { t, type MessageId, type MessageValues } from "@/lib/i18n-messages";
 import type {
   HealthScoreDomain,
   HealthScoreDomainId,
@@ -13,27 +14,19 @@ import type {
   PillarName
 } from "@/lib/health-score/v4-types";
 import {
-  ENERGY_CAUSE,
-  ENERGY_CAUSE_TH,
-  ENERGY_CAUSE_ZH,
   FINDINGS,
   GOAL_MAP,
   GOAL_PILLARS,
-  PILLAR_DESCRIPTION,
-  PILLAR_GAP,
-  PILLAR_GAP_TH,
-  PILLAR_GAP_ZH,
   PILLAR_ID,
-  PILLAR_LABEL_EN,
-  PILLAR_LABEL_TH,
-  PILLAR_LABEL_ZH,
-  PILLAR_STRENGTH,
-  PILLAR_STRENGTH_TH,
-  PILLAR_STRENGTH_ZH,
+  localizedEnergyCause,
   localizedFindingCopy,
   localizedGoalPhrase,
   localizedGoalTag,
   localizedList,
+  localizedPillarDescription,
+  localizedPillarGap,
+  localizedPillarLabel,
+  localizedPillarStrength,
   localizedSymptomName
 } from "@/lib/health-score/v4-copy";
 
@@ -244,6 +237,31 @@ function fmt(template: string, context: Record<string, string | number>) {
 
 function titleCaseFirst(value: string) {
   return value ? value.slice(0, 1).toUpperCase() + value.slice(1) : value;
+}
+
+function healthScorePageId(path: string) {
+  return `customer.healthScore.page.${path}` as MessageId;
+}
+
+function healthScorePageText(
+  locale: Locale,
+  path: string,
+  values?: MessageValues
+) {
+  return t(locale, healthScorePageId(path), values);
+}
+
+const BAND_COPY_KEY: Record<string, string> = {
+  "Building foundation": "buildingFoundation",
+  Excellent: "excellent",
+  "Good, with a clear gap": "goodClearGap",
+  "Needs attention": "needsAttention",
+  Strong: "strong",
+  "Strong, with headroom": "strongHeadroom"
+};
+
+function bandCopyKey(band: string) {
+  return BAND_COPY_KEY[band] ?? "fallback";
 }
 
 function ageBand(age: string) {
@@ -676,13 +694,7 @@ function scoreEngine(a: NormalizedAnswers): EngineResult {
 }
 
 function pillarLabel(name: PillarName, locale: Locale) {
-  if (locale === "th") {
-    return PILLAR_LABEL_TH[name];
-  }
-  if (locale === "zh-CN") {
-    return PILLAR_LABEL_ZH[name];
-  }
-  return PILLAR_LABEL_EN[name];
+  return localizedPillarLabel(name, locale);
 }
 
 function buildPillars(result: EngineResult, goals: readonly string[], locale: Locale) {
@@ -692,11 +704,7 @@ function buildPillars(result: EngineResult, goals: readonly string[], locale: Lo
       );
       const tag =
         linkedGoals.length >= 3
-          ? locale === "th"
-            ? "ทั้ง 3 เป้าหมาย"
-            : locale === "zh-CN"
-              ? "全部 3 个目标"
-              : "all 3 goals"
+          ? healthScorePageText(locale, "allGoalsTag")
           : linkedGoals.length > 0
             ? linkedGoals.map((goal) => localizedGoalTag(goal, locale)).join(" / ")
             : null;
@@ -772,13 +780,7 @@ function buildFindings(
           {
             body: fmt(finding.body, {
               energy_causes: localizedList(
-                causes.map((cause) =>
-                  locale === "th"
-                    ? (ENERGY_CAUSE_TH[cause] ?? cause)
-                    : locale === "zh-CN"
-                      ? (ENERGY_CAUSE_ZH[cause] ?? cause)
-                    : (ENERGY_CAUSE[cause] ?? cause)
-                ),
+                causes.map((cause) => localizedEnergyCause(cause, locale)),
                 locale
               )
             }),
@@ -871,21 +873,13 @@ function buildStrengthFindings(
     .sort((first, second) => second.value - first.value)
     .slice(0, 2)
     .map((pillar) => ({
-        body: fmt(
-          locale === "th"
-            ? PILLAR_STRENGTH_TH[pillar.name]
-            : locale === "zh-CN"
-              ? PILLAR_STRENGTH_ZH[pillar.name]
-            : PILLAR_STRENGTH[pillar.name],
-          { value: pillar.value }
-        ),
+        body: localizedPillarStrength(pillar.name, locale, {
+          value: pillar.value
+        }),
         code: `STRENGTH_${pillar.id.toUpperCase()}`,
-        headline:
-          locale === "th"
-            ? `${pillar.label} เป็นจุดแข็งสำคัญของคุณ`
-            : locale === "zh-CN"
-              ? `${pillar.label}正在承担重要作用。`
-              : `${pillar.label} is doing the heavy lifting.`,
+        headline: healthScorePageText(locale, "strengthHeadline", {
+          pillar: pillar.label
+        }),
       icon: "check"
     }));
 }
@@ -910,11 +904,11 @@ function highestLeverage(
 
   return {
     pillar: hero.label,
-    text: locale === "th"
-      ? `จุดที่ให้แรงส่งสูงที่สุด: ${hero.label} อยู่ที่ ${hero.value}% และเชื่อมกับเป้าหมายของคุณโดยตรง เมื่อเสาหลักนี้ขยับ ${goalList} จะขยับไปด้วย`
-      : locale === "zh-CN"
-        ? `最高杠杆点：${hero.label} 目前为 ${hero.value}%，并且直接连接你的目标。提升这一项，${goalList}会一起移动。这不是巧合，而是你答案呈现出的模式。`
-        : `Your highest-leverage move: ${hero.label} sits at ${hero.value}% and every one of your goals routes through it. Lift this one pillar and ${goalList} all move together. That is not a coincidence in your results; it is the shape of your answers.`,
+    text: healthScorePageText(locale, "highestLeverage.text", {
+      goalList,
+      pillar: hero.label,
+      value: hero.value
+    }),
     value: hero.value
   };
 }
@@ -927,14 +921,7 @@ function strengthNote(
   const top = nonGoalStrength ?? pillars.find((pillar) => pillar.value >= 80);
 
   return top
-    ? fmt(
-        locale === "th"
-          ? PILLAR_STRENGTH_TH[top.name]
-          : locale === "zh-CN"
-            ? PILLAR_STRENGTH_ZH[top.name]
-          : PILLAR_STRENGTH[top.name],
-        { value: top.value }
-      )
+    ? localizedPillarStrength(top.name, locale, { value: top.value })
     : null;
 }
 
@@ -943,22 +930,15 @@ function gapPillarCard(
   number: string,
   locale: Locale
 ): HealthScoreGapCard {
-  const copy =
-    locale === "th"
-      ? PILLAR_GAP_TH[pillar.name]
-      : locale === "zh-CN"
-        ? PILLAR_GAP_ZH[pillar.name]
-        : PILLAR_GAP[pillar.name];
+  const copy = localizedPillarGap(pillar.name, locale);
 
   return {
     body: copy.body,
     headline: copy.headline,
-    tag:
-      locale === "th"
-        ? `ช่องว่าง ${number} · ${pillar.label}`
-        : locale === "zh-CN"
-          ? `缺口 ${number} · ${pillar.label}`
-          : `GAP ${number} · ${pillar.label.toUpperCase()}`,
+    tag: healthScorePageText(locale, "gap.tag", {
+      number,
+      pillarLabel: locale === "en" ? pillar.label.toUpperCase() : pillar.label
+    }),
     value: `${pillar.value}%`
   };
 }
@@ -982,25 +962,13 @@ function buildGapTrio(
       symptoms.slice(0, 3).map((symptom) => localizedSymptomName(symptom, locale)),
       locale
     );
+    const symptomsText = locale === "en" ? titleCaseFirst(names) : names;
     cards.push({
-      body:
-        locale === "th"
-          ? `${names} กำลังกดคะแนนหลายด้านพร้อมกัน และเป็นสัญญาณที่แผนจะนำมาจัดลำดับก่อน`
-          : locale === "zh-CN"
-            ? `${names}正在同时拉低整体分数，也是你的计划会优先处理的身体信号。`
-            : `${titleCaseFirst(names)} pull down your whole score at once, and they are the felt signals your plan is built to address first.`,
-      headline:
-        locale === "th"
-          ? "อาการที่กำลังกดภาพรวม"
-          : locale === "zh-CN"
-            ? "正在拖累整体状态的症状"
-            : "The symptoms dragging on everything",
-      tag:
-        locale === "th"
-          ? "ช่องว่าง 03 · สิ่งที่คุณรู้สึก"
-          : locale === "zh-CN"
-            ? "缺口 03 · 你的体感"
-            : "GAP 03 · HOW YOU FEEL",
+      body: healthScorePageText(locale, "gap.symptom.body", {
+        symptoms: symptomsText
+      }),
+      headline: healthScorePageText(locale, "gap.symptom.headline"),
+      tag: healthScorePageText(locale, "gap.symptom.tag"),
       value: String(symptoms.length)
     });
   } else {
@@ -1023,16 +991,14 @@ function relativity(score: number, percentile: number, median: number, locale: L
 
   if (score >= median) {
     return {
-      headline: locale === "th"
-        ? `คุณอยู่ข้างหน้าประมาณ ${percentile}% ของคนที่ทำแบบประเมินนี้`
-        : locale === "zh-CN"
-          ? `你领先约 ${percentile}% 完成此评估的人。`
-          : `You are ahead of about ${percentile}% of people who finish this assessment.`,
-      legendCaptions: locale === "th"
-        ? ["ตำแหน่งของคุณ", "ระยะที่คุณอยู่ข้างหน้า", "พื้นที่ปรับถึง 92"] as const
-        : locale === "zh-CN"
-          ? ["您的位置", "领先距离", "到92分的提升空间"] as const
-          : ["Where you are", "How far ahead you sit", "Headroom to 92"] as const,
+      headline: healthScorePageText(locale, "relativity.rank.headline", {
+        percentile
+      }),
+      legendCaptions: [
+        healthScorePageText(locale, "relativity.rank.legend.0"),
+        healthScorePageText(locale, "relativity.rank.legend.1"),
+        healthScorePageText(locale, "relativity.rank.legend.2")
+      ] as const,
       mode: "rank" as const,
       spectrumGapLeftPct,
       spectrumGapWidthPct,
@@ -1040,11 +1006,7 @@ function relativity(score: number, percentile: number, median: number, locale: L
       spectrumMedianPct,
       spectrumYou: score,
       spectrumYouPct,
-      sub: locale === "th"
-        ? "คุณทำหลายอย่างได้ดีแล้ว สิ่งที่เหลือคือการปรับเฉพาะจุดให้คมขึ้น"
-        : locale === "zh-CN"
-          ? "你已经做对了很多事。剩下的是更精准的微调，让你更接近自己的最佳状态。"
-          : "You are clearly doing a lot right. What is left is refinement, a few targeted points between you and your personal best."
+      sub: healthScorePageText(locale, "relativity.rank.sub")
     };
   }
 
@@ -1052,16 +1014,15 @@ function relativity(score: number, percentile: number, median: number, locale: L
 
   return {
     gap,
-    headline: locale === "th"
-      ? `คนทั่วไปที่ทำแบบประเมินนี้ได้ประมาณ ${median} คะแนน ช่องว่างของคุณคือ ${gap} คะแนน และไม่ได้เกี่ยวกับอายุ`
-      : locale === "zh-CN"
-        ? `完成此评估的人平均约为 ${median} 分。你的差距是 ${gap} 分，而且这些差距并不是年龄本身造成的。`
-        : `The average person who finishes this assessment scores about ${median}. Your gap is ${gap} points, and none of them are about age.`,
-    legendCaptions: locale === "th"
-      ? ["ตำแหน่งของคุณ", "ช่องว่างที่ฟื้นกลับได้", "พื้นที่เติบโตถึง 92"] as const
-      : locale === "zh-CN"
-        ? ["您的位置", "可恢复的差距", "到92分的成长空间"] as const
-        : ["Where you are", "Recoverable gap", "Room to grow to 92"] as const,
+    headline: healthScorePageText(locale, "relativity.gap.headline", {
+      gap,
+      median
+    }),
+    legendCaptions: [
+      healthScorePageText(locale, "relativity.gap.legend.0"),
+      healthScorePageText(locale, "relativity.gap.legend.1"),
+      healthScorePageText(locale, "relativity.gap.legend.2")
+    ] as const,
     mode: "gap" as const,
     spectrumGapLeftPct,
     spectrumGapWidthPct,
@@ -1069,57 +1030,14 @@ function relativity(score: number, percentile: number, median: number, locale: L
     spectrumMedianPct,
     spectrumYou: score,
     spectrumYouPct,
-    sub: locale === "th"
-      ? `${gap} คะแนนนี้มาจากจุดเฉพาะที่ฟื้นกลับได้ และจุดใหญ่ที่สุดเชื่อมกับเป้าหมายที่คุณบอกว่าสำคัญ`
-      : locale === "zh-CN"
-        ? `这 ${gap} 分来自几个具体且可恢复的点，其中最大的部分正好连接到你说最重要的目标。`
-        : `Those ${gap} points are a few specific, recoverable things, and the biggest are exactly the goals you told us mattered most.`
+    sub: healthScorePageText(locale, "relativity.gap.sub", { gap })
   };
 }
 
 function bandLine(score: number, band: string, locale: Locale) {
-  if (locale === "th") {
-    return ({
-      "Building foundation":
-        `${score} ไม่ใช่คำตัดสินสุขภาพของคุณ แต่เป็นเส้นเริ่มต้น และตอนนี้เราเห็นแล้วว่าเส้นนี้อยู่ตรงไหน`,
-      Excellent:
-        `${score} เป็นคะแนนที่ยอดเยี่ยม แผนของคุณจึงเน้นปกป้องและปรับสิ่งที่คุณสร้างไว้ให้คมขึ้น`,
-      "Good, with a clear gap":
-        `${score} เป็นฐานที่ดี พร้อมช่องว่างชัดเจนหนึ่งจุดระหว่างคุณกับระดับถัดไป`,
-      "Needs attention":
-        "นี่คือเส้นเริ่มต้น ไม่ใช่คำตัดสิน และเราเห็นจุดที่ควรเริ่มแล้ว",
-      "Strong, with headroom":
-        `${score} เป็นคะแนนที่แข็งแรง สิ่งที่เหลือคือการปรับละเอียดที่คนส่วนใหญ่ไม่เคยเห็น`
-    }[band] ?? `คะแนนสุขภาพของคุณคือ ${score}`);
-  }
-
-  if (locale === "zh-CN") {
-    return ({
-      "Building foundation":
-        `${score} 分不是对健康的判决，而是一条起跑线。重要的是，我们已经能看清这条线在哪里。`,
-      Excellent:
-        `${score} 分非常出色。你的计划会专注于保护并优化你已经建立的基础。`,
-      "Good, with a clear gap":
-        `${score} 分是很扎实的基础，你和下一个层级之间有一个清晰可命名的缺口。`,
-      "Needs attention":
-        "这是起跑线，不是判决；我们已经看清该从哪里开始。",
-      "Strong, with headroom":
-        `${score} 分很强。剩下的是大多数人从未得到过的精细调整。`
-    }[band] ?? `你的 HealthScore 是 ${score}。`);
-  }
-
-  return ({
-    "Building foundation":
-      `A ${score} is not a verdict on your health. It is a starting line, and the rare thing is that we can see exactly where the line sits.`,
-    Excellent:
-      `A ${score} is excellent. Your plan is about protecting and sharpening what you have built.`,
-    "Good, with a clear gap":
-      `A ${score} is a genuinely solid base, with one clear, nameable gap between you and the next level.`,
-    "Needs attention":
-      "This is a starting line, not a verdict, and we can see exactly where to begin.",
-    "Strong, with headroom":
-      `A ${score} is strong. What is left is the fine-tuning most people never get to.`
-  }[band] ?? `Your HealthScore is ${score}.`);
+  return healthScorePageText(locale, `bandLine.${bandCopyKey(band)}`, {
+    score
+  });
 }
 
 function methodCards(
@@ -1132,60 +1050,32 @@ function methodCards(
       goals.slice(0, 3).map((goal) => localizedGoalPhrase(goal, locale)),
       locale
     ) ||
-    (locale === "th" ? "เป้าหมายของคุณ" : locale === "zh-CN" ? "你的目标" : "your goals");
+    healthScorePageText(locale, "method.goalFallback");
+  const formattedGoalList = locale === "en" ? titleCaseFirst(goalList) : goalList;
   const safetyFinding = findings.find((finding) =>
     ["BLOODTHINNER", "KIDNEY_CEILING", "LIVER_ROUTING", "PPI_B12_MAG", "PREGNANCY", "STATIN_COQ10"].includes(finding.code)
   );
 
   return [
     {
-      body:
-        locale === "th"
-          ? `${goalList} เป็นเลนส์ที่ใช้จัดลำดับคำตอบอื่นๆ เสาหลักที่เกี่ยวกับเป้าหมายจึงมีน้ำหนักมากขึ้น`
-          : locale === "zh-CN"
-            ? `${goalList}会成为解读其他答案的镜头，因此与目标相关的支柱权重更高。`
-            : `${titleCaseFirst(goalList)} become the lens every other answer is read through, which is why goal-linked pillars carry more weight.`,
-      title:
-        locale === "th"
-          ? "เป้าหมายกำหนดทิศทาง"
-          : locale === "zh-CN"
-            ? "你的目标决定方向"
-            : "Your goals set the direction",
+      body: healthScorePageText(locale, "method.card1.body", {
+        goalList: formattedGoalList
+      }),
+      title: healthScorePageText(locale, "method.card1.title"),
       number: 1
     },
     {
-      body:
-        locale === "th"
-          ? "การนอน ความเครียด การเคลื่อนไหว อาหาร กันแดด และการกินปลา ล้วนเปลี่ยนสิ่งที่ควรอยู่ในสูตรและสิ่งที่ควรถูกตัดออก"
-          : locale === "zh-CN"
-            ? "睡眠、压力、活动、饮食、防晒和鱼类摄入都会影响哪些内容适合进入你的方案，哪些应被排除。"
-            : "Sleep, stress, movement, diet, sunscreen, and fish intake all shift what belongs in your formula and what gets ruled out.",
-      title:
-        locale === "th"
-          ? "กิจวัตรเพิ่มบริบท"
-          : locale === "zh-CN"
-            ? "你的日常提供背景"
-            : "Your routine adds the context",
+      body: healthScorePageText(locale, "method.card2.body"),
+      title: healthScorePageText(locale, "method.card2.title"),
       number: 2
     },
     {
       body: safetyFinding
-        ? locale === "th"
-          ? `${safetyFinding.headline.replace(/\.$/, "")} ความปลอดภัยเป็นตัวกรองก่อนคำแนะนำใดๆ`
-          : locale === "zh-CN"
-            ? `${safetyFinding.headline.replace(/[。.]$/, "")}。安全会先于任何建议成为过滤条件。`
-            : `${safetyFinding.headline.replace(/\.$/, "")} Safety is a filter applied before any recommendation.`
-        : locale === "th"
-          ? "คำตอบเรื่องยา การตั้งครรภ์ ไต ตับ และความไวต่อสารต่างๆ เป็นเส้นที่แผนจะไม่ข้าม"
-          : locale === "zh-CN"
-            ? "用药、怀孕或哺乳、肾脏、肝脏和敏感性相关答案会划出计划不能跨越的边界。"
-            : "Medication, pregnancy, kidney, liver, and sensitivity answers draw boundaries the plan will not cross.",
-      title:
-        locale === "th"
-          ? "โปรไฟล์ความปลอดภัยขีดเส้น"
-          : locale === "zh-CN"
-            ? "你的安全资料划定边界"
-            : "Your safety profile draws the lines",
+        ? healthScorePageText(locale, "method.card3.body.withFinding", {
+          findingHeadline: safetyFinding.headline.replace(/[。.]$/, "")
+        })
+        : healthScorePageText(locale, "method.card3.body.default"),
+      title: healthScorePageText(locale, "method.card3.title"),
       number: 3
     }
   ] satisfies HealthScoreMethodCard[];
@@ -1202,117 +1092,42 @@ function subtractionCopy(
       goals.slice(0, 3).map((goal) => localizedGoalPhrase(goal, locale)),
       locale
     ) ||
-    (locale === "th" ? "คะแนนของคุณ" : locale === "zh-CN" ? "你的分数" : "your score");
+    healthScorePageText(locale, "subtraction.goalFallback");
   const constraint = flags.includes("STATIN_COQ10")
-    ? locale === "th" ? "ยา statin ของคุณ" : locale === "zh-CN" ? "你的他汀用药" : "your statin"
+    ? healthScorePageText(locale, "subtraction.constraint.statin")
     : flags.length > 0
-      ? locale === "th"
-        ? "โปรไฟล์ความปลอดภัยของคุณ"
-        : locale === "zh-CN"
-          ? "你的安全资料"
-          : "your safety profile"
-      : locale === "th"
-        ? "บริบทประจำวันของคุณ"
-        : locale === "zh-CN"
-          ? "你的日常背景"
-          : "your daily context";
-
-  if (locale === "th") {
-    return {
-      body:
-        `ตัวอย่างแผนที่ดีไม่ได้เริ่มจากการเพิ่มทุกอย่างที่อาจช่วย แต่เริ่มจากการคัดสิ่งที่ไม่พอดีออกตามคะแนน ${goalList} และ${constraint} ก่อนสร้างสูตรจริง`,
-      labelChosen: "คัดเลือกสำหรับคะแนนของคุณ",
-      labelEvaluated: "ส่วนผสมที่ประเมิน",
-      labelSetAside: "ตัดออกสำหรับคุณ"
-    };
-  }
-
-  if (locale === "zh-CN") {
-    return {
-      body:
-        `好的方案预览不是把所有可能有帮助的东西都加进去，而是先根据你的分数、${goalList}和${constraint}筛掉不适合的内容，再生成最终配方。`,
-      labelChosen: "按您的分数筛选",
-      labelEvaluated: "已评估成分",
-      labelSetAside: "已为你排除"
-    };
-  }
+      ? healthScorePageText(locale, "subtraction.constraint.safety")
+      : healthScorePageText(locale, "subtraction.constraint.context");
 
   return {
-    body:
-      `A good plan preview is not built by adding everything that might help. It first filters out what does not fit your score, ${goalList}, and ${constraint} before the final formula is generated.`,
-    labelChosen: "Shortlisted for your score",
-    labelEvaluated: "ingredients evaluated",
-    labelSetAside: "set aside for you"
+    body: healthScorePageText(locale, "subtraction.body", {
+      constraint,
+      goalList
+    }),
+    labelChosen: healthScorePageText(locale, "subtraction.labelChosen"),
+    labelEvaluated: healthScorePageText(locale, "subtraction.labelEvaluated"),
+    labelSetAside: healthScorePageText(locale, "subtraction.labelSetAside")
   };
 }
 
 function findingsHeadline(count: number, locale: Locale) {
-  if (locale === "th") {
-    return `${count} เรื่องที่แบบทดสอบวิตามินทั่วไปมักมองข้าม`;
-  }
-
-  if (locale === "zh-CN") {
-    return `普通维生素测验常会漏掉的 ${count} 个要点`;
-  }
-
-  return count === 1
-    ? "1 thing a generic vitamin quiz would have missed."
-    : `${count} things a generic vitamin quiz would have missed.`;
+  return healthScorePageText(locale, "findingsHeadline", { count });
 }
 
 function bandPillLabel(band: string, locale: Locale) {
-  const labels: Record<Locale, Record<string, string>> = {
-    en: {
-      "Building foundation": "Building foundation",
-      "Needs attention": "Needs attention",
-      "Good, with a clear gap": "Good, with a clear gap",
-      Strong: "Strong",
-      "Strong, with headroom": "Strong, with headroom",
-      Excellent: "Excellent"
-    },
-    th: {
-      "Building foundation": "กำลังสร้างพื้นฐาน",
-      "Needs attention": "ต้องให้ความสำคัญ",
-      "Good, with a clear gap": "ดี และมีช่องว่างที่ชัดเจน",
-      Strong: "แข็งแรง",
-      "Strong, with headroom": "แข็งแรง และยังพัฒนาได้",
-      Excellent: "ยอดเยี่ยม"
-    },
-    "zh-CN": {
-      "Building foundation": "正在建立基础",
-      "Needs attention": "需要关注",
-      "Good, with a clear gap": "良好，但仍有明显差距",
-      Strong: "强劲",
-      "Strong, with headroom": "较强，仍有提升空间",
-      Excellent: "优秀"
-    }
-  };
-
-  return labels[locale][band] ?? band;
+  return healthScorePageText(locale, `bandPill.${bandCopyKey(band)}`);
 }
 
 function opportunityPill(band: string, percentile: number, locale: Locale) {
   if (percentile >= 80 || band === "Excellent" || band === "Strong, with headroom") {
-    return locale === "th"
-      ? "ระดับสูง"
-      : locale === "zh-CN"
-        ? "顶级"
-        : "Top tier";
+    return healthScorePageText(locale, "opportunity.topTier");
   }
 
   if (band === "Good, with a clear gap") {
-    return locale === "th"
-      ? "ปรับให้คมขึ้นได้"
-      : locale === "zh-CN"
-        ? "可进一步优化"
-        : "Clear refinement";
+    return healthScorePageText(locale, "opportunity.refinement");
   }
 
-  return locale === "th"
-    ? "โอกาสสูง"
-    : locale === "zh-CN"
-      ? "高机会"
-      : "High opportunity";
+  return healthScorePageText(locale, "opportunity.high");
 }
 
 function healthScoreSelectedNutrientCount(answers: NormalizedAnswers) {
@@ -1434,54 +1249,29 @@ function buildPageContent({
       findings: selectedFindings,
       findingsHeadline: findings.length > 0
         ? findingsHeadline(selectedFindings.length, locale)
-        : locale === "th"
-          ? "สิ่งที่คุณทำได้ดีอยู่แล้วก็เป็นส่วนหนึ่งของแผน"
-          : locale === "zh-CN"
-            ? "你已经做得好的地方同样重要。"
-            : "What you are already doing well matters too.",
+        : healthScorePageText(locale, "findingsFallbackHeadline"),
       findingsMode: findings.length > 0 ? "caught" : "strengths",
       findingsSub: findings.length > 0
-        ? locale === "th"
-          ? "แสดงอย่างชัดเจนจากสัญญาณจริงในคำตอบของคุณ"
-          : locale === "zh-CN"
-            ? "这些内容来自你答案中的具体信号，清楚呈现，不做隐藏。"
-            : "Laid out from the specific signals in your answers, nothing held back."
-        : locale === "th"
-          ? "แผนจะรักษาจุดแข็งเหล่านี้ไว้ พร้อมจัดลำดับสิ่งที่ควรปรับ"
-          : locale === "zh-CN"
-            ? "计划会保留这些优势，同时优先处理少数真正值得改变的地方。"
-            : "The plan keeps these strengths intact while it prioritizes the few things worth changing.",
+        ? healthScorePageText(locale, "findingsSub.caught")
+        : healthScorePageText(locale, "findingsSub.strengths"),
       gapTrio: buildGapTrio(pillarsWithNames, answers, locale),
       goalMirror:
         answers.goals.length > 0
-          ? locale === "th"
-            ? `คุณมาที่นี่เพื่อ${localizedList(highlightedGoals, locale)}`
-            : locale === "zh-CN"
-              ? `你来到这里，是为了${localizedList(highlightedGoals, locale)}。`
-              : `You came here for ${localizedList(highlightedGoals, locale)}.`
-          : locale === "th"
-            ? "คุณมาที่นี่เพื่อเข้าใจสุขภาพของตัวเองให้ชัดขึ้น"
-            : locale === "zh-CN"
-              ? "你来到这里，是为了更清楚地理解自己的健康。"
-              : "You came here for a clearer way to understand your health.",
-      heroBody: locale === "th"
-        ? "เราอ่านเป้าหมาย กิจวัตร บริบทความเหมาะสม และชีวิตจริงของคุณ แล้วแปลงเป็นคะแนนเดียวพร้อมรูปแบบที่อยู่ข้างใต้"
-        : locale === "zh-CN"
-          ? "我们读取你的目标、日常习惯、安全背景和真实生活方式，并将它们转化为一个分数及其背后的模式。"
-          : "We read your goals, daily routine, safety context, and the way you actually live, then turned them into one number and the pattern underneath it.",
+          ? healthScorePageText(locale, "goalMirror.withGoals", {
+            goals: localizedList(highlightedGoals, locale)
+          })
+          : healthScorePageText(locale, "goalMirror.default"),
+      heroBody: healthScorePageText(locale, "heroBody"),
       highestLeverage: highestLeverage(pillarsWithNames, answers.goals, locale),
       methodCards: methodCards(answers.goals, selectedFindings, locale),
-      methodHeadline: locale === "th"
-        ? "โมเดลคะแนนคงที่ห้าด้าน ไม่ใช่การเดา และไม่ใช่ค่าเฉลี่ยของคนอื่น"
-        : locale === "zh-CN"
-          ? "这是覆盖五个领域的固定评分模型，不是猜测，也不是陌生人的平均值。"
-          : "A fixed scoring model across five domains, not a guess and not an average of strangers.",
+      methodHeadline: healthScorePageText(locale, "methodHeadline"),
       opportunityPill: opportunityPill(engine.band, percentile, locale),
-      pillarHeadline: locale === "th"
-        ? `เสาหลักที่เชื่อมกับเป้าหมายบอกว่า ${engine.final >= median ? "สิ่งที่เหลือคือการปรับให้คมขึ้น" : "ควรเริ่มจากจุดไหนก่อน"}`
-        : locale === "zh-CN"
-          ? `与你目标相关的支柱显示${engine.final >= median ? "哪里仍值得精细优化" : "计划应该从哪里开始"}。`
-          : `Your goal-linked pillars show ${engine.final >= median ? "where refinement still matters" : "where the plan should start"}.`,
+      pillarHeadline: healthScorePageText(
+        locale,
+        engine.final >= median
+          ? "pillarHeadline.refinement"
+          : "pillarHeadline.start"
+      ),
       relativity: relative,
       strengthNote: strengthNote(pillarsWithNames, locale),
       subtraction: {
@@ -1519,44 +1309,23 @@ function buildPageContent({
 }
 
 function summaryForScore(score: number, lowest: HealthScoreDomain, locale: Locale) {
-  if (locale === "th") {
-    return `พื้นที่ที่ควรให้ความสำคัญที่สุดคือ ${lowest.label} คะแนนนี้ช่วยให้เราเห็นรูปแบบที่ควรเริ่มก่อน`;
-  }
-
-  if (locale === "zh-CN") {
-    return `你最清晰的机会点是${lowest.label}。这个分数帮助我们围绕真实缺口确定计划优先级。`;
-  }
-
-  return `Your clearest opportunity is ${lowest.label.toLowerCase()}. This score helps us prioritise the plan around your actual gaps.`;
+  return healthScorePageText(locale, "summary", {
+    lowestLabel: locale === "en" ? lowest.label.toLowerCase() : lowest.label
+  });
 }
 
 function headlineForScore(score: number, locale: Locale) {
-  if (locale === "th") {
-    if (score >= 82) return "พื้นฐานสุขภาพของคุณแข็งแรงมาก";
-    if (score >= 70) return "คุณมีพื้นฐานที่ดีและยังปรับให้เฉพาะตัวได้อีก";
-    if (score >= 58) return "มีฐานที่ดีพร้อมช่องว่างที่ชัดเจน";
-    if (score >= 46) return "นี่คือจุดเริ่มต้นที่ชัดเจน";
-    return "มีโอกาสปรับปรุงพื้นฐานที่ชัดเจน";
-  }
+  if (score >= 82) return healthScorePageText(locale, "headline.excellent");
+  if (score >= 70) return healthScorePageText(locale, "headline.strong");
+  if (score >= 58) return healthScorePageText(locale, "headline.good");
+  if (score >= 46) return healthScorePageText(locale, "headline.building");
 
-  if (locale === "zh-CN") {
-    if (score >= 82) return "你的健康基础非常出色。";
-    if (score >= 70) return "你的基础很强，并且还有个性化优化空间。";
-    if (score >= 58) return "你的基础扎实，同时有一个清晰缺口。";
-    if (score >= 46) return "这是一个清晰的起点。";
-    return "基础层面有明确的改善机会。";
-  }
-
-  if (score >= 82) return "You have an excellent health foundation.";
-  if (score >= 70) return "You have a strong base with room to personalise.";
-  if (score >= 58) return "You have a solid base with a clear gap.";
-  if (score >= 46) return "You have a clear starting point.";
-  return "There is a clear opportunity to improve the fundamentals.";
+  return healthScorePageText(locale, "headline.needs");
 }
 
 function buildDomains(result: EngineResult, locale: Locale): HealthScoreDomain[] {
   return result.pillars.map((pillar) => ({
-    description: PILLAR_DESCRIPTION[pillar.name][locale],
+    description: localizedPillarDescription(pillar.name, locale),
     id: pillar.id,
     label: pillarLabel(pillar.name, locale),
     score: Math.round(pillar.pct * 100)
@@ -1569,18 +1338,10 @@ function buildMovers(domains: readonly HealthScoreDomain[], locale: Locale): Hea
     .sort((first, second) => first.score - second.score)
     .slice(0, 3)
     .map((domain) => ({
-      impact:
-        locale === "th"
-          ? "ผลกระทบสูง"
-          : locale === "zh-CN"
-            ? "高影响"
-            : "High impact",
-      label:
-        locale === "th"
-          ? `ปรับปรุง ${domain.label}`
-          : locale === "zh-CN"
-            ? `改善${domain.label}`
-            : `Improve ${domain.label.toLowerCase()}`
+      impact: healthScorePageText(locale, "mover.impact"),
+      label: healthScorePageText(locale, "mover.label", {
+        domainLabel: locale === "en" ? domain.label.toLowerCase() : domain.label
+      })
     }));
 }
 

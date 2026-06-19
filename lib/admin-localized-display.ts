@@ -2,6 +2,7 @@ import type { AdminFoodRow } from "@/lib/admin-foods";
 import type { AdminProductRow } from "@/lib/admin-products";
 import type { AdminSupplementRow } from "@/lib/admin-supplements";
 import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n-messages";
 
 export type AdminLocalizedText = Readonly<{
   canonicalValue: string | null;
@@ -158,13 +159,5 @@ export function adminLocalizedFallbackLabel(
     return null;
   }
 
-  if (locale === "zh-CN") {
-    return "缺少翻译";
-  }
-
-  if (locale === "th") {
-    return "ขาดคำแปล";
-  }
-
-  return "Missing translation";
+  return t(locale, "admin.localizedDisplay.missingTranslation");
 }

@@ -24,6 +24,7 @@ import {
 } from "@/lib/supplement-safety-flags";
 import { supplementDoseUnits } from "@/lib/supplement-dose-units";
 import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n-messages";
 import {
   supplementDoseSuggestionTimeoutMs,
   type AdminContent
@@ -563,21 +564,12 @@ function supplementSelectionSummary(row: AdminSupplementRow, locale: Locale) {
   const topDose = stats.topDoses[0]?.label;
   const chosen = formatter.format(stats.chosenPlanCount);
 
-  if (locale === "th") {
-    return topDose
-      ? `ถูกเลือกใน ${chosen} แผน · ขนาดที่พบบ่อย ${topDose}`
-      : `ถูกเลือกใน ${chosen} แผน`;
-  }
-
-  if (locale === "zh-CN") {
-    return topDose
-      ? `已在 ${chosen} 个计划中选择 · 常见剂量 ${topDose}`
-      : `已在 ${chosen} 个计划中选择`;
-  }
-
   return topDose
-    ? `Chosen in ${chosen} plans · top dose ${topDose}`
-    : `Chosen in ${chosen} plans`;
+    ? t(locale, "admin.supplementSelectionSummary.chosenWithDose", {
+        chosen,
+        topDose
+      })
+    : t(locale, "admin.supplementSelectionSummary.chosen", { chosen });
 }
 
 export function SupplementListMeta({
@@ -663,6 +655,12 @@ export function SupplementDetailsModal({
   const trimmedNewAlias = newAlias.trim();
   const localized = adminLocalizedSupplementText(draft, locale);
   const fallbackLabel = adminLocalizedFallbackLabel(localized.name, locale);
+  const supplementSelectionCopy = {
+    chosenPlans: t(locale, "admin.supplementSelectionSummary.chosenPlans"),
+    lastChosen: t(locale, "admin.supplementSelectionSummary.lastChosen"),
+    safetyHidden: t(locale, "admin.supplementSelectionSummary.safetyHidden"),
+    title: t(locale, "admin.supplementSelectionSummary.title")
+  };
 
   async function addAssociation() {
     if (!onAddAssociation || !trimmedNewAlias || addingAssociation) {
@@ -822,27 +820,23 @@ export function SupplementDetailsModal({
             {draft.selectionStats ? (
               <div className="rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
                 <p className="text-xs font-semibold tracking-normal text-emerald-700">
-                  {locale === "th"
-                    ? "การเลือกโดย AI"
-                    : locale === "zh-CN"
-                      ? "AI 选择"
-                      : "AI selections"}
+                  {supplementSelectionCopy.title}
                 </p>
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <SupplementListMeta
-                    label={locale === "th" ? "แผนที่เลือก" : locale === "zh-CN" ? "已选计划" : "Chosen plans"}
+                    label={supplementSelectionCopy.chosenPlans}
                     value={new Intl.NumberFormat(formatLocale(locale)).format(
                       draft.selectionStats.chosenPlanCount
                     )}
                   />
                   <SupplementListMeta
-                    label={locale === "th" ? "ซ่อนเพื่อความปลอดภัย" : locale === "zh-CN" ? "因安全隐藏" : "Safety hidden"}
+                    label={supplementSelectionCopy.safetyHidden}
                     value={new Intl.NumberFormat(formatLocale(locale)).format(
                       draft.selectionStats.safetyHiddenCount
                     )}
                   />
                   <SupplementListMeta
-                    label={locale === "th" ? "ล่าสุด" : locale === "zh-CN" ? "最近选择" : "Last chosen"}
+                    label={supplementSelectionCopy.lastChosen}
                     value={
                       draft.selectionStats.lastSelectedAt
                         ? new Intl.DateTimeFormat(formatLocale(locale), {

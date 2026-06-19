@@ -1,4 +1,32 @@
 import { closeSqlPool, getSql } from "@/lib/db";
+import { siteLocaleRegistry } from "@/lib/i18n";
+
+function sqlLiteral(value: string | null) {
+  return value === null ? "null" : `'${value.replaceAll("'", "''")}'`;
+}
+
+function sqlBoolean(value: boolean) {
+  return value ? "true" : "false";
+}
+
+function siteLocaleValuesSql() {
+  return siteLocaleRegistry
+    .map((locale) =>
+      [
+        sqlLiteral(locale.code),
+        sqlLiteral(locale.label),
+        sqlLiteral(locale.nativeLabel),
+        sqlLiteral(locale.htmlLang),
+        sqlLiteral(locale.direction),
+        sqlLiteral(locale.fallbackLocale),
+        sqlBoolean(locale.isPublic),
+        sqlBoolean(locale.isIndexable),
+        locale.sortOrder
+      ].join(", ")
+    )
+    .map((row) => `  (${row})`)
+    .join(",\n");
+}
 
 const schemaSql = `
 create table if not exists public.site_locales (
@@ -44,9 +72,7 @@ insert into public.site_locales (
   sort_order
 )
 values
-  ('en', 'EN', 'English', 'en', 'ltr', null, true, true, 10),
-  ('th', 'TH', 'ไทย', 'th', 'ltr', 'en', true, true, 20),
-  ('zh-CN', '中文', '简体中文', 'zh-CN', 'ltr', 'en', true, true, 30)
+${siteLocaleValuesSql()}
 on conflict (code) do update set
   label = excluded.label,
   native_label = excluded.native_label,
